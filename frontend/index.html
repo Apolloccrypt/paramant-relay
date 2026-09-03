@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
+<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0B3A6A">
 <title>ParaSign by Paramant &middot; sign and send documents in the EU</title>
@@ -25,103 +25,110 @@
 <link rel="stylesheet" href="/design-system.css?v=25">
 <link rel="stylesheet" href="/nav.css?v=20">
 <style>
-/* Homepage 2026: the vanishing document. Paper, ink, one accent, one dark object per screen. */
+/* Homepage 2026, night edition: the same hand as BeerWeer. Warm night ground,
+   cream ink, one ochre accent, mono for the small facts, a drawn band at the
+   top. One column, 780px, so nothing has to shout. */
 :root{
-  --hp-paper:#FAF8F3; --hp-paper-2:#F3F0E8; --hp-ink:#0C1B2A; --hp-ink-2:#3F4D5C; --hp-ink-3:#5F6B78;
-  --hp-line:rgba(12,27,42,.12); --hp-line-2:rgba(12,27,42,.22); --hp-night:#0C1622; --hp-night-2:#13233A;
-  --hp-cobalt:#1D4ED8; --hp-cobalt-2:#173FB3; --hp-lime:#B2FF3F; --hp-lime-ink:#5C7A12;
-  --hp-sans:var(--sans, Inter, system-ui, -apple-system, "Segoe UI", sans-serif);
+  --tint:234,226,206; --cream:#EAE2CE; --night:#15191C; --night-2:#101316;
+  --fg:var(--cream); --fg-mid:rgba(var(--tint),.8); --fg-dim:rgba(var(--tint),.62);
+  --line:rgba(var(--tint),.16); --line-2:rgba(var(--tint),.32); --card:rgba(var(--tint),.045); --card-line:rgba(var(--tint),.14);
+  --ochre:#D9A441; --ochre-2:#C7912E; --petrol:#155E75; --teal:#8FB3C4; --brick:#C4604F;
+  --paper:#F1EAD6; --paper-2:#E7DDC4; --paper-ink:#1B1F22; --paper-ink-2:#4A4A44;
+  --r:16px; --pad:clamp(16px,4vw,28px); --maxw:780px;
+  /* the design system's tokens, re-pointed so the nav, the menu and the footer follow the page */
+  --bone:var(--night); --bone-2:var(--night-2); --ink:var(--cream); --ink-2:var(--fg-mid); --ink-dim:var(--fg-dim);
+  --ink-hair:var(--line); --ink-ghost:rgba(var(--tint),.06); --cobalt:var(--ochre); --cobalt-2:var(--ochre-2); --lime:var(--ochre); --navy:var(--cream); --navy-2:var(--cream); --ochre-ink:#8A5E10;
+  --hp-paper:var(--night); --hp-paper-2:var(--night-2); --hp-ink:var(--cream); --hp-ink-2:var(--fg-mid); --hp-ink-3:var(--fg-dim);
+  --hp-line:var(--line); --hp-line-2:var(--line-2); --hp-night:var(--paper); --hp-night-2:var(--paper-2);
+  --hp-cobalt:var(--ochre); --hp-cobalt-2:var(--ochre-2); --hp-lime:var(--ochre); --hp-lime-ink:var(--ochre);
+  --hp-sans:var(--sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
   --hp-mono:var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
 }
-html{background:var(--hp-paper)}
-body{background:var(--hp-paper);color:var(--hp-ink);font-family:var(--hp-sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+html{background:var(--night)}
+body{background:linear-gradient(180deg,var(--night) 0,var(--night-2) 100%);color:var(--fg);font-family:var(--hp-sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 main{display:block;overflow:hidden}
-.hp-wrap{width:min(100% - 40px, 1120px);margin-inline:auto}
-@media (min-width:760px){.hp-wrap{width:min(100% - 80px, 1120px)}}
-.hp-kicker{font-family:var(--hp-mono);font-size:12px;letter-spacing:.06em;color:var(--hp-ink-3);margin:0 0 14px;display:flex;align-items:center;gap:10px}
-.hp-kicker::before{content:"";width:22px;height:2px;background:var(--hp-lime);border-radius:1px}
-.hp-h2{font-size:clamp(1.65rem, 2.6vw + .8rem, 3rem);line-height:1.06;letter-spacing:-.025em;font-weight:700;color:var(--hp-ink);margin:0;max-width:20ch}
-.hp-lede{font-size:clamp(1rem, .35vw + .9rem, 1.15rem);line-height:1.6;color:var(--hp-ink-2);margin:16px 0 0;max-width:56ch}
-.hp-sec{padding:64px 0;scroll-margin-top:64px}
-@media (min-width:900px){.hp-sec{padding:88px 0}}
-.hp-sec + .hp-sec{border-top:1px solid var(--hp-line)}
+nav.nav{background:var(--night);border-bottom-color:var(--line)}
+nav.nav .nav-logo .logo-para{color:var(--cream)}
+nav.nav .nav-logo .logo-mant{color:var(--ochre)}
+.btn,.btn-primary,nav.nav a.nav-cta,.nav-mobile-cta .btn{color:#141414}
+.hp-wrap{width:min(100% - 2*var(--pad), var(--maxw));margin-inline:auto}
+.hp-kicker{font-family:var(--hp-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-dim);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+.hp-kicker::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--fg-dim)}
+.hp-h2{font-size:clamp(1.6rem, 2.2vw + .8rem, 2.5rem);line-height:1.1;letter-spacing:-.02em;font-weight:700;color:var(--fg);margin:0;max-width:22ch}
+.hp-lede{font-size:clamp(1rem, .3vw + .9rem, 1.1rem);line-height:1.65;color:var(--fg-mid);margin:14px 0 0;max-width:58ch}
+.hp-sec{padding:56px 0;scroll-margin-top:64px}
+@media (min-width:900px){.hp-sec{padding:72px 0}}
+.hp-sec + .hp-sec{border-top:1px solid var(--line)}
+.home-hero + .check-sec{border-top:0}
 
-/* buttons: one filled, one hairline */
-.hp-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:3px;font-size:14.5px;font-weight:600;text-decoration:none;line-height:1;transition:background .15s,color .15s,border-color .15s,transform .15s;white-space:nowrap}
-.hp-btn-fill{background:var(--hp-cobalt);color:#fff;border:1px solid var(--hp-cobalt)}
-.hp-btn-fill:hover{background:var(--hp-cobalt-2);border-color:var(--hp-cobalt-2)}
-.hp-btn-line{background:transparent;color:var(--hp-ink);border:1px solid var(--hp-line-2)}
-.hp-btn-line:hover{border-color:var(--hp-ink);background:rgba(12,27,42,.03)}
-.hp-btn-paper{background:var(--hp-paper);color:var(--hp-ink);border:1px solid var(--hp-paper)}
-.hp-btn-paper:hover{background:#fff}
-.hp-btn:focus-visible{outline:3px solid rgba(29,78,216,.35);outline-offset:2px}
+/* buttons: one ochre, one hairline */
+.hp-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 18px;border-radius:12px;font-size:15px;font-weight:600;text-decoration:none;line-height:1;transition:background .15s,color .15s,border-color .15s,transform .15s;white-space:nowrap}
+.hp-btn-fill{background:var(--ochre);color:#141414;border:1px solid var(--ochre)}
+.hp-btn-fill:hover{background:var(--ochre-2);border-color:var(--ochre-2)}
+.hp-btn-line{background:var(--card);color:var(--fg);border:1px solid var(--line-2)}
+.hp-btn-line:hover{border-color:var(--fg);background:rgba(var(--tint),.09)}
+.hp-btn-paper{background:var(--paper-ink);color:var(--cream);border:1px solid var(--paper-ink)}
+.hp-btn-paper:hover{background:#000}
+.hp-btn:focus-visible{outline:3px solid rgba(217,164,65,.5);outline-offset:2px}
 .hp-btn:active{transform:translateY(1px)}
 
 /* ---------- signed in: the hero is the whole page ----------
    js/home-auth.js stamps data-session="in" on <html> once the session check
    comes back authenticated. Everything under the hero is the sales page, and a
-   customer who has already bought does not need to be sold to: on a phone the
-   three actions were followed by eight screens of pitch, ending in the founder
-   letter. The selector names the sections rather than a list of ids, so a
-   section added tomorrow is covered the day it lands. The nav, the hero and
-   the footer stay; the footer is where the legal documents are. Signed out,
-   nothing here applies and the page is exactly what it was. */
+   customer who has already bought does not need to be sold to. The nav, the
+   band, the hero and the footer stay; the footer is where the legal documents
+   are. The art is retired signed in: .hp-doc draws past the box .hp-art
+   reserves, which is invisible while the page continues underneath and a cut
+   document the moment the hero is the last thing in <main>. */
 html[data-session="in"] main > section:not(.home-hero){display:none}
-/* The art goes with the pitch it illustrates. It is a document that gets
-   signed, sealed and then burns, on a 16-second loop, and it exists to explain
-   the product to someone who does not have it yet. It is also the reason the
-   hero cannot simply be made shorter: .hp-doc is absolutely positioned and
-   draws about 120px BELOW the 380px box .hp-art reserves for it, which is
-   invisible while the sales page continues underneath and becomes a document
-   cut in half the moment the hero is the last thing in <main> (main has
-   overflow:hidden). Measured at 1440 signed in: hero 472px, .hp-doc bottom 80px
-   past it, receipt and signature sliced through. A phone has hidden this art
-   since it shipped, for its own reason; signed in, every width does. */
 html[data-session="in"] .hp-art{display:none}
-/* With the art gone the second grid column is empty, so the hero is one column
-   at every width. The wrap keeps its own 1120px width, which is what lines the
-   hero up with the nav and the footer; the heading, the lede and the founder
-   line carry their own ch-based measures, so nothing stretches. */
 html[data-session="in"] .home-hero .hp-wrap{grid-template-columns:minmax(0,1fr)}
 html[data-session="in"] .home-hero{padding-bottom:56px}
 
+/* ---------- the band: Harderwijk at first light, one sealed letter on the quay ---------- */
+.hp-band{position:relative;height:clamp(132px,34vw,230px);overflow:hidden;background:var(--paper-2);border-bottom:1px solid var(--line)}
+.hp-band svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hp-band-tag{position:absolute;right:var(--pad);top:14px;font-family:var(--hp-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(27,31,34,.82);display:flex;align-items:center;gap:8px}
+.hp-band-tag::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--ochre)}
+@media (min-width:900px){.hp-band-tag{right:max(var(--pad), calc((100% - var(--maxw)) / 2))}}
+
 /* ---------- hero ---------- */
-.home-hero{position:relative;padding:28px 0 32px;background:linear-gradient(180deg,#F8FAFC 0,var(--hp-paper) 160px)}
+.home-hero{position:relative;padding:24px 0 28px}
 .home-hero .hp-wrap{position:relative;display:grid;gap:28px}
 .home-state{position:relative;z-index:2}
-.home-hero h1,.home-hero .paramant-h1{font-size:clamp(1.85rem, 5vw + .5rem, 4.6rem);line-height:1.02;letter-spacing:-.03em;font-weight:700;color:var(--hp-ink);margin:0;max-width:14ch;text-wrap:balance}
-.home-hero .lede{font-size:clamp(.95rem, .4vw + .85rem, 1.2rem);line-height:1.55;color:var(--hp-ink-2);margin:16px 0 0;max-width:46ch}
-.home-hero .lede strong{color:var(--hp-ink);font-weight:600}
-.home-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
-.hero-note{font-size:13px;line-height:1.5;color:var(--hp-ink-3);margin:14px 0 0;max-width:46ch}
-.hero-note b{color:var(--hp-ink);font-weight:600}
-.hero-by{display:flex;align-items:center;gap:12px;margin:18px 0 0;padding-top:16px;border-top:1px solid var(--hp-line);font-size:13px;line-height:1.45;color:var(--hp-ink-2);max-width:52ch}
-.hero-by .hp-mono{font-family:var(--hp-mono);font-size:11px;color:var(--hp-ink-3);letter-spacing:.04em}
-.hero-by strong{color:var(--hp-ink);font-weight:600}
-.hero-by .by-mark{flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:1px solid var(--hp-line-2);display:grid;place-items:center;font-family:var(--hp-mono);font-size:11px;color:var(--hp-ink);background:#fff}
-.home-hi-name{color:var(--hp-cobalt)}
-.hp-proof{font-size:14px;line-height:1.5;color:var(--hp-ink-2);margin:12px 0 0;max-width:40ch}
-@media (min-width:760px){.hp-proof{display:none}}
+.home-hero h1,.home-hero .paramant-h1{font-size:clamp(1.7rem, 3.6vw + .5rem, 3.4rem);line-height:1.06;letter-spacing:-.025em;font-weight:700;color:var(--fg);margin:0;max-width:16ch;text-wrap:balance}
+.home-hero .lede{font-size:clamp(1rem, .35vw + .9rem, 1.15rem);line-height:1.6;color:var(--fg-mid);margin:18px 0 0;max-width:48ch}
+.home-hero .lede strong{color:var(--fg);font-weight:600}
+.home-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+.hero-note{font-size:13.5px;line-height:1.5;color:var(--fg-dim);margin:12px 0 0;max-width:46ch}
+.hero-note b{color:var(--fg);font-weight:600}
+.hero-by{display:flex;align-items:center;gap:12px;margin:16px 0 0;padding-top:14px;border-top:1px solid var(--line);font-size:13.5px;line-height:1.45;color:var(--fg-mid);max-width:52ch}
+.hero-by .hp-mono{font-family:var(--hp-mono);font-size:11px;color:var(--fg-dim);letter-spacing:.04em}
+.hero-by strong{color:var(--fg);font-weight:600}
+.hero-by .by-mark{flex:0 0 auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line-2);display:grid;place-items:center;font-family:var(--hp-mono);font-size:11px;color:var(--fg);background:var(--card)}
+.home-hi-name{color:var(--ochre)}
+.hp-proof{font-size:14.5px;line-height:1.5;color:var(--fg-mid);margin:10px 0 0;max-width:40ch}
+@media (min-width:900px){.hp-proof{display:none}}
 
-/* the art: a document that gets signed, sealed, and then is gone */
+/* the art: a document that gets signed, sealed, and then is gone. Desktop only; on a phone the band is the picture. */
 .hp-art{position:relative;z-index:1;height:150px;pointer-events:none;user-select:none}
 .hp-art-glow{position:absolute;inset:-40% -20%;background:
-  radial-gradient(40% 50% at 70% 40%, rgba(29,78,216,.10), transparent 70%),
-  radial-gradient(30% 40% at 30% 70%, rgba(178,255,63,.16), transparent 70%);filter:blur(10px)}
-.hp-doc{position:absolute;left:50%;top:0;width:min(260px, 62vw);aspect-ratio:1/1.32;transform:translateX(-50%) rotate(-4deg);background:#fff;border:1px solid var(--hp-line);border-radius:3px;box-shadow:0 30px 60px -30px rgba(12,27,42,.35), 0 1px 0 rgba(12,27,42,.05);padding:9% 9% 12%;display:flex;flex-direction:column;gap:7%;
+  radial-gradient(40% 50% at 70% 40%, rgba(217,164,65,.14), transparent 70%),
+  radial-gradient(30% 40% at 30% 70%, rgba(21,94,117,.35), transparent 70%);filter:blur(12px)}
+.hp-doc{position:absolute;left:50%;top:0;width:min(260px, 62vw);aspect-ratio:1/1.32;transform:translateX(-50%) rotate(-4deg);background:var(--paper);border:1px solid rgba(0,0,0,.2);border-radius:4px;box-shadow:0 30px 60px -30px rgba(0,0,0,.8);padding:9% 9% 12%;display:flex;flex-direction:column;gap:7%;
   -webkit-mask-image:linear-gradient(180deg,#000 0,#000 58%,rgba(0,0,0,.55) 74%,transparent 100%);mask-image:linear-gradient(180deg,#000 0,#000 58%,rgba(0,0,0,.55) 74%,transparent 100%);
   -webkit-mask-size:100% 300%;mask-size:100% 300%;-webkit-mask-position:0 0;mask-position:0 0;
   animation:hp-burn 16s ease-in-out infinite}
-.hp-doc i{display:block;height:5%;border-radius:2px;background:var(--hp-paper-2)}
-.hp-doc i.t{height:9%;width:62%;background:var(--hp-ink);opacity:.9}
+.hp-doc i{display:block;height:5%;border-radius:2px;background:rgba(27,31,34,.12)}
+.hp-doc i.t{height:9%;width:62%;background:var(--paper-ink);opacity:.9}
 .hp-doc i.w1{width:92%} .hp-doc i.w2{width:78%} .hp-doc i.w3{width:86%} .hp-doc i.w4{width:54%}
 .hp-doc svg{width:56%;height:auto;margin-top:auto;overflow:visible}
-.hp-doc svg path{fill:none;stroke:var(--hp-cobalt);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:420;stroke-dashoffset:420;animation:hp-sign 16s ease-in-out infinite}
-.hp-seal{position:absolute;right:8%;top:7%;width:19%;aspect-ratio:1;border-radius:50%;border:1.5px solid var(--hp-lime-ink);background:radial-gradient(circle at 50% 50%, rgba(178,255,63,.55), rgba(178,255,63,.12) 60%, transparent 62%);display:grid;place-items:center;font-family:var(--hp-mono);font-size:8px;color:var(--hp-lime-ink);letter-spacing:.08em;transform:scale(0);animation:hp-seal 16s ease-in-out infinite}
+.hp-doc svg path{fill:none;stroke:var(--petrol);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:420;stroke-dashoffset:420;animation:hp-sign 16s ease-in-out infinite}
+.hp-seal{position:absolute;right:8%;top:7%;width:19%;aspect-ratio:1;border-radius:50%;border:1.5px solid var(--ochre-2);background:radial-gradient(circle at 50% 50%, rgba(217,164,65,.9), rgba(217,164,65,.5) 60%, transparent 62%);display:grid;place-items:center;font-family:var(--hp-mono);font-size:8px;color:#141414;letter-spacing:.08em;transform:scale(0);animation:hp-seal 16s ease-in-out infinite}
 .hp-dust{position:absolute;left:50%;top:0;width:min(260px, 62vw);height:100%;transform:translateX(-50%);background-image:
-  radial-gradient(circle, rgba(12,27,42,.55) 1px, transparent 1.6px),
-  radial-gradient(circle, rgba(29,78,216,.5) 1px, transparent 1.6px),
-  radial-gradient(circle, rgba(12,27,42,.35) .8px, transparent 1.4px);
+  radial-gradient(circle, rgba(234,226,206,.6) 1px, transparent 1.6px),
+  radial-gradient(circle, rgba(217,164,65,.6) 1px, transparent 1.6px),
+  radial-gradient(circle, rgba(234,226,206,.35) .8px, transparent 1.4px);
   background-size:23px 29px, 37px 41px, 17px 19px;background-position:0 0, 9px 13px, 5px 3px;opacity:0;
   -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 40%,#000 70%,transparent 100%);mask-image:linear-gradient(180deg,transparent 0,#000 40%,#000 70%,transparent 100%);
   animation:hp-dust 16s ease-in-out infinite}
@@ -134,141 +141,132 @@ html[data-session="in"] .home-hero{padding-bottom:56px}
   .hp-doc{-webkit-mask-position:0 0;mask-position:0 0;opacity:1}
   .hp-doc svg path{stroke-dashoffset:0}.hp-seal{transform:scale(1)}.hp-dust{opacity:0}
 }
-@media (max-width:759px){
-  /* On a phone the document would sit over the heading at 320 and 360 wide, so the art is desktop only. */
+@media (max-width:899px){
   .hp-art{display:none}
   .home-hero .hp-wrap{gap:0}
 }
 @media print{.hp-art{display:none}}
-@media (min-width:760px){
-  .home-hero{padding:56px 0 64px}
-  .home-hero .hp-wrap{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);align-items:center;gap:40px}
+@media (min-width:900px){
+  .home-hero{padding:56px 0 56px}
+  .home-hero .hp-wrap{width:min(100% - 2*var(--pad), 1040px);grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);align-items:center;gap:40px}
   .hp-art{height:min(380px,38vw)}
-  .hp-doc,.hp-dust{width:min(360px,34vw);top:6%}
+  .hp-doc,.hp-dust{width:min(340px,32vw);top:6%}
 }
-@media (min-width:1100px){.home-hero{padding:40px 0 36px}.hp-btn{min-height:48px;padding:0 22px;font-size:15px}}
+@media (min-width:1100px){.hp-btn{min-height:48px;padding:0 22px;font-size:15px}}
 
 /* the receipt that stays while the document dissolves */
-.hp-receipt{position:absolute;right:2%;bottom:8px;width:min(230px,22vw);background:#fff;border:1px solid var(--hp-line);border-radius:3px;box-shadow:0 24px 50px -28px rgba(12,27,42,.35);padding:14px 14px 12px;transform:rotate(3deg);font-family:var(--hp-mono);font-size:10px;letter-spacing:.04em;color:var(--hp-ink-3);z-index:3}
-.hp-receipt .rc-head{display:flex;justify-content:space-between;align-items:baseline;color:var(--hp-ink);font-weight:600;margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed var(--hp-line-2)}
-.hp-receipt .rc-head span:last-child{color:var(--hp-lime-ink)}
+.hp-receipt{position:absolute;right:2%;bottom:8px;width:min(230px,22vw);background:var(--night-2);border:1px solid var(--line-2);border-radius:10px;box-shadow:0 24px 50px -28px rgba(0,0,0,.9);padding:14px 14px 12px;transform:rotate(3deg);font-family:var(--hp-mono);font-size:10px;letter-spacing:.04em;color:var(--fg-dim);z-index:3}
+.hp-receipt .rc-head{display:flex;justify-content:space-between;align-items:baseline;color:var(--fg);font-weight:600;margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed var(--line-2)}
+.hp-receipt .rc-head span:last-child{color:var(--ochre)}
 .hp-receipt .rc-row{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;margin:0 0 7px;opacity:0;transform:translateY(4px);animation:hp-row .5s ease-out forwards}
 .hp-receipt .rc-row:nth-child(2){animation-delay:.6s}.hp-receipt .rc-row:nth-child(3){animation-delay:1.1s}.hp-receipt .rc-row:nth-child(4){animation-delay:1.6s}
-.hp-receipt .rc-row i{display:block;height:6px;border-radius:2px;background:var(--hp-paper-2)}
-.hp-receipt .rc-foot{margin-top:10px;padding-top:8px;border-top:1px dashed var(--hp-line-2);color:var(--hp-ink-2);font-family:var(--hp-sans);font-size:11px;letter-spacing:0;line-height:1.35;opacity:0;animation:hp-row .5s ease-out 2.1s forwards}
+.hp-receipt .rc-row i{display:block;height:6px;border-radius:2px;background:rgba(var(--tint),.18)}
+.hp-receipt .rc-foot{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line-2);color:var(--fg-mid);font-family:var(--hp-sans);font-size:11px;letter-spacing:0;line-height:1.35;opacity:0;animation:hp-row .5s ease-out 2.1s forwards}
 @keyframes hp-row{to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.hp-receipt .rc-row,.hp-receipt .rc-foot{animation:none;opacity:1;transform:none}}
 
-/* ---------- the letter ---------- */
-.letter{font-size:16px;line-height:1.65;color:#D5DDE6;max-width:46ch}
-.letter p{margin:0 0 14px;color:#D5DDE6;font-size:16px}
-.letter-sign{margin-top:22px;padding-top:16px;border-top:1px solid rgba(255,255,255,.14);display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center}
-.letter-sign .by-mark{width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.3);display:grid;place-items:center;font-family:var(--hp-mono);font-size:12px;color:#fff}
-.letter-sign .who{color:#fff;font-weight:600;font-size:15px;display:block}
-.letter-sign .role{color:#B9C5D3;font-size:13.5px;line-height:1.45;display:block}
+/* ---------- the letter: real paper on the night desk ---------- */
+.letter{font-size:16px;line-height:1.65;color:var(--paper-ink-2);max-width:46ch}
+.letter p{margin:0 0 14px;color:var(--paper-ink-2);font-size:16px}
+.letter-sign{margin-top:22px;padding-top:16px;border-top:1px solid rgba(27,31,34,.18);display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center}
+.letter-sign .by-mark{width:38px;height:38px;border-radius:50%;border:1px solid rgba(27,31,34,.35);display:grid;place-items:center;font-family:var(--hp-mono);font-size:12px;color:var(--paper-ink)}
+.letter-sign .who{color:var(--paper-ink);font-weight:600;font-size:15px;display:block}
+.letter-sign .role{color:var(--paper-ink-2);font-size:13.5px;line-height:1.45;display:block}
 
-/* ---------- check it yourself ---------- */
-.check-sec{background:var(--hp-paper-2)}
-.check-grid{list-style:none;margin:32px 0 0;padding:0;display:grid;gap:1px;background:var(--hp-line);border:1px solid var(--hp-line);border-radius:6px;overflow:hidden}
-@media (min-width:760px){.check-grid{grid-template-columns:1fr 1fr}}
-@media (min-width:1100px){.check-grid{grid-template-columns:repeat(5,1fr)}}
-.check-grid li{background:#fff;padding:22px 20px 20px;display:flex;flex-direction:column;gap:8px}
-.check-grid .ck-fact{font-size:17px;font-weight:600;letter-spacing:-.015em;color:var(--hp-ink);line-height:1.25}
-.check-grid .ck-how{font-size:14px;line-height:1.5;color:var(--hp-ink-2);margin:0;flex:1}
-.check-grid a{font-size:14px;font-weight:600;color:var(--hp-cobalt);text-decoration:none;padding:6px 0;display:inline-block}
+/* ---------- check it yourself: one list, no boxes ---------- */
+.check-sec{background:transparent}
+.check-grid{list-style:none;margin:28px 0 0;padding:0;display:grid;gap:0;border-top:1px solid var(--line)}
+.check-grid li{padding:20px 0;border-bottom:1px solid var(--line);display:grid;gap:6px}
+@media (min-width:760px){.check-grid li{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) auto;gap:24px;align-items:baseline}}
+.check-grid .ck-fact{font-size:17px;font-weight:600;letter-spacing:-.01em;color:var(--fg);line-height:1.3}
+.check-grid .ck-how{font-size:14.5px;line-height:1.5;color:var(--fg-mid);margin:0}
+.check-grid a{font-family:var(--hp-mono);font-size:13px;font-weight:600;color:var(--teal);text-decoration:none;padding:6px 0;display:inline-block;white-space:nowrap}
 .check-grid a:hover{text-decoration:underline}
 
 /* ---------- the gift: two halves ---------- */
-.home-split-sec{padding-top:44px}
-@media (min-width:900px){.home-split-sec{padding-top:40px}}
-.gift-grid{display:grid;gap:14px;margin-top:32px}
-@media (min-width:900px){.gift-grid{grid-template-columns:1.05fr .95fr;gap:20px;margin-top:48px}}
-.panel{border-radius:6px;padding:28px 24px;position:relative;overflow:hidden;min-width:0}
-@media (min-width:900px){.panel{padding:44px 40px}}
-.panel-night{background:var(--hp-night);color:#E9EEF4}
-.panel-night::after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle, rgba(178,255,63,.18), transparent 65%);pointer-events:none}
-.panel-paper{background:#fff;border:1px solid var(--hp-line)}
-.panel-kicker{font-family:var(--hp-mono);font-size:12px;letter-spacing:.06em;margin:0 0 6px}
-.panel p.panel-amt{margin:0 0 18px;font-size:clamp(1.9rem,3.2vw,2.7rem);font-weight:700;letter-spacing:-.03em;line-height:1;white-space:nowrap}
-.panel p.panel-amt small{font-size:.5em;font-weight:500;letter-spacing:0;color:inherit;opacity:.75}
-.panel-night p.panel-amt{color:#fff}
-.panel-paper p.panel-amt{color:var(--hp-ink)}
-.panel-night .panel-kicker{color:var(--hp-lime)}
-.panel-paper .panel-kicker{color:var(--hp-cobalt)}
-.panel-kicker .amt{font-family:var(--hp-sans);font-size:clamp(1.6rem,3vw,2.4rem);font-weight:700;letter-spacing:-.03em;line-height:1}
-.panel-night .panel-kicker .amt{color:#fff}
-.panel-paper .panel-kicker .amt{color:var(--hp-ink)}
-.panel h3{font-size:clamp(1.35rem,1.4vw + .9rem,1.9rem);line-height:1.12;letter-spacing:-.02em;margin:0 0 14px;font-weight:700}
-.panel-night h3{color:#fff}
-.panel-paper h3{color:var(--hp-ink)}
+.check-sec{padding-top:28px}
+.home-split-sec{padding-top:56px}
+.gift-grid{display:grid;gap:16px;margin-top:28px}
+.panel{border-radius:var(--r);padding:28px 24px;position:relative;overflow:hidden;min-width:0}
+@media (min-width:900px){.panel{padding:40px 40px}}
+.panel-night{background:var(--paper);color:var(--paper-ink);box-shadow:0 30px 60px -40px rgba(0,0,0,.9)}
+.panel-night::after{content:none}
+.panel-paper{background:var(--card);border:1px solid var(--card-line)}
+.panel-kicker{font-family:var(--hp-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;margin:0 0 6px}
+.panel p.panel-amt{margin:0 0 18px;font-family:var(--hp-mono);font-size:clamp(1.9rem,3.2vw,2.6rem);font-weight:700;letter-spacing:-.02em;line-height:1;white-space:nowrap}
+.panel p.panel-amt small{font-size:.45em;font-weight:500;letter-spacing:0;color:inherit;opacity:.7;font-family:var(--hp-sans)}
+.panel-night p.panel-amt{color:var(--paper-ink)}
+.panel-paper p.panel-amt{color:var(--fg)}
+.panel-night .panel-kicker{color:var(--paper-ink-2)}
+.panel-paper .panel-kicker{color:var(--fg-dim)}
+.panel h3{font-size:clamp(1.3rem,1.2vw + .9rem,1.75rem);line-height:1.15;letter-spacing:-.02em;margin:0 0 14px;font-weight:700}
+.panel-night h3{color:var(--paper-ink)}
+.panel-paper h3{color:var(--fg)}
 .panel p{font-size:15.5px;line-height:1.6;margin:0 0 12px}
-.panel-night p{color:#B9C5D3}
-.panel-night p strong{color:#fff;font-weight:600}
-.panel-paper p{color:var(--hp-ink-2)}
-.panel-paper p strong{color:var(--hp-ink);font-weight:600}
+.panel-night p{color:var(--paper-ink-2)}
+.panel-night p strong{color:var(--paper-ink);font-weight:600}
+.panel-paper p{color:var(--fg-mid)}
+.panel-paper p strong{color:var(--fg);font-weight:600}
 .split-adds{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:10px}
-.split-adds li{font-size:14.5px;line-height:1.55;color:var(--hp-ink-2);padding-left:18px;position:relative}
-.split-adds li::before{content:"";position:absolute;left:0;top:.62em;width:8px;height:2px;background:var(--hp-cobalt)}
-.split-adds b{color:var(--hp-ink);font-weight:600}
-.split-person{margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,255,255,.14);display:grid;gap:4px}
-.split-person .who{color:#fff;font-weight:600;font-size:15px}
-.split-person .role{color:#B9C5D3;font-size:14px;line-height:1.5}
-.panel .split-org{font-family:var(--hp-mono);font-size:11px;line-height:1.6;letter-spacing:.04em;color:#8A9AAD;margin:6px 0 0}
+.split-adds li{font-size:14.5px;line-height:1.55;color:var(--fg-mid);padding-left:18px;position:relative}
+.split-adds li::before{content:"";position:absolute;left:0;top:.62em;width:8px;height:2px;background:var(--ochre)}
+.split-adds b{color:var(--fg);font-weight:600}
+.split-person{margin-top:22px;padding-top:18px;border-top:1px solid var(--line);display:grid;gap:4px}
+.split-person .who{color:var(--fg);font-weight:600;font-size:15px}
+.split-person .role{color:var(--fg-mid);font-size:14px;line-height:1.5}
+.panel .split-org{font-family:var(--hp-mono);font-size:11px;line-height:1.6;letter-spacing:.04em;color:var(--fg-dim);margin:6px 0 0}
 .split-cta{margin-top:24px;display:flex;flex-wrap:wrap;gap:10px}
 
-/* ---------- products ---------- */
-.prod-grid{list-style:none;margin:36px 0 0;padding:0;display:grid;gap:14px}
-@media (min-width:900px){.prod-grid{grid-template-columns:1fr 1fr;gap:20px;margin-top:48px}}
-.prod-grid li{border:1px solid var(--hp-line);border-radius:6px;background:#fff;padding:26px 22px;display:flex;flex-direction:column}
-@media (min-width:900px){.prod-grid li{padding:36px 34px}}
-.prod-name{font-family:var(--hp-mono);font-size:12px;letter-spacing:.08em;color:var(--hp-cobalt);display:block;margin-bottom:12px}
-.prod-grid h3{font-size:clamp(1.3rem,1.3vw + .9rem,1.8rem);line-height:1.12;letter-spacing:-.02em;margin:0 0 14px;max-width:16ch;color:var(--hp-ink)}
+/* ---------- products: two quiet cards ---------- */
+.prod-grid{list-style:none;margin:28px 0 0;padding:0;display:grid;gap:14px}
+.prod-grid li{border:1px solid var(--card-line);border-radius:var(--r);background:var(--card);padding:26px 22px;display:flex;flex-direction:column}
+@media (min-width:900px){.prod-grid li{padding:32px 32px}}
+.prod-name{font-family:var(--hp-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-dim);display:block;margin-bottom:12px}
+.prod-grid h3{font-size:clamp(1.25rem,1.1vw + .9rem,1.6rem);line-height:1.15;letter-spacing:-.02em;margin:0 0 14px;max-width:18ch;color:var(--fg)}
 .prod-lines{list-style:none;margin:0;padding:0;display:grid;gap:9px}
-.prod-lines li{font-size:15px;line-height:1.55;color:var(--hp-ink-2);padding:0 0 0 22px;margin:0;position:relative;border:0;background:none;box-shadow:none;border-radius:0}
-.prod-lines li::before{content:"";position:absolute;left:0;top:.55em;width:11px;height:11px;border-radius:50%;border:1.5px solid var(--hp-lime-ink);background:rgba(178,255,63,.35)}
-.prod-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px;padding-top:20px;border-top:1px solid var(--hp-line)}
+.prod-lines li{font-size:15px;line-height:1.55;color:var(--fg-mid);padding:0 0 0 22px;margin:0;position:relative;border:0;background:none;box-shadow:none;border-radius:0}
+.prod-lines li::before{content:"";position:absolute;left:0;top:.55em;width:10px;height:10px;border-radius:50%;border:1.5px solid var(--ochre);background:rgba(217,164,65,.35)}
+.prod-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
 
 /* ---------- three steps ---------- */
-.step-grid{list-style:none;margin:36px 0 0;padding:0;display:grid;gap:0;counter-reset:step;border-top:1px solid var(--hp-line)}
-@media (min-width:900px){.step-grid{grid-template-columns:1fr 1fr 1fr;gap:40px;margin-top:48px}}
-.step-grid li{padding:22px 0;border-bottom:1px solid var(--hp-line)}
-@media (min-width:900px){.step-grid li{padding:28px 0 0;border-bottom:0}}
-.step-n{font-family:var(--hp-mono);font-size:12px;letter-spacing:.08em;color:var(--hp-ink-3);display:block;margin-bottom:10px}
-.step-grid h3{font-size:1.2rem;letter-spacing:-.015em;margin:0 0 8px;color:var(--hp-ink)}
-.step-grid p{font-size:15px;line-height:1.55;color:var(--hp-ink-2);margin:0;max-width:34ch}
+.step-grid{list-style:none;margin:28px 0 0;padding:0;display:grid;gap:0;counter-reset:step;border-top:1px solid var(--line)}
+.step-grid li{padding:20px 0;border-bottom:1px solid var(--line);display:grid;gap:4px}
+@media (min-width:760px){.step-grid li{grid-template-columns:64px 1fr;column-gap:16px}.step-grid li .step-n{grid-row:1/3}}
+.step-n{font-family:var(--hp-mono);font-size:12px;letter-spacing:.12em;color:var(--fg-dim);display:block;margin-bottom:6px}
+.step-grid h3{font-size:1.15rem;letter-spacing:-.015em;margin:0 0 4px;color:var(--fg)}
+.step-grid p{font-size:15px;line-height:1.55;color:var(--fg-mid);margin:0;max-width:52ch}
 
 /* ---------- prices ---------- */
-.price-grid{list-style:none;margin:36px 0 0;padding:0;display:grid;gap:14px}
-@media (min-width:900px){.price-grid{grid-template-columns:1fr 1fr;gap:20px;margin-top:48px}}
-.price-grid > li{border:1px solid var(--hp-line);border-radius:6px;background:#fff;padding:24px 22px}
-@media (min-width:900px){.price-grid > li{padding:32px 34px}}
-.price-grid h3{font-size:1.25rem;margin:0 0 2px;letter-spacing:-.015em;color:var(--hp-ink)}
-.price-sub{font-size:14px;color:var(--hp-ink-3);margin:0 0 16px}
-.tiers{list-style:none;margin:0;padding:0;border-top:1px solid var(--hp-line)}
-.tiers li{display:grid;grid-template-columns:76px 1fr;gap:12px;align-items:baseline;padding:12px 0;border-bottom:1px solid var(--hp-line);font-size:14.5px;line-height:1.5;color:var(--hp-ink-2)}
-.tier-price{font-weight:700;color:var(--hp-ink);font-size:1.15rem;letter-spacing:-.02em}
-.tier-what b{color:var(--hp-ink);font-weight:600}
-.price-foot{font-family:var(--hp-mono);font-size:11px;letter-spacing:.03em;color:var(--hp-ink-3);margin:12px 0 0}
-.sec-more{margin-top:28px}
-.sec-link{color:var(--hp-ink);font-weight:600;text-decoration:none;border-bottom:1px solid var(--hp-line-2);padding-bottom:2px;font-size:15px}
-.sec-link:hover{border-color:var(--hp-ink)}
+.price-grid{list-style:none;margin:28px 0 0;padding:0;display:grid;gap:14px}
+.price-grid > li{border:1px solid var(--card-line);border-radius:var(--r);background:var(--card);padding:24px 22px}
+@media (min-width:900px){.price-grid > li{padding:28px 32px}}
+.price-grid h3{font-size:1.2rem;margin:0 0 2px;letter-spacing:-.015em;color:var(--fg)}
+.price-sub{font-size:14px;color:var(--fg-dim);margin:0 0 16px}
+.tiers{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.tiers li{display:grid;grid-template-columns:84px 1fr;gap:12px;align-items:baseline;padding:12px 0;border-bottom:1px solid var(--line);font-size:14.5px;line-height:1.5;color:var(--fg-mid)}
+.tier-price{font-family:var(--hp-mono);font-weight:700;color:var(--fg);font-size:1.05rem;letter-spacing:-.01em}
+.tier-what b{color:var(--fg);font-weight:600}
+.price-foot{font-family:var(--hp-mono);font-size:11px;letter-spacing:.03em;color:var(--fg-dim);margin:12px 0 0}
+.sec-more{margin-top:24px}
+.sec-link{color:var(--fg);font-weight:600;text-decoration:none;border-bottom:1px solid var(--line-2);padding-bottom:2px;font-size:15px}
+.sec-link:hover{border-color:var(--fg)}
 
 /* ---------- rules ---------- */
-.pq-core{margin:24px 0 0;font-size:13px;line-height:1.55;color:var(--hp-ink-3);max-width:60ch}
-.pq-core a{color:var(--hp-ink-2)}
-.rules-grid{list-style:none;margin:20px 0 0;padding:0;display:grid;gap:0;border-top:1px solid var(--hp-line)}
-@media (min-width:900px){.rules-grid{grid-template-columns:1fr 1fr;column-gap:40px}}
-.rules-grid li{padding:20px 0;border-bottom:1px solid var(--hp-line)}
-.rules-grid h3{font-size:1.1rem;letter-spacing:-.015em;margin:0 0 6px;color:var(--hp-ink)}
-.rules-grid li p{font-size:15px;line-height:1.55;color:var(--hp-ink-2);margin:0 0 8px;max-width:44ch}
-.rules-grid li p a{color:var(--hp-ink)}
-.r-verify{font-family:var(--hp-mono);font-size:12px;color:var(--hp-cobalt);text-decoration:none;letter-spacing:.02em}
+.pq-core{margin:20px 0 0;font-size:13.5px;line-height:1.55;color:var(--fg-dim);max-width:60ch}
+.pq-core a{color:var(--fg-mid)}
+.rules-grid{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:0;border-top:1px solid var(--line)}
+.rules-grid li{padding:18px 0;border-bottom:1px solid var(--line)}
+.rules-grid h3{font-size:1.05rem;letter-spacing:-.01em;margin:0 0 6px;color:var(--fg)}
+.rules-grid li p{font-size:15px;line-height:1.55;color:var(--fg-mid);margin:0 0 8px;max-width:56ch}
+.rules-grid li p a{color:var(--fg)}
+.r-verify{font-family:var(--hp-mono);font-size:12px;color:var(--teal);text-decoration:none;letter-spacing:.02em}
 .r-verify:hover{text-decoration:underline}
-.home-dev{font-size:14px;color:var(--hp-ink-3);margin:0;padding:28px 0 40px;border-top:1px solid var(--hp-line)}
-.home-dev a{color:var(--hp-ink)}
+.home-dev{font-size:14px;color:var(--fg-dim);margin:0;padding:24px 0 36px;border-top:1px solid var(--line)}
+.home-dev a{color:var(--fg)}
 
-/* footer sits on paper too */
-footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
+/* footer on the same night */
+footer{background:var(--night-2);border-top:1px solid var(--line);color:var(--fg-mid)}
+footer a{color:var(--fg)}
 @media (min-width:760px){footer .footer-grid,footer .footer-grid.footer-slim{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);gap:32px;align-items:start}}
 </style>
 <script type="application/ld+json" data-paramant-seo="1">
@@ -383,6 +381,50 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
 </div>
 <main id="main-content" role="main">
 
+<div class="hp-band" aria-hidden="true">
+  <svg viewBox="0 0 1440 230" preserveAspectRatio="xMidYMax slice" role="presentation" focusable="false">
+    <defs>
+      <linearGradient id="hpSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E3D9BE"/><stop offset="1" stop-color="#EDE5CF"/></linearGradient>
+    </defs>
+    <rect width="1440" height="230" fill="url(#hpSky)"/>
+    <ellipse cx="300" cy="62" rx="110" ry="22" fill="#F4EEDC"/>
+    <ellipse cx="1060" cy="48" rx="90" ry="18" fill="#F4EEDC"/>
+    <ellipse cx="820" cy="96" rx="60" ry="12" fill="#F4EEDC" opacity=".8"/>
+    <circle cx="720" cy="104" r="46" fill="#D9A441" opacity=".85"/>
+    <!-- Harderwijk, back row -->
+    <g fill="#B8AD8E">
+      <path d="M0 200h60v-40h-60zM90 200v-58l22-14 22 14v58zM1250 200v-46l18-16 18 16v46zM1320 200h70v-38h-70z"/>
+      <path d="M220 200v-70l30-20 30 20v70zM1130 200v-64l26-18 26 18v64z"/>
+    </g>
+    <!-- Harderwijk, front row: the Grote Kerk, the Vischpoort, gabled houses, the mill -->
+    <g fill="#21262A">
+      <path d="M0 208h1440v22H0z"/>
+      <path d="M40 208v-88l16-10 16 10v88zM76 208v-64h44v64zM124 208v-92l14-9 14 9v92z"/>
+      <path d="M170 208v-70h50v70zM230 208v-96l12-6 12 6v96z"/>
+      <path d="M300 208v-150h8v-30l14-24 14 24v30h8v150z"/>
+      <path d="M356 208v-76h30v76zM392 208v-100l18-12 18 12v100zM434 208v-70h36v70z"/>
+      <path d="M520 208v-60a28 28 0 0 1 56 0v60zM540 208v-34a8 8 0 0 1 16 0v34z" fill-rule="evenodd"/>
+      <path d="M520 148h56v-8h-56zM548 118l-8 22h16z"/>
+      <path d="M600 208v-80l16-10 16 10v80zM640 208v-66h40v66zM688 208v-56h26v56z"/>
+      <path d="M840 208v-70h36v70zM884 208v-96l16-10 16 10v96zM924 208v-62h48v62zM980 208v-84l14-8 14 8v84z"/>
+      <path d="M1040 208v-58h40v58zM1088 208v-72l14-9 14 9v72z"/>
+      <path d="M1176 208v-88h44v88zM1198 120v-40h4v40z"/>
+      <path d="M1198 84l38-38 4 4-38 38zM1198 84l-38-38-4 4 38 38zM1198 84l38 38-4 4-38-38zM1198 84l-38 38 4 4 38-38z"/>
+      <path d="M1290 208v-52h30v52zM1330 208v-74l16-10 16 10v74zM1380 208v-44h60v44z"/>
+    </g>
+    <!-- the sealed letter on the quay -->
+    <g transform="translate(700 150) rotate(-6)">
+      <rect x="0" y="0" width="112" height="76" rx="3" fill="#F4EEDC" stroke="#21262A" stroke-width="2.5"/>
+      <path d="M0 4l56 40 56-40" fill="none" stroke="#21262A" stroke-width="2.5" stroke-linejoin="round"/>
+      <circle cx="56" cy="46" r="11" fill="#D9A441" stroke="#21262A" stroke-width="2.5"/>
+    </g>
+    <!-- the water of the Veluwemeer -->
+    <path d="M0 208h1440v22H0z" fill="#4E6E72"/>
+    <path d="M0 208h1440" stroke="#EAE2CE" stroke-opacity=".35"/>
+  </svg>
+  <span class="hp-band-tag">Paramant &middot; from Harderwijk</span>
+</div>
+
 <section class="home-hero">
   <div class="hp-wrap">
     <div class="home-state" data-home="out">
@@ -425,6 +467,21 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
   </div>
 </section>
 
+<section class="hp-sec check-sec" aria-labelledby="check-h">
+  <div class="hp-wrap">
+    <p class="hp-kicker">Do not take our word for it</p>
+    <h2 id="check-h" class="hp-h2">Five things you can check yourself, today.</h2>
+    <p class="hp-lede">Trust is not something a website can claim. These five facts are on the record, outside this page, and each one has a place where you look it up.</p>
+    <ul class="check-grid">
+      <li><span class="ck-fact">A registered Dutch company</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk. The KvK register lists the company behind every promise on this page.</p><a href="https://www.kvk.nl/zoeken/?source=all&amp;q=42115132">KvK 42115132 &rarr;</a></li>
+      <li><span class="ck-fact">Servers in Germany</span><p class="ck-how">Hetzner in Nuremberg. Which company holds what, and the one exception for e-mail, is written out line by line on the security page.</p><a href="/security">Jurisdiction, line by line &rarr;</a></li>
+      <li><span class="ck-fact">A public log</span><p class="ck-how">Every registered key and every transfer leaves an entry in a tamper-evident log anyone can read. Not a claim about transparency: the log itself.</p><a href="/ct-log">Open the log &rarr;</a></li>
+      <li><span class="ck-fact">What happens when something goes wrong</span><p class="ck-how">A personal data breach is reported to you within 48 hours; that is in the signed Data Processing Agreement, not in a blog post. Your signature receipts verify without us, so they outlive us.</p><a href="/dpa#incidents">Breach notification, clause 8 &rarr;</a></li>
+      <li><span class="ck-fact">Code you can read</span><p class="ck-how">The core and the relay are published. Nine rules, each with a link to the proof, are written down in one place.</p><a href="/rules">The nine rules &rarr;</a></li>
+    </ul>
+  </div>
+</section>
+
 <section class="hp-sec home-split-sec" aria-labelledby="split-h">
   <div class="hp-wrap">
     <p class="hp-kicker">Why there are two kinds of plan</p>
@@ -463,21 +520,6 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
   </div>
 </section>
 
-<section class="hp-sec check-sec" aria-labelledby="check-h">
-  <div class="hp-wrap">
-    <p class="hp-kicker">Do not take our word for it</p>
-    <h2 id="check-h" class="hp-h2">Five things you can check yourself, today.</h2>
-    <p class="hp-lede">Trust is not something a website can claim. These five facts are on the record, outside this page, and each one has a place where you look it up.</p>
-    <ul class="check-grid">
-      <li><span class="ck-fact">A registered Dutch company</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk. The KvK register lists the company behind every promise on this page.</p><a href="https://www.kvk.nl/zoeken/?source=all&amp;q=42115132">KvK 42115132 &rarr;</a></li>
-      <li><span class="ck-fact">Servers in Germany</span><p class="ck-how">Hetzner in Nuremberg. Which company holds what, and the one exception for e-mail, is written out line by line on the security page.</p><a href="/security">Jurisdiction, line by line &rarr;</a></li>
-      <li><span class="ck-fact">A public log</span><p class="ck-how">Every registered key and every transfer leaves an entry in a tamper-evident log anyone can read. Not a claim about transparency: the log itself.</p><a href="/ct-log">Open the log &rarr;</a></li>
-      <li><span class="ck-fact">What happens when something goes wrong</span><p class="ck-how">A personal data breach is reported to you within 48 hours; that is in the signed Data Processing Agreement, not in a blog post. Your signature receipts verify without us, so they outlive us.</p><a href="/dpa#incidents">Breach notification, clause 8 &rarr;</a></li>
-      <li><span class="ck-fact">Code you can read</span><p class="ck-how">The core and the relay are published. Nine rules, each with a link to the proof, are written down in one place.</p><a href="/rules">The nine rules &rarr;</a></li>
-    </ul>
-  </div>
-</section>
-
 <section class="hp-sec" id="products" aria-labelledby="products-h">
   <div class="hp-wrap">
     <p class="hp-kicker">Two products</p>
@@ -491,8 +533,9 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
           <li>Upload the PDF, place the fields, and mail it to whoever has to sign.</li>
           <li>They sign with the link from that email. Signing an invitation needs no account.</li>
           <li>You keep a receipt anyone can check offline, plus an entry in the public log.</li>
+          <li>A simple electronic signature under eIDAS. Not a qualified one, and we say so.</li>
         </ul>
-        <div class="prod-cta"><a class="hp-btn hp-btn-fill" href="/parasign">What ParaSign is</a><a class="hp-btn hp-btn-line" href="/sign">Sign a document</a></div>
+        <div class="prod-cta"><a class="hp-btn hp-btn-line" href="/parasign">What ParaSign is</a><a class="hp-btn hp-btn-fill" href="/sign">Sign a document</a></div>
       </li>
       <li>
         <span class="prod-name">ParaSend</span>
@@ -501,8 +544,9 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
           <li>The file is encrypted in your browser before it leaves your device.</li>
           <li>Our server only ever holds the sealed file in memory, never on a disk.</li>
           <li>It is wiped after its last read, so there is nothing left to leak later.</li>
+          <li>That holds for the web app and the SDKs. The browser extensions still encrypt on our server, until that is changed.</li>
         </ul>
-        <div class="prod-cta"><a class="hp-btn hp-btn-fill" href="/parasend">What ParaSend is</a><a class="hp-btn hp-btn-line" href="/parashare">Send a file</a></div>
+        <div class="prod-cta"><a class="hp-btn hp-btn-line" href="/parasend">What ParaSend is</a><a class="hp-btn hp-btn-fill" href="/parashare">Send a file</a></div>
       </li>
     </ul>
   </div>
@@ -576,7 +620,7 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
       <li><h3>We never had it</h3><p>Encrypted in your browser before it leaves you, never written to a disk, gone after its last read.</p><a class="r-verify" href="/security">verify: architecture <span aria-hidden="true">&rarr;</span></a></li>
       <li><h3>You own your keys</h3><p>Generated on your device, never sent. We see only the public half.</p><a class="r-verify" href="https://www.npmjs.com/package/paramant-sdk">verify: SDK source <span aria-hidden="true">&rarr;</span></a></li>
       <li><h3>EU soil, EU law</h3><p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path. Email goes out via Resend, as <a href="/privacy">/privacy</a> sets out.</p><a class="r-verify" href="/security">verify: jurisdiction <span aria-hidden="true">&rarr;</span></a></li>
-      <li><h3>Verifiable, not trust-me</h3><p>The code is public, every receipt can be checked without us, and a public log shows when it happened.</p><a class="r-verify" href="/ct-log">verify: CT log <span aria-hidden="true">&rarr;</span></a></li>
+      <li><h3>Verifiable, not trust-me</h3><p>The code is source-available (BUSL 1.1), every receipt can be checked without us, and a public log shows when it happened.</p><a class="r-verify" href="/ct-log">verify: CT log <span aria-hidden="true">&rarr;</span></a></li>
     </ol>
     <div class="sec-more">
       <a class="sec-link" href="/rules">Read all nine rules <span aria-hidden="true">&rarr;</span></a>

@@ -627,6 +627,53 @@ block, `access_log off` inside **every** `:8090` block, and `nginx -t` clean
 before the reload. A run that changed nothing still tests and reloads nginx, so a hand
 edit made between deploys cannot hide behind "already applied".
 
+### Step 5d: the limit_req zones, from a tracked file
+
+Both site confs rate limit on named zones (`relay_auth`, `relay_trial`,
+`relay_inbound`, `relay_outbound`, `api`) and neither conf defines one, because
+`limit_req_zone` is an http-level directive and a `server {}` block is not that
+level. On the live server all five were typed into `/etc/nginx/nginx.conf` by
+hand, so nothing in the repo said what they were: a conf review could not see
+them, and a rebuilt server would have had locations pointing at zones that did
+not exist.
+
+`deploy/nginx/snippets/paramant-limit-req.conf` is now that record, and step 5d
+places it at `/etc/nginx/conf.d/paramant-limit-req.conf`
+(`PARAMANT_LIMIT_REQ_DEST` overrides the path). The rates are the ones the
+tracked self-host config already sets for the same jobs; the rates on the live
+server were never in the repo and the snippet does not guess at them.
+
+A zone may be bound only **once**. A second `limit_req_zone` with a name that
+is already bound is not a warning, it is a config nginx refuses to load. So 5d
+does not copy the file blindly:
+
+1. it reads `nginx -T`, the config nginx really loads, minus the destination
+   file itself, and collects the zone names that are already bound there
+2. it writes the snippet with those lines commented out, each with a line
+   saying which zone was left where it was
+3. `nginx -t`, and on failure the previous file goes back, byte for byte (or
+   is removed again when there was none), then a reload of the old config
+4. `nginx -T` again, to prove the file it wrote is in the list of files nginx
+   loaded. A file in a directory no `include` reaches passes `nginx -t` and
+   defines nothing, and only the dump tells those two apart
+5. every zone the resolved site confs reference has to be bound in that dump.
+   This is the check that catches `relay_auth` disappearing out of a
+   hand-edited `nginx.conf` while `/api/user/` still limits on it
+
+On the server as it stands all five names are already bound in `nginx.conf`, so
+the phase writes a file that changes no rate and says so:
+`after zone lines written = 0`, `after zone lines left elsewhere = 5`. Move a
+zone out of `nginx.conf` and the next deploy supplies it from the snippet
+instead. The counters to read are `before duplicate zones`,
+`after zone lines written`, `after snippet loaded` and
+`after zones referenced and undefined`.
+
+Doing it by hand:
+
+```bash
+nginx -T 2>/dev/null | grep -c 'limit_req_zone .* zone=relay_auth'   # must be 1, never 2
+```
+
 ## Step 6: smoke tests
 
 In the order `deploy.sh` runs them, plus the two the 3.0.0 runbook used.

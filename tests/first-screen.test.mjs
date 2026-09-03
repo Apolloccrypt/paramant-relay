@@ -163,7 +163,7 @@ const PAGES = [
       // The founder, by name and title, before the visitor scrolls: the homepage
       // sells a gift from a person, so the person has to be on the first screen.
       { name: 'the founder', css: '[data-home="out"] .hero-by', text: 'Mick Beer, privacy and security researcher' },
-      { name: 'the heading of the section that explains the split', css: '#split-h', text: 'One half is a gift' },
+      { name: 'the heading of the five facts, which now come before the gift (panel of 4 September: facts convince, the letter can wait)', css: '#check-h', text: 'Five things you can check' },
     ],
   },
   {

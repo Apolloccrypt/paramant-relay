@@ -1287,8 +1287,25 @@ api.post("/user/auth/webauthn/login/options", async (req, res) => {
   const L = webauthn.LIMITS.loginOptions;
   if (!(await webauthn.rateHit(redis(), `lo:ip:${ip}`, L.ip, L.windowSec)))
     return res.status(429).json({ error: "rate_limited" });
-  const email = (req.body?.email || "").toString().toLowerCase().trim();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "invalid_email" });
+  // The typed field is the ONLY thing that separates this route from the
+  // cross-device one below, which sends no address and therefore never failed.
+  // A phone adds invisible characters to it (no-break space, zero-width space,
+  // a pasted newline, the "Name <addr>" display form), and this route used to
+  // answer 400 to every one of them; see webauthn.normalizeLoginEmail.
+  const rawEmail = (req.body?.email || "").toString();
+  const email = webauthn.normalizeLoginEmail(rawEmail);
+  if (!webauthn.isLoginEmail(email)) {
+    // The diagnostic that was missing on 2026-09-04: which check refused, and
+    // the SHAPE of what arrived. No address, no hash of one, no domain, no IP.
+    logRedacted('warn', '[webauthn/login/options] refused invalid_email', JSON.stringify(webauthn.loginEmailShape(rawEmail)));
+    return res.status(400).json({ error: "invalid_email" });
+  }
+  // A request that only worked BECAUSE of the normalisation above is the
+  // evidence that names the cause the next time this is reported. One line, no
+  // address, and only on the path that would previously have been a 400.
+  if (!webauthn.isLoginEmail(rawEmail.toLowerCase().trim())) {
+    logRedacted('warn', '[webauthn/login/options] accepted after normalise', JSON.stringify(webauthn.loginEmailShape(rawEmail)));
+  }
   if (!(await webauthn.rateHit(redis(), `lo:acct:${webauthn.scopeHash(email)}`, L.account, L.windowSec)))
     return res.status(429).json({ error: "rate_limited" });
 

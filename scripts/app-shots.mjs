@@ -1,23 +1,35 @@
-// Screenshot harness for the app screens. Not a gate: it renders every app
-// screen at 390x844 and 1440x900, in light and dark, with the same API stubs
-// the dashboard suite uses, and writes the images.
+// Screenshot generator for the app screens. It renders every app screen at
+// 390x844 and 1440x900, in light and dark, with the same API stubs the
+// dashboard suite uses, and writes the images.
+//
+// This is a generator and not a gate, which is why it lives in scripts/ next to
+// brand-shots-direction.mjs and shot-dashboard.mjs. It used to sit in tests/,
+// where it was picked up by the sign-e2e workflow's "Browser suites" step: that
+// step runs every tests/*.mjs that imports playwright, and this file imports
+// playwright. It asserts nothing, so a green run proved nothing, and on
+// 2026-09-03 a `page.screenshot: Timeout 30000ms exceeded` in here took sign-e2e
+// red on main and blocked the deploy (run 33746496749). A picture is not a
+// gate. Moving the file out of tests/ takes it out of that selection without
+// touching the selection itself, so every real browser suite still runs.
 //
 // It writes to a temp directory by default. The tracked reference images under
-// docs/ are opt-in, because a suite that rewrites 36 tracked files on every run
-// turns `git commit -a` into a screenshot dump. See scripts/brand-shots-dir.mjs
-// for the rule and tests/brand-shots-optin.test.mjs for the guard.
+// docs/ are opt-in, because a generator that rewrites 36 tracked files on every
+// run turns `git commit -a` into a screenshot dump. See
+// scripts/brand-shots-dir.mjs for the rule and tests/brand-shots-optin.test.mjs
+// for the guard.
 //
-// Run:                 node tests/app-shots.mjs
-// Refresh references:  PARAMANT_WRITE_BRAND_SHOTS=1 node tests/app-shots.mjs
-// One screen only:     APP_SHOTS_ONLY=dashboard node tests/app-shots.mjs
-// Where would it write: APP_SHOTS_DRY_RUN=1 node tests/app-shots.mjs
+// Run:                 node scripts/app-shots.mjs
+// Refresh references:  PARAMANT_WRITE_BRAND_SHOTS=1 node scripts/app-shots.mjs
+// One screen only:     APP_SHOTS_ONLY=dashboard node scripts/app-shots.mjs
+// Where would it write: APP_SHOTS_DRY_RUN=1 node scripts/app-shots.mjs
 
 import { chromium } from 'playwright';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveBrandShotsDir, FLAG, DRY_RUN_VAR } from '../scripts/brand-shots-dir.mjs';
+import { resolveBrandShotsDir, FLAG, DRY_RUN_VAR } from './brand-shots-dir.mjs';
+import { stableScreenshot } from './stable-screenshot.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const TARGET = resolveBrandShotsDir();
@@ -123,7 +135,7 @@ for (const screen of SCREENS) {
       try { await page.locator(screen.ready).first().waitFor({ timeout:6000 }); } catch { /* render what there is */ }
       await page.waitForTimeout(500);
       const file = path.join(OUT, `${screen.name}-${vp.w}x${vp.h}-${theme}.png`);
-      await page.screenshot({ path:file, fullPage:true });
+      await stableScreenshot(page, { path:file, fullPage:true });
       written.push(path.basename(file));
       await context.close();
     }
@@ -143,13 +155,18 @@ if (!only || only.includes('dashboard')) {
     await page.goto(ORIGIN + '/dashboard', { waitUntil:'domcontentloaded' });
     await page.waitForTimeout(700);
     const file = path.join(OUT, `dashboard-1440x900-${theme}-loading.png`);
-    await page.screenshot({ path:file });
+    // No network settle here: /api/user/me is the request that never answers,
+    // so this page can never go idle and waiting for it would only cost time.
+    await stableScreenshot(page, { path:file, networkIdleMs:0 });
     written.push(path.basename(file));
     await context.close();
   }
 }
 
 // One reduced-motion pair, to prove nothing disappears when motion is off.
+// This still says something even though every capture freezes animations:
+// scripts/stable-screenshot.mjs freezes them for the capture only, while
+// prefers-reduced-motion is a media query the page renders differently for.
 if (!only || only.includes('dashboard')) {
   for (const theme of THEMES) {
     const context = await browser.newContext({ viewport:{ width:1440, height:900 }, deviceScaleFactor:2, colorScheme:theme, reducedMotion:'reduce' });
@@ -160,7 +177,7 @@ if (!only || only.includes('dashboard')) {
     try { await page.locator('#dh-root:not([hidden]) .dh-document').first().waitFor({ timeout:6000 }); } catch { /* */ }
     await page.waitForTimeout(400);
     const file = path.join(OUT, `dashboard-1440x900-${theme}-reduced-motion.png`);
-    await page.screenshot({ path:file, fullPage:true });
+    await stableScreenshot(page, { path:file, fullPage:true });
     written.push(path.basename(file));
     await context.close();
   }
