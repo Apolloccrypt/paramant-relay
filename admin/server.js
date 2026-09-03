@@ -2531,7 +2531,12 @@ function maskIp(ip) {
 // GET /api/user/account/key below stays as it is. It is the reveal a
 // self-hoster and the account page still need, and it is no longer what
 // /parashare uses.
-api.post("/user/parasend/token", authUser, async (req, res) => {
+//
+// The purpose is chosen HERE, by the route, never by the caller. A browser that
+// could name its own purpose could ask /parashare's endpoint for an `app` token
+// and start a checkout with it. Two routes, two fixed words, and the body the
+// browser sends is still ignored.
+async function mintSessionToken(req, res, purpose, label) {
   const key = proxyApiKey(req.userSession);
   if (!key) return res.status(403).json({ error: "no_account_key" });
   try {
@@ -2542,7 +2547,7 @@ api.post("/user/parasend/token", authUser, async (req, res) => {
         "X-Internal-Auth": INTERNAL_TOKEN,
         "X-Api-Key": key,
       },
-      body: "{}",
+      body: JSON.stringify({ purpose }),
       signal: AbortSignal.timeout(10000),
     });
     const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
@@ -2556,10 +2561,29 @@ api.post("/user/parasend/token", authUser, async (req, res) => {
     }
     return res.json({ token: body.token, expires_in_s: body.expires_in_s });
   } catch (err) {
-    console.error("[user/parasend/token]", err.message);
+    console.error(label, err.message);
     return res.status(502).json({ error: "relay_unreachable" });
   }
-});
+}
+
+api.post("/user/parasend/token", authUser, (req, res) =>
+  mintSessionToken(req, res, "parasend", "[user/parasend/token]"));
+
+// POST /api/user/app/token
+//
+// The same trade for the signed-in app pages. /pricing needs to start a
+// checkout and /dashboard needs to read the account's own history and audit
+// export; all three used to fetch GET /api/user/account/key and authenticate to
+// the relay with the pgp_ key itself, which put a credential with no expiry and
+// no scope into any tab that visited them.
+//
+// A DIFFERENT token from the ParaSend one, not a wider one. The relay judges an
+// `app` token against APP_SCOPE (checkout, history, audit-export) and a
+// `parasend` token against SCOPE (the five transfer routes); neither list
+// contains the other, so this route gives /pricing and /dashboard what they
+// need without giving /parashare anything it did not already have.
+api.post("/user/app/token", authUser, (req, res) =>
+  mintSessionToken(req, res, "app", "[user/app/token]"));
 
 // GET /api/user/account/key
 api.get("/user/account/key", authUser, async (req, res) => {
@@ -2582,7 +2606,11 @@ api.get("/user/dashboard/overview", authUser, async (req, res) => {
   try { const u = await findUserByEmail(req.userSession.email); if (u && u.plan) plan = u.plan; } catch {}
   try {
     const snap = await buildSnapshot({ redis, getAuditEvents, plan }, req.userSession);
-    const data = { plan: snap.plan, key_masked: snap.key_masked, quota: snap.quota, audit: snap.audit };
+    // key_masked is deliberately NOT passed on. /dashboard no longer prints a
+    // key in any form, and a payload that still carries one is a payload that
+    // will be printed again by the next person who reads it and assumes it is
+    // there to be used. The account key lives on /account, behind its fold.
+    const data = { plan: snap.plan, quota: snap.quota, audit: snap.audit };
     _ovCache.set(uid, { at: Date.now(), data });
     if (_ovCache.size > 500) _ovCache.clear();
     res.json(data);

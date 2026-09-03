@@ -94,7 +94,11 @@
       }
       const data = await res.json();
       document.getElementById('account-email').textContent = data.email;
-      document.getElementById('api-key').textContent = data.api_key_masked;
+      // The api-key is NOT rendered here, masked or otherwise. See the
+      // "Advanced account key" block further down: on this page the key is a
+      // legacy escape hatch behind a fold, and a page that prints it on load
+      // fetches a credential for every visitor who only came to check what they
+      // pay. data.api_key_masked is left unread on purpose.
       document.getElementById('plan').textContent = planName(data, data.plan);
       var planChip = document.getElementById('plan-chip');
       if (planChip) planChip.textContent = planName(data, data.plan);
@@ -155,29 +159,93 @@
     document.body.removeChild(ta);
     return ok;
   }
+  // ── The account key, behind the fold and only behind the fold ──────────────
+  //
+  // /account is the ONE page that may still put the pgp_ key in a browser: it
+  // is the page whose job is to show it to you, for the SDK, a script or an IoT
+  // device. Everything else on the site now authenticates to the relay with a
+  // short-lived scoped pst_ token (relay/lib/session-token.js), and /pricing and
+  // /dashboard stopped fetching this key entirely.
+  //
+  // So the fetch is tied to the "Advanced account key" fold, not to page load.
+  // A visitor who opens /account to read their plan, their sessions or their
+  // backup codes never causes a request to /api/user/account/key at all, and no
+  // key, masked or whole, is in the DOM for them. Opening the fold is the
+  // deliberate act that asks for it; from then on it is in this closure for the
+  // life of the tab, which is what Copy and Show need and no longer than they
+  // need it. tests/app-pages-no-api-key.test.mjs pins the load half of that.
+  //
+  // The masked form is computed HERE from the fetched key rather than read from
+  // data.api_key_masked, because reading that field would mean the account
+  // payload still had to carry a key shape to the page that promises not to
+  // hold one until asked. Same shape as the server's mask (admin/server.js):
+  // first eight, ellipsis, last four.
+  var _keyPromise = null;
+  function accountKey() {
+    if (_keyPromise) return _keyPromise;
+    _keyPromise = fetch('/api/user/account/key', {
+      credentials: 'include', headers: { Accept: 'application/json' }, cache: 'no-store'
+    }).then(function(res) {
+      if (!res.ok) throw new Error('key_http_' + res.status);
+      return res.json();
+    }).then(function(data) {
+      if (!data || !data.api_key) throw new Error('key_unavailable');
+      return data.api_key;
+    }).catch(function(err) {
+      // A failed reveal must not poison the fold: the next Copy or Show tries
+      // again rather than replaying the error forever.
+      _keyPromise = null;
+      throw err;
+    });
+    return _keyPromise;
+  }
+
+  function maskKey(key) {
+    var k = String(key || '');
+    return k.length > 12 ? k.slice(0, 8) + '...' + k.slice(-4) : k;
+  }
+
+  var advanced = document.getElementById('acct-advanced');
+  var keyRowFilled = false;
+  if (advanced) {
+    advanced.addEventListener('toggle', function() {
+      // Only on open, and only once it has really succeeded: a failed reveal
+      // must leave the fold able to try again on the next open, and a
+      // successful one must not overwrite a key the reader pressed Show on.
+      if (!advanced.open || keyRowFilled) return;
+      var el = document.getElementById('api-key');
+      accountKey().then(function(key) {
+        keyRowFilled = true;
+        el.textContent = maskKey(key);
+      }).catch(function() {
+        el.textContent = 'Unavailable';
+      });
+    });
+  }
+
   document.getElementById('copy-key').addEventListener('click', async function() {
     var btn = this;
-    const res = await fetch('/api/user/account/key', { credentials: 'include' });
-    if (!res.ok) { btn.textContent = 'Failed'; setTimeout(function(){ btn.textContent = 'Copy'; }, 2000); return; }
-    const data = await res.json();
     const original = btn.textContent;
-    const ok = await Promise.resolve(_copyText(data.api_key));
+    let key;
+    try { key = await accountKey(); }
+    catch (e) { btn.textContent = 'Failed'; setTimeout(function(){ btn.textContent = original; }, 2000); return; }
+    const ok = await Promise.resolve(_copyText(key));
     if (ok) {
       btn.textContent = 'Copied!';
     } else {
       // Last-resort path for Safari/WebKit with VPN extensions that block writes entirely.
       // Show the key so the user can select + ⌘-C manually.
-      document.getElementById('api-key').textContent = data.api_key;
+      document.getElementById('api-key').textContent = key;
       btn.textContent = 'Shown — ⌘-C';
     }
     setTimeout(function(){ btn.textContent = original; }, 2500);
   });
 
   document.getElementById('show-key').addEventListener('click', async function() {
-    const res = await fetch('/api/user/account/key', { credentials: 'include' });
-    if (res.ok) {
-      const data = await res.json();
-      document.getElementById('api-key').textContent = data.api_key;
+    try {
+      document.getElementById('api-key').textContent = await accountKey();
+    } catch (e) {
+      document.getElementById('api-key').textContent = 'Unavailable';
     }
   });
 

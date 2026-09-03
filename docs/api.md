@@ -36,19 +36,28 @@ Three credential types are in use across different API surfaces:
 > with the same care as API keys, and revoke the DID enrollment when a device
 > is retired or compromised.
 
-> **ParaSend session tokens.** A `pst_` token is a narrow, short-lived stand-in
+> **Browser session tokens.** A `pst_` token is a narrow, short-lived stand-in
 > for an account API key, so a browser never has to hold the key itself. It is
-> minted by the admin panel on behalf of a logged-in user
-> (`POST /api/user/parasend/token`, session cookie), which asks the relay for it
-> over the internal channel; the browser is only ever handed the token, never
-> the key. Properties, all enforced by the relay:
+> minted by the admin panel on behalf of a logged-in user, which asks the relay
+> for it over the internal channel; the browser is only ever handed the token,
+> never the key. Properties, all enforced by the relay:
 >
-> - **Scope.** An allowlist, checked above every route handler. A token opens
+> - **Purpose, and two allowlists.** A token is minted FOR a purpose, and the
+>   purpose picks the list it is judged against. `parasend`
+>   (`POST /api/user/parasend/token`, used by `/parashare`) opens
 >   `/v2/check-key`, `POST /v2/ws-ticket`, `POST /v2/pubkey`,
->   `GET /v2/pubkey/:device` and `POST /v2/inbound`, and nothing else. Any other
->   path answers `403 session_token_out_of_scope`, including `/v2/user/*`,
->   `/v2/outbound/:hash`, `/v2/audit`, `/v2/admin/*`, the ParaSign envelope
->   routes, and a second `POST /v2/session-token`: a token cannot mint another.
+>   `GET /v2/pubkey/:device` and `POST /v2/inbound`. `app`
+>   (`POST /api/user/app/token`, used by `/pricing` and `/dashboard`) opens
+>   `POST /v2/billing/checkout`, `GET /v2/user/history` and
+>   `GET /v2/parasign/audit-export`. The two lists are disjoint: neither purpose
+>   can do the other's work. The purpose is fixed by the admin route, not by the
+>   caller, and an unknown one is refused at the mint with `400 unknown_purpose`.
+> - **Scope.** The allowlist is checked above every route handler. Any path not
+>   on the list for that purpose answers `403 session_token_out_of_scope`,
+>   including the rest of `/v2/user/*`, `/v2/keys`, `/v2/outbound/:hash`,
+>   `/v2/audit`, `/v2/admin/*`, the ParaSign envelope routes, and a second
+>   `POST /v2/session-token`: no token mints another, whatever it was minted
+>   for.
 > - **Identity.** Inside that scope the token authenticates **as the API key it
 >   was minted for**. Monthly quotas (`transfers_month`), the audit chain,
 >   device queues and per-tier limits all resolve against the owner's account,
@@ -219,6 +228,12 @@ Pass this to `POST /v2/verify-receipt` to cryptographically confirm delivery.
 ### POST /v2/verify-receipt — Verify a delivery receipt
 
 Public. No API key required.
+
+This endpoint asks the relay to check its own signature. To check a receipt
+without the relay, and without a network connection at all, open
+[https://paramant.app/verify#receipt](https://paramant.app/verify#receipt) and
+drop the receipt in. That page carries the relay identity key and repeats the
+same four checks in the browser.
 
 ```bash
 curl -X POST https://relay.paramant.app/v2/verify-receipt \
@@ -499,8 +514,15 @@ curl -X POST https://health.paramant.app/v2/session-token \
 | 429 | The account already holds 20 live tokens. `Retry-After: 60`. |
 | 503 | The relay store is unreachable, so no checkable token can be issued. |
 
-The browser-facing half of this is `POST /api/user/parasend/token` on the admin
-panel (session cookie, no body, returns only `token` and `expires_in_s`).
+The browser-facing half of this is two routes on the admin panel, both session
+cookie, both ignoring their request body, both returning only `token` and
+`expires_in_s`: `POST /api/user/parasend/token` mints purpose `parasend` and
+`POST /api/user/app/token` mints purpose `app`. The purpose is a property of the
+route, so a page cannot ask for the other one's authority.
+
+`POST /v2/session-token` itself takes an optional body `{"purpose": "parasend" |
+"app"}`. An absent purpose means `parasend`, so a caller written before purposes
+existed is unchanged; an unrecognised one is `400 unknown_purpose`.
 
 ---
 

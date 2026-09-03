@@ -1,0 +1,73 @@
+/* /verify, the transfer-receipt checker.
+   Only this page loads it, so it can stay small and specific. Colours come
+   from design-system.css tokens; nothing here introduces a new palette. */
+
+.rv-tabs {
+  display: flex; gap: var(--space-2); margin-bottom: var(--space-5);
+  border-bottom: 1px solid var(--ink-hair);
+}
+.rv-tab {
+  appearance: none; background: none; border: 0; cursor: pointer;
+  padding: var(--space-3) var(--space-4); margin-bottom: -1px;
+  font-family: var(--sans); font-size: var(--text-sm); font-weight: 600;
+  color: var(--ink-dim); border-bottom: 2px solid transparent;
+}
+.rv-tab:hover { color: var(--ink); }
+.rv-tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--navy); }
+.rv-tab:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+
+.rv-drop {
+  display: block; padding: var(--space-5); border: 1.5px dashed var(--ink-hair);
+  border-radius: 10px; text-align: center; cursor: pointer; background: var(--ink-ghost);
+  transition: border-color .15s, background .15s;
+}
+.rv-drop:hover, .rv-drop.rv-over { border-color: var(--navy); }
+.rv-drop input[type=file] { display: none; }
+.rv-drop-cta { display: block; font-weight: 600; margin-bottom: var(--space-1); }
+.rv-drop-meta { display: block; font-family: var(--mono); font-size: var(--text-xs); color: var(--ink-dim); }
+
+.rv-paste {
+  width: 100%; min-height: 8rem; margin-top: var(--space-4);
+  padding: var(--space-3); border: 1.5px solid var(--ink-hair); border-radius: 8px;
+  font-family: var(--mono); font-size: var(--text-xs); line-height: 1.6;
+  background: var(--bone); color: var(--ink); resize: vertical;
+}
+.rv-paste:focus { outline: none; border-color: var(--navy); }
+
+.rv-sub { font-size: var(--text-sm); margin: var(--space-5) 0 var(--space-2); }
+.rv-facts, .rv-checks { margin: 0; padding: 0; list-style: none; }
+.rv-facts li {
+  font-size: var(--text-sm); line-height: 1.6; color: var(--ink);
+  padding: var(--space-1) 0; border-bottom: 1px solid var(--ink-hair);
+}
+.rv-facts li:last-child { border-bottom: 0; }
+.rv-facts code { word-break: break-all; }
+
+.rv-checks li {
+  display: grid; grid-template-columns: 1rem 1fr; gap: 0 var(--space-3);
+  font-size: var(--text-sm); line-height: 1.6; padding: var(--space-2) 0;
+}
+.rv-mark { font-family: var(--mono); font-weight: 700; }
+.rv-body { min-width: 0; }
+.rv-detail { display: block; }
+.rv-ok .rv-mark { color: var(--lime-ink, var(--navy)); }
+.rv-bad .rv-mark { color: var(--ink); }
+.rv-skip .rv-mark, .rv-skip { color: var(--ink-dim); }
+.rv-detail { color: var(--ink-dim); }
+.rv-sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.rv-raw { margin-top: var(--space-5); }
+.rv-raw summary { font-size: var(--text-sm); color: var(--ink-dim); cursor: pointer; }
+.rv-raw pre {
+  margin-top: var(--space-3); padding: var(--space-3); border-radius: 8px;
+  background: var(--bone-2, var(--ink-ghost)); overflow-x: auto;
+  font-size: var(--text-xs); line-height: 1.6; max-height: 24rem;
+}
+
+@media (max-width: 600px) {
+  .rv-tabs { gap: 0; }
+  .rv-tab { padding: var(--space-3) var(--space-3); }
+}

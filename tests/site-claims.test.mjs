@@ -2268,14 +2268,25 @@ test('the ParaSend credential /privacy describes is the credential the code impl
   assert.ok(priv.includes('That token lives fifteen minutes'),
     'privacy: the storage section must state the token lifetime');
 
-  // 2. Five requests, and the relay's allowlist is what decides that.
+  // 2. Five requests for the send page, three for the app pages, and the relay's
+  // two allowlists are what decide that. They are counted separately because
+  // they ARE separate: a token minted on /parashare is judged against SCOPE and
+  // one minted on /pricing against APP_SCOPE, and /privacy makes that promise in
+  // both directions ("It is not the send page's token and cannot do what that
+  // one does, or the other way round").
   const scope = stripJsComments(read('relay/lib/session-token.js'));
-  const rules = (scope.slice(scope.indexOf('const SCOPE = ['), scope.indexOf('function scopeAllows'))
+  const countRules = (from, to) => (scope.slice(scope.indexOf(from), scope.indexOf(to))
     .match(/\{ method:/g) || []).length;
+  const rules = countRules('const SCOPE = [', 'const APP_SCOPE = [');
   assert.equal(rules, 5,
-    `the relay allowlist now has ${rules} entries; /privacy says five, so change the page with the code`);
+    `the relay's ParaSend allowlist now has ${rules} entries; /privacy says five, so change the page with the code`);
   assert.ok(priv.includes('the relay accepts it on the five requests a transfer makes and refuses it on everything else'),
     'privacy: the storage section must state what the token can and cannot do');
+  const appRules = countRules('const APP_SCOPE = [', 'const PURPOSE_PARASEND');
+  assert.equal(appRules, 3,
+    `the relay's app allowlist now has ${appRules} entries; /privacy says three, so change the page with the code`);
+  assert.ok(priv.includes('which the relay accepts on three requests'),
+    'privacy: the pricing/dashboard token must be described by what it can do');
 
   // 3. /parashare really asks for a token, and really does not ask for the key.
   const ps = read('frontend/js/parashare.page.js');
@@ -2290,10 +2301,12 @@ test('the ParaSend credential /privacy describes is the credential the code impl
   // pages /privacy admits still hold the key must be exactly the pages that do.
   // A page that stops fetching it and is still listed is a page telling you it
   // holds something it does not; one that starts and is not listed is worse.
+  //
+  // The list is ONE page now. /pricing and /dashboard moved to an app session
+  // token, so their files must no longer name the reveal endpoint at all, and
+  // the ex-holders below are the assertion that they stay moved.
   const HOLDERS = {
     '/account': 'frontend/js/account.inline1.js',
-    '/pricing': 'frontend/js/pricing-billing.js',
-    '/dashboard': 'frontend/js/dashboard-history.js',
   };
   for (const [where, file] of Object.entries(HOLDERS)) {
     assert.ok(read(file).includes('/api/user/account/key'),
@@ -2301,6 +2314,12 @@ test('the ParaSend credential /privacy describes is the credential the code impl
     assert.ok(priv.includes(`<code>${where}</code>`),
       `privacy: ${where} fetches the account key and the page must name it`);
   }
+  for (const file of ['frontend/js/pricing-billing.js', 'frontend/js/dashboard-history.js']) {
+    assert.ok(!/fetch\(\s*['"`]\/api\/user\/account\/key/.test(stripJsComments(read(file))),
+      `${file} fetches the account key again; /privacy now says /pricing and /dashboard no longer hold it`);
+  }
+  assert.ok(priv.includes('no longer do.'),
+    'privacy: the page must say the pricing and dashboard pages stopped holding the key');
   // And nothing else in the frontend may fetch it without being named. This is
   // what catches a fourth page joining the list quietly.
   const fetchers = [];

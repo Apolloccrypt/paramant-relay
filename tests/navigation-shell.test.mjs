@@ -52,6 +52,7 @@ const publicMobilePaint = await publicPage.locator('nav.nav').evaluate((node) =>
   background: getComputedStyle(node).backgroundColor,
   backdropFilter: getComputedStyle(node).backdropFilter,
   webkitBackdropFilter: getComputedStyle(node).getPropertyValue('-webkit-backdrop-filter'),
+  paper: getComputedStyle(document.body).backgroundColor,
 }));
 // Pinned to the bone hex until 4 September 2026; the homepage now paints the bar in the night colour, so the pin is what it always guarded: fully opaque, no blur.
 ok('mobile navigation is opaque before opening the menu', /^rgb\(/.test(publicMobilePaint.background) && publicMobilePaint.backdropFilter === 'none' && (!publicMobilePaint.webkitBackdropFilter || publicMobilePaint.webkitBackdropFilter === 'none'), JSON.stringify(publicMobilePaint));
@@ -340,9 +341,16 @@ await appPage.route('**/api/user/me', (route) => route.fulfill({ status:200, con
 await appPage.route('**/api/user/documents', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"documents":[]}' }));
 await appPage.route('**/api/user/account/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
 await appPage.goto(ORIGIN + '/dashboard', { waitUntil:'domcontentloaded' });
-await appPage.waitForFunction(() => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === 'Documents,Send,Sign,Verify,Settings');
+// The workspace bar is pinned item by item, in order, because the order is the
+// claim: Documents is where the work lands, then the three verbs you came to
+// do, then Verify and Settings. It went from five entries to six when /vault
+// joined Send and Sign as the third verb ("Lock a file"), so this list and
+// APP_NAV in frontend/js/nav-auth.js are updated together or not at all.
+const WORKSPACE_NAV = ['Documents','Send','Sign','Lock a file','Verify','Settings'];
+await appPage.waitForFunction((expected) => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === expected, WORKSPACE_NAV.join(','));
 const appDesktop = await appPage.locator('nav.nav .nav-links .nav-link').allInnerTexts();
-ok('signed-in navigation follows document work', JSON.stringify(appDesktop) === JSON.stringify(['Documents','Send','Sign','Verify','Settings']), appDesktop.join(', '));
+ok('signed-in navigation follows document work', JSON.stringify(appDesktop) === JSON.stringify(WORKSPACE_NAV), appDesktop.join(', '));
+ok('locking a file is a verb in the bar, next to the other two', appDesktop.indexOf('Lock a file') === appDesktop.indexOf('Sign') + 1 && await appPage.locator('nav.nav .nav-links a[href="/vault"]').count() === 1, appDesktop.join(', '));
 ok('dashboard removes its duplicate marketing drawer', await appPage.locator('#nav-mobile-marketing').count() === 0 && await appPage.locator('nav.nav .nav-links').count() === 1, await appPage.locator('nav.nav .nav-links').count());
 await appPage.locator('#nav-hamburger').click();
 const appMobile = await appPage.locator('#nav-mobile a').allInnerTexts();
@@ -355,7 +363,7 @@ ok('developer tools are settings, not a sixth product', await appPage.locator('.
 // under the drawer. Signed in, js/nav-auth.js used to delete that strip, on the
 // reasoning that the user menu carries Help from then on. What that left on a
 // 390px screen was no Help at all in the two places anyone looks: the bar sheds
-// .nav-help below 700px, and the drawer is pinned to the five workspace links
+// .nav-help below 700px, and the drawer is pinned to the workspace links
 // by the check above. The only route was the menu behind the email address,
 // which is where you go to sign out, not where you go when a signature is
 // stuck. A customer had to type the url.
@@ -491,9 +499,9 @@ const developerPage = await browser.newPage({ viewport:{ width:1280, height:900 
 await developerPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
 await developerPage.route('**/api/developer/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
 await developerPage.goto(ORIGIN + '/developer', { waitUntil:'domcontentloaded' });
-await developerPage.waitForFunction(() => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === 'Documents,Send,Sign,Verify,Settings');
+await developerPage.waitForFunction((expected) => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === expected, WORKSPACE_NAV.join(','));
 const developerNav = await developerPage.locator('nav.nav .nav-links .nav-link').allInnerTexts();
-ok('developer page is presented as settings inside the same shell', await developerPage.title() === 'Developer settings · Paramant' && developerNav.map((item) => item.toLowerCase()).join(',') === 'documents,send,sign,verify,settings', await developerPage.title());
+ok('developer page is presented as settings inside the same shell', await developerPage.title() === 'Developer settings · Paramant' && developerNav.map((item) => item.toLowerCase()).join(',') === WORKSPACE_NAV.map((item) => item.toLowerCase()).join(','), await developerPage.title());
 ok('developer page shares the settings hierarchy', JSON.stringify(await developerPage.locator('.settings-tabs a').allInnerTexts()) === JSON.stringify(['Account & security','Plan & billing','Developer settings']) && await developerPage.locator('.settings-tabs a[aria-current="page"]').getAttribute('href') === '/developer', await developerPage.locator('.settings-tabs').innerText());
 await developerPage.close();
 
