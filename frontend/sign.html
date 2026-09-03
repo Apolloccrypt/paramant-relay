@@ -837,6 +837,10 @@ body[data-ds-step="step-done"] #ds-doc-meta{display:none}
       <strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong>
       A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 (FIPS 204) cryptographic attestation, produced in your browser. It is not a notarised legal signature under eIDAS or any qualified-trust regime (QES).
     </div>
+    <div class="ds-info-card" id="ds-qes-option" hidden>
+      <label class="ds-seal-check"><input type="checkbox" id="ds-qes-optin"> Also add a qualified signature (sandbox)</label>
+      <p class="ds-sub">A qualified trust service provider signs a hash of this document and returns a PAdES signature carrying its own certificate. The document itself never leaves this page. Sandbox only: this is a prototype against a test environment, not a production service.</p>
+    </div>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-sign-back" type="button">Back</button>
       <button class="btn btn-primary" id="ds-sign-now" type="button">Sign this document</button>
@@ -959,6 +963,6 @@ body[data-ds-step="step-done"] #ds-doc-meta{display:none}
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=4" defer></script>
-<script type="module" src="/sign-flow.js?v=52"></script>
+<script type="module" src="/sign-flow.js?v=53"></script>
 </body>
 </html>

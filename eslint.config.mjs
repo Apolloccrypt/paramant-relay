@@ -20,7 +20,7 @@ export default [
     // Hand-written server code only. The vendored bundles (pqc, wasm glue) are
     // generated, single-line, and full of browser globals: linting them says
     // nothing about code anyone edits.
-    files: ['relay/*.js', 'relay/lib/*.js', 'admin/*.js', 'admin/lib/*.js'],
+    files: ['relay/*.js', 'relay/lib/**/*.js', 'admin/*.js', 'admin/lib/*.js'],
     ignores: ['**/node_modules/**', 'relay/lib/paramant-pqc.js', '**/*.min.js'],
     languageOptions: {
       ecmaVersion: 2023,
