@@ -1,0 +1,1334 @@
+/* PARAMANT marketing-2026.css
+   ────────────────────────────────────────────────────────────────────────────
+   The six marketing screens (/, /pricing, /parasign, /parasend, /about,
+   /security) in the direction fixed by docs/brand/design-direction.md: STIL as
+   the core, grafted with the register row and the radius scale of LEVEND and a
+   degree of paper warmth from WARM.
+
+   Two things this file does, in this order.
+
+   1. TOKENS, plus an alias layer. Every value in section 1 comes from
+      design-direction.md section 2. The alias layer maps them onto the v4 names
+      design-system.css, nav.css and the pages themselves already use (--bone,
+      --navy, --ink, --ink-dim, --ink-hair, --cobalt, --lime, ...). That is what
+      lets the SHELL follow the pages into dark instead of staying light behind
+      them: the nav, the buildbar and the footer are written in those same v4
+      names, so they move with the tokens without a single line changing in the
+      files that other screens share.
+      This file loads LAST, after design-system.css and nav.css, so :root here
+      wins on equal specificity. When the tokens land in design-system.css
+      itself (rollout step 1 in design-direction.md section 5) section 1 of this
+      file is deleted and the rest stands unchanged.
+
+   2. THE CRAFT. Hairlines instead of boxes, one cobalt accent per screen, one
+      dark object per screen (the Community block), mono labels with a lime
+      dash, the radius scale, and motion that only ever confirms something.
+
+   Scope. Only the six marketing screens link this file, so nothing here can
+   reach /dashboard, /sign, /account or the auth pages. That is deliberate:
+   those screens belong to another builder in the same round. A page either
+   links this file and is dark-complete, shell included, or it does not link it
+   and stays exactly as it was. There is no half-lit page either way.
+
+   Verboden respected, by name (design-direction.md section 6): no external
+   font, no external script, no framework, no gradient without a function, no
+   text change, one primary button per screen, nothing under AA, no motion that
+   confirms nothing, no color-mix on anything that has to be measured, no radius
+   on what carries the brand.
+*/
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   1. TOKENS
+   Light on bare :root. Dark under prefers-color-scheme AND under
+   [data-theme="dark"], so an explicit choice and the system preference both
+   win. No color exists only inside a media query.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* surface */
+  --paper:        #FBFAF7;
+  --paper-blur:   rgba(251,250,247,.90);
+  --surface:      #FFFFFF;
+  --surface-sunk: #F4F4F1;
+  --surface-ink:  #0C1622;
+
+  /* ink */
+  --ink-1: #0C1B2A;   /* 16.68 on paper */
+  --ink-2: #40505F;   /* 7.95  on paper */
+  --ink-3: #5C6A78;   /* 5.31  on paper */
+
+  /* the one accent */
+  --accent:      #1D4ED8;              /* 6.42 on paper */
+  --accent-hov:  #1A43BE;              /* 7.77 on paper */
+  --accent-ink:  #FFFFFF;              /* 6.70 on the accent */
+  --accent-soft: rgba(29,78,216,.08);
+  /* the same wash, flattened over --surface, for a plane that must be opaque
+     so a translucent parent cannot darken it: 0.08x#1D4ED8 over #FFFFFF */
+  --accent-wash: #EDF1FC;
+  --accent-ring: rgba(29,78,216,.32);
+
+  /* hairlines: the main form on every one of these screens */
+  --line:       rgba(12,27,42,.11);
+  --line-2:     rgba(12,27,42,.20);
+  --line-ghost: rgba(12,27,42,.05);
+
+  /* punctuation. Lime is a LINE. The one legal lime plane is #0A1626 on
+     #B2FF3F, 14.94:1, and it is used nowhere on these six screens. */
+  --mark:     #B2FF3F;
+  --mark-ink: #5C7A12;   /* 4.9 on paper, the readable lime for text */
+
+  /* on the one inverted plane */
+  --on-ink:      #F4F7FB;
+  --on-ink-2:    rgba(244,247,251,.80);
+  --on-ink-line: rgba(244,247,251,.16);
+
+  /* type */
+  --t-micro: 11px;
+  --t-mini:  12px;
+  --t-sm:    13px;
+  --t-body:  15px;
+  --t-lead:  clamp(16px, 1.1vw + 13px, 18px);
+  --t-h4:    17px;
+  --t-h3:    clamp(19px, .6vw + 17px, 22px);
+  --t-h2:    clamp(24px, 2.2vw + 16px, 34px);
+  --t-h1:    clamp(32px, 3.6vw + 18px, 52px);
+
+  /* radius. The brand stays sharp; soft only where you touch. */
+  --r-0:    0;
+  --r-1:    3px;
+  --r-2:    10px;
+  --r-3:    16px;
+  --r-pill: 999px;
+
+  /* light */
+  --sh-1: 0 1px 2px rgba(12,27,42,.04);
+  --sh-2: 0 1px 2px rgba(12,27,42,.05), 0 8px 24px -12px rgba(12,27,42,.14);
+  --sh-3: 0 24px 64px -24px rgba(12,27,42,.28);
+  --ring: 0 0 0 2px var(--paper), 0 0 0 4px var(--accent-ring);
+
+  /* motion: three durations, two curves, nothing else */
+  --d-1: 110ms;
+  --d-2: 180ms;
+  --d-3: 260ms;
+  --e-standard: cubic-bezier(.2, 0, 0, 1);
+  --e-enter:    cubic-bezier(.16, 1, .3, 1);
+
+  --tap: 44px;
+
+  /* ── alias layer onto the v4 names the shell and the pages already speak ── */
+  --bone:              var(--paper);
+  --bone-2:            var(--surface-sunk);
+  --navy:              var(--ink-1);
+  --navy-2:            var(--ink-1);
+  --ink:               var(--ink-1);
+  --ink-dim:           var(--ink-2);
+  --ink-hair:          var(--line);
+  --ink-ghost:         var(--line-ghost);
+  --cobalt:            var(--accent);
+  --cobalt-2:          var(--accent-hov);
+  --lime:              var(--mark);
+  --bone-on-navy:      var(--on-ink);
+  --bone-on-navy-dim:  var(--on-ink-2);
+  --bone-on-navy-hair: var(--on-ink-line);
+  --black:             var(--ink-1);
+  --black-dim:         var(--ink-2);
+  --black-hair:        var(--line);
+  --black-ghost:       var(--line-ghost);
+  --lime-dim:          var(--ink-2);
+  --lime-hair:         var(--line);
+  --lime-ghost:        var(--line-ghost);
+  --doc-bg:            var(--paper);
+  --doc-ink:           var(--ink-1);
+  --doc-ink-dim:       var(--ink-2);
+
+  color-scheme: light dark;
+}
+
+/* Dark, written twice so the system preference and an explicit choice both win.
+   Own set, not a filter: paper #0A0F16, card #10161F, sunk #151C26,
+   inverted #060A0F. Contrast on paper/card from design-direction.md 2.2. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:        #0A0F16;
+    --paper-blur:   rgba(10,15,22,.90);
+    --surface:      #10161F;
+    --surface-sunk: #151C26;
+    --surface-ink:  #060A0F;
+
+    --ink-1: #EDF1F6;   /* 16.94 on paper */
+    --ink-2: #B4C1D0;   /* 10.50 on paper */
+    --ink-3: #8D9CAD;   /*  6.86 on paper */
+
+    --accent:      #7FA6FF;   /* 8.05 on paper */
+    --accent-hov:  #9CBAFF;   /* 9.96 on paper */
+    --accent-ink:  #06101F;
+    --accent-soft: rgba(127,166,255,.12);
+    --accent-wash: #1D273A;   /* 0.12x#7FA6FF over #10161F */
+    --accent-ring: rgba(127,166,255,.40);
+
+    --line:       rgba(237,241,246,.10);
+    --line-2:     rgba(237,241,246,.20);
+    --line-ghost: rgba(237,241,246,.05);
+
+    --mark:     #B2FF3F;   /* 15.80 on paper */
+    --mark-ink: #B2FF3F;
+
+    --on-ink:      #EDF1F6;
+    --on-ink-2:    rgba(237,241,246,.78);
+    --on-ink-line: rgba(237,241,246,.14);
+
+    --sh-1: 0 1px 2px rgba(0,0,0,.40);
+    --sh-2: 0 1px 2px rgba(0,0,0,.44), 0 8px 24px -12px rgba(0,0,0,.70);
+    --sh-3: 0 24px 64px -24px rgba(0,0,0,.80);
+  }
+}
+:root[data-theme="dark"] {
+  --paper:        #0A0F16;
+  --paper-blur:   rgba(10,15,22,.90);
+  --surface:      #10161F;
+  --surface-sunk: #151C26;
+  --surface-ink:  #060A0F;
+
+  --ink-1: #EDF1F6;
+  --ink-2: #B4C1D0;
+  --ink-3: #8D9CAD;
+
+  --accent:      #7FA6FF;
+  --accent-hov:  #9CBAFF;
+  --accent-ink:  #06101F;
+  --accent-soft: rgba(127,166,255,.12);
+  --accent-wash: #1D273A;
+  --accent-ring: rgba(127,166,255,.40);
+
+  --line:       rgba(237,241,246,.10);
+  --line-2:     rgba(237,241,246,.20);
+  --line-ghost: rgba(237,241,246,.05);
+
+  --mark:     #B2FF3F;
+  --mark-ink: #B2FF3F;
+
+  --on-ink:      #EDF1F6;
+  --on-ink-2:    rgba(237,241,246,.78);
+  --on-ink-line: rgba(237,241,246,.14);
+
+  --sh-1: 0 1px 2px rgba(0,0,0,.40);
+  --sh-2: 0 1px 2px rgba(0,0,0,.44), 0 8px 24px -12px rgba(0,0,0,.70);
+  --sh-3: 0 24px 64px -24px rgba(0,0,0,.80);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2. PAGE GROUND
+   ═══════════════════════════════════════════════════════════════════════════ */
+html, body {
+  background: var(--paper);
+  color: var(--ink-1);
+  /* Every amount, every count and every KvK number on these pages lines up. */
+  font-variant-numeric: tabular-nums;
+}
+
+::selection { background: var(--accent-soft); color: var(--ink-1); }
+
+/* One focus ring, the same in both modes, on everything that can be operated.
+   design-system.css sets outlines per component; this replaces them with one
+   shape so a keyboard walk over a page never changes vocabulary. */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-1);
+}
+/* #main-content carries tabindex="-1" for the skip link. Focusing it must not
+   draw a ring around the whole page. */
+#main-content:focus,
+#main-content:focus-visible { outline: none; }
+
+/* A link inside a running line is underlined, never colour alone (WCAG 1.4.1,
+   axe link-in-text-block). Written as "every anchor on the page, minus the ones
+   that are already a shape", not as "every anchor inside main": /about, /pricing
+   and the two product pages hang their sections OUTSIDE #main-content, and a
+   rule scoped to main left every link in them carrying #1D4ED8 against #40505F,
+   which is 1.23:1 of difference and nothing else. */
+.m26:not(.m-home) a:not(:is(.btn,.sec-link,.r-verify,.yearly-alt,.skip-link)) {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--accent-ring);
+  transition: text-decoration-color var(--d-1) var(--e-standard),
+              color var(--d-1) var(--e-standard);
+}
+.m26:not(.m-home) a:not(:is(.btn,.sec-link,.r-verify,.yearly-alt,.skip-link)):hover {
+  text-decoration-color: var(--accent);
+}
+/* The shell is navigation, not prose: a list of links is already a list, and
+   underlining it turns the bar and the footer into noise. */
+body.m26 nav a,
+body.m26 .nav-mobile a,
+body.m26 .meta-bar a,
+body.m26 footer a,
+body.m26 .skip-link,
+body.m26 .tier-card a,
+body.m26 .about-byline a {
+  text-decoration: none;
+}
+body.m26 nav a { color: inherit; }
+body.m26 footer .footer-links a { color: var(--ink-2); }
+body.m26 .meta-bar a.meta-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--mark);
+  text-underline-offset: 3px;
+}
+body.m26 footer a:hover,
+body.m26 nav a:hover { text-decoration: none; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3. THE SHELL
+   The buildbar, the nav and the footer are shared files. Nothing there is
+   edited; the few hard-coded hexes in them are named here so the shell is dark
+   on exactly the pages that are dark.
+   ═══════════════════════════════════════════════════════════════════════════ */
+body.m26 .meta-bar {
+  background: var(--surface-sunk);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-3);
+  letter-spacing: .14em;
+}
+body.m26 .meta-bar a.meta-link {
+  text-decoration-color: var(--mark);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+body.m26 .meta-bar a.meta-link:hover,
+body.m26 .meta-bar a.meta-link:focus-visible { color: var(--accent); text-decoration-color: var(--accent); }
+
+body.m26 nav.nav {
+  /* The blur under the nav is one of the two translucencies the system allows:
+     it is what keeps a scrolled line legible under a sticky bar. Written as an
+     rgba token, not color-mix, so a contrast scanner and an older Safari read
+     the same value (design-direction.md, verbod 8). */
+  background: var(--paper-blur);
+  border-bottom: 1px solid var(--line);
+}
+/* nav.css turns the blur OFF below 1024px and while the drawer is locked open,
+   because on iOS Safari a backdrop-filter over a dark hero renders see-through
+   and the hero showed through the top of the open menu. That guarantee is a
+   test (tests/navigation-shell.test.mjs) and it survives the new palette
+   unchanged: opaque paper, no blur, on exactly the same two conditions. */
+@media (max-width: 1023px) {
+  body.m26 nav.nav {
+    background: var(--paper);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+body.nav-locked.m26 .meta-bar,
+body.nav-locked.m26 nav.nav {
+  background: var(--paper);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+body.m26 nav.nav .nav-logo .logo-para { color: var(--ink-1); }
+body.m26 nav.nav .nav-logo .logo-mant { color: var(--accent); }
+
+/* The active item carries a lime underline, and it is the only lime on the
+   bar. 2px of line, never a plane. */
+body.m26 nav.nav .nav-link[aria-current="page"],
+body.m26 .nav-mobile-standalone[aria-current="page"] {
+  color: var(--ink-1);
+  box-shadow: inset 0 -2px 0 var(--mark);
+}
+body.m26 .nav-mobile { background: var(--surface); border-bottom: 1px solid var(--line); }
+body.m26 .nav-mobile-standalone,
+body.m26 .nav-mobile-group-btn,
+body.m26 .nav-mobile-group-items a { color: var(--ink-2); }
+body.m26 .nav-mobile-standalone:hover,
+body.m26 .nav-mobile-standalone:focus-visible,
+body.m26 .nav-mobile-group-items a:hover,
+body.m26 .nav-mobile-group-items a:focus-visible { color: var(--ink-1); border-left-color: var(--mark); }
+body.m26 .nav-mobile-group.open .nav-mobile-group-btn { color: var(--ink-1); }
+body.m26 .nav-hamburger span { background: var(--ink-1); }
+
+/* The one help button, written with hard-coded slate greys inline on two of
+   these pages. Named here so it follows the theme rather than staying light. */
+body.m26 .nav-help {
+  color: var(--ink-3);
+  border-color: var(--line-2);
+  border-radius: var(--r-1);
+  min-height: 32px;
+  transition: color var(--d-1) var(--e-standard),
+              border-color var(--d-1) var(--e-standard),
+              background var(--d-1) var(--e-standard);
+}
+body.m26 .nav-help::before { border-color: var(--ink-3); color: var(--ink-3); }
+body.m26 .nav-help:hover { color: var(--ink-1); border-color: var(--accent); background: var(--accent-soft); }
+body.m26 .nav-help:hover::before { border-color: var(--accent); color: var(--accent); background: transparent; }
+body.m26 .nav-help:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+body.m26 .nav-help-mobile { color: var(--ink-2); border-bottom-color: var(--line); }
+body.m26 .nav-help-mobile:hover { color: var(--ink-1); background: var(--accent-soft); }
+
+/* The skip link is the first thing a keyboard walk meets. It carries the one
+   filled accent it is allowed, in both states, so it is legible the instant it
+   appears rather than accent-on-navy at 1.71:1. */
+/* The bar's own call to action is SHELL, not a page component, so it belongs
+   here and reaches all six screens including the homepage this round does not
+   otherwise restyle. It used to be a filled lime plane, which on a page whose
+   hero already carries one filled cobalt action is a second primary and the
+   loudest thing on the screen, and which in dark put light ink on lime at
+   1.07:1. An accent outline: still unmistakably the button, no longer loudest. */
+body.m26 .nav-cta {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-1);
+}
+body.m26 .nav-cta:hover { background: var(--accent-soft); border-color: var(--accent-hov); color: var(--accent-hov); }
+body.m26 .nav-signin { color: var(--ink-2); }
+body.m26 .nav-signin:hover { color: var(--accent); }
+
+body.m26 .skip-link,
+body.m26 .skip-link:focus {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 2px solid var(--mark);
+  border-radius: var(--r-1);
+  text-decoration: none;
+}
+
+body.m26 footer {
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+}
+/* .footer-grid.footer-slim is two columns and these pages hang three children
+   in it, so the Legal column wrapped onto a second row under the address block
+   and the footer ended in 300px of nothing. Three columns, three columns' worth
+   of content. Scoped, like everything else here: the shared fix belongs with
+   the shell. */
+@media (min-width: 761px) {
+  body.m26 footer .footer-grid.footer-slim {
+    grid-template-columns: minmax(0, 2fr) 1fr 1fr;
+    gap: var(--space-8);
+  }
+}
+body.m26 footer .footer-col-label { color: var(--ink-3); letter-spacing: .14em; }
+body.m26 footer .footer-links a { color: var(--ink-2); }
+body.m26 footer .footer-links a:hover { color: var(--accent); }
+body.m26 footer .logo .a { color: var(--ink-1); }
+body.m26 footer .logo .b { color: var(--accent); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   4. COMPONENTS
+   NOT the homepage. index.html was rebuilt on main in #377 with a finished
+   page-local component set of its own, and this round has no business
+   restyling it: every rule below is held off .m-home by name. The shell above
+   and the tokens still reach it, which is all it needs.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Buttons. Exactly one filled accent per screen; everything else is a
+   hairline or bare text. 44px is the floor, on every pointer. ── */
+body.m26:not(.m-home) .btn {
+  border-radius: var(--r-1);
+  min-height: var(--tap);
+  padding: 0 var(--space-5);
+  letter-spacing: .08em;
+  font-weight: 600;
+  border-width: 1px;
+  justify-content: center;
+  transition: background var(--d-1) var(--e-standard),
+              color var(--d-1) var(--e-standard),
+              border-color var(--d-1) var(--e-standard),
+              transform var(--d-1) var(--e-standard),
+              box-shadow var(--d-1) var(--e-standard);
+}
+body.m26:not(.m-home) .btn:active { transform: translateY(1px); }
+
+/* One filled cobalt plane per screen, and it is the screen's own action: the
+   hero button. Everything else that used to be filled becomes an accent
+   outline, which keeps the hierarchy the brief asks for without taking a
+   single call to action off the page.
+
+   The one exception is lime, and it is a rule rather than a mood: LIME IS THE
+   GIFT, COBALT IS THE PURCHASE. The Community action sits inside the one dark
+   object on the screen and is set in the single legal lime plane in the
+   system, #0A1626 on #B2FF3F at 14.94:1. Nothing else on these pages fills
+   with lime. */
+body.m26:not(.m-home) .btn-primary,
+body.m26:not(.m-home) .btn-lime,
+body.m26:not(.m-home) .nav-cta {
+  border-radius: var(--r-1);
+  border-width: 1px;
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--accent);
+  box-shadow: none;
+}
+body.m26:not(.m-home) .btn-primary:hover,
+body.m26:not(.m-home) .btn-lime:hover,
+body.m26:not(.m-home) .nav-cta:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent-hov);
+  color: var(--accent-hov);
+  opacity: 1;
+}
+
+/* THE one filled action, per screen, by name. */
+body.m-home     .home-hero .home-actions .btn-lime,
+body.m-pricing  #main-content a.btn-primary[href="/signup"],
+body:is(.m-parasign,.m-parasend) .ps-hero .ps-actions a.btn-primary,
+body.m-about    .hero-cta a.btn-primary,
+body.m-security .hero-cta a.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  box-shadow: var(--sh-1);
+}
+body.m-home     .home-hero .home-actions .btn-lime:hover,
+body.m-pricing  #main-content a.btn-primary[href="/signup"]:hover,
+body:is(.m-parasign,.m-parasend) .ps-hero .ps-actions a.btn-primary:hover,
+body.m-about    .hero-cta a.btn-primary:hover,
+body.m-security .hero-cta a.btn-primary:hover {
+  background: var(--accent-hov);
+  border-color: var(--accent-hov);
+  color: var(--accent-ink);
+  box-shadow: var(--sh-2);
+}
+
+body.m26:not(.m-home) .btn-secondary,
+body.m26:not(.m-home) .btn-outline,
+body.m26:not(.m-home) .home-act-ghost,
+body.m26:not(.m-home) .nav-signin {
+  background: transparent;
+  color: var(--ink-2);
+  border-color: var(--line-2);
+  box-shadow: none;
+}
+body.m26:not(.m-home) .btn-secondary:hover,
+body.m26:not(.m-home) .btn-outline:hover,
+body.m26:not(.m-home) .home-act-ghost:hover,
+body.m26:not(.m-home) .nav-signin:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── The mono label. 11px, +0.14em, with a lime dash in front. Radius zero:
+   this is one of the things that carries the brand. ── */
+body.m26:not(.m-home) .sec-eyebrow,
+body.m26:not(.m-home) .mono-eyebrow,
+body.m26:not(.m-home) .prod-name,
+body.m26:not(.m-home) .split-kicker,
+body.m26:not(.m-home) .tier-name,
+body.m26:not(.m-home) .check-card .k,
+body.m26:not(.m-home) .split-card .k,
+body.m26:not(.m-home) .person-title,
+body.m26:not(.m-home) .about-byline .t {
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  line-height: 1.4;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-3);
+  border-radius: var(--r-0);
+}
+body.m26:not(.m-home) .mono-eyebrow,
+body.m26:not(.m-home) .prod-name,
+body.m26:not(.m-home) .tier-name,
+body.m26:not(.m-home) .check-card .k,
+body.m26:not(.m-home) .split-card .k,
+body.m26:not(.m-home) .person-title,
+body.m26:not(.m-home) .about-byline .t {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+body.m26:not(.m-home) .mono-eyebrow::before,
+body.m26:not(.m-home) .prod-name::before,
+body.m26:not(.m-home) .tier-name::before,
+body.m26:not(.m-home) .check-card .k::before,
+body.m26:not(.m-home) .split-card .k::before,
+body.m26:not(.m-home) .person-title::before,
+body.m26:not(.m-home) .about-byline .t::before {
+  content: "";
+  width: 14px;
+  height: 2px;
+  background: var(--mark);
+  flex: 0 0 auto;
+}
+/* .sec-eyebrow already ships its own dash as a <span>. */
+body.m26:not(.m-home) .sec-eyebrow span { width: 14px; height: 2px; background: var(--mark); }
+
+/* ── The marked link. Mono, a lime underline, an arrow that moves 3px. This is
+   the "read on" shape, and it is what stands in for a second button. ── */
+body.m26:not(.m-home) .sec-link,
+body.m26:not(.m-home) .r-verify,
+body.m26:not(.m-home) .yearly-alt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: var(--t-sm);
+  letter-spacing: .04em;
+  color: var(--ink-1);
+  text-decoration: none;
+  border-bottom: 1px solid var(--mark);
+  padding-bottom: 3px;
+  min-height: 32px;
+  transition: color var(--d-1) var(--e-standard);
+}
+body.m26:not(.m-home) .yearly-alt { color: var(--accent); text-decoration: none; border-bottom-color: var(--mark); }
+body.m26:not(.m-home) .sec-link:hover,
+body.m26:not(.m-home) .r-verify:hover,
+body.m26:not(.m-home) .yearly-alt:hover { color: var(--accent); }
+body.m26:not(.m-home) .sec-link span[aria-hidden],
+body.m26:not(.m-home) .r-verify span[aria-hidden],
+body.m26:not(.m-home) .yearly-alt::after {
+  display: inline-block;
+  transition: transform var(--d-2) var(--e-standard);
+}
+body.m26:not(.m-home) .sec-link:hover span[aria-hidden],
+body.m26:not(.m-home) .r-verify:hover span[aria-hidden] { transform: translateX(3px); }
+
+/* ── Cards. Hairline and a whisper of shadow; the plane does the work, not the
+   border. The clickable variant lifts 1px, and only that. ── */
+body.m26:not(.m-home) .split-card,
+body.m26:not(.m-home) .prod-grid > li,
+body.m26:not(.m-home) .price-grid > li,
+body.m26:not(.m-home) .check-card,
+body.m26:not(.m-home) .tier-card,
+body.m26:not(.m-home) .person-card,
+body.m26:not(.m-home) .scope-note,
+body.m26:not(.m-home) .ps-note,
+body.m26:not(.m-home) .card {
+  border-radius: var(--r-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--sh-1);
+}
+body.m26:not(.m-home) .check-card,
+body.m26:not(.m-home) .split-card,
+body.m26:not(.m-home) .step-grid li,
+body.m26:not(.m-home) .rules-grid li {
+  /* These live inside a 1px-gap grid that draws the hairlines itself, so they
+     keep square corners and no border of their own. */
+  border-radius: var(--r-0);
+  border: 0;
+  box-shadow: none;
+}
+body.m26:not(.m-home) .scope-note,
+body.m26:not(.m-home) .ps-note,
+body.m26:not(.m-home) .person-card {
+  background: var(--surface-sunk);
+  box-shadow: none;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5. HOME
+   The homepage was rebuilt on main in #377 while this branch was in flight, in
+   the same direction and with its own page-local token set (--hp-*). That page
+   is left exactly as it was merged: not one rule of its layout is touched here.
+   What is missing from it is dark, and dark is the one thing that cannot be
+   half done (design-direction.md section 5), because the shell around it goes
+   dark with the other five screens either way.
+
+   So this section is a token set and nothing else. :root:root outranks the
+   page's own :root on specificity rather than on order, so the values land
+   even though index.html's style block is parsed after this file.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) body.m-home,
+  :root:root:not([data-theme="light"]) {
+    --hp-paper:   #0A0F16;
+    --hp-paper-2: #10161F;
+    --hp-ink:     #EDF1F6;
+    --hp-ink-2:   #B4C1D0;
+    --hp-ink-3:   #8D9CAD;
+    --hp-line:    rgba(237,241,246,.12);
+    --hp-line-2:  rgba(237,241,246,.22);
+    /* The one dark object stays darker than the page it sits on, so it is
+       still the one dark object and not merely more of the same. */
+    --hp-night:   #04070C;
+    --hp-night-2: #0B1526;
+    --hp-cobalt:   #7FA6FF;
+    --hp-cobalt-2: #9CBAFF;
+    --hp-lime-ink: #B2FF3F;
+  }
+}
+:root:root[data-theme="dark"] {
+  --hp-paper:   #0A0F16;
+  --hp-paper-2: #10161F;
+  --hp-ink:     #EDF1F6;
+  --hp-ink-2:   #B4C1D0;
+  --hp-ink-3:   #8D9CAD;
+  --hp-line:    rgba(237,241,246,.12);
+  --hp-line-2:  rgba(237,241,246,.22);
+  --hp-night:   #04070C;
+  --hp-night-2: #0B1526;
+  --hp-cobalt:   #7FA6FF;
+  --hp-cobalt-2: #9CBAFF;
+  --hp-lime-ink: #B2FF3F;
+}
+/* The values that page writes as literals rather than as tokens. Each one is a
+   plane or a piece of ink that a token would have carried into dark on its own;
+   none of them changes in light. The document in the hero stays white, because
+   a document is white and that is the whole image. */
+body.m-home .home-hero { background: var(--hp-paper); }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) body.m-home .hp-btn-fill { color: #06101F; }
+  html:not([data-theme="light"]) body.m-home .hp-btn-paper { background: var(--hp-ink); color: #0A0F16; }
+  html:not([data-theme="light"]) body.m-home .hp-btn-paper:hover { background: #FFFFFF; }
+  html:not([data-theme="light"]) body.m-home .hp-btn-line:hover { background: rgba(237,241,246,.06); }
+  html:not([data-theme="light"]) body.m-home .panel-paper,
+  html:not([data-theme="light"]) body.m-home .prod-grid li,
+  html:not([data-theme="light"]) body.m-home .price-grid > li,
+  html:not([data-theme="light"]) body.m-home .hero-by .by-mark { background: var(--hp-paper-2); }
+  html:not([data-theme="light"]) body.m-home .hp-dust { filter: invert(1) brightness(1.6); }
+}
+body.m26[data-theme="dark"] .hp-btn-fill, :root[data-theme="dark"] body.m-home .hp-btn-fill { color: #06101F; }
+:root[data-theme="dark"] body.m-home .hp-btn-paper { background: var(--hp-ink); color: #0A0F16; }
+:root[data-theme="dark"] body.m-home .hp-btn-paper:hover { background: #FFFFFF; }
+:root[data-theme="dark"] body.m-home .hp-btn-line:hover { background: rgba(237,241,246,.06); }
+:root[data-theme="dark"] body.m-home .panel-paper,
+:root[data-theme="dark"] body.m-home .prod-grid li,
+:root[data-theme="dark"] body.m-home .price-grid > li,
+:root[data-theme="dark"] body.m-home .hero-by .by-mark { background: var(--hp-paper-2); }
+:root[data-theme="dark"] body.m-home .hp-dust { filter: invert(1) brightness(1.6); }
+/* Two inline links in the running text of that page are distinguished by
+   colour alone, at 2.01:1 and 1.76:1 against the sentence around them (axe
+   link-in-text-block). They get an underline and keep their colour, so nothing
+   about the design changes and the link is findable without seeing colour.
+   Only anchors with no class of their own, so every hp-btn is left alone. */
+body.m-home main a:not([class]) {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+body.m-home .home-dev a { color: var(--hp-ink); border-bottom: 1px solid var(--mark); text-decoration: none; }
+body.m-home .home-dev a:hover { color: var(--accent); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   6. PRICING
+   The strictest page on the site: tests/pricing-fold.test.mjs pins the bottom
+   edge of nine lines and the CTA inside 390x844, the order they stand in, and
+   the width of every tier card at 320/390/768/1024/1280. Vertical rhythm here
+   may only ever get tighter, never looser.
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* One left edge for the whole page. The hero sits in .container-md (760px)
+   and everything under it in .container (1280px), which on a wide screen puts
+   the first sentence 380px in and the tier grid 120px in: two different pages
+   stacked. Both containers are held to 1080px here, the measure the rest of
+   this system uses, and the running text keeps its own 62ch so nothing gets
+   harder to read. At 390px both are already full-bleed, so
+   tests/pricing-fold.test.mjs measures exactly what it measured before. */
+body.m-pricing .container,
+body.m-pricing .container-md { max-width: 1080px; }
+
+/* The hero head is a three-column grid, so the kicker sits on the H1's
+   baseline half a word away from it instead of reading as the line under the
+   title. Stacked, like every other page head in this round. */
+body.m-pricing .sec-head {
+  grid-template-columns: 1fr;
+  align-items: start;
+  row-gap: var(--space-2);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: var(--space-4);
+}
+body.m-pricing .sec-head h1 {
+  font-size: var(--t-h1);
+  line-height: 1.08;
+  letter-spacing: -0.028em;
+  color: var(--ink-1);
+}
+body.m-pricing .sec-head > span {
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  letter-spacing: .14em;
+  color: var(--ink-3) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+body.m-pricing .sec-head > span::before { content: ""; width: 14px; height: 2px; background: var(--mark); }
+body.m-pricing #main-content p { max-width: 62ch; }
+/* The two lime-ruled notes on /pricing are written inline, one of them with
+   margin:auto, so they sat centred in a 1280px container while the grid beside
+   them started 100px further left. Held to the same left edge and the same
+   reading measure as everything else, and given the sunk plane the scope note
+   on the product pages has. Not a word inside them changes. */
+body.m-pricing div[style*="border-left:3px solid var(--lime)"] {
+  max-width: 62ch !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  border: 1px solid var(--line) !important;
+  border-left: 2px solid var(--mark) !important;
+  border-radius: var(--r-1);
+  background: var(--surface-sunk) !important;
+}
+
+/* The amount is the one number a buyer reads twice. Set in the sans at a
+   display size with tabular figures, so €0, €49 and €299 line up on their own
+   column edge and "Let's talk" does not have to pretend to be a number in a
+   48px monospace. */
+body.m-pricing .tier-price {
+  font-family: var(--sans);
+  font-size: clamp(30px, 2.4vw, 40px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--ink-1);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 6px;
+}
+body.m-pricing .tier-price span {
+  font-family: var(--mono);
+  font-size: var(--t-mini) !important;
+  letter-spacing: .06em;
+  color: var(--ink-3) !important;
+  font-weight: 400;
+}
+
+body.m-pricing .tier-grid {
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  overflow: hidden;
+}
+body.m-pricing .tier-card {
+  background: var(--surface);
+  border-radius: var(--r-0);
+  border: 0;
+  box-shadow: none;
+  padding: var(--space-6) var(--space-5);
+  position: relative;
+}
+/* Lime as a plane behind text was the one contrast risk left on this page:
+   the cobalt tier label on #B2FF3F measures 3.4:1 and the note under the
+   amount 2.6:1, both under AA. The featured card keeps its emphasis and loses
+   the plane: a soft accent wash, a 2px lime rule on top, and the accent label.
+   Same card, same words, nothing under AA. */
+body.m-pricing .tier-card.featured {
+  /* Opaque, not a wash: .tier-grid paints a hairline behind every cell, and a
+     translucent card over it composited to rgb(209,214,224), which put the
+     price note and the "/month" at 3.79:1. Measured after the fix, not before. */
+  background: var(--accent-wash);
+  box-shadow: inset 0 2px 0 var(--mark);
+}
+body.m-pricing .tier-card.featured .tier-price-note,
+body.m-pricing .tier-card.featured .tier-price span { color: var(--ink-2) !important; }
+/* The incl.-btw figure inside the tier CTA is dimmed to .85 in the markup,
+   which was fine on a filled cobalt plane and is 4.47:1 on the outlined one.
+   The button is no longer filled, so the dimming has nothing left to do. */
+body.m-pricing .tier-card .btn span { opacity: 1 !important; }
+body.m-pricing .tier-card.featured .tier-name { color: var(--accent); }
+body.m-pricing .tier-card.featured .tier-name::before { background: var(--accent); }
+body.m-pricing .tier-name { color: var(--ink-3); margin-bottom: var(--space-4); }
+body.m-pricing .tier-price {
+  font-family: var(--mono);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink-1);
+  font-variant-numeric: tabular-nums;
+}
+body.m-pricing .tier-price-note { font-size: var(--t-sm); color: var(--ink-3); }
+body.m-pricing .tier-price-note .incl { color: var(--ink-2); font-weight: 600; }
+body.m-pricing .tier-features li {
+  font-family: var(--mono);
+  font-size: var(--t-mini);
+  line-height: 1.55;
+  color: var(--ink-2);
+  border-bottom: 1px solid var(--line-ghost);
+  padding: 9px 0 9px 16px;
+  text-indent: -16px;
+}
+body.m-pricing .tier-features li::before { color: var(--accent); font-weight: 600; }
+body.m-pricing .tier-features li.dim { color: var(--ink-3); }
+body.m-pricing .tier-features li.dim::before { color: var(--ink-3); }
+
+body.m-pricing .prose-section { border-top: 1px solid var(--line); padding: 72px 0; }
+body.m-pricing .prose-section h3 { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: .14em; }
+body.m-pricing .prose-section p { font-size: var(--t-body); color: var(--ink-2); line-height: 1.7; max-width: 62ch; }
+
+body.m-pricing .faq-item { border-top: 1px solid var(--line); padding: var(--space-5) 0; }
+body.m-pricing .faq-item:last-child { border-bottom: 1px solid var(--line); }
+body.m-pricing .faq-q { font-size: var(--t-h4); font-weight: 600; color: var(--ink-1); letter-spacing: -0.01em; }
+body.m-pricing .faq-a { font-size: var(--t-body); color: var(--ink-2); line-height: 1.7; max-width: 62ch; }
+
+body.m-pricing .trial-cta {
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+  padding: var(--space-6);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   7. PARASIGN AND PARASEND
+   Same treatment on both: hairline cards, a mono label over every heading, one
+   filled action. The mobile media queries that hold the SES sentence at y=815
+   on /parasign and the who-line on /parasend are in those files and untouched.
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* The shared .sec-head parks a display-size section number in its own grid
+   column beside the H1. On a page whose whole argument is "we show you the
+   proof", a 128px cobalt "00" that measures nothing is the largest object on
+   the screen and it is decoration: verbod 3. It stays on the page as the
+   register mark it is, in the mono label size, above the heading, and the H1
+   gets the full measure back. The pages' own mobile rules carry an id and so
+   still win under 640px, which is where the geometry tests measure. */
+body:is(.m-parasign,.m-parasend) .sec-head,
+body.m-about .sec-head {
+  grid-template-columns: 1fr;
+  align-items: start;
+  row-gap: var(--space-3);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+body:is(.m-parasign,.m-parasend) .sec-head .num,
+body.m-about .sec-head .num {
+  order: 1;
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  letter-spacing: .14em;
+  line-height: 1.4;
+  color: var(--ink-3);
+}
+body:is(.m-parasign,.m-parasend) .sec-head h1,
+body.m-about .sec-head h1 {
+  order: 2;
+  font-size: var(--t-h1);
+  line-height: 1.08;
+  letter-spacing: -0.028em;
+  color: var(--ink-1);
+  max-width: 22ch;
+  text-wrap: balance;
+}
+body:is(.m-parasign,.m-parasend) .sec-head .mono-eyebrow,
+body.m-about .sec-head .mono-eyebrow { order: 3; }
+/* 72px of section rhythm from the tablet width up only. On a phone these two
+   heroes keep the tighter top the pages set for themselves, and they have to:
+   tests/first-screen.test.mjs pins the SES sentence on /parasign inside 844 at
+   390px and that sentence starts two thirds of the way down. Applied at every
+   width this spent 40px of the one screen that has to carry it, which held on
+   one Chromium and wrapped a line on the next. */
+@media (min-width: 641px) {
+  body.m-parasign .ps-hero,
+  body.m-parasend .ps-hero { padding: 72px 0 var(--space-6); }
+}
+
+body.m-parasign .ps-band,
+body.m-parasend .ps-band { border-top: 1px solid var(--line); padding: 72px 0; }
+body.m-parasign .ps-band h2,
+body.m-parasend .ps-band h2 { font-size: var(--t-h2); letter-spacing: -0.022em; line-height: 1.14; color: var(--ink-1); }
+body.m-parasign .ps-lede,
+body.m-parasend .ps-lede { font-size: var(--t-lead); color: var(--ink-2); line-height: 1.62; max-width: 62ch; }
+body.m-parasign .ps-who,
+body.m-parasend .ps-who { font-size: var(--t-body); color: var(--ink-1); font-weight: 600; line-height: 1.6; max-width: 62ch; }
+body.m-parasign .ps-band p,
+body.m-parasend .ps-band p { font-size: var(--t-body); color: var(--ink-2); line-height: 1.7; max-width: 62ch; }
+body.m-parasign .ps-band p strong,
+body.m-parasend .ps-band p strong { color: var(--ink-1); }
+body.m-parasign .ps-sub,
+body.m-parasend .ps-sub { font-size: var(--t-sm); color: var(--ink-2); line-height: 1.65; }
+body.m-parasign .ps-fine,
+body.m-parasend .ps-fine { font-size: var(--t-micro); letter-spacing: .06em; color: var(--ink-3); line-height: 1.6; max-width: 72ch; }
+
+body.m-parasign .check-grid,
+body.m-parasend .check-grid { background: var(--line); border: 1px solid var(--line); border-radius: var(--r-2); overflow: hidden; }
+body.m-parasign .check-card,
+body.m-parasend .check-card { background: var(--surface); padding: var(--space-5); }
+body.m-parasign .check-card .k,
+body.m-parasend .check-card .k { color: var(--ink-3); }
+body.m-parasign .check-card p,
+body.m-parasend .check-card p { font-size: var(--t-sm); color: var(--ink-2); line-height: 1.62; }
+
+/* The business grid on /parasend is three columns wide and holds two cards, so
+   the empty third cell showed the grid's own hairline colour as a grey panel.
+   The hairlines move onto the cards, which means an unfilled cell is simply
+   not there instead of being a block of nothing. */
+body:is(.m-parasign,.m-parasend) .tier-grid { background: var(--surface); gap: 0; }
+body:is(.m-parasign,.m-parasend) .tier-grid > .tier-card + .tier-card { box-shadow: inset 1px 0 0 var(--line); }
+@media (max-width: 860px) {
+  body:is(.m-parasign,.m-parasend) .tier-grid > .tier-card + .tier-card { box-shadow: inset 0 1px 0 var(--line); }
+}
+/* Same treatment as /pricing: the highlighted tier keeps its emphasis and
+   loses the lime plane, which carried cobalt and navy text at 3.4:1 and 2.6:1. */
+body:is(.m-parasign,.m-parasend) .tier-card.featured {
+  background: var(--accent-wash);
+  box-shadow: inset 0 2px 0 var(--mark);
+}
+body:is(.m-parasign,.m-parasend) .tier-card.featured .tier-name { color: var(--accent); }
+body:is(.m-parasign,.m-parasend) .tier-card.featured .tier-name::before { background: var(--accent); }
+
+body.m-parasign .ps-steps li,
+body.m-parasend .ps-steps li {
+  border-top: 1px solid var(--line);
+  font-size: var(--t-body);
+  color: var(--ink-2);
+  line-height: 1.7;
+  padding-left: 56px;
+}
+body.m-parasign .ps-steps li:last-child,
+body.m-parasend .ps-steps li:last-child { border-bottom: 1px solid var(--line); }
+body.m-parasign .ps-steps li::before,
+body.m-parasend .ps-steps li::before { color: var(--accent); font-size: var(--t-micro); letter-spacing: .14em; }
+body.m-parasign .ps-steps strong,
+body.m-parasend .ps-steps strong { color: var(--ink-1); }
+
+/* Headroom for the one sentence on /parasign that has to be readable before a
+   buyer signs: "a ParaSign signature is a Simple Electronic Signature". It sits
+   two thirds down the first screen, and CI renders these pages in a DejaVu Sans
+   that wraps a line earlier than the one on a development machine, so the
+   margin has to be real rather than exact. Measured against origin/main at
+   390px, the sentence ends at y=815 there and y=784 here: 31px of room that was
+   not there before, bought back out of the gaps and not out of the words. */
+@media (max-width: 640px) {
+  body.m-parasign .ps-who,
+  body.m-parasend .ps-who { margin-top: var(--space-2); }
+  body.m-parasign .scope-note,
+  body.m-parasend .scope-note {
+    margin-top: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+  }
+  body.m-parasign .scope-note p,
+  body.m-parasend .scope-note p { line-height: 1.62; }
+}
+
+/* The scope note is not a warning and must not read as one. Sunk plane, lime
+   rule, no red anywhere. */
+body.m-parasign .scope-note,
+body.m-parasign .ps-note,
+body.m-parasend .scope-note,
+body.m-parasend .ps-note {
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--mark);
+  border-radius: var(--r-1);
+  background: var(--surface-sunk);
+  padding: var(--space-4) var(--space-5);
+}
+body.m-parasign .scope-note p,
+body.m-parasign .ps-note,
+body.m-parasend .scope-note p,
+body.m-parasend .ps-note { color: var(--ink-2); }
+
+/* The Community block on the product pages: the one dark object per screen,
+   in place of the lime plane it used to be. */
+body.m-parasign .community,
+body.m-parasend .community {
+  background: var(--surface-ink);
+  border: 1px solid var(--surface-ink);
+  border-radius: var(--r-3);
+  box-shadow: var(--sh-2);
+  padding: var(--space-6);
+  position: relative;
+  overflow: hidden;
+}
+body.m-parasign .community::before,
+body.m-parasend .community::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: var(--mark);
+}
+body.m-parasign .community .mono-eyebrow,
+body.m-parasend .community .mono-eyebrow { color: var(--mark); }
+body.m-parasign .community .mono-eyebrow::before,
+body.m-parasend .community .mono-eyebrow::before { background: var(--mark); }
+body.m-parasign .community h3,
+body.m-parasend .community h3 { color: var(--on-ink); font-size: var(--t-h3); letter-spacing: -0.014em; }
+body.m-parasign .community p,
+body.m-parasend .community p { color: var(--on-ink-2); font-size: var(--t-body); line-height: 1.65; }
+body:is(.m-parasign,.m-parasend) .community p strong,
+body:is(.m-parasign,.m-parasend) .community p b,
+body:is(.m-parasign,.m-parasend) .community strong,
+body:is(.m-parasign,.m-parasend) .community b,
+body:is(.m-parasign,.m-parasend) .community .k,
+body.m-parasign .community h2,
+body.m-parasend .community h2 { color: var(--on-ink); }
+/* An inverted plane needs its own link colour: cobalt on #0C1622 measures
+   2.72:1. The lime here is a text colour on a dark ground (15.8:1), not a
+   plane, so it stays inside the rule that lime is a line. */
+body:is(.m-parasign,.m-parasend) .community p a:not(.btn),
+body:is(.m-parasign,.m-parasend) .community li a:not(.btn),
+body.m-parasign .community a:not(.btn),
+body.m-parasend .community a:not(.btn) {
+  color: var(--mark);
+  text-decoration: underline;
+  text-decoration-color: rgba(178,255,63,.55);
+  text-underline-offset: 2px;
+}
+body.m-parasign .community a:not(.btn):hover,
+body.m-parasend .community a:not(.btn):hover { text-decoration-color: var(--mark); }
+body.m-parasign .community .k::before,
+body.m-parasend .community .k::before { background: var(--mark); }
+body.m-parasign .community li,
+body.m-parasend .community li {
+  font-family: var(--mono);
+  font-size: var(--t-mini);
+  color: var(--on-ink-2);
+  border-bottom: 1px solid var(--on-ink-line);
+  padding: 9px 0;
+}
+body.m-parasign .community li::before,
+body.m-parasend .community li::before { color: var(--mark); }
+body.m-parasign .community .btn-primary,
+body.m-parasign .community .btn-lime,
+body.m-parasend .community .btn-primary,
+body.m-parasend .community .btn-lime { background: var(--mark); border-color: var(--mark); color: #0A1626; }
+body.m-parasign .community .btn-primary:hover,
+body.m-parasign .community .btn-lime:hover,
+body.m-parasend .community .btn-primary:hover,
+body.m-parasend .community .btn-lime:hover { background: #C6FF74; border-color: #C6FF74; color: #0A1626; }
+body.m-parasign .community .btn-secondary,
+body.m-parasign .community .btn-outline,
+body.m-parasend .community .btn-secondary,
+body.m-parasend .community .btn-outline {
+  color: var(--on-ink);
+  border-color: var(--on-ink-line);
+  background: transparent;
+}
+body.m-parasign .community .btn-secondary:hover,
+body.m-parasign .community .btn-outline:hover,
+body.m-parasend .community .btn-secondary:hover,
+body.m-parasend .community .btn-outline:hover { border-color: var(--mark); color: var(--on-ink); background: rgba(178,255,63,.08); }
+
+body.m-parasign .person-card,
+body.m-parasign .about-byline,
+body.m-parasend .person-card,
+body.m-parasend .about-byline { border-left: 2px solid var(--accent); }
+body.m-parasign .person-card,
+body.m-parasend .person-card {
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--r-1);
+  background: var(--surface-sunk);
+  padding: var(--space-5) var(--space-6);
+}
+body.m-parasign .split-label,
+body.m-parasend .split-label { color: var(--ink-3); font-size: var(--t-micro); letter-spacing: .14em; }
+body.m-parasign .split-label .who,
+body.m-parasend .split-label .who { color: var(--ink-3); }
+body.m-parasign .dev-line,
+body.m-parasend .dev-line { font-size: var(--t-sm); color: var(--ink-3); line-height: 1.7; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   8. ABOUT
+   The one page that names the person behind the product. The byline is what
+   tests/first-screen.test.mjs measures, so it is the thing given room.
+   ═══════════════════════════════════════════════════════════════════════════ */
+body.m-about .about-band { border-top: 1px solid var(--line); padding: 72px 0; }
+body.m-about .about-band h2 { font-size: var(--t-h2); letter-spacing: -0.022em; line-height: 1.14; color: var(--ink-1); }
+body.m-about .about-lede { font-size: var(--t-lead); color: var(--ink-2); line-height: 1.62; max-width: 62ch; }
+body.m-about .about-band p { font-size: var(--t-body); color: var(--ink-2); line-height: 1.7; max-width: 62ch; }
+body.m-about .about-band p strong { color: var(--ink-1); }
+body.m-about .about-for { font-size: var(--t-body); color: var(--ink-2); line-height: 1.65; }
+body.m-about .about-byline {
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--accent);
+}
+body.m-about .about-byline .n { font-size: var(--t-h4); font-weight: 600; color: var(--ink-1); letter-spacing: -0.014em; }
+body.m-about .about-byline .t { color: var(--ink-3); margin-top: 6px; }
+body.m-about .person-name { font-size: var(--t-h3); font-weight: 600; color: var(--ink-1); letter-spacing: -0.014em; }
+body.m-about .split-head { font-size: var(--t-h4); font-weight: 600; color: var(--ink-1); }
+body.m-about .split-grid .split-card { background: var(--surface); padding: var(--space-5); }
+body.m-about .split-grid .split-card p { font-size: var(--t-sm); color: var(--ink-2); line-height: 1.62; }
+body.m-about .split-note { font-size: var(--t-sm); color: var(--ink-2); line-height: 1.65; }
+/* /about carries .split-grid too, but there it is a hairline grid rather than
+   the homepage's two-up of full cards, so it keeps square corners and lets the
+   grid itself draw the lines. */
+body.m-about .split-grid { border-radius: var(--r-2); overflow: hidden; }
+body.m-about .split-card { border-radius: var(--r-0); border: 0; box-shadow: none; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   9. SECURITY
+   A dark hero, and it is the one inverted plane on the page. Everything under
+   it is a document: hairlines, tabular figures, no boxes.
+   ═══════════════════════════════════════════════════════════════════════════ */
+body.m-security .page-hero {
+  background: var(--surface-sunk);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  /* 72px of section rhythm on a wide screen, 40px on a phone. The two hero
+     actions on /security end at y=838 in DejaVu at 390px and
+     tests/first-screen.test.mjs pins them inside 844, so this hero may not
+     grow at the narrow end. */
+  padding: clamp(40px, 6vw, 72px) var(--space-5);
+}
+body.m-security .page-hero-inner { max-width: 1080px; }
+body.m-security .page-hero h1 { color: var(--ink-1); font-size: var(--t-h1); line-height: 1.08; letter-spacing: -0.028em; }
+body.m-security .page-hero .lede { color: var(--ink-2); font-size: var(--t-lead); line-height: 1.6; max-width: 62ch; }
+/* The hero carries two ledes and the second one is the qualifier, not the
+   promise, so it stays at body size the way it always has. It is also 23px of
+   the one screen tests/first-screen.test.mjs measures: the two hero actions on
+   /security have to end inside 844 on a 390px phone. */
+body.m-security .page-hero-inner .lede + .lede { font-size: var(--t-body); line-height: 1.62; }
+/* The whole hero has to end inside 844 on a 390px phone, buttons included, and
+   the promise in it runs nine lines at that width. On a phone the leading
+   tightens and the gaps between the promise, the qualifier, the company line
+   and the actions close up. Nothing is dropped and no word changes; this is the
+   same six blocks, set tighter. tests/first-screen.test.mjs measures it. */
+@media (max-width: 640px) {
+  body.m-security .page-hero { padding-top: 28px; padding-bottom: 32px; }
+  body.m-security .page-hero .lede { line-height: 1.5; }
+  body.m-security .page-hero-inner .lede + .lede { margin-top: 12px; line-height: 1.55; }
+  body.m-security .hero-by { margin-top: 12px; line-height: 1.55; }
+  body.m-security .hero-cta { margin-top: 14px; gap: 10px; }
+}
+body.m-security .page-hero .eyebrow {
+  background: transparent;
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  letter-spacing: .14em;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--r-0);
+}
+body.m-security .page-hero .eyebrow::before { content: ""; width: 14px; height: 2px; background: var(--mark); }
+
+body.m-security .page-hero--navy {
+  background: var(--surface-ink);
+  border-color: var(--surface-ink);
+  position: relative;
+  overflow: hidden;
+}
+body.m-security .page-hero--navy::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 2px;
+  background: var(--mark);
+}
+body.m-security .page-hero--navy h1 { color: var(--on-ink); }
+body.m-security .page-hero--navy .lede { color: var(--on-ink-2); }
+body.m-security .page-hero--navy .eyebrow { background: transparent; color: var(--mark); }
+body.m-security .page-hero--navy .eyebrow::before { background: var(--mark); }
+body.m-security .page-hero--navy .hero-by { color: var(--on-ink-2); font-size: var(--t-sm); line-height: 1.65; }
+body.m-security .page-hero--navy .btn-primary { background: var(--mark); border-color: var(--mark); color: #0A1626; }
+body.m-security .page-hero--navy .btn-primary:hover { background: #C6FF74; border-color: #C6FF74; color: #0A1626; }
+body.m-security .page-hero--navy .btn-secondary {
+  color: var(--on-ink);
+  border-color: var(--on-ink-line);
+  background: transparent;
+}
+body.m-security .page-hero--navy .btn-secondary:hover { background: rgba(178,255,63,.08); border-color: var(--mark); color: var(--on-ink); }
+
+/* The body of /security is a document, and it is set like one. */
+/* One left edge again: the hero and the document under it are both held to an
+   820px measure with 48px of gutter, so the first sentence and the first table
+   start on the same line. Only from 641px up; the phone layout, which the
+   first-screen test measures, is untouched. */
+body.m-security main { max-width: 820px; }
+@media (min-width: 641px) {
+  body.m-security .page-hero { padding-left: 0; padding-right: 0; }
+  body.m-security .page-hero-inner { max-width: 820px; margin: 0 auto; padding: 0 48px; }
+  body.m-security main { padding: 72px 48px 120px; }
+}
+body.m-security .card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+  padding: var(--space-5) var(--space-6);
+}
+body.m-security .stat-n { color: var(--ink-1); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+body.m-security .stat-l { color: var(--ink-3); font-family: var(--mono); font-size: var(--t-micro); letter-spacing: .14em; text-transform: uppercase; }
+body.m-security .check { color: var(--mark-ink); }
+body.m-security .table th {
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  letter-spacing: .14em;
+  border-bottom: 1px solid var(--line-2);
+  background: var(--surface-sunk);
+  padding: 10px 14px;
+}
+body.m-security .table td { color: var(--ink-2); border-bottom: 1px solid var(--line-ghost); font-size: var(--t-sm); }
+body.m-security .table td:first-child { color: var(--ink-1); }
+body.m-security .divider { border-top: 1px solid var(--line); margin: 72px 0; }
+body.m-security .timeline-dot { background: var(--mark); }
+body.m-security .timeline-date { color: var(--ink-3); font-family: var(--mono); font-size: var(--t-micro); letter-spacing: .1em; }
+body.m-security .timeline-title { color: var(--ink-1); font-size: var(--t-body); }
+body.m-security .timeline-desc { color: var(--ink-2); font-size: var(--t-sm); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   10. TOUCH AND MOTION
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Every operable element reaches 44px on a phone. Two triggers, on purpose:
+   a coarse pointer, and a viewport of 640px or less. Chromium's own mobile
+   emulation does not always report pointer:coarse, so a rule that hangs on that
+   one media feature is a rule that cannot be measured, and a tap target you
+   cannot measure is a tap target you do not have.
+
+   One exception, by design-direction 2.8: a text link inside a running
+   paragraph is held to the READING rule, an underline, not to the button rule.
+   It stays at its line height. */
+/* .m26 twice: the component rules above are held off the homepage with
+   :not(.m-home), which costs them a class of specificity, and a tap floor that
+   loses to the resting size is not a floor. Repeating the scope class matches
+   it, and source order then decides, which is what was meant all along. */
+@media (pointer: coarse), (max-width: 640px) {
+  body.m26.m26 .btn,
+  body.m26.m26 .nav-link,
+  body.m26.m26 .nav-cta,
+  body.m26.m26 .nav-signin,
+  body.m26.m26 .nav-logo,
+  body.m26.m26 .nav-mobile-standalone,
+  body.m26.m26 .nav-help-mobile,
+  body.m26.m26 .sec-link,
+  body.m26.m26 .r-verify,
+  body.m26.m26 .yearly-alt,
+  body.m26.m26 footer .footer-links a,
+  body.m26.m26 .skip-link {
+    min-height: var(--tap);
+    display: inline-flex;
+    align-items: center;
+  }
+  body.m26.m26 .nav-mobile-standalone,
+  body.m26.m26 .nav-help-mobile,
+  body.m26.m26 footer .footer-links a { display: flex; }
+  body.m26.m26 .nav-hamburger { width: var(--tap); height: var(--tap); }
+  /* .nav-help grows through its own padding rather than a display switch: two
+     of these pages hide it under 900px in their own style block, and forcing a
+     display value here would put it back on their phone layout. */
+  body.m26.m26 .nav-help { min-height: var(--tap); }
+  /* The buildbar is 32px of mono type by design and its one link is a reading
+     link inside that line, so it keeps the line rule rather than the tap rule. */
+  body.m26.m26 .meta-bar a.meta-link { min-height: 0; display: inline; }
+}
+
+/* Beweging is bevestiging, niets anders. Everything above moves 1px, 3px or not
+   at all, over 110-260ms. Under prefers-reduced-motion every duration collapses
+   to 1ms and every transform is dropped, so the page still has all of its
+   states and none of its movement. Proven with a screenshot, not assumed. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+  .prod-grid > li:hover,
+  .btn:active { transform: none; }
+  .sec-link:hover span[aria-hidden],
+  .r-verify:hover span[aria-hidden] { transform: none; }
+}

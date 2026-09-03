@@ -653,8 +653,13 @@ test('the tier block on /about repeats the numbers /pricing charges for', () => 
   // inside each one, keyed by the tier name /pricing prints. #336 renamed both
   // headings and put ParaSign first, so the split finds the headings by their
   // product prefix and orders them by position rather than assuming either.
-  const HEAD = /<h3[^>]*>(ParaSign|ParaSend)\s*(?:&middot;|\u00b7)[^<]*<\/h3>/g;
-  const marks = [...pricing.matchAll(HEAD)].map((m) => ({ product: m[1], at: m.index }));
+  // h2, not h3: /pricing runs h1 "Pricing" straight into these two product
+  // headings, and a level skipped that way is a real defect for a screen reader
+  // walking the outline (axe heading-order, and the one point /pricing was
+  // still losing). The level is not what this test is about, so it matches
+  // either one and keeps doing what it is here for: finding the two blocks.
+  const HEAD = /<h([23])[^>]*>(ParaSign|ParaSend)\s*(?:&middot;|\u00b7)[^<]*<\/h\1>/g;
+  const marks = [...pricing.matchAll(HEAD)].map((m) => ({ product: m[2], at: m.index }));
   assert.equal(marks.length, 2,
     `pricing.html must carry one heading per product, found ${marks.length}`);
   const section = (product) => {

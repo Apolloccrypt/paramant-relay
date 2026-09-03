@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#FBFAF7;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Inter","Segoe UI",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}@media (prefers-color-scheme:dark){html:not([data-theme="light"]),html:not([data-theme="light"]) body{background:#0A0F16;color:#EDF1F6}}html[data-theme="dark"],html[data-theme="dark"] body{background:#0A0F16;color:#EDF1F6}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ParaSign &middot; get documents signed, by Paramant</title>
 <meta property="og:site_name" content="Paramant">
@@ -21,11 +21,13 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0B3A6A">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#FBFAF7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0A0F16">
 
 <link rel="stylesheet" href="/design-system.css?v=23">
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
+<link rel="stylesheet" href="/marketing-2026.css?v=1">
 <style>
 .ps-hero{padding:var(--space-10) 0 var(--space-6)}
 .ps-band{padding:var(--space-8) 0;border-top:1px solid var(--ink-hair)}
@@ -152,7 +154,7 @@
 }
 </script>
 </head>
-<body>
+<body class="m26 m-parasign">
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
 <div class="meta-bar">
@@ -194,7 +196,7 @@
      the one limit a lawyer asks about before anything else. The algorithm names
      are the reason section 04 is true; section 6 of the guide keeps them out of
      the H1 and out of the opening paragraph, so they live down there. -->
-<section class="ps-hero" id="main-content" tabindex="-1">
+<section class="ps-hero" id="main-content" tabindex="-1" role="main">
   <div class="container-md">
     <div class="sec-head">
       <span class="num">00</span>
@@ -268,7 +270,7 @@
         <p class="ps-fine">Receiving is not metered. The tier table in relay/lib/tiers.js has no inbound or receiving dimension at all, so being invited, opening an invitation and fetching the document back are not counted against anything, on any plan. Putting your own signature on one is: that counts against the 2 a month above, whoever sent it to you.</p>
       </div>
       <div>
-        <div class="k" style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--navy)">Why it is free</div>
+        <div class="k">Why it is free</div>
         <p>Paramant is built by <strong>Mick Beer, privacy and security researcher</strong>, founder of Paramantis Solutions B.V. (see the <a href="/about">about page</a>). The Community plan is his way of giving something back: whoever needs to sign a document without handing it to an American cloud can do that here, at no cost, with the same cryptography a paying customer gets.</p>
         <p>It is not a limited edition of the product. Community gets the same signatures, the same encryption and the same public proof log as Business. What a paid plan buys is volume, an API, support and accountability. Never security.</p>
       </div>

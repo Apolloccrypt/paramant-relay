@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#FBFAF7;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Inter","Segoe UI",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}@media (prefers-color-scheme:dark){html:not([data-theme="light"]),html:not([data-theme="light"]) body{background:#0A0F16;color:#EDF1F6}}html[data-theme="dark"],html[data-theme="dark"] body{background:#0A0F16;color:#EDF1F6}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#FBFAF7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0A0F16">
 <title>Pricing · What is free, and what businesses pay · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
@@ -22,6 +24,7 @@
 <link rel="stylesheet" href="/design-system.css?v=23">
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
+<link rel="stylesheet" href="/marketing-2026.css?v=1">
 <style>
 .tier-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ink-hair)}
 .tier-card{padding:var(--space-7) var(--space-6);background:var(--bone);min-height:440px;display:flex;flex-direction:column}
@@ -188,7 +191,7 @@
 }
 </script>
 </head>
-<body>
+<body class="m26 m-pricing">
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
 <div class="meta-bar">
@@ -261,7 +264,7 @@
      Jargon is out of this block on purpose. "A dedicated relay" and "a
      connection to their own software" were the two phrases a lawyer cannot
      read; the same facts stand under the tables in the words the docs use. -->
-<section style="padding:var(--space-6) 0 var(--space-7)" id="main-content" tabindex="-1">
+<section style="padding:var(--space-6) 0 var(--space-7)" id="main-content" tabindex="-1" role="main">
   <div class="container-md">
     <!-- .sec-head carries margin-bottom:var(--space-8) sitewide, which is right
          under a section heading and wrong here: on a 390px screen it spends
@@ -330,7 +333,7 @@
   <div class="container">
     <div style="margin-bottom:var(--space-6)">
       <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Product</span>
-      <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-top:var(--space-2)">ParaSign · Get a document signed</h3>
+      <h2 style="font-size:var(--text-xl);text-transform:uppercase;margin-top:var(--space-2)">ParaSign · Get a document signed</h2>
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;max-width:760px;margin-top:var(--space-3)">
         Sign a PDF yourself, or send it to the people who have to sign it. Community covers 2 signatures a month, forever. Organisations pay for volume: 100 a month on Pro, 1,000 a month on Business with a named contact. ParaSign is priced separately from ParaSend, and from Pro it comes with a <strong>developer API</strong> with its own <a href="/docs#parasign-api" style="color:var(--cobalt)">documentation</a> and webhooks, so signing can run inside your own software.
       </p>
@@ -409,7 +412,7 @@
   <div class="container">
     <div style="margin-bottom:var(--space-6)">
       <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Product</span>
-      <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-top:var(--space-2)">ParaSend · Send a file that disappears</h3>
+      <h2 style="font-size:var(--text-xl);text-transform:uppercase;margin-top:var(--space-2)">ParaSend · Send a file that disappears</h2>
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;max-width:760px;margin-top:var(--space-3)">
         Send a file over a link that expires and burns on first read. Community covers 10 transfers a month at 5 MB per file, forever. Organisations that send every week pay for longer links, more reads and more registered devices.
       </p>

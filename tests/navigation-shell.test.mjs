@@ -47,12 +47,35 @@ await (async () => {
   ok('the homepage leads to both product pages, with the apps as the second action', JSON.stringify(ctas) === JSON.stringify(['/parasign','/sign','/parasend','/parashare']), await publicPage.locator('#products').innerText());
   ok('the homepage still routes to ParaSend from its own section', ctas.includes('/parashare'), await publicPage.locator('#products').innerText());
 })();
-const publicMobilePaint = await publicPage.locator('nav.nav').evaluate((node) => ({
-  background: getComputedStyle(node).backgroundColor,
-  backdropFilter: getComputedStyle(node).backdropFilter,
-  webkitBackdropFilter: getComputedStyle(node).getPropertyValue('-webkit-backdrop-filter'),
-}));
-ok('mobile navigation is opaque before opening the menu', publicMobilePaint.background === 'rgb(248, 250, 252)' && publicMobilePaint.backdropFilter === 'none' && (!publicMobilePaint.webkitBackdropFilter || publicMobilePaint.webkitBackdropFilter === 'none'), JSON.stringify(publicMobilePaint));
+// The guarantee is that the bar is OPAQUE and unblurred on a phone: on iOS
+// Safari a backdrop-filter over the dark hero renders see-through and the hero
+// showed through the top of the open menu. This used to be pinned to the
+// literal rgb(248, 250, 252), which is one palette's page colour and not the
+// property that matters; a theme change then reads as a nav regression, and a
+// dark theme could never satisfy it at all. Pinned to the page's own surface
+// token instead: fully opaque (alpha 1), no blur, and the same colour the page
+// itself is painted in, so a bar that stops matching its own page still fails.
+const publicMobilePaint = await publicPage.locator('nav.nav').evaluate((node) => {
+  const surface = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim()
+    || getComputedStyle(document.documentElement).getPropertyValue('--bone').trim();
+  const probe = document.createElement('span');
+  probe.style.cssText = `position:absolute;visibility:hidden;background:${surface}`;
+  document.body.appendChild(probe);
+  const pageSurface = getComputedStyle(probe).backgroundColor;
+  probe.remove();
+  return {
+    background: getComputedStyle(node).backgroundColor,
+    pageSurface,
+    backdropFilter: getComputedStyle(node).backdropFilter,
+    webkitBackdropFilter: getComputedStyle(node).getPropertyValue('-webkit-backdrop-filter'),
+  };
+});
+ok('mobile navigation is opaque before opening the menu',
+  /^rgb\(\d+, \d+, \d+\)$/.test(publicMobilePaint.background)
+  && publicMobilePaint.background === publicMobilePaint.pageSurface
+  && publicMobilePaint.backdropFilter === 'none'
+  && (!publicMobilePaint.webkitBackdropFilter || publicMobilePaint.webkitBackdropFilter === 'none'),
+  JSON.stringify(publicMobilePaint));
 await publicPage.locator('#nav-hamburger').click();
 await publicPage.waitForFunction(() => {
   const nav = document.querySelector('nav.nav')?.getBoundingClientRect();
