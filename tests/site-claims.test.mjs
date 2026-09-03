@@ -2321,3 +2321,75 @@ test('the ParaSend credential /privacy describes is the credential the code impl
   assert.match(page('parashare'), /data-click="expandApiKeyCard">Use a key by hand/,
     'and /parashare must still offer it, or /privacy describes a door that is not there');
 });
+
+// 37 ── The two legal facts, and the sentence that keeps them honest.
+//
+// Verified against the primary sources on 2026-09-03 (vault: "Verificatie -
+// twee juridische argumenten voor Paramant"). Both are true and both are one
+// rewrite away from being a promise we cannot keep, so each is pinned in two
+// directions: the fact has to be on the page, WITH its disclaimer, and the
+// overclaiming version of it has to be absent everywhere on the public site.
+//
+// Fact 1, art. 3:15a of the Dutch Civil Code: since 10 March 2017 it is a
+// single sentence with no numbered paragraphs, and the condition ("sufficiently
+// reliable") is the whole provision. A page that drops the condition, or that
+// tells a reader they need no qualified signature, is giving legal advice about
+// a matter it knows nothing about.
+//
+// Fact 2, ECLI:NL:RBROT:2026:9319: one examining magistrate, one criminal case,
+// no appeal, and it was the client who used ChatGPT rather than the lawyer.
+// Privilege rests on the professional, never on a tool, so no page may say a
+// product complies with it.
+test('the two legal facts are stated with their limits, and never as a promise', () => {
+  // Body only. A claim that lives in a meta description is not on the page.
+  const body = (slug) => visible(page(slug)).slice(visible(page(slug)).indexOf('</head>'));
+  const DISCLAIMER = 'This is not legal advice; ask your own counsel what your matter needs.';
+
+  // 1. Art. 3:15a, on the two pages where a buyer weighs SES against QES.
+  for (const slug of ['parasign', 'pricing']) {
+    const html = body(slug);
+    assert.ok(html.includes('art. 3:15a'),
+      `${slug}: must cite the article by number, as "art. 3:15a"`);
+    assert.ok(html.includes('wetten.overheid.nl/BWBR0005291'),
+      `${slug}: the citation must link to the statute itself on wetten.overheid.nl`);
+    // The condition is the provision. Without it the sentence is untrue.
+    assert.ok(/sufficiently reliable/.test(html),
+      `${slug}: art. 3:15a only gives that effect if the signing method is "sufficiently reliable", and the page must say so in the same breath`);
+    assert.ok(html.includes(DISCLAIMER),
+      `${slug}: the legal paragraph must carry the disclaimer: "${DISCLAIMER}"`);
+  }
+
+  // 2. The Rotterdam decision, on /security, with all four limits.
+  const sec = body('security');
+  assert.ok(sec.includes('ECLI:NL:RBROT:2026:9319'),
+    'security: the decision must be cited by its ECLI, not paraphrased as "a court ruled"');
+  assert.ok(sec.includes('uitspraken.rechtspraak.nl/details?id=ECLI:NL:RBROT:2026:9319'),
+    'security: the ECLI must link to the published decision on rechtspraak.nl');
+  assert.ok(/examining magistrate/.test(sec),
+    'security: it was a rechter-commissaris, so the page must say examining magistrate rather than "the court"');
+  assert.ok(/client had put privileged information into ChatGPT/.test(sec)
+    && /not the lawyer/.test(sec),
+    'security: the page must say it was the client who used ChatGPT, not the lawyer');
+  assert.ok(/can count as disclosure/.test(sec),
+    'security: the holding is that it CAN count as disclosure, never that it does');
+  assert.ok(/not settled law/.test(sec),
+    'security: one magistrate, one case, no appeal, and the page must say it is not settled law');
+  assert.ok(sec.includes(DISCLAIMER),
+    `security: the paragraph must carry the disclaimer: "${DISCLAIMER}"`);
+
+  // 3. The four sentences neither page may ever grow into. Checked across the
+  // whole public site, because the way this copy goes wrong is by being
+  // shortened somewhere else into the version that sells better.
+  const FORBIDDEN = [
+    [/just as valid/i, 'validity is an outcome a court decides afterwards, and no page may promise it'],
+    [/no qualified signature needed/i, 'that is legal advice about the reader\'s matter, and some documents do require a QES'],
+    [/complies with legal privilege/i, 'privilege rests on the professional, not on a tool'],
+    [/comply with privilege/i, 'privilege rests on the professional, not on a tool'],
+  ];
+  for (const slug of publicPages()) {
+    const html = visible(page(slug));
+    for (const [rx, why] of FORBIDDEN) {
+      assert.doesNotMatch(html, rx, `${slug}: ${rx.source} is forbidden copy. ${why}`);
+    }
+  }
+});
