@@ -45,6 +45,15 @@
 .ds-headlink a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
 .ds-anon-actions{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0 0}
 .ds-service-note{margin:0 0 16px;padding:10px 14px;border:1px solid var(--line-2);border-left:2px solid var(--mark);border-radius:var(--r-1);background:var(--surface-sunk);font-size:13px;line-height:1.6;color:var(--ink-2)}
+/* Not signed in. This belongs to the whole flow, not to one step: #step-anon
+   is a .ds-step, so setActive() hides it the second a workflow is chosen, and a
+   visitor could pick a file and reach Co-signers with nothing on screen saying
+   he had no session. This bar sits outside the steps and stays put. It borrows
+   the service note's paint, so it introduces no colour of its own. */
+.ds-signedout{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin:0 0 20px;padding:11px 14px;border:1px solid var(--line-2);border-left:2px solid var(--mark);border-radius:var(--r-1);background:var(--surface-sunk)}
+.ds-signedout-text{margin:0;font-size:13px;line-height:1.6;color:var(--ink-2);max-width:62ch}
+.ds-signedout-actions{display:flex;flex-wrap:wrap;gap:8px;margin:0}
+.ds-signedout-actions .btn{font-size:13px;padding:8px 14px}
 /* The hero is the pitch for a visitor who has not started yet. From the step
    after the document is chosen it is only in the way: at 390px it held the
    whole uploaded PDF below the fold. sign-flow.js stamps the active step on
@@ -516,6 +525,20 @@ body[data-ds-step="step-done"] #ds-doc-meta{display:none}
        js/error-message.js, so both products apologise in the same words. -->
   <p class="ds-service-note" id="ds-service-note" role="status" hidden></p>
 
+  <!-- No session, said once and said for every step. Revealed by sign-flow.js
+       only after /api/user/session/verify has answered, so it never flashes at
+       a signed-in customer, and never dismissible: the requirement does not go
+       away by being closed. Both links carry ?next=/sign, which auth-login.js
+       honours on the way back; signup still finishes through the emailed
+       verification link and does not carry it yet. -->
+  <div class="ds-signedout" id="ds-signedout" role="status" hidden>
+    <p class="ds-signedout-text">You are not signed in. You can prepare a document here; sending it needs a free Community account.</p>
+    <p class="ds-signedout-actions">
+      <a class="btn btn-secondary" href="/auth/login?next=/sign">Sign in</a>
+      <a class="btn btn-primary" href="/signup?next=/sign">Create account</a>
+    </p>
+  </div>
+
   <ol class="ds-stepper" id="ds-stepper" aria-label="Sign progress" hidden>
     <li data-step="doc" class="active">Document</li>
     <li data-step="place">Place</li>
@@ -593,11 +616,11 @@ body[data-ds-step="step-done"] #ds-doc-meta{display:none}
   <!-- Step 1: pick document -->
   <section class="ds-step" id="step-doc" hidden>
     <h2>Pick the document you want to sign</h2>
-    <p class="ds-sub">PDFs get a visual signature stamp you can place on any page. Other file types get a hash-only attestation that recipients verify by re-hashing the file.</p>
+    <p class="ds-sub">ParaSign signs PDF files. Pick a PDF and place your signature stamp on any page. The file stays in this browser.</p>
     <div class="ds-dropzone" id="ds-dropzone" role="button" tabindex="0" aria-label="Pick or drop a file">
       <p class="big">Drop a file here, or click to choose</p>
       <p class="small">Stays in your browser. Nothing is uploaded yet.</p>
-      <input type="file" id="ds-doc-input" hidden>
+      <input type="file" id="ds-doc-input" accept="application/pdf,.pdf" hidden>
     </div>
     <p class="ds-doc-error" id="ds-doc-error" role="alert" hidden></p>
   </section>
@@ -936,6 +959,6 @@ body[data-ds-step="step-done"] #ds-doc-meta{display:none}
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=4" defer></script>
-<script type="module" src="/sign-flow.js?v=51"></script>
+<script type="module" src="/sign-flow.js?v=52"></script>
 </body>
 </html>

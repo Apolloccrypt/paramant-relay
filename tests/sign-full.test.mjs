@@ -61,6 +61,10 @@ await page.route('**/api/**', (route) => {
     return j({ flowId: 'f', options: { challenge: CHAL, allowCredentials: CRED_ID ? [{ id: CRED_ID, transports: ['internal'] }] : [], userVerification: 'required', timeout: 20000, rpId: 'localhost' } });
   }
   if (u.pathname.endsWith('/signing-key/step-up/bind')) return j({ ok: true });
+  // /sign reads the same session probe the nav reads. This suite is the signed-in
+  // signer, so answer it as one: a bare {ok:true} reads as no session and puts
+  // the signed-out bar on every screenshot below.
+  if (u.pathname.endsWith('/user/session/verify')) return j({ authenticated: true, email: 'demo@example.com' });
   // TOTP-gated ephemeral enrol route — response controlled by totpResp.
   if (u.pathname.endsWith('/account/signing-key')) return j(totpResp.body, totpResp.status);
   return j({ ok: true });

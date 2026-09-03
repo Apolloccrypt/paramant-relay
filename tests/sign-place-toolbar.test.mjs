@@ -60,6 +60,9 @@ for (const [width, height] of [[320, 844], [360, 844], [390, 844], [1440, 900]])
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
   await page.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }));
+  // Signed in: this measures the signer's toolbar, not the signed-out bar. Last
+  // registered wins in Playwright, so this sits under the catch-all above.
+  await page.route('**/api/user/session/verify', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"authenticated":true,"email":"demo@example.com"}' }));
   await page.goto(`${ORIGIN}/sign.html`, { waitUntil: 'domcontentloaded' });
 
   const reached = await page.evaluate(async () => {
