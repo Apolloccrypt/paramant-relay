@@ -304,6 +304,55 @@ tar czf /home/paramant/backups/docroot-pre-3.1-$TS.tgz -C /home/paramant app
 cp /etc/nginx/sites-enabled/paramant-public.conf /etc/nginx/backups/paramant-public.conf.pre-3.1-$TS
 ```
 
+### The nginx conf names are not the same on every server
+
+Step 2b backs up the nginx confs, and it needs their names. Those names differ
+per machine. On the run of 03-09 production had
+`/etc/nginx/sites-enabled/paramant-public.conf` and no `paramant-live.conf` at
+all: `deploy/signup-fix-deploy.sh` edits `paramant.conf` on that same host, so
+the backend conf is called `paramant.conf` there.
+
+The script therefore works with conf **slots** instead of fixed names. A slot
+is a list of candidate names separated by `|`, slots are separated by
+whitespace, and the default is
+
+```
+paramant-public.conf paramant-live.conf|paramant.conf
+```
+
+On the server the first candidate of each slot that is really in
+`sites-enabled` is chosen, and the choice is written to the log as
+
+```
+nginxconf paramant-public.conf resolved to paramant-public.conf
+nginxconf paramant-live.conf resolved to paramant.conf
+```
+
+A slot is always named after its first candidate, so the left half of that line
+is the same everywhere and the right half is what this server actually calls
+it. Everything downstream uses the resolved name: the backup in 2b, the edits
+in 5c, the checks in 6, and both rollback steps in 8. The backups are filed
+under the resolved name (`paramant.conf.pre-3.1-$TS`), and step 8 resolves the
+same way, so a rollback looks for the file that is really there.
+
+If no candidate of a slot is present the run stops in 2b with
+
+```
+nginxconf paramant-live.conf ABSENT, none of these is in /etc/nginx/sites-enabled: paramant-live.conf paramant.conf
+```
+
+and the hint to set `PARAMANT_NGINX_CONFS`. That variable still overrides the
+whole list, now in the slot syntax:
+
+```bash
+PARAMANT_NGINX_CONFS="paramant-public.conf paramant.conf" deploy/deploy-3.1.sh
+```
+
+`paramant.conf` as a candidate is an assumption drawn from
+`deploy/signup-fix-deploy.sh`, not a confirmed reading of the live server. The
+script does not rely on the assumption being right: it checks on the server
+each run and says which name it landed on.
+
 `deploy/ops/backup-full-state.sh` exists for the data volumes; run it too if
 the users file or the CT log matter to you today (they should).
 
@@ -404,9 +453,18 @@ keep the deny:
 
 ```bash
 nginx -T 2>/dev/null | grep -n 'paraid/issue\|location = /sign\|/compliance\|location = /dicom\|/pararules'
-# edit /etc/nginx/sites-enabled/paramant-public.conf and the live conf accordingly
+# edit /etc/nginx/sites-enabled/paramant-public.conf and the backend conf accordingly
 nginx -t && systemctl reload nginx
 ```
+
+Which files those are is the slot question from step 2: the backend conf is
+`paramant-live.conf` on one server and `paramant.conf` on another. 5c resolves
+the slots exactly as 2b did and prints the same `nginxconf <slot> resolved to
+<name>` lines before it touches anything, followed by a `target <name> -> <path>`
+line per conf. Read those two first: they say which files the four edits are
+about to land in. A slot with no candidate at all is FATAL here, and a resolved
+conf without the ParaID deny is FATAL too, with the resolved names in the
+message.
 
 The ParaID deny may stay: the route is gone from the relay (#319), so the
 deny answers 404 for a path that would answer 404 anyway. Remove it in a later
@@ -594,6 +652,13 @@ tar xzf /home/paramant/backups/docroot-pre-3.1-$TS.tgz -C /home/paramant
 cp /etc/nginx/backups/paramant-public.conf.pre-3.1-$TS /etc/nginx/sites-enabled/paramant-public.conf
 nginx -t && systemctl reload nginx
 ```
+
+The backups in `/etc/nginx/backups/` carry the name step 2b resolved, so on a
+server whose backend conf is `paramant.conf` the second file is
+`paramant.conf.pre-3.1-$TS` and it goes back to
+`/etc/nginx/sites-enabled/paramant.conf`. `ls /etc/nginx/backups/` says which
+names were filed. The script does this resolution itself in step 8, and stops
+before it writes anything if a backup under the resolved name is missing.
 
 Manual fallback for a single service, from the 3.0.0 runbook:
 

@@ -18,6 +18,7 @@ const { buildRecipientParties, RECIPIENT_EMAIL_RE } = require('./lib/recipient-b
 const { acquireSignupLock } = require('./lib/signup-lock');
 const loginRate = require('./lib/login-ratelimit');
 const { billingStubGone } = require('./lib/billing-stub');
+const { logRedacted, maskIpForLog, maskEmailForLog: maskEmail } = require('./lib/log-redact');
 const { generateAuthenticationOptions, verifyAuthenticationResponse, generateRegistrationOptions, verifyRegistrationResponse } = require('@simplewebauthn/server');
 
 const PORT        = parseInt(process.env.PORT || '4200', 10);
@@ -764,7 +765,7 @@ api.post("/user/signup", async (req, res) => {
       sendDuplicateSignupAttempt(norm, ip).catch(err =>
         console.error("[signup] duplicate notice failed:", err.message));
     });
-    console.log(`[signup] duplicate signup attempt: ${emailHash.slice(0, 8)} from ${ip}`);
+    logRedacted('log', `[signup] duplicate signup attempt: ${emailHash.slice(0, 8)} from ${maskIpForLog(ip)}`);
   } else {
     // Real pending signup token.
     await redis().set(
@@ -782,7 +783,7 @@ api.post("/user/signup", async (req, res) => {
         redis().del(`paramant:signup:pending:${verifyToken}`).catch(() => {});
       });
     });
-    console.log(`[signup] pending signup for ${norm} from ${ip}`);
+    logRedacted('log', `[signup] pending signup for ${maskEmail(norm)} from ${maskIpForLog(ip)}`);
   }
 
   // Identical response shape and timing in both branches.
@@ -1913,7 +1914,7 @@ api.post("/user/auth/request-totp-reset", async (req, res) => {
     ipCnt    === 1 ? redis().expire(ipRlKey,    3600)  : Promise.resolve(),
   ]);
   if (emailCnt > 5 || ipCnt > 10) {
-    console.warn(`[totp-reset-req] rate limited: emailHash=${emailHash} ip=${ip}`);
+    logRedacted('warn', `[totp-reset-req] rate limited: emailHash=${emailHash} ip=${maskIpForLog(ip)}`);
     return res.status(429).json({ error: "too_many_requests", retry_after: 86400 });
   }
 
@@ -2294,6 +2295,10 @@ api.get("/user/account", authUser, async (req, res) => {
   }
 });
 
+// Display form for the sessions API response, not for logs: it renders a
+// truncated address as a syntactically complete one (203.0.113.0), which a
+// reader of a log line cannot tell apart from a real address. Log lines use
+// maskIpForLog from lib/log-redact.js, which writes the host part as `x`.
 function maskIp(ip) {
   if (!ip) return "—";
   if (ip.includes(".")) {
@@ -2303,15 +2308,9 @@ function maskIp(ip) {
   return ip.split(":").slice(0, 2).join(":") + "::0";
 }
 
-// Mask an email for stdout/journald logs: keep first local char + full domain.
-// e.g. "alice@example.com" -> "a***@example.com". Audit-chain records keep the
-// full email on purpose (admin traceability); this is only for process logs.
-function maskEmail(e) {
-  const s = String(e || "");
-  const at = s.indexOf("@");
-  if (at < 1) return s ? "***" : "";
-  return s[0] + "***" + s.slice(at);
-}
+// maskEmail for process logs lives in lib/log-redact.js and is imported at the
+// top of this file. Audit-chain records keep the full email on purpose (admin
+// traceability); the masked form is only for stdout/journald.
 
 // GET /api/user/account/key
 api.get("/user/account/key", authUser, async (req, res) => {
