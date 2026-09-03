@@ -530,6 +530,10 @@ footer a{color:var(--fg)}
           <li>Our server only ever holds the sealed file in memory, never on a disk.</li>
           <li>It is wiped after its last read, so there is nothing left to leak later.</li>
           <li>That holds for the web app and the SDKs. The browser extensions still encrypt on our server, until that is changed.</li>
+          <!-- The handshake, on the card rather than on /parashare step 1. A
+               reviewer on 3 September 2026 bought ParaSign and refused ParaSend
+               over exactly this, and he only found it out after the button. -->
+          <li>In the web app you and the receiver are both online and compare a short code, and the file is handed over live. Sending to someone who is not online right now needs the API or the SDK.</li>
         </ul>
         <div class="prod-cta"><a class="hp-btn hp-btn-line" href="/parasend">What ParaSend is</a><a class="hp-btn hp-btn-fill" href="/parashare">Send a file</a></div>
       </li>

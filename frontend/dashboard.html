@@ -354,6 +354,9 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 <meta name="theme-color" content="#15191C">
 <link rel="stylesheet" href="/app-2026.css?v=7">
 <script src="/js/theme.js?v=4"></script>
+<!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
+     Blocking and above every other script, so it exists before any renderer runs. -->
+<script src="/js/format-date.js?v=1"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -675,6 +678,6 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=8" defer></script>
-<script src="/js/dashboard.js?v=11" defer></script>
+<script src="/js/dashboard.js?v=12" defer></script>
 </body>
 </html>

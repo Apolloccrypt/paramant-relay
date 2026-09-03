@@ -5,9 +5,10 @@ const escHtml = s => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
 
+// One notation, from /js/format-date.js: "8 September 2026, 20:48 UTC".
 function fmtTs(iso) {
   if (!iso) return '-';
-  try { return new Date(iso).toLocaleString(); } catch { return iso; }
+  return paramantDate.moment(iso, '-');
 }
 
 async function loadEnrolledKeys() {

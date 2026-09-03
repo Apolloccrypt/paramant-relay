@@ -50,8 +50,10 @@ const json = (route, body, status = 200) =>
 
 // The three terms under test, as an ISO paid_until the pages have to read.
 function term(days) { return new Date(Date.now() + days * DAY).toISOString(); }
+// The one notation the site shows, mirrored from frontend/js/format-date.js:
+// day, month in full, year, in UTC, and never a slash.
 function readable(iso) {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
 // ── /account ─────────────────────────────────────────────────────────────────

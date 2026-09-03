@@ -2412,3 +2412,105 @@ test('the two legal facts are stated with their limits, and never as a promise',
     }
   }
 });
+
+// 38 ── The live handshake, said before the button and not after it.
+//
+// A reviewer went through the site as a three-person accountancy office on
+// 3 September 2026, bought ParaSign, and refused ParaSend. Not on price and not
+// on trust: on this. The ParaSend web app is a LIVE handshake. Sender and
+// receiver both have the page open, a WebSocket carries the exchange, and the
+// two of them compare a short code out loud before the file moves. An office
+// sends a payslip and gets on with its work; a client who has to be sitting
+// there at the same moment is not a route that office can use.
+//
+// That was stated exactly once, on /parashare, step 1, which is after the
+// visitor has picked the product, read the price and pressed the button. The
+// homepage, /parasend and /pricing sold "a link that deletes itself" and said
+// nothing about it. The gap was not a lie in any single sentence; it was the
+// omission of the one fact that decided the sale, placed after the decision.
+//
+// So the three pages before the button now carry it, and this pins that they
+// do. Both halves are checked against code, because the second half is a
+// promise of its own:
+//
+//   the web app is live      -> frontend/js/parashare.page.js opens a WebSocket
+//                               and confirms a code before it uploads
+//   the API/SDK is not       -> POST /v2/inbound stores the sealed blob against
+//                               a TTL and mints a download token the receiver
+//                               fetches later, with no peer present
+//
+// Verified by sabotage: take the WebSocket out of parashare.page.js, or take
+// the download-token mint out of relay.js, and the sentence stops being true in
+// one half or the other; this block names which.
+test('the pages before the button say the ParaSend web app is a live handshake, and say what is not', () => {
+  const SENTENCE = 'In the web app you and the receiver are both online and compare a short code, and the file is handed over live. Sending to someone who is not online right now needs the API or the SDK.';
+
+  // Half one. The web app really does need the other side present, and really
+  // does compare a code before anything moves.
+  const share = stripJsComments(read('frontend/js/parashare.page.js'));
+  assert.match(share, /new WebSocket\(/,
+    'the ParaSend web app no longer holds a socket open to the other side; "both online" may no longer be stated as a fact');
+  assert.match(share, /wss:\/\/|RELAY_WS|relay\.paramant\.app/,
+    'the ParaSend web app no longer dials the relay socket; check the live-handshake sentence before trusting it');
+  assert.ok(/short code|sas|safety number|compare/i.test(share),
+    'the ParaSend web app no longer derives a code for the two sides to compare; the sentence promises one');
+  assert.match(read('frontend/parashare.html'),
+    /The person you send to has to be online while you send; you confirm a short code together\./,
+    '/parashare step 1 no longer carries the sentence the three pages before it now summarise');
+
+  // Half two. There IS an asynchronous route, it is the API, and it holds the
+  // sealed file against a deadline rather than a live peer.
+  const relaySrc = stripJsComments(read('relay/relay.js'));
+  assert.match(relaySrc, /path === '\/v2\/inbound' && req\.method === 'POST'/,
+    'POST /v2/inbound is gone; three pages now tell a buyer the API is the route for a receiver who is not online');
+  assert.match(relaySrc, /download_token/,
+    'the relay no longer mints a download token, so there is no link to hand to someone who arrives later');
+  assert.match(relaySrc, /path\.match\(\/\^\\\/v2\\\/dl\\\//,
+    'the download-token route is gone; the asynchronous half of the sentence has nothing behind it');
+  // The blob outlives the request: a timer, not a peer, decides when it goes.
+  assert.match(relaySrc, /blobStore\.set\(/,
+    'the relay no longer parks the sealed blob; there is nothing for a receiver to come back to');
+  // And the SDK the sentence names is a thing a customer can actually install.
+  assert.match(read('README.md'), /paramant-sdk/,
+    'the sentence sends a buyer to "the SDK"; the repository must still name one');
+  assert.match(read('frontend/docs.html'), /\/v2\/inbound/,
+    '/docs no longer documents the endpoint the sentence sends an asynchronous sender to');
+
+  // The three pages. Same sentence on all three: the site says this one way, as
+  // it does with the read counts above.
+  for (const slug of ['index', 'parasend', 'pricing']) {
+    const text = visible(page(slug)).replace(/\s+/g, ' ');
+    assert.ok(text.includes(SENTENCE),
+      `${slug}: must carry the live-handshake sentence in full, before the button: "${SENTENCE}"`);
+  }
+
+  // Both halves, phrase by phrase, so a rewrite that keeps the shape but drops
+  // the plain words fails here rather than in a review a year from now.
+  for (const slug of ['index', 'parasend', 'pricing']) {
+    const text = visible(page(slug)).replace(/\s+/g, ' ');
+    assert.ok(text.includes('both online'),
+      `${slug}: the words "both online" are the whole point; a paraphrase is what hid this for months`);
+    assert.ok(text.includes('compare a short code'),
+      `${slug}: must say the two sides compare a short code, in those words`);
+  }
+
+  // It has to come BEFORE the call to action on each page, or it is the same
+  // defect one screen higher. Measured on source order, which is DOM order on
+  // all three: the homepage card's list sits above its .prod-cta, the /parasend
+  // hero line above .ps-actions, the /pricing paragraph above the tier grid.
+  const before = {
+    index: /class="prod-cta"><a class="hp-btn hp-btn-line" href="\/parasend"/,
+    parasend: /<div class="ps-actions">/,
+    pricing: /<div class="tier-grid">/,
+  };
+  for (const [slug, cta] of Object.entries(before)) {
+    const html = visible(page(slug));
+    const said = html.replace(/\s+/g, ' ').indexOf(SENTENCE);
+    // The sentence index is measured on collapsed text and the CTA on raw html,
+    // so compare on one string: collapse both.
+    const flat = html.replace(/\s+/g, ' ');
+    const button = flat.search(new RegExp(cta.source.replace(/\s+/g, ' ')));
+    assert.ok(said >= 0 && button >= 0 && said < button,
+      `${slug}: the live-handshake sentence must stand ABOVE the button (sentence at ${said}, button at ${button}); after it is where it already was`);
+  }
+});

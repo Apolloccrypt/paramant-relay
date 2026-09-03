@@ -48,6 +48,9 @@
 <meta name="theme-color" content="#15191C">
 <link rel="stylesheet" href="/app-2026.css?v=7">
 <script src="/js/theme.js?v=4"></script>
+<!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
+     Blocking and above every other script, so it exists before any renderer runs. -->
+<script src="/js/format-date.js?v=1"></script>
 </head>
 <body>
 
@@ -137,7 +140,7 @@
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=8" defer></script>
 <script src="/js/auth-login.js?v=3"></script>
-<script type="module" src="/js/passkey.js?v=4"></script>
+<script type="module" src="/js/passkey.js?v=5"></script>
 
 <footer class="legal-strip">
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>

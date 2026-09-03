@@ -103,7 +103,7 @@
       var planChip = document.getElementById('plan-chip');
       if (planChip) planChip.textContent = planName(data, data.plan);
       document.getElementById('label').textContent = data.label || '—';
-      document.getElementById('created').textContent = data.created_at ? new Date(data.created_at).toLocaleDateString() : 'Unknown';
+      document.getElementById('created').textContent = paramantDate.day(data.created_at, 'Unknown');
       document.getElementById('backup-count').textContent = data.backup_codes_remaining;
 
       const sessionsList = document.getElementById('sessions-list');
@@ -119,7 +119,7 @@
         labelEl.textContent = (s.ip_masked || '') + (s.current ? ' (this session)' : '');
         const valueEl = document.createElement('div');
         valueEl.className = 'info-value';
-        valueEl.textContent = (s.user_agent_short || '') + ' · last seen ' + new Date(s.last_seen).toLocaleString();
+        valueEl.textContent = (s.user_agent_short || '') + ' · last seen ' + paramantDate.moment(s.last_seen);
         el.appendChild(labelEl);
         el.appendChild(valueEl);
         sessionsList.appendChild(el);
@@ -325,10 +325,11 @@
     return { at: at, ended: at <= now, warn: days > 0 && days <= TERM_WARN_DAYS };
   }
 
-  // en-GB and not the visitor's locale: the site is in English and the same
-  // date has to read the same here as it does in the reminder mail.
+  // One notation, from /js/format-date.js, and not the visitor's locale: the
+  // site is in English and the same date has to read the same here, in the
+  // invoice row below, and in the reminder mail.
   function termDate(at) {
-    return new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+    return paramantDate.day(at);
   }
 
   function renderTerm(d) {
@@ -392,14 +393,14 @@
       const until = d.access_until || d.next_billing_date;
       if (until) {
         document.getElementById('billing-next-row').style.display = 'flex';
-        document.getElementById('billing-next').textContent = new Date(until).toLocaleDateString();
+        document.getElementById('billing-next').textContent = paramantDate.day(until);
         const note = document.getElementById('billing-renew-note');
         if (note) note.hidden = !!d.auto_renews;
       }
       renderTerm(d);
       if (d.cancellation_scheduled_at) {
         document.getElementById('billing-cancel-row').style.display = 'flex';
-        document.getElementById('billing-cancel-date').textContent = 'Downgrade scheduled ' + new Date(d.cancellation_scheduled_at).toLocaleDateString();
+        document.getElementById('billing-cancel-date').textContent = 'Downgrade scheduled ' + paramantDate.day(d.cancellation_scheduled_at);
         document.getElementById('billing-cancel-btn').classList.add('hidden');
       }
     } catch(err) {
@@ -434,7 +435,7 @@
 
     const left = document.createElement('div');
     left.className = 'info-label';
-    left.appendChild(document.createTextNode(new Date(e.ts).toLocaleDateString()));
+    left.appendChild(document.createTextNode(paramantDate.day(e.ts)));
     left.appendChild(document.createTextNode(' · ' + historyLabel(e)));
     if (e.document) {
       const num = document.createElement('span');
@@ -486,7 +487,7 @@
     const res = await fetch('/api/user/billing/cancel', { method: 'POST', credentials: 'include' });
     if (res.ok) {
       const d = await res.json();
-      alert('Cancellation scheduled. Your plan downgrades on ' + new Date(d.scheduled_downgrade_at).toLocaleDateString());
+      alert('Cancellation scheduled. Your plan downgrades on ' + paramantDate.day(d.scheduled_downgrade_at));
       loadBilling();
     }
   });
@@ -514,7 +515,7 @@
         num.style.fontFamily = 'var(--mono)';
         num.textContent = inv.number;
         left.appendChild(num);
-        left.appendChild(document.createTextNode(' · ' + new Date(inv.date).toLocaleDateString()));
+        left.appendChild(document.createTextNode(' · ' + paramantDate.day(inv.date)));
         // Three shapes in one list. A credit note is not a receipt and must not
         // be labelled as one: it is the document that gives money back, and it
         // says which invoice it belongs to.
