@@ -1277,6 +1277,186 @@ else
 fi
 
 echo ""
+echo "6j. Phase 3a: an untracked path is not a dirty working tree"
+# Deploy run 5 (TS 20260903-0242) reached phase 3a for the first time and
+# stopped on
+#
+#   dirty ?? backups/
+#   FATAL working tree not clean
+#
+# An untracked directory in the server checkout, and nothing else wrong. A
+# fast-forward pull cannot lose an untracked file, so that was a stop for
+# nothing. A modified TRACKED file is a different matter and still stops the
+# run. This runs the real 3a remote block against two throwaway repositories,
+# one per case.
+G3A="$WORK/g3a"
+mkdir -p "$G3A"
+extract_remote "git pull" > "$G3A/3a.sh"
+if [ -s "$G3A/3a.sh" ]; then
+  pass "the 3a remote block could be extracted from the script"
+else
+  fail "could not extract the 3a remote block from the script"
+fi
+
+# make_3a_repo <dir>: a checkout one commit behind its origin, so 3a has a real
+# fast-forward to perform and "did it pull" is a question with an answer.
+make_3a_repo() {
+  local d="$1"
+  rm -rf "$d"
+  mkdir -p "$d"
+  (
+    set -e
+    cd "$d"
+    git init -q --bare origin.git
+    # git init --bare picks its own default branch name, and if that is not the
+    # one we push the clone comes out empty with only a warning. Say it.
+    git --git-dir=origin.git symbolic-ref HEAD refs/heads/main
+    git init -q seed && cd seed
+    git config user.email t@example.com && git config user.name t
+    git config commit.gpgsign false
+    echo one > tracked.txt
+    git add -A && git commit -qm one
+    git branch -M main
+    git remote add origin ../origin.git
+    git push -q origin main
+    cd ..
+    git clone -q origin.git checkout
+    cd checkout
+    git config user.email t@example.com && git config user.name t
+    git config commit.gpgsign false
+    cd ../seed
+    echo two > tracked.txt
+    git commit -qam two
+    git push -q origin main
+  ) >/dev/null 2>&1
+}
+
+# A silently broken fixture would make both cases below pass for the wrong
+# reason, so the fixture is checked before it is used.
+fixture_3a_ok() {   # dir
+  git -C "$1/checkout" rev-parse HEAD >/dev/null 2>&1 \
+    && [ -f "$1/checkout/tracked.txt" ] \
+    && [ -z "$(git -C "$1/checkout" status --porcelain)" ]
+}
+
+echo ""
+echo "6j-1. Only an untracked path: the deploy pulls and says what it left alone"
+make_3a_repo "$G3A/ok"
+if fixture_3a_ok "$G3A/ok"; then
+  pass "the fixture is a clean checkout one commit behind its origin"
+else
+  fail "the 3a fixture is broken, so the two cases below prove nothing"
+fi
+mkdir -p "$G3A/ok/checkout/backups"
+echo state > "$G3A/ok/checkout/backups/full-state.tar.gz.age"
+HEAD_BEFORE="$(git -C "$G3A/ok/checkout" rev-parse HEAD)"
+OUT18="$(bash "$G3A/3a.sh" "$G3A/ok/checkout" 2>&1)"; RC18=$?
+if [ "$RC18" -eq 0 ]; then pass "3a runs through with an untracked backups/ in the checkout"; else
+  fail "3a exits $RC18 on an untracked path (this is the run-5 stop)"
+  printf '%s\n' "$OUT18" | sed 's/^/        /' | head -20
+fi
+if printf '%s\n' "$OUT18" | grep -q '^  untracked backups/'; then
+  pass "it prints the untracked path instead of hiding it"
+else
+  fail "the untracked path was not reported"
+  printf '%s\n' "$OUT18" | sed 's/^/        /' | head -12
+fi
+for want in "before untracked paths:1" "before tracked changes:0"; do
+  f="${want%%:*}"; v="${want##*:}"
+  if [ "$(field_5c "$OUT18" "$f")" = "$v" ]; then pass "3a reports $f = $v"; else
+    fail "3a reports $f = '$(field_5c "$OUT18" "$f")', expected $v"; fi
+done
+if printf '%s\n' "$OUT18" | grep -q 'FATAL'; then
+  fail "3a still prints a FATAL for an untracked path"
+  printf '%s\n' "$OUT18" | grep FATAL | sed 's/^/        /'
+else
+  pass "no FATAL: an untracked path is not dirt"
+fi
+if [ "$(git -C "$G3A/ok/checkout" rev-parse HEAD)" != "$HEAD_BEFORE" ]; then
+  pass "the fast-forward pull really happened"
+else
+  fail "3a exited 0 but the checkout never moved"
+fi
+if [ -f "$G3A/ok/checkout/backups/full-state.tar.gz.age" ]; then
+  pass "the untracked file is still there, untouched by the pull"
+else
+  fail "the pull removed an untracked file"
+fi
+
+echo ""
+echo "6j-2. A modified tracked file still stops the deploy, before the pull"
+make_3a_repo "$G3A/dirty"
+if fixture_3a_ok "$G3A/dirty"; then
+  pass "the second fixture is clean before the hand edit goes in"
+else
+  fail "the 3a fixture is broken, so the stop below proves nothing"
+fi
+echo "hand edit between deploys" > "$G3A/dirty/checkout/tracked.txt"
+HEAD_BEFORE="$(git -C "$G3A/dirty/checkout" rev-parse HEAD)"
+OUT19="$(bash "$G3A/3a.sh" "$G3A/dirty/checkout" 2>&1)"; RC19=$?
+if [ "$RC19" -ne 0 ]; then pass "3a stops when a tracked file is modified"; else
+  fail "3a pulled over a modified tracked file (exit $RC19)"
+  printf '%s\n' "$OUT19" | sed 's/^/        /' | head -20
+fi
+if printf '%s\n' "$OUT19" | grep -q 'FATAL working tree not clean: 1 tracked file'; then
+  pass "the FATAL says how many tracked files, so the reason is not guesswork"
+else
+  fail "the FATAL does not name the tracked change"
+  printf '%s\n' "$OUT19" | grep FATAL | sed 's/^/        /'
+fi
+if printf '%s\n' "$OUT19" | grep -q '^  dirty  M tracked.txt'; then
+  pass "it lists the tracked file it stopped on"
+else
+  fail "the dirty listing is missing"
+  printf '%s\n' "$OUT19" | sed 's/^/        /' | head -12
+fi
+if [ "$(field_5c "$OUT19" 'before tracked changes')" = "1" ]; then
+  pass "the tracked-change count is reported, so the deploy can assert on it"
+else
+  fail "before tracked changes = '$(field_5c "$OUT19" 'before tracked changes')', expected 1"
+fi
+if [ "$(git -C "$G3A/dirty/checkout" rev-parse HEAD)" = "$HEAD_BEFORE" ]; then
+  pass "it stopped BEFORE the pull, so the hand edit is still there to look at"
+else
+  fail "3a pulled anyway; the local change is now tangled with the pull"
+fi
+# git would refuse this pull by itself, which is a net and not a gate: it would
+# report a merge conflict instead of "you have a hand edit here". Assert that
+# the fetch was never even attempted, so the gate is provably in FRONT of it.
+if printf '%s\n' "$OUT19" | grep -qE '^  (fetch|pull) '; then
+  fail "3a reached the fetch or pull with a modified tracked file; the gate is not in front of them"
+  printf '%s\n' "$OUT19" | grep -E '^  (fetch|pull) ' | sed 's/^/        /' | head -4
+else
+  pass "no fetch and no pull were attempted; the gate is the first thing 3a does"
+fi
+if grep -q 'hand edit between deploys' "$G3A/dirty/checkout/tracked.txt"; then
+  pass "the modified file is untouched, which is what makes the stop useful"
+else
+  fail "the tracked change was lost"
+fi
+
+echo ""
+echo "6j-3. The gate reads tracked and untracked separately, and says so"
+check_has "$SCRIPT" 'git status --porcelain --untracked-files=no' \
+  "the dirty gate asks git for tracked changes only"
+check_has "$SCRIPT" 'git ls-files --others --directory --exclude-standard' \
+  "untracked paths are read separately, to be reported rather than judged"
+check_lacks "$SCRIPT" '\$\(git status --porcelain\)' \
+  "the old all-or-nothing porcelain read is gone"
+check_has "$FULL" 'before untracked paths'  "the dry run shows the untracked count"
+check_has "$FULL" 'before tracked changes'  "the dry run shows the tracked count"
+check_has "$SCRIPT" 'expect_count "before tracked changes" 0' \
+  "the deploy asserts that no tracked file was modified"
+# backups/ is ignored in the repo, so a checkout that pulls this commit stops
+# reporting it at all.
+check_has "$ROOT/.gitignore" '^backups/$' "backups/ is gitignored, so the next pull makes it invisible"
+if git -C "$ROOT" check-ignore -q backups/ 2>/dev/null; then
+  pass "git agrees that backups/ is ignored"
+else
+  fail "backups/ is in .gitignore but git does not ignore it"
+fi
+
+echo ""
 echo "6d. The CI gate on main is one verdict per required workflow"
 # The old gate was `gh run list --branch main -L 5`: five runs of whichever
 # workflows happened to run last, with a stop on any `failure` among them. On
