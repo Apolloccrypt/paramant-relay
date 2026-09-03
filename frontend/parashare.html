@@ -69,13 +69,41 @@ h1{font-size:clamp(26px,5vw,38px);font-weight:600;letter-spacing:-.028em;line-he
 #step-setup.manual-key .ps-key-card{display:block}
 #step-setup.manual-key .ps-key-slim{display:none}
 
-/* The one thing that must never fail silently: no key, no ParaSend. The banner
-   says what happened, what to do, and leaves a door open for a self-hoster
-   whose deployment has no /api/user/account/key at all. */
-.ps-key-error{display:none;flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:16px;padding:12px 14px;border:1px solid var(--line-2);border-left:3px solid var(--sig-stop);border-radius:var(--r-1);background:var(--sig-stop-bg);font:13px/1.62 var(--sans);color:var(--ink-1)}
-.ps-key-error.is-shown{display:flex}
-.ps-key-error p{margin:0}
-.ps-key-error .ps-key-change{padding-left:0;font-family:var(--mono)}
+/* One alert style, used by both places on this page where something can fail
+   in front of the user: the account key that will not load, and the relay
+   connection that drops while step 2 is waiting. Each says what happened, what
+   the file is doing meanwhile, and offers the one action that helps. */
+.ps-alert{display:none;flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:16px;padding:12px 14px;border:1px solid var(--line-2);border-left:3px solid var(--sig-stop);border-radius:var(--r-1);background:var(--sig-stop-bg);font:13px/1.62 var(--sans);color:var(--ink-1)}
+.ps-alert.is-shown{display:flex}
+.ps-alert p{margin:0}
+.ps-alert-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+/* The primary action is the one that actually works on paramant.app: sign in
+   again. Typing a key by hand only helps a self-hosted relay, so it sits next
+   to it as a link with that said out loud. */
+.ps-alert-primary{display:inline-flex;align-items:center;min-height:var(--tap);padding:9px 16px;border:1px solid var(--accent);border-radius:var(--r-1);background:var(--accent);color:var(--accent-ink);font:600 13px/1 var(--sans);text-decoration:none}
+.ps-alert-primary:hover{background:var(--accent-hov);border-color:var(--accent-hov)}
+.ps-alert-primary:focus-visible{outline:none;box-shadow:var(--ring)}
+.ps-alert-note{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--ink-3)}
+/* The note belongs to the secondary action and to nothing else, so it is
+   stacked under it rather than left to wrap under both buttons. */
+.ps-alert-secondary{display:inline-flex;flex-direction:column;align-items:flex-start;gap:0}
+.ps-alert .ps-key-change{padding-left:0;font-family:var(--mono)}
+
+/* Said before the sender starts, not discovered on step 2: this is a live
+   handshake and the other person has to be there for it. */
+.ps-live-note{margin:0 0 16px;padding:11px 14px;border:1px solid var(--line-2);border-left:3px solid var(--mark);border-radius:0 var(--r-1) var(--r-1) 0;background:var(--surface-sunk);font:14px/1.6 var(--sans);color:var(--ink-1)}
+
+/* The jargon lives here instead of in the flow. A sender who wants ML-KEM-768
+   can open it; a sender who wants to send a file never has to read it. */
+.ps-how{margin:0 0 18px;border:1px solid var(--line);border-radius:var(--r-1);background:var(--surface)}
+.ps-how summary{cursor:pointer;display:flex;align-items:center;min-height:var(--tap);padding:11px 14px;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);list-style:none}
+.ps-how summary::-webkit-details-marker{display:none}
+.ps-how summary::after{content:" +";color:var(--ink-3)}
+.ps-how[open] summary::after{content:" \2013";color:var(--ink-3)}
+.ps-how summary:focus-visible{outline:none;box-shadow:var(--ring)}
+.ps-how-body{padding:0 14px 14px;font:13.5px/1.62 var(--sans);color:var(--ink-2)}
+.ps-how-body p{margin:0 0 10px}
+.ps-how-body p:last-child{margin-bottom:0}
 
 /* design-system.css puts 32px of padding on every .card; here the padding
    belongs to .card-head and .card-body, so it is reset. */
@@ -378,8 +406,8 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <section class="page-hero">
 <div class="page-hero-inner">
   <span class="eyebrow">PARASEND</span>
-  <h1>Encrypted file relay</h1>
-  <p class="lede">End-to-end encrypted file transfer. The receiver's browser generates a keypair — you verify the fingerprint before encrypting. The relay never sees plaintext.</p>
+  <h1>Send a file that deletes itself</h1>
+  <p class="lede">Pick a file and send a one-time link. The file is locked in your own browser before it leaves, so nobody in between can open it, and that includes us.</p>
 </div>
 </section>
 
@@ -397,7 +425,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   </li>
   <li class="ps-step" data-step-key="verify">
     <span class="ps-step-dot" aria-hidden="true"></span>
-    <span class="ps-step-label">3 &middot; Verify</span>
+    <span class="ps-step-label">3 &middot; Compare</span>
   </li>
   <li class="ps-step" data-step-key="encrypt">
     <span class="ps-step-dot" aria-hidden="true"></span>
@@ -411,9 +439,20 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 
 <!-- STEP 1: Setup -->
 <div class="step active" id="step-setup">
+  <p class="ps-live-note" id="ps-live-note">The person you send to has to be online while you send; you confirm a short code together.</p>
+
+  <details class="ps-how">
+    <summary>How this works</summary>
+    <div class="ps-how-body">
+      <p>Your receiver's browser makes a fresh pair of keys and sends us only the public half. Your browser locks the file for that public half and uploads the locked version. We hold no key, so what sits on our relay cannot be opened by us or by anyone who takes it from us.</p>
+      <p>The short code you compare is built from the receiver's public keys, and both browsers work it out on their own. If anything had swapped those keys along the way, the two codes would not match. That is why you read the code to each other on a channel we do not run, such as a phone call.</p>
+      <p>For the reader who wants the names: ML-KEM-768 and ECDH for the key exchange, AES-256-GCM for the file, ML-DSA-65 signatures per chunk. The locked file is stored with an expiry and is destroyed when the link runs out or once the download link has been spent.</p>
+    </div>
+  </details>
+
   <div class="ps-guide">
     <span class="ps-guide-kicker">Step 1 of 5 &middot; Setup</span>
-    <strong>Pick a file, set how long the link lives.</strong> Your file stays in your browser until step 4. The relay never sees plaintext.
+    <strong>Choose a file and say how long the link should live.</strong> The file stays on your own computer until step 4. We never hold it in a form we could open.
   </div>
 
   <div class="ps-key-slim is-loading" id="ps-key-slim" aria-label="Account key">
@@ -421,9 +460,15 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Change</button>
   </div>
 
-  <div class="ps-key-error" id="ps-key-error" role="alert">
+  <div class="ps-alert" id="ps-key-error" role="alert">
     <p>Your account key could not be loaded. Sign in again; if it keeps happening, mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
-    <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Use a key by hand</button>
+    <div class="ps-alert-actions">
+      <a class="ps-alert-primary" href="/auth/login">Sign in again</a>
+      <span class="ps-alert-secondary">
+        <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Use a key by hand</button>
+        <span class="ps-alert-note">for self-hosted relays</span>
+      </span>
+    </div>
   </div>
 
   <div class="card ps-key-card">
@@ -438,8 +483,9 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">File</div></div>
     <div class="card-body">
-      <label class="label" for="file-input">Select file(s) &mdash; select multiple for vault mode</label>
+      <label class="label" for="file-input">Choose a file (or several)</label>
       <input type="file" id="file-input" multiple data-change="onFileSelect">
+      <p class="ps-meta">Pick more than one and they travel as a single package.</p>
       <div class="status-line" id="file-status">No file selected</div>
       <div id="vault-list" style="margin-top:8px;display:none"></div>
     </div>
@@ -455,7 +501,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
         <option value="3600000" selected>1 hour</option>
         <option value="86400000">24 hours</option>
       </select>
-      <p class="ps-meta" id="ttl-status">Relay permanently deletes blobs after expiry</p>
+      <p class="ps-meta" id="ttl-status">When the link runs out we destroy the file, picked up or not.</p>
     </div>
   </div>
 
@@ -469,10 +515,18 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <!-- STEP 2: Waiting for receiver -->
 <div class="step" id="step-waiting">
   <h2 class="paramant-h1">Share this link</h2>
-  <p class="sub">Send this link to the receiver. Their browser will generate a keypair. You'll see their fingerprint appear below &mdash; verify it with them before sending.</p>
+  <p class="sub">Send the link to your receiver any way you like. Keep this page open: the moment they open it, a short code appears here and the two of you compare it.</p>
   <div class="ps-guide">
     <span class="ps-guide-kicker">Step 2 of 5 &middot; Share</span>
-    <strong>Send the one-time link via any channel.</strong> The link only tells the receiver where to connect; no key, no file, no metadata. When they open it, their browser generates an ML-KEM-768 keypair and we move to verify.
+    <strong>The link says where to connect, and nothing else.</strong> No key, no file, no file name. Your receiver has to open it while you are still on this page.
+  </div>
+
+  <div class="ps-alert" id="ps-link-error" role="alert">
+    <p id="ps-link-error-text">The connection to the relay dropped before your receiver arrived. Nothing was uploaded and your file is still here in this browser.</p>
+    <div class="ps-alert-actions">
+      <button type="button" class="ps-alert-primary" data-click="reopenSession">Open the session again</button>
+      <span class="ps-alert-note">this makes a fresh link</span>
+    </div>
   </div>
 
   <div class="card">
@@ -484,29 +538,29 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
       <button type="button" class="ps-copy" id="ps-copy-btn" data-click="copyLink">Copy link</button>
       </div>
       <p class="ps-meta" id="ps-link-meta">The link carries no key and no file name. It only says where to connect.</p>
-      <div class="status-line" id="waiting-status">Share this link with the receiver</div>
+      <div class="status-line" id="waiting-status">Send this link, and wait here for your receiver to open it</div>
     </div>
   </div>
 
   <div class="card" id="fp-card" style="display:none">
-    <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title">Receiver connected — verify fingerprint</div></div>
+    <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title">Compare this code together</div></div>
     <div class="card-body">
-      <p class="status-line" style="margin-bottom:6px">Call or message the receiver via a <strong>separate channel</strong> (phone, Signal, etc.) and ask: <em>"What is your fingerprint?"</em></p>
-      <p class="ps-caution">A compromised relay can return a fake key. Only fingerprint verification via a separate channel proves you are encrypting to the right person.</p>
+      <p class="status-line" style="margin-bottom:6px">Call or message your receiver on a <strong>different channel</strong> (phone, Signal) and read the code below to each other. Both screens have to show the same one.</p>
+      <p class="ps-caution">If the codes differ, stop here. A tampered relay can hand you the wrong key, and comparing the code on a channel we do not run is what catches it.</p>
       <div class="fingerprint" id="fp-display">—</div>
-      <div id="fp-seen-before" style="display:none;font-size:10px;color:var(--cobalt);margin:-4px 0 10px;text-align:center;font-family:var(--mono)">✓ Matches stored fingerprint from a previous session</div>
-      <div id="fp-new-device" style="display:none;font-size:10px;color:var(--cobalt);margin:-4px 0 10px;text-align:center">◈ First contact with this receiver — verify carefully</div>
+      <div id="fp-seen-before" style="display:none;font-size:10px;color:var(--cobalt);margin:-4px 0 10px;text-align:center;font-family:var(--mono)">✓ Same code as the last time you sent to this person</div>
+      <div id="fp-new-device" style="display:none;font-size:10px;color:var(--cobalt);margin:-4px 0 10px;text-align:center">◈ First time with this receiver. Compare with extra care.</div>
       <div style="display:flex;justify-content:center;margin:12px 0 4px">
         <canvas id="fp-qr" style="display:none;border:4px solid #fff"></canvas>
       </div>
-      <p style="font-size:10px;color:var(--ink-dim);text-align:center;margin-bottom:10px" id="fp-qr-label">QR — receiver can scan to compare</p>
+      <p style="font-size:10px;color:var(--ink-dim);text-align:center;margin-bottom:10px" id="fp-qr-label">Your receiver can scan this instead of reading it out</p>
       <label style="display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-size:11px;cursor:pointer;user-select:none">
         <input type="checkbox" id="fp-confirm-check" data-change="fpConfirmToggle" style="width:14px;height:14px;accent-color:var(--cobalt)">
-        I have verified this fingerprint with the receiver via a separate channel
+        We compared the code on a different channel and it matched
       </label>
       <div style="display:flex;gap:8px;margin-top:4px">
-        <button class="btn btn-green" id="fp-confirm-btn" data-click="confirmFingerprint" disabled>✓ Verified — encrypt &amp; send</button>
-        <button class="btn btn-red btn-outline" data-click="rejectFingerprint">✗ Mismatch — abort</button>
+        <button class="btn btn-green" id="fp-confirm-btn" data-click="confirmFingerprint" disabled>✓ Codes match, send the file</button>
+        <button class="btn btn-red btn-outline" data-click="rejectFingerprint">✗ Codes differ, stop</button>
       </div>
     </div>
   </div>

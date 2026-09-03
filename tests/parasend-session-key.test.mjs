@@ -65,6 +65,7 @@ function runPage({ keyResponses, sectorOk = true }) {
     return elements.get(id);
   };
   const listeners = new Map();
+  const sockets = [];
   const calls = { key: 0, sector: 0, urls: [], timeouts: [], storage: [] };
   let keyTurn = 0;
 
@@ -101,6 +102,13 @@ function runPage({ keyResponses, sectorOk = true }) {
     clearTimeout: () => {}, setInterval: () => 0, clearInterval: () => {},
     queueMicrotask,
     act: () => {},
+    // A socket the test can drive: step 2 has to be measurable when the relay
+    // connection dies, which is the case that used to print "Disconnected".
+    WebSocket: class {
+      constructor(url) { this.url = url; sockets.push(this); }
+      send() {}
+      close() { this.closed = true; }
+    },
     fetch: async (url) => {
       calls.urls.push(url);
       if (String(url).endsWith(KEY_URL)) {
@@ -117,7 +125,7 @@ function runPage({ keyResponses, sectorOk = true }) {
   context.globalThis = context;
   vm.createContext(context);
   vm.runInContext(PS_JS, context, { filename: 'parashare.page.js' });
-  return { context, elements, calls, listeners, getElementById };
+  return { context, elements, calls, listeners, getElementById, sockets };
 }
 
 // Fire DOMContentLoaded and let every pending microtask drain.
@@ -250,4 +258,135 @@ test('signing out removes a paramant_api_key left behind by an earlier build', (
   assert.ok(signout.length > 0, 'nav-auth.js must still wire a sign-out handler');
   assert.match(signout.slice(0, 700), /localStorage\.removeItem\('paramant_api_key'\)/,
     '/privacy said this key was "removed when you sign out" and nothing removed it. The page no longer writes it, and sign-out now clears an old one.');
+});
+
+// ── 7. The banner points at the door that actually opens ────────────────────
+// The first version of this banner offered one way out, "use a key by hand",
+// and on paramant.app that is not a way out at all: the hosted relay mints the
+// key, the sender has never seen it, and typing one is only meaningful on a
+// self-hosted deployment. The action that helps a hosted customer is signing in
+// again, so that is the button, and the other one says who it is for.
+// Verified by sabotage: swap the two, or drop the self-host note, and this
+// fails by name.
+test('the key banner leads with signing in again, and says who the manual key is for', () => {
+  const bannerAt = PS_HTML.indexOf('id="ps-key-error"');
+  assert.ok(bannerAt > 0, 'the banner markup must still be findable by its id');
+  const banner = PS_HTML.slice(bannerAt, bannerAt + 900);
+  assert.match(banner, /class="ps-alert-primary" href="\/auth\/login">Sign in again</,
+    'signing in again is the action that works on the hosted relay, so it is the primary');
+  assert.match(banner, /data-click="expandApiKeyCard">Use a key by hand</,
+    'the manual card must stay reachable for a self-host with no /api/user/account/key');
+  assert.match(banner, /for self-hosted relays/,
+    'a hosted customer must be told the manual key is not meant for them');
+  // Compared inside the action row, not the whole banner: the sentence above it
+  // also says "Sign in again", and matching that would pass whatever the buttons
+  // do.
+  const actionsAt = banner.indexOf('class="ps-alert-actions"');
+  assert.ok(actionsAt > 0, 'the banner must group its actions, so their order is a fact and not an accident of wrapping');
+  const actions = banner.slice(actionsAt);
+  assert.ok(actions.indexOf('href="/auth/login"') < actions.indexOf('data-click="expandApiKeyCard"'),
+    'the primary action must come first in the markup, which is the order a screen reader and a phone both follow');
+});
+
+// ── 8. An empty box is not a mistake ────────────────────────────────────────
+// "Change" clears the field and calls onKeyInput, and the field it just emptied
+// was told its format was invalid. A verdict on a field the user has not filled
+// in yet. Verified by sabotage: make the empty case take the malformed branch
+// and this goes red on both the wording and the error class.
+test('an empty manual key field is asked to be filled in, not called invalid', async () => {
+  const run = await loadPage({ keyResponses: [{ status: 500, body: {} }] });
+  evalIn(run, 'expandApiKeyCard()');
+  const status = run.getElementById('key-status');
+  assert.equal(status.textContent, 'Enter your API key to continue',
+    'an empty field gets an invitation, not a verdict');
+  assert.equal(status.className, 'status-line',
+    'and no error styling: nothing has gone wrong yet');
+
+  // A key that really is malformed still says so, otherwise the case above is
+  // just silence.
+  run.getElementById('api-key').value = 'not-a-key';
+  await evalIn(run, 'onKeyInput()');
+  assert.match(run.getElementById('key-status').textContent, /starts with pgp_/,
+    'a typed value that cannot be a key must say what a key looks like');
+  assert.equal(run.getElementById('key-status').className, 'status-line err',
+    'that one is an error and is allowed to look like one');
+});
+
+// ── 9. A dropped relay connection on step 2 ─────────────────────────────────
+// The sender has just handed over a file and made a link. When the socket died
+// the page wrote the single word "Disconnected" into a status line, which
+// answers none of the three questions a sender has: what happened, where is my
+// file, and what do I do now. Same treatment as the key banner.
+// Verified by sabotage: put the bare setStatus back, or drop the reopen action,
+// and this goes red.
+test('a relay connection that drops before the receiver arrives says so, and offers a way back', async () => {
+  const run = await loadPage({ keyResponses: [{ status: 200, body: { api_key: FAKE_KEY, revealable: true } }] });
+  pickAFile(run);
+  await evalIn(run, 'createSession()');
+  for (let i = 0; i < 10; i += 1) await new Promise((r) => setImmediate(r));
+
+  assert.equal(run.sockets.length, 1, 'creating a session opens exactly one relay socket');
+  const firstLink = run.getElementById('session-link').textContent;
+  assert.match(firstLink, /\/ontvang\?s=inv_/, 'the sender gets a one-time receiver link');
+  assert.equal(run.getElementById('ps-link-error').classList.contains('is-shown'), false,
+    'no alarm while the socket is healthy');
+
+  run.sockets[0].onclose();
+  const box = run.getElementById('ps-link-error');
+  assert.equal(box.classList.contains('is-shown'), true, 'a dropped socket is stated, not whispered into a status line');
+  const said = run.getElementById('ps-link-error-text').textContent;
+  assert.match(said, /dropped before your receiver arrived/, 'it says what happened');
+  assert.match(said, /Nothing was uploaded/, 'it says the file did not go anywhere');
+  assert.match(said, /still here in this browser/, 'it says where the file is');
+
+  // The way back: a fresh session, a new link, and the alarm cleared.
+  await evalIn(run, 'reopenSession()');
+  for (let i = 0; i < 10; i += 1) await new Promise((r) => setImmediate(r));
+  assert.equal(run.sockets.length, 2, 'reopening makes a new relay connection');
+  assert.notEqual(run.getElementById('session-link').textContent, firstLink,
+    'and a new one-time link: the old token died with the old socket');
+  assert.equal(box.classList.contains('is-shown'), false, 'the alarm clears once the session is back');
+
+  // A socket that closes after the receiver is already known is the normal end
+  // of the handshake, not a failure.
+  run.sockets[1].onopen();
+  await evalIn(run, "showReceiverConnected('aa'.repeat(16), 'bb'.repeat(16))");
+  run.sockets[1].onclose();
+  assert.equal(box.classList.contains('is-shown'), false,
+    'closing after the receiver has been seen is not an error and must not raise the banner');
+});
+
+// ── 10. The words a buyer reads on steps 1 and 2 ────────────────────────────
+// The page opened on "Encrypted file relay" and explained itself with keypair,
+// fingerprint, plaintext and relay. Every one of those is accurate and none of
+// them tells a small firm what the tool does. The jargon is not deleted, it is
+// moved: a "How this works" panel holds it, and the flow above it is written
+// for someone who wants to send a file. Verified by sabotage: put any of the
+// four words back into the flow, or drop the panel, and this fails by word.
+test('steps 1 and 2 are written for the sender, with the jargon moved into "How this works"', () => {
+  assert.match(PS_HTML, /<h1>Send a file that deletes itself<\/h1>/,
+    'the heading says what the tool does for the reader, not what it is made of');
+  assert.match(PS_HTML, /<details class="ps-how">[\s\S]*?<summary>How this works<\/summary>/,
+    'the technical account must still be on the page, one click away');
+  assert.match(PS_HTML, /ML-KEM-768[\s\S]{0,400}ML-DSA-65/,
+    'the panel must keep the real names: moving the jargon may not mean losing it');
+  assert.match(PS_HTML, /Choose a file \(or several\)/,
+    'the file label must ask for a file, not announce vault mode');
+
+  // The flow itself, steps 1 and 2 only, with the panel cut out.
+  // Visible words only: the ids and handler names below (fp-display,
+  // confirmFingerprint) are code, and renaming those buys the reader nothing.
+  const flowText = PS_HTML
+    .slice(PS_HTML.indexOf('id="step-setup"'), PS_HTML.indexOf('id="step-encrypting"'))
+    .replace(/<details class="ps-how">[\s\S]*?<\/details>/, ' ')
+    .replace(/<[^>]+>/g, ' ');
+  for (const word of ['keypair', 'key pair', 'plaintext', 'ML-KEM', 'ML-DSA', 'AES-256', 'fingerprint', 'vault mode', 'blob']) {
+    assert.ok(!new RegExp(word, 'i').test(flowText),
+      `steps 1 and 2 still say "${word}" to the reader; that belongs in the How this works panel, not in the path a sender walks`);
+  }
+  // And the fingerprint step is named after the thing the sender does.
+  assert.match(PS_HTML, /<div class="card-head-title">Compare this code together<\/div>/,
+    'the verify card must be named for the action, not for the data structure');
+  assert.match(PS_HTML, /<span class="ps-step-label">3 &middot; Compare<\/span>/,
+    'the stepper must name the same step the same way');
 });

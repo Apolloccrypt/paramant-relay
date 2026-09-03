@@ -14,6 +14,9 @@ let apiKey = '', keyValid = false, selectedFile = null, selectedFiles = [];
 // perfectly good while not one of the four sectors answers. relayReady says a
 // sector was found; relayError carries the reason it was not.
 let relayReady = false, relayError = '';
+// The receiver-pubkey poll lives next to the socket, and reopenSession has to
+// be able to stop it: a second poll on a dead token would keep asking forever.
+let pubkeyPoll = null;
 // nginx puts /api/user/ in the relay_auth zone (burst 5). One fetch for the
 // account key, and at most one retry, 2 s later, when that fetch is throttled.
 const KEY_RETRY_MS = 2000;
@@ -102,11 +105,40 @@ function applySlimApiKeyView() {
 // The banner. Shown only when the account key could not be loaded at all, and
 // it takes the slim row with it: a row that says "using your account key" while
 // there is no key would be the same lie the manual box used to tell.
+// TODO(#396): route the wording through failureText() in js/error-message.js
+// once that file is on main, so this page has one failure voice.
 function setKeyError(on) {
   var box = $('ps-key-error');
   if (box) box.classList.toggle('is-shown', !!on);
   var row = $('ps-key-slim');
   if (row && on) row.hidden = true;
+}
+
+// Step 2 used to answer a dropped socket with the bare word "Disconnected",
+// which tells the sender nothing about the file they just handed over. Same
+// treatment as the key banner: what happened, where the file is, one action.
+function setLinkError(on, msg) {
+  var box = $('ps-link-error');
+  if (!box) return;
+  if (on && msg) {
+    var t = $('ps-link-error-text');
+    if (t) t.textContent = msg;
+  }
+  box.classList.toggle('is-shown', !!on);
+}
+
+// Make a fresh session: new token, new link, new socket. The file is untouched
+// in the file input, so the sender does not pick it again.
+async function reopenSession() {
+  setLinkError(false);
+  if (pubkeyPoll) { clearInterval(pubkeyPoll); pubkeyPoll = null; }
+  if (ws) { try { ws.onclose = null; ws.close(); } catch (_) {} ws = null; }
+  receiverPubs = null;
+  var fp = $('fp-card');
+  if (fp) fp.style.display = 'none';
+  $('waiting-title').textContent = 'Waiting for receiver...';
+  $('waiting-dot').className = 'dot amber';
+  await createSession();
 }
 function setStatus(id, msg, cls) {
   const el = $(id);
@@ -204,7 +236,8 @@ async function showReceiverConnected(kyberPub, ecdhPub) {
   $('fp-display').textContent = fp;
   $('waiting-title').textContent = 'Receiver connected';
   $('waiting-dot').className = 'dot';
-  setStatus('waiting-status', 'Receiver is waiting for you to verify the fingerprint');
+  setLinkError(false);
+  setStatus('waiting-status', 'Your receiver is waiting for you to compare the code');
   setStepperStage('verify');
   // TOFU: check if we've verified this fingerprint before
   if (isFingerprintKnown(fp)) {
@@ -252,8 +285,15 @@ async function discoverRelay(key) {
 async function onKeyInput() {
   apiKey = $('api-key').value.trim();
   setCreateStatus('');
+  // An empty box has nothing wrong with it yet. Calling it invalid is what the
+  // "Change" link did the moment it cleared the field: a red-flavoured verdict
+  // on a field the user had not filled in.
+  if (!apiKey) {
+    setStatus('key-status', 'Enter your API key to continue');
+    keyValid = false; relayReady = false; relayError = ''; updateBtn(); return;
+  }
   if (apiKey.length < 10 || !apiKey.startsWith('pgp_')) {
-    setStatus('key-status', 'Invalid format');
+    setStatus('key-status', 'That does not look like a key. It starts with pgp_.', 'err');
     keyValid = false; relayReady = false; relayError = ''; updateBtn(); return;
   }
   // A well-formed key that came from the session is usable now. Whether a
@@ -300,7 +340,7 @@ function onFileSelect() {
     setStatus('file-status', '✓ ' + files[0].name + ' (' + (files[0].size/1024/1024).toFixed(1) + ' MB)', 'ok');
     $('vault-list').style.display = 'none';
   } else {
-    setStatus('file-status', '✓ ' + files.length + ' files selected — vault mode', 'ok');
+    setStatus('file-status', '✓ ' + files.length + ' files, sent as a single package', 'ok');
     const vl = $('vault-list');
     vl.style.display = 'block';
     vl.innerHTML = [...files].map(f =>
@@ -338,6 +378,7 @@ async function createSession() {
   const recvUrl = `${location.origin}/ontvang?s=${encodeURIComponent(sessionToken)}&r=${activeSector}`;
   $('session-link').textContent = recvUrl;
 
+  setLinkError(false);
   showStep('step-waiting');
   connectWebSocket();
 }
@@ -356,17 +397,19 @@ async function connectWebSocket() {
   ws.onopen = () => {
     // Join the invite room
     ws.send(JSON.stringify({ type: 'join', room: sessionToken, nick: 'sender' }));
-    setStatus('waiting-status', 'Waiting for receiver to open the link...');
+    setLinkError(false);
+    setStatus('waiting-status', 'Waiting for your receiver to open the link...');
   };
 
   // Poll voor receiver pubkey via ghost pipe relay
-  let pubkeyPollInterval = setInterval(async () => {
+  if (pubkeyPoll) clearInterval(pubkeyPoll);
+  pubkeyPoll = setInterval(async () => {
     try {
       const r = await fetch(`${RELAY_API}/v2/pubkey/${encodeURIComponent(sessionToken)}`, { headers: { 'X-Api-Key': apiKey }, signal: AbortSignal.timeout(3000) });
       if (r.ok) {
         const d = await r.json();
         if (d.kyber_pub && d.ecdh_pub) {
-          clearInterval(pubkeyPollInterval);
+          clearInterval(pubkeyPoll); pubkeyPoll = null;
           await showReceiverConnected(d.kyber_pub, d.ecdh_pub);
         }
       }
@@ -383,15 +426,26 @@ async function connectWebSocket() {
       }
 
       if (msg.type === 'peer_left') {
-        setStatus('waiting-status', 'Receiver disconnected', 'err');
+        setStatus('waiting-status', 'Your receiver closed the link', 'err');
+        setLinkError(true, 'Your receiver closed the link before you compared the code. Nothing was uploaded and your file is still here in this browser.');
       }
     } catch(err) {
       setStatus('waiting-status', failureText('receiver message', err), 'err');
     }
   };
 
-  ws.onerror = () => setStatus('waiting-status', 'Connection error', 'err');
-  ws.onclose = () => { if (!receiverPubs) setStatus('waiting-status', 'Disconnected', 'err'); };
+  // Both of these used to write one word into a status line. A sender who has
+  // just handed over a file needs to know that it did not go anywhere.
+  ws.onerror = () => {
+    if (receiverPubs) return;
+    setStatus('waiting-status', 'Connection lost', 'err');
+    setLinkError(true, 'The connection to the relay failed before your receiver arrived. Nothing was uploaded and your file is still here in this browser.');
+  };
+  ws.onclose = () => {
+    if (receiverPubs) return;
+    setStatus('waiting-status', 'Connection lost', 'err');
+    setLinkError(true, 'The connection to the relay dropped before your receiver arrived. Nothing was uploaded and your file is still here in this browser.');
+  };
 }
 
 // ── Fingerprint confirmed — encrypt & send ──
@@ -946,3 +1000,4 @@ act('click','confirmFingerprint',()=>confirmFingerprint());act('click','copyLink
 act('click','createSession',()=>createSession());act('click','expandApiKeyCard',()=>expandApiKeyCard());
 act('click','rejectFingerprint',()=>rejectFingerprint());act('input','onKeyInput',()=>onKeyInput());
 act('click','reload',()=>location.reload());
+act('click','reopenSession',()=>reopenSession());
