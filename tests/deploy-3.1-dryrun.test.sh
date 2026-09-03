@@ -1457,6 +1457,156 @@ else
 fi
 
 echo ""
+echo "6k. No remote block may let a command eat the script off stdin"
+# Deploy run 6 (TS 20260903-0259) landed phases 3, 4 and 5, six containers on
+# 3.1.0, the nginx edits applied, the site live, and then stopped in 6h on
+#
+#   STOP the server never printed 'effective outbound buffers'
+#
+# The body of a remote block is piped into `ssh ... bash -s`, so the script
+# text IS file descriptor 0, and bash reads it lazily. `docker compose exec -T`
+# reads stdin, so it swallowed everything bash had not parsed yet: the echo
+# below the for-loop was simply gone. The two lines the loop itself printed
+# came out fine, because the whole loop was parsed before it ran, which is
+# exactly what made the log look like a measurement failure rather than a
+# truncated script. 6i and the phase 7a marker never ran either, and the
+# missing marker is what would have stopped the next run in 1a.
+#
+# The rule: every stdin-reading command inside a remote heredoc gets
+# </dev/null. This scans the real blocks for the ones that do not.
+#
+# Heuristic, with its limit written down: backslash continuations are joined
+# first, comments are skipped, and a `read` is accepted when the line carries a
+# here-string or the loop it belongs to is redirected by a later `done <`.
+# That covers every shape this script uses. A `read` in some other shape would
+# be flagged, which is the safe direction to be wrong in.
+STDIN_SCAN="$WORK/stdin-scan.txt"
+awk '
+  # A block starts at a remote call ending in the heredoc marker.
+  /^  remote(_soft|_nginx)? ".*<<'"'"'EOF'"'"'$/ {
+    inb = 1; lbl = $0
+    sub(/^  remote(_soft|_nginx)? "/, "", lbl); sub(/".*$/, "", lbl)
+    ln = 0; n = 0; delete body; delete bln
+    next
+  }
+  inb && /^EOF$/ {
+    inb = 0
+    for (i = 1; i <= n; i++) {
+      line = body[i]
+      if (line ~ /^[[:space:]]*#/) continue
+      if (line ~ /docker compose exec|docker compose run|docker exec|docker run|(^|[^a-zA-Z_])ssh[[:space:]]/) {
+        if (line !~ /<[[:space:]]*\/dev\/null/) printf "%s\t%d\t%s\n", lbl, bln[i], line
+        continue
+      }
+      if (line ~ /(^|[;&|(][[:space:]]*|[[:space:]])read[[:space:]]/) {
+        if (line ~ /<<</ || line ~ /<[[:space:]]*\/dev\/null/) continue
+        redirected = 0
+        for (j = i + 1; j <= n; j++) if (body[j] ~ /^[[:space:]]*done[[:space:]]*</) { redirected = 1; break }
+        if (!redirected) printf "%s\t%d\t%s\n", lbl, bln[i], line
+      }
+    }
+    next
+  }
+  inb {
+    ln++
+    # Join backslash continuations, so a command whose </dev/null sits on the
+    # next line is judged whole.
+    if (pend != "") { pend = pend " " $0; pl = pl }
+    else { pend = $0; pl = ln }
+    if (pend ~ /\\$/) { sub(/\\$/, "", pend); next }
+    n++; body[n] = pend; bln[n] = pl; pend = ""
+  }
+' "$SCRIPT" > "$STDIN_SCAN"
+
+if [ ! -s "$STDIN_SCAN" ]; then
+  pass "every stdin-reading command in every remote block reads from /dev/null"
+else
+  fail "a command in a remote block would read the rest of the script off stdin"
+  sed 's/^/        /' "$STDIN_SCAN" | head -8
+fi
+
+# The scan has to be looking at something. If the block extraction breaks, the
+# check above passes on an empty search and proves nothing.
+SCAN_BLOCKS="$(grep -cE "^  remote(_soft|_nginx)? \".*<<'EOF'\$" "$SCRIPT" || true)"
+if [ "$SCAN_BLOCKS" -ge 10 ]; then
+  pass "the scan walked $SCAN_BLOCKS remote blocks, so it is looking at the real script"
+else
+  fail "the scan found only $SCAN_BLOCKS remote blocks; the extraction is stale"
+fi
+# And the three commands that actually read stdin are still there, guarded.
+check_has "$SCRIPT" 'docker compose exec -T "\$svc" sh -c .*</dev/null' \
+  "the 6h inline-receipt probe reads from /dev/null"
+check_has "$SCRIPT" '</dev/null 2>/dev/null \|\| echo "unreadable"' \
+  "the phase 1b env probe reads from /dev/null"
+check_has "$SCRIPT" 'docker exec "\$cid" grep -c _paraidAuth /app/relay\.js </dev/null' \
+  "the rollback paraidAuth probe reads from /dev/null"
+check_has "$FULL" 'effective outbound buffers' \
+  "the line run 6 lost is still in the 6h block"
+
+echo ""
+echo "6l. --verify-only finishes a deploy that died in the checks"
+# Run 6 did all the work and then lost 6h, 6i and the phase 7a marker. Redoing
+# the whole script to get those back would re-tag, re-back-up, re-pull, rebuild
+# and recreate six healthy containers. This mode runs phases 6 and 7 and gates
+# on the server already being deployed.
+VO="$WORK/verifyonly.txt"
+( cd "$ROOT" && bash "$SCRIPT" --dry-run --verify-only >"$VO" 2>&1 ); VO_RC=$?
+[ "$VO_RC" -eq 0 ] && pass "--dry-run --verify-only exits 0" \
+                   || fail "--dry-run --verify-only exits $VO_RC"
+check_has   "$VO" '^PHASE V: Preconditions for --verify-only' "verify-only gates before it verifies"
+check_has   "$VO" '^PHASE 6: Smoke tests'                     "verify-only runs phase 6"
+check_has   "$VO" '^PHASE 7: Summary'                         "verify-only runs phase 7"
+check_lacks "$VO" '^PHASE [0-5]: '                            "verify-only runs none of phases 0 to 5"
+check_has   "$VO" 'VERIFY ONLY FINISHED'                      "verify-only says where it stopped"
+check_has   "$VO" 'after deployed marker'                     "verify-only writes the deployed-head marker, which is the point"
+
+# The four things this mode must not do. Each is checked by the command that
+# would do it, not by a phase header, so moving a step between phases cannot
+# hide it.
+check_lacks "$VO" 'docker tag '                 "verify-only tags no rollback image"
+check_lacks "$VO" 'tar czf '                    "verify-only writes no backup"
+check_lacks "$VO" 'git pull --ff-only'          "verify-only pulls nothing"
+check_lacks "$VO" 'docker compose build'        "verify-only builds nothing"
+check_lacks "$VO" 'force-recreate'              "verify-only recreates no container"
+check_lacks "$VO" 'rsync -rc'                   "verify-only writes no docroot"
+check_lacks "$VO" 'sed -i -E .location = /sign' "verify-only edits no nginx conf"
+check_lacks "$VO" 'INTERNAL_AUTH_TOKEN=%s'      "verify-only writes nothing to .env"
+
+# The gate itself is a pure comparison, so both answers can be checked here.
+check_has "$VO" 'verify origin main'      "the gate reads origin/main off the server"
+check_has "$VO" 'verify health version'   "the gate reads the version the relay reports"
+check_has "$VO" 'verify package version'  "the gate reads the version the checkout describes"
+check_has "$SCRIPT" 'Run the full deploy instead' \
+  "a server that is not already deployed is sent to the full deploy, not verified"
+
+echo ""
+echo "6l-1. The gate says no when the checkout is not origin/main"
+# sha_eq is the same comparison phase 1a uses, and it is already extracted
+# above. These are the two ways the gate can refuse.
+if declare -F sha_eq >/dev/null; then
+  A2=aaaaaaa1111222233334444555566667777888899
+  B2=bbbbbbb1111222233334444555566667777888899
+  if sha_eq "$A2" "$A2"; then pass "the gate passes a checkout that equals origin/main"; else
+    fail "the gate would refuse a checkout that equals origin/main"; fi
+  if sha_eq "$A2" "$B2"; then fail "the gate would accept a checkout that is not origin/main"; else
+    pass "the gate refuses a checkout that is not origin/main"; fi
+  if sha_eq "$A2" ""; then fail "the gate would accept an empty origin/main"; else
+    pass "the gate refuses an unresolved origin/main"; fi
+else
+  fail "sha_eq was not available to test the verify-only gate with"
+fi
+
+echo ""
+echo "6l-2. The three run modes do not combine"
+( cd "$ROOT" && bash "$SCRIPT" --verify-only --preflight-only >/dev/null 2>&1 )
+[ $? -eq 2 ] && pass "--verify-only with --preflight-only exits 2" \
+             || fail "--verify-only and --preflight-only were accepted together"
+( cd "$ROOT" && bash "$SCRIPT" --verify-only --rollback 20260101-0000 >/dev/null 2>&1 )
+[ $? -eq 2 ] && pass "--verify-only with --rollback exits 2" \
+             || fail "--verify-only and --rollback were accepted together"
+check_has "$SCRIPT" 'verify-only' "the usage header documents the mode"
+
+echo ""
 echo "6d. The CI gate on main is one verdict per required workflow"
 # The old gate was `gh run list --branch main -L 5`: five runs of whichever
 # workflows happened to run last, with a stop on any `failure` among them. On
