@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Press kit · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -24,11 +24,11 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0B3A6A">
+<meta name="theme-color" content="#15191C">
 
-<link rel="stylesheet" href="/design-system.css?v=25">
-<link rel="stylesheet" href="/nav.css?v=21">
-<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/relay-pulse.css?v=4">
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -47,7 +47,7 @@ p{color:var(--ink-dim);margin-bottom:12px;line-height:1.7}
 .blurb{background:var(--ink-ghost);border-left:3px solid var(--lime);padding:16px 20px;margin:0 0 16px}
 .blurb strong{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);display:block;margin-bottom:8px}
 .blurb p{margin:0;color:var(--ink);font-size:14px;line-height:1.75}
-.card{background:rgba(178,255,63,.06);border:1px solid var(--ink-hair);padding:20px 24px;margin-bottom:16px}
+.card{background:rgba(217, 164, 65, .06);border:1px solid var(--ink-hair);padding:20px 24px;margin-bottom:16px}
 .facts{display:grid;grid-template-columns:auto 1fr;gap:.4rem 1.5rem}
 .facts dt{color:var(--ink-dim);white-space:nowrap;font-family:var(--mono);font-size:12px}
 .facts dd{margin:0;color:var(--ink);font-size:13px}
@@ -57,13 +57,13 @@ p{color:var(--ink-dim);margin-bottom:12px;line-height:1.7}
 .bullet-list li::before{content:"▸";color:var(--ink);position:absolute;left:0}
 .download-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
 .dl-btn{background:var(--ink-ghost);border:1px solid var(--ink-hair);color:var(--ink);padding:.5rem 1rem;text-decoration:none;font-size:13px;font-family:var(--mono);transition:background .15s}
-.dl-btn:hover{background:var(--cobalt);color:var(--bone-on-navy);text-decoration:none}
-.contact{background:rgba(178,255,63,.06);border:1px solid var(--ink-hair);padding:20px 24px}
+.dl-btn:hover{background:var(--cobalt);color: var(--on-ochre);text-decoration:none}
+.contact{background:rgba(217, 164, 65, .06);border:1px solid var(--ink-hair);padding:20px 24px}
 .contact p{margin-bottom:8px;color:var(--ink-dim);font-size:14px}
 .contact strong{color:var(--cobalt)}
 table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
 td,th{border:1px solid var(--ink-hair);padding:.55rem .9rem;text-align:left}
-th{background:rgba(178,255,63,.06);color:var(--ink-dim);font-family:var(--mono);font-size:11px;letter-spacing:.05em}
+th{background:rgba(217, 164, 65, .06);color:var(--ink-dim);font-family:var(--mono);font-size:11px;letter-spacing:.05em}
 td{color:var(--cobalt)}
 @media(max-width:600px){.grid{grid-template-columns:1fr}}
 </style>
@@ -76,9 +76,9 @@ td{color:var(--cobalt)}
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -89,26 +89,26 @@ td{color:var(--cobalt)}
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(217, 164, 65, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -117,13 +117,13 @@ td{color:var(--cobalt)}
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(217, 164, 65, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }

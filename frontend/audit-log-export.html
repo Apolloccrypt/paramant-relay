@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Send audit logs to a regulator without a second leak · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -19,9 +19,9 @@
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://paramant.app/audit-log-export">
-<link rel="stylesheet" href="/design-system.css?v=25">
-<link rel="stylesheet" href="/nav.css?v=21">
-<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/relay-pulse.css?v=4">
 <style>
 a{color:var(--ink);text-decoration:none}
 a:hover{opacity:.7}
@@ -31,7 +31,7 @@ code{font-size:var(--text-xs);padding:2px 6px;border:1px solid var(--ink-ghost);
 .hero-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--cobalt);margin-bottom:16px}
 .hero h1{font-size:32px;font-weight:600;letter-spacing:-.025em;line-height:1.2;margin-bottom:18px}
 .hero h1 em{font-style:italic;color:var(--cobalt);position:relative;display:inline}
-.hero h1 em::after{content:"";position:absolute;left:0;right:0;bottom:4%;height:22%;background:var(--lime);z-index:-1;pointer-events:none}
+.hero h1 em::after{content:"";position:absolute;left:0;right:0;bottom:4%;height:22%;background:var(--accent-soft);z-index:-1;pointer-events:none}
 .hero .lead{font-size:15px;color:var(--ink-dim);max-width:660px;line-height:1.75}
 
 main{max-width:860px;margin:0 auto;padding:0 48px 80px}
@@ -49,14 +49,14 @@ section p+p{margin-top:14px}
 .step-num{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--lime);min-width:28px;padding-top:2px;flex-shrink:0}
 .step-body{font-size:14px;color:var(--bone-on-navy-dim);line-height:1.75}
 .step-body strong{color:var(--bone-on-navy)}
-.workflow-block{background:var(--navy);padding:28px 32px;margin-top:24px}
+.workflow-block{background:var(--invert);padding:28px 32px;margin-top:24px}
 
 .compliance-table{width:100%;border-collapse:collapse;margin-top:20px;font-size:13px}
 .compliance-table th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);padding:8px 12px;border-bottom:2px solid var(--ink-hair)}
 .compliance-table td{padding:10px 12px;border-bottom:1px solid var(--ink-hair);vertical-align:top;line-height:1.6;color:var(--ink-dim)}
 .compliance-table td:first-child{color:var(--ink);font-weight:500;white-space:nowrap}
 
-.btn-primary{display:inline-block;font-size:13px;font-weight:700;text-decoration:none;color:#0B3A6A;background:var(--lime);padding:10px 22px;margin-right:10px}
+.btn-primary{display:inline-block;font-size:13px;font-weight:700;text-decoration:none;color: var(--on-ochre);background:var(--lime);padding:10px 22px;margin-right:10px}
 .btn-primary:hover{opacity:.88}
 .btn-sec{display:inline-block;font-size:13px;text-decoration:none;color:var(--bone-on-navy);border:1px solid var(--bone-on-navy-hair);padding:10px 22px}
 .btn-sec:hover{border-color:var(--lime)}
@@ -68,11 +68,11 @@ section p+p{margin-top:14px}
 }
 </style>
 <style>
-.nav-help{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-family:IBM Plex Mono,monospace;font-size:12px;letter-spacing:0.1em;color:#475569;text-decoration:none;border:1px solid #E2E8F0;transition:all 140ms ease;margin-right:12px}
-.nav-help::before{content:"?";display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1.5px solid #64748b;border-radius:50%;font-size:11px;font-weight:700;color:#64748b;font-family:Inter,sans-serif;line-height:1}
-.nav-help:hover{color:#0B3A6A;border-color:#B2FF3F;background:rgba(178,255,63,0.08)}
-.nav-help:hover::before{border-color:#0B3A6A;color:#0B3A6A;background:#B2FF3F}
-.nav-help:focus-visible{outline:2px solid #B2FF3F;outline-offset:2px}
+.nav-help{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-family:IBM Plex Mono,monospace;font-size:12px;letter-spacing:0.1em;color:var(--ink-2);text-decoration:none;border:1px solid var(--ink-hair);transition:all 140ms ease;margin-right:12px}
+.nav-help::before{content:"?";display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1.5px solid var(--ink-dim);border-radius:50%;font-size:11px;font-weight:700;color:var(--ink-dim);font-family:Inter,sans-serif;line-height:1}
+.nav-help:hover{color:var(--ink);border-color:var(--ochre);background:rgba(217, 164, 65, 0.08)}
+.nav-help:hover::before{border-color:var(--line-2);color: var(--on-ochre);background:var(--ochre)}
+.nav-help:focus-visible{outline:2px solid var(--ochre);outline-offset:2px}
 @media(max-width:900px){.nav-help{display:none}}
 </style>
 <script type="application/ld+json" data-paramant-seo="1">
@@ -214,7 +214,7 @@ section p+p{margin-top:14px}
 
 </main>
 
-<div style="background:var(--cobalt);padding:52px 48px;text-align:center">
+<div style="background:var(--bone-2);border:1px solid var(--ink-hair);padding:52px 48px;text-align:center">
   <h2 style="font-size:24px;font-weight:600;letter-spacing:-.02em;margin-bottom:10px;color:var(--bone-on-navy)">Deliver evidence without creating new exposure.</h2>
   <p style="font-size:14px;color:var(--bone-on-navy-dim);margin-bottom:28px;max-width:520px;margin-left:auto;margin-right:auto">Community plan for individual DPOs. Business plan for teams with regular audit obligations.</p>
   <a href="/signup" class="btn-primary">Create free account &rarr;</a>

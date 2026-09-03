@@ -89,8 +89,8 @@ LEGAL_STRIP = '''\
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
 </footer>'''
 
-DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=25">'
-NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=21">'
+DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=28">'
+NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=23">'
 NAV_JS    = '<script src="/nav.js?v=15" defer></script>'
 NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=8" defer></script>'
 

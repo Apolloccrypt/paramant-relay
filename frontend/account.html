@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">:root{color-scheme:light}html,body{background:#FBFAF7;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}@media(prefers-color-scheme:dark){:root[data-theme="auto"]{color-scheme:dark}html[data-theme="auto"],html[data-theme="auto"] body{background:#0A0F16;color:#EDF1F6}}html[data-theme="dark"],html[data-theme="dark"] body{background:#0A0F16;color:#EDF1F6}</style>
+<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}html[data-theme="light"],html[data-theme="light"] body{background:#F1EAD6;color:#1B1F22}html[data-theme="light"]{color-scheme:light}@media (prefers-color-scheme:light){html[data-theme="auto"],html[data-theme="auto"] body{background:#F1EAD6;color:#1B1F22}html[data-theme="auto"]{color-scheme:light}}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Your account · Paramant</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/design-system.css?v=25">
-<link rel="stylesheet" href="/nav.css?v=21">
-<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/relay-pulse.css?v=4">
 <meta property="og:title" content="Your account · Paramant">
 <meta property="og:description" content="Your account · Paramant">
 <meta property="og:url" content="https://paramant.app/account">
@@ -39,9 +39,9 @@
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -52,26 +52,26 @@
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(217, 164, 65, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -80,13 +80,13 @@
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(217, 164, 65, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -150,9 +150,9 @@ main.acct input::placeholder { color: var(--ink-3); }
 .acct-advanced-body { margin-top:var(--space-4); padding-top:var(--space-3); border-top:1px solid var(--line); }
 @media (max-width: 680px) { .acct-grid2 { grid-template-columns: 1fr; gap: var(--space-4); } main.acct { padding: var(--space-5) var(--space-3) var(--space-6); } }
 </style>
-<meta name="theme-color" content="#FBFAF7">
-<link rel="stylesheet" href="/app-2026.css?v=4">
-<script src="/js/theme.js?v=1"></script>
+<meta name="theme-color" content="#15191C">
+<link rel="stylesheet" href="/app-2026.css?v=7">
+<script src="/js/theme.js?v=4"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -285,7 +285,7 @@ main.acct input::placeholder { color: var(--ink-3); }
       <h3>Enrolled keys</h3>
       <p style="margin:0 0 12px" id="signing-empty" class="small">Checking your account...</p>
       <ul id="signing-list" style="margin:0;padding:0;list-style:none"></ul>
-      <div id="revoke-totp-wrap" hidden style="margin-top:10px;padding:12px 14px;border:1px solid var(--ink-hair,#E2E8F0);border-radius:6px">
+      <div id="revoke-totp-wrap" hidden style="margin-top:10px;padding:12px 14px;border:1px solid var(--ink-hair);border-radius:6px">
         <p class="small" style="margin:0 0 8px">Enter your 6-digit authenticator code to revoke this signing key.</p>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <input type="text" id="revoke-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" style="max-width:140px">
@@ -336,9 +336,9 @@ main.acct input::placeholder { color: var(--ink-3); }
   <div class="acct-kicker">Appearance &middot; light and dark</div>
   <h2>Appearance.</h2>
   <p class="acct-lead">
-    Light is the default and it stays light until you change it here. Your choice is kept in this
+    Dark is the default and it stays dark until you change it here. Your choice is kept in this
     browser only, and it applies to the pages behind your sign-in: your dashboard, signing,
-    sending, this page and the sign-in screens. The public pages stay light.
+    sending, this page and the sign-in screens. The public pages stay dark.
   </p>
   <fieldset class="theme-choice" id="theme-choice">
     <legend>Appearance</legend>
@@ -388,7 +388,7 @@ main.acct input::placeholder { color: var(--ink-3); }
     <p id="billing-renew-note" class="acct-note" hidden style="font-size:var(--text-sm);color:var(--ink-dim);margin-top:var(--space-2)">This is a one-off payment for the term you bought. Nothing is collected again by itself. Buy another term before this date to keep the plan running.</p>
     <div class="info-row" id="billing-cancel-row" style="display:none">
       <div class="info-label">Cancellation</div>
-      <div class="info-value" id="billing-cancel-date" style="color:#d97706">&mdash;</div>
+      <div class="info-value" id="billing-cancel-date" style="color:var(--warn-ink)">&mdash;</div>
     </div>
     <div class="acct-actions">
       <a href="/pricing" class="btn btn-secondary btn-small">View plans</a>
@@ -454,7 +454,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 <script type="module" src="/js/account.inline2.js?v=3"></script>
 <script type="module" src="/js/passkey.js?v=4"></script>
 <script type="module" src="/js/signing-enrol.js?v=14"></script>
-<script src="/js/account-theme.js?v=1" defer></script>
+<script src="/js/account-theme.js?v=2" defer></script>
 
 <footer class="legal-strip">
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>

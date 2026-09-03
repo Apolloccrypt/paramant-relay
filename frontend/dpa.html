@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Data processing agreement · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -19,9 +19,9 @@
 <meta name="twitter:title" content="Data processing agreement · Paramant">
 <meta name="twitter:description" content="The GDPR Article 28 agreement between Paramantis Solutions B.V. as processor and your organisation as controller. Sign it electronically, EU and German law.">
 <link rel="canonical" href="https://paramant.app/dpa">
-<link rel="stylesheet" href="/design-system.css?v=25">
-<link rel="stylesheet" href="/nav.css?v=21">
-<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/relay-pulse.css?v=4">
 <style>
 a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-hair)}
 a:hover{opacity:.7}
@@ -39,7 +39,7 @@ th{text-align:left;padding:10px 16px;font-size:var(--text-xs);letter-spacing:.06
 td{padding:12px 16px;color:var(--ink-dim);border-bottom:1px solid var(--ink-ghost)}
 tr:last-child td{border-bottom:none}
 td:first-child{color:var(--ink);font-weight:500;width:38%}
-.note-box{background:rgba(178,255,63,.08);border:1px solid var(--ink-hair);padding:20px 24px;margin-bottom:32px;font-size:13px;color:var(--ink-dim);line-height:1.7}
+.note-box{background:rgba(217, 164, 65, .08);border:1px solid var(--ink-hair);padding:20px 24px;margin-bottom:32px;font-size:13px;color:var(--ink-dim);line-height:1.7}
 .note-box strong{color:var(--ink)}
 .divider{border:none;border-top:1px solid var(--ink-hair);margin:48px 0}
 .sign-box{background:var(--bone-2);border:1px solid var(--ink-hair);padding:40px;margin-top:56px}
@@ -53,13 +53,13 @@ input:focus{border-color:var(--cobalt)}
 .checkbox-row{display:flex;align-items:flex-start;gap:12px;margin-bottom:24px}
 .checkbox-row input[type=checkbox]{width:16px;height:16px;margin-top:3px;flex-shrink:0;accent-color:var(--cobalt)}
 .checkbox-row label{font-size:13px;text-transform:none;letter-spacing:0;color:var(--ink-dim);line-height:1.6}
-.btn{background:var(--cobalt);color:var(--bone-on-navy);border:none;padding:12px 28px;font-size:14px;font-weight:600;font-family:var(--mono);letter-spacing:.04em;cursor:pointer;transition:opacity .15s}
+.btn{background:var(--cobalt);color: var(--on-ochre);border:none;padding:12px 28px;font-size:14px;font-weight:600;font-family:var(--mono);letter-spacing:.04em;cursor:pointer;transition:opacity .15s}
 .btn:hover{opacity:.88}
 .btn:disabled{opacity:.4;cursor:not-allowed}
-.success-box{display:none;background:rgba(178,255,63,.12);border:1px solid var(--navy);color:var(--navy);padding:24px;margin-top:24px}
+.success-box{display:none;background:rgba(217, 164, 65, .12);border:1px solid var(--navy);color:var(--navy);padding:24px;margin-top:24px}
 .ref{font-family:var(--mono);font-size:15px;color:var(--ink);margin:8px 0;font-weight:600}
 .error-box{display:none;background:rgba(200,50,50,.12);border:1px solid rgba(200,50,50,.4);padding:16px;margin-top:16px;font-size:13px;color:rgba(238,136,136,.9)}
-.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(11,58,106,.2);border-top-color:var(--cobalt);animation:spin .7s linear infinite;vertical-align:middle;margin-right:8px}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(var(--tint), .2);border-top-color:var(--cobalt);animation:spin .7s linear infinite;vertical-align:middle;margin-right:8px}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:640px){.wrap{padding:48px 24px 80px}.form-grid{grid-template-columns:1fr}.sign-box{padding:24px}}
 </style>
@@ -72,9 +72,9 @@ input:focus{border-color:var(--cobalt)}
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -85,26 +85,26 @@ input:focus{border-color:var(--cobalt)}
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(217, 164, 65, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -113,13 +113,13 @@ input:focus{border-color:var(--cobalt)}
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(217, 164, 65, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }

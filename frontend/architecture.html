@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Architecture · How Paramant works</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -24,11 +24,11 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0B3A6A">
+<meta name="theme-color" content="#15191C">
 
-<link rel="stylesheet" href="/design-system.css?v=25">
-<link rel="stylesheet" href="/nav.css?v=21">
-<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/relay-pulse.css?v=4">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -38,105 +38,110 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif}
 
 /* ── layout primitives ── */
 .arch-section{padding:80px 0}
-.arch-section--navy{background:#0B3A6A;color:#F8FAFC}
-.arch-section--tint{background:#EFF6FF}
+.arch-section--navy{background:var(--bone-2);color:var(--ink)}
+.arch-section--tint{background:var(--card)}
 .arch-inner{max-width:900px;margin:0 auto;padding:0 48px}
 
 /* ── eyebrow pill ── */
-.eyebrow{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:#B2FF3F;color:#0B3A6A;padding:4px 12px;margin-bottom:20px}
+.eyebrow{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:var(--ochre);color: var(--on-ochre);padding:4px 12px;margin-bottom:20px}
 
 /* ── hero ── */
-.page-hero{padding:100px 0 80px;border-bottom:1px solid var(--ink-hair,#e2e8f0)}
+.page-hero{padding:100px 0 80px;border-bottom:1px solid var(--ink-hair)}
 .page-hero-inner{max-width:900px;margin:0 auto;padding:0 48px}
 .page-hero h1{font-size:42px;font-weight:700;letter-spacing:-.03em;margin-bottom:16px;line-height:1.1}
-.lede{font-size:18px;color:#475569;line-height:1.7;max-width:600px}
-.lede a{color:#1D4ED8;text-decoration:none}
+.lede{font-size:18px;color:var(--ink-2);line-height:1.7;max-width:600px}
+.lede a{color:var(--cobalt);text-decoration:none}
 .lede a:hover{opacity:.7}
 
 /* ── section headings ── */
-.section-num{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#B2FF3F;margin-bottom:8px}
-.section-num--dark{color:#94a3b8}
+.section-num{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--lime);margin-bottom:8px}
+.section-num--dark{color:var(--ink-dim)}
 .section-title{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:16px}
-.section-desc{font-size:16px;line-height:1.75;color:#475569;max-width:640px;margin-bottom:40px}
-.arch-section--navy .section-desc{color:#cbd5e1}
-.arch-section--navy .section-title{color:#F8FAFC}
+.section-desc{font-size:16px;line-height:1.75;color:var(--ink-2);max-width:640px;margin-bottom:40px}
+.arch-section--navy .section-desc{color:var(--ink-dim)}
+.arch-section--navy .section-title{color:var(--ink)}
 
 /* ── diagram box ── */
-.arch-diagram{background:#fff;border:1px solid #e2e8f0;padding:40px;margin:32px 0;overflow-x:auto}
+.arch-diagram{background:var(--paper);border:1px solid var(--ink-hair);border-radius:var(--r);padding:40px;margin:32px 0;overflow-x:auto}
+/* The three diagrams below are drawn with fixed ink, the way a printed figure
+   is: their fills and strokes are SVG presentation attributes, not CSS, and
+   redrawing them for the night would be a redraw and not a recolour. So the
+   frame is the cream paper of the design system, and the figure sits on it
+   like a printed sheet on the night desk. */
 
 /* ── takeaway callout ── */
-.arch-takeaway{border-left:3px solid #B2FF3F;padding:16px 20px;background:#f0fdf4;margin-top:32px}
-.arch-takeaway--navy{border-left:3px solid #B2FF3F;padding:16px 20px;background:rgba(178,255,63,.07);margin-top:32px}
-.arch-takeaway p{font-size:14px;color:#374151;line-height:1.7;margin:0}
-.arch-takeaway--navy p{color:#cbd5e1}
-.arch-takeaway strong{color:#0B3A6A}
-.arch-takeaway--navy strong{color:#B2FF3F}
+.arch-takeaway{border-left:3px solid var(--ochre);padding:16px 20px;background:var(--card);margin-top:32px}
+.arch-takeaway--navy{border-left:3px solid var(--ochre);padding:16px 20px;background:rgba(217, 164, 65, .07);margin-top:32px}
+.arch-takeaway p{font-size:14px;color:var(--ink-2);line-height:1.7;margin:0}
+.arch-takeaway--navy p{color:var(--ink-dim)}
+.arch-takeaway strong{color:var(--ink)}
+.arch-takeaway--navy strong{color:var(--lime)}
 
 /* ── compare grid ── */
 .compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px}
-.compare-col{padding:28px 32px;border:1px solid rgba(255,255,255,.12)}
-.compare-col--bad{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.1)}
-.compare-col--good{background:rgba(178,255,63,.08);border-color:rgba(178,255,63,.3)}
+.compare-col{padding:28px 32px;border:1px solid rgba(var(--tint), .12)}
+.compare-col--bad{background:rgba(var(--tint), .04);border-color:rgba(var(--tint), .1)}
+.compare-col--good{background:rgba(217, 164, 65, .08);border-color:rgba(217, 164, 65, .3)}
 .compare-col h3{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:20px}
-.compare-col--bad h3{color:#f87171}
-.compare-col--good h3{color:#B2FF3F}
+.compare-col--bad h3{color:var(--brick-ink)}
+.compare-col--good h3{color:var(--lime)}
 .compare-col ul{list-style:none;display:flex;flex-direction:column;gap:10px}
-.compare-col li{font-size:14px;line-height:1.5;padding-left:22px;position:relative;color:#cbd5e1}
+.compare-col li{font-size:14px;line-height:1.5;padding-left:22px;position:relative;color:var(--ink-dim)}
 .compare-col li::before{position:absolute;left:0;font-weight:700}
-.compare-col--bad li::before{content:"✗";color:#f87171}
-.compare-col--good li::before{content:"✓";color:#B2FF3F}
+.compare-col--bad li::before{content:"✗";color:var(--brick-ink)}
+.compare-col--good li::before{content:"✓";color:var(--lime)}
 
 /* ── URL anatomy ── */
 .url-anatomy{margin:36px 0;position:relative}
-.url-display{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:15px;line-height:1.6;word-break:break-all;background:#fff;border:1px solid #e2e8f0;padding:20px 24px;display:flex;flex-wrap:wrap;align-items:center;gap:0}
+.url-display{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:15px;line-height:1.6;word-break:break-all;background:var(--card);border:1px solid var(--ink-hair);padding:20px 24px;display:flex;flex-wrap:wrap;align-items:center;gap:0}
 .url-part{display:inline}
-.url-sent{color:#1D4ED8}
-.url-not-sent{background:#B2FF3F;color:#0B3A6A;padding:2px 4px}
+.url-sent{color:var(--cobalt)}
+.url-not-sent{background:var(--ochre);color: var(--on-ochre);padding:2px 4px}
 .url-labels{display:flex;flex-wrap:wrap;gap:32px;margin-top:24px}
 .url-label-item{display:flex;flex-direction:column;gap:4px}
 .url-label-dot{width:10px;height:10px;display:inline-block;margin-right:6px;vertical-align:middle}
-.url-label-dot--blue{background:#1D4ED8}
-.url-label-dot--lime{background:#B2FF3F}
-.url-label-text{font-size:13px;color:#475569;line-height:1.6}
-.url-label-text strong{color:#0B3A6A;display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px}
+.url-label-dot--blue{background:var(--ochre)}
+.url-label-dot--lime{background:var(--ochre)}
+.url-label-text{font-size:13px;color:var(--ink-2);line-height:1.6}
+.url-label-text strong{color:var(--ink);display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px}
 
 /* ── lifecycle grid ── */
 .lifecycle-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin:32px 0}
-.lifecycle-state{padding:24px;border:1px solid #e2e8f0;background:#fff;position:relative}
-.lifecycle-state--active{border-color:#B2FF3F;border-width:2px}
+.lifecycle-state{padding:24px;border:1px solid var(--ink-hair);background:var(--card);position:relative}
+.lifecycle-state--active{border-color:var(--ochre);border-width:2px}
 .lifecycle-state--gone{opacity:.5}
-.lifecycle-num{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94a3b8;margin-bottom:12px}
-.lifecycle-state--active .lifecycle-num{color:#B2FF3F}
-.lifecycle-heading{font-size:15px;font-weight:700;color:#0B3A6A;margin-bottom:10px}
-.lifecycle-body{font-size:13px;color:#475569;line-height:1.6}
-.lifecycle-gone-icon{position:absolute;top:16px;right:16px;width:20px;height:20px;color:#ef4444}
+.lifecycle-num{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:12px}
+.lifecycle-state--active .lifecycle-num{color:var(--lime)}
+.lifecycle-heading{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:10px}
+.lifecycle-body{font-size:13px;color:var(--ink-2);line-height:1.6}
+.lifecycle-gone-icon{position:absolute;top:16px;right:16px;width:20px;height:20px;color:var(--brick-ink)}
 
 /* ── modes table ── */
 .modes-table{width:100%;border-collapse:collapse;margin-top:32px}
-.modes-table th{text-align:left;padding:12px 16px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b;border-bottom:2px solid #e2e8f0}
+.modes-table th{text-align:left;padding:12px 16px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);border-bottom:2px solid var(--ink-hair)}
 .modes-table th:not(:first-child){text-align:center}
-.modes-table td{padding:12px 16px;font-size:14px;color:#374151;border-bottom:1px solid #f1f5f9;vertical-align:top}
-.modes-table td:first-child{color:#0B3A6A;font-weight:600}
-.modes-table td:not(:first-child){text-align:center;color:#475569}
+.modes-table td{padding:12px 16px;font-size:14px;color:var(--ink-2);border-bottom:1px solid var(--ink-hair);vertical-align:top}
+.modes-table td:first-child{color:var(--ink);font-weight:600}
+.modes-table td:not(:first-child){text-align:center;color:var(--ink-2)}
 .modes-table tr:last-child td{border-bottom:none}
-.modes-table .mode-head{font-size:13px;font-weight:700;color:#1D4ED8;text-transform:uppercase;letter-spacing:.04em}
-.modes-table .mode-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;background:#eff6ff;color:#1D4ED8}
-.modes-table .mode-badge--lime{background:#f0fdf4;color:#166534}
+.modes-table .mode-head{font-size:13px;font-weight:700;color:var(--cobalt);text-transform:uppercase;letter-spacing:.04em}
+.modes-table .mode-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;background:var(--card);color:var(--cobalt)}
+.modes-table .mode-badge--lime{background:var(--card);color:var(--ok-ink)}
 
 /* ── going deeper ── */
 .going-deeper{text-align:center;padding:64px 48px}
-.going-deeper h2{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px;color:#0B3A6A}
-.going-deeper p{font-size:16px;color:#475569;margin-bottom:32px;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.7}
-.btn-arch{display:inline-block;background:#0B3A6A;color:#F8FAFC;text-decoration:none;padding:14px 32px;font-size:14px;font-weight:600;letter-spacing:.02em;transition:opacity .15s}
+.going-deeper h2{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:12px;color:var(--ink)}
+.going-deeper p{font-size:16px;color:var(--ink-2);margin-bottom:32px;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.7}
+.btn-arch{display:inline-block;background:var(--bone-2);color:var(--ink);text-decoration:none;padding:14px 32px;font-size:14px;font-weight:600;letter-spacing:.02em;transition:opacity .15s}
 .btn-arch:hover{opacity:.85}
 
 /* ── SVG helpers ── */
 .diagram-label{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 
-footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
 .footer-links{display:flex;gap:20px;flex-wrap:wrap}
-.footer-links a{font-size:var(--text-xs,12px);color:var(--cobalt,#1D4ED8)}
-.footer-meta{font-size:var(--text-xs,12px);color:var(--ink-dim,#64748b)}
+.footer-links a{font-size:var(--text-xs,12px);color:var(--cobalt)}
+.footer-meta{font-size:var(--text-xs,12px);color:var(--ink-dim)}
 
 @media(max-width:900px){
   .arch-inner,.page-hero-inner{padding:0 24px}
@@ -163,9 +168,9 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -176,26 +181,26 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(217, 164, 65, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -204,13 +209,13 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(217, 164, 65, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -342,7 +347,7 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
         <rect x="250" y="76" width="140" height="52" rx="2" fill="#fef2f2" stroke="#fecaca" stroke-width="1"/>
         <text x="320" y="98" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" fill="#dc2626">████████████</text>
         <text x="320" y="114" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" fill="#dc2626">opaque ciphertext</text>
-        <text x="320" y="146" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#475569">RAM only — no disk write</text>
+        <text x="320" y="146" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#475569">RAM only &mdash; no disk write</text>
         <text x="320" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" fill="#475569">no key, no plaintext</text>
 
         <!-- Arrow 2→3 -->
@@ -400,7 +405,7 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
           <li>Readable file contents (stored in plaintext or decryptable by the provider)</li>
           <li>Filename and metadata logged</li>
           <li>Preview thumbnail generated server-side</li>
-          <li>Written to disk — survives restarts, subpoenas, breaches</li>
+          <li>Written to disk &mdash; survives restarts, subpoenas, breaches</li>
           <li>Access logs tied to content</li>
           <li>Subject to legal disclosure orders</li>
         </ul>
@@ -408,11 +413,11 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
       <div class="compare-col compare-col--good">
         <h3>Paramant relay</h3>
         <ul>
-          <li>Ciphertext only — we cannot read it</li>
+          <li>Ciphertext only &mdash; we cannot read it</li>
           <li>No filename, no metadata</li>
-          <li>No preview possible — opaque bytes</li>
-          <li>RAM only — relay restart destroys everything</li>
-          <li>Nothing to disclose — we hold no plaintext</li>
+          <li>No preview possible &mdash; opaque bytes</li>
+          <li>RAM only &mdash; relay restart destroys everything</li>
+          <li>Nothing to disclose &mdash; we hold no plaintext</li>
           <li>GDPR jurisdiction, no US CLOUD Act</li>
         </ul>
       </div>
@@ -429,7 +434,7 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
   <div class="arch-inner">
     <div class="section-num">03</div>
     <h2 class="section-title">The # in the link</h2>
-    <p class="section-desc">Every Paramant link is split in two. The left half goes to the relay. The right half — the part after <code style="font-family:'IBM Plex Mono',monospace;font-size:14px;background:#eff6ff;padding:2px 6px;color:#1D4ED8">#</code> — never leaves your browser. This is not a Paramant policy. It is how browsers work.</p>
+    <p class="section-desc">Every Paramant link is split in two. The left half goes to the relay. The right half &mdash; the part after <code style="font-family:'IBM Plex Mono',monospace;font-size:14px;background:var(--card);padding:2px 6px;color:var(--cobalt)">#</code> &mdash; never leaves your browser. This is not a Paramant policy. It is how browsers work.</p>
 
     <div class="url-anatomy">
       <div class="url-display">
@@ -439,16 +444,16 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
         <div class="url-label-item">
           <div>
             <span class="url-label-dot url-label-dot--blue"></span>
-            <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1D4ED8">Sent to relay</strong>
+            <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cobalt)">Sent to relay</strong>
           </div>
           <p class="url-label-text" style="margin-top:6px;padding-left:16px">The path <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">/r/a8f3c92d</code> identifies which blob to retrieve. The relay sees this and serves the matching ciphertext.</p>
         </div>
         <div class="url-label-item">
           <div>
             <span class="url-label-dot url-label-dot--lime"></span>
-            <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#166534">Never leaves the browser</strong>
+            <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ok-ink)">Never leaves the browser</strong>
           </div>
-          <p class="url-label-text" style="margin-top:6px;padding-left:16px">The fragment <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code> is the decryption key. Browsers strip the fragment before making any network request. It is never transmitted to any server — including ours.</p>
+          <p class="url-label-text" style="margin-top:6px;padding-left:16px">The fragment <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code> is the decryption key. Browsers strip the fragment before making any network request. It is never transmitted to any server &mdash; including ours.</p>
         </div>
       </div>
     </div>
@@ -473,7 +478,7 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
         <div class="lifecycle-body">Ciphertext is held in relay RAM. The decryption key lives only in the URL fragment on the sender's clipboard. The relay is waiting.</div>
       </div>
       <div class="lifecycle-state lifecycle-state--active">
-        <div class="lifecycle-num">State 02 — active</div>
+        <div class="lifecycle-num">State 02 &mdash; active</div>
         <div class="lifecycle-heading">Link opened</div>
         <div class="lifecycle-body">Recipient's browser fetches the ciphertext. The relay flags the slot for immediate erasure. Decryption happens locally using the key from <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code>. File appears in the browser.</div>
       </div>
@@ -482,7 +487,7 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
           <circle cx="10" cy="10" r="9" stroke="#ef4444" stroke-width="1.5"/>
           <path d="M6.5 6.5L13.5 13.5M13.5 6.5L6.5 13.5" stroke="#ef4444" stroke-width="1.75"/>
         </svg>
-        <div class="lifecycle-num">State 03 — gone</div>
+        <div class="lifecycle-num">State 03 &mdash; gone</div>
         <div class="lifecycle-heading">Erased</div>
         <div class="lifecycle-body">Memory slot zeroed. Any subsequent request for that ID returns HTTP 410 Gone. No recovery, no retry, no copy anywhere on disk.</div>
       </div>
@@ -499,7 +504,7 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
   <div class="arch-inner">
     <div class="section-num">05</div>
     <h2 class="section-title">Verifiable history</h2>
-    <p class="section-desc">Every transfer event is appended to a Merkle tree. The root fingerprint is published. Changing any historical entry would change the root — which is publicly visible and tamper-evident.</p>
+    <p class="section-desc">Every transfer event is appended to a Merkle tree. The root fingerprint is published. Changing any historical entry would change the root &mdash; which is publicly visible and tamper-evident.</p>
 
     <div class="arch-diagram" role="img" aria-label="Merkle tree diagram showing root hash derived from four leaf events">
       <svg viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">
@@ -551,7 +556,7 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
     </div>
 
     <div class="arch-takeaway">
-      <p><strong>The root fingerprints the whole tree.</strong> Edit any leaf event — even by one byte — and the root hash changes. Because the root is published in the CT log, any retroactive tampering is immediately detectable. This is the same principle used by certificate transparency in TLS.</p>
+      <p><strong>The root fingerprints the whole tree.</strong> Edit any leaf event &mdash; even by one byte &mdash; and the root hash changes. Because the root is published in the CT log, any retroactive tampering is immediately detectable. This is the same principle used by certificate transparency in TLS.</p>
     </div>
   </div>
 </section>
@@ -564,7 +569,7 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
     <p class="section-desc">One jurisdiction. One data center. No CDN caching your files. No US entity holds ciphertext or a key; the one American sub-processor sends transactional email under Standard Contractual Clauses.</p>
 
     <div style="text-align:center;margin:40px 0 32px">
-      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#B2FF3F;margin-bottom:24px">HETZNER · NUREMBERG · GERMANY · EU</div>
+      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--lime);margin-bottom:24px">HETZNER · NUREMBERG · GERMANY · EU</div>
 
       <svg viewBox="0 0 360 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:360px;margin:0 auto;display:block" aria-label="Concentric circles showing relay location in Nuremberg, Germany">
         <!-- Concentric circles -->
@@ -584,21 +589,21 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
         <text x="196" y="128" font-family="'IBM Plex Mono',monospace" font-size="8" fill="rgba(178,255,63,0.7)">49.45°N 11.08°E</text>
       </svg>
 
-      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;color:rgba(178,255,63,0.8);letter-spacing:.08em;margin-top:8px">paramant-relay · 49.45N · 11.08E</div>
+      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;color:rgba(217, 164, 65, 0.8);letter-spacing:.08em;margin-top:8px">paramant-relay · 49.45N · 11.08E</div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:8px">
-      <div style="padding:20px;border:1px solid rgba(255,255,255,0.1)">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#B2FF3F;margin-bottom:8px">Jurisdiction</div>
-        <div style="font-size:14px;color:#e2e8f0;line-height:1.6">EU / Germany<br><span style="font-size:12px;color:#94a3b8">GDPR · DSGVO</span></div>
+      <div style="padding:20px;border:1px solid rgba(var(--tint), 0.1)">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);margin-bottom:8px">Jurisdiction</div>
+        <div style="font-size:14px;color:var(--ink-2);line-height:1.6">EU / Germany<br><span style="font-size:12px;color:var(--ink-dim)">GDPR · DSGVO</span></div>
       </div>
-      <div style="padding:20px;border:1px solid rgba(255,255,255,0.1)">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#B2FF3F;margin-bottom:8px">US Cloud Act</div>
-        <div style="font-size:14px;color:#e2e8f0;line-height:1.6">Not applicable<br><span style="font-size:12px;color:#94a3b8">no US entity</span></div>
+      <div style="padding:20px;border:1px solid rgba(var(--tint), 0.1)">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);margin-bottom:8px">US Cloud Act</div>
+        <div style="font-size:14px;color:var(--ink-2);line-height:1.6">Not applicable<br><span style="font-size:12px;color:var(--ink-dim)">no US entity</span></div>
       </div>
-      <div style="padding:20px;border:1px solid rgba(255,255,255,0.1)">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#B2FF3F;margin-bottom:8px">Storage</div>
-        <div style="font-size:14px;color:#e2e8f0;line-height:1.6">RAM only<br><span style="font-size:12px;color:#94a3b8">no disk, no CDN</span></div>
+      <div style="padding:20px;border:1px solid rgba(var(--tint), 0.1)">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);margin-bottom:8px">Storage</div>
+        <div style="font-size:14px;color:var(--ink-2);line-height:1.6">RAM only<br><span style="font-size:12px;color:var(--ink-dim)">no disk, no CDN</span></div>
       </div>
     </div>
   </div>
@@ -702,7 +707,7 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
     </table>
 
     <div class="arch-takeaway">
-      <p><strong>The relay never sees plaintext for SDK and WebApp transfers.</strong> The two extensions currently take a server-side path while their client-side crypto is finished — that is called out openly here rather than papered over. See <a href="/crypto-agility#06">crypto-agility § 06</a> for the per-client wire format and migration table.</p>
+      <p><strong>The relay never sees plaintext for SDK and WebApp transfers.</strong> The two extensions currently take a server-side path while their client-side crypto is finished &mdash; that is called out openly here rather than papered over. See <a href="/crypto-agility#06">crypto-agility § 06</a> for the per-client wire format and migration table.</p>
     </div>
   </div>
 </section>
@@ -710,7 +715,7 @@ footer{border-top:1px solid var(--ink-hair,#e2e8f0);padding:40px 48px;display:fl
 <!-- ── GOING DEEPER ── -->
 <section class="arch-section arch-section--tint">
   <div class="going-deeper">
-    <span class="eyebrow" style="display:block;text-align:center;margin-bottom:20px">GOING DEEPER</span>
+    <span class="eyebrow" style="display:block;width:fit-content;margin:0 auto 20px;text-align:center">GOING DEEPER</span>
     <h2>Want the cryptographic specification?</h2>
     <p>The security page covers every algorithm, the independent audit results, key verification layers, authentication model, and responsible disclosure. Written for cryptographers and security engineers.</p>
     <a href="/security" class="btn-arch">Read the security spec &rarr;</a>

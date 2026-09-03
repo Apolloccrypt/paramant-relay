@@ -1,71 +1,84 @@
 /* PARAMANT app-2026.css
    The product surface: dashboard, sign, parashare, signup, account, auth.
 
-   This file implements docs/brand/design-direction.md for the APP screens only.
-   Marketing pages keep design-system.css v4 untouched. Two things happen here:
+   Since the night edition this file no longer carries a palette of its own. It
+   carries the SAME night as frontend/design-system.css, plus the second half a
+   marketing page does not have: the cream paper, for the reader who asks for it
+   on /account.
 
-   1. Tokens. The 2026 palette from the direction (section 2), written twice so
-      an explicit "dark" and an explicit "auto" under a dark system both win,
-      and so no colour exists only inside a media query. Light is the default
-      and the app stays light until a reader picks otherwise on /account.
-   2. An alias layer that points the v4 token names at the new values. Every
+   1. Tokens. The night is the default, written out here rather than inherited,
+      because this file loads last and has to win over the hard-coded hexes the
+      page style blocks still carry. The cream paper is written twice: once for
+      an explicit "light", once for the system preference under an explicit
+      "auto". No colour exists only inside a media query.
+   2. An alias layer that points the v4 token names at the same values, so every
       rule already written against --bone / --ink / --ink-hair follows the theme
-      without being rewritten, which is what makes a dark mode on these pages
-      affordable at all.
+      without being rewritten.
 
    Load order matters: this file is the LAST stylesheet in the head, after the
-   page's own <style> blocks, so the hard-coded hexes those blocks still carry
-   can be corrected here for dark mode.
+   page's own <style> blocks.
 
    Contrast: every pair below was computed with the WCAG 2.1 relative-luminance
-   formula against its own background. Values are in the direction document. */
+   formula against its own background, and tests/app-contrast.test.mjs walks
+   every text node on eleven screens, at two widths, in both themes. */
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   1. TOKENS, light
+   1. TOKENS, the night. This is the default: no attribute, no media query.
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
+  /* the cream, as channels: every rgba(var(--tint), a) in a page's own style
+     block is a hairline or a tint, and it has to flip with the theme. */
+  --tint: 234, 226, 206;
+
   /* surface */
-  --paper:        #FBFAF7;
-  --surface:      #FFFFFF;
-  --surface-sunk: #F4F4F1;
-  --surface-ink:  #0C1622;
+  --paper:        #15191C;
+  --surface:      #1B1F23;
+  --surface-sunk: #101316;
+  --surface-ink:  #0B0E10;
 
   /* ink */
-  --ink-1: #0C1B2A;   /* 16.68 on paper */
-  --ink-2: #40505F;   /*  7.95 on paper */
-  --ink-3: #5C6A78;   /*  5.31 on paper */
+  --ink-1: #EAE2CE;                    /* 13.70 on the night */
+  --ink-2: rgba(234, 226, 206, .80);   /*  9.11 */
+  --ink-3: rgba(234, 226, 206, .62);   /*  5.95 */
 
   /* the one accent */
-  --accent:      #1D4ED8;              /* 6.42 on paper */
-  --accent-hov:  #1A43BE;
-  --accent-ink:  #FFFFFF;              /* 6.70 on accent */
-  --accent-soft: rgba(29,78,216,.08);
-  --accent-ring: rgba(29,78,216,.32);
+  --accent:      #D9A441;              /* 7.86 on the night */
+  --accent-hov:  #C7912E;
+  --accent-ink:  #141414;              /* 8.61 on the ochre */
+  --accent-soft: rgba(217, 164, 65, .12);
+  --accent-ring: rgba(217, 164, 65, .45);
 
   /* hairlines: the main shape of the system */
-  --line:       rgba(12,27,42,.11);
-  --line-2:     rgba(12,27,42,.20);
-  --line-ghost: rgba(12,27,42,.05);
+  --line:       rgba(234, 226, 206, .16);
+  --line-2:     rgba(234, 226, 206, .32);
+  --line-ghost: rgba(234, 226, 206, .06);
 
-  /* lime is a line, never a text background (one exception, see --mark-on) */
-  --mark:     #B2FF3F;
-  --mark-ink: #5C7A12;                 /* 4.90 on paper, readable lime */
-  --mark-on:  #0A1626;                 /* 14.94 on #B2FF3F */
+  /* the mark. Lime was the old one; the night has one accent and it is ochre. */
+  --mark:     #D9A441;
+  --mark-ink: #D9A441;
+  --mark-on:  #141414;
 
   /* signature states: the four words dashboard.js renders */
-  --sig-wait: #79600F;
-  --sig-move: #1D4ED8;
-  --sig-done: #1B6B45;
-  --sig-stop: #8C3A34;
-  --sig-wait-bg: rgba(121,96,15,.09);
-  --sig-stop-line: rgba(140,58,52,.42);
-  --paper-blur: rgba(251,250,247,.92);
-  --sig-move-bg: rgba(29,78,216,.09);
-  --sig-done-bg: rgba(27,107,69,.09);
-  --sig-stop-bg: rgba(140,58,52,.09);
+  --sig-wait: #E3C169;                 /* 10.19 */
+  --sig-move: #8FB8C9;                 /*  8.31 */
+  --sig-done: #8FC7A4;                 /*  9.15 */
+  --sig-stop: #E08A78;                 /*  6.80 */
+  --sig-wait-bg: rgba(227, 193, 105, .12);
+  --sig-move-bg: rgba(143, 184, 201, .12);
+  --sig-done-bg: rgba(143, 199, 164, .12);
+  --sig-stop-bg: rgba(224, 138, 120, .12);
+  --sig-stop-line: rgba(224, 138, 120, .44);
+  --paper-blur: rgba(21, 25, 28, .92);
 
-  /* radius: nul is a choice, soft only where you touch */
+  /* the cream paper, for the panels that have to read as paper on a desk */
+  --leaf:      #F1EAD6;
+  --leaf-2:    #E7DDC4;
+  --leaf-ink:  #1B1F22;
+  --leaf-ink-2:#4A4A44;
+  --ochre-ink: #8A5E10;                /* the ochre as ink on the cream paper */
+
+  /* radius: the night rounds, soft where you touch */
   --r-0: 0;
   --r-1: 3px;
   --r-2: 10px;
@@ -73,9 +86,9 @@
   --r-pill: 999px;
 
   /* shadow: almost nothing, depth comes from hairlines */
-  --sh-1: 0 1px 2px rgba(12,27,42,.04);
-  --sh-2: 0 1px 2px rgba(12,27,42,.05), 0 8px 24px -12px rgba(12,27,42,.14);
-  --sh-3: 0 24px 64px -24px rgba(12,27,42,.28);
+  --sh-1: 0 1px 2px rgba(0, 0, 0, .40);
+  --sh-2: 0 1px 2px rgba(0, 0, 0, .44), 0 8px 24px -12px rgba(0, 0, 0, .66);
+  --sh-3: 0 24px 64px -24px rgba(0, 0, 0, .80);
   --ring: 0 0 0 2px var(--paper), 0 0 0 4px var(--accent-ring);
 
   /* motion: three durations, two curves, and every one of them confirms
@@ -88,147 +101,181 @@
 
   --tap: 44px;
 
-  /* ── alias layer: the v4 names now resolve to the 2026 values ───────────── */
+  /* ── alias layer: the v4 names now resolve to the night ────────────────── */
   --bone:   var(--paper);
   --bone-2: var(--surface-sunk);
   --navy:   var(--ink-1);
   --navy-2: var(--ink-1);
   --ink:       var(--ink-1);
-  --ink-dim:   var(--ink-2);
+  --ink-dim:   var(--ink-3);
   --ink-hair:  var(--line);
   --ink-ghost: var(--line-ghost);
   --cobalt:   var(--accent);
   --cobalt-2: var(--accent-hov);
   --lime:     var(--mark);
-  --bone-on-navy:      #F4F7FA;
-  --bone-on-navy-dim:  rgba(244,247,250,.74);
-  --bone-on-navy-hair: rgba(244,247,250,.18);
+  --ochre:    var(--accent);
+  --ochre-2:  var(--accent-hov);
+  --on-ochre: var(--accent-ink);
+  --card:      var(--surface);
+  --card-2:    var(--surface-sunk);
+  --card-line: var(--line);
+  --brick:     #C4604F;
+  --brick-ink: var(--sig-stop);
+  --ok-ink:    var(--sig-done);
+  --warn-ink:  var(--sig-wait);
+  --petrol:    #155E75;
+  --petrol-ink:var(--sig-move);
+  --bone-on-navy:      var(--ink-1);
+  --bone-on-navy-dim:  var(--ink-2);
+  --bone-on-navy-hair: var(--line-2);
   --black:       var(--ink-1);
-  --black-dim:   var(--ink-2);
+  --black-dim:   var(--ink-3);
   --black-hair:  var(--line);
   --black-ghost: var(--line-ghost);
-  --lime-dim:    var(--ink-2);
+  --lime-dim:    var(--ink-3);
   --lime-hair:   var(--line);
   --lime-ghost:  var(--line-ghost);
 
-  /* an inverted block keeps its own ink regardless of theme */
-  --on-ink:      #F4F7FA;
-  --on-ink-dim:  rgba(244,247,250,.74);
+  /* an inverted block keeps its own ink regardless of theme: it is the night
+     in the night and the night again under the paper, so the ochre on it is
+     the bright one both times. */
+  --on-ink:        var(--ink-1);
+  --on-ink-dim:    var(--ink-2);
+  --on-ink-accent: #D9A441;
+
+  color-scheme: dark;
 }
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   2. TOKENS, dark: an own set and not a filter
+   2. TOKENS, the cream paper: an own set and not a filter
 
-   Dark is a CHOICE, never a jump. Measured 2026-09-03 on the previous version
-   of this file: with a dark OS and no choice made, /index and /pricing stayed
-   light while /dashboard, /sign, /parashare, /account and /auth/login went to
-   rgb(10,15,22). Signing in threw a reader from creme to black. So the system
-   preference is honoured under ONE condition, [data-theme="auto"], which only
-   frontend/js/theme.js writes and only after someone picked "Follow my system"
-   on /account. Without a choice there is no attribute, nothing below matches,
-   and the app is light. That holds with JavaScript switched off too.
+   The night is where the whole site stands, so it is the default here and it
+   needs neither an attribute nor a media query. The paper is the CHOICE: the
+   reader picks Light on /account, or picks Follow my system and is on a light
+   one. Both are written out in full, so no colour lives only inside a media
+   query, and the gate is [data-theme] and nothing else. Without a choice there
+   is no attribute, neither block matches, and the app is the night. That holds
+   with JavaScript switched off too.
 
-   Written twice: once for the system preference under an explicit "auto", once
-   for an explicit "dark". No colour exists only inside a media query.
+   Measured on the paper #F1EAD6: ink 13.81, ink-2 7.43, ink-3 5.35, the ochre
+   as ink 4.74.
    ═══════════════════════════════════════════════════════════════════════════ */
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
   :root[data-theme="auto"] {
-    --paper:        #0A0F16;
-    --surface:      #10161F;
-    --surface-sunk: #151C26;
-    --surface-ink:  #060A0F;
+    --tint: 27, 31, 34;
 
-    --ink-1: #EDF1F6;   /* 16.94 on paper */
-    --ink-2: #B4C1D0;   /* 10.50 */
-    --ink-3: #8D9CAD;   /*  6.86 */
+    --paper:        #F1EAD6;
+    --surface:      #F7F2E4;
+    --surface-sunk: #E7DDC4;
+    --surface-ink:  #15191C;
 
-    --accent:      #7FA6FF;   /* 8.05 */
-    --accent-hov:  #9CBAFF;
-    --accent-ink:  #061020;
-    --accent-soft: rgba(127,166,255,.12);
-    --accent-ring: rgba(127,166,255,.40);
+    --ink-1: #1B1F22;   /* 13.81 on the paper */
+    --ink-2: #4A4A44;   /*  7.43 */
+    --ink-3: #5F5F57;   /*  5.35 */
 
-    --line:       rgba(237,241,246,.10);
-    --line-2:     rgba(237,241,246,.20);
-    --line-ghost: rgba(237,241,246,.05);
+    --accent:      #6E4A0B;   /* 6.60 on the paper, 5.87 on the sunk paper */
+    --accent-hov:  #56390A;
+    --accent-ink:  #F1EAD6;
+    --accent-soft: rgba(110, 74, 11, .09);
+    --accent-ring: rgba(110, 74, 11, .38);
 
-    --mark:     #B2FF3F;   /* 15.80 on paper */
-    --mark-ink: #C7F86E;
-    --mark-on:  #0A1626;
+    --line:       rgba(27, 31, 34, .14);
+    --line-2:     rgba(27, 31, 34, .26);
+    --line-ghost: rgba(27, 31, 34, .06);
 
-    --sig-wait: #E3C169;
-    --sig-move: #90AEFF;
-    --sig-done: #6FD3A2;
-    --sig-stop: #F09A92;
-    --sig-wait-bg: rgba(227,193,105,.12);
-    --sig-move-bg: rgba(144,174,255,.12);
-    --sig-done-bg: rgba(111,211,162,.12);
-    --sig-stop-bg: rgba(240,154,146,.12);
-    --sig-stop-line: rgba(240,154,146,.44);
-    --paper-blur: rgba(10,15,22,.92);
+    --mark:     #6E4A0B;
+    --mark-ink: #6E4A0B;
+    --mark-on:  #F1EAD6;
 
-    --sh-1: 0 1px 2px rgba(0,0,0,.40);
-    --sh-2: 0 1px 2px rgba(0,0,0,.44), 0 8px 24px -12px rgba(0,0,0,.66);
-    --sh-3: 0 24px 64px -24px rgba(0,0,0,.80);
+    --sig-wait: #79600F;
+    --sig-move: #155E75;
+    --sig-done: #1B6B45;
+    --sig-stop: #8C3A34;
+    --sig-wait-bg: rgba(121, 96, 15, .10);
+    --sig-move-bg: rgba(21, 94, 117, .10);
+    --sig-done-bg: rgba(27, 107, 69, .10);
+    --sig-stop-bg: rgba(140, 58, 52, .10);
+    --sig-stop-line: rgba(140, 58, 52, .42);
+    --paper-blur: rgba(241, 234, 214, .92);
 
-    --bone-on-navy:      #EDF1F6;
-    --bone-on-navy-dim:  rgba(237,241,246,.74);
-    --bone-on-navy-hair: rgba(237,241,246,.18);
-    --on-ink:      #EDF1F6;
-    --on-ink-dim:  rgba(237,241,246,.74);
+    --leaf:      #15191C;
+    --leaf-2:    #101316;
+    --leaf-ink:  #EAE2CE;
+    --leaf-ink-2:rgba(234, 226, 206, .80);
+    --ochre-ink: #D9A441;
+
+    --sh-1: 0 1px 2px rgba(27, 31, 34, .05);
+    --sh-2: 0 1px 2px rgba(27, 31, 34, .06), 0 8px 24px -12px rgba(27, 31, 34, .16);
+    --sh-3: 0 24px 64px -24px rgba(27, 31, 34, .30);
+
+    --brick:     #8C3A34;
+    --petrol:    #155E75;
+
+    --on-ink:        #EAE2CE;
+    --on-ink-dim:    rgba(234, 226, 206, .80);
+    --on-ink-accent: #D9A441;
+
+    color-scheme: light;
   }
 }
 
-:root[data-theme="dark"] {
-  --paper:        #0A0F16;
-  --surface:      #10161F;
-  --surface-sunk: #151C26;
-  --surface-ink:  #060A0F;
+:root[data-theme="light"] {
+  --tint: 27, 31, 34;
 
-  --ink-1: #EDF1F6;
-  --ink-2: #B4C1D0;
-  --ink-3: #8D9CAD;
+  --paper:        #F1EAD6;
+  --surface:      #F7F2E4;
+  --surface-sunk: #E7DDC4;
+  --surface-ink:  #15191C;
 
-  --accent:      #7FA6FF;
-  --accent-hov:  #9CBAFF;
-  --accent-ink:  #061020;
-  --accent-soft: rgba(127,166,255,.12);
-  --accent-ring: rgba(127,166,255,.40);
+  --ink-1: #1B1F22;
+  --ink-2: #4A4A44;
+  --ink-3: #5F5F57;
 
-  --line:       rgba(237,241,246,.10);
-  --line-2:     rgba(237,241,246,.20);
-  --line-ghost: rgba(237,241,246,.05);
+  --accent:      #6E4A0B;
+  --accent-hov:  #56390A;
+  --accent-ink:  #F1EAD6;
+  --accent-soft: rgba(110, 74, 11, .09);
+  --accent-ring: rgba(110, 74, 11, .38);
 
-  --mark:     #B2FF3F;
-  --mark-ink: #C7F86E;
-  --mark-on:  #0A1626;
+  --line:       rgba(27, 31, 34, .14);
+  --line-2:     rgba(27, 31, 34, .26);
+  --line-ghost: rgba(27, 31, 34, .06);
 
-  --sig-wait: #E3C169;
-  --sig-move: #90AEFF;
-  --sig-done: #6FD3A2;
-  --sig-stop: #F09A92;
-  --sig-wait-bg: rgba(227,193,105,.12);
-  --sig-move-bg: rgba(144,174,255,.12);
-  --sig-done-bg: rgba(111,211,162,.12);
-  --sig-stop-bg: rgba(240,154,146,.12);
-  --sig-stop-line: rgba(240,154,146,.44);
-  --paper-blur: rgba(10,15,22,.92);
+  --mark:     #6E4A0B;
+  --mark-ink: #6E4A0B;
+  --mark-on:  #F1EAD6;
 
-  --sh-1: 0 1px 2px rgba(0,0,0,.40);
-  --sh-2: 0 1px 2px rgba(0,0,0,.44), 0 8px 24px -12px rgba(0,0,0,.66);
-  --sh-3: 0 24px 64px -24px rgba(0,0,0,.80);
+  --sig-wait: #79600F;
+  --sig-move: #155E75;
+  --sig-done: #1B6B45;
+  --sig-stop: #8C3A34;
+  --sig-wait-bg: rgba(121, 96, 15, .10);
+  --sig-move-bg: rgba(21, 94, 117, .10);
+  --sig-done-bg: rgba(27, 107, 69, .10);
+  --sig-stop-bg: rgba(140, 58, 52, .10);
+  --sig-stop-line: rgba(140, 58, 52, .42);
+  --paper-blur: rgba(241, 234, 214, .92);
 
-  --bone-on-navy:      #EDF1F6;
-  --bone-on-navy-dim:  rgba(237,241,246,.74);
-  --bone-on-navy-hair: rgba(237,241,246,.18);
-  --on-ink:      #EDF1F6;
-  --on-ink-dim:  rgba(237,241,246,.74);
+  --leaf:      #15191C;
+  --leaf-2:    #101316;
+  --leaf-ink:  #EAE2CE;
+  --leaf-ink-2:rgba(234, 226, 206, .80);
+  --ochre-ink: #D9A441;
+
+  --sh-1: 0 1px 2px rgba(27, 31, 34, .05);
+  --sh-2: 0 1px 2px rgba(27, 31, 34, .06), 0 8px 24px -12px rgba(27, 31, 34, .16);
+  --sh-3: 0 24px 64px -24px rgba(27, 31, 34, .30);
+
+  --brick:     #8C3A34;
+  --petrol:    #155E75;
+
+  --on-ink:        #EAE2CE;
+  --on-ink-dim:    rgba(234, 226, 206, .80);
+  --on-ink-accent: #D9A441;
+
+  color-scheme: light;
 }
-
-:root { color-scheme: light; }
-@media (prefers-color-scheme: dark) { :root[data-theme="auto"] { color-scheme: dark; } }
-:root[data-theme="dark"] { color-scheme: dark; }
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -502,22 +549,22 @@ footer .logo .a { color: var(--ink-1); }
 /* The one inverted block per screen. It keeps its own ink in both themes. */
 .dh-community, .acct-plan-band.free {
   background: var(--surface-ink);
-  box-shadow: inset 0 0 0 1px rgba(178,255,63,.20);
+  box-shadow: inset 0 0 0 1px rgba(217, 164, 65, .28);
   border: 0;
   border-radius: var(--r-2);
 }
 .dh-community-lede, .acct-plan-band.free .acct-plan-lede { color: var(--on-ink); }
 .dh-community-adds, .acct-plan-band.free .acct-plan-adds { color: var(--on-ink-dim); }
-.dh-community-kicker, .acct-plan-band.free .acct-plan-kicker { color: var(--mark); }
+.dh-community-kicker, .acct-plan-band.free .acct-plan-kicker { color: var(--on-ink-accent); }
 .dh-community-cta, .acct-plan-band.free a.acct-plan-cta {
   min-height: var(--tap); display: inline-flex; align-items: center;
-  background: var(--mark); color: var(--mark-on); border-radius: var(--r-1);
+  background: var(--on-ink-accent); color: #141414; border-radius: var(--r-1);
   font-family: var(--mono); font-size: 12px; font-weight: 600;
   letter-spacing: .08em; text-transform: uppercase; text-decoration: none;
   padding: 0 18px;
 }
-.dh-community-cta:hover, .acct-plan-band.free a.acct-plan-cta:hover { background: #C7F86E; }
-.dh-community-lede a, .acct-plan-band.free .acct-plan-lede a { color: var(--mark); }
+.dh-community-cta:hover, .acct-plan-band.free a.acct-plan-cta:hover { background: #C7912E; }
+.dh-community-lede a, .acct-plan-band.free .acct-plan-lede a { color: var(--on-ink-accent); }
 .acct-plan-band.paid { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); }
 .acct-plan-band.paid .acct-plan-kicker { color: var(--accent); }
 .acct-plan-band.paid .acct-plan-lede { color: var(--ink-1); }
@@ -565,16 +612,15 @@ footer .logo .a { color: var(--ink-1); }
 .theme-choice input:focus-visible + span { box-shadow: var(--ring); border-radius: var(--r-1); }
 
 
-/* The signed-out nav CTA used to be the one allowed lime field, with #0A1626
-   on it. It is cobalt now, in the bar and on the homepage: lime is the
-   punctuation of this brand and not the colour of its primary action, and next
-   to a cobalt hero button a lime bar button read as a second, competing offer.
-   White on #1D4ED8 is 6.3:1. Kept at the same weight as before, so an app page
-   cannot drift back to the lime field it was corrected out of. */
+/* The signed-out nav CTA was a lime field once and a cobalt one after that.
+   The night has one accent, so it is the ochre, and it takes the ochre's own
+   ink rather than white: --accent-ink is 8.61:1 on --accent. Kept on the token
+   at the same weight as before, so an app page cannot drift back to a colour
+   the system no longer has. */
 .nav-cta, a.nav-cta, .nav .nav-cta {
-  color: #FFFFFF !important;
-  background: #1D4ED8 !important;
-  border-color: #1D4ED8 !important;
+  color: var(--accent-ink) !important;
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -803,7 +849,7 @@ footer .logo .a { color: var(--ink-1); }
 /* The build bar is an inverted strip, so every part of it takes inverted ink. */
 .meta-bar, .meta-bar .sep, .meta-bar .right { color: var(--on-ink-dim); }
 .meta-bar b { color: var(--on-ink); }
-.meta-bar a.meta-link { color: var(--mark); text-decoration-color: rgba(178,255,63,.5); }
+.meta-bar a.meta-link { color: var(--mark); text-decoration-color: rgba(217, 164, 65, .5); }
 .meta-bar a.meta-link:hover, .meta-bar a.meta-link:focus-visible { color: var(--mark); text-decoration-color: var(--mark); }
 
 /* A failure sentence is a sentence in the fault colour of the current theme. */

@@ -1853,12 +1853,12 @@ console.log('ui-truthfulness: the rules page is Our rules on /rules, with /parar
   assert.doesNotMatch(themeJs, /fetch\(|XMLHttpRequest|navigator\.sendBeacon/,
     'theme.js must not send the choice anywhere; /account and /privacy both say it stays in the browser');
 
-  assert.match(account, /Light is the default and it stays light until you change it here/,
-    '/account must say that light is the default, because app-2026.css makes it so');
+  assert.match(account, /Dark is the default and it stays dark until you change it here/,
+    '/account must say that the night is the default, because app-2026.css makes it so');
   assert.match(account, /kept in this\s+browser only/,
     '/account must say the choice never leaves the browser');
-  assert.match(account, /The public pages stay light\./,
-    '/account promises the marketing pages stay light; tests/app-theme.test.mjs measures that');
+  assert.match(account, /The public pages stay dark\./,
+    '/account promises the marketing pages stay on the night; tests/app-theme.test.mjs measures that');
 })();
 
 console.log('ui-truthfulness: the appearance switch says only what theme.js and app-2026.css do');
