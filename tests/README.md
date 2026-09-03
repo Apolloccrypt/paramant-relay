@@ -22,7 +22,7 @@ Guards the auth + TOTP stack against the class of breakage that hit production r
 | `tests/auth-smoke.sh` | `deploy.sh` step 4 | 21 live HTTP assertions against production |
 | `deploy.sh` | manual deploy | Chains: sanity → build → health wait → smoke |
 | `tests/version-consistency.test.mjs` | Root integration suites | One version in one place: root `package.json` versus the relay and admin packages, both lockfiles, both image labels, the `VERSION` read in `relay.js`, the CHANGELOG section and the deploy check. Four places once gave three answers; see [docs/RELEASE.md](../docs/RELEASE.md) |
-| `tests/brand-shots-optin.test.mjs` | Root integration suites, and `tests/static-sanity.sh` (pre-commit) | The reference screenshots under `docs/brand/assets/app-2026/` are opt-in. `tests/app-shots.mjs` used to write 36 tracked PNGs on every run, so `git status` was never clean after a browser suite and the next `git commit -a` shipped them. Three layers: the resolver's own rules, a real dry run of `tests/app-shots.mjs` that has to name a directory outside the repo and leave the references byte-identical, and a scan so no other suite hardcodes the path. See [Refreshing the app screenshots](#refreshing-the-app-screenshots) |
+| `tests/brand-shots-optin.test.mjs` | Root integration suites, and `tests/static-sanity.sh` (pre-commit) | The reference screenshots under `docs/brand/assets/app-2026/` are opt-in. `scripts/app-shots.mjs` used to write 36 tracked PNGs on every run, so `git status` was never clean after a browser suite and the next `git commit -a` shipped them. Three layers: the resolver's own rules, a real dry run of `scripts/app-shots.mjs` that has to name a directory outside the repo and leave the references byte-identical, and a scan so no other suite hardcodes the path. See [Refreshing the app screenshots](#refreshing-the-app-screenshots) |
 | `tests/env-documented.test.mjs` | Root integration suites | Every `process.env` name the relay or admin reads must be in [deploy/.env.example](../deploy/.env.example) with a purpose, a default and the file that reads it. Nothing may be documented there that no code reads, and every `read in:` pointer must name a file that exists and mentions the variable. 40 of 57 were undocumented on 2026-09-02 |
 
 ## Running manually
@@ -41,27 +41,82 @@ Guards the auth + TOTP stack against the class of breakage that hit production r
 PARAMANT_BASE=http://localhost:4200/admin ./tests/auth-smoke.sh
 ```
 
-## Refreshing the app screenshots
+## Screenshots
 
-`tests/app-shots.mjs` renders every app screen at 390x844 and 1440x900, in
-light and dark, and writes 36 PNGs. The copies under
-`docs/brand/assets/app-2026/` are tracked, so writing them is a deliberate act
-and never a side effect of running the tests.
+### A screenshot is not a gate
+
+`scripts/app-shots.mjs` renders every app screen at 390x844 and 1440x900, in
+light and dark, and writes 36 PNGs. It lives in `scripts/`, next to
+`brand-shots-direction.mjs` and `shot-dashboard.mjs`, and it is deliberately not
+in `tests/`.
+
+It used to be `tests/app-shots.mjs`, and that is a real scar. The sign-e2e
+workflow's `Browser suites` step runs every `tests/*.mjs` that imports
+playwright, selected by import so a new browser suite is picked up the day it is
+written. This generator imports playwright, so it was picked up too. It asserts
+nothing, so a green run proved nothing, but a red one blocked everything: on
+2026-09-03 `page.screenshot: Timeout 30000ms exceeded` in this file took sign-e2e
+red on main (run 33746496749) and with it the deploy, which needs sign-e2e green
+in phase 0a. The same flake had already been seen on a pull request.
+
+Moving the file changes nothing about the workflow's selection line. The real
+browser suites it selects are the same sixteen minus this one:
+
+```bash
+# What the sign-e2e Browser suites step runs, before and after:
+grep -l "from 'playwright'" tests/*.mjs | grep -vE 'sign-full|product-heartbeat'
+```
+
+The rule this leaves behind: a file under `tests/` is a gate and asserts
+something. A file that only produces artefacts belongs in `scripts/`, whether or
+not it drives a browser.
+
+### Every screenshot goes through one helper
+
+`scripts/stable-screenshot.mjs`. It waits for network quiet and
+`document.fonts.ready` first (both bounded, both best-effort, so a page that is
+*meant* to be pending is still photographable), passes `animations: 'disabled'`
+so the capture is not waiting on a frame that never settles, and gives the shot
+60 s instead of Playwright's 30, with one retry at 120 s.
+
+The retry is measured, not guessed. Ten runs of the generator under sixteen busy
+cores put one capture past 60 s, and its call log read `taking page screenshot /
+disabled all CSS animations`: the page had settled and the raster itself was
+starved of CPU. No wait condition fixes that, only more budget does. A screenshot
+has no side effect, so taking it twice is safe; the retry warns on stderr, and a
+second timeout is thrown rather than swallowed.
+
+`animations: 'disabled'` and not `page.emulateMedia({ reducedMotion: 'reduce' })`,
+on purpose. Playwright freezes animations for the capture only; the media
+emulation changes what the page renders from that point on, which would silently
+move the ground under assertions taken after the shot and would make the
+reduced-motion pair in `app-shots.mjs` identical to the normal pair.
+
+The suites that write a screenshot as a byproduct call it too: `navigation-shell`,
+`cosign-document-delivery`, `user-dashboard-documents`, `sign-invite-delivery`
+and `developer-parasign-dashboard`. Those calls are gated on a
+`PARAMANT_*_SCREENSHOT_PATH` variable and never fire in CI, but a builder taking
+one by hand on a busy laptop hits the same wall the runner did.
+
+### Refreshing the app screenshots
+
+The copies under `docs/brand/assets/app-2026/` are tracked, so writing them is a
+deliberate act and never a side effect of running the tests.
 
 ```bash
 # Default: a temp directory. The repo stays clean.
-node tests/app-shots.mjs
+node scripts/app-shots.mjs
 
 # Only where would it write, no browser, no files.
-APP_SHOTS_DRY_RUN=1 node tests/app-shots.mjs
+APP_SHOTS_DRY_RUN=1 node scripts/app-shots.mjs
 
 # Refresh the tracked reference images. Review the diff before committing:
 # a screenshot that changed by two pixels of antialiasing still looks like a
 # screenshot, so a careless `git commit -a` is exactly the failure this guards.
-PARAMANT_WRITE_BRAND_SHOTS=1 node tests/app-shots.mjs
+PARAMANT_WRITE_BRAND_SHOTS=1 node scripts/app-shots.mjs
 
 # One screen only, and an explicit destination.
-APP_SHOTS_ONLY=dashboard APP_SHOTS_DIR=/tmp/shots node tests/app-shots.mjs
+APP_SHOTS_ONLY=dashboard APP_SHOTS_DIR=/tmp/shots node scripts/app-shots.mjs
 ```
 
 `APP_SHOTS_DIR` wins over the default, with one rule: a path pointing back
@@ -69,9 +124,10 @@ inside `docs/` is refused unless `PARAMANT_WRITE_BRAND_SHOTS=1` is set too.
 Otherwise the opt-in would be one environment variable away from meaning
 nothing. Where the decision is made: `scripts/brand-shots-dir.mjs`.
 
-CI never consumes these images. The sign-e2e workflow runs `tests/app-shots.mjs`
-because it picks up every suite that imports playwright, and no workflow uploads
-or reads the result, so nothing there sets the flag.
+CI never consumes these images, and since 2026-09-03 no workflow runs the
+generator at all. `tests/brand-shots-optin.test.mjs` still spawns it in dry-run
+mode, so the opt-in is measured against the file that does the writing rather
+than against a second copy of its rules.
 
 ## Pre-commit hook
 
