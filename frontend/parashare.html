@@ -63,7 +63,7 @@ h1{font-size:clamp(26px,5vw,38px);font-weight:600;letter-spacing:-.028em;line-he
 .ps-key-mask[hidden]{display:none}
 /* Not scoped to the slim row: the same control is the way out on the error
    banner, and there it has to look like an action too. */
-.ps-key-change{background:transparent;border:none;min-height:36px;padding:4px 6px;color:var(--accent);font:inherit;font-size:11px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;letter-spacing:.04em}
+.ps-key-change{background:transparent;border:none;min-height:var(--tap);padding:4px 6px;color:var(--accent);font:inherit;font-size:11px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;letter-spacing:.04em}
 .ps-key-change:hover{color:var(--accent-hov)}
 .ps-key-card{display:none}
 #step-setup.manual-key .ps-key-card{display:block}
@@ -160,6 +160,17 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 .ps-caution::before{content:"!";flex:0 0 auto;width:16px;height:16px;margin-top:1px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--sig-wait);border-radius:50%;font:700 10px/1 var(--mono);color:var(--sig-wait)}
 
 .share-box:hover{border-color:var(--line-2)}
+
+/* Step 2 can fail with its card still on screen. A beating beacon, "Waiting for
+   receiver", a link that connects to nothing and a blue Copy link are four
+   offers a dead session cannot honour, and they sat directly under the alarm
+   that said the session was gone. So the card goes with the alarm: greyed out,
+   marked aria-disabled, its copy button switched off and nothing in it takeable.
+   The one live control is the alarm's own "Open the session again", which sits
+   above the card and is untouched by this. */
+.card.is-stale{opacity:.5;pointer-events:none}
+.card.is-stale .ps-copy{cursor:not-allowed}
+#ps-session-card.is-stale #waiting-dot{background:var(--ink-3);animation:none}
 .progress-bar-wrap{background:var(--line-2);border:0;border-radius:var(--r-0);height:3px;overflow:hidden;margin:4px 0 12px}
 .progress-bar{height:100%;background:var(--accent);width:0%;transition:width var(--d-3) var(--e-standard)}
 .label{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ink-3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px;display:block}
@@ -368,7 +379,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 }
 </script>
 <meta name="theme-color" content="#FBFAF7">
-<link rel="stylesheet" href="/app-2026.css?v=3">
+<link rel="stylesheet" href="/app-2026.css?v=4">
 <script src="/js/theme.js?v=1"></script>
 </head>
 <body>
@@ -492,7 +503,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   </div>
 
   <div class="card">
-    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Self-destruct</div></div>
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Deletes itself</div></div>
     <div class="card-body">
       <label class="label" for="ttl-select">Link expires after</label>
       <select id="ttl-select">
@@ -522,14 +533,14 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   </div>
 
   <div class="ps-alert" id="ps-link-error" role="alert">
-    <p id="ps-link-error-text">The connection to the relay dropped before your receiver arrived. Nothing was uploaded and your file is still here in this browser.</p>
+    <p id="ps-link-error-text">The connection dropped before your receiver arrived. Nothing was uploaded and your file is still here in this browser.</p>
     <div class="ps-alert-actions">
       <button type="button" class="ps-alert-primary" data-click="reopenSession">Open the session again</button>
       <span class="ps-alert-note">this makes a fresh link</span>
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="ps-session-card">
     <div class="card-head"><div class="dot amber" id="waiting-dot"></div><div class="card-head-title" id="waiting-title">Waiting for receiver...</div></div>
     <div class="card-body">
       <span class="label">One-time session link</span>
@@ -698,7 +709,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
      two different contents under one immutable url is exactly what the ?v= is
      there to prevent, and check-cache-bust cannot see it because both sides
      agree on the number. -->
-<script src="/js/parashare.page.js?v=5" defer></script>
+<script src="/js/parashare.page.js?v=6" defer></script>
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=7" defer></script>
 <footer>

@@ -265,6 +265,21 @@ main :where(p, li, dd, .acct-lead, .ds-lede, .sub) a:not(.btn):not([class*="cta"
    corrected here rather than in six inline blocks.
    ═══════════════════════════════════════════════════════════════════════════ */
 nav.nav { background: var(--paper-blur); border-bottom: 1px solid var(--line); }
+/* nav.css turns the bar opaque under 1024px, and it is not decoration: at .92
+   with no backdrop-filter behind it the page scrolls straight through the
+   letters, which is what a review of /parashare on a 390 phone reported. This
+   file loads after nav.css and its rule above put the translucent token back on
+   every app screen, so it carries the same exception. The paint is the app's own
+   paper, not the marketing bone, because the bar has to match the page under
+   it and has to follow the theme; what tests/navigation-shell.test.mjs pins on
+   /parashare is therefore the opacity and the absent filter, not a hex. */
+@media (max-width: 1023px) {
+  nav.nav {
+    background: var(--paper);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
 nav.nav .nav-logo .logo-para { color: var(--ink-1); }
 nav.nav .nav-link { color: var(--ink-2); }
 nav.nav .nav-link:hover, nav.nav .nav-link[aria-current="page"] { color: var(--accent); }

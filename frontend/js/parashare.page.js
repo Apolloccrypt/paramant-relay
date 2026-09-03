@@ -127,6 +127,26 @@ function setLinkError(on, msg) {
     if (t) t.textContent = msg;
   }
   box.classList.toggle('is-shown', !!on);
+  setSessionCardStale(!!on);
+}
+
+// The alarm above the card said the session was gone; the card under it went on
+// offering a beating beacon, "Waiting for receiver...", the dead link and a blue
+// Copy link. A sender who copies that link sends his receiver to a session that
+// no longer exists, and finds out nothing until the receiver says so. So the
+// card is switched off with the alarm: greyed by CSS, marked aria-disabled for
+// a screen reader, and the copy button really disabled, not just dimmed. The
+// way back out is the alarm's own action, which sits outside the card.
+function setSessionCardStale(stale) {
+  var card = $('ps-session-card');
+  if (card) {
+    card.classList.toggle('is-stale', stale);
+    card.setAttribute('aria-disabled', stale ? 'true' : 'false');
+  }
+  var copy = $('ps-copy-btn');
+  if (copy) copy.disabled = stale;
+  var link = $('session-link');
+  if (link) link.setAttribute('aria-disabled', stale ? 'true' : 'false');
 }
 
 // Make a fresh session: new token, new link, new socket. The file is untouched
@@ -195,8 +215,12 @@ function setEncProgress(pct) {
 async function copyLink() {
   // The confirmation belongs on the button, not in the link box: overwriting
   // the link with "Copied!" hides the thing you just asked to see.
-  const url = $('session-link').textContent;
   const button = $('ps-copy-btn');
+  // A dead session hands out no links. pointer-events on the greyed card stops
+  // the mouse; this stops everything else, the share box's own click handler
+  // included.
+  if (button && button.disabled) return;
+  const url = $('session-link').textContent;
   let copied = true;
   await navigator.clipboard.writeText(url).catch(() => { copied = false; });
   if (!button) return;
@@ -443,12 +467,12 @@ async function connectWebSocket() {
   ws.onerror = () => {
     if (receiverPubs) return;
     setStatus('waiting-status', 'Connection lost', 'err');
-    setLinkError(true, 'The connection to the relay failed before your receiver arrived. Nothing was uploaded and your file is still here in this browser.');
+    setLinkError(true, 'The connection failed before your receiver arrived. Nothing was uploaded and your file is still here in this browser.');
   };
   ws.onclose = () => {
     if (receiverPubs) return;
     setStatus('waiting-status', 'Connection lost', 'err');
-    setLinkError(true, 'The connection to the relay dropped before your receiver arrived. Nothing was uploaded and your file is still here in this browser.');
+    setLinkError(true, 'The connection dropped before your receiver arrived. Nothing was uploaded and your file is still here in this browser.');
   };
 }
 
