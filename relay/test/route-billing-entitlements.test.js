@@ -518,3 +518,60 @@ test('the users.json write is atomic: no temp file is left behind and the file a
   srv.stop();
   did();
 });
+
+// ── the period has to LEAVE the relay, not just live on the record ───────────
+// Every account surface in admin/ is built on one relay read: findUserByEmail,
+// findUserById and /api/user/billing/status all call GET /v2/admin/keys and
+// project the row through productPlanFields(), which reads paid_until_*. That
+// projection emitted plan_parasign and plan_parasend and dropped the two dates,
+// so admin/ always saw null. Both readers treat a missing period as "no period
+// recorded", which is the same rule the server uses and means "never expires"
+// (entitlements.effectiveProductTier, mirrored client-side in
+// frontend/js/dashboard.js paidProductTier). The result was a straight
+// contradiction: the relay's own gates floored a lapsed account to free and
+// answered 402 at two signatures, while the dashboard and the account page kept
+// rendering "Pro plan, active" off the same relay. The tier without its period
+// is not a smaller answer, it is a wrong one.
+test('the admin key projection carries the paid period, not just the tier', async () => {
+  const srv = await withUsers('paid-until-projected', [{
+    key: 'pgp_live', plan: 'community', active: true, parasign: true,
+    account_id: 'acct_live', email: 'live@example.test',
+    plan_parasign: 'pro', paid_until_parasign: FUTURE,
+  }, {
+    key: 'pgp_lapsed2', plan: 'community', active: true, parasign: true,
+    account_id: 'acct_lapsed2', email: 'lapsed2@example.test',
+    plan_parasign: 'pro', paid_until_parasign: PAST,
+  }]);
+
+  for (const url of ['/v2/admin/keys', '/v2/admin/keys?reveal=1']) {
+    const r = await srv.get(url, { headers: BOTH });
+    assert.strictEqual(r.status, 200, r.text);
+    const live = r.json.keys.find((k) => k.account_id === 'acct_live');
+    const lapsed = r.json.keys.find((k) => k.account_id === 'acct_lapsed2');
+    assert.strictEqual(live.plan_parasign, 'pro', url);
+    assert.strictEqual(live.paid_until_parasign, FUTURE,
+      `${url} must carry the period the tier was paid for`);
+    assert.strictEqual(lapsed.paid_until_parasign, PAST,
+      `${url} must carry a lapsed period too, or the reader calls it unbounded`);
+    // An account that never bought anything reports no period, which is the
+    // honest answer and the one every reader is built for. It must be present
+    // as an explicit null rather than simply absent.
+    assert.strictEqual(live.paid_until_parasend, null,
+      'no ParaSend purchase means no ParaSend period, stated explicitly');
+    assert.ok('paid_until_parasend' in live, `${url} must always state the field`);
+  }
+
+  // The point of the projection: what admin/ reads must agree with what the
+  // relay's own gates decided, for the lapsed account as well as the live one.
+  const gate = await entitlementsOf(srv, 'acct_lapsed2');
+  assert.strictEqual(gate.json.entitlements.parasign.tier, 'free',
+    'the gate floors the lapsed account, so the projection must let a reader reach the same answer');
+
+  const single = await srv.get('/v2/admin/keys/reveal/acct_live', { headers: BOTH });
+  assert.strictEqual(single.status, 200, single.text);
+  assert.strictEqual(single.json.paid_until_parasign, FUTURE,
+    'the single-key reveal is the same row and must say the same thing');
+
+  srv.stop();
+  did();
+});

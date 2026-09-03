@@ -253,7 +253,11 @@
       const free = isFreeAccount(d, d.current_plan);
       if (!free) {
         document.getElementById('billing-active-badge').classList.remove('hidden');
-        document.getElementById('billing-cancel-btn').classList.remove('hidden');
+        // Cancel stops a NEXT collection. With auto_renews false there is no
+        // next collection to stop, and offering the button anyway scheduled a
+        // downgrade on a date nobody had bought, so the term end below is the
+        // whole answer. The button returns the day recurring billing is on.
+        if (d.auto_renews) document.getElementById('billing-cancel-btn').classList.remove('hidden');
       }
       // One calm line about what this plan is. On Community it says whose gift
       // it is and what the paid plans add, with a single way up. On a paid plan
@@ -262,9 +266,15 @@
       if (band) band.hidden = !free;
       const bought = document.getElementById('billing-paid');
       if (bought) bought.hidden = free;
-      if (d.next_billing_date) {
+      // access_until is the end of the term that was paid for and is the honest
+      // date on a one-off; next_billing_date only means something once
+      // something actually collects again.
+      const until = d.access_until || d.next_billing_date;
+      if (until) {
         document.getElementById('billing-next-row').style.display = 'flex';
-        document.getElementById('billing-next').textContent = new Date(d.next_billing_date).toLocaleDateString();
+        document.getElementById('billing-next').textContent = new Date(until).toLocaleDateString();
+        const note = document.getElementById('billing-renew-note');
+        if (note) note.hidden = !!d.auto_renews;
       }
       if (d.cancellation_scheduled_at) {
         document.getElementById('billing-cancel-row').style.display = 'flex';

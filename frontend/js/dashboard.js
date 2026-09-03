@@ -124,6 +124,57 @@
     }
   };
 
+  // ── Return from the payment provider ────────────────────────────────────────
+  // Mollie redirects the buyer to /dashboard?billing=return the moment he is
+  // done paying, and calls the webhook separately. The webhook is what grants
+  // the plan, so the redirect can easily win the race and land on a dashboard
+  // that still says Community. Saying nothing at all was the worst of the
+  // options: the buyer had just been charged and got no acknowledgement of it
+  // anywhere on the site. So the band says which state we are in, and re-asks a
+  // few times while the grant is still on its way.
+  var lastAccountIsPaid = false;
+  var RETURN_TRIES = 5;
+  var RETURN_DELAY_MS = 2000;
+
+  function isBillingReturn() {
+    try { return new URLSearchParams(window.location.search).get('billing') === 'return'; }
+    catch (e) { return false; }
+  }
+
+  // Take the parameter out of the address bar once it has been acted on, so a
+  // reload or a shared link does not re-announce a payment.
+  function clearBillingParam() {
+    try {
+      if (!window.history || !window.history.replaceState) return;
+      var url = new URL(window.location.href);
+      url.searchParams.delete('billing');
+      window.history.replaceState({}, '', url.pathname + (url.search || '') + (url.hash || ''));
+    } catch (e) { /* address bar is cosmetic; never break the page over it */ }
+  }
+
+  function showBillingReturn(tries) {
+    var band = document.querySelector('#dh-billing-return');
+    if (!band) return;
+    var kicker = band.querySelector('[data-dh="return-kicker"]');
+    var lede = band.querySelector('[data-dh="return-lede"]');
+    band.hidden = false;
+    if (lastAccountIsPaid) {
+      if (kicker) kicker.textContent = 'Payment received';
+      if (lede) lede.textContent = 'Thank you. Your plan is active and what it includes is below. The term you bought and the day it ends are under Plan and billing.';
+      clearBillingParam();
+      return;
+    }
+    if (tries > 0) {
+      if (kicker) kicker.textContent = 'Confirming your payment';
+      if (lede) lede.textContent = 'Your bank has sent you back. We are waiting for the payment to be confirmed, which usually takes a few seconds. This page updates by itself.';
+      window.setTimeout(function () { refreshAccount(tries - 1); }, RETURN_DELAY_MS);
+      return;
+    }
+    if (kicker) kicker.textContent = 'Payment not confirmed yet';
+    if (lede) lede.textContent = 'Your payment has not reached us yet. Nothing is lost: as soon as it is confirmed the plan is granted by itself. Reload this page in a minute, and mail privacy@paramant.app if it still has not appeared.';
+    clearBillingParam();
+  }
+
   function render(data) {
     var email = data.email || '';
     var planId = normalisePlan(data.plan);
@@ -152,6 +203,10 @@
     // pays for it. A paying customer never sees the band.
     var community = root.querySelector('#dh-community');
     if (community) community.hidden = !isFree;
+
+    // Remembered for the return-from-Mollie band below, which has to know
+    // whether the webhook has landed yet.
+    lastAccountIsPaid = !isFree;
 
     // The other half of the same rule: a paying account reads what it bought.
     // Per product, so a ParaSend customer is not told about signatures he has
@@ -604,7 +659,7 @@
     if (!opsPollTimer) opsPollTimer = setInterval(pull, 5000);
   }
 
-  function start() {
+  function start(tries) {
     wireActions();
     wireDocumentFilters();
     wireDocumentList();
@@ -633,12 +688,17 @@
       })
       .then(function (data) {
         if (data) render(data);
+        // Only after render, so lastAccountIsPaid reflects this answer.
+        if (isBillingReturn()) showBillingReturn(typeof tries === 'number' ? tries : RETURN_TRIES);
       })
       .catch(function () {
         if (timer) clearTimeout(timer);
         showError('Network error');
       });
   }
+
+  // Re-ask /api/user/me while a just-made payment is still being confirmed.
+  function refreshAccount(tries) { start(tries); }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', start);

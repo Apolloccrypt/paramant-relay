@@ -3107,14 +3107,30 @@ api.get("/user/billing/status", authUser, async (req, res) => {
   const cancelAt = await redis().get(`paramant:user:plan_cancel_at:${user_id}`);
   const keysRes = await relayFetch("health", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
   const currentKey = (keysRes.body?.keys || []).find(k => k.key === user_id);
+  // What the account page shows about money has to be what actually happened.
+  // Two things were wrong here. The record this used to read,
+  // paramant:user:billing:<id>, is written by nothing in this codebase, so
+  // next_billing_date was always null and the renewal row the page promises
+  // never appeared. And stub_notice said no real charges apply, to customers
+  // Mollie had genuinely charged. The truth is on the relay: paid_until_* is
+  // the day the term that was paid for runs out, so that is the date to show.
+  const fields = productPlanFields(currentKey);
+  const untils = [fields.paid_until_parasign, fields.paid_until_parasend]
+    .map(v => (v ? Date.parse(v) : NaN))
+    .filter(t => !Number.isNaN(t) && t > Date.now());
+  const accessUntil = untils.length ? new Date(Math.max(...untils)).toISOString() : null;
   res.json({
     current_plan: currentKey?.plan || 'community',
-    ...productPlanFields(currentKey),
+    ...fields,
     period: billing?.period || null,
-    amount_eur: billing?.amount_eur ?? 0,
+    amount_eur: billing?.amount_eur ?? null,
+    // The end of the term that was paid for. Every checkout is a one-off
+    // payment for that term (see /terms), so this is the day access stops
+    // unless another payment is made, not the day a collection is attempted.
+    access_until: accessUntil,
     next_billing_date: billing?.next_billing_date || null,
+    auto_renews: false,
     cancellation_scheduled_at: cancelAt || null,
-    stub_notice: 'Payment integration pending. No real charges apply.',
   });
 });
 

@@ -91,4 +91,63 @@ test('storage failures cannot break the page in private mode', () => {
   assert.ok(remember.includes('catch'), 'rememberIntent does not tolerate a blocked sessionStorage');
 });
 
+// ── the other end of the path: coming back from Mollie ──────────────────────
+// The purchase path did not end at the payment. Mollie sends the buyer to
+// /dashboard?billing=return (relay.js, the checkout redirectUrl) and grants the
+// plan through a SEPARATE webhook call, so the redirect regularly wins the race
+// and the buyer arrives before the entitlement does. Nothing on the dashboard
+// read that parameter: the money had left the account and the site said nothing
+// at all about it, on any page. docs.html has described this return URL the
+// whole time, so the contract existed; only the arrival did not.
+
+const dashJs = readFileSync(new URL('../../frontend/js/dashboard.js', import.meta.url), 'utf8');
+const dashHtml = readFileSync(new URL('../../frontend/dashboard.html', import.meta.url), 'utf8');
+
+// The real predicate, lifted and run, so the parameter the relay actually sends
+// is the parameter the page actually looks for.
+function loadIsBillingReturn() {
+  const m = dashJs.match(/function isBillingReturn\(\)\s*\{[\s\S]*?\n  \}/);
+  assert.ok(m, 'isBillingReturn not found in dashboard.js');
+  const fn = new Function('window', 'URLSearchParams', `${m[0]}; return isBillingReturn;`);
+  return (search) => fn({ location: { search } }, URLSearchParams)();
+}
+const isBillingReturn = loadIsBillingReturn();
+
+test('the dashboard recognises the return the checkout actually redirects to', () => {
+  assert.strictEqual(isBillingReturn('?billing=return'), true);
+  assert.strictEqual(isBillingReturn('?foo=1&billing=return'), true, 'other parameters may ride along');
+  assert.strictEqual(isBillingReturn(''), false, 'an ordinary visit announces nothing');
+  assert.strictEqual(isBillingReturn('?billing=cancelled'), false, 'only the return value counts');
+});
+
+test('the return band exists and is hidden until the page shows it', () => {
+  assert.ok(dashHtml.includes('id="dh-billing-return"'), 'there is no band to show');
+  const band = dashHtml.slice(dashHtml.indexOf('id="dh-billing-return"'), dashHtml.indexOf('id="dh-plan-paid"'));
+  assert.ok(/\bhidden\b/.test(band), 'the band must not appear on an ordinary dashboard visit');
+  assert.ok(band.includes('role="status"'), 'a state that changes by itself has to be announced');
+  // Same rule the paid band is held to: the sale already happened, so this is
+  // not a place to sell.
+  assert.ok(!band.includes('href="/pricing"'), 'a buyer who has just paid must not be sold to');
+});
+
+test('a grant that has not landed yet is waited for, not denied', () => {
+  const fn = dashJs.slice(dashJs.indexOf('function showBillingReturn'), dashJs.indexOf('function render(data)'));
+  assert.ok(fn.includes('lastAccountIsPaid'), 'the band does not look at whether the plan is actually active');
+  assert.ok(/setTimeout\([\s\S]*?refreshAccount\(tries - 1\)/.test(fn),
+    'the webhook can arrive after the redirect, so the page must ask again');
+  assert.ok(fn.includes('clearBillingParam()'),
+    'a settled state must take the parameter out of the address bar or a reload re-announces the payment');
+  // The last word must never be "your money is gone".
+  assert.ok(/Nothing is lost/.test(fn), 'the timeout case must tell the buyer where he stands');
+});
+
+test('the parameter is only cleared once there is something to say', () => {
+  const fn = dashJs.slice(dashJs.indexOf('function showBillingReturn'), dashJs.indexOf('function render(data)'));
+  const waiting = fn.indexOf('tries > 0');
+  const clears = [...fn.matchAll(/clearBillingParam\(\)/g)].map((m) => m.index);
+  assert.strictEqual(clears.length, 2, 'exactly the two settled states clear the parameter');
+  assert.ok(clears.some((i) => i < waiting), 'the confirmed state clears it');
+  assert.ok(clears.some((i) => i > waiting), 'the gave-up state clears it');
+});
+
 console.log(`\n${passed} passed`);
