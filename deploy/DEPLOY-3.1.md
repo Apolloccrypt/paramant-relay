@@ -596,13 +596,37 @@ checks and one marker would rebuild and recreate six healthy containers.
 It gates first, in the spirit of 1a, and refuses if the server is not already
 deployed:
 
-- the server checkout is on `origin/main` (fetched first, so the ref is real)
+- the deployed commit is **on the mainline**: `git merge-base --is-ancestor
+  HEAD $DEPLOY_REF`, asked after a fetch so the ref is real
 - `/health` reports the same version as `package.json` in that checkout, which
   is what says the running containers were built from it
 
-Either one off and the mode stops with "Run the full deploy instead". It does
-not combine with `--preflight-only` or `--rollback`; those three are separate
-runs and the script exits 2 if you ask for two of them.
+Either one off and the mode stops with "Run the full deploy instead".
+
+**Behind the tip is normal, not a fault.** main moves while a deploy runs. Run
+6 deployed `4e6de0b` and `origin/main` was already on `05bbd1b` by the time
+this mode existed, so a gate demanding equality would have refused exactly the
+state it was written for. Being *beside* the mainline is the real problem,
+because then nobody can say what is running. So the ancestor test is the gate
+and the difference from the tip is a note:
+
+```
+  note  checkout is on 4e6de0b, origin/main is 05bbd1b; this mode signs off on the DEPLOYED commit
+  note  so the deployed-head marker will name 4e6de0b, which is what the next run gates on
+```
+
+The marker phase 7a writes names the commit the checkout is **on**, not the tip
+of the ref. That is the commit that is actually deployed, and it is what the
+next run's phase 1a gates on; a later full run fast-forwards from there.
+
+`PARAMANT_VERIFY_HEAD=<sha>` names the deployed commit yourself, the way
+`PARAMANT_EXPECTED_HEAD` does in 1a, and likewise skips the test it replaces:
+the mainline check. The version check still runs.
+
+The ref is `$DEPLOY_REF`, so `DEPLOY_REF=origin/release bash
+deploy/deploy-3.1.sh --verify-only` gates against that instead. It does not
+combine with `--preflight-only` or `--rollback`; those three are separate runs
+and the script exits 2 if you ask for two of them.
 
 ```bash
 # 6a. deploy.sh step 4, from anywhere: public auth surface, never a 5xx
@@ -660,11 +684,25 @@ parsed before it ran, which is why the log read like a failed measurement and
 not like a truncated script.
 
 So: **every stdin-reading command inside a remote heredoc gets `</dev/null`**.
-That is `docker compose exec`, `docker compose run`, `docker exec`,
-`docker run`, a nested `ssh`, and any bare `read`. A `read` in a loop that is
+Two families:
+
+- **always reads, whatever its arguments**: `docker compose exec`,
+  `docker compose run`, `docker exec`, `docker run`, a nested `ssh`, and
+  `xargs`. `xargs rm -f` is not xargs-with-an-operand, it is xargs reading
+  stdin.
+- **reads only when given no file**: `cat`, `sort`, `wc`, `python -`,
+  `node -`, and any `read`. `cat "$f"` and `wc -l < "$f"` are fine; `cat` and
+  `wc -l` on their own are not.
+
+A command to the **right of a pipe** reads the pipe, not the script, so
+`... | wc -l` is fine and `wc -l` alone is not. A `read` in a loop that is
 already redirected (`done < "$file"`, `done < <(...)`) or fed by a here-string
-is fine as it is. `tests/deploy-3.1-dryrun.test.sh` scans every remote block in
-the script for this and fails on a command that lacks it.
+is fine as it is.
+
+`tests/deploy-3.1-dryrun.test.sh` scans every remote block in the script for
+this and fails on a command that lacks it. It also pins the number of blocks it
+walked, so an extraction that silently loses half the script fails instead of
+passing on an empty search.
 
 ## Step 7: after the deploy
 

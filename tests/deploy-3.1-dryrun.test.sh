@@ -469,7 +469,7 @@ echo ""
 echo "6g-1. First run: the conf is in its pre-3.1 shape, so there is work to do"
 seed_2b_backups "$NG/sites" "$NG/bk" 20260101-0000 "paramant-public.conf paramant-live.conf"
 OUT1="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0000 "$NG/sites" "$NG/bk" \
-        "paramant-public.conf paramant-live.conf" 2>&1)"; RC1=$?
+        "paramant-public.conf paramant-live.conf" </dev/null 2>&1)"; RC1=$?
 if [ "$RC1" -eq 0 ]; then pass "5c exits 0 on a conf that still needs the edits"; else
   fail "5c exits $RC1 on a conf that still needs the edits"
   printf '%s\n' "$OUT1" | sed 's/^/        /' | head -20
@@ -516,7 +516,7 @@ echo ""
 echo "6g-2. Second run on the same confs: already applied, not FATAL"
 seed_2b_backups "$NG/sites" "$NG/bk" 20260101-0001 "paramant-public.conf paramant-live.conf"
 OUT2="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0001 "$NG/sites" "$NG/bk" \
-        "paramant-public.conf paramant-live.conf" 2>&1)"; RC2=$?
+        "paramant-public.conf paramant-live.conf" </dev/null 2>&1)"; RC2=$?
 if [ "$RC2" -eq 0 ]; then pass "a second 5c on an already-edited conf exits 0"; else
   fail "a second 5c on an already-edited conf exits $RC2 (this is the bug)"
   printf '%s\n' "$OUT2" | sed 's/^/        /' | head -20
@@ -548,7 +548,7 @@ make_conf "$NG/available/paramant-public.conf" absent absent no yes
 make_conf "$NG/available/paramant-live.conf"   absent absent no yes
 seed_2b_backups "$NG/sites" "$NG/bk" 20260101-0002 "paramant-public.conf paramant-live.conf"
 OUT3="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0002 "$NG/sites" "$NG/bk" \
-        "paramant-public.conf paramant-live.conf" 2>&1)"; RC3=$?
+        "paramant-public.conf paramant-live.conf" </dev/null 2>&1)"; RC3=$?
 if [ "$RC3" -ne 0 ]; then pass "5c stops on a conf that is not the one the runbook describes"; else
   fail "5c accepted a conf carrying neither shape"; fi
 if printf '%s\n' "$OUT3" | grep -q "FATAL 'sign'"; then
@@ -603,7 +603,7 @@ CONF
 cp "$NG/available/paramant-public.conf" "$NG/available/paramant-live.conf"
 seed_2b_backups "$NG/sites" "$NG/bk" 20260101-0003 "paramant-public.conf paramant-live.conf"
 OUT4="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0003 "$NG/sites" "$NG/bk" \
-        "paramant-public.conf paramant-live.conf" 2>&1)"; RC4=$?
+        "paramant-public.conf paramant-live.conf" </dev/null 2>&1)"; RC4=$?
 
 if [ "$(field_5c "$OUT4" 'before sign gated')" = "0" ]; then
   pass "the one-line pattern really does miss a multi-line auth_request (the trap)"
@@ -668,7 +668,7 @@ for f in nis2 iec62443 nen7510; do echo "page $f" > "$RB5B/docroot/compliance/$f
 echo index > "$RB5B/docroot/index.html"
 
 # The marker is on main, because the rollback did not move the checkout.
-OUT5="$(bash "$RB5B/5b.sh" "$RB5B/repo" "$RB5B/docroot" "$HEADC" "dist" "$FLOOR" 2>&1)"; RC5=$?
+OUT5="$(bash "$RB5B/5b.sh" "$RB5B/repo" "$RB5B/docroot" "$HEADC" "dist" "$FLOOR" </dev/null 2>&1)"; RC5=$?
 if [ "$RC5" -eq 0 ]; then pass "5b exits 0 in the deploy-after-rollback situation"; else
   fail "5b exits $RC5 in the deploy-after-rollback situation"
   printf '%s\n' "$OUT5" | sed 's/^/        /' | head -20
@@ -702,7 +702,7 @@ fi
 
 # The healthy second deploy: nothing was restored, so everything is already
 # gone. That is an OK answer and must not be a failure.
-OUT6="$(bash "$RB5B/5b.sh" "$RB5B/repo" "$RB5B/docroot" "$HEADC" "dist" "$FLOOR" 2>&1)"; RC6=$?
+OUT6="$(bash "$RB5B/5b.sh" "$RB5B/repo" "$RB5B/docroot" "$HEADC" "dist" "$FLOOR" </dev/null 2>&1)"; RC6=$?
 if [ "$RC6" -eq 0 ] && [ "$(field_5c "$OUT6" 'after already absent')" = "3" ] \
    && [ "$(field_5c "$OUT6" 'after removed')" = "0" ]; then
   pass "running 5b again prunes nothing and reports all three as already absent"
@@ -814,7 +814,7 @@ ln -sfn "$NG2/available/paramant-public.conf" "$NG2/sites-fb/paramant-public.con
 ln -sfn "$NG2/available/paramant.conf"        "$NG2/sites-fb/paramant.conf"
 seed_2b_backups "$NG2/sites-fb" "$NG2/bk" 20260101-0100 "paramant-public.conf paramant-live.conf|paramant.conf"
 OUT7="$(cd "$NG2" && PATH="$NG2/bin:$PATH" bash "$NG/5c.sh" 20260101-0100 "$NG2/sites-fb" "$NG2/bk" \
-        "paramant-public.conf paramant-live.conf|paramant.conf" 2>&1)"; RC7=$?
+        "paramant-public.conf paramant-live.conf|paramant.conf" </dev/null 2>&1)"; RC7=$?
 if [ "$RC7" -eq 0 ]; then pass "5c exits 0 on a server that calls the backend conf paramant.conf"; else
   fail "5c exits $RC7 on the production naming"
   printf '%s\n' "$OUT7" | sed 's/^/        /' | head -25
@@ -860,7 +860,7 @@ ln -sfn "$NG2/available/paramant-live.conf"   "$NG2/sites-both/paramant-live.con
 ln -sfn "$NG2/available/paramant.conf"        "$NG2/sites-both/paramant.conf"
 seed_2b_backups "$NG2/sites-both" "$NG2/bk" 20260101-0101 "paramant-public.conf paramant-live.conf|paramant.conf"
 OUT8="$(cd "$NG2" && PATH="$NG2/bin:$PATH" bash "$NG/5c.sh" 20260101-0101 "$NG2/sites-both" "$NG2/bk" \
-        "paramant-public.conf paramant-live.conf|paramant.conf" 2>&1)"; RC8=$?
+        "paramant-public.conf paramant-live.conf|paramant.conf" </dev/null 2>&1)"; RC8=$?
 if [ "$RC8" -eq 0 ] && printf '%s\n' "$OUT8" | grep -q 'nginxconf paramant-live.conf resolved to paramant-live.conf'; then
   pass "with both present, slot 2 resolves to paramant-live.conf"
 else
@@ -885,7 +885,7 @@ make_conf "$NG2/available/paramant-public.conf" old old yes no
 ln -sfn "$NG2/available/paramant-public.conf" "$NG2/sites-none/paramant-public.conf"
 seed_2b_backups "$NG2/sites-none" "$NG2/bk" 20260101-0102 "paramant-public.conf paramant-live.conf|paramant.conf"
 OUT9="$(cd "$NG2" && PATH="$NG2/bin:$PATH" bash "$NG/5c.sh" 20260101-0102 "$NG2/sites-none" "$NG2/bk" \
-        "paramant-public.conf paramant-live.conf|paramant.conf" 2>&1)"; RC9=$?
+        "paramant-public.conf paramant-live.conf|paramant.conf" </dev/null 2>&1)"; RC9=$?
 if [ "$RC9" -ne 0 ] && printf '%s\n' "$OUT9" | grep -q 'FATAL 1 nginx conf slot'; then
   pass "5c stops when a slot has no candidate on the server"
 else
@@ -906,7 +906,7 @@ ln -sfn "$NG2/available/paramant-public.conf" "$NG2/sites-noparaid/paramant-publ
 ln -sfn "$NG2/available/paramant.conf"        "$NG2/sites-noparaid/paramant.conf"
 seed_2b_backups "$NG2/sites-noparaid" "$NG2/bk" 20260101-0103 "paramant-public.conf paramant-live.conf|paramant.conf"
 OUT10="$(cd "$NG2" && PATH="$NG2/bin:$PATH" bash "$NG/5c.sh" 20260101-0103 "$NG2/sites-noparaid" "$NG2/bk" \
-         "paramant-public.conf paramant-live.conf|paramant.conf" 2>&1)"; RC10=$?
+         "paramant-public.conf paramant-live.conf|paramant.conf" </dev/null 2>&1)"; RC10=$?
 if [ "$RC10" -ne 0 ] && printf '%s\n' "$OUT10" | grep -q 'FATAL the ParaID deny is not present'; then
   pass "5c still stops when the ParaID deny anchor is gone"
 else
@@ -950,7 +950,7 @@ else
 fi
 
 OUT11="$(PATH="$RBN/bin:$PATH" bash "$RBN/8a.sh" "$RBN/compose" "$RBTS" "$RBN/bk" "$RBN/ngbk" \
-         "$RBN/sites" "paramant-public.conf paramant-live.conf|paramant.conf" 2>&1)"; RC11=$?
+         "$RBN/sites" "paramant-public.conf paramant-live.conf|paramant.conf" </dev/null 2>&1)"; RC11=$?
 if [ "$RC11" -eq 0 ]; then pass "8a exits 0 against the production naming"; else
   fail "8a exits $RC11"
   printf '%s\n' "$OUT11" | sed 's/^/        /' | head -20
@@ -975,7 +975,7 @@ fi
 # And with that backup gone, 8a must refuse instead of half-rolling back.
 mv "$RBN/ngbk/paramant.conf.pre-3.1-$RBTS" "$RBN/ngbk/paramant.conf.pre-3.1-$RBTS.moved"
 OUT12="$(PATH="$RBN/bin:$PATH" bash "$RBN/8a.sh" "$RBN/compose" "$RBTS" "$RBN/bk" "$RBN/ngbk" \
-         "$RBN/sites" "paramant-public.conf paramant-live.conf|paramant.conf" 2>&1)"
+         "$RBN/sites" "paramant-public.conf paramant-live.conf|paramant.conf" </dev/null 2>&1)"
 if [ "$(field_5c "$OUT12" 'missing backups')" = "1" ]; then
   pass "a missing backup under the resolved name is counted, so the rollback stops"
 else
@@ -985,7 +985,7 @@ mv "$RBN/ngbk/paramant.conf.pre-3.1-$RBTS.moved" "$RBN/ngbk/paramant.conf.pre-3.
 
 echo bogus-added-by-deploy > "$RBN/root/app/added.html"
 OUT13="$(PATH="$RBN/bin:$PATH" bash "$RBN/8c.sh" "$RBTS" "$RBN/bk" "$RBN/root/app" "$RBN/ngbk" \
-         "$RBN/sites" "paramant-public.conf paramant-live.conf|paramant.conf" "dist" 2>&1)"; RC13=$?
+         "$RBN/sites" "paramant-public.conf paramant-live.conf|paramant.conf" "dist" </dev/null 2>&1)"; RC13=$?
 if [ "$RC13" -eq 0 ]; then pass "8c exits 0 against the production naming"; else
   fail "8c exits $RC13"
   printf '%s\n' "$OUT13" | sed 's/^/        /' | head -20
@@ -1008,7 +1008,7 @@ fi
 
 # A slot with no candidate must stop 8c too, before it writes anything.
 OUT14="$(PATH="$RBN/bin:$PATH" bash "$RBN/8c.sh" "$RBTS" "$RBN/bk" "$RBN/root/app" "$RBN/ngbk" \
-         "$RBN/sites" "paramant-public.conf paramant-live.conf|not-there.conf" "dist" 2>&1)"; RC14=$?
+         "$RBN/sites" "paramant-public.conf paramant-live.conf|not-there.conf" "dist" </dev/null 2>&1)"; RC14=$?
 if [ "$RC14" -ne 0 ] && printf '%s\n' "$OUT14" | grep -q 'FATAL 1 nginx conf slot'; then
   pass "8c stops when a slot resolves to nothing"
 else
@@ -1058,7 +1058,7 @@ MD5_PUB="$(md5sum < "$NG3/available/paramant-public.conf")"
 MD5_BE="$(md5sum < "$NG3/available/paramant.conf")"
 
 OUT15="$(cd "$NG3" && PATH="$NG3/bin:$PATH" bash "$NG/5c.sh" 20260101-0300 "$NG3/sites" "$NG3/bk" \
-         "$SL3" 2>&1)"; RC15=$?
+         "$SL3" </dev/null 2>&1)"; RC15=$?
 if [ "$RC15" -ne 0 ]; then pass "5c stops when the conf it resolved has no 2b backup"; else
   fail "5c edited a conf that has no backup (exit $RC15)"
   printf '%s\n' "$OUT15" | sed 's/^/        /' | head -20
@@ -1094,7 +1094,7 @@ echo "6i-7b. With the backup filed under the resolved name, the same run is clea
 # Control: the stop above is about the missing backup, not about the rename.
 cp -a "$NG3/available/paramant.conf" "$NG3/bk/paramant.conf.pre-3.1-20260101-0300"
 OUT16="$(cd "$NG3" && PATH="$NG3/bin:$PATH" bash "$NG/5c.sh" 20260101-0300 "$NG3/sites" "$NG3/bk" \
-         "$SL3" 2>&1)"; RC16=$?
+         "$SL3" </dev/null 2>&1)"; RC16=$?
 if [ "$RC16" -eq 0 ] && [ "$(field_5c "$OUT16" 'before confs without a backup')" = "0" ]; then
   pass "with the backup in place the same fixture runs through"
 else
@@ -1138,7 +1138,7 @@ MD4_PUB="$(md5sum < "$NG4/available/paramant-public.conf")"
 MD4_BE="$(md5sum < "$NG4/available/paramant.conf")"
 
 OUT17="$(cd "$NG4" && PATH="$NG4/bin:$PATH" bash "$NG/5c.sh" 20260101-0400 "$NG4/sites" "$NG4/bk" \
-         "$SL3" 2>&1)"; RC17=$?
+         "$SL3" </dev/null 2>&1)"; RC17=$?
 if [ "$RC17" -ne 0 ] && printf '%s\n' "$OUT17" | grep -q 'still carry an auth_request'; then
   pass "the run reaches the post-edit FATAL, so restore() is exercised"
 else
@@ -1350,7 +1350,7 @@ fi
 mkdir -p "$G3A/ok/checkout/backups"
 echo state > "$G3A/ok/checkout/backups/full-state.tar.gz.age"
 HEAD_BEFORE="$(git -C "$G3A/ok/checkout" rev-parse HEAD)"
-OUT18="$(bash "$G3A/3a.sh" "$G3A/ok/checkout" 2>&1)"; RC18=$?
+OUT18="$(bash "$G3A/3a.sh" "$G3A/ok/checkout" </dev/null 2>&1)"; RC18=$?
 if [ "$RC18" -eq 0 ]; then pass "3a runs through with an untracked backups/ in the checkout"; else
   fail "3a exits $RC18 on an untracked path (this is the run-5 stop)"
   printf '%s\n' "$OUT18" | sed 's/^/        /' | head -20
@@ -1393,7 +1393,7 @@ else
 fi
 echo "hand edit between deploys" > "$G3A/dirty/checkout/tracked.txt"
 HEAD_BEFORE="$(git -C "$G3A/dirty/checkout" rev-parse HEAD)"
-OUT19="$(bash "$G3A/3a.sh" "$G3A/dirty/checkout" 2>&1)"; RC19=$?
+OUT19="$(bash "$G3A/3a.sh" "$G3A/dirty/checkout" </dev/null 2>&1)"; RC19=$?
 if [ "$RC19" -ne 0 ]; then pass "3a stops when a tracked file is modified"; else
   fail "3a pulled over a modified tracked file (exit $RC19)"
   printf '%s\n' "$OUT19" | sed 's/^/        /' | head -20
@@ -1481,9 +1481,53 @@ echo "6k. No remote block may let a command eat the script off stdin"
 # That covers every shape this script uses. A `read` in some other shape would
 # be flagged, which is the safe direction to be wrong in.
 STDIN_SCAN="$WORK/stdin-scan.txt"
+# The commands that read stdin when nothing feeds them. Two families:
+#   always     docker compose exec/run, docker exec/run, a nested ssh, xargs
+#   when bare  cat, sort, wc, python -, node -, and any read
+# "Bare" means no file operand and no redirect. `cat "$f"`, `wc -l < "$f"` and
+# `sort file` are fine; `cat`, `wc -l` and `sort` on their own are not. xargs is
+# in the first family on purpose: it reads stdin however many arguments it has,
+# so `xargs rm -f` is not "xargs with an operand", it is xargs reading stdin.
+#
+# A command on the RIGHT of a pipe reads the pipe, not the script, so only the
+# first segment of a pipeline is exposed. That is the whole reason the scan
+# splits on "|" rather than grepping lines: `... | wc -l` is safe and common
+# here, `wc -l` alone is the bug. Logical || is masked first so it is not read
+# as a pipe.
+#
+# Heuristic, with its limit written down: backslash continuations are joined
+# first, comments are skipped, and a `read` is accepted when the line carries a
+# here-string or the loop it belongs to is redirected by a later `done <`.
+# That covers every shape this script uses. Something in another shape gets
+# flagged, which is the safe direction to be wrong in.
 awk '
-  # A block starts at a remote call ending in the heredoc marker.
-  /^  remote(_soft|_nginx)? ".*<<'"'"'EOF'"'"'$/ {
+  # Blank every quoted span to a single token Q, so a "|" inside a string is
+  # not read as a pipe and an argument is still visibly an argument. Q keeps
+  # `cat "$f"` looking like cat-with-an-operand, which "" would not.
+  function dequote(line) {
+    gsub(/\047[^\047]*\047/, "Q", line)
+    gsub(/"[^"]*"/, "Q", line)
+    return line
+  }
+  # Everything before the first real pipe. A command to the RIGHT of a pipe
+  # reads the pipe, not the script, so only this part is exposed to stdin.
+  function exposed_segment(line,   n, seg) {
+    gsub(/\|\|/, "\001", line)
+    n = index(line, "|")
+    seg = (n > 0) ? substr(line, 1, n - 1) : line
+    gsub(/\001/, "||", seg)
+    return seg
+  }
+  function has_stdin_redirect(line) {
+    return (line ~ /<[[:space:]]*\/dev\/null/ || line ~ /<[[:space:]]*"?\$/ \
+            || line ~ /<[[:space:]]*\// || line ~ /<</ || line ~ /<[[:space:]]*Q/)
+  }
+  # The command with no operand: end of segment, or only flags after it.
+  function bare(seg, cmd,   re) {
+    re = "(^|[;&(`]|[[:space:]]|[$][(])" cmd "([[:space:]]+-[^[:space:]]+)*[[:space:]]*($|[;&)`])"
+    return (seg ~ re)
+  }
+  /^  remote(_soft|_nginx)? ".*<<\047EOF\047$/ {
     inb = 1; lbl = $0
     sub(/^  remote(_soft|_nginx)? "/, "", lbl); sub(/".*$/, "", lbl)
     ln = 0; n = 0; delete body; delete bln
@@ -1494,24 +1538,52 @@ awk '
     for (i = 1; i <= n; i++) {
       line = body[i]
       if (line ~ /^[[:space:]]*#/) continue
+
+      # Family 1: reads stdin whatever its arguments. Judged on the WHOLE line,
+      # including inside $( ) and inside quotes, because that is where two of
+      # the three real ones live. Safety is </dev/null, nothing else.
       if (line ~ /docker compose exec|docker compose run|docker exec|docker run|(^|[^a-zA-Z_])ssh[[:space:]]/) {
-        if (line !~ /<[[:space:]]*\/dev\/null/) printf "%s\t%d\t%s\n", lbl, bln[i], line
+        if (line !~ /<[[:space:]]*\/dev\/null/) printf "%s\tL%d\tALWAYS-READS\t%s\n", lbl, bln[i], line
         continue
       }
+      # xargs reads stdin whatever arguments it is given, so a command name
+      # after it is not an operand that feeds it. It is only safe behind a pipe.
+      if (exposed_segment(dequote(line)) ~ /(^|[;&(`]|[[:space:]]|[$][(])xargs([[:space:]]|$)/) {
+        if (line !~ /<[[:space:]]*\/dev\/null/) printf "%s\tL%d\tALWAYS-READS\t%s\n", lbl, bln[i], line
+        continue
+      }
+      if (line ~ /(python|python3|node)[[:space:]]+-([[:space:]]|$)/) {
+        if (line !~ /<[[:space:]]*\/dev\/null/) printf "%s\tL%d\tSTDIN-DASH\t%s\n", lbl, bln[i], line
+        continue
+      }
+      # Family 2: a read, unless it has a here-string or its loop is redirected.
       if (line ~ /(^|[;&|(][[:space:]]*|[[:space:]])read[[:space:]]/) {
         if (line ~ /<<</ || line ~ /<[[:space:]]*\/dev\/null/) continue
         redirected = 0
         for (j = i + 1; j <= n; j++) if (body[j] ~ /^[[:space:]]*done[[:space:]]*</) { redirected = 1; break }
-        if (!redirected) printf "%s\t%d\t%s\n", lbl, bln[i], line
+        if (!redirected) printf "%s\tL%d\tBARE-READ\t%s\n", lbl, bln[i], line
+        continue
+      }
+      # Family 3: reads stdin only when given no file. Pipe position decides,
+      # so this one works on the dequoted, pre-pipe part of the line.
+      # Limit: a bare one nested inside $( ) inside a quoted string is not
+      # seen. Every such case in this script is pipe-fed, and family 1 covers
+      # the nested commands that are not.
+      seg = exposed_segment(dequote(line))
+      if (has_stdin_redirect(seg)) continue
+      split("cat sort wc", risky, " ")
+      for (k in risky) {
+        if (bare(seg, risky[k])) {
+          printf "%s\tL%d\tBARE-%s\t%s\n", lbl, bln[i], risky[k], line
+          break
+        }
       }
     }
     next
   }
   inb {
     ln++
-    # Join backslash continuations, so a command whose </dev/null sits on the
-    # next line is judged whole.
-    if (pend != "") { pend = pend " " $0; pl = pl }
+    if (pend != "") { pend = pend " " $0 }
     else { pend = $0; pl = ln }
     if (pend ~ /\\$/) { sub(/\\$/, "", pend); next }
     n++; body[n] = pend; bln[n] = pl; pend = ""
@@ -1519,20 +1591,24 @@ awk '
 ' "$SCRIPT" > "$STDIN_SCAN"
 
 if [ ! -s "$STDIN_SCAN" ]; then
-  pass "every stdin-reading command in every remote block reads from /dev/null"
+  pass "every stdin-reading command in every remote block reads from somewhere that is not the script"
 else
   fail "a command in a remote block would read the rest of the script off stdin"
   sed 's/^/        /' "$STDIN_SCAN" | head -8
 fi
 
-# The scan has to be looking at something. If the block extraction breaks, the
-# check above passes on an empty search and proves nothing.
+# The scan has to be looking at something. Pinned to the REAL number of remote
+# blocks, not a floor: a floor of "at least ten" would still pass if the
+# extraction silently lost half of them, and losing the block that holds the
+# bug is exactly how this check would go quiet. Adding or removing a remote
+# block is a deliberate act, so updating this number is part of it.
 SCAN_BLOCKS="$(grep -cE "^  remote(_soft|_nginx)? \".*<<'EOF'\$" "$SCRIPT" || true)"
-if [ "$SCAN_BLOCKS" -ge 10 ]; then
-  pass "the scan walked $SCAN_BLOCKS remote blocks, so it is looking at the real script"
+if [ "$SCAN_BLOCKS" = "25" ]; then
+  pass "the scan walked all 25 remote blocks"
 else
-  fail "the scan found only $SCAN_BLOCKS remote blocks; the extraction is stale"
+  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 25; update the number here on purpose"
 fi
+
 # And the three commands that actually read stdin are still there, guarded.
 check_has "$SCRIPT" 'docker compose exec -T "\$svc" sh -c .*</dev/null' \
   "the 6h inline-receipt probe reads from /dev/null"
@@ -1573,11 +1649,16 @@ check_lacks "$VO" 'sed -i -E .location = /sign' "verify-only edits no nginx conf
 check_lacks "$VO" 'INTERNAL_AUTH_TOKEN=%s'      "verify-only writes nothing to .env"
 
 # The gate itself is a pure comparison, so both answers can be checked here.
-check_has "$VO" 'verify origin main'      "the gate reads origin/main off the server"
+check_has "$VO" 'verify ref sha'          "the gate reads the deploy ref off the server"
+check_has "$VO" 'verify ancestor'         "the gate asks whether the deployed commit is on the mainline"
 check_has "$VO" 'verify health version'   "the gate reads the version the relay reports"
 check_has "$VO" 'verify package version'  "the gate reads the version the checkout describes"
 check_has "$SCRIPT" 'Run the full deploy instead' \
   "a server that is not already deployed is sent to the full deploy, not verified"
+check_lacks "$SCRIPT" 'git rev-parse origin/main' \
+  "Va uses \$DEPLOY_REF, not a hard-coded origin/main"
+check_has "$VO" 'bash -s -- /opt/paramant-relay origin/main"   # verify preconditions' \
+  "the deploy ref is handed to the gate as an argument, so the log says which ref it judged"
 
 echo ""
 echo "6l-1. The gate says no when the checkout is not origin/main"
@@ -1605,6 +1686,148 @@ echo "6l-2. The three run modes do not combine"
 [ $? -eq 2 ] && pass "--verify-only with --rollback exits 2" \
              || fail "--verify-only and --rollback were accepted together"
 check_has "$SCRIPT" 'verify-only' "the usage header documents the mode"
+
+echo ""
+echo "6m. The verify-only gate: on the mainline, not necessarily at its tip"
+# The first spelling of this gate demanded HEAD == origin/main, which refuses
+# exactly the state it was written for. Run 6 deployed 4e6de0b and main had
+# already moved to 05bbd1b by the time the mode existed: main moves while a
+# deploy runs, and a deploy that is BEHIND the tip is the normal case, not a
+# fault. What is a fault is a checkout BESIDE the mainline, because then
+# nobody knows what is running. So the gate is merge-base --is-ancestor.
+#
+# The remote half of Va is a real git question, so it is asked of real
+# repositories here, one per answer.
+GV="$WORK/gverify"
+mkdir -p "$GV"
+extract_remote "verify preconditions" > "$GV/va.sh"
+if [ -s "$GV/va.sh" ]; then
+  pass "the Va remote block could be extracted from the script"
+else
+  fail "could not extract the Va remote block from the script"
+fi
+
+# make_va_repo <dir> <where>: a checkout that is either behind origin/main
+# (the run-6 shape) or on a branch beside it.
+make_va_repo() {
+  local d="$1" where="$2"
+  rm -rf "$d"; mkdir -p "$d"
+  (
+    set -e
+    cd "$d"
+    git init -q --bare origin.git
+    git --git-dir=origin.git symbolic-ref HEAD refs/heads/main
+    git init -q seed && cd seed
+    git config user.email t@example.com && git config user.name t
+    git config commit.gpgsign false
+    printf '{\n  "name": "p",\n  "version": "3.1.0"\n}\n' > package.json
+    git add -A && git commit -qm one
+    git branch -M main
+    git remote add origin ../origin.git
+    git push -q origin main
+    DEPLOYED="$(git rev-parse HEAD)"
+    echo two >> package.json.note && git add -A && git commit -qm two
+    git push -q origin main
+    cd ..
+    git clone -q origin.git checkout
+    cd checkout
+    git config user.email t@example.com && git config user.name t
+    git config commit.gpgsign false
+    if [ "$where" = behind ]; then
+      git checkout -q "$DEPLOYED"
+    else
+      # Beside the mainline: a commit that is not an ancestor of origin/main.
+      git checkout -q "$DEPLOYED"
+      git checkout -q -b sidetrack
+      echo sidetrack > sidetrack.txt
+      git add -A && git commit -qm "not on main"
+    fi
+  ) >/dev/null 2>&1
+}
+
+# The relay is not running here, so /health answers nothing. Stub curl to
+# report the version, which is the half of Va that is about the containers.
+mkdir -p "$GV/bin"
+cat > "$GV/bin/curl" <<'STUB'
+#!/bin/sh
+echo '{"status":"ok","version":"3.1.0"}'
+STUB
+chmod +x "$GV/bin/curl"
+
+echo ""
+echo "6m-1. A checkout one commit behind origin/main is accepted"
+make_va_repo "$GV/behind" behind
+BEHIND_HEAD="$(git -C "$GV/behind/checkout" rev-parse HEAD)"
+TIP="$(git -C "$GV/behind/checkout" rev-parse origin/main 2>/dev/null || echo none)"
+if [ "$BEHIND_HEAD" != "$TIP" ] && [ "$TIP" != none ]; then
+  pass "the fixture really is behind the tip ($(printf %s "$BEHIND_HEAD" | cut -c1-7) vs $(printf %s "$TIP" | cut -c1-7))"
+else
+  fail "the behind fixture is not behind anything, so it proves nothing"
+fi
+OUT20="$(PATH="$GV/bin:$PATH" bash "$GV/va.sh" "$GV/behind/checkout" origin/main </dev/null 2>&1)"; RC20=$?
+if [ "$RC20" -eq 0 ]; then pass "Va runs on a checkout behind the tip"; else
+  fail "Va exits $RC20 on a checkout behind the tip"
+  printf '%s\n' "$OUT20" | sed 's/^/        /' | head -12
+fi
+if [ "$(field_5c "$OUT20" 'verify ancestor')" = "yes" ]; then
+  pass "a commit behind the tip reads as on the mainline"
+else
+  fail "verify ancestor = '$(field_5c "$OUT20" 'verify ancestor')', expected yes"
+fi
+if [ "$(field_5c "$OUT20" 'verify head')" = "$BEHIND_HEAD" ]; then
+  pass "Va reports the DEPLOYED commit, which is what phase 7a writes as the marker"
+else
+  fail "Va reports head '$(field_5c "$OUT20" 'verify head')', expected $BEHIND_HEAD"
+fi
+if [ "$(field_5c "$OUT20" 'verify package version')" = "3.1.0" ] \
+   && [ "$(field_5c "$OUT20" 'verify health version')" = "3.1.0" ]; then
+  pass "the two versions are read and agree"
+else
+  fail "versions read as package='$(field_5c "$OUT20" 'verify package version')' health='$(field_5c "$OUT20" 'verify health version')'"
+fi
+
+echo ""
+echo "6m-2. A checkout beside the mainline is refused"
+make_va_repo "$GV/beside" beside
+OUT21="$(PATH="$GV/bin:$PATH" bash "$GV/va.sh" "$GV/beside/checkout" origin/main </dev/null 2>&1)"; RC21=$?
+if [ "$(field_5c "$OUT21" 'verify ancestor')" = "no" ]; then
+  pass "a commit beside the mainline reads as not an ancestor"
+else
+  fail "verify ancestor = '$(field_5c "$OUT21" 'verify ancestor')', expected no"
+  printf '%s\n' "$OUT21" | sed 's/^/        /' | head -12
+fi
+# An unresolvable ref is a third answer, and it must not read as yes.
+OUT22="$(PATH="$GV/bin:$PATH" bash "$GV/va.sh" "$GV/beside/checkout" origin/nope </dev/null 2>&1)"
+if [ "$(field_5c "$OUT22" 'verify ancestor')" = "unknown" ]; then
+  pass "a ref the server cannot resolve reads as unknown, not as yes"
+else
+  fail "an unresolvable ref reads as '$(field_5c "$OUT22" 'verify ancestor')'"
+fi
+
+echo ""
+echo "6m-3. The local half turns those three answers into a verdict"
+# Va's judgement is three lines of case, and the whole point of the review was
+# that the wrong comparison passed the tests. So assert the verdict text is
+# keyed on the ancestor answer and that equality with the tip is NOT a gate.
+check_has "$SCRIPT" 'case "\$ancestor" in' \
+  "Va decides on the ancestor answer"
+check_has "$SCRIPT" 'is not an ancestor of \$DEPLOY_REF' \
+  "the refusal names the mainline test, not an equality test"
+check_lacks "$SCRIPT" 'sha_eq "\$head" "\$omain"' \
+  "the old HEAD-equals-origin/main gate is gone"
+check_has "$SCRIPT" 'this mode signs off on the DEPLOYED commit' \
+  "being behind the ref is a note, not a stop"
+check_has "$SCRIPT" 'PARAMANT_VERIFY_HEAD' \
+  "the deployed commit can be named explicitly"
+# The note has to be a note. If "behind the tip" ever becomes a die again, the
+# word die will appear in the same branch as the note text.
+BEHIND_BRANCH="$(awk '/this mode signs off on the DEPLOYED commit/,/^  note "no tag/' "$SCRIPT")"
+if printf '%s\n' "$BEHIND_BRANCH" | grep -q '\bdie\b'; then
+  fail "the behind-the-tip branch can still stop the run"
+  printf '%s\n' "$BEHIND_BRANCH" | grep -n 'die' | sed 's/^/        /'
+else
+  pass "nothing in the behind-the-tip branch stops the run"
+fi
 
 echo ""
 echo "6d. The CI gate on main is one verdict per required workflow"

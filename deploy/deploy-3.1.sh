@@ -105,6 +105,10 @@ DEPLOY_REF="${DEPLOY_REF:-origin/main}"
 # marker names the checkout, so it stays true.
 EXPECT_PROD_COMMIT="${EXPECT_PROD_COMMIT:-41501bb}"   # runbook: where we start
 EXPECTED_HEAD="${PARAMANT_EXPECTED_HEAD:-}"           # explicit override, wins
+# --verify-only: name the deployed commit yourself. Same idea as
+# PARAMANT_EXPECTED_HEAD in phase 1a, and it likewise skips the test it
+# replaces, here the mainline-ancestor test in phase Va.
+VERIFY_HEAD="${PARAMANT_VERIFY_HEAD:-}"
 DEPLOYED_HEAD_FILE="${PARAMANT_DEPLOYED_HEAD_FILE:-$BACKUP_DIR/deployed-head}"
 EXPECT_VERSION="3.1.0"
 SERVICES="relay-main relay-health relay-finance relay-legal relay-iot admin"
@@ -2019,15 +2023,28 @@ EOF
 phase_v() {
   phase V "Preconditions for --verify-only (server, read-only)" "no runbook step; this mode replaces one"
 
-  step "Va. the checkout is origin/main and the running relay matches it"
-  remote "verify preconditions" "$COMPOSE_DIR" <<'EOF'
+  step "Va. the checkout is on the mainline and the running relay was built from it"
+  remote "verify preconditions" "$COMPOSE_DIR" "$DEPLOY_REF" <<'EOF'
 set -euo pipefail
 cd "$1"
-# Fetch so origin/main is the real one, not a stale ref. It moves no file.
+REF="$2"
+# Fetch so the ref is the real one, not a stale remote-tracking pointer. It
+# moves no file and does not check anything out.
 git fetch origin >/dev/null 2>&1 || true
 echo "verify head = $(git rev-parse HEAD)"
 echo "verify head short = $(git rev-parse --short HEAD)"
-echo "verify origin main = $(git rev-parse origin/main 2>/dev/null || echo unknown)"
+echo "verify ref = $REF"
+echo "verify ref sha = $(git rev-parse "$REF" 2>/dev/null || echo unknown)"
+# Is the deployed commit ON the mainline? Being BEHIND the ref is normal and
+# fine: main moves while a deploy runs. Being beside it is not, and that is the
+# thing worth refusing.
+if ! git rev-parse "$REF" >/dev/null 2>&1; then
+  echo "verify ancestor = unknown"
+elif git merge-base --is-ancestor HEAD "$REF" >/dev/null 2>&1; then
+  echo "verify ancestor = yes"
+else
+  echo "verify ancestor = no"
+fi
 # The version the checkout describes, and the version the containers report.
 # These have to agree, or the containers were not built from this checkout.
 echo "verify package version = $(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' package.json | head -1)"
@@ -2035,26 +2052,52 @@ echo "verify health version = $(curl -s --max-time 5 http://127.0.0.1:3000/healt
 EOF
 
   if [ "$DRY_RUN" -eq 1 ]; then
-    printf '  SKIP  assert (dry-run): the checkout is origin/main and the relay reports the package version
-'
+    printf '  SKIP  assert (dry-run): the checkout is an ancestor of %s and the relay reports the version that checkout describes\n' "$DEPLOY_REF"
     return 0
   fi
 
-  local head omain pkg health
+  local head refsha ancestor pkg health
   head="$(remote_field 'verify head')"
-  omain="$(remote_field 'verify origin main')"
+  refsha="$(remote_field 'verify ref sha')"
+  ancestor="$(remote_field 'verify ancestor')"
   pkg="$(remote_field 'verify package version')"
   health="$(remote_field 'verify health version')"
 
   [ -n "$head" ] || die "the server never printed the commit its checkout is on"
-  [ -n "$omain" ] && [ "$omain" != unknown ]     || die "the server could not resolve origin/main, so there is nothing to compare the checkout against"
-  sha_eq "$head" "$omain"     || die "--verify-only needs a server that is already deployed: the checkout is on ${head:0:7} and origin/main is ${omain:0:7}. Run the full deploy instead"
-  ok "the server checkout is on origin/main (${head:0:7})"
+
+  # 1. An explicit answer wins, the same way PARAMANT_EXPECTED_HEAD does in
+  #    phase 1a. Someone who sets this has looked at the server; the script
+  #    does not second-guess which commit is the deployed one.
+  if [ -n "$VERIFY_HEAD" ]; then
+    sha_eq "$head" "$VERIFY_HEAD" \
+      || die "PARAMANT_VERIFY_HEAD names $VERIFY_HEAD but the checkout is on ${head:0:7}"
+    ok "the checkout is on ${head:0:7}, which PARAMANT_VERIFY_HEAD names (the mainline test is skipped on your say-so)"
+  else
+    # 2. Otherwise: the deployed commit has to be ON the mainline. Equality
+    #    with the ref is NOT the test. main moves while a deploy runs, and it
+    #    did: run 6 deployed 4e6de0b and origin/main was already further along
+    #    by the time the mode existed. Refusing that would refuse exactly the
+    #    state this mode is for. Being BESIDE the mainline is the real problem,
+    #    because then nobody knows what is running.
+    case "$ancestor" in
+      yes) ok "the checkout ${head:0:7} is an ancestor of $DEPLOY_REF, so it is on the mainline" ;;
+      no)  die "the checkout ${head:0:7} is not an ancestor of $DEPLOY_REF, so what is deployed is not on the mainline. Run the full deploy instead" ;;
+      *)   die "the server could not resolve $DEPLOY_REF, so there is no mainline to check the checkout against" ;;
+    esac
+  fi
 
   [ -n "$pkg" ] || die "could not read the version out of package.json in the server checkout"
   [ -n "$health" ] || die "/health did not report a version, so the relay is not up; --verify-only has nothing to verify"
-  [ "$pkg" = "$health" ]     || die "/health reports $health but the checkout describes $pkg, so the containers were not built from this checkout. Run the full deploy instead"
+  [ "$pkg" = "$health" ] \
+    || die "/health reports $health but the checkout describes $pkg, so the containers were not built from this checkout. Run the full deploy instead"
   ok "the running relay reports $health, the version the checkout describes"
+
+  # Behind the ref is a note, not a stop. Say it plainly, because the marker
+  # phase 7a writes names THIS commit, not the tip of the ref.
+  if [ -n "$refsha" ] && [ "$refsha" != unknown ] && ! sha_eq "$head" "$refsha"; then
+    note "checkout is on ${head:0:7}, $DEPLOY_REF is ${refsha:0:7}; this mode signs off on the DEPLOYED commit"
+    note "so the deployed-head marker will name ${head:0:7}, which is what the next run gates on"
+  fi
 
   note "no tag, backup, pull, build, recreate or nginx edit will run in this mode"
 }
@@ -2364,6 +2407,11 @@ if [ "$VERIFY_ONLY" -eq 1 ]; then
   echo
   hr
   echo "VERIFY ONLY FINISHED, warnings: $WARNINGS"
+  echo "Phases 6 and 7 only. Nothing was tagged, backed up, pulled, built,"
+  echo "recreated or edited. The deployed-head marker names the commit the"
+  echo "server checkout is on, which is the commit that is actually deployed,"
+  echo "and that is what the next run's phase 1a gates on. If $DEPLOY_REF has"
+  echo "moved on since that deploy, the next full run fast-forwards to it."
   hr
   exit 0
 fi
