@@ -24,110 +24,186 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="/design-system.css?v=23">
 <link rel="stylesheet" href="/nav.css?v=19">
-<link rel="stylesheet" href="/relay-pulse.css?v=1">
-<link rel="stylesheet" href="/parapear.css?v=1">
-<link rel="stylesheet" href="/components-parasign.css?v=3">
 <style>
-/* Homepage for a buyer, not for a cryptographer. Existing design tokens and
-   classes only; design-system.css, nav.css and nav.js are untouched. The order
-   of the page IS the argument: what it is, the two products, how it works,
-   what it costs, why you can check it, and one line for developers. */
+/* Homepage 2026: the vanishing document. Paper, ink, one accent, one dark object per screen. */
+:root{
+  --hp-paper:#FAF8F3; --hp-paper-2:#F3F0E8; --hp-ink:#0C1B2A; --hp-ink-2:#3F4D5C; --hp-ink-3:#66727F;
+  --hp-line:rgba(12,27,42,.12); --hp-line-2:rgba(12,27,42,.22); --hp-night:#0C1622; --hp-night-2:#13233A;
+  --hp-cobalt:#1D4ED8; --hp-cobalt-2:#173FB3; --hp-lime:#B2FF3F; --hp-lime-ink:#5C7A12;
+  --hp-sans:var(--sans, Inter, system-ui, -apple-system, "Segoe UI", sans-serif);
+  --hp-mono:var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+}
+html{background:var(--hp-paper)}
+body{background:var(--hp-paper);color:var(--hp-ink);font-family:var(--hp-sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+main{display:block;overflow:hidden}
+.hp-wrap{width:min(100% - 40px, 1120px);margin-inline:auto}
+@media (min-width:760px){.hp-wrap{width:min(100% - 80px, 1120px)}}
+.hp-kicker{font-family:var(--hp-mono);font-size:12px;letter-spacing:.06em;color:var(--hp-ink-3);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+.hp-kicker::before{content:"";width:22px;height:2px;background:var(--hp-lime);border-radius:1px}
+.hp-h2{font-size:clamp(1.65rem, 2.6vw + .8rem, 3rem);line-height:1.06;letter-spacing:-.025em;font-weight:700;color:var(--hp-ink);margin:0;max-width:20ch}
+.hp-lede{font-size:clamp(1rem, .35vw + .9rem, 1.15rem);line-height:1.6;color:var(--hp-ink-2);margin:16px 0 0;max-width:56ch}
+.hp-sec{padding:64px 0}
+@media (min-width:900px){.hp-sec{padding:120px 0}}
+.hp-sec + .hp-sec{border-top:1px solid var(--hp-line)}
 
-/* ── Hero ── */
-.home-hero { text-align: center; max-width: 1040px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-5); }
-.home-hero h1 { font-size: clamp(30px, 5vw, 50px); line-height: 1.06; letter-spacing: -0.025em; color: var(--navy); margin: 0 auto var(--space-4); max-width: 20ch; }
-.home-hero .lede { font-size: 17px; line-height: 1.55; color: var(--ink-dim); max-width: 58ch; margin: 0 auto; }
-.home-hero .lede strong { color: var(--navy); font-weight: 600; }
-.home-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: center; margin: var(--space-5) 0 0; }
-.home-act-ghost { background: transparent; color: var(--navy); border: 1px solid var(--ink-hair); }
-.home-act-ghost:hover { border-color: var(--navy); background: var(--bone); }
-.home-hi-name { color: var(--cobalt); }
-.home-state[hidden] { display: none; }
-.hero-note { margin: var(--space-4) 0 0; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+/* buttons: one filled, one hairline */
+.hp-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:3px;font-size:14.5px;font-weight:600;text-decoration:none;line-height:1;transition:background .15s,color .15s,border-color .15s,transform .15s;white-space:nowrap}
+.hp-btn-fill{background:var(--hp-cobalt);color:#fff;border:1px solid var(--hp-cobalt)}
+.hp-btn-fill:hover{background:var(--hp-cobalt-2);border-color:var(--hp-cobalt-2)}
+.hp-btn-line{background:transparent;color:var(--hp-ink);border:1px solid var(--hp-line-2)}
+.hp-btn-line:hover{border-color:var(--hp-ink);background:rgba(12,27,42,.03)}
+.hp-btn-paper{background:var(--hp-paper);color:var(--hp-ink);border:1px solid var(--hp-paper)}
+.hp-btn-paper:hover{background:#fff}
+.hp-btn:focus-visible{outline:3px solid rgba(29,78,216,.35);outline-offset:2px}
+.hp-btn:active{transform:translateY(1px)}
 
-/* ── The split that comes before every other argument: a free Community plan
-   that is given away, and the business plans that pay for it. ── */
-.home-split-sec { border-top: 0; padding-top: var(--space-3); }
-.split-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
-.split-card { display: flex; flex-direction: column; padding: var(--space-5); border: 1px solid var(--ink-hair); }
-.split-free { background: #0a1626; border-color: transparent; box-shadow: inset 0 0 0 1px rgba(178,255,63,.18); }
-.split-paid { background: #fff; border-top: 2px solid var(--cobalt); }
-.split-kicker { margin: 0 0 var(--space-2); font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-dim); }
-.split-free .split-kicker { color: #B2FF3F; }
-.split-card h3 { font-size: 22px; line-height: 1.15; letter-spacing: -0.018em; color: var(--navy); margin: 0 0 var(--space-3); }
-.split-free h3 { color: #F8FAFC; }
-.split-card p { font-size: 14px; line-height: 1.6; color: var(--ink-dim); margin: 0 0 var(--space-3); }
-.split-free p { color: rgba(248,250,252,.78); }
-.split-card strong, .split-card b { color: var(--navy); font-weight: 600; }
-.split-free strong { color: #F8FAFC; }
-.split-person { border-top: 1px solid rgba(248,250,252,.18); padding-top: var(--space-3); }
-.split-org { font-family: var(--mono); font-size: 11px; line-height: 1.6; letter-spacing: .02em; }
-.split-adds { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
-.split-adds li { position: relative; padding-left: 18px; font-size: 14px; line-height: 1.55; color: var(--ink-dim); margin-bottom: 10px; }
-.split-adds li::before { content: ""; position: absolute; left: 0; top: 9px; width: 7px; height: 2px; background: var(--cobalt); }
-.split-cta { margin-top: auto; }
-@media (max-width: 760px) { .split-grid { grid-template-columns: 1fr; } }
+/* ---------- hero ---------- */
+.home-hero{position:relative;padding:28px 0 32px;background:linear-gradient(180deg,#F8FAFC 0,var(--hp-paper) 160px)}
+.home-hero .hp-wrap{position:relative;display:grid;gap:28px}
+.home-state{position:relative;z-index:2}
+.home-hero h1,.home-hero .paramant-h1{font-size:clamp(1.85rem, 5vw + .5rem, 4.6rem);line-height:1.02;letter-spacing:-.03em;font-weight:700;color:var(--hp-ink);margin:0;max-width:14ch;text-wrap:balance}
+.home-hero .lede{font-size:clamp(.95rem, .4vw + .85rem, 1.2rem);line-height:1.55;color:var(--hp-ink-2);margin:16px 0 0;max-width:46ch}
+.home-hero .lede strong{color:var(--hp-ink);font-weight:600}
+.home-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+.hero-note{font-size:13px;line-height:1.5;color:var(--hp-ink-3);margin:14px 0 0;max-width:46ch}
+.hero-note b{color:var(--hp-ink);font-weight:600}
+.hero-by{display:flex;align-items:center;gap:12px;margin:18px 0 0;padding-top:16px;border-top:1px solid var(--hp-line);font-size:13px;line-height:1.45;color:var(--hp-ink-2);max-width:52ch}
+.hero-by .hp-mono{font-family:var(--hp-mono);font-size:11px;color:var(--hp-ink-3);letter-spacing:.04em}
+.hero-by strong{color:var(--hp-ink);font-weight:600}
+.hero-by .by-mark{flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:1px solid var(--hp-line-2);display:grid;place-items:center;font-family:var(--hp-mono);font-size:11px;color:var(--hp-ink);background:#fff}
+.home-hi-name{color:var(--hp-cobalt)}
 
-/* ── Shared section furniture ── */
-.home-sec { max-width: 1040px; margin: 0 auto var(--space-7); padding: var(--space-6) var(--space-4) 0; border-top: 1px solid var(--ink-hair); }
-.sec-intro { text-align: center; max-width: 60ch; margin: 0 auto var(--space-5); }
-.sec-eyebrow { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 var(--space-3); font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-dim); }
-.sec-eyebrow span { display: inline-block; width: 22px; height: 2px; background: var(--lime); }
-.sec-intro h2 { font-size: clamp(24px, 3.4vw, 34px); line-height: 1.12; letter-spacing: -0.02em; color: var(--navy); margin: 0 0 var(--space-3); }
-.sec-lede { font-size: 15px; line-height: 1.6; color: var(--ink-dim); margin: 0 auto; max-width: 54ch; }
-.sec-more { text-align: center; margin-top: var(--space-5); }
-.sec-link { display: inline-block; font-family: var(--mono); font-size: 13px; letter-spacing: .04em; color: var(--navy); text-decoration: none; border-bottom: 1px solid var(--lime); padding-bottom: 3px; }
-.sec-link:hover { color: var(--cobalt); }
+/* the art: a document that gets signed, sealed, and then is gone */
+.hp-art{position:relative;z-index:1;height:150px;pointer-events:none;user-select:none}
+.hp-art-glow{position:absolute;inset:-40% -20%;background:
+  radial-gradient(40% 50% at 70% 40%, rgba(29,78,216,.10), transparent 70%),
+  radial-gradient(30% 40% at 30% 70%, rgba(178,255,63,.16), transparent 70%);filter:blur(10px)}
+.hp-doc{position:absolute;left:50%;top:0;width:min(260px, 62vw);aspect-ratio:1/1.32;transform:translateX(-50%) rotate(-4deg);background:#fff;border:1px solid var(--hp-line);border-radius:3px;box-shadow:0 30px 60px -30px rgba(12,27,42,.35), 0 1px 0 rgba(12,27,42,.05);padding:9% 9% 12%;display:flex;flex-direction:column;gap:7%;
+  -webkit-mask-image:linear-gradient(180deg,#000 0,#000 58%,rgba(0,0,0,.55) 74%,transparent 100%);mask-image:linear-gradient(180deg,#000 0,#000 58%,rgba(0,0,0,.55) 74%,transparent 100%);
+  -webkit-mask-size:100% 300%;mask-size:100% 300%;-webkit-mask-position:0 100%;mask-position:0 100%;
+  animation:hp-burn 14s ease-in-out infinite}
+.hp-doc i{display:block;height:5%;border-radius:2px;background:var(--hp-paper-2)}
+.hp-doc i.t{height:9%;width:62%;background:var(--hp-ink);opacity:.9}
+.hp-doc i.w1{width:92%} .hp-doc i.w2{width:78%} .hp-doc i.w3{width:86%} .hp-doc i.w4{width:54%}
+.hp-doc svg{width:56%;height:auto;margin-top:auto;overflow:visible}
+.hp-doc svg path{fill:none;stroke:var(--hp-cobalt);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:420;stroke-dashoffset:420;animation:hp-sign 14s ease-in-out infinite}
+.hp-seal{position:absolute;right:9%;bottom:12%;width:19%;aspect-ratio:1;border-radius:50%;border:1.5px solid var(--hp-lime-ink);background:radial-gradient(circle at 50% 50%, rgba(178,255,63,.55), rgba(178,255,63,.12) 60%, transparent 62%);display:grid;place-items:center;font-family:var(--hp-mono);font-size:8px;color:var(--hp-lime-ink);letter-spacing:.08em;transform:scale(0);animation:hp-seal 14s ease-in-out infinite}
+.hp-dust{position:absolute;left:50%;top:0;width:min(260px, 62vw);height:100%;transform:translateX(-50%);background-image:
+  radial-gradient(circle, rgba(12,27,42,.55) 1px, transparent 1.6px),
+  radial-gradient(circle, rgba(29,78,216,.5) 1px, transparent 1.6px),
+  radial-gradient(circle, rgba(12,27,42,.35) .8px, transparent 1.4px);
+  background-size:23px 29px, 37px 41px, 17px 19px;background-position:0 0, 9px 13px, 5px 3px;opacity:0;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 40%,#000 70%,transparent 100%);mask-image:linear-gradient(180deg,transparent 0,#000 40%,#000 70%,transparent 100%);
+  animation:hp-dust 14s ease-in-out infinite}
+@keyframes hp-sign{0%,18%{stroke-dashoffset:420}38%,100%{stroke-dashoffset:0}}
+@keyframes hp-seal{0%,40%{transform:scale(0)}47%{transform:scale(1.12)}52%,100%{transform:scale(1)}}
+@keyframes hp-burn{0%,58%{-webkit-mask-position:0 100%;mask-position:0 100%;opacity:1}86%{-webkit-mask-position:0 0;mask-position:0 0;opacity:1}90%,96%{opacity:0;-webkit-mask-position:0 0;mask-position:0 0}100%{opacity:1;-webkit-mask-position:0 100%;mask-position:0 100%}}
+@keyframes hp-dust{0%,56%{opacity:0;transform:translate(-50%,0)}72%{opacity:.9}90%,100%{opacity:0;transform:translate(-50%,-70px)}}
+@media (prefers-reduced-motion:reduce){
+  .hp-doc,.hp-doc svg path,.hp-seal,.hp-dust{animation:none}
+  .hp-doc{-webkit-mask-position:0 100%;mask-position:0 100%}
+  .hp-doc svg path{stroke-dashoffset:0}.hp-seal{transform:scale(1)}.hp-dust{opacity:0}
+}
+@media (max-width:759px){
+  .hp-art{position:absolute;right:-6%;top:-6px;width:150px;height:200px;opacity:.55;z-index:0}
+  .hp-doc,.hp-dust{width:112px;left:auto;right:0;transform:none}
+  .hp-dust{transform:none}
+  @keyframes hp-dust{0%,56%{opacity:0;transform:translateY(0)}72%{opacity:.9}90%,100%{opacity:0;transform:translateY(-50px)}}
+  .home-hero .hp-wrap{gap:0}
+  .home-state{max-width:82%}
+}
+@media (min-width:760px){
+  .home-hero{padding:56px 0 64px}
+  .home-hero .hp-wrap{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);align-items:center;gap:40px}
+  .hp-art{height:min(440px,44vw)}
+  .hp-doc,.hp-dust{width:min(360px,34vw);top:6%}
+}
+@media (min-width:1100px){.home-hero{padding:72px 0 80px}.hp-btn{min-height:48px;padding:0 22px;font-size:15px}}
 
-/* ── Two products ── */
-.prod-grid { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin: 0; padding: 0; }
-.prod-grid li { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--ink-hair); border-top: 2px solid var(--lime); padding: var(--space-5); }
-.prod-name { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-dim); }
-.prod-grid h3 { font-size: 20px; line-height: 1.18; letter-spacing: -0.015em; color: var(--navy); margin: 8px 0 var(--space-3); }
-.prod-lines { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
-.prod-lines li { display: block; background: none; border: 0; padding: 0 0 0 18px; position: relative; font-size: 14px; line-height: 1.55; color: var(--ink-dim); margin-bottom: 6px; }
-.prod-lines li::before { content: ""; position: absolute; left: 0; top: 9px; width: 7px; height: 2px; background: var(--lime); }
-.prod-cta { margin-top: auto; display: flex; flex-wrap: wrap; gap: var(--space-2); }
-@media (max-width: 760px) { .prod-grid { grid-template-columns: 1fr; } }
+/* ---------- the gift: two halves ---------- */
+.home-split-sec{padding-top:44px}
+.gift-grid{display:grid;gap:14px;margin-top:32px}
+@media (min-width:900px){.gift-grid{grid-template-columns:1.05fr .95fr;gap:20px;margin-top:48px}}
+.panel{border-radius:6px;padding:28px 24px;position:relative;overflow:hidden}
+@media (min-width:900px){.panel{padding:44px 40px}}
+.panel-night{background:var(--hp-night);color:#E9EEF4}
+.panel-night::after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle, rgba(178,255,63,.18), transparent 65%);pointer-events:none}
+.panel-paper{background:#fff;border:1px solid var(--hp-line)}
+.panel-kicker{font-family:var(--hp-mono);font-size:12px;letter-spacing:.06em;margin:0 0 18px;display:flex;align-items:baseline;gap:10px}
+.panel-night .panel-kicker{color:var(--hp-lime)}
+.panel-paper .panel-kicker{color:var(--hp-cobalt)}
+.panel-kicker .amt{font-family:var(--hp-sans);font-size:clamp(1.6rem,3vw,2.4rem);font-weight:700;letter-spacing:-.03em;line-height:1}
+.panel-night .panel-kicker .amt{color:#fff}
+.panel-paper .panel-kicker .amt{color:var(--hp-ink)}
+.panel h3{font-size:clamp(1.35rem,1.4vw + .9rem,1.9rem);line-height:1.12;letter-spacing:-.02em;margin:0 0 14px;font-weight:700}
+.panel p{font-size:15.5px;line-height:1.6;margin:0 0 12px}
+.panel-night p{color:#B9C5D3}
+.panel-night p strong{color:#fff;font-weight:600}
+.panel-paper p{color:var(--hp-ink-2)}
+.panel-paper p strong{color:var(--hp-ink);font-weight:600}
+.split-adds{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:10px}
+.split-adds li{font-size:14.5px;line-height:1.55;color:var(--hp-ink-2);padding-left:18px;position:relative}
+.split-adds li::before{content:"";position:absolute;left:0;top:.62em;width:8px;height:2px;background:var(--hp-cobalt)}
+.split-adds b{color:var(--hp-ink);font-weight:600}
+.split-person{margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,255,255,.14);display:grid;gap:4px}
+.split-person .who{color:#fff;font-weight:600;font-size:15px}
+.split-person .role{color:#B9C5D3;font-size:14px;line-height:1.5}
+.split-org{font-family:var(--hp-mono);font-size:11px;letter-spacing:.04em;color:#8A9AAD;margin:6px 0 0}
+.split-cta{margin-top:24px;display:flex;flex-wrap:wrap;gap:10px}
 
-/* ── Three steps ── */
-.step-grid { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 0; padding: 0; background: var(--ink-hair); border: 1px solid var(--ink-hair); }
-.step-grid li { background: #fff; padding: var(--space-5) var(--space-4); }
-.step-n { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--navy); opacity: .5; }
-.step-grid h3 { font-size: 16px; line-height: 1.22; letter-spacing: -0.01em; color: var(--navy); margin: 6px 0 6px; }
-.step-grid p { font-size: 14px; line-height: 1.55; color: var(--ink-dim); margin: 0; }
-@media (max-width: 760px) { .step-grid { grid-template-columns: 1fr; } }
+/* ---------- products ---------- */
+.prod-grid{list-style:none;margin:36px 0 0;padding:0;display:grid;gap:14px}
+@media (min-width:900px){.prod-grid{grid-template-columns:1fr 1fr;gap:20px;margin-top:48px}}
+.prod-grid li{border:1px solid var(--hp-line);border-radius:6px;background:#fff;padding:26px 22px;display:flex;flex-direction:column}
+@media (min-width:900px){.prod-grid li{padding:36px 34px}}
+.prod-name{font-family:var(--hp-mono);font-size:12px;letter-spacing:.08em;color:var(--hp-cobalt);display:block;margin-bottom:12px}
+.prod-grid h3{font-size:clamp(1.3rem,1.3vw + .9rem,1.8rem);line-height:1.12;letter-spacing:-.02em;margin:0 0 14px;max-width:16ch}
+.prod-lines{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+.prod-lines li{font-size:15px;line-height:1.55;color:var(--hp-ink-2);padding-left:22px;position:relative}
+.prod-lines li::before{content:"";position:absolute;left:0;top:.55em;width:11px;height:11px;border-radius:50%;border:1.5px solid var(--hp-lime-ink);background:rgba(178,255,63,.35)}
+.prod-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px;padding-top:20px;border-top:1px solid var(--hp-line)}
 
-/* ── What it costs ── */
-.price-grid { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin: 0; padding: 0; }
-.price-grid > li { background: #fff; border: 1px solid var(--ink-hair); padding: var(--space-5); }
-.price-grid h3 { font-size: 17px; line-height: 1.2; letter-spacing: -0.01em; color: var(--navy); margin: 0 0 var(--space-2); }
-.price-sub { font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0 0 var(--space-4); }
-.tiers { list-style: none; margin: 0; padding: 0; }
-.tiers li { display: grid; grid-template-columns: 8.5ch auto; gap: var(--space-3); align-items: baseline; padding: 10px 0; border-top: 1px solid var(--ink-hair); }
-.tiers li:first-child { border-top: 0; }
-.tier-price { font-family: var(--mono); font-size: 13px; font-weight: 600; letter-spacing: -.01em; color: var(--navy); }
-.tier-what { font-size: 13px; line-height: 1.5; color: var(--ink-dim); }
-.tier-what b { color: var(--navy); font-weight: 600; }
-.price-foot { margin: var(--space-4) 0 0; font-family: var(--mono); font-size: 11px; line-height: 1.5; letter-spacing: .02em; color: var(--ink-dim); }
-@media (max-width: 760px) { .price-grid { grid-template-columns: 1fr; } }
+/* ---------- three steps ---------- */
+.step-grid{list-style:none;margin:36px 0 0;padding:0;display:grid;gap:0;counter-reset:step;border-top:1px solid var(--hp-line)}
+@media (min-width:900px){.step-grid{grid-template-columns:1fr 1fr 1fr;gap:40px;margin-top:48px}}
+.step-grid li{padding:22px 0;border-bottom:1px solid var(--hp-line)}
+@media (min-width:900px){.step-grid li{padding:28px 0 0;border-bottom:0}}
+.step-n{font-family:var(--hp-mono);font-size:12px;letter-spacing:.08em;color:var(--hp-ink-3);display:block;margin-bottom:10px}
+.step-grid h3{font-size:1.2rem;letter-spacing:-.015em;margin:0 0 8px}
+.step-grid p{font-size:15px;line-height:1.55;color:var(--hp-ink-2);margin:0;max-width:34ch}
 
-/* ── Why you can check it ── */
-.pq-core { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 6px 14px; width: fit-content; max-width: 100%; margin: 0 auto var(--space-5); padding: var(--space-3) var(--space-4); background: #0a1626; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(178,255,63,.18); }
-.pq-core strong { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; font-weight: 600; color: #B2FF3F; }
-.pq-core span { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: #88a6cb; }
-.rules-grid { list-style: none; display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; margin: 0; padding: 0; background: var(--ink-hair); border: 1px solid var(--ink-hair); }
-.rules-grid li { background: #fff; padding: var(--space-4); }
-.rules-grid h3 { font-size: 15px; line-height: 1.22; letter-spacing: -0.01em; color: var(--navy); margin: 0 0 4px; }
-.rules-grid li p { font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0; }
-.r-verify { display: inline-block; margin-top: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: .05em; color: var(--navy); text-decoration: none; border-bottom: 1px solid #B2FF3F; padding-bottom: 2px; }
-.r-verify:hover { color: var(--cobalt); }
-@media (max-width: 480px) { .rules-grid { grid-template-columns: 1fr; } }
+/* ---------- prices ---------- */
+.price-grid{list-style:none;margin:36px 0 0;padding:0;display:grid;gap:14px}
+@media (min-width:900px){.price-grid{grid-template-columns:1fr 1fr;gap:20px;margin-top:48px}}
+.price-grid > li{border:1px solid var(--hp-line);border-radius:6px;background:#fff;padding:24px 22px}
+@media (min-width:900px){.price-grid > li{padding:32px 34px}}
+.price-grid h3{font-size:1.25rem;margin:0 0 2px;letter-spacing:-.015em}
+.price-sub{font-size:14px;color:var(--hp-ink-3);margin:0 0 16px}
+.tiers{list-style:none;margin:0;padding:0;border-top:1px solid var(--hp-line)}
+.tiers li{display:grid;grid-template-columns:76px 1fr;gap:12px;align-items:baseline;padding:12px 0;border-bottom:1px solid var(--hp-line);font-size:14.5px;line-height:1.5;color:var(--hp-ink-2)}
+.tier-price{font-weight:700;color:var(--hp-ink);font-size:1.15rem;letter-spacing:-.02em}
+.tier-what b{color:var(--hp-ink);font-weight:600}
+.price-foot{font-family:var(--hp-mono);font-size:11px;letter-spacing:.03em;color:var(--hp-ink-3);margin:12px 0 0}
+.sec-more{margin-top:28px}
+.sec-link{color:var(--hp-ink);font-weight:600;text-decoration:none;border-bottom:1px solid var(--hp-line-2);padding-bottom:2px;font-size:15px}
+.sec-link:hover{border-color:var(--hp-ink)}
 
-/* ── Developers: one line, no section of its own ── */
-.home-dev { max-width: 1040px; margin: 0 auto var(--space-7); padding: 0 var(--space-4); text-align: center; font-size: 14px; line-height: 1.6; color: var(--ink-dim); }
-.home-dev a { color: var(--navy); border-bottom: 1px solid var(--lime); padding-bottom: 2px; text-decoration: none; }
-.home-dev a:hover { color: var(--cobalt); }
+/* ---------- rules ---------- */
+.pq-core{display:inline-flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;margin:28px 0 0;padding:10px 14px;border:1px solid var(--hp-line);border-radius:3px;background:#fff;font-family:var(--hp-mono);font-size:12px;color:var(--hp-ink-3);letter-spacing:.02em}
+.pq-core strong{color:var(--hp-ink);font-weight:600}
+.rules-grid{list-style:none;margin:20px 0 0;padding:0;display:grid;gap:0;border-top:1px solid var(--hp-line)}
+@media (min-width:900px){.rules-grid{grid-template-columns:1fr 1fr;column-gap:40px}}
+.rules-grid li{padding:20px 0;border-bottom:1px solid var(--hp-line)}
+.rules-grid h3{font-size:1.1rem;letter-spacing:-.015em;margin:0 0 6px}
+.rules-grid li p{font-size:15px;line-height:1.55;color:var(--hp-ink-2);margin:0 0 8px;max-width:44ch}
+.rules-grid li p a{color:var(--hp-ink)}
+.r-verify{font-family:var(--hp-mono);font-size:12px;color:var(--hp-cobalt);text-decoration:none;letter-spacing:.02em}
+.r-verify:hover{text-decoration:underline}
+.home-dev{font-size:14px;color:var(--hp-ink-3);margin:0;padding:28px 0 40px;border-top:1px solid var(--hp-line)}
+.home-dev a{color:var(--hp-ink)}
+
+/* footer sits on paper too */
+footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
 </style>
 <script type="application/ld+json" data-paramant-seo="1">
 {
@@ -209,14 +285,7 @@
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
-<div class="meta-bar">
-  <span class="">build 3.0.0</span>
-  <span class="sep">·</span>
-  <span class="">aes-256-gcm / <a href="/crypto-agility" class="meta-link">post-quantum</a></span>
-  <span class="sep">·</span>
-  <span class="">eu/de · ram only</span>
-</div>
-
+<div class="meta-bar" hidden></div>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
@@ -246,165 +315,179 @@
 <main id="main-content" role="main">
 
 <section class="home-hero">
-  <div class="home-state" data-home="out">
-    <h1>Get documents signed and send files safely, from your browser.</h1>
-    <p class="lede">Paramant is for <strong>small professional firms</strong> that would rather not put client files on an American cloud: legal, finance and healthcare practices in the EU. Send a contract out for signature, or send a file that is gone the moment it has been read. Everything runs on servers in Germany.</p>
-    <div class="home-actions">
-      <a class="btn btn-lime" href="/sign">Sign a document</a>
-      <a class="btn home-act-ghost" href="/pricing">See pricing</a>
+  <div class="hp-wrap">
+    <div class="home-state" data-home="out">
+      <h1>Get documents signed and send files safely, from your browser.</h1>
+      <p class="lede">Made for <strong>small professional firms</strong> in the EU: legal, finance, health. A contract signed, or a file that is gone the moment it has been read.</p>
+      <div class="home-actions">
+        <a class="hp-btn hp-btn-fill" href="/sign">Sign a document</a>
+        <a class="hp-btn hp-btn-line" href="/pricing">Business plans</a>
+      </div>
+      <p class="hero-note">Free on the <b>Community plan</b>, for good. Paid business plans from &euro;15 a month.</p>
+      <p class="hero-by"><span class="by-mark" aria-hidden="true">MB</span><span><strong>Mick Beer</strong>, privacy and security researcher.<br><span class="hp-mono">Founder, Paramantis Solutions B.V. &middot; Harderwijk</span></span></p>
     </div>
-    <p class="hero-note">Free on the Community plan &middot; business plans from &euro;15 a month &middot; the person you invite needs no account</p>
-  </div>
-  <div class="home-state" data-home="in" hidden>
-    <h2 class="paramant-h1">Your documents<span class="home-hi-name" data-home-name></span>.</h2>
-    <p class="lede">Pick up an open request, get a new document signed with ParaSign, or send a file that burns on read with ParaSend.</p>
-    <div class="home-actions">
-      <a class="btn btn-lime" href="/dashboard">Open documents</a>
-      <a class="btn home-act-ghost" href="/sign">Start signing</a>
-      <a class="btn home-act-ghost" href="/parashare">Send securely</a>
+    <div class="home-state" data-home="in" hidden>
+      <h2 class="paramant-h1">Your documents<span class="home-hi-name" data-home-name></span>.</h2>
+      <p class="lede">Pick up an open request, get a new document signed with ParaSign, or send a file that burns on read with ParaSend.</p>
+      <div class="home-actions">
+        <a class="hp-btn hp-btn-fill" href="/dashboard">Open documents</a>
+        <a class="hp-btn hp-btn-line" href="/sign">Start signing</a>
+        <a class="hp-btn hp-btn-line" href="/parashare">Send securely</a>
+      </div>
     </div>
-  </div>
-</section>
-
-<section class="home-sec home-split-sec" aria-labelledby="split-h">
-  <div class="sec-intro">
-    <p class="sec-eyebrow"><span></span>why there are two kinds of plan</p>
-    <h2 id="split-h">One half is a gift. The other half pays for it.</h2>
-    <p class="sec-lede">That split is the whole idea, so it goes first. Everything further down this page is either the free half or the paid half.</p>
-  </div>
-  <div class="split-grid">
-    <div class="split-card split-free">
-      <p class="split-kicker">Community &middot; &euro;0</p>
-      <h3>Free, because it is meant to be.</h3>
-      <p>Anyone can sign a document and send a file safely, with no card and no time limit. Community is the name on the pricing page too, and it is the name on your dashboard.</p>
-      <p>It is not a trial and it is not a funnel. It is what Paramant gives back: signing and sending that does not route through an American cloud, available to whoever needs it.</p>
-      <p class="split-person">Paramant is built by <strong>Mick Beer</strong>, privacy and security researcher and founder of Paramantis Solutions B.V. The Community plan is his contribution back to the society the tools came from.</p>
-      <p class="split-org">Paramantis Solutions B.V. &middot; Harderwijk, the Netherlands &middot; KvK 42115132</p>
-      <div class="split-cta"><a class="btn btn-lime" href="/sign">Sign a document</a></div>
-    </div>
-    <div class="split-card split-paid">
-      <p class="split-kicker">Business plans &middot; from &euro;15 a month</p>
-      <h3>Organisations that need more, buy it.</h3>
-      <p>Paid plans are what keeps the free half free. The tiers are exactly the ones on the pricing page: <strong>Pro</strong> and <strong>Enterprise</strong> for ParaSend, <strong>Pro</strong>, <strong>Business</strong> and <strong>Enterprise</strong> for ParaSign.</p>
-      <ul class="split-adds">
-        <li><b>Volume.</b> 100 or 1,000 signatures a month instead of 2, and links that live 24 hours or 7 days instead of 1.</li>
-        <li><b>Control.</b> Send history and link management, webhooks on upload and download, up to 50 registered devices, and up to 500 retrievals an hour through the API instead of 50.</li>
-        <li><b>Accountability.</b> Named support with a reply within one business day, an exportable audit log with CT tree head, help answering your customers' security questionnaires.</li>
-        <li><b>Your own relay.</b> Enterprise adds a dedicated relay, with terms that differ per product: ParaSend Enterprise carries the signed Data Processing Agreement and SLA 99.95%, ParaSign Enterprise carries the sector relay (health, legal, finance), SLA with service credits and a self-hosting licence.</li>
-      </ul>
-      <div class="split-cta"><a class="btn home-act-ghost" href="/pricing">See the business plans</a></div>
+    <div class="hp-art" aria-hidden="true">
+      <div class="hp-art-glow"></div>
+      <div class="hp-dust"></div>
+      <div class="hp-doc">
+        <i class="t"></i><i class="w1"></i><i class="w2"></i><i class="w3"></i><i class="w1"></i><i class="w4"></i>
+        <svg viewBox="0 0 160 46"><path d="M4 34c14-24 22-26 20-10s-8 20 2 12 18-26 18-14-6 26 6 12 14-22 20-10 2 18 12 10 16-22 22-10 6 18 18 4 20-16 34-10"/></svg>
+        <span class="hp-seal">EU</span>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="home-sec" id="products" aria-labelledby="products-h">
-  <div class="sec-intro">
-    <p class="sec-eyebrow"><span></span>two products</p>
-    <h2 id="products-h">One for signing. One for sending.</h2>
-    <p class="sec-lede">Both run on the same core, and both work in a plain browser. Nothing to install for you, nothing to install for the other side.</p>
-  </div>
-  <ul class="prod-grid">
-    <li>
-      <span class="prod-name">ParaSign</span>
-      <h3>Get a document signed.</h3>
-      <ul class="prod-lines">
-        <li>Upload the PDF, place the fields, and mail it to whoever has to sign.</li>
-        <li>They sign with the link from that email. Signing an invitation needs no account.</li>
-        <li>You keep a receipt anyone can check offline, plus an entry in the public log.</li>
-      </ul>
-      <div class="prod-cta"><a class="btn btn-lime" href="/parasign">What ParaSign is</a><a class="btn home-act-ghost" href="/sign">Sign a document</a></div>
-    </li>
-    <li>
-      <span class="prod-name">ParaSend</span>
-      <h3>Send a file that disappears.</h3>
-      <ul class="prod-lines">
-        <li>The file is encrypted in your browser before it leaves your device.</li>
-        <li>The relay only ever holds the encrypted blob in RAM, never on a disk.</li>
-        <li>It is burned on the first read, so there is nothing left to leak later.</li>
-      </ul>
-      <div class="prod-cta"><a class="btn btn-lime" href="/parasend">What ParaSend is</a><a class="btn home-act-ghost" href="/parashare">Send a file</a></div>
-    </li>
-  </ul>
-</section>
-
-<section class="home-sec" aria-labelledby="how-h">
-  <div class="sec-intro">
-    <p class="sec-eyebrow"><span></span>how it works</p>
-    <h2 id="how-h">Three steps, and you are done.</h2>
-    <p class="sec-lede">No plugin, no client software, no onboarding call. The whole thing happens in the tab you already have open.</p>
-  </div>
-  <ol class="step-grid">
-    <li>
-      <span class="step-n">01</span>
-      <h3>Pick the file</h3>
-      <p>Drop a PDF in your browser. It is encrypted on your own device, before anything is uploaded.</p>
-    </li>
-    <li>
-      <span class="step-n">02</span>
-      <h3>Send the link</h3>
-      <p>The other side opens the link from the email and signs or reads it there. They do not have to sign up for anything.</p>
-    </li>
-    <li>
-      <span class="step-n">03</span>
-      <h3>Keep the proof</h3>
-      <p>You get a receipt that can be checked without us, and a line in a public log that shows when it happened.</p>
-    </li>
-  </ol>
-</section>
-
-<section class="home-sec" aria-labelledby="cost-h">
-  <div class="sec-intro">
-    <p class="sec-eyebrow"><span></span>what it costs</p>
-    <h2 id="cost-h">Free to start. Then a flat price per month.</h2>
-    <p class="sec-lede">Prices are per month excluding btw. You can stay on the Community plan as long as you like; there is no card and no time limit.</p>
-  </div>
-  <ul class="price-grid">
-    <li>
-      <h3>ParaSign</h3>
-      <p class="price-sub">Getting documents signed.</p>
-      <ul class="tiers">
-        <li><span class="tier-price">&euro;0</span><span class="tier-what"><b>Community</b> &middot; 2 signatures a month, no limit on receiving</span></li>
-        <li><span class="tier-price">&euro;49</span><span class="tier-what"><b>Pro</b> &middot; 100 signatures a month, then &euro;0.40 each up to 1,000</span></li>
-        <li><span class="tier-price">&euro;299</span><span class="tier-what"><b>Business</b> &middot; 1,000 signatures a month, named support, exportable audit log</span></li>
-        <li><span class="tier-price">Talk</span><span class="tier-what"><b>Enterprise</b> &middot; dedicated relay, SLA with service credits, self-hosting licence</span></li>
-      </ul>
-      <p class="price-foot">&euro;59.29 and &euro;361.79 per month incl. 21% btw &middot; yearly is cheaper</p>
-    </li>
-    <li>
-      <h3>ParaSend</h3>
-      <p class="price-sub">Sending files that burn on read.</p>
-      <ul class="tiers">
-        <li><span class="tier-price">&euro;0</span><span class="tier-what"><b>Community</b> &middot; 10 transfers a month, 5 MB per file, 1 hour link expiry, burn on first read</span></li>
-        <li><span class="tier-price">&euro;15</span><span class="tier-what"><b>Pro</b> &middot; 24 hour expiry, up to 10 reads per link, send history, webhooks</span></li>
-        <li><span class="tier-price">Custom</span><span class="tier-what"><b>Enterprise</b> &middot; dedicated relay, signed DPA, SLA 99.95%, per-tenant limits</span></li>
-      </ul>
-      <p class="price-foot">&euro;18.15 per month incl. 21% btw &middot; yearly is cheaper</p>
-    </li>
-  </ul>
-  <div class="sec-more">
-    <a class="sec-link" href="/pricing">See the full pricing page <span aria-hidden="true">&rarr;</span></a>
+<section class="hp-sec home-split-sec" aria-labelledby="split-h">
+  <div class="hp-wrap">
+    <p class="hp-kicker">Why there are two kinds of plan</p>
+    <h2 id="split-h" class="hp-h2">One half is a gift. The other half pays for it.</h2>
+    <p class="hp-lede">That split is the whole idea, so it comes first. Everything further down this page is either the free half or the paid half.</p>
+    <div class="gift-grid">
+      <article class="panel panel-night">
+        <p class="panel-kicker">Community <span class="amt">&euro;0</span></p>
+        <h3>Free, because it is meant to be.</h3>
+        <p>Anyone can get a document signed and send a file safely. No card, no time limit, no trial that runs out. <strong>Community</strong> is the name on the pricing page and on your dashboard.</p>
+        <p>It is not a funnel. It is what Paramant gives back: 2 signatures a month, 10 transfers a month, 5 MB per file, and none of it through an American cloud.</p>
+        <div class="split-person">
+          <span class="who">Mick Beer, privacy and security researcher</span>
+          <span class="role">Founder of Paramantis Solutions B.V. He built Paramant, and the Community plan is his contribution back to the society the tools came from.</span>
+          <p class="split-org">Paramantis Solutions B.V. &middot; Harderwijk, the Netherlands &middot; KvK 42115132</p>
+        </div>
+        <div class="split-cta"><a class="hp-btn hp-btn-paper" href="/sign">Sign a document</a></div>
+      </article>
+      <article class="panel panel-paper">
+        <p class="panel-kicker">Business plans <span class="amt">from &euro;15</span> a month</p>
+        <h3>Organisations that need more, buy it.</h3>
+        <p>The paid plans are what keeps the free half free. The tiers are exactly the ones on the pricing page: <strong>Pro</strong> and <strong>Enterprise</strong> for ParaSend, <strong>Pro</strong>, <strong>Business</strong> and <strong>Enterprise</strong> for ParaSign.</p>
+        <ul class="split-adds">
+          <li><b>Volume.</b> 100 or 1,000 signatures a month instead of 2, and links that live 24 hours or 7 days instead of 1.</li>
+          <li><b>Control.</b> Send history and link management, webhooks on upload and download, up to 50 registered devices, and up to 500 retrievals an hour through the API instead of 50.</li>
+          <li><b>Accountability.</b> Named support with a reply within one business day, an exportable audit log with CT tree head, help answering your customers' security questionnaires.</li>
+          <li><b>Your own relay.</b> Enterprise adds a dedicated relay: ParaSend Enterprise carries the signed Data Processing Agreement and SLA 99.95%, ParaSign Enterprise the sector relay (health, legal, finance), SLA with service credits and a self-hosting licence.</li>
+        </ul>
+        <div class="split-cta"><a class="hp-btn hp-btn-fill" href="/pricing">See the business plans</a></div>
+      </article>
+    </div>
   </div>
 </section>
 
-<section class="home-sec" aria-labelledby="trust-h">
-  <div class="sec-intro">
-    <p class="sec-eyebrow"><span></span>why you can trust it</p>
-    <h2 id="trust-h">Rules you can check. Every one has a proof.</h2>
-    <p class="sec-lede">Everyone has a privacy policy. Our rules come with a verify link each: a log, a header, a repo. Not a promise. Four of the nine are below.</p>
-  </div>
-  <p class="pq-core"><strong>paramant-core</strong><span>ML-KEM-768 encryption &middot; ML-DSA-65 signatures &middot; FIPS 203/204</span></p>
-  <ol class="rules-grid">
-    <li><h3>We never had it</h3><p>Encrypted in your browser, held in RAM, burned on read.</p><a class="r-verify" href="/security">verify: architecture <span aria-hidden="true">&rarr;</span></a></li>
-    <li><h3>You own your keys</h3><p>Generated on your device, never sent. We see only the public half.</p><a class="r-verify" href="https://www.npmjs.com/package/paramant-sdk">verify: SDK source <span aria-hidden="true">&rarr;</span></a></li>
-    <li><h3>EU soil, EU law</h3><p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path. Email goes out via Resend, as <a href="/privacy">/privacy</a> sets out.</p><a class="r-verify" href="/security">verify: jurisdiction <span aria-hidden="true">&rarr;</span></a></li>
-    <li><h3>Verifiable, not trust-me</h3><p>Open-core, a public CT log, receipts anyone can check offline.</p><a class="r-verify" href="/ct-log">verify: CT log <span aria-hidden="true">&rarr;</span></a></li>
-  </ol>
-  <div class="sec-more">
-    <a class="sec-link" href="/rules">Read all nine rules <span aria-hidden="true">&rarr;</span></a>
+<section class="hp-sec" id="products" aria-labelledby="products-h">
+  <div class="hp-wrap">
+    <p class="hp-kicker">Two products</p>
+    <h2 id="products-h" class="hp-h2">One for signing. One for sending.</h2>
+    <p class="hp-lede">Both run on the same core, and both work in a plain browser. Nothing to install for you, nothing to install for the other side.</p>
+    <ul class="prod-grid">
+      <li>
+        <span class="prod-name">ParaSign</span>
+        <h3>Get a document signed.</h3>
+        <ul class="prod-lines">
+          <li>Upload the PDF, place the fields, and mail it to whoever has to sign.</li>
+          <li>They sign with the link from that email. Signing an invitation needs no account.</li>
+          <li>You keep a receipt anyone can check offline, plus an entry in the public log.</li>
+        </ul>
+        <div class="prod-cta"><a class="hp-btn hp-btn-fill" href="/parasign">What ParaSign is</a><a class="hp-btn hp-btn-line" href="/sign">Sign a document</a></div>
+      </li>
+      <li>
+        <span class="prod-name">ParaSend</span>
+        <h3>Send a file that disappears.</h3>
+        <ul class="prod-lines">
+          <li>The file is encrypted in your browser before it leaves your device.</li>
+          <li>The relay only ever holds the encrypted blob in RAM, never on a disk.</li>
+          <li>It is burned on the first read, so there is nothing left to leak later.</li>
+        </ul>
+        <div class="prod-cta"><a class="hp-btn hp-btn-fill" href="/parasend">What ParaSend is</a><a class="hp-btn hp-btn-line" href="/parashare">Send a file</a></div>
+      </li>
+    </ul>
   </div>
 </section>
 
-<p class="home-dev">Building on it instead of clicking? There is an SDK, a signing API and a self-host installer: <a href="/docs">read the developer docs &rarr;</a></p>
+<section class="hp-sec" aria-labelledby="how-h">
+  <div class="hp-wrap">
+    <p class="hp-kicker">How it works</p>
+    <h2 id="how-h" class="hp-h2">Three steps, and you are done.</h2>
+    <p class="hp-lede">No plugin, no client software, no onboarding call. The whole thing happens in the tab you already have open.</p>
+    <ol class="step-grid">
+      <li>
+        <span class="step-n">01</span>
+        <h3>Pick the file</h3>
+        <p>Drop a PDF in your browser. It is encrypted on your own device, before anything is uploaded.</p>
+      </li>
+      <li>
+        <span class="step-n">02</span>
+        <h3>Send the link</h3>
+        <p>The other side opens the link from the email and signs or reads it there. They do not have to sign up for anything.</p>
+      </li>
+      <li>
+        <span class="step-n">03</span>
+        <h3>Keep the proof</h3>
+        <p>You get a receipt that can be checked without us, and a line in a public log that shows when it happened.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="hp-sec" aria-labelledby="cost-h">
+  <div class="hp-wrap">
+    <p class="hp-kicker">What it costs</p>
+    <h2 id="cost-h" class="hp-h2">Free to start. Then a flat price a month.</h2>
+    <p class="hp-lede">Prices are a month excluding btw. You can stay on the Community plan as long as you like; there is no card and no time limit.</p>
+    <ul class="price-grid">
+      <li>
+        <h3>ParaSign</h3>
+        <p class="price-sub">Getting documents signed.</p>
+        <ul class="tiers">
+          <li><span class="tier-price">&euro;0</span><span class="tier-what"><b>Community</b> &middot; 2 signatures a month, no limit on receiving</span></li>
+          <li><span class="tier-price">&euro;49</span><span class="tier-what"><b>Pro</b> &middot; 100 signatures a month, then &euro;0.40 each up to 1,000</span></li>
+          <li><span class="tier-price">&euro;299</span><span class="tier-what"><b>Business</b> &middot; 1,000 signatures a month, named support, exportable audit log</span></li>
+          <li><span class="tier-price">Talk</span><span class="tier-what"><b>Enterprise</b> &middot; dedicated relay, SLA with service credits, self-hosting licence</span></li>
+        </ul>
+        <p class="price-foot">&euro;59.29 and &euro;361.79 a month incl. 21% btw &middot; yearly is cheaper</p>
+      </li>
+      <li>
+        <h3>ParaSend</h3>
+        <p class="price-sub">Sending files that burn on read.</p>
+        <ul class="tiers">
+          <li><span class="tier-price">&euro;0</span><span class="tier-what"><b>Community</b> &middot; 10 transfers a month, 5 MB per file, 1 hour link expiry, burn on first read</span></li>
+          <li><span class="tier-price">&euro;15</span><span class="tier-what"><b>Pro</b> &middot; 24 hour expiry, up to 10 reads per link, send history, webhooks</span></li>
+          <li><span class="tier-price">Custom</span><span class="tier-what"><b>Enterprise</b> &middot; dedicated relay, signed DPA, SLA 99.95%, per-tenant limits</span></li>
+        </ul>
+        <p class="price-foot">&euro;18.15 a month incl. 21% btw &middot; yearly is cheaper</p>
+      </li>
+    </ul>
+    <div class="sec-more">
+      <a class="sec-link" href="/pricing">See the full pricing page <span aria-hidden="true">&rarr;</span></a>
+    </div>
+  </div>
+</section>
+
+<section class="hp-sec" aria-labelledby="trust-h">
+  <div class="hp-wrap">
+    <p class="hp-kicker">Why you can trust it</p>
+    <h2 id="trust-h" class="hp-h2">Rules you can check. Every one has a proof.</h2>
+    <p class="hp-lede">Everyone has a privacy policy. Our rules come with a verify link each: a log, a header, a repo. Not a promise. Four of the nine are below.</p>
+    <p class="pq-core"><strong>paramant-core</strong><span>ML-KEM-768 encryption &middot; ML-DSA-65 signatures &middot; FIPS 203/204</span></p>
+    <ol class="rules-grid">
+      <li><h3>We never had it</h3><p>Encrypted in your browser, held in RAM, burned on read.</p><a class="r-verify" href="/security">verify: architecture <span aria-hidden="true">&rarr;</span></a></li>
+      <li><h3>You own your keys</h3><p>Generated on your device, never sent. We see only the public half.</p><a class="r-verify" href="https://www.npmjs.com/package/paramant-sdk">verify: SDK source <span aria-hidden="true">&rarr;</span></a></li>
+      <li><h3>EU soil, EU law</h3><p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path. Email goes out via Resend, as <a href="/privacy">/privacy</a> sets out.</p><a class="r-verify" href="/security">verify: jurisdiction <span aria-hidden="true">&rarr;</span></a></li>
+      <li><h3>Verifiable, not trust-me</h3><p>Open-core, a public CT log, receipts anyone can check offline.</p><a class="r-verify" href="/ct-log">verify: CT log <span aria-hidden="true">&rarr;</span></a></li>
+    </ol>
+    <div class="sec-more">
+      <a class="sec-link" href="/rules">Read all nine rules <span aria-hidden="true">&rarr;</span></a>
+    </div>
+    <p class="home-dev" style="margin-top:40px">Building on it instead of clicking? There is an SDK, a signing API and a self-host installer: <a href="/docs">read the developer docs &rarr;</a></p>
+  </div>
+</section>
 
 </main>
 <footer>
