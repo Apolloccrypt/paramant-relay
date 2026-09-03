@@ -127,6 +127,9 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-document-name { min-width: 0; }
 .dh-document-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.35 var(--sans); color: var(--ink-1); }
 .dh-document-name span { display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-3); }
+/* The reference is a whole value or an honestly shortened one. Cut without a
+   sign that it was cut, "env_waiting_..." read as the complete id. */
+.dh-document-name .dh-doc-ref { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .dh-document-progress { min-width: 0; }
 /* Never a bar without the number next to it. */
 .dh-document-progress span { display: block; margin-bottom: 7px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-2); }
@@ -145,6 +148,8 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-empty strong { display: block; margin-bottom: 8px; font: 600 16px/1.3 var(--sans); color: var(--ink-1); }
 .dh-empty span { display: block; max-width: 52ch; margin: 0 auto; font: 14px/1.6 var(--sans); color: var(--ink-2); }
 .dh-empty .dh-refresh { margin-top: 12px; }
+.dh-empty .dh-empty-cta { margin-top: 16px; min-height: var(--tap); border-color: var(--accent); color: var(--accent); }
+.dh-empty .dh-empty-cta:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 
 /* Loading skeleton: the shape of a register row, so the page does not jump. */
 .dh-skel-row { display: grid; grid-template-columns: minmax(0, 1fr) 132px 148px; gap: 22px; align-items: center; padding: 17px 26px; border-bottom: 1px solid var(--line); }
@@ -330,6 +335,13 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
   .dh-doc-kv dd { margin-bottom: 10px; }
   .dh-acct-head { padding: var(--space-3) var(--space-4); }
   .dh-acct-body { padding: 0 var(--space-4) var(--space-4); }
+  /* Tap targets on a phone: padding, never smaller or larger type. Measured at
+     390px the filter chips and Refresh were 36px, the four quiet links 36px,
+     and the two text links in a running line 19px. */
+  .dh-filter, .dh-refresh, .dh-btn, .dh-quiet-links a { min-height: var(--tap); }
+  /* The links inside the answers count too: measured at 390 they were 19px
+     ("See the plans", at the end of its line) and 41px. */
+  .dh-ask-list a, .dh-ask-foot a, footer .footer-links a { display: inline-flex; align-items: center; min-height: var(--tap); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -629,6 +641,6 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=6" defer></script>
-<script src="/js/dashboard.js?v=8" defer></script>
+<script src="/js/dashboard.js?v=9" defer></script>
 </body>
 </html>

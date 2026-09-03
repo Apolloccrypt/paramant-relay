@@ -106,6 +106,52 @@ await page.locator('[data-doc-filter="cancelled"]').click();
 ok('filenames are rendered as text', await page.locator('.dh-document img').count() === 0 && await page.evaluate(() => !window.dashboardInjected), await page.locator('#dh-documents').innerText());
 ok('phone viewport has no horizontal overflow', await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 1, await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
 ok('document status is fetched once on load', documentRequests === 1, documentRequests);
+
+// ── What the phone screen actually hands the customer ────────────────────────
+// A koper review of the signed-in journey measured this screen at 390px. Three
+// findings are pinned here, because all three were invisible to every existing
+// assertion: they are geometry and attributes, not text.
+// The All filter, because the case above cancelled the first request: Open
+// now holds one row and All still holds the four the relay stub returned.
+await page.locator('[data-doc-filter="all"]').click();
+await page.waitForFunction(() => document.querySelectorAll('.dh-document').length === 4);
+
+// 1. The reference. It used to be sliced to ten characters in dashboard.js, so
+// env_waiting_abcdefghijklmnop rendered as "env_waitin": a fragment with
+// nothing to say it was one, which is worthless when a customer reads it out
+// to support. The full value is in the DOM and in the title; when it does not
+// fit, CSS shortens it with an ellipsis rather than a silent cut.
+const reference = await page.locator('.dh-doc-ref').first().evaluate((node) => ({
+  text: node.textContent.trim(),
+  title: node.getAttribute('title'),
+  textOverflow: getComputedStyle(node).textOverflow,
+  clipped: node.scrollWidth > node.clientWidth + 1,
+}));
+ok('the document reference is never cut without an ellipsis',
+  reference.text.endsWith('Ref env_waiting_abcdefghijklmnop') &&
+  reference.title === 'env_waiting_abcdefghijklmnop' &&
+  reference.textOverflow === 'ellipsis', JSON.stringify(reference));
+
+// 2. Tap targets. Measured at 390px before this change: filter chips and
+// Refresh 36px, the four quiet links 36px, the two text links in a running
+// line 19px. The house minimum is 44, and it is reached with padding: the
+// type keeps its size.
+const taps = await page.evaluate(() => {
+  const h = (sel) => { const el = document.querySelector(sel); return el ? Math.round(el.getBoundingClientRect().height) : 0; };
+  return {
+    filter: h('.dh-filter'),
+    refresh: h('#dh-documents-refresh'),
+    quiet: h('.dh-quiet-links a'),
+    help: h('.dh-ask-foot a'),
+    footer: h('footer .footer-links a'),
+    // Every link inside an answer, not just the first: "See the plans" sat at
+    // the end of its line and measured 19px while its neighbours measured 41.
+    faq: Math.min(...[...document.querySelectorAll('.dh-ask-list a')].map((el) => Math.round(el.getBoundingClientRect().height))),
+  };
+});
+ok('every control on the phone screen is at least a 44px tap target',
+  Object.values(taps).every((height) => height >= 44), JSON.stringify(taps));
+
 await page.setViewportSize({ width:1280, height:900 });
 ok('desktop uses a three-action row without overflow', await page.evaluate(() => getComputedStyle(document.querySelector('.dh-start')).gridTemplateColumns.split(' ').length === 3 && document.documentElement.scrollWidth - document.documentElement.clientWidth <= 1), await page.evaluate(() => getComputedStyle(document.querySelector('.dh-start')).gridTemplateColumns));
 
@@ -154,6 +200,16 @@ async function planCase(state) {
 
 const freePlan = await planCase({ plan:'community' });
 ok('a Community account sees the give-back band', freePlan.badge === 'Community' && freePlan.band === true, JSON.stringify(freePlan));
+
+// 3. The empty state. This page's document list is stubbed empty, so it is the
+// screen a new customer meets. It used to be two sentences and no way out: the
+// one action that fills the list now sits in it as a real button.
+const emptyCta = await planPage.locator('.dh-empty a').first();
+const emptyCtaBox = await emptyCta.boundingBox();
+ok('the empty document list offers the action that fills it',
+  await planPage.locator('.dh-empty strong').innerText() === 'No open requests' &&
+  (await emptyCta.getAttribute('href')).startsWith('/sign') &&
+  emptyCtaBox.height >= 44, JSON.stringify({ href: await emptyCta.getAttribute('href'), height: emptyCtaBox && Math.round(emptyCtaBox.height) }));
 
 const paidPlan = await planCase({ plan:'community', plan_parasign:'pro', paid_until_parasign:future });
 ok('a paid ParaSign tier is never called free', paidPlan.badge === 'Pro' && paidPlan.band === false, JSON.stringify(paidPlan));
