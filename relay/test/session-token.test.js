@@ -1,0 +1,329 @@
+'use strict';
+// The decision layer of ParaSend session tokens: relay/lib/session-token.js.
+//
+// This suite is the one that needs nothing -- no relay, no redis, no native
+// binding -- so it runs in the unit job and gates the rules a reviewer would
+// otherwise have to read the route for. The HTTP behaviour of the same rules,
+// against a real relay and a real redis, is route-session-token.test.js.
+//
+// What is pinned here, and why each line earns its place:
+//   * the scope allowlist, from both ends: the five routes a transfer walks are
+//     open, and the routes the review named as the danger (/v2/keys,
+//     /v2/user/*, /v2/outbound, /v2/admin/*, minting another token) are shut.
+//     The closed half is asserted by name, because an allowlist that is only
+//     tested from the open side passes just as well when it is `() => true`;
+//   * the token shape, so a malformed Authorization header never reaches the
+//     store;
+//   * the Bearer parse, including the forms that are NOT a token;
+//   * mint/resolve/revoke against a fake store, including the TTL that is
+//     written and the expiry that is honoured even when the store forgot it;
+//   * a store that is absent or broken THROWS rather than returning null,
+//     which is what makes the route answer 503 instead of 401.
+//
+// Verified by sabotage:
+//   * make scopeAllows return true and the six closed-route cases go red;
+//   * drop the OPTIONS branch and the preflight case goes red;
+//   * loosen TOKEN_RE to /^pst_/ and the shape case goes red;
+//   * return null instead of throwing on a missing client and the fail-closed
+//     case goes red, which is the exact bug that would turn an outage into a
+//     silent 401 storm;
+//   * drop the `exp` check in resolve and the "store forgot the TTL" case goes
+//     red.
+// Run: node --test relay/test/session-token.test.js
+
+const { test, after } = require('node:test');
+const assert = require('assert');
+const st = require('../lib/session-token');
+const { summary } = require('./_requires');
+
+let checks = 0;
+const did = () => { checks++; };
+after(() => summary('session-token', checks));
+
+// A redis stand-in with the four commands this module uses. TTLs are recorded
+// rather than slept through, and `fail` turns the whole thing into the outage.
+function fakeRedis() {
+  const store = new Map();   // key -> string
+  const ttls = new Map();    // key -> seconds
+  const sets = new Map();    // key -> Set
+  const api = {
+    fail: null,
+    calls: [],
+    _guard(op) { api.calls.push(op); if (api.fail) throw api.fail; },
+    async get(k) { api._guard(['get', k]); return store.has(k) ? store.get(k) : null; },
+    async set(k, v, opts) { api._guard(['set', k]); store.set(k, v); if (opts && opts.EX) ttls.set(k, opts.EX); },
+    async sAdd(k, v) { api._guard(['sAdd', k]); if (!sets.has(k)) sets.set(k, new Set()); sets.get(k).add(v); },
+    async sMembers(k) { api._guard(['sMembers', k]); return [...(sets.get(k) || [])]; },
+    async expire(k, s) { api._guard(['expire', k]); ttls.set(k, s); },
+    async del(k) {
+      api._guard(['del', k]);
+      const keys = Array.isArray(k) ? k : [k];
+      let n = 0;
+      for (const one of keys) { if (store.delete(one)) n++; sets.delete(one); ttls.delete(one); }
+      return n;
+    },
+    store, ttls, sets,
+  };
+  return api;
+}
+
+// ── 1. The scope allowlist, from the open side ───────────────────────────────
+
+test('the five routes a ParaSend transfer walks are the routes the token opens', () => {
+  const walk = [
+    // Sector discovery races four hosts and reads valid/plan.
+    ['GET', '/v2/check-key'],
+    // The one-time ticket for the signalling socket.
+    ['POST', '/v2/ws-ticket'],
+    // The sender publishes its half of the handshake and polls the receiver's.
+    ['POST', '/v2/pubkey'],
+    ['GET', '/v2/pubkey/inv_0123456789abcdef0123456789abcdef'],
+    // And the upload.
+    ['POST', '/v2/inbound'],
+  ];
+  for (const [method, path] of walk) {
+    assert.strictEqual(st.scopeAllows(method, path), true,
+      `${method} ${path} is on the path a sender walks; a token that cannot do it is not a usable credential`);
+  }
+  did();
+});
+
+test('a preflight is never refused by scope: it carries no credential to judge', () => {
+  assert.strictEqual(st.scopeAllows('OPTIONS', '/v2/keys'), true);
+  assert.strictEqual(st.scopeAllows('options', '/v2/user/signing-key'), true);
+  did();
+});
+
+// ── 2. The closed side, which is the whole point ─────────────────────────────
+
+test('THE POINT: everything the security review named is shut, by name', () => {
+  const shut = [
+    // The credential surface. A token minted to send a file must never be able
+    // to list, mint or reveal a key.
+    ['GET', '/v2/keys'],
+    ['POST', '/v2/keys'],
+    // The account's own session surface. Enrolling a signing key with a token
+    // stolen from a page would be the whole ParaSign trust model, gone.
+    ['POST', '/v2/user/signing-key'],
+    ['GET', '/v2/user/signing-key'],
+    ['DELETE', '/v2/user/signing-key'],
+    ['POST', '/v2/user/setup-totp'],
+    ['POST', '/v2/user/envelopes'],
+    ['GET', '/v2/user/history'],
+    // Downloading is the receiver's half and needs no account credential.
+    ['GET', '/v2/outbound/' + 'a'.repeat(64)],
+    // The account's history.
+    ['GET', '/v2/audit'],
+    // Admin, under any credential but ADMIN_TOKEN.
+    ['GET', '/v2/admin/keys'],
+    ['POST', '/v2/admin/keys/revoke'],
+    // A token may not roll its own fifteen minutes forward.
+    ['POST', '/v2/session-token'],
+    // ParaSign, which is a different product on the same account.
+    ['POST', '/v2/envelopes'],
+    ['POST', '/v1/envelopes'],
+  ];
+  for (const [method, path] of shut) {
+    assert.strictEqual(st.scopeAllows(method, path), false,
+      `${method} ${path} is reachable with a session token; the allowlist is the only thing that makes this credential narrower than an API key`);
+  }
+  did();
+});
+
+test('the method is part of the rule, not decoration', () => {
+  // POST /v2/pubkey publishes; GET /v2/pubkey is the RELAY's identity key and
+  // is not on the sender's path. The one that is on the path is the per-device
+  // read below it.
+  assert.strictEqual(st.scopeAllows('GET', '/v2/pubkey'), false,
+    'GET /v2/pubkey is the relay identity route, not a step in a transfer');
+  assert.strictEqual(st.scopeAllows('DELETE', '/v2/inbound'), false);
+  assert.strictEqual(st.scopeAllows('GET', '/v2/inbound'), false);
+  assert.strictEqual(st.scopeAllows('GET', '/v2/ws-ticket'), false);
+  did();
+});
+
+test('the per-device pubkey read is exactly one path segment deep', () => {
+  assert.strictEqual(st.scopeAllows('GET', '/v2/pubkey/inv_abc'), true);
+  // Not a prefix match: a deeper path is a different route and gets no ride.
+  assert.strictEqual(st.scopeAllows('GET', '/v2/pubkey/inv_abc/secret'), false);
+  assert.strictEqual(st.scopeAllows('GET', '/v2/pubkey/'), false, 'an empty device id is not a route');
+  // POST under the same prefix is /v2/pubkey/verify, and it is not in scope.
+  assert.strictEqual(st.scopeAllows('POST', '/v2/pubkey/verify'), false);
+  did();
+});
+
+// ── 3. The token shape ───────────────────────────────────────────────────────
+
+test('only a pst_ token of the exact minted shape is ever looked up', () => {
+  assert.strictEqual(st.isSessionToken('pst_' + 'a'.repeat(64)), true);
+  const no = [
+    '', null, undefined, 42, {},
+    'pgp_a_real_api_key_would_be_a_disaster_here',
+    'pst_',
+    'pst_' + 'a'.repeat(63),          // one short
+    'pst_' + 'a'.repeat(65),          // one long
+    'pst_' + 'A'.repeat(64),          // uppercase is not what randomBytes.hex makes
+    'pst_' + 'g'.repeat(64),          // not hex
+    ' pst_' + 'a'.repeat(64),         // leading space
+    'pst_' + 'a'.repeat(64) + '\n',
+  ];
+  for (const v of no) {
+    assert.strictEqual(st.isSessionToken(v), false, `${JSON.stringify(v)} must not be treated as a token`);
+  }
+  did();
+});
+
+test('the Bearer parse takes the token and nothing else', () => {
+  const tok = 'pst_' + 'b'.repeat(64);
+  assert.strictEqual(st.bearerToken(`Bearer ${tok}`), tok);
+  assert.strictEqual(st.bearerToken(`bearer ${tok}`), tok, 'the scheme is case-insensitive per RFC 7235');
+  assert.strictEqual(st.bearerToken(`  Bearer ${tok}  `), tok, 'surrounding whitespace is not part of the credential');
+  assert.strictEqual(st.bearerToken(`Bearer\t${tok}`), tok);
+  for (const bad of ['', null, undefined, 42, tok, `Basic ${tok}`, `Bearer ${tok} extra`, 'Bearer']) {
+    assert.strictEqual(st.bearerToken(bad), '', `${JSON.stringify(bad)} is not a Bearer credential`);
+  }
+  did();
+});
+
+// ── 4. Mint ──────────────────────────────────────────────────────────────────
+
+test('mint writes one record under the token, with the TTL it promises', async () => {
+  const r = fakeRedis();
+  const out = await st.mint(r, 'pgp_owner_demo', 1_000_000);
+
+  assert.ok(st.isSessionToken(out.token), 'a minted token must satisfy the shape the resolver demands');
+  assert.strictEqual(out.expires_in_s, st.TTL_S);
+  assert.strictEqual(st.TTL_S, 900, 'fifteen minutes is the number SECURITY.md and /privacy both state');
+  assert.strictEqual(out.expires_ms, 1_000_000 + 900_000);
+
+  const rk = st.tokenKey(out.token);
+  assert.deepStrictEqual(JSON.parse(r.store.get(rk)), { key: 'pgp_owner_demo', exp: 1_900_000 });
+  assert.strictEqual(r.ttls.get(rk), 900, 'redis must be the thing that expires the token, not a sweeper');
+  did();
+});
+
+test('two mints are two different tokens, and the owner key is never a redis key name', async () => {
+  const r = fakeRedis();
+  const a = await st.mint(r, 'pgp_owner_demo');
+  const b = await st.mint(r, 'pgp_owner_demo');
+  assert.notStrictEqual(a.token, b.token, 'a token that repeats is a token an attacker can wait for');
+
+  // Key NAMES show up in SCAN output, slowlog entries and keyspace listings. An
+  // api-key in a key name is an api-key in every one of those.
+  for (const name of r.store.keys()) assert.ok(!name.includes('pgp_owner_demo'), `redis key name leaks the api-key: ${name}`);
+  for (const name of r.sets.keys()) assert.ok(!name.includes('pgp_owner_demo'), `redis set name leaks the api-key: ${name}`);
+  assert.match(st.ownerKey('pgp_owner_demo'), /^paramant:pst:owner:[0-9a-f]{64}$/);
+  did();
+});
+
+test('the sweep index holds both tokens and outlives neither by much', async () => {
+  const r = fakeRedis();
+  const a = await st.mint(r, 'pgp_owner_demo');
+  const b = await st.mint(r, 'pgp_owner_demo');
+  const idx = st.ownerKey('pgp_owner_demo');
+  assert.deepStrictEqual([...r.sets.get(idx)].sort(), [a.token, b.token].sort());
+  assert.strictEqual(r.ttls.get(idx), st.TTL_S + 60,
+    'the index must expire on its own; a set that lives forever is a slow leak with an api-key hash in the name');
+  did();
+});
+
+// ── 5. Resolve ───────────────────────────────────────────────────────────────
+
+test('a minted token resolves to the api-key it was minted for', async () => {
+  const r = fakeRedis();
+  const { token, expires_ms } = await st.mint(r, 'pgp_owner_demo', 5_000);
+  assert.deepStrictEqual(await st.resolve(r, token, 6_000), { key: 'pgp_owner_demo', expires_ms });
+  did();
+});
+
+test('every refusal looks the same: null, with no way to tell them apart', async () => {
+  const r = fakeRedis();
+  const { token } = await st.mint(r, 'pgp_owner_demo', 5_000);
+
+  // Never minted.
+  assert.strictEqual(await st.resolve(r, 'pst_' + 'c'.repeat(64)), null);
+  // Not even a token.
+  assert.strictEqual(await st.resolve(r, 'pgp_a_real_key'), null);
+  assert.strictEqual(await st.resolve(r, ''), null);
+  // Revoked out from under it.
+  await r.del(st.tokenKey(token));
+  assert.strictEqual(await st.resolve(r, token), null);
+  did();
+});
+
+test('an expired record is refused even when the store still holds it', async () => {
+  // Redis is what expires a token. This is the second lock: a record restored
+  // from a backup, or served by a replica that lagged through the expiry, still
+  // carries the wall-clock expiry it was minted with, and that is checked.
+  const r = fakeRedis();
+  const { token, expires_ms } = await st.mint(r, 'pgp_owner_demo', 5_000);
+  assert.ok(await st.resolve(r, token, expires_ms), 'a token AT its expiry ms is still live');
+  assert.strictEqual(await st.resolve(r, token, expires_ms + 1), null, 'one millisecond past it, it is not');
+  did();
+});
+
+test('a record that is not the shape this module writes is refused, not trusted', async () => {
+  const r = fakeRedis();
+  const tok = 'pst_' + 'd'.repeat(64);
+  for (const junk of ['not json', 'null', '[]', '{}', '{"key":""}', '{"key":123}']) {
+    await r.set(st.tokenKey(tok), junk);
+    assert.strictEqual(await st.resolve(r, tok), null, `a record of ${junk} must not yield a principal`);
+  }
+  did();
+});
+
+// ── 6. Fail closed ───────────────────────────────────────────────────────────
+
+test('FAIL CLOSED: no store is a throw, never a quiet null', async () => {
+  // The distinction is the whole difference between a 503 and a 401. A null
+  // here would tell a sender holding a perfectly good token that it is bad, and
+  // send them back to sign in, during an outage where signing in cannot work.
+  await assert.rejects(() => st.resolve(null, 'pst_' + 'e'.repeat(64)), /no redis client/);
+  await assert.rejects(() => st.mint(null, 'pgp_owner_demo'), /no redis client/);
+  did();
+});
+
+test('a broken store propagates, so the route can answer 503 instead of 401', async () => {
+  const r = fakeRedis();
+  const { token } = await st.mint(r, 'pgp_owner_demo');
+  r.fail = new Error('redis command timed out after 1000ms');
+  await assert.rejects(() => st.resolve(r, token), /timed out/);
+  await assert.rejects(() => st.mint(r, 'pgp_owner_demo'), /timed out/);
+  did();
+});
+
+test('mint refuses to hand out a token with no owner on it', async () => {
+  const r = fakeRedis();
+  for (const bad of ['', null, undefined, 42]) {
+    await assert.rejects(() => st.mint(r, bad), /no owner key/);
+  }
+  did();
+});
+
+// ── 7. Revoke ────────────────────────────────────────────────────────────────
+
+test('revoking a key takes every one of its live tokens with it', async () => {
+  const r = fakeRedis();
+  const a = await st.mint(r, 'pgp_owner_demo');
+  const b = await st.mint(r, 'pgp_owner_demo');
+  const other = await st.mint(r, 'pgp_owner_other');
+
+  const n = await st.revokeForKey(r, 'pgp_owner_demo');
+  assert.strictEqual(n, 2, 'both tokens are reported swept');
+  assert.strictEqual(await st.resolve(r, a.token), null);
+  assert.strictEqual(await st.resolve(r, b.token), null);
+  assert.ok(await st.resolve(r, other.token), 'another account is untouched: revocation is per key, not per store');
+  assert.strictEqual(r.sets.has(st.ownerKey('pgp_owner_demo')), false, 'the index goes too, or it grows forever');
+  did();
+});
+
+test('revoking a key with no tokens is a no-op, not an error', async () => {
+  const r = fakeRedis();
+  assert.strictEqual(await st.revokeForKey(r, 'pgp_owner_never_used'), 0);
+  // And a caller with no store at all (a relay without REDIS_URL) gets 0 rather
+  // than a throw: the revocation itself has already happened in users.json, and
+  // a relay with no store has no tokens to sweep.
+  assert.strictEqual(await st.revokeForKey(null, 'pgp_owner_demo'), 0);
+  assert.strictEqual(await st.revokeForKey(fakeRedis(), ''), 0);
+  did();
+});

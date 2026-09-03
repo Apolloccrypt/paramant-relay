@@ -19,6 +19,7 @@ Three credential types are in use across different API surfaces:
 | API key (`pgp_` prefix) | `X-Api-Key: pgp_your_key` | Data plane — uploads, downloads, CT log (developer clients) |
 | Operator key (`plk_` prefix) | `X-Api-Key: plk_your_key` | Data plane — unlimited throughput (operator license) |
 | DID signature | `X-DID: did:paramant:…` + `X-DID-Signature: <sig over request URL>` | Data plane — **active fallback** when no `X-Api-Key` is sent (see Device Identity) |
+| ParaSend session token (`pst_` prefix) | `Authorization: Bearer pst_…` | Data plane: the five ParaSend transfer routes only, 15 minutes, minted for a browser session (see below) |
 | Session cookie | `Cookie: paramant_user_session=<token>` | `/api/user/*` endpoints — set automatically after TOTP login |
 | Admin token | `X-Admin-Token: <token>` | `/admin/api/admin/*` endpoints — admin panel only |
 
@@ -34,6 +35,33 @@ Three credential types are in use across different API surfaces:
 > owner's account, not merely an attribution label: treat device private keys
 > with the same care as API keys, and revoke the DID enrollment when a device
 > is retired or compromised.
+
+> **ParaSend session tokens.** A `pst_` token is a narrow, short-lived stand-in
+> for an account API key, so a browser never has to hold the key itself. It is
+> minted by the admin panel on behalf of a logged-in user
+> (`POST /api/user/parasend/token`, session cookie), which asks the relay for it
+> over the internal channel; the browser is only ever handed the token, never
+> the key. Properties, all enforced by the relay:
+>
+> - **Scope.** An allowlist, checked above every route handler. A token opens
+>   `/v2/check-key`, `POST /v2/ws-ticket`, `POST /v2/pubkey`,
+>   `GET /v2/pubkey/:device` and `POST /v2/inbound`, and nothing else. Any other
+>   path answers `403 session_token_out_of_scope`, including `/v2/user/*`,
+>   `/v2/outbound/:hash`, `/v2/audit`, `/v2/admin/*`, the ParaSign envelope
+>   routes, and a second `POST /v2/session-token`: a token cannot mint another.
+> - **Identity.** Inside that scope the token authenticates **as the API key it
+>   was minted for**. Monthly quotas (`transfers_month`), the audit chain,
+>   device queues and per-tier limits all resolve against the owner's account,
+>   byte-identical to a request that carried the owner's `X-Api-Key`.
+> - **Lifetime.** 15 minutes, held in the relay's shared Redis so all five
+>   sectors honour the same token. It is not configurable.
+> - **Revocation.** Revoking the API key deletes every live token for it, and a
+>   token whose owner key is revoked or deleted grants no principal even if that
+>   sweep did not run.
+> - **Precedence.** A request that carries `X-Api-Key` is that key's request; the
+>   `Authorization` header is only read when no API key was sent.
+> - **Outage.** With the store unreachable a token is answered `503
+>   redis_unavailable` with `Retry-After`, never `401`.
 
 CT log and STH endpoints are **public** — no credential required.
 
@@ -438,6 +466,31 @@ curl https://relay.paramant.app/v2/pubkey/phone-001 \
 # {"device_id":"phone-001","ecdh_pub":"…","kyber_pub":"…","registered_at":"…"}
 ```
 
+### POST /v2/session-token: mint a ParaSend session token (internal)
+
+Not reachable from a browser or from the public internet. It requires the
+internal channel header **and** the account's API key, and the admin panel is
+the only caller: it sends the key of the session that asked, so a browser can
+never name an account other than the one it is signed in as. See the
+Authentication section above for what the resulting token can and cannot do.
+
+```bash
+curl -X POST https://health.paramant.app/v2/session-token \
+  -H "X-Internal-Auth: $INTERNAL_AUTH_TOKEN" \
+  -H "X-Api-Key: pgp_your_key"
+# {"ok":true,"token":"pst_…","expires_ms":1767225600000,"expires_in_s":900}
+```
+
+| Status | Meaning |
+|--------|---------|
+| 200 | Token minted. The response never contains the API key. |
+| 401 | Missing or wrong `X-Internal-Auth`, or no live account key. The two are not distinguishable. |
+| 403 | The caller presented a session token; a token cannot mint another one. |
+| 503 | The relay store is unreachable, so no checkable token can be issued. |
+
+The browser-facing half of this is `POST /api/user/parasend/token` on the admin
+panel (session cookie, no body, returns only `token` and `expires_in_s`).
+
 ---
 
 ## Device Identity
@@ -593,7 +646,7 @@ Notes:
 |------|---------|
 | 400 | Bad request — missing or invalid fields |
 | 401 | Invalid API key or signature |
-| 403 | Forbidden — wrong API key for this blob |
+| 403 | Forbidden: wrong API key for this blob, or `session_token_out_of_scope` |
 | 404 | No blob / no STH at that timestamp |
 | 429 | Rate limit exceeded |
 | 503 | ML-DSA-65 not available on this relay |
