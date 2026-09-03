@@ -128,6 +128,17 @@ HOSTS="paramant.app health.paramant.app legal.paramant.app finance.paramant.app 
 #   build-image.yml     path-gated on relay/** for the same reason. It is a
 #                       toolchain-drift gate for pull requests, not a
 #                       main-is-deployable gate.
+#   security-posture.yml  runs on pull requests, schedule and workflow_dispatch,
+#                       never on a push to main, and its live job is gated on
+#                       vars.SECURITY_POSTURE_ENABLED. Its last completed run on
+#                       main is the nightly external scan, which is red on
+#                       purpose: today that is a missing CAA record, an unsigned
+#                       zone, a duplicated HSTS header from a layer above the
+#                       repo, and one Rust advisory carrying no severity in any
+#                       database, which a human has to rule on. Every one of
+#                       those is a statement about the DNS zone or the server,
+#                       not about whether main deploys. Same reasoning as
+#                       heartbeat.yml, one row up.
 REQUIRED_WORKFLOWS="${PARAMANT_REQUIRED_WORKFLOWS:-test.yml csp-inline-check.yml sign-e2e.yml product-heartbeat.yml}"
 
 # A required workflow still in_progress or queued on the sha we would deploy is
@@ -603,6 +614,7 @@ phase_0() {
   step "0a. CI on main, one verdict per required workflow"
   printf '  required: %s\n' "$REQUIRED_WORKFLOWS"
   printf '  excluded: heartbeat.yml (schedule only, red by design while its canary secrets are absent),\n'
+  printf '            security-posture.yml (no push trigger, red by design while the posture gate is shut),\n'
   printf '            docker-publish.yml and build-image.yml (path-gated on relay/**, so they need not have run)\n'
 
   local main_sha wf ci_bad=0 ci_n=0

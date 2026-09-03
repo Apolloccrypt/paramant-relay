@@ -174,6 +174,16 @@ finds out.
      own design while the two canary secrets are missing: it has no skip, a
      missing secret fails and names the secret. Gating the deploy on it would
      mean no deploy until the alarm has its secrets.
+   * `security-posture.yml` runs on pull requests, on a schedule and on
+     `workflow_dispatch`, never on a push to `main`, and its live job is gated
+     on `vars.SECURITY_POSTURE_ENABLED`. Its last completed run on `main` is the
+     nightly external scan, and that scan is red on purpose: a missing CAA
+     record, an unsigned zone, a duplicated HSTS header set by a layer above
+     this repository, and one Rust advisory that carries no severity in any
+     database and needs a human ruling. All of those describe the DNS zone or
+     the server, not whether `main` is deployable. Its own gate, the selftest
+     that drives all 109 measurements green once and red once, does run on every
+     pull request, which is how every change reaches `main`.
    * `docker-publish.yml` and `build-image.yml` are path-gated on `relay/**`, so
      a commit that touches only the frontend produces no run at all and a hard
      "must be success" would block every such deploy. Neither is what this
