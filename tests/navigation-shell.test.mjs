@@ -110,13 +110,47 @@ const scrolledMenuGeometry = await publicPage.evaluate(() => {
 ok('mobile menu stays attached when opened after scrolling', scrolledMenuGeometry.navTop === 0 && Math.abs(scrolledMenuGeometry.menuTop - scrolledMenuGeometry.navBottom) < 0.5 && scrolledMenuGeometry.bodyPosition === 'fixed' && scrolledMenuGeometry.bodyTop === '-450px', JSON.stringify(scrolledMenuGeometry));
 await publicPage.evaluate(() => document.querySelector('#nav-hamburger').click());
 ok('closing the mobile menu restores the page position', await publicPage.evaluate(() => window.scrollY === 450 && getComputedStyle(document.body).position !== 'fixed'), await publicPage.evaluate(() => JSON.stringify({ scrollY:window.scrollY, bodyPosition:getComputedStyle(document.body).position })));
-const phoneHelp = await publicPage.evaluate(() => {
-  const link = document.querySelector('nav.nav a[href="/help"]');
-  if (!link) return { found:false };
-  const box = link.getBoundingClientRect();
-  return { found:true, display:getComputedStyle(link).display, width:box.width, height:box.height };
+// Two reviews of the phone, a week apart, named the same thing: the bar was
+// full. Logo, Help, Sign in, Create account and the hamburger, five elements
+// on 390px, with the button and the hamburger both starting at x=330 and no
+// air between them. So the bar is measured now, and not by eye: what is in it,
+// how far apart, and how big a thumb's worth of it there is.
+const phoneBar = await publicPage.evaluate(() => {
+  const nav = document.querySelector('nav.nav');
+  const items = Array.from(nav.querySelectorAll('a, button'))
+    .filter((node) => {
+      const box = node.getBoundingClientRect();
+      return getComputedStyle(node).display !== 'none' && box.width > 0 && box.height > 0;
+    })
+    .map((node) => {
+      const box = node.getBoundingClientRect();
+      return { label:node.textContent.trim().slice(0, 24) || node.getAttribute('aria-label'), left:Math.round(box.left), right:Math.round(box.right), width:Math.round(box.width), height:Math.round(box.height) };
+    })
+    .sort((first, second) => first.left - second.left);
+  return { items, gaps:items.slice(1).map((item, index) => Math.round(item.left - items[index].right)) };
 });
-ok('support is reachable on a phone', phoneHelp.found && phoneHelp.display !== 'none' && phoneHelp.width > 0 && phoneHelp.height > 0, JSON.stringify(phoneHelp));
+ok('the phone bar carries one action beside the menu button', phoneBar.items.length <= 3, JSON.stringify(phoneBar.items));
+ok('nothing in the phone bar touches its neighbour', phoneBar.gaps.length > 0 && phoneBar.gaps.every((gap) => gap >= 12), JSON.stringify(phoneBar));
+ok('every target in the phone bar is finger-sized', phoneBar.items.every((item) => item.height >= 44), JSON.stringify(phoneBar.items));
+
+// Support on a phone. This used to demand a visible /help link in the closed
+// bar, which is why Help was the fifth element up there, shrunk to 9px type to
+// make it fit. The requirement is that a visitor looking for support finds a
+// working route, not that the route lives on one particular surface: it is now
+// the first thing under the four destinations when the menu is open, at 48px
+// tall instead of 9px wide. The static contract below still demands the link
+// in the stamped markup of every page, so it can never quietly disappear.
+await publicPage.locator('#nav-hamburger').click();
+await publicPage.waitForFunction(() => document.querySelector('#nav-mobile')?.classList.contains('open'));
+const phoneHelp = await publicPage.evaluate(() => {
+  const links = Array.from(document.querySelectorAll('nav.nav a[href="/help"], .nav-mobile-tail a[href="/help"]'));
+  return links.map((link) => {
+    const box = link.getBoundingClientRect();
+    return { display:getComputedStyle(link).display, width:Math.round(box.width), height:Math.round(box.height) };
+  });
+});
+ok('support is reachable on a phone', phoneHelp.some((link) => link.display !== 'none' && link.width > 0 && link.height >= 44), JSON.stringify(phoneHelp));
+await publicPage.locator('#nav-hamburger').click();
 await publicPage.close();
 
 const tabletPage = await browser.newPage({ viewport:{ width:820, height:1180 } });
@@ -132,8 +166,9 @@ ok('support is reachable on a tablet', tabletHelp.display !== 'none' && tabletHe
 await tabletPage.close();
 
 // Static contract, no browser needed. The mobile drawer mirrors the four nav
-// links and carries no Help entry, so every stamped page must keep the /help
-// link in the bar itself. Pages without a footer must still name the three
+// links and carries no Help entry of its own; the link lives in the bar and,
+// on a phone, in the strip under the drawer. Either way it must be in the
+// stamped markup of every page. Pages without a footer must still name the three
 // legal documents; apply-nav.py stamps a legal strip there.
 // Application shells keep their own narrower nav and reach Help through the
 // signed-in user menu; apply-nav.py names them and this test reads that list

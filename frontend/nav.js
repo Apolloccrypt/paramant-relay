@@ -5,6 +5,10 @@
   var hamburger = document.getElementById('nav-hamburger');
   var mobile    = document.getElementById('nav-mobile');
   var closeBtn  = document.querySelector('.nav-mobile-close');
+  // Sign in and Help leave the phone bar and hang under the drawer as their
+  // own strip. It is a sibling of #nav-mobile, not a child: js/nav-auth.js
+  // rewrites the whole inside of the drawer after the session check.
+  var tail      = document.getElementById('nav-mobile-tail');
 
   // ── Helpers ───────────────────────────────────────────
   var lockedScrollY = 0;
@@ -146,6 +150,7 @@
       mobile.style.top = navBottom + 'px';
     }
     mobile.classList.add('open');
+    if (tail) tail.classList.add('open');
     hamburger.setAttribute('aria-expanded', 'true');
     hamburger.setAttribute('aria-label', 'Close menu');
     lockScroll();
@@ -154,6 +159,7 @@
 
   function closeMobileMenu() {
     mobile.classList.remove('open');
+    if (tail) tail.classList.remove('open');
     hamburger.setAttribute('aria-expanded', 'false');
     hamburger.setAttribute('aria-label', 'Open menu');
     unlockScroll();
@@ -170,12 +176,18 @@
   mobile.querySelectorAll('a').forEach(function (a) {
     a.addEventListener('click', closeMobileMenu);
   });
+  if (tail) {
+    tail.querySelectorAll('a').forEach(function (a) {
+      a.addEventListener('click', closeMobileMenu);
+    });
+  }
 
   document.addEventListener('click', function (e) {
     if (
       mobile.classList.contains('open') &&
       !hamburger.contains(e.target) &&
-      !mobile.contains(e.target)
+      !mobile.contains(e.target) &&
+      !(tail && tail.contains(e.target))
     ) {
       closeMobileMenu();
     }
