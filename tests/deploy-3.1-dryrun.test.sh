@@ -42,6 +42,22 @@ check_lacks() { # file, pattern, name
   fi
 }
 
+# extract_remote <label>: the body of one remote block, verbatim from the
+# script. A block that touches an nginx conf is sent with remote_nginx, which
+# prepends NGINX_RESOLVE_SNIPPET on the wire, so the snippet is prepended here
+# too. What these tests run is then exactly what the server runs.
+extract_snippet() {
+  sed -n "/^NGINX_RESOLVE_SNIPPET=/,/^RESOLVER\$/p" "$SCRIPT" | sed '1d;$d'
+}
+extract_remote() {
+  local label="$1" line kind
+  line="$(grep -nE "^  remote(_nginx)? \"$label\"" "$SCRIPT" | head -1)"
+  [ -n "$line" ] || return 1
+  kind="$(printf '%s' "$line" | sed -E 's/^[0-9]+:[[:space:]]*([a-z_]+).*/\1/')"
+  [ "$kind" = remote_nginx ] && extract_snippet
+  sed -n "/^  remote\(_nginx\)\? \"$label\"/,/^EOF\$/p" "$SCRIPT" | sed '1d;$d'
+}
+
 echo "======== deploy-3.1.sh dry run ========"
 
 # ---------------------------------------------------------------- 1. syntax --
@@ -378,8 +394,8 @@ exit 0
 STUB
 chmod +x "$NG/bin/nginx" "$NG/bin/systemctl"
 
-# The 5c body, verbatim from the script.
-sed -n '/^  remote "nginx edits"/,/^EOF$/p' "$SCRIPT" | sed '1d;$d' > "$NG/5c.sh"
+# The 5c body, verbatim from the script, resolver and all.
+extract_remote "nginx edits" > "$NG/5c.sh"
 if [ -s "$NG/5c.sh" ]; then
   pass "the 5c remote block could be extracted from the script"
 else
@@ -602,7 +618,7 @@ echo "6h. A deploy AFTER a rollback still prunes the pages the rollback restored
 # the OLDER of the deployed commit and the runbook floor for this reason.
 RB5B="$WORK/rb5b"
 mkdir -p "$RB5B/repo" "$RB5B/docroot"
-sed -n '/^  remote "prune deleted frontend files"/,/^EOF$/p' "$SCRIPT" | sed '1d;$d' > "$RB5B/5b.sh"
+extract_remote "prune deleted frontend files" > "$RB5B/5b.sh"
 if [ -s "$RB5B/5b.sh" ]; then
   pass "the 5b remote block could be extracted from the script"
 else
@@ -674,6 +690,311 @@ fi
 check_has "$SCRIPT" 'merge-base --is-ancestor "\$FLOOR" "\$BASE"' \
   "the older-of-the-two choice is git's answer, not a guess"
 check_has "$FULL"   'before prune base'   "the dry run shows which base 5b will diff against"
+
+echo ""
+echo "6i. The conf names differ per server, so a slot is a list of candidates"
+# Production on 03-09 carries /etc/nginx/sites-enabled/paramant-public.conf and
+# no paramant-live.conf at all: deploy/signup-fix-deploy.sh edits paramant.conf
+# on that same host. Phase 2b stopped on the name it could not find, which was
+# correct but unrunnable. A slot is now a "|" separated candidate list, the
+# server takes the first candidate that is really in sites-enabled, and it logs
+# which one that was.
+SLOTS_DEFAULT="$(sed -n 's/^NGINX_CONF_SLOTS="\${PARAMANT_NGINX_CONFS:-\(.*\)}"$/\1/p' "$SCRIPT")"
+if [ "$SLOTS_DEFAULT" = "paramant-public.conf paramant-live.conf|paramant.conf" ]; then
+  pass "the default names paramant.conf as the second candidate of slot 2"
+else
+  fail "the default slots are '$SLOTS_DEFAULT', expected paramant-live.conf|paramant.conf as slot 2"
+fi
+check_has "$SCRIPT" 'PARAMANT_NGINX_CONFS' "PARAMANT_NGINX_CONFS still overrides the whole list"
+check_has "$FULL"   'nginx confs   paramant-public.conf paramant-live.conf\|paramant.conf' \
+  "the run header prints the candidates it will resolve on the server"
+
+echo ""
+echo "6i-1. resolve_conf_slots picks the first candidate that is there"
+NG2="$WORK/ng2"
+mkdir -p "$NG2/bin" "$NG2/available" "$NG2/bk" "$NG2/unit-both" "$NG2/unit-fallback" "$NG2/unit-none"
+cp "$NG/bin/nginx" "$NG/bin/systemctl" "$NG2/bin/"
+: > "$NG2/available/u-public"; : > "$NG2/available/u-live"; : > "$NG2/available/u-paramant"
+ln -sfn "$NG2/available/u-public"   "$NG2/unit-both/paramant-public.conf"
+ln -sfn "$NG2/available/u-live"     "$NG2/unit-both/paramant-live.conf"
+ln -sfn "$NG2/available/u-paramant" "$NG2/unit-both/paramant.conf"
+ln -sfn "$NG2/available/u-public"   "$NG2/unit-fallback/paramant-public.conf"
+ln -sfn "$NG2/available/u-paramant" "$NG2/unit-fallback/paramant.conf"
+ln -sfn "$NG2/available/u-public"   "$NG2/unit-none/paramant-public.conf"
+# A symlink into nothing is not a conf. -e follows the link on purpose.
+ln -sfn "$NG2/available/does-not-exist" "$NG2/unit-none/paramant-live.conf"
+
+if eval "$(extract_snippet)" 2>/dev/null && declare -F resolve_conf_slots >/dev/null; then
+  pass "resolve_conf_slots() could be extracted from the script"
+
+  SL="paramant-public.conf paramant-live.conf|paramant.conf"
+
+  # Run it in THIS shell, not in a command substitution: the answer is in
+  # RESOLVED_CONFS and RESOLVED_MISSING, and a subshell would keep them.
+  resolve_conf_slots "$NG2/unit-both" "$SL" > "$NG2/unit-out.txt"
+  OUTU="$(cat "$NG2/unit-out.txt")"
+  if [ "$RESOLVED_CONFS" = "paramant-public.conf paramant-live.conf" ] && [ "$RESOLVED_MISSING" = 0 ]; then
+    pass "with both names present, slot 2 resolves to paramant-live.conf"
+  else
+    fail "with both present it resolved to '$RESOLVED_CONFS' (missing $RESOLVED_MISSING)"
+  fi
+  if printf '%s\n' "$OUTU" | grep -q 'nginxconf paramant-live.conf resolved to paramant-live.conf'; then
+    pass "the choice is logged under the slot name"
+  else
+    fail "no 'resolved to' line for slot 2"
+    printf '%s\n' "$OUTU" | sed 's/^/        /'
+  fi
+
+  resolve_conf_slots "$NG2/unit-fallback" "$SL" > "$NG2/unit-out.txt"
+  OUTU="$(cat "$NG2/unit-out.txt")"
+  if [ "$RESOLVED_CONFS" = "paramant-public.conf paramant.conf" ] && [ "$RESOLVED_MISSING" = 0 ]; then
+    pass "with paramant-live.conf absent, slot 2 resolves to paramant.conf (production, 03-09)"
+  else
+    fail "the fallback resolved to '$RESOLVED_CONFS' (missing $RESOLVED_MISSING)"
+  fi
+  if printf '%s\n' "$OUTU" | grep -q 'nginxconf paramant-live.conf resolved to paramant.conf'; then
+    pass "the log says which name it landed on, not which name it was looking for"
+  else
+    fail "the resolved name is not in the log"
+    printf '%s\n' "$OUTU" | sed 's/^/        /'
+  fi
+
+  resolve_conf_slots "$NG2/unit-none" "$SL" > "$NG2/unit-out.txt"
+  OUTU="$(cat "$NG2/unit-out.txt")"
+  if [ "$RESOLVED_MISSING" = 1 ] && [ "$RESOLVED_CONFS" = "paramant-public.conf" ]; then
+    pass "no candidate of a slot present: the slot resolves to nothing, and says so"
+  else
+    fail "a slot with no candidate resolved to '$RESOLVED_CONFS' (missing $RESOLVED_MISSING)"
+  fi
+  # This is the exact pattern phase 2b asserts on, so the STOP still fires.
+  if printf '%s\n' "$OUTU" | grep -qE 'nginxconf [a-z.-]+ ABSENT'; then
+    pass "the ABSENT line matches the pattern phase 2b stops on"
+  else
+    fail "the ABSENT line does not match /nginxconf [a-z.-]+ ABSENT/"
+    printf '%s\n' "$OUTU" | sed 's/^/        /'
+  fi
+  if printf '%s\n' "$OUTU" | grep -q 'paramant-live.conf paramant.conf'; then
+    pass "it names every candidate it tried"
+  else
+    fail "the ABSENT line does not name the candidates it tried"
+  fi
+else
+  fail "could not extract resolve_conf_slots() from the script to test it"
+fi
+
+echo ""
+echo "6i-2. 5c on a replica that has paramant.conf instead of paramant-live.conf"
+mkdir -p "$NG2/sites-fb"
+make_conf "$NG2/available/paramant-public.conf" old old yes no
+make_conf "$NG2/available/paramant.conf"        old old yes no
+ln -sfn "$NG2/available/paramant-public.conf" "$NG2/sites-fb/paramant-public.conf"
+ln -sfn "$NG2/available/paramant.conf"        "$NG2/sites-fb/paramant.conf"
+OUT7="$(cd "$NG2" && PATH="$NG2/bin:$PATH" bash "$NG/5c.sh" 20260101-0100 "$NG2/sites-fb" "$NG2/bk" \
+        "paramant-public.conf paramant-live.conf|paramant.conf" 2>&1)"; RC7=$?
+if [ "$RC7" -eq 0 ]; then pass "5c exits 0 on a server that calls the backend conf paramant.conf"; else
+  fail "5c exits $RC7 on the production naming"
+  printf '%s\n' "$OUT7" | sed 's/^/        /' | head -25
+fi
+if printf '%s\n' "$OUT7" | grep -q 'nginxconf paramant-live.conf resolved to paramant.conf'; then
+  pass "5c logs the resolved name"
+else
+  fail "5c never logged which name it resolved slot 2 to"
+fi
+if printf '%s\n' "$OUT7" | grep -q 'target paramant.conf ->'; then
+  pass "5c edits the resolved file, not the candidate string"
+else
+  fail "5c did not name paramant.conf as a target"
+fi
+for want in "after sign gated:0" "after compliance:0" "after dicom try_files:0" "after edited files:2"; do
+  f="${want%%:*}"; v="${want##*:}"
+  if [ "$(field_5c "$OUT7" "$f")" = "$v" ]; then pass "on the production naming, $f = $v"; else
+    fail "on the production naming, $f = '$(field_5c "$OUT7" "$f")', expected $v"; fi
+done
+if [ "$(field_5c "$OUT7" 'after outbound blocks with buffer')" \
+   = "$(field_5c "$OUT7" 'after outbound locations')" ]; then
+  pass "the buffers landed in every /v2/outbound block of both resolved confs"
+else
+  fail "the buffer landed in $(field_5c "$OUT7" 'after outbound blocks with buffer') of $(field_5c "$OUT7" 'after outbound locations') blocks"
+fi
+if grep -q 'return 404' "$NG2/available/paramant.conf" \
+   && ! grep -q 'auth_request' "$NG2/available/paramant.conf" \
+   && ! grep -q 'location = /compliance' "$NG2/available/paramant.conf"; then
+  pass "the three edits really landed in the file called paramant.conf"
+else
+  fail "paramant.conf on disk did not get the edits"
+fi
+
+echo ""
+echo "6i-3. With both names present the first candidate wins and the other is left alone"
+mkdir -p "$NG2/sites-both"
+make_conf "$NG2/available/paramant-public.conf" old old yes no
+make_conf "$NG2/available/paramant-live.conf"   old old yes no
+make_conf "$NG2/available/paramant.conf"        old old yes no
+BEFORE_MD5="$(md5sum < "$NG2/available/paramant.conf")"
+ln -sfn "$NG2/available/paramant-public.conf" "$NG2/sites-both/paramant-public.conf"
+ln -sfn "$NG2/available/paramant-live.conf"   "$NG2/sites-both/paramant-live.conf"
+ln -sfn "$NG2/available/paramant.conf"        "$NG2/sites-both/paramant.conf"
+OUT8="$(cd "$NG2" && PATH="$NG2/bin:$PATH" bash "$NG/5c.sh" 20260101-0101 "$NG2/sites-both" "$NG2/bk" \
+        "paramant-public.conf paramant-live.conf|paramant.conf" 2>&1)"; RC8=$?
+if [ "$RC8" -eq 0 ] && printf '%s\n' "$OUT8" | grep -q 'nginxconf paramant-live.conf resolved to paramant-live.conf'; then
+  pass "with both present, slot 2 resolves to paramant-live.conf"
+else
+  fail "5c exited $RC8 and did not resolve slot 2 to paramant-live.conf"
+  printf '%s\n' "$OUT8" | sed 's/^/        /' | head -25
+fi
+if [ "$(field_5c "$OUT8" 'after edited files')" = "2" ]; then
+  pass "exactly two confs were rewritten, not three"
+else
+  fail "5c rewrote $(field_5c "$OUT8" 'after edited files') conf(s), expected 2"
+fi
+if [ "$(md5sum < "$NG2/available/paramant.conf")" = "$BEFORE_MD5" ]; then
+  pass "the losing candidate paramant.conf was not touched"
+else
+  fail "5c also rewrote paramant.conf, which is not in any resolved slot"
+fi
+
+echo ""
+echo "6i-4. A slot with no candidate at all is a stop, with the same hint"
+mkdir -p "$NG2/sites-none"
+make_conf "$NG2/available/paramant-public.conf" old old yes no
+ln -sfn "$NG2/available/paramant-public.conf" "$NG2/sites-none/paramant-public.conf"
+OUT9="$(cd "$NG2" && PATH="$NG2/bin:$PATH" bash "$NG/5c.sh" 20260101-0102 "$NG2/sites-none" "$NG2/bk" \
+        "paramant-public.conf paramant-live.conf|paramant.conf" 2>&1)"; RC9=$?
+if [ "$RC9" -ne 0 ] && printf '%s\n' "$OUT9" | grep -q 'FATAL 1 nginx conf slot'; then
+  pass "5c stops when a slot has no candidate on the server"
+else
+  fail "5c exited $RC9 with a slot that resolved to nothing"
+  printf '%s\n' "$OUT9" | sed 's/^/        /' | head -20
+fi
+check_has "$SCRIPT" 'set PARAMANT_NGINX_CONFS if they are named differently' \
+  "the STOP in 2b still hands over the same hint"
+
+echo ""
+echo "6i-5. A missing ParaID deny is still FATAL, and it names the resolved conf"
+mkdir -p "$NG2/sites-noparaid"
+make_conf "$NG2/available/paramant-public.conf" old old yes no
+make_conf "$NG2/available/paramant.conf"        old old yes no
+sed -i '/paraid\/issue-document/d' "$NG2/available/paramant-public.conf"
+sed -i '/paraid\/issue-document/d' "$NG2/available/paramant.conf"
+ln -sfn "$NG2/available/paramant-public.conf" "$NG2/sites-noparaid/paramant-public.conf"
+ln -sfn "$NG2/available/paramant.conf"        "$NG2/sites-noparaid/paramant.conf"
+OUT10="$(cd "$NG2" && PATH="$NG2/bin:$PATH" bash "$NG/5c.sh" 20260101-0103 "$NG2/sites-noparaid" "$NG2/bk" \
+         "paramant-public.conf paramant-live.conf|paramant.conf" 2>&1)"; RC10=$?
+if [ "$RC10" -ne 0 ] && printf '%s\n' "$OUT10" | grep -q 'FATAL the ParaID deny is not present'; then
+  pass "5c still stops when the ParaID deny anchor is gone"
+else
+  fail "5c exited $RC10 on a conf without the ParaID deny"
+  printf '%s\n' "$OUT10" | sed 's/^/        /' | head -20
+fi
+if printf '%s\n' "$OUT10" | grep -q 'FATAL the ParaID deny is not present in the resolved conf(s) paramant-public.conf paramant.conf'; then
+  pass "the FATAL names the confs it actually read, resolved names and all"
+else
+  fail "the ParaID FATAL does not name the resolved confs"
+  printf '%s\n' "$OUT10" | grep FATAL | sed 's/^/        /'
+fi
+
+echo ""
+echo "6i-6. The rollback resolves the same way, so it looks for the backup that exists"
+RBN="$WORK/rbnginx"
+RBTS=20260101-0200
+mkdir -p "$RBN/bin" "$RBN/compose" "$RBN/bk" "$RBN/ngbk" "$RBN/sites" "$RBN/available" "$RBN/root/app"
+cp "$NG/bin/nginx" "$NG/bin/systemctl" "$RBN/bin/"
+for svc in relay-main relay-health relay-finance relay-legal relay-iot admin; do
+  echo "$svc|img/$svc:3.1.0|paramant-rollback/$svc:$RBTS" >> "$RBN/bk/rollback-images-$RBTS.txt"
+done
+echo "PARAMANT=1" > "$RBN/bk/.env-pre-3.1-$RBTS"
+echo pre-rollback-index > "$RBN/root/app/index.html"
+tar czf "$RBN/bk/docroot-pre-3.1-$RBTS.tgz" -C "$RBN/root" app
+# The server calls the backend conf paramant.conf, so phase 2b filed the backup
+# under that name. A rollback that looked for paramant-live.conf would stop.
+echo "server { server_name public; }"  > "$RBN/available/paramant-public.conf"
+echo "server { server_name backend; }" > "$RBN/available/paramant.conf"
+echo "server { server_name public-backup; }"  > "$RBN/ngbk/paramant-public.conf.pre-3.1-$RBTS"
+echo "server { server_name backend-backup; }" > "$RBN/ngbk/paramant.conf.pre-3.1-$RBTS"
+ln -sfn "$RBN/available/paramant-public.conf" "$RBN/sites/paramant-public.conf"
+ln -sfn "$RBN/available/paramant.conf"        "$RBN/sites/paramant.conf"
+
+extract_remote "rollback preconditions" > "$RBN/8a.sh"
+extract_remote "rollback nginx and docroot" > "$RBN/8c.sh"
+if [ -s "$RBN/8a.sh" ] && [ -s "$RBN/8c.sh" ]; then
+  pass "the 8a and 8c remote blocks could be extracted from the script"
+else
+  fail "could not extract the rollback blocks from the script"
+fi
+
+OUT11="$(PATH="$RBN/bin:$PATH" bash "$RBN/8a.sh" "$RBN/compose" "$RBTS" "$RBN/bk" "$RBN/ngbk" \
+         "$RBN/sites" "paramant-public.conf paramant-live.conf|paramant.conf" 2>&1)"; RC11=$?
+if [ "$RC11" -eq 0 ]; then pass "8a exits 0 against the production naming"; else
+  fail "8a exits $RC11"
+  printf '%s\n' "$OUT11" | sed 's/^/        /' | head -20
+fi
+if printf '%s\n' "$OUT11" | grep -q 'nginxconf paramant-live.conf resolved to paramant.conf'; then
+  pass "8a resolves slot 2 to paramant.conf before it looks for a backup"
+else
+  fail "8a did not resolve the slot"
+fi
+if [ "$(field_5c "$OUT11" 'missing backups')" = "0" ]; then
+  pass "8a finds every backup it needs under the resolved names"
+else
+  fail "8a reports $(field_5c "$OUT11" 'missing backups') missing backup(s)"
+  printf '%s\n' "$OUT11" | grep -i backup | sed 's/^/        /'
+fi
+if printf '%s\n' "$OUT11" | grep -q 'paramant-live.conf.pre-3.1'; then
+  fail "8a is still looking for a backup named after the candidate string"
+else
+  pass "8a never looks for paramant-live.conf.pre-3.1, the name that is not there"
+fi
+
+# And with that backup gone, 8a must refuse instead of half-rolling back.
+mv "$RBN/ngbk/paramant.conf.pre-3.1-$RBTS" "$RBN/ngbk/paramant.conf.pre-3.1-$RBTS.moved"
+OUT12="$(PATH="$RBN/bin:$PATH" bash "$RBN/8a.sh" "$RBN/compose" "$RBTS" "$RBN/bk" "$RBN/ngbk" \
+         "$RBN/sites" "paramant-public.conf paramant-live.conf|paramant.conf" 2>&1)"
+if [ "$(field_5c "$OUT12" 'missing backups')" = "1" ]; then
+  pass "a missing backup under the resolved name is counted, so the rollback stops"
+else
+  fail "with the paramant.conf backup gone, 8a still reports $(field_5c "$OUT12" 'missing backups') missing"
+fi
+mv "$RBN/ngbk/paramant.conf.pre-3.1-$RBTS.moved" "$RBN/ngbk/paramant.conf.pre-3.1-$RBTS"
+
+echo bogus-added-by-deploy > "$RBN/root/app/added.html"
+OUT13="$(PATH="$RBN/bin:$PATH" bash "$RBN/8c.sh" "$RBTS" "$RBN/bk" "$RBN/root/app" "$RBN/ngbk" \
+         "$RBN/sites" "paramant-public.conf paramant-live.conf|paramant.conf" "dist" 2>&1)"; RC13=$?
+if [ "$RC13" -eq 0 ]; then pass "8c exits 0 against the production naming"; else
+  fail "8c exits $RC13"
+  printf '%s\n' "$OUT13" | sed 's/^/        /' | head -20
+fi
+if [ "$(field_5c "$OUT13" 'restored nginx confs')" = "2" ]; then
+  pass "8c restored both resolved confs"
+else
+  fail "8c restored $(field_5c "$OUT13" 'restored nginx confs') conf(s), expected 2"
+fi
+if grep -q 'backend-backup' "$RBN/available/paramant.conf"; then
+  pass "the backup really landed in the file the slot resolved to"
+else
+  fail "paramant.conf on disk is not the restored backup"
+fi
+if printf '%s\n' "$OUT13" | grep -q 'before nginx paramant.conf bytes'; then
+  pass "8c reports the restore under the resolved name"
+else
+  fail "8c never named paramant.conf in its evidence"
+fi
+
+# A slot with no candidate must stop 8c too, before it writes anything.
+OUT14="$(PATH="$RBN/bin:$PATH" bash "$RBN/8c.sh" "$RBTS" "$RBN/bk" "$RBN/root/app" "$RBN/ngbk" \
+         "$RBN/sites" "paramant-public.conf paramant-live.conf|not-there.conf" "dist" 2>&1)"; RC14=$?
+if [ "$RC14" -ne 0 ] && printf '%s\n' "$OUT14" | grep -q 'FATAL 1 nginx conf slot'; then
+  pass "8c stops when a slot resolves to nothing"
+else
+  fail "8c exited $RC14 with an unresolvable slot"
+fi
+
+# No remote block may still loop over the raw candidate string.
+if grep -nE '^for name in \$(CONFS|SLOTS)' "$SCRIPT" >/dev/null; then
+  fail "a remote block still loops over the candidate string instead of the resolved names"
+  grep -nE '^for name in \$(CONFS|SLOTS)' "$SCRIPT" | sed 's/^/        /'
+else
+  pass "every remote block loops over \$RESOLVED_CONFS, never over the candidate string"
+fi
 
 echo ""
 echo "6d. The CI gate on main is one verdict per required workflow"
