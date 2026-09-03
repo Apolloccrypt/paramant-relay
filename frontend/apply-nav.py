@@ -30,8 +30,10 @@ NEW_NAV = '''\
 # the desktop bar, and js/nav-auth.js rewrites its whole inside after the
 # session check. The two secondary routes a phone loses from the bar -- Sign in
 # and Help -- therefore hang under it as their own strip, which nav.js opens
-# and closes with the drawer and nav-auth.js removes once you are signed in
-# (the user menu carries both from then on).
+# and closes with the drawer. Signed in, nav-auth.js rewrites that strip down
+# to Help alone: Sign in is not an action you still need, and Help is, on the
+# one surface a phone has left for it. It used to REMOVE the strip there, which
+# is how a signed-in phone ended up with no route to support at all.
 NEW_MOBILE = '''\
 <div class="nav-mobile" id="nav-mobile">
   <a href="/#products" class="nav-mobile-standalone">Product</a>
@@ -90,7 +92,7 @@ LEGAL_STRIP = '''\
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=25">'
 NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=20">'
 NAV_JS    = '<script src="/nav.js?v=15" defer></script>'
-NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=6" defer></script>'
+NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=7" defer></script>'
 
 # Pages that don't have <nav class="nav"> yet but should — inject the canonical
 # nav after <body> (or after a skip-link if present). App shells (admin,

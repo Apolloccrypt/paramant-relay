@@ -730,4 +730,77 @@ ok('the compliance bullet on /parasend carries its own limit');
   ok('every page that repeats a monthly limit uses one spelling ("a month")');
 })();
 
+// ── The price question on the signed-in surfaces ─────────────────────────────
+//
+// A customer who signs in lands on /dashboard, and the FAQ there answered "what
+// does it cost?" with "Paid plans start at &euro;15 a month, which is ParaSend
+// Pro". True, and beside the point on the page whose whole job is signing:
+// /help answers the same question with "ParaSign Pro at &euro;49 a month". One
+// customer, two of our own pages, two numbers, and the cheaper one on the
+// surface he reads first.
+//
+// So the dashboard answer names BOTH products with BOTH prices, and this pins
+// it the way the cards above are pinned. The chain is the same one: the amount
+// in the sentence is the excl-btw price of the monthly variant in
+// relay/lib/billing-catalog.js, which is where checkout reads what to charge.
+// billing-catalog holds prices; relay/lib/tiers.js holds LIMITS, and it is
+// pinned here too, for the plan name the same sentence uses. Neither can move
+// without this going red.
+(function dashboardPriceAnswer() {
+  const dashHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'dashboard.html'), 'utf8');
+  const visible = dashHtml.replace(/<!--[\s\S]*?-->/g, ' ');
+  const answerMatch = /<dt>What does it cost\?<\/dt>\s*<dd>([\s\S]*?)<\/dd>/.exec(visible);
+  assert(answerMatch, 'dashboard.html must still answer "What does it cost?"');
+  const answer = answerMatch[1];
+
+  // Both products, by the names /pricing sells them under.
+  for (const productName of ['ParaSend Pro', 'ParaSign Pro']) {
+    assert(answer.includes(productName),
+      'the dashboard price answer must name ' + productName + '; naming one product prices half the account');
+    assert(html.includes(productName.split(' ')[0]),
+      '/pricing no longer sells ' + productName + ', so the dashboard answer points at nothing');
+  }
+
+  // The amounts are the catalog's, read back out of it rather than typed here.
+  const exclOf = (product) => {
+    const order = catalog.resolveOrder({ product, plan: 'pro', interval: 'monthly' });
+    assert(!order.error, 'billing-catalog has no monthly Pro price for ' + product + ': ' + order.error);
+    return Math.round((parseFloat(order.amount) / 1.21) * 100) / 100;
+  };
+  const sendExcl = exclOf('parasend');
+  const signExcl = exclOf('parasign');
+  assert(sendExcl !== signExcl,
+    'sending and signing are priced apart; if the catalog ever agrees, this answer is no longer a split');
+  assert(new RegExp('&euro;' + sendExcl + ' a month excl\\. btw, which is ParaSend Pro').test(answer),
+    'the dashboard must price SENDING at the ParaSend Pro catalog amount (&euro;' + sendExcl + '), got: ' + answer.trim());
+  assert(new RegExp('&euro;' + signExcl + ' a month excl\\. btw, which is ParaSign Pro').test(answer),
+    'the dashboard must price SIGNING at the ParaSign Pro catalog amount (&euro;' + signExcl + '), got: ' + answer.trim());
+
+  // ui-truthfulness in one line: no amount here that a reader cannot find on
+  // the page he is sent to. The boundary matters -- a bare &euro;15 is
+  // satisfied by &euro;150 sitting elsewhere on /pricing.
+  const amounts = [...new Set([...answer.matchAll(/&euro;([\d.,]+)/g)].map((m) => m[1]))];
+  assert(amounts.length >= 2, 'expected the dashboard answer to quote both prices, found ' + amounts.length);
+  for (const amount of amounts) {
+    assert(new RegExp('&euro;' + amount.replace(/[.]/g, '\\.') + '(?![\\d.,])').test(html),
+      'the dashboard names &euro;' + amount + ', which is not on /pricing');
+  }
+
+  // The free plan keeps the one name the whole site uses, and tiers.js is what
+  // says that name is the canonical row 'free' folds onto.
+  assert(tiers.normalisePlan('free') === 'community',
+    'relay/lib/tiers.js no longer folds free onto community; the dashboard answer names Community');
+  assert(/\bCommunity is free forever\b/.test(answer),
+    'the dashboard answer must still name the free plan Community');
+
+  // And /help answers the same question with the same two amounts, so the two
+  // pages a customer reads in the same minute cannot disagree again.
+  const helpHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'help', 'index.html'), 'utf8');
+  for (const excl of [signExcl]) {
+    assert(new RegExp('&euro;' + excl + '(?![\\d.,])').test(helpHtml),
+      '/help must still name the ParaSign Pro price (&euro;' + excl + ') the dashboard now agrees with');
+  }
+  ok('the dashboard price answer names both products and both catalog amounts');
+})();
+
 console.log('pricing-page: ' + passed + ' checks passed');

@@ -6,6 +6,13 @@
 // interface without touching callers. Self-hosted deps only (CSP 'self').
 import { ml_dsa65, sha3_256 } from '/vendor/paramant-pqc.js';
 import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultAddPrfWrap, vaultCreatePrfOnly, vaultAvailable, vaultList } from '/vendor/vault.js?v=5';
+// js/error-message.js is loadable from node, from a classic script and from
+// here, which costs it its named exports: it is a UMD factory that hangs its
+// namespace off the global. Side-effect import, then read it, the same way
+// js/parasign-pdf-ops.js is reached. It owns the one sentence a customer sees
+// when we have no better answer than "not your fault, here is who to mail".
+import '/js/error-message.js?v=1';
+const paramantErrors = self.paramantErrors;
 
 // Byte-identical to relay/envelope.js SIGN_DOMAIN_DOC (recipe v3). Keep in sync
 // across relay + SDK + core.
@@ -395,7 +402,12 @@ export async function enrolEphemeralSigningKeyWithTotp({ label, totp, onStatus }
     if (errCode === 'no_totp_setup') { const err = new Error('Set up an authenticator app on your account first, then sign with its code.'); err.code = 'totp_unavailable'; throw err; }
     if (errCode === 'invalid_totp' || e.status === 403 || e.status === 401) { const err = new Error('That authenticator code didn’t match. Try the current 6-digit code.'); err.code = 'totp_invalid'; throw err; }
     if (e && (e.status === 400 || e.status === 409) && /totp/i.test(errCode)) { const err = new Error('That authenticator code didn’t match. Try the current 6-digit code.'); err.code = 'totp_invalid'; throw err; }
-    throw e;
+    // Anything else. This used to be a bare `throw e`, which put the wire's own
+    // words in front of the customer: _postJSON below builds its message out of
+    // the relay's error field or 'http_' + status, and a dropped connection
+    // arrives as a TypeError whose message is whatever the browser calls it.
+    // "http_502" is not an instruction. The console keeps the detail.
+    throw paramantErrors.reportFailure('signing-key enrolment', e);
   }
 
   const signer = new ActivatedSigner(kp.secretKey, pk_b64);   // holds the in-memory secret; caller disposes
