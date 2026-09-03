@@ -71,11 +71,11 @@ async function open(width, height, slug = 'pricing') {
 // is a span, and the amount in the promise sits inside a <strong>.
 //
 // A pattern may ask for the enclosing BLOCK instead of the element holding the
-// matched text. The founder claim is the case that needs it: "Mick Beer" is a
-// <strong> that ends at y=726, but the claim a reader has to be able to read is
-// the whole line, title and KvK number included, and that ends 40px lower. An
-// earlier version measured the <strong> and would have called the line visible
-// with its registration clipped off the bottom of the screen.
+// matched text. The company claim is the case that needs it: the name of the
+// company is a <strong>, but the claim a reader has to be able to read is the
+// whole line, where it is built and the KvK number included, and that ends
+// lower. An earlier version measured the <strong> and would have called the
+// line visible with its registration clipped off the bottom of the screen.
 const measure = (page, needles) => page.evaluate((patterns) => {
   const out = {};
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -98,7 +98,7 @@ const measure = (page, needles) => page.evaluate((patterns) => {
     out[name] = {
       top: Math.round(rect.top + window.scrollY),
       bottom: Math.round(rect.bottom + window.scrollY),
-      // A block claim is reported whole enough to assert on: the founder line
+      // A block claim is reported whole enough to assert on: the company line
       // runs past 100 characters before it reaches the registration number.
       text: (block ? el.textContent : hit.text).replace(/\s+/g, ' ').trim().slice(0, block ? 240 : 100),
     };
@@ -110,7 +110,7 @@ const measure = (page, needles) => page.evaluate((patterns) => {
   return out;
 }, needles);
 
-test('the first screen at 390px carries the amount, the audience, the founder and an action', async () => {
+test('the first screen at 390px carries the amount, the audience, the company and an action', async () => {
   const page = await open(FOLD.width, FOLD.height);
   const seen = await measure(page, [
     ['h1', '^Pricing$'],
@@ -122,8 +122,10 @@ test('the first screen at 390px carries the amount, the audience, the founder an
     ['sending', '€15 a month'],
     ['signing', '€49 a month'],
     ['audience', 'one-person practice, a volunteer board or a household'],
-    // Whole line: the name, the title /about gives him, and the registration.
-    ['founder', 'Mick Beer', true],
+    // Mick, 4 September: the name and the title left every page but /about and
+    // the letter on the homepage. What the first screen still has to carry is
+    // who is accountable: the company, where it sits, and its registration.
+    ['company', 'Paramantis Solutions B.V.', true],
   ]);
   const cta = await page.evaluate(() => {
     // The hero's own action, not the nav's: the nav carries a /signup link on
@@ -143,12 +145,12 @@ test('the first screen at 390px carries the amount, the audience, the founder an
       `the ${name} line ends at y=${hit.bottom}, past the ${FOLD.height}px first screen: a buyer has to scroll for it`);
   }
   // Order is the argument: what it does, then what it costs, then who it is
-  // for, then who is behind it, and only then the button.
+  // for, and only then the button. The company line closes the block.
   assert.ok(seen.what.top < seen.amount.top, 'what the product does stands above what it costs');
   assert.ok(seen.amount.top <= seen.audience.top, 'the amount stands above the audience line');
   assert.ok(seen.audience.top < cta.top, 'the audience line stands above the first action');
-  assert.match(seen.founder.text, /privacy and security researcher.*KvK 42115132/,
-    'the measured founder line must be the whole claim, not just the name in bold');
+  assert.match(seen.company.text, /Harderwijk.*KvK 42115132/,
+    'the measured company line must be the whole claim: where it is built and the registration');
 });
 
 test('the first screen at 390px spends no words on jargon', async () => {
