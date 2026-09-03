@@ -1342,6 +1342,21 @@ test('every third party the server code calls is named on /privacy and /dpa', ()
     if (!re.test(subs)) problems.push(`privacy: the code calls ${v}, and the sub-processor list does not name it`);
     if (!re.test(table)) problems.push(`dpa: the code calls ${v}, and the sub-processor table does not name it`);
   }
+  // A US sub-processor is on the signed table, under Standard Contractual
+  // Clauses. /press said "No US entity in the chain" in the same breath as the
+  // Hetzner location, which is the opposite of what the controller signs.
+  // Verified by sabotage in both directions: putting the sentence back turns
+  // this red, and so does removing the US row from /dpa.
+  const usRow = /<tr><td>([^<]+)<\/td><td>US[^<]*<\/td>/.exec(page('dpa'));
+  if (usRow) {
+    const denials = [];
+    for (const slug of publicPages()) {
+      const m = /No US entity in the chain/.exec(visible(page(slug)));
+      if (m) denials.push(`${slug}: says "${m[0]}", and the /dpa sub-processor table names ${usRow[1]} in the US`);
+    }
+    assert.deepEqual(denials, [], `\n  ${denials.join('\n  ')}\n`);
+  }
+  assert.ok(usRow, 'the /dpa table no longer names a US sub-processor; check /press and /privacy before deleting this assertion');
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });
 
