@@ -245,6 +245,48 @@ else
   printf "   WARN  %s not found or not executable, test-scope guard skipped\n" "$SCOPE"
 fi
 
+# ── 12. Test suites do not write into tracked docs/ by default ───────────────
+# tests/app-shots.mjs renders 36 PNGs. It used to write them straight into
+# docs/brand/assets/app-2026/, which is tracked, so every local run of the
+# browser suites left 36 modified files behind and the next `git commit -a`
+# carried them. Refreshing those references is a deliberate act:
+# PARAMANT_WRITE_BRAND_SHOTS=1. This is the pre-commit half of that rule, so a
+# suite that hardcodes the path is caught before the commit rather than in CI.
+# The full guard, including a real dry run of the suite, is
+# tests/brand-shots-optin.test.mjs.
+echo ""
+echo "12. Brand screenshots stay opt-in..."
+SHOTS_FLAG='PARAMANT_WRITE_BRAND_SHOTS'
+SHOTS_RESOLVER="$ROOT/scripts/brand-shots-dir.mjs"
+if [ ! -f "$SHOTS_RESOLVER" ]; then
+  printf "   FAIL  scripts/brand-shots-dir.mjs is gone; nothing decides where the shots land\n"
+  FAIL=$((FAIL + 1))
+elif ! grep -qE "^export const FLAG = '$SHOTS_FLAG';" "$SHOTS_RESOLVER" || ! grep -q 'env\[FLAG\]' "$SHOTS_RESOLVER"; then
+  # The assignment and the read, not a mention: the file documents the variable
+  # in its header, so a plain grep for the name stays green over a resolver that
+  # has stopped reading it.
+  printf "   FAIL  scripts/brand-shots-dir.mjs no longer reads %s, so the opt-in is gone\n" "$SHOTS_FLAG"
+  FAIL=$((FAIL + 1))
+else
+  SHOTS_BAD=""
+  while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    case "$f" in *brand-shots-dir.mjs|*brand-shots-optin.test.mjs) continue ;; esac
+    grep -qE "docs/brand/assets|'docs', 'brand', 'assets'" "$f" || continue
+    grep -qE "$SHOTS_FLAG|brand-shots-dir\.mjs" "$f" && continue
+    SHOTS_BAD="$SHOTS_BAD $f"
+  done <<< "$(find "$ROOT/tests" "$ROOT/scripts" -type f \( -name '*.mjs' -o -name '*.js' -o -name '*.sh' \) -not -path '*/node_modules/*')"
+  if [ -n "$SHOTS_BAD" ]; then
+    for f in $SHOTS_BAD; do
+      printf "   FAIL  %s names the tracked screenshot directory without the opt-in\n" "${f#"$ROOT/"}"
+    done
+    printf "         Write to a temp dir by default and let %s=1 opt in.\n" "$SHOTS_FLAG"
+    FAIL=$((FAIL + 1))
+  else
+    printf "   OK  no suite writes the tracked reference images without %s=1\n" "$SHOTS_FLAG"
+  fi
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
 echo "════════ RESULT ════════"
