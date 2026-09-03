@@ -284,7 +284,12 @@
       var empty = documentFilter === 'open'
         ? ['No open requests', 'Start a signing request when you need someone to sign a document.']
         : ['Nothing here yet', 'Documents in this state will appear here automatically.'];
-      list.innerHTML = '<div class="dh-empty"><strong>' + empty[0] + '</strong><span>' + empty[1] + '</span></div>';
+      // An empty state that only describes the way out is a dead end. The one
+      // action that fills this list is a signing request, so it gets a button
+      // to the page that starts one. Send is deliberately not offered here:
+      // this list counts signing requests, not deliveries.
+      list.innerHTML = '<div class="dh-empty"><strong>' + empty[0] + '</strong><span>' + empty[1] + '</span>' +
+        '<a class="dh-btn dh-empty-cta" href="/sign?mode=invite">Start a signing request</a></div>';
       return;
     }
     list.innerHTML = visible.map(function (doc) {
@@ -293,10 +298,16 @@
       var signed = Math.max(0, Math.min(total, Number(doc.signed_count || 0)));
       var pct = total ? Math.round((signed / total) * 100) : 0;
       var name = doc.original_filename || 'Signing request';
-      var reference = String(doc.id || '').slice(0, 10);
+      // The reference used to be cut to ten characters in code, which sliced
+      // env_waiting_... into "env_waitin": a fragment that looks like a whole
+      // value and is useless for support. The full value goes in, CSS shortens
+      // it with an ellipsis when it does not fit, and the title carries it.
+      var reference = String(doc.id || '');
       return '<button type="button" class="dh-document" data-document-id="' + esc(doc.id || '') + '" aria-label="Open details for ' + esc(name) + '">' +
         '<div class="dh-document-name"><strong title="' + esc(name) + '">' + esc(name) + '</strong>' +
-        '<span>Created ' + esc(fmtDate(doc.created_at)) + (reference ? ' · Ref ' + esc(reference) : '') + '</span></div>' +
+        '<span>Created ' + esc(fmtDate(doc.created_at)) +
+        (reference ? ' <span class="dh-doc-ref" title="' + esc(reference) + '">· Ref ' + esc(reference) + '</span>' : '') +
+        '</span></div>' +
         '<div class="dh-document-progress"><span>' + signed + ' of ' + total + ' signed</span><div class="dh-progress" aria-label="' + signed + ' of ' + total + ' signed"><i style="width:' + pct + '%"></i></div></div>' +
         '<div class="dh-status ' + state + '">' + documentLabel(state) + '</div>' +
         '</button>';
