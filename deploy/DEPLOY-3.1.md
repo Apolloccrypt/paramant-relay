@@ -4,8 +4,9 @@
 > (`bash deploy/deploy-3.1.sh`) runs every step below, prints the command and
 > the measurement for each one, and stops at the first result the runbook did
 > not predict. `--preflight-only` does the checks and nothing else,
-> `--dry-run` prints every remote command instead of running it, and
-> `--rollback <TS>` is step 8. This file stays the readable source: the script
+> `--dry-run` prints every remote command instead of running it,
+> `--rollback <TS>` is step 8, and `--verify-only` is steps 6 and 7 on a server
+> that is already deployed. This file stays the readable source: the script
 > follows it, it does not replace it, and a step that is argued out here is
 > argued out here only.
 
@@ -575,6 +576,58 @@ edit made between deploys cannot hide behind "already applied".
 
 In the order `deploy.sh` runs them, plus the two the 3.0.0 runbook used.
 
+### Finishing a deploy that died in the checks: `--verify-only`
+
+Steps 3, 4 and 5 do the work; step 6 measures it and step 7 writes the
+deployed-head marker the next run gates on. A deploy that lands the work and
+then dies in a check leaves the server correct and the marker missing, which
+stops the NEXT run in 1a. Deploy run 6 (TS 20260903-0259) is that case: six
+containers on 3.1.0, the nginx edits applied, the site live, and then 6h
+stopped on a swallowed line, so 6h, 6i and the 7a marker never happened.
+
+```bash
+bash deploy/deploy-3.1.sh --verify-only
+```
+
+runs phases 6 and 7 and nothing else. No tags, no backups, no pull, no build,
+no recreate, no nginx edit, no `.env` write. Redoing the whole script for two
+checks and one marker would rebuild and recreate six healthy containers.
+
+It gates first, in the spirit of 1a, and refuses if the server is not already
+deployed:
+
+- the deployed commit is **on the mainline**: `git merge-base --is-ancestor
+  HEAD $DEPLOY_REF`, asked after a fetch so the ref is real
+- `/health` reports the same version as `package.json` in that checkout, which
+  is what says the running containers were built from it
+
+Either one off and the mode stops with "Run the full deploy instead".
+
+**Behind the tip is normal, not a fault.** main moves while a deploy runs. Run
+6 deployed `4e6de0b` and `origin/main` was already on `05bbd1b` by the time
+this mode existed, so a gate demanding equality would have refused exactly the
+state it was written for. Being *beside* the mainline is the real problem,
+because then nobody can say what is running. So the ancestor test is the gate
+and the difference from the tip is a note:
+
+```
+  note  checkout is on 4e6de0b, origin/main is 05bbd1b; this mode signs off on the DEPLOYED commit
+  note  so the deployed-head marker will name 4e6de0b, which is what the next run gates on
+```
+
+The marker phase 7a writes names the commit the checkout is **on**, not the tip
+of the ref. That is the commit that is actually deployed, and it is what the
+next run's phase 1a gates on; a later full run fast-forwards from there.
+
+`PARAMANT_VERIFY_HEAD=<sha>` names the deployed commit yourself, the way
+`PARAMANT_EXPECTED_HEAD` does in 1a, and likewise skips the test it replaces:
+the mainline check. The version check still runs.
+
+The ref is `$DEPLOY_REF`, so `DEPLOY_REF=origin/release bash
+deploy/deploy-3.1.sh --verify-only` gates against that instead. It does not
+combine with `--preflight-only` or `--rollback`; those three are separate runs
+and the script exits 2 if you ask for two of them.
+
 ```bash
 # 6a. deploy.sh step 4, from anywhere: public auth surface, never a 5xx
 tests/auth-smoke.sh https://paramant.app
@@ -611,6 +664,45 @@ for c in main health finance legal iot; do printf '%-8s' $c; docker logs paraman
 Stop and roll back (step 8) on: a relay that does not reach `healthy`,
 `auth-smoke.sh` exit 1, `post-deploy-verify.sh` exit 2, `/health` without
 `3.1.0`, or a `billing_config` line with `recurring:true`.
+
+## A rule for every remote block: `</dev/null`
+
+The script sends each remote step as a heredoc piped into `ssh ... bash -s`.
+That means the script text **is** the remote shell's stdin, and bash reads it
+lazily, one compound command at a time. Any command in that block that reads
+stdin therefore eats the rest of the script.
+
+Run 6 stopped in 6h on "the server never printed 'effective outbound
+buffers'". The measurement was fine; the line had been swallowed by
+
+```bash
+docker compose exec -T "$svc" sh -c '...'      # no </dev/null: reads stdin
+```
+
+The two lines above it came out normally, because the whole `for` loop was
+parsed before it ran, which is why the log read like a failed measurement and
+not like a truncated script.
+
+So: **every stdin-reading command inside a remote heredoc gets `</dev/null`**.
+Two families:
+
+- **always reads, whatever its arguments**: `docker compose exec`,
+  `docker compose run`, `docker exec`, `docker run`, a nested `ssh`, and
+  `xargs`. `xargs rm -f` is not xargs-with-an-operand, it is xargs reading
+  stdin.
+- **reads only when given no file**: `cat`, `sort`, `wc`, `python -`,
+  `node -`, and any `read`. `cat "$f"` and `wc -l < "$f"` are fine; `cat` and
+  `wc -l` on their own are not.
+
+A command to the **right of a pipe** reads the pipe, not the script, so
+`... | wc -l` is fine and `wc -l` alone is not. A `read` in a loop that is
+already redirected (`done < "$file"`, `done < <(...)`) or fed by a here-string
+is fine as it is.
+
+`tests/deploy-3.1-dryrun.test.sh` scans every remote block in the script for
+this and fails on a command that lacks it. It also pins the number of blocks it
+walked, so an extraction that silently loses half the script fails instead of
+passing on an empty search.
 
 ## Step 7: after the deploy
 

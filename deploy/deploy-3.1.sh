@@ -11,10 +11,20 @@
 #   bash deploy/deploy-3.1.sh                  full deploy, phases 0 to 7
 #   bash deploy/deploy-3.1.sh --preflight-only phases 0 and 1, read-only
 #   bash deploy/deploy-3.1.sh --rollback <TS>  phase 8, back to the <TS> backup
+#   bash deploy/deploy-3.1.sh --verify-only    phases 6 and 7 only, on a server
+#                                              that is already deployed
 #   bash deploy/deploy-3.1.sh --dry-run        print every remote and gated
 #                                              command instead of running it
 #
-# Flags combine: --dry-run --preflight-only, --dry-run --rollback <TS>.
+# Flags combine with --dry-run: --dry-run --preflight-only, --dry-run
+# --rollback <TS>, --dry-run --verify-only. The three run modes are mutually
+# exclusive.
+#
+# --verify-only exists for a deploy that did its work and then died in the
+# checks. It gates on the server already being deployed (checkout on
+# origin/main, /health reporting the version that checkout describes) and then
+# runs phases 6 and 7 and nothing else: no tags, no backups, no pull, no build,
+# no recreate, no nginx edit, no .env write.
 #
 # The commit the production checkout must be on before phase 3 moves it is a
 # parameter, not a constant. PARAMANT_EXPECTED_HEAD=<commit> wins; without it
@@ -95,6 +105,10 @@ DEPLOY_REF="${DEPLOY_REF:-origin/main}"
 # marker names the checkout, so it stays true.
 EXPECT_PROD_COMMIT="${EXPECT_PROD_COMMIT:-41501bb}"   # runbook: where we start
 EXPECTED_HEAD="${PARAMANT_EXPECTED_HEAD:-}"           # explicit override, wins
+# --verify-only: name the deployed commit yourself. Same idea as
+# PARAMANT_EXPECTED_HEAD in phase 1a, and it likewise skips the test it
+# replaces, here the mainline-ancestor test in phase Va.
+VERIFY_HEAD="${PARAMANT_VERIFY_HEAD:-}"
 DEPLOYED_HEAD_FILE="${PARAMANT_DEPLOYED_HEAD_FILE:-$BACKUP_DIR/deployed-head}"
 EXPECT_VERSION="3.1.0"
 SERVICES="relay-main relay-health relay-finance relay-legal relay-iot admin"
@@ -157,6 +171,7 @@ SSH_SHOWN="ssh -i <prod-key> -o BatchMode=yes -o IdentitiesOnly=yes $PROD_HOST"
 
 DRY_RUN=0
 PREFLIGHT_ONLY=0
+VERIFY_ONLY=0
 ROLLBACK_TS=""
 REMOTE_OUT=""
 REMOTE_RC=0
@@ -541,6 +556,7 @@ usage() {
 while [ $# -gt 0 ]; do
   case "$1" in
     --preflight-only) PREFLIGHT_ONLY=1; shift ;;
+    --verify-only)    VERIFY_ONLY=1; shift ;;
     --dry-run)        DRY_RUN=1; shift ;;
     --rollback)       [ $# -ge 2 ] || { echo "--rollback needs a <TS>" >&2; exit 2; }
                       ROLLBACK_TS="$2"; shift 2 ;;
@@ -551,6 +567,10 @@ done
 
 if [ -n "$ROLLBACK_TS" ] && [ "$PREFLIGHT_ONLY" -eq 1 ]; then
   echo "--rollback and --preflight-only are different runs; pick one" >&2
+  exit 2
+fi
+if [ "$VERIFY_ONLY" -eq 1 ] && { [ -n "$ROLLBACK_TS" ] || [ "$PREFLIGHT_ONLY" -eq 1 ]; }; then
+  echo "--verify-only is its own run; do not combine it with --rollback or --preflight-only" >&2
   exit 2
 fi
 if [ -n "$ROLLBACK_TS" ] && ! printf '%s' "$ROLLBACK_TS" | grep -qE '^[0-9]{8}-[0-9]{4}$'; then
@@ -571,6 +591,7 @@ exec > >(tee -a "$LOG") 2>&1
 
 MODE="full deploy"
 [ "$PREFLIGHT_ONLY" -eq 1 ] && MODE="preflight only (phases 0 and 1, read-only)"
+[ "$VERIFY_ONLY" -eq 1 ] && MODE="verify only (phases 6 and 7 on an already deployed server)"
 [ -n "$ROLLBACK_TS" ] && MODE="rollback to $ROLLBACK_TS (phase 8)"
 [ "$DRY_RUN" -eq 1 ] && MODE="$MODE, DRY RUN (nothing is executed on the server)"
 
@@ -771,9 +792,12 @@ set -euo pipefail
 cd "$1"
 for v in BILLING_MODE MOLLIE_API_KEY MOLLIE_TEST_API_KEY INTERNAL_AUTH_TOKEN ADMIN_TOKEN PARAMANT_TOTP_MASTER_KEY RELAY_REDIS_URL PARAMANT_INLINE_RECEIPT_HEADER; do
   printf 'env %-26s ' "$v"
+  # </dev/null is load bearing on EVERY stdin-reading command in a remote
+  # heredoc. The body of this block IS the ssh stdin (bash -s), so a command
+  # that reads stdin eats the rest of the script. See the note above phase 6h.
   docker compose exec -T relay-main sh -c \
     "v=\$(printenv $v); if [ -z \"\$v\" ]; then echo empty; else echo \"set, prefix \$(printf %s \"\$v\" | cut -c1-5)\"; fi" \
-    2>/dev/null || echo "unreadable"
+    </dev/null 2>/dev/null || echo "unreadable"
 done
 EOF
 
@@ -1876,13 +1900,24 @@ EOF
     fi
   fi
 
+  # Every stdin-reading command in a remote heredoc needs </dev/null.
+  #
+  # The body of a remote block is piped into `ssh ... bash -s`, so the script
+  # text IS file descriptor 0. `docker compose exec -T` reads stdin, and bash
+  # reads the script lazily, one compound command at a time: the exec swallowed
+  # everything bash had not parsed yet. Deploy run 6 (TS 20260903-0259) is what
+  # that looks like from the outside. The two `inline` lines came out fine,
+  # because the whole for-loop was already parsed before it ran, and then the
+  # echo below it was simply gone. Phase 6h stopped on "the server never
+  # printed 'effective outbound buffers'", and 6i and the phase 7a marker never
+  # ran at all, which left the next run with no marker to gate on.
   step "6h. the inline receipt opt-in really works end to end (#342)"
   remote "inline receipt config" "$COMPOSE_DIR" <<'EOF'
 set -euo pipefail
 cd "$1"
 for svc in relay-main relay-iot; do
   printf 'inline %-12s ' "$svc"
-  docker compose exec -T "$svc" sh -c 'v=$(printenv PARAMANT_INLINE_RECEIPT_HEADER); [ -n "$v" ] && echo "$v" || echo empty' 2>/dev/null || echo unreadable
+  docker compose exec -T "$svc" sh -c 'v=$(printenv PARAMANT_INLINE_RECEIPT_HEADER); [ -n "$v" ] && echo "$v" || echo empty' </dev/null 2>/dev/null || echo unreadable
 done
 # The effective config, not the file: nginx -T is what is actually loaded.
 echo "effective outbound buffers = $(nginx -T 2>/dev/null | grep -c 'proxy_buffer_size 32k' || true)"
@@ -1967,6 +2002,104 @@ for svc in relay-main relay-health relay-finance relay-legal relay-iot; do
 done
 EOF
   expect_not '"recurring":true' "every relay still reports recurring:false"
+}
+
+# =============================================================== PHASE V =====
+
+# --verify-only: finish a deploy that got its work done and then died in the
+# checks. Run 6 (TS 20260903-0259) is the case it exists for: phases 3, 4 and 5
+# all landed, six containers on 3.1.0, the nginx edits applied, the site live,
+# and then 6h stopped on a swallowed line. Re-running the whole script would
+# re-tag, re-back-up, re-pull, rebuild and recreate six healthy containers to
+# get at two checks and one marker file. This mode runs phases 6 and 7 and
+# nothing else: no tags, no backups, no pull, no build, no recreate, no nginx
+# edit, no .env write.
+#
+# That is only safe when the server really is already deployed, so this phase
+# is the gate, in the same spirit as phase 1a: the checkout has to BE the
+# commit that would have been deployed, and the containers have to be running
+# the version that checkout describes. Anything else and the mode refuses,
+# because "verify" on a half-deployed server would sign off on nothing.
+phase_v() {
+  phase V "Preconditions for --verify-only (server, read-only)" "no runbook step; this mode replaces one"
+
+  step "Va. the checkout is on the mainline and the running relay was built from it"
+  remote "verify preconditions" "$COMPOSE_DIR" "$DEPLOY_REF" <<'EOF'
+set -euo pipefail
+cd "$1"
+REF="$2"
+# Fetch so the ref is the real one, not a stale remote-tracking pointer. It
+# moves no file and does not check anything out.
+git fetch origin >/dev/null 2>&1 || true
+echo "verify head = $(git rev-parse HEAD)"
+echo "verify head short = $(git rev-parse --short HEAD)"
+echo "verify ref = $REF"
+echo "verify ref sha = $(git rev-parse "$REF" 2>/dev/null || echo unknown)"
+# Is the deployed commit ON the mainline? Being BEHIND the ref is normal and
+# fine: main moves while a deploy runs. Being beside it is not, and that is the
+# thing worth refusing.
+if ! git rev-parse "$REF" >/dev/null 2>&1; then
+  echo "verify ancestor = unknown"
+elif git merge-base --is-ancestor HEAD "$REF" >/dev/null 2>&1; then
+  echo "verify ancestor = yes"
+else
+  echo "verify ancestor = no"
+fi
+# The version the checkout describes, and the version the containers report.
+# These have to agree, or the containers were not built from this checkout.
+echo "verify package version = $(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' package.json | head -1)"
+echo "verify health version = $(curl -s --max-time 5 http://127.0.0.1:3000/health </dev/null | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' | head -1)"
+EOF
+
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '  SKIP  assert (dry-run): the checkout is an ancestor of %s and the relay reports the version that checkout describes\n' "$DEPLOY_REF"
+    return 0
+  fi
+
+  local head refsha ancestor pkg health
+  head="$(remote_field 'verify head')"
+  refsha="$(remote_field 'verify ref sha')"
+  ancestor="$(remote_field 'verify ancestor')"
+  pkg="$(remote_field 'verify package version')"
+  health="$(remote_field 'verify health version')"
+
+  [ -n "$head" ] || die "the server never printed the commit its checkout is on"
+
+  # 1. An explicit answer wins, the same way PARAMANT_EXPECTED_HEAD does in
+  #    phase 1a. Someone who sets this has looked at the server; the script
+  #    does not second-guess which commit is the deployed one.
+  if [ -n "$VERIFY_HEAD" ]; then
+    sha_eq "$head" "$VERIFY_HEAD" \
+      || die "PARAMANT_VERIFY_HEAD names $VERIFY_HEAD but the checkout is on ${head:0:7}"
+    ok "the checkout is on ${head:0:7}, which PARAMANT_VERIFY_HEAD names (the mainline test is skipped on your say-so)"
+  else
+    # 2. Otherwise: the deployed commit has to be ON the mainline. Equality
+    #    with the ref is NOT the test. main moves while a deploy runs, and it
+    #    did: run 6 deployed 4e6de0b and origin/main was already further along
+    #    by the time the mode existed. Refusing that would refuse exactly the
+    #    state this mode is for. Being BESIDE the mainline is the real problem,
+    #    because then nobody knows what is running.
+    case "$ancestor" in
+      yes) ok "the checkout ${head:0:7} is an ancestor of $DEPLOY_REF, so it is on the mainline" ;;
+      no)  die "the checkout ${head:0:7} is not an ancestor of $DEPLOY_REF, so what is deployed is not on the mainline. Run the full deploy instead" ;;
+      *)   die "the server could not resolve $DEPLOY_REF, so there is no mainline to check the checkout against" ;;
+    esac
+  fi
+
+  [ -n "$pkg" ] || die "could not read the version out of package.json in the server checkout"
+  [ -n "$health" ] || die "/health did not report a version, so the relay is not up; --verify-only has nothing to verify"
+  [ "$pkg" = "$health" ] \
+    || die "/health reports $health but the checkout describes $pkg, so the containers were not built from this checkout. Run the full deploy instead"
+  ok "the running relay reports $health, the version the checkout describes"
+
+  # Behind the ref is a note, not a stop. Say it plainly, because the marker
+  # phase 7a writes names THIS commit, not the tip of the ref.
+  if [ -n "$refsha" ] && [ "$refsha" != unknown ] && ! sha_eq "$head" "$refsha"; then
+    note "checkout is on ${head:0:7}, $DEPLOY_REF is ${refsha:0:7}; this mode signs off on the DEPLOYED commit"
+    note "so the deployed-head marker will name ${head:0:7}, which is what the next run gates on"
+  fi
+
+  note "no tag, backup, pull, build, recreate or nginx edit will run in this mode"
 }
 
 # =============================================================== PHASE 7 =====
@@ -2218,7 +2351,7 @@ done
 echo "rollback relay health = $ok"
 echo "rollback version = $(curl -s --max-time 5 http://127.0.0.1:3000/health | grep -o '"version":"[^"]*"' || echo unknown)"
 cid="$(docker compose ps -q relay-main)"
-echo "rollback paraidAuth occurrences = $(docker exec "$cid" grep -c _paraidAuth /app/relay.js 2>/dev/null || echo 0)"
+echo "rollback paraidAuth occurrences = $(docker exec "$cid" grep -c _paraidAuth /app/relay.js </dev/null 2>/dev/null || echo 0)"
 EOF
   expect 'rollback relay health = yes' "the relay answers /health after the rollback"
 
@@ -2263,6 +2396,22 @@ if [ -n "$ROLLBACK_TS" ]; then
   echo
   hr
   echo "ROLLBACK FINISHED, warnings: $WARNINGS"
+  hr
+  exit 0
+fi
+
+if [ "$VERIFY_ONLY" -eq 1 ]; then
+  phase_v
+  phase_6
+  phase_7
+  echo
+  hr
+  echo "VERIFY ONLY FINISHED, warnings: $WARNINGS"
+  echo "Phases 6 and 7 only. Nothing was tagged, backed up, pulled, built,"
+  echo "recreated or edited. The deployed-head marker names the commit the"
+  echo "server checkout is on, which is the commit that is actually deployed,"
+  echo "and that is what the next run's phase 1a gates on. If $DEPLOY_REF has"
+  echo "moved on since that deploy, the next full run fast-forwards to it."
   hr
   exit 0
 fi
