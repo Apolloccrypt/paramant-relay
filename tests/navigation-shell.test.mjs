@@ -256,9 +256,9 @@ const homeSections = await homePage.evaluate(() => {
   };
 });
 ok('the signed-in homepage stops after the hero', homeSections.total > 1 && JSON.stringify(homeSections.visible) === JSON.stringify(['home-hero']), JSON.stringify(homeSections));
-// The founder line stays: it is the one thing on this page that says who is
-// accountable, and tests/ui-truthfulness pins its wording.
-ok('the signed-in hero keeps the name behind the product', (await homePage.locator('[data-home="in"]').innerText()).includes('Mick Beer'), await homePage.locator('[data-home="in"]').innerText());
+// Mick, 4 September: one note is enough. The founder line left both hero states,
+// so what the signed-in hero has to carry is the workspace a customer came for.
+ok('the signed-in hero opens on the documents', (await homePage.locator('[data-home="in"]').innerText()).includes('Your documents'), await homePage.locator('[data-home="in"]').innerText());
 if (process.env.PARAMANT_HOME_SCREENSHOT_PATH) await stableScreenshot(homePage, { path:process.env.PARAMANT_HOME_SCREENSHOT_PATH });
 await homePage.close();
 
