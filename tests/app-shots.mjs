@@ -1,20 +1,37 @@
 // Screenshot harness for the app screens. Not a gate: it renders every app
 // screen at 390x844 and 1440x900, in light and dark, with the same API stubs
-// the dashboard suite uses, and writes the images to the directory given in
-// APP_SHOTS_DIR (default docs/brand/assets/app-2026/).
+// the dashboard suite uses, and writes the images.
 //
-// Run: node tests/app-shots.mjs
-// One screen only: APP_SHOTS_ONLY=dashboard node tests/app-shots.mjs
+// It writes to a temp directory by default. The tracked reference images under
+// docs/ are opt-in, because a suite that rewrites 36 tracked files on every run
+// turns `git commit -a` into a screenshot dump. See scripts/brand-shots-dir.mjs
+// for the rule and tests/brand-shots-optin.test.mjs for the guard.
+//
+// Run:                 node tests/app-shots.mjs
+// Refresh references:  PARAMANT_WRITE_BRAND_SHOTS=1 node tests/app-shots.mjs
+// One screen only:     APP_SHOTS_ONLY=dashboard node tests/app-shots.mjs
+// Where would it write: APP_SHOTS_DRY_RUN=1 node tests/app-shots.mjs
 
 import { chromium } from 'playwright';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveBrandShotsDir, FLAG, DRY_RUN_VAR } from '../scripts/brand-shots-dir.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
-const OUT = process.env.APP_SHOTS_DIR
-  || path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'brand', 'assets', 'app-2026');
+const TARGET = resolveBrandShotsDir();
+const OUT = TARGET.dir;
+
+// Dry run: say where the images would go and touch nothing. This is what
+// tests/brand-shots-optin.test.mjs runs, so the guard measures this file rather
+// than a copy of its logic. It has to come before the mkdir below.
+if (process.env[DRY_RUN_VAR] === '1') {
+  console.log(`out-dir: ${OUT}`);
+  console.log(`opt-in: ${TARGET.optIn ? 'yes' : 'no'} (${FLAG}, resolved from ${TARGET.source})`);
+  process.exit(0);
+}
+
 fs.mkdirSync(OUT, { recursive: true });
 
 const MIME = { '.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.html':'text/html','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.webp':'image/webp','.woff2':'font/woff2','.json':'application/json','.wasm':'application/wasm' };
@@ -152,4 +169,5 @@ if (!only || only.includes('dashboard')) {
 await browser.close();
 server.close();
 console.log(`${written.length} images in ${OUT}`);
+if (!TARGET.optIn) console.log(`Not the tracked references: set ${FLAG}=1 to refresh docs/brand/assets/app-2026.`);
 for (const name of written) console.log('  ' + name);
