@@ -76,7 +76,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   footer{padding:32px 20px;flex-direction:column}
 }
 </style>
-<link rel="stylesheet" href="/design-system.css?v=23">
+<link rel="stylesheet" href="/design-system.css?v=24">
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
 <style>
@@ -252,7 +252,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h1>Paramant for <em>Gmail</em> — send encrypted attachments without leaving your inbox.</h1>
 
-  <p class="lead">The Paramant Chrome extension adds a button to Gmail's compose window. Select a file, the extension uploads it to Paramant, and inserts the burn-on-read link into your email. The recipient downloads it once; then it is gone.</p>
+  <p class="lead">The Paramant Chrome extension adds a button to Gmail's compose window. Select a file, the extension uploads it to Paramant, and inserts the burn-on-read link into your email. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Pro, 25 on Business and 100 on Enterprise.</p>
 
   <h2>Before you start</h2>
 
@@ -326,7 +326,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">4</div>
     <div class="step-body">
       <h2>Recipient downloads the file</h2>
-      <p>Your recipient clicks the link. They see the file name and size, click <strong>Download</strong>, and the file is delivered. The link and file are deleted immediately after the first download. If the recipient tries the link again, they get a 404.</p>
+      <p>Your recipient clicks the link. They see the file name and size, click <strong>Download</strong>, and the file is delivered. The link and file are deleted immediately after that first download on every plan, because the extension never asks the relay for a second read, and a second try gets a 404.</p>
     </div>
   </div>
 

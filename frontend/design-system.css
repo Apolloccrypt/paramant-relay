@@ -1,6 +1,11 @@
-/* PARAMANT design-system.css v4.0
+/* PARAMANT design-system.css v4.1
    Source of truth: PARAMANT-DESIGN-SYSTEM-v4.md (Denim Edit)
-   Four colors: bone / navy / cobalt / lime. Zero radius. Sans + mono split. */
+   Four colors: bone / navy / cobalt / lime. Zero radius. Sans + mono split.
+
+   v4.1 verandert precies een ding: --ink-dim, --lime-dim en --black-dim
+   wijzen naar --ink-2 (#40505F) in plaats van naar rgba(11,58,106,.65).
+   Dat is de enige gemeten wijziging; alle andere waarden staan zoals ze
+   stonden. Zie het blok bij --ink-2 voor de getallen. */
 
 
 /* ═══════════════════════════════════════════════════
@@ -15,7 +20,16 @@
   --navy:      #0B3A6A;
   --navy-2:    #0A2E55;
   --ink:       #0B3A6A;
-  --ink-dim:   rgba(11,58,106,.65);
+  /* --ink-2 is de leeskleur voor alles wat niet de primaire tekst is: de
+     kleine letter, de prijsregel, de limietregel, de meta onder een kaart.
+     De oude waarde was rgba(11,58,106,.65) en die landt op 4.09:1 tegen het
+     papier, 3.96:1 tegen de voet en 4.18:1 op een witte kaart. Drie keer net
+     onder de 4.5 die WCAG AA vraagt, en drie keer onder de tekst die de prijs
+     en de kleine letter draagt. #40505F haalt 7.95:1 op het papier en 7.35:1
+     op de voet. Gemeten met de WCAG 2.1 relatieve-luminantieformule; de meting
+     staat in tests/theme-contrast.test.mjs en die faalt op elke nieuwe. */
+  --ink-2:     #40505F;
+  --ink-dim:   var(--ink-2);
   --ink-hair:  rgba(11,58,106,.15);
   --ink-ghost: rgba(11,58,106,.08);
 
@@ -81,10 +95,10 @@
 
   /* ─── v3 legacy token aliases (remove after Phase D HTML migration) ─── */
   --black:       #0B3A6A;
-  --lime-dim:    rgba(11,58,106,.65);
+  --lime-dim:    var(--ink-2);
   --lime-hair:   rgba(11,58,106,.15);
   --lime-ghost:  rgba(11,58,106,.08);
-  --black-dim:   rgba(11,58,106,.65);
+  --black-dim:   var(--ink-2);
   --black-hair:  rgba(11,58,106,.15);
   --black-ghost: rgba(11,58,106,.08);
   --doc-bg:      var(--bone);

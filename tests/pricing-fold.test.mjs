@@ -114,7 +114,7 @@ test('the first screen at 390px carries the amount, the audience, the founder an
   const page = await open(FOLD.width, FOLD.height);
   const seen = await measure(page, [
     ['h1', '^Pricing$'],
-    ['what', 'Sign documents and send files that vanish after one read'],
+    ['what', 'Sign documents and send files that delete themselves after reading'],
     ['amount', '€0 a month, forever'],
     ['limit', '2 signatures a month, 10 transfers a month, 5 MB per file'],
     // Both paid amounts, because they buy different products and a buyer who

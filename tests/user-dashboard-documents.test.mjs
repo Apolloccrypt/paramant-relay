@@ -62,7 +62,11 @@ const mainText = await page.locator('main').innerText();
 // Private by design." It now names the two products we actually sell, in the
 // same words the homepage uses, because a customer who has just signed up
 // should be able to map what is on screen onto what he read before signing up.
-ok('mission is the first dashboard promise', /Important documents, under control/.test(mainText) && /ParaSign gets a document signed/.test(mainText) && /ParaSend sends a file that burns on read/.test(mainText), mainText.slice(0, 220));
+// "burns on read" left here because the dashboard sends through the web app,
+// which does burn on the first read; but the sentence names the PRODUCT, and
+// through the API a paid link reads up to ten times. Block 37 of
+// site-claims.test.mjs now sweeps this screen too.
+ok('mission is the first dashboard promise', /Important documents, under control/.test(mainText) && /ParaSign gets a document signed/.test(mainText) && /ParaSend sends a file that deletes itself after reading/.test(mainText), mainText.slice(0, 220));
 ok('dashboard leads with three plain-language actions', await page.locator('.dh-start-card').count() === 3, await page.locator('.dh-start').innerText());
 // The order changed on purpose: the two PRODUCTS lead, so ParaSend is second
 // and signing alone is third. On a 390px screen the old order put both

@@ -1,5 +1,11 @@
 # Dependencies
+# Zonder slash ook, want een regel met slash matcht alleen een MAP. Wie voor
+# een losse worktree `ln -s ../repo/node_modules` zet, krijgt een symlink, en
+# die is voor git een bestand: hij glipte langs deze twee regels en belandde
+# als 120000-blob in een commit. De regels zonder slash vangen hem.
+node_modules
 node_modules/
+**/node_modules
 **/node_modules/
 
 # License key generator — contains logic to issue keys; NEVER commit

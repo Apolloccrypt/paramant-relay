@@ -19,7 +19,7 @@
 <meta name="twitter:title" content="Pricing · What is free, and what businesses pay · Paramant">
 <meta name="twitter:description" content="The Community plan is free, forever. Organisations pay for higher limits: sending from 15 euro a month, signing from 49, excl. btw. From Paramantis Solutions B.V.">
 <link rel="canonical" href="https://paramant.app/pricing">
-<link rel="stylesheet" href="/design-system.css?v=23">
+<link rel="stylesheet" href="/design-system.css?v=24">
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
 <style>
@@ -266,7 +266,7 @@
       <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Free for everyone, paid for organisations</span>
     </div>
     <p style="font-size:var(--text-md);color:var(--ink);line-height:1.6;margin:0 0 var(--space-3)">
-      Sign documents and send files that vanish after one read.
+      Sign documents and send files that delete themselves after reading.
     </p>
     <p style="font-size:var(--text-md);color:var(--ink);line-height:1.6;margin:0 0 var(--space-3)">
       <strong>Community is &euro;0 a month, forever:</strong> 2 signatures a month, 10 transfers a month, 5 MB per file, no card.
@@ -404,7 +404,7 @@
       <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Product</span>
       <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-top:var(--space-2)">ParaSend · Send a file that disappears</h3>
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;max-width:760px;margin-top:var(--space-3)">
-        Send a file over a link that expires and burns on first read. Community covers 10 transfers a month at 5 MB per file, forever. Organisations that send every week pay for longer links, more reads and more registered devices.
+        Send a file over a link that expires and wipes the file after the last read it allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Pro, 25 on Business and 100 on Enterprise. Community covers 10 transfers a month at 5 MB per file, forever. Organisations that send every week pay for longer links, more reads through the API and more registered devices. More reads is not a weaker promise: it is one link a whole team can open, or a counterparty reopening it after a misclick, instead of you sending the file a second time.
       </p>
     </div>
     <div class="tier-grid">
@@ -433,7 +433,7 @@
         <ul class="tier-features">
           <li>Everything in Community</li>
           <li>24 hour link expiry</li>
-          <li>Up to 10 reads per link</li>
+          <li>Up to 10 reads per link through the API</li>
           <li>Up to 50 registered devices</li>
           <li>Send history and link management</li>
           <li>Webhooks on upload and download</li>
@@ -461,7 +461,7 @@
         <ul class="tier-features">
           <li>Everything in Pro</li>
           <li>7 day link expiry</li>
-          <li>Up to 100 reads per link</li>
+          <li>Up to 100 reads per link through the API</li>
           <li>Unlimited registered devices</li>
           <li>Dedicated relay on our infra or yours</li>
           <li>Configurable limits per tenant</li>
@@ -534,7 +534,7 @@
 
     <div class="faq-item">
       <p class="faq-q">What happens to my file after the recipient downloads it?</p>
-      <div class="faq-a">All files are RAM-only. They exist only in server memory and are wiped immediately on download (burn-on-read) or on TTL expiry. Nothing persists after expiry on any tier. There is no disk storage.</div>
+      <div class="faq-a">All files are RAM-only. They exist only in server memory and are wiped after the last read the link allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Pro, 25 on Business and 100 on Enterprise. TTL expiry wipes them too. Nothing persists after expiry on any tier. There is no disk storage.</div>
     </div>
 
     <div class="faq-item">

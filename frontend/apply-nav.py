@@ -77,7 +77,7 @@ LEGAL_STRIP = '''\
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
 </footer>'''
 
-DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=23">'
+DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=24">'
 NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=19">'
 NAV_JS    = '<script src="/nav.js?v=14" defer></script>'
 NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=5" defer></script>'

@@ -6,20 +6,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Send audit logs to a regulator without a second leak · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<meta name="twitter:description" content="Deliver GDPR Article 30 evidence to a supervisory authority or an auditor without a second exposure. The file is destroyed after the first read.">
+<meta name="twitter:description" content="Deliver GDPR Article 30 evidence to a supervisory authority or an auditor without a second exposure. The web app destroys the file after the first read.">
 <meta name="twitter:title" content="Send audit logs to a regulator without a second leak · Paramant">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Deliver GDPR Article 30 evidence to a supervisory authority or an auditor without a second exposure. The file is destroyed after the first read.">
+<meta name="description" content="Deliver GDPR Article 30 evidence to a supervisory authority or an auditor without a second exposure. The web app destroys the file after the first read.">
 <meta property="og:title" content="Send audit logs to a regulator without a second leak · Paramant">
-<meta property="og:description" content="Deliver GDPR Article 30 evidence to a supervisory authority or an auditor without a second exposure. The file is destroyed after the first read.">
+<meta property="og:description" content="Deliver GDPR Article 30 evidence to a supervisory authority or an auditor without a second exposure. The web app destroys the file after the first read.">
 <meta property="og:url" content="https://paramant.app/audit-log-export">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://paramant.app/audit-log-export">
-<link rel="stylesheet" href="/design-system.css?v=23">
+<link rel="stylesheet" href="/design-system.css?v=24">
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
 <style>
@@ -91,7 +91,7 @@ section p+p{margin-top:14px}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "Deliver GDPR Article 30 evidence to a supervisory authority or an auditor without a second exposure. The file is destroyed after the first read."
+      "description": "Deliver GDPR Article 30 evidence to a supervisory authority or an auditor without a second exposure. The web app destroys the file after the first read."
     },
     {
       "@type": "Organization",
@@ -201,7 +201,7 @@ section p+p{margin-top:14px}
       </thead>
       <tbody>
         <tr><td>GDPR Art.&nbsp;32 &mdash; Appropriate technical measures</td><td>ML-KEM-768 + AES-256-GCM in transit; relay cannot decrypt; EU/DE hosting</td></tr>
-        <tr><td>GDPR Art.&nbsp;5(1)(e) &mdash; Storage limitation</td><td>Burn-on-read: relay holds ciphertext only until first download, then wipes</td></tr>
+        <tr><td>GDPR Art.&nbsp;5(1)(e) &mdash; Storage limitation</td><td>Burn-on-read: a web app transfer is held only until the first download, then wiped; an API link is wiped after its last read</td></tr>
         <tr><td>Evidence integrity</td><td>ML-DSA-65 signed receipt with SHA-256 file hash; tamper-evident by construction</td></tr>
         <tr><td>GDPR Art.&nbsp;28 &mdash; Processor agreement</td><td>Standard DPA at <a href="/dpa">/dpa</a>, signable electronically and applies to all plans. The relay does process personal data (account email, IP for rate limiting and abuse-prevention); what it never holds is document plaintext or keys.</td></tr>
       </tbody>
