@@ -142,6 +142,10 @@ test('both services actually use the bound rather than just carrying it', () => 
   // one path where the admin has already charged it against the address.
   assert.match(relay, /if \(!throttled_upstream\) await authThrottle\.sleep\(/,
     'relay.js must honour throttled_upstream, or the account-keyed delay comes back');
-  assert.match(read('admin/server.js'), /throttled_upstream: true/,
-    'and the admin must send it');
+  const admin = read('admin/server.js');
+  const flagged = (admin.match(/throttled_upstream: true/g) || []).length;
+  assert.equal(flagged, 2,
+    'both login routes must send it: /user/login reaches verify-totp and ' +
+    '/user/login-with-backup reaches consume-backup, and each has its own ' +
+    'account-keyed delay to suppress');
 });

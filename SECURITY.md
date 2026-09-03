@@ -441,9 +441,11 @@ redis hiccup in the code that exists to prevent denial of service:
 every INCR, with `NX` so it can only ever create a window and never slide one.
 The healthy case behaves exactly as before; the broken case is repaired by the
 first request that lands after it, so a missing TTL survives one request instead
-of for ever. All 23 INCR call sites in both services go through it:
-`admin/lib/login-ratelimit.js` (2), `admin/lib/webauthn.js`, `admin/server.js`
-(7), `relay/lib/quota.js` (6), `relay/relay.js`. `EXPIRE ... NX` needs Redis 7.0;
+of for ever. All 18 INCR call sites in both services go through it:
+`admin/lib/login-ratelimit.js` (2), `admin/lib/webauthn.js` (1),
+`admin/server.js` (8), `relay/lib/quota.js` (6), `relay/relay.js` (1). (An
+earlier revision of this note said 23, which counted the two copies of the
+helper itself and miscounted `admin/server.js`.) `EXPIRE ... NX` needs Redis 7.0;
 `docker-compose.yml` pins 7.4.8 by digest, and a server that refuses the option
 makes the helper fall back to a TTL read for the life of the process, because an
 error on every rate-limited route would be a worse regression than the bug.
@@ -456,6 +458,83 @@ counters come back TTL -1. A third test pins the `NX`: a later hit must not
 extend a window that already exists, or the repair becomes the same denial of
 service from the other end. `tests/redis-deadline-parity.test.mjs` fails if any
 of the five files goes back to calling INCR directly.
+
+#### 5. The backup-code route answered the same question with argon2
+
+The fixed floor from finding 2 was applied to `/api/user/login-with-backup` in
+the same change, and it was not enough, because on that route the work is not
+4 ms of redis reads. `consumeBackupCode` verifies the provided code against
+EVERY stored hash until one matches, and a wrong code matches none, so a miss
+costs ten full argon2id verifications at 64 MiB and timeCost 3. An address with
+no account pays none of it.
+
+Measured on the machine this was written on, with ten codes really stored:
+
+| | p50 | min | max |
+|---|---|---|---|
+| one argon2 verification | 49.7 ms | 44.7 ms | 95.9 ms |
+| ten of them (one wrong code) | 494.2 ms | 462.3 ms | 870.9 ms |
+
+Through the route, with the 250 ms floor it had inherited: 472.7 ms for an
+address that exists against 251.6 ms for one that does not, ranges not
+overlapping. The admin logged `answer overran its floor` on 40 requests out of
+40, which is the code saying out loud that the number it was given was not a
+floor at all. That log line existed and nobody had run the route past it.
+
+Two changes. The floor on this route is its own,
+`PARAMANT_LOGIN_BACKUP_MIN_ANSWER_MS`, 1500 ms by default: 1.7x the slowest
+ten-hash miss measured here and 3x the median. And the per-address throttle is
+mirrored onto this route as well, on the counter it already keeps
+(`bk:email:<sha256>`, incremented before the account lookup so it is the same
+number for a hit and a miss). It needs its own curve rather than
+`mirrorThrottleMs`: the route refuses at five attempts per address per window,
+so the relay's threshold of ten is unreachable through it and a mirror using
+that threshold would be zero for every attempt the route allows. It starts after
+the first attempt instead, with the same 250 ms step and the same 2 s ceiling.
+
+The route is the emergency path a user takes once, when their authenticator is
+gone, so a second and a half is a cost worth paying to stop it answering the
+question "is this address a customer". A slower machine needs a higher floor and
+will say so on every request that overruns it.
+
+Pinned by `admin/test/login-timing.test.js`, which for this route boots a REAL
+relay rather than the stub, enrols an account, checks that ten argon2 hashes are
+really stored, and then measures a wrong code against an address that exists and
+one that does not, at zero and four prior attempts (five prior attempts is a 429
+for both, which is not a credential answer). Against the previous revision of
+this branch it reads 491.99 ms against 253.16 ms with no overlap. The suite also
+fails if the admin logged a single floor overrun.
+
+#### 6. Two smaller things from the same review
+
+**A body that was not what it said it was answered 500 in a millisecond.**
+`{"email": {}}` is truthy, so `if (!email)` waved it through into
+`String(email).trim().toLowerCase()`, which threw. Both login routes now check
+the type and answer 400, which is the same answer for every caller and carries
+no information about the address. It was also an unhandled throw on an
+unauthenticated route.
+
+**The health routes repeated the deadline in their error text.** The redis
+deadline error carries the configured bound in its message ("no answer within
+1000ms"), and both `/health` on the admin and the `redis` check in
+`/v2/health/deep` passed it straight through, unauthenticated. They report a
+fixed word now; the real message goes to the log.
+
+#### A residual: 503 against 401, when the two services have separate stores
+
+Worth writing down because it is a property of the deployment rather than of the
+code. If the RELAY's redis is unreachable while the ADMIN's is not, an address
+with an account answers `503 totp_unavailable` (the relay's replay guard failing
+closed, passed through) while an address without one answers 401, because the
+second never reaches the relay at all. The floor makes them take the same time;
+the status codes still differ.
+
+In the shipped topology this is not reachable: `docker-compose.yml` gives both
+services the same redis, so the admin cannot serve a login at all while the
+relay's store is down. It becomes reachable the moment somebody splits them, or
+points the two at different instances of a cluster. Anyone doing that should
+know that the split turns an outage into an enumeration oracle, which is why it
+is recorded here rather than left as a surprise.
 
 #### Follow-ups, recorded rather than fixed here
 

@@ -158,6 +158,57 @@ function defaultRelayState(accounts = [], secret = '123456') {
   return state;
 }
 
+// A REAL relay, for the one thing a stub cannot fake: argon2.
+//
+// The stub above is the right tool for the limiter suites, which care about
+// status codes and counters. It is the wrong tool for the backup-code timing
+// suite, where the finding IS the cost of the work: consumeBackupCode verifies
+// a code against every stored hash, ten argon2id verifications at 64 MiB for a
+// code that matches none, and an address without an account pays none of it.
+// Faking that number would be measuring the fake.
+//
+// So this boots relay.js through the relay's own harness and hands back
+// something boot() accepts in place of a stub. It needs relay/node_modules
+// (argon2 is a native build) and a redis, and it declares that rather than
+// quietly passing over a relay that never started.
+async function realRelay({ redisUrl, accounts = [], adminToken, internalToken }) {
+  let relayHarness;
+  try { relayHarness = require('../../relay/test/_relay-server'); }
+  catch (e) {
+    throw new Error(`unmet precondition "relay": ${e.message}\n` +
+      '  This suite needs a real relay for its argon2 cost. Run npm ci in relay/,\n' +
+      '  or, if this job is deliberately without it: ADMIN_TEST_SKIP=relay');
+  }
+  const srv = await relayHarness.boot({
+    tag: 'admin-backup',
+    users: { api_keys: accounts },
+    env: {
+      REDIS_URL: redisUrl,
+      ADMIN_TOKEN: adminToken,
+      INTERNAL_AUTH_TOKEN: internalToken,
+      // The stored TOTP secret is encrypted at rest, so the relay refuses to
+      // enroll without a key. Test-only, fixed, 32 bytes.
+      PARAMANT_TOTP_MASTER_KEY: Buffer.alloc(32, 5).toString('base64'),
+    },
+  });
+  return {
+    base: srv.base,
+    srv,
+    // Enroll an account and mint its ten backup codes, the way the setup wizard
+    // does: setup-totp writes the secret, activate-totp is the single place
+    // plaintext codes are produced.
+    async enrol(userId) {
+      const headers = { 'X-Internal-Auth': internalToken };
+      const setup = await srv.post('/v2/user/setup-totp', { headers, body: { user_id: userId } });
+      if (setup.status !== 200) throw new Error(`setup-totp failed: ${setup.status} ${setup.text}`);
+      const active = await srv.post('/v2/user/activate-totp', { headers, body: { user_id: userId } });
+      if (active.status !== 200) throw new Error(`activate-totp failed: ${active.status} ${active.text}`);
+      return active.json.backup_codes || [];
+    },
+    close: () => relayHarness.killAll(),
+  };
+}
+
 // Boot admin/server.js and wait until it answers.
 //
 // opts.redisUrl   - required; the admin exits at once without one.
@@ -305,4 +356,4 @@ function summary(name, passed) {
     : `\n${name}: SKIPPED - 0 checks ran`);
 }
 
-module.exports = { boot, killAll, freePort, stubRelay, defaultRelayState, solvePow, summary, ADMIN_DIR, ADMIN_JS };
+module.exports = { boot, killAll, freePort, stubRelay, defaultRelayState, realRelay, solvePow, summary, ADMIN_DIR, ADMIN_JS };

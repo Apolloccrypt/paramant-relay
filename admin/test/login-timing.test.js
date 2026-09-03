@@ -29,7 +29,7 @@
 const { test, before, after } = require('node:test');
 const assert = require('assert');
 const crypto = require('crypto');
-const { boot, killAll, stubRelay, defaultRelayState, solvePow, summary } = require('./_admin-server');
+const { boot, killAll, stubRelay, defaultRelayState, realRelay, solvePow, summary } = require('./_admin-server');
 
 const TIMING_DEFAULT_REDIS = 'redis://127.0.0.1:6399';
 // The production default from deploy/.env.example. Not a smaller number: a
@@ -201,6 +201,150 @@ test('the relay is told the delay was already charged, so it is never charged tw
   const unflagged = calls.filter((c) => !c.body || c.body.throttled_upstream !== true);
   assert.equal(unflagged.length, 0,
     `every verify-totp call must declare the throttle was applied upstream, ${unflagged.length} did not`);
+  tDid();
+});
+
+// ── /api/user/login-with-backup ──────────────────────────────────────────────
+//
+// The same question on the other login route, and it needed its own answer.
+// consumeBackupCode verifies a code against EVERY stored hash until one
+// matches, so a wrong code costs ten full argon2id verifications at 64 MiB:
+// measured here, one verification p50 49.7 ms and ten of them p50 494.2 ms with
+// a max of 870.9 ms. An address with no account pays none of it. With the
+// 250 ms floor this route inherited in the last round, that read as 472.7 ms
+// against 251.6 ms with no overlap, and the admin logged "answer overran its
+// floor" on every single request, which is the code saying the floor it was
+// given was not one.
+//
+// The floor on this route is PARAMANT_LOGIN_BACKUP_MIN_ANSWER_MS, 1500 ms by
+// default, plus the per-address throttle. Nothing is stubbed here: it is a real
+// relay doing real argon2 against ten real stored hashes, because the finding
+// is the cost of that work and a stub would be measuring the stub.
+const BK_SAMPLES = 6;
+// The route refuses at five hits per address per window, so the last attempt it
+// answers with a verdict is the fifth: four before it. Five before it is a 429
+// for BOTH cases, which is not a credential answer and carries no information.
+const BK_LEVELS = [0, 4];
+const BK_KEY = `pgp_backup_account_for_the_timing_suite_${TIMING_RUN}`;
+const BK_PRESENT_EMAIL = `bkpresent_${TIMING_RUN}@example.com`;
+const BK_ABSENT_EMAIL = `bkabsent_${TIMING_RUN}@example.com`;
+const BK_ADMIN_TOKEN = 'admin-token-for-the-backup-timing-suite';
+const BK_INTERNAL_TOKEN = 'internal-token-for-the-backup-timing-suite';
+// admin/server.js LOGIN_BACKUP_MIN_ANSWER_MS default.
+const BK_FLOOR_MS = 1500;
+
+let bkSrv = null;
+let bkRelay = null;
+
+const bkHitKey = (email) =>
+  `paramant:webauthn:rl:bk:email:${crypto.createHash('sha256').update(String(email).toLowerCase().trim()).digest('hex')}`;
+
+// The engine the relay refuses to boot without. @paramant/core is a file-link to
+// the sibling repo, so a checkout that has not built it cannot start a relay,
+// and this case cannot run. Same doctrine as relay/test/_requires.js: that is a
+// hard failure unless the runner names it, so the job that lacks the engine has
+// to say so and the job that has it cannot quietly stop running this.
+function relayEngineAvailable() {
+  try { require.resolve('@paramant/core', { paths: [require('path').join(__dirname, '..', '..', 'relay')] }); return true; }
+  catch (_) { return false; }
+}
+
+test('the backup-code route answers in the same time whether the address has an account or not', async (t) => {
+  if (!ready()) return t.skip('no redis');
+  const url = process.env.REDIS_URL || TIMING_DEFAULT_REDIS;
+
+  if (!relayEngineAvailable()) {
+    if (String(process.env.ADMIN_TEST_SKIP || '').split(',').map((x) => x.trim()).includes('relay')) {
+      console.log('  SKIP [relay] - @paramant/core is not built, so relay.js cannot boot ' +
+        '(declared via ADMIN_TEST_SKIP). This case runs in the relay-crypto job, which builds it.');
+      return;
+    }
+    throw new Error(
+      'unmet precondition "relay": @paramant/core is not built, so relay.js cannot boot and\n' +
+      '  the argon2 cost this case measures cannot be produced. Build the binding (see\n' +
+      '  .github/workflows/test.yml, job relay-crypto-tests), or, if this job is\n' +
+      '  deliberately without it, say so on the runner: ADMIN_TEST_SKIP=relay');
+  }
+
+  bkRelay = await realRelay({
+    redisUrl: url,
+    adminToken: BK_ADMIN_TOKEN,
+    internalToken: BK_INTERNAL_TOKEN,
+    accounts: [{ key: BK_KEY, plan: 'pro', active: true, email: BK_PRESENT_EMAIL, account_id: 'acct_bk' }],
+  });
+  bkSrv = await boot({
+    redisUrl: url,
+    relay: bkRelay,
+    adminToken: BK_ADMIN_TOKEN,
+    internalToken: BK_INTERNAL_TOKEN,
+  });
+  t.after(async () => { await bkSrv.stop(); await bkRelay.close(); });
+
+  const codes = await bkRelay.enrol(BK_KEY);
+  assert.equal(codes.length, 10, `the account must really have ten backup codes, got ${codes.length}`);
+  const stored = await tRedis.sCard(`paramant:user:backup_codes:${BK_KEY}`);
+  assert.equal(stored, 10, `and ten argon2 hashes stored, got ${stored}`);
+  tDid();
+
+  // A code that is wrong in the right shape: it has to reach argon2 and fail
+  // against all ten, which is the worst case and the one that matters.
+  const wrong = 'ZZZZ-ZZZZ-ZZZZ';
+  assert.ok(!codes.includes(wrong), 'the wrong code must really be wrong');
+
+  const attempt = async (email, priorHits) => {
+    // Put the address on exactly `priorHits` attempts. Both cases are driven to
+    // the same number, which is the point: the counter is incremented before
+    // findUserByEmail, so it cannot know whether the account exists.
+    if (priorHits <= 0) await tRedis.del(bkHitKey(email));
+    else await tRedis.set(bkHitKey(email), String(priorHits), { EX: 900 });
+    const r = await bkSrv.post('/api/user/login-with-backup', {
+      headers: { 'X-Real-IP': tIp() },
+      body: { email, backup_code: wrong },
+    });
+    assert.equal(r.status, 401,
+      `a wrong backup code is a 401 at ${priorHits} prior attempts, got ${r.status} ${r.text}`);
+    return r.ms;
+  };
+
+  // Warm-up: the first argon2 call in a fresh process pays for the native
+  // module and the first 64 MiB allocation.
+  for (let i = 0; i < 2; i++) await attempt(BK_PRESENT_EMAIL, 0);
+
+  for (const level of BK_LEVELS) {
+    const present = [];
+    const absent = [];
+    for (let i = 0; i < BK_SAMPLES; i++) {
+      present.push(await attempt(BK_PRESENT_EMAIL, level));
+      absent.push(await attempt(BK_ABSENT_EMAIL, level));
+    }
+    const pMed = median(present), aMed = median(absent);
+    const pMin = Math.min(...present), pMax = Math.max(...present);
+    const aMin = Math.min(...absent), aMax = Math.max(...absent);
+    const detail = `at ${level} prior attempts: exists p50=${pMed.toFixed(2)} [${pMin.toFixed(2)}, ${pMax.toFixed(2)}], ` +
+                   `absent p50=${aMed.toFixed(2)} [${aMin.toFixed(2)}, ${aMax.toFixed(2)}]`;
+
+    // The floor must be above the argon2 worst case, or the work shows through
+    // it. 250 ms per attempt past the first, same step as the other route.
+    const owed = BK_FLOOR_MS + Math.min(Math.max(level - 1, 0) * 250, 2000);
+    for (const [label, med] of [['exists', pMed], ['absent', aMed]]) {
+      assert.ok(med >= owed - 20, `${label} must be held to its floor of ${owed}ms; ${detail}`);
+    }
+    tDid();
+
+    assert.ok(Math.abs(pMed - aMed) < 25,
+      `the medians must not separate the two cases; ${detail}`);
+    tDid();
+
+    assert.ok(pMin < aMax && aMin < pMax,
+      `the two ranges must overlap, or one request still classifies an address; ${detail}`);
+    tDid();
+  }
+
+  // The floor is only a floor while it is above the work. If argon2 on this
+  // machine ever costs more than the floor allows, the admin says so, and the
+  // suite would rather fail on that than on a timing gap nobody can explain.
+  assert.doesNotMatch(bkSrv.log() || '', /answer overran its floor/,
+    'no answer may overrun its floor: raise PARAMANT_LOGIN_BACKUP_MIN_ANSWER_MS');
   tDid();
 });
 

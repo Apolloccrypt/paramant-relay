@@ -171,25 +171,32 @@ section 6.
 
 ```bash
 cd admin && node --test test/*.test.js
-#   # tests 63   # pass 63   # fail 0      ~2m
+#   # tests 67   # pass 67   # fail 0      ~1m50s
 ```
 
 Four of those suites boot a real `admin/server.js` (`login-http`,
 `login-timing`, `redis-outage`, `ratelimit-ttl`), so this job now needs a redis
 and the admin's own `node_modules`, which the CI job deliberately did not
-install. They declare their precondition the way the relay suites do: without it
+install. `login-timing` additionally boots a real `relay.js` for its
+backup-code case, because the oracle there is ten argon2 verifications and a
+stub would be measuring the stub. That needs `@paramant/core`, which relay.js
+refuses to start without, so the admin CI job declares it (`ADMIN_TEST_SKIP=relay`)
+and the `relay-crypto-tests` job, the one that builds the binding, runs that
+suite for real and fails if it skips there. They declare their precondition the way the relay suites do: without it
 the run fails by name, unless the runner says `ADMIN_TEST_SKIP=redis`.
 
 Most of those two minutes are deliberate waiting rather than work.
 `login-timing` measures at 0, 12 and 20 prior failures, and by design an answer
-at twenty failures is held for 2.25 seconds; every request past ten also has to
-carry a real 2^18 proof-of-work, which `login-http` pays as well.
+at twenty failures is held for 2.25 seconds; its backup-code case is held for at
+least 1.5 seconds per request, because that floor has to sit above ten argon2
+verifications. Every request past the failure threshold also has to carry a real
+2^18 proof-of-work, which `login-http` pays as well.
 
 **Root integration suites** (node builtins plus the root deps, no browser):
 
 ```bash
 node --test $(grep -L "from 'playwright'" tests/*.mjs)
-#   # tests 176   # pass 174   # skipped 2   # fail 0    ~1.1s
+#   # tests 190   # pass 188   # skipped 2   # fail 0    ~1.2s
 ```
 
 The two skips are the external-link checks in `tests/links.test.mjs`; they need

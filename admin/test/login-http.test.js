@@ -235,6 +235,102 @@ test('a relay that cannot reach its replay store is reported as an outage, not a
   }
 });
 
+// ── /api/user/login-with-backup ──────────────────────────────────────────────
+// The other unauthenticated, session-granting route, and until now no test
+// reached it over HTTP either. The argon2 cost that makes it a timing oracle is
+// measured in login-timing.test.js against a real relay; what is checked here
+// is the wiring: the caps, the verdicts, the cookie, and the flag that keeps
+// the relay from charging its per-account delay a second time.
+const HTTP_BACKUP_CODE = 'AAAA-BBBB-CCCC';
+// admin/lib/login-ratelimit.js BACKUP_ATTEMPT_LIMIT.
+const HTTP_BACKUP_LIMIT = 5;
+
+function backupLogin(email, code, ip) {
+  return httpSrv.post('/api/user/login-with-backup', {
+    headers: { 'X-Real-IP': ip || nextIp() },
+    body: { email, backup_code: code },
+  });
+}
+
+test('a backup code signs the owner in, and a wrong one does not', async (t) => {
+  if (!ready()) return t.skip('no redis');
+  const email = freshEmail();
+  const key = `pgp_backup_${crypto.randomBytes(5).toString('hex')}`;
+  await withAccount(email, key);
+  const previous = httpRelay.state.consumeBackup;
+  httpRelay.state.consumeBackup = (body) => ({ valid: body && body.code === HTTP_BACKUP_CODE });
+  try {
+    const wrong = await backupLogin(email, 'ZZZZ-ZZZZ-ZZZZ');
+    assert.equal(wrong.status, 401, `a wrong code is refused: ${wrong.status} ${wrong.text}`);
+    httpDid();
+
+    const right = await backupLogin(email, HTTP_BACKUP_CODE);
+    assert.equal(right.status, 200, `the owner's code gets in: ${right.status} ${right.text}`);
+    assert.ok(String(right.headers['set-cookie'] || '').length > 0, 'with a session cookie');
+    httpDid();
+
+    // The relay must be told the delay was already charged here, exactly as on
+    // /user/login. Without it the account-keyed delay comes back on top of the
+    // address-keyed one, and only an address with an account pays it.
+    const calls = httpRelay.state.calls.filter((c) => c.path === '/v2/user/consume-backup');
+    assert.ok(calls.length >= 2, 'the suite must have reached the relay');
+    assert.ok(calls.every((c) => c.body && c.body.throttled_upstream === true),
+      'every consume-backup call must declare the throttle was applied upstream');
+    httpDid();
+  } finally {
+    httpRelay.state.consumeBackup = previous;
+  }
+});
+
+test('the backup route refuses per address, and an unknown address reads the same as a known one', async (t) => {
+  if (!ready()) return t.skip('no redis');
+  const email = freshEmail();
+  const key = `pgp_backupcap_${crypto.randomBytes(5).toString('hex')}`;
+  await withAccount(email, key);
+
+  // Five attempts on one address are answered; the sixth is refused. Each uses
+  // its own source address, so this measures the per-address cap and not the
+  // per-IP one that sits in front of it.
+  for (let i = 0; i < HTTP_BACKUP_LIMIT; i++) {
+    const r = await backupLogin(email, 'ZZZZ-ZZZZ-ZZZZ');
+    assert.equal(r.status, 401, `attempt ${i + 1} of ${HTTP_BACKUP_LIMIT} gets a verdict, got ${r.status}`);
+  }
+  const over = await backupLogin(email, 'ZZZZ-ZZZZ-ZZZZ');
+  assert.equal(over.status, 429, 'the sixth attempt on one address is refused');
+  httpDid();
+
+  const unknown = await backupLogin(freshEmail(), 'ZZZZ-ZZZZ-ZZZZ');
+  const known = await backupLogin(freshEmail(), 'ZZZZ-ZZZZ-ZZZZ');
+  assert.equal(unknown.status, 401);
+  assert.deepEqual(unknown.json, known.json, 'and the bodies are identical');
+  httpDid();
+});
+
+test('a body that is not what it says it is gets a 400, not a 500', async (t) => {
+  if (!ready()) return t.skip('no redis');
+  // `{"email": {}}` is truthy, so a `!email` check waved it through into
+  // String(email).toLowerCase(), which threw. That answered 500 in about a
+  // millisecond: an unhandled throw on an unauthenticated route, and the
+  // fastest answer either handler had.
+  const junk = [{}, [], 42, true, null];
+  for (const value of junk) {
+    const login = await httpSrv.post('/api/user/login', {
+      headers: { 'X-Real-IP': nextIp() }, body: { email: value, totp: '000000' },
+    });
+    assert.equal(login.status, 400, `/user/login with email=${JSON.stringify(value)} must be a 400, got ${login.status} ${login.text}`);
+    const backup = await httpSrv.post('/api/user/login-with-backup', {
+      headers: { 'X-Real-IP': nextIp() }, body: { email: value, backup_code: 'AAAA-BBBB-CCCC' },
+    });
+    assert.equal(backup.status, 400, `/user/login-with-backup with email=${JSON.stringify(value)} must be a 400, got ${backup.status} ${backup.text}`);
+  }
+  // And the same for the second field, which has the same shape of check.
+  const badCode = await httpSrv.post('/api/user/login-with-backup', {
+    headers: { 'X-Real-IP': nextIp() }, body: { email: freshEmail(), backup_code: {} },
+  });
+  assert.equal(badCode.status, 400, `a non-string backup_code must be a 400, got ${badCode.status} ${badCode.text}`);
+  httpDid();
+});
+
 test('an unknown address and a known one are both a plain 401', async (t) => {
   if (!ready()) return t.skip('no redis');
   // The status code half of the enumeration defence. The timing half is

@@ -66,10 +66,27 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and that source address kept getting 429 until the key was deleted by hand.
   The same shape stranded the login failure counter (a proof-of-work bill that
   never lifts, on an address anybody may name) and the monthly quota counters in
-  `relay/lib/quota.js` (an account permanently over its limit). All 23 INCR call
+  `relay/lib/quota.js` (an account permanently over its limit). All 18 INCR call
   sites now go through `lib/redis-counter.js`, which sets the expiry after every
   INCR with `NX`, so a lost window is repaired by the next request instead of
   never.
+- **`POST /api/user/login-with-backup` answered the same question with argon2.**
+  `consumeBackupCode` verifies the code against every stored hash until one
+  matches, so a wrong code costs ten full argon2id verifications at 64 MiB:
+  measured here, p50 494.2 ms with a max of 870.9 ms. An address with no account
+  pays none of it, and the 250 ms floor the route inherited was far below it, so
+  it read as 472.7 ms against 251.6 ms with no overlap and the admin logged
+  "answer overran its floor" on every request. The route now has a floor of its
+  own (`PARAMANT_LOGIN_BACKUP_MIN_ANSWER_MS`, default 1500 ms) plus a throttle
+  mirrored onto the counter it already keeps for that address.
+- **A request body that was not what it said it was answered 500 in a
+  millisecond.** `{"email": {}}` is truthy, so `if (!email)` waved it through
+  into `String(email).trim().toLowerCase()`, which threw: an unhandled throw on
+  an unauthenticated route, and the fastest answer either login handler had.
+  Both now check the type and answer 400.
+- **`/health` and `/v2/health/deep` repeated the configured redis deadline** in
+  the error text they passed through, unauthenticated. They report a fixed word;
+  the message goes to the log.
 
 ### Added
 - **`admin/test/ratelimit-ttl.test.js`**, which boots a real admin behind a proxy

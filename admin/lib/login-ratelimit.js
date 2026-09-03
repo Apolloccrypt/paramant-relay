@@ -156,9 +156,30 @@ function mirrorThrottleMs(failures) {
   return Math.min(over * THROTTLE_STEP_MS, THROTTLE_MAX_MS);
 }
 
+// The same idea for /api/user/login-with-backup, on that route's own counter.
+//
+// WHY IT NEEDS ITS OWN CURVE. That route refuses at BACKUP_ATTEMPT_LIMIT hits
+// per address per window, so a counter behind it can never reach the relay's
+// threshold of ten and mirrorThrottleMs() would return zero for every attempt
+// the route allows. A mirror that is always zero is not a mirror. The cost has
+// to escalate inside the range the route actually permits, so it starts after
+// the first attempt and steps by the same 250 ms to the same 2 s ceiling.
+//
+// `attempts` is the number of attempts BEFORE this one, which is the counted
+// hit minus one (webauthn.rateHitCounted returns the post-increment value).
+const BACKUP_ATTEMPT_LIMIT = 5;
+const BACKUP_THROTTLE_THRESHOLD = 1;
+
+function backupThrottleMs(attempts) {
+  const over = Number(attempts) - BACKUP_THROTTLE_THRESHOLD;
+  if (!(over > 0)) return 0;
+  return Math.min(over * THROTTLE_STEP_MS, THROTTLE_MAX_MS);
+}
+
 module.exports = {
   IP_LIMIT, WINDOW_S, EMAIL_FAIL_THRESHOLD,
   THROTTLE_THRESHOLD, THROTTLE_STEP_MS, THROTTLE_MAX_MS, mirrorThrottleMs,
+  BACKUP_ATTEMPT_LIMIT, BACKUP_THROTTLE_THRESHOLD, backupThrottleMs,
   IP_PREFIX, EMAIL_FAIL_PREFIX,
   normalizeEmail, ipKey, emailFailKey,
   hitIp, refundIp, emailFailures, noteEmailFailure, clearEmailFailures, powRequired,

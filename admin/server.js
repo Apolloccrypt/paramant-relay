@@ -1026,13 +1026,36 @@ const LOGIN_MIN_ANSWER_MS = (() => {
   return Number.isFinite(raw) && raw > 0 ? raw : 250;
 })();
 
+// /api/user/login-with-backup needs a floor of its own, six times higher, and
+// the reason is argon2.
+//
+// consumeBackupCode verifies the code against EVERY stored hash until one
+// matches, and a wrong code matches none, so a miss costs ten full argon2id
+// verifications at 64 MiB and timeCost 3. Measured on the machine this was
+// written on: one verification p50 49.7 ms, ten of them p50 494.2 ms with a max
+// of 870.9 ms. An address with no account never reaches any of it. That was the
+// whole answer: 472.7 ms for an address that exists against 251.6 ms for one
+// that does not, no overlap, and the admin logged "answer overran its floor"
+// on 40 out of 40 requests, which is the code saying out loud that the floor it
+// was given was not one.
+//
+// 1500 ms is 1.7x the slowest ten-hash miss measured here and 3x the median. A
+// slower box needs more, and it will say so: every overrun is logged. The route
+// is the emergency path a user takes once, when their authenticator is gone, so
+// a second and a half is a cost worth paying to stop the route answering the
+// question "is this address a customer".
+const LOGIN_BACKUP_MIN_ANSWER_MS = (() => {
+  const raw = parseInt(process.env.PARAMANT_LOGIN_BACKUP_MIN_ANSWER_MS || '', 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : 1500;
+})();
+
 // `extraMs` is the per-address throttle this attempt owes, from
 // loginRate.mirrorThrottleMs. It is added to the FLOOR rather than slept before
 // the work, so it cannot be told apart from the work itself, and it is the same
 // number for an address that exists and one that does not, because the counter
 // behind it counts both.
-function answerLoginAt(t0, res, status, body, extraMs = 0) {
-  const floor = LOGIN_MIN_ANSWER_MS + Math.max(0, extraMs);
+function answerLoginAt(t0, res, status, body, extraMs = 0, baseMs = LOGIN_MIN_ANSWER_MS) {
+  const floor = baseMs + Math.max(0, extraMs);
   const wait = floor - (Date.now() - t0);
   if (wait <= 0) {
     // Only reachable when the real work took longer than the floor, which means
@@ -1051,7 +1074,13 @@ api.post("/user/login", async (req, res) => {
   // own failures. See answerLoginAt.
   const t0 = Date.now();
   const { email, totp } = req.body || {};
-  if (!email || !totp) return res.status(400).json({ error: "missing_fields" });
+  // typeof, not truthiness. `{"email": {}}` is truthy and reached
+  // loginRate.emailFailures -> String(email).trim().toLowerCase(), which threw,
+  // so the route answered 500 in about a millisecond: an unhandled throw on an
+  // unauthenticated route, and the fastest answer the handler had.
+  if (typeof email !== "string" || typeof totp !== "string" || !email || !totp) {
+    return res.status(400).json({ error: "missing_fields" });
+  }
 
   const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
 
@@ -1181,7 +1210,13 @@ api.post("/user/login-with-backup", async (req, res) => {
   // slept out.
   const t0 = Date.now();
   const { email, backup_code } = req.body || {};
-  if (!email || !backup_code) return res.status(400).json({ error: "missing_fields" });
+  // typeof, not truthiness. `{"email": {}}` is truthy, reaches
+  // String(email).toLowerCase() two lines down, and used to answer 500 in about
+  // a millisecond, which is both an unhandled throw on an unauthenticated route
+  // and the fastest answer this handler has.
+  if (typeof email !== "string" || typeof backup_code !== "string" || !email || !backup_code) {
+    return res.status(400).json({ error: "missing_fields" });
+  }
 
   // This is an unauthenticated, session-granting factor. Without throttling,
   // each wrong code triggers up to 10x 64MB argon2id verifications on the relay
@@ -1192,11 +1227,22 @@ api.post("/user/login-with-backup", async (req, res) => {
   const emailHash = crypto.createHash('sha256').update(String(email).toLowerCase().trim()).digest('hex');
   if (!(await webauthn.rateHit(redis(), `bk:ip:${ip}`, 10, 900)))
     return res.status(429).json({ error: "rate_limited" });
-  if (!(await webauthn.rateHit(redis(), `bk:email:${emailHash}`, 5, 900)))
-    return res.status(429).json({ error: "rate_limited" });
+  // Counted, because this route charges an escalating cost as well as refusing
+  // at the ceiling. The hit happens before findUserByEmail, so the number is the
+  // same for an address with an account and one without, which is the only
+  // reason it can be used as the throttle for both.
+  const bkHit = await webauthn.rateHitCounted(redis(), `bk:email:${emailHash}`, loginRate.BACKUP_ATTEMPT_LIMIT, 900);
+  if (!bkHit.allowed) return res.status(429).json({ error: "rate_limited" });
+  // The relay's per-account delay is suppressed on this route
+  // (throttled_upstream below), so the cost of guessing is charged here instead,
+  // against a counter that does not know whether the account exists. See
+  // lib/login-ratelimit.js backupThrottleMs.
+  const bkThrottleMs = loginRate.backupThrottleMs(bkHit.count - 1);
+  const backupAnswer = (status, body) =>
+    answerLoginAt(t0, res, status, body, bkThrottleMs, LOGIN_BACKUP_MIN_ANSWER_MS);
 
   const user = await findUserByEmail(email);
-  if (!user) return answerLoginAt(t0, res, 401, { error: "invalid_credentials" });
+  if (!user) return backupAnswer(401, { error: "invalid_credentials" });
 
   // throttled_upstream, for the reason given on /user/login: the relay's
   // per-account delay is only ever charged to an address that exists. What
@@ -1210,10 +1256,10 @@ api.post("/user/login-with-backup", async (req, res) => {
   });
   // Guard the relay response parse: a relay error / non-JSON body must surface
   // as 502 (relay failure), not a 500 from an unhandled JSON.parse throw.
-  if (!consumeRes.ok) return answerLoginAt(t0, res, 502, { error: "relay_unreachable" });
+  if (!consumeRes.ok) return backupAnswer(502, { error: "relay_unreachable" });
   let result;
-  try { result = await consumeRes.json(); } catch { return answerLoginAt(t0, res, 502, { error: "relay_unreachable" }); }
-  if (!result || !result.valid) return answerLoginAt(t0, res, 401, { error: "invalid_credentials" });
+  try { result = await consumeRes.json(); } catch { return backupAnswer(502, { error: "relay_unreachable" }); }
+  if (!result || !result.valid) return backupAnswer(401, { error: "invalid_credentials" });
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await redis().set(
@@ -1223,7 +1269,7 @@ api.post("/user/login-with-backup", async (req, res) => {
   );
 
   setUserCookie(res, sessionToken);
-  return answerLoginAt(t0, res, 200, { success: true, email: user.email });
+  return backupAnswer(200, { success: true, email: user.email });
 });
 
 

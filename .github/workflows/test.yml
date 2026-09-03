@@ -224,6 +224,29 @@ jobs:
             exit 1
           fi
 
+      # The one admin suite that needs a REAL relay. Its backup-code case
+      # measures the cost of ten argon2 verifications, which is the whole
+      # finding, so a stub would be measuring the stub. This is the only job
+      # with the engine built, so it is the only job that can run it, and the
+      # admin job declares it as a skip by name.
+      - name: Install admin dependencies
+        working-directory: admin
+        run: npm ci
+      - name: Admin login timing against a real relay
+        working-directory: admin
+        env:
+          REDIS_URL: redis://127.0.0.1:6399
+        run: |
+          set -o pipefail
+          node --test --test-reporter=tap test/login-timing.test.js 2>&1 | tee /tmp/admin-timing.log
+          # It must not have skipped here: this job has the engine.
+          if grep -q 'SKIP \[relay\]' /tmp/admin-timing.log; then
+            echo "::error::the backup-code timing case skipped in the job that builds the engine."
+            exit 1
+          fi
+          silent=$(grep -oE '^# [a-z0-9-]+: SKIPPED - 0 checks ran' /tmp/admin-timing.log || true)
+          if [ -n "$silent" ]; then echo "silent suite(s):"; echo "$silent"; exit 1; fi
+
   relay-unit-tests:
     name: relay - unit suite (no native deps)
     runs-on: ubuntu-latest
@@ -353,6 +376,14 @@ jobs:
           --health-retries 10
     env:
       REDIS_URL: redis://127.0.0.1:6399
+      # login-timing's backup-code case boots a real relay.js for its argon2
+      # cost, and relay.js will not start without @paramant/core, which is a
+      # file-link to the sibling repo and is built only in relay-crypto-tests.
+      # Declared by name here, and that job runs the suite for real; see the
+      # step "Admin login timing against a real relay" there. Without the
+      # declaration the case is a hard failure, which is the point: it cannot
+      # quietly stop running in both jobs at once.
+      ADMIN_TEST_SKIP: relay
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

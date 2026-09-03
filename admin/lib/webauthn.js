@@ -43,10 +43,18 @@ const LIMITS = {
 // Returns true if this hit is within the limit. `bucket` already encodes scope
 // (e.g. 'lv:ip:1.2.3.4' or 'lv:acct:<hash>').
 async function rateHit(redisClient, bucket, limit, windowSec) {
+  return (await rateHitCounted(redisClient, bucket, limit, windowSec)).allowed;
+}
+
+// The same hit, with the count. A caller that has to charge an escalating cost
+// (rather than only refuse at the ceiling) needs to know how far into its
+// budget this attempt is; `count` is the post-increment value, so the attempts
+// BEFORE this one are count - 1.
+async function rateHitCounted(redisClient, bucket, limit, windowSec) {
   const k = `paramant:webauthn:rl:${bucket}`;
   // A lost expiry here refuses this bucket for good; see lib/redis-counter.js.
   const n = await incrInWindow(redisClient, k, windowSec);
-  return n <= limit;
+  return { allowed: n <= limit, count: n };
 }
 
 // Hash an account/email scope so the rate-limit key never stores PII.
@@ -92,6 +100,6 @@ async function takeRegFlow(redisClient, flowId) {
 module.exports = {
   RP_ID, RP_NAME, EXPECTED_ORIGIN,
   counterIsAcceptable,
-  LIMITS, rateHit, scopeHash,
+  LIMITS, rateHit, rateHitCounted, scopeHash,
   newFlowId, putAuthFlow, takeAuthFlow, putRegFlow, takeRegFlow,
 };

@@ -805,6 +805,17 @@ curl -X POST https://paramant.app/api/user/auth/login-with-backup \
 
 Backup codes are single-use. The account is re-locked after use; a new TOTP enrollment is required.
 
+**This route is floored too, and higher.** A wrong backup code is verified
+against every stored hash, so a miss costs ten argon2id verifications at 64 MiB:
+about half a second, and an address with no account pays none of it. Every
+credential answer is held to `PARAMANT_LOGIN_BACKUP_MIN_ANSWER_MS` (default
+1500 ms) plus 250 ms per prior attempt on that address past the first, capped at
+2000 ms. Five attempts per address and ten per source address per fifteen
+minutes are refused outright with a 429.
+
+A body whose `email` or `backup_code` is not a string is a `400 missing_fields`,
+the same answer for every caller.
+
 ### POST /api/user/auth/logout
 
 ```bash
