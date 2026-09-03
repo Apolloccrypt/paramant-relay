@@ -359,7 +359,13 @@ check_npm_audit() {
       record audit "npm audit $label" red "no package-lock.json in $dir, so nothing was audited"
       continue
     fi
+    # Two attempts. npm audit is a network call to the registry and a single
+    # hiccup there is not a finding about Paramant; a second failure still ends
+    # red, so this shortens the odds without giving the check a way out.
     out=$(cd "$REPO_ROOT/$dir" && "$NPM" audit --json 2>/dev/null)
+    if ! printf '%s' "$out" | grep -q '"vulnerabilities"'; then
+      out=$(cd "$REPO_ROOT/$dir" && "$NPM" audit --json 2>/dev/null)
+    fi
     # Parsed with node, not sed. The report has a "high" key at more than one
     # depth and a regex picks whichever comes first in the byte stream, which is
     # not necessarily the metadata total.
@@ -402,12 +408,10 @@ check_rust_audit() {
   need_tool "$CURL" audit || return
 
   # Why OSV and not `cargo audit --json`: the RustSec advisory record carries a
-  # CVSS vector string and no severity word. A gate written against a
-  # `severity` field it does not have reads undefined for every advisory,
-  # classifies all of them as unrated and passes forever. That is the same shape
-  # as a canary that reports its own skip as a pass, so the severity comes from
-  # a source that actually states one. cargo audit stays useful by hand; it is
-  # not what this gate reads.
+  # CVSS vector and no severity word, so a gate written against a `severity`
+  # field reads undefined for every advisory and passes forever. The severity
+  # comes from a source that states one, and is turned into a word by
+  # scripts/security/osv-severity.mjs, which that file explains at length.
   local query
   query=$(node -e '
     const fs = require("fs");
@@ -432,53 +436,71 @@ check_rust_audit() {
   local batch
   batch=$("$CURL" -sS --max-time 60 -X POST -H 'Content-Type: application/json' \
     -d "$query" https://api.osv.dev/v1/querybatch 2>/dev/null)
+  # results must line up one-for-one with the crates asked about. A short or
+  # empty array is a truncated answer, and reading "no vulns" out of it would
+  # turn an outage into a clean bill of health for 114 crates.
   local ids
   ids=$(printf '%s' "$batch" | node -e '
     let raw = "";
     process.stdin.on("data", d => raw += d);
     process.stdin.on("end", () => {
       try {
+        const want = Number(process.argv[1]);
         const r = JSON.parse(raw).results;
-        if (!Array.isArray(r)) throw new Error("no results");
+        if (!Array.isArray(r)) throw new Error("results is not an array");
+        if (r.length !== want) throw new Error("results " + r.length + " for " + want + " crates");
         const out = [];
-        for (const entry of r) for (const v of entry.vulns || []) out.push(v.id);
+        for (const entry of r) for (const v of (entry && entry.vulns) || []) out.push(v.id);
         process.stdout.write(out.join(" "));
-      } catch { process.exit(1); }
+      } catch (e) { process.stderr.write(e.message); process.exit(1); }
     });
-  ' 2>/dev/null)
+  ' "$crates" 2>"$ROWS_FILE.osverr")
   if [ $? -ne 0 ]; then
-    record audit "rust audit $CARGO_DIR" red "the advisory service returned nothing parseable for $crates crates"
+    record audit "rust audit $CARGO_DIR" red "the advisory service did not answer for all $crates crates: $(cat "$ROWS_FILE.osverr" 2>/dev/null)"
+    rm -f "$ROWS_FILE.osverr"
+    return
+  fi
+  rm -f "$ROWS_FILE.osverr"
+
+  if [ -z "$ids" ]; then
+    record audit "rust audit $CARGO_DIR" green "no advisories at all over $crates locked crates"
     return
   fi
 
-  local bad="" seen="" id detail sev
+  # One detail request per advisory, concatenated as json lines, classified in
+  # a single pass.
+  local details id detail
+  details="$ROWS_FILE.osv"
+  : >"$details"
   for id in $ids; do
     detail=$("$CURL" -sS --max-time 30 "https://api.osv.dev/v1/vulns/$id" 2>/dev/null)
-    sev=$(printf '%s' "$detail" | node -e '
-      let raw = "";
-      process.stdin.on("data", d => raw += d);
-      process.stdin.on("end", () => {
-        try {
-          const d = JSON.parse(raw);
-          const s = (d.database_specific && d.database_specific.severity) || "";
-          process.stdout.write(String(s).toLowerCase() || "unrated");
-        } catch { process.exit(1); }
-      });
-    ' 2>/dev/null)
-    if [ -z "$sev" ]; then
-      # An advisory whose severity cannot be read is red. Guessing it low would
-      # be the escape hatch this whole script is built to avoid.
-      bad="$bad $id(unreadable)"
-      continue
-    fi
-    case "$sev" in
-      high|critical) bad="$bad $id($sev)" ;;
-      *) seen="$seen $id($sev)" ;;
-    esac
+    # An empty or multi-line answer must still occupy a line, or the classifier
+    # silently sees fewer advisories than were found.
+    printf '%s\n' "$(printf '%s' "${detail:-{\}}" | tr -d '\n')" >>"$details"
   done
 
+  local verdicts
+  verdicts=$(node "$REPO_ROOT/scripts/security/osv-severity.mjs" <"$details" 2>/dev/null)
+  local want got
+  want=$(printf '%s\n' "$ids" | tr ' ' '\n' | grep -c .)
+  got=$(printf '%s\n' "$verdicts" | grep -c .)
+  rm -f "$details"
+  if [ -z "$verdicts" ] || [ "$got" -ne "$want" ]; then
+    record audit "rust audit $CARGO_DIR" red "classified $got of $want advisories; the rest could not be read"
+    return
+  fi
+
+  local bad="" seen="" line vid band why
+  while IFS=$'\t' read -r vid band why; do
+    [ -z "$vid" ] && continue
+    case "$band" in
+      high|critical|unknown) bad="$bad $vid($band: $why)" ;;
+      *) seen="$seen $vid($band)" ;;
+    esac
+  done <<<"$verdicts"
+
   if [ -n "$bad" ]; then
-    record audit "rust audit $CARGO_DIR" red "high or critical advisories against the locked tree:$bad"
+    record audit "rust audit $CARGO_DIR" red "high, critical or unrated advisories against the locked tree:$bad"
   else
     record audit "rust audit $CARGO_DIR" green "0 high or critical over $crates locked crates"
   fi
@@ -523,9 +545,17 @@ check_robots_sitemap() {
   local disallows
   disallows=$(printf '%s\n' "$robots" | sed -n 's/^[Dd]isallow: *//p' | grep -v '^$')
 
-  local bad_status="" bad_disallow="" loc code path rule
+  local bad_status="" bad_disallow="" bad_host="" loc code path rule
   while IFS= read -r loc; do
     [ -z "$loc" ] && continue
+    # The sitemap is fetched over the network, so its contents are input, not
+    # instruction. Anything that is not our own origin does not get requested:
+    # a scanner that follows whatever a <loc> says is a scanner that can be
+    # aimed at a third party by editing one file on the web server.
+    case "$loc" in
+      "https://$APEX"|"https://$APEX"/*|https://*.paramant.app|https://*.paramant.app/*) ;;
+      *) bad_host="$bad_host $loc"; continue ;;
+    esac
     code=$("$CURL" -sS --max-time "$CURL_TIMEOUT" -o /dev/null -w '%{http_code}' "$loc" 2>/dev/null)
     if [ "$code" != 200 ]; then
       bad_status="$bad_status $loc=${code:-none}"
@@ -550,6 +580,12 @@ check_robots_sitemap() {
     record seo "no sitemap url is disallowed" red "robots.txt blocks:$bad_disallow"
   else
     record seo "no sitemap url is disallowed" green "checked against $(printf '%s\n' "$disallows" | grep -c .) disallow rules"
+  fi
+
+  if [ -n "$bad_host" ]; then
+    record seo "every sitemap url is ours" red "off-origin urls, not requested:$bad_host"
+  else
+    record seo "every sitemap url is ours" green "all $total on paramant.app"
   fi
 }
 

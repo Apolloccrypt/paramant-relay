@@ -56,8 +56,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
       - name: The scanner parses
@@ -102,8 +102,8 @@ jobs:
     # turns a hung relay into a red run instead of a job that sits there.
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
 
@@ -122,7 +122,7 @@ jobs:
       # Always, and a red run's report is the more useful of the two.
       - name: Keep the evidence
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: security-posture-${{ github.run_id }}
           path: security-posture-evidence/
@@ -151,31 +151,30 @@ jobs:
 
       - name: Open or update the issue when the posture is red
         if: failure()
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const fs = require('fs');
-            const read = (p, d) => { try { return fs.readFileSync(p, 'utf8'); } catch { return d; } };
             let scan = null;
-            try { scan = JSON.parse(read('security-posture-evidence/posture.json', 'null')); } catch {}
+            try { scan = JSON.parse(fs.readFileSync('security-posture-evidence/posture.json', 'utf8')); } catch {}
             const title = 'Security posture rood';
-            const reds = scan ? scan.checks.filter(c => c.status === 'red') : [];
-            const lines = scan
-              ? (reds.length
-                  ? reds.map(c => `- **${c.group}** ${c.name}: ${c.detail}`).join('\n')
-                  : '- the scan ended red but listed no red measurement, which is itself the finding')
-              : '- the scan wrote no evidence, so it failed before it could report anything';
+            // COUNT AND LINK ONLY. This repository is public and so is every
+            // issue in it. An earlier draft pasted the full list of red
+            // measurements here, which would have published lines like "the
+            // unauthenticated issuing route is reachable again", naming an open
+            // door on production to anyone reading. The detail belongs in the
+            // artifact, which only someone who can already see the Actions tab
+            // can download. An alarm says that something is wrong and where to
+            // look; it does not narrate the weakness to the street.
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const head = scan
-              ? `**${scan.red} red of ${scan.checks.length} measurements, taken ${scan.stamp} from outside.**`
-              : '**The scan produced no evidence.**';
+              ? `**${scan.red} of ${scan.checks.length} posture measurements are red**, taken ${scan.stamp} from outside.`
+              : '**The scan produced no evidence**, so it failed before it could measure anything.';
             const body = [
               head,
               '',
-              lines,
-              '',
-              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              `Evidence: the security-posture-${context.runId} artifact on that run carries the full report`,
-              'and the json behind every line above.',
+              `Which ones, and what each of them found, is in the run: ${runUrl}`,
+              `Download the \`security-posture-${context.runId}\` artifact there for the full report.`,
               '',
               `_${new Date().toISOString()}_`,
             ].join('\n');
@@ -201,7 +200,7 @@ jobs:
 
       - name: Close the issue when the posture is green again
         if: success()
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const open = await github.rest.issues.listForRepo({
