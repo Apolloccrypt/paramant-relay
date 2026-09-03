@@ -33,6 +33,7 @@ const redisCounter  = require('./lib/redis-counter');   // INCR that always carr
 const rateLimit     = require('./lib/rate-limit');
 const authThrottle  = require('./lib/auth-throttle');
 const authGate      = require('./lib/auth-gate');
+const sessionTokens = require('./lib/session-token'); // pst_ ParaSend session tokens
 const userSigning   = require('./lib/user-signing');
 const userWebauthn  = require('./lib/user-webauthn');
 const tiers         = require('./lib/tiers');
@@ -210,7 +211,7 @@ const ALLOWED = {
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream',
                '/v2/ack','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
-               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
+               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session','/v2/session-token',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
                '/v2/sth','/v2/verify-receipt','/v2/transfers','/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v1'],
@@ -218,7 +219,7 @@ const ALLOWED = {
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/ack','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
-               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session',
+               '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session','/v2/session-token',
                '/v2/relays','/v2/sign-dpa','/v2/sth','/v2/verify-receipt','/v2/transfers',
                '/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v1'],
@@ -1339,6 +1340,37 @@ const apiKeys    = new Map();  // key → {plan, active, label, dsa_pub, account
 const accounts   = new Map();  // account_id → {account_id, plan, email, primary_api_key, label}  (stap 1: account_id == key)
 const accountKeys = new Map(); // account_id → Set<api_key>  (reverse index for per-account cap + listing)
 const kidIndex   = new Map();  // kid → api_key  (non-secret key id for URLs/listings)
+// sha256(api_key) → api_key. A ParaSend session-token record names its owner by
+// hash, never in the clear, so a read-only leak of the store (an RDB snapshot,
+// a replica, a backup, a MONITOR session) carries no live pgp_ key. This map is
+// the way back, and it exists only in this process's memory: nothing derives a
+// key from a hash, it is looked up in the table the relay already has.
+const apiKeyByHash = new Map();
+let _hashIndexBuiltAt = 0;
+function rebuildApiKeyHashIndex() {
+  apiKeyByHash.clear();
+  for (const k of apiKeys.keys()) apiKeyByHash.set(sessionTokens.keyHash(k), k);
+  _hashIndexBuiltAt = Date.now();
+  return apiKeyByHash.size;
+}
+// Resolve a hash, self-healing. The index is rebuilt on load and on
+// /v2/reload-users, which is where the table normally changes, but keys are
+// also created at run time (/v2/admin/keys, team keys, the claim flow) without
+// going through either. So a miss rebuilds and asks again, and a hit is checked
+// against apiKeys, which means a stale entry can never resolve to a key that is
+// gone. The rebuild is bounded: it runs when the table changed size, and
+// otherwise at most once a second, so a flood of invented hashes cannot turn a
+// lookup into a full scan per request.
+function apiKeyFromHash(hash) {
+  const hit = apiKeyByHash.get(hash);
+  if (hit && apiKeys.has(hit)) return hit;
+  if (apiKeyByHash.size !== apiKeys.size || Date.now() - _hashIndexBuiltAt > 1000) {
+    rebuildApiKeyHashIndex();
+    const again = apiKeyByHash.get(hash);
+    if (again && apiKeys.has(again)) return again;
+  }
+  return null;
+}
 // Resolve a key to its account_id. For every loaded key account_id is preset
 // (stap 1); for a legacy 1:1 key account_id === apiKey, so device/pubkey/webhook
 // keys built from acctOf(apiKey) are byte-identical to the old apiKey-scoped
@@ -2084,7 +2116,7 @@ function mintParasignKey(accountId, opts = {}) {
 
 function loadUsers() {
   if (process.env.USERS_JSON) {
-    try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",email:k.email||"",active:true,created:k.created||null,...keysTable.parseAccountFields(k)}); }); keysTable.rebuildKeyIndexes(apiKeys,accounts,accountKeys,kidIndex,log); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
+    try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",email:k.email||"",active:true,created:k.created||null,...keysTable.parseAccountFields(k)}); }); keysTable.rebuildKeyIndexes(apiKeys,accounts,accountKeys,kidIndex,log); rebuildApiKeyHashIndex(); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
   }
   try {
     const d = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
@@ -2100,6 +2132,7 @@ function loadUsers() {
       });
     });
     keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log);
+    rebuildApiKeyHashIndex();
     log('info', 'users_loaded', { count: apiKeys.size, sector: SECTOR });
   } catch(e) { log('warn', 'no_users_file'); }
 }
@@ -2125,7 +2158,7 @@ function loadTrialKeys() {
         }
       } catch {}
     }
-    if (loaded > 0) { keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log); log('info', 'trial_keys_loaded', { count: loaded }); }
+    if (loaded > 0) { keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log); rebuildApiKeyHashIndex(); log('info', 'trial_keys_loaded', { count: loaded }); }
   } catch(e) { /* file may not exist yet */ }
 }
 
@@ -2485,7 +2518,13 @@ async function handleRelayRequest(req, res) {
   const parsed  = url_.parse(req.url, true);
   const path    = parsed.pathname;
   const query   = parsed.query;
-  const apiKey  = (req.headers['x-api-key'] || '').trim();
+  // `let`, not `const`: a ParaSend session token (pst_) resolves BELOW into the
+  // api-key it was minted for, and everything downstream -- acctOf, the audit
+  // chain, the device queues, the quota gates -- then behaves exactly as it
+  // would for a request that carried that key itself. That identity is the
+  // point: a token is a narrower way to present the same account, never a
+  // second account with a history of its own.
+  let apiKey = (req.headers['x-api-key'] || '').trim();
   // Reject any request that passes the API key as a query-string parameter.
   // Query strings appear in server logs, browser history, and proxy access logs.
   if (query.k) {
@@ -2502,6 +2541,34 @@ async function handleRelayRequest(req, res) {
   if (!apiKey && didHeader && didSig) {
     didAuthEntry = authByDid(didHeader, didSig, { method: req.method, url: req.url, ts: didTs, nonce: didNonce });
     if (didAuthEntry) log('info', 'did_auth_mode', { did: didHeader.slice(0,30) });
+  }
+  // ── ParaSend session token (Authorization: Bearer pst_...) ─────────────────
+  // Only when no X-Api-Key was sent: a request that carries a real key is that
+  // key's request, and a token may never widen or narrow it. The token resolves
+  // to the api-key it was minted for; from here on the request IS that key's,
+  // with one difference, enforced a few lines down: the scope allowlist.
+  //
+  // The refusals are all silent by design. A bad token yields no principal and
+  // the ordinary 401 gate answers it, the same 401 an unknown api-key gets, so
+  // nothing here separates "no such token" from "expired" from "revoked".
+  //
+  // Redis down is NOT a refusal. Without a store no token can be checked, and
+  // answering 401 would tell a legitimate holder their credential is bad. It is
+  // a 503, so the browser retries instead of throwing the sender back to login.
+  const _bearer = sessionTokens.bearerToken(req.headers['authorization'] || '');
+  let viaSessionToken = false;
+  if (!apiKey && sessionTokens.isSessionToken(_bearer)) {
+    if (!redisClient) {
+      res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '5' });
+      return res.end(J({ error: 'redis_unavailable', hint: 'session tokens need the relay store' }));
+    }
+    try {
+      const _pst = await sessionTokens.resolve(redisClient, _bearer, apiKeyFromHash);
+      if (_pst) { apiKey = _pst.key; viaSessionToken = true; }
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      throw err;
+    }
   }
   const dsaSig  = req.headers['x-dsa-signature'] || '';
   // DID-auth NEVER mints its own principal. A DID only authenticates as the API
@@ -2546,6 +2613,25 @@ async function handleRelayRequest(req, res) {
     return res.end(J({ ok: true, relay: SECTOR, version: VERSION, status: 'operational', protocol: 'ghost-pipe-v2', docs: 'https://paramant.app/docs' }));
   }
   if (!modeAllows(path)) { res.writeHead(405); return res.end(J({ error: 'Not available in this relay mode', mode: RELAY_MODE })); }
+
+  // ── The scope of a ParaSend session token ──────────────────────────────────
+  // Here, and not inside the five routes it opens. A gate that each route had
+  // to remember to call is a gate that the sixty-ninth route forgets, and the
+  // whole value of this credential is that it is provably narrower than an
+  // api-key. So it sits above every route comparison in this function: an
+  // allowlist, checked once, with no way past it.
+  //
+  // 403 rather than 401 on purpose. The token is real and the account is real;
+  // what is missing is authority for THIS route, and a 401 would send the page
+  // off to mint a replacement that would be refused in exactly the same way.
+  if (viaSessionToken && !sessionTokens.scopeAllows(req.method, path)) {
+    log('warn', 'session_token_out_of_scope', { method: req.method, path });
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    return res.end(J({
+      error: 'session_token_out_of_scope',
+      hint: 'a pst_ session token opens the ParaSend transfer routes only; use an API key for anything else',
+    }));
+  }
 
   // ── Code-transparency manifest: publiek leesbaar, vóór de /v1-Bearer-gate ───
   // The SHA3-256 inventory of the deployed frontend, CT-anchored on publish.
@@ -2922,6 +3008,67 @@ async function handleRelayRequest(req, res) {
   function _internalReject() {
     res.writeHead(401, { "Content-Type": "application/json" });
     res.end(J({ error: "unauthorized" }));
+  }
+
+  // ── POST /v2/session-token: mint a ParaSend session token ──────────────────
+  // Called by the admin panel on behalf of a logged-in user, never by a
+  // browser. Two credentials have to line up:
+  //
+  //   X-Internal-Auth   the admin plane speaking, same gate as every /v2/user/*
+  //                     route. Not configured means closed (auth-gate treats a
+  //                     missing token as closed), like every internal endpoint.
+  //   X-Api-Key         the account the token will speak for. The admin sends
+  //                     the session's own key through proxyApiKey(), so the
+  //                     browser never gets to name an account: it can only ever
+  //                     be handed a token for the account it is signed in as.
+  //
+  // A token may not mint another token. It cannot reach here anyway -- the
+  // scope allowlist refuses this path far above -- but the check is written out
+  // rather than inferred, because "an unreachable path" is a property of code
+  // somewhere else and this is the line that must not be wrong.
+  if (req.method === 'POST' && path === '/v2/session-token') {
+    if (!_internalOk()) return _internalReject();
+    if (viaSessionToken) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'session_token_out_of_scope', hint: 'a session token cannot mint another one' }));
+    }
+    const owner = apiKeys.get(apiKey);
+    if (!owner || !owner.active) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
+    }
+    if (!redisClient) {
+      res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '5' });
+      return res.end(J({ error: 'redis_unavailable', hint: 'session tokens need the relay store' }));
+    }
+    try {
+      const minted = await sessionTokens.mint(redisClient, apiKey);
+      // The per-account ceiling. Twenty live tokens is far above any honest
+      // use of a page that mints one per load, so this is a signed-in session
+      // being used as a credential factory. 429 rather than 403: the account is
+      // fine and the answer changes on its own as the tokens expire.
+      if (minted.capped) {
+        log('warn', 'session_token_capped', {
+          account: String(owner.account_id || apiKey).slice(0, 12), live: minted.live, cap: minted.cap,
+        });
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+        return res.end(J({ error: 'session_token_cap_reached', cap: minted.cap }));
+      }
+      log('info', 'session_token_minted', {
+        account: String(owner.account_id || apiKey).slice(0, 12),
+        ttl_s: minted.expires_in_s,
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({
+        ok: true,
+        token: minted.token,
+        expires_ms: minted.expires_ms,
+        expires_in_s: minted.expires_in_s,
+      }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      throw err;
+    }
   }
 
   // POST /v2/user/setup-totp
@@ -4417,6 +4564,7 @@ async function handleRelayRequest(req, res) {
     apiKeys.clear();
     candidate.forEach((v, k) => apiKeys.set(k, v));
     keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log);
+    rebuildApiKeyHashIndex();
 
     applyKeyLimitEnforcement();
     log('info', 'reload_users', { prev: prevCount, now: apiKeys.size, delta: apiKeys.size - prevCount });
@@ -4908,7 +5056,14 @@ async function handleRelayRequest(req, res) {
       const deviceId = meta?.device_id;
       incMetric('blobs_stored'); incMetric('bytes_in_total', blob.length);
       stats.inbound++; stats.bytes_in += blob.length;
-      auditAppend(apiKey, 'inbound', { hash: hash.slice(0,16)+'...', bytes: blob.length, device: deviceId, sig: sigResult.valid ? 'ML-DSA-OK' : 'unsigned' });
+      // `via` marks the credential, not a second identity. The chain is the
+      // owner's, keyed on the owner's api-key exactly as it is for a request
+      // that carried the key, and only the field says the fifteen-minute token
+      // was what presented it. Without it an account owner reading their own
+      // audit log cannot tell a transfer made from a browser session apart from
+      // one made with the key itself, which is the difference that matters when
+      // they are trying to work out what happened.
+      auditAppend(apiKey, 'inbound', { hash: hash.slice(0,16)+'...', bytes: blob.length, device: deviceId, sig: sigResult.valid ? 'ML-DSA-OK' : 'unsigned', ...(viaSessionToken ? { via: 'pst' } : {}) });
       log('info', 'blob_stored', { hash: hash.slice(0,16), size: blob.length, sig: sigResult.valid });
       // ParaSend Pro upload notification (no-op below Pro+ or without RESEND key).
       transferNotify.maybeNotify({ keyData, event: 'upload', hashPrefix: hash, bytes: blob.length, sendEmail: sendResendEmail });
@@ -5584,6 +5739,18 @@ async function handleRelayRequest(req, res) {
         ud.updated = new Date().toISOString();
       }).then(() => log('info', 'key_revoked_via_admin', { key: revokedKey.slice(0,16), persisted: true }))
         .catch(we => log('warn', 'key_revoke_persist_failed', { err: we.message }));
+      // Every live ParaSend session token for this key, gone from the shared
+      // store, so the other four sectors stop honouring them too. Not awaited:
+      // the revocation itself is already done above (the key is inactive in
+      // this process and being persisted), and a slow redis must not hold up
+      // the answer. It is also not the only thing standing between a revoked
+      // key and a live token -- a resolved token is looked up in apiKeys like
+      // any other credential, so this sweep is the fast path, not the guarantee.
+      if (redisClient) {
+        sessionTokens.revokeForKey(redisClient, revokedKey)
+          .then(n => { if (n) log('info', 'session_tokens_revoked', { key: revokedKey.slice(0, 16), count: n }); })
+          .catch(e => log('warn', 'session_token_revoke_failed', { err: e.message }));
+      }
       // Fix 12: close active WebSocket connections for the revoked key
       const revokedWsClients = wsClients.get(revokedKey);
       if (revokedWsClients) {

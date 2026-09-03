@@ -42,6 +42,14 @@ for (const [label, header] of [
   ['a Bearer token that is not a psk_ key', 'Bearer abc123'],
   ['an unknown psk_ key', 'Bearer psk_live_neverissued0000000'],
   ['a revoked psk_ key', `Bearer ${REVOKED}`],
+  // The boundary between the two Bearer credentials this relay now has. A pst_
+  // ParaSend session token is resolved in relay.js, against redis, and it opens
+  // five /v2 routes; /v1 is the ParaSign developer API and knows only psk_
+  // keys. Neither may be mistaken for the other, and the direction that would
+  // hurt is this one: a token minted for a browser must not become a developer
+  // credential on an open API. The prefix is what separates them, so the case
+  // is written out rather than assumed.
+  ['a pst_ ParaSend session token', `Bearer pst_${'a'.repeat(64)}`],
 ]) {
   const r = openApi.authenticateBearer(header, keys);
   assert.strictEqual(r.ok, false, `${label} was accepted`);
@@ -70,5 +78,18 @@ const revoked = openApi.authenticateBearer(`Bearer ${REVOKED}`, keys);
 assert.strictEqual(unknown.code, revoked.code, 'unknown and revoked answer with different codes');
 assert.strictEqual(unknown.error, revoked.error, 'unknown and revoked answer with different errors');
 ok('an unknown key and a revoked key are indistinguishable from outside');
+
+// And the same boundary from the other side, so a reader of either suite finds
+// it: relay/lib/session-token.js refuses a psk_ key as a session token, and its
+// scope allowlist contains no /v1 path at all. Cheap to assert, and it is the
+// pair of facts that keeps the two Bearer namespaces from drifting together.
+const sessionTokens = require('../lib/session-token');
+assert.strictEqual(sessionTokens.isSessionToken(KEY), false, 'a psk_ key must not be readable as a session token');
+assert.strictEqual(sessionTokens.bearerToken(`Bearer ${KEY}`), KEY,
+  'the parse is shared and takes any Bearer; it is isSessionToken that refuses this one');
+assert.strictEqual(sessionTokens.scopeAllows('POST', '/v1/envelopes'), false,
+  'a session token must not reach the ParaSign developer API');
+assert.strictEqual(sessionTokens.scopeAllows('GET', '/v1/code-manifest'), false);
+ok('a psk_ key is not a session token, and a session token opens no /v1 route');
 
 console.log(`\nv1-bearer-gate: ${passed} checks passed`);

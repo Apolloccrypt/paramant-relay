@@ -87,12 +87,23 @@ async function stubRelay(state) {
     req.on('end', () => {
       let body = null;
       try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch (_) { body = null; }
-      state.calls.push({ method: req.method, path: url.pathname, body });
+      // Headers are recorded as well as the body. The mint route below is
+      // authenticated entirely by headers the browser does not have, so a suite
+      // that could only see the body could not tell a correct call from one
+      // that forgot the internal token and would fail closed in production.
+      state.calls.push({ method: req.method, path: url.pathname, body, headers: req.headers });
       const send = (status, payload) => {
         res.writeHead(status, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(payload));
       };
       if (url.pathname === '/v2/admin/keys') return send(200, { keys: state.accounts });
+      // POST /v2/session-token: the ParaSend session-token mint. Only answered
+      // when a suite asked for it by setting state.mintReply, so every other
+      // suite keeps the 404 it has today.
+      if (url.pathname === '/v2/session-token' && typeof state.mintReply === 'function') {
+        const out = state.mintReply(req.headers, body || {});
+        return send(out.status || 200, out.body !== undefined ? out.body : {});
+      }
       if (url.pathname === '/v2/user/verify-totp' || url.pathname === '/v2/user/consume-backup') {
         const backup = url.pathname.endsWith('consume-backup');
         const out = backup
