@@ -1889,6 +1889,25 @@ console.log('ui-truthfulness: the appearance switch says only what theme.js and 
 
   assert.match(parashare, /The person you send to has to be online while you send; you confirm a short code together\./,
     '/parashare must say above step 1 that the receiver has to be there; a sender should not discover a live handshake on step 2');
+
+  // The sentence above became a sentence about ONE of two stands the moment
+  // /parashare grew "Send a link", so it may only be shown while that stand is
+  // chosen. Three things have to hold together or the page starts lying in one
+  // direction or the other: the chooser exists and offers both, the live
+  // sentence is the DEFAULT (the live stand is the one selected on arrival, so
+  // a sender who chooses nothing reads the promise that is true of what he is
+  // about to do), and the sentence is really swapped when the other stand is
+  // picked rather than left standing over a flow it does not describe.
+  // Sabotage: delete either mode card, flip aria-checked to the link card, or
+  // take the swap out of setSendMode, and this goes red.
+  assert.match(parashare, /id="ps-mode-live"[^>]*aria-checked="true"/,
+    'the live stand must be the one selected on arrival: it is the stand the sentence above step 1 describes');
+  assert.match(parashare, /id="ps-mode-link"[^>]*aria-checked="false"/,
+    'the "Send a link" stand must not be pre-selected while the live sentence stands above step 1');
+  assert.match(psJs, /note\.textContent = \(sendMode === 'link'\)/,
+    'setSendMode no longer swaps the live-handshake sentence; choosing "Send a link" would leave a promise on screen that that stand does not keep');
+  assert.match(psJs, /does not have to be online/,
+    'the "Send a link" stand must say the receiver does not have to be online; that is the whole reason it exists');
   // Above step 1 means above it, not somewhere on the page: the sentence has to
   // sit before the step-1 guide inside #step-setup.
   const setupAt = parashare.indexOf('id="step-setup"');

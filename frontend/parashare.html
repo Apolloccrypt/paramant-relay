@@ -40,6 +40,34 @@ h1{font-size:clamp(26px,5vw,38px);font-weight:600;letter-spacing:-.028em;line-he
 .ps-step.done:not(:last-child)::after{background:var(--sig-done)}
 @media (max-width:560px){.ps-step-label{font-size:9px;letter-spacing:.06em}.ps-stepper{gap:2px}}
 
+/* The two ways to send, offered before anything else on the page. A koper who
+   wants to mail a payslip to somebody who is not at a desk right now used to
+   read the live-handshake note, conclude the product could not do it, and
+   leave. Both stands are named in plain words, and the second one says what it
+   costs: the sealed file waits on our server. */
+.ps-mode{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:26px}
+@media (max-width:640px){.ps-mode{grid-template-columns:1fr}}
+.ps-mode-card{display:flex;flex-direction:column;gap:6px;text-align:left;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-1);background:var(--surface);color:var(--ink-2);font:inherit;cursor:pointer;transition:border-color var(--d-2) var(--e-standard),background var(--d-2) var(--e-standard)}
+.ps-mode-card:hover{border-color:var(--line-2)}
+.ps-mode-card[aria-checked="true"]{border-color:var(--accent);background:var(--surface-sunk);box-shadow:inset 2px 0 0 var(--accent)}
+.ps-mode-title{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.ps-mode-card[aria-checked="true"] .ps-mode-title{color:var(--ink-1)}
+.ps-mode-body{font-size:13px;line-height:1.6;color:var(--ink-2)}
+
+/* The links this browser session has minted. Not a receipt list: the relay
+   issues no signed delivery receipt on the /v2/dl path, so each row says what
+   GET /v2/dl/:token/info says plus this page's own clock, and the note under
+   the list says exactly that rather than dressing a status up as proof. */
+.ps-links{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.ps-link-row{border:1px solid var(--line);border-radius:var(--r-1);padding:12px 14px;background:var(--surface-sunk)}
+.ps-link-name{font-size:13.5px;font-weight:600;color:var(--ink-1);word-break:break-all}
+.ps-link-url{font-family:var(--mono);font-size:11px;color:var(--ink-2);word-break:break-all;margin-top:6px;line-height:1.55}
+.ps-link-meta{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--ink-3);margin-top:7px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.ps-link-state{font-weight:600}
+.ps-link-state.is-waiting{color:var(--sig-wait)}
+.ps-link-state.is-delivered{color:var(--sig-done)}
+.ps-link-state.is-expired{color:var(--ink-3)}
+
 /* Inline along-the-way guide -- explains what is happening at each step */
 .ps-guide{font-family:var(--sans);font-size:13.5px;line-height:1.62;color:var(--ink-2);padding:13px 15px;border:1px solid var(--line);border-left:2px solid var(--mark);background:var(--surface-sunk);margin-bottom:18px;border-radius:0 var(--r-1) var(--r-1) 0}
 .ps-guide strong{color:var(--ink-1);font-weight:600}
@@ -424,6 +452,23 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 
 <main id="main-content" style="position:relative;z-index:10">
 
+<!-- Two stands, chosen before anything else. The Send-a-link sentence carries
+     no times in the markup on purpose: the hours per plan are tiers.js
+     view_ttl_ms and are written in by parashare.page.js from the plan API
+     (GET /v2/check-key), so a tier change cannot leave a stale hour on the
+     page. Until that answer arrives the sentence says only what is true of
+     every plan. -->
+<div class="ps-mode" id="ps-mode" role="radiogroup" aria-label="How do you want to send this file">
+  <button type="button" class="ps-mode-card" id="ps-mode-live" role="radio" aria-checked="true" data-click="chooseModeLive">
+    <span class="ps-mode-title">Hand over live</span>
+    <span class="ps-mode-body">Both of you are online, you compare a code, and nothing is ever stored.</span>
+  </button>
+  <button type="button" class="ps-mode-card" id="ps-mode-link" role="radio" aria-checked="false" data-click="chooseModeLink">
+    <span class="ps-mode-title">Send a link</span>
+    <span class="ps-mode-body">The receiver opens it later. <span id="ps-mode-link-ttl">The sealed file waits on our server until its link expires, and a link from this web app is wiped after the first download.</span></span>
+  </button>
+</div>
+
 <!-- Stepper -- visible above the active step, updates as you move through -->
 <ol class="ps-stepper" id="ps-stepper" aria-label="Sending progress">
   <li class="ps-step active" data-step-key="setup">
@@ -618,6 +663,54 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   </div>
 </div>
 
+<!-- SEND A LINK: sealing and uploading. Its own step and not a shared one with
+     the live hand-over, for two reasons. The copy differs: there is no
+     receiver's public key here to wrap a session key for, so the sentence next
+     to the bar has to say what really happens. And tests/ui-truthfulness.test.mjs
+     pins that exactly one path reaches #step-encrypting, because the live
+     promise "the receiver has to be online" holds only while confirmFingerprint
+     is the single door into it. This stand walks its own door. -->
+<div class="step" id="step-sealing">
+  <h2 class="paramant-h1">Sealing &amp; uploading</h2>
+  <p class="sub">Your browser locks the file under a fresh AES-256-GCM key, then uploads the locked bytes. The key stays here and goes into the link, after the #, where no server ever sees it.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Upload progress</div></div>
+    <div class="card-body">
+      <div class="ps-progress-head">
+        <span class="status-line" id="seal-status">Starting...</span>
+        <span class="ps-pct" id="seal-pct" aria-live="polite">0%</span>
+      </div>
+      <div class="progress-bar-wrap" role="progressbar" id="seal-progress-track" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-bar" id="seal-progress"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- SEND A LINK: the link is ready. Reached only from the Send-a-link stand;
+     the live stand never shows this step. -->
+<div class="step" id="step-link">
+  <h2 class="paramant-h1">Your link is ready</h2>
+  <p class="sub">Send it any way you like. The key sits after the # in the link, which browsers never send to a server, so we cannot open the file even though we are holding it.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Sent links</div></div>
+    <div class="card-body">
+      <ul class="ps-links" id="ps-link-list"></ul>
+      <p class="ps-meta" id="ps-link-note">Each link works once. The first completed download wipes the file from our relay; if nobody opens it, it is destroyed when it expires.</p>
+      <p class="ps-meta" id="ps-link-receipt-note">There is no signed delivery receipt for a link download yet: the relay signs one for the API download path, not for this one. What a row says is the link's own status plus this page's clock, and it lives only as long as this tab.</p>
+      <button type="button" class="ps-copy" id="ps-link-refresh" data-click="refreshSentLinks">Check again</button>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;display:flex;gap:4px;flex-wrap:wrap">
+    <span class="tag green">AES-256-GCM in your browser</span>
+    <span class="tag green">Key in the URL fragment</span>
+    <span class="tag green">Spent by one download</span>
+  </div>
+
+  <button class="btn btn-outline" data-click="reload" style="margin-top:16px">Send another file</button>
+</div>
+
 <div class="step" id="step-done">
   <aside class="parapear-block is-success" aria-label="Transfer complete">
     <img class="parapear-img" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" loading="lazy" decoding="async" width="120" height="120">
@@ -709,7 +802,11 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
      two different contents under one immutable url is exactly what the ?v= is
      there to prevent, and check-cache-bust cannot see it because both sides
      agree on the number. -->
-<script src="/js/parashare.page.js?v=7" defer></script>
+<!-- One date format for the whole site (#424). The Send-a-link stand prints
+     an expiry moment, and a slashed locale date next to "24 hours on Pro"
+     is the exact ambiguity that file exists to kill. -->
+<script src="/js/format-date.js?v=1" defer></script>
+<script src="/js/parashare.page.js?v=8" defer></script>
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=8" defer></script>
 <footer>

@@ -4236,8 +4236,32 @@ async function handleRelayRequest(req, res) {
   if (path === '/v2/check-key') {
     if (!checkKeyRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests. Retry after 60 seconds.' })); }
     const kd = apiKeys.get(apiKey);
+    // How long a sealed file waits on the relay, in milliseconds, straight out
+    // of tiers.js. The "Send a link" chooser on /parashare has to name those
+    // times in its own first sentence, before a file is picked, and a sentence
+    // that carries hand-written hours is a sentence that goes stale the first
+    // time a tier changes. So the numbers are served, not written.
+    //
+    // Two fields because the page asks two different questions. `link_ttl_ms`
+    // is the ceiling THIS key is really held to, read through the ParaSend
+    // entitlement, so a ParaSend Pro buyer whose legacy `plan` still says
+    // community is told 24 hours and not 1 hour -- the same source POST
+    // /v2/inbound clamps against, so the page cannot promise what the upload
+    // will not give. `link_ttl_ms_by_plan` is the plain tiers.js table the
+    // chooser needs to say "1 hour on Community, 24 hours on Pro, 7 days on
+    // Business" to a reader who is on none of them yet.
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ valid: !!(kd?.active), plan: kd?.plan || null }));
+    return res.end(J({
+      valid: !!(kd?.active),
+      plan: kd?.plan || null,
+      link_ttl_ms: parasendLimitsOf(kd).limits.view_ttl_ms,
+      link_ttl_ms_by_plan: {
+        community:  tiers.tierLimit('community',  'view_ttl_ms'),
+        pro:        tiers.tierLimit('pro',        'view_ttl_ms'),
+        business:   tiers.tierLimit('business',   'view_ttl_ms'),
+        enterprise: tiers.tierLimit('enterprise', 'view_ttl_ms'),
+      },
+    }));
   }
 
   // ── GET /v2/lookup-signer/:pk_hash — public reverse-lookup for verifiers ──
