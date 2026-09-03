@@ -211,30 +211,64 @@ That is a real reduction and it is not a fix for cross-site scripting. The CSP
 on the site and the escaping in the pages remain the thing that stops a script
 running in the first place; this only bounds what one gets if it does.
 
-#### What is still open
+#### What was still open, and what closed it
 
-The `GET /api/user/account/key` reveal route still exists, and ParaSend was not
-its only caller. Three pages still fetch the raw key into the browser and use it
-as a relay credential:
+The `GET /api/user/account/key` reveal route existed and ParaSend was not its
+only caller: `/account`, `/pricing` and `/dashboard` each fetched the raw key
+into the browser and used it as a relay credential. The honest statement of the
+ceiling at the time was that on `/parashare` the key was gone, and on a browser
+that had loaded any of those three pages it was not.
 
-| Page | File | What it does with the key |
-|------|------|---------------------------|
-| `/account` | `frontend/js/account.inline1.js` | reveals it on the screen, deliberately |
-| `/pricing` | `frontend/js/pricing-billing.js` | `X-Api-Key` on `POST /v2/billing/checkout` |
-| `/dashboard` | `frontend/js/dashboard-history.js` | `X-Api-Key` on the usage and history reads |
+That is now closed, and closing it needed a second purpose rather than a wider
+scope.
 
-So the honest statement of the ceiling is this: on `/parashare` the key is gone,
-and on a browser that has loaded any of those three pages it is not. The route
-is reachable from any signed-in browser and answers with the raw key, so a
-script with a session cookie can also simply ask for it.
+**A token is minted FOR a purpose, and the purpose picks the allowlist.**
+`relay/lib/session-token.js` holds two lists. `SCOPE` is the ParaSend one and is
+unchanged: the five transfer routes above. `APP_SCOPE` is the new one and holds
+three routes, each because one page needed exactly it:
 
-Closing that is the next change, and it is not one line: `/pricing` and
-`/dashboard` need scoped credentials of their own (or server-side proxies, which
-is what `/api/user/documents` already does), and `/account` has to keep a way to
-show a key that a self-hoster genuinely needs. Recorded here rather than fixed,
-because a partial fix that removed the route would break three pages, and one
-that left it while claiming the key is out of the browser would be the same kind
-of untruth this section exists to correct.
+| Route | Page | Why |
+|-------|------|-----|
+| `POST /v2/billing/checkout` | `/pricing` | pressing a price button creates the Mollie payment |
+| `GET /v2/user/history` | `/dashboard` | the account's own send/envelope history, read-only |
+| `GET /v2/parasign/audit-export` | `/dashboard` | the account's own signing audit, read-only, Business+ |
+
+The two lists are **disjoint**. A token minted on `/parashare` is `403` on all
+three app routes, and a token minted on `/pricing` is `403` on all five transfer
+routes. Merging them into one flat allowlist would have widened the ParaSend
+token by three routes to give three other pages a credential they needed, which
+is how a narrow credential quietly becomes an api-key again. `/v2/user/history`
+is named on its own path, never as a prefix, so the rest of `/v2/user/*` (the
+signing-key and TOTP surface) stays shut under both purposes, as do `/v2/keys`,
+`/v2/outbound`, `/v2/audit`, `/v2/admin/*` and a second mint.
+
+The purpose is chosen by the ADMIN ROUTE, never by the caller:
+`POST /api/user/parasend/token` asks for `parasend` and
+`POST /api/user/app/token` asks for `app`, both ignore their request body, and a
+purpose the relay does not recognise is refused at the mint with `400
+unknown_purpose` rather than folded onto a default. A stored record with no
+purpose field predates this change and is a ParaSend token; a record carrying a
+purpose the running build does not know authenticates nobody at all.
+
+**What each page does now.**
+
+| Page | File | Credential |
+|------|------|------------|
+| `/account` | `frontend/js/account.inline1.js` | the reveal route, and only when the "Advanced account key" fold is opened. Nothing is fetched or rendered on load |
+| `/pricing` | `frontend/js/pricing-billing.js` | `Authorization: Bearer pst_...`, purpose `app`, minted on the first click |
+| `/dashboard` | `frontend/js/dashboard-history.js` | the same, minted on the click that needs it. `/dashboard` no longer prints a key in any form, masked included |
+
+`tests/app-pages-no-api-key.test.mjs` drives real Chromium over the three pages
+and fails if any of them asks for the key on load, or renders anything shaped
+like one.
+
+**What is left, stated plainly.** The reveal route still exists and still
+answers any signed-in browser with the raw key, because `/account` is the page
+whose job is to show it to you and a self-hoster genuinely needs it. So a script
+that runs on paramant.app with a session cookie can still ask for the key
+directly. What changed is that it no longer finds one lying in a variable on a
+page nobody opened for that reason, and that the two pages which used to put it
+there now run on a credential that expires and opens three routes.
 
 ---
 

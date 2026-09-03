@@ -85,9 +85,10 @@ after(async () => {
 });
 
 // Mint the way the admin does: the internal header plus the session's own key.
-async function mint(key = OWNER, server = srv) {
+async function mint(key = OWNER, server = srv, purpose = undefined) {
   const r = await server.post('/v2/session-token', {
     headers: { 'X-Internal-Auth': INTERNAL, 'X-Api-Key': key },
+    ...(purpose === undefined ? {} : { body: { purpose } }),
   });
   return r;
 }
@@ -220,6 +221,77 @@ test('THE SCOPE: every route outside the transfer path is 403, above the handler
     assert.strictEqual(r.status, 403, `${method} ${path} answered ${r.status}, not 403: ${r.text}`);
     assert.strictEqual(r.json.error, 'session_token_out_of_scope');
   }
+  did();
+});
+
+// ── 3b. The other purpose, over HTTP ─────────────────────────────────────────
+// /pricing and /dashboard run on a token minted with purpose `app`. What matters
+// on the wire is that the two purposes are not interchangeable: each opens its
+// own three-or-five routes and is 403 on the other's. A single flat allowlist
+// would pass the "app routes work" half of this and fail the wall below, which
+// is why both halves are here.
+
+test('an app-purpose token opens the three app routes and nothing from the transfer path', async (t) => {
+  if (!rc) return t.skip('no redis');
+  const minted = await mint(OWNER, srv, 'app');
+  assert.strictEqual(minted.status, 200, minted.text);
+  assert.strictEqual(minted.json.purpose, 'app', 'the relay must say what it minted');
+  const h = bearer(minted.json.token);
+
+  // In scope. The statuses are the routes' own answers (a community account is
+  // not entitled to history or the export, and checkout needs a real body), and
+  // any of them is proof the scope gate let the request through: the gate
+  // answers 403 with error session_token_out_of_scope and nothing else does.
+  for (const [method, path, body] of [
+    ['GET', '/v2/user/history', undefined],
+    ['GET', '/v2/parasign/audit-export', undefined],
+    ['POST', '/v2/billing/checkout', { product: 'parasend', plan: 'pro', interval: 'month' }],
+  ]) {
+    const r = await srv.req(method, path, { headers: h, body });
+    assert.notStrictEqual(r.json && r.json.error, 'session_token_out_of_scope',
+      `${method} ${path} was refused by scope, and it is what an app token is for: ${r.text}`);
+  }
+
+  // Out of scope: the whole ParaSend transfer path, which this token was never
+  // minted to walk.
+  for (const [method, path, body] of [
+    ['POST', '/v2/ws-ticket', undefined],
+    ['POST', '/v2/pubkey', { device_id: 'inv_' + 'a'.repeat(32), ecdh_pub: 'aa'.repeat(32), kyber_pub: 'bb'.repeat(32) }],
+    ['POST', '/v2/inbound', undefined],
+  ]) {
+    const r = await srv.req(method, path, { headers: h, body });
+    assert.strictEqual(r.status, 403, `${method} ${path} answered ${r.status}, not 403: ${r.text}`);
+    assert.strictEqual(r.json.error, 'session_token_out_of_scope');
+  }
+  did();
+});
+
+test('a ParaSend token is 403 on every app route: the two lists are disjoint', async (t) => {
+  if (!rc) return t.skip('no redis');
+  const { token } = (await mint()).json;
+  const h = bearer(token);
+  for (const [method, path, body] of [
+    ['GET', '/v2/user/history', undefined],
+    ['GET', '/v2/parasign/audit-export', undefined],
+    ['POST', '/v2/billing/checkout', { product: 'parasend', plan: 'pro', interval: 'month' }],
+  ]) {
+    const r = await srv.req(method, path, { headers: h, body });
+    assert.strictEqual(r.status, 403, `${method} ${path} answered ${r.status}, not 403: ${r.text}`);
+    assert.strictEqual(r.json.error, 'session_token_out_of_scope');
+  }
+  did();
+});
+
+test('an unknown purpose is refused at the mint, so no unusable token is ever handed out', async (t) => {
+  if (!rc) return t.skip('no redis');
+  const r = await mint(OWNER, srv, 'admin');
+  assert.strictEqual(r.status, 400, r.text);
+  assert.strictEqual(r.json.error, 'unknown_purpose');
+  // And the default is still the ParaSend one, so the admin route that predates
+  // purposes keeps working without sending a purpose at all.
+  const plain = await mint();
+  assert.strictEqual(plain.status, 200, plain.text);
+  assert.strictEqual(plain.json.purpose, 'parasend');
   did();
 });
 

@@ -5,10 +5,19 @@
  *   GET /v2/user/history            per-account send/envelope history (Pro+)
  *   GET /v2/parasign/audit-export   signing-audit export, CSV or JSON (Business+)
  *
- * Both are gated by X-Api-Key (a pgp_ key). The browser never stores that key:
- * it reveals the account's own primary key on demand via the session-cookie
- * endpoint /api/user/account/key (the same source the developer dashboard uses),
- * calls the relay, then drops it. A 403 renders an honest upgrade/lock message.
+ * THE CREDENTIAL. Both relay routes are authenticated. This file used to reveal
+ * the account's own pgp_ key through /api/user/account/key and send it as
+ * X-Api-Key: an unscoped credential with no expiry, in the tab for as long as
+ * it stayed open. It now runs on the short-lived scoped token /parashare got in
+ * #401. js/app-session-token.js mints a pst_ token with purpose `app`, the
+ * relay accepts it on exactly GET /v2/user/history,
+ * GET /v2/parasign/audit-export and POST /v2/billing/checkout, and refuses it
+ * on everything else, including every other route under /v2/user/*. Fifteen
+ * minutes, held in memory, never persisted. A 403 still renders an honest
+ * upgrade/lock message; a 401 mints once more before it is believed.
+ *
+ * Nothing is fetched when the page loads: the token is minted on the click that
+ * needs it. tests/app-pages-no-api-key.test.mjs pins that.
  *
  * ASCII-only. Vanilla JS, no libraries.
  */
@@ -51,22 +60,14 @@
     })[s] || (s || 'event');
   }
 
-  // Reveal (and cache for the page lifetime) the account's own primary pgp_ key
-  // via the session-cookie endpoint. Never persisted anywhere.
-  var _keyPromise = null;
-  function getApiKey() {
-    if (_keyPromise) return _keyPromise;
-    _keyPromise = fetch('/api/user/account/key', {
-      credentials: 'include', headers: { Accept: 'application/json' }, cache: 'no-store'
-    }).then(function (r) {
-      if (!r.ok) throw new Error('key_http_' + r.status);
-      return r.json();
-    }).then(function (j) {
-      var k = j && j.api_key;
-      if (!k) throw new Error('key_unavailable');
-      return k;
-    });
-    return _keyPromise;
+  // One relay call on an app session token. `send(token)` must return the fetch
+  // promise; paAppToken.withToken mints one, and mints a second and retries once
+  // if the relay answers 401, so a tab open past the fifteen minutes recovers
+  // instead of telling the reader to sign in again. The retry lives in the
+  // helper so this file and pricing-billing.js cannot drift apart on it.
+  function relayCall(send) {
+    if (!window.paAppToken) return Promise.reject(new Error('token_unavailable'));
+    return window.paAppToken.withToken(send);
   }
 
   function upsell(msg, planPath) {
@@ -94,13 +95,13 @@
     var orig = histLoad.textContent;
     histLoad.textContent = 'Loading...';
     histBody.innerHTML = '<div class="dh-ops-dim">Loading your history...</div>';
-    getApiKey().then(function (key) {
+    relayCall(function (tok) {
       return fetch('/v2/user/history?limit=100', {
-        headers: { 'X-Api-Key': key, Accept: 'application/json' }, cache: 'no-store'
-      }).then(function (r) {
-        return r.json().then(function (j) { return { status: r.status, body: j }; })
-          .catch(function () { return { status: r.status, body: {} }; });
+        headers: { Authorization: 'Bearer ' + tok, Accept: 'application/json' }, cache: 'no-store'
       });
+    }).then(function (r) {
+      return r.json().then(function (j) { return { status: r.status, body: j }; })
+        .catch(function () { return { status: r.status, body: {} }; });
     }).then(function (res) {
       histLoad.disabled = false; histLoad.textContent = orig;
       if (res.status === 200) { renderHistory(res.body && res.body.entries); return; }
@@ -139,16 +140,16 @@
     btn.textContent = 'Preparing...';
     var isCsv = format === 'csv';
     var url = isCsv ? '/v2/parasign/audit-export?format=csv' : '/v2/parasign/audit-export';
-    getApiKey().then(function (key) {
+    relayCall(function (tok) {
       return fetch(url, {
-        headers: { 'X-Api-Key': key, Accept: isCsv ? 'text/csv' : 'application/json' }, cache: 'no-store'
-      }).then(function (r) {
-        if (r.status === 200) {
-          return r.blob().then(function (blob) { return { status: 200, blob: blob }; });
-        }
-        return r.json().then(function (j) { return { status: r.status, body: j }; })
-          .catch(function () { return { status: r.status, body: {} }; });
+        headers: { Authorization: 'Bearer ' + tok, Accept: isCsv ? 'text/csv' : 'application/json' }, cache: 'no-store'
       });
+    }).then(function (r) {
+      if (r.status === 200) {
+        return r.blob().then(function (blob) { return { status: 200, blob: blob }; });
+      }
+      return r.json().then(function (j) { return { status: r.status, body: j }; })
+        .catch(function () { return { status: r.status, body: {} }; });
     }).then(function (res) {
       buttons.forEach(function (b) { if (b) b.disabled = false; });
       btn.textContent = orig;

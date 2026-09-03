@@ -623,10 +623,16 @@
       : '<div class="dh-ops-dim">No activity' + (f ? ' matches "' + esc(opsFilter) + '"' : ' yet') + '.</div>';
   }
   function renderOps(d) {
+    // No key on this page, not even a masked one. /account is the one page that
+    // shows the account key, behind its "Advanced account key" fold and only
+    // when that fold is opened; /dashboard authenticates to the relay with a
+    // short-lived scoped pst_ token instead (js/app-session-token.js), so it has
+    // no reason to hold or print a key shape at all. The overview endpoint stopped
+    // sending key_masked with it.
     var keysEl = document.getElementById('dh-ops-keys');
     if (keysEl) {
       keysEl.innerHTML =
-        '<div class="dh-ops-row"><span class="mono">' + esc(d.key_masked || '--') + '</span><span class="dim">primary</span></div>' +
+        '<div class="dh-ops-row"><span class="dim">account key</span><span class="dim"><a href="/account">on your account page</a></span></div>' +
         '<div class="dh-ops-row"><span class="dim">last used</span><span class="dim">tracked via activity</span></div>';
     }
     var q = d.quota || { transfers: 0, signs: 0, caps: {} };
