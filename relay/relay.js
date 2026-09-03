@@ -1340,6 +1340,37 @@ const apiKeys    = new Map();  // key → {plan, active, label, dsa_pub, account
 const accounts   = new Map();  // account_id → {account_id, plan, email, primary_api_key, label}  (stap 1: account_id == key)
 const accountKeys = new Map(); // account_id → Set<api_key>  (reverse index for per-account cap + listing)
 const kidIndex   = new Map();  // kid → api_key  (non-secret key id for URLs/listings)
+// sha256(api_key) → api_key. A ParaSend session-token record names its owner by
+// hash, never in the clear, so a read-only leak of the store (an RDB snapshot,
+// a replica, a backup, a MONITOR session) carries no live pgp_ key. This map is
+// the way back, and it exists only in this process's memory: nothing derives a
+// key from a hash, it is looked up in the table the relay already has.
+const apiKeyByHash = new Map();
+let _hashIndexBuiltAt = 0;
+function rebuildApiKeyHashIndex() {
+  apiKeyByHash.clear();
+  for (const k of apiKeys.keys()) apiKeyByHash.set(sessionTokens.keyHash(k), k);
+  _hashIndexBuiltAt = Date.now();
+  return apiKeyByHash.size;
+}
+// Resolve a hash, self-healing. The index is rebuilt on load and on
+// /v2/reload-users, which is where the table normally changes, but keys are
+// also created at run time (/v2/admin/keys, team keys, the claim flow) without
+// going through either. So a miss rebuilds and asks again, and a hit is checked
+// against apiKeys, which means a stale entry can never resolve to a key that is
+// gone. The rebuild is bounded: it runs when the table changed size, and
+// otherwise at most once a second, so a flood of invented hashes cannot turn a
+// lookup into a full scan per request.
+function apiKeyFromHash(hash) {
+  const hit = apiKeyByHash.get(hash);
+  if (hit && apiKeys.has(hit)) return hit;
+  if (apiKeyByHash.size !== apiKeys.size || Date.now() - _hashIndexBuiltAt > 1000) {
+    rebuildApiKeyHashIndex();
+    const again = apiKeyByHash.get(hash);
+    if (again && apiKeys.has(again)) return again;
+  }
+  return null;
+}
 // Resolve a key to its account_id. For every loaded key account_id is preset
 // (stap 1); for a legacy 1:1 key account_id === apiKey, so device/pubkey/webhook
 // keys built from acctOf(apiKey) are byte-identical to the old apiKey-scoped
@@ -2085,7 +2116,7 @@ function mintParasignKey(accountId, opts = {}) {
 
 function loadUsers() {
   if (process.env.USERS_JSON) {
-    try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",email:k.email||"",active:true,created:k.created||null,...keysTable.parseAccountFields(k)}); }); keysTable.rebuildKeyIndexes(apiKeys,accounts,accountKeys,kidIndex,log); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
+    try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",email:k.email||"",active:true,created:k.created||null,...keysTable.parseAccountFields(k)}); }); keysTable.rebuildKeyIndexes(apiKeys,accounts,accountKeys,kidIndex,log); rebuildApiKeyHashIndex(); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
   }
   try {
     const d = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
@@ -2101,6 +2132,7 @@ function loadUsers() {
       });
     });
     keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log);
+    rebuildApiKeyHashIndex();
     log('info', 'users_loaded', { count: apiKeys.size, sector: SECTOR });
   } catch(e) { log('warn', 'no_users_file'); }
 }
@@ -2126,7 +2158,7 @@ function loadTrialKeys() {
         }
       } catch {}
     }
-    if (loaded > 0) { keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log); log('info', 'trial_keys_loaded', { count: loaded }); }
+    if (loaded > 0) { keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log); rebuildApiKeyHashIndex(); log('info', 'trial_keys_loaded', { count: loaded }); }
   } catch(e) { /* file may not exist yet */ }
 }
 
@@ -2531,7 +2563,7 @@ async function handleRelayRequest(req, res) {
       return res.end(J({ error: 'redis_unavailable', hint: 'session tokens need the relay store' }));
     }
     try {
-      const _pst = await sessionTokens.resolve(redisClient, _bearer);
+      const _pst = await sessionTokens.resolve(redisClient, _bearer, apiKeyFromHash);
       if (_pst) { apiKey = _pst.key; viaSessionToken = true; }
     } catch (err) {
       if (redisOutage503(err, res)) return;
@@ -3011,6 +3043,17 @@ async function handleRelayRequest(req, res) {
     }
     try {
       const minted = await sessionTokens.mint(redisClient, apiKey);
+      // The per-account ceiling. Twenty live tokens is far above any honest
+      // use of a page that mints one per load, so this is a signed-in session
+      // being used as a credential factory. 429 rather than 403: the account is
+      // fine and the answer changes on its own as the tokens expire.
+      if (minted.capped) {
+        log('warn', 'session_token_capped', {
+          account: String(owner.account_id || apiKey).slice(0, 12), live: minted.live, cap: minted.cap,
+        });
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+        return res.end(J({ error: 'session_token_cap_reached', cap: minted.cap }));
+      }
       log('info', 'session_token_minted', {
         account: String(owner.account_id || apiKey).slice(0, 12),
         ttl_s: minted.expires_in_s,
@@ -4521,6 +4564,7 @@ async function handleRelayRequest(req, res) {
     apiKeys.clear();
     candidate.forEach((v, k) => apiKeys.set(k, v));
     keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log);
+    rebuildApiKeyHashIndex();
 
     applyKeyLimitEnforcement();
     log('info', 'reload_users', { prev: prevCount, now: apiKeys.size, delta: apiKeys.size - prevCount });
@@ -5012,7 +5056,14 @@ async function handleRelayRequest(req, res) {
       const deviceId = meta?.device_id;
       incMetric('blobs_stored'); incMetric('bytes_in_total', blob.length);
       stats.inbound++; stats.bytes_in += blob.length;
-      auditAppend(apiKey, 'inbound', { hash: hash.slice(0,16)+'...', bytes: blob.length, device: deviceId, sig: sigResult.valid ? 'ML-DSA-OK' : 'unsigned' });
+      // `via` marks the credential, not a second identity. The chain is the
+      // owner's, keyed on the owner's api-key exactly as it is for a request
+      // that carried the key, and only the field says the fifteen-minute token
+      // was what presented it. Without it an account owner reading their own
+      // audit log cannot tell a transfer made from a browser session apart from
+      // one made with the key itself, which is the difference that matters when
+      // they are trying to work out what happened.
+      auditAppend(apiKey, 'inbound', { hash: hash.slice(0,16)+'...', bytes: blob.length, device: deviceId, sig: sigResult.valid ? 'ML-DSA-OK' : 'unsigned', ...(viaSessionToken ? { via: 'pst' } : {}) });
       log('info', 'blob_stored', { hash: hash.slice(0,16), size: blob.length, sig: sigResult.valid });
       // ParaSend Pro upload notification (no-op below Pro+ or without RESEND key).
       transferNotify.maybeNotify({ keyData, event: 'upload', hashPrefix: hash, bytes: blob.length, sendEmail: sendResendEmail });

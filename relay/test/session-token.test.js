@@ -54,6 +54,14 @@ function fakeRedis() {
     async set(k, v, opts) { api._guard(['set', k]); store.set(k, v); if (opts && opts.EX) ttls.set(k, opts.EX); },
     async sAdd(k, v) { api._guard(['sAdd', k]); if (!sets.has(k)) sets.set(k, new Set()); sets.get(k).add(v); },
     async sMembers(k) { api._guard(['sMembers', k]); return [...(sets.get(k) || [])]; },
+    async sCard(k) { api._guard(['sCard', k]); return (sets.get(k) || new Set()).size; },
+    async sRem(k, v) {
+      api._guard(['sRem', k]);
+      const set = sets.get(k); if (!set) return 0;
+      let n = 0; for (const one of (Array.isArray(v) ? v : [v])) { if (set.delete(one)) n++; }
+      return n;
+    },
+    async exists(k) { api._guard(['exists', k]); return store.has(k) ? 1 : 0; },
     async expire(k, s) { api._guard(['expire', k]); ttls.set(k, s); },
     async del(k) {
       api._guard(['del', k]);
@@ -66,6 +74,16 @@ function fakeRedis() {
   };
   return api;
 }
+
+// The resolver relay.js injects: a lookup in the api-key table it already holds.
+// Written out here rather than stubbed with `() => key`, because the point of
+// hashing the record is that resolution needs a table, and a test that handed
+// the key straight back would prove nothing about that.
+function ownerTable(...keys) {
+  const byHash = new Map(keys.map((k) => [st.keyHash(k), k]));
+  return (hash) => byHash.get(hash) || null;
+}
+const OWNERS = ownerTable('pgp_owner_demo', 'pgp_owner_other');
 
 // ── 1. The scope allowlist, from the open side ───────────────────────────────
 
@@ -197,8 +215,31 @@ test('mint writes one record under the token, with the TTL it promises', async (
   assert.strictEqual(out.expires_ms, 1_000_000 + 900_000);
 
   const rk = st.tokenKey(out.token);
-  assert.deepStrictEqual(JSON.parse(r.store.get(rk)), { key: 'pgp_owner_demo', exp: 1_900_000 });
+  assert.deepStrictEqual(JSON.parse(r.store.get(rk)), { kh: st.keyHash('pgp_owner_demo'), exp: 1_900_000 });
   assert.strictEqual(r.ttls.get(rk), 900, 'redis must be the thing that expires the token, not a sweeper');
+  did();
+});
+
+test('THE RECORD HOLDS NO KEY. Everything written to the store is a hash', async () => {
+  // A read-only leak of redis is an RDB snapshot, a replica, a backup on
+  // someone's laptop, a MONITOR session. Before this, every one of those
+  // carried live pgp_ credentials for every account that had sent a file in the
+  // last fifteen minutes. Now they carry hashes, and a hash is only a key to
+  // somebody who already holds the api-key table.
+  const r = fakeRedis();
+  const out = await st.mint(r, 'pgp_owner_demo');
+
+  const everything = [...r.store.keys(), ...r.store.values(), ...r.sets.keys(),
+    ...[...r.sets.values()].flatMap((set) => [...set])].join('\n');
+  assert.ok(!everything.includes('pgp_owner_demo'),
+    'the api-key appears somewhere in the store. Key names AND values must both be hashes.');
+  assert.ok(!/pgp_/.test(everything), 'nothing shaped like an api-key may be written to the store');
+
+  // And the hash really is the sha256 of the key, not some other digest that
+  // happens not to contain the string.
+  const rec = JSON.parse(r.store.get(st.tokenKey(out.token)));
+  assert.strictEqual(rec.kh, require('crypto').createHash('sha256').update('pgp_owner_demo').digest('hex'));
+  assert.strictEqual(Object.keys(rec).sort().join(','), 'exp,kh', 'the record carries exactly the hash and the expiry');
   did();
 });
 
@@ -229,10 +270,26 @@ test('the sweep index holds both tokens and outlives neither by much', async () 
 
 // ── 5. Resolve ───────────────────────────────────────────────────────────────
 
-test('a minted token resolves to the api-key it was minted for', async () => {
+test('a minted token resolves to the api-key it was minted for, through the table', async () => {
   const r = fakeRedis();
   const { token, expires_ms } = await st.mint(r, 'pgp_owner_demo', 5_000);
-  assert.deepStrictEqual(await st.resolve(r, token, 6_000), { key: 'pgp_owner_demo', expires_ms });
+  assert.deepStrictEqual(await st.resolve(r, token, OWNERS, 6_000), { key: 'pgp_owner_demo', expires_ms });
+  did();
+});
+
+test('a hash the api-key table does not know resolves to nothing', async () => {
+  // This is revocation and key deletion arriving for free: the resolver is a
+  // lookup in the live table, so a key that is gone from it cannot be reached
+  // through a token, whatever the store still holds.
+  const r = fakeRedis();
+  const { token } = await st.mint(r, 'pgp_owner_gone', 5_000);
+  assert.strictEqual(await st.resolve(r, token, OWNERS, 6_000), null,
+    'the record is live and well-formed; the owner is simply not in the table any more');
+  // And a resolver that answers with something that is not a key is refused
+  // rather than trusted.
+  for (const bad of [() => null, () => undefined, () => '', () => 42, () => ({})]) {
+    assert.strictEqual(await st.resolve(r, token, bad, 6_000), null);
+  }
   did();
 });
 
@@ -241,13 +298,13 @@ test('every refusal looks the same: null, with no way to tell them apart', async
   const { token } = await st.mint(r, 'pgp_owner_demo', 5_000);
 
   // Never minted.
-  assert.strictEqual(await st.resolve(r, 'pst_' + 'c'.repeat(64)), null);
+  assert.strictEqual(await st.resolve(r, 'pst_' + 'c'.repeat(64), OWNERS), null);
   // Not even a token.
-  assert.strictEqual(await st.resolve(r, 'pgp_a_real_key'), null);
-  assert.strictEqual(await st.resolve(r, ''), null);
+  assert.strictEqual(await st.resolve(r, 'pgp_a_real_key', OWNERS), null);
+  assert.strictEqual(await st.resolve(r, '', OWNERS), null);
   // Revoked out from under it.
   await r.del(st.tokenKey(token));
-  assert.strictEqual(await st.resolve(r, token), null);
+  assert.strictEqual(await st.resolve(r, token, OWNERS), null);
   did();
 });
 
@@ -257,17 +314,51 @@ test('an expired record is refused even when the store still holds it', async ()
   // carries the wall-clock expiry it was minted with, and that is checked.
   const r = fakeRedis();
   const { token, expires_ms } = await st.mint(r, 'pgp_owner_demo', 5_000);
-  assert.ok(await st.resolve(r, token, expires_ms), 'a token AT its expiry ms is still live');
-  assert.strictEqual(await st.resolve(r, token, expires_ms + 1), null, 'one millisecond past it, it is not');
+  assert.ok(await st.resolve(r, token, OWNERS, expires_ms), 'a token AT its expiry ms is still live');
+  assert.strictEqual(await st.resolve(r, token, OWNERS, expires_ms + 1), null, 'one millisecond past it, it is not');
+  did();
+});
+
+test('EXP IS REQUIRED: a record without a usable expiry is refused, not given the store default', async () => {
+  // It used to be optional, guarded with a typeof, so a record that lost the
+  // field fell back to whatever TTL redis happened to have on it, and one
+  // written by hand with no field never expired on the wall clock at all. A
+  // credential whose lifetime is a property of the store alone has no lifetime
+  // when the store is wrong.
+  const r = fakeRedis();
+  const tok = 'pst_' + 'f'.repeat(64);
+  const kh = st.keyHash('pgp_owner_demo');
+  for (const exp of [undefined, null, 'soon', '1900000', {}, [], NaN, Infinity, -Infinity]) {
+    const rec = exp === undefined ? { kh } : { kh, exp };
+    await r.set(st.tokenKey(tok), JSON.stringify(rec));
+    assert.strictEqual(await st.resolve(r, tok, OWNERS, 1000), null,
+      `a record with exp=${JSON.stringify(exp)} must not authenticate anybody`);
+  }
+  // The control: the same record with a real expiry does resolve, so the case
+  // above is measuring the expiry and not some other refusal.
+  await r.set(st.tokenKey(tok), JSON.stringify({ kh, exp: 2000 }));
+  assert.deepStrictEqual(await st.resolve(r, tok, OWNERS, 1000), { key: 'pgp_owner_demo', expires_ms: 2000 });
   did();
 });
 
 test('a record that is not the shape this module writes is refused, not trusted', async () => {
   const r = fakeRedis();
   const tok = 'pst_' + 'd'.repeat(64);
-  for (const junk of ['not json', 'null', '[]', '{}', '{"key":""}', '{"key":123}']) {
-    await r.set(st.tokenKey(tok), junk);
-    assert.strictEqual(await st.resolve(r, tok), null, `a record of ${junk} must not yield a principal`);
+  const junk = [
+    'not json', 'null', '[]', '{}',
+    '{"kh":""}', '{"kh":123}',
+    // The old shape, with the owner in the clear. It must be refused rather
+    // than read: accepting it would keep a plaintext record working, which is
+    // the thing this shape exists to stop.
+    '{"key":"pgp_owner_demo","exp":9999999999999}',
+    // A hash that is not one.
+    '{"kh":"not-a-hash","exp":9999999999999}',
+    `{"kh":"${'g'.repeat(64)}","exp":9999999999999}`,
+    `{"kh":"${'A'.repeat(64)}","exp":9999999999999}`,
+  ];
+  for (const one of junk) {
+    await r.set(st.tokenKey(tok), one);
+    assert.strictEqual(await st.resolve(r, tok, OWNERS), null, `a record of ${one} must not yield a principal`);
   }
   did();
 });
@@ -278,8 +369,14 @@ test('FAIL CLOSED: no store is a throw, never a quiet null', async () => {
   // The distinction is the whole difference between a 503 and a 401. A null
   // here would tell a sender holding a perfectly good token that it is bad, and
   // send them back to sign in, during an outage where signing in cannot work.
-  await assert.rejects(() => st.resolve(null, 'pst_' + 'e'.repeat(64)), /no redis client/);
+  await assert.rejects(() => st.resolve(null, 'pst_' + 'e'.repeat(64), OWNERS), /no redis client/);
   await assert.rejects(() => st.mint(null, 'pgp_owner_demo'), /no redis client/);
+  // And a caller that forgot the resolver is a programming error, not a silent
+  // refusal: without a table there is no way to turn a hash back into a key,
+  // and returning null would look exactly like a bad token.
+  const r = fakeRedis();
+  const { token } = await st.mint(r, 'pgp_owner_demo');
+  await assert.rejects(() => st.resolve(r, token), /no owner resolver/);
   did();
 });
 
@@ -287,7 +384,7 @@ test('a broken store propagates, so the route can answer 503 instead of 401', as
   const r = fakeRedis();
   const { token } = await st.mint(r, 'pgp_owner_demo');
   r.fail = new Error('redis command timed out after 1000ms');
-  await assert.rejects(() => st.resolve(r, token), /timed out/);
+  await assert.rejects(() => st.resolve(r, token, OWNERS), /timed out/);
   await assert.rejects(() => st.mint(r, 'pgp_owner_demo'), /timed out/);
   did();
 });
@@ -310,9 +407,9 @@ test('revoking a key takes every one of its live tokens with it', async () => {
 
   const n = await st.revokeForKey(r, 'pgp_owner_demo');
   assert.strictEqual(n, 2, 'both tokens are reported swept');
-  assert.strictEqual(await st.resolve(r, a.token), null);
-  assert.strictEqual(await st.resolve(r, b.token), null);
-  assert.ok(await st.resolve(r, other.token), 'another account is untouched: revocation is per key, not per store');
+  assert.strictEqual(await st.resolve(r, a.token, OWNERS), null);
+  assert.strictEqual(await st.resolve(r, b.token, OWNERS), null);
+  assert.ok(await st.resolve(r, other.token, OWNERS), 'another account is untouched: revocation is per key, not per store');
   assert.strictEqual(r.sets.has(st.ownerKey('pgp_owner_demo')), false, 'the index goes too, or it grows forever');
   did();
 });
@@ -325,5 +422,79 @@ test('revoking a key with no tokens is a no-op, not an error', async () => {
   // a relay with no store has no tokens to sweep.
   assert.strictEqual(await st.revokeForKey(null, 'pgp_owner_demo'), 0);
   assert.strictEqual(await st.revokeForKey(fakeRedis(), ''), 0);
+  did();
+});
+
+// ── 8. The ceiling on live tokens per account ────────────────────────────────
+
+test('an account can hold twenty live tokens, and the twenty-first is refused', async () => {
+  // A ceiling, not a rate limit. The page mints one per load and one per
+  // refresh, so twenty is far above honest use; what it stops is a signed-in
+  // session being run as a credential factory, each token good for fifteen
+  // minutes on five routes.
+  const r = fakeRedis();
+  assert.strictEqual(st.MAX_LIVE_PER_ACCOUNT, 20);
+  const minted = [];
+  for (let i = 0; i < st.MAX_LIVE_PER_ACCOUNT; i += 1) {
+    const out = await st.mint(r, 'pgp_owner_demo');
+    assert.ok(out.token, `mint ${i + 1} of the cap must succeed`);
+    minted.push(out.token);
+  }
+  const over = await st.mint(r, 'pgp_owner_demo');
+  assert.strictEqual(over.capped, true, 'the twenty-first must be refused');
+  assert.strictEqual(over.cap, 20);
+  assert.strictEqual(over.token, undefined, 'a refused mint hands out no token');
+  // The tokens already minted keep working: a cap is not a revocation.
+  assert.ok(await st.resolve(r, minted[0], OWNERS));
+  did();
+});
+
+test('the cap is per account, and it counts LIVE tokens, not names left in the index', async () => {
+  const r = fakeRedis();
+  for (let i = 0; i < st.MAX_LIVE_PER_ACCOUNT; i += 1) await st.mint(r, 'pgp_owner_demo');
+  // Another account is unaffected.
+  assert.ok((await st.mint(r, 'pgp_owner_other')).token, 'one account at its cap must not block another');
+
+  // Redis expires the RECORDS, not the names in the sweep index, so the set
+  // drifts upward. A caller refused because of tokens that no longer exist
+  // would be locked out for the rest of the window by nothing at all. The
+  // prune runs before the cap is believed.
+  const idx = st.ownerKey('pgp_owner_demo');
+  const names = [...r.sets.get(idx)];
+  for (const n of names.slice(0, 5)) await r.del(st.tokenKey(n));   // redis expiry, by hand
+  assert.strictEqual(r.sets.get(idx).size, 20, 'the index still names all twenty');
+
+  const out = await st.mint(r, 'pgp_owner_demo');
+  assert.ok(out.token, 'with five of the twenty expired there is room, and the mint must succeed');
+  assert.strictEqual(r.sets.get(idx).size, 16, 'and the dead names are gone from the index: 20 - 5 + 1');
+  did();
+});
+
+test('the prune only ever removes names whose record is gone', async () => {
+  const r = fakeRedis();
+  const a = await st.mint(r, 'pgp_owner_demo');
+  const b = await st.mint(r, 'pgp_owner_demo');
+  const idx = st.ownerKey('pgp_owner_demo');
+  assert.strictEqual(await st.pruneOwnerIndex(r, idx), 2, 'nothing to prune when both are live');
+  await r.del(st.tokenKey(a.token));
+  assert.strictEqual(await st.pruneOwnerIndex(r, idx), 1);
+  assert.deepStrictEqual([...r.sets.get(idx)], [b.token], 'the live one survives the prune');
+  assert.ok(await st.resolve(r, b.token, OWNERS), 'and it still resolves');
+  // An index that is empty or absent is not an error.
+  assert.strictEqual(await st.pruneOwnerIndex(r, st.ownerKey('pgp_never_minted')), 0);
+  did();
+});
+
+test('the cheap count is what runs on the ordinary path: no prune under the cap', async () => {
+  // The prune is O(live) round trips. Paying it on every mint would make the
+  // common case the expensive one for a ceiling almost nobody reaches.
+  const r = fakeRedis();
+  await st.mint(r, 'pgp_owner_demo');
+  r.calls.length = 0;
+  await st.mint(r, 'pgp_owner_demo');
+  const ops = r.calls.map(([op]) => op);
+  assert.ok(ops.includes('sCard'), 'the cap is checked');
+  assert.ok(!ops.includes('sMembers'), `an under-cap mint must not walk the index; it ran ${ops.join(', ')}`);
+  assert.ok(!ops.includes('exists'), 'and must not probe every token');
   did();
 });

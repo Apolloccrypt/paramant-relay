@@ -30,19 +30,41 @@ const crypto = require('crypto');
 const TTL_S = 900;
 
 const PREFIX = 'pst_';
+// At most this many live tokens per account. A ceiling, not a rate limit: the
+// page mints one per load and one per refresh, so twenty is far above any
+// honest use, and it stops a signed-in session (or a script inside one) from
+// turning the mint route into an unbounded credential factory. The index is
+// pruned before the cap is believed, so nobody is refused because of tokens
+// redis has already expired.
+const MAX_LIVE_PER_ACCOUNT = 20;
 // 32 bytes of CSPRNG, hex. The shape is pinned here rather than guessed at the
 // call sites, so a malformed Authorization header is refused before it ever
 // reaches the store.
 const TOKEN_RE = /^pst_[0-9a-f]{64}$/;
 
+// SHA-256 of an api-key, hex. The ONE way an owner is named anywhere in this
+// module: in the redis key names AND in the record body.
+//
+// WHY THE BODY TOO. The key names were hashed from the start, because SCAN
+// output, keyspace listings and the slowlog all show names. The VALUE was the
+// api-key in the clear, which meant an RDB snapshot, a replica, a backup on
+// someone's laptop or a MONITOR session carried live pgp_ credentials for every
+// account that had sent a file in the last fifteen minutes. A read-only leak of
+// the store is now a leak of hashes: to use one you would have to already hold
+// the key it is a hash of.
+//
+// Preimage resistance is not what does the work here, and it should not have
+// to: an api-key is 32 random bytes, so the hash is not guessable, but the real
+// property is that the relay resolves a hash by looking it up in the api-key
+// table it already has in memory. Nothing derives a key from a hash. Anyone
+// without that table has a hash and nothing else.
+const keyHash = (key) => crypto.createHash('sha256').update(String(key)).digest('hex');
+const HASH_RE = /^[0-9a-f]{64}$/;
+
 // token -> owner record.
 const tokenKey = (token) => `paramant:pst:${token}`;
 // owner key -> the set of tokens minted for it, so a revocation can sweep them.
-// The owner key is hashed: redis keyspace listings, SCAN output and slowlog
-// entries all show key NAMES, and an api-key in a key name is an api-key in
-// every one of those places.
-const ownerKey = (key) =>
-  `paramant:pst:owner:${crypto.createHash('sha256').update(String(key)).digest('hex')}`;
+const ownerKey = (key) => `paramant:pst:owner:${keyHash(key)}`;
 
 function isSessionToken(value) {
   return typeof value === 'string' && TOKEN_RE.test(value);
@@ -101,46 +123,92 @@ function scopeAllows(method, path) {
 
 // ── Store ────────────────────────────────────────────────────────────────────
 
+// Drop the names of tokens redis has already expired from an owner index, and
+// return how many are really live. The index is a set of NAMES; redis expires
+// the records those names point at, not the names, so the set drifts upward
+// until something looks. Only the cap below looks, and only when it is about to
+// refuse, so this costs nothing on the ordinary path.
+async function pruneOwnerIndex(redisClient, idx) {
+  const names = await redisClient.sMembers(idx);
+  if (!names || !names.length) return 0;
+  const alive = await Promise.all(names.map((n) => redisClient.exists(tokenKey(n))));
+  const dead = names.filter((_, i) => !alive[i]);
+  if (dead.length) await redisClient.sRem(idx, dead);
+  return names.length - dead.length;
+}
+
 // Mint a token for `owner` (an api-key). Returns { token, expires_ms,
-// expires_in_s }. Throws when there is no store: a token that cannot be written
-// must not be handed out, because the holder would then carry a credential no
-// relay can check.
+// expires_in_s }, or { capped: true, live, cap } when the account already holds
+// the maximum number of live tokens. Throws when there is no store: a token
+// that cannot be written must not be handed out, because the holder would then
+// carry a credential no relay can check.
 async function mint(redisClient, owner, now = Date.now()) {
   if (!redisClient) throw new Error('session-token: no redis client');
   if (!owner || typeof owner !== 'string') throw new Error('session-token: no owner key');
+  const idx = ownerKey(owner);
+
+  // The ceiling. sCard first because it is one round trip and almost always
+  // under the cap; the prune runs only when the cheap count says we are about
+  // to refuse, so a refusal is never made on the strength of dead names.
+  let live = await redisClient.sCard(idx);
+  if (live >= MAX_LIVE_PER_ACCOUNT) {
+    live = await pruneOwnerIndex(redisClient, idx);
+    if (live >= MAX_LIVE_PER_ACCOUNT) {
+      return { capped: true, live, cap: MAX_LIVE_PER_ACCOUNT };
+    }
+  }
+
   const token = PREFIX + crypto.randomBytes(32).toString('hex');
   const expires_ms = now + TTL_S * 1000;
-  // exp is stored INSIDE the record as well as being the redis TTL. Redis is
-  // what expires it; the field is what catches a record that outlived its TTL
-  // through a restore, a replica lag or a hand-written key.
-  await redisClient.set(tokenKey(token), JSON.stringify({ key: owner, exp: expires_ms }), { EX: TTL_S });
+  // The owner is named by HASH, never in the clear: see keyHash above for why
+  // the value matters as much as the key name. exp is stored inside the record
+  // as well as being the redis TTL. Redis is what expires it; the field is what
+  // catches a record that outlived its TTL through a restore, a replica lag or
+  // a hand-written key.
+  await redisClient.set(tokenKey(token), JSON.stringify({ kh: keyHash(owner), exp: expires_ms }), { EX: TTL_S });
   // The sweep index. Its own TTL is the token's plus a minute, refreshed on
   // every mint, so the set never outlives the last token it points at by more
-  // than that. Entries for tokens that already expired are harmless: the
-  // revocation deletes names, and deleting a name that is gone is a no-op.
-  await redisClient.sAdd(ownerKey(owner), token);
-  await redisClient.expire(ownerKey(owner), TTL_S + 60);
+  // than that.
+  await redisClient.sAdd(idx, token);
+  await redisClient.expire(idx, TTL_S + 60);
   return { token, expires_ms, expires_in_s: TTL_S };
 }
 
 // The owner key a token stands for, or null. Null covers every refusal there
-// is: a malformed token, one that expired, one that was revoked, and one whose
-// record is not the shape this module writes. The caller cannot tell them
-// apart, and must not: that separation would be an oracle for guessing tokens.
+// is: a malformed token, one that expired, one that was revoked, one whose
+// record is not the shape this module writes, and one whose owner hash no
+// longer resolves to a key. The caller cannot tell them apart, and must not:
+// that separation would be an oracle for guessing tokens.
+//
+// `resolveOwner` turns the stored hash back into the api-key. It is injected,
+// and in relay.js it is a lookup in the api-key table already in memory. That
+// is the whole reason hashing the record is free: nothing derives a key from a
+// hash, it is looked up in a table only the relay has.
+//
+// EXP IS REQUIRED. A record with no exp, or an exp that is not a number, is
+// refused. It used to be optional, checked with a typeof, so a record that
+// somehow lost the field fell back to whatever TTL redis had on it, and one
+// written by hand with no field at all never expired on the wall clock at all.
+// A credential whose lifetime is a property of the store alone has no lifetime
+// when the store is wrong.
 //
 // A redis failure is NOT null. It throws, and the route turns that into a 503,
 // because answering 401 on an outage would tell a legitimate holder their token
 // is bad and send them to re-authenticate over a store that is merely down.
-async function resolve(redisClient, token, now = Date.now()) {
+async function resolve(redisClient, token, resolveOwner, now = Date.now()) {
   if (!isSessionToken(token)) return null;
   if (!redisClient) throw new Error('session-token: no redis client');
+  if (typeof resolveOwner !== 'function') throw new Error('session-token: no owner resolver');
   const raw = await redisClient.get(tokenKey(token));
   if (!raw) return null;
   let rec;
   try { rec = JSON.parse(raw); } catch (_) { return null; }
-  if (!rec || typeof rec.key !== 'string' || !rec.key) return null;
-  if (typeof rec.exp === 'number' && now > rec.exp) return null;
-  return { key: rec.key, expires_ms: typeof rec.exp === 'number' ? rec.exp : null };
+  if (!rec || typeof rec.kh !== 'string' || !HASH_RE.test(rec.kh)) return null;
+  if (typeof rec.exp !== 'number' || !Number.isFinite(rec.exp)) return null;
+  if (now > rec.exp) return null;
+  const key = resolveOwner(rec.kh);
+  if (!key || typeof key !== 'string') return null;
+  return { key, expires_ms: rec.exp };
 }
 
 // Every live token for one api-key, gone. Called when the key is revoked.
@@ -162,8 +230,8 @@ async function revokeForKey(redisClient, owner) {
 }
 
 module.exports = {
-  TTL_S, PREFIX, SCOPE,
-  isSessionToken, bearerToken, scopeAllows,
-  mint, resolve, revokeForKey,
+  TTL_S, PREFIX, SCOPE, MAX_LIVE_PER_ACCOUNT,
+  isSessionToken, bearerToken, scopeAllows, keyHash,
+  mint, resolve, revokeForKey, pruneOwnerIndex,
   tokenKey, ownerKey,
 };

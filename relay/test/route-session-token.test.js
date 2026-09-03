@@ -294,9 +294,27 @@ test('AUDIT: the upload lands in the owner chain, under the owner key', async (t
   // opened a chain of its own, this would not find the entry.
   const audit = await srv.get('/v2/audit?limit=50', { headers: { 'X-Api-Key': OWNER } });
   assert.strictEqual(audit.status, 200, audit.text);
-  const found = (audit.json.entries || []).some(e =>
+  const entry = (audit.json.entries || []).find(e =>
     e.event === 'inbound' && String(e.hash || '').startsWith(b.hash.slice(0, 16)));
-  assert.ok(found, `the token upload is missing from the owner audit chain: ${audit.text.slice(0, 400)}`);
+  assert.ok(entry, `the token upload is missing from the owner audit chain: ${audit.text.slice(0, 400)}`);
+
+  // And it is marked. `via` names the credential, not a second identity: the
+  // chain is still the owner's, keyed on the owner's api-key. Without the field
+  // an owner reading their own log cannot tell a transfer made from a browser
+  // session apart from one made with the key itself.
+  assert.strictEqual(entry.via, 'pst',
+    'an upload made with a session token must be marked in the audit chain');
+
+  // The other half, and the one that makes the first mean something: the same
+  // upload with the key carries no such field.
+  const k = blob('audit-with-key');
+  assert.strictEqual((await upload({ 'X-Api-Key': OWNER }, k)).status, 200);
+  const after = await srv.get('/v2/audit?limit=50', { headers: { 'X-Api-Key': OWNER } });
+  const plain = (after.json.entries || []).find(e =>
+    e.event === 'inbound' && String(e.hash || '').startsWith(k.hash.slice(0, 16)));
+  assert.ok(plain, 'the key upload must be in the chain too');
+  assert.strictEqual(plain.via, undefined,
+    'a transfer made with the api-key must carry no via field, or the marker says nothing');
   did();
 });
 
@@ -329,7 +347,7 @@ test('a record that outlived its own TTL is refused on the wall clock inside it'
   // came back from a backup or from a replica that lagged through the expiry.
   const token = `pst_${crypto.randomBytes(32).toString('hex')}`;
   await rc.set(sessionTokens.tokenKey(token),
-    JSON.stringify({ key: OWNER, exp: Date.now() - 1000 }), { EX: 300 });
+    JSON.stringify({ kh: sessionTokens.keyHash(OWNER), exp: Date.now() - 1000 }), { EX: 300 });
   const r = await upload(bearer(token), blob('stale-record'));
   assert.strictEqual(r.status, 401, 'a record past its own exp must not authenticate, TTL or no TTL');
   await rc.del(sessionTokens.tokenKey(token));
@@ -368,7 +386,7 @@ test('and a token whose owner is revoked is refused even when the sweep never ra
   // credential, and a revoked key is not there.
   const token = `pst_${crypto.randomBytes(32).toString('hex')}`;
   await rc.set(sessionTokens.tokenKey(token),
-    JSON.stringify({ key: REVOKE_ME, exp: Date.now() + 600_000 }), { EX: 600 });
+    JSON.stringify({ kh: sessionTokens.keyHash(REVOKE_ME), exp: Date.now() + 600_000 }), { EX: 600 });
   const r = await upload(bearer(token), blob('revoked-owner'));
   assert.strictEqual(r.status, 401, 'a live record for a revoked key must not authenticate');
   assert.strictEqual((await srv.get('/v2/check-key', { headers: bearer(token) })).json.valid, false);
@@ -413,7 +431,181 @@ test('a malformed or foreign Bearer is simply not a credential', async (t) => {
   did();
 });
 
-// ── 8. No store ──────────────────────────────────────────────────────────────
+// ── 8. What the store actually holds ─────────────────────────────────────────
+
+test('THE STORE HOLDS NO KEY: a leak of redis is a leak of hashes', async (t) => {
+  if (!rc) return t.skip('no redis');
+  // The threat is read-only and unexciting: an RDB snapshot, a replica, a
+  // backup on a laptop, a MONITOR session. Before the record was hashed, every
+  // one of those carried live pgp_ credentials for every account that had sent
+  // a file in the last fifteen minutes. This reads the real store the same way
+  // any of those would.
+  const { token } = (await mint()).json;
+  const raw = await rc.get(sessionTokens.tokenKey(token));
+  assert.ok(raw, 'the record must be there to be inspected');
+  assert.ok(!raw.includes(OWNER), 'the record body carries the api-key in the clear');
+  assert.ok(!/pgp_/.test(raw), 'nothing shaped like an api-key may be in the record');
+  const rec = JSON.parse(raw);
+  assert.strictEqual(rec.kh, sessionTokens.keyHash(OWNER), 'the owner is named by sha256 of the key');
+  assert.strictEqual(rec.key, undefined, 'and by nothing else');
+
+  // Key names as well as values, because SCAN, the keyspace listing and the
+  // slowlog all show names. Scanned over the whole prefix, so the sweep index
+  // is included.
+  const names = [];
+  for await (const k of rc.scanIterator({ MATCH: 'paramant:pst:*', COUNT: 500 })) {
+    names.push(...(Array.isArray(k) ? k : [k]));
+  }
+  assert.ok(names.length > 0, 'the scan must find something, or this asserts nothing');
+  assert.ok(!names.some((n) => /pgp_/.test(String(n))), 'a redis key NAME carries an api-key');
+
+  // And resolution still works, which is the half that makes the hash useful
+  // rather than merely safe: the relay looks the hash up in the api-key table
+  // it already has in memory.
+  const ck = await srv.get('/v2/check-key', { headers: bearer(token) });
+  assert.deepStrictEqual(ck.json, { valid: true, plan: 'community' },
+    'hashing the record must not cost the relay the ability to resolve it');
+  did();
+});
+
+test('a hash that resolves to no key in the table is refused, whatever the store says', async (t) => {
+  if (!rc) return t.skip('no redis');
+  // Written by hand, well-formed, unexpired, and pointing at a key this relay
+  // has never heard of. The resolver is a lookup in the live api-key table, so
+  // key deletion and revocation arrive here for free.
+  const token = `pst_${crypto.randomBytes(32).toString('hex')}`;
+  await rc.set(sessionTokens.tokenKey(token),
+    JSON.stringify({ kh: sessionTokens.keyHash('pgp_this_key_never_existed'), exp: Date.now() + 600_000 }),
+    { EX: 300 });
+  const r = await upload(bearer(token), blob('unknown-owner'));
+  assert.strictEqual(r.status, 401);
+  await rc.del(sessionTokens.tokenKey(token));
+  did();
+});
+
+test('EXP IS REQUIRED over HTTP too: a record without one authenticates nobody', async (t) => {
+  if (!rc) return t.skip('no redis');
+  const kh = sessionTokens.keyHash(OWNER);
+  for (const rec of [{ kh }, { kh, exp: null }, { kh, exp: 'soon' }, { kh, exp: '9999999999999' }]) {
+    const token = `pst_${crypto.randomBytes(32).toString('hex')}`;
+    // A 300 s redis TTL on purpose: the store says this record is live, and the
+    // missing expiry is the only reason it must not be.
+    await rc.set(sessionTokens.tokenKey(token), JSON.stringify(rec), { EX: 300 });
+    const r = await upload(bearer(token), blob('no-exp'));
+    assert.strictEqual(r.status, 401, `${JSON.stringify(rec)} authenticated somebody`);
+    await rc.del(sessionTokens.tokenKey(token));
+  }
+  did();
+});
+
+test('a key created AFTER boot still resolves: the hash index heals itself', async (t) => {
+  if (!rc) return t.skip('no redis');
+  // The index is rebuilt on load and on /v2/reload-users, which is where the
+  // api-key table normally changes. It is not the only way it changes: keys are
+  // also created at run time through /v2/admin/keys, the team route and the
+  // claim flow, none of which go near either. A token minted for such a key
+  // would carry a hash the index had never seen, and without the self-healing
+  // rebuild it would resolve to nothing, which is a credential that mints fine
+  // and then does not work.
+  const created = await srv.post('/v2/admin/keys', {
+    headers: { 'X-Admin-Token': ADMIN },
+    body: { plan: 'community', label: 'fresh', email: `fresh-${SUFFIX}@example.com` },
+  });
+  assert.strictEqual(created.status, 200, created.text);
+  const fresh = created.json.key;
+  assert.match(fresh, /^pgp_/);
+
+  const minted = await mint(fresh);
+  assert.strictEqual(minted.status, 200, minted.text);
+  const ck = await srv.get('/v2/check-key', { headers: bearer(minted.json.token) });
+  assert.strictEqual(ck.json.valid, true,
+    'a token for a key created after boot must resolve; the hash index has to rebuild on a miss');
+
+  const up = await upload(bearer(minted.json.token), blob('fresh-key'));
+  assert.strictEqual(up.status, 200, up.text);
+  did();
+});
+
+test('a users reload does not break the tokens already in flight', async (t) => {
+  if (!rc) return t.skip('no redis');
+  // /v2/reload-users clears and refills the whole api-key table, and the hash
+  // index is rebuilt with it. A reload that left the index behind would strand
+  // every live token on the relay at once, which is the kind of outage a deploy
+  // would cause and nobody would connect to the reload.
+  //
+  // Said honestly: the self-healing rebuild above would carry this case too, so
+  // deleting the explicit rebuild in the reload handler does NOT turn this red.
+  // What this pins is the PROPERTY -- a reload does not strand live tokens --
+  // and that property has two mechanisms behind it on purpose. The explicit
+  // rebuild is also what keeps a reload costing one rebuild instead of a
+  // rebuild per miss for the second after it.
+  const { token } = (await mint()).json;
+  assert.strictEqual((await srv.get('/v2/check-key', { headers: bearer(token) })).json.valid, true);
+
+  const reload = await srv.post('/v2/reload-users', { headers: { 'X-Api-Key': ADMIN } });
+  assert.strictEqual(reload.status, 200, reload.text);
+  assert.ok(reload.json.loaded > 0, 'the reload must actually load the table');
+
+  const after = await srv.get('/v2/check-key', { headers: bearer(token) });
+  assert.strictEqual(after.json.valid, true, 'a live token must survive a users reload');
+  const up = await upload(bearer(token), blob('after-reload'));
+  assert.strictEqual(up.status, 200, up.text);
+  did();
+});
+
+// ── 9. The ceiling ───────────────────────────────────────────────────────────
+
+test('an account is held to twenty live tokens, and the twenty-first is a 429', async (t) => {
+  if (!rc) return t.skip('no redis');
+  // A separate key, so the cap this test fills does not sit on OWNER for the
+  // rest of the suite.
+  const CAP_KEY = `pgp_cap_key_for_the_session_token_suite_${SUFFIX}`;
+  const capSrv = await boot({
+    tag: 'sesstok-cap',
+    // OWNER rides along so the per-account claim below is made on the SAME
+    // relay and the SAME store as the account that is at its ceiling.
+    users: { api_keys: [
+      { key: CAP_KEY, plan: 'community', active: true, email: 'cap@example.test', account_id: `acct_cap_${SUFFIX}` },
+      { key: OWNER, plan: 'community', active: true, email: 'owner@example.test', account_id: OWNER_ACCT },
+    ] },
+    env: { INTERNAL_AUTH_TOKEN: INTERNAL, REDIS_URL: process.env.REDIS_URL || DEFAULT_REDIS },
+  });
+  t.after(async () => {
+    await capSrv.stop();
+    try { await rc.del(sessionTokens.ownerKey(CAP_KEY)); } catch (_) { /* gone */ }
+  });
+
+  const first = [];
+  for (let i = 0; i < 20; i += 1) {
+    const r = await mint(CAP_KEY, capSrv);
+    assert.strictEqual(r.status, 200, `mint ${i + 1} answered ${r.status}: ${r.text}`);
+    first.push(r.json.token);
+  }
+  const over = await mint(CAP_KEY, capSrv);
+  assert.strictEqual(over.status, 429, over.text);
+  assert.strictEqual(over.json.error, 'session_token_cap_reached');
+  assert.strictEqual(over.json.cap, 20);
+  assert.strictEqual(over.headers['retry-after'], '60', 'a cap that clears on its own says when to come back');
+  assert.ok(!over.text.includes(CAP_KEY), 'and the refusal names no key');
+
+  // A cap is not a revocation: everything already minted keeps working.
+  const still = await capSrv.get('/v2/check-key', { headers: bearer(first[0]) });
+  assert.strictEqual(still.json.valid, true, 'tokens minted under the cap must keep working');
+
+  // Another account is not affected by this one's ceiling.
+  const other = await mint(OWNER, capSrv);
+  assert.strictEqual(other.status, 200, `the cap must be per account: ${other.text}`);
+
+  // And room made by an expiry is room again. Two of the twenty are removed the
+  // way redis would remove them, and the next mint succeeds through the prune.
+  await rc.del(sessionTokens.tokenKey(first[0]));
+  await rc.del(sessionTokens.tokenKey(first[1]));
+  const again = await mint(CAP_KEY, capSrv);
+  assert.strictEqual(again.status, 200, `with two expired there is room again: ${again.text}`);
+  did();
+});
+
+// ── 10. No store ─────────────────────────────────────────────────────────────
 
 test('FAIL CLOSED: a relay with no store answers 503 to a token, never 401', async (t) => {
   if (!rc) return t.skip('no redis');

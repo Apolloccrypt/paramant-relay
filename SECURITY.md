@@ -165,6 +165,38 @@ Revoking the key sweeps its tokens out of the store, and a token whose owner key
 is inactive grants no principal even when that sweep did not run: the sweep is
 the fast path, not the guarantee.
 
+#### Three things the review of this change tightened
+
+- **The stored record names its owner by hash.** It used to carry the api-key in
+  the clear. The key NAMES were already hashed, because SCAN output, keyspace
+  listings and the slowlog all show names, but the VALUE was not: an RDB
+  snapshot, a replica, a backup on a laptop or a `MONITOR` session carried live
+  `pgp_` credentials for every account that had sent a file in the last fifteen
+  minutes. The record is now `{kh, exp}`, and the relay turns the hash back into
+  a key by looking it up in the api-key table it already has in memory. Nothing
+  derives a key from a hash; a read-only copy of the store is a copy of hashes.
+  It also means key revocation and deletion arrive for free, because the lookup
+  is against the live table.
+- **The expiry is required, not optional.** A record with no `exp`, or one whose
+  `exp` is not a number, is refused. It used to fall through a `typeof` guard to
+  whatever TTL redis happened to have on the key, which meant a credential whose
+  lifetime was a property of the store alone, and no lifetime at all when the
+  store was wrong.
+- **A transfer made with a token is marked in the audit chain**, with one field,
+  `"via": "pst"`. Not a second identity: the chain is the owner's, keyed on the
+  owner's api-key exactly as for a request that carried the key. Without the
+  field an owner reading their own log cannot tell a transfer made from a
+  browser session apart from one made with the key itself, which is the
+  distinction that matters when they are working out what happened.
+
+There is also a ceiling of 20 live tokens per account, answered with `429` and a
+`Retry-After`. It is not a rate limit: the page mints one per load and one per
+refresh, so twenty is far above honest use, and what it stops is a signed-in
+session being run as a credential factory. Tokens already issued keep working,
+and room returns as they expire; the sweep index is pruned of names redis has
+already expired before a refusal is made, so nobody is refused on the strength
+of tokens that are gone.
+
 #### The new ceiling, stated plainly
 
 **A script that runs on paramant.app can still act as the signed-in user for

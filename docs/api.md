@@ -54,7 +54,17 @@ Three credential types are in use across different API surfaces:
 >   device queues and per-tier limits all resolve against the owner's account,
 >   byte-identical to a request that carried the owner's `X-Api-Key`.
 > - **Lifetime.** 15 minutes, held in the relay's shared Redis so all five
->   sectors honour the same token. It is not configurable.
+>   sectors honour the same token. It is not configurable. The stored record
+>   carries the owner as a SHA-256 hash, never as an API key, and the relay
+>   resolves it against the key table it already holds in memory; a read-only
+>   copy of the store therefore contains no usable credential. A record without
+>   a numeric expiry is refused outright.
+> - **Ceiling.** At most 20 live tokens per account. The 21st mint answers
+>   `429 session_token_cap_reached` with `Retry-After`; tokens already issued
+>   keep working, and room returns as they expire.
+> - **Audit.** A transfer made with a token appears in the owner's audit chain
+>   like any other, with one extra field, `"via": "pst"`. It is a note on the
+>   credential, not a second identity.
 > - **Revocation.** Revoking the API key deletes every live token for it, and a
 >   token whose owner key is revoked or deleted grants no principal even if that
 >   sweep did not run.
@@ -486,6 +496,7 @@ curl -X POST https://health.paramant.app/v2/session-token \
 | 200 | Token minted. The response never contains the API key. |
 | 401 | Missing or wrong `X-Internal-Auth`, or no live account key. The two are not distinguishable. |
 | 403 | The caller presented a session token; a token cannot mint another one. |
+| 429 | The account already holds 20 live tokens. `Retry-After: 60`. |
 | 503 | The relay store is unreachable, so no checkable token can be issued. |
 
 The browser-facing half of this is `POST /api/user/parasend/token` on the admin
