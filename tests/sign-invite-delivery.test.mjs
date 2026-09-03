@@ -2,6 +2,7 @@
 // Uses the real page and WebCrypto. Only same-origin APIs are stubbed.
 
 import { chromium } from 'playwright';
+import { stableScreenshot } from '../scripts/stable-screenshot.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -100,7 +101,7 @@ await page.goto(ORIGIN + '/sign', { waitUntil: 'domcontentloaded' });
 ok('landing leads with the request-signatures workflow', await page.locator('.ds-mode-card').first().getAttribute('data-mode') === 'invite' && await page.locator('.ds-mode-card').first().getAttribute('class').then((value) => value.includes('primary')), await page.locator('.ds-mode-card').first().innerText());
 ok('technical stepper stays hidden until a workflow is chosen', await page.locator('#ds-stepper').isHidden(), 'hidden');
 ok('landing has no phone-width overflow', await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 1, await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
-if (process.env.PARAMANT_SIGN_SCREENSHOT_PATH) await page.screenshot({ path:process.env.PARAMANT_SIGN_SCREENSHOT_PATH, fullPage:true });
+if (process.env.PARAMANT_SIGN_SCREENSHOT_PATH) await stableScreenshot(page, { path:process.env.PARAMANT_SIGN_SCREENSHOT_PATH, fullPage:true });
 await page.locator('.ds-mode-card[data-mode="invite"]').click();
 await page.locator('#ds-doc-input').setInputFiles({ name: 'agreement-demo.txt', mimeType: 'text/plain', buffer: Buffer.from('agreement document for invite delivery') });
 await page.locator('#step-recipients:not([hidden])').waitFor();

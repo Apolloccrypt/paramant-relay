@@ -36,5 +36,15 @@ jobs:
       # dashboards, the navigation shell, multi-verify and invite delivery had
       # no CI at all. Selected by import, so a new browser suite is picked up
       # here the day it is written. product-heartbeat has its own workflow.
+      #
+      # Selected by import means anything in tests/ that drives a browser lands
+      # here, gate or not. app-shots was a screenshot generator that asserted
+      # nothing, and on 2026-09-03 its `page.screenshot: Timeout 30000ms
+      # exceeded` took this workflow red on main and blocked the deploy, which
+      # needs sign-e2e green in phase 0a. It now lives in scripts/app-shots.mjs
+      # with the other generators, so this line did not have to grow an
+      # exception. The rule: tests/ is for files that assert something, and a
+      # file that only produces artefacts goes in scripts/, browser or not.
+      # Same move as the heartbeat canaries in test.yml. See tests/README.md.
       - name: Browser suites
         run: node --test $(grep -l "from 'playwright'" tests/*.mjs | grep -vE 'sign-full|product-heartbeat')

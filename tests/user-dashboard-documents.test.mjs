@@ -1,6 +1,7 @@
 // Real Chromium coverage for the document-focused user dashboard.
 
 import { chromium } from 'playwright';
+import { stableScreenshot } from '../scripts/stable-screenshot.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -83,7 +84,7 @@ await page.locator('[data-pa-action="document-cancel"]').click();
 await page.waitForFunction(() => document.querySelector('#dh-document-dialog-body')?.textContent.includes('closed'));
 ok('cancel is owner action and updates measured status', cancelRequests === 1 && /Cancelled/.test(await page.locator('#dh-document-dialog-body').innerText()), await page.locator('#dh-document-dialog-body').innerText());
 await page.locator('[data-pa-action="document-close"]').click();
-if (process.env.PARAMANT_DASHBOARD_SCREENSHOT_PATH) await page.screenshot({ path:process.env.PARAMANT_DASHBOARD_SCREENSHOT_PATH, fullPage:true });
+if (process.env.PARAMANT_DASHBOARD_SCREENSHOT_PATH) await stableScreenshot(page, { path:process.env.PARAMANT_DASHBOARD_SCREENSHOT_PATH, fullPage:true });
 
 await page.locator('[data-doc-filter="completed"]').click();
 ok('completed filter shows only completed work', await page.locator('.dh-document').count() === 1 && /Completed contract/.test(await page.locator('#dh-documents').innerText()), await page.locator('#dh-documents').innerText());
@@ -99,7 +100,7 @@ const completedDialogInViewport = !completedDialogMetrics.hidden && completedDia
 ok('completed document exposes proof export with honest storage guidance', completedDialogInViewport && await page.locator('a[download]').getAttribute('href') === '/api/user/documents/env_complete_abcdefghijklmnop/receipt' && /not a plaintext copy/i.test(await page.locator('#dh-document-dialog-body').innerText()), JSON.stringify(completedDialogMetrics));
 if (process.env.PARAMANT_DASHBOARD_DETAIL_SCREENSHOT_PATH) {
   await page.waitForTimeout(100);
-  await page.locator('#dh-document-dialog').screenshot({ path:process.env.PARAMANT_DASHBOARD_DETAIL_SCREENSHOT_PATH });
+  await stableScreenshot(page.locator('#dh-document-dialog'), { path:process.env.PARAMANT_DASHBOARD_DETAIL_SCREENSHOT_PATH });
 }
 await page.locator('[data-pa-action="document-close"]').click();
 await page.locator('[data-doc-filter="cancelled"]').click();
