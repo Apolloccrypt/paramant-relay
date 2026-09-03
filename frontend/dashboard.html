@@ -468,10 +468,22 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     <aside class="dh-community" id="dh-community" aria-label="Your plan" hidden>
       <div>
         <p class="dh-community-kicker">Community &middot; &euro;0</p>
-        <p class="dh-community-lede">You are on the Community plan and it stays free. It is Mick Beer, privacy and security researcher and founder of Paramantis Solutions B.V., giving something back to society; the business plans pay for it.</p>
+        <p class="dh-community-lede">You are on the Community plan and it stays free. The business plans pay for the servers and keep it that way.</p>
         <p class="dh-community-adds">They raise 2 signatures a month to 100 or 1,000, keep links open longer, keep a record of what you sent, give you support with a name on it, and an audit trail you can export and hand over.</p>
       </div>
       <a class="dh-community-cta" href="/pricing">See the business plans &rarr;</a>
+    </aside>
+
+    <!-- Where Mollie sends the buyer back to (/dashboard?billing=return). The
+         entitlement is granted by the webhook, never by this redirect, so the
+         two can arrive in either order: this band says which of the two the
+         page is looking at instead of leaving a paying customer on a dashboard
+         that still reads Community and says nothing about the money. Shown by
+         dashboard.js only when the query parameter is there. No link to
+         /pricing: the sale already happened. -->
+    <aside class="dh-paid" id="dh-billing-return" aria-label="Payment" role="status" hidden>
+      <p class="dh-paid-kicker" data-dh="return-kicker">--</p>
+      <p class="dh-paid-lede" data-dh="return-lede">--</p>
     </aside>
 
     <!-- What a paying customer bought, in the words /pricing sells it in. Shown
@@ -480,7 +492,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     <aside class="dh-paid" id="dh-plan-paid" aria-label="Your plan" hidden>
       <p class="dh-paid-kicker"><span data-dh="paid-name">--</span> plan &middot; active</p>
       <p class="dh-paid-lede" data-dh="paid-includes">--</p>
-      <p class="dh-paid-foot">Your subscription and invoices are under <a href="/account#billing-section">Plan &amp; billing</a>.</p>
+      <p class="dh-paid-foot">Your plan and the day your term ends are under <a href="/account#billing-section">Plan &amp; billing</a>.</p>
     </aside>
 
     <!-- One-time question: shown by dashboard.js only while /api/user/me returns
