@@ -99,6 +99,46 @@ not at startup.
 
 ---
 
+## Bug #4 - A store that is gone, and a route that never answers
+
+**Found:** review of #368, 2026-09-03. **Fixed on:** `fix/auth-hardening-2`.
+
+**What happened:**
+node-redis does not time a command out, and it holds commands on an offline
+queue while it reconnects. Against a redis that had gone away, a request did not
+fail: it waited, and went on waiting. Every redis-backed route in both services
+had this shape, which is roughly 300 call sites. #368 bounded exactly one of
+them, on the TOTP verify path, and recorded the rest in SECURITY.md as open.
+
+**Why it belongs in this document:**
+it is the same failure class as bugs 1 to 3. `/health` on the relay answered 200
+throughout, because it touches no redis; `/v2/health/deep` answered green,
+because it did not check the store either; and the admin's container probe was
+`GET /api/auth/check`, which answers 401 when nobody is signed in, so it was
+already "healthy" when nothing worked. A monitor watching any of those saw a
+healthy stack while no user could sign in. Nothing was returning an error,
+because nothing was returning at all, which is the one thing a 5xx counter
+cannot see.
+
+**The second half nobody expects:**
+a per-command deadline makes the CALLER safe, not the client. After a command is
+lost to a connection that stays open and goes silent, node-redis keeps waiting
+for its reply and holds every later command behind it, so the client never
+recovers even once the network does. Measured on 5.12.1 and 6.2.1: it reports
+itself ready and answers nothing, until the process is restarted.
+
+**What catches it now:**
+`relay/test/route-redis-outage.test.js` and `admin/test/redis-outage.test.js`
+boot both processes against a real redis behind a proxy, cut it, black-hole it,
+and assert that every redis-backed route answers 503 inside
+`PARAMANT_REDIS_DEADLINE_MS`, that the health routes tell the truth, and that
+both processes heal on their own when the store comes back.
+
+**Code location:** `relay/lib/redis-deadline.js` and its copy in `admin/lib/`;
+the two `createClient` calls in `relay/relay.js` and `admin/lib/redis.js`.
+
+---
+
 ## Severity Classification
 
 | Bug class               | Silent? | Healthcheck catches? | e2e-auth-flow catches? |

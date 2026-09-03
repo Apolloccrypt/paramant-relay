@@ -28,6 +28,7 @@ const url_   = require('url');
 const { createClient } = require('redis');
 const userTotp      = require('./lib/user-totp');
 const totpLib       = require('./lib/totp');
+const redisDeadlines = require('./lib/redis-deadline'); // one bound for every redis call
 const rateLimit     = require('./lib/rate-limit');
 const authThrottle  = require('./lib/auth-throttle');
 const authGate      = require('./lib/auth-gate');
@@ -62,36 +63,38 @@ setInterval(() => { const now = Date.now(); for (const [k, v] of wsTickets) if (
 // ── Drop / Argon2id / BIP39 — optioneel laden ─────────────────────────────────
 let argon2Lib = null;
 try { argon2Lib = require('argon2'); } catch(e) { /* npm install argon2 */ }
+// A redis call that answers inside a deadline, or an outage. node-redis queues
+// commands while it reconnects, so against an unreachable server a GET neither
+// resolves nor rejects: the route waits, forever.
+//
+// #368 bounded exactly one read, on the TOTP path, and wrote the rest up in
+// SECURITY.md as open: "every other redis-backed route still inherits it". It
+// does not any more. The bound now lives on the CLIENT (lib/redis-deadline),
+// so every command in relay.js, relay/lib/* and envelope.js is bounded by
+// construction rather than by a list somebody has to keep correct. The name of
+// the knob is unchanged, PARAMANT_REDIS_DEADLINE_MS, and it is now the single
+// configuration source for both services.
+const REDIS_DEADLINE_MS = redisDeadlines.redisDeadlineMs();
+function redisDeadline(promise, ms = REDIS_DEADLINE_MS) {
+  return redisDeadlines.withRedisDeadline(promise, { ms, op: 'redis' });
+}
+
 // Redis client for user TOTP endpoints
 const RELAY_REDIS_URL = process.env.REDIS_URL || '';
 let redisClient = null;
 if (RELAY_REDIS_URL) {
-  redisClient = createClient({ url: RELAY_REDIS_URL });
+  // guardRedisClient is what makes the bound unconditional; redisClientBounds
+  // adds disableOfflineQueue, without which a command issued during a reconnect
+  // is held rather than refused. Neither is sufficient alone: the queue is what
+  // hangs a dead socket, the deadline is what catches a black hole, where the
+  // client still believes it is ready.
+  redisClient = redisDeadlines.guardRedisClient(
+    createClient({ url: RELAY_REDIS_URL, ...redisDeadlines.redisClientBounds() }),
+    { ms: REDIS_DEADLINE_MS, label: 'relay/redis' });
   redisClient.on('error', (err) => console.error('[relay/redis] error:', err.message));
   redisClient.connect()
     .then(() => console.log('[relay/redis] connected'))
     .catch(e => console.error('[relay/redis] connect failed:', e.message));
-}
-// A redis call that answers inside a deadline, or an outage. node-redis queues
-// commands while it reconnects, so against an unreachable server a GET neither
-// resolves nor rejects: the route waits, forever. On an auth path that is worse
-// than an error, because fail-closed means DECIDING and a decision has to
-// arrive. Used by the TOTP verify path, where the secret read sits in front of
-// the single-use guard and would otherwise hang before the guard can fail
-// closed. The rest of the relay still inherits the queue; see SECURITY.md.
-const REDIS_DEADLINE_MS = (() => {
-  const raw = parseInt(process.env.PARAMANT_REDIS_DEADLINE_MS || '', 10);
-  // A deployment with a slow or distant redis may need more room; one that
-  // would rather refuse than wait may want less. Zero or nonsense is not an
-  // opt-out, because "wait forever" is the failure this exists to prevent.
-  return Number.isFinite(raw) && raw > 0 ? raw : 1000;
-})();
-function redisDeadline(promise, ms = REDIS_DEADLINE_MS) {
-  let timer = null;
-  const deadline = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error('redis_deadline_exceeded')), ms);
-  });
-  return Promise.race([Promise.resolve(promise), deadline]).finally(() => { if (timer) clearTimeout(timer); });
 }
 
 const PORT       = parseInt(process.env.PORT       || '3000');
@@ -2424,7 +2427,60 @@ const _static = require('./lib/static-serve').createStaticHandler({
 });
 if (_static.serveFrontend) log('info', 'static_serving_enabled', { root: _static.frontendRoot });
 
-const server = http.createServer(async (req, res) => {
+// Every request, with one catch around the lot.
+//
+// The handler below is 4000 lines of `await`, and until now it was passed
+// straight to createServer as an async callback with nothing behind it. An
+// async callback that throws produces an unhandled rejection: the client gets
+// no answer at all, and on Node 22 the process exits. That was survivable only
+// because almost nothing in here could reject -- a redis call against a dead
+// server hung instead. Now that every redis call fails inside a bound, the
+// throw is the normal outage path, so it needs an answer and not a crash.
+//
+// Redis unreachable is 503 (the service could not answer, the caller did
+// nothing wrong); anything else is 500.
+const server = http.createServer((req, res) => {
+  handleRelayRequest(req, res).catch((err) => relayRequestFailed(req, res, err));
+});
+
+// A route-level catch that is about to answer 4xx or 5xx for what is really the
+// store being unreachable. One line at the top of each such catch turns that
+// into the honest answer instead.
+//
+// WHY IT IS NEEDED AT ALL. Every redis command is bounded now, so an outage
+// arrives as a rejection rather than as a hang -- but this file catches its own
+// errors on 31 routes and answers 400 "bad_request" or 500 "internal" for them.
+// A caller reading either of those has no way to tell "you sent nonsense" or
+// "we have a bug" from "come back in ten seconds", and a monitor watching for
+// 5xx sees a bug where there is an outage. Whoever adds the 32nd route is
+// covered by the top-level catch in relayRequestFailed, which answers the same
+// way; this is for the routes that already swallow.
+function redisOutage503(err, res) {
+  if (!redisDeadlines.isRedisOutage(err)) return false;
+  log('error', 'redis_unavailable', { err: (err && err.message) || String(err) });
+  if (res.headersSent || res.writableEnded) return true;
+  res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '5' });
+  res.end(J({ error: 'redis_unavailable', hint: 'the relay store did not answer inside its deadline' }));
+  return true;
+}
+
+function relayRequestFailed(req, res, err) {
+  const outage = redisDeadlines.isRedisOutage(err);
+  log('error', outage ? 'redis_unavailable' : 'request_failed', {
+    method: req.method, url: String(req.url || '').split('?')[0],
+    err: (err && err.message) || String(err),
+  });
+  // A handler that already started writing cannot be given a status any more.
+  if (res.headersSent || res.writableEnded) { try { res.end(); } catch (_) { /* gone */ } return; }
+  const headers = { 'Content-Type': 'application/json' };
+  if (outage) headers['Retry-After'] = '5';
+  res.writeHead(outage ? 503 : 500, headers);
+  res.end(J(outage
+    ? { error: 'redis_unavailable', hint: 'the relay store did not answer inside its deadline' }
+    : { error: 'internal_error' }));
+}
+
+async function handleRelayRequest(req, res) {
   setHeaders(res, req);
   const parsed  = url_.parse(req.url, true);
   const path    = parsed.pathname;
@@ -2831,6 +2887,22 @@ const server = http.createServer(async (req, res) => {
     add('users', apiKeys.size > 0 ? 'green' : 'yellow', apiKeys.size + ' API key(s) loaded');
     add('audit', 'green', 'Merkle hash chain active');
 
+    // The store, said out loud. Until now nothing in either health route
+    // mentioned redis, so a relay whose TOTP secrets and replay guard were
+    // unreachable reported the same green as a healthy one. The probe is
+    // bounded like every other redis call (lib/redis-deadline), so a dead store
+    // makes this route slower by at most one deadline and never hangs it.
+    if (!redisClient) {
+      add('redis', 'yellow', 'not configured (REDIS_URL empty)');
+    } else {
+      try {
+        const pong = await redisClient.ping();
+        add('redis', pong === 'PONG' ? 'green' : 'red', pong === 'PONG' ? 'reachable' : 'unexpected ping reply');
+      } catch (e) {
+        add('redis', 'red', 'unreachable: ' + ((e && e.message) || 'unknown'));
+      }
+    }
+
     const rank = { green: 0, yellow: 1, red: 2 };
     const overall = checks.reduce((m, c) => (rank[c.status] > rank[m] ? c.status : m), 'green');
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -2881,6 +2953,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ secret, backup_codes: [] }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/setup-totp]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -2930,6 +3003,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J(result));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/verify-totp]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -2951,6 +3025,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ success: true, backup_codes: backupCodes }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/activate-totp]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -2972,6 +3047,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J(result));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/consume-backup]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -2987,6 +3063,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ backup_codes: codes }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/regenerate-backup]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3004,6 +3081,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ success: true }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/delete-totp]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3029,6 +3107,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ exists: true, secret, backup_codes: [] }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/get-totp-provisional]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3073,6 +3152,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
       return res.end(J({ ok: true, documents, count: documents.length }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/envelopes GET]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3134,6 +3214,7 @@ const server = http.createServer(async (req, res) => {
         totp_algorithm: totpResult.algorithm,
       }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/signing-key POST]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3158,6 +3239,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, keys: projected, total: projected.length }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/signing-key GET]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3205,6 +3287,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, revoked_at: result.entry.revoked_at, ct_index: ctEntry.index }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/signing-key DELETE]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3273,6 +3356,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, pk_hash_sha3: result.entry.pk_hash_sha3, enrolled_at: result.entry.enrolled_at, ct_index: ctEntry.index }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/signing-key/tofu]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3346,6 +3430,7 @@ const server = http.createServer(async (req, res) => {
         ct_index: ctEntry.index,
       }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/signing-key/attested]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3369,6 +3454,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, handle }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/webauthn/handle]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3399,6 +3485,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, reenrolled: result.reenrolled, credId: result.entry.credId }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/webauthn/credential POST]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3420,6 +3507,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, credentials: creds, total: creds.length }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/webauthn/credentials GET]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3440,6 +3528,7 @@ const server = http.createServer(async (req, res) => {
         counter: found.entry.counter, prfSupported: found.entry.prfSupported,
       }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/webauthn/lookup]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3455,6 +3544,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ found: true, user_id: found.userId }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/webauthn/by-handle]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3471,6 +3561,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, updated }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/webauthn/counter]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3504,6 +3595,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, remaining_active: result.remaining_active }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/webauthn/credential DELETE]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3536,6 +3628,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, mode: out.mode, scope: out.scope, key_masked: out.masked,
         note: "Store this key now -- it is shown once and cannot be retrieved in full again." }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/parasign-keys POST]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3555,6 +3648,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(J({ ok: true, account_id: accountId, count: keys.length, keys }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error("[user/parasign-keys GET]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -3606,7 +3700,7 @@ const server = http.createServer(async (req, res) => {
       log('info', 'claim_revealed', {});
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       return res.end(J({ ok: true, key }));
-    } catch (e) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_request' })); }
+    } catch (e) { if (redisOutage503(e, res)) return; res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_request' })); }
   }
 
   // ── GET /v2/check-key ───────────────────────────────────────────────────────
@@ -3652,6 +3746,7 @@ const server = http.createServer(async (req, res) => {
         revoked_at: found.entry.revoked_at,
       }));
     } catch (err) {
+      if (redisOutage503(err, res)) return;
       console.error('[lookup-signer]', err.message);
       res.writeHead(500); return res.end(J({ error: 'internal' }));
     }
@@ -4824,7 +4919,7 @@ const server = http.createServer(async (req, res) => {
       };
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, hash, ttl_ms: ttl, size: blob.length, sig_verified: sigResult.valid, download_token: dlToken, merkle_proof: merkleProof }));
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+    } catch (e) { if (redisOutage503(e, res)) return; res.writeHead(400); return res.end(J({ error: e.message })); }
     finally { inFlightInbound--; }
   }
 
@@ -5298,7 +5393,7 @@ const server = http.createServer(async (req, res) => {
       applyKeyLimitEnforcement();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, key: newKey, kid, account_id, plan, label }));
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+    } catch (e) { if (redisOutage503(e, res)) return; res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
   // ── GET /v2/admin/keys ────────────────────────────────────────────────────
@@ -5448,7 +5543,7 @@ const server = http.createServer(async (req, res) => {
       if (acct) { for (const f of keysTable.PERSONAL_DATA_FIELDS) delete acct[f]; }
       log('info', 'account_erased', { target: String(target).slice(0, 16), ...result });
       res.writeHead(200); return res.end(J({ ok: true, erased: result }));
-    } catch (e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+    } catch (e) { if (redisOutage503(e, res)) return; res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
   // ── POST /v2/admin/keys/revoke ────────────────────────────────────────────
@@ -5810,7 +5905,7 @@ const server = http.createServer(async (req, res) => {
         .catch(we => log('warn', 'primary_persist_failed', { err: we.message }));
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, account_id: accountId, primary_key: key, previous_primary: result.previous }));
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+    } catch (e) { if (redisOutage503(e, res)) return; res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
   // ── POST /v2/admin/send-welcome ──────────────────────────────────────────────
@@ -5856,7 +5951,7 @@ const server = http.createServer(async (req, res) => {
         log('warn', 'welcome_mail_failed', { email: maskEmail(d.email), resp });
         res.writeHead(502); return res.end(J({ error: 'Resend error', detail: resp }));
       }
-    } catch(e) { res.writeHead(500); return res.end(J({ error: e.message })); }
+    } catch (e) { if (redisOutage503(e, res)) return; res.writeHead(500); return res.end(J({ error: e.message })); }
   }
 
   // ── GET /v2/team/devices ───────────────────────────────────────────────────
@@ -6020,6 +6115,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, envelope }));
     } catch (e) {
+      if (redisOutage503(e, res)) return;
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: e.message }));
     }
@@ -6505,6 +6601,7 @@ const server = http.createServer(async (req, res) => {
         signed_at: out.signed_at, appearance: out.appearance, appearance_hash: out.appearance_hash,
         ...(_quotaField ? { quota: _quotaField } : {}) }));
     } catch (e) {
+      if (redisOutage503(e, res)) return;
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: e.message }));
     }
@@ -6620,7 +6717,7 @@ const server = http.createServer(async (req, res) => {
                 'GET /v2/outbound/:hash','GET /v2/status/:hash','POST /v2/webhook',
                 'GET /v2/stream-next','GET /v2/audit','GET /health','GET /metrics',
                 'POST /v2/verify-receipt'] }));
-});
+}
 
 // ── WebSocket streaming — push blob_ready events zonder polling ───────────────
 const wsClients = new Map(); // apiKey → Set van ws connections

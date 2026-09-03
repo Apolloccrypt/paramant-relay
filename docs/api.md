@@ -774,6 +774,14 @@ could not reach Redis. The code was not rejected and nothing is wrong with the
 account; verification fails closed rather than accepting a code it cannot mark
 as spent. See SECURITY.md.
 
+**Every credential answer on this route is held to a floor**
+(`PARAMANT_LOGIN_MIN_ANSWER_MS`, default 250 ms), so a 401 for an address that
+has an account takes exactly as long as one for an address that does not. That
+difference used to be 4 ms with no overlap between the two distributions, which
+is one request per address to tell a customer from a stranger. The 428 and the
+429 are not held back: their status codes tell them apart whatever the clock
+says, and the login page is waiting on the 428 to start hashing.
+
 ### POST /api/user/auth/login-with-backup
 
 ```bash
@@ -933,6 +941,8 @@ They are not accessible from the public internet.
 | 428 | `pow_required` | This email address has collected enough failed sign-ins that the next attempt must carry a solved proof-of-work. Not a refusal: solve `GET /api/captcha/challenge` and post again |
 | 429 | `rate_limited` | Too many requests from this IP address |
 | 503 | `totp_unavailable` | The TOTP single-use guard could not reach Redis. Verification fails closed; retry when the relay reports healthy |
+| 503 | `redis_unavailable` | Any other Redis-backed route whose store did not answer inside `PARAMANT_REDIS_DEADLINE_MS` (default 1000 ms). Carries `Retry-After: 5`. Nothing is wrong with the request; the relay refuses rather than waiting for a store that may never answer |
+| 503 | `session_store_unavailable` | The admin could not read the session behind an authenticated request, for the same reason |
 | 500 | `internal` | Unexpected server error; check relay logs |
 
 ### POST /admin/api/admin/force-totp

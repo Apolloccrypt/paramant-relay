@@ -5,7 +5,8 @@ const pow = require('./lib/pow-captcha');
 const http    = require('http');
 const crypto  = require('crypto');
 const path    = require('path');
-const { initRedis, redis, scanKeys } = require('./lib/redis');
+const { initRedis, redis, redisHealthy, scanKeys } = require('./lib/redis');
+const { isRedisOutage } = require('./lib/redis-deadline');
 const { logAuditEvent, getAuditEvents } = require('./lib/audit');
 const { spawn } = require('child_process');
 const cliCommands = require('./lib/cli-commands');
@@ -175,6 +176,28 @@ app.use((req, res, next) => {
   next();
 });
 app.use(BASE_PATH || '/', express.static(path.join(__dirname, 'public')));
+
+// GET /health -- liveness, and an honest word about the store.
+//
+// The admin had no health route at all: the container probe was GET
+// /api/auth/check, which answers 401 when nobody is signed in, so "healthy"
+// meant "the process still refuses me". That cannot distinguish an admin that
+// is fine from one whose redis has been gone for an hour, which is exactly the
+// blind spot the regression watchlist is about.
+//
+// Always 200, because the process IS up and still serves its static app and
+// still answers honestly on every other route. The status field is where the
+// truth about redis goes: "degraded" when the store cannot be reached. The
+// probe is bounded like every other redis call, so this route cannot be the one
+// that hangs.
+app.get(`${BASE_PATH}/health`, async (req, res) => {
+  const store = await redisHealthy();
+  res.status(200).json({
+    ok: true,
+    status: store.ok ? 'ok' : 'degraded',
+    redis: { ok: store.ok, detail: store.detail },
+  });
+});
 
 const api = express.Router();
 
@@ -968,8 +991,54 @@ api.post("/user/setup/:token/confirm", async (req, res) => {
 
 // ── Login flow ────────────────────────────────────────────────────────────────
 
+// Every credential answer on /api/user/login leaves at the same point on the
+// clock, whatever the handler had to do to reach it.
+//
+// THE ORACLE THIS CLOSES. The status codes on this route were already
+// identical: an earlier fix folded three different 403s into one 401 precisely
+// so the code could not be read as "this address exists". The WORK was not.
+// An address that exists reaches a second relay call (/v2/user/verify-totp)
+// and one more redis read; one that does not returns two steps earlier. On a
+// booted admin, 200 requests per case, interleaved, one X-Real-IP each:
+//
+//   relay verify-totp cost   exists (p50)   absent (p50)   delta
+//   0 ms (instant stub)          3.02 ms        1.93 ms    1.10 ms
+//   3 ms (a realistic relay)     6.13 ms        1.93 ms    4.20 ms
+//
+// In the second row the two distributions do not overlap at all: the fastest
+// hit (4.58 ms) is slower than the slowest miss (4.02 ms), so ONE request
+// classifies an address, under the rate limit, without ever signing in. The
+// review measured 5.40 against 2.95 ms on the production pair; same channel,
+// different machine.
+//
+// WHAT REPLACES IT. A floor, not a sleep: the answer is held until t0 plus a
+// constant, so what an attacker times is a number this file sets. Padding by a
+// fixed amount would not have worked -- it moves both curves and keeps the
+// distance between them. The not-found branch also does the same shape of redis
+// work as the found one now, so the floor is a safety margin rather than the
+// only thing holding the two paths together.
+//
+// 429 and 428 are deliberately NOT padded. They are not credential answers,
+// their status codes tell them apart anyway, and slowing them down would only
+// cost the honest client who is being asked for a proof-of-work.
+const LOGIN_MIN_ANSWER_MS = (() => {
+  const raw = parseInt(process.env.PARAMANT_LOGIN_MIN_ANSWER_MS || '', 10);
+  // The floor has to sit above the p99 of the slowest branch or it stops being
+  // a floor and the difference leaks again. Zero or nonsense is not an opt-out.
+  return Number.isFinite(raw) && raw > 0 ? raw : 250;
+})();
+
+function answerLoginAt(t0, res, status, body) {
+  const wait = LOGIN_MIN_ANSWER_MS - (Date.now() - t0);
+  if (wait <= 0) return res.status(status).json(body);
+  return new Promise((resolve) => setTimeout(resolve, wait)).then(() => res.status(status).json(body));
+}
+
 // POST /api/user/login
 api.post("/user/login", async (req, res) => {
+  // Read before anything else runs: every credential answer below is held until
+  // this moment plus LOGIN_MIN_ANSWER_MS. See answerLoginAt.
+  const t0 = Date.now();
   const { email, totp } = req.body || {};
   if (!email || !totp) return res.status(400).json({ error: "missing_fields" });
 
@@ -1001,8 +1070,13 @@ api.post("/user/login", async (req, res) => {
 
   const user = await findUserByEmail(email);
   if (!user) {
+    // The read the existing-account branch does next, against a key that cannot
+    // exist. A GET on a random key, no write, so it costs one round trip and
+    // leaves nothing behind: the point is that both branches make the same
+    // number of calls to the same store before they answer.
+    await redis().get(`paramant:user:totp_active:absent_${crypto.randomBytes(16).toString("hex")}`);
     await loginRate.noteEmailFailure(redis(), email);
-    return res.status(401).json({ error: "invalid_credentials" });
+    return answerLoginAt(t0, res, 401, { error: "invalid_credentials" });
   }
 
   const activeRaw = await redis().get(`paramant:user:totp_active:${user.key}`);
@@ -1023,12 +1097,12 @@ api.post("/user/login", async (req, res) => {
       // fact that the email belongs to a real account with admin-required
       // TOTP not yet set up.
       await loginRate.noteEmailFailure(redis(), email);
-      return res.status(401).json({ error: "invalid_credentials" });
+      return answerLoginAt(t0, res, 401, { error: "invalid_credentials" });
     }
     // Same 401 for TOTP-not-configured so this branch also does not leak
     // account existence. Was: 403 totp_not_configured.
     await loginRate.noteEmailFailure(redis(), email);
-    return res.status(401).json({ error: "invalid_credentials" });
+    return answerLoginAt(t0, res, 401, { error: "invalid_credentials" });
   }
 
   const verifyRes = await callRelay("/v2/user/verify-totp", { user_id: user.key, totp });
@@ -1040,12 +1114,12 @@ api.post("/user/login", async (req, res) => {
   if (verifyRes.status === 503) return res.status(503).json({ error: "totp_unavailable" });
   if (!verifyRes.ok) {
     await loginRate.noteEmailFailure(redis(), email);
-    return res.status(401).json({ error: "invalid_credentials" });
+    return answerLoginAt(t0, res, 401, { error: "invalid_credentials" });
   }
   const result = await verifyRes.json();
   if (!result.valid) {
     await loginRate.noteEmailFailure(redis(), email);
-    return res.status(401).json({ error: "invalid_credentials" });
+    return answerLoginAt(t0, res, 401, { error: "invalid_credentials" });
   }
 
   // A correct code proves who is at the keyboard, so the failures collected in
@@ -1062,7 +1136,10 @@ api.post("/user/login", async (req, res) => {
 
   setUserCookie(res, sessionToken);
 
-  res.json({
+  // The success answer is floored too. A sign-in that came back faster than
+  // every refusal would be its own oracle: the 200 is visible, but so is the
+  // fact that this address got as far as having a code checked at all.
+  return answerLoginAt(t0, res, 200, {
     success: true,
     email: user.email,
     session_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
@@ -3638,6 +3715,15 @@ app.get(`${BASE_PATH}/*path`, (req, res) => res.sendFile(path.join(__dirname, 'p
     console.error('[unhandled error]', err.message);
     if (res.headersSent) return next(err);
     if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'payload_too_large' });
+    // Redis unreachable is an availability answer, not a bug. Express 5 forwards
+    // a rejected async handler here by itself, so with every redis command now
+    // bounded (lib/redis-deadline) this one branch turns EVERY redis-backed
+    // route in this file into an honest 503 inside the deadline, instead of a
+    // request that waits for a store that is never going to answer.
+    if (isRedisOutage(err)) {
+      res.setHeader('Retry-After', '5');
+      return res.status(503).json({ error: 'redis_unavailable' });
+    }
     res.status(500).json({ error: 'internal_error' });
   });
 

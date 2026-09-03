@@ -10,6 +10,53 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **No redis call in the relay or the admin panel can hang any more.** node-redis
+  holds commands on an offline queue while it reconnects, and it never times a
+  command out, so against a store that is gone a route neither succeeded nor
+  failed: it waited. #368 bounded one read on the TOTP path and wrote the rest
+  up in SECURITY.md as open. The bound now sits on the client itself
+  (`lib/redis-deadline.js`, `guardRedisClient` plus `disableOfflineQueue`), so
+  all of it is covered, including the `sMembers`/`sRem` pair behind
+  `/v2/user/consume-backup` that the earlier fix left next to the one it fixed.
+  Both mechanisms are needed and neither is enough alone: `disableOfflineQueue`
+  refuses a command issued while the socket is down, and only a deadline catches
+  a connection that stays open and goes silent, where the client still reports
+  itself ready. A third measurement made a rebuild necessary too: after a
+  command is lost that way, node-redis holds every later command behind it and
+  never recovers, so the guard reconnects after two unanswered commands in a
+  row. `PARAMANT_REDIS_DEADLINE_MS` keeps its name and is now the one knob for
+  both services. An outage answers 503 with `Retry-After`, never a 500 and never
+  a wrong-credentials 401.
+- **The relay's request handler now catches.** `http.createServer` was handed a
+  4000-line async callback with nothing behind it, so a throw was an unhandled
+  rejection: no response to the client, and on Node 22 a process exit. It was
+  survivable only because a dead redis hung rather than threw; with the bound
+  above, an outage is the normal throw path.
+- **`/v2/health/deep` mentions redis, and the admin has a `/health` at all.** The
+  deep check reported the same green whether the store that holds every TOTP
+  secret was reachable or not. The admin's container probe was
+  `GET /api/auth/check`, which answers 401 when nobody is signed in, so
+  "healthy" meant "the process still refuses me". The new admin `GET /health` is
+  always 200 and says `status: "degraded"` when redis is unreachable.
+- **`POST /api/user/login` no longer says which addresses are customers.** An
+  address that exists reached a second relay call and one more redis read than
+  one that does not. Measured over 200 requests per case on a booted admin: 6.44
+  ms against 2.20 ms at the median, with the two ranges not overlapping, so one
+  request classified an address without any credentials. Every credential answer
+  is now held to a floor (`PARAMANT_LOGIN_MIN_ANSWER_MS`, default 250 ms) and the
+  not-found branch makes the same redis calls as the found one; the same
+  measurement after the fix reads 251.37 against 251.27 ms. The 429 and the 428
+  are deliberately not padded: they are told apart by their status code anyway.
+
+### Added
+- **An HTTP test harness for the admin panel** (`admin/test/_admin-server.js`),
+  the counterpart of `relay/test/_relay-server.js`. Every admin suite until now
+  was a lib test or a source-text assertion; none of them ever started the
+  server. `admin/test/login-http.test.js` runs the login limiter scenario
+  against the real process -- ten wrong codes from three addresses, then the
+  owner with a real proof-of-work -- and goes red against the pre-#368 admin,
+  which the test it supplements could not.
+
 - **Every ParaSend limit now reads the product tier, not the unified `plan`.**
   Billing writes a purchase with `setProductPlan` ->
   `entitlements.applyProductTier`, which sets `plan_parasend` (or

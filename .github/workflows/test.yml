@@ -336,14 +336,40 @@ jobs:
   admin-unit-tests:
     name: admin - unit suite
     runs-on: ubuntu-latest
+    # Three suites boot the real admin/server.js over HTTP (login-http,
+    # login-timing, redis-outage), so this job now needs a store and the admin's
+    # own dependencies. It used to install nothing, which is exactly why every
+    # admin suite was a lib test or a source-text assertion and the login
+    # handler itself was never run.
+    services:
+      redis:
+        image: redis:7.4.8-alpine
+        ports:
+          - 6399:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      REDIS_URL: redis://127.0.0.1:6399
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
+      - name: Install admin dependencies
+        working-directory: admin
+        run: npm ci
       - name: Admin unit suite
         working-directory: admin
-        run: node --test test/*.test.js
+        run: |
+          set -o pipefail
+          node --test --test-reporter=tap test/*.test.js | tee /tmp/admin.tap
+          # A suite that ran and asserted nothing prints this and would
+          # otherwise be a green tick over no coverage at all.
+          silent=$(grep -oE '^# [a-z0-9-]+: SKIPPED - 0 checks ran' /tmp/admin.tap || true)
+          if [ -n "$silent" ]; then echo "silent suite(s):"; echo "$silent"; exit 1; fi
 
   gitleaks:
     name: secrets - gitleaks

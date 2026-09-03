@@ -207,19 +207,171 @@ inside `verifyTotpGeneric` (`storeTimeoutMs`, 1s) and the secret read in front
 of it (`redisDeadline` in relay.js, 1s). A timeout is reported exactly like a
 thrown error, so the route answers 503 in about a second.
 
-**Still open, and deliberately not fixed here.** That queue-forever behaviour is
-a property of the relay's redis client, not of this path. Every other
-redis-backed route in relay.js still inherits it and will still hang in an
-outage. The fix is a client-level one (`disableOfflineQueue`, or a command
-deadline applied globally) which changes the failure mode of every call site at
-once, so it belongs in its own change with its own review, not smuggled in
-behind an auth fix.
+**Closed by the 2026-09-03 change below.** This was left open here as "a
+property of the relay's redis client, not of this path", with every other
+redis-backed route still inheriting it. It is now bounded on the client, in both
+services. See *No redis call in either service can hang*.
 
 Pinned by `relay/test/verify-totp.test.js` (a throwing store, a synchronously
 throwing store and a store that never answers, none of which may validate a
 code), `relay/test/route-user-mfa-lockout.test.js` (a real relay, a real redis,
 and the connection cut underneath it mid-suite), `relay/test/auth-throttle.test.js`
 and `admin/test/login-ratelimit.test.js`.
+
+---
+
+### 2026-09-03: redis outages, a login timing oracle, and a test that tested itself
+
+Three findings from the review of #368.
+
+#### 1. No redis call in either service can hang
+
+This closes the finding #368 left open above, and it turned out to be two
+problems rather than one.
+
+**The offline queue.** node-redis holds commands in memory while it reconnects,
+and its default reconnect strategy retries for as long as the process lives.
+Measured against redis 5.12.1 (relay) and 6.2.1 (admin), with a live connection
+cut underneath the client: the first command after the cut rejects in about a
+millisecond, and every command after that neither resolves nor rejects. Still
+pending after four seconds, after twelve, after any bound worth measuring.
+`disableOfflineQueue` turns that into an immediate refusal.
+
+**A connection that goes silent.** If the bytes stop but the socket stays open
+(a dropped firewall rule, a wedged proxy, a frozen container) nothing fails at
+all. `isReady` stays `true`, the command goes out, the reply never comes.
+`disableOfflineQueue` cannot see this case, because from the client's point of
+view nothing is wrong. Only a per-command deadline catches it. Both, therefore,
+and neither is redundant.
+
+**A bound makes the caller safe, not the client.** A third measurement: after a
+command is lost to a silent connection, node-redis goes on waiting for its reply
+and holds every later command behind it, so the client never recovers even once
+the network does. On both major versions, a connection that was holed and then
+healed answered nothing again, ever, while continuing to report itself ready.
+`destroy()` followed by `connect()` rebuilds it in about three milliseconds. The
+guard does that after two unanswered commands in a row; not after one, because a
+single slow command is a big `SCAN` or a loaded server, and tearing the socket
+down for that would turn a slow minute into a broken one.
+
+The bound lives on the CLIENT, in `lib/redis-deadline.js`, not on the call
+sites: `guardRedisClient` returns a proxy that puts the deadline on every
+command, every `MULTI` chain and every `scanIterator` step. There are roughly
+300 redis call sites across `relay.js`, `relay/lib/*`, `relay/envelope.js`,
+`admin/server.js` and `admin/lib/*`, including the `sMembers`/`sRem` pair in
+`consumeBackupCode` that #368 bounded on the verify path and not on the
+backup-code path next to it. A per-call-site list would have been wrong the
+first time somebody added a route.
+
+An exceeded bound, a closed socket and an offline client all arrive as one
+`RedisUnavailableError`, so a route does not have to know which happened to know
+that the honest answer is 503. Three places turn it into one:
+`relay.js redisOutage503` for the 31 route-level catches that used to answer 400
+`bad_request` or 500 `internal` for an outage, a new top-level catch on the
+relay's request handler for everything that does not catch (an async throw there
+was previously an unhandled rejection: no answer at all, and on Node 22 a process
+exit), and the admin's express error middleware.
+
+`PARAMANT_REDIS_DEADLINE_MS` keeps its name from #368 and is now the single
+configuration source for both services. Default 1000 ms; zero or a non-number
+falls back to the default, because "wait forever" is the failure it exists to
+prevent.
+
+**What was given up.** During an outage every request pays the deadline once
+before it is refused, where before it paid nothing and answered nothing. A
+deployment whose redis routinely takes longer than a second to answer will see
+503s it did not see before, and must raise the knob rather than remove it. There
+is no retry and no open circuit: throughput during an outage is not what this
+buys, a bounded answer is.
+
+**Honesty about the store.** `GET /health` on the relay touches no redis and
+still answers 200, which is correct: the process is up. `GET /v2/health/deep`
+now carries a `redis` check and goes red when the store is unreachable, where it
+previously reported the same green as a healthy relay. The admin had no health
+route at all -- its container probe was `GET /api/auth/check`, which answers 401
+when nobody is signed in, so "healthy" meant "the process still refuses me". It
+now has `GET /health`, always 200, with `status: "degraded"` when redis cannot be
+reached.
+
+Pinned by `relay/test/route-redis-outage.test.js` and
+`admin/test/redis-outage.test.js` (a booted relay and a booted admin, a real
+redis behind a proxy the suite cuts and then black-holes mid-run, every
+redis-backed route asserted to answer 503 inside the deadline, and both
+processes asserted to heal by themselves when the store comes back),
+`relay/test/redis-deadline.test.js` (the classifier, the deadline, the proxy and
+the rebuild, without a redis) and `tests/redis-deadline-parity.test.mjs` (the
+relay and admin copies of the module are one file, and both services actually
+wrap their client with it).
+
+#### 2. The login page told you which addresses were customers
+
+`POST /api/user/login` did strictly more work for an address that exists: it
+reached a second relay call (`/v2/user/verify-totp`) and one more redis read,
+where a non-existent address returned two steps earlier. The status codes were
+already identical on purpose -- three different 403s were folded into one 401 in
+#368 for exactly this reason -- but the clock was not.
+
+Measured on a booted admin, 200 requests per case, interleaved, one source
+address each, with the relay stub given a realistic 3 ms cost for the verify
+call:
+
+| | median | range |
+|---|---|---|
+| address exists | 6.44 ms | 4.59 - 9.94 ms |
+| address absent | 2.20 ms | 0.90 - 3.73 ms |
+
+The ranges do not overlap. One request classifies an address, under the rate
+limit, without any credentials. The review measured 5.40 against 2.95 ms on the
+production pair; same channel, slower machine.
+
+No credential answer on that route now leaves before `t0` plus
+`PARAMANT_LOGIN_MIN_ANSWER_MS` (default 250 ms), so what an attacker times is a
+constant this code sets rather than the path the request took. The not-found
+branch also makes the same number of redis calls as the found one, so the floor
+is a margin rather than the only thing holding the two paths together. After,
+same instrument, same 200 requests:
+
+| | median | range |
+|---|---|---|
+| address exists | 251.37 ms | 249.61 - 253.01 ms |
+| address absent | 251.27 ms | 249.70 - 253.00 ms |
+
+**What was not padded, and why.** 429 (per-IP refusal) and 428 (proof-of-work
+required) are not credential answers: their status codes tell them apart
+whatever the clock says, and holding them back would only slow down the honest
+client whose page is waiting to start hashing. **What this does not fix:** an
+address that is over the failure threshold answers 428 where one that is not
+answers 401, so a determined attacker who is willing to burn ten failures per
+address can still tell them apart by status code. That is the cost of pricing an
+attempt instead of refusing it, and it is a far more expensive oracle than a
+2 ms timing difference.
+
+Pinned by `admin/test/login-timing.test.js`, which measures both cases against a
+booted admin and asserts the medians do not separate and the ranges overlap. The
+instrument that produced the numbers above is `admin/test/login-timing.bench.js`
+and it can be pointed at any checkout with `ADMIN_SERVER_JS=`.
+
+#### 3. A test that reimplemented the handler it was testing
+
+`admin/test/login-ratelimit.test.js` drove `lib/login-ratelimit.js` directly
+through an `attemptLogin()` helper written inside the test file, and then read
+`server.js` as a string to assert the order of three calls. The module is
+correct and the order assertion is worth keeping, but between them they never
+ran the handler: the decision under test was one the test file made up, so it
+could pass while the route was wrong.
+
+`admin/test/_admin-server.js` is the admin counterpart of
+`relay/test/_relay-server.js`: it spawns the real `admin/server.js`, points it
+at a stub relay that answers the two routes a login touches, and speaks HTTP to
+it. `admin/test/login-http.test.js` runs the reviewer's scenario on it -- ten
+wrong codes on one address from three source addresses, then the owner solving
+a real 2^18 proof-of-work and getting a session -- plus the per-IP refusal, the
+IP refund on a priced attempt, and the relay 503 being passed through instead of
+reported as a wrong code.
+
+Checked against the code it is meant to catch: run against the pre-#368 admin,
+three of its five tests fail, on the 429 where a 428 belongs and on the outage
+reported as `invalid_credentials`. `login-timing.test.js` fails there too.
 
 ---
 
