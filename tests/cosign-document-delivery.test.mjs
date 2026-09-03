@@ -178,7 +178,7 @@ await anonPage.close();
 // envelope, seeds this editor, and is never binding: the signer may move it,
 // and their signature commits to where they actually signed (the recipe-5
 // message, guarded by tests/cosign-appearance-contract.test.mjs).
-const requestedPosition = { version: 1, fields: [{ type: 'seal', page_index: 0, x: 0.42, y: 0.61, w: 0.36, h: 0.105 }] };
+const requestedPosition = { version: 1, fields: [{ type: 'seal', page_index: 0, x: 0.42, y: 0.72, w: 0.36, h: 0.105 }] };
 const seedPage = await browser.newPage({ viewport: { width: 390, height: 844 } });   // its own context, so its own sessionStorage
 await seedPage.route(`**/api/user/envelopes/${ENV_ID}/document*`, (route) =>
   route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(fixture.capsule) }));
@@ -202,12 +202,76 @@ await seedPage.route('https://health.paramant.app/v2/envelopes/**', (route) => {
 await seedPage.goto(base + fixture.fragment, { waitUntil: 'domcontentloaded' });
 await waitForDeliveryResult(seedPage);
 await seedPage.waitForFunction(() => document.querySelectorAll('.appearance-field:not(.prior)').length === 1);
+// The page marks the element once the load-time scroll has run, so the check
+// below observes that it happened instead of waiting a hopeful number of ms.
+await seedPage.locator('#requested-note[data-scrolled="1"]').waitFor({ timeout: 15000 });
 const seeded = await seedPage.evaluate(() => ({
   fields: Array.from(document.querySelectorAll('.appearance-field:not(.prior)')).map((n) => ({ left: n.style.left, top: n.style.top, width: n.style.width })),
   help: document.querySelector('#appearance-help')?.textContent || '',
   draft: Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.getItem(sessionStorage.key(i))).find((v) => v && v.includes('"fields"')) || '',
 }));
-ok('the requested position seeds the recipient editor', seeded.fields.length === 1 && seeded.fields[0].left === '42%' && seeded.fields[0].top === '61%' && seeded.fields[0].width === '36%', JSON.stringify(seeded.fields));
+ok('the requested position seeds the recipient editor', seeded.fields.length === 1 && seeded.fields[0].left === '42%' && seeded.fields[0].top === '72%' && seeded.fields[0].width === '36%', JSON.stringify(seeded.fields));
+
+// A requested box is not a signature. The sender saw "SIGNATURE REQUESTED /
+// Their signature"; the recipient used to see "Paramant signed - <name> x",
+// which reads as a signature that already exists and that they could delete.
+const seededLook = await seedPage.evaluate(() => {
+  const node = document.querySelector('.appearance-field');
+  const cs = node && getComputedStyle(node);
+  return {
+    className: node && node.className,
+    text: node && node.textContent,
+    borderStyle: cs && cs.borderTopStyle,
+    hasRemove: !!(node && node.querySelector('.appearance-remove')),
+    inView: node ? (() => { const b = node.getBoundingClientRect(); return b.top >= 0 && b.bottom <= window.innerHeight; })() : null,
+    noteVisible: !document.getElementById('requested-note').hidden,
+    noteText: document.getElementById('requested-note-text')?.textContent,
+    goLabel: document.getElementById('requested-note-go')?.textContent,
+  };
+});
+ok('the seeded box wears the requested style, not the signed style',
+  /\brequested\b/.test(seededLook.className) && seededLook.borderStyle === 'dashed'
+  && /Requested spot/i.test(seededLook.text) && !/Signer Demo/.test(seededLook.text) && !seededLook.hasRemove,
+  JSON.stringify(seededLook));
+ok('the marked spot is brought into view when the document opens', seededLook.inView === true, JSON.stringify(seededLook));
+ok('a line above the document points at the spot',
+  seededLook.noteVisible && /sender marked where you sign/i.test(seededLook.noteText) && /Go to the spot/i.test(seededLook.goLabel),
+  JSON.stringify(seededLook));
+
+// Scroll away, then use the button: it has to bring the spot back.
+await seedPage.evaluate(() => { window.scrollTo(0, 0); document.getElementById('doc-preview').scrollTop = 0; });
+await seedPage.locator('#requested-note-go').click();
+await seedPage.waitForTimeout(700);
+const afterGo = await seedPage.evaluate(() => {
+  const b = document.querySelector('.appearance-field').getBoundingClientRect();
+  return { inView: b.top >= 0 && b.bottom <= window.innerHeight, top: Math.round(b.top) };
+});
+ok('Go to the spot returns to the marked box', afterGo.inView === true, JSON.stringify(afterGo));
+
+// The document gets the width. The sender placed this box on a 343px render at
+// 390; the recipient used to review it at 229px with margins on both sides.
+// The wrapper, the canvas and the click layer must also be ONE box, or a click
+// fraction is a fraction of something the reader never saw.
+const previewWidth = await seedPage.evaluate(() => {
+  const wrap = document.querySelector('.doc-page[data-page-index="0"]');
+  const canvas = wrap.querySelector('canvas');
+  const layer = wrap.querySelector('.appearance-layer');
+  return {
+    viewport: window.innerWidth,
+    wrap: Math.round(wrap.getBoundingClientRect().width),
+    canvas: Math.round(canvas.getBoundingClientRect().width),
+    layer: Math.round(layer.getBoundingClientRect().width),
+  };
+});
+ok('the document is rendered fit-to-width like the sender saw it',
+  previewWidth.canvas >= previewWidth.viewport * 0.82 && previewWidth.canvas === previewWidth.wrap && previewWidth.layer === previewWidth.wrap,
+  JSON.stringify(previewWidth));
+
+const touchTargets = await seedPage.evaluate(() => Array.from(
+  document.querySelectorAll('#appearance-editor .btn, #sign-confirm, #requested-note-go'),
+).map((b) => ({ id: b.id, h: Math.round(b.getBoundingClientRect().height) })));
+ok('every control on the signing screen is a 44px touch target',
+  touchTargets.length >= 5 && touchTargets.every((b) => b.h >= 44), JSON.stringify(touchTargets));
 ok('the recipient is told it is a request they may move', /sender asked/i.test(seeded.help) && /move it/i.test(seeded.help) && /where you actually sign/i.test(seeded.help), seeded.help);
 ok('a requested position is not silently adopted as the signer draft', seeded.draft === '', seeded.draft);
 
@@ -217,13 +281,58 @@ const moved = await seedPage.evaluate(() => ({
   fields: Array.from(document.querySelectorAll('.appearance-field:not(.prior)')).map((n) => ({ left: n.style.left, top: n.style.top })),
   draft: Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.getItem(sessionStorage.key(i))).find((v) => v && v.includes('"fields"')) || '',
 }));
-ok('the recipient can move the requested box', moved.fields.length === 1 && moved.fields[0].top !== '61%' && /"type":"seal"/.test(moved.draft), JSON.stringify(moved));
+ok('the recipient can move the requested box', moved.fields.length === 1 && moved.fields[0].top !== '72%' && /"type":"seal"/.test(moved.draft), JSON.stringify(moved));
+const afterMove = await seedPage.evaluate(() => {
+  const node = document.querySelector('.appearance-field');
+  return { className: node.className, text: node.textContent, hasRemove: !!node.querySelector('.appearance-remove'), noteHidden: document.getElementById('requested-note').hidden };
+});
+ok('once the signer places it, it is their signature and not a request',
+  !/requested/.test(afterMove.className) && /Paramant signed/.test(afterMove.text) && afterMove.hasRemove && afterMove.noteHidden === true,
+  JSON.stringify(afterMove));
 
+// Fit-to-width changed how wide the render is, so the click-to-fraction maths
+// gets its own measurement: place the box dead centre and read the fraction
+// back. Wrapper, canvas and click layer are one box, so the centre of the
+// canvas has to come back as the centre of the page.
+const centred = await seedPage.evaluate(() => {
+  const layer = document.querySelector('.doc-page[data-page-index="0"] .appearance-layer');
+  const r = layer.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+});
+await seedPage.locator('#appearance-seal').click();
+await seedPage.mouse.click(centred.x, centred.y);
+const roundTrip = await seedPage.evaluate(() => {
+  const raw = Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.getItem(sessionStorage.key(i))).find((v) => v && v.includes('"fields"'));
+  const field = JSON.parse(raw).fields[0];
+  return { cx: field.x + field.w / 2, cy: field.y + field.h / 2, field };
+});
+ok('a click in the middle of the page is the middle of the page',
+  Math.abs(roundTrip.cx - 0.5) < 0.01 && Math.abs(roundTrip.cy - 0.5) < 0.01, JSON.stringify(roundTrip));
+
+// The nav over a scrolling document must be opaque below 1024 (#399 fixed the
+// app-2026 pages; /co-sign loads the same nav.css and has to stay covered).
+const navPaint = await seedPage.evaluate(() => {
+  const cs = getComputedStyle(document.querySelector('.nav'));
+  return { bg: cs.backgroundColor, blur: cs.backdropFilter, position: cs.position };
+});
+ok('the co-sign nav is opaque on a phone', /^rgb\(\d+, \d+, \d+\)$/.test(navPaint.bg) && navPaint.blur === 'none', JSON.stringify(navPaint));
+
+// Whatever the signer last placed is what must survive the refresh, so read it
+// now rather than comparing against a position two placements ago.
+const beforeReload = await seedPage.evaluate(() => Array.from(document.querySelectorAll('.appearance-field:not(.prior)')).map((n) => ({ left: n.style.left, top: n.style.top })));
 await seedPage.reload({ waitUntil: 'domcontentloaded' });
 await waitForDeliveryResult(seedPage);
 await seedPage.waitForFunction(() => document.querySelectorAll('.appearance-field:not(.prior)').length === 1);
 const afterReload = await seedPage.evaluate(() => Array.from(document.querySelectorAll('.appearance-field:not(.prior)')).map((n) => ({ left: n.style.left, top: n.style.top })));
-ok('the signer own draft wins over the requested position on reload', afterReload.length === 1 && afterReload[0].top === moved.fields[0].top && afterReload[0].top !== '61%', JSON.stringify({ afterReload, moved: moved.fields }));
+ok('the signer own draft wins over the requested position on reload',
+  afterReload.length === 1 && afterReload[0].top === beforeReload[0].top && afterReload[0].left === beforeReload[0].left && afterReload[0].top !== '72%',
+  JSON.stringify({ afterReload, beforeReload }));
+const reloadedLook = await seedPage.evaluate(() => ({
+  className: document.querySelector('.appearance-field').className,
+  noteHidden: document.getElementById('requested-note').hidden,
+}));
+ok('a restored draft is never redressed as a request',
+  !/requested/.test(reloadedLook.className) && reloadedLook.noteHidden === true, JSON.stringify(reloadedLook));
 await seedPage.close();
 
 for (const c of checks) console.log(`${c.pass ? 'PASS' : 'FAIL'} ${c.name}${c.detail ? ' :: ' + c.detail : ''}`);

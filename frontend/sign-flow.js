@@ -3408,12 +3408,34 @@ async function showSessionRequirement() {
   if (!el) return;
   const q = new URLSearchParams(location.search);
   if (q.get('envelope') || q.get('e') || q.get('invite') || q.get('token') || location.hash.length > 1) return;
-  let unauthenticated = false;
+  let status = 0;
   try {
     const r = await fetch('/api/user/check', { credentials: 'same-origin', cache: 'no-store' });
-    unauthenticated = (r.status === 401 || r.status === 403);
-  } catch { return; }
-  if (!unauthenticated) return;
+    status = r.status;
+  } catch {
+    // A thrown fetch is the browser being offline, and the browser says so
+    // better than we can. Silence, as before: guessing "not signed in" from a
+    // dead connection would show the account notice to the paying customer
+    // whose wifi dropped.
+    return;
+  }
+  // The probe answered, but it answered that IT is broken. authUser returns 503
+  // session_store_unavailable when redis is unreachable, and a proxy in front
+  // can return any 5xx of its own. None of those mean "no account": a koper
+  // review found a signed-in user reading "Signing a document needs an account"
+  // because the answer was a failure rather than a refusal. Say what actually
+  // happened, in the shared sentence, and leave the account notice hidden.
+  if (status >= 500) {
+    const note = $('ds-service-note');
+    const errors = (typeof self !== 'undefined') && self.paramantErrors;
+    if (note && errors) { note.textContent = errors.SUPPORT_FAILURE_MESSAGE; note.hidden = false; }
+    try { console.error('[paramant] session probe', status); } catch { /* no console is never why a flow dies */ }
+    return;
+  }
+  // 401/403 is the one answer that means what the notice says: this browser has
+  // no session. Anything else (200, and any 4xx that is not a refusal) leaves
+  // both the notice and the service line hidden.
+  if (status !== 401 && status !== 403) return;
   el.hidden = false;
   // The mode picker stays visible underneath: a visitor should still see what
   // the three workflows are before deciding whether the account is worth it.

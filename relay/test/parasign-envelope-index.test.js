@@ -109,6 +109,19 @@ async function main() {
       requestedAppearance: { version: 1, fields: [{ type: 'seal', page_index: 0, x: 0.9, y: 0.5, w: 0.4, h: 0.12 }] },
     }), /outside page/, 'a box that runs off the page is refused');
     assert.strictEqual((await rc.keys('env:*')).length, envKeysBefore, 'the refused create left no envelope behind');
+
+    // A security review found create() accepting a bare string and storing an
+    // empty manifest for it. Through the real store, over real redis: it is a
+    // refusal now, and so is a requested field type the product never issues.
+    for (const bad of ['{"fields":[]}', 7, [{ type: 'seal' }], { version: 1, fields: [] },
+      { version: 1, fields: [{ type: 'date', page_index: 0, x: 0.1, y: 0.1, w: 0.22, h: 0.055 }] }]) {
+      await assert.rejects(() => store.create({
+        creatorApiKeyHash: 'y'.repeat(64), accountId: ACCT_REQ, docHash,
+        parties: [{ label: 'R', email: 'r@example.com' }], bindingMode: 'email', recipeVersion: 5,
+        requestedAppearance: bad,
+      }), /invalid requested appearance/, 'refused: ' + JSON.stringify(bad));
+    }
+    assert.strictEqual((await rc.keys('env:*')).length, envKeysBefore, 'none of the refusals left an envelope behind');
     ok('create() stores one normalized requested position and refuses a bad one');
 
     // 2) complete it, then the Business+ export returns its full .psign ---------

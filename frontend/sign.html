@@ -44,6 +44,7 @@
 .ds-headlink{margin:14px 0 0;font-size:13px}
 .ds-headlink a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
 .ds-anon-actions{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0 0}
+.ds-service-note{margin:0 0 16px;padding:10px 14px;border:1px solid var(--line-2);border-left:2px solid var(--mark);border-radius:var(--r-1);background:var(--surface-sunk);font-size:13px;line-height:1.6;color:var(--ink-2)}
 /* The hero is the pitch for a visitor who has not started yet. From the step
    after the document is chosen it is only in the way: at 390px it held the
    whole uploaded PDF below the fold. sign-flow.js stamps the active step on
@@ -488,6 +489,13 @@ body[data-ds-step="step-done"] #ds-doc-meta{display:none}
     </ul>
     <p class="ds-headlink"><a href="/parasign">What ParaSign is, and what organisations pay &rarr;</a></p>
   </header>
+
+  <!-- The session probe could not answer. NOT the same event as "you are not
+       signed in", and it must never be told as one: a signed-in customer whose
+       probe hit a 500 used to be shown the account notice, which reads as
+       "your account is gone". One sentence, the shared one from
+       js/error-message.js, so ParaSign and ParaShare apologise identically. -->
+  <p class="ds-service-note" id="ds-service-note" role="status" hidden></p>
 
   <ol class="ds-stepper" id="ds-stepper" aria-label="Sign progress" hidden>
     <li data-step="doc" class="active">Document</li>

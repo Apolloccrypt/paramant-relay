@@ -75,18 +75,38 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .step{display:none;animation:fadeIn .2s ease}
 .step.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-.doc-preview{margin-top:12px;border:1px solid var(--ink-hair);background:#fff;max-height:72vh;overflow:auto;padding:10px}
-.doc-page{margin:0 auto 12px;max-width:100%}
+/* The preview IS the document, so it gets the width. Nested padding (card 32,
+   card-body 18, its own 10) ate 120px of a 390px phone and left the page 229px
+   wide with a margin on either side, while the sender who placed the box was
+   looking at a 343px render of the same page. The negative margin cancels the
+   two paddings it is nested in, so the preview runs edge to edge inside the
+   card and both sides see the document at the same scale. */
+.doc-preview{margin:12px -50px 0;border:1px solid var(--ink-hair);border-left:0;border-right:0;background:#fff;max-height:72vh;overflow:auto;padding:10px 8px}
+.doc-page{position:relative;width:100%;margin:0 auto 12px;max-width:100%}
 .doc-page:last-child{margin-bottom:0}
 .doc-page canvas,.doc-page img{display:block;width:100%;height:auto;border:1px solid var(--ink-hair);background:#fff}
 .doc-page.appearance-page{position:relative;cursor:crosshair}
 .appearance-layer{position:absolute;inset:0;pointer-events:auto;cursor:crosshair}
 .appearance-field{position:absolute;display:flex;align-items:center;overflow:hidden;border:2px solid var(--cobalt);background:rgba(255,255,255,.94);color:var(--ink);padding:5px 8px;font:600 10px/1.25 var(--sans);box-shadow:0 3px 12px rgba(11,58,106,.16);pointer-events:auto}
 .appearance-field.date{border-color:#64748b;font-family:var(--mono);font-weight:500}
+/* The box the SENDER asked for, before the signer has touched it. It must not
+   look like a signature that already exists: no name, no date, no delete
+   control, a dashed outline and its own words. It becomes a real placed field
+   the moment the signer chooses Place my signature. */
+.appearance-field.requested{border:2px dashed var(--cobalt);background:rgba(11,58,106,.06);box-shadow:none;color:var(--cobalt);font-weight:600;justify-content:center;text-align:center;pointer-events:none}
 .appearance-field.prior{border-style:solid;background:rgba(239,246,255,.92);pointer-events:none}
 .appearance-remove{position:absolute;top:1px;right:2px;width:20px;height:20px;border:0;background:var(--cobalt);color:#fff;font:700 13px/1 var(--sans);cursor:pointer}
 .appearance-tools{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
 .appearance-tools .btn{width:auto;min-width:120px}
+/* 44px: a finger, not a mouse. These were 34-36px, under every touch-target
+   guideline, on the one screen where a mis-tap costs a signature. */
+.btn,.file-cta{min-height:44px}
+.appearance-tools .btn{min-height:44px}
+/* The pointer to the requested spot. It sits ABOVE the preview because that is
+   where the reader is when the document opens; the spot itself can be three
+   pages down. */
+.requested-note{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding:10px 14px;border:1px solid var(--cobalt);background:rgba(11,58,106,.04);font-size:12px;line-height:1.5;color:var(--cobalt)}
+.requested-note .btn{width:auto;min-width:0;padding:11px 14px;flex:0 0 auto}
 .appearance-help{font-size:12px;line-height:1.55;color:var(--ink-dim)}
 .appearance-help.active{color:var(--cobalt);font-weight:600}
 .doc-preview-meta{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-dim);text-align:center;padding:8px 0;line-height:1.5}
@@ -155,6 +175,10 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
       <label class="file-cta" for="verify-file" id="verify-file-cta">Choose the document manually if automatic loading fails</label>
       <input type="file" id="verify-file" hidden>
       <div class="banner" id="verify-result" hidden></div>
+      <div class="requested-note" id="requested-note" hidden>
+        <span id="requested-note-text">The sender marked where you sign</span>
+        <button class="btn" id="requested-note-go" type="button">Go to the spot</button>
+      </div>
       <div class="doc-preview" id="doc-preview" hidden></div>
       <div id="appearance-editor" hidden>
         <div class="appearance-tools" role="toolbar" aria-label="Visible signature fields">

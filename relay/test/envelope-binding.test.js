@@ -8,7 +8,7 @@
 const assert = require('assert');
 const crypto = require('crypto');
 const {
-  EnvelopeStore, signMessageBytes, normaliseAppearance, appearanceHash, partyEmailHash,
+  EnvelopeStore, signMessageBytes, normaliseAppearance, normaliseRequestedAppearance, appearanceHash, partyEmailHash,
 } = require('../envelope');
 
 let passed = 0;
@@ -408,6 +408,40 @@ async function main() {
     assert.ok(!seenMsg.equals(signMessageBytes(ID, DOC, 0, EMAIL_HASH, 5, PUB_A, appearanceHash(requested))),
       'the requested position is not the thing that was signed');
     ok('requested position reads back for both views and is never signed');
+  }
+
+  // 14. The requested position is validated more strictly than a signed one.
+  //     A security review found two soft edges: a bare string was normalized to
+  //     an empty manifest instead of refused, and a 'date' field was accepted
+  //     although /sign issues nothing but the seal. Both are now refusals.
+  {
+    for (const bad of ['{"fields":[]}', 42, true, [], [{ type: 'seal' }], null, undefined, '']) {
+      assert.throws(() => normaliseRequestedAppearance(bad), /invalid requested appearance/,
+        'non-object refused: ' + JSON.stringify(bad));
+    }
+    assert.throws(() => normaliseRequestedAppearance({ version: 1, fields: [] }), /invalid requested appearance/,
+      'an empty request is not a request');
+    assert.throws(() => normaliseRequestedAppearance({ version: 1, fields: [
+      { type: 'date', page_index: 0, x: .1, y: .1, w: .22, h: .055 },
+    ] }), /invalid requested appearance type/, 'a requested date is refused');
+    assert.throws(() => normaliseRequestedAppearance({ version: 1, fields: [
+      { type: 'seal', page_index: 0, x: .1, y: .1, w: .36, h: .105 },
+      { type: 'date', page_index: 0, x: .1, y: .3, w: .22, h: .055 },
+    ] }), /invalid requested appearance type/, 'one bad field fails the whole request');
+    // The signed appearance keeps its own, wider contract: a signer really can
+    // place a date, and really can choose to place nothing at all.
+    assert.deepStrictEqual(normaliseAppearance('not an object'), { version: 1, fields: [] },
+      'the signed-appearance validator is unchanged');
+    assert.strictEqual(normaliseAppearance({ version: 1, fields: [
+      { type: 'date', page_index: 0, x: .1, y: .1, w: .22, h: .055 },
+    ] }).fields[0].type, 'date', 'a signer may still place a date');
+    const good = normaliseRequestedAppearance({ version: 1, fields: [
+      { type: 'seal', page_index: 3, x: .4200004, y: .61, w: .36, h: .105 },
+    ] });
+    assert.deepStrictEqual(good, { version: 1, fields: [
+      { type: 'seal', page_index: 3, x: .42, y: .61, w: .36, h: .105 },
+    ] }, 'a real request still normalizes and passes');
+    ok('a requested position must be an object and may only ask for the seal');
   }
 }
 

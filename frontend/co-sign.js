@@ -69,6 +69,11 @@ let __blindAck = false;     // user explicitly opted to sign without opening the
 let __documentBytes = null; // verified source bytes, retained only for this page session
 let __appearanceTool = '';
 let __appearance = { version: 1, fields: [] };
+// True while __appearance is still exactly what the SENDER asked for and the
+// signer has not touched it. It is what tells the overlay to draw a dashed,
+// unnamed "requested spot" instead of a placed signature, and it goes false the
+// moment the signer places, moves or clears anything.
+let __appearanceIsSeed = false;
 let __signedPdfBytes = null;
 
 function appearanceDraftKey() {
@@ -184,10 +189,14 @@ function renderEnvelope() {
   const me = e.parties[__partyIndex] || {};
   $('me-label').textContent = (me.label || 'party ' + (__partyIndex + 1));
   $('verify-file').onchange = onVerifyFile;
+  const go = $('requested-note-go');
+  if (go) go.onclick = () => scrollToRequestedSpot('smooth');
   $('appearance-seal').onclick = () => armAppearanceTool('seal');
   $('appearance-date').onclick = () => armAppearanceTool('date');
   $('appearance-clear').onclick = () => {
     __appearance = { version: 1, fields: [] };
+    __appearanceIsSeed = false;
+    { const note = $('requested-note'); if (note) note.hidden = true; }
     saveAppearanceDraft();
     __appearanceTool = '';
     setAppearanceHelp('Your visible fields were cleared. You can place them again or sign without a visible mark.', false);
@@ -350,6 +359,7 @@ async function verifyAndRenderDocument(buf, source) {
   const draft = __hashMatches ? loadAppearanceDraft() : null;
   const seed = (__hashMatches && !draft) ? requestedAppearanceSeed() : null;
   __appearance = draft || seed || { version: 1, fields: [] };
+  __appearanceIsSeed = !!seed;
   __appearanceTool = '';
   const b = $('verify-result');
   b.hidden = false;
@@ -370,6 +380,20 @@ async function verifyAndRenderDocument(buf, source) {
   // signature binds is the position the signer actually used.
   if (seed && editorOn) {
     setAppearanceHelp('The sender asked for your signature in the marked spot. Choose Place my signature to move it: your signature binds where you actually sign, not where it was requested.', false);
+  }
+  // The requested spot can be on page three of a long agreement, so pointing at
+  // it is not enough: take the reader there, and leave a way back to it.
+  const note = $('requested-note');
+  if (note) { note.hidden = !(seed && editorOn); delete note.dataset.scrolled; }
+  if (seed && editorOn) {
+    // One frame later. The last page canvas has only just been sized, and a
+    // scroll issued before layout settles lands on an offset that no longer
+    // exists. The marker is what the browser test waits for, so "we took the
+    // reader there" is observed rather than timed.
+    requestAnimationFrame(() => {
+      scrollToRequestedSpot('instant');
+      if (note) note.dataset.scrolled = '1';
+    });
   }
   refreshSignGate();
 }
@@ -407,17 +431,24 @@ async function renderPdfPreview(bytes, host) {
   for (let i = 1; i <= maxPages; i++) {
     const page = await pdf.getPage(i);
     const base = page.getViewport({ scale: 1 });
-    const targetWidth = Math.min(820, Math.floor(((host.clientWidth || window.innerWidth) - 20) * 0.98)) || 600;
+    // Fit to width, like the sender's Place step. The canvas is laid out at
+    // 100% of the page wrapper rather than a computed pixel width, so wrapper,
+    // canvas and .appearance-layer are one and the same box: a click fraction
+    // is then exactly a fraction of the PDF page, with no few-pixel drift
+    // between the div the maths reads and the pixels the reader sees.
+    const contentWidth = Math.max(200, (host.clientWidth || window.innerWidth) - 16);
+    const targetWidth = Math.min(820, contentWidth);
     const cssScale = targetWidth / base.width;
     const viewport = page.getViewport({ scale: cssScale * dpr });
     const wrap = document.createElement('div');
     wrap.className = 'doc-page appearance-page';
     wrap.dataset.pageIndex = String(i - 1);
+    wrap.style.maxWidth = targetWidth + 'px';
     const canvas = document.createElement('canvas');
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
-    canvas.style.width = targetWidth + 'px';
-    canvas.style.height = Math.floor(base.height * cssScale) + 'px';
+    canvas.style.width = '100%';
+    canvas.style.height = 'auto';
     canvas.style.display = 'block';
     wrap.appendChild(canvas);
     const layer = document.createElement('div');
@@ -445,6 +476,20 @@ async function renderImagePreview(bytes, mime, host) {
   img.src = url;
   wrap.appendChild(img);
   host.appendChild(wrap);
+}
+
+// Bring the requested box into view. scrollIntoView walks every scrollable
+// ancestor, so this moves the preview's own scroller AND the page: the caller
+// only has to say when.
+function scrollToRequestedSpot(behavior) {
+  const node = document.querySelector('.appearance-field.requested');
+  if (!node) return false;
+  // 'instant' rather than 'auto': the page sets scroll-behavior:smooth, and
+  // 'auto' inherits it. A one-second animation on load means the box is still
+  // off screen while the reader is deciding what this page is.
+  try { node.scrollIntoView({ behavior: behavior || 'smooth', block: 'center', inline: 'center' }); }
+  catch { node.scrollIntoView(true); }
+  return true;
 }
 
 function setAppearanceHelp(message, active) {
@@ -481,8 +526,12 @@ function placeAppearanceField(event) {
   };
   __appearance = normaliseSigningAppearance({
     version: 1,
-    fields: __appearance.fields.filter((item) => item.type !== field.type).concat(field),
+    // Placing anything makes this the signer's own manifest: the seeded box was
+    // a request, and from here on every field in it was put there by the signer.
+    fields: (__appearanceIsSeed ? [] : __appearance.fields).filter((item) => item.type !== field.type).concat(field),
   });
+  __appearanceIsSeed = false;
+  { const note = $('requested-note'); if (note) note.hidden = true; }
   saveAppearanceDraft();
   __appearanceTool = '';
   setAppearanceHelp(field.type === 'seal'
@@ -496,15 +545,17 @@ function appearanceText(type, party, current) {
   return 'Paramant signed · ' + String(party.label || 'Signer');
 }
 
-function addAppearanceNode(layer, field, party, current) {
+function addAppearanceNode(layer, field, party, current, requested) {
   const node = document.createElement('div');
-  node.className = 'appearance-field ' + field.type + (current ? '' : ' prior');
+  node.className = 'appearance-field ' + field.type + (requested ? ' requested' : current ? '' : ' prior');
   node.style.left = (field.x * 100) + '%';
   node.style.top = (field.y * 100) + '%';
   node.style.width = (field.w * 100) + '%';
   node.style.height = (field.h * 100) + '%';
-  node.textContent = appearanceText(field.type, party, current);
-  if (current) {
+  // A requested box names nobody and carries no date: nothing has been signed
+  // there yet, and showing a name would be a signature the signer never made.
+  node.textContent = requested ? 'Requested spot · your signature goes here' : appearanceText(field.type, party, current);
+  if (current && !requested) {
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'appearance-remove';
@@ -513,6 +564,7 @@ function addAppearanceNode(layer, field, party, current) {
     remove.addEventListener('click', (event) => {
       event.stopPropagation();
       __appearance = { version: 1, fields: __appearance.fields.filter((item) => item.type !== field.type) };
+      __appearanceIsSeed = false;
       saveAppearanceDraft();
       renderAppearanceOverlays();
     });
@@ -528,17 +580,17 @@ function renderAppearanceOverlays() {
     const layer = page.querySelector('.appearance-layer');
     if (layer) layer.innerHTML = '';
   }
-  const add = (field, party, current) => {
+  const add = (field, party, current, requested) => {
     const page = pages.find((node) => Number(node.dataset.pageIndex) === Number(field.page_index));
     const layer = page && page.querySelector('.appearance-layer');
-    if (layer) addAppearanceNode(layer, field, party, current);
+    if (layer) addAppearanceNode(layer, field, party, current, requested);
   };
   for (const party of (__envelope?.parties || [])) {
     if (party.index === __partyIndex || party.status !== 'signed' || !party.appearance) continue;
     for (const field of (party.appearance.fields || [])) add(field, party, false);
   }
   const me = (__envelope?.parties || [])[__partyIndex] || {};
-  for (const field of (__appearance.fields || [])) add(field, me, true);
+  for (const field of (__appearance.fields || [])) add(field, me, true, __appearanceIsSeed);
 }
 
 function downloadBytes(bytes, filename, type) {

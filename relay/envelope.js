@@ -153,6 +153,30 @@ function normaliseAppearance(value) {
   return { version: 1, fields };
 }
 
+// The REQUESTED position is a narrower thing than a signed appearance, and it
+// is held to a stricter contract.
+//
+// A signed appearance may legitimately be absent: a signer who wants no visible
+// mark submits nothing and normaliseAppearance() returns an empty manifest.
+// That leniency is wrong here. A requested position only exists because the
+// requester deliberately placed a box, so a caller sending a bare string, a
+// number or an array is a bug in that caller, and it gets a 400 instead of a
+// silently empty manifest that quietly drops the request on the floor.
+//
+// It is also seal-only. /sign issues exactly one field type in invite mode, and
+// storing a requested 'date' would be a promise no screen in the product makes.
+// The shared validator keeps accepting 'date' for the SIGNED appearance, where
+// the signer really can place one.
+function normaliseRequestedAppearance(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid requested appearance');
+  if (!Array.isArray(value.fields) || value.fields.length === 0) throw new Error('invalid requested appearance');
+  const clean = normaliseAppearance(value);
+  for (const field of clean.fields) {
+    if (field.type !== 'seal') throw new Error('invalid requested appearance type');
+  }
+  return clean;
+}
+
 function canonicalAppearance(value) {
   return JSON.stringify(normaliseAppearance(value));
 }
@@ -319,7 +343,7 @@ class EnvelopeStore {
     // here, before an id is allocated, so a bad manifest leaves no record.
     let requestedJson = '';
     if (requestedAppearance !== undefined && requestedAppearance !== null) {
-      requestedJson = canonicalAppearance(requestedAppearance);   // throws -> 400 at the route
+      requestedJson = JSON.stringify(normaliseRequestedAppearance(requestedAppearance));   // throws -> 400 at the route
     }
     const now = new Date();
     const expires = new Date(now.getTime() + ttlDays * 86400_000);
@@ -891,4 +915,4 @@ class EnvelopeStore {
   }
 }
 
-module.exports = { EnvelopeStore, signMessageBytes, normaliseAppearance, canonicalAppearance, appearanceHash, partyEmailHash, safeHexEqual, newEnvelopeId, SIGN_DOMAIN_DOC, MAX_PARTIES, DEFAULT_TTL_DAYS, MAX_TTL_DAYS, SIGN_INVITE_TTL_DAYS };
+module.exports = { EnvelopeStore, signMessageBytes, normaliseAppearance, normaliseRequestedAppearance, canonicalAppearance, appearanceHash, partyEmailHash, safeHexEqual, newEnvelopeId, SIGN_DOMAIN_DOC, MAX_PARTIES, DEFAULT_TTL_DAYS, MAX_TTL_DAYS, SIGN_INVITE_TTL_DAYS };

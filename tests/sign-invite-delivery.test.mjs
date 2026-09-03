@@ -65,6 +65,37 @@ await directPage.goto(ORIGIN + '/sign?mode=alone', { waitUntil: 'domcontentloade
 ok('dashboard deep link enters self-signing directly', await directPage.locator('#step-doc').isVisible() && await directPage.locator('.ds-stepper li[data-step="recipients"]').isHidden(), await directPage.locator('main').innerText());
 await directPage.close();
 
+// ── the session probe: three answers, three different things to say ──────────
+// "Signing a document needs an account" is only true when the browser HAS no
+// session. A koper review saw it while signed in, because the probe had failed
+// rather than refused. A failure gets the shared service sentence instead, and
+// a healthy answer gets neither.
+async function probeSays(status, body) {
+  const probe = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await probe.route('**/api/user/check', (route) => route.fulfill({
+    status, contentType: 'application/json', body: body || '{}',
+  }));
+  await probe.goto(ORIGIN + '/sign', { waitUntil: 'domcontentloaded' });
+  await probe.waitForFunction(() => !!(self.paramantErrors), null, { timeout: 15000 });
+  await probe.waitForTimeout(300);
+  const seen = await probe.evaluate(() => ({
+    anon: !document.getElementById('step-anon').hidden,
+    service: !document.getElementById('ds-service-note').hidden,
+    serviceText: document.getElementById('ds-service-note').textContent,
+    support: self.paramantErrors.SUPPORT_FAILURE_MESSAGE,
+  }));
+  await probe.close();
+  return seen;
+}
+const probe401 = await probeSays(401, '{"error":"unauthenticated"}');
+ok('no session still gets the account notice', probe401.anon === true && probe401.service === false, JSON.stringify(probe401));
+const probe503 = await probeSays(503, '{"error":"session_store_unavailable"}');
+ok('a broken probe is a service failure, not a missing account',
+  probe503.anon === false && probe503.service === true && probe503.serviceText === probe503.support,
+  JSON.stringify(probe503));
+const probe200 = await probeSays(200, '');
+ok('a signed-in visitor is told nothing at all', probe200.anon === false && probe200.service === false, JSON.stringify(probe200));
+
 await page.goto(ORIGIN + '/sign', { waitUntil: 'domcontentloaded' });
 ok('landing leads with the request-signatures workflow', await page.locator('.ds-mode-card').first().getAttribute('data-mode') === 'invite' && await page.locator('.ds-mode-card').first().getAttribute('class').then((value) => value.includes('primary')), await page.locator('.ds-mode-card').first().innerText());
 ok('technical stepper stays hidden until a workflow is chosen', await page.locator('#ds-stepper').isHidden(), 'hidden');
