@@ -99,6 +99,76 @@ not at startup.
 
 ---
 
+## Bug #4 - A store that is gone, and a route that never answers
+
+**Found:** review of #368, 2026-09-03. **Fixed on:** `fix/auth-hardening-2`.
+
+**What happened:**
+node-redis does not time a command out, and it holds commands on an offline
+queue while it reconnects. Against a redis that had gone away, a request did not
+fail: it waited, and went on waiting. Every redis-backed route in both services
+had this shape, which is roughly 300 call sites. #368 bounded exactly one of
+them, on the TOTP verify path, and recorded the rest in SECURITY.md as open.
+
+**Why it belongs in this document:**
+it is the same failure class as bugs 1 to 3. `/health` on the relay answered 200
+throughout, because it touches no redis; `/v2/health/deep` answered green,
+because it did not check the store either; and the admin's container probe was
+`GET /api/auth/check`, which answers 401 when nobody is signed in, so it was
+already "healthy" when nothing worked. A monitor watching any of those saw a
+healthy stack while no user could sign in. Nothing was returning an error,
+because nothing was returning at all, which is the one thing a 5xx counter
+cannot see.
+
+**The second half nobody expects:**
+a per-command deadline makes the CALLER safe, not the client. After a command is
+lost to a connection that stays open and goes silent, node-redis keeps waiting
+for its reply and holds every later command behind it, so the client never
+recovers even once the network does. Measured on 5.12.1 and 6.2.1: it reports
+itself ready and answers nothing, until the process is restarted.
+
+**What catches it now:**
+`relay/test/route-redis-outage.test.js` and `admin/test/redis-outage.test.js`
+boot both processes against a real redis behind a proxy, cut it, black-hole it,
+and assert that every redis-backed route answers 503 inside
+`PARAMANT_REDIS_DEADLINE_MS`, that the health routes tell the truth, and that
+both processes heal on their own when the store comes back.
+
+**Code location:** `relay/lib/redis-deadline.js` and its copy in `admin/lib/`;
+the two `createClient` calls in `relay/relay.js` and `admin/lib/redis.js`.
+
+---
+
+## Bug #5 - The limiter that locked the door and threw away the key
+
+**Found:** review of the fix for bug #4, 2026-09-03. **Fixed on:**
+`fix/auth-hardening-2`.
+
+**What happened:**
+every rate limiter in both services was INCR followed by
+`if (count === 1) await expire(key, WINDOW)`. Correct only while those two
+commands always happen together. The redis deadline added for bug #4 makes the
+gap reachable in a single request: the INCR outlives the deadline while the
+server still executes it, the caller gets an outage, the expiry is never sent,
+and the next INCR returns 2 so no later call sets it either. TTL -1 is for ever.
+
+**Why it belongs in this document:**
+it is a fix that created a new failure of the same class it was fixing. Nothing
+errors, nothing is logged, and the only symptom is that one source address, or
+one e-mail address, or one paying account, is refused from then on. Twenty-three
+call sites had the shape, including the per-IP login limiter, the failure
+counter behind the proof-of-work threshold, and every monthly quota counter.
+
+**What catches it now:**
+`admin/test/ratelimit-ttl.test.js` boots a real admin behind a proxy that
+delivers commands to redis and drops the replies, which is the only sabotage
+that reproduces it. `tests/redis-deadline-parity.test.mjs` fails if any of the
+five files goes back to calling INCR directly.
+
+**Code location:** `relay/lib/redis-counter.js` and its copy in `admin/lib/`.
+
+---
+
 ## Severity Classification
 
 | Bug class               | Silent? | Healthcheck catches? | e2e-auth-flow catches? |

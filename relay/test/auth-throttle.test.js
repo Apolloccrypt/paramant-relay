@@ -90,13 +90,23 @@ test('relay.js uses the throttle and no longer refuses on a named user_id', () =
 
   assert.match(relay, /userMfaNoteFailure/, 'failures are recorded');
   assert.match(relay, /userMfaAttemptReset/, 'and a success clears them');
-  assert.match(relay, /authThrottle\.sleep\(userMfaDelayMs\(user_id\)\)/, 'the answer is a delay');
+  assert.match(relay, /authThrottle\.sleep\(/, 'the answer is a delay');
 
   // Both MFA endpoints go through it: verify-totp and consume-backup. The
   // second is the one where a wrong code costs argon2 work, so it needs the
   // throttle more than the first, not less.
-  const hits = relay.match(/authThrottle\.sleep\(userMfaDelayMs\(user_id\)\)/g) || [];
-  assert.equal(hits.length, 2, 'verify-totp and consume-backup are both throttled');
+  //
+  // Each sleep is now guarded by `!throttled_upstream`, because this delay is
+  // only ever charged to a request that names an account that EXISTS, which
+  // made it an account-existence oracle at the admin's edge (509 ms against
+  // 251 ms at twelve failures, with no overlap). A caller that has already
+  // charged the same curve against the hashed ADDRESS says so and is not
+  // charged twice. Any caller that does not say so still pays here.
+  const hits = relay.match(/if \(!throttled_upstream\) await authThrottle\.sleep\(/g) || [];
+  assert.equal(hits.length, 2, 'verify-totp and consume-backup both still charge the delay by default');
+  const unguarded = relay.match(/(?<!throttled_upstream\) )await authThrottle\.sleep\(/g) || [];
+  assert.equal(unguarded.length, 0,
+    'a sleep that is not behind the flag is charged on top of the one the admin already applied');
   const notes = relay.match(/(?<!function )userMfaNoteFailure\(user_id\)/g) || [];
   assert.equal(notes.length, 2, 'and both record their failures');
 });
@@ -126,10 +136,15 @@ test('every replay-guarded route turns a store outage into a 503, not a 401', ()
 
   // Configurable per deployment, but never off: a value of zero or a non-number
   // has to fall back to the default, because an unbounded deadline is the
-  // failure it exists to prevent. deploy/.env.example documents both names, and
+  // failure it exists to prevent. The declaration moved out of relay.js into
+  // lib/redis-deadline when the bound stopped being one hand-wrapped read and
+  // became a property of the client, so the pin follows it. Same env name,
+  // still the only one: deploy/.env.example documents it and
   // tests/env-documented.test.mjs is what keeps that true.
-  assert.match(relay, /process\.env\.PARAMANT_REDIS_DEADLINE_MS/, 'the deadline reads its environment');
-  const decl = relay.slice(relay.indexOf('const REDIS_DEADLINE_MS'), relay.indexOf('function redisDeadline'));
+  const bound = fs.readFileSync(path.join(__dirname, '..', 'lib', 'redis-deadline.js'), 'utf8');
+  assert.match(bound, /process\.env\.PARAMANT_REDIS_DEADLINE_MS|env\.PARAMANT_REDIS_DEADLINE_MS/,
+    'the deadline reads its environment');
+  const decl = bound.slice(bound.indexOf('function redisDeadlineMs'), bound.indexOf('function withRedisDeadline'));
   assert.match(decl, /Number\.isFinite\(raw\) && raw > 0 \? raw : 1000/,
     'zero, a negative and a non-number must all fall back to the 1000 ms default');
   assert.match(relay, /log\("error", "totp_replay_store_unavailable"/,

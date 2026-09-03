@@ -19,6 +19,7 @@
 // 24 h does not double-count. After 24 h the upload counts as a new transfer
 // (which is what we want -- a brand-new send the next day).
 'use strict';
+const { incrInWindow } = require('./redis-counter');
 
 const crypto = require('crypto');
 
@@ -72,8 +73,7 @@ async function recordTransfer(redisClient, accountId, chunkHash, log) {
       if (setRes !== 'OK') return { counted: false, deduped: true, error: null };
     }
     const tk = transfersKey(accountId);
-    const n  = await redisClient.incr(tk);
-    if (n === 1) await redisClient.expire(tk, MONTH_TTL_SECONDS);
+    const n  = await incrInWindow(redisClient, tk, MONTH_TTL_SECONDS);
     return { counted: true, deduped: false, error: null };
   } catch (e) {
     if (log) log('warn', 'quota_transfer_record_failed', { account: String(accountId).slice(0, 12), err: e.message });
@@ -87,8 +87,7 @@ async function recordSign(redisClient, accountId, log) {
   if (!redisClient || !redisClient.isReady) return { counted: false, error: 'redis_not_ready' };
   try {
     const sk = signsKey(accountId);
-    const n  = await redisClient.incr(sk);
-    if (n === 1) await redisClient.expire(sk, MONTH_TTL_SECONDS);
+    const n  = await incrInWindow(redisClient, sk, MONTH_TTL_SECONDS);
     return { counted: true, error: null };
   } catch (e) {
     if (log) log('warn', 'quota_sign_record_failed', { account: String(accountId).slice(0, 12), err: e.message });
@@ -133,13 +132,11 @@ async function recordSignTiered(redisClient, accountId, included, log) {
   if (!redisClient || !redisClient.isReady) return { counted: false, used: null, overage_count: null, error: 'redis_not_ready' };
   try {
     const sk = signsKey(accountId);
-    const n  = await redisClient.incr(sk);
-    if (n === 1) await redisClient.expire(sk, MONTH_TTL_SECONDS);
+    const n  = await incrInWindow(redisClient, sk, MONTH_TTL_SECONDS);
     let overage = 0;
     if (Number.isFinite(included) && n > included) {
       const ok = signsOverageKey(accountId);
-      overage = await redisClient.incr(ok);
-      if (overage === 1) await redisClient.expire(ok, OVERAGE_TTL_SECONDS);
+      overage = await incrInWindow(redisClient, ok, OVERAGE_TTL_SECONDS);
     }
     return { counted: true, used: n, overage_count: overage, error: null };
   } catch (e) {
@@ -187,8 +184,7 @@ async function gateTransfer(redisClient, accountId, chunkHash, limit, log) {
       if (cur >= limit) return { allowed: false, counted: false, deduped: false, over_limit: true, error: null };
     }
     const tk = transfersKey(accountId);
-    const n  = await redisClient.incr(tk);
-    if (n === 1) await redisClient.expire(tk, MONTH_TTL_SECONDS);
+    const n  = await incrInWindow(redisClient, tk, MONTH_TTL_SECONDS);
     return { allowed: true, counted: true, deduped: false, over_limit: false, error: null };
   } catch (e) {
     if (log) log('warn', 'quota_gate_transfer_failed', { account: String(accountId).slice(0, 12), err: e.message });
@@ -205,8 +201,7 @@ async function gateSign(redisClient, accountId, limit, log) {
     const cur = parseInt((await redisClient.get(signsKey(accountId))) || '0', 10);
     if (cur >= limit) return { allowed: false, counted: false, over_limit: true, error: null };
     const sk = signsKey(accountId);
-    const n  = await redisClient.incr(sk);
-    if (n === 1) await redisClient.expire(sk, MONTH_TTL_SECONDS);
+    const n  = await incrInWindow(redisClient, sk, MONTH_TTL_SECONDS);
     return { allowed: true, counted: true, over_limit: false, error: null };
   } catch (e) {
     if (log) log('warn', 'quota_gate_sign_failed', { account: String(accountId).slice(0, 12), err: e.message });

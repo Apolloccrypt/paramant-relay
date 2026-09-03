@@ -224,5 +224,9 @@ test('the login handler counts failures after authenticating, never attempts bef
   assert.ok(iRefund > 0 && iRefund < i428 && i428 - iRefund < 300,
     'the 428 path must hand the IP its attempt back, or proof-of-work halves the budget');
   assert.match(handler, /pow\.verifyChallenge/, 'and the existing proof-of-work is what is asked for');
-  assert.match(handler, /status\(503\)/, 'a replay-store outage is passed through as 503');
+  // Floored like every other credential answer now (answerLoginAt with a 503),
+  // because unfloored it was a 9 ms reply where every other answer took at
+  // least 250 ms, and only an address with an account could produce it.
+  assert.match(handler, /answerLoginAt\(t0, res, 503, \{ error: "totp_unavailable" \}/,
+    'a replay-store outage is passed through as 503, and held to the same floor');
 });
