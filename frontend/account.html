@@ -115,6 +115,18 @@ main.acct .btn { width: auto; }
 .acct-field { display: flex; flex-direction: column; gap: 8px; max-width: 440px; margin-top: var(--space-3); }
 /* These two inputs sit outside .form-card, so nothing had given them a size.
    tests/app-contrast.test.mjs measured them at 22px on a phone. */
+/* The invoice company-details form. A label per field (the signing-key field
+   above is a single placeholder-only input, which does not scale to three), and
+   a textarea that has to look like the inputs next to it. */
+.acct-field-label { font: 13px/1.4 var(--sans); color: var(--ink-2); }
+main.acct textarea {
+  width: 100%; max-width: 440px; padding: 11px 13px;
+  border: 1px solid var(--line-2); border-radius: var(--r-1);
+  background: var(--surface); color: var(--ink-1); font: 15px/1.4 var(--sans);
+  transition: border-color var(--d-1) var(--e-standard); resize: vertical;
+}
+main.acct textarea:hover { border-color: var(--ink-3); }
+main.acct textarea:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
 main.acct input[type="text"], main.acct input[type="email"], main.acct input[type="password"] {
   width: 100%; max-width: 440px; min-height: var(--tap); padding: 11px 13px;
   border: 1px solid var(--line-2); border-radius: var(--r-1);
@@ -382,6 +394,39 @@ main.acct input::placeholder { color: var(--ink-3); }
       <a href="/pricing" class="btn btn-secondary btn-small">View plans</a>
       <button id="billing-cancel-btn" class="btn btn-danger btn-small hidden">Cancel plan</button>
     </div>
+
+    <hr class="acct-divider">
+    <!-- Every payment gets a numbered document, issued by the relay the moment
+         Mollie confirms the money. The list is read-only here: a document is
+         never edited after it is issued. -->
+    <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Invoices</h3>
+    <div id="billing-invoices" style="font-size:var(--text-sm);color:var(--ink-dim)">Loading invoices&hellip;</div>
+
+    <hr class="acct-divider">
+    <!-- What goes in the "Billed to" block. All three optional: without them a
+         document is still issued to the email address on this account. -->
+    <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Company details for invoices</h3>
+    <p class="acct-note" style="font-size:var(--text-sm);color:var(--ink-dim);margin-bottom:var(--space-3)">
+      Optional. Fill these in and they appear on every invoice issued from now on. Invoices already issued keep the details they were issued with.
+    </p>
+    <form id="billing-profile-form" class="acct-form">
+      <label class="acct-field">
+        <span class="acct-field-label">Company name</span>
+        <input type="text" id="billing-company" name="company" maxlength="120" autocomplete="organization">
+      </label>
+      <label class="acct-field">
+        <span class="acct-field-label">Address</span>
+        <textarea id="billing-address" name="address" rows="3" maxlength="300" autocomplete="street-address"></textarea>
+      </label>
+      <label class="acct-field">
+        <span class="acct-field-label">VAT number</span>
+        <input type="text" id="billing-vat" name="vat" maxlength="40">
+      </label>
+      <div class="acct-actions">
+        <button type="submit" class="btn btn-secondary btn-small" id="billing-profile-save">Save company details</button>
+        <span id="billing-profile-msg" style="font-size:var(--text-sm);color:var(--ink-dim)"></span>
+      </div>
+    </form>
 
     <hr class="acct-divider">
     <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Billing history</h3>

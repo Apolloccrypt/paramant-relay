@@ -141,6 +141,8 @@ const userHistory      = require('./lib/user-history');      // GET /v2/user/his
 const usagePurpose     = require('./lib/usage-purpose');     // POST /v2/user/usage-purpose (internal)
 const parasignAuditExport = require('./lib/parasign-audit-export'); // GET /v2/parasign/audit-export (Business+)
 const transferNotify   = require('./lib/transfer-notify');   // ParaSend Pro upload/download mail
+const invoiceMod       = require('./lib/invoice');            // invoice numbering, records and VAT split
+const invoicePdf       = require('./lib/invoice-pdf');        // one-page PDF writer, no dependency
 
 // Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
 // setting PARAMANT_WIRE_VERSION=1 activates the self-describing v1 header
@@ -1669,9 +1671,10 @@ function auditAppend(key, event, data = {}) {
 // ── Reusable Resend mailer ────────────────────────────────────────────────────
 // Fire-and-forget. Returns false (no-op) when RESEND_API_KEY is unset or there is
 // no recipient, so a caller never blocks on mail and mail stays optional. Used by
-// the ParaSend Pro transfer notifications (upload/download); the DPA and
+// the ParaSend Pro transfer notifications (upload/download) and by the invoice
+// mail, which is the one caller that passes an attachment; the DPA and
 // inbound-claim flows keep their own richly-templated inline sends.
-function sendResendEmail({ to, subject, text, html, from, cc } = {}) {
+function sendResendEmail({ to, subject, text, html, from, cc, attachments } = {}) {
   const RESEND_KEY = process.env.RESEND_API_KEY || '';
   if (!RESEND_KEY || !to) return false;
   const payload = {
@@ -1682,6 +1685,10 @@ function sendResendEmail({ to, subject, text, html, from, cc } = {}) {
   if (cc) payload.cc = Array.isArray(cc) ? cc : [cc];
   if (html) payload.html = html;
   if (text) payload.text = text;
+  // Resend takes attachments as { filename, content } with content base64.
+  // Used by the invoice mail; every other caller leaves it undefined and the
+  // request body is byte for byte what it was.
+  if (Array.isArray(attachments) && attachments.length) payload.attachments = attachments;
   const body = JSON.stringify(payload);
   try {
     const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
@@ -2030,6 +2037,136 @@ function _billingRecordOf(accountId) {
   const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
   for (const m of members) { const mv = apiKeys.get(m); if (mv) return mv; }
   return accounts.get(accountId) || null;
+}
+
+// ── Billing profile: the customer half of an invoice ─────────────────────────
+// Three optional fields the account owner fills in himself (company name,
+// address, VAT id).
+//
+// IN REDIS, NOT IN users.json. Every relay container has its own /data volume
+// (docker-compose.yml: relay-main-data, relay-health-data, ...), so a profile
+// saved through the container the account page happens to talk to would be
+// invisible to the container nginx routes the Mollie webhook to, and the
+// invoice would go out without the company details the customer had just
+// entered. Redis is the one store all five relays share.
+const BILLING_PROFILE_KEY = (accountId) => `paramant:billing:profile:${accountId}`;
+
+async function _setBillingProfile(accountId, profile) {
+  if (!accountId || !profile) return { ok: false, reason: 'bad_args' };
+  if (!redisClient || !redisClient.isReady) return { ok: false, reason: 'no_redis' };
+  const clean = {
+    company: profile.company || '',
+    address: profile.address || '',
+    vat: profile.vat || '',
+    updated_at: new Date().toISOString(),
+  };
+  // No TTL. These details are part of documents that must be kept.
+  try { await redisClient.set(BILLING_PROFILE_KEY(accountId), JSON.stringify(clean)); }
+  catch (e) { return { ok: false, reason: e.message }; }
+  return { ok: true };
+}
+
+// What goes in the "Billed to" block. The email address always: it is the only
+// customer detail an account is guaranteed to have, and it comes off the
+// account record rather than out of redis, so a document is still addressed to
+// someone even when the profile store is empty or unreachable.
+async function _billingBuyerOf(accountId) {
+  const rec = _billingRecordOf(accountId) || {};
+  const buyer = { email: rec.email || '', company: '', address: '', vat: '' };
+  if (!redisClient || !redisClient.isReady) return buyer;
+  try {
+    const raw = await redisClient.get(BILLING_PROFILE_KEY(accountId));
+    if (raw) {
+      const p = JSON.parse(raw);
+      buyer.company = p.company || '';
+      buyer.address = p.address || '';
+      buyer.vat = p.vat || '';
+    }
+  } catch { /* an unreadable profile must not cost the customer his document */ }
+  return buyer;
+}
+
+// One warning per process, not one per payment: a missing BILLING_SELLER_VAT is
+// a configuration fact, and repeating it on every sale would bury the log line
+// that means something.
+let _sellerVatWarned = false;
+
+// Issue the document for a payment that is settled and matched. Deliberately
+// runs for a REPEAT webhook too (an 'already_processed' outcome on a paid
+// payment): issueDocument is idempotent per payment id, so a retry cannot
+// produce a second invoice, and a first attempt that lost redis gets a second
+// chance instead of leaving the customer with nothing. Never throws: an
+// entitlement that was granted must not be undone by paperwork.
+async function _issueInvoiceForPayment(payment, outcome) {
+  try {
+    const md = (payment && payment.metadata) || {};
+    const order = billingCatalog.resolveOrder({ product: md.product, plan: md.plan, interval: md.interval });
+    if (order.error) return;
+    const seller = invoiceMod.sellerFromEnv(process.env);
+    if (!seller.vat && !_sellerVatWarned) {
+      _sellerVatWarned = true;
+      log('warn', 'billing_invoice_no_vat_number', {
+        reason: 'BILLING_SELLER_VAT is not set',
+        effect: 'documents go out as a payment receipt, not a VAT invoice',
+      });
+    }
+    const redis = (redisClient && redisClient.isReady) ? redisClient : null;
+    const out = await invoiceMod.issueDocument({
+      payment,
+      order: Object.assign({ accountId: md.accountId }, order),
+      seller,
+      buyer: await _billingBuyerOf(md.accountId),
+      periodEnd: outcome && outcome.paidUntil,
+    }, redis);
+
+    if (out.result !== 'issued') {
+      log(out.result === 'existing' ? 'info' : 'warn', 'billing_invoice', {
+        payment_id: payment.id, result: out.result, reason: out.reason, number: out.number,
+      });
+      return;
+    }
+    log('info', 'billing_invoice', {
+      payment_id: payment.id, result: 'issued', number: out.number, kind: out.record.kind,
+      account: String(md.accountId).slice(0, 12), total: out.record.amount_gross,
+    });
+    _mailInvoice(out.record);
+  } catch (e) {
+    log('error', 'billing_invoice_failed', { payment_id: payment && payment.id, err: e.message });
+  }
+}
+
+// The document as mail, with the PDF attached. No mail path configured means no
+// mail and no error: the record exists and /v2/billing/invoices still serves it,
+// which is the half that has to work.
+function _mailInvoice(record) {
+  if (!record || !record.buyer || !record.buyer.email) return false;
+  let pdf;
+  try { pdf = invoicePdf.render(record, { buyerHint: invoiceMod.BUYER_HINT }); }
+  catch (e) { log('warn', 'billing_invoice_pdf_failed', { number: record.number, err: e.message }); return false; }
+  const isInvoice = record.kind === 'invoice';
+  const subject = `${isInvoice ? 'Invoice' : 'Payment receipt'} ${record.number} - ${record.seller.name}`;
+  const lines = [
+    `Thank you for your payment.`,
+    ``,
+    `${record.title} ${record.number}`,
+    `Date: ${record.invoice_date}`,
+    `${record.description}`,
+    `Total: ${record.currency} ${record.amount_gross} (incl. ${record.vat_rate}% VAT, ${record.currency} ${record.amount_vat})`,
+    ``,
+    isInvoice ? '' : `${invoiceMod.RECEIPT_NOTE}`,
+    invoiceMod.buyerIsComplete(record.buyer) ? '' : `${invoiceMod.BUYER_HINT}.`,
+    ``,
+    `The document is attached, and every document stays available on your account page.`,
+    ``,
+    record.seller.name,
+  ].filter((l, i, a) => !(l === '' && a[i - 1] === ''));
+  return sendResendEmail({
+    to: record.buyer.email,
+    from: 'PARAMANT <billing@paramant.app>',
+    subject,
+    text: lines.join('\n'),
+    attachments: [{ filename: `${record.number}.pdf`, content: pdf.toString('base64') }],
+  });
 }
 
 // Per-key persistence for the ParaSign entitlement toggle. Injected into
@@ -5951,6 +6088,28 @@ async function handleRelayRequest(req, res) {
         });
       }
     }
+    // The paperwork. A grant is money received, and money received without a
+    // document is what this whole branch is about: no number, no VAT split, no
+    // record to hand a bookkeeper. Runs AFTER the grant and can never undo it.
+    //
+    // 'already_processed' is included on purpose. A repeat webhook for a paid
+    // payment means the entitlement half is settled, but the document half may
+    // have failed the first time (redis down at exactly that moment), and
+    // issueDocument is idempotent per payment id, so a retry can only ever
+    // repair, never duplicate.
+    if (payment && payment.status === 'paid' &&
+        (outcome.result === 'granted' ||
+         (outcome.result === 'ignored' && outcome.reason === 'already_processed'))) {
+      await _issueInvoiceForPayment(payment, outcome);
+    }
+    // A chargeback leaves the invoice standing with its number, and marks it as
+    // reversed. There is no numbered credit note yet (see lib/invoice.js), so a
+    // marker is the honest minimum: the record must not keep claiming money the
+    // customer took back.
+    if (outcome.result === 'revoked' && redisClient && redisClient.isReady) {
+      const rev = await invoiceMod.recordReversal({ payment }, redisClient);
+      if (rev.result === 'reversed') log('warn', 'billing_invoice_reversed', { payment_id: paymentId, number: rev.number });
+    }
     // Monitoring: log every webhook with payment-id, status and outcome. The
     // 'error' level marks the alert cases (paid but no entitlement: amount
     // mismatch, missing metadata, or a grant that failed).
@@ -5960,6 +6119,95 @@ async function handleRelayRequest(req, res) {
       product: outcome.product, reason: outcome.reason,
     });
     res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true }));
+  }
+
+  // ── GET /v2/billing/invoices: this account's documents (authenticated) ────
+  // Every document ever issued to this account, newest first, read from the
+  // append-only per-account list. Never another account's: listFor re-checks
+  // account_id on each record it loads, so a shared or leaked number still
+  // yields nothing here.
+  if (path === '/v2/billing/invoices' && req.method === 'GET') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    if (!redisClient || !redisClient.isReady) {
+      res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invoices_unavailable' }));
+    }
+    const accountId = acctOf(apiKey);
+    const records = await invoiceMod.listFor(accountId, redisClient);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({
+      ok: true,
+      // The listing carries no seller/buyer blocks: the account page shows a
+      // row per document and the PDF is the document. Less to leak, less to
+      // keep in step.
+      invoices: records.map(r => ({
+        number: r.number, kind: r.kind, date: r.invoice_date, description: r.description,
+        currency: r.currency, amount_net: r.amount_net, amount_vat: r.amount_vat,
+        amount_gross: r.amount_gross, vat_rate: r.vat_rate,
+        reversed_at: r.reversed_at || null,
+        pdf_url: `/v2/billing/invoices/${r.number}.pdf`,
+      })),
+    }));
+  }
+
+  // ── GET /v2/billing/invoices/:number.pdf: one document (authenticated) ────
+  // Rendered on demand from the stored record rather than kept as a blob: the
+  // record is the thing that must survive seven years, and a layout change then
+  // reprints every old document unchanged in content.
+  if (path.startsWith('/v2/billing/invoices/') && req.method === 'GET') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    const number = decodeURIComponent(path.slice('/v2/billing/invoices/'.length)).replace(/\.pdf$/i, '');
+    if (!invoiceMod.parseNumber(number)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_invoice_number' }));
+    }
+    if (!redisClient || !redisClient.isReady) {
+      res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'invoices_unavailable' }));
+    }
+    const record = await invoiceMod.getFor(acctOf(apiKey), number, redisClient);
+    if (!record) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+    let pdf;
+    try { pdf = invoicePdf.render(record, { buyerHint: invoiceMod.BUYER_HINT }); }
+    catch (e) {
+      log('error', 'billing_invoice_pdf_failed', { number, err: e.message });
+      res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'render_failed' }));
+    }
+    res.writeHead(200, {
+      'Content-Type': 'application/pdf',
+      'Content-Length': pdf.length,
+      'Content-Disposition': `attachment; filename="${number}.pdf"`,
+      'Cache-Control': 'private, no-store',
+    });
+    return res.end(pdf);
+  }
+
+  // ── GET/POST /v2/billing/profile: the customer half of an invoice ─────────
+  // Company name, address and VAT id, all optional. Without them a document is
+  // still valid as a receipt to the email address on the account, and says on
+  // its face how to get the company details onto the next one.
+  if (path === '/v2/billing/profile' && (req.method === 'GET' || req.method === 'POST')) {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    const accountId = acctOf(apiKey);
+    if (req.method === 'POST') {
+      let body;
+      try { body = JSON.parse((await readBody(req, 4096)).toString() || '{}'); }
+      catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_json' })); }
+      // Trimmed and length-capped, and nothing else: these strings are printed
+      // on a PDF and mailed, never interpolated into markup or a query.
+      const clean = (v, max) => String(v == null ? '' : v).replace(/\r/g, '').trim().slice(0, max);
+      const profile = {
+        company: clean(body.company, 120),
+        address: clean(body.address, 300),
+        vat: clean(body.vat, 40),
+      };
+      if (profile.address.split('\n').length > 6) {
+        res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'address_too_many_lines' }));
+      }
+      const saved = await _setBillingProfile(accountId, profile);
+      if (!saved.ok) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'profile_unavailable' })); }
+      log('info', 'billing_profile_saved', { account: String(accountId).slice(0, 12), has_company: !!profile.company, has_vat: !!profile.vat });
+    }
+    const buyer = await _billingBuyerOf(accountId);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, email: buyer.email, company: buyer.company, address: buyer.address, vat: buyer.vat }));
   }
 
   // ── POST /v2/billing/cancel — stop the next collection (authenticated) ──────

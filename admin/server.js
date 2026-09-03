@@ -3195,6 +3195,88 @@ api.get("/user/billing/status", authUser, async (req, res) => {
   });
 });
 
+// ─── Invoices ────────────────────────────────────────────────────────────────
+// The documents themselves live on the relay: the Mollie webhook is what issues
+// them, and the numbering counter and the records are in the redis the relays
+// share. The admin plane only lends the browser its session, exactly as it does
+// for envelopes: the account page never holds an api-key.
+//
+// SECTORS.main and not health, because nginx routes public /v2/ to relay-main
+// (deploy/nginx-paramant-public.conf), so that is the relay the Mollie webhook
+// reaches and the one whose logs a billing question is read out of.
+const INVOICE_NUMBER_RE = /^PS-\d{4}-\d{4,}$/;
+
+api.get("/user/billing/invoices", authUser, async (req, res) => {
+  try {
+    const r = await fetch(`${SECTORS.main}/v2/billing/invoices`, {
+      headers: { "X-Api-Key": proxyApiKey(req.userSession) },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!r.ok) return res.status(r.status === 401 ? 401 : 502).json({ error: "invoices_unavailable" });
+    return res.json(await r.json());
+  } catch (err) {
+    console.error("[user/billing/invoices]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// The PDF, streamed straight through. The relay checks the number belongs to
+// this account; the number pattern here only keeps a malformed path from
+// becoming an upstream request at all.
+// The path is :file and not :number.pdf on purpose: express 5's path-to-regexp
+// does not split a parameter from a literal suffix the way express 4 did, so
+// the extension is stripped here instead.
+api.get("/user/billing/invoices/:file", authUser, async (req, res) => {
+  const number = String(req.params.file || "").replace(/\.pdf$/i, "");
+  if (!INVOICE_NUMBER_RE.test(number)) return res.status(400).json({ error: "bad_invoice_number" });
+  try {
+    const r = await fetch(`${SECTORS.main}/v2/billing/invoices/${number}.pdf`, {
+      headers: { "X-Api-Key": proxyApiKey(req.userSession) },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (r.status === 404) return res.status(404).json({ error: "not_found" });
+    if (!r.ok) return res.status(r.status === 401 ? 401 : 502).json({ error: "invoice_unavailable" });
+    const buf = Buffer.from(await r.arrayBuffer());
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Length": String(buf.length),
+      "Content-Disposition": `attachment; filename="${number}.pdf"`,
+      "Cache-Control": "private, no-store",
+    });
+    return res.end(buf);
+  } catch (err) {
+    console.error("[user/billing/invoices/pdf]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// Company name, address and VAT id for the invoice. All three optional: without
+// them a document is still issued, addressed to the account's email, and says on
+// its face how to get the company details onto the next one.
+async function billingProfileProxy(req, res, method) {
+  try {
+    const r = await fetch(`${SECTORS.main}/v2/billing/profile`, {
+      method,
+      headers: Object.assign(
+        { "X-Api-Key": proxyApiKey(req.userSession) },
+        method === "POST" ? { "Content-Type": "application/json" } : {}),
+      body: method === "POST" ? JSON.stringify({
+        company: req.body?.company ?? "",
+        address: req.body?.address ?? "",
+        vat: req.body?.vat ?? "",
+      }) : undefined,
+      signal: AbortSignal.timeout(10000),
+    });
+    const body = await r.json().catch(() => ({}));
+    return res.status(r.ok ? 200 : (r.status === 401 ? 401 : 502)).json(body);
+  } catch (err) {
+    console.error("[user/billing/profile]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+}
+api.get("/user/billing/profile", authUser, (req, res) => billingProfileProxy(req, res, "GET"));
+api.post("/user/billing/profile", authUser, (req, res) => billingProfileProxy(req, res, "POST"));
+
 api.get("/user/billing/history", authUser, async (req, res) => {
   const { user_id } = req.userSession;
   const events = await getAuditEvents(user_id, {

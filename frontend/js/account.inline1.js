@@ -384,7 +384,102 @@
     }
   });
 
+  // ── Invoices ───────────────────────────────────────────────────────────────
+  // One row per document the relay issued: number, date, total, download. The
+  // list is the record, so it is never edited here and nothing is ever removed
+  // from it; a reversed document keeps its row and says it was reversed.
+  async function loadInvoices() {
+    const el = document.getElementById('billing-invoices');
+    if (!el) return;
+    try {
+      const res = await fetch('/api/user/billing/invoices', { credentials: 'include' });
+      if (!res.ok) { el.textContent = 'Invoices unavailable right now.'; return; }
+      const d = await res.json();
+      const rows = (d && d.invoices) || [];
+      if (rows.length === 0) { el.textContent = 'No invoices yet. One is issued for every payment.'; return; }
+      el.textContent = '';
+      rows.forEach(function(inv) {
+        const row = document.createElement('div');
+        row.className = 'info-row';
+        const left = document.createElement('div');
+        left.className = 'info-label';
+        const num = document.createElement('span');
+        num.style.fontFamily = 'var(--mono)';
+        num.textContent = inv.number;
+        left.appendChild(num);
+        left.appendChild(document.createTextNode(' · ' + new Date(inv.date).toLocaleDateString()));
+        if (inv.kind !== 'invoice') left.appendChild(document.createTextNode(' · receipt'));
+        if (inv.reversed_at) left.appendChild(document.createTextNode(' · reversed'));
+        const right = document.createElement('div');
+        right.className = 'info-value';
+        const amount = document.createElement('span');
+        amount.style.fontFamily = 'var(--mono)';
+        amount.textContent = inv.currency + ' ' + inv.amount_gross;
+        right.appendChild(amount);
+        right.appendChild(document.createTextNode(' '));
+        const link = document.createElement('a');
+        link.href = '/api/user/billing/invoices/' + encodeURIComponent(inv.number) + '.pdf';
+        link.textContent = 'Download PDF';
+        right.appendChild(link);
+        row.appendChild(left);
+        row.appendChild(right);
+        el.appendChild(row);
+      });
+    } catch (err) {
+      el.textContent = 'Could not load invoices.';
+    }
+  }
+
+  // ── Company details ────────────────────────────────────────────────────────
+  // Optional, and stated as optional: an account with none of these still gets
+  // a document, addressed to its email. Only documents issued AFTER a save
+  // carry the new details, which is why the page says so rather than implying
+  // that saving fixes an invoice already in the customer's bookkeeping.
+  async function loadBillingProfile() {
+    const form = document.getElementById('billing-profile-form');
+    if (!form) return;
+    try {
+      const res = await fetch('/api/user/billing/profile', { credentials: 'include' });
+      if (!res.ok) return;
+      const d = await res.json();
+      document.getElementById('billing-company').value = d.company || '';
+      document.getElementById('billing-address').value = d.address || '';
+      document.getElementById('billing-vat').value = d.vat || '';
+    } catch (err) {}
+  }
+
+  const profileForm = document.getElementById('billing-profile-form');
+  if (profileForm) {
+    profileForm.addEventListener('submit', async function(ev) {
+      ev.preventDefault();
+      const msg = document.getElementById('billing-profile-msg');
+      const btn = document.getElementById('billing-profile-save');
+      btn.disabled = true;
+      msg.textContent = 'Saving...';
+      try {
+        const res = await fetch('/api/user/billing/profile', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            company: document.getElementById('billing-company').value,
+            address: document.getElementById('billing-address').value,
+            vat: document.getElementById('billing-vat').value,
+          }),
+        });
+        msg.textContent = res.ok
+          ? 'Saved. New invoices will carry these details.'
+          : 'Could not save. Try again.';
+      } catch (err) {
+        msg.textContent = 'Could not save. Try again.';
+      }
+      btn.disabled = false;
+    });
+  }
+
   loadAccount();
   loadBilling();
   loadBillingHistory();
+  loadInvoices();
+  loadBillingProfile();
 })();
