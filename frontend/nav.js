@@ -5,6 +5,10 @@
   var hamburger = document.getElementById('nav-hamburger');
   var mobile    = document.getElementById('nav-mobile');
   var closeBtn  = document.querySelector('.nav-mobile-close');
+  // Sign in and Help leave the phone bar and hang under the drawer as their
+  // own strip. It is a sibling of #nav-mobile, not a child: js/nav-auth.js
+  // rewrites the whole inside of the drawer after the session check.
+  var tail      = document.getElementById('nav-mobile-tail');
 
   // ── Helpers ───────────────────────────────────────────
   var lockedScrollY = 0;
@@ -135,6 +139,20 @@
   // ── Mobile menu ───────────────────────────────────────
   if (!hamburger || !mobile) return;
 
+  // A bar with a hamburger has handed Sign in and Help to the drawer, so the
+  // strip that catches them has to exist. developer.html keeps its own nav
+  // (KEEP_OWN_NAV in frontend/apply-nav.py), is stamped by hand, and had no
+  // strip: on a 390px screen both routes were simply gone from that page. The
+  // markup is in the page now, and this builds it for any page that forgets.
+  if (!tail) {
+    tail = document.createElement('div');
+    tail.className = 'nav-mobile-tail';
+    tail.id = 'nav-mobile-tail';
+    tail.innerHTML = '<a href="/auth/login" class="nav-tail-btn">Sign in</a>' +
+                     '<a href="/help" class="nav-tail-link">Help</a>';
+    mobile.parentNode.insertBefore(tail, mobile.nextSibling);
+  }
+
   function openMobileMenu() {
     // Drawer is position:fixed; align its top to the actual bottom of the
     // sticky navbar so it never overlaps the navbar (which sits below the
@@ -146,6 +164,7 @@
       mobile.style.top = navBottom + 'px';
     }
     mobile.classList.add('open');
+    if (tail) tail.classList.add('open');
     hamburger.setAttribute('aria-expanded', 'true');
     hamburger.setAttribute('aria-label', 'Close menu');
     lockScroll();
@@ -154,6 +173,7 @@
 
   function closeMobileMenu() {
     mobile.classList.remove('open');
+    if (tail) tail.classList.remove('open');
     hamburger.setAttribute('aria-expanded', 'false');
     hamburger.setAttribute('aria-label', 'Open menu');
     unlockScroll();
@@ -170,12 +190,18 @@
   mobile.querySelectorAll('a').forEach(function (a) {
     a.addEventListener('click', closeMobileMenu);
   });
+  if (tail) {
+    tail.querySelectorAll('a').forEach(function (a) {
+      a.addEventListener('click', closeMobileMenu);
+    });
+  }
 
   document.addEventListener('click', function (e) {
     if (
       mobile.classList.contains('open') &&
       !hamburger.contains(e.target) &&
-      !mobile.contains(e.target)
+      !mobile.contains(e.target) &&
+      !(tail && tail.contains(e.target))
     ) {
       closeMobileMenu();
     }

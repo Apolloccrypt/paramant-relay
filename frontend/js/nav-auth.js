@@ -46,13 +46,18 @@
 
   function renderLoggedOut() {
     setNavigation(PUBLIC_NAV, 'Primary');
-    container.innerHTML = '<a href="/help" class="nav-help">HELP</a>' +
+    container.innerHTML = '<a href="/help" class="nav-help">Help</a>' +
       '<a href="/auth/login" class="nav-signin">Sign in</a>' +
       '<a href="/signup" class="nav-cta">Create account</a>';
   }
 
   function renderLoggedIn(email) {
     setNavigation(APP_NAV, 'Workspace');
+    // The drawer tail offers Sign in and Help to a visitor who is not signed
+    // in. Once you are, both are wrong there: the user menu below carries
+    // Help, and Sign in is not an action you still need.
+    var tail = document.getElementById('nav-mobile-tail');
+    if (tail) tail.remove();
     var shortEmail = email.length > 24 ? email.slice(0, 18) + '...' : email;
     // Never interpolate the email into innerHTML (stored/self DOM XSS): the
     // signup regex permits HTML metacharacters. Build static markup, then set
