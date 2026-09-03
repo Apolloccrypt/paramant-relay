@@ -60,9 +60,15 @@ h1{font-size:clamp(26px,5vw,38px);font-weight:600;letter-spacing:-.028em;line-he
 .card{border:1px solid var(--line);border-radius:var(--r-2);background:var(--surface);box-shadow:var(--sh-1);overflow:hidden;margin-bottom:14px;padding:0}
 .card-head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
 .card-head-title{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
-.dot{width:6px;height:6px;border-radius:50%;background:var(--sig-done);flex:0 0 auto}
+/* Section 3 of the direction: the beacon only beats where something is really
+   being measured. A card head is a section marker, so its dot is a static
+   colour swatch. design-system.css v4 puts status-pulse and a navy ring on
+   every .dot, and both are reset here. The one live beacon on this screen is
+   #waiting-dot, which beats for as long as the relay is really waiting. */
+.dot{width:6px;height:6px;border-radius:50%;background:var(--sig-done);flex:0 0 auto;border:0;animation:none}
 .dot.red{background:var(--sig-stop)}
 .dot.amber{background:var(--sig-wait)}
+#waiting-dot{animation:status-pulse 2.4s var(--e-standard) infinite}
 .card-body{padding:18px}
 
 input[type=text],input[type=password],input[type=file]{width:100%;min-height:var(--tap);background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-1);color:var(--ink-1);padding:11px 13px;font-family:var(--mono);font-size:13px;outline:none;margin-bottom:10px;transition:border-color var(--d-1) var(--e-standard)}

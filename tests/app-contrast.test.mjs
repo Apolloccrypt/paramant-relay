@@ -30,6 +30,7 @@ const MIME = { '.js':'text/javascript','.mjs':'text/javascript','.css':'text/css
 const ALIAS = {
   '/dashboard':'/dashboard.html', '/account':'/account.html', '/sign':'/sign.html',
   '/parashare':'/parashare.html', '/signup':'/signup.html',
+  '/signup/verified':'/signup/verified.html',
   '/auth/login':'/auth/login.html', '/auth/setup':'/auth/setup.html',
   '/auth/backup':'/auth/backup.html', '/auth/request-reset':'/auth/request-reset.html',
   '/auth/reset-confirm':'/auth/reset-confirm.html',
@@ -64,9 +65,10 @@ const DOCS = { documents:[
 ] };
 
 // Playwright tries handlers newest-first, so the catch-all goes on FIRST.
-async function stub(page) {
+async function stub(page, { signedIn = true } = {}) {
   await page.route('**/api/user/**', (r) => r.fulfill({ status:200, contentType:'application/json', body:'{}' }));
-  await page.route('**/api/user/session/verify', (r) => r.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
+  await page.route('**/api/user/session/verify', (r) => r.fulfill({ status:200, contentType:'application/json',
+    body: signedIn ? '{"authenticated":true,"email":"demo@example.com"}' : '{"authenticated":false}' }));
   await page.route('**/api/user/me', (r) => r.fulfill({ status:200, contentType:'application/json', body:JSON.stringify(ME) }));
   await page.route('**/api/user/account', (r) => r.fulfill({ status:200, contentType:'application/json', body:JSON.stringify(ME) }));
   await page.route('**/api/user/billing/status', (r) => r.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ current_plan:'community', ...ME }) }));
@@ -179,6 +181,9 @@ const SCREENS = [
   { name:'/auth/backup', url:'/auth/backup', ready:'main' },
   { name:'/auth/request-reset', url:'/auth/request-reset', ready:'main' },
   { name:'/auth/reset-confirm', url:'/auth/reset-confirm', ready:'main' },
+  // You land here straight from the mail link, so the signed-out nav is the
+  // normal state on this one and the audit has to see that nav.
+  { name:'/signup/verified', url:'/signup/verified', ready:'main', signedIn:false },
 ];
 const VIEWPORTS = [{ w:390, h:844 }, { w:1440, h:900 }];
 const THEMES = ['light', 'dark'];
@@ -193,7 +198,7 @@ test('every app screen keeps its text above AA in light and dark, at 390 and 144
       for (const theme of THEMES) {
         const context = await browser.newContext({ viewport:{ width:vp.w, height:vp.h }, colorScheme:theme });
         const page = await context.newPage();
-        await stub(page);
+        await stub(page, { signedIn: screen.signedIn !== false });
         await page.goto(ORIGIN + screen.url, { waitUntil:'domcontentloaded' });
         try { await page.locator(screen.ready).first().waitFor({ timeout:6000 }); } catch { /* audit what rendered */ }
         await page.waitForTimeout(250);
@@ -215,7 +220,7 @@ test('a coarse pointer gets a 44px target on every app control', async () => {
   for (const screen of SCREENS) {
     const context = await browser.newContext({ viewport:{ width:390, height:844 }, hasTouch:true, isMobile:true });
     const page = await context.newPage();
-    await stub(page);
+    await stub(page, { signedIn: screen.signedIn !== false });
     await page.goto(ORIGIN + screen.url, { waitUntil:'domcontentloaded' });
     try { await page.locator(screen.ready).first().waitFor({ timeout:6000 }); } catch { /* audit what rendered */ }
     await page.waitForTimeout(250);

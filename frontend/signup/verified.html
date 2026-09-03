@@ -13,75 +13,88 @@
   <script src="/nav.js?v=14" defer></script>
 <script src="/js/nav-auth.js?v=5" defer></script>
   <style>
-    body { background: #F8FAFC; }
+    /* Every colour here is a token from app-2026.css, so this page follows the
+       theme instead of staying light inside a dark shell. Section 5 of
+       docs/brand/design-direction.md: no half rollout. */
+    body { background: var(--paper); }
     .vwrap { max-width: 620px; margin: 48px auto; padding: 0 20px; }
     .vcheck {
       display: inline-flex; align-items: center; gap: 8px;
-      background: #DCFCE7; color: #15803D;
+      background: var(--sig-done-bg); color: var(--sig-done);
+      border: 1px solid var(--line);
       padding: 6px 14px; border-radius: 100px;
       font-size: 13px; font-weight: 600;
       margin-bottom: 24px;
     }
     .vcheck svg { width: 14px; height: 14px; }
     .vtitle {
-      font-size: 30px; font-weight: 600; color: #0B3A6A;
+      font-size: 30px; font-weight: 600; color: var(--ink-1);
       margin: 0 0 16px; line-height: 1.2;
     }
     .vlead {
-      color: #475569; line-height: 1.6;
+      color: var(--ink-2); line-height: 1.6;
       margin: 0 0 32px; font-size: 16px;
     }
     .next-box {
-      background: #EFF6FF; border: 1px solid #BFDBFE;
+      background: var(--accent-soft); border: 1px solid var(--line);
       border-radius: 10px; padding: 28px; margin: 0 0 32px;
     }
     .next-step {
-      display: inline-block; background: #1D4ED8; color: #fff;
+      display: inline-block; background: var(--accent); color: var(--accent-ink);
       border-radius: 999px; padding: 5px 14px;
       font-weight: 700; font-size: 12px; letter-spacing: .04em;
       text-transform: uppercase; margin-bottom: 14px;
     }
     .vwho {
-      color: #64748B; font-size: 13px; line-height: 1.7;
+      color: var(--ink-3); font-size: 13px; line-height: 1.7;
       margin: 32px 0 0;
     }
-    .vwho a { color: #1D4ED8; }
+    .vwho a { color: var(--accent); }
     .next-title {
-      font-size: 18px; font-weight: 600; color: #0B3A6A;
+      font-size: 18px; font-weight: 600; color: var(--ink-1);
       margin: 0 0 12px;
     }
     .next-msg {
-      color: #334155; line-height: 1.6;
+      color: var(--ink-2); line-height: 1.6;
       margin: 0 0 14px; font-size: 15px;
     }
     .next-subject {
-      display: inline-block; background: #fff;
-      border: 1px solid #CBD5E1; border-radius: 5px;
+      display: inline-block; background: var(--surface);
+      border: 1px solid var(--line-2); border-radius: 5px;
       padding: 8px 14px;
       font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
-      font-size: 13px; color: #0B3A6A;
+      font-size: 13px; color: var(--ink-1);
       word-break: break-word;
     }
     .faq {
       margin-top: 36px; padding-top: 28px;
-      border-top: 1px solid rgba(11,58,106,0.1);
+      border-top: 1px solid var(--line);
     }
     .faq h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em;
-              color: #64748B; font-weight: 600; margin: 0 0 16px; }
+              color: var(--ink-3); font-weight: 600; margin: 0 0 16px; }
     .faq details { margin-bottom: 10px;
-                   border: 1px solid rgba(11,58,106,0.08);
-                   border-radius: 6px; padding: 14px 18px; background: #fff; }
-    .faq summary { cursor: pointer; font-weight: 600; color: #0B3A6A;
-                   font-size: 14px; }
+                   border: 1px solid var(--line);
+                   border-radius: 6px; padding: 14px 18px; background: var(--surface); }
+    /* One indicator, the page's own plus. Chromium still draws its list-item
+       triangle next to it unless the marker is removed on both sides, and the
+       row is a flex line so it reads the same at every width. */
+    .faq summary { cursor: pointer; font-weight: 600; color: var(--ink-1);
+                   font-size: 14px; list-style: none;
+                   display: flex; align-items: center; gap: 12px; }
     .faq summary::-webkit-details-marker { display: none; }
-    .faq summary::after { content: '+'; float: right; color: #94A3B8;
+    .faq summary::marker { content: ''; }
+    .faq summary::after { content: '+'; margin-left: auto; color: var(--ink-3);
                           font-weight: 400; font-size: 18px; line-height: 1; }
     .faq details[open] summary::after { content: '&minus;'; }
-    .faq p { color: #475569; line-height: 1.6;
+    .faq p { color: var(--ink-2); line-height: 1.6;
              margin: 10px 0 0; font-size: 14px; }
-    .faq code { background: #F1F5F9; padding: 2px 6px; border-radius: 3px;
-                font-size: 13px; color: #0B3A6A; }
-    .faq a { color: #1D4ED8; text-decoration: underline; }
+    .faq code { background: var(--surface-sunk); padding: 2px 6px; border-radius: 3px;
+                font-size: 13px; color: var(--ink-1); }
+    .faq a { color: var(--accent); text-decoration: underline; }
+    /* A finger opens the accordion, so the row it grabs is a real target. */
+    @media (pointer: coarse) {
+      .faq summary { min-height: var(--tap); }
+    }
   </style>
 <meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0A0F16" media="(prefers-color-scheme: dark)">

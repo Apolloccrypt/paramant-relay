@@ -276,6 +276,12 @@ nav.nav .nav-link:hover, nav.nav .nav-link[aria-current="page"] { color: var(--a
 .nav-help-mobile { color: var(--ink-2); border-bottom-color: var(--line); }
 .nav-help-mobile:hover { color: var(--ink-1); background: var(--accent-soft); }
 
+/* Signed out, the nav still shows Sign in. design-system.css v4 falls back to
+   a hard #64748b there, which is 4.03:1 on the dark paper. The signed-out nav
+   is the normal state on /signup/verified, so it follows the theme too. */
+.nav-signin { color: var(--ink-2); }
+.nav-signin:hover { color: var(--ink-1); }
+
 footer { background: var(--surface-sunk); border-top: 1px solid var(--line); color: var(--ink-2); }
 footer a { color: var(--ink-2); }
 footer a:hover { color: var(--accent); }

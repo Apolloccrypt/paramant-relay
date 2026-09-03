@@ -20,6 +20,7 @@ fs.mkdirSync(OUT, { recursive: true });
 const MIME = { '.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.html':'text/html','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.webp':'image/webp','.woff2':'font/woff2','.json':'application/json','.wasm':'application/wasm' };
 const ALIAS = { '/dashboard':'/dashboard.html', '/account':'/account.html', '/sign':'/sign.html',
   '/parashare':'/parashare.html', '/signup':'/signup.html', '/pricing':'/pricing.html',
+  '/signup/verified':'/signup/verified.html',
   '/auth/login':'/auth/login.html', '/auth/setup':'/auth/setup.html', '/auth/backup':'/auth/backup.html',
   '/auth/request-reset':'/auth/request-reset.html', '/auth/reset-confirm':'/auth/reset-confirm.html' };
 
@@ -51,11 +52,12 @@ const DOCS = { documents:[
   { id:'env_void_abcdefghijklmnop', original_filename:'Draft NDA.pdf', status:'void', created_at:'2026-08-18T10:00:00.000Z', expires_at:'2026-09-18T10:00:00.000Z', party_count:1, signed_count:0 },
 ] };
 
-async function stub(page) {
+async function stub(page, { signedIn = true } = {}) {
   // Playwright tries handlers newest-first, so the catch-all is registered
   // FIRST and every specific stub lands on top of it.
   await page.route('**/api/user/**', (r) => r.fulfill({ status:200, contentType:'application/json', body:'{}' }));
-  await page.route('**/api/user/session/verify', (r) => r.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
+  await page.route('**/api/user/session/verify', (r) => r.fulfill({ status:200, contentType:'application/json',
+    body: signedIn ? '{"authenticated":true,"email":"demo@example.com"}' : '{"authenticated":false}' }));
   await page.route('**/api/user/me', (r) => r.fulfill({ status:200, contentType:'application/json', body:JSON.stringify(ME) }));
   await page.route('**/api/user/account', (r) => r.fulfill({ status:200, contentType:'application/json', body:JSON.stringify(ME) }));
   await page.route('**/api/user/billing/status', (r) => r.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ current_plan:'community', ...ME }) }));
@@ -73,6 +75,8 @@ const SCREENS = [
   { name:'account',   url:'/account',   ready:'#state-account:not(.hidden)' },
   { name:'login',     url:'/auth/login', ready:'main, .auth-card, form' },
   { name:'setup',     url:'/auth/setup', ready:'main, .auth-card, form' },
+  // Straight from the mail link, so this one is shot signed out.
+  { name:'verified',  url:'/signup/verified', ready:'main', signedIn:false },
 ];
 const VIEWPORTS = [{ w:390, h:844 }, { w:1440, h:900 }];
 const THEMES = ['light', 'dark'];
@@ -86,7 +90,7 @@ for (const screen of SCREENS) {
     for (const theme of THEMES) {
       const context = await browser.newContext({ viewport:{ width:vp.w, height:vp.h }, deviceScaleFactor:2, colorScheme:theme });
       const page = await context.newPage();
-      await stub(page);
+      await stub(page, { signedIn: screen.signedIn !== false });
       await page.goto(ORIGIN + screen.url, { waitUntil:'domcontentloaded' });
       try { await page.locator(screen.ready).first().waitFor({ timeout:6000 }); } catch { /* render what there is */ }
       await page.waitForTimeout(500);
