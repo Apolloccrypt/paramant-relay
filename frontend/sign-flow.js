@@ -101,6 +101,11 @@ function hide(id) { $(id).hidden = true; }
 let __firstStepRender = true;
 function setActive(stepId) {
   document.querySelectorAll('.ds-step').forEach(s => s.hidden = (s.id !== stepId));
+  // Publish the current step on <body> so the page chrome can react to it in
+  // CSS alone. sign.html uses it to collapse the hero once a document is in
+  // hand: at full height it kept the whole uploaded PDF below the fold on a
+  // 390px screen (measured: first page at y=1231 of an 844px viewport).
+  document.body.setAttribute('data-ds-step', stepId);
   // Move focus to the new step's heading so keyboard + screen-reader users land
   // on the freshly revealed content (skip the very first render at page load).
   if (!__firstStepRender) {
@@ -382,6 +387,19 @@ function initStepDoc() {
   inp.addEventListener('change', e => e.target.files[0] && onDocChosen(e.target.files[0]));
 }
 
+// The chosen file's name and size, shown next to the document itself. Without
+// it the place step never named the file: a visitor who picked the wrong one
+// out of three similar PDFs had nothing on screen to tell him.
+function showDocMeta(name, size) {
+  const wrap = $('ds-doc-meta');
+  if (!wrap) return;
+  const nameEl = $('ds-doc-meta-name');
+  const sizeEl = $('ds-doc-meta-size');
+  if (nameEl) { nameEl.textContent = name; nameEl.title = name; }
+  if (sizeEl) sizeEl.textContent = formatSize(size);
+  wrap.hidden = false;
+}
+
 function showDocError(msg) {
   const el = $('ds-doc-error');
   if (el) { el.textContent = msg; el.hidden = false; }
@@ -400,6 +418,7 @@ async function onDocChosen(file) {
     return;
   }
   state.doc = { bytes, name: file.name, size: file.size };
+  showDocMeta(file.name, file.size);
   state.signer.docImageDataUrl = null;
   state.imageType = null;
   state.extras = [];        // fresh document: drop any text/date objects from a prior file

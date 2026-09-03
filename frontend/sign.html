@@ -44,6 +44,26 @@
 .ds-headlink{margin:14px 0 0;font-size:13px}
 .ds-headlink a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
 .ds-anon-actions{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0 0}
+/* The hero is the pitch for a visitor who has not started yet. From the step
+   after the document is chosen it is only in the way: at 390px it held the
+   whole uploaded PDF below the fold. sign-flow.js stamps the active step on
+   <body>, so this is a CSS collapse to a single line, no script in the page. */
+body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head{margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-kicker,
+body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-lede,
+body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-facts,
+body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-headlink{display:none}
+body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-title{font-size:15px;font-weight:600;line-height:1.4;letter-spacing:0;margin:0;max-width:none;color:var(--ink-2)}
+/* The chosen file, named where the document is worked on. */
+.ds-doc-meta{display:flex;align-items:center;gap:10px;min-width:0;margin:0 0 14px;padding:9px 12px;border:1px solid var(--line-2);border-left:2px solid var(--mark);border-radius:var(--r-1);background:var(--surface-sunk);font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+.ds-doc-meta-label{flex:0 0 auto;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.ds-doc-meta-name{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-1);font-weight:600}
+.ds-doc-meta-size{flex:0 0 auto;color:var(--ink-3)}
+/* Two steps name the file themselves: the hash-only card and the finished
+   screen, where the name is the SIGNED one and repeating the source above it
+   would say two different things at once. */
+body[data-ds-step="step-hash-only"] #ds-doc-meta,
+body[data-ds-step="step-done"] #ds-doc-meta{display:none}
 .ds-stepper{list-style:none;display:flex;gap:8px;padding:0;margin:0 0 32px;border-bottom:1px solid var(--line);counter-reset:dsstep}
 .ds-stepper li{flex:1;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);padding:14px 0;border-bottom:2px solid transparent;counter-increment:dsstep;text-align:center}
 .ds-stepper li::before{content:counter(dsstep);display:inline-block;width:20px;height:20px;border:1px solid var(--line-2);border-radius:50%;line-height:18px;font-size:10px;margin-right:6px;font-weight:600}
@@ -102,6 +122,12 @@
    targets. */
 .ds-place-actions{position:sticky;bottom:0;z-index:20;margin-top:14px;padding:12px 0;background:var(--paper);border-top:1px solid var(--line);pointer-events:none}
 .ds-place-actions .btn{min-height:var(--tap)}
+/* The bar is opaque and sticky, so whatever sits directly above it scrolls
+   underneath and cannot be read while it is stuck (measured at 1440: the edit
+   tip ended 7px under it). Reserve its height at the end of the scrolling
+   content, and let the buttons clear a phone's bottom safe area. */
+.ds-place-actions{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+#ds-pdf-canvas-list{padding-bottom:calc(70px + env(safe-area-inset-bottom,0px))}
 .ds-place-actions>*{pointer-events:auto}
 /* Edit toolbar + free text/date annotations (additive layer, baked as PDF vector text) */
 .ds-edit-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
@@ -247,6 +273,8 @@
 @media(max-width:640px){.ds-proof-dl{grid-template-columns:1fr}}
 @media(max-width:640px){.ds-review-grid{grid-template-columns:1fr}}
 @media(max-width:640px){
+  /* Tap targets on a phone. Padding, not type: the words keep their size. */
+  .ds-headlink a,footer .footer-links a{display:inline-flex;align-items:center;min-height:var(--tap)}
   .ds-wrap{padding:0 16px;margin-top:24px}
   .ds-title{font-size:24px}
   .ds-stepper li{font-size:10px;padding:10px 0}
@@ -464,6 +492,14 @@
     <li data-step="identity">Identity</li>
     <li data-step="sign">Sign</li>
   </ol>
+
+  <!-- The document under the whole flow, named once and shown on every step
+       after it is picked. It used to live inside the Place step, which the
+       request-signatures flow never visits: that flow went straight from the
+       file picker to the co-signers, so the file was named nowhere and the
+       last thing before "Send for signature" was a screen that did not say
+       what was being sent. -->
+  <p class="ds-doc-meta" id="ds-doc-meta" hidden><span class="ds-doc-meta-label">File</span><span class="ds-doc-meta-name" id="ds-doc-meta-name"></span><span class="ds-doc-meta-size" id="ds-doc-meta-size"></span></p>
 
   <!-- No session: say what this needs BEFORE a document is picked.
        The page used to be behind an nginx auth_request, so a visitor never got
@@ -860,6 +896,6 @@
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=4" defer></script>
-<script type="module" src="/sign-flow.js?v=49"></script>
+<script type="module" src="/sign-flow.js?v=50"></script>
 </body>
 </html>
