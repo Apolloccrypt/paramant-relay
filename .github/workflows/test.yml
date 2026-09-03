@@ -29,6 +29,40 @@ jobs:
           | xargs -0 -n1 bash -n
           echo "All shell scripts parse OK."
 
+  static-sanity:
+    name: static sanity, tests/static-sanity.sh
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 is load-bearing, not a habit. Check 10 delegates to
+      # scripts/check-commit-style.sh, which reads commit messages and the added
+      # diff lines of the commits under review. On a pull request the checkout is
+      # refs/pull/N/merge: HEAD is a merge commit with the message
+      # "Merge <sha> into <sha>" and no diff of its own, so the script's default
+      # (the last commit) would scan nothing and pass over anything. The script
+      # builds "origin/$GITHUB_BASE_REF..HEAD" instead, and that base branch is
+      # only in the clone with the full fetch. With the shallow default the check
+      # says so in the log rather than going quietly green.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # Check 1 is `node --check` over admin/server.js, admin/lib/*.js and
+      # relay/relay.js; check 11 parses all 134 suites the same way. No npm
+      # install: nothing here resolves an import.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      # Twelve checks, no secrets, no server, no network. It was written as a
+      # pre-commit hook and deploy/deploy-3.1.sh phase 0b runs it against the
+      # commit being deployed, but until now it ran in NO workflow at all:
+      # security-posture.yml only mentioned it in a comment. Every
+      # "static-sanity PASS" on record was somebody's laptop. That is the exact
+      # shape of hole the deploy dry-run job below was added to close, and
+      # checks 10, 11 and 12 are precisely the ones a pull request can break for
+      # everybody: the style guard, the merge-collision guard on the shared test
+      # namespace, and the opt-in on the tracked brand screenshots.
+      - name: Static sanity (twelve checks)
+        run: bash tests/static-sanity.sh
+
   undefined-names:
     name: static, every name must exist
     runs-on: ubuntu-latest

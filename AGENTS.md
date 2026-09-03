@@ -18,10 +18,15 @@ en GitHub-comments volgen deze regels:
 De poort is `scripts/check-commit-style.sh`. Die scant de commit-message(s) en de
 toegevoegde diff-regels op deze fouten. Een commit die de scan laat FALEN mag niet
 gepusht worden; herschrijf de message of de diff en commit opnieuw. De scan draait
-op twee plekken:
+op drie plekken:
 
 - `bash tests/static-sanity.sh` (de gate vlak voor commit) draait de scan over de
   laatste commit, naast de bestaande checks.
+- In CI, als job `static-sanity` in `.github/workflows/test.yml`, op elke push
+  naar main en elke pull request. Daar scant hij niet de laatste commit maar
+  `origin/$GITHUB_BASE_REF..HEAD`: op een pull request is HEAD de merge-commit,
+  en die heeft geen eigen diff. Een hook die niet geinstalleerd is, of een
+  `git commit --no-verify`, komt hier alsnog boven water.
 - De committed pre-push hook `.githooks/pre-push` draait dezelfde scan over het
   push-bereik. Committed hooks activeren niet vanzelf; zet ze eenmalig aan met:
 

@@ -203,17 +203,52 @@ done
 
 # ── 10. Commit/GitHub style guard ────────────────────────────────────────────
 # Same gate as the secret checks: block em-dashes, emoji, and AI attribution
-# markers in the last commit message and its added diff lines.
+# markers in the commit message(s) and the added diff lines.
 # scripts/check-commit-style.sh is the single source of truth; the committed
 # pre-push hook (.githooks/pre-push) runs the same script on push.
+#
+# WHICH commits get scanned depends on where this runs, and it has to.
+# Locally and on a push the default is right: the last commit, which is the one
+# being made. On a pull request in GitHub Actions it is not. actions/checkout
+# checks out refs/pull/N/merge, so HEAD is a merge commit whose message reads
+# "Merge <sha> into <sha>" and for which git show prints no diff at all. The
+# default range would therefore scan an empty commit and report OK over a branch
+# full of em-dashes, which is a green tick bought with nothing. So when
+# GITHUB_BASE_REF is set, scan the commits the pull request actually adds.
+# The job that does this checks out with fetch-depth: 0; without the base branch
+# in the clone the range cannot be built, and the check says so rather than
+# quietly falling back to the vacuous default.
+# PARAMANT_STYLE_RANGE overrides both, for a caller that knows better.
 echo ""
 echo "10. Commit/GitHub style guard (scripts/check-commit-style.sh)..."
 STYLE="$ROOT/scripts/check-commit-style.sh"
+STYLE_RANGE="${PARAMANT_STYLE_RANGE:-}"
+STYLE_WHAT="last commit"
+if [ -n "$STYLE_RANGE" ]; then
+  STYLE_WHAT="range $STYLE_RANGE"
+elif [ -n "${GITHUB_BASE_REF:-}" ]; then
+  for base in "origin/$GITHUB_BASE_REF" "$GITHUB_BASE_REF"; do
+    if git -C "$ROOT" rev-parse --verify --quiet "$base^{commit}" >/dev/null 2>&1; then
+      STYLE_RANGE="$base..HEAD"
+      STYLE_WHAT="range $STYLE_RANGE (the commits this pull request adds)"
+      break
+    fi
+  done
+  if [ -z "$STYLE_RANGE" ]; then
+    printf "   WARN  GITHUB_BASE_REF=%s is not in this clone (needs fetch-depth: 0);\n" "$GITHUB_BASE_REF"
+    printf "         falling back to the last commit, which on a merge ref scans nothing\n"
+  fi
+fi
 if [ -x "$STYLE" ]; then
-  if STYLE_OUT="$("$STYLE" 2>&1)"; then
-    printf "   OK  last commit message + added lines are style-clean\n"
+  if [ -n "$STYLE_RANGE" ]; then
+    STYLE_OUT="$("$STYLE" "$STYLE_RANGE" 2>&1)" && STYLE_RC=0 || STYLE_RC=1
   else
-    printf "   FAIL  style guard flagged the last commit:\n"
+    STYLE_OUT="$("$STYLE" 2>&1)" && STYLE_RC=0 || STYLE_RC=1
+  fi
+  if [ "$STYLE_RC" -eq 0 ]; then
+    printf "   OK  %s: message(s) + added lines are style-clean\n" "$STYLE_WHAT"
+  else
+    printf "   FAIL  style guard flagged the %s:\n" "$STYLE_WHAT"
     printf '%s\n' "$STYLE_OUT" | sed 's/^/     /'
     FAIL=$((FAIL + 1))
   fi
