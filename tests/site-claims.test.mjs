@@ -1453,8 +1453,19 @@ test('the CT-log hash named on /privacy and /dpa is the one ct-hash.js computes'
 // 28 ── The browser-storage list. It named ps_free_uses "to enforce the 10/day
 // limit client-side" and pm_docs_key; neither string exists anywhere in the
 // repository, and the limit it described is 10 a month, not a day. Meanwhile the
-// key the site really does write, an API key, was not on the list at all.
-// Verified by sabotage: deleting any one <code> entry fails this by key name.
+// key the site really did write, an API key, was not on the list at all.
+//
+// That API key is now the other half of the same problem. The page also said
+// paramant_api_key was "removed when you sign out" and nothing removed it, and
+// ParaSend has since stopped writing it altogether: /parashare reads
+// GET /api/user/account/key on every load and keeps the key in memory only. So
+// the inventory harvests what the frontend READS OR WRITES, and a key it only
+// ever DELETES (legacy cleanup of what an older build stored) is asserted to be
+// OFF the list rather than on it. Naming a key the site no longer keeps is the
+// same untruth as omitting one it does.
+// Verified by sabotage in both directions: deleting any one <code> entry fails
+// this by key name; putting localStorage.setItem('paramant_api_key', …) back
+// into frontend/js/parashare.page.js fails it by the ParaSend assertion below.
 test('the browser storage /privacy lists is the storage the frontend writes', () => {
   const files = [];
   (function walk(dir, prefix) {
@@ -1465,21 +1476,35 @@ test('the browser storage /privacy lists is the storage the frontend writes', ()
   })(path.join(ROOT, 'frontend'), '');
   assert.ok(files.length > 20, `the frontend walk found only ${files.length} files; the check would be vacuous`);
 
+  // Three shapes of key, harvested twice: once for the verbs that mean the
+  // browser is holding something (get/set), once for the verb that means the
+  // browser is being emptied (remove).
+  const harvest = (src, verbs, into) => {
+    for (const m of src.matchAll(new RegExp(`localStorage\\.(?:${verbs})Item\\(\\s*['"\`]([^'"\`]+)`, 'g'))) into.add(m[1]);
+    // A key held in a constant, and a key built by a helper: both are used here.
+    for (const m of src.matchAll(new RegExp(`localStorage\\.(?:${verbs})Item\\(\\s*([A-Za-z_$][\\w$]*)\\s*[,)]`, 'g'))) {
+      const c = new RegExp(`(?:const|let|var)\\s+${m[1]}\\s*=\\s*['"\`]([^'"\`]+)`).exec(src);
+      if (c) into.add(c[1]);
+    }
+    for (const m of src.matchAll(new RegExp(`localStorage\\.(?:${verbs})Item\\(\\s*([A-Za-z_$][\\w$]*)\\(`, 'g'))) {
+      const fn = new RegExp(`function\\s+${m[1]}\\s*\\([^)]*\\)\\s*\\{\\s*return\\s+['"\`]([^'"\`]+)`).exec(src);
+      if (fn) into.add(fn[1]);
+    }
+  };
   const keys = new Set();
+  const cleared = new Set();
   for (const f of files) {
     const src = stripJsComments(read(`frontend/${f}`));
-    for (const m of src.matchAll(/localStorage\.(?:get|set|remove)Item\(\s*['"`]([^'"`]+)/g)) keys.add(m[1]);
-    // A key held in a constant, and a key built by a helper: both are used here.
-    for (const m of src.matchAll(/localStorage\.(?:get|set|remove)Item\(\s*([A-Za-z_$][\w$]*)\s*[,)]/g)) {
-      const c = new RegExp(`(?:const|let|var)\\s+${m[1]}\\s*=\\s*['"\`]([^'"\`]+)`).exec(src);
-      if (c) keys.add(c[1]);
-    }
-    for (const m of src.matchAll(/localStorage\.(?:get|set|remove)Item\(\s*([A-Za-z_$][\w$]*)\(/g)) {
-      const fn = new RegExp(`function\\s+${m[1]}\\s*\\([^)]*\\)\\s*\\{\\s*return\\s+['"\`]([^'"\`]+)`).exec(src);
-      if (fn) keys.add(fn[1]);
-    }
+    harvest(src, 'get|set', keys);
+    harvest(src, 'remove', cleared);
   }
-  assert.ok(keys.size >= 5, `only ${keys.size} storage keys resolved; the check would be vacuous`);
+  assert.ok(keys.size >= 4, `only ${keys.size} storage keys resolved; the check would be vacuous`);
+
+  // The ParaSend pin. Send in the signed-in navigation used to die on a key the
+  // sender had typed by hand, because localStorage was a second source of truth
+  // next to the session. There is one source now, and it is not this store.
+  assert.ok(!keys.has('paramant_api_key'),
+    'a frontend file reads or writes paramant_api_key again. ParaSend takes the account key from GET /api/user/account/key on every load and keeps it in memory; /privacy no longer lists this key, so putting it back in localStorage makes that page untrue.');
 
   const priv = visible(page('privacy'));
   const list = priv.slice(priv.indexOf('<h2>Local storage in your browser</h2>'), priv.indexOf('</ul>', priv.indexOf('<h2>Local storage in your browser</h2>')));
@@ -1490,6 +1515,9 @@ test('the browser storage /privacy lists is the storage the frontend writes', ()
   }
   for (const n of named) {
     if (![...keys].some((k) => k === n || k.startsWith(n))) problems.push(`privacy: the storage list names "${n}" and no frontend file writes it`);
+  }
+  for (const k of [...cleared].filter((c) => !keys.has(c)).sort()) {
+    if (named.some((n) => k === n || k.startsWith(n))) problems.push(`privacy: the storage list names "${k}" and the frontend only ever deletes it, which is not storage the browser keeps`);
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });

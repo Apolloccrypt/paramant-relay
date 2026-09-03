@@ -115,6 +115,7 @@
       try {
         await fetch('/api/user/logout', { method: 'POST', credentials: 'include' });
       } catch (err) {}
+      try { localStorage.removeItem('paramant_api_key'); } catch (err) {} // legacy: /parashare no longer writes it, clear an old one
       if (location.pathname === '/account' || location.pathname.startsWith('/auth/')) {
         location.href = '/';
       } else {

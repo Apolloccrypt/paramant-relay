@@ -45,15 +45,37 @@ h1{font-size:clamp(26px,5vw,38px);font-weight:600;letter-spacing:-.028em;line-he
 .ps-guide strong{color:var(--ink-1);font-weight:600}
 .ps-guide .ps-guide-kicker{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:5px;font-weight:600}
 
-/* Slim API-key row -- shown when key was auto-fetched from /api/user/account/key */
-.ps-key-slim{display:none;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;border:1px solid var(--line);border-radius:var(--r-1);background:var(--surface-sunk);margin-bottom:16px;font-family:var(--mono);font-size:11px;color:var(--ink-3);flex-wrap:wrap}
+/* The account key comes from the session and from nowhere else, so the slim row
+   is the DEFAULT state of step 1 and the manual card is the exception. It used
+   to be the other way round: the card was the default and the slim row appeared
+   only after a key had been fetched, which is why a signed-in sender was shown
+   an empty "API key" box and typed one in by hand. #step-setup carries
+   .manual-key only when the user asks for the box (the Change link, or the way
+   out on the error banner), which is the self-host / paste-a-key path. */
+.ps-key-slim{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;border:1px solid var(--line);border-radius:var(--r-1);background:var(--surface-sunk);margin-bottom:16px;font-family:var(--mono);font-size:11px;color:var(--ink-3);flex-wrap:wrap}
+.ps-key-slim[hidden]{display:none}
 .ps-key-slim .ps-key-status{display:inline-flex;align-items:center;gap:8px}
 .ps-key-slim .ps-key-status::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--sig-done);flex-shrink:0}
+/* Amber while the fetch is in flight: the row must not claim a key it does not
+   have yet. It turns green in applySlimApiKeyView, once the key is really in. */
+.ps-key-slim.is-loading .ps-key-status::before{background:var(--sig-wait)}
 .ps-key-slim .ps-key-mask{color:var(--ink-1);font-weight:600}
-.ps-key-slim .ps-key-change{background:transparent;border:none;min-height:36px;padding:4px 6px;color:var(--accent);font:inherit;font-size:11px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;letter-spacing:.04em}
-.ps-key-slim .ps-key-change:hover{color:var(--accent-hov)}
-#step-setup.has-saved-key .ps-key-card{display:none}
-#step-setup.has-saved-key .ps-key-slim{display:flex}
+.ps-key-mask[hidden]{display:none}
+/* Not scoped to the slim row: the same control is the way out on the error
+   banner, and there it has to look like an action too. */
+.ps-key-change{background:transparent;border:none;min-height:36px;padding:4px 6px;color:var(--accent);font:inherit;font-size:11px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;letter-spacing:.04em}
+.ps-key-change:hover{color:var(--accent-hov)}
+.ps-key-card{display:none}
+#step-setup.manual-key .ps-key-card{display:block}
+#step-setup.manual-key .ps-key-slim{display:none}
+
+/* The one thing that must never fail silently: no key, no ParaSend. The banner
+   says what happened, what to do, and leaves a door open for a self-hoster
+   whose deployment has no /api/user/account/key at all. */
+.ps-key-error{display:none;flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:16px;padding:12px 14px;border:1px solid var(--line-2);border-left:3px solid var(--sig-stop);border-radius:var(--r-1);background:var(--sig-stop-bg);font:13px/1.62 var(--sans);color:var(--ink-1)}
+.ps-key-error.is-shown{display:flex}
+.ps-key-error p{margin:0}
+.ps-key-error .ps-key-change{padding-left:0;font-family:var(--mono)}
 
 /* design-system.css puts 32px of padding on every .card; here the padding
    belongs to .card-head and .card-body, so it is reset. */
@@ -394,9 +416,14 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <strong>Pick a file, set how long the link lives.</strong> Your file stays in your browser until step 4. The relay never sees plaintext.
   </div>
 
-  <div class="ps-key-slim" aria-label="Signed-in API key">
-    <span class="ps-key-status">Using your account key <span class="ps-key-mask" id="ps-key-mask">pgp_...</span></span>
+  <div class="ps-key-slim is-loading" id="ps-key-slim" aria-label="Account key">
+    <span class="ps-key-status"><span id="ps-key-slim-label">Loading your account key</span> <span class="ps-key-mask" id="ps-key-mask" hidden></span></span>
     <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Change</button>
+  </div>
+
+  <div class="ps-key-error" id="ps-key-error" role="alert">
+    <p>Your account key could not be loaded. Sign in again; if it keeps happening, mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
+    <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Use a key by hand</button>
   </div>
 
   <div class="card ps-key-card">
@@ -433,6 +460,10 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   </div>
 
   <button class="btn" id="btn-create-session" disabled data-click="createSession">Create secure session &rarr;</button>
+  <!-- A sector that will not answer used to leave this button quietly disabled
+       with no reason given. It now reports itself here, at the moment of the
+       press. -->
+  <div class="status-line" id="create-status" role="status"></div>
 </div>
 
 <!-- STEP 2: Waiting for receiver -->
@@ -609,7 +640,11 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <!-- One sentence for "we broke it, here is what to do", shared with the signer.
      Plain script, above the page code that reads window.paramantErrors. -->
 <script src="/js/error-message.js?v=1" defer></script>
-<script src="/js/parashare.page.js?v=4" defer></script>
+<!-- v5, not v4. #396 shipped a v4 of this file and so did the commit below it;
+     two different contents under one immutable url is exactly what the ?v= is
+     there to prevent, and check-cache-bust cannot see it because both sides
+     agree on the number. -->
+<script src="/js/parashare.page.js?v=5" defer></script>
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=7" defer></script>
 <footer>
