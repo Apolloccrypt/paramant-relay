@@ -26,7 +26,7 @@ await page.goto(origin + '/', { waitUntil:'domcontentloaded' });
 
 const fixture = await page.evaluate(async () => {
   const pqc = await import('/vendor/paramant-pqc.js');
-  const signer = await import('/js/parasign-signer.js?v=14');
+  const signer = await import('/js/parasign-signer.js?v=15');
   const enc = new TextEncoder();
   const hex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
   const b64 = (bytes) => { let value = ''; for (const byte of bytes) value += String.fromCharCode(byte); return btoa(value); };

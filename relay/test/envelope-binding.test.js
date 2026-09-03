@@ -8,7 +8,7 @@
 const assert = require('assert');
 const crypto = require('crypto');
 const {
-  EnvelopeStore, signMessageBytes, normaliseAppearance, appearanceHash, partyEmailHash,
+  EnvelopeStore, signMessageBytes, normaliseAppearance, normaliseRequestedAppearance, appearanceHash, partyEmailHash,
 } = require('../envelope');
 
 let passed = 0;
@@ -359,6 +359,89 @@ async function main() {
     assert.ok(!JSON.stringify(rows).includes('secret-invite-token'), 'summary omits invite token');
     assert.deepStrictEqual(await store.listAccountEnvelopes('acct_other', {}), [], 'stored account mismatch rejected');
     ok('dashboard worklist is account-scoped and capability-free');
+  }
+
+  // 13. The requested signing position: ONE box for the whole envelope, chosen
+  //     by the requester in the invite flow on /sign. It is a request and never
+  //     a commitment, so it must (a) read back identically for the public view
+  //     and for the invited party, (b) be normalized like any other manifest,
+  //     and (c) stay entirely out of the signing message, which is what lets a
+  //     signer move it and still produce a signature that verifies.
+  {
+    const requested = normaliseAppearance({ version: 1, fields: [
+      { type: 'seal', page_index: 1, x: .5, y: .62, w: .4, h: .12 },
+    ] });
+    const requestedJson = JSON.stringify(requested);
+    const hash = {
+      ...emailHashOf(EMAIL_HASH),
+      recipe_version: '5',
+      p0_invite_token: 'invite-token-13',
+      requested_appearance: requestedJson,
+      requested_appearance_hash: appearanceHash(requested),
+    };
+    const store = new EnvelopeStore(fakeRedis(hash), {
+      sigVerify: () => true,
+    });
+    const publicView = await store.getRedacted(ID);
+    assert.deepStrictEqual(publicView.requested_appearance, requested, 'public view carries the requested position');
+    assert.strictEqual(publicView.requested_appearance_hash, appearanceHash(requested));
+    const partyView = await store.getForParty(ID, 0, 'invite-token-13');
+    assert.deepStrictEqual(partyView.requested_appearance, requested, 'the invited party sees the same one position');
+    assert.strictEqual(partyView.party.appearance, null, 'requested is not the party appearance');
+
+    // The signer moves the box. The message the relay verifies is built from
+    // the appearance THEY submitted; the requested one appears nowhere in it.
+    const moved = normaliseAppearance({ version: 1, fields: [
+      { type: 'seal', page_index: 0, x: .1, y: .1, w: .3, h: .09 },
+    ] });
+    let seenMsg = null;
+    const signing = new EnvelopeStore(fakeRedis({ ...hash }), {
+      sigVerify: (_sig, msg) => { seenMsg = msg; return true; },
+    });
+    const signed = await signing.sign(ID, 0, PUB_A, 'c2ln', {
+      internalTrusted: true, verifiedEmailHash: EMAIL_HASH, appearance: moved,
+    });
+    assert.strictEqual(signed.ok, true);
+    assert.deepStrictEqual(signed.appearance, moved, 'the signature records where the signer actually signed');
+    assert.ok(seenMsg.equals(signMessageBytes(ID, DOC, 0, EMAIL_HASH, 5, PUB_A, appearanceHash(moved))),
+      'signing message binds the used position, not the requested one');
+    assert.ok(!seenMsg.equals(signMessageBytes(ID, DOC, 0, EMAIL_HASH, 5, PUB_A, appearanceHash(requested))),
+      'the requested position is not the thing that was signed');
+    ok('requested position reads back for both views and is never signed');
+  }
+
+  // 14. The requested position is validated more strictly than a signed one.
+  //     A security review found two soft edges: a bare string was normalized to
+  //     an empty manifest instead of refused, and a 'date' field was accepted
+  //     although /sign issues nothing but the seal. Both are now refusals.
+  {
+    for (const bad of ['{"fields":[]}', 42, true, [], [{ type: 'seal' }], null, undefined, '']) {
+      assert.throws(() => normaliseRequestedAppearance(bad), /invalid requested appearance/,
+        'non-object refused: ' + JSON.stringify(bad));
+    }
+    assert.throws(() => normaliseRequestedAppearance({ version: 1, fields: [] }), /invalid requested appearance/,
+      'an empty request is not a request');
+    assert.throws(() => normaliseRequestedAppearance({ version: 1, fields: [
+      { type: 'date', page_index: 0, x: .1, y: .1, w: .22, h: .055 },
+    ] }), /invalid requested appearance type/, 'a requested date is refused');
+    assert.throws(() => normaliseRequestedAppearance({ version: 1, fields: [
+      { type: 'seal', page_index: 0, x: .1, y: .1, w: .36, h: .105 },
+      { type: 'date', page_index: 0, x: .1, y: .3, w: .22, h: .055 },
+    ] }), /invalid requested appearance type/, 'one bad field fails the whole request');
+    // The signed appearance keeps its own, wider contract: a signer really can
+    // place a date, and really can choose to place nothing at all.
+    assert.deepStrictEqual(normaliseAppearance('not an object'), { version: 1, fields: [] },
+      'the signed-appearance validator is unchanged');
+    assert.strictEqual(normaliseAppearance({ version: 1, fields: [
+      { type: 'date', page_index: 0, x: .1, y: .1, w: .22, h: .055 },
+    ] }).fields[0].type, 'date', 'a signer may still place a date');
+    const good = normaliseRequestedAppearance({ version: 1, fields: [
+      { type: 'seal', page_index: 3, x: .4200004, y: .61, w: .36, h: .105 },
+    ] });
+    assert.deepStrictEqual(good, { version: 1, fields: [
+      { type: 'seal', page_index: 3, x: .42, y: .61, w: .36, h: .105 },
+    ] }, 'a real request still normalizes and passes');
+    ok('a requested position must be an object and may only ask for the seal');
   }
 }
 

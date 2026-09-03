@@ -1738,6 +1738,21 @@ api.post("/user/envelopes", authUser, async (req, res) => {
   // can explicitly omit them: the requester is then the owner/coordinator, not
   // an unsigned party that would keep the envelope open forever.
   const includeRequester = req.body?.include_requester !== false;
+  // ONE requested signing position for the whole envelope: where the requester
+  // asked every party to sign. It is a request, never a commitment -- a party's
+  // signature binds the appearance they actually used (POST /user/sign/submit),
+  // so this never touches the signing message. Bounded here with the SAME
+  // 4096-byte ceiling as that route, before the relay is called at all. Shape
+  // and coordinates are validated by the relay's normaliseAppearance.
+  const requestedAppearance = req.body?.requested_appearance;
+  if (requestedAppearance !== undefined) {
+    let requestedSize = 0;
+    try { requestedSize = Buffer.byteLength(JSON.stringify(requestedAppearance), "utf8"); }
+    catch { return res.status(400).json({ error: "invalid_requested_appearance" }); }
+    if (requestedSize > 4096 || !requestedAppearance || typeof requestedAppearance !== "object" || Array.isArray(requestedAppearance)) {
+      return res.status(400).json({ error: "invalid_requested_appearance" });
+    }
+  }
   const parties = includeRequester
     ? [{ label: ((req.body?.signer_label || "") + " (you)").trim(), email }]
     : [];
@@ -1753,7 +1768,7 @@ api.post("/user/envelopes", authUser, async (req, res) => {
     const rr = await fetch(`${SECTORS.health}/v2/envelopes`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Api-Key": proxyApiKey(req.userSession) },
-      body: JSON.stringify({ doc_hash: docHash, parties, original_filename: originalFilename, binding_mode: "email", recipe_version: 5, creator_public_key: creatorPublicKey }),
+      body: JSON.stringify({ doc_hash: docHash, parties, original_filename: originalFilename, binding_mode: "email", recipe_version: 5, creator_public_key: creatorPublicKey, requested_appearance: requestedAppearance }),
     });
     const body = await rr.json().catch(() => ({}));
     if (rr.status !== 200) return res.status(rr.status).json({ error: body.error || "envelope_create_failed" });
