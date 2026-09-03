@@ -702,9 +702,21 @@ async function fetchAccountKey() {
     await new Promise(res => setTimeout(res, KEY_RETRY_MS));
     r = await fetch('/api/user/account/key', { credentials: 'include' });
   }
-  if (!r.ok) throw new Error('account key: HTTP ' + r.status);
+  // Expected, and marked so: a browser with no session gets 401/403, and a
+  // self-host that never built this endpoint answers 404. Both mean "no key
+  // here", the banner is the whole answer, and neither is worth a line in the
+  // console of every signed-out visitor.
+  if (!r.ok) {
+    const noSession = new Error('account key: HTTP ' + r.status);
+    noSession.expected = r.status === 401 || r.status === 403 || r.status === 404;
+    throw noSession;
+  }
   const d = await r.json();
-  if (!d || !d.api_key) throw new Error('account key: none on this session');
+  if (!d || !d.api_key) {
+    const noKey = new Error('account key: none on this session');
+    noKey.expected = true;
+    throw noKey;
+  }
   return d.api_key;
 }
 
@@ -716,9 +728,11 @@ async function loadAccountKey() {
     await onKeyInput();
   } catch (e) {
     setKeyError(true);
-    // The banner carries the sentence; failureText logs the detail through the
-    // one reporter and keeps the console readable when three things fail at once.
-    failureText('account key', e);
+    // The banner carries the sentence either way. Only the unplanned half gets
+    // reported: a 500, or a fetch that never arrived. Reporting the planned half
+    // would put a console error on every signed-out page load, which is both
+    // noise and a false alarm for the heartbeat that reads that console.
+    if (!e || !e.expected) failureText('account key', e);
     setStatus('key-status', 'Account key could not be loaded', 'err');
     keyValid = false;
     updateBtn();

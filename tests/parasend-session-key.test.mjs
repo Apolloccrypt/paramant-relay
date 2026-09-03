@@ -31,15 +31,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
-import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const PS_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PS_JS = fs.readFileSync(path.join(PS_ROOT, 'frontend/js/parashare.page.js'), 'utf8');
 const PS_HTML = fs.readFileSync(path.join(PS_ROOT, 'frontend/parashare.html'), 'utf8');
-// The real error module, in the context, so the page's one failure sentence is
-// the one this suite measures rather than the fallback copy inside failureText.
-const PS_ERRORS = createRequire(import.meta.url)('../frontend/js/error-message.js');
+// The real error module, run INSIDE the context the way the page loads it: as a
+// plain script that assigns self.paramantErrors. Requiring it here instead would
+// close it over this process's console, and half of what this suite measures is
+// what the page does or does not write to the browser's.
+const PS_ERRORS_JS = fs.readFileSync(path.join(PS_ROOT, 'frontend/js/error-message.js'), 'utf8');
 const KEY_URL = '/api/user/account/key';
 const FAKE_KEY = 'pgp_livetestkey0000000000abcd';
 
@@ -79,8 +80,11 @@ function runPage({ keyResponses, sectorOk = true }) {
     json: async () => spec.body,
   });
 
+  const consoleErrors = [];
   const context = {
-    console,
+    console: Object.assign(Object.create(console), {
+      error: (...args) => { consoleErrors.push(args.map(String).join(' ')); },
+    }),
     URLSearchParams,
     AbortSignal: { timeout: () => null },
     crypto: globalThis.crypto,
@@ -106,7 +110,6 @@ function runPage({ keyResponses, sectorOk = true }) {
     clearTimeout: () => {}, setInterval: () => 0, clearInterval: () => {},
     queueMicrotask,
     act: () => {},
-    paramantErrors: PS_ERRORS,
     // A socket the test can drive: step 2 has to be measurable when the relay
     // connection dies, which is the case that used to print "Disconnected".
     WebSocket: class {
@@ -128,9 +131,13 @@ function runPage({ keyResponses, sectorOk = true }) {
   };
   context.window = context;
   context.globalThis = context;
+  context.self = context;
   vm.createContext(context);
+  // Script order matters and the page ships it that way: the reporter first,
+  // then the page code that reads window.paramantErrors at call time.
+  vm.runInContext(PS_ERRORS_JS, context, { filename: 'error-message.js' });
   vm.runInContext(PS_JS, context, { filename: 'parashare.page.js' });
-  return { context, elements, calls, listeners, getElementById, sockets };
+  return { context, elements, calls, listeners, getElementById, sockets, consoleErrors };
 }
 
 // Fire DOMContentLoaded and let every pending microtask drain.
@@ -400,4 +407,36 @@ test('steps 1 and 2 are written for the sender, with the jargon moved into "How 
     'the verify card must be named for the action, not for the data structure');
   assert.match(PS_HTML, /<span class="ps-step-label">3 &middot; Compare<\/span>/,
     'the stepper must name the same step the same way');
+});
+
+// ── 11. Which failures are worth a line in the console ──────────────────────
+// The page reports the unplanned case through failureText, which is the shared
+// reporter from js/error-message.js. "No key for this session" is not that
+// case: a signed-out browser gets 401 or 403 and a self-host that never built
+// the endpoint gets 404, and the banner is the whole answer to both. Reporting
+// them would put a console error on every signed-out visit, and
+// tests/product-heartbeat.test.mjs reads that console: it caught exactly this
+// and went red on "account key: HTTP 404". A 500 is a different thing and does
+// get reported. Verified by sabotage in both directions: report the expected
+// half and the 404 case goes red; stop reporting the 500 and the 500 case does.
+test('a missing session key is not a console error, and a broken endpoint is', async () => {
+  for (const status of [401, 403, 404]) {
+    const quiet = await loadPage({ keyResponses: [{ status, body: {} }] });
+    assert.equal(quiet.getElementById('ps-key-error').classList.contains('is-shown'), true,
+      `a ${status} must still raise the banner: the sender has to know why there is no key`);
+    assert.deepEqual(quiet.consoleErrors, [],
+      `a ${status} is the ordinary "no key here" answer and may not write to the console of every signed-out visit`);
+  }
+
+  const broken = await loadPage({ keyResponses: [{ status: 500, body: {} }] });
+  assert.equal(broken.getElementById('ps-key-error').classList.contains('is-shown'), true);
+  assert.ok(broken.consoleErrors.some((line) => /\[paramant\] account key/.test(line)),
+    'a 500 is unplanned, and its detail belongs in the console through the one reporter');
+
+  // A 200 that carries no key is the non-revealable account, which is planned
+  // as well: the reveal route says so in as many words.
+  const noKey = await loadPage({ keyResponses: [{ status: 200, body: { api_key: null, revealable: false } }] });
+  assert.equal(noKey.getElementById('ps-key-error').classList.contains('is-shown'), true);
+  assert.deepEqual(noKey.consoleErrors, [],
+    'an account whose key is not revealable is a documented state, not a fault to report');
 });
