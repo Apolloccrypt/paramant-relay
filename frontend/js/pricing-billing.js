@@ -14,8 +14,20 @@
  * cannot honour. The href stays as a real link so it survives without JS, but
  * every scripted click goes through checkout.
  *
- * CSP-safe: external file, no inline script. Same session->key bridge as
- * dashboard-history.js (/api/user/account/key, never persisted).
+ * CSP-safe: external file, no inline script.
+ *
+ * THE CREDENTIAL. This page used to fetch the account's pgp_ key from
+ * /api/user/account/key and send it as X-Api-Key on the checkout call. That key
+ * has no expiry and no scope, so a click on a price button left a full
+ * data-plane credential in the tab for as long as it stayed open. It now runs
+ * on the same kind of short-lived scoped token /parashare got in #401: js/
+ * app-session-token.js mints a pst_ token with purpose `app`, which the relay
+ * accepts on POST /v2/billing/checkout and two dashboard reads, and refuses
+ * everywhere else. Fifteen minutes, held in memory, never persisted.
+ *
+ * NOTHING IS FETCHED ON LOAD. The token is minted on the first click, not when
+ * the page opens, so simply reading the prices asks for no credential at all.
+ * tests/app-pages-no-api-key.test.mjs pins that.
  */
 (function () {
   'use strict';
@@ -23,26 +35,24 @@
   var buttons = document.querySelectorAll('a[data-billing-product]');
   if (!buttons.length) return;
 
-  var keyPromise = null;
-  function getApiKey() {
-    if (keyPromise) return keyPromise;
-    keyPromise = fetch('/api/user/account/key', {
-      credentials: 'include', headers: { Accept: 'application/json' }, cache: 'no-store'
-    }).then(function (r) {
-      if (!r.ok) throw new Error('key_http_' + r.status);
-      return r.json();
-    }).then(function (j) {
-      if (!j || !j.api_key) throw new Error('key_unavailable');
-      return j.api_key;
-    });
-    return keyPromise;
-  }
-
   function checkout(btn) {
-    return getApiKey().then(function (key) {
+    /* A missing helper is a broken page, not a reason to reach for the key. The
+     * error travels the same route as a failed mint, so the buyer sees the same
+     * honest message instead of a silent no-op.
+     *
+     * withToken does the one retry on 401 with a freshly minted token: a tab
+     * left open past the fifteen minutes must not send the buyer to the login
+     * page for a session that is still perfectly valid. A second 401 is a real
+     * refusal and falls through to the sign-in branch below. */
+    if (!window.paAppToken) return Promise.reject(new Error('token_unavailable'));
+    return window.paAppToken.withToken(function (tok) {
       return fetch('/v2/billing/checkout', {
         method: 'POST',
-        headers: { 'X-Api-Key': key, 'Content-Type': 'application/json', Accept: 'application/json' },
+        headers: {
+          Authorization: 'Bearer ' + tok,
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
         body: JSON.stringify({
           product: btn.getAttribute('data-billing-product'),
           plan: btn.getAttribute('data-billing-plan'),
@@ -147,8 +157,8 @@
          * every signed-out visitor who clicked a price button landed on the
          * error page. The rest of the site already linked /auth/login; this
          * one line was the odd one out. */
-        if (msg.indexOf('key_http_401') === 0 || msg.indexOf('key_http_403') === 0 ||
-            msg === 'key_unavailable' || msg.indexOf('checkout_http_401') === 0 ||
+        if (msg.indexOf('token_http_401') === 0 || msg.indexOf('token_http_403') === 0 ||
+            msg === 'token_unavailable' || msg.indexOf('checkout_http_401') === 0 ||
             msg.indexOf('checkout_http_403') === 0) {
           rememberIntent(btn);
           window.location.href = '/auth/login?next=' + encodeURIComponent(location.pathname + location.search);
