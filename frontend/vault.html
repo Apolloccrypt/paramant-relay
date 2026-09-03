@@ -50,6 +50,7 @@
 .vt-status.ok{border-color:var(--lime);background:rgba(178,255,63,.14);color:var(--navy)}
 .vt-status.err{border-color:rgba(200,30,30,.5);background:rgba(255,80,80,.06);color:rgba(170,20,20,1)}
 .vt-note{margin-top:22px;font-size:12px;color:var(--ink-dim);line-height:1.6;text-align:center}
+.vt-tech{margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--ink-dim);line-height:1.6;text-align:center}
 .vt-warn{margin:20px 0;padding:14px 16px;border:1px solid #d4a017;background:#fff4d6;border-radius:10px;color:#5a3f00;font-size:13px}
 </style>
 <script type="application/ld+json" data-paramant-seo="1">
@@ -123,7 +124,7 @@
 <main class="vt-wrap">
   <div class="vt-kicker">Paramant Vault</div>
   <h1 class="vt-title">Lock a file</h1>
-  <p class="vt-lede">Pick a file and a passphrase. Paramant turns it into a locked <code>.prmnt</code> file that only your passphrase can open. Everything happens on this device — the file and the passphrase never leave your browser.</p>
+  <p class="vt-lede">Pick a file and a passphrase. Paramant turns it into a locked <code>.prmnt</code> file that only your passphrase can open. Everything happens on this device; the file and the passphrase never leave your browser.</p>
 
   <div id="vt-unsupported" class="vt-warn" hidden>Your browser does not support the encryption this page needs. Try a recent Chrome, Edge, Safari or Firefox.</div>
 
@@ -168,9 +169,10 @@
     <div id="open-status" class="vt-status" hidden></div>
   </section>
 
-  <p class="vt-note">Locked with AES-256-GCM (quantum-resistant), key from your passphrase via PBKDF2. Lose the passphrase and the file cannot be recovered — that is the point.</p>
+  <p class="vt-note">Your file is encrypted here, in this browser, before anything is saved. Nothing leaves your browser, so we never receive your file or your passphrase and we cannot reset it for you. Lose the passphrase and the file is gone.</p>
+  <p class="vt-tech">AES-256-GCM, key from your passphrase with PBKDF2-SHA-256, 600,000 rounds, random 16-byte salt, random 12-byte nonce.</p>
 </main>
 
-<script src="/vault.js?v=1" defer></script>
+<script src="/vault.js?v=2" defer></script>
 </body>
 </html>
