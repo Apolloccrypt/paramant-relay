@@ -67,7 +67,23 @@ main{display:block;overflow:hidden}
    the footer stay; the footer is where the legal documents are. Signed out,
    nothing here applies and the page is exactly what it was. */
 html[data-session="in"] main > section:not(.home-hero){display:none}
-html[data-session="in"] .home-hero{padding-bottom:48px}
+/* The art goes with the pitch it illustrates. It is a document that gets
+   signed, sealed and then burns, on a 16-second loop, and it exists to explain
+   the product to someone who does not have it yet. It is also the reason the
+   hero cannot simply be made shorter: .hp-doc is absolutely positioned and
+   draws about 120px BELOW the 380px box .hp-art reserves for it, which is
+   invisible while the sales page continues underneath and becomes a document
+   cut in half the moment the hero is the last thing in <main> (main has
+   overflow:hidden). Measured at 1440 signed in: hero 472px, .hp-doc bottom 80px
+   past it, receipt and signature sliced through. A phone has hidden this art
+   since it shipped, for its own reason; signed in, every width does. */
+html[data-session="in"] .hp-art{display:none}
+/* With the art gone the second grid column is empty, so the hero is one column
+   at every width. The wrap keeps its own 1120px width, which is what lines the
+   hero up with the nav and the footer; the heading, the lede and the founder
+   line carry their own ch-based measures, so nothing stretches. */
+html[data-session="in"] .home-hero .hp-wrap{grid-template-columns:minmax(0,1fr)}
+html[data-session="in"] .home-hero{padding-bottom:56px}
 
 /* ---------- hero ---------- */
 .home-hero{position:relative;padding:28px 0 32px;background:linear-gradient(180deg,#F8FAFC 0,var(--hp-paper) 160px)}

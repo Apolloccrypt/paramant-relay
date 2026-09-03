@@ -274,6 +274,64 @@ const homeOutSections = await homeOutPage.evaluate(() => ({
 ok('the signed-out homepage still shows the whole pitch', homeOutSections.session === null && homeOutSections.visible === homeOutSections.total && homeOutSections.total > 1, JSON.stringify(homeOutSections));
 await homeOutPage.close();
 
+// The hero art, on a desktop, measured against the edge that actually cuts.
+//
+// index.html gives <main> overflow:hidden, and .hp-doc inside .hp-art is
+// absolutely positioned: it draws roughly 120px BELOW the 380px box .hp-art
+// reserves for it. Signed out that overhang lands on the section underneath and
+// nobody sees it. Signed in the hero is the last thing in <main>, so main's box
+// ends where the hero ends and the overhang is simply cut off: the first review
+// of this change measured a 472px hero at 1440 with the document, the receipt
+// and the signature sliced through. That is the whole reason the art is retired
+// signed in rather than the hero being trimmed to fit around it.
+//
+// So this measures every box the art actually draws against main's own
+// rectangle, which is the clip. One exclusion, by name and with a reason:
+// .hp-art-glow is a blurred radial gradient with inset:-40% -20%, so it is
+// BUILT to bleed past its own box and has no edge that can read as cut. It has
+// hung 13px over the top of main since the art shipped. Everything else in
+// there has an outline someone can see the knife go through.
+async function artInsideTheClip(authenticated) {
+  const page = await browser.newPage({ viewport:{ width:1440, height:900 } });
+  await page.route('**/api/user/session/verify', (route) => route.fulfill({
+    status: authenticated ? 200 : 401,
+    contentType: 'application/json',
+    body: authenticated ? '{"authenticated":true,"email":"demo@example.com"}' : '{"authenticated":false}',
+  }));
+  await page.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
+  await page.locator(authenticated ? '[data-home="in"]:not([hidden])' : '[data-home="out"]:not([hidden])').waitFor();
+  const measured = await page.evaluate(() => {
+    const main = document.querySelector('main').getBoundingClientRect();
+    const hero = document.querySelector('.home-hero').getBoundingClientRect();
+    const art = document.querySelector('.hp-art');
+    const nodes = art ? [art, ...art.querySelectorAll('*')] : [];
+    const drawn = nodes
+      .filter((node) => !node.classList || !node.classList.contains('hp-art-glow'))
+      .map((node) => {
+        const box = node.getBoundingClientRect();
+        const name = (typeof node.className === 'string' && node.className) || node.tagName.toLowerCase();
+        return { name, top:Math.round(box.top), bottom:Math.round(box.bottom), width:Math.round(box.width), height:Math.round(box.height) };
+      })
+      .filter((box) => box.width > 0 && box.height > 0);
+    return {
+      heroHeight: Math.round(hero.height),
+      mainTop: Math.round(main.top),
+      mainBottom: Math.round(main.bottom),
+      drawn: drawn.length,
+      cut: drawn.filter((box) => box.bottom > Math.round(main.bottom) || box.top < Math.round(main.top))
+        .map((box) => `${box.name} ${box.top}..${box.bottom} outside main ${Math.round(main.top)}..${Math.round(main.bottom)}`),
+    };
+  });
+  await page.close();
+  return measured;
+}
+const artIn = await artInsideTheClip(true);
+ok('signed in at 1440, no part of the hero art is cut off by the clip', artIn.cut.length === 0, JSON.stringify(artIn));
+// And the measurement above is capable of finding a box, which a vacuous pass
+// on an empty node list would not prove. Signed out the art is drawn, in full.
+const artOut = await artInsideTheClip(false);
+ok('signed out at 1440, the hero art is drawn and drawn whole', artOut.drawn > 0 && artOut.cut.length === 0, JSON.stringify(artOut));
+
 const appPage = await browser.newPage({ viewport:{ width:390, height:844 } });
 await appPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
 await appPage.route('**/api/user/me', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"email":"demo@example.com","label":"Demo","plan":"pro","created_at":"2026-06-01T10:00:00.000Z","backup_codes_remaining":8,"session_expires_at":"2026-07-21T16:00:00.000Z","usage_purpose":"organisation"}' }));
