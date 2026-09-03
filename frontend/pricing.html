@@ -432,6 +432,12 @@
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;max-width:760px;margin-top:var(--space-3)">
         Send a file over a link that expires and wipes the file after the last read it allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Pro, 25 on Business and 100 on Enterprise. Community covers 10 transfers a month at 5 MB per file, forever. Organisations that send every week pay for longer links, more reads through the API and more registered devices. More reads is not a weaker promise: it is one link a whole team can open, or a counterparty reopening it after a misclick, instead of you sending the file a second time.
       </p>
+      <!-- Which route a buyer actually has, before he picks a plan. The web app
+           is a live handshake, and until 3 September 2026 that stood only on
+           /parashare, step 1, which is after the money. -->
+      <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.7;max-width:760px;margin-top:var(--space-3)">
+        In the web app you and the receiver are both online and compare a short code, and the file is handed over live. Sending to someone who is not online right now needs the API or the SDK.
+      </p>
     </div>
     <div class="tier-grid">
 

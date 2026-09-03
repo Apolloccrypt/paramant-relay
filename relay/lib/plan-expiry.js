@@ -104,13 +104,19 @@ const FLOOR_NAME = 'Community';
 const MONTHS = Object.freeze(['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December']);
 
-// "3 October". UTC and hand-built rather than toLocaleDateString: the same
-// date has to read the same in a mail from any container, and Intl data is not
-// something a slim container image is guaranteed to carry.
+// "3 October 2026". UTC and hand-built rather than toLocaleDateString: the
+// same date has to read the same in a mail from any container, and Intl data is
+// not something a slim container image is guaranteed to carry.
+//
+// The year is part of it. It read "3 October" until 2026-09-03, which is
+// unambiguous only while the reader assumes the current year, and a term that
+// ended last December reads exactly like one that ends this December. The
+// browser side writes the same string from frontend/js/format-date.js, so the
+// date in this mail and the date on /account are one date.
 function formatDate(value) {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return null;
-  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
 function memberOf(accountId, product) {

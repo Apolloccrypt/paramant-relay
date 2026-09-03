@@ -40,6 +40,10 @@
 .ps-sub{font-size:var(--text-sm);color:var(--ink-dim);line-height:1.7;max-width:680px;margin-top:var(--space-4)}
 .ps-sub a{color:var(--cobalt)}
 .ps-who{font-size:var(--text-base);color:var(--navy);font-weight:700;line-height:1.7;max-width:680px;margin-top:var(--space-3)}
+/* The live-handshake sentence. Same weight as .ps-sub, not a warning box: it
+   is a fact about how the product works, and dressing it as an alert would make
+   the honest version look like a defect. */
+.ps-live{font-size:var(--text-sm);color:var(--ink-dim);line-height:1.7;max-width:680px;margin-top:var(--space-3)}
 .ps-note{font-size:var(--text-sm);color:var(--ink);line-height:1.7;max-width:680px;margin-top:var(--space-4);border-left:3px solid var(--lime);background:var(--bone);padding:var(--space-3) var(--space-4)}
 .ps-note a{color:var(--cobalt)}
 .split-label{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--navy);font-weight:700;margin-top:var(--space-6);display:block}
@@ -210,6 +214,13 @@
     </div>
     <p class="ps-lede">Your file is locked on your own device before it is sent, and our copy is wiped after its last read. Servers in Germany, under EU law.</p>
     <p class="ps-who">For offices that email client documents, contracts and personal data today, and would rather not leave them sitting in a mailbox.</p>
+    <!-- The one thing a buyer used to find out only on /parashare, step 1, after
+         he had already decided. A reviewer reading this page on 3 September 2026
+         called it the single reason he would not buy: an office sends a payslip
+         and gets on with its work, and a receiver who has to be sitting there at
+         the same moment is not a route that office can use. So it is said here,
+         above the button, in the words the reviewer would have wanted. -->
+    <p class="ps-live">In the web app you and the receiver are both online and compare a short code, and the file is handed over live. Sending to someone who is not online right now needs the API or the SDK.</p>
     <div class="ps-actions">
       <a href="/parashare" class="btn btn-primary">Send a file &rarr;</a>
       <a href="/pricing" class="btn btn-secondary">See pricing &rarr;</a>

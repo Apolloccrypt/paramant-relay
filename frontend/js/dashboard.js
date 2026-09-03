@@ -33,14 +33,11 @@
     });
   }
 
+  // "Created Aug 31, 2026" used to sit one card away from "Ends on
+  // 8 September". Two notations for the same kind of fact on the same screen,
+  // so both now come from /js/format-date.js.
   function fmtDate(iso) {
-    if (!iso) return '--';
-    var d = new Date(iso);
-    if (isNaN(d.getTime())) return String(iso).slice(0, 10);
-    var y = d.getUTCFullYear();
-    var m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()];
-    var day = d.getUTCDate();
-    return m + ' ' + day + ', ' + y;
+    return paramantDate.day(iso);
   }
 
   function fmtMinutesUntil(iso) {
@@ -127,8 +124,9 @@
     return { at: at, ended: at <= now, warn: days > 0 && days <= TERM_WARN_DAYS };
   }
 
-  // en-GB and not the visitor's locale: the site is in English and the same
-  // date has to read the same here, on /account and in the reminder mail.
+  // One notation, from /js/format-date.js, and not the visitor's locale: the
+  // site is in English and the same date has to read the same here, on /account
+  // and in the reminder mail.
   function renderTerm(root, data) {
     var line = root.querySelector('#dh-term-line');
     var warn = root.querySelector('#dh-term-warn');
@@ -136,7 +134,7 @@
     if (warn) warn.hidden = true;
     var term = termState(data);
     if (!term) return;
-    var when = new Date(term.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+    var when = paramantDate.day(term.at);
     if (line) {
       line.textContent = term.ended
         ? 'Ended on ' + when + ', now on Community.'

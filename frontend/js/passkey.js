@@ -287,7 +287,7 @@ function wireAccountPasskey() {
       if (emptyEl) emptyEl.hidden = true;
       if (listEl) listEl.innerHTML = pk.map((c) => {
         const lbl = c.label ? esc(c.label) : 'passkey';
-        const when = c.created_at ? esc(new Date(c.created_at).toLocaleString()) : '';
+        const when = c.created_at ? esc(paramantDate.moment(c.created_at, '')) : '';
         return '<li style="padding:8px 0;border-bottom:1px solid var(--ink-hair,#e5e7eb)">'
           + '<strong>' + lbl + '</strong> <span class="small" style="color:var(--ink-dim,#6b7280)">&middot; active'
           + (when ? ' &middot; added ' + when : '') + '</span></li>';
