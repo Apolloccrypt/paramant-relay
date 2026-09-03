@@ -503,14 +503,31 @@ test('the SLA figures are consistent across pages and the measurement described 
 test('the IP-logging row says what the deploy configuration does and promises no retention', () => {
   const conf = read('deploy/nginx-paramant-live.conf').replace(/#.*$/gm, '');
   assert.doesNotMatch(conf, /access_log\s+(?!off;)/, 'nginx-paramant-live.conf now writes an access log; rewrite the IP-logging row on /security');
-  // Every block that serves the docroot or proxies to a relay or the admin.
-  // (The last block only fronts the Outlook add-in via an external host.)
+  // Every block that serves the docroot or proxies to a relay or the admin,
+  // plus :8090.
+  //
+  // :8090 used to be excluded, with a comment saying it "only fronts the
+  // Outlook add-in via an external host". That was wrong twice over. Its
+  // /outlook/* aliases duplicate the :8081 block and are served for real from
+  // addin.paramant.app; what the block actually does is answer for
+  // "location /dicom/" in the public block, which reaches it over
+  // 127.0.0.1:8090. So it serves the site, and it belongs in this sweep.
+  // It matches neither half of the filter on its own (it uses alias, and its
+  // catch-all proxies to an external https upstream), hence the third arm.
+  //
+  // The doesNotMatch above does not cover this: it fires on an access_log
+  // pointed at a file, and DELETING the line leaves nothing to match. The
+  // sweep below is what makes a missing line fail.
   const blocks = conf.split(/^server \{/m).slice(1)
-    .filter((b) => /root \/home\/paramant|proxy_pass http:\/\/127\.0\.0\.1:/.test(b));
-  assert.ok(blocks.length >= 6, 'nginx-paramant-live.conf must carry the site and relay server blocks');
+    .filter((b) => /root \/home\/paramant|proxy_pass http:\/\/127\.0\.0\.1:|listen 127\.0\.0\.1:8090/.test(b));
+  assert.ok(blocks.length >= 7, 'nginx-paramant-live.conf must carry the site, relay and :8090 server blocks');
   for (const b of blocks) {
     assert.match(b, /^\s*access_log off;/m, `the server block on ${/listen\s+([^;]+)/.exec(b)?.[1]} logs requests; rewrite the IP-logging row on /security`);
   }
+  const dicomBlock = blocks.find((b) => /listen 127\.0\.0\.1:8090/.test(b));
+  assert.ok(dicomBlock, 'the :8090 block backs location /dicom/; if it was retired, retire the /dicom/ proxy with it');
+  assert.match(dicomBlock, /^\s*access_log off;/m,
+    'the :8090 block serves /dicom/ and must switch access logging off like every other block in this file');
   const rotation = fs.readdirSync(path.join(ROOT, 'deploy')).filter((f) => /logrotate/i.test(f));
   const sec = visible(page('security'));
   const row = /IP logging<\/td><td>(.*?)<\/td>/s.exec(page('security'))?.[1] || '';

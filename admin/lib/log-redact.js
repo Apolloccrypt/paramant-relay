@@ -23,10 +23,17 @@
 // is not an address at all, which is what makes "no full IP reaches the log"
 // something a regex can assert.
 
-// Finding an address inside a longer log line. Deliberately narrow: this runs
+// Finding an address inside a longer log line. Narrow on purpose: this runs
 // over ordinary log text, so a pattern that also eats a clock time or a C++
 // scope operator would corrupt lines it was meant to leave alone.
-const IPV4_RE = /(?<![0-9A-Za-z.:])\d{1,3}(?:\.\d{1,3}){3}(?![0-9A-Za-z.])/g;
+//
+// The lookbehind is [0-9A-Za-z.] and deliberately does NOT include ":". An
+// earlier version did, which is exactly the hole a reviewer walked through:
+// "ip:203.0.113.42" and "ipv6:2001:db8:85a3::1" are the ordinary shape of a
+// key/value log line, the character in front of the address is a colon, and
+// both went through untouched. A colon in front of an address is the common
+// case, not a reason to skip it.
+const IPV4_RE = /(?<![0-9A-Za-z.])\d{1,3}(?:\.\d{1,3}){3}(?![0-9A-Za-z.])/g;
 // Every valid IPv6 literal is either written out in full (exactly eight
 // hextets, seven colons) or carries a "::". A clock time is neither, which is
 // what keeps 12:34:56 out of this.
@@ -39,9 +46,10 @@ const IPV6_RE = new RegExp(
     '(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}',
     // compressed, with hextets before the "::"
     '(?:[0-9A-Fa-f]{1,4}:){1,7}:(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){0,6})?',
-    // compressed, with nothing before it (::1, ::)
-    '::(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){0,6})?',
-  ].map(alt => '(?<![0-9A-Za-z:.])' + alt).join('|'),
+    // compressed, with nothing before it (::1). At least one hextet has to
+    // follow, so a bare "::" in prose is not an address and is left alone.
+    '::(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){0,6})',
+  ].map(alt => '(?<![0-9A-Za-z.])' + alt).join('|'),
   'g'
 );
 // A plaintext address. maskEmailForLog leaves `a***@domain`, whose local part
@@ -106,16 +114,26 @@ function maskEmailForLog(e) {
   return s[0] + '***' + s.slice(at);
 }
 
-// Last line of defence. Runs over the finished log line and masks any full
-// address that a call site forgot to mask, so a new console.log on one of
-// these paths cannot reintroduce the bug by omission. Order matters: e-mails
-// first, because an address may carry a domain that looks like nothing else,
-// then IPv6 before IPv4 so ::ffff:203.0.113.42 is handled as one token.
+// Second pass over the finished log line, masking any full address a call site
+// forgot to mask. It is a backstop, not a guarantee, and the difference matters:
+// the masking that the claim rests on is at the three call sites, and the test
+// asserts it there. Order matters here: e-mails first, because an address may
+// carry a domain that looks like nothing else, then IPv6 before IPv4 so
+// ::ffff:203.0.113.42 is handled as one token.
+//
+// What it does not do, both known and accepted:
+//   - An address glued straight onto a word or a dot ("addr2001:db8::1") is
+//     skipped, because that lookbehind is the only thing keeping std::vector,
+//     ns::method and a bare "::" in prose intact. A log line writes an address
+//     after a space, an "=" or a ":", and all three of those are caught.
+//   - A four-part version number (1.2.3.4) is masked as if it were an address.
+//     Over-scrubbing costs a digit in a log line; under-scrubbing costs an IP,
+//     so this one is left as it is.
 function redact(value) {
   if (typeof value !== 'string') return value;
   return value
     .replace(EMAIL_RE, m => maskEmailForLog(m))
-    .replace(IPV6_RE, m => (m.includes(':') ? maskIpForLog(m) : m))
+    .replace(IPV6_RE, m => maskIpForLog(m))
     .replace(IPV4_RE, m => maskIpForLog(m));
 }
 

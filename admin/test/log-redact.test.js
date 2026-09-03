@@ -102,12 +102,33 @@ function testMaskEmail() {
 function testRedactScrubber() {
   const dirty = `[signup] ${SAMPLE_EMAIL} from ${SAMPLE_IPV4} and ${SAMPLE_IPV6} and ::ffff:203.0.113.9`;
   assertClean(redact(dirty), 'redact');
-  // And it leaves alone the things a log line legitimately carries.
+  // The separator in front of the address. An earlier lookbehind excluded ":",
+  // so every one of these key:value shapes went through the scrubber intact.
+  // They are the ordinary way a log line is written, so they are the cases the
+  // scrubber has to get right, not the exotic ones.
+  const separators = [
+    `ip:${SAMPLE_IPV4}`,
+    `ipv6:${SAMPLE_IPV6}`,
+    `ip=${SAMPLE_IPV4} ua=curl`,
+    `addr:2001:db8:85a3::8a2e:370:7334`,
+    `client:::ffff:203.0.113.42`,
+    `peer=::ffff:203.0.113.42`,
+    `[2001:db8::1]:443`,
+    `v6:::1`,
+    `x=fe80::1%eth0`,
+    `ip:${SAMPLE_EMAIL} from ${SAMPLE_IPV4}`,
+  ];
+  for (const line of separators) assertClean(redact(line), `redact after a separator: ${line}`);
+  // And it leaves alone the things a log line legitimately carries. The C++
+  // scope operator is the reason the lookbehind still blocks a word character:
+  // std::vector must survive, and an address is never written glued to a word.
   const untouched = [
     'timestamp 12:34:56 duration 1200ms',
+    'at 2026-09-03T01:02:03Z',
     'build 3.1.0 node v22.11.0',
     'emailHash=8f14e45fceea167a5a36dedd4bea2543',
-    'std::vector<int> and foo::bar',
+    'std::vector<int> and foo::bar and ns::method',
+    'key::value',
     'ip=unknown',
   ];
   for (const line of untouched) {
@@ -116,6 +137,10 @@ function testRedactScrubber() {
   // Non-strings pass through untouched so an object argument is not stringified.
   const obj = { ip: SAMPLE_IPV4 };
   assert.strictEqual(redact(obj), obj);
+  // Known and accepted: a four-part version number reads as an address and is
+  // masked. Over-scrubbing costs a digit in a log line, under-scrubbing costs
+  // an IP. Pinned so the trade-off is a decision and not a surprise.
+  assert.strictEqual(redact('schema 1.2.3.4'), 'schema 1.2.3.x', 'four-part versions are over-scrubbed on purpose');
   ok('redact scrubs addresses and leaves ordinary log text alone');
 }
 
@@ -155,7 +180,6 @@ function testCallSitesAreRedacted() {
     // The masking must be at the call site, not left to the scrubber alone.
     assert.ok(stmt.startsWith('logRedacted('), `"${tag}" must log through logRedacted, got: ${stmt}`);
     const lines = captureConsole(() => {
-      // eslint-disable-next-line no-new-func
       const run = new Function(
         'ip', 'norm', 'email', 'emailHash', 'logRedacted', 'maskIpForLog', 'maskEmail', 'console',
         stmt
