@@ -305,13 +305,22 @@ class EnvelopeStore {
   // can then still label an expired envelope instead of silently dropping it.
   _acctIndexKey(accountId) { return 'parasign:acct:' + accountId + ':envelopes'; }
 
-  async create({ creatorPkHash, creatorApiKeyHash, accountId, docHash, parties, originalFilename, expiresInDays, bindingMode, recipeVersion: recipeVersionArg }) {
+  async create({ creatorPkHash, creatorApiKeyHash, accountId, docHash, parties, originalFilename, expiresInDays, bindingMode, recipeVersion: recipeVersionArg, requestedAppearance }) {
     if (!this.available()) throw new Error('redis unavailable');
     if (!/^[0-9a-f]{64}$/.test(docHash)) throw new Error('doc_hash must be 64-char sha3-256 hex');
     if (!Array.isArray(parties) || parties.length === 0) throw new Error('parties required');
     if (parties.length > MAX_PARTIES) throw new Error('too many parties (max ' + MAX_PARTIES + ')');
     const ttlDays = Math.max(1, Math.min(MAX_TTL_DAYS,
       Number.isFinite(expiresInDays) ? expiresInDays : DEFAULT_TTL_DAYS));
+    // ONE requested signing position for the whole envelope, the same for every
+    // party: what the creator asked for. It is envelope data, never party data
+    // and never signed -- sign() hashes only the appearance the signer submits,
+    // so this field can change nothing about a signature's meaning. Validated
+    // here, before an id is allocated, so a bad manifest leaves no record.
+    let requestedJson = '';
+    if (requestedAppearance !== undefined && requestedAppearance !== null) {
+      requestedJson = canonicalAppearance(requestedAppearance);   // throws -> 400 at the route
+    }
     const now = new Date();
     const expires = new Date(now.getTime() + ttlDays * 86400_000);
 
@@ -354,6 +363,10 @@ class EnvelopeStore {
       created_at: now.toISOString(),
       expires_at: expires.toISOString(),
     };
+    if (requestedJson) {
+      hash.requested_appearance = requestedJson;
+      hash.requested_appearance_hash = crypto.createHash('sha3-256').update(requestedJson, 'utf8').digest('hex');
+    }
     // Per-party capability token: the secret embedded in the invite link.
     // Stored server-side, returned to the creator ONCE below so it can build
     // the invite emails, and NEVER exposed via getRedacted/getForParty output.
@@ -433,6 +446,11 @@ class EnvelopeStore {
       voided_at: h.voided_at || null,
       party_count: partyCount,
       signed_count: parseInt(h.signed_count, 10) || 0,
+      // The position the creator asked every party to sign at. Public on
+      // purpose: /co-sign seeds its placement editor from it. A party may move
+      // it, and their signature binds where they actually signed, not this.
+      requested_appearance: h.requested_appearance ? storedAppearance(h.requested_appearance) : null,
+      requested_appearance_hash: h.requested_appearance_hash || null,
       parties,
     };
   }
@@ -655,6 +673,9 @@ class EnvelopeStore {
       // When this email-bound invite stops being signable (created_at + 7d);
       // null for open envelopes. Lets the admin gate fail early before the PRF.
       sign_expires_at: mode === 'email' ? signInviteExpiresAt(h.created_at) : null,
+      // Same requested position as the public view: one box for every party.
+      requested_appearance: h.requested_appearance ? storedAppearance(h.requested_appearance) : null,
+      requested_appearance_hash: h.requested_appearance_hash || null,
       party: {
         index: pi,
         label: h['p' + pi + '_label'] || null,

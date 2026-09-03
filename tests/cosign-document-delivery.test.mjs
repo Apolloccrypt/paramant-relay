@@ -173,6 +173,59 @@ ok('sign-in return preserves the document-key fragment', decodeURIComponent(retu
 ok('ciphertext is not requested before recipient sign-in', anonymousDocumentReads === 0, anonymousDocumentReads);
 await anonPage.close();
 
+// ── the position the requester asked for ──────────────────────────────────────
+// /sign lets the requester point at one spot. That position rides on the
+// envelope, seeds this editor, and is never binding: the signer may move it,
+// and their signature commits to where they actually signed (the recipe-5
+// message, guarded by tests/cosign-appearance-contract.test.mjs).
+const requestedPosition = { version: 1, fields: [{ type: 'seal', page_index: 0, x: 0.42, y: 0.61, w: 0.36, h: 0.105 }] };
+const seedPage = await browser.newPage({ viewport: { width: 390, height: 844 } });   // its own context, so its own sessionStorage
+await seedPage.route(`**/api/user/envelopes/${ENV_ID}/document*`, (route) =>
+  route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.from(fixture.capsule) }));
+await seedPage.route('**/api/user/account', (route) => route.fulfill({
+  status: 200, contentType: 'application/json', headers: { 'Cache-Control': 'no-store' }, body: '{"email":"demo@example.com"}',
+}));
+await seedPage.route('https://health.paramant.app/v2/envelopes/**', (route) => {
+  const url = new URL(route.request().url());
+  if (url.pathname.endsWith('/view')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+  return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+    envelope: {
+      id: ENV_ID, doc_hash: fixture.docHash, original_filename: 'agreement-demo.pdf', recipe_version: 5,
+      created_at: '2026-07-21T12:00:00.000Z', expires_at: '2026-08-20T12:00:00.000Z',
+      status: 'sent', signed_count: 0, party_count: 1,
+      parties: [{ index: 0, label: 'Signer Demo', status: 'pending' }],
+      requested_appearance: requestedPosition,
+    },
+  }) });
+});
+
+await seedPage.goto(base + fixture.fragment, { waitUntil: 'domcontentloaded' });
+await waitForDeliveryResult(seedPage);
+await seedPage.waitForFunction(() => document.querySelectorAll('.appearance-field:not(.prior)').length === 1);
+const seeded = await seedPage.evaluate(() => ({
+  fields: Array.from(document.querySelectorAll('.appearance-field:not(.prior)')).map((n) => ({ left: n.style.left, top: n.style.top, width: n.style.width })),
+  help: document.querySelector('#appearance-help')?.textContent || '',
+  draft: Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.getItem(sessionStorage.key(i))).find((v) => v && v.includes('"fields"')) || '',
+}));
+ok('the requested position seeds the recipient editor', seeded.fields.length === 1 && seeded.fields[0].left === '42%' && seeded.fields[0].top === '61%' && seeded.fields[0].width === '36%', JSON.stringify(seeded.fields));
+ok('the recipient is told it is a request they may move', /sender asked/i.test(seeded.help) && /move it/i.test(seeded.help) && /where you actually sign/i.test(seeded.help), seeded.help);
+ok('a requested position is not silently adopted as the signer draft', seeded.draft === '', seeded.draft);
+
+await seedPage.locator('#appearance-seal').click();
+await seedPage.locator('.doc-page[data-page-index="0"] .appearance-layer').click({ position: { x: 120, y: 60 } });
+const moved = await seedPage.evaluate(() => ({
+  fields: Array.from(document.querySelectorAll('.appearance-field:not(.prior)')).map((n) => ({ left: n.style.left, top: n.style.top })),
+  draft: Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.getItem(sessionStorage.key(i))).find((v) => v && v.includes('"fields"')) || '',
+}));
+ok('the recipient can move the requested box', moved.fields.length === 1 && moved.fields[0].top !== '61%' && /"type":"seal"/.test(moved.draft), JSON.stringify(moved));
+
+await seedPage.reload({ waitUntil: 'domcontentloaded' });
+await waitForDeliveryResult(seedPage);
+await seedPage.waitForFunction(() => document.querySelectorAll('.appearance-field:not(.prior)').length === 1);
+const afterReload = await seedPage.evaluate(() => Array.from(document.querySelectorAll('.appearance-field:not(.prior)')).map((n) => ({ left: n.style.left, top: n.style.top })));
+ok('the signer own draft wins over the requested position on reload', afterReload.length === 1 && afterReload[0].top === moved.fields[0].top && afterReload[0].top !== '61%', JSON.stringify({ afterReload, moved: moved.fields }));
+await seedPage.close();
+
 for (const c of checks) console.log(`${c.pass ? 'PASS' : 'FAIL'} ${c.name}${c.detail ? ' :: ' + c.detail : ''}`);
 await browser.close();
 server.close();

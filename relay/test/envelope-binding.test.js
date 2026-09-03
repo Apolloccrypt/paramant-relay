@@ -360,6 +360,55 @@ async function main() {
     assert.deepStrictEqual(await store.listAccountEnvelopes('acct_other', {}), [], 'stored account mismatch rejected');
     ok('dashboard worklist is account-scoped and capability-free');
   }
+
+  // 13. The requested signing position: ONE box for the whole envelope, chosen
+  //     by the requester in the invite flow on /sign. It is a request and never
+  //     a commitment, so it must (a) read back identically for the public view
+  //     and for the invited party, (b) be normalized like any other manifest,
+  //     and (c) stay entirely out of the signing message, which is what lets a
+  //     signer move it and still produce a signature that verifies.
+  {
+    const requested = normaliseAppearance({ version: 1, fields: [
+      { type: 'seal', page_index: 1, x: .5, y: .62, w: .4, h: .12 },
+    ] });
+    const requestedJson = JSON.stringify(requested);
+    const hash = {
+      ...emailHashOf(EMAIL_HASH),
+      recipe_version: '5',
+      p0_invite_token: 'invite-token-13',
+      requested_appearance: requestedJson,
+      requested_appearance_hash: appearanceHash(requested),
+    };
+    const store = new EnvelopeStore(fakeRedis(hash), {
+      sigVerify: () => true,
+    });
+    const publicView = await store.getRedacted(ID);
+    assert.deepStrictEqual(publicView.requested_appearance, requested, 'public view carries the requested position');
+    assert.strictEqual(publicView.requested_appearance_hash, appearanceHash(requested));
+    const partyView = await store.getForParty(ID, 0, 'invite-token-13');
+    assert.deepStrictEqual(partyView.requested_appearance, requested, 'the invited party sees the same one position');
+    assert.strictEqual(partyView.party.appearance, null, 'requested is not the party appearance');
+
+    // The signer moves the box. The message the relay verifies is built from
+    // the appearance THEY submitted; the requested one appears nowhere in it.
+    const moved = normaliseAppearance({ version: 1, fields: [
+      { type: 'seal', page_index: 0, x: .1, y: .1, w: .3, h: .09 },
+    ] });
+    let seenMsg = null;
+    const signing = new EnvelopeStore(fakeRedis({ ...hash }), {
+      sigVerify: (_sig, msg) => { seenMsg = msg; return true; },
+    });
+    const signed = await signing.sign(ID, 0, PUB_A, 'c2ln', {
+      internalTrusted: true, verifiedEmailHash: EMAIL_HASH, appearance: moved,
+    });
+    assert.strictEqual(signed.ok, true);
+    assert.deepStrictEqual(signed.appearance, moved, 'the signature records where the signer actually signed');
+    assert.ok(seenMsg.equals(signMessageBytes(ID, DOC, 0, EMAIL_HASH, 5, PUB_A, appearanceHash(moved))),
+      'signing message binds the used position, not the requested one');
+    assert.ok(!seenMsg.equals(signMessageBytes(ID, DOC, 0, EMAIL_HASH, 5, PUB_A, appearanceHash(requested))),
+      'the requested position is not the thing that was signed');
+    ok('requested position reads back for both views and is never signed');
+  }
 }
 
 main()

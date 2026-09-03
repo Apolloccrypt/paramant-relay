@@ -37,7 +37,7 @@ const browser = await chromium.launch({ headless: true, ...(EXE ? { executablePa
 const page = await browser.newPage();
 await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil:'domcontentloaded' });
 const actual = await page.evaluate(async (input) => {
-  const signer = await import('/js/parasign-signer.js?v=14');
+  const signer = await import('/js/parasign-signer.js?v=15');
   const normalized = signer.normaliseSigningAppearance(input.appearance);
   const message = signer.buildDocSignMessage({
     envelopeId: input.envelopeId,

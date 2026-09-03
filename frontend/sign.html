@@ -131,6 +131,10 @@ body[data-ds-step="step-done"] #ds-doc-meta{display:none}
 .ds-place-actions>*{pointer-events:auto}
 /* Edit toolbar + free text/date annotations (additive layer, baked as PDF vector text) */
 .ds-edit-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+/* Invite mode: the requester places one box and nothing else, so the Place step
+   gets a single-row toolbar instead of the 160px editor and the 247px seal
+   panel. That is what keeps the PDF above the fold on a 390px phone. */
+.ds-invite-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .ds-edit-label{font-size:12px;color:var(--ink-dim);font-weight:600}
 .ds-edit-btn{font:inherit;font-size:12.5px;min-height:34px;padding:6px 13px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-1);border-radius:var(--r-1);cursor:pointer;line-height:1.4;font-weight:500}
 .ds-edit-btn:hover{border-color:var(--ink-3);background:var(--line-ghost)}
@@ -582,6 +586,9 @@ body[data-ds-step="step-done"] #ds-doc-meta{display:none}
       <button id="ds-zoom-in" type="button" aria-label="Zoom in">+</button>
       <button id="ds-zoom-fit" type="button">Fit</button>
     </div>
+    <div class="ds-invite-tools" id="ds-invite-tools" hidden>
+      <button class="ds-edit-btn" id="ds-invite-place" type="button">Place the signature box</button>
+    </div>
     <p class="ds-edit-hint" id="ds-edit-tools-hint" hidden>This file is an image, so you can place your signature stamp only. The full editor (+ Text, + Date, highlights, notes and page management) works on PDF files: pick a PDF to use it.</p>
     <div class="ds-edit-tools" id="ds-edit-tools" hidden>
       <span class="ds-edit-label">Add to the document:</span>
@@ -896,6 +903,6 @@ body[data-ds-step="step-done"] #ds-doc-meta{display:none}
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=4" defer></script>
-<script type="module" src="/sign-flow.js?v=50"></script>
+<script type="module" src="/sign-flow.js?v=51"></script>
 </body>
 </html>

@@ -2,6 +2,8 @@
 // ParaSign per-account envelope index + full per-envelope .psign audit-export.
 // Exercises against a REAL EnvelopeStore + REAL redis + REAL ML-DSA-65 engine:
 //   1. create() adds the envelope id to the account index (listAccountEnvelopeIds)
+//   1b. create() stores the requester's ONE requested signing position and hands
+//      it back on the public view, and refuses a manifest that is out of bounds
 //   2. the Business+ audit-export returns the completed envelope's full .psign,
 //      and a Pro key is still refused 403 even with the envelope deps present
 //   3. backfillAccountIndex() rebuilds the index from an un-indexed env:* key
@@ -54,6 +56,7 @@ async function main() {
   const rnd = crypto.randomBytes(6).toString('hex');
   const ACCT = 'acct_test_' + rnd;
   const ACCT2 = 'acct_legacy_' + rnd;
+  const ACCT_REQ = 'acct_requested_' + rnd;   // its own account, so the export below still sees exactly one
   const docHash = crypto.createHash('sha3-256').update(Buffer.from('doc-' + rnd)).digest('hex');
 
   try {
@@ -79,6 +82,34 @@ async function main() {
     await rc.zAdd(store._acctIndexKey(OTHER), { score: Date.now(), value: out.id });
     assert.deepStrictEqual(await store.listAccountEnvelopes(OTHER, {}), [], 'stored account mismatch is rejected');
     ok('dashboard summary rejects a cross-account index entry');
+
+    // 1b) the requested signing position ---------------------------------------
+    // What the invite flow on /sign sends: one seal box, the same for every
+    // party, normalized on the way in and durable across a read.
+    const requestedEnv = await store.create({
+      creatorApiKeyHash: crypto.createHash('sha3-256').update('psk_req_' + rnd).digest('hex'),
+      accountId: ACCT_REQ, docHash, parties: [{ label: 'R', email: 'r@example.com' }],
+      bindingMode: 'email', recipeVersion: 5,
+      requestedAppearance: { version: 1, fields: [{ type: 'seal', page_index: 2, x: 0.4200004, y: 0.61, w: 0.4, h: 0.12 }] },
+    });
+    const requestedView = await store.getRedacted(requestedEnv.id);
+    assert.deepStrictEqual(requestedView.requested_appearance, { version: 1, fields: [
+      { type: 'seal', page_index: 2, x: 0.42, y: 0.61, w: 0.4, h: 0.12 },
+    ] }, 'stored position is the normalized manifest');
+    assert.match(requestedView.requested_appearance_hash, /^[0-9a-f]{64}$/, 'stored position carries its hash');
+    const partyOfRequested = await store.getForParty(requestedEnv.id, 0, requestedEnv.party_links[0].invite_token);
+    assert.deepStrictEqual(partyOfRequested.requested_appearance, requestedView.requested_appearance, 'the invited party sees the same position');
+    assert.strictEqual(requestedView.parties[0].appearance, null, 'nobody has signed, so no party appearance exists');
+
+    // Out of bounds is refused BEFORE an id is allocated: no half-made envelope.
+    const envKeysBefore = (await rc.keys('env:*')).length;
+    await assert.rejects(() => store.create({
+      creatorApiKeyHash: 'x'.repeat(64), accountId: ACCT_REQ, docHash,
+      parties: [{ label: 'R', email: 'r@example.com' }], bindingMode: 'email', recipeVersion: 5,
+      requestedAppearance: { version: 1, fields: [{ type: 'seal', page_index: 0, x: 0.9, y: 0.5, w: 0.4, h: 0.12 }] },
+    }), /outside page/, 'a box that runs off the page is refused');
+    assert.strictEqual((await rc.keys('env:*')).length, envKeysBefore, 'the refused create left no envelope behind');
+    ok('create() stores one normalized requested position and refuses a bad one');
 
     // 2) complete it, then the Business+ export returns its full .psign ---------
     const r = await completeOpenEnvelope(store, eng, out, docHash);
@@ -148,9 +179,11 @@ async function main() {
     // cleanup our test keys (leave other tests' keys untouched)
     try {
       await rc.del('env:' + out.id);
+      await rc.del('env:' + requestedEnv.id);
       await rc.del('env:' + legacy.id);
       await rc.del(store._acctIndexKey(ACCT));
       await rc.del(store._acctIndexKey(ACCT2));
+      await rc.del(store._acctIndexKey(ACCT_REQ));
       await rc.del(store._acctIndexKey('acct_other_' + rnd));
     } catch { /* best effort */ }
   } finally {
@@ -158,7 +191,7 @@ async function main() {
   }
 
   summary('parasign-envelope-index', passed);
-  if (passed < 7) process.exit(1);
+  if (passed < 8) process.exit(1);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

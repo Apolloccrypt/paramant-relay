@@ -73,7 +73,7 @@ CRED_ID = await page.evaluate(async () => {
 });
 
 const phase1 = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=14');
+  const m = await import('/js/parasign-signer.js?v=15');
   const pqc = await import('/vendor/paramant-pqc.js');
   const vault = await import('/vendor/vault.js?v=5');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
@@ -120,7 +120,7 @@ const phase1 = await page.evaluate(async () => {
 
 // Phase 2a: ensureSigningKey branching + ephemeral TOTP enrol (admin stubbed ok).
 const phase2a = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=14');
+  const m = await import('/js/parasign-signer.js?v=15');
   const pqc = await import('/vendor/paramant-pqc.js');
   const vault = await import('/vendor/vault.js?v=5');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
@@ -146,14 +146,14 @@ const phase2a = await page.evaluate(async () => {
 // Phase 2b: TOTP enrol error mapping (admin stub returns relay 403s).
 totpResp = { status: 403, body: { error: 'invalid_totp' } };
 const phase2b1 = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=14');
+  const m = await import('/js/parasign-signer.js?v=15');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   let c=''; try { await m.enrolEphemeralSigningKeyWithTotp({ totp:'654321' }); } catch(e){ c=e.code; } ok('J1 relay 403 invalid_totp -> totp_invalid', c==='totp_invalid', c);
   return T;
 });
 totpResp = { status: 403, body: { error: 'no_totp_setup' } };
 const phase2b2 = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=14');
+  const m = await import('/js/parasign-signer.js?v=15');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   let c=''; try { await m.enrolEphemeralSigningKeyWithTotp({ totp:'654321' }); } catch(e){ c=e.code; } ok('J2 relay 403 no_totp_setup -> totp_unavailable', c==='totp_unavailable', c);
   return T;
@@ -163,7 +163,7 @@ totpResp = { status: 200, body: { ok: true } };
 // Phase 2c: server 409 no_passkey path.
 noPasskeyMode = true;
 const phase2c = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=14');
+  const m = await import('/js/parasign-signer.js?v=15');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   const delDB = () => new Promise(r => { const q = indexedDB.deleteDatabase('paramant'); q.onsuccess=q.onerror=q.onblocked=()=>r(); });
   await delDB();

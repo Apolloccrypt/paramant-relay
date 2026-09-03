@@ -18,7 +18,7 @@
 // the view receipt. The signing path itself is same-origin via the admin
 // (/api/user/sign/*), bound to the logged-in invitee session.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=14';
+import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=15';
 import { promptTotp } from '/js/totp-prompt.js?v=1';
 import { decryptDocumentCapsule, parseDocumentKeyFragment } from '/js/parasign-document-capsule.js?v=1';
 
@@ -75,11 +75,26 @@ function appearanceDraftKey() {
   return __envelope ? 'paramant.cosign.appearance.v1:' + __envelope.id + ':' + __partyIndex : '';
 }
 
+// null means "this signer has no draft of their own", which is what lets the
+// requested position seed the editor without ever overwriting a real draft.
 function loadAppearanceDraft() {
   try {
     const raw = sessionStorage.getItem(appearanceDraftKey());
-    return raw ? normaliseSigningAppearance(JSON.parse(raw)) : { version: 1, fields: [] };
-  } catch { return { version: 1, fields: [] }; }
+    if (!raw) return null;
+    return normaliseSigningAppearance(JSON.parse(raw));
+  } catch { return null; }
+}
+
+// The position the requester asked for, carried on the envelope. Untrusted
+// relay data, so it goes through the same normaliser as anything the signer
+// places themselves; anything malformed is simply not offered.
+function requestedAppearanceSeed() {
+  const requested = __envelope && __envelope.requested_appearance;
+  if (!requested) return null;
+  try {
+    const normalized = normaliseSigningAppearance(requested);
+    return normalized.fields.length ? normalized : null;
+  } catch { return null; }
 }
 
 function saveAppearanceDraft() {
@@ -332,7 +347,9 @@ async function verifyAndRenderDocument(buf, source) {
   __hashMatches = (h === __envelope.doc_hash);
   __blindAck = false;   // an opened file supersedes any earlier blind-sign override
   __documentBytes = __hashMatches ? new Uint8Array(buf) : null;
-  __appearance = __hashMatches ? loadAppearanceDraft() : { version: 1, fields: [] };
+  const draft = __hashMatches ? loadAppearanceDraft() : null;
+  const seed = (__hashMatches && !draft) ? requestedAppearanceSeed() : null;
+  __appearance = draft || seed || { version: 1, fields: [] };
   __appearanceTool = '';
   const b = $('verify-result');
   b.hidden = false;
@@ -347,7 +364,13 @@ async function verifyAndRenderDocument(buf, source) {
   }
   await renderDocPreview(buf);
   const editor = $('appearance-editor');
-  if (editor) editor.hidden = !(__hashMatches && isPdfBytes(buf) && Number(__envelope.recipe_version) >= 5);
+  const editorOn = __hashMatches && isPdfBytes(buf) && Number(__envelope.recipe_version) >= 5;
+  if (editor) editor.hidden = !editorOn;
+  // Say out loud whose box this is. The requested spot is a suggestion: what a
+  // signature binds is the position the signer actually used.
+  if (seed && editorOn) {
+    setAppearanceHelp('The sender asked for your signature in the marked spot. Choose Place my signature to move it: your signature binds where you actually sign, not where it was requested.', false);
+  }
   refreshSignGate();
 }
 
