@@ -268,9 +268,16 @@ footer a{color:var(--ink);text-decoration:none}
 <li><strong>Passkey / WebAuthn credentials</strong>: your passkey&rsquo;s private key is created and held by your device or password manager. PARAMANT only ever stores its <em>public</em> key, server-side; the private key never leaves your device.</li>
 <li><strong>ParaSign signing vault</strong> (IndexedDB): if you sign documents, your post-quantum signing key (ML-DSA-65) is generated and kept in your browser&rsquo;s IndexedDB, encrypted either with your passkey (WebAuthn-PRF &rarr; HKDF &rarr; AES-256-GCM) or, if your passkey provider cannot do that, with a passphrase (PBKDF2 &rarr; AES-256-GCM). The private key never leaves your device; only its public half is registered to your account.</li>
 </ul>
-<p><strong>Your account key is not on that list, and it is not in your browser at all.</strong> Sending a file needs a credential, and the page is never given the API key that would be one. It asks our server for a <em>session token</em> instead. That token lives fifteen minutes, the relay accepts it on the five requests a transfer makes and refuses it on everything else, and it is held in the page&rsquo;s memory only: it is not written to local storage, so closing the tab ends it and there is nothing left for a later visit to find. Revoking your API key revokes every token minted from it. On a self-hosted relay without our admin panel you can still type a key by hand, and then it is in that browser for as long as the tab is open, which is why the page says so where it offers that.</p>
-
 <p>You can delete all local data at any time: browser settings &rarr; paramant.app &rarr; Clear site data.</p>
+
+<h2>Your API key, and which pages hold it</h2>
+<p>Your account has an API key. It is stored on our servers; nothing in the list above keeps it in your browser, and no page writes it to local storage. Some pages do load it into memory for as long as their tab is open, and we would rather name them than leave you to guess.</p>
+<ul>
+<li><strong>Sending a file (<code>/parashare</code>) does not.</strong> It asks our server for a <em>session token</em> instead. That token lives fifteen minutes, the relay accepts it on the five requests a transfer makes and refuses it on everything else, and it is held in the page&rsquo;s memory only, so closing the tab ends it. Revoking your API key revokes every token minted from it. On a self-hosted relay without our admin panel you can still type a key by hand on that page, and then it is in that browser for as long as the tab is open, which is why the page says so where it offers it.</li>
+<li><strong>Your account page (<code>/account</code>) does</strong>, on purpose: showing you your key is what the page is for.</li>
+<li><strong>The pricing and dashboard pages (<code>/pricing</code>, <code>/dashboard</code>) do</strong>, because they still authenticate to the relay with the key itself to start a checkout and to read your usage. We are moving them to the same kind of scoped token; until we have, a tab on either of those pages holds the key in memory.</li>
+</ul>
+<p>Nothing on this list survives the tab. Closing the page ends it, and a later visit starts again from the server.</p>
 
 <h2>Servers &amp; jurisdiction</h2>
 <p>All relay servers run on <strong>Hetzner</strong> infrastructure in <strong>Nuremberg, Germany (EU/DE)</strong>. There is no infrastructure in the United States or outside the EU. No CLOUD Act exposure. All data is subject to EU/GDPR jurisdiction only.</p>

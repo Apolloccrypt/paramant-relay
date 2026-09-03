@@ -181,14 +181,28 @@ running in the first place; this only bounds what one gets if it does.
 
 #### What is still open
 
-The `GET /api/user/account/key` reveal route still exists. It is not what
-`/parashare` uses, and the page's "Use a key by hand" way out is meant for a
-self-hosted deployment with no admin panel, but the route is reachable from any
-signed-in browser and answers with the raw key. A script with fifteen minutes
-and a session cookie can call it. Closing that means deciding what the account
-page and the self-host flow do instead, which is a separate change; until then,
-the ceiling above is the ceiling for a user who has visited a page that can
-reveal, not for ParaSend alone.
+The `GET /api/user/account/key` reveal route still exists, and ParaSend was not
+its only caller. Three pages still fetch the raw key into the browser and use it
+as a relay credential:
+
+| Page | File | What it does with the key |
+|------|------|---------------------------|
+| `/account` | `frontend/js/account.inline1.js` | reveals it on the screen, deliberately |
+| `/pricing` | `frontend/js/pricing-billing.js` | `X-Api-Key` on `POST /v2/billing/checkout` |
+| `/dashboard` | `frontend/js/dashboard-history.js` | `X-Api-Key` on the usage and history reads |
+
+So the honest statement of the ceiling is this: on `/parashare` the key is gone,
+and on a browser that has loaded any of those three pages it is not. The route
+is reachable from any signed-in browser and answers with the raw key, so a
+script with a session cookie can also simply ask for it.
+
+Closing that is the next change, and it is not one line: `/pricing` and
+`/dashboard` need scoped credentials of their own (or server-side proxies, which
+is what `/api/user/documents` already does), and `/account` has to keep a way to
+show a key that a self-hoster genuinely needs. Recorded here rather than fixed,
+because a partial fix that removed the route would break three pages, and one
+that left it while claiming the key is out of the browser would be the same kind
+of untruth this section exists to correct.
 
 ---
 

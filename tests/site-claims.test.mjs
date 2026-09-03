@@ -2232,20 +2232,23 @@ test('every page that promises burn-on-read says which client and which plan it 
   }
 });
 
-// 36 ── The account key and the browser. /privacy now states, in the storage
-// section, that the key is not in the browser at all and that a fifteen-minute
-// session token stands in for it. Three of the four things that sentence claims
-// are facts about code in this repository, so they are checked against it:
-// where the page gets its credential, what the relay honours, and how long.
-// The fourth, that the token is not persisted, is row 28 above.
+// 36 ── The account key and the browser. /privacy now has a section that names
+// which pages hold the API key in memory and which do not, and the list is a
+// claim about code: /parashare runs on a fifteen-minute session token, /account
+// reveals on purpose, /pricing and /dashboard still authenticate with the key
+// itself. Every one of those is checked against the file that does it.
 //
 // This row exists because the previous version of that paragraph was untrue for
 // months: it said paramant_api_key was "removed when you sign out" and nothing
-// removed it. A privacy page that describes a credential has to be pinned to
-// the credential.
-// Verified by sabotage: move TTL_S off 900, point the page back at
-// /api/user/account/key, or add a sixth route to the relay allowlist, and this
-// fails by name.
+// removed it. The first draft of THIS paragraph was untrue too, in the other
+// direction: it said the key was "not in your browser at all", which was true of
+// /parashare and false of three other pages. A privacy page that describes a
+// credential has to be pinned to the credential, in both directions, or it goes
+// stale the first time a page changes.
+// Verified by sabotage: move TTL_S off 900, add a sixth route to the relay
+// allowlist, point /parashare back at /api/user/account/key, or take the key
+// fetch out of pricing-billing.js without rewriting the page, and this fails by
+// name.
 test('the ParaSend credential /privacy describes is the credential the code implements', () => {
   const priv = visible(page('privacy'));
 
@@ -2266,20 +2269,47 @@ test('the ParaSend credential /privacy describes is the credential the code impl
   assert.ok(priv.includes('the relay accepts it on the five requests a transfer makes and refuses it on everything else'),
     'privacy: the storage section must state what the token can and cannot do');
 
-  // 3. The page really asks for a token, and really does not ask for the key.
+  // 3. /parashare really asks for a token, and really does not ask for the key.
   const ps = read('frontend/js/parashare.page.js');
   assert.ok(ps.includes('/api/user/parasend/token'),
-    'parashare.page.js must fetch a session token; /privacy says the browser is never given the key');
+    'parashare.page.js must fetch a session token; /privacy says the send page is never given the key');
   assert.ok(!ps.includes('/api/user/account/key'),
-    'parashare.page.js fetches the account key again, and /privacy says the page is never given it');
-  assert.ok(priv.includes('it is not in your browser at all'),
+    'parashare.page.js fetches the account key again, and /privacy says the send page is not given it');
+  assert.ok(priv.includes('Sending a file (<code>/parashare</code>) does not.'),
     'privacy: the claim itself must be on the page');
 
-  // 4. The manual self-host escape is named rather than hidden. It is the one
-  // case where a key IS in the browser, and a privacy page that described only
-  // the happy path would be the same half-truth as the last one.
-  assert.ok(priv.includes('On a self-hosted relay without our admin panel you can still type a key by hand'),
-    'privacy: the self-host exception must be stated, because on that path a key really is in the browser');
+  // 4. THE OTHER DIRECTION, and the half a privacy page usually gets wrong. The
+  // pages /privacy admits still hold the key must be exactly the pages that do.
+  // A page that stops fetching it and is still listed is a page telling you it
+  // holds something it does not; one that starts and is not listed is worse.
+  const HOLDERS = {
+    '/account': 'frontend/js/account.inline1.js',
+    '/pricing': 'frontend/js/pricing-billing.js',
+    '/dashboard': 'frontend/js/dashboard-history.js',
+  };
+  for (const [where, file] of Object.entries(HOLDERS)) {
+    assert.ok(read(file).includes('/api/user/account/key'),
+      `${file} no longer fetches the account key, and /privacy still says ${where} holds it. Rewrite the page with the code.`);
+    assert.ok(priv.includes(`<code>${where}</code>`),
+      `privacy: ${where} fetches the account key and the page must name it`);
+  }
+  // And nothing else in the frontend may fetch it without being named. This is
+  // what catches a fourth page joining the list quietly.
+  const fetchers = [];
+  (function walk(dir, prefix) {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) { if (!['node_modules', 'vendor', 'pkg'].includes(e.name)) walk(path.join(dir, e.name), `${prefix}${e.name}/`); continue; }
+      if (!/\.(js|mjs|html)$/.test(e.name)) continue;
+      const rel = `${prefix}${e.name}`;
+      if (/fetch\(\s*['"`]\/api\/user\/account\/key/.test(stripJsComments(read(`frontend/${rel}`)))) fetchers.push(`frontend/${rel}`);
+    }
+  })(path.join(ROOT, 'frontend'), '');
+  assert.deepEqual(fetchers.sort(), Object.values(HOLDERS).sort(),
+    'a frontend file fetches the account key and /privacy does not name the page it is on');
+
+  // 5. The manual self-host escape on /parashare is named rather than hidden.
+  assert.ok(priv.includes('you can still type a key by hand on that page'),
+    'privacy: the self-host exception must be stated, because on that path a key really is typed into the browser');
   assert.match(page('parashare'), /data-click="expandApiKeyCard">Use a key by hand/,
     'and /parashare must still offer it, or /privacy describes a door that is not there');
 });
