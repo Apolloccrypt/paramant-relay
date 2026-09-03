@@ -1,6 +1,19 @@
 'use strict';
 
-const RELAY = 'https://health.paramant.app';
+// Which relay sector holds the blob. An account is valid on exactly one sector,
+// and the sender's page knows which one, so the link carries it in `&r=`. Before
+// that this file always asked health, which is right for most accounts and
+// silently wrong for the rest: a legal or finance sender's receiver got a 404
+// and the page called the file burned when it was sitting on another sector.
+// An unknown or missing `r` still falls back to health, so every link minted
+// before this change keeps working.
+const RELAY_SECTORS = {
+  health:  'https://health.paramant.app',
+  legal:   'https://legal.paramant.app',
+  finance: 'https://finance.paramant.app',
+  iot:     'https://iot.paramant.app',
+};
+const DEFAULT_RELAY = RELAY_SECTORS.health;
 
 function showStep(id) {
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
@@ -115,6 +128,7 @@ async function init() {
   const params = new URLSearchParams(location.search);
   const token = params.get('t');
   const fragment = location.hash.slice(1);
+  const RELAY = RELAY_SECTORS[params.get('r')] || DEFAULT_RELAY;
 
   if (!token && !fragment) {
     showStep('step-enter');

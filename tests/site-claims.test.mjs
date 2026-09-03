@@ -2442,8 +2442,24 @@ test('the two legal facts are stated with their limits, and never as a promise',
 // Verified by sabotage: take the WebSocket out of parashare.page.js, or take
 // the download-token mint out of relay.js, and the sentence stops being true in
 // one half or the other; this block names which.
+//
+// AMENDED once the web app grew the asynchronous stand. The tail used to read
+// "needs the API or the SDK", which was true when it was written and became a
+// false discouragement the moment /parashare shipped a "Send a link" mode: the
+// office that refused ParaSend for exactly this reason would have read a page
+// telling it to go and write code for something two clicks away. The tail now
+// names the third route, and a THIRD half is pinned below, because a sentence
+// that sends a buyer to a mode in the web app is only honest while that mode
+// exists and really is asynchronous:
+//
+//   the web app can send a link  -> parashare.html offers the stand, and
+//                                   parashare.page.js seals the file, uploads it
+//                                   to /v2/inbound and puts the key in the URL
+//                                   fragment, with no peer anywhere in the flow
+//   the receiver needs no account -> /get reads that fragment and spends the
+//                                   one-time download token
 test('the pages before the button say the ParaSend web app is a live handshake, and say what is not', () => {
-  const SENTENCE = 'In the web app you and the receiver are both online and compare a short code, and the file is handed over live. Sending to someone who is not online right now needs the API or the SDK.';
+  const SENTENCE = 'In the web app you and the receiver are both online and compare a short code, and the file is handed over live. Sending to someone who is not online right now needs the API, the SDK, or the Send a link mode in the web app.';
 
   // Half one. The web app really does need the other side present, and really
   // does compare a code before anything moves.
@@ -2475,6 +2491,29 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
     'the sentence sends a buyer to "the SDK"; the repository must still name one');
   assert.match(read('frontend/docs.html'), /\/v2\/inbound/,
     '/docs no longer documents the endpoint the sentence sends an asynchronous sender to');
+
+  // Half three. The web app really does have the asynchronous stand the tail now
+  // names, and it really is asynchronous: no socket, no code to compare, no
+  // second browser awake. Pinned against code rather than against the copy,
+  // because the copy is what this block exists to distrust.
+  assert.match(read('frontend/parashare.html'), /data-click="chooseModeLink"/,
+    '/parashare no longer offers the "Send a link" stand that the three pages send a buyer to');
+  assert.ok(visible(read('frontend/parashare.html')).includes('Send a link'),
+    '/parashare must name the stand in the same words the three pages use, or the buyer arrives and cannot find it');
+  assert.match(share, /function createLink\(/,
+    'the "Send a link" stand has no flow behind it; the tail of the sentence promises one');
+  assert.match(share, /\/v2\/inbound/,
+    'the "Send a link" stand no longer uploads to the relay, so there is nothing for a later receiver to fetch');
+  assert.match(share, /'\/get\?t='/,
+    'the link the stand hands out no longer points at /get; the receiving half of the sentence is unreachable');
+  assert.match(share, /'#' \+ row\.key/,
+    'the key no longer travels in the URL fragment; move it into the query and the relay would see it, and "we cannot open it" becomes false');
+  // And the page that opens that link needs no account and spends the token.
+  const getSrc = stripJsComments(read('frontend/js/get.page.js'));
+  assert.match(getSrc, /location\.hash/,
+    '/get no longer reads the key out of the fragment, so a link minted by the web app cannot be opened');
+  assert.match(getSrc, /'\/v2\/dl\/' \+ token \+ '\/get'/,
+    '/get no longer spends the one-time download token; nothing burns and "works once" has no mechanism behind it');
 
   // The three pages. Same sentence on all three: the site says this one way, as
   // it does with the read counts above.

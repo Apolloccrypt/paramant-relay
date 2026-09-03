@@ -61,6 +61,91 @@ Response:
 
 ---
 
+### The share link: `/v2/dl/<token>` end to end
+
+`POST /v2/inbound` hands back a `download_token`. That token is the whole of the
+asynchronous route: it lets somebody who was not present when you uploaded come
+and fetch the blob later, with no account, no API key and no second browser
+awake. This is what the "Send a link" stand on the ParaSend web app is built on,
+and what an integration builds on directly.
+
+**1. Upload the sealed bytes.** The file is encrypted on the sender's side. The
+relay is handed ciphertext and a SHA-256 of exactly those bytes, and it verifies
+the two match before it stores anything, so the hash written into the CT log
+leaf is a hash of bytes the relay really held.
+
+```bash
+curl -X POST https://relay.paramant.app/v2/inbound \
+  -H "X-Api-Key: pgp_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"hash":"sha256hex","payload":"base64_ciphertext","ttl_ms":3600000}'
+```
+
+**2. Take the token out of the response.**
+
+```json
+{ "ok": true, "hash": "a3f2…", "ttl_ms": 3600000, "download_token": "6b3c…" }
+```
+
+`download_token` is 24 random bytes as 48 hex characters. `ttl_ms` is the value
+the relay actually applied, which is **not** always the one you asked for: the
+upload clamps your request to the account's ParaSend tier ceiling (`view_ttl_ms`
+in `relay/lib/tiers.js`: 1 hour on Community, 24 hours on Pro, 7 days on
+Business and Enterprise, and the table under "ParaSend limits per tier" above is
+generated from the same rows). Compute the expiry the receiver is told from the
+`ttl_ms` that came back, never from the one you sent.
+
+**3. Build the link, and put the key after the `#`.** A URL fragment is never
+put on the wire by a browser, so a key that lives there is a key the relay
+cannot see even while it is holding the ciphertext. Everything before the `#`
+is fair game for the relay, a proxy, a mail server and a log; everything after
+it is not.
+
+```
+https://paramant.app/get?t=<download_token>&r=<sector>#<base64url(key||iv)>
+```
+
+| Part | What it is |
+|---|---|
+| `t` | the `download_token` from step 2 |
+| `r` | which relay sector holds the blob: `health`, `legal`, `finance` or `iot`. An account is valid on exactly one. Omitted, `/get` asks `health`. |
+| fragment | `base64url(key32 then iv12)`, unpadded: the AES-256-GCM key and nonce, 44 bytes before encoding |
+
+The plaintext `/get` expects inside the ciphertext is
+`[uint32-LE nameLen][name UTF-8][file bytes]`, so the file name travels sealed
+and the relay never learns it. The same wire is produced by the "Send a link"
+stand in the web app (`frontend/js/parashare.page.js`) and read by
+`frontend/js/get.page.js`.
+
+**4. The receiver opens it.** Three routes serve the link, and only one of them
+burns anything:
+
+| Route | What it does |
+|---|---|
+| `GET /v2/dl/:token` | An HTML confirmation page. Safe for link preloaders and mail scanners: known preload user-agents get a static placeholder, and nothing is spent. |
+| `GET /v2/dl/:token/get` | The download itself, and the only route that burns. Answers `410` to a known preload user-agent's twin, `409` while another download of the same token is in flight, and `410` once the token is spent or expired. |
+| `GET /v2/dl/:token/info` | `{ ok, enc_meta, file_size, ttl_left_s, used }` while the link is live, `404` once it is not. No credential. |
+
+**5. It works exactly once.** The blob is deleted and its buffer zeroed on the
+`finish` event of the download response, not when the response starts: a
+transfer that dies mid-flight leaves the token spendable, so a dropped
+connection is a retry and not a lost file. Once a download does finish, the
+token is marked used and the bytes are gone. The TTL is enforced separately by a
+timer, so a link nobody opens is destroyed when it expires whether or not
+anybody asks.
+
+**No delivery receipt on this route.** The relay signs a delivery receipt for
+`GET /v2/outbound/:hash`, the API's own download path, and you fetch it back
+from `GET /v2/transfers/:receipt_id/receipt`. The `/v2/dl` family signs nothing.
+If you need proof that a specific person took the file, use `/v2/outbound` and
+its receipt; `/v2/dl/:token/info` gives you a status and not a proof, and it
+cannot tell "downloaded" apart from "expired" on its own: both answer `404`.
+A caller that recorded the expiry at upload time can separate the two by its own
+clock, which is what the web app's "sent links" list does, and that inference is
+the caller's, not the relay's.
+
+---
+
 ### GET /v2/outbound/:hash — Download (burn-on-read)
 
 ```bash

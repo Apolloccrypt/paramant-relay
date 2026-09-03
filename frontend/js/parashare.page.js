@@ -37,6 +37,20 @@ const TOKEN_URL = '/api/user/parasend/token';
 const TOKEN_MARGIN_MS = 60000;
 let sessionToken = '', ws = null;
 let receiverPubs = null;
+// Which of the two stands the page is in. 'live' is the handshake this page was
+// built for: both online, a code compared, nothing stored. 'link' is the stand
+// added for the sender whose receiver is not at a desk right now -- the file is
+// sealed in this browser, parked on the relay under a one-time download token,
+// and the key travels in the URL fragment where no server ever sees it.
+let sendMode = 'live';
+// The per-plan link lifetimes, straight from tiers.js by way of GET
+// /v2/check-key. Never written into the page by hand: see the comment on the
+// chooser in parashare.html.
+let planTtlByPlan = null, planTtlMs = 0;
+// The links this browser session has minted, newest last. Page-local on
+// purpose: the relay keeps no list of a sender's outstanding links, and
+// pretending otherwise would be a claim this build cannot keep.
+const sentLinks = [];
 
 // ── Helpers ──
 function $(id) { return document.getElementById(id); }
@@ -58,8 +72,12 @@ function showStep(id) {
   globeOnStepChange(id);
   // The 5-stage stepper describes the sender's journey. Hide it for the
   // receiver-only download path (step-tb-download); show + advance otherwise.
+  // The stepper is the LIVE journey: share the link, compare the code, encrypt.
+  // The receiver-only download path never walks it, and neither does the
+  // Send-a-link stand, which has no share-and-compare stage to be at. Showing it
+  // there would put a sender on "3 . Compare" in a flow with nothing to compare.
   var stepper = $('ps-stepper');
-  if (stepper) stepper.style.display = (id === 'step-tb-download') ? 'none' : '';
+  if (stepper) stepper.style.display = (id === 'step-tb-download' || sendMode === 'link') ? 'none' : '';
   var stepperKey = ({
     'step-setup': 'setup',
     'step-waiting': 'share',
@@ -397,7 +415,10 @@ async function discoverRelay() {
         signal: AbortSignal.timeout(5000)
       });
       const d = await r.json();
-      return { sector, url, plan: d.plan, valid: !!d.valid };
+      return {
+        sector, url, plan: d.plan, valid: !!d.valid,
+        link_ttl_ms: d.link_ttl_ms, link_ttl_ms_by_plan: d.link_ttl_ms_by_plan,
+      };
     })
   );
   const answered = results.filter(r => r.status === 'fulfilled').map(r => r.value);
@@ -432,6 +453,7 @@ async function discoverAndReport() {
   if (d.found) {
     RELAY_API = d.found.url;
     relayReady = true;
+    applyPlanTtls(d.found);
     const sectorLabel = d.found.sector !== 'health' ? ` · ${d.found.sector}` : '';
     setStatus('key-status', `✓ Valid, plan: ${d.found.plan}${sectorLabel}`, 'ok');
   } else if (d.rejected) {
@@ -744,6 +766,324 @@ async function confirmFingerprint() {
       $('enc-status').className = 'status-line err';
     }
   }
+}
+
+// ── Send a link ──────────────────────────────────────────────────────────────
+//
+// WHAT THIS STAND IS FOR. An administratiekantoor wants to mail a payslip to
+// somebody who is not online right now. The live handshake above cannot do it
+// by design: it needs two browsers awake at the same moment. So this stand
+// seals the file here, parks it on the relay under a one-time download token,
+// and hands the sender one link.
+//
+// WHERE THE KEY GOES. Into the URL fragment, after the '#'. A fragment is never
+// put on the wire by a browser, so the relay holds ciphertext it cannot open
+// even though it is holding it. That is the same trick the mail extensions
+// already use, and the wire format below is the one /get already reads, byte
+// for byte: [u32le nameLen][name utf8][file bytes], AES-256-GCM, and the
+// fragment is base64url(key32 || iv12). Reusing it rather than inventing a
+// second one is what makes the receiving half of this feature already exist.
+//
+// WHY NOT THE LIVE STAND'S WIRE. That one is ML-KEM-768 + ECDH to the
+// RECEIVER'S public key, and in this stand there is no receiver yet to have a
+// public key. There is nothing to do a key exchange with, so the file is sealed
+// under a symmetric key that travels beside the link instead.
+
+// The ceiling POST /v2/inbound enforces: MAX_BLOB, 5 MB, on every ParaSend tier
+// today. One link is one blob, so a file bigger than that cannot be sent this
+// way and is refused here with the number, rather than at the upload with a 413.
+const LINK_MAX_BLOB = 5 * 1024 * 1024;
+// AES-GCM tag (16) + the 4-byte name-length header. The file name itself is
+// counted per file, below.
+const LINK_OVERHEAD = 20;
+
+function b64url(u8) {
+  return toB64(u8).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function u32le(n) {
+  const b = new Uint8Array(4);
+  new DataView(b.buffer).setUint32(0, n, true);
+  return b;
+}
+
+// "1 hour", "24 hours", "7 days". Built from the millisecond number the relay
+// serves so the sentence cannot drift from tiers.js.
+function humanDuration(ms) {
+  const n = Number(ms);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  const days = n / 86400000, hours = n / 3600000, mins = n / 60000;
+  // Hours win up to two days. tiers.js Pro is 86_400_000, and "1 day on Pro"
+  // next to "1 hour on Community" reads as a smaller step than it is; the
+  // pricing page has always sold that row as 24 hours, and the two have to
+  // agree word for word or a buyer thinks they are two different limits.
+  if (days >= 2 && Number.isInteger(days))   return days  + ' days';
+  if (hours >= 1 && Number.isInteger(hours)) return hours + (hours === 1 ? ' hour'   : ' hours');
+  if (mins >= 1)                             return Math.round(mins) + ' minutes';
+  return Math.round(n / 1000) + ' seconds';
+}
+
+// The chooser's second sentence, written from the served table. Called once a
+// sector has answered; until then the markup's plan-free sentence stands, which
+// is true of every plan and names no time it might get wrong.
+function applyPlanTtls(found) {
+  planTtlMs = Number(found && found.link_ttl_ms) || 0;
+  planTtlByPlan = (found && found.link_ttl_ms_by_plan) || null;
+  const el = $('ps-mode-link-ttl');
+  if (!el || !planTtlByPlan) return;
+  const c = humanDuration(planTtlByPlan.community);
+  const pr = humanDuration(planTtlByPlan.pro);
+  const b = humanDuration(planTtlByPlan.business);
+  if (!c || !pr || !b) return;
+  // "web app" is not decoration. tests/site-claims.test.mjs block 37 holds every
+  // page about a client that never sends max_views to naming that client beside
+  // a single-read claim, because "up to 10 reads on Pro" is something this page
+  // will never do: it asks the relay for no read count at all.
+  el.textContent = 'The sealed file waits on our server for up to ' + c + ' on Community, ' +
+    pr + ' on Pro and ' + b + ' on Business, and a link from this web app is wiped after the first download.';
+  // The TTL picker in step 1 offers 24 hours to an account whose plan stops at
+  // one, and POST /v2/inbound silently clamps it. Saying the ceiling here is
+  // cheaper than letting the sender pick a number the relay will not honour.
+  const note = $('ttl-status');
+  if (note && planTtlMs) {
+    note.textContent = 'When the link runs out we destroy the file, picked up or not. ' +
+      'Your plan holds a link to ' + humanDuration(planTtlMs) + ' at most; a longer choice is shortened to that.';
+  }
+}
+
+// ── The chooser ──────────────────────────────────────────────────────────────
+// Both cards stay in the DOM; only what the chosen stand does not use is
+// hidden. The stepper is the live journey (share, compare) and describes
+// nothing the link stand walks, so it goes away rather than lying about where
+// the sender is.
+function setSendMode(mode) {
+  sendMode = mode === 'link' ? 'link' : 'live';
+  const live = $('ps-mode-live'), link = $('ps-mode-link');
+  if (live) live.setAttribute('aria-checked', String(sendMode === 'live'));
+  if (link) link.setAttribute('aria-checked', String(sendMode === 'link'));
+  const stepper = $('ps-stepper');
+  if (stepper) stepper.style.display = (sendMode === 'link') ? 'none' : '';
+  // "The person you send to has to be online while you send" is the one
+  // sentence on this page that the link stand makes false.
+  const note = $('ps-live-note');
+  if (note) {
+    note.textContent = (sendMode === 'link')
+      ? 'The person you send to does not have to be online. You get a link to pass on; it works once.'
+      : 'The person you send to has to be online while you send; you confirm a short code together.';
+  }
+  const btn = $('btn-create-session');
+  if (btn) btn.textContent = (sendMode === 'link') ? 'Seal the file and make a link →' : 'Create secure session →';
+  setCreateStatus('');
+}
+function chooseModeLive() { setSendMode('live'); }
+function chooseModeLink() { setSendMode('link'); }
+
+// The one button at the bottom of step 1, dispatched on the chosen stand. The
+// two flows share step 1 entirely -- same credential, same file picker, same
+// expiry choice -- and part company only here.
+async function startSend() {
+  return (sendMode === 'link') ? createLink() : createSession();
+}
+
+// ── Seal one file and upload it ──────────────────────────────────────────────
+// Returns { name, size, token, key, expires_ms }. Throws on refusal, with the
+// relay's quota JSON attached when that is what happened, so the caller can
+// render the upgrade notice the live stand already renders.
+async function sealAndUpload(file, ttlMs) {
+  const nameBytes = new TextEncoder().encode(file.name);
+  if (file.size + nameBytes.length + LINK_OVERHEAD > LINK_MAX_BLOB) {
+    throw new Error(file.name + ' is too big for a link. One link is one 5 MB block; ' +
+      'send it with the live hand-over, which splits a file into chunks.');
+  }
+  const plain = concat(u32le(nameBytes.length), nameBytes, new Uint8Array(await file.arrayBuffer()));
+  const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
+  const rawKey = new Uint8Array(await crypto.subtle.exportKey('raw', key));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain));
+
+  const hashBuf = await crypto.subtle.digest('SHA-256', ct);
+  const hash = u8toHex(new Uint8Array(hashBuf));
+  const ur = await relayFetch(RELAY_API + '/v2/inbound', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      hash, payload: toB64(ct), ttl_ms: ttlMs,
+      // No file name and no size on the relay side: the name lives only inside
+      // the sealed bytes, which is the same rule the live stand keeps.
+      meta: { device_id: 'transfer-web-link' }
+    }),
+    signal: AbortSignal.timeout(120000)
+  });
+  const ud = await ur.json();
+  if (window.paQuotaUpgrade && window.paQuotaUpgrade.isQuota402(ur.status, ud)) {
+    const qe = new Error(ud.error); qe.quota = ud; throw qe;
+  }
+  if (!ud.ok) throw new Error(ud.error || 'Upload failed: ' + file.name);
+  return {
+    name: file.name, size: file.size, token: ud.download_token,
+    // The relay's ttl_ms, not the one that was asked for: POST /v2/inbound
+    // clamps to the tier, and the expiry the sender is shown has to be the one
+    // the relay will actually act on.
+    expires_ms: Date.now() + Number(ud.ttl_ms || ttlMs),
+    key: b64url(concat(rawKey, iv)),
+    state: 'waiting',
+  };
+}
+
+function setSealProgress(pct) {
+  const rounded = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+  const bar = $('seal-progress');
+  const readout = $('seal-pct');
+  const track = $('seal-progress-track');
+  if (bar) bar.style.width = rounded + '%';
+  if (readout) readout.textContent = rounded + '%';
+  if (track) track.setAttribute('aria-valuenow', String(rounded));
+}
+
+async function createLink() {
+  if (!relayReady) {
+    setCreateStatus('Looking for a relay sector...');
+    await discoverAndReport();
+    if (!relayReady) {
+      setCreateStatus(relayError || failureText('relay sector discovery', new Error('no sector answered')), 'err');
+      return;
+    }
+  }
+  setCreateStatus('');
+  const files = [...$('file-input').files];
+  if (!files.length) return;
+  const ttlMs = parseInt($('ttl-select').value);
+  const sector = Object.entries(RELAY_SECTORS).find(([, u]) => u === RELAY_API)?.[0] || 'health';
+
+  showStep('step-sealing');
+  setSealProgress(0);
+  try {
+    for (let i = 0; i < files.length; i++) {
+      $('seal-status').textContent = (files.length > 1 ? 'File ' + (i + 1) + '/' + files.length + ': ' : '') +
+        'Sealing ' + files[i].name + ' in this browser...';
+      setSealProgress(Math.round((i / files.length) * 90));
+      const row = await sealAndUpload(files[i], ttlMs);
+      // The sector rides in the link because an account lives on exactly one of
+      // them; without it /get asks health and a legal sender's receiver is told
+      // the file is burned when it is sitting on another sector.
+      row.url = location.origin + '/get?t=' + encodeURIComponent(row.token) +
+        '&r=' + encodeURIComponent(sector) + '#' + row.key;
+      sentLinks.push(row);
+    }
+    setSealProgress(100);
+    renderSentLinks();
+    showStep('step-link');
+    refreshSentLinks();
+  } catch (e) {
+    if (e && e.quota && window.paQuotaUpgrade) {
+      $('seal-status').className = 'status-line';
+      $('seal-status').innerHTML = window.paQuotaUpgrade.html(e.quota);
+    } else {
+      $('seal-status').textContent = failureText('seal and upload', e);
+      $('seal-status').className = 'status-line err';
+    }
+  }
+}
+
+// ── The sent-links list ──────────────────────────────────────────────────────
+// NOT a receipt list, and the page says so under it. The relay signs a delivery
+// receipt on the API download path (GET /v2/outbound, fetched back from
+// /v2/transfers/:id/receipt); the browser download path, GET /v2/dl/:token/get,
+// signs nothing. What is left is GET /v2/dl/:token/info, which answers 200 with
+// the time remaining while the link is live and 404 once it is "not found, used,
+// or expired" -- one status for three outcomes. This page separates the last two
+// with its own clock: a 404 before the expiry it recorded means the file was
+// taken, after it means it timed out. That is an inference, and the note under
+// the list calls it one.
+function linkStateLabel(row) {
+  if (row.state === 'delivered') return 'Downloaded, and the file is gone';
+  if (row.state === 'expired')   return 'Expired, and the file is gone';
+  return 'Waiting for the receiver';
+}
+
+function renderSentLinks() {
+  const list = $('ps-link-list');
+  if (!list) return;
+  list.innerHTML = '';
+  sentLinks.forEach((row, i) => {
+    const li = document.createElement('li');
+    li.className = 'ps-link-row';
+    li.dataset.linkIndex = String(i);
+
+    const name = document.createElement('div');
+    name.className = 'ps-link-name';
+    name.textContent = row.name;
+    li.appendChild(name);
+
+    const url = document.createElement('div');
+    url.className = 'ps-link-url';
+    url.textContent = row.url;
+    li.appendChild(url);
+
+    const meta = document.createElement('div');
+    meta.className = 'ps-link-meta';
+    const state = document.createElement('span');
+    state.className = 'ps-link-state is-' + row.state;
+    state.textContent = linkStateLabel(row);
+    meta.appendChild(state);
+    const exp = document.createElement('span');
+    // One date format for the whole site (#424): day, month in full, year, and
+    // the clock in UTC, because a one-hour link is a moment and not a day.
+    exp.textContent = 'Expires ' + (window.paramantDate
+      ? window.paramantDate.moment(row.expires_ms)
+      : new Date(row.expires_ms).toISOString());
+    meta.appendChild(exp);
+    const once = document.createElement('span');
+    once.textContent = 'Works once';
+    meta.appendChild(once);
+    li.appendChild(meta);
+
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'ps-copy';
+    copy.setAttribute('data-click', 'copySentLink');
+    copy.setAttribute('data-link-index', String(i));
+    copy.textContent = 'Copy link';
+    li.appendChild(copy);
+
+    list.appendChild(li);
+  });
+}
+
+async function copySentLink(el) {
+  const i = parseInt(el && el.getAttribute('data-link-index'), 10);
+  const row = sentLinks[i];
+  if (!row) return;
+  let copied = true;
+  await navigator.clipboard.writeText(row.url).catch(() => { copied = false; });
+  if (el._resetTimer) clearTimeout(el._resetTimer);
+  el.textContent = copied ? 'Copied' : 'Copy failed';
+  el.classList.toggle('is-copied', copied);
+  el._resetTimer = setTimeout(() => {
+    el.textContent = 'Copy link';
+    el.classList.remove('is-copied');
+  }, 2000);
+}
+
+// No credential on this call: /v2/dl/:token/info is the receiver's half of the
+// route family and takes none. Sending the session token here would be widening
+// a fifteen-minute credential to a route that does not want it.
+async function refreshSentLinks() {
+  const btn = $('ps-link-refresh');
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking...'; }
+  for (const row of sentLinks) {
+    if (row.state !== 'waiting') continue;
+    try {
+      const r = await fetch(RELAY_API + '/v2/dl/' + encodeURIComponent(row.token) + '/info',
+        { signal: AbortSignal.timeout(8000) });
+      if (r.ok) row.state = 'waiting';
+      else if (r.status === 404) row.state = (Date.now() < row.expires_ms) ? 'delivered' : 'expired';
+    } catch (_) {
+      // A check that did not arrive says nothing about the link. Leave the row
+      // as it was rather than reporting a delivery that may not have happened.
+    }
+  }
+  renderSentLinks();
+  if (btn) { btn.disabled = false; btn.textContent = 'Check again'; }
 }
 
 function rejectFingerprint() {
@@ -1155,7 +1495,9 @@ function updateGlobeTransfer(userLat, userLng) {
 act('change','fpConfirmToggle',(el)=>{const b=document.getElementById('fp-confirm-btn');if(b)b.disabled=!el.checked;});
 act('change','onFileSelect',()=>onFileSelect());
 act('click','confirmFingerprint',()=>confirmFingerprint());act('click','copyLink',()=>copyLink());
-act('click','createSession',()=>createSession());act('click','expandApiKeyCard',()=>expandApiKeyCard());
+act('click','createSession',()=>startSend());act('click','expandApiKeyCard',()=>expandApiKeyCard());
+act('click','chooseModeLive',()=>chooseModeLive());act('click','chooseModeLink',()=>chooseModeLink());
+act('click','copySentLink',(el)=>copySentLink(el));act('click','refreshSentLinks',()=>refreshSentLinks());
 act('click','rejectFingerprint',()=>rejectFingerprint());act('input','onKeyInput',()=>onKeyInput());
 act('click','reload',()=>location.reload());
 act('click','reopenSession',()=>reopenSession());

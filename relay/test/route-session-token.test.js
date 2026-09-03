@@ -94,6 +94,28 @@ async function mint(key = OWNER, server = srv, purpose = undefined) {
 }
 const bearer = (token) => ({ Authorization: `Bearer ${token}` });
 
+// What GET /v2/check-key answers for a community owner, in full. The two
+// assertions below compare the WHOLE object on purpose: this route is reached
+// with a fifteen-minute browser credential, and the point of pinning the shape
+// is that a future field cannot quietly become a way to read the account
+// through a token that was minted to upload a file.
+//
+// The link-lifetime fields joined it when /parashare grew the "Send a link"
+// stand, which has to say how long a sealed file waits per plan BEFORE a file
+// is picked. They are the tiers.js view_ttl_ms rows and nothing else: the same
+// numbers the pricing page prints to anyone, tied to no account and to no
+// identity. `link_ttl_ms` is the one number that IS about this key, and it is
+// the same ceiling POST /v2/inbound would clamp its upload to, so it tells a
+// holder nothing the next request would not.
+const CHECK_KEY_COMMUNITY = {
+  valid: true,
+  plan: 'community',
+  link_ttl_ms: 3_600_000,
+  link_ttl_ms_by_plan: {
+    community: 3_600_000, pro: 86_400_000, business: 604_800_000, enterprise: 604_800_000,
+  },
+};
+
 // A fresh blob every time: the store is keyed on the sha256 and rejects a
 // repeat with 409.
 function blob(label) {
@@ -168,8 +190,8 @@ test('a token authenticates as the owner on all five ParaSend routes', async (t)
   // reported valid:false and the page would have refused its own credential.
   const ck = await srv.get('/v2/check-key', { headers: h });
   assert.strictEqual(ck.status, 200);
-  assert.deepStrictEqual(ck.json, { valid: true, plan: 'community' },
-    'a token must report the owner as valid, with the owner plan');
+  assert.deepStrictEqual(ck.json, CHECK_KEY_COMMUNITY,
+    'a token must report the owner as valid, with the owner plan, and nothing about the account beyond that');
 
   const ticket = await srv.post('/v2/ws-ticket', { headers: h });
   assert.strictEqual(ticket.status, 200, ticket.text);
@@ -535,7 +557,7 @@ test('THE STORE HOLDS NO KEY: a leak of redis is a leak of hashes', async (t) =>
   // rather than merely safe: the relay looks the hash up in the api-key table
   // it already has in memory.
   const ck = await srv.get('/v2/check-key', { headers: bearer(token) });
-  assert.deepStrictEqual(ck.json, { valid: true, plan: 'community' },
+  assert.deepStrictEqual(ck.json, CHECK_KEY_COMMUNITY,
     'hashing the record must not cost the relay the ability to resolve it');
   did();
 });
