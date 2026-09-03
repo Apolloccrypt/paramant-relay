@@ -789,6 +789,11 @@ nav.nav .nav-menu-divider { height: 1px; background: var(--ink-hair); margin: va
    pins its contents to exactly the four destinations of the desktop bar. So
    the two secondary routes hang under it as their own strip, pinned to the
    bottom edge where a thumb reaches.
+
+   Signed in the strip is still here and carries Help alone. It used to be
+   deleted, and since the bar drops .nav-help below 700px and the drawer is
+   pinned to the five workspace links, that left a paying customer on a phone
+   with no route to support anywhere.
    ════════════════════════════════════════ */
 .nav-mobile-tail {
   display: none;
