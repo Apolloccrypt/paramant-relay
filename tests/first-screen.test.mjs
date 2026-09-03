@@ -163,6 +163,7 @@ const PAGES = [
       // Mick, 4 September: one note is enough. The founder line left both hero
       // states; the letter signature further down the page is the one place the
       // homepage still names him, and tests/ui-truthfulness pins that block.
+      { name: 'the band tag, once, with the two frames that sell (5 September: a merge left it doubled and garbled)', css: '.hp-band-tag', text: 'Paramant · made in the Netherlands, hosted in the EU' },
       { name: 'the heading of the five facts, which now come before the gift (panel of 4 September: facts convince, the letter can wait)', css: '#check-h', text: 'Five things you can check' },
     ],
   },
