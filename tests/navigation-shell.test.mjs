@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const MIME = { '.js':'text/javascript', '.css':'text/css', '.html':'text/html', '.svg':'image/svg+xml', '.png':'image/png', '.woff2':'font/woff2' };
-const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/account':'/account.html', '/developer':'/developer.html', '/pricing':'/pricing.html', '/help':'/help/index.html' };
+const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/account':'/account.html', '/developer':'/developer.html', '/pricing':'/pricing.html', '/parashare':'/parashare.html', '/help':'/help/index.html' };
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   pathname = aliases[pathname] || pathname;
@@ -423,6 +423,30 @@ ok('the signed-in phone bar carries one account control beside the menu button',
 ok('nothing in the signed-in phone bar touches its neighbour', appBar.gaps.length > 0 && appBar.gaps.every((gap) => gap >= 12), JSON.stringify(appBar));
 ok('every target in the signed-in phone bar is finger-sized', appBar.items.every((item) => item.height >= 44), JSON.stringify(appBar.items));
 await appBarPage.close();
+
+// The same measurement as the signed-out bar above, on an app screen. It is a
+// second check and not a second route in that loop because the answer is a
+// different colour: /parashare, /dashboard, /sign, /account and the auth pages
+// load app-2026.css AFTER nav.css, and that file paints the bar in the app's
+// own paper rather than the marketing bone. What must be identical is the
+// opacity. nav.css turns the bar opaque under 1024px on purpose, because at .92
+// with no backdrop-filter behind it the page scrolls through the letters; the
+// later stylesheet had quietly put the translucent token back, and a review of
+// /parashare on a 390 phone read it off the screen as spook letters. So this
+// pins the alpha and the absent filter and lets the theme own the hex.
+const appPaintPage = await browser.newPage({ viewport:{ width:390, height:844 } });
+await appPaintPage.route('**/api/**', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
+await appPaintPage.goto(ORIGIN + '/parashare', { waitUntil:'domcontentloaded' });
+await appPaintPage.locator('nav.nav').waitFor();
+const appPaint = await appPaintPage.locator('nav.nav').evaluate((node) => ({
+  background: getComputedStyle(node).backgroundColor,
+  backdropFilter: getComputedStyle(node).backdropFilter,
+  webkitBackdropFilter: getComputedStyle(node).getPropertyValue('-webkit-backdrop-filter'),
+}));
+ok('the /parashare navigation is opaque on a phone', /^rgb\(\d+, \d+, \d+\)$/.test(appPaint.background)
+  && appPaint.backdropFilter === 'none'
+  && (!appPaint.webkitBackdropFilter || appPaint.webkitBackdropFilter === 'none'), JSON.stringify(appPaint));
+await appPaintPage.close();
 
 // A signed-in tablet has the room the phone does not, so Help is a text link in
 // the bar there, exactly as it is signed out. One tap, and the same place the
