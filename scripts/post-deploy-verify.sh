@@ -10,7 +10,7 @@
 #     SITE_URL         public base, default https://paramant.app
 #     RELAY_LOCAL_URL  optional; e.g. http://127.0.0.1:3000 when run ON the
 #                      server, used only for endpoints nginx does not expose
-#                      publicly (/health/deep). Omitted -> those checks SKIP.
+#                      publicly (/v2/health/deep). Omitted -> those checks SKIP.
 #
 # Requires: curl, jq. ASCII-only output.
 #
@@ -20,7 +20,7 @@
 #   paramant.app/admin/...   -> admin:4200
 #   paramant.app/.well-known -> static files
 #   paramant.app/  /setup /dashboard /docs -> frontend upstream
-#   /health/deep is NOT publicly routed -> use RELAY_LOCAL_URL on the server.
+#   /v2/health/deep is NOT publicly routed -> use RELAY_LOCAL_URL on the server.
 
 set -uo pipefail
 
@@ -101,10 +101,22 @@ check "/v2/capabilities sig count (none + ML-DSA-65)" "2" "$SIGS" no
 
 note ""
 note "== relay deep health (server-local only) =="
+# The route is /v2/health/deep, and it always was: this file probed a bare
+# /health/deep that relay.js has never served, so the check answered 404 on
+# every run and the suite could never exit 0. Phase 6g of deploy/deploy-3.1.sh
+# waved that away as "known red", which is a warning nobody reads.
+#
+# 401 is the PASS here, not 200. Outside RELAY_MODE=full the route sits behind
+# X-Internal-Auth (#322), and this script has no token: it reads no .env and
+# takes no secret on its command line, so the strongest thing it can prove
+# without one is that the gate is shut. A 200 without a token would mean the
+# relay is in full mode or the gate is open, and both are worth a FAIL here.
+# The authenticated 200 is proved by phase 6c of the deploy script, which does
+# have the token.
 if [ -n "$RELAY_LOCAL" ]; then
-  check "/health/deep HTTP" "200" "$(http_code "$RELAY_LOCAL/health/deep")" no
+  check "/v2/health/deep closed without a token" "401" "$(http_code "$RELAY_LOCAL/v2/health/deep")" no
 else
-  skip "/health/deep (no RELAY_LOCAL_URL given; run on server with http://127.0.0.1:3000)"
+  skip "/v2/health/deep (no RELAY_LOCAL_URL given; run on server with http://127.0.0.1:3000)"
 fi
 
 note ""

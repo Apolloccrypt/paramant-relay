@@ -1375,7 +1375,7 @@ EOF
     fi
   fi
 
-  step "5c. the four nginx changes, by hand, keeping the ParaID deny"
+  step "5c. the six nginx changes, by hand, keeping the ParaID deny"
   remote_nginx "nginx edits" "$TS" "$NGINX_SITES" "$NGINX_BACKUP_DIR" "$NGINX_CONF_SLOTS" <<'EOF'
 set -euo pipefail
 TS="$1"; SITES="$2"; NGBK="$3"; SLOTS="$4"
@@ -1479,6 +1479,53 @@ END { for (i in deny) { t++; if (has[i]) w++ } printf "%d %d\n", t+0, w+0 }'
 
 count_rules() { awk "$RULES_COUNT_AWK" $TARGETS | awk '{t+=$1; w+=$2} END{printf "%d %d\n", t, w}'; }
 
+# access_log off in the server block that backs /dicom/, the one on
+# listen 127.0.0.1:8090. It was the only block in paramant-live.conf still
+# writing a combined line, and /security claims logging is off on every block
+# that serves the site. #374 put the line in the repo conf and said so in the
+# note above the block: repo only, because 5c edits the live confs by anchor
+# and never copies a repo file over them. This is the edit that closes that.
+#
+# What it was recording is the request line, the URI, the timing, the status,
+# the referrer and the user-agent of each /dicom/ call. NOT the client IP:
+# set_real_ip_from and real_ip_header live in the :8080 block and the /dicom/
+# location forwards no X-Real-IP, so $remote_addr here is 127.0.0.1 on every
+# request.
+#
+# The anchor is the listen line itself, so the edit finds the block whichever
+# conf slot it ended up in. In practice that is slot 2, the live conf:
+# paramant-public.conf has no 127.0.0.1:8090 block, so this is a no-op there
+# and both counters below stay at zero for it.
+#
+# Two passes, like the buffer and the /pararules edits: pass one learns which
+# of those blocks already carry access_log off, pass two inserts only into the
+# ones that do not. That is what makes a second deploy leave the file alone.
+ALOG_AWK='
+FNR==NR {
+  if ($0 ~ /^server[[:space:]]*\{/) b++
+  if ($0 ~ /^[[:space:]]*listen[[:space:]]+127\.0\.0\.1:8090[[:space:]]*;/) lis[b]=1
+  if ($0 ~ /^[[:space:]]*access_log[[:space:]]+off[[:space:]]*;/) has[b]=1
+  next
+}
+{
+  print
+  if ($0 ~ /^server[[:space:]]*\{/) j++
+  if ($0 ~ /^[[:space:]]*listen[[:space:]]+127\.0\.0\.1:8090[[:space:]]*;/ && !has[j] && !ins[j]) {
+    print "    access_log off;"
+    ins[j]=1
+  }
+}'
+
+# Count the server blocks that carry the :8090 listen line, and how many of
+# those already switch the access log off.
+ALOG_COUNT_AWK='
+/^server[[:space:]]*\{/ { b++ }
+/^[[:space:]]*listen[[:space:]]+127\.0\.0\.1:8090[[:space:]]*;/ { lis[b]=1 }
+/^[[:space:]]*access_log[[:space:]]+off[[:space:]]*;/ { has[b]=1 }
+END { for (i in lis) { t++; if (has[i]) w++ } printf "%d %d\n", t+0, w+0 }'
+
+count_alog() { awk "$ALOG_COUNT_AWK" $TARGETS | awk '{t+=$1; w+=$2} END{printf "%d %d\n", t, w}'; }
+
 # Two-pass insert: learn which /v2/outbound blocks already carry the buffer,
 # then insert only into the ones that do not.
 BUF_AWK='
@@ -1555,6 +1602,9 @@ echo "before outbound blocks with buffer = $_obw"
 read -r _rbt _rbw <<< "$(count_rules)"
 echo "before pararules blocks = $_rbt"
 echo "before pararules blocks with redirect = $_rbw"
+read -r _abt _abw <<< "$(count_alog)"
+echo "before 8090 blocks = $_abt"
+echo "before 8090 blocks with access_log off = $_abw"
 
 # Each edit is in one of three states, and only one of them is a stop:
 #
@@ -1607,10 +1657,12 @@ pending=0
 for st in "$SIGN_STATE" "$COMP_STATE" "$DICOM_STATE"; do
   [ "$st" = todo ] && pending=$((pending + 1))
 done
-# A /v2/outbound block without the buffer is a fourth thing still to do, and a
-# site block without the /pararules redirect a fifth.
+# A /v2/outbound block without the buffer is a fourth thing still to do, a
+# site block without the /pararules redirect a fifth, and a :8090 block that
+# still writes an access log a sixth.
 pending=$((pending + _obt - _obw))
 pending=$((pending + _rbt - _rbw))
+pending=$((pending + _abt - _abw))
 echo "before edits pending = $pending"
 if [ "$pending" -eq 0 ]; then
   echo "before everything already applied = yes"
@@ -1654,6 +1706,10 @@ for f in $TARGETS; do
   awk "$RULES_AWK" "$f" "$f" > "/tmp/nginx-rules.$$"
   cat "/tmp/nginx-rules.$$" > "$f"
   rm -f "/tmp/nginx-rules.$$"
+  # 6. access_log off in the :8090 block that backs /dicom/ (#374).
+  awk "$ALOG_AWK" "$f" "$f" > "/tmp/nginx-alog.$$"
+  cat "/tmp/nginx-alog.$$" > "$f"
+  rm -f "/tmp/nginx-alog.$$"
   if ! cmp -s "$f" "/tmp/nginx-pre-3.1-$(basename "$f").$TS"; then
     echo "edited $(basename "$f")"
     edited=$((edited + 1))
@@ -1675,6 +1731,9 @@ read -r _rat _raw <<< "$(count_rules)"
 echo "after pararules blocks = $_rat"
 echo "after pararules blocks with redirect = $_raw"
 echo "after pararules redirect lines = $(count "$RULES_RE")"
+read -r _aat _aaw <<< "$(count_alog)"
+echo "after 8090 blocks = $_aat"
+echo "after 8090 blocks with access_log off = $_aaw"
 
 # Restore exactly the confs this phase edited, not whatever the backup dir
 # happens to hold for this TS. The precondition above proved every one of them
@@ -1727,8 +1786,9 @@ EOF
   # count of 2 only holds on a run that found work in both confs. What always
   # holds is the END state, and that is asserted hard just below: no
   # auth_request on /sign, no /compliance locations, /dicom answering 404, a
-  # buffer inside every /v2/outbound block, and the /pararules 301 inside every
-  # block that answers for the site. Those five are the deploy.
+  # buffer inside every /v2/outbound block, the /pararules 301 inside every
+  # block that answers for the site, and access_log off inside every :8090
+  # block. Those six are the deploy.
   if [ "$DRY_RUN" -eq 1 ]; then
     printf '  SKIP  assert (dry-run): both named confs were rewritten, unless every edit was already applied\n'
   else
@@ -1738,7 +1798,7 @@ EOF
     [ -n "$pend" ] && [ -n "$edited" ] \
       || die "could not read the nginx edit state from the server"
     if [ "$pend" = yes ]; then
-      ok "nginx: already applied. All three edits, the outbound buffers and the /pararules 301 were in place before this run, so nothing was rewritten (edited files = $edited)"
+      ok "nginx: already applied. All three edits, the outbound buffers, the /pararules 301 and access_log off on :8090 were in place before this run, so nothing was rewritten (edited files = $edited)"
     else
       [ "$edited" -ge 1 ] \
         || die "$(remote_field 'before edits pending') nginx edit(s) were still pending but no conf was rewritten"
@@ -1769,6 +1829,22 @@ EOF
     [ "$rw" = "$rt" ] \
       || die "the /pararules 301 sits in $rw of $rt site block(s); an indexed link to the old rules page would 404 on the rest"
     ok "every site block redirects /pararules to /rules ($rw of $rt blocks)"
+  fi
+  if [ "$DRY_RUN" -eq 0 ]; then
+    local at aw
+    at="$(remote_field 'after 8090 blocks')"
+    aw="$(remote_field 'after 8090 blocks with access_log off')"
+    [ -n "$at" ] && [ -n "$aw" ] || die "could not read the :8090 access_log counts from the server"
+    # Zero such blocks is a legitimate answer: the /dicom/ gateway can be
+    # retired, and then there is nothing to switch off. What may not happen is
+    # a block that is there and still logging.
+    [ "$aw" = "$at" ] \
+      || die "access_log off sits in $aw of $at :8090 server block(s); the /dicom/ gateway still logs the request line and the user-agent of every call, which /security says it does not"
+    if [ "$at" -eq 0 ]; then
+      ok "no :8090 server block on this server, so there is no /dicom/ access log to switch off"
+    else
+      ok "every :8090 server block switches the access log off ($aw of $at blocks)"
+    fi
   fi
   if [ "$DRY_RUN" -eq 0 ]; then
     local pb pa
@@ -1879,7 +1955,7 @@ EOF
     ok "/sign is 200 without a login"
   fi
 
-  step "6g. the 3.0.0 verify suite, on the server (informational, exit 2 blocks)"
+  step "6g. the 3.0.0 verify suite, on the server (any non-zero exit blocks)"
   remote_soft "post-deploy-verify" "$COMPOSE_DIR" <<'EOF'
 set -euo pipefail
 cd "$1" || exit 1
@@ -1896,7 +1972,13 @@ EOF
     elif [ "$vrc" = "0" ]; then
       ok "post-deploy-verify.sh passed"
     else
-      warn "post-deploy-verify.sh exited ${vrc:-unknown} but not 2; its /health/deep probe is known red (the route is /v2/health/deep), read the list above"
+      # This used to be a warn, because the suite probed a bare /health/deep
+      # that the relay has never served: exit 1 on every single run, so the
+      # one line that could have reported a real non-critical regression was
+      # noise by construction. The probe now asks /v2/health/deep and expects
+      # the 401 the #322 gate gives an unauthenticated caller, so exit 0 is
+      # reachable and anything else is a finding.
+      die "post-deploy-verify.sh exited ${vrc:-unknown}; read the list above, every check in it is expected to pass"
     fi
   fi
 
