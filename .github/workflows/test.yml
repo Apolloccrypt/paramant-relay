@@ -62,6 +62,26 @@ jobs:
       - name: no-undef over the hand-written server code
         run: npx --yes eslint@9 .
 
+  deploy-dryrun:
+    name: deploy - 3.1 dry run (no server)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # deploy/deploy-3.1.sh is the only thing in this repo that recreates
+      # production containers and rewrites the nginx config, and it was the
+      # only thing with a self-test that ran nowhere: docs/ONBOARDING.md said
+      # so in as many words. So a green pull request said nothing about the
+      # deploy script, and two rounds of nginx changes landed on that silence.
+      #
+      # The suite needs no server and no secrets. It runs the script with
+      # --dry-run, which executes nothing, and it runs the real phase 5b, 5c,
+      # 8a and 8c remote blocks, extracted from the source, against synthetic
+      # nginx confs with nginx and systemctl stubbed. ubuntu-latest carries
+      # shellcheck, so the shellcheck leg of the suite runs here and is skipped
+      # on a laptop that has none.
+      - name: Deploy 3.1 dry-run self-test
+        run: bash tests/deploy-3.1-dryrun.test.sh
+
   frontend-cache-bust:
     name: frontend, cache-bust guard
     runs-on: ubuntu-latest

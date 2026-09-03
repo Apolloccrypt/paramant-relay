@@ -58,6 +58,25 @@ extract_remote() {
   sed -n "/^  remote\(_nginx\)\? \"$label\"/,/^EOF\$/p" "$SCRIPT" | sed '1d;$d'
 }
 
+# resolve_conf_slots() is the function the script sends to the server. It is
+# used here too, to build the phase 2b backups that a 5c fixture needs, exactly
+# the way 2b builds them. The function itself is tested in section 6i-1.
+eval "$(extract_snippet)" 2>/dev/null || true
+
+# seed_2b_backups <sites-dir> <ngbk-dir> <ts> <slots>: what phase 2b leaves in
+# /etc/nginx/backups. 5c refuses to edit a conf that has no backup under the
+# run TS, because restore() could not put that conf back, so every 5c fixture
+# has to have been through 2b first.
+seed_2b_backups() {
+  local sites="$1" ngbk="$2" ts="$3" slots="$4" name
+  mkdir -p "$ngbk"
+  declare -F resolve_conf_slots >/dev/null || return 0
+  resolve_conf_slots "$sites" "$slots" >/dev/null
+  for name in $RESOLVED_CONFS; do
+    cp -a "$(readlink -f "$sites/$name")" "$ngbk/$name.pre-3.1-$ts"
+  done
+}
+
 echo "======== deploy-3.1.sh dry run ========"
 
 # ---------------------------------------------------------------- 1. syntax --
@@ -448,6 +467,7 @@ ln -sfn "$NG/available/paramant-live.conf"   "$NG/sites/paramant-live.conf"
 
 echo ""
 echo "6g-1. First run: the conf is in its pre-3.1 shape, so there is work to do"
+seed_2b_backups "$NG/sites" "$NG/bk" 20260101-0000 "paramant-public.conf paramant-live.conf"
 OUT1="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0000 "$NG/sites" "$NG/bk" \
         "paramant-public.conf paramant-live.conf" 2>&1)"; RC1=$?
 if [ "$RC1" -eq 0 ]; then pass "5c exits 0 on a conf that still needs the edits"; else
@@ -494,6 +514,7 @@ fi
 
 echo ""
 echo "6g-2. Second run on the same confs: already applied, not FATAL"
+seed_2b_backups "$NG/sites" "$NG/bk" 20260101-0001 "paramant-public.conf paramant-live.conf"
 OUT2="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0001 "$NG/sites" "$NG/bk" \
         "paramant-public.conf paramant-live.conf" 2>&1)"; RC2=$?
 if [ "$RC2" -eq 0 ]; then pass "a second 5c on an already-edited conf exits 0"; else
@@ -525,6 +546,7 @@ echo ""
 echo "6g-3. A conf with neither the old nor the wanted shape is still FATAL"
 make_conf "$NG/available/paramant-public.conf" absent absent no yes
 make_conf "$NG/available/paramant-live.conf"   absent absent no yes
+seed_2b_backups "$NG/sites" "$NG/bk" 20260101-0002 "paramant-public.conf paramant-live.conf"
 OUT3="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0002 "$NG/sites" "$NG/bk" \
         "paramant-public.conf paramant-live.conf" 2>&1)"; RC3=$?
 if [ "$RC3" -ne 0 ]; then pass "5c stops on a conf that is not the one the runbook describes"; else
@@ -579,6 +601,7 @@ server {
 }
 CONF
 cp "$NG/available/paramant-public.conf" "$NG/available/paramant-live.conf"
+seed_2b_backups "$NG/sites" "$NG/bk" 20260101-0003 "paramant-public.conf paramant-live.conf"
 OUT4="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0003 "$NG/sites" "$NG/bk" \
         "paramant-public.conf paramant-live.conf" 2>&1)"; RC4=$?
 
@@ -789,6 +812,7 @@ make_conf "$NG2/available/paramant-public.conf" old old yes no
 make_conf "$NG2/available/paramant.conf"        old old yes no
 ln -sfn "$NG2/available/paramant-public.conf" "$NG2/sites-fb/paramant-public.conf"
 ln -sfn "$NG2/available/paramant.conf"        "$NG2/sites-fb/paramant.conf"
+seed_2b_backups "$NG2/sites-fb" "$NG2/bk" 20260101-0100 "paramant-public.conf paramant-live.conf|paramant.conf"
 OUT7="$(cd "$NG2" && PATH="$NG2/bin:$PATH" bash "$NG/5c.sh" 20260101-0100 "$NG2/sites-fb" "$NG2/bk" \
         "paramant-public.conf paramant-live.conf|paramant.conf" 2>&1)"; RC7=$?
 if [ "$RC7" -eq 0 ]; then pass "5c exits 0 on a server that calls the backend conf paramant.conf"; else
@@ -834,6 +858,7 @@ BEFORE_MD5="$(md5sum < "$NG2/available/paramant.conf")"
 ln -sfn "$NG2/available/paramant-public.conf" "$NG2/sites-both/paramant-public.conf"
 ln -sfn "$NG2/available/paramant-live.conf"   "$NG2/sites-both/paramant-live.conf"
 ln -sfn "$NG2/available/paramant.conf"        "$NG2/sites-both/paramant.conf"
+seed_2b_backups "$NG2/sites-both" "$NG2/bk" 20260101-0101 "paramant-public.conf paramant-live.conf|paramant.conf"
 OUT8="$(cd "$NG2" && PATH="$NG2/bin:$PATH" bash "$NG/5c.sh" 20260101-0101 "$NG2/sites-both" "$NG2/bk" \
         "paramant-public.conf paramant-live.conf|paramant.conf" 2>&1)"; RC8=$?
 if [ "$RC8" -eq 0 ] && printf '%s\n' "$OUT8" | grep -q 'nginxconf paramant-live.conf resolved to paramant-live.conf'; then
@@ -858,6 +883,7 @@ echo "6i-4. A slot with no candidate at all is a stop, with the same hint"
 mkdir -p "$NG2/sites-none"
 make_conf "$NG2/available/paramant-public.conf" old old yes no
 ln -sfn "$NG2/available/paramant-public.conf" "$NG2/sites-none/paramant-public.conf"
+seed_2b_backups "$NG2/sites-none" "$NG2/bk" 20260101-0102 "paramant-public.conf paramant-live.conf|paramant.conf"
 OUT9="$(cd "$NG2" && PATH="$NG2/bin:$PATH" bash "$NG/5c.sh" 20260101-0102 "$NG2/sites-none" "$NG2/bk" \
         "paramant-public.conf paramant-live.conf|paramant.conf" 2>&1)"; RC9=$?
 if [ "$RC9" -ne 0 ] && printf '%s\n' "$OUT9" | grep -q 'FATAL 1 nginx conf slot'; then
@@ -878,6 +904,7 @@ sed -i '/paraid\/issue-document/d' "$NG2/available/paramant-public.conf"
 sed -i '/paraid\/issue-document/d' "$NG2/available/paramant.conf"
 ln -sfn "$NG2/available/paramant-public.conf" "$NG2/sites-noparaid/paramant-public.conf"
 ln -sfn "$NG2/available/paramant.conf"        "$NG2/sites-noparaid/paramant.conf"
+seed_2b_backups "$NG2/sites-noparaid" "$NG2/bk" 20260101-0103 "paramant-public.conf paramant-live.conf|paramant.conf"
 OUT10="$(cd "$NG2" && PATH="$NG2/bin:$PATH" bash "$NG/5c.sh" 20260101-0103 "$NG2/sites-noparaid" "$NG2/bk" \
          "paramant-public.conf paramant-live.conf|paramant.conf" 2>&1)"; RC10=$?
 if [ "$RC10" -ne 0 ] && printf '%s\n' "$OUT10" | grep -q 'FATAL the ParaID deny is not present'; then
@@ -994,6 +1021,259 @@ if grep -nE '^for name in \$(CONFS|SLOTS)' "$SCRIPT" >/dev/null; then
   grep -nE '^for name in \$(CONFS|SLOTS)' "$SCRIPT" | sed 's/^/        /'
 else
   pass "every remote block loops over \$RESOLVED_CONFS, never over the candidate string"
+fi
+
+echo ""
+echo "6i-7. sites-enabled changed between phase 2b and 5c: stop, do not edit"
+# 2b and 5c each ask the server what is there when they run, which is what
+# makes the slots work at all. It also means they can disagree: phases 3 and 4
+# pull, build and recreate in between, and if sites-enabled is rearranged in
+# that window 5c resolves to a conf 2b never backed up. Every FATAL in 5c calls
+# restore(), restore() can only put back what was filed, so the run used to end
+# on "restoring the backed up confs" with that conf left edited and nothing to
+# roll it back to. 5c now refuses before the first sed.
+NG3="$WORK/ng3"
+mkdir -p "$NG3/bin" "$NG3/available" "$NG3/bk" "$NG3/sites"
+cp "$NG/bin/nginx" "$NG/bin/systemctl" "$NG3/bin/"
+SL3="paramant-public.conf paramant-live.conf|paramant.conf"
+
+# Phase 2b ran while the server still had paramant-live.conf.
+make_conf "$NG3/available/paramant-public.conf" old old yes no
+make_conf "$NG3/available/paramant-live.conf"   old old yes no
+ln -sfn "$NG3/available/paramant-public.conf" "$NG3/sites/paramant-public.conf"
+ln -sfn "$NG3/available/paramant-live.conf"   "$NG3/sites/paramant-live.conf"
+seed_2b_backups "$NG3/sites" "$NG3/bk" 20260101-0300 "$SL3"
+if [ -f "$NG3/bk/paramant-live.conf.pre-3.1-20260101-0300" ] \
+   && [ ! -f "$NG3/bk/paramant.conf.pre-3.1-20260101-0300" ]; then
+  pass "2b filed the backup under paramant-live.conf, the name that was there then"
+else
+  fail "the 2b fixture did not file the backup the scenario needs"
+fi
+
+# Between 2b and 5c the backend conf is renamed on the server.
+make_conf "$NG3/available/paramant.conf" old old yes no
+rm -f "$NG3/sites/paramant-live.conf"
+ln -sfn "$NG3/available/paramant.conf" "$NG3/sites/paramant.conf"
+MD5_PUB="$(md5sum < "$NG3/available/paramant-public.conf")"
+MD5_BE="$(md5sum < "$NG3/available/paramant.conf")"
+
+OUT15="$(cd "$NG3" && PATH="$NG3/bin:$PATH" bash "$NG/5c.sh" 20260101-0300 "$NG3/sites" "$NG3/bk" \
+         "$SL3" 2>&1)"; RC15=$?
+if [ "$RC15" -ne 0 ]; then pass "5c stops when the conf it resolved has no 2b backup"; else
+  fail "5c edited a conf that has no backup (exit $RC15)"
+  printf '%s\n' "$OUT15" | sed 's/^/        /' | head -20
+fi
+if printf '%s\n' "$OUT15" | grep -q 'FATAL no phase 2b backup .*paramant.conf.pre-3.1-20260101-0300 for paramant.conf'; then
+  pass "the FATAL names the conf and the backup it went looking for"
+else
+  fail "the FATAL does not name the missing backup"
+  printf '%s\n' "$OUT15" | grep FATAL | sed 's/^/        /'
+fi
+if [ "$(field_5c "$OUT15" 'before confs without a backup')" = "1" ]; then
+  pass "the count of confs without a backup is reported, so the deploy can assert on it"
+else
+  fail "before confs without a backup = '$(field_5c "$OUT15" 'before confs without a backup')', expected 1"
+fi
+# The whole point: nothing was written, so there is nothing left modified.
+if [ "$(md5sum < "$NG3/available/paramant.conf")" = "$MD5_BE" ] \
+   && [ "$(md5sum < "$NG3/available/paramant-public.conf")" = "$MD5_PUB" ]; then
+  pass "neither conf was touched, so no conf is left modified without a backup"
+else
+  fail "5c changed a conf before it stopped"
+fi
+if printf '%s\n' "$OUT15" | grep -qi 'estoring the backed up confs'; then
+  fail "5c still claims to restore confs on a run where one of them has no backup"
+else
+  pass "5c does not promise a restore it could not deliver"
+fi
+check_lacks "$SCRIPT" 'for b in "\$NGBK"/\*\.pre-3\.1' \
+  "restore() no longer globs the backup dir; it restores exactly the resolved confs"
+
+echo ""
+echo "6i-7b. With the backup filed under the resolved name, the same run is clean"
+# Control: the stop above is about the missing backup, not about the rename.
+cp -a "$NG3/available/paramant.conf" "$NG3/bk/paramant.conf.pre-3.1-20260101-0300"
+OUT16="$(cd "$NG3" && PATH="$NG3/bin:$PATH" bash "$NG/5c.sh" 20260101-0300 "$NG3/sites" "$NG3/bk" \
+         "$SL3" 2>&1)"; RC16=$?
+if [ "$RC16" -eq 0 ] && [ "$(field_5c "$OUT16" 'before confs without a backup')" = "0" ]; then
+  pass "with the backup in place the same fixture runs through"
+else
+  fail "the control run exits $RC16 with $(field_5c "$OUT16" 'before confs without a backup') conf(s) unbacked"
+  printf '%s\n' "$OUT16" | sed 's/^/        /' | head -20
+fi
+if [ "$(field_5c "$OUT16" 'after edited files')" = "2" ]; then
+  pass "and it edits both resolved confs"
+else
+  fail "the control run edited $(field_5c "$OUT16" 'after edited files') conf(s), expected 2"
+fi
+
+echo ""
+echo "6i-7c. A FATAL after the edits really does put every resolved conf back"
+# restore() used to walk the backup dir. Now it walks the resolved names, so
+# what it restores is exactly what was edited. The multi-line auth_request is
+# the cheapest way to reach a FATAL that happens after the sed calls.
+NG4="$WORK/ng4"
+mkdir -p "$NG4/bin" "$NG4/available" "$NG4/bk" "$NG4/sites"
+cp "$NG/bin/nginx" "$NG/bin/systemctl" "$NG4/bin/"
+cat > "$NG4/available/paramant-public.conf" <<'CONF'
+server {
+    server_name paramant.app;
+    location = /sign {
+        auth_request /api/user/check;
+        error_page 401 = @login_redirect;
+        try_files /sign.html =404;
+    }
+    location = /dicom { return 404; }
+    location = /v1/paraid/issue-document { deny all; }
+    location ~ ^/v2/outbound {
+        proxy_pass http://relay;
+    }
+}
+CONF
+cp "$NG4/available/paramant-public.conf" "$NG4/available/paramant.conf"
+ln -sfn "$NG4/available/paramant-public.conf" "$NG4/sites/paramant-public.conf"
+ln -sfn "$NG4/available/paramant.conf"        "$NG4/sites/paramant.conf"
+seed_2b_backups "$NG4/sites" "$NG4/bk" 20260101-0400 "$SL3"
+MD4_PUB="$(md5sum < "$NG4/available/paramant-public.conf")"
+MD4_BE="$(md5sum < "$NG4/available/paramant.conf")"
+
+OUT17="$(cd "$NG4" && PATH="$NG4/bin:$PATH" bash "$NG/5c.sh" 20260101-0400 "$NG4/sites" "$NG4/bk" \
+         "$SL3" 2>&1)"; RC17=$?
+if [ "$RC17" -ne 0 ] && printf '%s\n' "$OUT17" | grep -q 'still carry an auth_request'; then
+  pass "the run reaches the post-edit FATAL, so restore() is exercised"
+else
+  fail "the fixture did not reach the post-edit FATAL (exit $RC17)"
+  printf '%s\n' "$OUT17" | sed 's/^/        /' | head -20
+fi
+if printf '%s\n' "$OUT17" | grep -q 'restored paramant.conf from' \
+   && printf '%s\n' "$OUT17" | grep -q 'restored paramant-public.conf from'; then
+  pass "restore() says which conf it put back, under the resolved name"
+else
+  fail "restore() did not report both confs"
+  printf '%s\n' "$OUT17" | grep -i restor | sed 's/^/        /'
+fi
+if [ "$(md5sum < "$NG4/available/paramant.conf")" = "$MD4_BE" ] \
+   && [ "$(md5sum < "$NG4/available/paramant-public.conf")" = "$MD4_PUB" ]; then
+  pass "both confs are byte for byte what they were before the run"
+else
+  fail "a conf was left modified after the FATAL restore"
+fi
+
+echo ""
+echo "6i-8. remote_nginx must not run remote() in a subshell"
+# Deploy run 4 (TS 20260903-0216) stopped in phase 2b on "the server never
+# printed 'after .env backup bytes'" while the server had printed exactly that,
+# 1420 bytes, and had resolved both confs. The wrapper was a pipeline,
+#
+#   { printf '%s\n' "$NGINX_RESOLVE_SNIPPET"; cat; } | remote "$@"
+#
+# and every stage of a pipeline is a subshell, so remote() and _remote_run()
+# set REMOTE_OUT and REMOTE_RC in a child that then exited. Every expect after
+# a remote_nginx call read whatever the PREVIOUS block had left behind.
+#
+# The block-level tests above extract heredoc bodies and never touch the
+# wrapper, which is why 252 green checks missed this. This one drives the real
+# remote_nginx(), with _remote_run() stubbed, and asks the calling shell what
+# it can see afterwards.
+WRAP="$WORK/wrap"
+mkdir -p "$WRAP"
+
+# The stub stands in for the ssh call: it records the body it was handed and
+# sets the two variables the way _remote_run() does on a real run.
+cat > "$WRAP/stub.sh" <<'STUB'
+die() { echo "die: $*" >&2; return 1; }
+_remote_run() {
+  cat > "$WRAPDIR/stdin.txt"
+  REMOTE_OUT="after .env backup bytes = 1420"
+  REMOTE_RC=0
+  return 0
+}
+STUB
+
+# harness <wrapper-source-file>: source the stub, the snippet, remote() and one
+# spelling of remote_nginx(), call it, and report what the CALLER can see.
+cat > "$WRAP/harness.sh" <<'HARNESS'
+set -uo pipefail
+WRAPDIR="$1"; WRAPPER="$2"; SCRIPT="$3"
+# shellcheck source=/dev/null
+. "$WRAPDIR/stub.sh"
+eval "$(sed -n '/^NGINX_RESOLVE_SNIPPET=/,/^)"$/p' "$SCRIPT")"
+eval "$(sed -n '/^remote() {$/,/^}$/p' "$SCRIPT")"
+# shellcheck source=/dev/null
+. "$WRAPPER"
+REMOTE_OUT="stale output from the previous block"
+REMOTE_RC=7
+remote_nginx "unit" one two <<'BODY'
+set -euo pipefail
+echo body-marker
+BODY
+echo "PARENT REMOTE_OUT=[$REMOTE_OUT]"
+echo "PARENT REMOTE_RC=[$REMOTE_RC]"
+HARNESS
+
+# The wrapper as the script spells it today.
+sed -n '/^remote_nginx() {$/,/^}$/p' "$SCRIPT" > "$WRAP/wrapper-now.sh"
+if [ -s "$WRAP/wrapper-now.sh" ]; then
+  pass "remote_nginx() could be extracted from the script"
+else
+  fail "could not extract remote_nginx() from the script"
+fi
+
+WOUT="$(WRAPDIR="$WRAP" bash "$WRAP/harness.sh" "$WRAP" "$WRAP/wrapper-now.sh" "$SCRIPT" 2>&1)"
+if printf '%s\n' "$WOUT" | grep -q 'PARENT REMOTE_OUT=\[after \.env backup bytes = 1420\]'; then
+  pass "REMOTE_OUT set by the remote call is visible in the shell that called remote_nginx"
+else
+  fail "REMOTE_OUT did not reach the caller; every expect after a remote_nginx would judge the previous block"
+  printf '%s\n' "$WOUT" | sed 's/^/        /' | head -10
+fi
+if printf '%s\n' "$WOUT" | grep -q 'PARENT REMOTE_RC=\[0\]'; then
+  pass "REMOTE_RC reaches the caller too, so a failing block still stops the deploy"
+else
+  fail "REMOTE_RC did not reach the caller (got: $(printf '%s\n' "$WOUT" | sed -n 's/^PARENT REMOTE_RC=//p'))"
+fi
+# The body still has to arrive whole, and the resolver still has to come first.
+if [ -f "$WRAP/stdin.txt" ]; then
+  R_LINE="$(grep -n '^resolve_conf_slots() {' "$WRAP/stdin.txt" | head -1 | cut -d: -f1)"
+  B_LINE="$(grep -n '^echo body-marker$' "$WRAP/stdin.txt" | head -1 | cut -d: -f1)"
+  if [ -n "$R_LINE" ] && [ -n "$B_LINE" ] && [ "$R_LINE" -lt "$B_LINE" ]; then
+    pass "the resolver is defined before the block body in what the server receives"
+  else
+    fail "the stdin the server would get is wrong (resolver at '${R_LINE:-none}', body at '${B_LINE:-none}')"
+    sed 's/^/        /' "$WRAP/stdin.txt" | head -8
+  fi
+  if grep -q '^set -euo pipefail$' "$WRAP/stdin.txt"; then
+    pass "the body arrives intact, strict mode and all"
+  else
+    fail "the block body did not survive the wrapper"
+  fi
+else
+  fail "the stub was never handed a body"
+fi
+
+# Negative control: the pipeline spelling, so this test cannot pass by accident
+# on a harness that would wave the bug through.
+cat > "$WRAP/wrapper-pipe.sh" <<'OLD'
+remote_nginx() {
+  { printf '%s\n' "$NGINX_RESOLVE_SNIPPET"; cat; } | remote "$@"
+}
+OLD
+POUT="$(WRAPDIR="$WRAP" bash "$WRAP/harness.sh" "$WRAP" "$WRAP/wrapper-pipe.sh" "$SCRIPT" 2>&1)"
+if printf '%s\n' "$POUT" | grep -q 'PARENT REMOTE_OUT=\[stale output from the previous block\]'; then
+  pass "negative control: the pipeline spelling really does lose REMOTE_OUT in a subshell"
+else
+  fail "the negative control no longer reproduces the run-4 bug, so the check above proves nothing"
+  printf '%s\n' "$POUT" | sed 's/^/        /' | head -10
+fi
+
+# And no remote call anywhere may be piped into again. Comment lines are left
+# out: the wrapper writes down the spelling that caused this, on purpose.
+PIPED="$(grep -nE '\|[[:space:]]*remote(_soft|_nginx)?[[:space:]]+"' "$SCRIPT" \
+         | grep -vE '^[0-9]+:[[:space:]]*#' || true)"
+if [ -n "$PIPED" ]; then
+  fail "a remote call is piped into, which puts it in a subshell and loses REMOTE_OUT"
+  printf '%s\n' "$PIPED" | sed 's/^/        /'
+else
+  pass "no remote call is on the right-hand side of a pipe"
 fi
 
 echo ""
