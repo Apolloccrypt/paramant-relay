@@ -208,7 +208,7 @@ footer a{color:var(--ink);text-decoration:none}
 
 <h2>Core principle</h2>
 <p><strong>PARAMANT collects only what is strictly required to operate your account and run the service.</strong></p>
-<p>An email address is required to create an account and recover access; it is personal data, and it is stored. No phone number. We do not log IP addresses for analytics or profiling. An IP is processed for security and abuse-prevention only (rate limiting, the session record, an audit log, and the DPA signature record), and two operational logs hold one for longer than a timer; they are named below. Only a strictly-necessary session cookie (no tracking cookies). No tracking pixels. No analytics. No advertisements. We never sell your data.</p>
+<p>An email address is required to create an account and recover access; it is personal data, and it is stored. No phone number. We do not log IP addresses for analytics or profiling. An IP is processed for security and abuse-prevention only (rate limiting, the session record, an audit log, and the DPA signature record), and one log holds an address for longer than a timer; it is named below. Only a strictly-necessary session cookie (no tracking cookies). No tracking pixels. No analytics. No advertisements. We never sell your data.</p>
 
 <h2>How Ghost Pipe &amp; ParaShare (the ParaSend web app) work</h2>
 <p>All files are encrypted <strong>client-side in your browser</strong> using post-quantum cryptography (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256) before they ever reach our servers. The relay never sees plaintext at any point.</p>
@@ -237,14 +237,14 @@ footer a{color:var(--ink);text-decoration:none}
 <tr><td>Sign-in factors: passkey public keys, TOTP secret (encrypted), recovery codes (hashed)</td><td>Account authentication</td><td>Stored (server)</td><td>Never</td></tr>
 <tr><td>ParaSign signing public key + fingerprint</td><td>Verifiable signing identity</td><td>Stored (server) &middot; public half only; the private key never leaves your browser</td><td>Public (its hash is in the CT log)</td></tr>
 <tr><td>Plan + anonymised billing reference</td><td>Pro/Enterprise billing</td><td>Stored (server)</td><td>Payment processor (Mollie, EU)</td></tr>
-<tr><td>Client IP + user-agent</td><td>Security, rate limiting, audit log</td><td>Session/rate-limit TTL; the audit log and the two operational logs named below are capped by volume, not by time</td><td>Never</td></tr>
+<tr><td>Client IP + user-agent</td><td>Security, rate limiting, audit log</td><td>Session/rate-limit TTL; the audit log and the edge access log named below are capped by volume, not by time</td><td>Never</td></tr>
 </tbody>
 </table>
 
 <h2>What we never do</h2>
 <ul>
 <li>Sell your data, or use it for advertising or profiling</li>
-<li>Log or store IP addresses for analytics or profiling (an IP is used for security and abuse-prevention only, in the logs named below)</li>
+<li>Log or store IP addresses for analytics or profiling (an IP is used for security and abuse-prevention only, in the log named below)</li>
 <li>Use tracking cookies or browser fingerprinting (only a strictly-necessary session cookie is set after login)</li>
 <li>Run advertising or tracking scripts</li>
 <li>Share your data with third parties, except the operational subprocessors needed to run the service (hosting, transactional email, and payments, listed below)</li>
