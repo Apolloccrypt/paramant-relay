@@ -17,38 +17,9 @@
 
 const { test, after } = require('node:test');
 const assert = require('assert');
-const { spawn } = require('child_process');
-const path = require('path');
+const { bootHealthyRelay, killSpawnedRelays } = require('./_boot-relay');
 
-const RELAY_DIR = path.join(__dirname, '..');
 const TOKEN = 'deephealth-test-token';
-const children = [];
-
-function boot(port, extraEnv) {
-  const child = spawn('node', ['relay.js'], {
-    cwd: RELAY_DIR,
-    env: {
-      ...process.env,
-      PORT: String(port),
-      USERS_JSON: '{"api_keys":[]}',
-      RELAY_REDIS_URL: '',
-      NATS_URL: '',
-      ...extraEnv,
-    },
-    stdio: ['ignore', 'ignore', 'ignore'],
-  });
-  children.push(child);
-  return child;
-}
-
-async function waitHealthy(port) {
-  const deadline = Date.now() + 15000;
-  for (;;) {
-    try { const r = await fetch(`http://127.0.0.1:${port}/health`); if (r.ok) return; } catch (_) { /* not up yet */ }
-    if (Date.now() > deadline) throw new Error('relay did not become healthy in time');
-    await new Promise((r) => setTimeout(r, 250));
-  }
-}
 
 async function deep(port, headers) {
   const r = await fetch(`http://127.0.0.1:${port}/v2/health/deep`, { headers: headers || {} });
@@ -57,12 +28,10 @@ async function deep(port, headers) {
   return { status: r.status, body: j };
 }
 
-after(() => { for (const c of children) c.kill('SIGKILL'); });
+after(killSpawnedRelays);
 
 test('ghost_pipe: internal auth reads the deep check, the open internet gets 401', async () => {
-  const port = 34500 + (process.pid % 400);
-  boot(port, { RELAY_MODE: 'ghost_pipe', INTERNAL_AUTH_TOKEN: TOKEN });
-  await waitHealthy(port);
+  const { port } = await bootHealthyRelay({ RELAY_MODE: 'ghost_pipe', INTERNAL_AUTH_TOKEN: TOKEN });
 
   // Unauthenticated: closed, and closed the RIGHT way — a 401 from the gate,
   // not the old mode-allowlist drop that said "Not available in this relay
@@ -87,9 +56,7 @@ test('ghost_pipe: internal auth reads the deep check, the open internet gets 401
 });
 
 test('ghost_pipe without INTERNAL_AUTH_TOKEN: stays closed, never open-by-default', async () => {
-  const port = 34900 + (process.pid % 400);
-  boot(port, { RELAY_MODE: 'ghost_pipe', INTERNAL_AUTH_TOKEN: '' });
-  await waitHealthy(port);
+  const { port } = await bootHealthyRelay({ RELAY_MODE: 'ghost_pipe', INTERNAL_AUTH_TOKEN: '' });
   const anon = await deep(port);
   assert.strictEqual(anon.status, 401, 'missing token config must read as closed');
   // Even presenting the header cannot open a gate with no configured token.
@@ -98,9 +65,7 @@ test('ghost_pipe without INTERNAL_AUTH_TOKEN: stays closed, never open-by-defaul
 });
 
 test('full mode: stays public for the setup wizard', async () => {
-  const port = 35300 + (process.pid % 400);
-  boot(port, { RELAY_MODE: 'full' });
-  await waitHealthy(port);
+  const { port } = await bootHealthyRelay({ RELAY_MODE: 'full' });
   const anon = await deep(port);
   assert.strictEqual(anon.status, 200, 'full mode must keep the public read');
   assert.ok(Array.isArray(anon.body.checks) && anon.body.checks.length > 0);

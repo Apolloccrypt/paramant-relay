@@ -14,41 +14,59 @@
 
 const { test, after } = require('node:test');
 const assert = require('assert');
-const { spawn } = require('child_process');
-const path = require('path');
+const {
+  BOOT_TIMEOUT_MS, freeRelayPort, killSpawnedRelays, spawnRelay,
+} = require('./_boot-relay');
 
-const RELAY_DIR = path.join(__dirname, '..');
-const children = [];
-after(() => { for (const c of children) c.kill('SIGKILL'); });
+after(killSpawnedRelays);
 
 // Boot until the billing_config line appears (it is logged right after
-// relay_started), then return it parsed. Fails loudly if it never comes.
-function bootForBillingLine(port, extraEnv) {
+// relay_started), then return it parsed. Fails loudly if it never comes, and
+// the message now carries the exit state and both output tails: a boot that
+// died on a port someone else had taken used to look exactly like a boot that
+// was merely slow.
+//
+// The port comes from the OS. It used to be 34900 + (pid % 400) + a counter,
+// which is the same window deep-health-gate picked from, and test.yml runs the
+// two suites as parallel processes out of a single `node --test`.
+async function bootForBillingLine(extraEnv) {
+  const port = await freeRelayPort();
   return new Promise((resolve, reject) => {
-    const env = { ...process.env, PORT: String(port), USERS_JSON: '{"api_keys":[]}', RELAY_REDIS_URL: '', NATS_URL: '' };
-    for (const k of ['BILLING_MODE', 'MOLLIE_API_KEY', 'MOLLIE_TEST_API_KEY']) delete env[k];
-    Object.assign(env, extraEnv);
-    const child = spawn('node', ['relay.js'], { cwd: RELAY_DIR, env, stdio: ['ignore', 'pipe', 'ignore'] });
-    children.push(child);
-    let buf = '';
-    const timer = setTimeout(() => reject(new Error(`no billing_config line within 15s; stdout so far:\n${buf.slice(-2000)}`)), 15000);
-    child.stdout.on('data', (d) => {
-      buf += d.toString();
-      for (const line of buf.split('\n')) {
-        if (!line.includes('"billing_config"')) continue;
-        let j = null;
-        try { j = JSON.parse(line); } catch (_) { continue; }
-        if (j && j.msg === 'billing_config') { clearTimeout(timer); child.kill('SIGKILL'); return resolve(j); }
-      }
+    let settled = false;
+    // Whichever of the three outcomes lands first wins; the other two are the
+    // consequences of it (killing the child fires 'exit', for one).
+    const once = (fn) => (...args) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn(...args);
+    };
+    const done = once((line) => { relay.kill(); resolve(line); });
+    const fail = once((what) => {
+      reject(new Error(`${what} on port ${relay.port}\n${relay.output()}`));
     });
-    child.on('exit', (code) => { clearTimeout(timer); reject(new Error(`relay exited (${code}) before logging billing_config:\n${buf.slice(-2000)}`)); });
+    // spawnRelay hands over complete stdout lines. The relay logs one JSON
+    // object per line, so nothing has to be reassembled here.
+    const relay = spawnRelay(port, extraEnv, {
+      unset: ['BILLING_MODE', 'MOLLIE_API_KEY', 'MOLLIE_TEST_API_KEY'],
+      onLine: (line) => {
+        if (settled || !line.includes('"billing_config"')) return;
+        let j = null;
+        try { j = JSON.parse(line); } catch (_) { return; }
+        if (j && j.msg === 'billing_config') done(j);
+      },
+    });
+    relay.child.on('exit', (code, signal) => {
+      fail(`relay exited (code=${code} signal=${signal}) before logging billing_config`);
+    });
+    const timer = setTimeout(
+      () => fail(`no billing_config line within ${BOOT_TIMEOUT_MS}ms`),
+      BOOT_TIMEOUT_MS);
   });
 }
 
-const port = () => 34900 + (process.pid % 400) + children.length;
-
 test('stance 1: BILLING_MODE empty with a live key boots one-off only, and says so at warn', async () => {
-  const j = await bootForBillingLine(port(), { MOLLIE_API_KEY: 'live_bootcheck_0123456789' });
+  const j = await bootForBillingLine({ MOLLIE_API_KEY: 'live_bootcheck_0123456789' });
   assert.strictEqual(j.level, 'warn', 'an inferred stance is legitimate but undecided, so it warns');
   assert.strictEqual(j.mode, 'live');
   assert.strictEqual(j.mode_source, 'inferred');
@@ -61,7 +79,7 @@ test('stance 1: BILLING_MODE empty with a live key boots one-off only, and says 
 });
 
 test('stance 2: BILLING_MODE=test boots the recurring layer against the test key', async () => {
-  const j = await bootForBillingLine(port(), { BILLING_MODE: 'test', MOLLIE_TEST_API_KEY: 'test_bootcheck_0123456789', MOLLIE_API_KEY: 'live_bootcheck_0123456789' });
+  const j = await bootForBillingLine({ BILLING_MODE: 'test', MOLLIE_TEST_API_KEY: 'test_bootcheck_0123456789', MOLLIE_API_KEY: 'live_bootcheck_0123456789' });
   assert.strictEqual(j.level, 'info');
   assert.strictEqual(j.mode, 'test');
   assert.strictEqual(j.mode_source, 'explicit');
@@ -72,7 +90,7 @@ test('stance 2: BILLING_MODE=test boots the recurring layer against the test key
 });
 
 test('stance 3: BILLING_MODE=live boots the recurring layer against the live key', async () => {
-  const j = await bootForBillingLine(port(), { BILLING_MODE: 'live', MOLLIE_API_KEY: 'live_bootcheck_0123456789' });
+  const j = await bootForBillingLine({ BILLING_MODE: 'live', MOLLIE_API_KEY: 'live_bootcheck_0123456789' });
   assert.strictEqual(j.level, 'info');
   assert.strictEqual(j.mode, 'live');
   assert.strictEqual(j.mode_source, 'explicit');
@@ -82,7 +100,7 @@ test('stance 3: BILLING_MODE=live boots the recurring layer against the live key
 });
 
 test('an explicit stance without its key boots red: nothing can bill, and the log says so first', async () => {
-  const j = await bootForBillingLine(port(), { BILLING_MODE: 'test', MOLLIE_API_KEY: 'live_bootcheck_0123456789' });
+  const j = await bootForBillingLine({ BILLING_MODE: 'test', MOLLIE_API_KEY: 'live_bootcheck_0123456789' });
   assert.strictEqual(j.level, 'error');
   assert.strictEqual(j.mode, 'test');
   assert.strictEqual(j.key_present, false);
