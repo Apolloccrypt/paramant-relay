@@ -201,7 +201,7 @@ section p+p{margin-top:14px}
       </thead>
       <tbody>
         <tr><td>GDPR Art.&nbsp;32 &mdash; Appropriate technical measures</td><td>ML-KEM-768 + AES-256-GCM in transit; relay cannot decrypt; EU/DE hosting</td></tr>
-        <tr><td>GDPR Art.&nbsp;5(1)(e) &mdash; Storage limitation</td><td>Burn-on-read: relay holds ciphertext only until first download, then wipes</td></tr>
+        <tr><td>GDPR Art.&nbsp;5(1)(e) &mdash; Storage limitation</td><td>Burn-on-read: a web app transfer is held only until the first download, then wiped; an API link is wiped once the reads it allows are spent</td></tr>
         <tr><td>Evidence integrity</td><td>ML-DSA-65 signed receipt with SHA-256 file hash; tamper-evident by construction</td></tr>
         <tr><td>GDPR Art.&nbsp;28 &mdash; Processor agreement</td><td>Standard DPA at <a href="/dpa">/dpa</a>, signable electronically and applies to all plans. The relay does process personal data (account email, IP for rate limiting and abuse-prevention); what it never holds is document plaintext or keys.</td></tr>
       </tbody>

@@ -566,7 +566,10 @@ const pricingVisible = pricing.slice(pricing.indexOf('<body')).replace(/<!--[\s\
 
 // What the page sells, before what it costs. A visitor who lands here from a
 // search engine has seen no other page, so "Pricing" plus a table says nothing.
-assert.match(pricingVisible, /Sign documents and send files that vanish after one read\./,
+// "on Community" is load-bearing, not padding: tiers.js gives a Pro link up to
+// ten reads, so the sentence without the plan is false for everybody who pays.
+// Block 37 of site-claims.test.mjs holds the same line across the whole site.
+assert.match(pricingVisible, /Sign documents and send files that vanish after one read on Community\./,
   'pricing.html must say what the product does above the prices');
 
 // The promise carries its own number. "Free forever" on its own reads as
@@ -580,7 +583,7 @@ assert.match(pricingVisible, /Community is &euro;0 a month, forever:<\/strong> 2
 assert.doesNotMatch(pricingVisible, /uploads per hour/,
   'pricing.html must not sell the anonymous per-IP rate as an account limit');
 assert.ok(
-  pricingVisible.indexOf('Sign documents and send files that vanish after one read.') <
+  pricingVisible.indexOf('Sign documents and send files that vanish after one read on Community.') <
   pricingVisible.indexOf('Community is &euro;0 a month, forever:'),
   'the product line must stand above the free/paid split',
 );

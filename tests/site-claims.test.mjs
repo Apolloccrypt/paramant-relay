@@ -1314,8 +1314,8 @@ test('the reads a link allows on /privacy are the ones tiers.js grants', () => {
   assert.doesNotMatch(priv, /relay server and is permanently and irreversibly destroyed after the first download/,
     'privacy: must not state burn-on-read as a property of every plan');
 
-  // The other half of the same untruth. Fifteen pages still call burn-on-read
-  // universal, and that sweep is a batch of its own; but /press went further and
+  // The other half of the same untruth. Fifteen pages called burn-on-read
+  // universal; that sweep is block 37. /press went further and
   // denied the timer outright ("destroyed on download, not on a timer") while
   // tiers.js gives every plan a view_ttl_ms. Saying a thing exists where it does
   // not is a different mistake from denying a thing that does, and the denial is
@@ -1886,4 +1886,172 @@ test('the norm mappings the site claims are the ones written in the tree, and no
     }
   }
   assert.deepEqual(gated, [], `\n  ${gated.join('\n  ')}\n`);
+});
+
+// 37 -- Burn-on-read as a universal property: the fifteen pages block 24 named
+// and left for a batch of its own. tiers.js gives a Community link one read and
+// a paid link more (Pro 10, Business 25, Enterprise 100), so "the file is gone
+// after the first read" is true on the free plan and false on every plan a
+// customer pays for. The rule this block enforces is narrow on purpose: a page
+// may sell burn-on-read as loudly as it likes, but wherever it states the claim
+// the same paragraph has to say which plan it holds for.
+//
+// Three ways for a paragraph to be right, and the third is not a loophole:
+//   1. it names Community, the plan that really does burn on the first read;
+//   2. it names the read count a paid link buys, read off tiers.js;
+//   3. it says "web app". frontend/js/parashare.page.js never sends max_views
+//      and relay.js defaults a transfer without one to a single read on every
+//      plan, so a web app transfer does burn on the first read whatever the
+//      sender pays. Both halves are pinned below, so the day either changes the
+//      pages that lean on it go red instead of quietly becoming false.
+//
+// Tier-card feature lists are cut out of the sweep before it runs. A bullet
+// inside a card is scoped by the card, not by the sentence, and repeating the
+// plan name in every bullet would be noise; the cards are pinned against
+// tiers.js directly instead, which is the stronger check.
+//
+// Verified by sabotage in both directions:
+//   * put any rewritten sentence back to its universal form (drop "on
+//     Community" from /rules, or "On the Community plan" from /security) and
+//     this goes red naming the page and the sentence;
+//   * set pro.max_views to 1 in tiers.js and it goes red too, because the
+//     qualification is then false the other way round: the pages would be
+//     promising reads the relay no longer grants.
+test('every page that promises burn-on-read says which plan it holds for', () => {
+  const tiersSrc = read('relay/lib/tiers.js');
+  const viewsOf = (tier) => {
+    const m = /max_views:\s*(\d+)/.exec(tiersSrc.slice(tiersSrc.indexOf(`${tier}:`)));
+    assert.ok(m, `tiers.js ${tier} must declare a literal max_views`);
+    return Number(m[1]);
+  };
+  const reads = {
+    community: viewsOf('community'),
+    pro: viewsOf('pro'),
+    business: viewsOf('business'),
+    enterprise: viewsOf('enterprise'),
+  };
+  assert.equal(reads.community, 1,
+    'community no longer burns on the first read; the Community qualification this block requires is now the wrong sentence');
+  for (const paid of ['pro', 'business', 'enterprise']) {
+    assert.ok(reads[paid] > reads.community,
+      `${paid} now allows ${reads[paid]} reads, the same as Community: burn-on-read is universal again, and every page that says a paid link buys more reads is promising something the relay does not grant`);
+  }
+
+  // The web app escape hatch, pinned to the two lines that make it true.
+  const relaySrc = stripJsComments(read('relay/relay.js'));
+  assert.match(relaySrc, /const maxViews = Math\.max\(1, Math\.min\(parseInt\(reqMaxViews \|\| 1\) \|\| 1, _psend\.limits\.max_views \|\| 1\)\)/,
+    'relay.js no longer defaults a transfer that asks for no max_views to a single read; the pages that say the ParaSend web app burns on the first read have lost their ground');
+  assert.match(relaySrc, /apiKey: null, max_views: 1, views_remaining: 1/,
+    'the anonymous inbound path no longer pins a single read');
+  assert.doesNotMatch(stripJsComments(read('frontend/js/parashare.page.js')), /max_views/,
+    'the ParaSend web app now asks for a read count of its own; a paragraph may no longer say "web app" instead of naming the plan');
+
+  // What a visitor reads, body only. /docs ships no <body> tag at all, so fall
+  // back to the end of the head rather than scanning the JSON-LD and the meta
+  // descriptions, which this batch deliberately does not touch.
+  const bodyOf = (html) => {
+    const i = html.search(/<body[\s>]/i);
+    const j = i >= 0 ? i : html.indexOf('</head>');
+    let body = html.slice(j >= 0 ? j : 0)
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ');
+    // Tier-card feature lists out: scoped by their card, pinned separately.
+    body = body.replace(/<ul[^>]*>[\s\S]*?<\/ul>/gi, (m, off, src) =>
+      /tier-name|tier-card/.test(src.slice(Math.max(0, off - 500), off)) ? ' ' : m);
+    return body;
+  };
+  const flatten = (s) => s
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&rsquo;/g, "'").replace(/&nbsp;/g, ' ').replace(/&mdash;/g, '-')
+    .replace(/&euro;/g, 'EUR').replace(/&middot;/g, '.').replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ').trim();
+  // One paragraph = the text between two block starts. Rows and preformatted
+  // blocks count as paragraphs; table cells do not, so a value cell may be
+  // qualified by the label cell beside it.
+  const paragraphs = (body) => {
+    const cut = /<p[\s>]|<li[\s>]|<tr[\s>]|<h[1-6][\s>]|<pre[\s>]|<\/pre>|<section[\s>]|<div class="faq-item"|<div class="k">|<span class="badge"/gi;
+    const at = [0];
+    let m;
+    while ((m = cut.exec(body))) at.push(m.index);
+    at.push(body.length);
+    return at.slice(0, -1).map((start, i) => flatten(body.slice(start, at[i + 1]))).filter(Boolean);
+  };
+
+  // The sentences that state burn-on-read as a property of the transfer rather
+  // than of a plan. The bare compound noun is a feature name and is left alone:
+  // "a burn-on-read link" says nothing false, "burns it on read" does.
+  const CLAIM = [
+    /\b(?:burn|destroy|wipe|erase)(?:s|ed|ing)?\b[^.<]{0,15}\bon (?:the )?first (?:read|open|download)\b/i,
+    /\b(?:burn|destroy|wipe|erase)(?:s|ed|ing)?\b[^.<]{0,15}\bon read\b/i,
+    /\b(?:burn|destroy|wipe|erase)(?:s|ed|ing)?\b[^.<]{0,25}\bafter (?:one|a single|the first)(?: successful)? (?:read|download|open|delivery)\b/i,
+    /\bburn-on-first-read\b/i,
+    /\b(?:destroyed|wiped|erased|deleted|gone)\b[^.<]{0,40}\bafter (?:the )?(?:first|one)(?: successful)? (?:read|download|open)\b/i,
+    /\b(?:vanish(?:es)?|gone)\b[^.<]{0,25}\bafter one read\b/i,
+    /\bgone the moment\b/i,
+    /\buntil (?:the )?first (?:read|download|open)\b/i,
+    /\b(?:wiped|destroyed|erased|deleted)\b[^.<]{0,20}\bimmediately on download\b/i,
+    /\bone (?:download|retrieval|read) only\b/i,
+    /\bexactly one opening\b/i,
+    /\bsingle-use guarantee\b/i,
+    /\bdownloads it once; then it is gone\b/i,
+  ];
+  const QUALIFIED = [/\bCommunity\b/, /\bweb app\b/i, new RegExp(`\\bup to ${reads.pro} reads\\b`, 'i')];
+
+  const unqualified = [];
+  const claiming = new Set();
+  for (const slug of publicPages()) {
+    for (const para of paragraphs(bodyOf(page(slug)))) {
+      if (/^burn[- ]on[- ]read$/i.test(para)) continue; // the feature's name, used as a heading
+      const hit = CLAIM.find((re) => re.test(para));
+      if (!hit) continue;
+      claiming.add(slug);
+      if (QUALIFIED.some((re) => re.test(para))) continue;
+      unqualified.push(`${slug}: "${hit.exec(para)[0]}" states burn-on-read for every plan, and tiers.js gives Pro ${reads.pro} reads per link. Paragraph: ${para.slice(0, 160)}`);
+    }
+  }
+  assert.deepEqual(unqualified, [], `\n  ${unqualified.join('\n  ')}\n`);
+  assert.ok(claiming.size >= 10,
+    `only ${claiming.size} public pages still make the burn-on-read claim; the patterns above have stopped matching the site and this block is measuring nothing`);
+
+  // Every read count the site names is the one tiers.js grants. This is the
+  // half that catches the other sabotage: with pro.max_views at 1 the number
+  // in the copy stops matching, on every page that carries it.
+  const PLAN = { community: 'community', pro: 'pro', business: 'business', enterprise: 'enterprise' };
+  const drifted = [];
+  for (const slug of publicPages()) {
+    const text = flatten(bodyOf(page(slug)));
+    for (const m of text.matchAll(/up to (\d+) reads? on (Community|Pro|Business|Enterprise)/gi)) {
+      const want = reads[PLAN[m[2].toLowerCase()]];
+      if (Number(m[1]) !== want) drifted.push(`${slug}: says "${m[0]}", tiers.js grants ${want}`);
+    }
+  }
+  assert.deepEqual(drifted, [], `\n  ${drifted.join('\n  ')}\n`);
+
+  // The ParaSend tier cards, which are where a buyer reads the number before
+  // he pays for it. Community's card is the one page element allowed to say
+  // "Burn on first read" flat, because the card it sits in is the plan.
+  const pricingSrc = page('pricing');
+  assert.ok(pricingSrc.includes('<li>Burn on first read</li>'),
+    'pricing: the ParaSend Community card must still say the link burns on the first read');
+  assert.ok(pricingSrc.includes(`<li>Up to ${reads.pro} reads per link</li>`),
+    `pricing: the ParaSend Pro card must offer the ${reads.pro} reads per link tiers.js grants`);
+  assert.ok(pricingSrc.includes(`<li>Up to ${reads.enterprise} reads per link</li>`),
+    `pricing: the ParaSend Enterprise card must offer the ${reads.enterprise} reads per link tiers.js grants`);
+  assert.ok(page('parasend').includes('<li>Burn on first read</li>'),
+    'parasend: the Community card must still say the link burns on the first read');
+  assert.ok(flatten(bodyOf(page('index'))).includes(`up to ${reads.pro} reads per link`),
+    `index: the ParaSend Pro price line must name the ${reads.pro} reads per link tiers.js grants`);
+
+  // The three sentences that spell out all four plans at once. Written off
+  // tiers.js so a policy change moves them instead of leaving them stale.
+  const spelled = [
+    ['architecture', `up to ${reads.pro} reads on Pro, ${reads.business} on Business and ${reads.enterprise} on Enterprise`],
+    ['pricing', `A Pro link allows up to ${reads.pro} reads, Business ${reads.business} and Enterprise ${reads.enterprise}.`],
+    ['docs', `Community gets 1 hour and 1 read, Pro 24 hours and up to ${reads.pro} reads, Business 7 days and ${reads.business} reads, Enterprise 7 days and ${reads.enterprise} reads`],
+  ];
+  for (const [slug, sentence] of spelled) {
+    assert.ok(flatten(bodyOf(page(slug))).includes(sentence),
+      `${slug}: must spell the per-plan read counts as "${sentence}", the numbers tiers.js sets`);
+  }
 });
