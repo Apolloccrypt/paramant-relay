@@ -5,7 +5,7 @@
 // first shift. Run: node relay/test/ct-window.test.js
 const assert = require('assert');
 const crypto = require('crypto');
-const { CtWindow } = require('../lib/ct-window');
+const { CtWindow, reindexEntries } = require('../lib/ct-window');
 const { ctTreeHash, ctInclusionProof, ctNodeHash } = require('../lib/ct-hash');
 
 let passed = 0;
@@ -129,6 +129,102 @@ function fill(w, n) {
   assert.strictEqual(w.get(24).leaf_hash, last.leaf_hash);
   assert.strictEqual(w.get(10), null, 'a pruned index is gone, not misresolved');
   ok('integration: inclusion proof validates for a fresh entry past the cap');
+}
+
+// ── the stored index field is a cache, the position is the truth ────────────
+// Reproduces the public-log defect of 2026-09: five entries whose persisted
+// .index survived an April rebuild unchanged while their position had moved,
+// so the listing showed indices 4..8 twice and 42..46 not at all.
+function poisoned(n) {
+  const list = [];
+  for (let i = 0; i < n; i++) list.push({ index: i, leaf_hash: 'leaf' + i, type: 't' });
+  for (let p = 42; p <= 46; p++) list[p].index = p - 38;   // 42..46 -> 4..8
+  return list;
+}
+
+{
+  const w = new CtWindow(1000);
+  w.load(poisoned(60));
+  // page() numbers rows from the position, so the poisoned field is bypassed.
+  const pg = w.page(40, 8);
+  assert.strictEqual(pg.start_index, 40);
+  assert.deepStrictEqual(pg.entries.map((e, i) => pg.start_index + i), [40,41,42,43,44,45,46,47]);
+  assert.deepStrictEqual(pg.entries.map(e => e.leaf_hash),
+    ['leaf40','leaf41','leaf42','leaf43','leaf44','leaf45','leaf46','leaf47'],
+    'position 42 still carries the leaf that was appended 43rd');
+  // The stored field is still wrong at this point; that is the whole point.
+  assert.strictEqual(pg.entries[2].index, 4, 'stored field is stale, and unused');
+  ok('page() numbers entries from position, not from the stored index field');
+}
+
+{
+  const w = new CtWindow(1000);
+  w.load(poisoned(60));
+  const feed = w.recentPage(10);
+  assert.strictEqual(feed.start_index, 50);
+  assert.deepStrictEqual(feed.entries.map((e, i) => feed.start_index + i),
+    [50,51,52,53,54,55,56,57,58,59]);
+  assert.strictEqual(w.logicalIndexAt(42), 42);
+  ok('recentPage() and logicalIndexAt() are positional too');
+}
+
+// ── the repair: idempotent, and the Merkle root does not move ───────────────
+{
+  const w = new CtWindow(1000);
+  w.load(poisoned(60));
+  const rootBefore = ctTreeHash(w.entries);
+  const leavesBefore = w.entries.map(e => e.leaf_hash);
+  const proofBefore = ctInclusionProof(w.entries, 42);
+
+  assert.strictEqual(w.reindex(), 5, 'exactly the five poisoned entries are corrected');
+  assert.deepStrictEqual(w.entries.map(e => e.index), w.entries.map((_, p) => p),
+    'every stored index now equals its position');
+  assert.strictEqual(w.reindex(), 0, 'idempotent: a second pass finds nothing');
+
+  assert.deepStrictEqual(w.entries.map(e => e.leaf_hash), leavesBefore, 'no leaf moved');
+  assert.strictEqual(ctTreeHash(w.entries), rootBefore, 'root is byte-identical after the repair');
+  assert.deepStrictEqual(ctInclusionProof(w.entries, 42), proofBefore, 'audit path is unchanged');
+  // And lookups that were already positional keep answering the same entry.
+  assert.strictEqual(w.get(42).leaf_hash, 'leaf42');
+  ok('reindex() repairs the field, is idempotent, and leaves the root untouched');
+}
+
+// ── reindexEntries on the persisted list, including the rotated case ────────
+{
+  const list = poisoned(60);
+  const rootBefore = ctTreeHash(list);
+  assert.strictEqual(reindexEntries(list), 5);
+  assert.strictEqual(reindexEntries(list), 0);
+  assert.strictEqual(ctTreeHash(list), rootBefore, 'root unchanged over the persisted list');
+
+  // A rotated file does not start at 0. The first entry is the anchor, so the
+  // recount must continue from it rather than renumber the whole file from 0.
+  const rotated = [{ index: 900, leaf_hash: 'a' }, { index: 7, leaf_hash: 'b' }, { index: 902, leaf_hash: 'c' }];
+  assert.strictEqual(reindexEntries(rotated), 1);
+  assert.deepStrictEqual(rotated.map(e => e.index), [900, 901, 902]);
+
+  // No index field at all (a very old line) counts as wrong and gets one.
+  const legacy = [{ leaf_hash: 'a' }, { leaf_hash: 'b' }];
+  assert.strictEqual(reindexEntries(legacy), 2);
+  assert.deepStrictEqual(legacy.map(e => e.index), [0, 1]);
+
+  assert.strictEqual(reindexEntries([]), 0);
+  assert.strictEqual(reindexEntries(null), 0);
+  ok('reindexEntries anchors on the first entry, handles rotated and legacy lines');
+}
+
+// ── load() of a repaired list keeps appending monotonically ────────────────
+{
+  const list = poisoned(60);
+  reindexEntries(list);
+  const w = new CtWindow(1000);
+  w.load(list);
+  assert.strictEqual(w.base, 0);
+  assert.strictEqual(w.nextIndex(), 60);
+  const index = w.nextIndex();
+  w.append({ index, leaf_hash: 'leaf60' });
+  assert.strictEqual(w.get(60).leaf_hash, 'leaf60');
+  ok('a repaired log rehydrates and keeps appending without a gap');
 }
 
 console.log(`\n${passed} passed`);

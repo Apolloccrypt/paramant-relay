@@ -13,6 +13,17 @@
 //   - window position : 0..windowLength-1, where the Merkle tree/proof live.
 // An entry whose logical index has aged out of the window returns null on
 // lookup (honestly "pruned") instead of a wrong or duplicate-indexed entry.
+//
+// POSITION IS THE AUTHORITY (2026-09). An entry also carries a stored .index
+// field, written once at append time and persisted with the entry. That field
+// is a cache, not a source of truth: a rebuild or migration of the persisted
+// log can leave it stale while order and leaf_hashes are perfectly fine, which
+// is exactly what happened on the public log (five entries at positions 42..46
+// carried indices 4..8, so the listing showed duplicates while /v2/ct/proof,
+// which resolves by position, kept answering correctly). Every read path that
+// hands an index out therefore derives it from the position -- page(),
+// recentPage() and logicalIndexAt() exist for that -- and reindex() /
+// reindexEntries() repair the stored field so the two can no longer diverge.
 class CtWindow {
   constructor(max) {
     this.max = max;
@@ -35,6 +46,10 @@ class CtWindow {
     const p = logicalIndex - this.base;
     return (p >= 0 && p < this.entries.length) ? p : -1;
   }
+
+  // The logical index of the entry at window position `p`. This, not the
+  // stored .index field, is what a caller must publish for an entry.
+  logicalIndexAt(position) { return this.base + position; }
 
   // Retrieve an entry by its logical index, or null if pruned/absent.
   get(logicalIndex) {
@@ -63,8 +78,29 @@ class CtWindow {
     return this.entries.slice(start, start + count);
   }
 
+  // sliceByIndex plus the logical index the first returned entry actually sits
+  // at, so a listing can number its rows `start_index + i` instead of trusting
+  // the stored .index field. `from` below base clamps to base, so start_index
+  // is what the caller got, not what it asked for.
+  page(fromLogical, count) {
+    const start = Math.max(0, fromLogical - this.base);
+    return { start_index: this.base + start, entries: this.entries.slice(start, start + count) };
+  }
+
   // The most recent `n` entries (for the /ct feed).
   recent(n) { return this.entries.slice(-n); }
+
+  // recent(n) with the logical index of its first entry, same reason as page().
+  recentPage(n) {
+    const start = Math.max(0, this.entries.length - n);
+    return { start_index: this.base + start, entries: this.entries.slice(start) };
+  }
+
+  // One-shot repair of the retained window: force every stored .index back to
+  // its position (base + p). Returns how many were wrong. Order, leaf_hash and
+  // tree_hash are never touched, so the Merkle root over the window is
+  // byte-identical before and after. Idempotent: a second call returns 0.
+  reindex() { return reindexEntries(this.entries); }
 
   // Rehydrate from a persisted list (oldest first). Each entry carries its own
   // monotonic .index; base is taken from the first retained entry. Trims to the
@@ -77,4 +113,25 @@ class CtWindow {
   }
 }
 
-module.exports = { CtWindow };
+// Recount a persisted, oldest-first entry list in place so every entry's stored
+// .index equals its position relative to the first entry's index. The first
+// entry is the anchor by definition: nothing else on disk says where a rotated
+// or trimmed file starts, so its own index is taken at face value (0 when it
+// has none). Returns the number of entries whose field was wrong. Only .index
+// is written; order and leaf_hashes are left alone, which is what keeps the
+// Merkle root identical. Idempotent.
+function reindexEntries(list) {
+  if (!Array.isArray(list) || list.length === 0) return 0;
+  const first = list[0];
+  const anchor = first && Number.isInteger(first.index) ? first.index : 0;
+  let fixed = 0;
+  for (let p = 0; p < list.length; p++) {
+    const entry = list[p];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    const want = anchor + p;
+    if (entry.index !== want) { entry.index = want; fixed++; }
+  }
+  return fixed;
+}
+
+module.exports = { CtWindow, reindexEntries };

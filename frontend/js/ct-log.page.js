@@ -86,6 +86,9 @@ function render() {
 
   document.getElementById('entries').innerHTML = slice.map(function(e, i) {
     var gi  = start + i;
+    // e.index comes straight from /v2/ct/log, which derives it from the
+    // entry's position in the log, so it is the same number /v2/ct/proof takes.
+    // The fallback is for a relay too old to send the field at all.
     var idx = e.index !== undefined ? e.index : (filtered.length - 1 - gi);
     var ts  = e.ts;
     var time = ts
