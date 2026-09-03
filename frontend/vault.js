@@ -1,16 +1,28 @@
-// Paramant Vault — client-side file encryption to a .prmnt container.
+// Paramant Vault - client-side file encryption to a .prmnt container.
 //
-// MVP = passphrase mode: PBKDF2-SHA256 -> AES-256-GCM, all in the browser via
+// MVP = passphrase mode: PBKDF2-SHA-256 -> AES-256-GCM, all in the browser via
 // WebCrypto. Nothing is uploaded; the server never sees the file or the key
-// (server-blind by design). AES-256 is quantum-resistant, so this is already
-// post-quantum-safe for confidentiality. The .prmnt header is versioned so the
-// public-key / passkey (ML-KEM) key-slots can be added later without breaking it.
+// (server-blind by design). The .prmnt header is versioned so public-key /
+// passkey (ML-KEM) key-slots can be added later without breaking it.
+//
+// No post-quantum claim is made here and none belongs on the page either. A
+// large quantum computer halves the effective strength of a symmetric cipher at
+// best (Grover), which leaves AES-256 comfortable, but "quantum-resistant" is a
+// property of the whole construction and this one hangs on a human-chosen
+// passphrase run through PBKDF2. The weak link is the passphrase, not the
+// cipher, so the page says what the code does and stops there.
 //
 // .prmnt container (binary):
 //   MAGIC "PRMNT" (5) | VERSION (1) | KDF id (1) | ITER u32-LE (4)
 //   | SALT (16) | NONCE (12) | CIPHERTEXT (AES-256-GCM)
 // Plaintext inside the ciphertext: [metaLen u32-LE (4)][meta JSON][file bytes],
 // so the original filename/type is encrypted too (not leaked in the container).
+//
+// The iteration count travels IN the header, which is what makes raising it
+// safe: decryptFile derives with the count the file was written with, never
+// with ITER. Containers locked at the old 210,000 rounds keep opening; only
+// newly locked files get the current number. tests/vault-kdf.test.mjs proves
+// both directions in a real browser.
 
 (function () {
   'use strict';
@@ -18,7 +30,10 @@
   const MAGIC = new Uint8Array([0x50, 0x52, 0x4d, 0x4e, 0x54]); // "PRMNT"
   const VERSION = 1;
   const KDF_PBKDF2 = 1;
-  const ITER = 210000;
+  // OWASP's Password Storage Cheat Sheet puts PBKDF2-HMAC-SHA256 at 600,000
+  // rounds. This carried the older 210,000 figure. Old files still open: the
+  // count is read back out of their own header, see decryptFile.
+  const ITER = 600000;
   const HDR_LEN = 5 + 1 + 1 + 4 + 16 + 12; // 39
   const LOCKED_CONTAINER_NAME = 'paramant-vault.prmnt';
 
@@ -161,7 +176,7 @@
         if (cfg.mode === 'lock') {
           const out = await encryptFile(file, pw);
           downloadBytes(out, LOCKED_CONTAINER_NAME, 'application/octet-stream');
-          setStatus(status, 'Locked. Your .prmnt file is downloading. Keep your passphrase safe — without it the file cannot be opened.', 'ok');
+          setStatus(status, 'Locked. Your .prmnt file is downloading. Keep your passphrase safe: without it the file cannot be opened, and we cannot reset it for you.', 'ok');
         } else {
           const { meta, bytes } = await decryptFile(file, pw);
           downloadBytes(bytes, meta.name || 'unlocked', meta.type);

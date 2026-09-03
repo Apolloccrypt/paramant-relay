@@ -172,6 +172,26 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Enterprise as before.
 
 ### Changed
+- **/vault says what it does, and it no longer says "quantum-resistant".** The
+  page sold AES-256-GCM as quantum-resistant. AES-256 does survive Grover with
+  room to spare, but the claim describes the construction, and this
+  construction hangs on a human-chosen passphrase run through PBKDF2, which is
+  where it would actually break. The word is gone from the page and from the
+  header comment in `frontend/vault.js`. In its place: one sentence in plain
+  language (nothing leaves your browser, so we cannot reset your passphrase and
+  a lost one means a lost file) and one technical line that names every
+  parameter, "AES-256-GCM, key from your passphrase with PBKDF2-SHA-256,
+  600,000 rounds, random 16-byte salt, random 12-byte nonce".
+- **Vault PBKDF2 goes from 210,000 to 600,000 rounds**, the OWASP Password
+  Storage Cheat Sheet figure for PBKDF2-HMAC-SHA256. Files locked before this
+  still open: the count is a `u32` field in the `.prmnt` header and
+  `decryptFile` derives with the count the file carries, never with the current
+  constant. `tests/vault-kdf.test.mjs` forges a container at the old 210,000
+  rounds and makes the real page open it, and pins the number on the page to
+  the number in the code so the two cannot drift.
+- **Locking a file is a third verb in the signed-in navigation.** `/vault` sits
+  next to Send and Sign as "Lock a file". It had no route in from anywhere in
+  the product.
 - **The ParaSend delivery receipt moved out of the response header.**
   `GET /v2/outbound/:hash` used to answer with `X-Paramant-Receipt`, the whole
   signed receipt inline: 18551 bytes for that header and 19560 for the block.
