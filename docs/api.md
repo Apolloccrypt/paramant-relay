@@ -774,13 +774,25 @@ could not reach Redis. The code was not rejected and nothing is wrong with the
 account; verification fails closed rather than accepting a code it cannot mark
 as spent. See SECURITY.md.
 
-**Every credential answer on this route is held to a floor**
-(`PARAMANT_LOGIN_MIN_ANSWER_MS`, default 250 ms), so a 401 for an address that
-has an account takes exactly as long as one for an address that does not. That
-difference used to be 4 ms with no overlap between the two distributions, which
-is one request per address to tell a customer from a stranger. The 428 and the
-429 are not held back: their status codes tell them apart whatever the clock
-says, and the login page is waiting on the 428 to start hashing.
+**Every credential answer on this route is held to a floor**, so a 401 for an
+address that has an account takes exactly as long as one for an address that
+does not. The floor is `PARAMANT_LOGIN_MIN_ANSWER_MS` (default 250 ms) plus what
+the address owes for its own recorded failures: 250 ms per failure past ten,
+capped at 2000 ms. So a clean address is answered at 250 ms and one with twenty
+failures at 2250 ms, either way whether or not it exists.
+
+That second part used to be charged by the relay against the ACCOUNT, and only
+an address with an account could reach it, so the anti-guessing delay was itself
+an existence oracle: 509.91 ms against 251.61 ms at twelve prior failures, with
+no overlap. The `503 totp_unavailable` answer was unfloored for the same reason
+and is floored now too. The 428 and the 429 are not held back: their status
+codes tell them apart whatever the clock says, and the login page is waiting on
+the 428 to start hashing.
+
+An address over the failure threshold still answers 428 where one under it
+answers 401, so the status code remains a distinguisher for an attacker willing
+to burn ten failures and a proof-of-work per address. That is the deliberate
+price of pricing an attempt rather than refusing it.
 
 ### POST /api/user/auth/login-with-backup
 

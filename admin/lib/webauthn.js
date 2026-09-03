@@ -11,6 +11,7 @@
 // RP. Override only via trusted env at deploy time.
 
 const crypto = require('crypto');
+const { incrInWindow } = require('./redis-counter');
 
 const RP_ID           = process.env.WEBAUTHN_RP_ID || 'paramant.app';
 const RP_NAME         = process.env.WEBAUTHN_RP_NAME || 'Paramant';
@@ -43,8 +44,8 @@ const LIMITS = {
 // (e.g. 'lv:ip:1.2.3.4' or 'lv:acct:<hash>').
 async function rateHit(redisClient, bucket, limit, windowSec) {
   const k = `paramant:webauthn:rl:${bucket}`;
-  const n = await redisClient.incr(k);
-  if (n === 1) await redisClient.expire(k, windowSec);
+  // A lost expiry here refuses this bucket for good; see lib/redis-counter.js.
+  const n = await incrInWindow(redisClient, k, windowSec);
   return n <= limit;
 }
 

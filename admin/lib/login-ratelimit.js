@@ -33,6 +33,7 @@
 // address in plaintext, and it is a new namespace, so no stale counter from the
 // old shape survives a deploy and keeps somebody locked out.
 const crypto = require('crypto');
+const { incrInWindow } = require('./redis-counter');
 
 // Per-IP: hard refusal. Same numbers as before, and the same window.
 const IP_LIMIT = 5;
@@ -65,8 +66,9 @@ function emailFailKey(email) {
 // is the last allowed. Returns the count too so callers can log it.
 async function hitIp(redisClient, ip) {
   const k = ipKey(ip);
-  const count = await redisClient.incr(k);
-  if (count === 1) await redisClient.expire(k, WINDOW_S);
+  // incrInWindow, not INCR plus a conditional expire: a counter that loses its
+  // expiry is a permanent 429 for this source address. See lib/redis-counter.js.
+  const count = await incrInWindow(redisClient, k, WINDOW_S);
   return { allowed: count <= IP_LIMIT, count };
 }
 
@@ -98,8 +100,10 @@ async function emailFailures(redisClient, email) {
 // Called only after a sign-in has actually failed.
 async function noteEmailFailure(redisClient, email) {
   const k = emailFailKey(email);
-  const count = await redisClient.incr(k);
-  if (count === 1) await redisClient.expire(k, WINDOW_S);
+  // Same reason as hitIp, and worse here: a counter stuck above the threshold
+  // is a proof-of-work obligation that never lifts, on an address anybody may
+  // name. See lib/redis-counter.js.
+  const count = await incrInWindow(redisClient, k, WINDOW_S);
   return count;
 }
 
@@ -118,8 +122,43 @@ function powRequired(failures) {
   return failures >= EMAIL_FAIL_THRESHOLD;
 }
 
+// ── The per-account MFA throttle, moved to where existence is not known ──────
+//
+// relay/lib/auth-throttle.js delays a wrong code by 250 ms per failure past ten,
+// capped at two seconds, and relay.js charges it on /v2/user/verify-totp. Only a
+// request naming an EXISTING account ever gets that far, because the login
+// handler answers two steps earlier for an address it cannot find. So the
+// throttle was an account-existence oracle at the admin's edge: measured through
+// a booted admin at twelve prior failures, 306 ms against 252 ms with no
+// overlap, and 2006 against 252 at the cap. That is four orders of magnitude
+// louder than the 4 ms the fixed floor was built to hide.
+//
+// The delay itself is worth keeping: it is what makes bulk guessing pointless.
+// It just has to be charged by something that does not know whether the account
+// exists. That is this file. The counter here is keyed on the HASHED ADDRESS and
+// is incremented for a miss exactly as for a hit, so it is the same number for
+// both. The login handler adds mirrorThrottleMs() to the floor under every
+// credential answer and tells the relay it has already paid
+// (`throttled_upstream`), so the cost is identical on both branches and the wall
+// clock carries no information about which one ran.
+//
+// These three numbers are the relay's, duplicated because admin/ and relay/ are
+// separate npm projects that cannot require across the boundary;
+// tests/redis-deadline-parity.test.mjs fails if they drift from
+// relay/lib/auth-throttle.js.
+const THROTTLE_THRESHOLD = 10;
+const THROTTLE_STEP_MS = 250;
+const THROTTLE_MAX_MS = 2000;
+
+function mirrorThrottleMs(failures) {
+  const over = Number(failures) - THROTTLE_THRESHOLD;
+  if (!(over > 0)) return 0;
+  return Math.min(over * THROTTLE_STEP_MS, THROTTLE_MAX_MS);
+}
+
 module.exports = {
   IP_LIMIT, WINDOW_S, EMAIL_FAIL_THRESHOLD,
+  THROTTLE_THRESHOLD, THROTTLE_STEP_MS, THROTTLE_MAX_MS, mirrorThrottleMs,
   IP_PREFIX, EMAIL_FAIL_PREFIX,
   normalizeEmail, ipKey, emailFailKey,
   hitIp, refundIp, emailFailures, noteEmailFailure, clearEmailFailures, powRequired,

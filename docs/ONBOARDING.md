@@ -171,21 +171,25 @@ section 6.
 
 ```bash
 cd admin && node --test test/*.test.js
-#   # tests 58   # pass 58   # fail 0      ~35s
+#   # tests 63   # pass 63   # fail 0      ~2m
 ```
 
-Three of those suites boot a real `admin/server.js` (`login-http`,
-`login-timing`, `redis-outage`), so this job now needs a redis and the admin's
-own `node_modules`, which the CI job deliberately did not install. They declare
-their precondition the way the relay suites do: without it the run fails by
-name, unless the runner says `ADMIN_TEST_SKIP=redis`. `login-http` also solves a
-real 2^18 proof-of-work, which is where most of those 35 seconds go.
+Four of those suites boot a real `admin/server.js` (`login-http`,
+`login-timing`, `redis-outage`, `ratelimit-ttl`), so this job now needs a redis
+and the admin's own `node_modules`, which the CI job deliberately did not
+install. They declare their precondition the way the relay suites do: without it
+the run fails by name, unless the runner says `ADMIN_TEST_SKIP=redis`.
+
+Most of those two minutes are deliberate waiting rather than work.
+`login-timing` measures at 0, 12 and 20 prior failures, and by design an answer
+at twenty failures is held for 2.25 seconds; every request past ten also has to
+carry a real 2^18 proof-of-work, which `login-http` pays as well.
 
 **Root integration suites** (node builtins plus the root deps, no browser):
 
 ```bash
 node --test $(grep -L "from 'playwright'" tests/*.mjs)
-#   # tests 166   # pass 164   # skipped 2   # fail 0    ~1.0s
+#   # tests 176   # pass 174   # skipped 2   # fail 0    ~1.1s
 ```
 
 The two skips are the external-link checks in `tests/links.test.mjs`; they need
@@ -228,7 +232,7 @@ docker run --rm -d --name paramant-test-redis -p 6399:6379 redis:7.4.8-alpine
 cd relay
 REDIS_URL=redis://127.0.0.1:6399 \
   node --test --test-reporter=tap test/route-*.test.js test/parasign-signs-quota.test.js
-#   # tests 85   # pass 85   # fail 0      ~17s
+#   # tests 91   # pass 91   # fail 0      ~21s
 
 docker rm -f paramant-test-redis
 ```

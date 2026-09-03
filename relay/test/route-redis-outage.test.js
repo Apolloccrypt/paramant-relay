@@ -169,6 +169,9 @@ function outageRoutes(srv) {
 async function assertOutageAnswers(t, breakIt, tag) {
   if (!outageRedis) return t.skip('no redis');
   const { srv, proxy } = await bootBehindProxy(tag);
+  // Before the first assertion: a red test still has to release its sockets, or
+  // the run hangs on the failure instead of reporting it.
+  t.after(() => { srv.stop(); proxy.close(); });
 
   // With the store up the same routes are not 503, so the assertions below are
   // about the outage and not about a route that never worked.
@@ -211,8 +214,6 @@ async function assertOutageAnswers(t, breakIt, tag) {
   assert.notEqual(deep.json.overall, 'green', 'and a relay that cannot reach its store is not green');
   outageDid();
 
-  srv.stop();
-  proxy.close();
 }
 
 test('a cut connection: every redis-backed route answers 503 inside the deadline', async (t) => {
@@ -228,6 +229,7 @@ test('a silent connection: the same, where the client still believes it is ready
 test('the store coming back is the end of it: no restart needed', async (t) => {
   if (!outageRedis) return t.skip('no redis');
   const { srv, proxy } = await bootBehindProxy('outage-recover');
+  t.after(() => { srv.stop(); proxy.close(); });
   const uid = () => `pgp_recover_${crypto.randomBytes(5).toString('hex')}`;
 
   proxy.hole();
@@ -249,6 +251,4 @@ test('the store coming back is the end of it: no restart needed', async (t) => {
   assert.equal(after.status, 200, `the relay must recover on its own once redis answers again, last: ${after.status} ${after.text}`);
   outageDid();
 
-  srv.stop();
-  proxy.close();
 });

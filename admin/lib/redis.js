@@ -51,12 +51,18 @@ function redis() {
 // Is redis answering right now? Bounded by the same deadline as every other
 // command, so a health check can never be the thing that hangs.
 async function redisHealthy() {
+  // The detail is a fixed word, never the error. /health is unauthenticated,
+  // and the deadline error carries the configured bound in its message
+  // ("no answer within 1000ms"), which is a free reading of how long an
+  // attacker may hold a connection before the door closes. The real message is
+  // in the logs, where it belongs.
   try {
     if (!client || !client.isReady) return { ok: false, detail: 'not connected' };
     const pong = await client.ping();
-    return { ok: pong === 'PONG', detail: pong === 'PONG' ? 'reachable' : `unexpected ping reply: ${pong}` };
+    return { ok: pong === 'PONG', detail: pong === 'PONG' ? 'reachable' : 'unexpected ping reply' };
   } catch (e) {
-    return { ok: false, detail: (e && e.message) || 'unreachable' };
+    console.error('[admin/redis] health probe failed:', (e && e.message) || e);
+    return { ok: false, detail: 'unreachable' };
   }
 }
 

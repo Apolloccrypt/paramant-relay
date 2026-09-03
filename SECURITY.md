@@ -305,51 +305,85 @@ wrap their client with it).
 
 #### 2. The login page told you which addresses were customers
 
-`POST /api/user/login` did strictly more work for an address that exists: it
-reached a second relay call (`/v2/user/verify-totp`) and one more redis read,
-where a non-existent address returned two steps earlier. The status codes were
-already identical on purpose -- three different 403s were folded into one 401 in
-#368 for exactly this reason -- but the clock was not.
+`POST /api/user/login` did strictly more work for an address that exists, in two
+separate ways, and the first round of this fix only closed the smaller one.
 
-Measured on a booted admin, 200 requests per case, interleaved, one source
-address each, with the relay stub given a realistic 3 ms cost for the verify
-call:
+**The cheap half: the work itself.** An address with an account reached a second
+relay call (`/v2/user/verify-totp`) and one more redis read, where one without
+returned two steps earlier. About 4 ms with a realistic relay, with the two
+distributions not overlapping. The status codes were already identical on
+purpose (#368 folded three 403s into one 401 for exactly this reason); the clock
+was not.
 
-| | median | range |
-|---|---|---|
-| address exists | 6.44 ms | 4.59 - 9.94 ms |
-| address absent | 2.20 ms | 0.90 - 3.73 ms |
+**The expensive half: the throttle.** `relay/lib/auth-throttle.js` delays a wrong
+code by 250 ms per failure past ten, capped at two seconds, and `relay.js`
+charges it on `/v2/user/verify-totp` before it checks anything. Only a request
+naming an account that EXISTS ever reaches that sleep. So the anti-guessing
+delay was itself the oracle, and it is three orders of magnitude louder than the
+work difference. Twelve wrong codes from rotating source addresses put an
+address there, and nothing refuses them, because the per-address counter
+deliberately imposes cost rather than denial.
 
-The ranges do not overlap. One request classifies an address, under the rate
-limit, without any credentials. The review measured 5.40 against 2.95 ms on the
-production pair; same channel, slower machine.
+Measured on a booted admin with a stub relay charging the same throttle,
+100 requests per case, interleaved, one source address each:
 
-No credential answer on that route now leaves before `t0` plus
-`PARAMANT_LOGIN_MIN_ANSWER_MS` (default 250 ms), so what an attacker times is a
-constant this code sets rather than the path the request took. The not-found
-branch also makes the same number of redis calls as the found one, so the floor
-is a margin rather than the only thing holding the two paths together. After,
-same instrument, same 200 requests:
+| prior failures | exists (p50) | absent (p50) | ranges |
+|---|---|---|---|
+| 0 | 251.87 ms | 251.90 ms | overlap |
+| 12 | 509.91 ms | 251.61 ms | **do not overlap** |
+| 20 | 2010.23 ms | 251.82 ms | **do not overlap** |
 
-| | median | range |
-|---|---|---|
-| address exists | 251.37 ms | 249.61 - 253.01 ms |
-| address absent | 251.27 ms | 249.70 - 253.00 ms |
+A third path leaked as well: `503 totp_unavailable`, the answer the admin passes
+through when the relay's replay store is down, was not floored and is only
+reachable for an address that has an account. Nine milliseconds against two
+hundred and fifty.
+
+**What replaces it.** The delay has to be charged by something that does not
+know whether the account exists. That is the admin, which owns a failure counter
+keyed on the hashed ADDRESS and increments it for a miss exactly as for a hit.
+`loginRate.mirrorThrottleMs()` reproduces the relay's curve on that counter, the
+result is added to the floor under every credential answer on both login routes,
+and the admin tells the relay it has already paid (`throttled_upstream`) so the
+account-keyed delay is not charged a second time. The relay still counts the
+failure, still reports what it would have charged as `throttle_ms`, and still
+charges any caller that does not set the flag; the route is `X-Internal-Auth`
+only, so the callers who can set it are callers who could already name any
+account they like.
+
+The 503 branch is floored like the rest. Same instrument, same 100 requests:
+
+| prior failures | exists (p50) | absent (p50) | delta | ranges |
+|---|---|---|---|---|
+| 0 | 251.86 ms | 251.87 ms | -0.01 ms | overlap |
+| 12 | 751.84 ms | 751.76 ms | 0.08 ms | overlap |
+| 20 | 2251.90 ms | 2252.11 ms | -0.21 ms | overlap |
 
 **What was not padded, and why.** 429 (per-IP refusal) and 428 (proof-of-work
 required) are not credential answers: their status codes tell them apart
-whatever the clock says, and holding them back would only slow down the honest
-client whose page is waiting to start hashing. **What this does not fix:** an
-address that is over the failure threshold answers 428 where one that is not
-answers 401, so a determined attacker who is willing to burn ten failures per
-address can still tell them apart by status code. That is the cost of pricing an
-attempt instead of refusing it, and it is a far more expensive oracle than a
-2 ms timing difference.
+whatever the clock says, and holding the 428 back only delays the login page
+that is waiting to start hashing.
 
-Pinned by `admin/test/login-timing.test.js`, which measures both cases against a
-booted admin and asserts the medians do not separate and the ranges overlap. The
-instrument that produced the numbers above is `admin/test/login-timing.bench.js`
-and it can be pointed at any checkout with `ADMIN_SERVER_JS=`.
+**What this still does not fix.** An address over the failure threshold answers
+428 where one under it answers 401, so an attacker willing to burn ten failures
+per address can tell them apart by status code. That is the cost of pricing an
+attempt instead of refusing it, and it is a far more expensive oracle than a
+timing difference: ten failures and a 2^18 proof-of-work per address, against
+one unauthenticated request. It is a deliberate trade, not an oversight.
+
+`PARAMANT_LOGIN_MIN_ANSWER_MS` (default 250 ms) is only the BASE of the floor;
+the throttle is added on top, so a clean address is answered at 250 ms and one
+with twenty failures at 2250 ms, either way regardless of whether it exists. The
+base has to cover the work, which is about 10 ms against a healthy relay. An
+answer that overruns its floor is logged as such, because at that point the
+floor has stopped being one.
+
+Pinned by `admin/test/login-timing.test.js`, which measures both cases at 0, 12
+and 20 prior failures with the shipped default floor and the real throttle
+values, asserts the medians do not separate and the ranges overlap, and pins the
+`throttled_upstream` flag itself so a change that drops it cannot pass on a
+quiet machine. Against the previous revision of this branch it fails on the
+twelve-failure level. The instrument that produced the tables above is
+`admin/test/login-timing.bench.js`; `ADMIN_SERVER_JS=` points it at any checkout.
 
 #### 3. A test that reimplemented the handler it was testing
 
@@ -372,6 +406,75 @@ reported as a wrong code.
 Checked against the code it is meant to catch: run against the pre-#368 admin,
 three of its five tests fail, on the 429 where a 428 belongs and on the outage
 reported as `invalid_credentials`. `login-timing.test.js` fails there too.
+
+
+#### 4. A rate-limit counter that lost its expiry refused for ever
+
+Found while reviewing the deadline in finding 1, and caused by it. Every limiter
+in both services was written as an INCR followed by a CONDITIONAL expiry:
+
+```js
+const count = await redis.incr(k);
+if (count === 1) await redis.expire(k, WINDOW_S);   // only on the first hit
+```
+
+That is correct only while the two commands always happen together. The deadline
+makes the gap reachable in one request: if the INCR exceeds the deadline while
+the server still executes it, the caller gets an outage and the EXPIRE is never
+sent. The key then holds a count with TTL -1, and because the next INCR returns
+2 rather than 1, no later call sets the expiry either. TTL -1 means for ever.
+
+Measured on a booted admin with the replies from redis dropped for the duration
+of one login: `paramant:user:ratelimit:ip:<ip>` stood at 9 with TTL -1, and that
+source address kept getting 429 until the key was deleted by hand.
+
+Three kinds of permanent damage, all of them denial of service produced by a
+redis hiccup in the code that exists to prevent denial of service:
+
+- `paramant:user:ratelimit:ip:<ip>` -- a permanent 429 for that source address;
+- `paramant:user:loginfail:<hash>` -- a proof-of-work obligation that never
+  lifts, on an address anybody may name;
+- the monthly counters in `relay/lib/quota.js` -- an account permanently over
+  its transfer or signing quota.
+
+`lib/redis-counter.js` (`incrInWindow`) sets the expiry UNCONDITIONALLY after
+every INCR, with `NX` so it can only ever create a window and never slide one.
+The healthy case behaves exactly as before; the broken case is repaired by the
+first request that lands after it, so a missing TTL survives one request instead
+of for ever. All 23 INCR call sites in both services go through it:
+`admin/lib/login-ratelimit.js` (2), `admin/lib/webauthn.js`, `admin/server.js`
+(7), `relay/lib/quota.js` (6), `relay/relay.js`. `EXPIRE ... NX` needs Redis 7.0;
+`docker-compose.yml` pins 7.4.8 by digest, and a server that refuses the option
+makes the helper fall back to a TTL read for the life of the process, because an
+error on every rate-limited route would be a worse regression than the bug.
+
+Pinned by `admin/test/ratelimit-ttl.test.js`, which boots a real admin behind a
+proxy that delivers commands and drops replies -- the shape that makes the
+server execute the INCR while the client gives up on it -- and then reads the
+TTL on its own connection. Against the previous revision of this branch both
+counters come back TTL -1. A third test pins the `NX`: a later hit must not
+extend a window that already exists, or the repair becomes the same denial of
+service from the other end. `tests/redis-deadline-parity.test.mjs` fails if any
+of the five files goes back to calling INCR directly.
+
+#### Follow-ups, recorded rather than fixed here
+
+**`consumeBackupCode` can spend a code while the caller sees 503.** It is
+SMEMBERS, then an argon2 verification per stored hash, then SREM. Each of those
+is bounded separately now, so a deadline breach on the SREM leaves the code
+consumed on the server while the admin answers 503 and the user is told the
+service is down. The failure direction is safe (a code is burned, not accepted
+twice) but it costs a legitimate user one of their backup codes for an outage
+they did not cause. Fixing it properly means making the read-verify-remove
+atomic, which is a Lua script or a WATCH/MULTI, and it belongs in its own change.
+
+**`regenerateBackupCodes` is a DEL followed by a SADD with nothing between
+them.** If the process dies, or the SADD exceeds its deadline, the account is
+left with no backup codes at all and no error the user can act on. The same
+transaction work covers both.
+
+Both are reachable only through `X-Internal-Auth` routes and neither accepts a
+code that should have been refused.
 
 ---
 

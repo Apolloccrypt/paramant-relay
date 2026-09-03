@@ -1,48 +1,45 @@
 'use strict';
 // Does an address that exists take longer to be refused than one that does not?
 //
-// WHY THIS SUITE EXISTS. The status codes on /api/user/login were made
-// identical on purpose: three different 403s were folded into one 401 so the
-// code could not be read as "this address is a customer". The clock was left
-// alone. An existing account reaches a second relay call and one more redis
-// read; a non-existent one returns two steps earlier, and the difference is
-// stable enough to classify an address from a single request. Measured on this
-// harness before the fix, 200 requests per case, with the stub relay given a
-// realistic 3 ms cost for /v2/user/verify-totp:
+// WHY THIS SUITE EXISTS, AND WHY IT WAS REWRITTEN. The first version measured
+// only a clean address, found the gap was about 4 ms, added a fixed floor, and
+// declared the oracle closed. It was not. relay.js charges a per-ACCOUNT
+// throttle before it checks a code (relay/lib/auth-throttle.js: 250 ms per
+// failure past ten, capped at two seconds), and only a request naming an
+// account that exists ever reaches it. Measured through a booted admin with the
+// stub relay charging that same throttle, 100 requests per case:
 //
-//   exists  p50 6.44 ms   min 4.59 ms
-//   absent  p50 2.20 ms   max 3.73 ms
+//   prior failures   exists p50    absent p50   ranges
+//   0                251.87 ms     251.90 ms    overlap
+//   12               509.91 ms     251.61 ms    do not overlap
+//   20              2010.23 ms     251.82 ms    do not overlap
 //
-// The ranges do not even touch. One request per address, under the rate limit,
-// no credentials, and the customer list falls out.
+// Twelve wrong codes from rotating source addresses, which nothing refuses
+// because the per-address counter deliberately does not refuse, and one request
+// classifies the address. So this suite runs at three failure levels, with the
+// real floor and the real throttle values, and a level of zero on its own is
+// not enough to pass it.
 //
-// WHAT IS ASSERTED HERE. Not "the code contains a delay" -- that is a source
-// assertion and it would pass over a delay applied to the wrong branch. The
-// property is measured: the two medians sit on top of each other, and the two
-// ranges overlap, so no threshold separates them.
-//
-// The floor is set low for this suite (PARAMANT_LOGIN_MIN_ANSWER_MS below)
-// because a suite that waits the production 250 ms per request would take
-// minutes. That also pins the knob: if the environment variable were ignored,
-// every sample would land at 250 ms and the run would time out rather than
-// quietly pass.
+// It costs about a minute: at twenty failures every answer is held for 2.25 s
+// by design, and each request past the threshold has to carry a real 2^18
+// proof-of-work, solved before the clock starts so the hashing is not measured.
 //
 // Run: REDIS_URL=redis://127.0.0.1:6399 node --test admin/test/login-timing.test.js
 
 const { test, before, after } = require('node:test');
 const assert = require('assert');
 const crypto = require('crypto');
-const { boot, killAll, stubRelay, defaultRelayState, summary } = require('./_admin-server');
+const { boot, killAll, stubRelay, defaultRelayState, solvePow, summary } = require('./_admin-server');
 
 const TIMING_DEFAULT_REDIS = 'redis://127.0.0.1:6399';
-const TIMING_FLOOR_MS = 60;
-// What a real relay costs on the verify call. This is the oracle: with it set
-// to zero the pre-fix gap was about 1 ms, with it at 3 ms it was about 4 ms.
-// The suite runs with it on, so a fix that only closed the small gap fails.
+// The production default from deploy/.env.example. Not a smaller number: a
+// floor that only holds in the test is not a floor.
+const TIMING_FLOOR_MS = 250;
+// What a real relay costs on the verify call, on top of the throttle.
 const TIMING_RELAY_MS = 3;
-const TIMING_SAMPLES = 30;
-// Per run, for the same reason as the other admin HTTP suites: the failure
-// counter is shared state with a fifteen-minute window.
+// relay/lib/auth-throttle.js, via the stub. This is the finding.
+const TIMING_LEVELS = [0, 12, 20];
+const TIMING_SAMPLES = 8;
 const TIMING_RUN = crypto.randomBytes(5).toString('hex');
 const TIMING_PRESENT_KEY = `pgp_present_account_for_the_timing_suite_${TIMING_RUN}`;
 const TIMING_PRESENT_EMAIL = `present_${TIMING_RUN}@example.com`;
@@ -57,6 +54,9 @@ const tDid = () => { tChecks++; };
 const TIMING_NET = 20 + Math.floor(Math.random() * 200);
 let _tIp = 0;
 const tIp = () => { _tIp++; return `${TIMING_NET}.${(_tIp >> 8) & 255}.${_tIp & 255}.11`; };
+
+const failKey = (email) =>
+  `paramant:user:loginfail:${crypto.createHash('sha256').update(email.trim().toLowerCase()).digest('hex')}`;
 
 before(async () => {
   const url = process.env.REDIS_URL || TIMING_DEFAULT_REDIS;
@@ -86,14 +86,13 @@ before(async () => {
   tRelay = await stubRelay(defaultRelayState(
     [{ key: TIMING_PRESENT_KEY, email: TIMING_PRESENT_EMAIL, active: true }], '123456'));
   tRelay.state.verifyDelayMs = TIMING_RELAY_MS;
-  tSrv = await boot({
-    redisUrl: url,
-    relay: tRelay,
-    env: { PARAMANT_LOGIN_MIN_ANSWER_MS: String(TIMING_FLOOR_MS) },
-  });
-  // Without this the existing account takes the "TOTP not configured" branch
-  // and never reaches the relay, which is the cheap path -- and the suite would
-  // be comparing two short paths and finding nothing.
+  tRelay.state.throttle = true;
+  // No env override: the suite runs on the shipped default, so a change to that
+  // default that reopens the oracle shows up here.
+  tSrv = await boot({ redisUrl: url, relay: tRelay });
+  // Without this the existing account takes the "TOTP not configured" branch and
+  // never reaches the relay, which is the cheap path: the suite would compare
+  // two short paths and find nothing.
   await tRedis.set(`paramant:user:totp_active:${TIMING_PRESENT_KEY}`, 'true');
 });
 
@@ -110,76 +109,109 @@ function median(xs) {
   return s[Math.floor(s.length / 2)];
 }
 
-// Merely naming an address must not push it over the proof-of-work threshold
-// halfway through a run: a 428 is a different amount of work and would show up
-// as noise in exactly the measurement being taken.
-async function clearFailures(email) {
-  await tRedis.del(`paramant:user:loginfail:${crypto.createHash('sha256').update(email.trim().toLowerCase()).digest('hex')}`);
+// Put this address on exactly `n` recorded failures. Both the admin's counter
+// (keyed on the hashed address) and, for the account that exists, the relay's
+// own per-account counter, so the two are in the state twelve wrong codes would
+// really have left them in.
+async function setFailures(email, n, presentKey) {
+  if (n <= 0) await tRedis.del(failKey(email));
+  else await tRedis.set(failKey(email), String(n), { EX: 900 });
+  if (presentKey) tRelay.state.throttleCounts.set(presentKey, n);
 }
 
-test('a 401 for an address that exists takes the same time as one for an address that does not', async (t) => {
+// Past ten failures the answer is 428 unless the request carries a solved
+// proof-of-work, so the attack has to buy one and so does this. Solved before
+// the timed request: 2^18 hashes inside the measurement would drown it.
+async function proofIfNeeded(failures) {
+  if (failures < 10) return {};
+  const ch = await tSrv.get('/api/captcha/challenge', { headers: { 'X-Real-IP': tIp() } });
+  assert.equal(ch.status, 200, `a challenge must be issuable: ${ch.status} ${ch.text}`);
+  return {
+    challenge_id: ch.json.challenge_id,
+    nonce: solvePow(ch.json.challenge_id, ch.json.salt, ch.json.difficulty),
+  };
+}
+
+async function sampleOne(email, failures, presentKey) {
+  await setFailures(email, failures, presentKey);
+  const proof = await proofIfNeeded(failures);
+  const r = await tSrv.login({ email, totp: '000000', ip: tIp(), ...proof });
+  assert.equal(r.status, 401,
+    `at ${failures} prior failures ${email} must still get a plain 401, got ${r.status} ${r.text}`);
+  return r.ms;
+}
+
+test('the refusal takes the same time whether the address has an account or not', async (t) => {
   if (!ready()) return t.skip('no redis');
 
-  // Thrown away: the first requests through a fresh process pay for JIT and for
-  // the first redis round trips, and they would land in whichever group ran
-  // first.
-  for (let i = 0; i < 5; i++) {
-    await clearFailures(TIMING_PRESENT_EMAIL);
-    await tSrv.login({ email: TIMING_PRESENT_EMAIL, totp: '000000', ip: tIp() });
+  // Warm-up, thrown away: the first requests pay for JIT and the first redis
+  // round trips, and they would land in whichever group ran first.
+  for (let i = 0; i < 4; i++) await sampleOne(TIMING_PRESENT_EMAIL, 0, TIMING_PRESENT_KEY);
+
+  for (const level of TIMING_LEVELS) {
+    const present = [];
+    const absent = [];
+    // Interleaved, so a drift in machine load hits both cases equally.
+    for (let i = 0; i < TIMING_SAMPLES; i++) {
+      present.push(await sampleOne(TIMING_PRESENT_EMAIL, level, TIMING_PRESENT_KEY));
+      absent.push(await sampleOne(TIMING_ABSENT_EMAIL, level, null));
+    }
+    const pMed = median(present);
+    const aMed = median(absent);
+    const pMin = Math.min(...present), pMax = Math.max(...present);
+    const aMin = Math.min(...absent), aMax = Math.max(...absent);
+    const detail = `at ${level} prior failures: exists p50=${pMed.toFixed(2)} [${pMin.toFixed(2)}, ${pMax.toFixed(2)}], ` +
+                   `absent p50=${aMed.toFixed(2)} [${aMin.toFixed(2)}, ${aMax.toFixed(2)}]`;
+
+    // The floor is doing the work, and it grows with the failure count exactly
+    // as the relay's throttle does: 250 ms base, plus 250 ms per failure past
+    // ten, capped at two seconds. If the mirror were missing, the absent case
+    // would sit at 250 ms while the present one climbed.
+    const owed = TIMING_FLOOR_MS + Math.min(Math.max(level - 10, 0) * 250, 2000);
+    for (const [label, med] of [['exists', pMed], ['absent', aMed]]) {
+      assert.ok(med >= owed - 10,
+        `${label} must be held to its floor of ${owed}ms; ${detail}`);
+    }
+    tDid();
+
+    // The gap this closes was 258 ms at twelve failures and 1758 ms at twenty.
+    // Ten is a generous ceiling on a loaded machine and two orders of magnitude
+    // below a usable signal.
+    assert.ok(Math.abs(pMed - aMed) < 10,
+      `the medians must not separate the two cases; ${detail}`);
+    tDid();
+
+    // The property that actually kills the oracle: the ranges overlap, so no
+    // threshold classifies an address from one request. Before the fix the
+    // fastest hit was slower than the slowest miss at both levels above zero.
+    assert.ok(pMin < aMax && aMin < pMax,
+      `the two ranges must overlap, or one request still classifies an address; ${detail}`);
+    tDid();
   }
+});
 
-  // Interleaved, so a drift in machine load hits both cases equally.
-  const present = [];
-  const absent = [];
-  for (let i = 0; i < TIMING_SAMPLES; i++) {
-    await clearFailures(TIMING_PRESENT_EMAIL);
-    await clearFailures(TIMING_ABSENT_EMAIL);
-    const a = await tSrv.login({ email: TIMING_PRESENT_EMAIL, totp: '000000', ip: tIp() });
-    const b = await tSrv.login({ email: TIMING_ABSENT_EMAIL, totp: '000000', ip: tIp() });
-    assert.equal(a.status, 401, `the existing account must answer 401, got ${a.status} ${a.text}`);
-    assert.equal(b.status, 401, `the absent account must answer 401, got ${b.status} ${b.text}`);
-    present.push(a.ms);
-    absent.push(b.ms);
-  }
-
-  const pMed = median(present);
-  const aMed = median(absent);
-  const pMin = Math.min(...present);
-  const pMax = Math.max(...present);
-  const aMin = Math.min(...absent);
-  const aMax = Math.max(...absent);
-  const detail = `exists p50=${pMed.toFixed(2)} [${pMin.toFixed(2)}, ${pMax.toFixed(2)}], ` +
-                 `absent p50=${aMed.toFixed(2)} [${aMin.toFixed(2)}, ${aMax.toFixed(2)}]`;
-
-  // The floor has to be doing the work, or this suite proves nothing: both
-  // groups must sit on it rather than on whatever the handler happened to cost.
-  assert.ok(pMed >= TIMING_FLOOR_MS - 5 && aMed >= TIMING_FLOOR_MS - 5,
-    `both cases must be held to the floor of ${TIMING_FLOOR_MS}ms; ${detail}`);
-  tDid();
-
-  // The gap this closes was 4.2 ms at the median with the same 3 ms relay cost.
-  // Five is a generous ceiling on a loaded machine and still an order of
-  // magnitude below a usable signal at these sample sizes.
-  assert.ok(Math.abs(pMed - aMed) < 5,
-    `the medians must not separate the two cases; ${detail}`);
-  tDid();
-
-  // The stronger property, and the one that actually kills the oracle: the
-  // ranges overlap, so there is no threshold at which a single request
-  // classifies an address. Before the fix the fastest hit was slower than the
-  // slowest miss.
-  assert.ok(pMin < aMax && aMin < pMax,
-    `the two ranges must overlap, or one request still classifies an address; ${detail}`);
+test('the relay is told the delay was already charged, so it is never charged twice', async (t) => {
+  if (!ready()) return t.skip('no redis');
+  // The floor above only stays constant because relay.js does not ALSO sleep.
+  // A change that drops this flag would put the account-keyed delay back on top
+  // of the address-keyed one, and the timing test would only notice it on a
+  // loaded machine. Pin the flag itself.
+  const calls = tRelay.state.calls.filter((c) => c.path === '/v2/user/verify-totp');
+  assert.ok(calls.length > 0, 'the suite above must have reached the relay at all');
+  const unflagged = calls.filter((c) => !c.body || c.body.throttled_upstream !== true);
+  assert.equal(unflagged.length, 0,
+    `every verify-totp call must declare the throttle was applied upstream, ${unflagged.length} did not`);
   tDid();
 });
 
-test('the floor does not slow down the refusals that are not credential answers', async (t) => {
+test('the answers that are not credential answers are not held back', async (t) => {
   if (!ready()) return t.skip('no redis');
-  // A 429 is told apart from a 401 by its status code, so padding it would buy
-  // nothing and would only punish the caller who is already being refused. The
-  // same goes for the 428 that asks for a proof-of-work: the login page is
-  // waiting on it to start hashing.
+  // A 429 is told apart from a 401 by its status code, so padding it buys
+  // nothing and only punishes a caller who is already refused. The same for the
+  // 428 that asks for a proof-of-work: the login page is waiting on it to start
+  // hashing.
   const ip = tIp();
+  await setFailures(TIMING_ABSENT_EMAIL, 0, null);
   for (let i = 0; i < 5; i++) await tSrv.login({ email: TIMING_ABSENT_EMAIL, totp: '000000', ip });
   const refused = await tSrv.login({ email: TIMING_ABSENT_EMAIL, totp: '000000', ip });
   assert.equal(refused.status, 429, `the sixth attempt from one IP is refused, got ${refused.status}`);

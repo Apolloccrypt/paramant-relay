@@ -29,6 +29,7 @@ const { createClient } = require('redis');
 const userTotp      = require('./lib/user-totp');
 const totpLib       = require('./lib/totp');
 const redisDeadlines = require('./lib/redis-deadline'); // one bound for every redis call
+const redisCounter  = require('./lib/redis-counter');   // INCR that always carries an expiry
 const rateLimit     = require('./lib/rate-limit');
 const authThrottle  = require('./lib/auth-throttle');
 const authGate      = require('./lib/auth-gate');
@@ -1506,8 +1507,7 @@ async function envCreateRateOkShared(apiKey) {
   try {
     const bucket = Math.floor(Date.now() / 3600_000);
     const rk = `paramant:rl:envcreate:${bucket}:${apiKey}`;
-    const n = await redisClient.incr(rk);
-    if (n === 1) await redisClient.expire(rk, 3600);
+    const n = await redisCounter.incrInWindow(redisClient, rk, 3600);
     return n <= ENV_CREATE_LIMIT;
   } catch (e) {
     log('warn', 'env_create_rl_redis_fail', { err: e.message });
@@ -2899,7 +2899,10 @@ async function handleRelayRequest(req, res) {
         const pong = await redisClient.ping();
         add('redis', pong === 'PONG' ? 'green' : 'red', pong === 'PONG' ? 'reachable' : 'unexpected ping reply');
       } catch (e) {
-        add('redis', 'red', 'unreachable: ' + ((e && e.message) || 'unknown'));
+        // No detail from the error: it carries the configured deadline in its
+        // message, and in full mode this route is public.
+        log('warn', 'deep_health_redis_unreachable', { err: (e && e.message) || 'unknown' });
+        add('redis', 'red', 'unreachable');
       }
     }
 
@@ -2963,10 +2966,29 @@ async function handleRelayRequest(req, res) {
   if (req.method === "POST" && path === "/v2/user/verify-totp") {
     if (!_internalOk()) return _internalReject();
     try {
-      const { user_id, totp } = JSON.parse((await readBody(req, 4096)).toString());
+      const { user_id, totp, throttled_upstream } = JSON.parse((await readBody(req, 4096)).toString());
       if (!user_id || !totp) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
       // Throttle, never refuse: see userMfaDelayMs.
-      await authThrottle.sleep(userMfaDelayMs(user_id));
+      //
+      // WHY throttled_upstream EXISTS. This sleep is charged to an account, and
+      // only a request that names an EXISTING account ever reaches it: the admin
+      // returns two steps earlier for an address it cannot find. So the delay is
+      // an account-existence oracle at the admin's edge, worth up to two seconds,
+      // which is four orders of magnitude louder than the 4 ms difference the
+      // fixed floor was built to hide. Measured through the admin at twelve
+      // prior failures: 306 ms for an address that exists against 252 ms for one
+      // that does not, with no overlap; at the cap, 2006 against 252.
+      //
+      // The delay has to be applied somewhere that does not know whether the
+      // account exists, and that is the admin, which owns a failure counter
+      // keyed on the hashed ADDRESS. So a caller may declare that it has already
+      // paid, and this route then counts the failure and reports what it would
+      // have charged, without charging it twice. The route is X-Internal-Auth
+      // only, so the only callers who can set this are callers who could already
+      // pass any user_id they like; it moves the delay, it does not remove it.
+      // A caller that does not set it pays here exactly as before.
+      const ownDelayMs = userMfaDelayMs(user_id);
+      if (!throttled_upstream) await authThrottle.sleep(ownDelayMs);
       // Bounded, so an unreachable redis answers 503 here instead of parking the
       // request in front of the single-use guard that is supposed to fail closed.
       let secret;
@@ -3001,7 +3023,9 @@ async function handleRelayRequest(req, res) {
         if (result.algorithm === "sha1") log("info", "totp_sha1_accepted", { account: String(user_id).slice(0, 12), endpoint: "login" });
       }
       res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(J(result));
+      // throttle_ms is what this account owed before the attempt, so an upstream
+      // that took the delay on itself can be checked against it.
+      return res.end(J({ ...result, throttle_ms: ownDelayMs }));
     } catch (err) {
       if (redisOutage503(err, res)) return;
       console.error("[user/verify-totp]", err.message);
@@ -3035,12 +3059,13 @@ async function handleRelayRequest(req, res) {
   if (req.method === "POST" && path === "/v2/user/consume-backup") {
     if (!_internalOk()) return _internalReject();
     try {
-      const { user_id, code } = JSON.parse((await readBody(req, 4096)).toString());
+      const { user_id, code, throttled_upstream } = JSON.parse((await readBody(req, 4096)).toString());
       if (!user_id || !code) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
       // Same treatment as verify-totp. The delay is what bounds the argon2 work
       // a wrong code triggers now that the refusal is gone; the per-IP caps on
       // the admin side bound it from the other end.
-      await authThrottle.sleep(userMfaDelayMs(user_id));
+      // Same existence oracle, same opt-out: see /v2/user/verify-totp above.
+      if (!throttled_upstream) await authThrottle.sleep(userMfaDelayMs(user_id));
       const result = await userTotp.consumeBackupCode(redisClient, user_id, code);
       if (result && (result.valid || result.success)) userMfaAttemptReset(user_id);
       else userMfaNoteFailure(user_id);

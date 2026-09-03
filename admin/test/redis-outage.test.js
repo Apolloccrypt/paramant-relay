@@ -150,6 +150,9 @@ async function timed(fn) {
 async function assertAdminOutage(t, breakIt, name) {
   if (!aoUrl) return t.skip('no redis');
   const { srv, proxy, relay } = await bootBehindProxy();
+  // Before the first assertion: a red test still has to release its sockets, or
+  // the run hangs on the failure instead of reporting it.
+  t.after(async () => { srv.stop(); proxy.close(); await relay.close(); });
 
   // With the store up the route works, so the 503s below are about the outage.
   const up = await srv.login({ email: AO_EMAIL, totp: '000000', ip: aoIp() });
@@ -190,9 +193,6 @@ async function assertAdminOutage(t, breakIt, name) {
   assert.equal(health.json.redis.ok, false);
   aoDid();
 
-  srv.stop();
-  proxy.close();
-  await relay.close();
 }
 
 test('a cut connection: every redis-backed admin route answers 503 inside the deadline', async (t) => {
@@ -206,6 +206,7 @@ test('a silent connection: the same, where the client still believes it is ready
 test('the admin heals by itself when the store comes back', async (t) => {
   if (!aoUrl) return t.skip('no redis');
   const { srv, proxy, relay } = await bootBehindProxy();
+  t.after(async () => { srv.stop(); proxy.close(); await relay.close(); });
 
   proxy.hole();
   const during = await timed(() => srv.login({ email: AO_EMAIL, totp: '000000', ip: aoIp() }));
@@ -238,7 +239,4 @@ test('the admin heals by itself when the store comes back', async (t) => {
     `and the login route works again, got ${after.status} ${after.text}`);
   aoDid();
 
-  srv.stop();
-  proxy.close();
-  await relay.close();
 });

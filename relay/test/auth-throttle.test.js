@@ -90,13 +90,23 @@ test('relay.js uses the throttle and no longer refuses on a named user_id', () =
 
   assert.match(relay, /userMfaNoteFailure/, 'failures are recorded');
   assert.match(relay, /userMfaAttemptReset/, 'and a success clears them');
-  assert.match(relay, /authThrottle\.sleep\(userMfaDelayMs\(user_id\)\)/, 'the answer is a delay');
+  assert.match(relay, /authThrottle\.sleep\(/, 'the answer is a delay');
 
   // Both MFA endpoints go through it: verify-totp and consume-backup. The
   // second is the one where a wrong code costs argon2 work, so it needs the
   // throttle more than the first, not less.
-  const hits = relay.match(/authThrottle\.sleep\(userMfaDelayMs\(user_id\)\)/g) || [];
-  assert.equal(hits.length, 2, 'verify-totp and consume-backup are both throttled');
+  //
+  // Each sleep is now guarded by `!throttled_upstream`, because this delay is
+  // only ever charged to a request that names an account that EXISTS, which
+  // made it an account-existence oracle at the admin's edge (509 ms against
+  // 251 ms at twelve failures, with no overlap). A caller that has already
+  // charged the same curve against the hashed ADDRESS says so and is not
+  // charged twice. Any caller that does not say so still pays here.
+  const hits = relay.match(/if \(!throttled_upstream\) await authThrottle\.sleep\(/g) || [];
+  assert.equal(hits.length, 2, 'verify-totp and consume-backup both still charge the delay by default');
+  const unguarded = relay.match(/(?<!throttled_upstream\) )await authThrottle\.sleep\(/g) || [];
+  assert.equal(unguarded.length, 0,
+    'a sleep that is not behind the flag is charged on top of the one the admin already applied');
   const notes = relay.match(/(?<!function )userMfaNoteFailure\(user_id\)/g) || [];
   assert.equal(notes.length, 2, 'and both record their failures');
 });

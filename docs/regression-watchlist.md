@@ -139,6 +139,36 @@ the two `createClient` calls in `relay/relay.js` and `admin/lib/redis.js`.
 
 ---
 
+## Bug #5 - The limiter that locked the door and threw away the key
+
+**Found:** review of the fix for bug #4, 2026-09-03. **Fixed on:**
+`fix/auth-hardening-2`.
+
+**What happened:**
+every rate limiter in both services was INCR followed by
+`if (count === 1) await expire(key, WINDOW)`. Correct only while those two
+commands always happen together. The redis deadline added for bug #4 makes the
+gap reachable in a single request: the INCR outlives the deadline while the
+server still executes it, the caller gets an outage, the expiry is never sent,
+and the next INCR returns 2 so no later call sets it either. TTL -1 is for ever.
+
+**Why it belongs in this document:**
+it is a fix that created a new failure of the same class it was fixing. Nothing
+errors, nothing is logged, and the only symptom is that one source address, or
+one e-mail address, or one paying account, is refused from then on. Twenty-three
+call sites had the shape, including the per-IP login limiter, the failure
+counter behind the proof-of-work threshold, and every monthly quota counter.
+
+**What catches it now:**
+`admin/test/ratelimit-ttl.test.js` boots a real admin behind a proxy that
+delivers commands to redis and drops the replies, which is the only sabotage
+that reproduces it. `tests/redis-deadline-parity.test.mjs` fails if any of the
+five files goes back to calling INCR directly.
+
+**Code location:** `relay/lib/redis-counter.js` and its copy in `admin/lib/`.
+
+---
+
 ## Severity Classification
 
 | Bug class               | Silent? | Healthcheck catches? | e2e-auth-flow catches? |

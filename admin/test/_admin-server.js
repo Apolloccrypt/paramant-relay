@@ -93,19 +93,24 @@ async function stubRelay(state) {
         res.end(JSON.stringify(payload));
       };
       if (url.pathname === '/v2/admin/keys') return send(200, { keys: state.accounts });
-      if (url.pathname === '/v2/user/verify-totp') {
-        const out = state.verify(body || {});
-        const reply = () => send(out.status || 200, out.body !== undefined ? out.body : { valid: !!out.valid, algorithm: 'sha256' });
-        // A real relay does not answer instantly: it sleeps out the per-account
-        // throttle, reads the encrypted secret from redis, and writes a
-        // single-use key. state.verifyDelayMs models that cost, because the
-        // size of the login timing oracle is exactly the cost of this call.
-        if (state.verifyDelayMs > 0) return setTimeout(reply, state.verifyDelayMs);
+      if (url.pathname === '/v2/user/verify-totp' || url.pathname === '/v2/user/consume-backup') {
+        const backup = url.pathname.endsWith('consume-backup');
+        const out = backup
+          ? (state.consumeBackup ? state.consumeBackup(body || {}) : { valid: false })
+          : state.verify(body || {});
+        const throttleMs = relayThrottleMs(state, body || {});
+        const reply = () => send(out.status || 200, out.body !== undefined ? out.body : {
+          valid: !!out.valid, ...(backup ? {} : { algorithm: 'sha256' }), throttle_ms: throttleMs,
+        });
+        // A real relay does not answer instantly. Two costs, and they are
+        // different in kind: state.verifyDelayMs is the fixed work (a redis read
+        // of the encrypted secret, the single-use write), and the throttle below
+        // is the per-account delay relay.js charges for previous failures. The
+        // second one is the whole finding: it is only ever charged to a request
+        // that names an account that exists.
+        const wait = (state.verifyDelayMs || 0) + throttleMs;
+        if (wait > 0) return setTimeout(reply, wait);
         return reply();
-      }
-      if (url.pathname === '/v2/user/consume-backup') {
-        const out = state.consumeBackup ? state.consumeBackup(body || {}) : { valid: false };
-        return send(out.status || 200, out.body !== undefined ? out.body : { valid: !!out.valid });
       }
       if (url.pathname === '/health') return send(200, { ok: true });
       return send(404, { error: 'stub_relay_has_no_such_route', path: url.pathname });
@@ -114,6 +119,24 @@ async function stubRelay(state) {
   await new Promise((r) => server.listen(port, '127.0.0.1', r));
   _servers.add(server);
   return { port, base: `http://127.0.0.1:${port}`, state, close: () => new Promise((r) => { _servers.delete(server); server.close(r); }) };
+}
+
+// relay/lib/auth-throttle.js, reproduced: 250 ms per failure past ten, capped at
+// two seconds, charged per user_id. The stub keeps the count the way relay.js
+// keeps it, in memory, so a suite can drive the throttle from outside.
+//
+// `throttled_upstream` in the body is the caller declaring it has already
+// charged the delay itself. relay.js honours it by counting the failure and
+// reporting throttle_ms without sleeping, and so does this.
+function relayThrottleMs(state, body) {
+  if (!state.throttle) return 0;
+  const key = String(body.user_id || '');
+  const failures = state.throttleCounts.get(key) || 0;
+  const over = failures - 10;
+  const owed = over > 0 ? Math.min(over * 250, 2000) : 0;
+  const wrong = !(state.verify(body) || {}).valid;
+  state.throttleCounts.set(key, wrong ? failures + 1 : 0);
+  return body.throttled_upstream ? 0 : owed;
 }
 
 // A relay stub with one account on it, ready to be handed to boot().
@@ -126,6 +149,10 @@ function defaultRelayState(accounts = [], secret = '123456') {
     accounts,
     calls: [],
     verifyDelayMs: 0,
+    // Off by default so the suites that do not care about it are not slowed
+    // down; login-timing turns it on, because it is the finding.
+    throttle: false,
+    throttleCounts: new Map(),
     verify: (body) => ({ valid: body && body.totp === secret }),
   };
   return state;

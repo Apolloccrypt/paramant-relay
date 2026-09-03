@@ -38,17 +38,44 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `GET /api/auth/check`, which answers 401 when nobody is signed in, so
   "healthy" meant "the process still refuses me". The new admin `GET /health` is
   always 200 and says `status: "degraded"` when redis is unreachable.
-- **`POST /api/user/login` no longer says which addresses are customers.** An
-  address that exists reached a second relay call and one more redis read than
-  one that does not. Measured over 200 requests per case on a booted admin: 6.44
-  ms against 2.20 ms at the median, with the two ranges not overlapping, so one
-  request classified an address without any credentials. Every credential answer
-  is now held to a floor (`PARAMANT_LOGIN_MIN_ANSWER_MS`, default 250 ms) and the
-  not-found branch makes the same redis calls as the found one; the same
-  measurement after the fix reads 251.37 against 251.27 ms. The 429 and the 428
-  are deliberately not padded: they are told apart by their status code anyway.
+- **`POST /api/user/login` no longer says which addresses are customers.** Two
+  leaks, and the loud one was the anti-guessing delay itself. `relay.js` charges
+  250 ms per failure past ten, capped at two seconds, before it checks a code,
+  and only a request naming an account that EXISTS ever reaches that sleep.
+  Twelve wrong codes from rotating source addresses put an address there, and
+  nothing refuses them. Measured over 100 requests per case on a booted admin:
+  at twelve prior failures 509.91 ms against 251.61 ms, at twenty 2010.23 ms
+  against 251.82 ms, ranges not overlapping either time; the work difference on
+  a clean address was a further 4 ms. The `503 totp_unavailable` answer was
+  unfloored too, and only an address with an account could produce it.
+
+  The delay is now charged by the admin, against the per-address failure counter
+  that counts a miss exactly like a hit, and the relay is told not to charge it
+  again (`throttled_upstream`). Every credential answer on both login routes,
+  including the 503, is held to `PARAMANT_LOGIN_MIN_ANSWER_MS` (default 250 ms)
+  plus what the address owes. Same measurement after: 251.86 against 251.87,
+  751.84 against 751.76, 2251.90 against 2252.11, all overlapping. The 429 and
+  the 428 are deliberately not padded: they are told apart by their status code
+  anyway.
+- **A rate-limit counter that lost its expiry refused for ever.** Every limiter
+  in both services was INCR plus a conditional `if (count === 1) expire(...)`.
+  The redis deadline above makes that gap reachable in one request: if the INCR
+  outlives the deadline while the server still executes it, the expiry is never
+  sent, the next INCR returns 2, and the key is immortal. Measured with redis
+  replies dropped during one login, the per-IP counter stood at 9 with TTL -1
+  and that source address kept getting 429 until the key was deleted by hand.
+  The same shape stranded the login failure counter (a proof-of-work bill that
+  never lifts, on an address anybody may name) and the monthly quota counters in
+  `relay/lib/quota.js` (an account permanently over its limit). All 23 INCR call
+  sites now go through `lib/redis-counter.js`, which sets the expiry after every
+  INCR with `NX`, so a lost window is repaired by the next request instead of
+  never.
 
 ### Added
+- **`admin/test/ratelimit-ttl.test.js`**, which boots a real admin behind a proxy
+  that delivers commands and drops replies, and then reads the TTL on its own
+  connection. That is the only shape that reproduces a counter stranded without
+  a window: a full outage never executes the INCR either.
 - **An HTTP test harness for the admin panel** (`admin/test/_admin-server.js`),
   the counterpart of `relay/test/_relay-server.js`. Every admin suite until now
   was a lib test or a source-text assertion; none of them ever started the
