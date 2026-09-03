@@ -204,11 +204,11 @@ footer a{color:var(--ink);text-decoration:none}
 <div class="content">
 
 <h1>Privacy Policy</h1>
-<p class="updated">Last updated: July 21, 2026</p>
+<p class="updated">Last updated: September 3, 2026</p>
 
 <h2>Core principle</h2>
 <p><strong>PARAMANT collects only what is strictly required to operate your account and run the service.</strong></p>
-<p>An email address is required to create an account and recover access; it is personal data, and it is stored. No phone number. We do not log IP addresses for analytics or profiling; an IP is processed only transiently, for security and abuse-prevention (rate limiting, the session record, an audit log, and the DPA signature record). Only a strictly-necessary session cookie (no tracking cookies). No tracking pixels. No analytics. No advertisements. We never sell your data.</p>
+<p>An email address is required to create an account and recover access; it is personal data, and it is stored. No phone number. We do not log IP addresses for analytics or profiling. An IP is processed for security and abuse-prevention only (rate limiting, the session record, an audit log, and the DPA signature record), and two operational logs hold one for longer than a timer; they are named below. Only a strictly-necessary session cookie (no tracking cookies). No tracking pixels. No analytics. No advertisements. We never sell your data.</p>
 
 <h2>How Ghost Pipe &amp; ParaShare (the ParaSend web app) work</h2>
 <p>All files are encrypted <strong>client-side in your browser</strong> using post-quantum cryptography (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256) before they ever reach our servers. The relay never sees plaintext at any point.</p>
@@ -236,18 +236,18 @@ footer a{color:var(--ink);text-decoration:none}
 <tr><td>Email address</td><td>Account identity, login, recovery, signing-invite delivery</td><td>Stored (server) &middot; also kept as a hash for rate-limiting</td><td>Email provider (Resend) for messages we send you</td></tr>
 <tr><td>Sign-in factors: passkey public keys, TOTP secret (encrypted), recovery codes (hashed)</td><td>Account authentication</td><td>Stored (server)</td><td>Never</td></tr>
 <tr><td>ParaSign signing public key + fingerprint</td><td>Verifiable signing identity</td><td>Stored (server) &middot; public half only; the private key never leaves your browser</td><td>Public (its hash is in the CT log)</td></tr>
-<tr><td>Plan + anonymised billing reference</td><td>Pro/Enterprise billing</td><td>Stored (server)</td><td>Payment processor (Mollie, EU) once billing is enabled</td></tr>
-<tr><td>Client IP + user-agent</td><td>Security, rate limiting, audit log</td><td>Transient (session/rate-limit TTL; audit log volume-capped)</td><td>Never</td></tr>
+<tr><td>Plan + anonymised billing reference</td><td>Pro/Enterprise billing</td><td>Stored (server)</td><td>Payment processor (Mollie, EU)</td></tr>
+<tr><td>Client IP + user-agent</td><td>Security, rate limiting, audit log</td><td>Session/rate-limit TTL; the audit log and the two operational logs named below are capped by volume, not by time</td><td>Never</td></tr>
 </tbody>
 </table>
 
 <h2>What we never do</h2>
 <ul>
 <li>Sell your data, or use it for advertising or profiling</li>
-<li>Log or store IP addresses for analytics or profiling (an IP is used only transiently, for security and abuse-prevention)</li>
+<li>Log or store IP addresses for analytics or profiling (an IP is used for security and abuse-prevention only, in the logs named below)</li>
 <li>Use tracking cookies or browser fingerprinting (only a strictly-necessary session cookie is set after login)</li>
 <li>Run advertising or tracking scripts</li>
-<li>Share your data with third parties, except the operational subprocessors needed to run the service (hosting, transactional email, and payments when enabled, listed below)</li>
+<li>Share your data with third parties, except the operational subprocessors needed to run the service (hosting, transactional email, and payments, listed below)</li>
 <li>Write Ghost Pipe or ParaShare transfer payloads to disk. ParaSign request documents are different: their encrypted capsule may be persisted until the envelope expires.</li>
 <li>Load fonts, scripts, styles, or any other resource from a third party. Everything is self-hosted on paramant.app</li>
 </ul>
@@ -255,7 +255,7 @@ footer a{color:var(--ink);text-decoration:none}
 <h2>No third-party requests</h2>
 <p><strong>Every byte your browser loads on paramant.app comes from paramant.app.</strong> No web fonts from Google, no JavaScript or CSS from a CDN, no analytics, no tracking pixels, no embedded third-party widgets. Open your browser&rsquo;s network inspector on any page: every request goes to one origin, and nowhere else.</p>
 <p>This is deliberate. A single request to a third party leaks your IP address and the page you are viewing to that party before you have agreed to anything. So we self-host everything: fonts (a plain system font stack, zero font files downloaded), scripts, styles, and images all come from paramant.app.</p>
-<p>What runs the service is operational, never tracking: our own edge (Caddy) terminates TLS directly on our server (see below); transactional email is sent server-side via our email provider; and a payment processor will handle billing on its own pages once that is enabled. None of these is loaded into the site, and none follows you across it.</p>
+<p>What runs the service is operational, never tracking: our own edge (Caddy) terminates TLS directly on our server (see below); transactional email is sent server-side via our email provider; and a payment processor handles billing on its own pages. None of these is loaded into the site, and none follows you across it.</p>
 
 <h2>Local storage in your browser</h2>
 <p>For technical functionality, the following data is stored locally in your browser only. It never leaves your device:</p>
@@ -278,17 +278,25 @@ footer a{color:var(--ink);text-decoration:none}
 <h2>Network edge</h2>
 <p>TLS is terminated by <strong>our own edge (Caddy)</strong>, running on the same Hetzner infrastructure in Germany, with post-quantum key exchange. There is no third-party reverse proxy or CDN in front of the site: your connection reaches our server and nowhere else. Short-lived connection metadata (IP, timestamp) is processed transiently for security and abuse-prevention as described above, never for analytics.</p>
 
+<h2>Logs that hold an IP address</h2>
+<p>Two logs hold a full client address, and neither is bounded by a timer. We name them rather than let the word &ldquo;transient&rdquo; do work it cannot do.</p>
+<ul>
+<li><strong>Admin service log.</strong> Three operational lines write the client IP: a duplicate signup attempt, a pending signup, and a rate-limited request to reset a second factor. The pending-signup line writes the account email address next to the IP. They go to the container log, which rotates on size (5 MB, 3 files kept), so the bound is volume and not time.</li>
+<li><strong>Edge access log.</strong> Our own edge writes a server access log with the client address, the timestamp, the path and the user agent. We read it to tell real visitors apart from scanners, never to build a profile of a person, and it is not exported to anyone. The nginx configuration in this repository logs nothing; the edge in front of it does.</li>
+</ul>
+<p>Neither log is used for analytics, profiling or advertising, and neither is shared with a third party.</p>
+
 <h2>Subprocessors</h2>
 <p>A few operational providers are needed to run the service. None is loaded into the site, and none is used for tracking:</p>
 <ul>
 <li><strong>Hetzner</strong> (Germany, EU): hosting and infrastructure.</li>
 <li><strong>Bunny.net</strong> (Slovenia, EU): DNS hosting for paramant.app. It answers the lookup for our name; it is not a CDN or a proxy, and no request for a page or a file passes through it.</li>
 <li><strong>Resend</strong>: transactional email only (account verification, optional signing invites, billing notices). For a signing invite it receives the recipient address, message and complete personal link. Opening the encrypted document additionally requires the invited Paramant account. Resend does not receive document plaintext and is never used for marketing.</li>
-<li><strong>Mollie</strong>: payment processing for Pro/Enterprise. <strong>Billing is not yet live</strong> (current plans are arranged manually); once enabled, Mollie (a Dutch company, EU jurisdiction, GDPR-native) handles payment data on its own pages and PARAMANT never sees or stores card numbers, only your plan and an anonymised reference.</li>
+<li><strong>Mollie</strong> (a Dutch company, EU jurisdiction, GDPR-native): payment processing for paid plans. Checkout runs through Mollie today. <strong>Every payment is a one-off for the term you buy; there are no subscriptions</strong>, because the recurring layer stays switched off until an operator sets it. The relay sends Mollie the amount, a plan description and payment metadata (accountId, product, plan, interval), and no email address while the recurring layer is off. Card data is entered on Mollie&rsquo;s own pages; PARAMANT never sees or stores card numbers, only your plan and an anonymised reference.</li>
 </ul>
 
 <h2>GDPR / AVG</h2>
-<p>We process the minimum personal data needed to run your account, on a lawful basis (performing the service you request, and our legitimate interest in keeping it secure). You can request access to, or deletion of, your account data by emailing us. For Pro and Enterprise customers we provide a <strong>Data Processing Agreement (DPA)</strong>.</p>
+<p>We process the minimum personal data needed to run your account, on a lawful basis (performing the service you request, and our legitimate interest in keeping it secure). You can request access to, or deletion of, your account data by emailing us. The standard <strong>Data Processing Agreement (DPA)</strong> is published at <a href="/dpa">/dpa</a> and applies to all plans; anyone can sign it electronically, with no account and no paid tier required.</p>
 <p>Temporary relay data is never retained longer than the applicable TTL (1 hour for Community, 24 hours for Pro, 7 days for Business and Enterprise). In practice it is destroyed much earlier on download.</p>
 
 <h2>Children</h2>

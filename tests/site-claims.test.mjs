@@ -1228,6 +1228,50 @@ test('the BUSL conversion the site publishes is the one LICENSE grants', () => {
   assert.ok(visible(page('terms')).includes(`converts to the ${name} on ${human}.`),
     `terms: the licence sentence must say ${name} and ${human}`);
 
+  // The three fields that decide who may run this in production, and they are
+  // the ones the review found saying three different things. LICENSE grants
+  // production use up to five API keys and one self-hosted deployment,
+  // commercial use included. deploy/LICENSE, which ships with a self-hosted
+  // relay, carried no Additional Use Grant at all while its Terms referred to
+  // one "above"; the box on /license granted non-commercial use only and named
+  // a different Licensor and a different Licensed Work. Only the Change Date
+  // and Change License were pinned, so all three could disagree and stay green.
+  // Verified by sabotage in both directions: editing the grant, the Licensor or
+  // the Licensed Work in LICENSE turns this red, and so does editing either
+  // copy.
+  const licenseField = (src, key, where) => {
+    const m = new RegExp(`^${key}:[ \\t]*(\\S.*?)[ \\t]*$`, 'm').exec(src);
+    assert.ok(m, `${where}: must state ${key}`);
+    return m[1];
+  };
+  const grantOf = (src, where) => {
+    const start = src.indexOf('Additional Use Grant');
+    assert.ok(start >= 0, `${where}: must carry the Additional Use Grant, not a reference to one`);
+    const end = src.indexOf('\nTerms', start);
+    assert.ok(end > start, `${where}: the Additional Use Grant must sit above the Terms section`);
+    return src.slice(start, end).replace(/\s+/g, ' ').trim();
+  };
+  const boxMatch = /<div class="license-box">([\s\S]*?)<\/div>/.exec(licPage);
+  assert.ok(boxMatch, 'license: the full licence text box must still be on the page');
+  const copies = [['deploy/LICENSE', read('deploy/LICENSE')], ['license (box)', boxMatch[1]]];
+  for (const [where, src] of copies) {
+    for (const key of ['Licensor', 'Licensed Work']) {
+      assert.equal(licenseField(src, key, where), licenseField(lic, key, 'LICENSE'),
+        `${where}: ${key} differs from LICENSE, and LICENSE is the operative grant`);
+    }
+    assert.equal(grantOf(src, where), grantOf(lic, 'LICENSE'),
+      `${where}: the Additional Use Grant is not word for word the one LICENSE gives`);
+  }
+  // The grant permits commercial production use inside the limits, so no page
+  // may sell the licence as non-commercial only.
+  const grantProblems = [];
+  for (const slug of publicPages()) {
+    for (const m of visible(page(slug)).matchAll(/\bnon-commercial\b[^.<]*/g)) {
+      grantProblems.push(`${slug}: says "non-commercial${m[0].slice(14, 60)}"; LICENSE grants commercial production use within the Additional Use Grant`);
+    }
+  }
+  assert.deepEqual(grantProblems, [], `\n  ${grantProblems.join('\n  ')}\n`);
+
   // No page may name a conversion the file does not grant.
   const problems = [];
   for (const slug of publicPages()) {
@@ -1314,6 +1358,12 @@ test('the signing and receipt retentions on /privacy are the ones the relay appl
   const priv = visible(page('privacy'));
   assert.ok(priv.includes(`${def} days unless the request asks for another term, and never longer than ${max} days`),
     `privacy: the envelope retention must say ${def} days by default and ${max} days at most`);
+  // /dpa is the document a controller signs, and its Hetzner row said the
+  // capsule "may persist until envelope expiry": a term with no number in it.
+  // Same two constants, same sentence, so the signed table cannot drift from
+  // the policy page. Verified by the same sabotage as above.
+  assert.ok(visible(page('dpa')).includes(`persist until the envelope expires: ${def} days unless the request asks for another term, and never longer than ${max} days`),
+    `dpa: the sub-processor row must state the ${def} day default and the ${max} day maximum, not "until envelope expiry"`);
 
   const rly = stripJsComments(read('relay/relay.js'));
   const m = /RECEIPT_TTL_MS\s*=\s*(\d+)\s*\*\s*(\d+)\s*\*\s*(\d+)/.exec(rly);
@@ -1415,4 +1465,232 @@ test('the repository names one Hetzner location, the one the DPA names', () => {
     }
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// 31 ── Mollie is wired and unconditional. /v2/billing/checkout and
+// /v2/billing/webhook are routed (relay.js), createPayment runs on every
+// checkout, so the DPA row stays. What the row said it sends was wrong in both
+// directions: it named an email address, which the payload does not carry
+// while the recurring layer is off, and it did not name the four metadata keys
+// it does carry. /privacy and /terms were a version behind the code as well:
+// both still said billing was not live and that plans were arranged by hand,
+// while production has taken one-off Mollie payments since 2026-08-08 and takes
+// no subscriptions because BILLING_MODE is unset. Verified by sabotage in both
+// directions: renaming a metadata key in relay.js turns this red, so does
+// editing the row on /dpa; making billingStance recurring by default turns the
+// stance half red, so does putting "not yet live" back on /privacy or /terms.
+test('the Mollie row on /dpa is the payload relay.js sends, and the stance the pages describe is the one mollie.js takes', async () => {
+  const rly = stripJsComments(read('relay/relay.js'));
+  for (const route of ['/v2/billing/checkout', '/v2/billing/webhook']) {
+    assert.ok(rly.includes(`path === '${route}'`), `relay.js no longer routes ${route}; the Mollie sub-processor row may need to go`);
+  }
+  const at = rly.indexOf('mollie.createPayment(');
+  assert.ok(at > 0, 'relay.js must still build the Mollie payment inline; this block reads that payload');
+  const payload = rly.slice(at, rly.indexOf('}, customerId', at));
+  const fields = [...payload.matchAll(/^\s{8}(\w+):/gm)].map((m) => m[1]);
+  assert.deepEqual(fields, ['amount', 'description', 'redirectUrl', 'webhookUrl', 'metadata'],
+    `the checkout payload now sends ${fields.join(', ')}; the /dpa data column has to say so`);
+  const meta = /metadata:\s*\{([^}]*)\}/.exec(payload);
+  assert.ok(meta, 'the checkout payload must still carry a metadata object');
+  const metaKeys = meta[1].split(',').map((k) => k.split(':')[0].trim()).filter(Boolean);
+  assert.deepEqual(metaKeys, ['accountId', 'product', 'plan', 'interval'],
+    `the payment metadata is now ${metaKeys.join(', ')}; the /dpa and /privacy columns name the old set`);
+  assert.ok(!/email/i.test(payload),
+    'the checkout payload now carries an email field; /dpa and /privacy say no email address is sent');
+
+  // The only place an address could reach Mollie is the customer record, and
+  // that whole step is skipped while the recurring layer is off.
+  const rec = stripJsComments(read('relay/lib/billing-recurring.js'));
+  assert.match(rec, /if \(!recurringAllowed\(d\)\) return \{ customerId: null, result: 'skipped', reason: 'recurring_disabled' \}/,
+    'ensureCustomer no longer skips on a disabled recurring layer; an email address may now reach Mollie');
+  assert.match(rec, /email:\s*\(rec && rec\.email\)/,
+    'the customer record no longer sends the account email; rewrite the Mollie rows rather than delete this line');
+
+  // The stance itself, called rather than pattern-matched: an unset
+  // BILLING_MODE with a live key is production today, and it is one-off only.
+  const { createRequire } = await import('node:module');
+  const mollieLib = createRequire(import.meta.url)(path.join(ROOT, 'relay/lib/mollie.js'));
+  const savedEnv = { BILLING_MODE: process.env.BILLING_MODE, MOLLIE_API_KEY: process.env.MOLLIE_API_KEY, MOLLIE_TEST_API_KEY: process.env.MOLLIE_TEST_API_KEY };
+  try {
+    delete process.env.BILLING_MODE; delete process.env.MOLLIE_TEST_API_KEY;
+    process.env.MOLLIE_API_KEY = 'live_siteclaims_stance_pin';
+    assert.equal(mollieLib.billingStance().recurring, false,
+      'an unset BILLING_MODE now opens the recurring layer; /privacy and /terms say there are no subscriptions');
+    process.env.BILLING_MODE = 'live';
+    assert.equal(mollieLib.billingStance().recurring, true,
+      'BILLING_MODE=live no longer switches the recurring layer on; the stance the pages describe has moved');
+  } finally {
+    for (const [k, v] of Object.entries(savedEnv)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
+
+  const dpaPage = visible(page('dpa'));
+  assert.ok(dpaPage.includes(`the payment metadata the relay sets: ${metaKeys.join(', ')}`),
+    `dpa: the Mollie data column must name the metadata keys relay.js sends (${metaKeys.join(', ')})`);
+  assert.ok(dpaPage.includes('The amount, a plan description'),
+    'dpa: the Mollie data column must name the amount and the description, which are what the payload also carries');
+  assert.ok(dpaPage.includes('No email address is sent while recurring billing is off'),
+    'dpa: the Mollie data column must say no email address is sent, because the payload carries none');
+
+  const privPage = visible(page('privacy'));
+  assert.ok(privPage.includes(`payment metadata (${metaKeys.join(', ')})`),
+    'privacy: the Mollie entry must name the same metadata keys');
+  assert.ok(privPage.includes('Every payment is a one-off for the term you buy; there are no subscriptions'),
+    'privacy: the Mollie entry must describe the stance the code takes, which is one-off payments only');
+  const termsPage = visible(page('terms'));
+  assert.ok(termsPage.includes('Every checkout is a one-off payment for the term you buy.'),
+    'terms: the payment paragraph must describe one-off payments');
+  assert.ok(termsPage.includes('Automatic renewal is not switched on'),
+    'terms: the payment paragraph must say renewal is not automatic while the recurring layer is off');
+
+  const stale = [];
+  for (const slug of publicPages()) {
+    const text = visible(page(slug));
+    for (const re of [/[Bb]illing is not yet live/, /automated billing is not yet live/, /arranged by hand, by e-mail/, /arranged manually/, /once billing is enabled/]) {
+      const m = re.exec(text);
+      if (m) stale.push(`${slug}: says "${m[0]}", and the relay has taken Mollie payments since billing exists`);
+    }
+  }
+  assert.deepEqual(stale, [], `\n  ${stale.join('\n  ')}\n`);
+});
+
+// 32 ── Who gets a DPA. POST /v2/sign-dpa is in the ALLOWED path list for every
+// relay profile and its handler checks a name, an organisation, an email and a
+// rate limit, and nothing else: no API key, no plan, no account. So the DPA is
+// public, and "applies to all plans" on /pricing was the one sentence out of
+// four that matched the code. The other three (a paid-tier-only line on
+// /pricing, "For Pro and Enterprise customers" on /privacy, an Enterprise
+// bullet on the tier card) described a gate that does not exist.
+// /audit-log-export went the other way and denied the position the whole of
+// /dpa takes. Verified by sabotage in both directions: adding an unauthorized
+// check to the handler turns this red, and so does putting a tier back in front
+// of the DPA on any page.
+test('the DPA the pages offer is the public endpoint relay.js serves', () => {
+  const rly = stripJsComments(read('relay/relay.js'));
+  const allowed = /const ALLOWED = \{([\s\S]*?)\n\};/.exec(rly);
+  assert.ok(allowed, 'relay.js must still declare the per-profile ALLOWED path list');
+  for (const profile of ['ghost_pipe', 'iot']) {
+    const list = new RegExp(`${profile}:\\s*\\[([\\s\\S]*?)\\]`).exec(allowed[1]);
+    assert.ok(list && list[1].includes(`'/v2/sign-dpa'`), `relay.js: ${profile} no longer allows /v2/sign-dpa; the DPA is no longer reachable everywhere the pages say`);
+  }
+  const at = rly.indexOf(`path === '/v2/sign-dpa'`);
+  assert.ok(at > 0, 'relay.js must still handle POST /v2/sign-dpa');
+  const handler = rly.slice(at, rly.indexOf(`  if (path === `, at + 10));
+  assert.ok(handler.length > 500, 'the /v2/sign-dpa handler could not be sliced; this block would assert on nothing');
+  for (const gate of [/!keyData/, /unauthorized/, /requireAuth/, /plan\s*===/]) {
+    assert.doesNotMatch(handler, gate, 'the /v2/sign-dpa handler now gates on an account or a plan; the pages say the DPA applies to all plans');
+  }
+  assert.match(handler, /if \(!name \|\| !org \|\| !email\)/, 'the handler must still require a name, an organisation and an email');
+  assert.match(handler, /Too many requests/, 'the handler must still rate limit; a public endpoint without one is a different claim');
+
+  const SCOPE = 'applies to all plans';
+  for (const slug of ['pricing', 'privacy', 'audit-log-export']) {
+    assert.ok(visible(page(slug)).toLowerCase().includes(SCOPE), `${slug}: must say the DPA ${SCOPE}, because the endpoint has no gate`);
+  }
+  const gated = [];
+  const GATES = [
+    /available on request for all paid tiers/i,
+    /For Pro and Enterprise customers we provide a/i,
+    /relay does not process personal data/i,
+  ];
+  for (const slug of allPages()) {
+    const text = visible(page(slug));
+    for (const re of GATES) {
+      const m = re.exec(text);
+      if (m) gated.push(`${slug}: says "${m[0]}", which the /v2/sign-dpa handler and /dpa both contradict`);
+    }
+  }
+  assert.deepEqual(gated, [], `\n  ${gated.join('\n  ')}\n`);
+});
+
+// 33 ── The host-hardening numbers. /dpa row "Integrity and availability" and
+// the CIS section of SECURITY.md quote the same audit, and nothing kept them
+// equal: either could be edited alone and stay green. Neither file proves the
+// host is in that state, and this block does not claim it does; it only forbids
+// the repository from quoting two different figures for one benchmark.
+// Verified by sabotage in both directions: 49 to 48 in SECURITY.md, or 114 to
+// 113 on /dpa, each turn this red.
+test('the hardening figures on /dpa are the ones SECURITY.md records', () => {
+  const sec = read('SECURITY.md');
+  const bench = /### [\d-]+ [^\n]*CIS Ubuntu ([\d.]+) benchmark/.exec(sec);
+  assert.ok(bench, 'SECURITY.md must still record the CIS Ubuntu benchmark section');
+  const checks = /^(\d+) checks applied across/m.exec(sec);
+  assert.ok(checks, 'SECURITY.md must still state how many CIS checks were applied');
+  const rules = /\|\s*auditd\s*\|\s*(\d+) CIS L2 rules loaded\s*\|/.exec(sec);
+  assert.ok(rules, 'SECURITY.md must still state the auditd rule count');
+  assert.match(sec, /\|\s*AIDE\s*\|\s*Installed, daily integrity check\s*\|/, 'SECURITY.md must still record the daily AIDE check');
+  assert.match(sec, /\|\s*AppArmor\s*\|\s*\d+\/\d+ profiles enforcing\s*\|/, 'SECURITY.md must still record AppArmor enforcing');
+
+  const row = visible(page('dpa'));
+  assert.ok(row.includes(`auditd (${rules[1]} CIS L2 rules)`), `dpa: the Article 32 row must say ${rules[1]} auditd rules, the figure SECURITY.md records`);
+  assert.ok(row.includes(`CIS Ubuntu ${bench[1]} L2 benchmark \u2014 ${checks[1]} checks`), `dpa: the Article 32 row must say CIS Ubuntu ${bench[1]} and ${checks[1]} checks`);
+  assert.ok(row.includes('AIDE daily file integrity check'), 'dpa: the Article 32 row must name the daily AIDE check SECURITY.md records');
+  assert.ok(row.includes('AppArmor enforcing'), 'dpa: the Article 32 row must name AppArmor enforcing');
+});
+
+// 34 ── The signature level. /about and /parasign name it: a Simple Electronic
+// Signature. /sign and /co-sign, the two screens where somebody actually signs,
+// said only what it is not. A reader who has just been told the thing is not
+// eIDAS-qualified is owed the level it does reach, in the same box.
+// Verified by sabotage in both directions: dropping SES from any of the four
+// turns this red, and so does adding an eIDAS disclaimer to a fifth page
+// without naming the level.
+test('every page that says the signature is not eIDAS-qualified names the level it does reach', () => {
+  const LEVEL = 'Simple Electronic Signature (SES)';
+  const named = [];
+  const bare = [];
+  for (const slug of allPages()) {
+    const text = visible(page(slug));
+    if (!/[Nn]ot eIDAS-qualified/.test(text) && !text.includes(LEVEL)) continue;
+    if (text.includes(LEVEL)) named.push(slug); else bare.push(`${slug}: says the signature is not eIDAS-qualified and never names the level it is`);
+  }
+  assert.deepEqual(bare, [], `\n  ${bare.join('\n  ')}\n`);
+  for (const slug of ['about', 'parasign', 'sign', 'co-sign']) {
+    assert.ok(named.includes(slug), `${slug}: must name the signature level as a ${LEVEL}`);
+  }
+  const qes = [];
+  for (const slug of named) {
+    if (!/\(QES\)/.test(visible(page(slug)))) qes.push(`${slug}: names SES without naming the qualified level it is not`);
+  }
+  assert.deepEqual(qes, [], `\n  ${qes.join('\n  ')}\n`);
+});
+
+// 35 ── "Transient" was doing work it cannot do. Three console lines in the
+// admin service write a full client IP and one of them writes the account email
+// next to it, into a container log Docker rotates on size and not on time; and
+// scripts/access-log-visitors.mjs reads an edge access log full of client
+// addresses that no page described at all. The nginx configuration in this
+// repository really does log nothing, which is how both survived a review.
+// Verified by sabotage in both directions: adding a fourth console line with
+// ${ip} to admin/server.js turns this red, so does changing the admin log
+// rotation in docker-compose.yml, and so does deleting the section on /privacy.
+test('the logs that hold an IP address are the ones /privacy names', () => {
+  const adminSrc = stripJsComments(read('admin/server.js'));
+  const ipLines = [...adminSrc.matchAll(/console\.(?:log|warn|error)\(`[^`]*\$\{ip\}[^`]*`/g)].map((m) => m[0]);
+  assert.equal(ipLines.length, 3,
+    `admin/server.js now writes ${ipLines.length} log lines with a full client IP; /privacy says three`);
+  const withEmail = ipLines.filter((l) => /\$\{norm\}/.test(l));
+  assert.equal(withEmail.length, 1,
+    `${withEmail.length} of those lines also write the account email; /privacy says one`);
+
+  const compose = read('docker-compose.yml');
+  const adminBlock = compose.slice(compose.indexOf('\n  admin:'));
+  const size = /max-size:\s*"(\d+)m"/.exec(adminBlock);
+  const count = /max-file:\s*"(\d+)"/.exec(adminBlock);
+  assert.ok(size && count, 'the admin service must still declare its json-file rotation');
+  const priv = visible(page('privacy'));
+  assert.ok(priv.includes(`rotates on size (${size[1]} MB, ${count[1]} files kept)`),
+    `privacy: the admin log rotation must say ${size[1]} MB and ${count[1]} files, which is what docker-compose.yml sets`);
+  assert.ok(priv.includes('The pending-signup line writes the account email address next to the IP'),
+    'privacy: the one line that also writes an email address must be named');
+
+  const reader = read('scripts/access-log-visitors.mjs');
+  assert.match(reader, /access\.log/, 'scripts/access-log-visitors.mjs must still be the tool that reads the edge access log');
+  assert.ok(priv.includes('Our own edge writes a server access log with the client address'),
+    'privacy: the edge access log must be described, because a script in this repository reads it');
+  assert.ok(priv.includes('The nginx configuration in this repository logs nothing; the edge in front of it does'),
+    'privacy: the difference between the config in this repository and the edge must be stated');
+  assert.ok(priv.includes('<h2>Logs that hold an IP address</h2>'),
+    'privacy: the section naming both logs must still be on the page');
+  assert.doesNotMatch(priv, /an IP is processed only transiently/,
+    'privacy: "only transiently" is not true of either log named in this block');
 });
