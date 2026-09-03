@@ -59,6 +59,12 @@ x-relay-env: &relay-env
   MOLLIE_API_KEY: "${MOLLIE_API_KEY:-}"
   MOLLIE_TEST_API_KEY: "${MOLLIE_TEST_API_KEY:-}"
   BILLING_MODE: "${BILLING_MODE:-}"
+  # Moneybird bookkeeping push (dormant until BOTH are set in .env). The relay
+  # reads these by name, so they need a line here: .env only substitutes ${VAR}
+  # into this file, there is no env_file, and a variable that is not listed
+  # never reaches a container.
+  MONEYBIRD_TOKEN: "${MONEYBIRD_TOKEN:-}"
+  MONEYBIRD_ADMINISTRATION_ID: "${MONEYBIRD_ADMINISTRATION_ID:-}"
   # Add your plk_ license key here to unlock unlimited users (Community Edition = max 5)
   PLK_KEY: "${PLK_KEY:-}"
   REDIS_URL: "${RELAY_REDIS_URL}"

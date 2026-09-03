@@ -1048,6 +1048,48 @@ ended. Rows carry `ts`, `type` (`invoice`, `credit_note`, `term_ended`), `label`
 `detail`, `amount`, `currency`, `document` and `pdf_url`. A period end that a
 renewal extended is not an ending and is not listed.
 
+### GET /v2/admin/billing/export: the books for one period
+
+Requires `X-Admin-Token` (`ADMIN_TOKEN`), like every other `/v2/admin/*` path.
+This is the whole customer base's billing in one answer, so it is never reachable
+with a customer key.
+
+```
+GET /v2/admin/billing/export?from=2026-09-01&to=2026-09-30&format=csv
+GET /v2/admin/billing/export?from=2026-09-01&to=2026-09-30&format=json
+GET /v2/admin/billing/export?from=2026-09-01&to=2026-09-30&pdfs=1
+```
+
+Every document issued in the period, both ends inclusive, both series, filtered
+on the date the document itself states. One row per document, with the columns
+`number`, `date`, `type`, `customer_name`, `customer_email`, `customer_vat`,
+`description`, `amount_net`, `vat_rate`, `amount_vat`, `amount_gross`,
+`currency`, `payment_id` (the Mollie `tr_` id), `credit_for` (the invoice a
+credit note reverses) and `moneybird_id`. A credit note carries negative
+amounts; nothing is netted off.
+
+`format=csv` (the default) answers with a downloadable file for a Dutch Excel:
+semicolon separated, a UTF-8 BOM, CRLF line endings and a comma as the decimal
+mark. `format=json` answers with the same rows using dots, plus `totals` over
+the period and `missing`, the numbers in the series whose record could not be
+read. `pdfs=1` answers with a `application/zip` holding the ledger file and one
+PDF per document, stored without compression.
+
+`400 bad_period` for a date that is not `YYYY-MM-DD` or a `from` after the `to`;
+`400 bad_format` for anything but `csv` or `json`; `503 export_unavailable` when
+redis is not reachable, because the documents live there.
+
+### Moneybird
+
+With `MONEYBIRD_TOKEN` and `MONEYBIRD_ADMINISTRATION_ID` set, every invoice and
+credit note is also pushed to Moneybird as an **external sales invoice**: our own
+number goes in `reference`, Moneybird draws no number of its own and sends
+nothing to the customer, and the PDF is attached. The Moneybird id is written
+back onto the record as `moneybird_id`, so a document is never pushed twice; a
+failed push is queued and retried by a six-hour sweep. The push is aftercare and
+can never fail a payment or an invoice. Without both variables nothing is sent at
+all. See `deploy/DEPLOY-3.1.md` for how to make the token.
+
 ---
 
 ## Relay internal endpoints (operators only)
