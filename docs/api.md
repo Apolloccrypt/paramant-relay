@@ -447,6 +447,10 @@ curl "https://relay.paramant.app/v2/ct/log?limit=20"
 # {"ok":true,"entries":[{…}],"tree_size":43,"root":"c7a9…"}
 ```
 
+`index` is the entry's position in the log, counted from the start. It is
+derived at request time, so it always matches the index `/v2/ct/proof` resolves
+and the leaf position the Merkle tree commits to.
+
 ---
 
 ### GET /v2/ct/proof — Inclusion proof for a specific index

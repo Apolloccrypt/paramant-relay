@@ -10,6 +10,22 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **The public CT log listing numbers its entries by position again.** On the
+  live log at `/v2/ct/log` five entries reported the indices 4 to 8 a second
+  time while 42 to 46 were missing: they sat at positions 42 to 46 and had kept
+  the stored index field from before an April rebuild moved them. Only the
+  listing was affected. The Merkle root, the inclusion proofs and the signed
+  tree head all verify, and `/v2/ct/proof?index=42` returned the entry at
+  position 42 the whole time, because those address the log by position. The
+  listing, the `/ct/feed` tail and the relay registry rebuild now derive the
+  index from the position too, so the stored field is no longer read on any
+  path that hands an index out. On startup the relay recounts a persisted log
+  once, logs a single line naming how many entries were wrong, and writes the
+  corrected field back through a temp file and a rename. The recount touches
+  nothing but that field: line order and leaf hashes are left alone, so the
+  Merkle root is byte-identical before and after, which
+  `relay/test/route-ct-log-index.test.js` recomputes from the file to prove.
+  A second boot finds nothing to do.
 - **No redis call in the relay or the admin panel can hang any more.** node-redis
   holds commands on an offline queue while it reconnects, and it never times a
   command out, so against a store that is gone a route neither succeeded nor

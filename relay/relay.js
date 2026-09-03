@@ -353,7 +353,7 @@ const CT_MAX = 10000;
 // Bounded, monotonically-indexed window (see lib/ct-window). Past CT_MAX the
 // logical index keeps advancing (no duplicates / frozen STH) and lookups for a
 // pruned index return null instead of the wrong entry.
-const { CtWindow } = require('./lib/ct-window');
+const { CtWindow, reindexEntries } = require('./lib/ct-window');
 const ctWindow = new CtWindow(CT_MAX);
 const CT_FILE     = process.env.CT_FILE     || null; // opt-in only — auto-derive disabled to preserve RAM-only default
 const CT_MAX_SIZE = parseInt(process.env.CT_MAX_SIZE || String(100 * 1024 * 1024)); // 100 MB default
@@ -424,6 +424,28 @@ if (CT_FILE) {
           loaded.push(parsed);
         }
       } catch {}
+    }
+    // One-shot, idempotent recount of the stored index field (2026-09). The
+    // public log had five entries whose persisted .index was stale after an
+    // April rebuild: positions 42..46 carried indices 4..8, so /v2/ct/log
+    // listed duplicates while /v2/ct/proof, which resolves by position, was
+    // right all along. The index of an entry IS its position, so recount from
+    // position here, before the window is built, and persist the correction so
+    // the next boot finds nothing to do. Only the index field is rewritten:
+    // the line order and every leaf_hash stay exactly as they were, which is
+    // what keeps the Merkle root byte-identical. One log line per log.
+    const ctFixed = reindexEntries(loaded);
+    if (ctFixed > 0) {
+      log('info', 'ct_log_reindexed', { fixed: ctFixed, entries: loaded.length, file: CT_FILE });
+      // Write to a sibling temp file and rename over the original, so a crash
+      // mid-write leaves the old log intact rather than a half-written one.
+      try {
+        const tmp = CT_FILE + '.reindex.tmp';
+        fs.writeFileSync(tmp, loaded.map(e => JSON.stringify(e) + '\n').join(''));
+        fs.renameSync(tmp, CT_FILE);
+      } catch (e) {
+        log('warn', 'ct_log_reindex_write_failed', { err: e.message, file: CT_FILE });
+      }
     }
     ctWindow.load(loaded);
     if (ctWindow.windowLength) log('info', 'ct_log_loaded', { entries: ctWindow.windowLength, file: CT_FILE });
@@ -531,21 +553,28 @@ const relayRegistry = new Map();
 const MAX_RELAY_REGISTRY = parseInt(process.env.MAX_RELAY_REGISTRY || '10000');
 
 function relayRegistryFromCTLog() {
-  for (const entry of ctWindow.entries) {
+  // ct_index is taken from the window position, not from the entry's stored
+  // index field: this runs over entries rehydrated from disk, and that field
+  // is the one a rebuild can leave stale. The startup recount above already
+  // repairs it, but reading position keeps this correct even when the log is
+  // fed from somewhere the recount did not touch.
+  for (let p = 0; p < ctWindow.entries.length; p++) {
+    const entry = ctWindow.entries[p];
     if (entry.type !== 'relay_reg') continue;
     const key = entry.relay_pk_hash;
     if (!key) continue;
+    const ctIndex = ctWindow.logicalIndexAt(p);
     const existing = relayRegistry.get(key);
     if (!existing) {
       relayRegistry.set(key, {
         url: entry.relay_url, sector: entry.relay_sector,
         version: entry.relay_version, edition: entry.relay_edition || 'community',
         pk_hash: key, verified_since: entry.ts, last_seen: entry.ts,
-        ct_index: entry.index, last_ct_index: entry.index
+        ct_index: ctIndex, last_ct_index: ctIndex
       });
     } else {
       existing.last_seen    = entry.ts;
-      existing.last_ct_index = entry.index;
+      existing.last_ct_index = ctIndex;
       existing.version      = entry.relay_version;
       existing.edition      = entry.relay_edition || existing.edition;
     }
@@ -588,6 +617,12 @@ function canonicalJSON(obj) {
   return '{' + Object.keys(obj).sort().map(k => JSON.stringify(k) + ':' + canonicalJSON(obj[k])).join(',') + '}';
 }
 
+// Every ctAppend* below takes its index from ctWindow.nextIndex(), which is
+// base + window length: the position the new leaf is about to occupy. The
+// value is stored on the entry as a convenience for the response it goes into,
+// and CtWindow.append() rejects an entry whose index is not nextIndex(), so a
+// freshly appended entry can never disagree with its position. Read paths that
+// serve entries back out do not rely on that field regardless; see /v2/ct/log.
 function ctAppend(deviceId, pubKeyHex, apiKey) {
   const ts = new Date().toISOString();
   const deviceIdHash = crypto.createHash('sha3-256').update(deviceId + apiKey.slice(0,8)).digest('hex');
@@ -4439,7 +4474,9 @@ async function handleRelayRequest(req, res) {
 
   // ── GET /ct/feed — public JSON feed for CT log UI (no auth, no keys) ─────────
   if (path === '/ct/feed' && req.method === 'GET') {
-    const last50 = ctWindow.recent(50);
+    // `i` comes from the window position (start_index + i), never from the
+    // entry's stored index field. See /v2/ct/log below.
+    const last50 = ctWindow.recentPage(50);
     const root   = ctWindow.last() ? ctWindow.last().tree_hash : '0'.repeat(64);
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
     return res.end(J({
@@ -4448,8 +4485,8 @@ async function handleRelayRequest(req, res) {
       version:  VERSION,
       tree_size: ctWindow.size,
       root,
-      entries: last50.map(e => ({
-        i:    e.index,
+      entries: last50.entries.map((e, i) => ({
+        i:    last50.start_index + i,
         t:    e.ts,
         h:    e.leaf_hash ? e.leaf_hash.slice(0, 16) + '...' : null,
         type: e.type || 'key_reg',
@@ -4470,7 +4507,14 @@ async function handleRelayRequest(req, res) {
     // across sector relays. The transparency guarantee does NOT depend on it:
     // tamper-evidence comes from leaf_hash + tree_hash + the Merkle proof
     // (/v2/ct/proof) + the signed tree head, none of which reveal identity.
-    const entries = ctWindow.sliceByIndex(from, limit).map(e => ({ index: e.index, type: e.type, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, ts: ctCoarseTs(e.ts) }));
+    // The published index is the entry's POSITION in the log (start_index + i),
+    // never the index field stored with the entry. Those two agreed until an
+    // April rebuild left five entries with a stale field, and the listing then
+    // reported indices 4..8 twice while the entries really sat at 42..46. The
+    // Merkle tree, /v2/ct/proof and the STH were all correct throughout,
+    // because they address the log by position; only this projection lied.
+    const pageR = ctWindow.page(from, limit);
+    const entries = pageR.entries.map((e, i) => ({ index: pageR.start_index + i, type: e.type, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, ts: ctCoarseTs(e.ts) }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, size: ctWindow.size, root: ctWindow.last() ? ctWindow.last().tree_hash : '0'.repeat(64), entries }));
   }
@@ -4478,6 +4522,9 @@ async function handleRelayRequest(req, res) {
   const ctpq0 = (!ctpm0 && path === '/v2/ct/proof') ? query.index : null;
   if (ctpm0 || (ctpq0 !== null && ctpq0 !== undefined)) {
     const idx = parseInt(ctpm0 ? ctpm0[1] : ctpq0);
+    // Positional by construction: get() resolves idx - base into the window, so
+    // this route never consulted the stored index field and was already right
+    // while the listing was wrong. The echoed `index` is the requested one.
     const entry = ctWindow.get(idx);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Index not found' })); }
     res.writeHead(200, { 'Content-Type': 'application/json' });
