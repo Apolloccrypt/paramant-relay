@@ -542,6 +542,15 @@ for (const slug of [...FOUNDER_REQUIRED, ...FOUNDER_OPTIONAL]) {
 }
 assert.ok(!/\bMick Beer\b/.test(home) || /KvK 42115132/.test(home),
   'if the homepage names the founder it must also name the accountable company registration');
+// The signature under the founder's letter must carry the registration itself,
+// not lean on the footer or a card elsewhere on the page: the reader who stops
+// at the signature has to see who is accountable.
+{
+  const letterSign = home.match(/<div class="letter-sign">[\s\S]*?<\/div>/);
+  assert.ok(letterSign, 'the homepage letter has a signature block (.letter-sign)');
+  assert.ok(/Mick Beer, privacy and security researcher/.test(letterSign[0]) && /KvK 42115132/.test(letterSign[0]),
+    'the letter signature names Mick Beer, privacy and security researcher, and KvK 42115132 in the same block');
+}
 
 // 6. What /pricing promises, and in what order. relay/test/pricing-page.test.js
 // checks the numbers against the catalog; tests/pricing-fold.test.mjs measures
