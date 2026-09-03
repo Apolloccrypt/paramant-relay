@@ -93,6 +93,24 @@ Pages not in scope: everything behind a login or in a one-shot flow
 | Site still functions in a browser (send, sign, verify) | index, sign, verify | `tests/product-heartbeat.test.mjs` (hourly, against production) |
 | No admin log statement writes a full client IP or a plaintext e-mail address to stdout | privacy, security | `admin/test/log-redact.test.js` |
 
+## Browser storage: the appearance choice
+
+The list a reader can act on is on **/privacy**, under "Local storage in your
+browser", and `tests/site-claims.test.mjs` (row 28) fails when the frontend
+writes a `localStorage` key that list does not name, or names one nothing
+writes. That gate is the inventory; this section only records what the newest
+key is for, because it is the one a page makes a promise about.
+
+| Key | What it holds | Written by | Set where |
+|---|---|---|---|
+| `paramant.theme.v1` | The appearance choice: `auto`, `light` or `dark`. Absent means light, which is the default on every app screen. Applied before the first paint by `frontend/js/theme.js`; the dark tokens in `frontend/app-2026.css` are scoped to `[data-theme="auto"]` and `[data-theme="dark"]`, so a dark operating system alone never darkens the app | `frontend/js/theme.js` | The Appearance switch on /account |
+
+/account tells the reader the choice is "kept in this browser only" and that the
+public pages stay light. `tests/ui-truthfulness.test.mjs` pins the key name, the
+three values, that `theme.js` contains no `fetch`, `XMLHttpRequest` or
+`sendBeacon`, and that /privacy names the key. What the sentence promises about
+colour is measured in a browser by `tests/app-theme.test.mjs`.
+
 ## UNCOVERED: provable from the code, test still to write
 
 | Claim | Pages | Where the truth lives |

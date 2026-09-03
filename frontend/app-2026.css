@@ -4,9 +4,10 @@
    This file implements docs/brand/design-direction.md for the APP screens only.
    Marketing pages keep design-system.css v4 untouched. Two things happen here:
 
-   1. Tokens. The 2026 palette from the direction (section 2), written three
-      times so an explicit theme choice and the system preference both win, and
-      so no colour exists only inside a media query.
+   1. Tokens. The 2026 palette from the direction (section 2), written twice so
+      an explicit "dark" and an explicit "auto" under a dark system both win,
+      and so no colour exists only inside a media query. Light is the default
+      and the app stays light until a reader picks otherwise on /account.
    2. An alias layer that points the v4 token names at the new values. Every
       rule already written against --bone / --ink / --ink-hair follows the theme
       without being rewritten, which is what makes a dark mode on these pages
@@ -118,11 +119,21 @@
 
 /* ═══════════════════════════════════════════════════════════════════════════
    2. TOKENS, dark: an own set and not a filter
-   Written twice below so the system preference and an explicit choice both
-   win, and once more for [data-theme="light"] never being overridden.
+
+   Dark is a CHOICE, never a jump. Measured 2026-09-03 on the previous version
+   of this file: with a dark OS and no choice made, /index and /pricing stayed
+   light while /dashboard, /sign, /parashare, /account and /auth/login went to
+   rgb(10,15,22). Signing in threw a reader from creme to black. So the system
+   preference is honoured under ONE condition, [data-theme="auto"], which only
+   frontend/js/theme.js writes and only after someone picked "Follow my system"
+   on /account. Without a choice there is no attribute, nothing below matches,
+   and the app is light. That holds with JavaScript switched off too.
+
+   Written twice: once for the system preference under an explicit "auto", once
+   for an explicit "dark". No colour exists only inside a media query.
    ═══════════════════════════════════════════════════════════════════════════ */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root[data-theme="auto"] {
     --paper:        #0A0F16;
     --surface:      #10161F;
     --surface-sunk: #151C26;
@@ -216,7 +227,7 @@
 }
 
 :root { color-scheme: light; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; } }
+@media (prefers-color-scheme: dark) { :root[data-theme="auto"] { color-scheme: dark; } }
 :root[data-theme="dark"] { color-scheme: dark; }
 
 
@@ -495,6 +506,49 @@ footer .logo .a { color: var(--ink-1); }
 .acct-plan-band.paid { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); }
 .acct-plan-band.paid .acct-plan-kicker { color: var(--accent); }
 .acct-plan-band.paid .acct-plan-lede { color: var(--ink-1); }
+
+/* ── the appearance switch on /account ───────────────────────────────────────
+   Three ways to answer one question, so the answer is visible without opening
+   anything. The radio itself is 0x0 and the <span> is the target: it carries
+   the 44px, the state and the focus ring, and a 13px radio never becomes the
+   thing you have to hit. */
+.theme-choice {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  overflow: hidden;
+  width: fit-content;
+  max-width: 100%;
+}
+.theme-choice legend { position: absolute; width: 0; height: 0; overflow: hidden; opacity: 0; }
+.theme-choice input { position: absolute; width: 0; height: 0; opacity: 0; margin: 0; }
+.theme-choice label { display: inline-flex; margin: 0; }
+.theme-choice label + label > span { border-left: 1px solid var(--line-2); }
+.theme-choice span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap);
+  padding: 0 18px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background var(--d-1) var(--e-standard), color var(--d-1) var(--e-standard);
+}
+.theme-choice span:hover { background: var(--surface-sunk); color: var(--ink-1); }
+.theme-choice input:checked + span {
+  background: var(--accent-soft);
+  color: var(--ink-1);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+}
+.theme-choice input:focus-visible + span { box-shadow: var(--ring); border-radius: var(--r-1); }
+
 
 /* The signed-out nav CTA is the one allowed lime field, and the only text
    that may sit on it is #0A1626 (14.94:1). The app pages set this with

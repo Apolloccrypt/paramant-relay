@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">:root{color-scheme:light}html,body{background:#FBFAF7;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark}html:not([data-theme="light"]),html:not([data-theme="light"]) body{background:#0A0F16;color:#EDF1F6}}html[data-theme="dark"],html[data-theme="dark"] body{background:#0A0F16;color:#EDF1F6}</style>
+<style id="critical-css">:root{color-scheme:light}html,body{background:#FBFAF7;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}@media(prefers-color-scheme:dark){:root[data-theme="auto"]{color-scheme:dark}html[data-theme="auto"],html[data-theme="auto"] body{background:#0A0F16;color:#EDF1F6}}html[data-theme="dark"],html[data-theme="dark"] body{background:#0A0F16;color:#EDF1F6}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Your account · Paramant</title>
 <meta name="robots" content="noindex, nofollow">
@@ -138,9 +138,9 @@ main.acct input::placeholder { color: var(--ink-3); }
 .acct-advanced-body { margin-top:var(--space-4); padding-top:var(--space-3); border-top:1px solid var(--line); }
 @media (max-width: 680px) { .acct-grid2 { grid-template-columns: 1fr; gap: var(--space-4); } main.acct { padding: var(--space-5) var(--space-3) var(--space-6); } }
 </style>
-<meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0A0F16" media="(prefers-color-scheme: dark)">
-<link rel="stylesheet" href="/app-2026.css?v=1">
+<meta name="theme-color" content="#FBFAF7">
+<link rel="stylesheet" href="/app-2026.css?v=2">
+<script src="/js/theme.js?v=1"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -316,6 +316,23 @@ main.acct input::placeholder { color: var(--ink-3); }
 </section>
 
 
+<section class="acct-card" id="appearance-section">
+  <div class="acct-kicker">Appearance &middot; light and dark</div>
+  <h2>Appearance.</h2>
+  <p class="acct-lead">
+    Light is the default and it stays light until you change it here. Your choice is kept in this
+    browser only, and it applies to the pages behind your sign-in: your dashboard, signing,
+    sending, this page and the sign-in screens. The public pages stay light.
+  </p>
+  <fieldset class="theme-choice" id="theme-choice">
+    <legend>Appearance</legend>
+    <label><input type="radio" name="appearance" value="auto"><span>Follow my system</span></label>
+    <label><input type="radio" name="appearance" value="light"><span>Light</span></label>
+    <label><input type="radio" name="appearance" value="dark"><span>Dark</span></label>
+  </fieldset>
+</section>
+
+
 <section class="acct-card" id="billing-section">
   <div class="acct-kicker">Plan &amp; billing &middot; subscription and history</div>
   <h2>Plan &amp; billing.</h2>
@@ -384,6 +401,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 <script type="module" src="/js/account.inline2.js?v=3"></script>
 <script type="module" src="/js/passkey.js?v=3"></script>
 <script type="module" src="/js/signing-enrol.js?v=14"></script>
+<script src="/js/account-theme.js?v=1" defer></script>
 
 <footer class="legal-strip">
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>

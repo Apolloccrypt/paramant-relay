@@ -188,6 +188,19 @@ const SCREENS = [
 const VIEWPORTS = [{ w:390, h:844 }, { w:1440, h:900 }];
 const THEMES = ['light', 'dark'];
 
+// Dark is a stored choice now, not the operating system's to make: see
+// tests/app-theme.test.mjs and frontend/js/theme.js. So the dark pass has to
+// say so, or it measures the light screens twice and reports 792 clean pairs
+// while the dark palette is never rendered at all. colorScheme stays set as
+// well: a reader who picks dark is usually on a dark system, and the two
+// signals must not disagree here.
+const THEME_KEY = 'paramant.theme.v1';
+async function chooseTheme(context, theme) {
+  await context.addInitScript(([key, value]) => {
+    try { window.localStorage.setItem(key, value); } catch { /* storage off */ }
+  }, [THEME_KEY, theme]);
+}
+
 const browser = await chromium.launch({ headless:true, ...(EXE ? { executablePath:EXE } : {}) });
 
 test('every app screen keeps its text above AA in light and dark, at 390 and 1440', async () => {
@@ -197,6 +210,7 @@ test('every app screen keeps its text above AA in light and dark, at 390 and 144
     for (const vp of VIEWPORTS) {
       for (const theme of THEMES) {
         const context = await browser.newContext({ viewport:{ width:vp.w, height:vp.h }, colorScheme:theme });
+        await chooseTheme(context, theme);
         const page = await context.newPage();
         await stub(page, { signedIn: screen.signedIn !== false });
         await page.goto(ORIGIN + screen.url, { waitUntil:'domcontentloaded' });

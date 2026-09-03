@@ -80,6 +80,16 @@ const SCREENS = [
 ];
 const VIEWPORTS = [{ w:390, h:844 }, { w:1440, h:900 }];
 const THEMES = ['light', 'dark'];
+
+// Dark is a stored choice, not the operating system's to make: see
+// frontend/js/theme.js and tests/app-theme.test.mjs. Without this the dark half
+// of these screenshots would be sixteen more pictures of the light theme.
+const THEME_KEY = 'paramant.theme.v1';
+async function chooseTheme(context, theme) {
+  await context.addInitScript(([key, value]) => {
+    try { window.localStorage.setItem(key, value); } catch { /* storage off */ }
+  }, [THEME_KEY, theme]);
+}
 const only = process.env.APP_SHOTS_ONLY ? process.env.APP_SHOTS_ONLY.split(',') : null;
 
 const browser = await chromium.launch({ headless:true });
@@ -89,6 +99,7 @@ for (const screen of SCREENS) {
   for (const vp of VIEWPORTS) {
     for (const theme of THEMES) {
       const context = await browser.newContext({ viewport:{ width:vp.w, height:vp.h }, deviceScaleFactor:2, colorScheme:theme });
+      await chooseTheme(context, theme);
       const page = await context.newPage();
       await stub(page, { signedIn: screen.signedIn !== false });
       await page.goto(ORIGIN + screen.url, { waitUntil:'domcontentloaded' });
@@ -108,6 +119,7 @@ for (const screen of SCREENS) {
 if (!only || only.includes('dashboard')) {
   for (const theme of THEMES) {
     const context = await browser.newContext({ viewport:{ width:1440, height:900 }, deviceScaleFactor:2, colorScheme:theme });
+    await chooseTheme(context, theme);
     const page = await context.newPage();
     await stub(page);
     await page.route('**/api/user/me', () => { /* never resolves: hold the placeholder */ });
@@ -124,6 +136,7 @@ if (!only || only.includes('dashboard')) {
 if (!only || only.includes('dashboard')) {
   for (const theme of THEMES) {
     const context = await browser.newContext({ viewport:{ width:1440, height:900 }, deviceScaleFactor:2, colorScheme:theme, reducedMotion:'reduce' });
+    await chooseTheme(context, theme);
     const page = await context.newPage();
     await stub(page);
     await page.goto(ORIGIN + '/dashboard', { waitUntil:'domcontentloaded' });
