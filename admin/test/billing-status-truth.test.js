@@ -38,6 +38,13 @@ const SERVER = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
 
 // The handler with its comments stripped. A comment is allowed to name the
 // sentence that was removed and why; only the code may be asserted on.
+function handlerOf2(route) {
+  const start = SERVER.indexOf(`api.post("${route}"`);
+  assert.notEqual(start, -1, `admin/server.js must serve POST ${route}`);
+  const end = SERVER.indexOf('\napi.', start + 1);
+  return SERVER.slice(start, end === -1 ? start + 4000 : end);
+}
+
 function handlerOf(route) {
   const start = SERVER.indexOf(`api.get("${route}"`);
   assert.notEqual(start, -1, `admin/server.js must serve GET ${route}`);
@@ -58,12 +65,21 @@ test('the status reports the end of the term that was actually bought', () => {
   const body = handlerOf('/user/billing/status');
   assert.match(body, /access_until:/,
     'the response must carry the day access stops');
-  assert.match(body, /paid_until_parasign/,
+  assert.match(body, /access_until:\s*accessUntil/,
+    'and it must be the computed term end, not a value from elsewhere');
+  assert.match(body, /termEndOf\(/,
     'access_until must be derived from the relay period, not from an unwritten Redis record');
-  assert.match(body, /paid_until_parasend/,
-    'both products carry a term, and the later one is the one access runs to');
   assert.match(body, /auto_renews:\s*false/,
     'every checkout is a one-off for its term, so the response must not imply a renewal');
+
+  // The derivation itself: both products carry a term, only a term still in the
+  // future counts, and the later of the two is the one access runs to.
+  const helper = /function termEndOf\(fields\) \{[\s\S]*?\n\}/.exec(SERVER);
+  assert.ok(helper, 'admin/server.js must define termEndOf()');
+  assert.match(helper[0], /paid_until_parasign/, 'the ParaSign term must count');
+  assert.match(helper[0], /paid_until_parasend/, 'the ParaSend term must count');
+  assert.match(helper[0], /Math\.max/, 'the later of the two terms is the one access runs to');
+  assert.match(helper[0], /> Date\.now\(\)/, 'a term that has already passed grants nothing');
 });
 
 test('nothing reads a renewal date out of a record no code writes', () => {
@@ -80,13 +96,25 @@ test('nothing reads a renewal date out of a record no code writes', () => {
   assert.ok(accessLine, 'access_until must come from the computed term end');
 });
 
-test('the account page renders the term end and does not offer to cancel a one-off', () => {
+test('cancel schedules on the term that was bought, not on a made-up month', () => {
+  const body = handlerOf2('/user/billing/cancel');
+  assert.match(body, /termEndOf\(productPlanFields\(/,
+    'the downgrade date must come from the term the customer actually paid for');
+  const fallback = body.indexOf('30 * 86_400_000');
+  const real = body.indexOf('termEndOf(');
+  assert.ok(real !== -1 && (fallback === -1 || real < fallback),
+    'now plus 30 days may only ever be a last resort, never the first answer');
+  // Both surfaces must answer with one derivation, or the page shows one date
+  // and the cancel mail promises another.
+  assert.match(handlerOf('/user/billing/status'), /termEndOf\(/,
+    'status and cancel must share the same term-end helper');
+});
+
+test('the account page renders the term end', () => {
   const js = fs.readFileSync(
     path.join(__dirname, '..', '..', 'frontend', 'js', 'account.inline1.js'), 'utf8');
   assert.match(js, /d\.access_until/,
     'the account page must read the term end the API now sends');
-  assert.match(js, /if \(d\.auto_renews\) document\.getElementById\('billing-cancel-btn'\)/,
-    'Cancel stops a next collection; with none scheduled there is nothing to cancel');
 
   const html = fs.readFileSync(
     path.join(__dirname, '..', '..', 'frontend', 'account.html'), 'utf8');
