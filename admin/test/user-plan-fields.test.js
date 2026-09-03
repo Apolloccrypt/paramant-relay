@@ -57,7 +57,22 @@ test('the three endpoints a signed-in page reads all spread the same helper', ()
     const body = SERVER.slice(start, start + 3000);
     const json = body.indexOf('res.json({');
     assert.notEqual(json, -1, `GET ${route} must answer with res.json({...})`);
-    assert.match(body.slice(json, json + 1200), /\.\.\.productPlanFields\(/,
+    const payload = body.slice(json, json + 1200);
+    // The helper may be spread straight into the body, or bound to a const
+    // first when the handler also needs the values for something else (
+    // /user/billing/status derives access_until from paid_until_*). Both are
+    // the same guarantee, so both are accepted, but a spread through a const
+    // only counts when that const really is the helper's result: a name that
+    // holds something else would drop fields just as quietly as a missing
+    // spread, which is the whole failure this test exists to catch.
+    let spread = /\.\.\.productPlanFields\(/.test(payload);
+    if (!spread) {
+      for (const m of payload.matchAll(/\.\.\.([A-Za-z_$][\w$]*)\b/g)) {
+        const bound = new RegExp(`(?:const|let|var)\\s+${m[1]}\\s*=\\s*productPlanFields\\(`);
+        if (bound.test(body.slice(0, json))) { spread = true; break; }
+      }
+    }
+    assert.ok(spread,
       `GET ${route} must spread productPlanFields(), or the dashboard and the account page read different truths`);
   }
 });
