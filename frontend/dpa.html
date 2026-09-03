@@ -253,8 +253,9 @@ input:focus{border-color:var(--cobalt)}
   <table>
     <thead><tr><th>Sub-processor</th><th>Location</th><th>Purpose</th><th>Data transferred</th></tr></thead>
     <tbody>
-      <tr><td>Hetzner Online GmbH</td><td>Germany (NBG1)</td><td>Infrastructure hosting</td><td>Encrypted transfer payloads in RAM; encrypted ParaSign document capsules may persist until envelope expiry</td></tr>
+      <tr><td>Hetzner Online GmbH</td><td>Germany (NBG1)</td><td>Infrastructure hosting</td><td>Encrypted transfer payloads in RAM; encrypted ParaSign document capsules persist until the envelope expires: 30 days unless the request asks for another term, and never longer than 365 days</td></tr>
       <tr><td>Resend Inc.</td><td>US (SCC applied)</td><td>Transactional email, including optional signing invitations</td><td>Email address and message; for an optional signing invitation, the complete personal access link; no document plaintext</td></tr>
+      <tr><td>Mollie B.V.</td><td>Netherlands (EU)</td><td>Payment processing for paid plans</td><td>The amount, a plan description, and the payment metadata the relay sets: accountId, product, plan, interval. No email address is sent while recurring billing is off, which is how production runs. Card details are entered on Mollie&rsquo;s own pages and never reach PARAMANT</td></tr>
     </tbody>
   </table>
   <p>PARAMANT will notify the Controller at least 14 days in advance of any intended changes to sub-processors, giving the Controller the opportunity to object.</p>

@@ -283,7 +283,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <tr><td>Legal jurisdiction</td><td>EU / Germany (GDPR)</td></tr>
         <tr><td>US CLOUD Act</td><td>No US provider in the data path: files and keys stay in the EU. Transactional email goes via Resend, a US provider, which never receives the document. See <a href="/privacy">privacy</a>.</td></tr>
         <tr><td>Data retained</td><td>No plaintext, no keys. Only: transfer hash, creation timestamp, approximate encrypted size (up to 5 MB; exact 5 MB for the ParaSend web app), view count. Deleted on burn.</td></tr>
-        <tr><td>IP logging</td><td>Nginx access logging is switched off in the deploy configuration (<code>access_log off</code> on every server block that serves the site and the relays in <code>deploy/nginx-paramant-live.conf</code>). Not linked to transfer content. No separate retention period is promised.</td></tr>
+        <tr><td>IP logging</td><td>Nginx access logging is switched off in the deploy configuration (<code>access_log off</code> on every server block that serves the site and the relays in <code>deploy/nginx-paramant-live.conf</code>). Not linked to transfer content. No separate retention period is promised. A relay you host yourself is the other way round: <code>deploy/nginx-selfhost.conf</code> writes an access log whose first field is the client address, so switch it off if you do not want it.</td></tr>
         <tr><td>Analytics</td><td>None. No third-party scripts on the relay or API.</td></tr>
       </tbody>
     </table>

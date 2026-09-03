@@ -256,8 +256,8 @@ td{color:var(--cobalt)}
 
   <ul class="bullet-list">
     <li><strong>No plaintext, ever.</strong> Encryption happens client-side in Rust/WASM before upload. The relay cannot read your file — even under court order, because it never had it.</li>
-    <li><strong>Burn-on-read, not expiry.</strong> Blobs are destroyed on download, not on a timer. You cannot re-download a file, and neither can an attacker who compromises the relay after delivery.</li>
-    <li><strong>EU jurisdiction by design.</strong> Infrastructure is on Hetzner Nuremberg DE. No US entity in the chain. No CLOUD Act exposure. GDPR-compliant by architecture, not by policy.</li>
+    <li><strong>Burn-on-read, and a ceiling.</strong> A blob is destroyed when the last read its link allows is spent, which on Community is the first one. It is destroyed on a timer too if that read never comes: one hour on Community, twenty-four hours on Pro, seven days on Business and Enterprise. Whichever comes first, an attacker who compromises the relay afterwards finds nothing.</li>
+    <li><strong>EU jurisdiction by design.</strong> Infrastructure is on Hetzner Nuremberg DE, and no US entity ever holds ciphertext or a key. One sub-processor is American: Resend Inc. sends transactional email under Standard Contractual Clauses, as the <a href="/dpa">DPA</a> states. No CLOUD Act exposure for transfer content. GDPR-compliant by architecture, not by policy.</li>
     <li><strong>Sector compartmentalisation.</strong> Five separate relay containers — healthcare, legal, finance, IoT, general. A breach or subpoena targeting the finance relay cannot reach health data.</li>
     <li><strong>Post-quantum now, not later.</strong> ML-KEM-768 (NIST FIPS 203) protects against store-now-decrypt-later attacks. Healthcare data sent today cannot be decrypted by a quantum computer in 2030.</li>
   </ul>

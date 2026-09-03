@@ -5,6 +5,22 @@
 #   3. AI-attributie-markers (zie ATTRIB hieronder)
 # Scant de commit-message(s) EN de toegevoegde ('+') regels van de commits.
 #
+# UITZONDERING op regel 1, en alleen op regel 1. De licentietekst is een
+# juridisch document en geen kopij: LICENSE bepaalt wat iemand met deze software
+# mag, en die tekst herschrijven om een stijlregel te halen is een besluit van
+# de licentiegever, niet van deze wacht. De Additional Use Grant bevat twee
+# em-dashes. Vrijgesteld zijn daarom:
+#
+#   - LICENSE en deploy/LICENSE, op pad, in hun geheel
+#   - in frontend/license.html het blok tussen LICENCE-VERBATIM-START en
+#     LICENCE-VERBATIM-END, dat LICENSE woord voor woord herhaalt en door
+#     blok 23 van tests/site-claims.test.mjs daaraan gelijk wordt gehouden
+#
+# Emoji en AI-attributie blijven overal verboden, ook daar. De vrijstelling
+# geldt uitsluitend voor diff-regels: een commit-message met een em-dash wordt
+# geweigerd, ook als hij de licentie aanpast. En zij geldt per regelnummer, dus
+# een em-dash die elders op license.html wordt toegevoegd valt gewoon door.
+#
 # Gebruik:
 #   scripts/check-commit-style.sh [git-range]     # standalone, default de laatste commit
 #   scripts/check-commit-style.sh --pre-push      # leest het git pre-push protocol op stdin
@@ -28,6 +44,22 @@ EMOJI='[\x{1F000}-\x{1FAFF}\x{2600}-\x{26FF}\x{FE0F}]'
 # de scan niet op zichzelf laten falen. Runtime-waarde: de drie verboden markers.
 _a1="Generated"; _a2="with"; _a3="Co"; _a4="authored"
 ATTRIB="${_a1} ${_a2}|${_a3}-${_a4}"
+
+# Paden waarvan elke toegevoegde regel van de em-dash-regel is vrijgesteld.
+EMDASH_EXEMPT_PATHS='^(LICENSE|deploy/LICENSE)$'
+# Bestand met een gemarkeerd letterlijk licentieblok, en de twee markeringen.
+VERBATIM_FILE='frontend/license.html'
+VERBATIM_START='LICENCE-VERBATIM-START'
+VERBATIM_END='LICENCE-VERBATIM-END'
+
+# Regelbereik van het letterlijke licentieblok in een blob ($1 = <commit>:<pad>).
+# Print "start eind", of niets als het blok er niet compleet staat.
+verbatim_range() {
+  git show "$1" 2>/dev/null | awk -v s="$VERBATIM_START" -v e="$VERBATIM_END" '
+    index($0, s) && !st { st = NR }
+    index($0, e) && st && !en { en = NR }
+    END { if (st && en && en > st) print st " " en }'
+}
 
 # Denylist: repo-lokale lijst met te-beschermen termen (echte namen). Staat in
 # .gitignore en wordt NOOIT gecommit, zo blijven de namen lokaal. Afwezig -> de
@@ -82,12 +114,14 @@ check_denylist_commit() {
 }
 
 # Scant een tekstblok op alle drie de categorieen. $1 = plek-omschrijving.
+# $3 = "no-emdash" slaat uitsluitend regel 1 over (letterlijke licentietekst).
 check_text() {
   local where="$1"
   local text="$2"
+  local mode="${3:-all}"
   local hit
 
-  if hit=$(printf '%s\n' "$text" | grep -nP "$EMDASH" 2>/dev/null); then
+  if [ "$mode" != "no-emdash" ] && hit=$(printf '%s\n' "$text" | grep -nP "$EMDASH" 2>/dev/null); then
     echo "FOUT [$where]: em-dash (U+2014) gevonden. Gebruik gewone interpunctie:"
     printf '%s\n' "$hit" | sed 's/^/    /'
     FAIL=$((FAIL + 1))
@@ -106,6 +140,50 @@ check_text() {
   fi
 }
 
+# Verdeelt de toegevoegde regels van een commit over twee bakken: gewoon, en
+# vrijgesteld van de em-dash-regel. De verdeling is per bestand, en binnen
+# VERBATIM_FILE per regelnummer, dus een em-dash die buiten het gemarkeerde blok
+# op diezelfde pagina wordt toegevoegd valt gewoon door de wacht.
+scan_added() {
+  local c="$1"
+  local file="" newno=0 line content h range
+  local vstart=0 vend=0 exempt
+  local checked="" verbatim=""
+  while IFS= read -r line; do
+    case "$line" in
+      '+++ '*)
+        file="${line#+++ }"; file="${file#b/}"
+        vstart=0; vend=0
+        if [ "$file" = "$VERBATIM_FILE" ]; then
+          range="$(verbatim_range "$c:$file" || true)"
+          if [ -n "$range" ]; then vstart="${range%% *}"; vend="${range##* }"; fi
+        fi
+        ;;
+      '@@'*) h="${line#*+}"; h="${h%% *}"; newno="${h%%,*}";;
+      '+'*)
+        content="${line#+}"
+        exempt=0
+        if printf '%s' "$file" | grep -qE "$EMDASH_EXEMPT_PATHS"; then
+          exempt=1
+        elif [ "$vend" -gt 0 ] && [ "$newno" -ge "$vstart" ] && [ "$newno" -le "$vend" ]; then
+          exempt=1
+        fi
+        if [ "$exempt" -eq 1 ]; then
+          verbatim="${verbatim}${content}"$'\n'
+        else
+          checked="${checked}${content}"$'\n'
+        fi
+        newno=$((newno + 1));;
+      '-'*) : ;;
+      *) newno=$((newno + 1));;
+    esac
+  done < <(git show "$c" --no-color --format= --unified=0 2>/dev/null)
+  [ -n "$checked" ] && check_text "toegevoegde regels ${c:0:12}" "$checked"
+  # Emoji en AI-attributie gelden ook in de licentietekst; alleen de em-dash niet.
+  [ -n "$verbatim" ] && check_text "letterlijke licentietekst ${c:0:12}" "$verbatim" no-emdash
+  return 0
+}
+
 # Scant elke commit in een rev-list-revspec: message + toegevoegde diff-regels.
 scan_revspec() {
   local revspec="$1"
@@ -115,9 +193,7 @@ scan_revspec() {
   for c in $commits; do
     msg=$(git log -1 --format=%B "$c")
     check_text "commit-message ${c:0:12}" "$msg"
-    added=$(git show "$c" --no-color --format= --unified=0 2>/dev/null \
-      | grep '^+' | grep -v '^+++' || true)
-    [ -n "$added" ] && check_text "toegevoegde regels ${c:0:12}" "$added"
+    scan_added "$c"
     check_denylist_commit "$c"
   done
 }
