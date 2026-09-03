@@ -486,6 +486,20 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
       <p class="dh-paid-lede" data-dh="return-lede">--</p>
     </aside>
 
+    <!-- Shown by dashboard.js from seven days before the bought term runs out.
+         A one-off payment has nothing to cancel and nothing to collect, so the
+         band says the date, what happens after it, and offers the one action
+         that changes anything. -->
+    <div class="plan-term-warn" id="dh-term-warn" role="status" hidden>
+      <p class="plan-term-warn-text" data-dh="term-warn">--</p>
+      <a class="plan-term-warn-cta" href="/pricing">Renew</a>
+    </div>
+    <!-- The same fact in one line, shown whenever a term end is on record and
+         not only while it is close: before it, the day the plan stops; after
+         it, the day it stopped and where the account landed. Filled from
+         paid_until_*, which the relay has emitted since the betaalpad fixes. -->
+    <p class="plan-term-line" id="dh-term-line" hidden>--</p>
+
     <!-- What a paying customer bought, in the words /pricing sells it in. Shown
          by dashboard.js only on Pro, Business or Enterprise, and it carries no
          link to a higher tier: someone who already pays is not a lead. -->
@@ -661,6 +675,6 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=8" defer></script>
-<script src="/js/dashboard.js?v=10" defer></script>
+<script src="/js/dashboard.js?v=11" defer></script>
 </body>
 </html>

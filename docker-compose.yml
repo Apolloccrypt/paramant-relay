@@ -50,6 +50,11 @@ x-relay-env: &relay-env
   RAM_LIMIT_MB: "${RAM_LIMIT_MB:-1024}"
   LOG_LEVEL: "${LOG_LEVEL:-info}"
   RESEND_API_KEY: "${RESEND_API_KEY:-}"
+  # The public base the paid-term reminder mails link to (/pricing). Those
+  # mails are sent by the relay itself (lib/plan-expiry.js) and only when
+  # RESEND_API_KEY is set; without SITE_URL the link falls back to
+  # https://paramant.app.
+  SITE_URL: "${SITE_URL:-https://paramant.app}"
   # Mollie billing (dormant until a key is set in .env)
   MOLLIE_API_KEY: "${MOLLIE_API_KEY:-}"
   MOLLIE_TEST_API_KEY: "${MOLLIE_TEST_API_KEY:-}"

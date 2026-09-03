@@ -143,6 +143,7 @@ const parasignAuditExport = require('./lib/parasign-audit-export'); // GET /v2/p
 const transferNotify   = require('./lib/transfer-notify');   // ParaSend Pro upload/download mail
 const invoiceMod       = require('./lib/invoice');            // invoice numbering, records and VAT split
 const invoicePdf       = require('./lib/invoice-pdf');        // one-page PDF writer, no dependency
+const planExpiry       = require('./lib/plan-expiry');      // paid-term warning + expiry mail (in-process planner)
 
 // Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
 // setting PARAMANT_WIRE_VERSION=1 activates the self-describing v1 header
@@ -1998,7 +1999,35 @@ function setProductPlan(accountId, product, tier, paidUntil) {
     ud.updated = new Date().toISOString();
   }).then(() => log('info', 'billing_entitlement_set', { account: String(accountId).slice(0, 12), product, tier: norm, keys: members.size, changed, persisted: true }))
     .catch(we => log('warn', 'billing_entitlement_persist_failed', { err: we.message }));
+  // Keep the shared expiry index in step with the period that was just written.
+  // This is the ONLY thing that lets a container which has never seen this
+  // account mail its owner: users.json is per container, redis is not.
+  _indexAccountExpiry(accountId, product);
   return { ok: true, product, tier: norm, keys: members.size, changed };
+}
+
+// Mirror one product's paid period into the redis expiry index (lib/plan-expiry).
+// Reads back the record it just wrote rather than trusting the argument, so an
+// admin grant that passed paidUntil undefined (leave whatever is on file) is
+// indexed with what is actually on file. Fire-and-forget: a redis outage may
+// delay a reminder, never a grant.
+function _indexAccountExpiry(accountId, product) {
+  if (!redisClient || !redisClient.isReady) return;
+  const rec = entitlementRecordOf(accountId);
+  if (!rec) return;
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  let email = (accounts.get(accountId) || {}).email || '';
+  for (const m of members) { const mv = apiKeys.get(m); if (mv && mv.email) { email = mv.email; break; } }
+  const products = product ? [product] : entitlements.PRODUCTS;
+  for (const prod of products) {
+    planExpiry.upsertExpiry(redisClient, {
+      accountId,
+      product: prod,
+      tier: rec[entitlements.PRODUCT_PLAN_FIELD[prod]],
+      paidUntil: rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[prod]] || null,
+      email,
+    }).catch(e => log('warn', 'plan_expiry_index_failed', { product: prod, err: e.message }));
+  }
 }
 
 // ── Mollie pointers (customer + per-product subscription) ────────────────────
@@ -5895,6 +5924,13 @@ async function handleRelayRequest(req, res) {
       }
       const acct = accounts.get(target);
       if (acct) { for (const f of keysTable.PERSONAL_DATA_FIELDS) delete acct[f]; }
+      // The expiry index carries a copy of the address so any container can
+      // mail from it. An erasure that left that copy behind would be an
+      // erasure in name only, and the next sweep would write to it.
+      if (redisClient && redisClient.isReady) {
+        planExpiry.forgetAccount(redisClient, target)
+          .catch(e => log('warn', 'plan_expiry_forget_failed', { err: e.message }));
+      }
       log('info', 'account_erased', { target: String(target).slice(0, 16), ...result });
       res.writeHead(200); return res.end(J({ ok: true, erased: result }));
     } catch (e) { if (redisOutage503(e, res)) return; res.writeHead(400); return res.end(J({ error: e.message })); }
@@ -7449,6 +7485,43 @@ setInterval(() => {
   if (sthLog.length === 0 || !relayIdentity) return;
   broadcastSTH(sthLog[sthLog.length - 1]).catch(() => {});
 }, 10 * 60_000);
+
+// ── Paid-term reminders ──────────────────────────────────────────────────────
+// The one thing standing between a customer and a plan that stops without a
+// word. There is no cron on the server, so the schedule lives here: one sweep a
+// short random delay after boot, then every six hours. Five relay containers
+// run this same line against one redis, and a SET NX lock in lib/plan-expiry
+// means exactly one of them does the work each window. Nothing about "already
+// warned him" is held in this process: the markers are redis keys carrying the
+// paid_until they belong to, so a restart, a redeploy and a second container
+// all send zero extra mail.
+//
+// The seed is what makes the index complete. Accounts live in users.json, per
+// container; every container puts what it knows into the shared index once at
+// boot, so an account that paid before this existed is still warned.
+planExpiry.startPlanExpiryPlanner({
+  redis: redisClient,
+  sendEmail: ({ to, subject, text, html }) => sendResendEmail({ to, subject, text, html }),
+  log,
+  siteUrl: process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL,
+  seed: () => planExpiry.seedIndex(redisClient, accountsWithTerms()),
+});
+
+// One entry per ACCOUNT, not per key: an account with three keys is one
+// customer with one address. A fresh generator per call, so a seed that failed
+// on an unreachable redis can be retried against a full list instead of an
+// exhausted one.
+function* accountsWithTerms() {
+  const seenAccounts = new Set();
+  for (const [key, rec] of apiKeys) {
+    const accountId = (rec && rec.account_id) || key;
+    if (seenAccounts.has(accountId)) continue;
+    seenAccounts.add(accountId);
+    const merged = entitlementRecordOf(accountId);
+    if (!merged) continue;
+    yield { accountId, record: { ...merged, email: rec.email || (accounts.get(accountId) || {}).email || '' } };
+  }
+}
 server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   log('info', 'relay_started', { port: PORT, version: VERSION, sector: SECTOR, mode: RELAY_MODE,
       dsa: !!mlDsa, protocol: 'ghost-pipe-v2',

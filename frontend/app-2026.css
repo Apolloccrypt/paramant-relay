@@ -569,6 +569,32 @@ footer .logo .a { color: var(--ink-1); }
 .acct-plan-band.paid .acct-plan-kicker { color: var(--accent); }
 .acct-plan-band.paid .acct-plan-lede { color: var(--ink-1); }
 
+/* The term a one-off payment bought is running out. Amber and not red: nothing
+   is broken, nothing is going to be charged, a date is simply approaching, and
+   a scare here would be a lie about what happens next. Shared by /account and
+   /dashboard so the same fact reads the same on both. */
+.plan-term-warn {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--space-3);
+  padding: 14px 18px; margin: 0 0 20px;
+  background: var(--sig-wait-bg);
+  border: 1px solid var(--sig-wait);
+  border-radius: var(--r-2);
+}
+.plan-term-warn-text { flex: 1 1 320px; margin: 0; font: 14px/1.6 var(--sans); color: var(--ink-1); }
+a.plan-term-warn-cta {
+  flex: 0 0 auto;
+  min-height: var(--tap); display: inline-flex; align-items: center;
+  padding: 0 18px; border-radius: var(--r-1);
+  background: var(--surface-ink); color: var(--on-ink);
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; text-decoration: none;
+}
+a.plan-term-warn-cta:hover { background: var(--ink-1); }
+/* The plain one-line statement of the same fact, shown whenever a term end is
+   on record and not only while it is close. */
+.plan-term-line { margin: 6px 0 20px; font: 13px/1.6 var(--sans); color: var(--ink-dim); }
+
 /* ── the appearance switch on /account ───────────────────────────────────────
    Three ways to answer one question, so the answer is visible without opening
    anything. The radio itself is 0x0 and the <span> is the target: it carries

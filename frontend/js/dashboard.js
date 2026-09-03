@@ -108,6 +108,48 @@
     return t;
   }
 
+  // ── The end of the term that was bought ────────────────────────────────────
+  // Same rule and same words as /account: a checkout here buys one month or one
+  // year outright, so paid_until_<product> is the day access stops and there is
+  // no collection to announce. Two products can hold two dates; the one that
+  // matters is the nearest one still ahead, and once they have all passed it is
+  // the last one, because that is the day the account fell back to Community.
+  var TERM_WARN_DAYS = 7;
+  function termState(data, nowMs) {
+    var now = typeof nowMs === 'number' ? nowMs : Date.now();
+    var ends = [data.paid_until_parasign, data.paid_until_parasend]
+      .map(function (v) { return v ? Date.parse(v) : NaN; })
+      .filter(function (t) { return !isNaN(t); });
+    if (!ends.length) return null;
+    var ahead = ends.filter(function (t) { return t > now; });
+    var at = ahead.length ? Math.min.apply(null, ahead) : Math.max.apply(null, ends);
+    var days = (at - now) / 86400000;
+    return { at: at, ended: at <= now, warn: days > 0 && days <= TERM_WARN_DAYS };
+  }
+
+  // en-GB and not the visitor's locale: the site is in English and the same
+  // date has to read the same here, on /account and in the reminder mail.
+  function renderTerm(root, data) {
+    var line = root.querySelector('#dh-term-line');
+    var warn = root.querySelector('#dh-term-warn');
+    if (line) line.hidden = true;
+    if (warn) warn.hidden = true;
+    var term = termState(data);
+    if (!term) return;
+    var when = new Date(term.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+    if (line) {
+      line.textContent = term.ended
+        ? 'Ended on ' + when + ', now on Community.'
+        : 'Ends on ' + when + ', nothing renews automatically.';
+      line.hidden = false;
+    }
+    if (warn && term.warn) {
+      var text = warn.querySelector('[data-dh="term-warn"]');
+      if (text) text.textContent = 'Your plan ends on ' + when + '. Renew for another month or year, or let it fall back to Community. Nothing is charged automatically.';
+      warn.hidden = false;
+    }
+  }
+
   // What a paying customer already has, per product, quoted from /pricing. It
   // is per product because a self-serve purchase moves one ladder only: someone
   // who bought ParaSend Pro has no signature allowance to read about. Nothing
@@ -233,6 +275,11 @@
         txt('paid-includes', lines.join(' '));
       }
     }
+
+    // Outside the paid band on purpose. An expired term floors every product,
+    // which empties that band, and the one moment a customer most needs the
+    // date is the moment the band that would have carried it disappears.
+    renderTerm(root, data);
     txt('created',      fmtDate(data.created_at));
     txt('backup',       String(data.backup_codes_remaining != null ? data.backup_codes_remaining : '--'));
     txt('session',      fmtMinutesUntil(data.session_expires_at));
