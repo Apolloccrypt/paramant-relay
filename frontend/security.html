@@ -293,9 +293,14 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </table>
   </div>
 
+  <div class="card" style="margin-top:14px;border-left:3px solid var(--cobalt)">
+    <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Where your documents go has become a legal question</div>
+    <p style="margin:0;line-height:1.8">In a criminal case at the Rotterdam district court, a client had put privileged information into ChatGPT. It was the client who did so, not the lawyer. On 12 June 2026 the examining magistrate held that entering such information into an external AI service can count as disclosure, so the information loses its privileged character (<a href="https://uitspraken.rechtspraak.nl/details?id=ECLI:NL:RBROT:2026:9319" target="_blank" rel="noopener">ECLI:NL:RBROT:2026:9319</a>, published 30 July 2026). That is one examining magistrate in one case, with no appeal followed. It is not settled law. What it does show is that where a document ends up is a question a court will now ask. Paramant's answer to that question is architectural, not contractual: the file is encrypted in your browser and the server never holds a readable copy, as <a href="#core-principle">Core principle</a> sets out below. This is not legal advice; ask your own counsel what your matter needs.</p>
+  </div>
+
   <hr class="divider">
 
-  <h3>Core principle</h3>
+  <h3 id="core-principle">Core principle</h3>
   <div class="card">
     <p style="margin:0;line-height:1.8">The relay is an <strong>untrusted intermediary</strong>. It stores only ciphertext and has no access to keys or plaintext. A fully compromised relay cannot read, forge, or retroactively recover any transfer. This is not a policy. It is a cryptographic guarantee.</p>
   </div>
