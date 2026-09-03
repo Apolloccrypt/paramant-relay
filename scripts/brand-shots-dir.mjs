@@ -1,6 +1,6 @@
 // Where the app screenshots are allowed to land.
 //
-// tests/app-shots.mjs renders every app screen at two viewports in two themes
+// scripts/app-shots.mjs renders every app screen at two viewports in two themes
 // and writes 36 PNGs. Until now it wrote them straight into
 // docs/brand/assets/app-2026/, which is tracked. So every local run of the
 // browser suites rewrote 36 tracked files, `git status` was never clean after a
@@ -10,8 +10,8 @@
 // Rewriting the reference images is a deliberate act, not a side effect of
 // running the tests. So the tracked directory is opt-in:
 //
-//   node tests/app-shots.mjs                          -> a temp dir, repo clean
-//   PARAMANT_WRITE_BRAND_SHOTS=1 node tests/app-shots.mjs  -> docs/brand/assets
+//   node scripts/app-shots.mjs                          -> a temp dir, repo clean
+//   PARAMANT_WRITE_BRAND_SHOTS=1 node scripts/app-shots.mjs  -> docs/brand/assets
 //
 // APP_SHOTS_DIR still names an explicit directory and still wins, with one
 // rule: an explicit path that points back inside docs/ is refused without the

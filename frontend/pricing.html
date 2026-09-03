@@ -282,8 +282,13 @@
       For a one-person practice, a volunteer board or a household, and for the offices that sign and send every week.
     </p>
     <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:center;margin-bottom:var(--space-4)">
-      <a href="/signup" class="btn btn-primary">Create a free account &rarr;</a>
-      <a href="#plans" class="btn btn-secondary">Compare plans</a>
+<!-- Besluit 22 (one filled accent per screen): the nav carries the filled
+           cobalt "Create account" on every page and it is sticky, so a filled
+           hero button put two of them on the first screen. This page has its own
+           primary action, the button in each plan card, so the two text CTAs on
+           it are outlined. The plan cards keep one filled button each. -->
+      <a href="/signup" class="btn btn-secondary">Create a free account &rarr;</a>
+      <a href="#plans" class="btn btn-tertiary">Compare plans</a>
     </div>
     <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-6)">
       Built in Harderwijk by <strong style="color:var(--navy)">Mick Beer</strong>, privacy and security researcher, founder of
@@ -398,6 +403,23 @@
       </p>
     </div>
     <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4)">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Pro &euro;59.29/mo or &euro;603.79/yr, Business &euro;361.79/mo or &euro;3,617.90/yr.</p>
+    <!-- HOW PAYMENT WORKS. Every sentence here is what the code does today.
+         relay/lib/mollie.js: BILLING_MODE is unset in production, so
+         billingStance().recurring is false and relay/lib/billing-recurring.js
+         skips the customer, the mandate and the subscription; the checkout in
+         relay.js is a plain one-off Mollie payment. relay/lib/billing.js
+         periodEnd() turns the interval into one calendar month or twelve, and
+         relay/lib/entitlements.js effectiveProductTier() drops the product to
+         its floor tier (Community for ParaSend, the free tier for ParaSign) as
+         soon as that date passes, per product. /privacy and /terms carry the
+         same claim in the same words; tests/site-claims.test.mjs pins all three
+         against mollie.js. -->
+    <div style="text-align:left;max-width:760px;margin:var(--space-6) auto 0;padding:var(--space-4) var(--space-5);border:1px solid var(--ink-hair);border-left:3px solid var(--cobalt);background:var(--bone)">
+      <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt);margin:0 0 var(--space-3)">How payment works</p>
+      <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0">
+        Payment runs through Mollie. Every payment is a one-off for the term you buy: one month, or one year paid up front. Automatic renewal is not switched on, so there is no direct debit mandate and no subscription that renews by itself. ParaSign and ParaSend each carry their own paid term. When a term ends, that product falls back to its free Community plan, and nothing is charged again unless you buy the next term yourself.
+      </p>
+    </div>
   </div>
 </section>
 
@@ -526,7 +548,7 @@
         <p style="font-size:var(--text-base);font-weight:700;margin-bottom:var(--space-2)">Not sure which plan fits?</p>
         <p style="font-size:var(--text-sm);color:var(--ink)">Start on the Community plan. No card, no time limit; upgrade when you outgrow the limits.</p>
       </div>
-      <a href="/signup" class="btn btn-primary">Create account →</a>
+      <a href="/signup" class="btn btn-secondary">Create account →</a>
     </div>
   </div>
 </section>
