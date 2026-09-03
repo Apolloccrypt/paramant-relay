@@ -527,6 +527,36 @@ that means slot 2, the live conf: `paramant-public.conf` has no `:8090` block,
 so the edit is a no-op there. Two passes, like the buffers and the `/pararules`
 301, so a block that already has the line is left untouched.
 
+A `:8090` block that logs to a **file** is refused, not edited. The phase
+prints `before 8090 blocks logging to a file` and stops if that is not zero.
+`access_log off;` written above an `access_log /var/log/nginx/dicom.log;` would
+leave two `access_log` directives on the same level and would undo a log
+somebody put there on purpose. Neither is a deploy's call: decide by hand which
+of the two the block should have, then run the phase again.
+
+### What the block counters do not see: an indented `server {`
+
+Both block-counting edits, the `/pararules` 301 and this one, walk the conf by
+counting `^server[[:space:]]*{`. That anchor is pinned to **column 0**. Every
+`server` block in both confs and in the repo files starts there, and nginx
+config written by hand or by this repo has always looked like that, so the
+count is right for the confs that exist today. It is a convention, not a rule
+nginx enforces: nginx would happily read
+
+```nginx
+    server {
+        listen 127.0.0.1:8090;
+    }
+```
+
+and both counters would miss it. What that means in practice is that an
+indented block is invisible to the walk, not that it gets edited wrongly: an
+unseen block is never counted and never written into, and the after-counters
+then agree with the before-counters, so the phase passes with the block
+untouched. If a conf on some server ever indents its `server` blocks, the
+counts are the thing to read: `before 8090 blocks = 0` on a server that does
+have the gateway is the symptom, and the anchor is what needs widening.
+
 The server files carry the 01-09 ParaID deny that the repo files do not, so
 **do not copy the repo files over them**. Apply the six changes by hand and
 keep the deny:
@@ -667,7 +697,18 @@ and the suite could never exit 0. It now asks `/v2/health/deep` and expects the
 `401` the #322 gate gives a caller with no token, which is the strongest thing
 that script can prove: it reads no `.env` and takes no secret on its command
 line. Phase 6g therefore stops the deploy on **any** non-zero exit, not only on
-exit 2. The authenticated `200` is step 6c, which does have the token:
+exit 2.
+
+Because 6g is hard, the probes retry. The shared curl carries
+`--retry 2 --retry-delay 2 --retry-all-errors`, and `http_code` asks once more,
+from scratch, when the answer is still `000`. `000` is not a status the server
+sent: it is what curl writes when the transfer never produced a status line at
+all. Without that, one CDN hiccup, one 429 or one DNS blip ends a deploy that
+is entirely healthy, and it ends it after the work landed and before 6h, 6i and
+the phase 7a marker, which is deploy run 6 all over again. A real status is
+never retried, so a genuine 503 stays a 503 and does not become a slow one.
+
+The authenticated `200` is step 6c, which does have the token:
 
 ```bash
 # 6c. the deep check from #322: 200 with the token, 401 without

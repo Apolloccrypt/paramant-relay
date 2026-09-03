@@ -1500,31 +1500,46 @@ count_rules() { awk "$RULES_COUNT_AWK" $TARGETS | awk '{t+=$1; w+=$2} END{printf
 # Two passes, like the buffer and the /pararules edits: pass one learns which
 # of those blocks already carry access_log off, pass two inserts only into the
 # ones that do not. That is what makes a second deploy leave the file alone.
+#
+# A block that logs to a FILE is left alone and never gets the line written
+# above its own directive. That case is refused outright a few lines below,
+# before anything is written, so this guard is the second lock on the same
+# door: if that check is ever loosened, the awk still does not quietly stack
+# `access_log off;` on top of a log the operator asked for.
 ALOG_AWK='
 FNR==NR {
   if ($0 ~ /^server[[:space:]]*\{/) b++
   if ($0 ~ /^[[:space:]]*listen[[:space:]]+127\.0\.0\.1:8090[[:space:]]*;/) lis[b]=1
   if ($0 ~ /^[[:space:]]*access_log[[:space:]]+off[[:space:]]*;/) has[b]=1
+  if ($0 ~ /^[[:space:]]*access_log[[:space:]]+/ && $0 !~ /^[[:space:]]*access_log[[:space:]]+off[[:space:]]*;/) file[b]=1
   next
 }
 {
   print
   if ($0 ~ /^server[[:space:]]*\{/) j++
-  if ($0 ~ /^[[:space:]]*listen[[:space:]]+127\.0\.0\.1:8090[[:space:]]*;/ && !has[j] && !ins[j]) {
+  if ($0 ~ /^[[:space:]]*listen[[:space:]]+127\.0\.0\.1:8090[[:space:]]*;/ && !has[j] && !file[j] && !ins[j]) {
     print "    access_log off;"
     ins[j]=1
   }
 }'
 
-# Count the server blocks that carry the :8090 listen line, and how many of
-# those already switch the access log off.
+# Count the server blocks that carry the :8090 listen line, how many of those
+# already switch the access log off, and how many log to a FILE.
+#
+# The third number is the one that stops the edit. `access_log off;` above an
+# `access_log /var/log/nginx/dicom.log;` is not "logging off": nginx takes both
+# directives on the same level, and which one wins is not something a deploy
+# should be guessing at behind the operator's back. A block that logs to a file
+# is a deliberate act by whoever wrote it, so the phase says so and stops
+# instead of stacking a second directive on top of it.
 ALOG_COUNT_AWK='
 /^server[[:space:]]*\{/ { b++ }
 /^[[:space:]]*listen[[:space:]]+127\.0\.0\.1:8090[[:space:]]*;/ { lis[b]=1 }
 /^[[:space:]]*access_log[[:space:]]+off[[:space:]]*;/ { has[b]=1 }
-END { for (i in lis) { t++; if (has[i]) w++ } printf "%d %d\n", t+0, w+0 }'
+/^[[:space:]]*access_log[[:space:]]+/ && $0 !~ /^[[:space:]]*access_log[[:space:]]+off[[:space:]]*;/ { file[b]=1 }
+END { for (i in lis) { t++; if (has[i]) w++; if (file[i]) f++ } printf "%d %d %d\n", t+0, w+0, f+0 }'
 
-count_alog() { awk "$ALOG_COUNT_AWK" $TARGETS | awk '{t+=$1; w+=$2} END{printf "%d %d\n", t, w}'; }
+count_alog() { awk "$ALOG_COUNT_AWK" $TARGETS | awk '{t+=$1; w+=$2; f+=$3} END{printf "%d %d %d\n", t, w, f}'; }
 
 # Two-pass insert: learn which /v2/outbound blocks already carry the buffer,
 # then insert only into the ones that do not.
@@ -1602,9 +1617,10 @@ echo "before outbound blocks with buffer = $_obw"
 read -r _rbt _rbw <<< "$(count_rules)"
 echo "before pararules blocks = $_rbt"
 echo "before pararules blocks with redirect = $_rbw"
-read -r _abt _abw <<< "$(count_alog)"
+read -r _abt _abw _abf <<< "$(count_alog)"
 echo "before 8090 blocks = $_abt"
 echo "before 8090 blocks with access_log off = $_abw"
+echo "before 8090 blocks logging to a file = $_abf"
 
 # Each edit is in one of three states, and only one of them is a stop:
 #
@@ -1678,6 +1694,13 @@ if [ "$(count "$OUT_RE")" -eq 0 ]; then
   echo "FATAL no location ~ ^/v2/outbound block found; the inline receipt header would 502"
   exit 1
 fi
+if [ "$_abf" -ne 0 ]; then
+  echo "FATAL $_abf :8090 server block(s) write their access log to a FILE. Adding access_log off"
+  echo "FATAL above that would leave two access_log directives on the same level, and it would"
+  echo "FATAL undo a log someone put there on purpose. Nothing was written. Decide by hand which"
+  echo "FATAL of the two the block should have, then run this phase again."
+  exit 1
+fi
 
 edited=0
 for f in $TARGETS; do
@@ -1731,9 +1754,10 @@ read -r _rat _raw <<< "$(count_rules)"
 echo "after pararules blocks = $_rat"
 echo "after pararules blocks with redirect = $_raw"
 echo "after pararules redirect lines = $(count "$RULES_RE")"
-read -r _aat _aaw <<< "$(count_alog)"
+read -r _aat _aaw _aaf <<< "$(count_alog)"
 echo "after 8090 blocks = $_aat"
 echo "after 8090 blocks with access_log off = $_aaw"
+echo "after 8090 blocks logging to a file = $_aaf"
 
 # Restore exactly the confs this phase edited, not whatever the backup dir
 # happens to hold for this TS. The precondition above proved every one of them
@@ -1831,10 +1855,14 @@ EOF
     ok "every site block redirects /pararules to /rules ($rw of $rt blocks)"
   fi
   if [ "$DRY_RUN" -eq 0 ]; then
-    local at aw
+    local at aw af
     at="$(remote_field 'after 8090 blocks')"
     aw="$(remote_field 'after 8090 blocks with access_log off')"
-    [ -n "$at" ] && [ -n "$aw" ] || die "could not read the :8090 access_log counts from the server"
+    af="$(remote_field 'after 8090 blocks logging to a file')"
+    [ -n "$at" ] && [ -n "$aw" ] && [ -n "$af" ] \
+      || die "could not read the :8090 access_log counts from the server"
+    [ "$af" -eq 0 ] \
+      || die "$af :8090 server block(s) still write their access log to a file; the phase should have refused to edit this conf"
     # Zero such blocks is a legitimate answer: the /dicom/ gateway can be
     # retired, and then there is nothing to switch off. What may not happen is
     # a block that is there and still logging.

@@ -32,7 +32,18 @@ FAIL=0
 SKIP=0
 CRITICAL=0
 
-CURL="curl -sS --max-time 15"
+# Retries, because phase 6g of deploy/deploy-3.1.sh now stops the deploy on any
+# non-zero exit of this script. Before that it only stopped on exit 2, so a
+# transient answer cost nothing. Now one CDN hiccup, one 429 or one DNS blip
+# would kill a deploy that is entirely healthy, and it would kill it AFTER the
+# work landed and BEFORE 6h, 6i and the phase 7a marker, which is the exact
+# shape of deploy run 6: server correct, marker missing, next run stopped in 1a.
+#
+# --retry-all-errors is what makes --retry cover a transport failure and not
+# only an HTTP status curl considers transient. Two extra attempts, two seconds
+# apart, so a bad answer costs at most a few seconds and a real outage still
+# fails inside --max-time.
+CURL="curl -sS --max-time 15 --retry 2 --retry-delay 2 --retry-all-errors"
 
 note() { echo "$1" | tee -a "$REPORT"; }
 
@@ -64,10 +75,31 @@ contains() {
 
 skip() { note "SKIP: $1"; SKIP=$((SKIP+1)); }
 
+# One more retry around the whole curl, and only for 000.
+#
+# 000 is not a status the server sent. It is what curl writes when the transfer
+# never produced a status line at all: DNS did not resolve, the connection was
+# refused or reset, TLS did not come up, the deadline passed. Every retry
+# inside --retry-all-errors has already been spent by the time it appears, so
+# the answer to a 000 is a fresh curl, not another attempt within the same one.
+# Any real status, 4xx and 5xx included, is an answer and is reported as it is:
+# this loop must not turn a genuine 503 into a slow one.
+#
+# The delay is a variable so the self-test can set it to 0. Nothing else sets
+# either of these.
+HTTP_RETRIES="${PARAMANT_VERIFY_HTTP_RETRIES:-1}"
+HTTP_RETRY_DELAY="${PARAMANT_VERIFY_HTTP_RETRY_DELAY:-3}"
 http_code() {
-  local code
-  code=$($CURL -o /dev/null -w "%{http_code}" "$1" 2>/dev/null)
-  echo "${code:-000}"
+  local code attempt=0
+  while : ; do
+    code=$($CURL -o /dev/null -w "%{http_code}" "$1" 2>/dev/null)
+    code="${code:-000}"
+    [ "$code" != "000" ] && break
+    [ "$attempt" -ge "$HTTP_RETRIES" ] && break
+    attempt=$((attempt + 1))
+    sleep "$HTTP_RETRY_DELAY"
+  done
+  echo "$code"
 }
 
 {

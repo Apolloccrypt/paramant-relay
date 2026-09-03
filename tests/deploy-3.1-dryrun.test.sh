@@ -796,6 +796,63 @@ check_has "$FULL"   'before 8090 blocks with access_log off' \
   "the dry run shows the :8090 access_log counters"
 
 echo ""
+echo "6g-8. A :8090 block that logs to a FILE is refused, not quietly stacked"
+# `access_log off;` written above an `access_log /var/log/nginx/dicom.log;`
+# leaves two access_log directives on the same level, and it undoes a log
+# somebody put there on purpose. Neither is a deploy's call to make, so the
+# phase counts those blocks, says how many it found and stops before it writes
+# anything.
+make_dicom_conf "$NG/available/paramant-public.conf" none
+make_dicom_conf "$NG/available/paramant-live.conf"   missing
+# One line, straight into the :8090 block: the shape a server gets when someone
+# wants that gateway logged.
+sed -i 's|^    listen 127\.0\.0\.1:8090;$|    listen 127.0.0.1:8090;\n    access_log /var/log/nginx/dicom.log;|' \
+  "$NG/available/paramant-live.conf"
+cp -a "$NG/available/paramant-live.conf" "$WORK/live-filelog.conf"
+seed_2b_backups "$NG/sites" "$NG/bk" 20260101-0007 "paramant-public.conf paramant-live.conf"
+OUT8="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0007 "$NG/sites" "$NG/bk" \
+        "paramant-public.conf paramant-live.conf" </dev/null 2>&1)"; RC8B=$?
+if [ "$(field_5c "$OUT8" 'before 8090 blocks logging to a file')" = "1" ]; then
+  pass "the phase counts the :8090 block that logs to a file"
+else
+  fail "the file-logging block is counted as $(field_5c "$OUT8" 'before 8090 blocks logging to a file'), expected 1"
+fi
+if [ "$RC8B" -ne 0 ] && printf '%s\n' "$OUT8" | grep -q 'write their access log to a FILE'; then
+  pass "5c stops and names it instead of writing access_log off above it"
+else
+  fail "5c exited $RC8B on a :8090 block that logs to a file"
+  printf '%s\n' "$OUT8" | sed 's/^/        /' | head -20
+fi
+if cmp -s "$WORK/live-filelog.conf" "$NG/available/paramant-live.conf"; then
+  pass "nothing was written: the conf is byte-identical after the refusal"
+else
+  fail "5c wrote to the conf before refusing it"
+  diff -u "$WORK/live-filelog.conf" "$NG/available/paramant-live.conf" | sed 's/^/        /' | head -20
+fi
+# And the awk itself, with the FATAL out of the way, still refuses that block.
+# If the precondition is ever loosened, this is the lock that is left.
+eval "$(sed -n "/^ALOG_AWK='/,/^}'\$/p" "$SCRIPT")"
+awk "$ALOG_AWK" "$WORK/live-filelog.conf" "$WORK/live-filelog.conf" > "$WORK/live-filelog-out.conf"
+if cmp -s "$WORK/live-filelog.conf" "$WORK/live-filelog-out.conf"; then
+  pass "the edit awk on its own leaves a file-logging :8090 block untouched"
+else
+  fail "the edit awk would stack access_log off on top of a file log"
+  diff -u "$WORK/live-filelog.conf" "$WORK/live-filelog-out.conf" | sed 's/^/        /' | head -10
+fi
+# The plain fixtures must read zero, or the counter would be meaningless.
+if [ "$(field_5c "$OUT5" 'before 8090 blocks logging to a file')" = "0" ] \
+   && [ "$(field_5c "$OUT5" 'after 8090 blocks logging to a file')" = "0" ]; then
+  pass "a :8090 block with no access_log at all does not read as logging to a file"
+else
+  fail "the plain fixture reads $(field_5c "$OUT5" 'before 8090 blocks logging to a file') file-logging block(s), expected 0"
+fi
+if [ "$(field_5c "$OUT7A" 'before 8090 blocks logging to a file')" = "0" ]; then
+  pass "access_log off itself does not read as logging to a file"
+else
+  fail "a block with access_log off reads as logging to a file"
+fi
+
+echo ""
 echo "6h. A deploy AFTER a rollback still prunes the pages the rollback restored"
 # Phase 8 restores the docroot from the pre-3.1 tar, which puts every pruned
 # page back, and leaves the checkout, and so the marker, on main. Diffing
@@ -2105,6 +2162,96 @@ else
   fail "the 6g verdict has $(printf '%s\n' "$PDV_BRANCH" | grep -c 'die ') die branch(es), expected 2"
   printf '%s\n' "$PDV_BRANCH" | sed 's/^/        /' | head -20
 fi
+
+echo ""
+echo "6n-1. One bad answer may not kill a healthy deploy"
+# 6g is hard now, so every probe in post-deploy-verify.sh is a stop. curl writes
+# 000 when the transfer never produced a status line at all: DNS did not
+# resolve, the connection was refused or reset, TLS did not come up, the
+# deadline passed. Without a retry, one CDN hiccup or one DNS blip ends a deploy
+# that is completely healthy, AFTER the work landed and BEFORE 6h, 6i and the
+# phase 7a marker. That is deploy run 6 all over again, and the missing marker
+# is what stops the NEXT run in 1a.
+#
+# So: --retry-all-errors inside the curl, and one more whole curl around it when
+# the answer is still 000. This runs the real http_code() out of the script,
+# with curl stubbed, because the retry has to be provable and not just written
+# down.
+check_has "$PDV" 'curl -sS --max-time 15 --retry 2 --retry-delay 2 --retry-all-errors' \
+  "the shared curl retries, transport errors included"
+check_has "$PDV" 'HTTP_RETRIES' "http_code has a retry budget of its own"
+
+RTY="$WORK/retry"
+mkdir -p "$RTY/bin"
+# The stub answers from a script it is given: one line per call, "<code> <exit>".
+cat > "$RTY/bin/curl" <<'STUB'
+#!/bin/sh
+n=$(cat "$RETRY_STATE" 2>/dev/null || echo 0)
+n=$((n + 1))
+echo "$n" > "$RETRY_STATE"
+line=$(sed -n "${n}p" "$RETRY_PLAN")
+[ -n "$line" ] || line=$(tail -1 "$RETRY_PLAN")
+printf '%s' "${line% *}"
+exit "${line#* }"
+STUB
+chmod +x "$RTY/bin/curl"
+
+# http_code(), verbatim from the script, with the two variables it reads.
+{
+  echo 'CURL="curl"'
+  sed -n '/^HTTP_RETRIES=/,/^}$/p' "$PDV"
+} > "$RTY/http_code.sh"
+if grep -q '^http_code() {' "$RTY/http_code.sh"; then
+  pass "http_code could be extracted from the verify suite"
+else
+  fail "could not extract http_code from the verify suite"
+fi
+
+# Green: the first attempt never got a status, the second did.
+printf '000 7\n200 0\n' > "$RTY/plan"
+export RETRY_PLAN="$RTY/plan" RETRY_STATE="$RTY/state"
+: > "$RETRY_STATE"
+GREEN="$(PATH="$RTY/bin:$PATH" PARAMANT_VERIFY_HTTP_RETRY_DELAY=0 \
+         bash -c ". '$RTY/http_code.sh'; http_code https://example.invalid/health")"
+if [ "$GREEN" = "200" ]; then
+  pass "a 000 followed by a 200 answers 200, so one blip does not stop the deploy"
+else
+  fail "a 000 followed by a 200 answered '$GREEN', expected 200"
+fi
+if [ "$(cat "$RETRY_STATE")" = "2" ]; then
+  pass "it took exactly two attempts to get there, so the retry really happened"
+else
+  fail "the probe made $(cat "$RETRY_STATE") attempt(s), expected 2"
+fi
+
+# Red: nothing answers, twice. That is not a blip and it must not be swallowed.
+: > "$RETRY_STATE"
+printf '000 7\n000 7\n' > "$RTY/plan"
+RED="$(PATH="$RTY/bin:$PATH" PARAMANT_VERIFY_HTTP_RETRY_DELAY=0 \
+       bash -c ". '$RTY/http_code.sh'; http_code https://example.invalid/health")"
+if [ "$RED" = "000" ]; then
+  pass "two 000s in a row are still reported as 000, so a real outage still fails"
+else
+  fail "two 000s answered '$RED', expected 000"
+fi
+if [ "$(cat "$RETRY_STATE")" = "2" ]; then
+  pass "it gave up after the second attempt instead of retrying forever"
+else
+  fail "the probe made $(cat "$RETRY_STATE") attempt(s) on a dead host, expected 2"
+fi
+
+# A real status is an answer, whatever it is. Retrying a 503 would turn a
+# genuine failure into a slow one and hide it behind a second reading.
+: > "$RETRY_STATE"
+printf '503 0\n200 0\n' > "$RTY/plan"
+KEEP="$(PATH="$RTY/bin:$PATH" PARAMANT_VERIFY_HTTP_RETRY_DELAY=0 \
+        bash -c ". '$RTY/http_code.sh'; http_code https://example.invalid/health")"
+if [ "$KEEP" = "503" ] && [ "$(cat "$RETRY_STATE")" = "1" ]; then
+  pass "a 503 is reported as a 503 on the first attempt, never retried into a 200"
+else
+  fail "a 503 became '$KEEP' after $(cat "$RETRY_STATE") attempt(s)"
+fi
+unset RETRY_PLAN RETRY_STATE
 
 echo ""
 echo "6d. The CI gate on main is one verdict per required workflow"
