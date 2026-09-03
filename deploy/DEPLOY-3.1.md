@@ -174,6 +174,16 @@ finds out.
      own design while the two canary secrets are missing: it has no skip, a
      missing secret fails and names the secret. Gating the deploy on it would
      mean no deploy until the alarm has its secrets.
+   * `security-posture.yml` runs on pull requests, on a schedule and on
+     `workflow_dispatch`, never on a push to `main`, and its live job is gated
+     on `vars.SECURITY_POSTURE_ENABLED`. Its last completed run on `main` is the
+     nightly external scan, and that scan is red on purpose: a missing CAA
+     record, an unsigned zone, a duplicated HSTS header set by a layer above
+     this repository, and one Rust advisory that carries no severity in any
+     database and needs a human ruling. All of those describe the DNS zone or
+     the server, not whether `main` is deployable. Its own gate, the selftest
+     that drives all 109 measurements green once and red once, does run on every
+     pull request, which is how every change reaches `main`.
    * `docker-publish.yml` and `build-image.yml` are path-gated on `relay/**`, so
      a commit that touches only the frontend produces no run at all and a hard
      "must be success" would block every such deploy. Neither is what this
@@ -381,13 +391,37 @@ the users file or the CT log matter to you today (they should).
 
 ```bash
 cd /opt/paramant-relay
-git status                                                   # clean, or stash and note what it was
+git status --porcelain --untracked-files=no                  # empty, or stash and note what it was
 git fetch origin && git pull --ff-only origin main
 git rev-parse --short HEAD                                   # the commit you tested locally
 
 tests/static-sanity.sh; echo "exit $?"                       # expect exit 1: checks 1 to 9 OK, only check 10 FAIL
 docker compose build                                         # relays and admin from source, containers untouched
 ```
+
+### What counts as a dirty working tree in 3a
+
+Only **tracked** changes. A modified tracked file stops the run, before the
+fetch, because a fast-forward pull would tangle it with what is coming in and
+the log would then report a merge conflict instead of the hand edit that caused
+it. Untracked paths are listed and left alone: `git pull --ff-only` cannot lose
+one.
+
+3a prints both counts, so the log says which of the two it judged:
+
+```
+before untracked paths = 1
+  untracked backups/
+before tracked changes = 0
+```
+
+Deploy run 5 (TS 20260903-0242) stopped here on `dirty ?? backups/`, an
+untracked directory in `/opt/paramant-relay` and nothing else wrong. No script
+in this repo writes a relative `backups/` (`deploy/ops/backup-full-state.sh`
+defaults to an absolute `/home/paramant/backups/full-state`), so what put it
+there is **not established**; a `BACKUP_ROOT` or `BACKUP_DIR` override on the
+server is the likely candidate. `backups/` is in the repo `.gitignore` from
+this commit on, so once the server has pulled it, 3a stops reporting it at all.
 
 Read the sanity output the way "Before you start" step 2 says: checks 1 to 9
 are the gate, check 10 (the commit style guard on the last commit) is known
