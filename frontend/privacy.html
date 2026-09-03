@@ -204,19 +204,19 @@ footer a{color:var(--ink);text-decoration:none}
 <div class="content">
 
 <h1>Privacy Policy</h1>
-<p class="updated">Last updated: July 21, 2026</p>
+<p class="updated">Last updated: September 3, 2026</p>
 
 <h2>Core principle</h2>
 <p><strong>PARAMANT collects only what is strictly required to operate your account and run the service.</strong></p>
-<p>An email address is required to create an account and recover access; it is personal data, and it is stored. No phone number. We do not log IP addresses for analytics or profiling; an IP is processed only transiently, for security and abuse-prevention (rate limiting, the session record, an audit log, and the DPA signature record). Only a strictly-necessary session cookie (no tracking cookies). No tracking pixels. No analytics. No advertisements. We never sell your data.</p>
+<p>An email address is required to create an account and recover access; it is personal data, and it is stored. No phone number. We do not log IP addresses for analytics or profiling. An IP is processed for security and abuse-prevention only (rate limiting, the session record, an audit log, and the DPA signature record), the audit trail keeps a masked address for up to 400 days, and one log holds a full address for longer than any timer; both are named below. Only a strictly-necessary session cookie (no tracking cookies). No tracking pixels. No analytics. No advertisements. We never sell your data.</p>
 
 <h2>How Ghost Pipe &amp; ParaShare (the ParaSend web app) work</h2>
 <p>All files are encrypted <strong>client-side in your browser</strong> using post-quantum cryptography (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256) before they ever reach our servers. The relay never sees plaintext at any point.</p>
-<p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server and is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>). Encrypted payload data is never written to disk. From a <em>transfer</em>, the only thing persisted to disk is cryptographic hashes in the public Certificate Transparency log: no file content, no keys, no plaintext. (Account data, listed below, is stored separately to run your account.)</p>
-<p>Community plan blobs expire after 1 hour maximum. Pro blobs after 24 hours. Enterprise blobs after 7 days. All are destroyed earlier if downloaded.</p>
+<p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server. On the Community plan it is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>); a paid plan buys more reads per link before that same destruction, up to 10 on Pro, 25 on Business and 100 on Enterprise. Encrypted payload data is never written to disk. From a <em>transfer</em>, the only thing persisted to disk is cryptographic hashes in the public Certificate Transparency log: no file content, no keys, no plaintext. (Account data, listed below, is stored separately to run your account.)</p>
+<p>Community plan blobs expire after 1 hour maximum. Pro blobs after 24 hours. Business and Enterprise blobs after 7 days. All are destroyed earlier once the last read of the link is spent.</p>
 
 <h2>How ParaSign document delivery works</h2>
-<p>When you request signatures, your browser encrypts the document with AES-256-GCM before upload. The signing relay stores the encrypted capsule with the envelope until its expiry. The relay does not receive document plaintext or the document key. The personal signing link contains the key in its URL fragment; browsers do not send that fragment to the relay.</p>
+<p>When you request signatures, your browser encrypts the document with AES-256-GCM before upload. The signing relay stores the encrypted capsule with the envelope until its expiry: 30 days unless the request asks for another term, and never longer than 365 days. The relay does not receive document plaintext or the document key. The personal signing link contains the key in its URL fragment; browsers do not send that fragment to the relay.</p>
 <p>When a signer places a visible seal or date, the relay stores the signed field type, page number and normalized coordinates in the envelope. It does not receive document text, a drawn signature image or free-form field content. The placement is covered by the signer&rsquo;s ML-DSA-65 signature.</p>
 <p>The recipient must also sign in with the exact invited email address. The link alone cannot retrieve the ciphertext. If you choose Paramant email delivery, Resend processes the recipient address, message and complete signing link. It does not receive document plaintext. You can instead create links without sending email.</p>
 
@@ -230,23 +230,25 @@ footer a{color:var(--ink);text-decoration:none}
 <tr><td>SHA-256 hash of blob</td><td>Routing &amp; delivery confirmation</td><td>RAM only &middot; deleted on burn</td><td>Never</td></tr>
 <tr><td>API key (Pro/Enterprise)</td><td>Authentication &amp; rate limiting</td><td>Loaded from config at startup</td><td>Never</td></tr>
 <tr><td>Device ID (SDK users)</td><td>Key routing between sender and receiver</td><td>RAM only &middot; cleared on restart</td><td>Never</td></tr>
-<tr><td>Device ID hash (CT log)</td><td>Public tamper-evident audit log</td><td>Disk &middot; /data/ct-log.json &middot; SHA-256 one-way hash only</td><td>Never</td></tr>
+<tr><td>Device ID hash (CT log)</td><td>Public tamper-evident audit log</td><td>Disk &middot; /data/ct-log.json &middot; SHA3-256 one-way hash only</td><td>Never</td></tr>
+<tr><td>Signed delivery receipt</td><td>Proof that a transfer was delivered</td><td>Redis &middot; 15 minutes, then deleted</td><td>Never</td></tr>
 <tr><td>Aggregated relay statistics</td><td>System health monitoring</td><td>In-process counters only</td><td>Never</td></tr>
 <tr><td>Email address</td><td>Account identity, login, recovery, signing-invite delivery</td><td>Stored (server) &middot; also kept as a hash for rate-limiting</td><td>Email provider (Resend) for messages we send you</td></tr>
 <tr><td>Sign-in factors: passkey public keys, TOTP secret (encrypted), recovery codes (hashed)</td><td>Account authentication</td><td>Stored (server)</td><td>Never</td></tr>
 <tr><td>ParaSign signing public key + fingerprint</td><td>Verifiable signing identity</td><td>Stored (server) &middot; public half only; the private key never leaves your browser</td><td>Public (its hash is in the CT log)</td></tr>
-<tr><td>Plan + anonymised billing reference</td><td>Pro/Enterprise billing</td><td>Stored (server)</td><td>Payment processor (Mollie, EU) once billing is enabled</td></tr>
-<tr><td>Client IP + user-agent</td><td>Security, rate limiting, audit log</td><td>Transient (session/rate-limit TTL; audit log volume-capped)</td><td>Never</td></tr>
+<tr><td>Plan + anonymised billing reference</td><td>Pro/Enterprise billing</td><td>Stored (server)</td><td>Payment processor (Mollie, EU)</td></tr>
+<tr><td>Client IP + user-agent</td><td>Security, rate limiting</td><td>Session/rate-limit TTL</td><td>Never</td></tr>
+<tr><td>Masked IP in the audit log (1.2.x.x)</td><td>Account audit trail</td><td>Redis &middot; at most 400 days, and at most 1000 entries per account</td><td>Never</td></tr>
 </tbody>
 </table>
 
 <h2>What we never do</h2>
 <ul>
 <li>Sell your data, or use it for advertising or profiling</li>
-<li>Log or store IP addresses for analytics or profiling (an IP is used only transiently, for security and abuse-prevention)</li>
+<li>Log or store IP addresses for analytics or profiling (an IP is used for security and abuse-prevention only, in the logs named below)</li>
 <li>Use tracking cookies or browser fingerprinting (only a strictly-necessary session cookie is set after login)</li>
 <li>Run advertising or tracking scripts</li>
-<li>Share your data with third parties, except the operational subprocessors needed to run the service (hosting, transactional email, and payments when enabled, listed below)</li>
+<li>Share your data with third parties, except the operational subprocessors needed to run the service (hosting, transactional email, and payments, listed below)</li>
 <li>Write Ghost Pipe or ParaShare transfer payloads to disk. ParaSign request documents are different: their encrypted capsule may be persisted until the envelope expires.</li>
 <li>Load fonts, scripts, styles, or any other resource from a third party. Everything is self-hosted on paramant.app</li>
 </ul>
@@ -254,15 +256,18 @@ footer a{color:var(--ink);text-decoration:none}
 <h2>No third-party requests</h2>
 <p><strong>Every byte your browser loads on paramant.app comes from paramant.app.</strong> No web fonts from Google, no JavaScript or CSS from a CDN, no analytics, no tracking pixels, no embedded third-party widgets. Open your browser&rsquo;s network inspector on any page: every request goes to one origin, and nowhere else.</p>
 <p>This is deliberate. A single request to a third party leaks your IP address and the page you are viewing to that party before you have agreed to anything. So we self-host everything: fonts (a plain system font stack, zero font files downloaded), scripts, styles, and images all come from paramant.app.</p>
-<p>What runs the service is operational, never tracking: our own edge (Caddy) terminates TLS directly on our server (see below); transactional email is sent server-side via our email provider; and a payment processor will handle billing on its own pages once that is enabled. None of these is loaded into the site, and none follows you across it.</p>
+<p>What runs the service is operational, never tracking: our own edge (Caddy) terminates TLS directly on our server (see below); transactional email is sent server-side via our email provider; and a payment processor handles billing on its own pages. None of these is loaded into the site, and none follows you across it.</p>
 
 <h2>Local storage in your browser</h2>
 <p>For technical functionality, the following data is stored locally in your browser only. It never leaves your device:</p>
 <ul>
 <li><strong>ECDH + ML-KEM key pairs</strong>: generated locally for end-to-end encryption (SDK / Ghost Pipe sessions)</li>
 <li><strong>Nonce registry</strong>: replay-attack protection (SDK sessions)</li>
-<li><strong>Community plan usage counter</strong> (<code>ps_free_uses</code>): today's date and upload count, used to enforce the 10/day limit client-side</li>
-<li><strong>Docs access key</strong> (<code>pm_docs_key</code>): stored if you authenticate to the Docs with a paid API key</li>
+<li><strong>API key</strong> (<code>paramant_api_key</code>): the key of the account you are signed in with, kept so the send screen does not ask for it again. Removed when you sign out.</li>
+<li><strong>Status history</strong> (<code>paramant_status_v1</code>): the last 24 hours of relay health checks your own browser made on the status page</li>
+<li><strong>Signature placement template</strong> (<code>parasign.placement.tpl.v1</code>): where you last put a seal on a page, so the next document opens the same way</li>
+<li><strong>Seen signing fingerprints</strong> (<code>paramant_fp_&hellip;</code>): a marker per signing key you have already been shown, so a known key is not flagged as new</li>
+<li><strong>Dismissed key-setup notice</strong> (<code>paramant.keysetup.dismissed.v1</code>): that you closed the signing-key banner on your dashboard</li>
 <li><strong>Passkey / WebAuthn credentials</strong>: your passkey&rsquo;s private key is created and held by your device or password manager. PARAMANT only ever stores its <em>public</em> key, server-side; the private key never leaves your device.</li>
 <li><strong>ParaSign signing vault</strong> (IndexedDB): if you sign documents, your post-quantum signing key (ML-DSA-65) is generated and kept in your browser&rsquo;s IndexedDB, encrypted either with your passkey (WebAuthn-PRF &rarr; HKDF &rarr; AES-256-GCM) or, if your passkey provider cannot do that, with a passphrase (PBKDF2 &rarr; AES-256-GCM). The private key never leaves your device; only its public half is registered to your account.</li>
 </ul>
@@ -274,17 +279,27 @@ footer a{color:var(--ink);text-decoration:none}
 <h2>Network edge</h2>
 <p>TLS is terminated by <strong>our own edge (Caddy)</strong>, running on the same Hetzner infrastructure in Germany, with post-quantum key exchange. There is no third-party reverse proxy or CDN in front of the site: your connection reaches our server and nowhere else. Short-lived connection metadata (IP, timestamp) is processed transiently for security and abuse-prevention as described above, never for analytics.</p>
 
+<h2>Logs that hold an address</h2>
+<p>One log holds a full client address, and it is not bounded by a timer. We name it rather than let the word &ldquo;transient&rdquo; do work it cannot do.</p>
+<ul>
+<li><strong>Edge access log.</strong> Our own edge writes a server access log with the client address, the timestamp, the path and the user agent. We read it to tell real visitors apart from scanners, never to build a profile of a person, and it is not exported to anyone. The nginx configuration in this repository logs nothing; the edge in front of it does.</li>
+<li><strong>Account audit log.</strong> Every audit entry keeps the network part of the address and drops the host part, so a full address is never written: 1.2.x.x for IPv4 and the first two groups for IPv6. Entries are bounded twice, by age and by count: nothing older than 400 days survives, and an account keeps at most its last 1000 entries. The 400 days is a default an operator can change.</li>
+<li><strong>Admin service log, for contrast.</strong> Three operational lines write about a signup attempt, a pending signup and a rate-limited request to reset a second factor. They used to carry the full address, and one of them the account email in plain text. They no longer do: an address is truncated to its network before it is written (203.0.113.x for IPv4, the first three groups for IPv6) and an email keeps one character and its domain (d***@example.com). What lands in the container log is what is left after that.</li>
+</ul>
+<p>None of these is used for analytics, profiling or advertising, and none is shared with a third party.</p>
+
 <h2>Subprocessors</h2>
 <p>A few operational providers are needed to run the service. None is loaded into the site, and none is used for tracking:</p>
 <ul>
 <li><strong>Hetzner</strong> (Germany, EU): hosting and infrastructure.</li>
+<li><strong>Bunny.net</strong> (Slovenia, EU): DNS hosting for paramant.app. It answers the lookup for our name; it is not a CDN or a proxy, and no request for a page or a file passes through it.</li>
 <li><strong>Resend</strong>: transactional email only (account verification, optional signing invites, billing notices). For a signing invite it receives the recipient address, message and complete personal link. Opening the encrypted document additionally requires the invited Paramant account. Resend does not receive document plaintext and is never used for marketing.</li>
-<li><strong>Mollie</strong>: payment processing for Pro/Enterprise. <strong>Billing is not yet live</strong> (current plans are arranged manually); once enabled, Mollie (a Dutch company, EU jurisdiction, GDPR-native) handles payment data on its own pages and PARAMANT never sees or stores card numbers, only your plan and an anonymised reference.</li>
+<li><strong>Mollie</strong> (a Dutch company, EU jurisdiction, GDPR-native): payment processing for paid plans. Checkout runs through Mollie today. <strong>Every payment is a one-off for the term you buy; there are no subscriptions</strong>, because the recurring layer stays switched off until an operator sets it. The relay sends Mollie the amount, a plan description and payment metadata (accountId, product, plan, interval), and no email address while the recurring layer is off. Card data is entered on Mollie&rsquo;s own pages; PARAMANT never sees or stores card numbers, only your plan and an anonymised reference.</li>
 </ul>
 
 <h2>GDPR / AVG</h2>
-<p>We process the minimum personal data needed to run your account, on a lawful basis (performing the service you request, and our legitimate interest in keeping it secure). You can request access to, or deletion of, your account data by emailing us. For Pro and Enterprise customers we provide a <strong>Data Processing Agreement (DPA)</strong>.</p>
-<p>Temporary relay data is never retained longer than the applicable TTL (1 hour for Community, 24 hours for Pro, 7 days for Enterprise). In practice it is destroyed much earlier on download.</p>
+<p>We process the minimum personal data needed to run your account, on a lawful basis (performing the service you request, and our legitimate interest in keeping it secure). You can request access to, or deletion of, your account data by emailing us. The standard <strong>Data Processing Agreement (DPA)</strong> is published at <a href="/dpa">/dpa</a> and applies to all plans; anyone can sign it electronically, with no account and no paid tier required.</p>
+<p>Temporary relay data is never retained longer than the applicable TTL (1 hour for Community, 24 hours for Pro, 7 days for Business and Enterprise). In practice it is destroyed much earlier on download.</p>
 
 <h2>Children</h2>
 <p>PARAMANT is not directed at children under 13. We do not knowingly collect data from minors.</p>
