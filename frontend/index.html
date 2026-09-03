@@ -105,14 +105,11 @@ main{display:block;overflow:hidden}
   .hp-doc svg path{stroke-dashoffset:0}.hp-seal{transform:scale(1)}.hp-dust{opacity:0}
 }
 @media (max-width:759px){
-  .hp-art{position:absolute;right:0;top:-4px;width:120px;height:200px;opacity:.6;z-index:0}
-  .hp-art-glow{inset:-30% -10%}
-  .hp-doc,.hp-dust{width:104px;left:auto;right:6px;transform:rotate(-4deg)}
-  .hp-dust{transform:none}
-  @keyframes hp-dust{0%,74%{opacity:0;transform:translateY(0)}84%{opacity:.9}94%,100%{opacity:0;transform:translateY(-50px)}}
+  /* On a phone the document would sit over the heading at 320 and 360 wide, so the art is desktop only. */
+  .hp-art{display:none}
   .home-hero .hp-wrap{gap:0}
-  .home-state{max-width:82%}
 }
+@media print{.hp-art{display:none}}
 @media (min-width:760px){
   .home-hero{padding:56px 0 64px}
   .home-hero .hp-wrap{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);align-items:center;gap:40px}
@@ -156,7 +153,7 @@ main{display:block;overflow:hidden}
 .split-person{margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,255,255,.14);display:grid;gap:4px}
 .split-person .who{color:#fff;font-weight:600;font-size:15px}
 .split-person .role{color:#B9C5D3;font-size:14px;line-height:1.5}
-.split-org{font-family:var(--hp-mono);font-size:11px;letter-spacing:.04em;color:#8A9AAD;margin:6px 0 0}
+.panel .split-org{font-family:var(--hp-mono);font-size:11px;line-height:1.6;letter-spacing:.04em;color:#8A9AAD;margin:6px 0 0}
 .split-cta{margin-top:24px;display:flex;flex-wrap:wrap;gap:10px}
 
 /* ---------- products ---------- */
@@ -368,7 +365,7 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
         <p class="panel-amt">&euro;0 <small>for good</small></p>
         <h3>Free, because it is meant to be.</h3>
         <p>Anyone can get a document signed and send a file safely. No card, no time limit, no trial that runs out. <strong>Community</strong> is the name on the pricing page and on your dashboard.</p>
-        <p>It is not a funnel. It is what Paramant gives back: 2 signatures a month, 10 transfers a month, 5 MB per file, and none of it through an American cloud.</p>
+        <p>It is not a funnel. It is what Paramant gives back: 2 signatures a month, 10 transfers a month, 5 MB per file, and your files never touch an American cloud.</p>
         <div class="split-person">
           <span class="who">Mick Beer, privacy and security researcher</span>
           <span class="role">Founder of Paramantis Solutions B.V. He built Paramant, and the Community plan is his contribution back to the society the tools came from.</span>
