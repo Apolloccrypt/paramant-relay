@@ -79,6 +79,35 @@ export function normaliseSigningAppearance(value) {
   return { version: 1, fields };
 }
 
+// Pure: one stamp placed on /sign (PDF points, bottom-left origin, exactly the
+// shape of state.stamp) plus the page it sits on, turned into the normalised
+// appearance model. Fractions 0..1 of the page, y measured from the TOP, which
+// is what normaliseSigningAppearance accepts and what /co-sign paints with.
+// Returns null when there is nothing to ask for, so the caller can simply omit
+// the field instead of sending an empty manifest.
+export function requestedAppearanceFromStamp(stamp, page) {
+  if (!stamp || !page || stamp.isImage) return null;
+  const pageW = Number(page.width);
+  const pageH = Number(page.height);
+  const stampW = Number(stamp.w);
+  const stampH = Number(stamp.h);
+  if (![pageW, pageH, stampW, stampH, Number(stamp.x), Number(stamp.y)].every(Number.isFinite)) return null;
+  if (pageW <= 0 || pageH <= 0 || stampW <= 0 || stampH <= 0) return null;
+  // The manifest has a floor (a box smaller than this is not a signature mark),
+  // and a fraction can never exceed the page, so clamp rather than throw.
+  const w = Math.min(1, Math.max(0.02, stampW / pageW));
+  const h = Math.min(1, Math.max(0.01, stampH / pageH));
+  // stamp.y is the distance from the BOTTOM of the page to the bottom of the
+  // box (pdf-lib's origin); the manifest wants the top edge from the top.
+  const x = Math.min(1 - w, Math.max(0, Number(stamp.x) / pageW));
+  const y = Math.min(1 - h, Math.max(0, (pageH - Number(stamp.y) - stampH) / pageH));
+  const pageIndex = Number(stamp.pageIndex);
+  return normaliseSigningAppearance({
+    version: 1,
+    fields: [{ type: 'seal', page_index: Number.isInteger(pageIndex) && pageIndex >= 0 ? pageIndex : 0, x, y, w, h }],
+  });
+}
+
 export function signingAppearanceHash(value) {
   return sha3_256(new TextEncoder().encode(JSON.stringify(normaliseSigningAppearance(value))));
 }
@@ -455,15 +484,21 @@ async function _postJSON(url, body) {
 }
 // Create the envelope. Self-sign/co-sign include the requester as party 0;
 // request-signatures sets includeRequester=false and contains recipients only.
-export function createSigningEnvelope({ docHash, recipients, originalFilename, signerLabel, creatorPublicKey, includeRequester = true }) {
-  return _postJSON('/api/user/envelopes', {
+export function createSigningEnvelope({ docHash, recipients, originalFilename, signerLabel, creatorPublicKey, includeRequester = true, requestedAppearance }) {
+  const body = {
     doc_hash: docHash,
     recipients: recipients || [],
     original_filename: originalFilename,
     signer_label: signerLabel,
     creator_public_key: creatorPublicKey,
     include_requester: includeRequester,
-  });
+  };
+  // The position the requester asked for: one box, the same for every party.
+  // It is a request only. A signature binds the position the signer actually
+  // used (submitSignature's `appearance`), never this one, so it is sent on
+  // envelope creation and never near the signing message.
+  if (requestedAppearance) body.requested_appearance = normaliseSigningAppearance(requestedAppearance);
+  return _postJSON('/api/user/envelopes', body);
 }
 // Authorize + issue the per-document activation (pre-unlock gate). Returns
 // { activation_id, email_hash, recipe_version }.

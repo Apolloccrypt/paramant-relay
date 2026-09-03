@@ -6215,7 +6215,7 @@ async function handleRelayRequest(req, res) {
         ? crypto.createHash('sha3-256').update(Buffer.from(d.creator_public_key, 'base64')).digest('hex')
         : '';
       const creatorApiHash = crypto.createHash('sha3-256').update(apiKey).digest('hex');
-      const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, accountId: acctOf(apiKey), docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays, bindingMode: d.binding_mode, recipeVersion: d.recipe_version });
+      const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, accountId: acctOf(apiKey), docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays, bindingMode: d.binding_mode, recipeVersion: d.recipe_version, requestedAppearance: d.requested_appearance });
       log('info', 'envelope_created', { id: out.id, parties: out.party_count, binding_mode: out.binding_mode });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, envelope: out }));

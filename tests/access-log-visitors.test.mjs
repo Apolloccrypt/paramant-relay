@@ -37,7 +37,7 @@ test('a client that renders is not excluded for lacking a referer', () => {
   const r = analyse([
     line({ ip: '8.8.8.8', path: '/sign' }),
     line({ ip: '8.8.8.8', path: '/design-system.css?v=25' }),
-    line({ ip: '8.8.8.8', path: '/sign-flow.js?v=50' }),
+    line({ ip: '8.8.8.8', path: '/sign-flow.js?v=51' }),
   ]);
   assert.equal(r.atMostVisitors, 1);
   assert.equal(r.verdicts.possible_visitor, 1);

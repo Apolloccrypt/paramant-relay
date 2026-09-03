@@ -11,7 +11,7 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=14';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp, requestedAppearanceFromStamp } from '/js/parasign-signer.js?v=15';
 import { promptTotp } from '/js/totp-prompt.js?v=1';
 import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=1';
 
@@ -46,6 +46,7 @@ const state = {
   imageType: null,       // 'png' | 'jpg' (only when mode === 'image')
   doc:  null,            // { bytes (Uint8Array), name, size }
   stamp: null,           // PDF mode: bottom-left PDF points. Image mode: top-left image pixels.
+  stampPage: null,       // { width, height } of the page state.stamp sits on, in that page's own units.
   stampAllPages: false,  // PDF mode: repeat the seal on every page at the same relative spot.
   sealPlacement: 'inline', // PDF mode: inline, sheet, or both.
   pdfPageCount: null,    // PDF source page count, used to identify the appended sheet in the receipt.
@@ -211,7 +212,9 @@ function setStepperForMode(mode) {
   const steps = {
     alone:  ['doc', 'place', 'identity', 'sign'],
     cosign: ['doc', 'place', 'recipients', 'identity', 'sign'],
-    invite: ['doc', 'recipients', 'sign'],
+    // The invite flow places too: /sign promises the requester can point at
+    // the spot where the other party signs, and Place is where that happens.
+    invite: ['doc', 'place', 'recipients', 'sign'],
   }[mode] || ['doc', 'place', 'recipients', 'identity', 'sign'];
   document.querySelectorAll('.ds-stepper li').forEach(li => { li.hidden = !steps.includes(li.dataset.step); });
   const stepper = $('ds-stepper'); if (stepper) stepper.hidden = false;
@@ -282,6 +285,11 @@ async function sendForSignature() {
   showRecipientsHint('Creating the signing request…', false);
   try {
     const docHashForEnvelope = toHex(sha3_256(state.doc.bytes));
+    // One requested position, identical for every party. Absent when the
+    // requester placed nothing, or when the document is not a PDF.
+    const requestedAppearance = state.mode === 'pdf'
+      ? requestedAppearanceFromStamp(state.stamp, state.stampPage)
+      : null;
     const created = await createSigningEnvelope({
       docHash: docHashForEnvelope,
       recipients: state.recipients,
@@ -289,6 +297,7 @@ async function sendForSignature() {
       signerLabel: 'Requester',
       creatorPublicKey: '',   // the requester does not sign
       includeRequester: false,
+      requestedAppearance,
     });
     const envelope = created.envelope;
     showRecipientsHint('Encrypting the document for the recipients…', false);
@@ -423,6 +432,7 @@ async function onDocChosen(file) {
   state.imageType = null;
   state.extras = [];        // fresh document: drop any text/date objects from a prior file
   state.stamp = null;       // fresh document: drop the previous file's seal (QA: ghost stamp)
+  state.stampPage = null;
   state.sealPlacement = 'inline';
   state.pdfPageCount = null;
 
@@ -445,6 +455,7 @@ async function onDocChosen(file) {
   const toHashOnly = (note) => {
     state.mode = 'hash';
     state.stamp = null;
+    state.stampPage = null;
     setActive('step-hash-only');
     $('ds-hash-only-name').textContent = file.name;
     $('ds-hash-only-size').textContent = formatSize(file.size);
@@ -454,8 +465,10 @@ async function onDocChosen(file) {
     if (hint) { if (note) { hint.textContent = note; hint.hidden = false; } else { hint.hidden = true; } }
   };
 
-  if (state.signingMode === 'invite') {
-    // Requester doesn't stamp/sign — go straight to choosing who must sign.
+  if (state.signingMode === 'invite' && !isPdf) {
+    // Nothing to point at: the recipient's placement editor on /co-sign is
+    // PDF-only, so a non-PDF invite stays hash-only and skips Place entirely
+    // rather than offering a position that could never be honoured.
     enterRecipients();
   } else if (canPlaceVisually) {
     // A file can carry a valid %PDF/PNG/JPG magic and still be corrupt or
@@ -488,12 +501,52 @@ function loadImageElement(bytes, mime) {
   });
 }
 
+// The Place step serves two different jobs. Signing yourself: the full editor,
+// the seal choice and the sign-every-page toggle. Inviting someone else: ONE
+// box, the position asked of the other party, and nothing else. On a 390px
+// phone the two hidden toolbars are 160px and 247px of chrome above the PDF, so
+// in invite mode the page itself has to be what is on screen. Hence one button.
+function applyPlaceChromeForMode() {
+  const invite = state.signingMode === 'invite';
+  const heading = document.querySelector('#step-place h2');
+  const subline = document.querySelector('#step-place .ds-sub');
+  const hint = $('ds-place-hint');
+  const tools = $('ds-invite-tools');
+  if (tools) tools.hidden = !invite;
+  if (heading) heading.textContent = invite ? 'Show where they sign' : 'Place your signature';
+  if (subline && subline.firstChild) {
+    subline.firstChild.textContent = invite
+      ? 'Tap where the other party signs. They can still move the box. '
+      : 'Click anywhere on a page to drop the stamp. Click another spot to move it. ';
+  }
+  if (hint) {
+    hint.textContent = invite
+      ? 'Optional: you can continue without asking for a spot.'
+      : 'Click a page to drop the signature stamp.';
+  }
+  if (invite) {
+    // Asking for a position is a courtesy, not a requirement: the requester may
+    // always continue without one, so this step is never a dead end.
+    const cont = $('ds-place-continue'); if (cont) cont.disabled = false;
+    const btn = $('ds-invite-place');
+    if (btn) {
+      btn.textContent = state.stamp ? 'Move the signature box' : 'Place the signature box';
+      btn.onclick = () => {
+        const first = document.querySelector('#ds-pdf-canvas-list .ds-page-wrap');
+        if (first) first.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (hint) hint.textContent = 'Tap the spot on the page where their signature belongs.';
+      };
+    }
+  }
+}
+
 async function renderImageForPlacement() {
   $('ds-place-continue').disabled = true;
   teardownPageNav();                                  // single image: no page-nav
   { const et = $('ds-edit-tools'); if (et) et.hidden = true; }   // text/date tools are PDF-only
   { const st = $('ds-seal-tools'); if (st) st.hidden = true; }   // sign-every-page is PDF-only
   { const eh = $('ds-edit-tools-hint'); if (eh) eh.hidden = false; }  // tell the user WHY the editor is absent
+  applyPlaceChromeForMode();
   const mime = state.imageType === 'jpg' ? 'image/jpeg' : 'image/png';
   const img = await loadImageElement(state.doc.bytes, mime);
 
@@ -533,14 +586,17 @@ async function renderPdfForPlacement() {
   $('ds-place-continue').disabled = hasInlineSeal() && !state.stamp;
   teardownPageNav();
   { const zb = $('ds-zoom'); if (zb) zb.hidden = false; }
-  { const et = $('ds-edit-tools'); if (et) et.hidden = false; }   // text/date tools: PDF only
+  const inviteMode = state.signingMode === 'invite';
+  { const et = $('ds-edit-tools'); if (et) et.hidden = inviteMode; }   // text/date tools: PDF only, and not for a requester
   { const eh = $('ds-edit-tools-hint'); if (eh) eh.hidden = true; }
-  // Seal tools (sign-every-page toggle + reuse-saved-position) are PDF-only.
-  { const st = $('ds-seal-tools'); if (st) st.hidden = false; }
+  // Seal tools (sign-every-page toggle + reuse-saved-position) are PDF-only,
+  // and in invite mode there is no seal of the requester's to configure.
+  { const st = $('ds-seal-tools'); if (st) st.hidden = inviteMode; }
   { const cb = $('ds-allpages'); if (cb) cb.checked = !!state.stampAllPages; }
   { const radio = $('ds-seal-' + state.sealPlacement); if (radio) radio.checked = true; }
   refreshApplyTplBtn();
   updateSignatureSheetControls();
+  applyPlaceChromeForMode();
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(state.doc.bytes);
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
@@ -751,6 +807,9 @@ function refreshVisibleSealPreviews() {
 }
 
 function updateSignatureSheetControls() {
+  // A requester is not signing, so there is no seal choice, no signature sheet
+  // and no sign-every-page here. The invite Place chrome is owned in one place.
+  if (state.signingMode === 'invite') { applyPlaceChromeForMode(); return; }
   const sheetOnly = state.sealPlacement === 'sheet';
   const withSheet = hasSignatureSheet();
   const allPages = $('ds-allpages'); if (allPages) allPages.disabled = sheetOnly;
@@ -1474,10 +1533,22 @@ function onPlaceClick(e) {
     const pdfYBottom = wrap._pdfPage.height - natYTop - stampNatH;
     state.stamp = { pageIndex: wrap._pdfPage.index, x: natX, y: pdfYBottom, w: stampNatW, h: stampNatH };
   }
+  // The page the stamp was placed on, in its own units. requestedAppearance()
+  // needs it to turn PDF points into page fractions long after the canvases are
+  // gone, and it costs one object to keep the conversion pure.
+  state.stampPage = { width: wrap._pdfPage.width, height: wrap._pdfPage.height };
 
   document.querySelectorAll('.ds-stamp-marker').forEach(el => el.remove());
   renderStampMarker(wrap, left, top, stampPxW, stampPxH);
   $('ds-place-continue').disabled = false;
+  if (state.signingMode === 'invite') {
+    // Nothing of the requester's is stamped into this document: this box is a
+    // request the other party may move, so no ghosts and no saved template.
+    $('ds-place-hint').textContent =
+      'You are asking for a signature on page ' + (wrap._pdfPage.index + 1) + '. Tap another spot to move the box.';
+    const btn = $('ds-invite-place'); if (btn) btn.textContent = 'Move the signature box';
+    return;
+  }
   reflowGhostStamps();          // update the repeated-seal ghosts to the new spot
   savePlacementTemplate();      // remember this position/scale for next time
   $('ds-place-hint').textContent = isImage
@@ -2325,6 +2396,18 @@ function stampInnerHtml() {
 // thing; this mockup is a faithful HTML/CSS approximation so the signer
 // sees the same layout before clicking Sign.
 function stampMockupHtml() {
+  // The requester does not sign, so their Place step must never show a name or
+  // a signature that does not exist. It shows the box being asked for.
+  if (state.signingMode === 'invite') {
+    return (
+      '<div class="ds-sm-band">' +
+        '<span class="ds-sm-logo">Para<span>MANT</span></span>' +
+        '<span class="ds-sm-badge">SIGNATURE REQUESTED</span>' +
+      '</div>' +
+      '<div class="ds-sm-mid"><div class="ds-sm-sig-typed">Their signature</div></div>' +
+      '<div class="ds-sm-foot"><span class="ds-sm-name">Requested position</span></div>'
+    );
+  }
   const name = (state.signer.name || 'Signer').slice(0, 40);
   const dateStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
   const fp = state.signer.fingerprint ? state.signer.fingerprint.slice(0, 8) : 'pending';
@@ -3164,7 +3247,7 @@ function wireNav() {
   $('ds-place-back').addEventListener('click', () => setActive('step-doc'));
   $('ds-hash-only-back').addEventListener('click', () => setActive('step-doc'));
   $('ds-recipients-back').addEventListener('click', () => {
-    if (state.signingMode === 'invite') setActive('step-doc');
+    if (state.signingMode === 'invite') setActive(state.mode === 'pdf' ? 'step-place' : 'step-doc');
     else setActive(state.mode === 'pdf' ? 'step-place' : 'step-hash-only');
   });
   $('ds-recipients-continue').addEventListener('click', () => {
@@ -3325,12 +3408,34 @@ async function showSessionRequirement() {
   if (!el) return;
   const q = new URLSearchParams(location.search);
   if (q.get('envelope') || q.get('e') || q.get('invite') || q.get('token') || location.hash.length > 1) return;
-  let unauthenticated = false;
+  let status = 0;
   try {
     const r = await fetch('/api/user/check', { credentials: 'same-origin', cache: 'no-store' });
-    unauthenticated = (r.status === 401 || r.status === 403);
-  } catch { return; }
-  if (!unauthenticated) return;
+    status = r.status;
+  } catch {
+    // A thrown fetch is the browser being offline, and the browser says so
+    // better than we can. Silence, as before: guessing "not signed in" from a
+    // dead connection would show the account notice to the paying customer
+    // whose wifi dropped.
+    return;
+  }
+  // The probe answered, but it answered that IT is broken. authUser returns 503
+  // session_store_unavailable when redis is unreachable, and a proxy in front
+  // can return any 5xx of its own. None of those mean "no account": a koper
+  // review found a signed-in user reading "Signing a document needs an account"
+  // because the answer was a failure rather than a refusal. Say what actually
+  // happened, in the shared sentence, and leave the account notice hidden.
+  if (status >= 500) {
+    const note = $('ds-service-note');
+    const errors = (typeof self !== 'undefined') && self.paramantErrors;
+    if (note && errors) { note.textContent = errors.SUPPORT_FAILURE_MESSAGE; note.hidden = false; }
+    try { console.error('[paramant] session probe', status); } catch { /* no console is never why a flow dies */ }
+    return;
+  }
+  // 401/403 is the one answer that means what the notice says: this browser has
+  // no session. Anything else (200, and any 4xx that is not a refusal) leaves
+  // both the notice and the service line hidden.
+  if (status !== 401 && status !== 403) return;
   el.hidden = false;
   // The mode picker stays visible underneath: a visitor should still see what
   // the three workflows are before deciding whether the account is worth it.

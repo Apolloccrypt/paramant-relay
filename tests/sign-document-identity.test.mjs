@@ -3,12 +3,16 @@
 //
 // Why this suite exists. The file name and size were added to the Place step,
 // which is the step the request-signatures flow never visits: onDocChosen()
-// sends that mode straight from the file picker to the co-signers. So a
+// sent that mode straight from the file picker to the co-signers. So a
 // customer who chose "Request signatures" picked a file, typed two email
 // addresses and pressed "Send for signature" without one screen in between
 // saying what he was sending. A koper review found it on the second pass, on a
 // phone, where the only other place the name could have been (the collapsed
 // step-1 panel) is off screen.
+//
+// A PDF invite now DOES visit Place, because that is where the requester points
+// at the spot the other party signs. The name has to hold on both of its
+// screens, so the invite case below walks the step instead of skipping it.
 //
 // It drives the real page in Chromium rather than reading the source, because
 // what is under test is whether the name is VISIBLE at that moment: the element
@@ -86,8 +90,15 @@ async function documentLine(page) {
   });
 }
 
-// ── invite: the mode that had no Place step at all ───────────────────────────
+// ── invite: place first (PDF), co-signers after ──────────────────────────────
 const invite = await uploadIn('invite', 'huur.pdf');
+const invitePlace = await documentLine(invite);
+ok('request-signatures names the file on the place step',
+  invitePlace.activeStep === 'step-place' && invitePlace.visible && !invitePlace.insideHiddenStep &&
+  /huur\.pdf/.test(invitePlace.text),
+  JSON.stringify(invitePlace));
+await invite.locator('#ds-place-continue').click();
+await invite.locator('#step-recipients:not([hidden])').waitFor();
 const inviteLine = await documentLine(invite);
 ok('request-signatures names the file on the co-signers step',
   inviteLine.activeStep === 'step-recipients' && inviteLine.visible && !inviteLine.insideHiddenStep &&
