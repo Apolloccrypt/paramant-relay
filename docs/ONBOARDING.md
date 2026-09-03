@@ -49,7 +49,7 @@ What is in each directory, and which test or workflow fails when you break it.
 | `scripts/directie/` | `signalen.py`: a no-model status meter. Asks GitHub over `gh` and production over `curl`, turns each answer into red/orange/green with the command it measured with. | Nothing. Documented in `docs/directie.md`. |
 | `scripts/heartbeat/` | `run.mjs` and its lib: the four hourly production proofs (`surface`, `parasend`, `parasign-receipt`, `parasign-public-sign`). Every step runs even after one fails, on purpose: a dead page must never hide a dead signer. | Its logic by `tests/heartbeat-lib.test.mjs` (runs on every push); its execution by `heartbeat.yml` (hourly) |
 | `deploy/` | `DEPLOY-3.1.md` is the runbook; `deploy-3.1.sh` executes it phase by phase and refuses to continue when a measurement disagrees. `.env.example` is the canonical env inventory (81 variables, names and purposes, no values). Plus the three nginx configs and `ops/backup-*.sh`. | `tests/env-documented.test.mjs` (every `process.env` name must be documented there, and nothing documented that no code reads); `test.yml` job `shell-syntax` (`bash -n`); `test.yml` job `deploy-dryrun` runs `tests/deploy-3.1-dryrun.test.sh` on every push and pull request, with no server and no secrets. |
-| `tests/` | 27 `node:test` `.mjs` suites (16 node-only, 11 browser), plus `static-sanity.sh`, `auth-smoke.sh`, `e2e-auth-flow.sh` and the deploy dry-run self-test. | `test.yml` (node-only set), `sign-e2e.yml` (browser set), `product-heartbeat.yml`. Of the `.sh` files, `deploy-3.1-dryrun.test.sh` runs in CI (`test.yml` job `deploy-dryrun`); the rest run at deploy time and in hooks. |
+| `tests/` | 27 `node:test` `.mjs` suites (16 node-only, 11 browser), plus `static-sanity.sh`, `auth-smoke.sh`, `e2e-auth-flow.sh` and the deploy dry-run self-test. | `test.yml` (node-only set), `sign-e2e.yml` (browser set), `product-heartbeat.yml`. Of the `.sh` files, `deploy-3.1-dryrun.test.sh` runs in CI (`test.yml` job `deploy-dryrun`) and `static-sanity.sh` does too (`test.yml` job `static-sanity`, twelve checks, no secrets and no server); `auth-smoke.sh` and `e2e-auth-flow.sh` need a live target and run at deploy time only. |
 
 Selection of browser vs node-only suites is done **by what a file imports**, never
 by a hand-kept name list (`.github/workflows/test.yml:290-296`,
@@ -139,7 +139,8 @@ Run these in order. The commands are the ones CI runs, copied from
 
 ```bash
 bash tests/static-sanity.sh
-#   10 numbered checks, ends with "PASS (all hard checks clear)".  ~1.5s
+#   12 numbered checks, ends with "PASS (all hard checks clear)".  ~1.5s
+#   Same command as test.yml job static-sanity runs on every push and pull request.
 
 npx --yes eslint@9 .
 #   silent on success.  ~5s
@@ -336,18 +337,33 @@ the commit message and the added `+` diff lines, and runs from both
 `tests/static-sanity.sh` and `.githooks/pre-push`. Default tooling adds these
 trailers for you; turn them off before your first commit.
 
-**static-sanity is eleven checks, and check 10 is the style guard.**
-`tests/static-sanity.sh` runs eleven numbered checks: syntax, redisClient
+**static-sanity is twelve checks, and check 10 is the style guard.**
+`tests/static-sanity.sh` runs twelve numbered checks: syntax, redisClient
 initialisation, TOTP helpers (warn), unsafe `req.body` access (warn), orphan code
 (warn), `/request-key` still returning 410, DID-auth replay protection, the
 open-mode envelope signer binding, installer release pinning, check 10, the
-commit and GitHub style guard delegating to `check-commit-style.sh`, and check
-11, the test-scope guard delegating to `check-test-declarations.sh`. Exit code is
-the number of hard failures. It runs in no workflow: its callers are the
-pre-commit hook and `deploy.sh:25`. Check 10 inspects the **last commit**, so on
-a branch with a non-conforming commit checks 1 to 9 pass and the script still
-exits 1; `deploy/DEPLOY-3.1.md:197-204` documents that this state does not block
-a deploy. Do not rewrite history to make it green.
+commit and GitHub style guard delegating to `check-commit-style.sh`, check 11,
+the test-scope guard delegating to `check-test-declarations.sh`, and check 12,
+the opt-in on the tracked brand screenshots. Exit code is the number of hard
+failures.
+
+It runs in CI as `test.yml` job `static-sanity`, on every push to main and every
+pull request. That is new. Until then it ran in **no** workflow at all: its only
+callers were the pre-commit hook and `deploy.sh:25`, `security-posture.yml`
+named it in a comment and nowhere else, and every "static-sanity PASS" on record
+came from somebody's laptop. If your hook is not installed, or you committed
+with `--no-verify`, the pull request now says so.
+
+Which commits check 10 reads depends on where it runs, and it has to. Locally
+and on a push it is the **last commit**, so on a branch with a non-conforming
+commit checks 1 to 9 pass and the script still exits 1;
+`deploy/DEPLOY-3.1.md:197-204` documents that this state does not block a deploy.
+On a pull request the checkout is `refs/pull/N/merge`, whose HEAD is a merge
+commit with no diff of its own, so the script scans
+`origin/$GITHUB_BASE_REF..HEAD` instead: the commits the pull request adds. That
+is why the job checks out with `fetch-depth: 0`, and why it prints which range it
+scanned. `PARAMANT_STYLE_RANGE` overrides the choice. Do not rewrite history to
+make it green.
 
 **Every claim on the site is tied to a test.** The rule, from
 `docs/brand/messaging.md:14-18`: a sentence may only go on the site if it is

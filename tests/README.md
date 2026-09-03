@@ -6,7 +6,7 @@ Guards the auth + TOTP stack against the class of breakage that hit production r
 
 | Script | When it runs | What it checks |
 |---|---|---|
-| `tests/static-sanity.sh` | pre-commit hook, `deploy.sh` step 1 | Eleven numbered checks: Node syntax, redisClient init, TOTP helpers, unsafe req.body access, orphan code, 410 in source, DID-auth replay protection, the open-mode envelope signer binding, installer release pinning, the commit and GitHub style guard (`check-commit-style.sh`) and the test-scope guard (`check-test-declarations.sh`) |
+| `tests/static-sanity.sh` | `test.yml` job `static-sanity` (every push to main and every pull request), pre-commit hook, `deploy.sh` step 1, `deploy/deploy-3.1.sh` phase 0b | Twelve numbered checks: Node syntax, redisClient init, TOTP helpers, unsafe req.body access, orphan code, 410 in source, DID-auth replay protection, the open-mode envelope signer binding, installer release pinning, the commit and GitHub style guard (`check-commit-style.sh`), the test-scope guard (`check-test-declarations.sh`) and the brand-screenshot opt-in. No secrets, no server, no network |
 | `tests/redis-deadline-parity.test.mjs` | Root integration suites | `relay/lib/redis-deadline.js` and `admin/lib/redis-deadline.js` are one file. They exist twice because each Dockerfile copies only its own `lib/`, and the duplication is watched rather than hoped about. Also asserts both services really wrap their redis client with it |
 | `relay/test/redis-deadline.test.js` | Relay unit suite | The bound itself, with no redis: the outage classifier, the deadline, the proxy that puts it on every command, and the connection rebuild after two unanswered commands |
 | `relay/test/route-redis-outage.test.js` | Route suites (need redis) | A booted relay with its store behind a proxy the suite cuts and then black-holes. Every redis-backed route answers 503 inside the deadline, `/health` stays 200, `/v2/health/deep` goes red, and the relay heals by itself |
@@ -77,7 +77,22 @@ or reads the result, so nothing there sets the flag.
 
 `tests/static-sanity.sh` is installed as `.git/hooks/pre-commit`. Commits that introduce syntax errors, undefined redisClient, or a missing 410 on /request-key are blocked automatically. `.githooks/pre-push` runs the commit-style guard on its own; it needs `git config core.hooksPath .githooks` once per clone.
 
+The hook is a convenience, not the gate. Until 2026-09-03 it was the only thing
+that ran this script, together with `deploy.sh`, so a clone without the hook or a
+single `git commit --no-verify` sailed straight past all twelve checks and no
+pull request ever noticed. `test.yml` job `static-sanity` now runs the same
+`bash tests/static-sanity.sh` on ubuntu, with no secrets and no server.
+
+One difference between the two, and it is deliberate. Check 10 delegates to
+`scripts/check-commit-style.sh`, which locally scans the **last commit**. On a
+pull request GitHub checks out `refs/pull/N/merge`, and that merge commit has a
+generated message and no diff of its own, so the local default would scan an
+empty commit and pass over a branch full of em-dashes. The script therefore
+scans `origin/$GITHUB_BASE_REF..HEAD` when that variable is set, which is why the
+job uses `fetch-depth: 0`. It prints the range it scanned. Set
+`PARAMANT_STYLE_RANGE` to choose one yourself.
+
 ## Adding new checks
 
-- **Static checks** go in `tests/static-sanity.sh`. Exit 1 on failure so the pre-commit hook blocks.
+- **Static checks** go in `tests/static-sanity.sh`. Exit 1 on failure so the pre-commit hook blocks and `test.yml` job `static-sanity` goes red. Keep them free of secrets, servers and network: that is what lets the job be a checkout, a node setup and one line.
 - **Live checks** go in `tests/auth-smoke.sh`. Use `check`/`check_not` helpers. Never hardcode credentials.
