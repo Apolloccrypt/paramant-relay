@@ -10,6 +10,16 @@ const RELAY_SECTORS = {
 let RELAY_API = RELAY_SECTORS.health; // updated after key validation
 
 let apiKey = '', keyValid = false, selectedFile = null, selectedFiles = [];
+// Sector discovery is its own question, kept apart from keyValid: a key can be
+// perfectly good while not one of the four sectors answers. relayReady says a
+// sector was found; relayError carries the reason it was not.
+let relayReady = false, relayError = '';
+// The receiver-pubkey poll lives next to the socket, and reopenSession has to
+// be able to stop it: a second poll on a dead token would keep asking forever.
+let pubkeyPoll = null;
+// nginx puts /api/user/ in the relay_auth zone (burst 5). One fetch for the
+// account key, and at most one retry, 2 s later, when that fetch is throttled.
+const KEY_RETRY_MS = 2000;
 let sessionToken = '', ws = null;
 let receiverPubs = null;
 
@@ -58,17 +68,22 @@ function setStepperStage(key) {
   });
 }
 
-// Show the full API-key card (used by the "Change" link in the slim row)
+// Show the full API-key card. Two callers: the "Change" link in the slim row,
+// and the way out on the error banner, which is the path a self-hoster without
+// /api/user/account/key takes.
 function expandApiKeyCard() {
   var s = $('step-setup');
-  if (s) s.classList.remove('has-saved-key');
+  if (s) s.classList.add('manual-key');
+  setKeyError(false);
   var inp = $('api-key');
   if (inp) { inp.value = ''; inp.focus(); onKeyInput(); }
+  // Legacy only. This page no longer writes the key to localStorage; this
+  // clears whatever a build from before that change left behind.
   try { localStorage.removeItem('paramant_api_key'); } catch (_) {}
 }
 
-// Apply slim API-key view when a key was auto-fetched (login flow) or
-// saved locally. Pure cosmetic: the underlying input still holds the key.
+// The slim row is the default state of step 1. This fills it in once the
+// session key has really arrived: the mask, the label, and the green dot.
 function applySlimApiKeyView() {
   var inp = $('api-key');
   if (!inp || !inp.value) return;
@@ -76,9 +91,56 @@ function applySlimApiKeyView() {
   if (mask) {
     var v = inp.value;
     mask.textContent = v.length > 14 ? v.slice(0, 8) + '...' + v.slice(-4) : v;
+    mask.hidden = false;
   }
+  var label = $('ps-key-slim-label');
+  if (label) label.textContent = 'Using your account key';
+  var row = $('ps-key-slim');
+  if (row) { row.classList.remove('is-loading'); row.hidden = false; }
   var s = $('step-setup');
-  if (s) s.classList.add('has-saved-key');
+  if (s) s.classList.remove('manual-key');
+  setKeyError(false);
+}
+
+// The banner. Shown only when the account key could not be loaded at all, and
+// it takes the slim row with it: a row that says "using your account key" while
+// there is no key would be the same lie the manual box used to tell.
+// The banner keeps its own words on purpose: failureText is the sentence for
+// what we did not plan for, and a key that will not load is planned, with a
+// better next step than "try again in a minute". Its unplanned tail goes
+// through failureText like everything else on this page.
+function setKeyError(on) {
+  var box = $('ps-key-error');
+  if (box) box.classList.toggle('is-shown', !!on);
+  var row = $('ps-key-slim');
+  if (row && on) row.hidden = true;
+}
+
+// Step 2 used to answer a dropped socket with the bare word "Disconnected",
+// which tells the sender nothing about the file they just handed over. Same
+// treatment as the key banner: what happened, where the file is, one action.
+function setLinkError(on, msg) {
+  var box = $('ps-link-error');
+  if (!box) return;
+  if (on && msg) {
+    var t = $('ps-link-error-text');
+    if (t) t.textContent = msg;
+  }
+  box.classList.toggle('is-shown', !!on);
+}
+
+// Make a fresh session: new token, new link, new socket. The file is untouched
+// in the file input, so the sender does not pick it again.
+async function reopenSession() {
+  setLinkError(false);
+  if (pubkeyPoll) { clearInterval(pubkeyPoll); pubkeyPoll = null; }
+  if (ws) { try { ws.onclose = null; ws.close(); } catch (_) {} ws = null; }
+  receiverPubs = null;
+  var fp = $('fp-card');
+  if (fp) fp.style.display = 'none';
+  $('waiting-title').textContent = 'Waiting for receiver...';
+  $('waiting-dot').className = 'dot amber';
+  await createSession();
 }
 function setStatus(id, msg, cls) {
   const el = $(id);
@@ -176,7 +238,8 @@ async function showReceiverConnected(kyberPub, ecdhPub) {
   $('fp-display').textContent = fp;
   $('waiting-title').textContent = 'Receiver connected';
   $('waiting-dot').className = 'dot';
-  setStatus('waiting-status', 'Receiver is waiting for you to verify the fingerprint');
+  setLinkError(false);
+  setStatus('waiting-status', 'Your receiver is waiting for you to compare the code');
   setStepperStage('verify');
   // TOFU: check if we've verified this fingerprint before
   if (isFingerprintKnown(fp)) {
@@ -191,6 +254,10 @@ async function showReceiverConnected(kyberPub, ecdhPub) {
 }
 
 // ── Relay discovery: try all sectors in parallel, pick first valid ──
+// It used to fold two different failures into one null: "a sector answered and
+// refused this key" and "not one sector answered". The first is about the key,
+// the second is about the network, and only the first should ever disable the
+// button. So the two are reported apart.
 async function discoverRelay(key) {
   const results = await Promise.allSettled(
     Object.entries(RELAY_SECTORS).map(async ([sector, url]) => {
@@ -199,41 +266,72 @@ async function discoverRelay(key) {
         signal: AbortSignal.timeout(5000)
       });
       const d = await r.json();
-      if (!d.valid) throw new Error('invalid');
-      return { sector, url, plan: d.plan };
+      return { sector, url, plan: d.plan, valid: !!d.valid };
     })
   );
-  const valid = results.filter(r => r.status === 'fulfilled').map(r => r.value);
-  if (!valid.length) return null;
-  // Prefer health; otherwise first sector that responded
-  return valid.find(v => v.sector === 'health') || valid[0];
+  const answered = results.filter(r => r.status === 'fulfilled').map(r => r.value);
+  const valid = answered.filter(a => a.valid);
+  return {
+    // Every sector that spoke said no. That is a verdict on the key.
+    rejected: answered.length > 0 && valid.length === 0,
+    // Prefer health; otherwise first sector that responded
+    found: valid.find(v => v.sector === 'health') || valid[0] || null
+  };
 }
 
 // ── Key validation ──
+// The key is never written to localStorage. It comes from the session
+// (/api/user/account/key) or, on a self-host without that endpoint, from the
+// manual card. Persisting it bought nothing and put a bearer credential in a
+// store that outlives the sign-out that was documented to clear it.
 async function onKeyInput() {
   apiKey = $('api-key').value.trim();
-  if (apiKey) localStorage.setItem('paramant_api_key', apiKey);
-  if (apiKey.length < 10 || !apiKey.startsWith('pgp_')) {
-    setStatus('key-status', 'Invalid format');
-    keyValid = false; updateBtn(); return;
+  setCreateStatus('');
+  // An empty box has nothing wrong with it yet. Calling it invalid is what the
+  // "Change" link did the moment it cleared the field: a red-flavoured verdict
+  // on a field the user had not filled in.
+  if (!apiKey) {
+    setStatus('key-status', 'Enter your API key to continue');
+    keyValid = false; relayReady = false; relayError = ''; updateBtn(); return;
   }
+  if (apiKey.length < 10 || !apiKey.startsWith('pgp_')) {
+    setStatus('key-status', 'That does not look like a key. It starts with pgp_.', 'err');
+    keyValid = false; relayReady = false; relayError = ''; updateBtn(); return;
+  }
+  // A well-formed key that came from the session is usable now. Whether a
+  // sector answers is a separate question, and it is answered below without
+  // holding the button hostage.
+  keyValid = true; relayReady = false; relayError = '';
   setStatus('key-status', 'Checking...');
+  updateBtn();
+  let d;
   try {
-    const found = await discoverRelay(apiKey);
-    if (found) {
-      RELAY_API = found.url;
-      const sectorLabel = found.sector !== 'health' ? ` · ${found.sector}` : '';
-      setStatus('key-status', `✓ Valid — plan: ${found.plan}${sectorLabel}`, 'ok');
-      keyValid = true;
-    } else {
-      setStatus('key-status', 'Invalid or revoked key', 'err');
-      keyValid = false;
-    }
-  } catch(e) {
-    setStatus('key-status', 'Could not verify key', 'err');
+    d = await discoverRelay(apiKey);
+  } catch (e) {
+    d = { answered: false, rejected: false, found: null };
+  }
+  if (d.found) {
+    RELAY_API = d.found.url;
+    relayReady = true;
+    const sectorLabel = d.found.sector !== 'health' ? ` · ${d.found.sector}` : '';
+    setStatus('key-status', `✓ Valid, plan: ${d.found.plan}${sectorLabel}`, 'ok');
+  } else if (d.rejected) {
+    setStatus('key-status', 'Invalid or revoked key', 'err');
     keyValid = false;
+  } else {
+    // Nothing answered. Say so where the user is looking, and let the button
+    // stay live: the failure belongs at the press, with a reason attached.
+    relayError = 'No relay sector answered. Check your connection and press Create secure session again.';
+    setStatus('key-status', 'Could not reach a relay sector. You can still continue.', 'err');
   }
   updateBtn();
+}
+
+function setCreateStatus(msg, cls) {
+  const el = $('create-status');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.className = 'status-line' + (cls ? ' ' + cls : '');
 }
 
 function onFileSelect() {
@@ -244,7 +342,7 @@ function onFileSelect() {
     setStatus('file-status', '✓ ' + files[0].name + ' (' + (files[0].size/1024/1024).toFixed(1) + ' MB)', 'ok');
     $('vault-list').style.display = 'none';
   } else {
-    setStatus('file-status', '✓ ' + files.length + ' files selected — vault mode', 'ok');
+    setStatus('file-status', '✓ ' + files.length + ' files, sent as a single package', 'ok');
     const vl = $('vault-list');
     vl.style.display = 'block';
     vl.innerHTML = [...files].map(f =>
@@ -261,6 +359,20 @@ function updateBtn() {
 
 // ── Session creation ──
 async function createSession() {
+  // A sector that would not answer during discovery used to leave this button
+  // disabled with no explanation. Try once more here, and if it still will not
+  // answer, say so out loud instead of going quiet.
+  if (!relayReady) {
+    setCreateStatus('Looking for a relay sector...');
+    await onKeyInput();
+    if (!relayReady) {
+      // relayError is the planned sentence. Reaching here without one is a state
+      // we did not plan for, so it gets the page's one sentence for that.
+      setCreateStatus(relayError || failureText('relay sector discovery', new Error('no sector answered')), 'err');
+      return;
+    }
+  }
+  setCreateStatus('');
   // Generate random invite token
   const tokenBytes = crypto.getRandomValues(new Uint8Array(16));
   sessionToken = 'inv_' + u8toHex(tokenBytes).slice(0, 32);
@@ -270,6 +382,7 @@ async function createSession() {
   const recvUrl = `${location.origin}/ontvang?s=${encodeURIComponent(sessionToken)}&r=${activeSector}`;
   $('session-link').textContent = recvUrl;
 
+  setLinkError(false);
   showStep('step-waiting');
   connectWebSocket();
 }
@@ -288,17 +401,19 @@ async function connectWebSocket() {
   ws.onopen = () => {
     // Join the invite room
     ws.send(JSON.stringify({ type: 'join', room: sessionToken, nick: 'sender' }));
-    setStatus('waiting-status', 'Waiting for receiver to open the link...');
+    setLinkError(false);
+    setStatus('waiting-status', 'Waiting for your receiver to open the link...');
   };
 
   // Poll voor receiver pubkey via ghost pipe relay
-  let pubkeyPollInterval = setInterval(async () => {
+  if (pubkeyPoll) clearInterval(pubkeyPoll);
+  pubkeyPoll = setInterval(async () => {
     try {
       const r = await fetch(`${RELAY_API}/v2/pubkey/${encodeURIComponent(sessionToken)}`, { headers: { 'X-Api-Key': apiKey }, signal: AbortSignal.timeout(3000) });
       if (r.ok) {
         const d = await r.json();
         if (d.kyber_pub && d.ecdh_pub) {
-          clearInterval(pubkeyPollInterval);
+          clearInterval(pubkeyPoll); pubkeyPoll = null;
           await showReceiverConnected(d.kyber_pub, d.ecdh_pub);
         }
       }
@@ -315,15 +430,26 @@ async function connectWebSocket() {
       }
 
       if (msg.type === 'peer_left') {
-        setStatus('waiting-status', 'Receiver disconnected', 'err');
+        setStatus('waiting-status', 'Your receiver closed the link', 'err');
+        setLinkError(true, 'Your receiver closed the link before you compared the code. Nothing was uploaded and your file is still here in this browser.');
       }
     } catch(err) {
       setStatus('waiting-status', failureText('receiver message', err), 'err');
     }
   };
 
-  ws.onerror = () => setStatus('waiting-status', 'Connection error', 'err');
-  ws.onclose = () => { if (!receiverPubs) setStatus('waiting-status', 'Disconnected', 'err'); };
+  // Both of these used to write one word into a status line. A sender who has
+  // just handed over a file needs to know that it did not go anywhere.
+  ws.onerror = () => {
+    if (receiverPubs) return;
+    setStatus('waiting-status', 'Connection lost', 'err');
+    setLinkError(true, 'The connection to the relay failed before your receiver arrived. Nothing was uploaded and your file is still here in this browser.');
+  };
+  ws.onclose = () => {
+    if (receiverPubs) return;
+    setStatus('waiting-status', 'Connection lost', 'err');
+    setLinkError(true, 'The connection to the relay dropped before your receiver arrived. Nothing was uploaded and your file is still here in this browser.');
+  };
 }
 
 // ── Fingerprint confirmed — encrypt & send ──
@@ -558,34 +684,60 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  // Prefer the session-derived key: if the user is logged in, their current API key
-  // is the authoritative value. localStorage may still hold a stale key from a
-  // previous (revoked/rotated) account and would otherwise show "Invalid key".
-  (async function resolveKey(){
-    try {
-      const r = await fetch('/api/user/account/key', { credentials: 'include' });
-      if (r.ok) {
-        const d = await r.json();
-        if (d && d.api_key) {
-          $('api-key').value = d.api_key;
-          try { localStorage.setItem('paramant_api_key', d.api_key); } catch {}
-          onKeyInput();
-          applySlimApiKeyView();
-          return;
-        }
-      }
-    } catch {}
-    // Not logged in or endpoint unavailable: fall back to localStorage (manual paste flow).
-    const saved = localStorage.getItem('paramant_api_key');
-    if (saved) {
-      $('api-key').value = saved;
-      onKeyInput();
-      applySlimApiKeyView();
-    }
-  })();
+  loadAccountKey();
   // Small delay so DOM is fully painted before Globe.gl reads dimensions
   setTimeout(() => initGlobe(), 400);
 });
+
+// The session is the only source of the key. localStorage used to be a second
+// one, and it is what the buyer review caught: a stale or hand-typed key sat
+// there, the slim row said "using your account key", and Send died on a key
+// that belonged to nobody. One source, one failure mode, one banner.
+async function fetchAccountKey() {
+  let r = await fetch('/api/user/account/key', { credentials: 'include' });
+  // nginx rate-limits /api/user/ (zone relay_auth, burst 5). A 429 here is the
+  // page arriving next to its own siblings, not a broken account, so it earns
+  // exactly one retry and then gives up.
+  if (r.status === 429) {
+    await new Promise(res => setTimeout(res, KEY_RETRY_MS));
+    r = await fetch('/api/user/account/key', { credentials: 'include' });
+  }
+  // Expected, and marked so: a browser with no session gets 401/403, and a
+  // self-host that never built this endpoint answers 404. Both mean "no key
+  // here", the banner is the whole answer, and neither is worth a line in the
+  // console of every signed-out visitor.
+  if (!r.ok) {
+    const noSession = new Error('account key: HTTP ' + r.status);
+    noSession.expected = r.status === 401 || r.status === 403 || r.status === 404;
+    throw noSession;
+  }
+  const d = await r.json();
+  if (!d || !d.api_key) {
+    const noKey = new Error('account key: none on this session');
+    noKey.expected = true;
+    throw noKey;
+  }
+  return d.api_key;
+}
+
+async function loadAccountKey() {
+  try {
+    const key = await fetchAccountKey();
+    $('api-key').value = key;
+    applySlimApiKeyView();
+    await onKeyInput();
+  } catch (e) {
+    setKeyError(true);
+    // The banner carries the sentence either way. Only the unplanned half gets
+    // reported: a 500, or a fetch that never arrived. Reporting the planned half
+    // would put a console error on every signed-out page load, which is both
+    // noise and a false alarm for the heartbeat that reads that console.
+    if (!e || !e.expected) failureText('account key', e);
+    setStatus('key-status', 'Account key could not be loaded', 'err');
+    keyValid = false;
+    updateBtn();
+  }
+}
 
 function toggleGlobe() {
   const overlay = document.getElementById('globe-overlay');
@@ -869,3 +1021,4 @@ act('click','confirmFingerprint',()=>confirmFingerprint());act('click','copyLink
 act('click','createSession',()=>createSession());act('click','expandApiKeyCard',()=>expandApiKeyCard());
 act('click','rejectFingerprint',()=>rejectFingerprint());act('input','onKeyInput',()=>onKeyInput());
 act('click','reload',()=>location.reload());
+act('click','reopenSession',()=>reopenSession());

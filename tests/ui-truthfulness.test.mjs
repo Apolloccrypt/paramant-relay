@@ -1848,3 +1848,56 @@ console.log('ui-truthfulness: the rules page is Our rules on /rules, with /parar
 })();
 
 console.log('ui-truthfulness: the appearance switch says only what theme.js and app-2026.css do');
+
+// ── /parashare says up front that this is a live handshake ──────────────────
+// A buyer reached step 2 before finding out that the other person has to be at
+// their screen right now. The stepper said "2 . Share", the card said "Waiting
+// for receiver", and by then he had already picked a file and made a link. That
+// is not a copy problem on step 2; it is a fact about the product that belongs
+// above step 1, in the words someone would use out loud.
+//
+// The sentence is pinned to the flow rather than to itself. It claims two
+// things: that the receiver has to be online while you send, and that the two
+// of you confirm a short code together. Both are properties of
+// parashare.page.js, so both are read back from it here. Verified by sabotage:
+// drop the sentence, or let confirmFingerprint run without receiverPubs, or
+// let createSession reach step-encrypting without going through the waiting
+// step, and this block goes red.
+(() => {
+  const parashare = read('frontend/parashare.html');
+  const psJs = read('frontend/js/parashare.page.js');
+
+  assert.match(parashare, /The person you send to has to be online while you send; you confirm a short code together\./,
+    '/parashare must say above step 1 that the receiver has to be there; a sender should not discover a live handshake on step 2');
+  // Above step 1 means above it, not somewhere on the page: the sentence has to
+  // sit before the step-1 guide inside #step-setup.
+  const setupAt = parashare.indexOf('id="step-setup"');
+  const noteAt = parashare.indexOf('The person you send to has to be online');
+  const guideAt = parashare.indexOf('Step 1 of 5');
+  assert.ok(setupAt > 0 && noteAt > setupAt && noteAt < guideAt,
+    'the sentence must stand inside #step-setup and above the step-1 guide, which is where a sender reads before choosing a file');
+
+  // Claim 1: sending really does wait for the other person. createSession goes
+  // to the waiting step and opens the socket, and nothing else advances.
+  assert.match(psJs, /showStep\('step-waiting'\);\s*\n\s*connectWebSocket\(\);/,
+    'createSession must hand over to the waiting step: that wait is what the sentence promises');
+  assert.equal((psJs.match(/showStep\('step-encrypting'\)/g) || []).length, 1,
+    'more than one path now reaches the encrypt step; the promise that the receiver has to be online is only true while confirmFingerprint is the single door');
+  const confirm = psJs.slice(psJs.indexOf('async function confirmFingerprint()'));
+  const guardAt = confirm.indexOf('if (!receiverPubs) return;');
+  const encryptAt = confirm.indexOf('showStep(\'step-encrypting\')');
+  assert.ok(guardAt >= 0,
+    'confirmFingerprint no longer refuses to run without a receiver; the sentence above step 1 promises the receiver has to be there');
+  assert.ok(encryptAt > guardAt,
+    'the encrypt step must sit behind the receiverPubs guard, so a sender cannot send to nobody');
+
+  // Claim 2: there really is a short code, and both sides work it out.
+  assert.match(psJs, /async function genFingerprint\(/,
+    'the short code the sentence promises is genFingerprint; without it the sentence describes nothing');
+  assert.match(parashare, /Compare this code together/,
+    'the card where the two of you compare must be named after what it asks you to do');
+  assert.match(read('frontend/js/ontvang.page.js'), /genFingerprint|fp-display/,
+    'the receiver side must compute a code too, otherwise "together" is one-sided');
+})();
+
+console.log('ui-truthfulness: /parashare says the receiver has to be online, and the flow really waits for them');
