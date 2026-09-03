@@ -51,6 +51,14 @@ BACKUP_DIR="${PARAMANT_BACKUP_DIR:-/home/paramant/backups}"
 NGINX_BACKUP_DIR=/etc/nginx/backups
 NGINX_SITES=/etc/nginx/sites-enabled
 
+# Where the tracked limit_req snippet lands. conf.d is the directory the stock
+# nginx.conf includes at http level, which is the only level a limit_req_zone
+# may sit at: the site confs in sites-enabled are inside server blocks, so the
+# zones cannot live with the locations that use them. Phase 5d proves with
+# nginx -T that the file it wrote is really loaded, and puts the previous file
+# back when it is not.
+LIMIT_REQ_DEST="${PARAMANT_LIMIT_REQ_DEST:-/etc/nginx/conf.d/paramant-limit-req.conf}"
+
 # The two server confs the runbook names. Phase 5 edits these and nothing else:
 # a wildcard loop over sites-enabled would silently rewrite a conf nobody
 # reviewed.
@@ -605,6 +613,7 @@ printf '  target        %s\n' "$PROD_HOST"
 printf '  compose dir   %s\n' "$COMPOSE_DIR"
 printf '  docroot       %s\n' "$DOCROOT"
 printf '  nginx confs   %s\n' "$NGINX_CONF_SLOTS"
+printf '  limit_req     %s\n' "$LIMIT_REQ_DEST"
 printf '                %s slot(s); the first candidate present on the server wins\n' "$NGINX_SLOT_COUNT"
 printf '  deploy ref    %s\n' "$DEPLOY_REF"
 if [ -n "$EXPECTED_HEAD" ]; then
@@ -1882,6 +1891,234 @@ EOF
       ok "the ParaID deny survived the edit ($pa line(s), was $pb)"
     else
       die "the ParaID deny changed from ${pb:-?} to ${pa:-?} lines; the runbook keeps it in this round"
+    fi
+  fi
+  step "5d. the limit_req zones, from the tracked snippet, without binding one twice"
+  note "the site confs write limit_req zone=NAME in their locations but define no"
+  note "zone: limit_req_zone is an http-level directive. The five zones the two"
+  note "confs use lived only in the server's own nginx.conf, so nothing in git"
+  note "said what they were. deploy/nginx/snippets/paramant-limit-req.conf is now"
+  note "that record, and this step places it."
+  remote_nginx "limit_req zones" "$COMPOSE_DIR" "$TS" "$NGINX_BACKUP_DIR" "$LIMIT_REQ_DEST" "$NGINX_SITES" "$NGINX_CONF_SLOTS" <<'EOF'
+set -euo pipefail
+CO="$1"; TS="$2"; NGBK="$3"; DEST="$4"; SITES="$5"; SLOTS="$6"
+SRC="$CO/deploy/nginx/snippets/paramant-limit-req.conf"
+DEST_BASE="$(basename "$DEST")"
+BK="$NGBK/$DEST_BASE.pre-3.1-$TS"
+
+if [ ! -f "$SRC" ]; then
+  echo "FATAL the tracked snippet $SRC is not in the checkout, so there is nothing to place."
+  echo "FATAL phase 3 pulls main before this runs, so a missing file here means the pull"
+  echo "FATAL did not land. Nothing was written."
+  exit 1
+fi
+
+# zone_names <file>: the zone names a file defines, one per line, sorted.
+zone_names() {
+  sed -nE 's/^[[:space:]]*limit_req_zone[[:space:]]+[^[:space:]]+[[:space:]]+zone=([A-Za-z0-9_]+).*/\1/p' "$1" | sort -u
+}
+# zones_used <file...>: the zone names a conf REFERENCES from a location.
+zones_used() {
+  sed -nE 's/^[[:space:]]*limit_req[[:space:]]+zone=([A-Za-z0-9_]+).*/\1/p' "$@" | sort -u
+}
+count_words() { printf '%s' "$1" | wc -w | tr -d ' '; }
+
+# What nginx already loads, minus this file. `nginx -T` is the authority and a
+# walk over /etc/nginx is not: a *.conf lying there that no include picks up
+# defines nothing, and a zone can just as well come from a file that is not
+# called *.conf at all. Get that wrong in either direction and this phase
+# either binds a zone twice (nginx refuses the whole config) or comments out
+# the only definition of one (every rate-limited location stops loading).
+DUMP="/tmp/paramant-limitreq-dump.$$"
+rc=0
+nginx -T > "$DUMP" 2>/dev/null || rc=$?
+if [ "$rc" -ne 0 ] || [ ! -s "$DUMP" ]; then
+  rm -f "$DUMP"
+  echo "FATAL nginx -T exited $rc or printed nothing, so this phase cannot tell which"
+  echo "FATAL limit_req zones the running config already defines. Nothing was written."
+  exit 1
+fi
+# nginx -T prefixes each file it dumps with "# configuration file <path>:".
+# Drop the block that belongs to DEST, so a snippet a previous deploy already
+# placed does not read as "this zone is defined elsewhere" and get commented
+# out of its own file.
+LOADED="/tmp/paramant-limitreq-loaded.$$"
+awk -v dest="$DEST" '
+/^# configuration file .*:$/ {
+  f = $0
+  sub(/^# configuration file /, "", f)
+  sub(/:$/, "", f)
+  skip = (f == dest)
+  next
+}
+!skip { print }
+' "$DUMP" > "$LOADED"
+rm -f "$DUMP"
+
+SNIP_ZONES="$(zone_names "$SRC")"
+ELSE_ZONES="$(zone_names "$LOADED")"
+rm -f "$LOADED"
+echo "before snippet zones = $(count_words "$SNIP_ZONES")"
+echo "before zones defined elsewhere = $(count_words "$ELSE_ZONES")"
+
+# The intersection is the set this phase must NOT write: nginx answers a second
+# limit_req_zone with the same name with "is already bound to key", and that is
+# a config that does not load at all, not a warning.
+DUPS=""
+for z in $SNIP_ZONES; do
+  for e in $ELSE_ZONES; do
+    if [ "$z" = "$e" ]; then DUPS="${DUPS:+$DUPS }$z"; break; fi
+  done
+done
+echo "before duplicate zones = $(count_words "$DUPS")"
+if [ -n "$DUPS" ]; then
+  echo "before duplicate zone names = $DUPS"
+fi
+
+TMP="/tmp/paramant-limitreq.$$"
+awk -v dups=" $DUPS " '
+$0 ~ /^[[:space:]]*limit_req_zone/ {
+  z = $0
+  sub(/.*zone=/, "", z)
+  sub(/[^A-Za-z0-9_].*/, "", z)
+  if (index(dups, " " z " ") > 0) {
+    print "# zone " z " is already bound by the config nginx loads, so this deploy left"
+    print "# the definition where it is rather than binding the same name twice:"
+    print "# " $0
+    next
+  }
+}
+{ print }
+' "$SRC" > "$TMP"
+echo "after zone lines written = $(grep -cE '^[[:space:]]*limit_req_zone' "$TMP" || true)"
+echo "after zone lines left elsewhere = $(grep -cE '^# zone [A-Za-z0-9_]+ is already bound' "$TMP" || true)"
+
+mkdir -p "$(dirname "$DEST")" "$NGBK"
+if [ -f "$DEST" ]; then
+  echo "before dest existed = yes"
+  cp -a "$DEST" "$BK"
+  echo "after snippet backup bytes = $(stat -c%s "$BK")"
+else
+  echo "before dest existed = no"
+  echo "after snippet backup bytes = 0"
+fi
+if [ -f "$DEST" ] && cmp -s "$TMP" "$DEST"; then
+  echo "after snippet changed = no"
+else
+  echo "after snippet changed = yes"
+fi
+
+# Put it back the way it was: the backup when there was one, and gone when
+# there was not. Same promise as the 5c restore, for a file that may not have
+# existed before this run.
+restore_snippet() {
+  if [ -f "$BK" ]; then
+    cp -a "$BK" "$DEST"
+    echo "restored $DEST from $BK"
+  else
+    rm -f "$DEST"
+    echo "removed $DEST again; there was no file there before this phase"
+  fi
+}
+
+cat "$TMP" > "$DEST"
+chmod 0644 "$DEST"
+rm -f "$TMP"
+echo "after snippet bytes = $(stat -c%s "$DEST")"
+
+rc=0
+nginx -t > "/tmp/paramant-limitreq-t.$$" 2>&1 || rc=$?
+sed 's/^/  nginxt /' "/tmp/paramant-limitreq-t.$$"
+rm -f "/tmp/paramant-limitreq-t.$$"
+if [ "$rc" -ne 0 ]; then
+  echo "FATAL nginx -t failed with the limit_req snippet in place, restoring"
+  restore_snippet
+  nginx -t 2>&1 | sed 's/^/  restoredtest /' || true
+  systemctl reload nginx && echo "restored and reloaded the previous nginx conf"
+  exit 1
+fi
+
+# A file on disk that no include reaches is not a zone. Read the dump again and
+# look for DEST in the list of files nginx says it loaded.
+DUMP2="/tmp/paramant-limitreq-dump2.$$"
+rc=0
+nginx -T > "$DUMP2" 2>/dev/null || rc=$?
+if [ "$rc" -ne 0 ] || [ ! -s "$DUMP2" ]; then
+  rm -f "$DUMP2"
+  echo "FATAL nginx -T exited $rc after the write, so the phase cannot prove what got loaded"
+  restore_snippet
+  exit 1
+fi
+if grep -qF "# configuration file $DEST:" "$DUMP2"; then
+  echo "after snippet loaded = yes"
+else
+  echo "after snippet loaded = no"
+  echo "FATAL nginx -T does not list $DEST among the files it loaded. The snippet is on"
+  echo "FATAL disk and nginx never reads it, so the zones in it do not exist. Point"
+  echo "FATAL PARAMANT_LIMIT_REQ_DEST at a directory nginx.conf includes at http level."
+  rm -f "$DUMP2"
+  restore_snippet
+  exit 1
+fi
+
+# Close the loop the other way round: every zone the site confs rate limit on
+# has to be defined in the config that is now loaded. This is the check that
+# would have caught relay_auth disappearing out of a hand-edited nginx.conf.
+resolve_conf_slots "$SITES" "$SLOTS"
+DEFINED="$(zone_names "$DUMP2")"
+rm -f "$DUMP2"
+USED=""
+if [ "$RESOLVED_MISSING" -eq 0 ]; then
+  TARGETS=""
+  for name in $RESOLVED_CONFS; do
+    TARGETS="$TARGETS $(readlink -f "$SITES/$name")"
+  done
+  USED="$(zones_used $TARGETS)"
+fi
+UNDEF=""
+for u in $USED; do
+  found=0
+  for d in $DEFINED; do
+    if [ "$u" = "$d" ]; then found=1; break; fi
+  done
+  if [ "$found" -eq 0 ]; then UNDEF="${UNDEF:+$UNDEF }$u"; fi
+done
+echo "after zones referenced = $(count_words "$USED")"
+echo "after zones defined = $(count_words "$DEFINED")"
+echo "after zones referenced and undefined = $(count_words "$UNDEF")"
+if [ -n "$UNDEF" ]; then
+  echo "FATAL the site conf(s) rate limit on zone(s) the loaded config does not define: $UNDEF"
+  restore_snippet
+  exit 1
+fi
+
+systemctl reload nginx
+echo "reloaded nginx for the limit_req snippet"
+EOF
+
+  expect_not 'FATAL' "the limit_req snippet is in place and the config tests clean"
+  expect 'after snippet loaded = yes' \
+    "nginx really loads the limit_req snippet, it is not just a file on disk"
+  expect_min "before snippet zones" 1 "the tracked snippet defines at least one zone"
+  expect_count "after zones referenced and undefined" 0 \
+    "every limit_req zone the site confs use is defined in the config nginx loaded"
+  expect 'reloaded nginx for the limit_req snippet' "nginx reloaded after the snippet"
+  if [ "$DRY_RUN" -eq 0 ]; then
+    local sz dz wz lz
+    sz="$(remote_field 'before snippet zones')"
+    dz="$(remote_field 'before duplicate zones')"
+    wz="$(remote_field 'after zone lines written')"
+    lz="$(remote_field 'after zone lines left elsewhere')"
+    [ -n "$sz" ] && [ -n "$dz" ] && [ -n "$wz" ] && [ -n "$lz" ] \
+      || die "could not read the limit_req zone counts from the server"
+    [ "$((wz + lz))" -eq "$sz" ] \
+      || die "the snippet has $sz zone(s) but the deploy accounted for $wz written plus $lz left elsewhere"
+    [ "$lz" = "$dz" ] \
+      || die "$dz zone(s) were already bound elsewhere but $lz line(s) were commented out; one of them would be defined twice"
+    if [ "$dz" -eq 0 ]; then
+      ok "limit_req: all $wz zone(s) came from the tracked snippet, none was already bound elsewhere"
+    else
+      ok "limit_req: $wz zone(s) written, $lz left to the config that already binds them ($(remote_field 'before duplicate zone names'))"
     fi
   fi
 }
