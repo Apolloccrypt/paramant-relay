@@ -90,9 +90,9 @@ LEGAL_STRIP = '''\
 </footer>'''
 
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=25">'
-NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=20">'
+NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=21">'
 NAV_JS    = '<script src="/nav.js?v=15" defer></script>'
-NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=7" defer></script>'
+NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=8" defer></script>'
 
 # Pages that don't have <nav class="nav"> yet but should — inject the canonical
 # nav after <body> (or after a skip-link if present). App shells (admin,
@@ -229,16 +229,35 @@ def replace_mobile_div(html):
     return html
 
 
+def renumber_shared_assets(fpath, html):
+    """Carry the ?v= of design-system.css and nav.css to pages the generator
+    otherwise leaves alone.
+
+    co-sign.html and developer.html keep their own nav, and setup.html and
+    all-systems-go.html carry no shared nav at all, but all four still LINK
+    these two stylesheets. Bumping the version here and nowhere else left them
+    pointing at the old cache key, which scripts/check-cache-bust.sh fails on
+    ("one file, two cache keys") while the idempotency gate stayed green. This
+    only rewrites links that are already there; it injects nothing."""
+    updated = re.sub(r'<link rel="stylesheet" href="/design-system\.css(?:\?v=\d+)?">', DS_LINK, html)
+    updated = re.sub(r'<link rel="stylesheet" href="/nav\.css(?:\?v=\d+)?">', NAV_LINK, updated)
+    if updated == html:
+        return False
+    with open(fpath, 'w', encoding='utf-8') as f:
+        f.write(updated)
+    return True
+
+
 def process(fpath):
     with open(fpath, encoding='utf-8') as f:
         original = f.read()
     rel = os.path.relpath(fpath, frontend).replace(os.sep, '/')
     if rel in KEEP_OWN_NAV:
-        return False
+        return renumber_shared_assets(fpath, original)
     content = original
     if '<nav class="nav">' not in content:
         if rel not in ADD_NAV_TO:
-            return False
+            return renumber_shared_assets(fpath, original)
         content = inject_nav_block(content)
         if '<nav class="nav">' not in content:
             return False

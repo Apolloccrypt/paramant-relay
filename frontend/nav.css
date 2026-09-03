@@ -1,5 +1,9 @@
 /* PARAMANT shared navbar v4 — design-system.css v4 tokens only */
 
+/* --nav-paper / --nav-paper-blur: the paper the bar, the drawer and the drawer
+   tail paint themselves in. A page sets them when its own paper is not the
+   cool bone; every page that sets nothing renders exactly as before. */
+
 /* ════════════════════════════════════════
    NAV BAR
    ════════════════════════════════════════ */
@@ -14,7 +18,13 @@ nav.nav {
   gap: var(--space-4);
   padding: 0 40px;
   height: 56px;
-  background: rgba(248,250,252,.92);
+  /* The bar paints the paper of the page it sits on, not a fixed hex. The
+     homepage runs on warm paper (#FAF8F3) while the bar was pinned to the cool
+     bone (#F8FAFC), and the two met in a visible band under the bar as soon as
+     the page scrolled. app-2026.css already does this for the app screens
+     (var(--paper)); --nav-paper is the same idea for the marketing pages. Any
+     page that sets no token keeps the exact value it had. */
+  background: var(--nav-paper-blur, rgba(248,250,252,.92));
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--ink-hair);
@@ -302,7 +312,7 @@ nav.nav .nav-hamburger[aria-expanded="true"] span:nth-child(3) {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--bone);
+  background: var(--nav-paper, var(--bone));
   border-top: 1px solid var(--ink-hair);
   z-index: 299;
   overflow-y: auto;
@@ -450,7 +460,7 @@ body.nav-locked {
    menu form one continuous opaque surface. */
 body.nav-locked .meta-bar,
 body.nav-locked .nav {
-  background: var(--bone);
+  background: var(--nav-paper, var(--bone));
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -469,7 +479,7 @@ body.nav-locked .nav {
   nav.nav {
     padding: 0 16px;
     gap: var(--space-3);
-    background: var(--bone);
+    background: var(--nav-paper, var(--bone));
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -806,7 +816,7 @@ nav.nav .nav-menu-divider { height: 1px; background: var(--ink-hair); margin: va
   gap: var(--space-2);
   padding: var(--space-3) var(--space-5);
   padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
-  background: var(--bone);
+  background: var(--nav-paper, var(--bone));
   border-top: 1px solid var(--ink-hair);
 }
 .nav-mobile-tail.open { display: flex; }

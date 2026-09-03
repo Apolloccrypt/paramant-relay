@@ -425,9 +425,12 @@ const PINNED = {
     title: 'Sign a PDF in your browser · Paramant',
     desc: 'Sign a PDF in your browser. The document text and your signing key never leave it, and anyone can check the finished document afterwards.',
   },
+  // Updated when /verify grew a second tab: it now also checks the delivery
+  // receipt a ParaSend transfer leaves behind, so the promise in the preview
+  // had to cover both proofs instead of only the signed document.
   verify: {
-    title: 'Check whether a signed document was changed · Paramant',
-    desc: 'Check whether a signed document was changed after it was signed. It happens in your browser, without an account and without uploading the file.',
+    title: 'Check a signed document or a delivery receipt · Paramant',
+    desc: 'Check a signed document, or the receipt that proves a file was delivered. Both happen in your browser, without an account and without uploading anything.',
   },
   download: {
     title: 'The Paramant desktop app is no longer maintained',

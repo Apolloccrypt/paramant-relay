@@ -24,7 +24,7 @@
 <link rel="canonical" href="https://paramant.app/sign">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="stylesheet" href="/design-system.css?v=25">
-<link rel="stylesheet" href="/nav.css?v=20">
+<link rel="stylesheet" href="/nav.css?v=21">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
 <link rel="stylesheet" href="/components-parasign.css?v=3">
 <style>
@@ -123,6 +123,15 @@ body[data-ds-step="step-done"] #ds-doc-meta{display:none}
    targets. */
 .ds-place-actions{position:sticky;bottom:0;z-index:20;margin-top:14px;padding:12px 0;background:var(--paper);border-top:1px solid var(--line);pointer-events:none}
 .ds-place-actions .btn{min-height:var(--tap)}
+/* A sticky bottom bar floats over everything ABOVE it in its containing block.
+   With the whole step as that block the opaque bar landed on the rows the step
+   is explaining: at 390x844 it covered the page switcher, at 320 and 360 it cut
+   through the "sign every page" hint. Wrapping the page list and the bar in
+   .ds-place-doc makes the document the containing block, so the bar can hover
+   over pages (which reserve room for it below) and over nothing else. It comes
+   into view together with the first page, which is also the first moment there
+   is anything to press Continue about. */
+.ds-place-doc{position:relative}
 /* The bar is opaque and sticky, so whatever sits directly above it scrolls
    underneath and cannot be read while it is stuck (measured at 1440: the edit
    tip ended 7px under it). Reserve its height at the end of the scrolling
@@ -204,6 +213,13 @@ body[data-ds-step="step-done"] #ds-doc-meta{display:none}
 .ds-disclaimer strong{display:block;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;margin-bottom:5px;color:var(--sig-wait)}
 .ds-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
 .ds-actions .btn{flex:0 1 auto;min-width:160px}
+/* Back and Continue keep one row down to 320. Two 160px buttons plus the gap
+   need 330px, so on the narrowest phone they wrapped and the bar grew to 123px
+   of the 844 it had. */
+@media (max-width:520px){
+  .ds-place-actions{flex-wrap:nowrap}
+  .ds-place-actions .btn{flex:1 1 0;min-width:0}
+}
 .ds-banner{padding:11px 14px;font-size:12.5px;border:1px solid var(--line);border-radius:var(--r-1);background:var(--surface-sunk);color:var(--ink-2);margin-top:12px;line-height:1.6;font-family:var(--mono)}
 .ds-banner.err{border-color:var(--line-2);border-left:3px solid var(--sig-stop);color:var(--ink-1);background:var(--sig-stop-bg)}
 .ds-banner.ok{border-color:var(--line-2);border-left:3px solid var(--sig-done);color:var(--ink-1);background:var(--sig-done-bg)}
@@ -627,10 +643,16 @@ body[data-ds-step="step-done"] #ds-doc-meta{display:none}
       <input id="ds-page-nav-jump" type="number" min="1" aria-label="Go to page">
       <button id="ds-page-nav-next" type="button" aria-label="Next page">&#8595;</button>
     </div>
-    <div id="ds-pdf-canvas-list"></div>
-    <div class="ds-actions ds-place-actions">
-      <button class="btn btn-tertiary" id="ds-place-back" type="button">Back</button>
-      <button class="btn btn-primary" id="ds-place-continue" type="button" disabled>Continue</button>
+    <!-- The sticky action bar belongs to the document, not to the whole step:
+         it is wrapped together with the page list so it can never float up
+         over the hint line, the seal options or the page switcher. See
+         .ds-place-doc in the stylesheet above. -->
+    <div class="ds-place-doc">
+      <div id="ds-pdf-canvas-list"></div>
+      <div class="ds-actions ds-place-actions">
+        <button class="btn btn-tertiary" id="ds-place-back" type="button">Back</button>
+        <button class="btn btn-primary" id="ds-place-continue" type="button" disabled>Continue</button>
+      </div>
     </div>
   </section>
 
@@ -906,7 +928,7 @@ body[data-ds-step="step-done"] #ds-doc-meta{display:none}
   </div>
 </footer>
 <script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=7" defer></script>
+<script src="/js/nav-auth.js?v=8" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=1"></script>

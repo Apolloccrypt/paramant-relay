@@ -9,7 +9,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="/design-system.css?v=25">
-<link rel="stylesheet" href="/nav.css?v=20">
+<link rel="stylesheet" href="/nav.css?v=21">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
 <meta property="og:title" content="Your account · Paramant">
 <meta property="og:description" content="Your account · Paramant">
@@ -349,15 +349,15 @@ main.acct input::placeholder { color: var(--ink-3); }
          business plans pay for it, and one link is the whole upgrade path. -->
     <div class="acct-plan-band free" id="billing-community" hidden>
       <p class="acct-plan-kicker">Community &middot; &euro;0</p>
-      <p class="acct-plan-lede">You are on the Community plan and it stays free. It is Mick Beer, privacy and security researcher and founder of Paramantis Solutions B.V., giving something back to society; the business plans pay for it.</p>
+      <p class="acct-plan-lede">You are on the Community plan and it stays free. The business plans pay for the servers and keep it that way.</p>
       <p class="acct-plan-adds">They raise 2 signatures a month to 100 or 1,000, keep links open longer, keep a record of what you sent, give you support with a name on it, and an audit trail you can export and hand over.</p>
       <a class="acct-plan-cta" href="/pricing">See the business plans &rarr;</a>
     </div>
     <!-- Shown on a paid plan. No link to a higher tier: a customer who pays is
          reading his own subscription, not an offer. -->
     <div class="acct-plan-band paid" id="billing-paid" hidden>
-      <p class="acct-plan-kicker">Your subscription &middot; active</p>
-      <p class="acct-plan-lede">Thank you. Your subscription is what keeps the Community plan free for everyone else. Your plan, renewal date and invoices are below.</p>
+      <p class="acct-plan-kicker">Your plan &middot; active</p>
+      <p class="acct-plan-lede">Thank you. What you pay is what keeps the Community plan free for everyone else. Your plan and the day the term you bought runs out are below.</p>
     </div>
     <div class="info-row">
       <div class="info-label">Current plan</div>
@@ -366,10 +366,14 @@ main.acct input::placeholder { color: var(--ink-3); }
         <span id="billing-active-badge" class="plan-tier-active hidden">Active</span>
       </div>
     </div>
+    <!-- Each checkout buys one term and nothing is collected again by itself
+         (see /terms), so what a customer needs is the day access stops, not a
+         collection date. The renewal note under it says so in words. -->
     <div class="info-row" id="billing-next-row" style="display:none">
-      <div class="info-label">Next billing date</div>
+      <div class="info-label">Access until</div>
       <div class="info-value" id="billing-next">&mdash;</div>
     </div>
+    <p id="billing-renew-note" class="acct-note" hidden style="font-size:var(--text-sm);color:var(--ink-dim);margin-top:var(--space-2)">This is a one-off payment for the term you bought. Nothing is collected again by itself. Buy another term before this date to keep the plan running.</p>
     <div class="info-row" id="billing-cancel-row" style="display:none">
       <div class="info-label">Cancellation</div>
       <div class="info-value" id="billing-cancel-date" style="color:#d97706">&mdash;</div>
@@ -399,7 +403,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 </main>
 
 <script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=7" defer></script>
+<script src="/js/nav-auth.js?v=8" defer></script>
 <script src="/js/account.inline1.js?v=2"></script>
 
 <script type="module" src="/js/account.inline2.js?v=3"></script>

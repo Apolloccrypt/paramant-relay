@@ -12,10 +12,16 @@
     ['Pricing', '/pricing'],
     ['Docs', '/docs']
   ];
+  // The workspace bar is verbs: what you came here to do, in the order you do
+  // it. Send and Sign were the two; locking a file with a passphrase is the
+  // third, so it sits beside them under the same kind of name. /vault is the
+  // route, "Lock a file" is what it does; the page keeps no product name of its
+  // own because there is not one to give it yet.
   var APP_NAV = [
     ['Documents', '/dashboard'],
     ['Send', '/parashare'],
     ['Sign', '/sign'],
+    ['Lock a file', '/vault'],
     ['Verify', '/verify'],
     ['Settings', '/account']
   ];
@@ -56,7 +62,7 @@
     // Support survives signing in. The tail used to be REMOVED here, on the
     // reasoning that the user menu carries Help from then on. On a phone that
     // left no Help at all: the bar sheds .nav-help below 700px, the drawer is
-    // pinned to the five workspace links, and the menu behind the email
+    // pinned to the workspace links, and the menu behind the email
     // address is not where anyone looks for support. A signed-in customer with
     // a stuck signature had to type the url.
     //
