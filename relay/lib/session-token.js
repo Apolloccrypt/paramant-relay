@@ -110,12 +110,72 @@ const SCOPE = [
   { method: 'POST', path: '/v2/inbound' },
 ];
 
-function scopeAllows(method, path) {
+// ── The second purpose: the signed-in app pages ──────────────────────────────
+// A token is minted FOR A PURPOSE, and the purpose picks which allowlist it is
+// judged against. The two lists are DISJOINT and neither is a superset of the
+// other: a token minted on /parashare cannot start a checkout, and a token
+// minted on /pricing cannot upload a file. That is the only reason this feature
+// could grow past the transfer path at all. Merging both into one flat SCOPE
+// would have widened the ParaSend token by three routes to give three other
+// pages a credential they needed, which is how a narrow credential quietly
+// becomes an api-key again.
+//
+// Why each route is here, and nothing else is:
+//
+//   POST /v2/billing/checkout        /pricing. Pressing a price button creates
+//     a Mollie payment whose metadata names the account, and that call is
+//     authenticated to the relay. Until now pricing-billing.js fetched the
+//     account's pgp_ key to make it, so every visit to /pricing that ended in a
+//     click put a permanent data-plane credential in the tab. The route creates
+//     a payment; it moves no money and reveals nothing about the account.
+//
+//   GET  /v2/user/history            /dashboard, "Your history". A read-only
+//     projection over the account's own audit chain: identifiers, status and
+//     timing, never a payload, download token or key. This one path out of
+//     /v2/user/* is named ON ITS OWN, never a prefix, precisely because the
+//     rest of /v2/user/* is the signing-key and TOTP surface that the ParaSend
+//     scope note below refuses by name. A read of your own history is not that.
+//
+//   GET  /v2/parasign/audit-export   /dashboard, the signing-audit export. Also
+//     read-only over the same chain, tier-gated at Business+ by the route
+//     itself. It is an export of what the account already did.
+//
+// What stays out, under BOTH purposes: /v2/keys, the signing-key and TOTP
+// routes, /v2/outbound, /v2/admin/*, and /v2/session-token itself. No token
+// mints another one, whatever it was minted for.
+const APP_SCOPE = [
+  { method: 'POST', path: '/v2/billing/checkout' },
+  { method: 'GET', path: '/v2/user/history' },
+  { method: 'GET', path: '/v2/parasign/audit-export' },
+];
+
+const PURPOSE_PARASEND = 'parasend';
+const PURPOSE_APP = 'app';
+const SCOPES = { [PURPOSE_PARASEND]: SCOPE, [PURPOSE_APP]: APP_SCOPE };
+
+// A stored record written before purposes existed has no `p` field, and it can
+// only be a ParaSend token, so an ABSENT purpose means parasend. That is the
+// only lenient case, and it is deliberately `undefined` alone: null, a number,
+// an object and an unknown word all come back null, and null opens nothing.
+//
+// This asymmetry is the whole safety property. If null had folded onto parasend
+// too, then a record carrying a purpose this build does not understand would be
+// judged against the transfer allowlist instead of being refused, which is a
+// credential doing something nobody minted it to do. So: unknown means no
+// scope, and resolve() below turns that into no principal at all.
+function normalisePurpose(purpose) {
+  if (purpose === undefined || purpose === '') return PURPOSE_PARASEND;
+  return Object.prototype.hasOwnProperty.call(SCOPES, purpose) ? purpose : null;
+}
+
+function scopeAllows(method, path, purpose = PURPOSE_PARASEND) {
   const m = String(method || '').toUpperCase();
   // A preflight carries no Authorization header, so it never gets here with a
   // token; if one ever does, it is answered by the CORS handler, not by us.
   if (m === 'OPTIONS') return true;
-  return SCOPE.some((rule) => {
+  const rules = SCOPES[normalisePurpose(purpose)];
+  if (!rules) return false;
+  return rules.some((rule) => {
     if (rule.method && rule.method !== m) return false;
     return rule.re ? rule.re.test(path) : rule.path === path;
   });
@@ -142,9 +202,14 @@ async function pruneOwnerIndex(redisClient, idx) {
 // the maximum number of live tokens. Throws when there is no store: a token
 // that cannot be written must not be handed out, because the holder would then
 // carry a credential no relay can check.
-async function mint(redisClient, owner, now = Date.now()) {
+async function mint(redisClient, owner, now = Date.now(), purpose = PURPOSE_PARASEND) {
   if (!redisClient) throw new Error('session-token: no redis client');
   if (!owner || typeof owner !== 'string') throw new Error('session-token: no owner key');
+  // A purpose this module does not know is refused HERE rather than written and
+  // refused later: a token that opens nothing is a support ticket, and minting
+  // one silently is how a typo in a caller becomes an hour of debugging.
+  const p = normalisePurpose(purpose);
+  if (!p) throw new Error('session-token: unknown purpose');
   const idx = ownerKey(owner);
 
   // The ceiling. sCard first because it is one round trip and almost always
@@ -165,13 +230,13 @@ async function mint(redisClient, owner, now = Date.now()) {
   // as well as being the redis TTL. Redis is what expires it; the field is what
   // catches a record that outlived its TTL through a restore, a replica lag or
   // a hand-written key.
-  await redisClient.set(tokenKey(token), JSON.stringify({ kh: keyHash(owner), exp: expires_ms }), { EX: TTL_S });
+  await redisClient.set(tokenKey(token), JSON.stringify({ kh: keyHash(owner), exp: expires_ms, p }), { EX: TTL_S });
   // The sweep index. Its own TTL is the token's plus a minute, refreshed on
   // every mint, so the set never outlives the last token it points at by more
   // than that.
   await redisClient.sAdd(idx, token);
   await redisClient.expire(idx, TTL_S + 60);
-  return { token, expires_ms, expires_in_s: TTL_S };
+  return { token, expires_ms, expires_in_s: TTL_S, purpose: p };
 }
 
 // The owner key a token stands for, or null. Null covers every refusal there
@@ -208,7 +273,16 @@ async function resolve(redisClient, token, resolveOwner, now = Date.now()) {
   if (now > rec.exp) return null;
   const key = resolveOwner(rec.kh);
   if (!key || typeof key !== 'string') return null;
-  return { key, expires_ms: rec.exp };
+  // The purpose travels back with the principal, because the caller cannot
+  // decide the scope without it. A record with no `p` predates purposes and is
+  // a ParaSend token. A record with a `p` this build does not know is refused
+  // OUTRIGHT, here, rather than handed back with an empty scope: a credential
+  // whose authority this code cannot compute is not a principal, and leaving it
+  // to the gate would make every future caller of resolve() responsible for a
+  // rule that belongs in one place.
+  const purpose = normalisePurpose(rec.p);
+  if (!purpose) return null;
+  return { key, expires_ms: rec.exp, purpose };
 }
 
 // Every live token for one api-key, gone. Called when the key is revoked.
@@ -230,7 +304,8 @@ async function revokeForKey(redisClient, owner) {
 }
 
 module.exports = {
-  TTL_S, PREFIX, SCOPE, MAX_LIVE_PER_ACCOUNT,
+  TTL_S, PREFIX, SCOPE, APP_SCOPE, SCOPES, MAX_LIVE_PER_ACCOUNT,
+  PURPOSE_PARASEND, PURPOSE_APP, normalisePurpose,
   isSessionToken, bearerToken, scopeAllows, keyHash,
   mint, resolve, revokeForKey, pruneOwnerIndex,
   tokenKey, ownerKey,

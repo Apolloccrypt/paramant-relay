@@ -170,6 +170,121 @@ test('the per-device pubkey read is exactly one path segment deep', () => {
   did();
 });
 
+// ── 2b. The second purpose, and the wall between the two ─────────────────────
+// /pricing and /dashboard stopped fetching the account's pgp_ key and now run
+// on a session token of their own. The whole reason that was allowed to happen
+// is that it is a DIFFERENT token, not a wider one: the two allowlists are
+// disjoint, and neither page can do the other's work with the credential it
+// holds. If that ever stops being true, the honest thing is for these cases to
+// go red rather than for the send page to quietly gain a checkout.
+
+test('the app purpose opens exactly the three routes the signed-in pages need', () => {
+  const open = [
+    // /pricing: pressing a price button creates the Mollie payment.
+    ['POST', '/v2/billing/checkout'],
+    // /dashboard: the account's own history, and its own signing-audit export.
+    ['GET', '/v2/user/history'],
+    ['GET', '/v2/parasign/audit-export'],
+  ];
+  for (const [method, path] of open) {
+    assert.strictEqual(st.scopeAllows(method, path, 'app'), true,
+      `${method} ${path} is what an app-purpose token exists for`);
+  }
+  assert.strictEqual(st.APP_SCOPE.length, 3,
+    'the app allowlist grew; /privacy names three requests, so change the page with the code');
+  did();
+});
+
+test('THE WALL: neither purpose can do the other\'s work', () => {
+  for (const [method, path] of [['POST', '/v2/inbound'], ['POST', '/v2/ws-ticket'],
+    ['POST', '/v2/pubkey'], ['GET', '/v2/check-key']]) {
+    assert.strictEqual(st.scopeAllows(method, path, 'app'), false,
+      `${method} ${path} is a transfer route; a token minted on /pricing must not walk it`);
+  }
+  for (const [method, path] of [['POST', '/v2/billing/checkout'], ['GET', '/v2/user/history'],
+    ['GET', '/v2/parasign/audit-export']]) {
+    assert.strictEqual(st.scopeAllows(method, path, 'parasend'), false,
+      `${method} ${path} is an app route; a token minted on /parashare must not reach it. ` +
+      'Merging the two lists is how a narrow credential becomes an api-key again.');
+  }
+  did();
+});
+
+test('the app purpose shuts everything the review named, exactly as parasend does', () => {
+  const shut = [
+    ['GET', '/v2/keys'], ['POST', '/v2/keys'],
+    ['POST', '/v2/user/signing-key'], ['GET', '/v2/user/signing-key'],
+    ['POST', '/v2/user/setup-totp'], ['POST', '/v2/user/envelopes'],
+    ['GET', '/v2/outbound/' + 'a'.repeat(64)],
+    ['GET', '/v2/audit'],
+    ['GET', '/v2/admin/keys'], ['POST', '/v2/admin/keys/revoke'],
+    // No token mints another one, whatever it was minted for.
+    ['POST', '/v2/session-token'],
+    ['POST', '/v2/envelopes'], ['POST', '/v1/envelopes'],
+  ];
+  for (const [method, path] of shut) {
+    assert.strictEqual(st.scopeAllows(method, path, 'app'), false,
+      `${method} ${path} is reachable with an app session token`);
+  }
+  // /v2/user/history is named ON ITS OWN, never as a prefix: the rest of
+  // /v2/user/* stays shut, and a deeper path under history is a different route.
+  assert.strictEqual(st.scopeAllows('GET', '/v2/user/history/all', 'app'), false);
+  assert.strictEqual(st.scopeAllows('POST', '/v2/user/history', 'app'), false);
+  assert.strictEqual(st.scopeAllows('POST', '/v2/parasign/audit-export', 'app'), false);
+  did();
+});
+
+test('an absent purpose is parasend; an unknown purpose opens nothing at all', () => {
+  // A record written before purposes existed carries no `p` and can only be a
+  // ParaSend token, so the default has to be parasend or every live token dies
+  // on deploy. An unknown word is the other direction and must fail CLOSED: a
+  // build that does not know the purpose cannot know the scope either.
+  assert.strictEqual(st.normalisePurpose(undefined), 'parasend');
+  assert.strictEqual(st.normalisePurpose(''), 'parasend');
+  assert.strictEqual(st.normalisePurpose('parasend'), 'parasend');
+  assert.strictEqual(st.normalisePurpose('app'), 'app');
+  // null is NOT the absent case. Only `undefined` folds onto parasend, so a
+  // purpose that arrived as an explicit null opens nothing rather than the
+  // transfer list.
+  for (const bogus of [null, 'admin', 'APP', 'app ', 'toString', '__proto__', 0, {}]) {
+    assert.strictEqual(st.normalisePurpose(bogus), null, `${JSON.stringify(bogus)} is not a purpose`);
+    assert.strictEqual(st.scopeAllows('POST', '/v2/inbound', bogus), false,
+      'an unknown purpose must open nothing, not fall back to the transfer list');
+    assert.strictEqual(st.scopeAllows('POST', '/v2/billing/checkout', bogus), false);
+  }
+  did();
+});
+
+test('mint records the purpose, resolve hands it back, and an unknown one is never written', async () => {
+  const r = fakeRedis();
+  const app = await st.mint(r, 'pgp_owner_demo', 5_000, 'app');
+  assert.strictEqual(app.purpose, 'app');
+  assert.deepStrictEqual(await st.resolve(r, app.token, OWNERS, 6_000),
+    { key: 'pgp_owner_demo', expires_ms: app.expires_ms, purpose: 'app' });
+
+  const send = await st.mint(r, 'pgp_owner_demo', 5_000);
+  assert.strictEqual(send.purpose, 'parasend', 'the default is the purpose that predates purposes');
+
+  // A record with no `p` at all: the shape redis still holds from the build
+  // before this one. It must resolve, and it must resolve as parasend.
+  const legacy = 'pst_' + '7'.repeat(64);
+  await r.set(st.tokenKey(legacy), JSON.stringify({ kh: st.keyHash('pgp_owner_demo'), exp: 9_000 }));
+  assert.deepStrictEqual(await st.resolve(r, legacy, OWNERS, 6_000),
+    { key: 'pgp_owner_demo', expires_ms: 9_000, purpose: 'parasend' });
+
+  // A record with a purpose this build does not know is no principal at all. It
+  // must NOT come back as a parasend token, which is what a lenient default
+  // would have made it.
+  const alien = 'pst_' + '8'.repeat(64);
+  await r.set(st.tokenKey(alien), JSON.stringify({ kh: st.keyHash('pgp_owner_demo'), exp: 9_000, p: 'admin' }));
+  assert.strictEqual(await st.resolve(r, alien, OWNERS, 6_000), null,
+    'a token whose purpose this build cannot judge must authenticate nobody');
+
+  await assert.rejects(() => st.mint(r, 'pgp_owner_demo', 5_000, 'admin'), /unknown purpose/,
+    'minting a token nothing can use is a support ticket, so it is refused at the mint');
+  did();
+});
+
 // ── 3. The token shape ───────────────────────────────────────────────────────
 
 test('only a pst_ token of the exact minted shape is ever looked up', () => {
@@ -215,7 +330,8 @@ test('mint writes one record under the token, with the TTL it promises', async (
   assert.strictEqual(out.expires_ms, 1_000_000 + 900_000);
 
   const rk = st.tokenKey(out.token);
-  assert.deepStrictEqual(JSON.parse(r.store.get(rk)), { kh: st.keyHash('pgp_owner_demo'), exp: 1_900_000 });
+  assert.deepStrictEqual(JSON.parse(r.store.get(rk)),
+    { kh: st.keyHash('pgp_owner_demo'), exp: 1_900_000, p: 'parasend' });
   assert.strictEqual(r.ttls.get(rk), 900, 'redis must be the thing that expires the token, not a sweeper');
   did();
 });
@@ -239,7 +355,8 @@ test('THE RECORD HOLDS NO KEY. Everything written to the store is a hash', async
   // happens not to contain the string.
   const rec = JSON.parse(r.store.get(st.tokenKey(out.token)));
   assert.strictEqual(rec.kh, require('crypto').createHash('sha256').update('pgp_owner_demo').digest('hex'));
-  assert.strictEqual(Object.keys(rec).sort().join(','), 'exp,kh', 'the record carries exactly the hash and the expiry');
+  assert.strictEqual(Object.keys(rec).sort().join(','), 'exp,kh,p',
+    'the record carries exactly the hash, the expiry and the purpose');
   did();
 });
 
@@ -273,7 +390,8 @@ test('the sweep index holds both tokens and outlives neither by much', async () 
 test('a minted token resolves to the api-key it was minted for, through the table', async () => {
   const r = fakeRedis();
   const { token, expires_ms } = await st.mint(r, 'pgp_owner_demo', 5_000);
-  assert.deepStrictEqual(await st.resolve(r, token, OWNERS, 6_000), { key: 'pgp_owner_demo', expires_ms });
+  assert.deepStrictEqual(await st.resolve(r, token, OWNERS, 6_000),
+    { key: 'pgp_owner_demo', expires_ms, purpose: 'parasend' });
   did();
 });
 
@@ -337,7 +455,8 @@ test('EXP IS REQUIRED: a record without a usable expiry is refused, not given th
   // The control: the same record with a real expiry does resolve, so the case
   // above is measuring the expiry and not some other refusal.
   await r.set(st.tokenKey(tok), JSON.stringify({ kh, exp: 2000 }));
-  assert.deepStrictEqual(await st.resolve(r, tok, OWNERS, 1000), { key: 'pgp_owner_demo', expires_ms: 2000 });
+  assert.deepStrictEqual(await st.resolve(r, tok, OWNERS, 1000),
+    { key: 'pgp_owner_demo', expires_ms: 2000, purpose: 'parasend' });
   did();
 });
 

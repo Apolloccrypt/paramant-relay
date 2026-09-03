@@ -107,6 +107,7 @@ after(async () => {
 });
 
 const mint = (headers = {}) => srv.post('/api/user/parasend/token', { headers });
+const mintApp = (headers = {}) => srv.post('/api/user/app/token', { headers });
 const mintCalls = () => relay.state.calls.filter(c => c.path === '/v2/session-token');
 
 test('no session is 401, and the relay is never asked', async (t) => {
@@ -169,6 +170,62 @@ test('a body cannot name an account: the session decides, always', async (t) => 
   const call = mintCalls().at(-1);
   assert.strictEqual(call.headers['x-api-key'], ACCOUNT_KEY,
     'a browser named another account and the admin passed it on. The account is the session, and only the session.');
+  did();
+});
+
+// ── The second route: the signed-in app pages ────────────────────────────────
+// /pricing and /dashboard stopped fetching the account's pgp_ key and mint a
+// token of their own. It is a SECOND route rather than a parameter on the first
+// one, because a purpose the browser could name is a purpose the browser could
+// change: a script on /parashare would ask for an `app` token and start a
+// checkout with it. The word is fixed by the route, and the body is still
+// ignored.
+
+test('the app route mints with purpose app, and the browser never chooses that word', async (t) => {
+  if (!redis) return t.skip('no redis');
+  relay.state.calls.length = 0;
+  const r = await mintApp(await session());
+  assert.strictEqual(r.status, 200, r.text);
+  assert.strictEqual(r.json.token, MINTED);
+  assert.deepStrictEqual(Object.keys(r.json).sort(), ['expires_in_s', 'token'],
+    'the app route answers exactly what the ParaSend one does: a token and its life, nothing else');
+  assert.ok(!r.text.includes('pgp_'), 'nothing shaped like an api-key may leave this route either');
+
+  const call = mintCalls().at(-1);
+  assert.ok(call, 'the admin must actually ask the relay');
+  assert.strictEqual(call.headers['x-api-key'], ACCOUNT_KEY);
+  assert.strictEqual(call.headers['x-internal-auth'], INTERNAL);
+  assert.deepStrictEqual(call.body, { purpose: 'app' },
+    'the purpose the relay is asked for must be the route\'s own word');
+  did();
+});
+
+test('the ParaSend route still asks for the ParaSend purpose, and a body cannot change either', async (t) => {
+  if (!redis) return t.skip('no redis');
+  relay.state.calls.length = 0;
+  await mint(await session());
+  assert.deepStrictEqual(mintCalls().at(-1).body, { purpose: 'parasend' });
+
+  // A browser trying to name the other purpose on either route gets its own
+  // route's word, not the one it asked for. This is the whole reason the
+  // purpose is not a parameter.
+  for (const [path, expected] of [['/api/user/parasend/token', 'parasend'], ['/api/user/app/token', 'app']]) {
+    relay.state.calls.length = 0;
+    const r = await srv.post(path, { headers: await session(), body: { purpose: 'admin' } });
+    assert.strictEqual(r.status, 200, r.text);
+    assert.deepStrictEqual(mintCalls().at(-1).body, { purpose: expected },
+      `${path} passed on a purpose the caller supplied`);
+  }
+  did();
+});
+
+test('the app route needs a session too: no cookie, no token, no mint', async (t) => {
+  if (!redis) return t.skip('no redis');
+  const before = mintCalls().length;
+  const r = await mintApp();
+  assert.strictEqual(r.status, 401);
+  assert.deepStrictEqual(r.json, { error: 'unauthenticated' });
+  assert.strictEqual(mintCalls().length, before, 'an unauthenticated caller must not cause a mint');
   did();
 });
 

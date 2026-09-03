@@ -2557,6 +2557,11 @@ async function handleRelayRequest(req, res) {
   // a 503, so the browser retries instead of throwing the sender back to login.
   const _bearer = sessionTokens.bearerToken(req.headers['authorization'] || '');
   let viaSessionToken = false;
+  // Which allowlist this token is judged against, set from the record the token
+  // resolves to and never from anything the caller sent. A browser picks a
+  // purpose when it MINTS (through the admin plane, on a signed-in session);
+  // once minted, the purpose is a property of the credential.
+  let sessionTokenPurpose = null;
   if (!apiKey && sessionTokens.isSessionToken(_bearer)) {
     if (!redisClient) {
       res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '5' });
@@ -2564,7 +2569,7 @@ async function handleRelayRequest(req, res) {
     }
     try {
       const _pst = await sessionTokens.resolve(redisClient, _bearer, apiKeyFromHash);
-      if (_pst) { apiKey = _pst.key; viaSessionToken = true; }
+      if (_pst) { apiKey = _pst.key; viaSessionToken = true; sessionTokenPurpose = _pst.purpose; }
     } catch (err) {
       if (redisOutage503(err, res)) return;
       throw err;
@@ -2624,12 +2629,12 @@ async function handleRelayRequest(req, res) {
   // 403 rather than 401 on purpose. The token is real and the account is real;
   // what is missing is authority for THIS route, and a 401 would send the page
   // off to mint a replacement that would be refused in exactly the same way.
-  if (viaSessionToken && !sessionTokens.scopeAllows(req.method, path)) {
-    log('warn', 'session_token_out_of_scope', { method: req.method, path });
+  if (viaSessionToken && !sessionTokens.scopeAllows(req.method, path, sessionTokenPurpose)) {
+    log('warn', 'session_token_out_of_scope', { method: req.method, path, purpose: sessionTokenPurpose });
     res.writeHead(403, { 'Content-Type': 'application/json' });
     return res.end(J({
       error: 'session_token_out_of_scope',
-      hint: 'a pst_ session token opens the ParaSend transfer routes only; use an API key for anything else',
+      hint: 'a pst_ session token opens the short list of routes it was minted for; use an API key for anything else',
     }));
   }
 
@@ -3041,8 +3046,27 @@ async function handleRelayRequest(req, res) {
       res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '5' });
       return res.end(J({ error: 'redis_unavailable', hint: 'session tokens need the relay store' }));
     }
+    // The purpose picks the allowlist the minted token will be judged against.
+    // It is read from the admin plane's body, which is the only caller that can
+    // reach this route at all (X-Internal-Auth above), and an unknown word is
+    // refused rather than folded onto a default: handing back a token that
+    // opens the wrong three routes is worse than handing back nothing. An
+    // ABSENT purpose is the ParaSend one, so the admin route that predates
+    // purposes keeps working byte for byte.
+    let _purpose = sessionTokens.PURPOSE_PARASEND;
     try {
-      const minted = await sessionTokens.mint(redisClient, apiKey);
+      const b = JSON.parse((await readBody(req, 1024)).toString() || '{}');
+      if (b && b.purpose !== undefined && b.purpose !== null) _purpose = String(b.purpose);
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'bad_json' }));
+    }
+    if (!sessionTokens.normalisePurpose(_purpose)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'unknown_purpose', hint: 'purpose must be one of: parasend, app' }));
+    }
+    try {
+      const minted = await sessionTokens.mint(redisClient, apiKey, Date.now(), _purpose);
       // The per-account ceiling. Twenty live tokens is far above any honest
       // use of a page that mints one per load, so this is a signed-in session
       // being used as a credential factory. 429 rather than 403: the account is
@@ -3057,6 +3081,7 @@ async function handleRelayRequest(req, res) {
       log('info', 'session_token_minted', {
         account: String(owner.account_id || apiKey).slice(0, 12),
         ttl_s: minted.expires_in_s,
+        purpose: minted.purpose,
       });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({
@@ -3064,6 +3089,7 @@ async function handleRelayRequest(req, res) {
         token: minted.token,
         expires_ms: minted.expires_ms,
         expires_in_s: minted.expires_in_s,
+        purpose: minted.purpose,
       }));
     } catch (err) {
       if (redisOutage503(err, res)) return;
