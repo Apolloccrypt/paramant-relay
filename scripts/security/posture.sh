@@ -161,7 +161,7 @@ check_tls() {
 
 # fetch_headers URL -> lowercased header block on stdout, empty on failure
 fetch_headers() {
-  "$CURL" -sS --max-time "$CURL_TIMEOUT" -o /dev/null -D - "$1" 2>/dev/null | tr 'A-Z' 'a-z'
+  "$CURL" -sS --max-time "$CURL_TIMEOUT" -o /dev/null -D - "$1" 2>/dev/null | tr '[:upper:]' '[:lower:]'
 }
 
 check_one_header_set() {
@@ -440,7 +440,7 @@ check_rust_audit() {
   # empty array is a truncated answer, and reading "no vulns" out of it would
   # turn an outage into a clean bill of health for 114 crates.
   local ids
-  ids=$(printf '%s' "$batch" | node -e '
+  if ! ids=$(printf '%s' "$batch" | node -e '
     let raw = "";
     process.stdin.on("data", d => raw += d);
     process.stdin.on("end", () => {
@@ -454,8 +454,7 @@ check_rust_audit() {
         process.stdout.write(out.join(" "));
       } catch (e) { process.stderr.write(e.message); process.exit(1); }
     });
-  ' "$crates" 2>"$ROWS_FILE.osverr")
-  if [ $? -ne 0 ]; then
+  ' "$crates" 2>"$ROWS_FILE.osverr"); then
     record audit "rust audit $CARGO_DIR" red "the advisory service did not answer for all $crates crates: $(cat "$ROWS_FILE.osverr" 2>/dev/null)"
     rm -f "$ROWS_FILE.osverr"
     return
@@ -490,7 +489,7 @@ check_rust_audit() {
     return
   fi
 
-  local bad="" seen="" line vid band why
+  local bad="" seen="" vid band why
   while IFS=$'\t' read -r vid band why; do
     [ -z "$vid" ] && continue
     case "$band" in
@@ -560,7 +559,7 @@ check_robots_sitemap() {
     if [ "$code" != 200 ]; then
       bad_status="$bad_status $loc=${code:-none}"
     fi
-    path=${loc#https://$APEX}
+    path=${loc#"https://$APEX"}
     [ -z "$path" ] && path=/
     while IFS= read -r rule; do
       [ -z "$rule" ] && continue

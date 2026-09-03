@@ -33,6 +33,10 @@ trap 'rm -rf "$WORK"' EXIT
 fail=0
 bad() { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 ok() { printf 'ok   %s\n' "$1"; }
+# Everything below asserts with an explicit if/else. `cond && ok ... || bad ...`
+# reads like if-then-else and is not: should ok ever fail, bad runs too and the
+# suite reports a failure that did not happen. In the file whose whole job is to
+# be believed, that shortcut is not worth the line it saves.
 
 [ -x "$SCANNER" ] || { bad "scripts/security/posture.sh is missing or not executable"; exit 1; }
 for stub in curl openssl dig npm; do
@@ -62,7 +66,7 @@ names() {
 
 printf '== green: every answer correct ==\n'
 green_code=$(run green)
-[ "$green_code" = 0 ] && ok "exit 0" || bad "green run exited $green_code, expected 0"
+if [ "$green_code" = 0 ]; then ok "exit 0"; else bad "green run exited $green_code, expected 0"; fi
 green_red=$(names red "$WORK/green.json")
 if [ -n "$green_red" ]; then
   bad "green run reported red rows:"
@@ -72,11 +76,15 @@ else
 fi
 green_ok=$(names green "$WORK/green.json")
 green_n=$(printf '%s\n' "$green_ok" | grep -c .)
-[ "$green_n" -gt 40 ] && ok "$green_n measurements ran" || bad "only $green_n measurements ran; the scanner is not measuring what it claims"
+if [ "$green_n" -gt 40 ]; then
+  ok "$green_n measurements ran"
+else
+  bad "only $green_n measurements ran; the scanner is not measuring what it claims"
+fi
 
 printf '\n== red: every answer wrong ==\n'
 red_code=$(run red)
-[ "$red_code" = 1 ] && ok "exit 1" || bad "red run exited $red_code, expected 1"
+if [ "$red_code" = 1 ]; then ok "exit 1"; else bad "red run exited $red_code, expected 1"; fi
 red_green=$(names green "$WORK/red.json")
 if [ -n "$red_green" ]; then
   bad "red run still reported these green, so they cannot fail:"
@@ -98,12 +106,15 @@ fi
 # at the top of the Actions page instead of somewhere in the log.
 errors=$(grep -c '^::error title=' "$WORK/red.log")
 red_n=$(printf '%s\n' "$red_red" | grep -c .)
-[ "$errors" = "$red_n" ] && ok "$errors ::error lines, one per red measurement" \
-  || bad "$errors ::error lines for $red_n red measurements"
+if [ "$errors" = "$red_n" ]; then
+  ok "$errors ::error lines, one per red measurement"
+else
+  bad "$errors ::error lines for $red_n red measurements"
+fi
 
 printf '\n== missing: the services say nothing ==\n'
 missing_code=$(run missing)
-[ "$missing_code" = 1 ] && ok "exit 1" || bad "missing run exited $missing_code, expected 1"
+if [ "$missing_code" = 1 ]; then ok "exit 1"; else bad "missing run exited $missing_code, expected 1"; fi
 missing_green=$(names green "$WORK/missing.json")
 if [ -n "$missing_green" ]; then
   bad "a silent service was still reported green, which is the escape hatch this scanner must not have:"
@@ -122,9 +133,9 @@ for want in "no certificate returned" "no response from" "no v=spf1" "no _dmarc"
 done
 
 # The report is the artifact a human reads. It has to say which way it went.
-grep -q '^\*\*Uitslag: GROEN\*\*' "$WORK/green.md" && ok "green report says GROEN" || bad "green report does not say GROEN"
-grep -q '^\*\*Uitslag: ROOD\*\*' "$WORK/red.md" && ok "red report says ROOD" || bad "red report does not say ROOD"
-grep -q '^## Rood' "$WORK/red.md" && ok "red report leads with the red table" || bad "red report has no red table"
+if grep -q '^\*\*Uitslag: GROEN\*\*' "$WORK/green.md"; then ok "green report says GROEN"; else bad "green report does not say GROEN"; fi
+if grep -q '^\*\*Uitslag: ROOD\*\*' "$WORK/red.md"; then ok "red report says ROOD"; else bad "red report does not say ROOD"; fi
+if grep -q '^## Rood' "$WORK/red.md"; then ok "red report leads with the red table"; else bad "red report has no red table"; fi
 
 printf '\n'
 if [ "$fail" -eq 0 ]; then

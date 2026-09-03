@@ -9,7 +9,7 @@ for a in "$@"; do
   case "$a" in
     -d) take_body=1 ;;
     -D) want_headers=1 ;;
-    *%{http_code}*) want_code=1 ;;
+    *'%{http_code}'*) want_code=1 ;;
     POST) post=1 ;;
     https://*) url=$a ;;
   esac

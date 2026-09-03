@@ -64,12 +64,17 @@ jobs:
         run: bash -n scripts/security/posture.sh tests/security-posture-dryrun.sh
       # Not installed in this repo and not in any other job, so it is asked for
       # rather than assumed. If the runner image stops shipping it the step says
-      # so instead of quietly passing.
+      # so instead of quietly passing. The stubs are in the list: a guard that
+      # skips the files most likely to be sloppy is not much of a guard, and the
+      # first run of this step found a literal-brace bug in exactly those.
       - name: shellcheck, if the runner has it
         run: |
           set -uo pipefail
           if command -v shellcheck >/dev/null 2>&1; then
-            shellcheck --severity=warning scripts/security/posture.sh tests/security-posture-dryrun.sh
+            shellcheck --severity=style \
+              scripts/security/posture.sh \
+              tests/security-posture-dryrun.sh \
+              tests/security-posture-stubs/*
           else
             echo "::warning title=shellcheck::not on this runner; only bash -n ran over the posture scripts"
           fi
