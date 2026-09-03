@@ -253,6 +253,11 @@
       const free = isFreeAccount(d, d.current_plan);
       if (!free) {
         document.getElementById('billing-active-badge').classList.remove('hidden');
+        // A customer who pays gets a way to stop paying. What was wrong here was
+        // never the button but the date behind it: cancel used to schedule the
+        // downgrade at now plus 30 days, so someone who had bought a YEAR was
+        // told his plan ended next month. It now schedules on the term he
+        // actually paid for, the same date shown below.
         document.getElementById('billing-cancel-btn').classList.remove('hidden');
       }
       // One calm line about what this plan is. On Community it says whose gift
@@ -262,9 +267,15 @@
       if (band) band.hidden = !free;
       const bought = document.getElementById('billing-paid');
       if (bought) bought.hidden = free;
-      if (d.next_billing_date) {
+      // access_until is the end of the term that was paid for and is the honest
+      // date on a one-off; next_billing_date only means something once
+      // something actually collects again.
+      const until = d.access_until || d.next_billing_date;
+      if (until) {
         document.getElementById('billing-next-row').style.display = 'flex';
-        document.getElementById('billing-next').textContent = new Date(d.next_billing_date).toLocaleDateString();
+        document.getElementById('billing-next').textContent = new Date(until).toLocaleDateString();
+        const note = document.getElementById('billing-renew-note');
+        if (note) note.hidden = !!d.auto_renews;
       }
       if (d.cancellation_scheduled_at) {
         document.getElementById('billing-cancel-row').style.display = 'flex';

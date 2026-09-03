@@ -474,13 +474,25 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
       <a class="dh-community-cta" href="/pricing">See the business plans &rarr;</a>
     </aside>
 
+    <!-- Where Mollie sends the buyer back to (/dashboard?billing=return). The
+         entitlement is granted by the webhook, never by this redirect, so the
+         two can arrive in either order: this band says which of the two the
+         page is looking at instead of leaving a paying customer on a dashboard
+         that still reads Community and says nothing about the money. Shown by
+         dashboard.js only when the query parameter is there. No link to
+         /pricing: the sale already happened. -->
+    <aside class="dh-paid" id="dh-billing-return" aria-label="Payment" role="status" hidden>
+      <p class="dh-paid-kicker" data-dh="return-kicker">--</p>
+      <p class="dh-paid-lede" data-dh="return-lede">--</p>
+    </aside>
+
     <!-- What a paying customer bought, in the words /pricing sells it in. Shown
          by dashboard.js only on Pro, Business or Enterprise, and it carries no
          link to a higher tier: someone who already pays is not a lead. -->
     <aside class="dh-paid" id="dh-plan-paid" aria-label="Your plan" hidden>
       <p class="dh-paid-kicker"><span data-dh="paid-name">--</span> plan &middot; active</p>
       <p class="dh-paid-lede" data-dh="paid-includes">--</p>
-      <p class="dh-paid-foot">Your subscription and invoices are under <a href="/account#billing-section">Plan &amp; billing</a>.</p>
+      <p class="dh-paid-foot">Your plan and the day your term ends are under <a href="/account#billing-section">Plan &amp; billing</a>.</p>
     </aside>
 
     <!-- One-time question: shown by dashboard.js only while /api/user/me returns

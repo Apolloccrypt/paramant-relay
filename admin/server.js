@@ -2215,6 +2215,17 @@ api.get("/user/session/verify", async (req, res) => {
 // paying customer he is on the free plan. The paid_until pair travels with them
 // so a client can apply the same expiry rule as effectiveProductTier: a stored
 // tier above the floor is paid only while its period has not run out.
+// The day the term that was paid for runs out: the later of the two product
+// periods that is still in the future, or null when nothing is paid for. Both
+// the status endpoint and the cancel endpoint answer with this, so a customer
+// cannot be shown one date and promised another.
+function termEndOf(fields) {
+  const ends = [fields.paid_until_parasign, fields.paid_until_parasend]
+    .map((v) => (v ? Date.parse(v) : NaN))
+    .filter((t) => !Number.isNaN(t) && t > Date.now());
+  return ends.length ? new Date(Math.max(...ends)).toISOString() : null;
+}
+
 function productPlanFields(rec) {
   return {
     plan_parasign: rec?.plan_parasign ?? null,
@@ -3109,7 +3120,15 @@ api.post("/user/billing/cancel", authUser, async (req, res) => {
   const { user_id, email } = req.userSession;
   const billingRaw = await redis().get(`paramant:user:billing:${user_id}`);
   const billing = billingRaw ? JSON.parse(billingRaw) : null;
-  const cancelAt = billing?.next_billing_date || new Date(Date.now() + 30 * 86_400_000).toISOString();
+  // "You keep access until the end of your billing period" is a promise about a
+  // specific day, so it has to be the day the relay will actually stop granting.
+  // next_billing_date came from a Redis record nothing writes, so this fell
+  // through to now plus 30 days and told a customer who had paid for a YEAR
+  // that his plan ended next month. The term end is on the relay; read it.
+  const cancelUser = await findUserByEmail(email).catch(() => null);
+  const cancelAt = termEndOf(productPlanFields(cancelUser))
+    || billing?.next_billing_date
+    || new Date(Date.now() + 30 * 86_400_000).toISOString();
   await redis().set(`paramant:user:plan_cancel_at:${user_id}`, cancelAt);
   await logAuditEvent(user_id, 'plan_cancellation_scheduled', { cancel_at: cancelAt, plan: billing?.plan || 'pro', via: 'user_request' });
   try { await sendCancellationScheduled(email, billing?.plan || 'pro', cancelAt); }
@@ -3124,14 +3143,27 @@ api.get("/user/billing/status", authUser, async (req, res) => {
   const cancelAt = await redis().get(`paramant:user:plan_cancel_at:${user_id}`);
   const keysRes = await relayFetch("health", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
   const currentKey = (keysRes.body?.keys || []).find(k => k.key === user_id);
+  // What the account page shows about money has to be what actually happened.
+  // Two things were wrong here. The record this used to read,
+  // paramant:user:billing:<id>, is written by nothing in this codebase, so
+  // next_billing_date was always null and the renewal row the page promises
+  // never appeared. And stub_notice said no real charges apply, to customers
+  // Mollie had genuinely charged. The truth is on the relay: paid_until_* is
+  // the day the term that was paid for runs out, so that is the date to show.
+  const fields = productPlanFields(currentKey);
+  const accessUntil = termEndOf(fields);
   res.json({
     current_plan: currentKey?.plan || 'community',
-    ...productPlanFields(currentKey),
+    ...fields,
     period: billing?.period || null,
-    amount_eur: billing?.amount_eur ?? 0,
+    amount_eur: billing?.amount_eur ?? null,
+    // The end of the term that was paid for. Every checkout is a one-off
+    // payment for that term (see /terms), so this is the day access stops
+    // unless another payment is made, not the day a collection is attempted.
+    access_until: accessUntil,
     next_billing_date: billing?.next_billing_date || null,
+    auto_renews: false,
     cancellation_scheduled_at: cancelAt || null,
-    stub_notice: 'Payment integration pending. No real charges apply.',
   });
 });
 
