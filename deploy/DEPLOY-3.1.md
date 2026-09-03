@@ -330,10 +330,31 @@ nginxconf paramant-live.conf resolved to paramant.conf
 
 A slot is always named after its first candidate, so the left half of that line
 is the same everywhere and the right half is what this server actually calls
-it. Everything downstream uses the resolved name: the backup in 2b, the edits
-in 5c, the checks in 6, and both rollback steps in 8. The backups are filed
-under the resolved name (`paramant.conf.pre-3.1-$TS`), and step 8 resolves the
-same way, so a rollback looks for the file that is really there.
+it. Every step that names a conf file uses the resolved name: the backup in 2b,
+the edits in 5c, and both rollback steps in 8. The backups are filed under the
+resolved name (`paramant.conf.pre-3.1-$TS`), and step 8 resolves the same way,
+so a rollback looks for the file that is really there.
+
+Step 6 is not in that list, and does not need to be. It reads `nginx -T`, the
+config that is actually loaded, and probes the site over HTTP. Neither knows or
+cares what the file on disk is called, so a rename cannot make step 6 measure
+the wrong thing. (The commit message of #376 said step 6 used the resolved name
+as well; that was wrong, and this is the correction.)
+
+Step 5c also refuses to edit a conf that has no 2b backup under this run's TS.
+2b and 5c resolve independently, each asking the server what is there when it
+runs, and phases 3 and 4 sit in between. If sites-enabled is rearranged in that
+window, 5c would otherwise edit a conf nothing had backed up, and every FATAL
+in 5c calls a restore that can only put back what was filed. The check sits
+before the first `sed`, so a run that hits it has written nothing:
+
+```
+FATAL no phase 2b backup /etc/nginx/backups/paramant.conf.pre-3.1-$TS for paramant.conf, which this phase would edit
+before confs without a backup = 1
+```
+
+Run step 2 again for that TS, or start the deploy over so 2b backs up the confs
+that are there now.
 
 If no candidate of a slot is present the run stops in 2b with
 

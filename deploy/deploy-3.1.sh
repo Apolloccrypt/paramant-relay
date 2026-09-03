@@ -334,8 +334,25 @@ RESOLVER
 )"
 
 # remote_nginx: remote(), with resolve_conf_slots() already defined in the body.
+#
+# NOT a pipeline. The first version was
+#
+#   { printf '%s\n' "$NGINX_RESOLVE_SNIPPET"; cat; } | remote "$@"
+#
+# and every stage of a pipeline is a subshell, so remote() and _remote_run()
+# ran in a child: REMOTE_OUT and REMOTE_RC were set there and thrown away when
+# it exited. Every expect after a remote_nginx call then judged whatever the
+# PREVIOUS remote block had left in REMOTE_OUT. Deploy run 4 (TS 20260903-0216)
+# stopped in 2b on "the server never printed 'after .env backup bytes'" while
+# the server had printed exactly that, 1420 bytes.
+#
+# So read the body here and hand remote() its stdin through a redirect. The
+# printf runs in a subshell, remote() does not, and the two variables land in
+# the caller.
 remote_nginx() {
-  { printf '%s\n' "$NGINX_RESOLVE_SNIPPET"; cat; } | remote "$@"
+  local body
+  body="$(cat)"
+  remote "$@" < <(printf '%s\n%s\n' "$NGINX_RESOLVE_SNIPPET" "$body")
 }
 
 # expect: assert against the output of the last remote call. Skipped, loudly,
@@ -1304,12 +1321,37 @@ if [ "$RESOLVED_MISSING" -ne 0 ]; then
 fi
 
 # Resolve the named confs to real files. A symlink is not the file.
+#
+# And refuse to touch a conf that has no phase 2b backup under this run's TS.
+# 2b and 5c resolve independently, on purpose: each asks the server what is
+# there at the moment it runs. If sites-enabled changes in between, say
+# paramant-live.conf is swapped for paramant.conf while phases 3 and 4 build
+# and recreate, then 5c resolves to a conf 2b never backed up. Every FATAL
+# below then calls restore(), which can only put back what was filed, so the
+# run would end saying "restoring the backed up confs" with that conf left
+# edited and nothing to roll it back to. The check is before the first sed, so
+# nothing has been written yet when it stops.
 TARGETS=""
+nobackup=0
 for name in $RESOLVED_CONFS; do
   t="$(readlink -f "$SITES/$name")"
-  echo "target $name -> $t"
+  b="$NGBK/$name.pre-3.1-$TS"
+  if [ ! -f "$b" ]; then
+    echo "FATAL no phase 2b backup $b for $name, which this phase would edit"
+    nobackup=$((nobackup + 1))
+    continue
+  fi
+  echo "target $name -> $t (backup $b, $(stat -c%s "$b") bytes)"
   TARGETS="$TARGETS $t"
 done
+echo "before confs without a backup = $nobackup"
+if [ "$nobackup" -ne 0 ]; then
+  echo "FATAL $nobackup resolved conf(s) have no backup under this run TS $TS, so an edit here"
+  echo "FATAL could not be undone. sites-enabled changed since phase 2b, or 2b never ran for"
+  echo "FATAL this TS. Nothing was written. Run phase 2 again for this TS, or start the deploy"
+  echo "FATAL over so 2b backs up the confs that are there now."
+  exit 1
+fi
 
 # grep exits 1 when it matches nothing, and pipefail turns that into a failed
 # pipeline. The count IS the answer here, and zero is a perfectly good answer,
@@ -1566,11 +1608,14 @@ echo "after pararules blocks = $_rat"
 echo "after pararules blocks with redirect = $_raw"
 echo "after pararules redirect lines = $(count "$RULES_RE")"
 
+# Restore exactly the confs this phase edited, not whatever the backup dir
+# happens to hold for this TS. The precondition above proved every one of them
+# has a backup, so "restoring the backed up confs" is a promise that holds for
+# all of them and for nothing else.
 restore() {
-  for b in "$NGBK"/*.pre-3.1-"$TS"; do
-    [ -f "$b" ] || continue
-    name="$(basename "$b" ".pre-3.1-$TS")"
-    cp -a "$b" "$(readlink -f "$SITES/$name")"
+  for name in $RESOLVED_CONFS; do
+    cp -a "$NGBK/$name.pre-3.1-$TS" "$(readlink -f "$SITES/$name")"
+    echo "restored $name from $NGBK/$name.pre-3.1-$TS"
   done
 }
 
@@ -1608,6 +1653,8 @@ echo "reloaded nginx"
 EOF
 
   expect_not 'FATAL' "nginx edits applied and the config tests clean"
+  expect_count "before confs without a backup" 0 \
+    "every conf 5c edited had a phase 2b backup under this run TS, so a FATAL could restore all of them"
   # How many files were rewritten depends on what was left to do, so the exact
   # count of 2 only holds on a run that found work in both confs. What always
   # holds is the END state, and that is asserted hard just below: no
