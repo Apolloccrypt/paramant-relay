@@ -2967,6 +2967,83 @@ async function doSign() {
   }
 }
 
+// ── qualified signature (optional, off unless the relay says otherwise) ──────
+// The relay reports the configured provider on /v2/auth/capabilities. With no
+// provider the checkbox is never revealed and nothing on this page changes.
+async function revealQesOption() {
+  const box = $('ds-qes-option');
+  if (!box) return;
+  let res;
+  try {
+    res = await fetch('/v2/auth/capabilities', { cache: 'no-store' });
+  } catch {
+    return;   // offline is not a reason to show a half-working option
+  }
+  if (!res.ok) return;
+  let caps;
+  try { caps = await res.json(); } catch { return; }
+  if (caps && caps.parasign_qes) box.hidden = false;
+}
+
+// Hand the signed PDF to the server QES step. Everything here is additive: the
+// ParaSign signature and its .psign are already made and downloadable, and a
+// failure below never takes them away.
+async function addQualifiedSignature(pdfBytes) {
+  const note = document.createElement('div');
+  note.id = 'ds-qes-note';
+  note.className = 'ds-note';
+  note.setAttribute('role', 'note');
+  const line = document.createElement('p');
+  line.textContent = 'Requesting a qualified signature...';
+  note.appendChild(line);
+  const dl = $('ds-dl-pdf');
+  if (dl && dl.parentNode) dl.parentNode.insertBefore(note, dl.nextSibling);
+
+  let bin = '';
+  for (let i = 0; i < pdfBytes.length; i++) bin += String.fromCharCode(pdfBytes[i]);
+  let res;
+  try {
+    res = await fetch('/v2/qes/sign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ document: btoa(bin), signer_name: state.signer.name || null }),
+    });
+  } catch {
+    line.textContent = 'The qualified signature could not be requested. Your ParaSign signature is unaffected.';
+    return;
+  }
+  let body = null;
+  try { body = await res.json(); } catch { /* handled by the status below */ }
+
+  if (res.status === 409 && body) {
+    line.textContent = 'A qualified signature needs the signer to authorise it in the provider app first. '
+      + (body.reason || '');
+    if (body.authorize_url) {
+      const a = document.createElement('a');
+      a.href = body.authorize_url;
+      a.textContent = 'Open the provider authorisation';
+      a.rel = 'noopener';
+      note.appendChild(a);
+    }
+    return;
+  }
+  if (!res.ok || !body || !body.document) {
+    line.textContent = 'The provider did not return a qualified signature. Your ParaSign signature is unaffected.';
+    return;
+  }
+
+  const raw = atob(body.document);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  line.textContent = 'Qualified signature added (' + (body.level || 'PAdES') + ').';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn-secondary';
+  btn.textContent = 'Download the qualified PDF';
+  btn.addEventListener('click', () => downloadBytes(out, 'qualified-' + signedDocName(), 'application/pdf'));
+  note.appendChild(btn);
+}
+
 function downloadBytes(bytes, name, mime) {
   const blob = new Blob([bytes], { type: mime || 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
@@ -3061,6 +3138,10 @@ function showDone() {
     $('ds-dl-pdf').hidden = false;
     $('ds-dl-pdf').textContent = state.mode === 'pdf' ? 'Download signed PDF' : 'Download signed image';
     $('ds-dl-pdf').onclick = () => downloadBytes(r.stampedBytes, signedDocName(), signedDocMime());
+    const optIn = $('ds-qes-optin');
+    if (state.mode === 'pdf' && optIn && optIn.checked) {
+      addQualifiedSignature(r.stampedBytes).catch(() => { /* additive only */ });
+    }
   } else {
     $('ds-dl-pdf').hidden = true;
   }
@@ -3429,6 +3510,7 @@ function wireLiveStampUpdates() {
 }
 
 function init() {
+  revealQesOption().catch(() => { /* the option simply stays hidden */ });
   initStepMode();
   initStepDoc();
   initStepIdentity();

@@ -136,6 +136,7 @@ const billing         = require('./lib/billing');           // Mollie webhook de
 const billingRecurring = require('./lib/billing-recurring'); // subscription + mandate layer
 const parasignStoreMod = require('./lib/parasign-store');    // durable encrypted /v1 side-store
 const parasignStamp = require('./lib/parasign-stamp');       // server-side PDF stamp-worker
+const qes           = require('./lib/qes');                   // qualified-signature layer, off unless flagged
 const tierGate         = require('./lib/tier-gate');         // per-tier feature gate (billing hardening)
 const userHistory      = require('./lib/user-history');      // GET /v2/user/history (Pro+)
 const usagePurpose     = require('./lib/usage-purpose');     // POST /v2/user/usage-purpose (internal)
@@ -222,7 +223,7 @@ const ALLOWED = {
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session','/v2/session-token',
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
                '/v2/sth','/v2/verify-receipt','/v2/transfers','/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
-               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v1'],
+               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v2/qes','/v1'],
   iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/ack','/v2/monitor',
@@ -230,7 +231,7 @@ const ALLOWED = {
                '/v2/key-sector','/v2/team','/v2/reload-users','/v2/session','/v2/session-token',
                '/v2/relays','/v2/sign-dpa','/v2/sth','/v2/verify-receipt','/v2/transfers',
                '/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
-               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v1'],
+               '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v2/qes','/v1'],
   full:       null,
 };
 
@@ -3007,6 +3008,66 @@ async function handleRelayRequest(req, res) {
     return res.end(J(registry.listSupported()));
   }
 
+  // ── POST /v2/qes/sign, a qualified signature over a hash (flag-gated) ────
+  // Off unless PARASIGN_QES_PROVIDER names a provider: without the flag this
+  // path does not exist and /sign shows no option for it.
+  //
+  // The document is prepared here (signature dictionary plus ByteRange), the
+  // SHA-256 of the CAdES signed attributes goes to the QTSP, and the signature
+  // comes back. Only that digest leaves the relay; the PDF does not.
+  //
+  // Without a service token and a SAD there is nothing to sign with, so the
+  // route answers 409 and hands back the authorisation URL. That is not a
+  // shortcut we chose: the Cleverbase Signing API only offers authType
+  // "oauth2code", so a natural person has to authorise in the Cleverbase app
+  // for every batch of signatures. There is no machine-to-machine route.
+  if (path === '/v2/qes/sign' && req.method === 'POST') {
+    if (!qes.enabled()) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+    try {
+      const d = JSON.parse((await readBody(req, 32 * 1024 * 1024)).toString());
+      const pdf = Buffer.from(String(d.document || ''), 'base64');
+      if (pdf.subarray(0, 5).toString('latin1') !== '%PDF-') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'document must be a base64 PDF' }));
+      }
+      const client = qes.clientFor();
+      if (!d.service_token || !d.sad || !d.credential_id) {
+        let authorizeUrl = null;
+        let reason = 'A qualified signature needs the signer to authorise it in the provider app.';
+        try {
+          authorizeUrl = client.authorizeUrl({ scope: 'service', state: crypto.randomBytes(16).toString('hex') });
+        } catch (e) { reason = e.message; }
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        return res.end(J({
+          error: 'qes_authorisation_required',
+          provider: qes.provider(),
+          authorize_url: authorizeUrl,
+          reason,
+        }));
+      }
+      const out = await qes.signPdf({
+        pdf, client,
+        credentialID: String(d.credential_id),
+        serviceToken: String(d.service_token),
+        authorise: () => String(d.sad),
+        signerName: d.signer_name ? String(d.signer_name).slice(0, 120) : null,
+        reason: d.reason ? String(d.reason).slice(0, 200) : null,
+        providerName: qes.provider(),
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({
+        document: out.pdf.toString('base64'),
+        level: out.level,
+        tsa_url: out.tsaUrl,
+        qes: out.qes,
+      }));
+    } catch (e) {
+      log('warn', 'qes_sign_failed', { error: e.message });
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: e.message }));
+    }
+  }
+
   // ── GET /v2/auth/capabilities — public, no auth ─────────────────────────────
   if (req.method === 'GET' && path === '/v2/auth/capabilities') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -3016,6 +3077,10 @@ async function handleRelayRequest(req, res) {
       user_totp_status: process.env.ENABLE_USER_TOTP === 'true'
         ? 'live'
         : 'rolling_out_q2_2026',
+      // Qualified electronic signature layer. Empty string means off, which is
+      // the default: with no provider configured nothing about signing changes
+      // and the /sign page shows no extra option at all.
+      parasign_qes: qes.provider(),
       capabilities_version: 1,
     }));
   }

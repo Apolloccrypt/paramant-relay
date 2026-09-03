@@ -668,6 +668,20 @@ function buildEnvelopePsign({ env, meta, canonicalJSON, sigEngine, relayIdentity
   // signed .psign, so the test nature travels with the evidence itself, not
   // only the create-response note. A live envelope carries NO such marker.
   if (m.mode === 'test') { psign.mode = 'test'; psign.sandbox = true; }
+  // Qualified-signature marker (PARASIGN_QES_PROVIDER). The QES itself lives in
+  // the PDF as a PAdES signature and is validated by Adobe or DSS without us;
+  // this is only a pointer to it, so a reader of the receipt knows a second,
+  // independent signature exists and which certificate carries it. Added BEFORE
+  // the notary signature, like mode/sandbox above, or the counter-signature
+  // over the canonical JSON would no longer verify.
+  const qes = env.qes && typeof env.qes === 'object' ? env.qes : null;
+  if (qes && qes.provider && qes.certificate_fingerprint) {
+    psign.qes = {
+      provider: String(qes.provider),
+      certificate_fingerprint: String(qes.certificate_fingerprint),
+      signed_at: qes.signed_at || null,
+    };
+  }
 
   const notarySig = Buffer.from(
     sigEngine.sign(Buffer.from(canonicalJSON(psign), 'utf8'), relayIdentity.sk)
