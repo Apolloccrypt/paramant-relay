@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const MIME = { '.js':'text/javascript', '.css':'text/css', '.html':'text/html', '.svg':'image/svg+xml', '.png':'image/png', '.woff2':'font/woff2' };
-const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/account':'/account.html', '/developer':'/developer.html' };
+const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/account':'/account.html', '/developer':'/developer.html', '/pricing':'/pricing.html' };
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   pathname = aliases[pathname] || pathname;
@@ -110,29 +110,6 @@ const scrolledMenuGeometry = await publicPage.evaluate(() => {
 ok('mobile menu stays attached when opened after scrolling', scrolledMenuGeometry.navTop === 0 && Math.abs(scrolledMenuGeometry.menuTop - scrolledMenuGeometry.navBottom) < 0.5 && scrolledMenuGeometry.bodyPosition === 'fixed' && scrolledMenuGeometry.bodyTop === '-450px', JSON.stringify(scrolledMenuGeometry));
 await publicPage.evaluate(() => document.querySelector('#nav-hamburger').click());
 ok('closing the mobile menu restores the page position', await publicPage.evaluate(() => window.scrollY === 450 && getComputedStyle(document.body).position !== 'fixed'), await publicPage.evaluate(() => JSON.stringify({ scrollY:window.scrollY, bodyPosition:getComputedStyle(document.body).position })));
-// Two reviews of the phone, a week apart, named the same thing: the bar was
-// full. Logo, Help, Sign in, Create account and the hamburger, five elements
-// on 390px, with the button and the hamburger both starting at x=330 and no
-// air between them. So the bar is measured now, and not by eye: what is in it,
-// how far apart, and how big a thumb's worth of it there is.
-const phoneBar = await publicPage.evaluate(() => {
-  const nav = document.querySelector('nav.nav');
-  const items = Array.from(nav.querySelectorAll('a, button'))
-    .filter((node) => {
-      const box = node.getBoundingClientRect();
-      return getComputedStyle(node).display !== 'none' && box.width > 0 && box.height > 0;
-    })
-    .map((node) => {
-      const box = node.getBoundingClientRect();
-      return { label:node.textContent.trim().slice(0, 24) || node.getAttribute('aria-label'), left:Math.round(box.left), right:Math.round(box.right), width:Math.round(box.width), height:Math.round(box.height) };
-    })
-    .sort((first, second) => first.left - second.left);
-  return { items, gaps:items.slice(1).map((item, index) => Math.round(item.left - items[index].right)) };
-});
-ok('the phone bar carries one action beside the menu button', phoneBar.items.length <= 3, JSON.stringify(phoneBar.items));
-ok('nothing in the phone bar touches its neighbour', phoneBar.gaps.length > 0 && phoneBar.gaps.every((gap) => gap >= 12), JSON.stringify(phoneBar));
-ok('every target in the phone bar is finger-sized', phoneBar.items.every((item) => item.height >= 44), JSON.stringify(phoneBar.items));
-
 // Support on a phone. This used to demand a visible /help link in the closed
 // bar, which is why Help was the fifth element up there, shrunk to 9px type to
 // make it fit. The requirement is that a visitor looking for support finds a
@@ -152,6 +129,52 @@ const phoneHelp = await publicPage.evaluate(() => {
 ok('support is reachable on a phone', phoneHelp.some((link) => link.display !== 'none' && link.width > 0 && link.height >= 44), JSON.stringify(phoneHelp));
 await publicPage.locator('#nav-hamburger').click();
 await publicPage.close();
+
+// Two reviews of the phone, a week apart, named the same thing: the bar was
+// full. Logo, Help, Sign in, Create account and the hamburger, five elements
+// on 390px, with the button and the hamburger both starting at x=330 and no
+// air between them. So the bar is measured now, and not by eye: what is in it,
+// how far apart, and how big a thumb's worth of it there is.
+//
+// It is measured on three pages, not on the homepage alone. The bar is shared,
+// but not every page gets it from the generator: developer.html keeps its own
+// (KEEP_OWN_NAV in frontend/apply-nav.py) and is stamped by hand, which is
+// exactly where the first round of this went wrong. A check that only ever
+// looks at / cannot see that.
+for (const route of ['/', '/pricing', '/developer']) {
+  const barPage = await browser.newPage({ viewport:{ width:390, height:844 } });
+  await barPage.route('**/api/user/session/verify', (call) => call.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
+  await barPage.goto(ORIGIN + route, { waitUntil:'domcontentloaded' });
+  await barPage.locator('nav.nav .nav-cta').waitFor();
+  const bar = await barPage.evaluate(() => {
+    const items = Array.from(document.querySelectorAll('nav.nav a, nav.nav button'))
+      .filter((node) => {
+        const box = node.getBoundingClientRect();
+        return getComputedStyle(node).display !== 'none' && box.width > 0 && box.height > 0;
+      })
+      .map((node) => {
+        const box = node.getBoundingClientRect();
+        return { label:node.textContent.trim().slice(0, 24) || node.getAttribute('aria-label'), left:Math.round(box.left), right:Math.round(box.right), height:Math.round(box.height) };
+      })
+      .sort((first, second) => first.left - second.left);
+    return { items, gaps:items.slice(1).map((item, index) => Math.round(item.left - items[index].right)) };
+  });
+  ok(`the phone bar of ${route} carries one action beside the menu button`, bar.items.length <= 3, JSON.stringify(bar.items));
+  ok(`nothing in the phone bar of ${route} touches its neighbour`, bar.gaps.length > 0 && bar.gaps.every((gap) => gap >= 12), JSON.stringify(bar));
+  ok(`every target in the phone bar of ${route} is finger-sized`, bar.items.every((item) => item.height >= 44), JSON.stringify(bar.items));
+
+  // And what the bar handed over has somewhere to land. Sign in and Help leave
+  // the bar below 700px, so on these pages the drawer strip is the only route
+  // to either, and both must be a real tap target.
+  await barPage.locator('#nav-hamburger').click();
+  await barPage.waitForFunction(() => document.querySelector('#nav-mobile-tail')?.classList.contains('open'));
+  const handover = await barPage.evaluate(() => Array.from(document.querySelectorAll('#nav-mobile-tail a')).map((link) => {
+    const box = link.getBoundingClientRect();
+    return { href:link.getAttribute('href'), height:Math.round(box.height), width:Math.round(box.width) };
+  }));
+  ok(`${route} keeps sign in and support one tap away`, ['/auth/login', '/help'].every((href) => handover.some((link) => link.href === href && link.height >= 44 && link.width > 0)), JSON.stringify(handover));
+  await barPage.close();
+}
 
 const tabletPage = await browser.newPage({ viewport:{ width:820, height:1180 } });
 await tabletPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
@@ -176,6 +199,7 @@ await tabletPage.close();
 const generatorSource = fs.readFileSync(path.join(ROOT, 'apply-nav.py'), 'utf8');
 const keepOwnNav = new Set(Array.from((generatorSource.match(/KEEP_OWN_NAV = \{([^}]*)\}/) || [null, ''])[1].matchAll(/'([^']+)'/g), (match) => match[1]));
 const stamped = [];
+const everyPage = [];
 (function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes:true })) {
     const full = path.join(dir, entry.name);
@@ -183,10 +207,23 @@ const stamped = [];
     else if (entry.name.endsWith('.html')) {
       const html = fs.readFileSync(full, 'utf8');
       const name = path.relative(ROOT, full).split(path.sep).join('/');
+      everyPage.push([name, html]);
       if (html.includes('<nav class="nav">') && html.includes('id="nav-auth"') && !keepOwnNav.has(name)) stamped.push([name, html]);
     }
   }
 })(ROOT);
+
+// A hamburger is a promise: below 700px Sign in and Help leave the bar, and the
+// strip under the drawer is where they land. A page with the button and without
+// the strip has no route to either, and that is not hypothetical. developer.html
+// keeps its own nav, is stamped by hand, and shipped exactly like that: on a
+// 390px screen both links measured 0x0. This runs over every page in frontend/,
+// not only the generated ones, because the generated ones were never the
+// problem.
+const hamburgerWithoutTail = everyPage
+  .filter(([, html]) => html.includes('id="nav-hamburger"') && !html.includes('id="nav-mobile-tail"'))
+  .map(([name]) => name);
+ok('no page carries a menu button without the strip that catches what it takes away', hamburgerWithoutTail.length === 0, hamburgerWithoutTail.join(', ') || `${everyPage.filter(([, html]) => html.includes('id="nav-hamburger"')).length} pages with a menu button`);
 const withoutHelp = stamped.filter(([, html]) => !/<a href="\/help"/.test(html)).map(([name]) => name);
 ok('every stamped page links support', stamped.length > 0 && withoutHelp.length === 0, withoutHelp.join(', ') || `${stamped.length} pages`);
 const withoutLegal = stamped.filter(([, html]) => !['/privacy', '/dpa', '/terms'].every((href) => html.includes(`href="${href}"`))).map(([name]) => name);

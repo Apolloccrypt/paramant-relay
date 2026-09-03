@@ -139,6 +139,20 @@
   // ── Mobile menu ───────────────────────────────────────
   if (!hamburger || !mobile) return;
 
+  // A bar with a hamburger has handed Sign in and Help to the drawer, so the
+  // strip that catches them has to exist. developer.html keeps its own nav
+  // (KEEP_OWN_NAV in frontend/apply-nav.py), is stamped by hand, and had no
+  // strip: on a 390px screen both routes were simply gone from that page. The
+  // markup is in the page now, and this builds it for any page that forgets.
+  if (!tail) {
+    tail = document.createElement('div');
+    tail.className = 'nav-mobile-tail';
+    tail.id = 'nav-mobile-tail';
+    tail.innerHTML = '<a href="/auth/login" class="nav-tail-btn">Sign in</a>' +
+                     '<a href="/help" class="nav-tail-link">Help</a>';
+    mobile.parentNode.insertBefore(tail, mobile.nextSibling);
+  }
+
   function openMobileMenu() {
     // Drawer is position:fixed; align its top to the actual bottom of the
     // sticky navbar so it never overlaps the navbar (which sits below the
