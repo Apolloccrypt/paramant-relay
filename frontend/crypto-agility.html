@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Crypto agility · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -19,9 +19,9 @@
 <meta name="twitter:title" content="Crypto agility · Paramant">
 <meta name="twitter:description" content="Algorithms you can swap without rebuilding. Identifiers travel in the header, not in the code path. NIST FIPS 203, 204, 205 and 206 loaded in production.">
 <link rel="canonical" href="https://paramant.app/crypto-agility">
-<link rel="stylesheet" href="/design-system.css?v=25">
-<link rel="stylesheet" href="/nav.css?v=21">
-<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/relay-pulse.css?v=4">
 <style>
 a{color:var(--ink);text-decoration:none}
 a:hover{opacity:.7}
@@ -45,7 +45,7 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
 
 /* algo comparison */
 .algo-table{width:100%;border-collapse:collapse;margin-top:20px;font-size:13px}
-.algo-table th{text-align:left;padding:9px 14px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);border-bottom:1px solid var(--ink-hair);background:rgba(178,255,63,.06)}
+.algo-table th{text-align:left;padding:9px 14px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);border-bottom:1px solid var(--ink-hair);background:rgba(217, 164, 65, .06)}
 .algo-table td{padding:10px 14px;border-bottom:1px solid var(--ink-ghost);vertical-align:top;color:var(--ink-dim)}
 .algo-table td:first-child{font-size:11px;color:var(--ink);font-weight:600}
 .algo-table tr:last-child td{border-bottom:none}
@@ -73,7 +73,7 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
 .cta{background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:26px 30px;margin-top:48px}
 .cta h3{font-size:15px;font-weight:600;margin-bottom:8px}
 .cta p{font-size:13px;color:var(--ink-dim);line-height:1.65;margin-bottom:14px}
-.btn-primary{display:inline-block;font-size:13px;font-weight:700;text-decoration:none;color:var(--bone-on-navy);background:var(--cobalt);padding:8px 18px;margin-right:10px}
+.btn-primary{display:inline-block;font-size:13px;font-weight:700;text-decoration:none;color: var(--on-ochre);background:var(--cobalt);padding:8px 18px;margin-right:10px}
 .btn-primary:hover{opacity:.88}
 .btn-sec{display:inline-block;font-size:13px;text-decoration:none;color:var(--ink);border:1px solid var(--ink-hair);padding:8px 18px}
 .btn-sec:hover{border-color:var(--cobalt)}
@@ -96,9 +96,9 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -109,26 +109,26 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(217, 164, 65, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -137,13 +137,13 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(217, 164, 65, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -161,7 +161,7 @@ section .section-sub{font-size:13px;color:var(--ink-dim);margin-bottom:22px}
 .hero-stats b::before{content:"";width:8px;height:8px;background:var(--lime);flex:none}
 .hero-stats li span{display:block;font-size:11px;color:var(--ink-dim);line-height:1.45;margin-top:8px}
 section h2{display:flex;align-items:baseline;gap:11px}
-.s-num{flex:none;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.03em;color:var(--navy);background:var(--lime);padding:2px 7px;line-height:1.5}
+.s-num{flex:none;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.03em;color: var(--on-ochre);background:var(--lime);padding:2px 7px;line-height:1.5}
 .algo-table td.safe::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--lime);margin-right:7px}
 @media(max-width:640px){.hero-stats li{min-width:100%;border-right:none;border-bottom:1px solid var(--ink-hair)}.hero-stats li:last-child{border-bottom:none}}
 </style>
@@ -283,7 +283,7 @@ section h2{display:flex;align-items:baseline;gap:11px}
   <section>
     <h2><span class="s-num">02</span>The wire format (v1)</h2>
     <p class="section-sub">A 10-byte fixed header, length-prefixed variable fields after.</p>
-    <pre style="background:var(--navy);color:#F8FAFC;border:1px solid var(--ink-hair);padding:18px 22px;font-size:12px;overflow-x:auto;line-height:1.75;font-family:'IBM Plex Mono',ui-monospace,monospace">MAGIC    4 bytes   PQHB
+    <pre style="background:var(--invert);color:var(--invert-ink);border:1px solid var(--ink-hair);padding:18px 22px;font-size:12px;overflow-x:auto;line-height:1.75;font-family:'IBM Plex Mono',ui-monospace,monospace">MAGIC    4 bytes   PQHB
 VERSION  1 byte    0x01
 KEM_ID   2 bytes   uint16 BE
 SIG_ID   2 bytes   uint16 BE (0x0000 = anonymous)
@@ -397,9 +397,9 @@ FLAGS    1 byte    reserved for future features</pre>
   <section>
     <h2><span class="s-num">05</span>See for yourself</h2>
     <p class="section-sub">The live capabilities endpoint is the source of truth.</p>
-    <pre style="background:var(--navy);color:#F8FAFC;border:1px solid var(--ink-hair);padding:14px 20px;font-size:12px;overflow-x:auto;font-family:'IBM Plex Mono',ui-monospace,monospace">curl https://paramant.app/v2/capabilities</pre>
+    <pre style="background:var(--invert);color:var(--invert-ink);border:1px solid var(--ink-hair);padding:14px 20px;font-size:12px;overflow-x:auto;font-family:'IBM Plex Mono',ui-monospace,monospace">curl https://paramant.app/v2/capabilities</pre>
     <p style="font-size:12px;color:var(--ink-dim);margin-top:12px;margin-bottom:10px">Excerpt (full response lists all 21 entries):</p>
-    <pre style="background:var(--navy);color:#F8FAFC;border:1px solid var(--ink-hair);padding:16px 20px;font-size:12px;overflow-x:auto;line-height:1.6;font-family:'IBM Plex Mono',ui-monospace,monospace">{
+    <pre style="background:var(--invert);color:var(--invert-ink);border:1px solid var(--ink-hair);padding:16px 20px;font-size:12px;overflow-x:auto;line-height:1.6;font-family:'IBM Plex Mono',ui-monospace,monospace">{
   "wire_version": 1,
   "kem": [
     { "id": 1, "name": "ML-KEM-512",  "loaded": true },

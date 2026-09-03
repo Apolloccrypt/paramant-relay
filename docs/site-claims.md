@@ -104,10 +104,10 @@ key is for, because it is the one a page makes a promise about.
 
 | Key | What it holds | Written by | Set where |
 |---|---|---|---|
-| `paramant.theme.v1` | The appearance choice: `auto`, `light` or `dark`. Absent means light, which is the default on every app screen. Applied before the first paint by `frontend/js/theme.js`; the dark tokens in `frontend/app-2026.css` are scoped to `[data-theme="auto"]` and `[data-theme="dark"]`, so a dark operating system alone never darkens the app | `frontend/js/theme.js` | The Appearance switch on /account |
+| `paramant.theme.v1` | The appearance choice: `auto`, `light` or `dark`. Absent means the night, which is the default on every page of the site and every app screen. Applied before the first paint by `frontend/js/theme.js`; the cream-paper tokens in `frontend/app-2026.css` are scoped to `[data-theme="light"]` and `[data-theme="auto"]`, so a light operating system alone never lifts the app off the night | `frontend/js/theme.js` | The Appearance switch on /account |
 
 /account tells the reader the choice is "kept in this browser only" and that the
-public pages stay light. `tests/ui-truthfulness.test.mjs` pins the key name, the
+public pages stay dark. `tests/ui-truthfulness.test.mjs` pins the key name, the
 three values, that `theme.js` contains no `fetch`, `XMLHttpRequest` or
 `sendBeacon`, and that /privacy names the key. What the sentence promises about
 colour is measured in a browser by `tests/app-theme.test.mjs`.

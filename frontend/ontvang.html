@@ -5,13 +5,13 @@
 <!-- Sticky readiness signals. Plain script in <head> on purpose: it must run
      before every module and deferred script that signals or awaits. -->
 <script src="/js/ready.js?v=1"></script>
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Receive a file · Paramant</title>
 <meta name="robots" content="noindex, nofollow">
-<link rel="stylesheet" href="/design-system.css?v=25">
-<link rel="stylesheet" href="/nav.css?v=21">
-<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/relay-pulse.css?v=4">
 <meta name="description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download.">
 <meta property="og:title" content="A secure file is waiting · Paramant">
 <meta property="og:description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download. Nothing is stored on the server.">
@@ -42,10 +42,10 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .card-body{padding:20px 18px}
 .status-line{font-size:11px;color:var(--ink-dim);padding:4px 0;display:flex;align-items:center;gap:8px;line-height:1.7}
 .status-line.ok{color:var(--cobalt)}
-.status-line.err{color:rgba(255,80,80,1)}
+.status-line.err{color:rgba(196, 96, 79, 1)}
 .fingerprint{font-size:28px;font-weight:700;letter-spacing:.18em;color:var(--ink);text-align:center;padding:24px;background:var(--bone);border:1px solid var(--ink-hair);margin:16px 0}
 .fingerprint-label{font-size:11px;color:var(--ink-dim);text-align:center;margin-bottom:8px}
-.btn{width:100%;padding:11px;background:var(--cobalt);color:var(--bone-on-navy);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;margin-top:8px}
+.btn{width:100%;padding:11px;background:var(--cobalt);color: var(--on-ochre);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;margin-top:8px}
 .btn:hover{opacity:.85}
 .btn:disabled{background:var(--ink-ghost);cursor:not-allowed}
 .progress-bar-wrap{background:var(--bone);border:1px solid var(--ink-hair);height:4px;overflow:hidden;margin:12px 0}
@@ -67,9 +67,9 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -80,26 +80,26 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(217, 164, 65, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -108,13 +108,13 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(217, 164, 65, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -225,7 +225,7 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <div class="step" id="step-error">
   <h1>Transfer failed</h1>
   <div class="card">
-    <div class="card-head"><div class="dot" style="background:rgba(255,80,80,1)"></div><div class="card-head-title">Error</div></div>
+    <div class="card-head"><div class="dot" style="background:rgba(196, 96, 79, 1)"></div><div class="card-head-title">Error</div></div>
     <div class="card-body">
       <div class="status-line err" id="error-msg">Unknown error</div>
     </div>

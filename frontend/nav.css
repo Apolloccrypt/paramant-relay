@@ -18,13 +18,7 @@ nav.nav {
   gap: var(--space-4);
   padding: 0 40px;
   height: 56px;
-  /* The bar paints the paper of the page it sits on, not a fixed hex. The
-     homepage runs on warm paper (#FAF8F3) while the bar was pinned to the cool
-     bone (#F8FAFC), and the two met in a visible band under the bar as soon as
-     the page scrolled. app-2026.css already does this for the app screens
-     (var(--paper)); --nav-paper is the same idea for the marketing pages. Any
-     page that sets no token keeps the exact value it had. */
-  background: var(--nav-paper-blur, rgba(248,250,252,.92));
+  background: var(--bone-blur);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--ink-hair);
@@ -173,9 +167,9 @@ nav.nav .nav-dropdown-menu li a {
 }
 nav.nav .nav-dropdown-menu li a:hover,
 nav.nav .nav-dropdown-menu li a:focus {
-  color: #0B3A6A;
-  background: rgba(178,255,63,0.15);
-  border-left: 2px solid #B2FF3F;
+  color: var(--ink);
+  background: rgba(217, 164, 65, 0.15);
+  border-left: 2px solid var(--ochre);
   padding-left: calc(var(--space-5) - 2px);
   outline: none;
 }
@@ -231,7 +225,7 @@ nav.nav .nav-link.active::after { transform: scaleX(1); }
   padding: 4px;
   border: 1px solid var(--ink-hair);
   border-radius: 12px;
-  background: rgba(255,255,255,.62);
+  background: var(--card);
 }
 .settings-tabs a {
   flex: 0 0 auto;
@@ -242,8 +236,8 @@ nav.nav .nav-link.active::after { transform: scaleX(1); }
   text-decoration: none;
   white-space: nowrap;
 }
-.settings-tabs a:hover { color: var(--cobalt); background: rgba(35,80,216,.05); }
-.settings-tabs a[aria-current="page"] { color: var(--cobalt); background: rgba(35,80,216,.1); }
+.settings-tabs a:hover { color: var(--cobalt); background: rgba(217, 164, 65, .05); }
+.settings-tabs a[aria-current="page"] { color: var(--cobalt); background: rgba(217, 164, 65, .1); }
 .settings-tabs a:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
 @media (max-width:520px) {
   .settings-tabs { gap:2px; padding:3px; }
@@ -272,17 +266,17 @@ nav.nav .nav-hamburger {
 }
 nav.nav .nav-hamburger:hover {
   border-color: var(--cobalt);
-  background: rgba(29,78,216,.05);
+  background: rgba(217, 164, 65, .05);
 }
 nav.nav .nav-hamburger:focus-visible {
-  outline: 3px solid rgba(29,78,216,.35);
+  outline: 3px solid rgba(217, 164, 65, .35);
   outline-offset: 2px;
 }
 nav.nav .nav-hamburger span {
   display: block;
   width: 22px;
   height: 2px;
-  background: var(--ink);
+  background: var(--invert);
   transition: transform var(--duration-base) var(--ease-out),
               opacity var(--duration-fast) var(--ease-out);
   pointer-events: none;
@@ -357,11 +351,11 @@ nav.nav .nav-hamburger[aria-expanded="true"] span:nth-child(3) {
   transition: color var(--duration-base) var(--ease-sharp);
 }
 .nav-mobile-group-btn:hover {
-  background: rgba(178,255,63,0.08);
-  color: #0B3A6A;
+  background: rgba(217, 164, 65, 0.08);
+  color: var(--ink);
 }
-.nav-mobile-group.open .nav-mobile-group-btn { color: #0B3A6A; }
-.nav-mobile-group.open .nav-mobile-group-btn::after { content: '\2212'; color: #B2FF3F; }
+.nav-mobile-group.open .nav-mobile-group-btn { color: var(--ink); }
+.nav-mobile-group.open .nav-mobile-group-btn::after { content: '\2212'; color: var(--lime); }
 
 /* Group items — animated reveal using max-height + opacity */
 .nav-mobile-group-items {
@@ -394,15 +388,15 @@ nav.nav .nav-hamburger[aria-expanded="true"] span:nth-child(3) {
 }
 .nav-mobile-group-items a:hover,
 .nav-mobile-group-items a:focus-visible {
-  color: #0B3A6A;
-  border-left-color: #B2FF3F;
-  background: rgba(178,255,63,0.1);
+  color: var(--ink);
+  border-left-color: var(--ochre);
+  background: rgba(217, 164, 65, 0.1);
   outline: none;
 }
 .nav-mobile-group-items a[aria-current="page"] {
-  color: #0B3A6A;
-  border-left-color: #B2FF3F;
-  background: rgba(178,255,63,0.12);
+  color: var(--ink);
+  border-left-color: var(--ochre);
+  background: rgba(217, 164, 65, 0.12);
   font-weight: 600;
 }
 
@@ -433,13 +427,13 @@ nav.nav .nav-hamburger[aria-expanded="true"] span:nth-child(3) {
 .nav-mobile-standalone:focus-visible {
   color: var(--cobalt);
   border-left-color: var(--cobalt);
-  background: rgba(29,78,216,.04);
+  background: rgba(217, 164, 65, .04);
   outline: none;
 }
 .nav-mobile-standalone[aria-current="page"] {
   color: var(--cobalt);
   border-left-color: var(--cobalt);
-  background: rgba(29,78,216,.06);
+  background: rgba(217, 164, 65, .06);
   font-weight: 600;
 }
 
@@ -528,7 +522,7 @@ body.nav-locked .nav {
   color: var(--ink-dim);
   line-height: 1.35;
 }
-.nmpl-featured { border-left-color: rgba(29,78,216,.25); }
+.nmpl-featured { border-left-color: rgba(217, 164, 65, .25); }
 .nmpl-featured .nmpl-title { color: var(--cobalt); }
 
 /* Desktop Products dropdown — title + tagline */
@@ -556,7 +550,7 @@ body.nav-locked .nav {
   letter-spacing: 0;
   font-weight: 400;
 }
-.nav-product-item:hover .npi-title { color: #0B3A6A; }
+.nav-product-item:hover .npi-title { color: var(--ink); }
 
 /* Plain-link "buttons" — Compare and Pricing */
 nav.nav .nav-link-btn {
@@ -578,20 +572,20 @@ nav.nav .nav-link-btn:hover {
   position: absolute;
   top: -200px;
   left: 0;
-  background: var(--navy, #0B3A6A);
-  color: #F8FAFC;
+  background: var(--navy);
+  color: var(--ink);
   padding: 12px 20px;
   z-index: 10000;
   text-decoration: none;
   font-family: var(--mono);
   font-size: var(--text-xs);
   letter-spacing: .04em;
-  border: 2px solid #B2FF3F;
+  border: 2px solid var(--ochre);
   transition: top 120ms ease;
 }
 .skip-link:focus,
 .skip-link:focus-visible { top: 0; outline: none; }
-.skip-link:focus:hover { background: #1D4ED8; }
+.skip-link:focus:hover { background: var(--ochre); }
 
 /* ════════════════════════════════════════
    MOBILE NAV CTA + META
@@ -627,8 +621,8 @@ nav.nav .nav-link-btn:hover {
               color var(--duration-base) var(--ease-sharp);
 }
 .btn-ghost-dark:hover {
-  background: var(--ink);
-  color: #F8FAFC;
+  background: var(--invert);
+  color: var(--ink);
 }
 .nav-mobile-meta {
   padding: var(--space-3) var(--space-5) var(--space-5);
@@ -640,7 +634,7 @@ nav.nav .nav-link-btn:hover {
   gap: var(--space-2);
   letter-spacing: .04em;
 }
-.nav-mobile-meta .meta-sep { color: #B2FF3F; }
+.nav-mobile-meta .meta-sep { color: var(--lime); }
 
 /* Beeldmerk-logo: de blauwe P met lime stip als de P van Paramant. */
 nav.nav .nav-logo { display: inline-flex; align-items: center; gap: 0; color: var(--ink); font-weight: 600; }
@@ -683,7 +677,7 @@ nav.nav .nav-help:hover,
 nav.nav .nav-signin:hover { color: var(--cobalt); }
 nav.nav .nav-help:focus-visible,
 nav.nav .nav-signin:focus-visible {
-  outline: 3px solid rgba(29,78,216,.35);
+  outline: 3px solid rgba(217, 164, 65, .35);
   outline-offset: 2px;
 }
 
@@ -698,7 +692,7 @@ nav.nav .nav-cta {
   min-height: 40px;
   padding: 0 var(--space-4);
   background: var(--cobalt);
-  color: #FFFFFF;
+  color: var(--on-ochre);
   border: 1px solid var(--cobalt);
   border-radius: 3px;
   font-family: var(--sans);
@@ -715,10 +709,10 @@ nav.nav .nav-cta {
 nav.nav .nav-cta:hover {
   background: var(--cobalt-2);
   border-color: var(--cobalt-2);
-  color: #FFFFFF;
+  color: var(--ink);
 }
 nav.nav .nav-cta:focus-visible {
-  outline: 3px solid rgba(29,78,216,.35);
+  outline: 3px solid rgba(217, 164, 65, .35);
   outline-offset: 2px;
 }
 
@@ -744,7 +738,7 @@ nav.nav .nav-user-trigger {
 }
 nav.nav .nav-user-trigger:hover { border-color: var(--cobalt); }
 nav.nav .nav-user-trigger:focus-visible {
-  outline: 3px solid rgba(29,78,216,.35);
+  outline: 3px solid rgba(217, 164, 65, .35);
   outline-offset: 2px;
 }
 nav.nav .nav-user-email {
@@ -763,7 +757,7 @@ nav.nav .nav-user-menu {
   background: var(--bone);
   border: 1px solid var(--ink-hair);
   border-radius: 3px;
-  box-shadow: 0 6px 24px rgba(15,23,42,.08);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .08);
   padding: var(--space-1) 0;
   z-index: 400;
 }
@@ -783,9 +777,9 @@ nav.nav .nav-menu-item {
   cursor: pointer;
   text-align: left;
 }
-nav.nav .nav-menu-item:hover { background: rgba(29,78,216,.06); color: var(--cobalt); }
-nav.nav .nav-menu-signout { color: #991B1B; }
-nav.nav .nav-menu-signout:hover { background: rgba(220,38,38,.06); color: #991B1B; }
+nav.nav .nav-menu-item:hover { background: rgba(217, 164, 65, .06); color: var(--cobalt); }
+nav.nav .nav-menu-signout { color: var(--brick-ink); }
+nav.nav .nav-menu-signout:hover { background: rgba(196, 96, 79, .06); color: var(--brick-ink); }
 nav.nav .nav-menu-divider { height: 1px; background: var(--ink-hair); margin: var(--space-1) 0; }
 
 @media (max-width: 420px) {
@@ -842,7 +836,7 @@ nav.nav .nav-menu-divider { height: 1px; background: var(--ink-hair); margin: va
 }
 .nav-mobile-tail .nav-tail-link:hover { color: var(--cobalt); }
 .nav-mobile-tail a:focus-visible {
-  outline: 3px solid rgba(29,78,216,.35);
+  outline: 3px solid rgba(217, 164, 65, .35);
   outline-offset: 2px;
 }
 

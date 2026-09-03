@@ -9,25 +9,28 @@
 // prijs, de limiet en de kleine letter draagt. Dat is niet te zien met het
 // blote oog en het is wel het verschil tussen voldoen en niet voldoen.
 //
-// design-system.css v4.1 zet --ink-dim (en de v3-aliassen --lime-dim en
-// --black-dim) op --ink-2, #40505F, 7.95:1 op het papier. Wat er van die 336
-// overblijft staat hieronder met naam en toenaam in KNOWN_LIGHT, en alle
-// overgebleven gevallen zitten in het style-blok van een pagina en niet in het
-// ontwerpsysteem. Die lijst mag korter worden en nooit langer: een nieuwe regel
-// eronder is een regressie, ook als niemand hem ziet.
+// design-system.css v4.1 zette --ink-dim op #40505F en bracht dat terug tot
+// vier bekende gevallen. design-system.css v5.0, de nachtronde, zet de hele
+// site op de nacht en heeft die laatste vier ook opgelost, in de kleur. De
+// KNOWN_LIGHT-lijst hieronder is daarom leeg. Hij mag korter worden en nooit
+// langer: een nieuwe regel eronder is een regressie, ook als niemand hem ziet.
 //
 // De meting zelf. Voor elk tekstknooppunt wordt de tekstkleur afgevlakt tegen
 // de eerste ondoorzichtige achtergrond erboven, precies zoals een browser hem
 // samenstelt, en dan door de WCAG 2.1 relatieve-luminantie formule gehaald.
 // 4.5:1 voor gewone tekst, 3:1 voor groot (>=24px, of >=18.66px vetgedrukt).
 //
-// GEEN DONKERE MODUS. Een eerdere versie van dit bestand mat ook donker, tegen
-// een donkere tokenset die achter [data-theme] stond zonder schakelaar in de
-// nav. Die laag is uit de tak gehaald: hij was op /security, /pricing en het
-// dashboard onleesbaar (wit op lime, 1.07:1) en kostte 31 KB op elke pagina.
-// Wat hier overblijft is de meting die wel iets bewaakt wat een bezoeker
-// vandaag ziet. Komt donker terug, dan komt de tweede helft van dit bestand
-// mee terug, met een schakelaar en met nul open gevallen.
+// WAT "LIGHT" HIER NOG BETEKENT. De pagina's staan sinds de nachtronde alle
+// zestien op de nacht: warme donkere grond, creme inkt, een okeren accent. De
+// browser wordt hier nog steeds op colorScheme 'light' gezet, en dat is met
+// opzet: het bewijst dat een bezoeker met een licht besturingssysteem exact
+// dezelfde pagina krijgt, want de marketingpagina's laden de schakelaar niet
+// en kennen dus maar een grond. De meting zelf is niet veranderd; alleen de
+// kleuren eronder zijn dat.
+//
+// De schakelaar met drie standen zit op de app-schermen en wordt gemeten door
+// tests/app-theme.test.mjs (welke grond) en tests/app-contrast.test.mjs (of
+// beide gronden leesbaar zijn).
 //
 // Run: node --test tests/theme-contrast.test.mjs
 import { chromium } from 'playwright';
@@ -55,35 +58,20 @@ const aliases = {
 const PAGES = Object.keys(aliases);
 const SIZES = [[390, 844], [1440, 900]];
 
-// Wat er na de tokenfix overbleef, elk met de reden dat hij er nog staat.
-// Alles wat hier niet in staat is een regressie. Het formaat is pagina +
-// selector, want de kleurwaarden veranderen mee met het merk en de plek niet.
+// Wat er na de tokenfix overbleef. Alles wat hier niet in staat is een
+// regressie. Het formaat is pagina + selector, want de kleurwaarden veranderen
+// mee met het merk en de plek niet.
 //
-// Geen van de vier komt uit het ontwerpsysteem: alle vier staan als letterlijke
-// kleur in het style-blok van de pagina zelf, en alle vier stonden er al voor
-// deze tak. Ze horen bij de groep die zo'n scherm onder handen neemt, niet bij
-// een tokenronde die geen woord tekst en geen pagina-CSS aanraakt.
+// Deze lijst is leeg. Hij stond op vier: de primaire knop van /about in cobalt
+// op cobalt, het lime vinkje van /security op papier, en twee gevallen in het
+// style-blok van /docs. De nachtronde heeft alle vier opgelost in de kleur en
+// niet in de lijst. De knop van /about was het enige geval dat de nacht niet
+// vanzelf meenam: `.about-band p a{color:var(--cobalt)}` pakte ook de knop in
+// die alinea, en dat is nu `a:not(.btn)`.
 //
-// De statusregel van /parashare stond hier ook, op rgba(248,250,252,.65),
-// bijna-wit op bijna-wit. #381 heeft hem opgelost, dus hij is hier weg. De
-// mono-kicker van de homepage stond hier ook, op 4.31:1 tegen het tweede
-// papier (#F3F0E8). #389 heeft --hp-ink-3 van #66727F naar #5F6B78 gezet en
-// daarmee haalt hij 4.78:1 tegen dat papier en 5.12:1 tegen #FAF8F3, dus hij
-// is hier weg. Zo hoort deze lijst te bewegen: korter, nooit langer.
-const KNOWN_LIGHT = [
-  // about.html geeft de primaire knop cobalt tekst op een cobalt vlak.
-  { slug: '/about', sel: 'a.btn.btn-primary' },
-  // security.html zet het vinkje in lime op papier: 1.16:1. Lime is 1.17 op
-  // papier en dus per definitie nooit tekst. Het vinkje is hier bullet en geen
-  // inhoud: de zin ernaast draagt de betekenis volledig. Lime hier vervangen is
-  // een merkbesluit en geen herstel, dus het staat hier met naam in plaats van
-  // dat het stil wordt weggepoetst.
-  { slug: '/security', sel: 'span.check' },
-  // docs.html zet inline code en links op gekleurde blokken zonder de
-  // tekstkleur mee te kantelen. Vier gevallen, alle vier in dat style-blok.
-  { slug: '/docs', sel: 'code' },
-  { slug: '/docs', sel: 'a' },
-];
+// De lijst mag korter worden en nooit langer: een nieuwe regel eronder is een
+// regressie, ook als niemand hem ziet.
+const KNOWN_LIGHT = [];
 
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
@@ -181,12 +169,13 @@ test('every page clears WCAG AA in light, and the known page defects do not grow
     measured += result.measured;
     for (const hit of result.uniq) {
       const known = KNOWN_LIGHT.find((k) => k.slug === slug && k.sel === hit.sel);
-      if (known) { stillThere.add(`${slug} ${hit.sel}`); continue; }
+      if (known) { stillThere.add(`${slug} ${hit.sel}: ${hit.c}:1 (needs ${hit.need}), ${hit.color} on ${hit.bg}, "${hit.text}"`); continue; }
       unexpected.push(`${slug} ${hit.sel}: ${hit.c}:1 (needs ${hit.need}), ${hit.color} on ${hit.bg}, "${hit.text}"`);
     }
   }
   t.diagnostic(`light: ${measured} text pairs measured across ${PAGES.length} pages at 390 and 1440`);
   t.diagnostic(`light: ${stillThere.size} of the ${KNOWN_LIGHT.length} known page defects still present`);
+  for (const one of stillThere) t.diagnostic(`light: still on the known list: ${one}`);
   assert.deepEqual(unexpected, [],
     `New contrast failures in light mode. Every one of these is below WCAG AA and none of them is on the known list:\n  ${unexpected.join('\n  ')}\n`
     + 'Fix the colour, or, if it is a deliberate page-owned defect that predates this run, add it to KNOWN_LIGHT with the reason. Do not loosen the ratio.');

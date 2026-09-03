@@ -16,7 +16,7 @@
 .ps-step {
   display: inline-flex; align-items: center; justify-content: center;
   width: 1.6rem; height: 1.6rem; flex: 0 0 1.6rem; border-radius: 50%;
-  background: var(--navy); color: var(--bone); font-family: var(--mono);
+  background: var(--invert); color: var(--invert-ink); font-family: var(--mono);
   font-size: var(--text-xs); font-weight: 700;
 }
 .ps-panel-title { font-size: var(--text-lg); margin: 0; }

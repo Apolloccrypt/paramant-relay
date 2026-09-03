@@ -57,7 +57,7 @@ h2 {
   color: var(--doc-ink-dim);
   margin-bottom: 7px;
   margin-top: 18px;
-  border-bottom: 1px solid rgba(10,10,10,.2);
+  border-bottom: 1px solid rgba(var(--tint), .2);
   padding-bottom: 3px;
 }
 h3 { font-size: 9.5pt; font-weight: 700; margin: 12px 0 5px; }
@@ -65,7 +65,7 @@ p { font-size: 9.5pt; color: var(--doc-ink); line-height: 1.6; margin-bottom: 6p
 ul { padding-left: 14px; margin-bottom: 8px; }
 li { font-size: 9.5pt; color: var(--doc-ink); line-height: 1.55; margin-bottom: 2px; }
 .intro-block {
-  background: rgba(10,10,10,.05);
+  background: rgba(var(--tint), .05);
   border-left: 3px solid var(--doc-ink);
   padding: 10px 14px;
   margin-bottom: 16px;
@@ -75,11 +75,11 @@ li { font-size: 9.5pt; color: var(--doc-ink); line-height: 1.55; margin-bottom: 
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 8px; }
 .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 8px; }
 .prop-list { list-style: none; padding: 0; }
-.prop-list li { font-size: 9.5pt; padding: 3px 0; border-bottom: 1px solid rgba(10,10,10,.1); display: flex; gap: 6px; }
+.prop-list li { font-size: 9.5pt; padding: 3px 0; border-bottom: 1px solid rgba(var(--tint), .1); display: flex; gap: 6px; }
 .prop-list li::before { content: "✓"; color: var(--doc-accent); font-weight: 700; flex-shrink: 0; }
 .arch-box {
-  background: rgba(10,10,10,.05);
-  border: 1px solid rgba(10,10,10,.2);
+  background: rgba(var(--tint), .05);
+  border: 1px solid rgba(var(--tint), .2);
   padding: 12px 14px;
   font-family: var(--mono);
   font-size: 8.5pt;
@@ -90,14 +90,14 @@ li { font-size: 9.5pt; color: var(--doc-ink); line-height: 1.55; margin-bottom: 
 code {
   font-family: var(--mono);
   font-size: 8.5pt;
-  background: rgba(10,10,10,.07);
+  background: rgba(var(--tint), .07);
   padding: 1px 5px;
 }
 .code-block {
   font-family: var(--mono);
   font-size: 8pt;
-  background: rgba(10,10,10,.05);
-  border: 1px solid rgba(10,10,10,.2);
+  background: rgba(var(--tint), .05);
+  border: 1px solid rgba(var(--tint), .2);
   padding: 10px 12px;
   line-height: 1.65;
   color: var(--doc-ink);
@@ -106,11 +106,11 @@ code {
 }
 table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 9pt; }
 th { background: var(--doc-ink); color: var(--doc-bg); text-align: left; padding: 6px 10px; font-size: 8pt; font-weight: 600; letter-spacing: 0.4px; }
-td { padding: 6px 10px; border-bottom: 1px solid rgba(10,10,10,.1); vertical-align: top; color: var(--doc-ink); }
-tr:nth-child(even) td { background: rgba(10,10,10,.03); }
+td { padding: 6px 10px; border-bottom: 1px solid rgba(var(--tint), .1); vertical-align: top; color: var(--doc-ink); }
+tr:nth-child(even) td { background: rgba(var(--tint), .03); }
 .sr-ref { font-family: var(--mono); font-weight: 700; color: var(--doc-accent); white-space: nowrap; }
 .check-col { color: var(--doc-accent); font-weight: 700; text-align: center; }
-.tier-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: rgba(10,10,10,.2); margin: 8px 0; }
+.tier-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: rgba(var(--tint), .2); margin: 8px 0; }
 .tier { background: var(--doc-bg); padding: 10px 12px; }
 .tier.hl { background: rgba(26,122,60,.07); }
 .tier-name { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }

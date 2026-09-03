@@ -2,16 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">:root{color-scheme:light}html,body{background:#FBFAF7;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}@media(prefers-color-scheme:dark){:root[data-theme="auto"]{color-scheme:dark}html[data-theme="auto"],html[data-theme="auto"] body{background:#0A0F16;color:#EDF1F6}}html[data-theme="dark"],html[data-theme="dark"] body{background:#0A0F16;color:#EDF1F6}</style>
+<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}html[data-theme="light"],html[data-theme="light"] body{background:#F1EAD6;color:#1B1F22}html[data-theme="light"]{color-scheme:light}@media (prefers-color-scheme:light){html[data-theme="auto"],html[data-theme="auto"] body{background:#F1EAD6;color:#1B1F22}html[data-theme="auto"]{color-scheme:light}}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Set up your account · Paramant</title>
 <link rel="canonical" href="https://paramant.app/auth/setup">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/design-system.css?v=25">
-<link rel="stylesheet" href="/nav.css?v=21">
-<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/relay-pulse.css?v=4">
 <script src="/js/qrcode.min.js?v=1"></script>
 <style>
 /* Een auth-scherm is op een telefoon één taak. Kop, één zin en de knop moeten
@@ -23,9 +23,9 @@
   .section { padding: var(--space-5) 0; border-top: none; }
 }
 </style>
-<meta name="theme-color" content="#FBFAF7">
-<link rel="stylesheet" href="/app-2026.css?v=4">
-<script src="/js/theme.js?v=1"></script>
+<meta name="theme-color" content="#15191C">
+<link rel="stylesheet" href="/app-2026.css?v=7">
+<script src="/js/theme.js?v=4"></script>
 </head>
 <body>
 
@@ -73,7 +73,7 @@
 <!-- Step 3: pick a sign-in method. Passkey is recommended; the authenticator
      route stays scanner-safe (no POST until the user clicks "instead"). -->
 <section id="state-loading" class="section">
-  <div class="card" style="border-left:3px solid #B2FF3F">
+  <div class="card" style="border-left:3px solid var(--ochre)">
     <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Use a passkey &middot; Recommended</div>
     <p style="margin:0 0 16px">
       A passkey lives on this device and nowhere else. You unlock it with your
@@ -160,7 +160,7 @@
     </div>
   </div>
 
-  <details class="mt-4" style="border:1px solid var(--ink-hair,#E2E8F0);border-radius:6px;padding:14px 18px">
+  <details class="mt-4" style="border:1px solid var(--ink-hair);border-radius:6px;padding:14px 18px">
     <summary style="cursor:pointer;font-weight:600;color:var(--navy)">Which apps work?</summary>
     <p class="small mt-2" style="margin-bottom:0">
       Every standard authenticator app works, including Google Authenticator and Microsoft Authenticator.
@@ -217,8 +217,8 @@
     <button type="button" class="btn btn-primary" id="download-codes">Download my codes</button>
   </div>
   <p class="small mt-2">
-    or <button type="button" id="copy-codes" style="background:none;border:none;color:#1D4ED8;font-weight:600;cursor:pointer;text-decoration:underline;padding:0;font:inherit">copy them</button>
-    &middot; <button type="button" id="print-codes" style="background:none;border:none;color:#1D4ED8;font-weight:600;cursor:pointer;text-decoration:underline;padding:0;font:inherit">print</button>
+    or <button type="button" id="copy-codes" style="background:none;border:none;color:var(--cobalt);font-weight:600;cursor:pointer;text-decoration:underline;padding:0;font:inherit">copy them</button>
+    &middot; <button type="button" id="print-codes" style="background:none;border:none;color:var(--cobalt);font-weight:600;cursor:pointer;text-decoration:underline;padding:0;font:inherit">print</button>
   </p>
 
   <div class="form-checkbox mt-4">
@@ -265,7 +265,7 @@
   <h2>You're all set.</h2>
   <p class="lede mt-3">Your account is active. Two things you can do right now.</p>
   <div class="grid2 mt-3">
-    <a href="/parashare" class="card" style="border-left:3px solid #B2FF3F;text-decoration:none;display:block">
+    <a href="/parashare" class="card" style="border-left:3px solid var(--ochre);text-decoration:none;display:block">
       <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Send a file</div>
       <p class="small" style="margin:0">Encrypt a file in your browser and send a link that the web app burns on the first read, on every plan.</p>
     </a>

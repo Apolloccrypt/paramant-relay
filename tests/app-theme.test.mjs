@@ -1,29 +1,31 @@
-// Dark is a choice, never a jump.
+// The night is the ground. The paper is a choice, never a jump.
 //
-// What was measured on 2026-09-03, before this gate existed: with
-// prefers-color-scheme: dark and nobody having chosen anything, /index and
-// /pricing stayed light while /dashboard, /sign, /parashare, /account and
-// /auth/login came up on rgb(10, 15, 22). A reader on a dark operating system
-// went from creme to black by signing in, and had no way to say no. That is the
-// one thing this suite exists to keep from coming back.
+// What this file measured before the night edition was the opposite case: with
+// prefers-color-scheme: dark and nobody having chosen anything, the app screens
+// went to rgb(10, 15, 22) while the marketing pages stayed creme, so signing in
+// threw a reader from creme to black. The site now stands on one ground on
+// every page, so that jump cannot happen at all: /index, /pricing, /dashboard,
+// /sign, /parashare, /account and /auth/login all come up on the same warm
+// night. What is left to guard is the mirror image of the old rule, and the
+// switch on /account that carries it.
 //
 // The rule it measures:
 //
-//   no choice   -> light, whatever the operating system says
-//   'light'     -> light, whatever the operating system says
-//   'dark'      -> dark,  whatever the operating system says
+//   no choice   -> the night, whatever the operating system says
+//   'dark'      -> the night, whatever the operating system says
+//   'light'     -> the cream paper, whatever the operating system says
 //   'auto'      -> the operating system decides, because someone asked it to
 //
-// and the marketing pages stay light in every one of those cases, which is what
-// the text next to the switch on /account promises.
+// and the marketing pages stay on the night in every one of those cases, which
+// is what the text next to the switch on /account says.
 //
 // It has to be a browser. The gate is a media query scoped to an attribute that
 // a script writes during head parsing, so the answer is a cascade over a DOM
 // state, and only the browser can flatten those into one background colour.
 //
-// The last test in the file takes the gate out and checks the screens go dark
-// again. Without that, a suite like this one passes just as happily against a
-// site that has no dark mode at all.
+// The last test in the file takes the gate out and checks the screens go light
+// again on a light system. Without that, a suite like this one passes just as
+// happily against a site that has no second theme at all.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -38,8 +40,8 @@ const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const THEME_KEY = 'paramant.theme.v1';
 
 // The two page grounds, from --paper in frontend/app-2026.css.
-const LIGHT = 'rgb(251, 250, 247)';
-const DARK = 'rgb(10, 15, 22)';
+const LIGHT = 'rgb(241, 234, 214)';
+const DARK = 'rgb(21, 25, 28)';
 
 const TYPES = { '.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.html':'text/html','.svg':'image/svg+xml','.png':'image/png','.json':'application/json','.woff2':'font/woff2' };
 const ROUTES = {
@@ -83,16 +85,16 @@ async function stubApi(page) {
   await page.route('**/api/user/documents**', (r) => r.fulfill({ status:200, contentType:'application/json', body:'{"documents":[]}' }));
 }
 
-// Serve the pages back with the gate taken out: [data-theme="auto"] becomes the
-// :not([data-theme="light"]) it replaced, in the stylesheet and in every page's
-// critical <style>. That is the code as it stood before this change, and under
-// a dark system with no choice made it must go dark again.
+// Serve the pages back with the gate taken out: [data-theme="auto"] becomes a
+// :not([data-theme="dark"]), in the stylesheet and in every page's critical
+// <style>. That is a site whose second theme follows the operating system on
+// its own, and under a light system with no choice made it must go light.
 async function withoutTheGate(page) {
   await page.route('**/*', async (route) => {
     const response = await route.fetch();
     const type = response.headers()['content-type'] || '';
     if (!/html|css/.test(type)) return route.fulfill({ response });
-    const body = (await response.text()).split('[data-theme="auto"]').join(':not([data-theme="light"])');
+    const body = (await response.text()).split('[data-theme="auto"]').join(':not([data-theme="dark"])');
     return route.fulfill({ response, body });
   });
 }
@@ -129,17 +131,17 @@ const MARKETING = ['/', '/pricing'];
 
 const browser = await chromium.launch({ headless:true, ...(EXE ? { executablePath:EXE } : {}) });
 
-test('a dark system with no choice made leaves every app screen light', async () => {
+test('a light system with no choice made leaves every app screen on the night', async () => {
   const wrong = [];
   for (const url of APP) {
-    const seen = await ground(browser, { url, system:'dark', choice:null });
-    if (seen.body !== LIGHT) wrong.push(`${url}: body is ${seen.body}, expected ${LIGHT}`);
+    const seen = await ground(browser, { url, system:'light', choice:null });
+    if (seen.body !== DARK) wrong.push(`${url}: body is ${seen.body}, expected ${DARK}`);
     if (seen.attribute !== null) wrong.push(`${url}: <html data-theme="${seen.attribute}"> without anyone choosing it`);
-    if (seen.chrome !== '#FBFAF7') wrong.push(`${url}: theme-color is ${seen.chrome}, expected #FBFAF7`);
+    if (seen.chrome !== '#15191C') wrong.push(`${url}: theme-color is ${seen.chrome}, expected #15191C`);
   }
   assert.deepEqual(wrong, [],
-    '\n  A dark operating system must not darken the app on its own. That is the\n' +
-    '  jump from creme to black at sign-in this gate exists to prevent.\n\n  ' +
+    '\n  A light operating system must not lift the app off the night on its own.\n' +
+    '  The night is the ground of the whole site; the paper is asked for.\n\n  ' +
     wrong.join('\n  ') + '\n');
 });
 
@@ -159,10 +161,10 @@ test('the choice "dark" darkens every app screen, on a light system too', async 
     const seen = await ground(browser, { url, system:'light', choice:'dark' });
     if (seen.body !== DARK) wrong.push(`${url}: body is ${seen.body}, expected ${DARK}`);
     if (seen.attribute !== 'dark') wrong.push(`${url}: <html data-theme="${seen.attribute}">, expected "dark"`);
-    if (seen.chrome !== '#0A0F16') wrong.push(`${url}: theme-color is ${seen.chrome}, expected #0A0F16`);
+    if (seen.chrome !== '#15191C') wrong.push(`${url}: theme-color is ${seen.chrome}, expected #15191C`);
   }
   assert.deepEqual(wrong, [],
-    '\n  A dark mode nobody can switch on is not a dark mode.\n\n  ' + wrong.join('\n  ') + '\n');
+    '\n  A choice nobody can make is not a choice.\n\n  ' + wrong.join('\n  ') + '\n');
 });
 
 test('the choice "auto" hands the decision back to the operating system', async () => {
@@ -176,17 +178,20 @@ test('the choice "auto" hands the decision back to the operating system', async 
   assert.deepEqual(wrong, [], '\n  ' + wrong.join('\n  ') + '\n');
 });
 
-test('the marketing pages stay light in every case, which is what /account promises', async () => {
+test('the marketing pages stay on the night in every case, which is what /account promises', async () => {
   const wrong = [];
   for (const url of MARKETING) {
-    for (const choice of [null, 'auto', 'dark']) {
-      const seen = await ground(browser, { url, system:'dark', choice });
-      if (seen.body === DARK) wrong.push(`${url} with choice ${choice}: body is ${seen.body}`);
+    for (const choice of [null, 'auto', 'light']) {
+      const seen = await ground(browser, { url, system:'light', choice });
+      // The homepage paints its ground with a gradient, so its computed
+      // backgroundColor is transparent and never equals a hex. What matters is
+      // that it never becomes the paper.
+      if (seen.body === LIGHT) wrong.push(`${url} with choice ${choice}: body is ${seen.body}, which is the paper`);
     }
   }
   assert.deepEqual(wrong, [],
-    '\n  The switch on /account says the public pages stay light. Either the pages\n' +
-    '  changed or the sentence has to.\n\n  ' + wrong.join('\n  ') + '\n');
+    '\n  The switch on /account says the public pages stay on the night. Either the\n' +
+    '  pages changed or the sentence has to.\n\n  ' + wrong.join('\n  ') + '\n');
 });
 
 // ── the switch itself ────────────────────────────────────────────────────────
@@ -202,24 +207,24 @@ test('/account offers the three choices and picking one repaints the page', asyn
     (nodes) => nodes.map((node) => node.value));
   assert.deepEqual(values, ['auto', 'light', 'dark'], 'the switch must offer exactly Systeem / Licht / Donker');
 
-  assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), LIGHT,
-    'a fresh browser starts light');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), DARK,
+    'a fresh browser starts on the night');
 
   // Click the label, the way a reader does: the radio itself is 0x0 by design
   // and the <span> is the 44px target (see .theme-choice in app-2026.css).
-  await page.locator('#theme-choice input[value="dark"] + span').click();
+  await page.locator('#theme-choice input[value="light"] + span').click();
   await page.waitForTimeout(120);
-  assert.equal(await page.locator('#theme-choice input[value="dark"]').isChecked(), true,
+  assert.equal(await page.locator('#theme-choice input[value="light"]').isChecked(), true,
     'clicking the label must select the radio it belongs to');
-  assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), DARK,
-    'picking Dark must darken the page you are standing on');
-  assert.equal(await page.evaluate((key) => window.localStorage.getItem(key), THEME_KEY), 'dark',
+  assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), LIGHT,
+    'picking Light must repaint the page you are standing on');
+  assert.equal(await page.evaluate((key) => window.localStorage.getItem(key), THEME_KEY), 'light',
     'the choice must survive the next page load');
 
   // And it comes back on the next screen, not just this one.
   await page.goto(ORIGIN + '/dashboard', { waitUntil:'load' });
   await page.waitForTimeout(120);
-  assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), DARK,
+  assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), LIGHT,
     'the choice must carry to the other app screens');
 
   await context.close();
@@ -254,17 +259,17 @@ test('every page that loads app-2026.css also loads the theme script', () => {
 
 // ── the sabotage ─────────────────────────────────────────────────────────────
 
-test('sabotage: with the [data-theme="auto"] gate removed the screens go dark again', async () => {
-  const stillLight = [];
+test('sabotage: with the [data-theme="auto"] gate removed the screens go light again', async () => {
+  const stillNight = [];
   for (const url of APP) {
-    const seen = await ground(browser, { url, system:'dark', choice:null, sabotage:true });
-    if (seen.body !== DARK) stillLight.push(`${url}: body is ${seen.body}, expected ${DARK} without the gate`);
+    const seen = await ground(browser, { url, system:'light', choice:null, sabotage:true });
+    if (seen.body !== LIGHT) stillNight.push(`${url}: body is ${seen.body}, expected ${LIGHT} without the gate`);
   }
-  assert.deepEqual(stillLight, [],
-    '\n  The gate was taken out and the screens stayed light anyway, so the four\n' +
-    '  tests above are not measuring the thing they claim to measure. Either the\n' +
-    '  dark tokens moved somewhere this rewrite no longer reaches, or the dark\n' +
-    '  mode is gone.\n\n  ' + stillLight.join('\n  ') + '\n');
+  assert.deepEqual(stillNight, [],
+    '\n  The gate was taken out and the screens stayed on the night anyway, so the\n' +
+    '  four tests above are not measuring the thing they claim to measure. Either\n' +
+    '  the paper tokens moved somewhere this rewrite no longer reaches, or the\n' +
+    '  second theme is gone.\n\n  ' + stillNight.join('\n  ') + '\n');
 });
 
 test.after(async () => { await browser.close(); host.close(); });

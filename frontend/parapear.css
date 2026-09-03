@@ -27,15 +27,15 @@
   font-family: var(--sans, Inter, system-ui, sans-serif);
   font-size: var(--text-base, 15px);
   line-height: 1.55;
-  color: var(--ink, #0B3A6A);
+  color: var(--ink);
   background: transparent;
-  border: 1px solid var(--ink-hair, rgba(11,58,106,0.18));
+  border: 1px solid var(--ink-hair, rgba(var(--tint), 0.18));
   border-radius: 12px;
   padding: var(--space-3, 12px) var(--space-4, 16px);
 }
 
 .parapear-bubble strong {
-  color: var(--ink, #0B3A6A);
+  color: var(--ink);
   font-weight: 600;
 }
 
@@ -45,31 +45,31 @@
   font-size: 11px;
   letter-spacing: .08em;
   text-transform: uppercase;
-  color: var(--ink-dim, #64748B);
+  color: var(--ink-dim);
   margin-bottom: 4px;
 }
 
 .parapear-bubble a {
-  color: var(--cobalt, #1D4ED8);
+  color: var(--cobalt);
 }
 
 .parapear-dismiss {
   align-self: flex-start;
   margin-left: var(--space-2, 8px);
   background: transparent;
-  border: 1px solid var(--ink-hair, rgba(11,58,106,0.18));
+  border: 1px solid var(--ink-hair, rgba(var(--tint), 0.18));
   border-radius: 8px;
   font-family: var(--sans, Inter, system-ui, sans-serif);
   font-size: 12px;
-  color: var(--ink-dim, #64748B);
+  color: var(--ink-dim);
   padding: 6px 10px;
   cursor: pointer;
   line-height: 1;
 }
 
 .parapear-dismiss:hover {
-  border-color: var(--ink, #0B3A6A);
-  color: var(--ink, #0B3A6A);
+  border-color: var(--ink);
+  color: var(--ink);
 }
 
 /* Accent variant: warm green dot before the kicker, reuses --lime. */
@@ -79,7 +79,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--lime, #B2FF3F);
+  background: var(--lime);
   margin-right: 8px;
   vertical-align: 1px;
 }

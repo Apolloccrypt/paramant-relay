@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Changelog · Paramant release history</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -21,39 +21,39 @@
 <link rel="canonical" href="https://paramant.app/changelog">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0B3A6A">
+<meta name="theme-color" content="#15191C">
 
-<link rel="stylesheet" href="/design-system.css?v=25">
-<link rel="stylesheet" href="/nav.css?v=21">
-<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/relay-pulse.css?v=4">
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{background:var(--bone,#F8FAFC);color:var(--ink,#0B3A6A)}
+body{background:var(--bone);color:var(--ink)}
 main{max-width:780px;margin:0 auto;padding:80px 48px 120px}
 h1{font-size:36px;font-weight:600;letter-spacing:-.03em;margin-bottom:12px}
-.lead{font-size:16px;color:var(--ink-dim,#475569);line-height:1.7;margin-bottom:60px;max-width:560px}
-.release{margin-bottom:64px;border-top:2px solid var(--cobalt,#1D4ED8);padding-top:32px}
+.lead{font-size:16px;color:var(--ink-dim);line-height:1.7;margin-bottom:60px;max-width:560px}
+.release{margin-bottom:64px;border-top:2px solid var(--cobalt);padding-top:32px}
 .release:first-of-type{border-top:none;padding-top:0}
 .release-header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:8px}
-h2{font-size:20px;font-weight:600;letter-spacing:-.01em;color:var(--ink,#0B3A6A)}
-.release-date{font-size:12px;color:var(--ink-dim,#475569);font-family:monospace;letter-spacing:.06em;text-transform:uppercase}
-.release-summary{font-size:15px;color:var(--ink-dim,#475569);line-height:1.7;margin-bottom:28px;max-width:620px}
-h3{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim,#475569);margin:28px 0 12px}
+h2{font-size:20px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+.release-date{font-size:12px;color:var(--ink-dim);font-family:monospace;letter-spacing:.06em;text-transform:uppercase}
+.release-summary{font-size:15px;color:var(--ink-dim);line-height:1.7;margin-bottom:28px;max-width:620px}
+h3{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin:28px 0 12px}
 ul{padding-left:20px;margin-bottom:0}
-li{font-size:14px;color:var(--ink-dim,#475569);line-height:1.8;margin-bottom:4px}
-li strong{color:var(--ink,#0B3A6A)}
-code{background:rgba(11,58,106,.06);padding:2px 5px;font-size:12px;font-family:monospace}
+li{font-size:14px;color:var(--ink-dim);line-height:1.8;margin-bottom:4px}
+li strong{color:var(--ink)}
+code{background:rgba(var(--tint), .06);padding:2px 5px;font-size:12px;font-family:monospace}
 .badge{display:inline-block;font-size:11px;font-family:monospace;padding:2px 7px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
-.badge-added{background:rgba(178,255,63,.25);color:#166534}
-.badge-changed{background:rgba(29,78,216,.08);color:#1D4ED8}
-.badge-fixed{background:rgba(11,58,106,.06);color:#475569}
-.badge-security{background:#FEF3C7;color:#92400E}
+.badge-added{background:rgba(217, 164, 65, .25);color:var(--ok-ink)}
+.badge-changed{background:rgba(217, 164, 65, .08);color:var(--cobalt)}
+.badge-fixed{background:rgba(var(--tint), .06);color:var(--ink-2)}
+.badge-security{background:var(--card);color:var(--warn-ink)}
 .unreleased{opacity:.6}
-footer{border-top:1px solid rgba(11,58,106,.1);padding:40px 48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
 .footer-links{display:flex;gap:20px;flex-wrap:wrap}
-.footer-links a{font-size:12px;color:var(--cobalt,#1D4ED8);text-decoration:none}
-.footer-meta{font-size:12px;color:var(--ink-dim,#475569)}
+.footer-links a{font-size:12px;color:var(--cobalt);text-decoration:none}
+.footer-meta{font-size:12px;color:var(--ink-dim)}
 @media(max-width:640px){main{padding:48px 20px 80px}h1{font-size:26px}footer{padding:32px 20px;flex-direction:column}}
 </style>
 <script type="application/ld+json" data-paramant-seo="1">

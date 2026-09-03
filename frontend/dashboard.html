@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">:root{color-scheme:light}html,body{background:#FBFAF7;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}@media(prefers-color-scheme:dark){:root[data-theme="auto"]{color-scheme:dark}html[data-theme="auto"],html[data-theme="auto"] body{background:#0A0F16;color:#EDF1F6}}html[data-theme="dark"],html[data-theme="dark"] body{background:#0A0F16;color:#EDF1F6}</style>
+<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}html[data-theme="light"],html[data-theme="light"] body{background:#F1EAD6;color:#1B1F22}html[data-theme="light"]{color-scheme:light}@media (prefers-color-scheme:light){html[data-theme="auto"],html[data-theme="auto"] body{background:#F1EAD6;color:#1B1F22}html[data-theme="auto"]{color-scheme:light}}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Your dashboard · Paramant</title>
 <meta name="robots" content="noindex, nofollow">
@@ -10,10 +10,10 @@
 <meta name="description" content="Sign in to your Paramant dashboard.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://relay.paramant.app">
-<link rel="stylesheet" href="/design-system.css?v=25">
-<link rel="stylesheet" href="/nav.css?v=21">
-<link rel="stylesheet" href="/relay-pulse.css?v=1">
-<link rel="stylesheet" href="/parapear.css?v=1">
+<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/relay-pulse.css?v=4">
+<link rel="stylesheet" href="/parapear.css?v=4">
 <noscript><meta http-equiv="refresh" content="0;url=/auth/login?next=/dashboard"></noscript>
 <style>
 /* Dashboard. Client-side rendered from /api/user/me JSON. Auth-gate stays
@@ -62,7 +62,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 /* The one filled accent on this screen. */
 .dh-start-card.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: var(--sh-2); }
 .dh-start-card.primary:hover { background: var(--accent-hov); border-color: var(--accent-hov); }
-.dh-start-card.primary .dh-start-icon { background: rgba(255,255,255,.16); color: var(--accent-ink); }
+.dh-start-card.primary .dh-start-icon { background: rgba(0, 0, 0, .14); color: var(--accent-ink); }
 .dh-start-card.primary .dh-start-kicker { color: var(--accent-ink); opacity: .8; }
 .dh-start-card.primary p { color: var(--accent-ink); opacity: .86; }
 
@@ -116,7 +116,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-filter [data-doc-count] { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--ink-3); }
 .dh-filter[aria-pressed="true"] { background: var(--surface-ink); border-color: var(--surface-ink); color: var(--on-ink); }
 .dh-filter[aria-pressed="true"] + .dh-filter { border-left-color: var(--surface-ink); }
-.dh-filter[aria-pressed="true"] [data-doc-count] { color: var(--mark); }
+.dh-filter[aria-pressed="true"] [data-doc-count] { color: var(--on-ink-accent); }
 .dh-filter:focus-visible { outline: none; box-shadow: var(--ring); position: relative; z-index: 1; }
 
 .dh-documents { border-top: 1px solid var(--line); }
@@ -192,7 +192,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-invites span { display: block; font: 13px/1.55 var(--sans); color: var(--ink-2); }
 
 /* ── Document detail ───────────────────────────────────────────────────────── */
-.dh-doc-dialog { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 14px; background: rgba(6,10,15,.62); animation: dh-veil var(--d-2) var(--e-standard) both; }
+.dh-doc-dialog { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 14px; background: rgba(0, 0, 0, .62); animation: dh-veil var(--d-2) var(--e-standard) both; }
 @keyframes dh-veil { from { opacity: 0; } to { opacity: 1; } }
 .dh-doc-dialog-panel { width: min(620px, 100%); max-height: calc(100dvh - 28px); overflow: auto; border-radius: var(--r-3); color: var(--ink-1); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--sh-3); animation: dh-panel-in var(--d-3) var(--e-enter) both; }
 @keyframes dh-panel-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -249,7 +249,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-btn[disabled] { opacity: .5; cursor: default; }
 
 /* ── Setup nudge ───────────────────────────────────────────────────────────── */
-.dh-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: var(--space-4); background: rgba(6,10,15,.62); animation: dh-veil var(--d-2) var(--e-standard) both; }
+.dh-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: var(--space-4); background: rgba(0, 0, 0, .62); animation: dh-veil var(--d-2) var(--e-standard) both; }
 .dh-modal-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-3); max-width: 460px; width: 100%; padding: var(--space-6) var(--space-5) var(--space-5); box-shadow: var(--sh-3); text-align: center; animation: dh-panel-in var(--d-3) var(--e-enter) both; }
 .dh-modal-img { display: block; margin: 0 auto var(--space-3); }
 .dh-modal-card h2 { font: 600 21px/1.2 var(--sans); letter-spacing: -.02em; color: var(--ink-1); margin: 0 0 var(--space-2); }
@@ -351,9 +351,9 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
   .dh-start-card:hover { transform: none; }
 }
 </style>
-<meta name="theme-color" content="#FBFAF7">
-<link rel="stylesheet" href="/app-2026.css?v=4">
-<script src="/js/theme.js?v=1"></script>
+<meta name="theme-color" content="#15191C">
+<link rel="stylesheet" href="/app-2026.css?v=7">
+<script src="/js/theme.js?v=4"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>

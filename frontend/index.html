@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
+<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}html{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0B3A6A">
+<meta name="theme-color" content="#15191C">
 <title>ParaSign by Paramant &middot; sign and send documents in the EU</title>
 <meta property="og:site_name" content="Paramant">
 <meta name="description" content="Get documents signed and send files safely, straight from your browser. Built and hosted in the EU by Paramantis Solutions B.V. The Community plan is free, forever.">
@@ -22,35 +22,26 @@
 <link rel="canonical" href="https://paramant.app/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="/design-system.css?v=25">
-<link rel="stylesheet" href="/nav.css?v=21">
+<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/nav.css?v=23">
 <style>
-/* Homepage 2026, night edition: the same hand as BeerWeer. Warm night ground,
-   cream ink, one ochre accent, mono for the small facts, a drawn band at the
-   top. One column, 780px, so nothing has to shout. */
+/* Homepage 2026, night edition: the same hand as BeerWeer. The night itself is
+   no longer here: frontend/design-system.css carries it for the whole site, so
+   this block is only what the homepage owns on top of it. The band, the letter,
+   the drawn document and the receipt live nowhere else. */
 :root{
-  --tint:234,226,206; --cream:#EAE2CE; --night:#15191C; --night-2:#101316;
-  --fg:var(--cream); --fg-mid:rgba(var(--tint),.8); --fg-dim:rgba(var(--tint),.62);
-  --line:rgba(var(--tint),.16); --line-2:rgba(var(--tint),.32); --card:rgba(var(--tint),.045); --card-line:rgba(var(--tint),.14);
-  --ochre:#D9A441; --ochre-2:#C7912E; --petrol:#155E75; --teal:#8FB3C4; --brick:#C4604F;
-  --paper:#F1EAD6; --paper-2:#E7DDC4; --paper-ink:#1B1F22; --paper-ink-2:#4A4A44;
-  --r:16px; --pad:clamp(16px,4vw,28px); --maxw:780px;
-  /* the design system's tokens, re-pointed so the nav, the menu and the footer follow the page */
-  --bone:var(--night); --bone-2:var(--night-2); --ink:var(--cream); --ink-2:var(--fg-mid); --ink-dim:var(--fg-dim);
-  --ink-hair:var(--line); --ink-ghost:rgba(var(--tint),.06); --cobalt:var(--ochre); --cobalt-2:var(--ochre-2); --lime:var(--ochre); --navy:var(--cream); --navy-2:var(--cream); --ochre-ink:#8A5E10;
+  --fg:var(--ink); --fg-mid:var(--ink-2); --fg-dim:var(--ink-dim);
+  --teal:#8FB3C4;   /* the band at first light, and nowhere else */
+  --pad:clamp(16px,4vw,28px); --maxw:780px;
   --hp-paper:var(--night); --hp-paper-2:var(--night-2); --hp-ink:var(--cream); --hp-ink-2:var(--fg-mid); --hp-ink-3:var(--fg-dim);
   --hp-line:var(--line); --hp-line-2:var(--line-2); --hp-night:var(--paper); --hp-night-2:var(--paper-2);
   --hp-cobalt:var(--ochre); --hp-cobalt-2:var(--ochre-2); --hp-lime:var(--ochre); --hp-lime-ink:var(--ochre);
   --hp-sans:var(--sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
   --hp-mono:var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
 }
-html{background:var(--night)}
-body{background:linear-gradient(180deg,var(--night) 0,var(--night-2) 100%);color:var(--fg);font-family:var(--hp-sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{background:linear-gradient(180deg,var(--night) 0,var(--night-2) 100%);font-family:var(--hp-sans);text-rendering:optimizeLegibility}
 main{display:block;overflow:hidden}
-nav.nav{background:var(--night);border-bottom-color:var(--line)}
-nav.nav .nav-logo .logo-para{color:var(--cream)}
-nav.nav .nav-logo .logo-mant{color:var(--ochre)}
-.btn,.btn-primary,nav.nav a.nav-cta,.nav-mobile-cta .btn{color:#141414}
+
 .hp-wrap{width:min(100% - 2*var(--pad), var(--maxw));margin-inline:auto}
 .hp-kicker{font-family:var(--hp-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-dim);margin:0 0 14px;display:flex;align-items:center;gap:10px}
 .hp-kicker::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--fg-dim)}

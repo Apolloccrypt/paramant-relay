@@ -10,7 +10,8 @@
   var group = document.getElementById('theme-choice');
   if (!api || !group) return;
 
-  var current = api.read() || 'light';
+  // No stored choice is the night, the same default /js/theme.js applies.
+  var current = api.read() || 'dark';
   var inputs = group.querySelectorAll('input[name="appearance"]');
 
   for (var i = 0; i < inputs.length; i++) {

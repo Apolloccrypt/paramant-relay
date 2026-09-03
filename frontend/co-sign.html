@@ -5,7 +5,7 @@
 <!-- Sticky readiness signals. Plain script in <head> on purpose: it must run
      before every module and deferred script that signals or awaits. -->
 <script src="/js/ready.js?v=1"></script>
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
+<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}html{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Co-sign this document · Paramant</title>
 <meta name="description" content="Review and sign a document someone sent you. The file and your signing key stay in your browser.">
@@ -24,10 +24,10 @@
 <meta name="robots" content="noindex,nofollow">
 <link rel="canonical" href="https://paramant.app/co-sign">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<meta name="theme-color" content="#0B3A6A">
-<link rel="stylesheet" href="/design-system.css?v=25">
-<link rel="stylesheet" href="/nav.css?v=21">
-<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<meta name="theme-color" content="#15191C">
+<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/relay-pulse.css?v=4">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bone);color:var(--ink);font-family:var(--sans);min-height:100vh}
@@ -39,39 +39,39 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .card-head-title{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim)}
 .card-body{padding:18px}
 .dot{width:6px;height:6px;background:var(--lime);border:1px solid var(--navy)}
-.dot.amber{background:#f59e0b}
-.dot.red{background:rgba(255,80,80,1)}
+.dot.amber{background:var(--ochre)}
+.dot.red{background:rgba(196, 96, 79, 1)}
 .kv{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;font-size:12px;line-height:1.6}
 .kv dt{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);padding-top:1px}
 .kv dd{font-family:var(--mono);font-size:11px;color:var(--ink);word-break:break-all}
 .party-row{display:grid;grid-template-columns:32px 1fr auto;gap:10px;padding:8px 0;border-bottom:1px solid var(--ink-hair);font-size:12px;align-items:center}
 .party-row:last-child{border-bottom:0}
-.party-row.me{background:rgba(178,255,63,0.08);margin:0 -8px;padding-left:8px;padding-right:8px}
+.party-row.me{background:rgba(217, 164, 65, 0.08);margin:0 -8px;padding-left:8px;padding-right:8px}
 .party-idx{font-family:var(--mono);font-size:10px;color:var(--ink-dim);text-align:center}
 .party-label{font-weight:600}
 .party-status{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
 .party-status.signed{color:var(--cobalt)}
 .party-status.pending{color:#888}
-.party-status.viewed{color:#d4a017}
+.party-status.viewed{color:var(--warn-ink)}
 .field{margin-bottom:14px}
 .label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
 .input,.select,.file-cta{width:100%;padding:10px;border:1px solid var(--ink-hair);background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:12px}
 .file-cta{display:inline-block;text-align:center;cursor:pointer;border-style:dashed}
 .file-cta:hover{border-color:var(--cobalt);color:var(--cobalt)}
-.btn{display:inline-block;width:100%;padding:11px;background:var(--cobalt);color:var(--bone-on-navy);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;text-decoration:none;text-align:center}
+.btn{display:inline-block;width:100%;padding:11px;background:var(--cobalt);color: var(--on-ochre);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;text-decoration:none;text-align:center}
 .btn:hover{opacity:.85}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .btn-outline{background:transparent;color:var(--ink);border:1px solid var(--ink-hair)}
 .btn-outline:hover{color:var(--cobalt);border-color:var(--cobalt)}
 .banner{padding:10px 14px;font-size:12px;border:1px solid var(--ink-hair);background:var(--bone-2);margin-bottom:14px;line-height:1.5}
-.banner.ok{border-color:var(--cobalt);color:var(--cobalt);background:rgba(11,58,106,0.04)}
-.banner.err{border-color:rgba(200,30,30,0.6);color:rgba(180,20,20,1);background:rgba(255,80,80,0.06)}
-.banner.warn{border-color:#d4a017;background:#fff4d6;color:#5a3f00}
-.disclaimer{background:#fff4d6;border:1px solid #d4a017;padding:10px 14px;font-size:12px;color:#5a3f00;margin-bottom:14px;line-height:1.5}
+.banner.ok{border-color:var(--cobalt);color:var(--cobalt);background:rgba(var(--tint), 0.04)}
+.banner.err{border-color:rgba(196, 96, 79, 0.6);color:rgba(196, 96, 79, 1);background:rgba(196, 96, 79, 0.06)}
+.banner.warn{border-color:#d4a017;background:var(--card);color:var(--warn-ink)}
+.disclaimer{background:var(--card);border:1px solid #d4a017;padding:10px 14px;font-size:12px;color:var(--warn-ink);margin-bottom:14px;line-height:1.5}
 .disclaimer strong{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;color:#7a5300}
 .tag{display:inline-block;font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid var(--ink-hair);color:var(--ink-dim);margin-right:4px}
 .tag.green{border-color:var(--cobalt);color:var(--cobalt)}
-.tag.red{border-color:rgba(200,30,30,0.6);color:rgba(180,20,20,1)}
+.tag.red{border-color:rgba(196, 96, 79, 0.6);color:rgba(196, 96, 79, 1)}
 .step{display:none;animation:fadeIn .2s ease}
 .step.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -81,21 +81,21 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
    looking at a 343px render of the same page. The negative margin cancels the
    two paddings it is nested in, so the preview runs edge to edge inside the
    card and both sides see the document at the same scale. */
-.doc-preview{margin:12px -50px 0;border:1px solid var(--ink-hair);border-left:0;border-right:0;background:#fff;max-height:72vh;overflow:auto;padding:10px 8px}
+.doc-preview{margin:12px -50px 0;border:1px solid var(--ink-hair);border-left:0;border-right:0;background:var(--card);max-height:72vh;overflow:auto;padding:10px 8px}
 .doc-page{position:relative;width:100%;margin:0 auto 12px;max-width:100%}
 .doc-page:last-child{margin-bottom:0}
-.doc-page canvas,.doc-page img{display:block;width:100%;height:auto;border:1px solid var(--ink-hair);background:#fff}
+.doc-page canvas,.doc-page img{display:block;width:100%;height:auto;border:1px solid var(--ink-hair);background:#FFFFFF}
 .doc-page.appearance-page{position:relative;cursor:crosshair}
 .appearance-layer{position:absolute;inset:0;pointer-events:auto;cursor:crosshair}
-.appearance-field{position:absolute;display:flex;align-items:center;overflow:hidden;border:2px solid var(--cobalt);background:rgba(255,255,255,.94);color:var(--ink);padding:5px 8px;font:600 10px/1.25 var(--sans);box-shadow:0 3px 12px rgba(11,58,106,.16);pointer-events:auto}
-.appearance-field.date{border-color:#64748b;font-family:var(--mono);font-weight:500}
+.appearance-field{position:absolute;display:flex;align-items:center;overflow:hidden;border:2px solid #1D4ED8;background:rgba(255,255,255,.94);color:#0C1B2A;padding:5px 8px;font:600 10px/1.25 var(--sans);box-shadow:0 3px 12px rgba(0, 0, 0, .16);pointer-events:auto}
+.appearance-field.date{border-color:#5C6A78;font-family:var(--mono);font-weight:500}
 /* The box the SENDER asked for, before the signer has touched it. It must not
    look like a signature that already exists: no name, no date, no delete
    control, a dashed outline and its own words. It becomes a real placed field
    the moment the signer chooses Place my signature. */
-.appearance-field.requested{border:2px dashed var(--cobalt);background:rgba(11,58,106,.06);box-shadow:none;color:var(--cobalt);font-weight:600;justify-content:center;text-align:center;pointer-events:none}
+.appearance-field.requested{border:2px dashed #1D4ED8;background:rgba(29,78,216,.06);box-shadow:none;color:#1D4ED8;font-weight:600;justify-content:center;text-align:center;pointer-events:none}
 .appearance-field.prior{border-style:solid;background:rgba(239,246,255,.92);pointer-events:none}
-.appearance-remove{position:absolute;top:1px;right:2px;width:20px;height:20px;border:0;background:var(--cobalt);color:#fff;font:700 13px/1 var(--sans);cursor:pointer}
+.appearance-remove{position:absolute;top:1px;right:2px;width:20px;height:20px;border:0;background:#1D4ED8;color:#FFFFFF;font:700 13px/1 var(--sans);cursor:pointer}
 .appearance-tools{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
 .appearance-tools .btn{width:auto;min-width:120px}
 /* 44px: a finger, not a mouse. These were 34-36px, under every touch-target
@@ -105,14 +105,14 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 /* The pointer to the requested spot. It sits ABOVE the preview because that is
    where the reader is when the document opens; the spot itself can be three
    pages down. */
-.requested-note{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding:10px 14px;border:1px solid var(--cobalt);background:rgba(11,58,106,.04);font-size:12px;line-height:1.5;color:var(--cobalt)}
+.requested-note{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding:10px 14px;border:1px solid var(--cobalt);background:rgba(var(--tint), .04);font-size:12px;line-height:1.5;color:var(--cobalt)}
 .requested-note .btn{width:auto;min-width:0;padding:11px 14px;flex:0 0 auto}
 .appearance-help{font-size:12px;line-height:1.55;color:var(--ink-dim)}
 .appearance-help.active{color:var(--cobalt);font-weight:600}
 .doc-preview-meta{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-dim);text-align:center;padding:8px 0;line-height:1.5}
 .review-gate{font-size:12px;color:var(--ink-dim);margin-top:10px;line-height:1.6}
 .blind-link{background:none;border:none;color:var(--ink-dim);text-decoration:underline;font-family:var(--mono);font-size:11px;cursor:pointer;padding:0}
-.blind-link:hover{color:#b91c1c}
+.blind-link:hover{color:var(--brick-ink)}
 @media(max-width:640px){main{padding:40px 16px}h1{font-size:19px}.kv{grid-template-columns:1fr}}
 </style>
 </head>
@@ -204,8 +204,8 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
            for this session — signing "like logging in again". -->
       <div class="banner" id="cs-pass-panel" hidden style="margin-top:12px">
         <p id="cs-pass-prompt" style="margin-bottom:10px"></p>
-        <input type="text" id="cs-pass-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="6-digit code" aria-label="Authenticator code" style="width:100%;padding:10px;border:1px solid var(--ink-hair,#e2e8f0);border-radius:6px;margin-bottom:8px;font-size:14px">
-        <p id="cs-pass-err" hidden style="color:var(--danger,#b91c1c);font-size:13px;margin-bottom:8px"></p>
+        <input type="text" id="cs-pass-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="6-digit code" aria-label="Authenticator code" style="width:100%;padding:10px;border:1px solid var(--ink-hair);border-radius:6px;margin-bottom:8px;font-size:14px">
+        <p id="cs-pass-err" hidden style="color:var(--danger);font-size:13px;margin-bottom:8px"></p>
         <div style="display:flex;gap:8px">
           <button class="btn btn-outline" id="cs-pass-cancel" type="button">Cancel</button>
           <button class="btn" id="cs-pass-confirm" type="button">Continue</button>

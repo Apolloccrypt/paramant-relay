@@ -2,16 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Create an account · Paramant</title>
 <meta name="description" content="Paramant API keys are now issued through account signup with TOTP protection. Create a free account to get started.">
 <meta name="robots" content="noindex">
 <meta http-equiv="refresh" content="8;url=/signup">
 <link rel="canonical" href="https://paramant.app/signup">
-<link rel="stylesheet" href="/design-system.css?v=25">
-<link rel="stylesheet" href="/nav.css?v=21">
-<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/relay-pulse.css?v=4">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
 .nav-help {
@@ -22,9 +22,9 @@
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -35,26 +35,26 @@
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(217, 164, 65, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -63,13 +63,13 @@
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(217, 164, 65, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -114,25 +114,25 @@
   <section class="section section--light" style="padding: 80px 24px;">
     <div style="max-width: 600px; margin: 0 auto; text-align: center;">
 
-      <span style="display:inline-block;background:#B2FF3F;color:#0B3A6A;padding:3px 14px;font-family:&quot;IBM Plex Mono&quot;,monospace;font-size:11px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:28px;">UPDATED FLOW</span>
+      <span style="display:inline-block;background:var(--ochre);color:var(--ink);padding:3px 14px;font-family:&quot;IBM Plex Mono&quot;,monospace;font-size:11px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:28px;">UPDATED FLOW</span>
 
-      <h1 style="font-size:clamp(32px,5vw,52px);color:#0B3A6A;margin:0 0 20px 0;letter-spacing:-0.02em;line-height:1.1;font-weight:600;">
+      <h1 style="font-size:clamp(32px,5vw,52px);color:var(--ink);margin:0 0 20px 0;letter-spacing:-0.02em;line-height:1.1;font-weight:600;">
         API keys now come with accounts.
       </h1>
 
-      <p style="font-size:17px;color:#475569;line-height:1.7;margin:0 0 36px 0;">
+      <p style="font-size:17px;color:var(--ink-2);line-height:1.7;margin:0 0 36px 0;">
         We replaced the trial-key-by-email flow with a proper signup. You still get a free key — but now it comes with TOTP protection, an admin dashboard, and no plaintext key sitting in your inbox.
       </p>
 
-      <a href="/signup" style="display:inline-block;padding:16px 36px;background:#B2FF3F;color:#0B3A6A;text-decoration:none;font-family:&quot;IBM Plex Mono&quot;,monospace;font-size:14px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">
+      <a href="/signup" style="display:inline-block;padding:16px 36px;background:var(--ochre);color:var(--ink);text-decoration:none;font-family:&quot;IBM Plex Mono&quot;,monospace;font-size:14px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">
         Create account →
       </a>
 
-      <p style="font-size:14px;color:#64748b;margin:32px 0 0 0;line-height:1.6;">
-        Already had a trial key? It still works until it expires. <a href="/signup" style="color:#1D4ED8;text-decoration:underline;">Upgrade to a full account</a> to keep access after the trial.
+      <p style="font-size:14px;color:var(--ink-dim);margin:32px 0 0 0;line-height:1.6;">
+        Already had a trial key? It still works until it expires. <a href="/signup" style="color:var(--cobalt);text-decoration:underline;">Upgrade to a full account</a> to keep access after the trial.
       </p>
 
-      <p style="font-size:12px;color:#94A3B8;margin:24px 0 0 0;font-family:&quot;IBM Plex Mono&quot;,monospace;">
+      <p style="font-size:12px;color:var(--ink-dim);margin:24px 0 0 0;font-family:&quot;IBM Plex Mono&quot;,monospace;">
         Redirecting automatically in 8 seconds&hellip;
       </p>
 

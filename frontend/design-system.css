@@ -1,49 +1,103 @@
-/* PARAMANT design-system.css v4.1
-   Source of truth: PARAMANT-DESIGN-SYSTEM-v4.md (Denim Edit)
-   Four colors: bone / navy / cobalt / lime. Zero radius. Sans + mono split.
+/* PARAMANT design-system.css v5.0, night edition
+   Source of truth for colour: the homepage of PR #404, which put Paramant in
+   the same hand as BeerWeer (weer.mickbeer.com). That was one page. This file
+   moves it into the system, so every page of the site and every screen of the
+   app stands on the same ground.
 
-   v4.1 verandert precies een ding: --ink-dim, --lime-dim en --black-dim
-   wijzen naar --ink-2 (#40505F) in plaats van naar rgba(11,58,106,.65).
-   Dat is de enige gemeten wijziging; alle andere waarden staan zoals ze
-   stonden. Zie het blok bij --ink-2 voor de getallen. */
+   What the night is. A warm dark ground (#15191C into #101316), cream ink
+   (#EAE2CE) with a dim at 62% of it, hairlines at 16% of it, cards at 4.5% of
+   it with a 16px radius. ONE accent, ochre #D9A441, with #141414 as the ink on
+   top of it. Petrol #155E75 is the second accent and never carries text on the
+   night; #3FA3C4 is its readable ink. Brick #C4604F marks a fault; #E08A78 is
+   its readable ink. Cream paper #F1EAD6 with ink #1B1F22 is the one inverted
+   surface, for a panel that has to read as paper on a desk.
+
+   Cobalt and lime are gone from the UI. Their token names stay and point at
+   the ochre, so a rule written against --cobalt or --lime in a page's own
+   style block follows the system instead of breaking.
+
+   Measured against WCAG 2.1 on #15191C: cream 13.70, dim 5.95, ochre 7.86,
+   petrol-ink 6.10, brick-ink 6.80. On the cream paper #F1EAD6: ink 13.81,
+   ink-2 7.43, ochre-ink 4.74. tests/theme-contrast.test.mjs walks every text
+   node on sixteen pages and fails on anything under AA. */
 
 
 /* ═══════════════════════════════════════════════════
    TOKENS
    ═══════════════════════════════════════════════════ */
 :root {
+  /* the cream, as channels, so every tint of it is one number away */
+  --tint: 234, 226, 206;
+
+  /* the night, the cream, the one accent */
+  --night:     #15191C;
+  --night-2:   #101316;
+  --cream:     #EAE2CE;
+  --ochre:     #D9A441;
+  --ochre-2:   #C7912E;
+  --ochre-ink: #8A5E10;              /* the ochre as ink, for the cream paper */
+  --on-ochre:  #141414;              /* the ink that sits on a filled ochre */
+  --petrol:    #155E75;              /* second accent: fills and lines only */
+  --petrol-ink:#3FA3C4;              /* the petrol as ink on the night */
+  --brick:     #C4604F;              /* a fault, as a fill or a line */
+  --brick-ink: #E08A78;              /* a fault, as ink on the night */
+  --ok-ink:    #8FC7A4;
+  --warn-ink:  #E3C169;
+
+  /* the cream paper: the one inverted surface */
+  --paper:       #F1EAD6;
+  --paper-2:     #E7DDC4;
+  --paper-ink:   #1B1F22;
+  --paper-ink-2: #4A4A44;
+  --paper-line:  rgba(27, 31, 34, .18);
+
+  /* the corner. Zero was the old system's choice; the night rounds. */
+  --r: 16px;
+
   /* surface */
-  --bone:   #F8FAFC;
-  --bone-2: #EEF2F6;
+  --bone:   var(--night);
+  --bone-2: var(--night-2);
+  --card:      rgba(var(--tint), .045);
+  --card-2:    rgba(var(--tint), .075);
+  --card-line: rgba(var(--tint), .14);
+  --surface:   var(--card);
 
   /* ink */
-  --navy:      #0B3A6A;
-  --navy-2:    #0A2E55;
-  --ink:       #0B3A6A;
-  /* --ink-2 is de leeskleur voor alles wat niet de primaire tekst is: de
-     kleine letter, de prijsregel, de limietregel, de meta onder een kaart.
-     De oude waarde was rgba(11,58,106,.65) en die landt op 4.09:1 tegen het
-     papier, 3.96:1 tegen de voet en 4.18:1 op een witte kaart. Drie keer net
-     onder de 4.5 die WCAG AA vraagt, en drie keer onder de tekst die de prijs
-     en de kleine letter draagt. #40505F haalt 7.95:1 op het papier en 7.35:1
-     op de voet. Gemeten met de WCAG 2.1 relatieve-luminantieformule; de meting
-     staat in tests/theme-contrast.test.mjs en die faalt op elke nieuwe. */
-  --ink-2:     #40505F;
-  --ink-dim:   var(--ink-2);
-  --ink-hair:  rgba(11,58,106,.15);
-  --ink-ghost: rgba(11,58,106,.08);
+  --navy:      var(--cream);
+  --navy-2:    var(--cream);
+  --ink:       var(--cream);
+  --ink-2:     rgba(var(--tint), .80);
+  --ink-dim:   rgba(var(--tint), .62);
+  --ink-hair:  rgba(var(--tint), .16);
+  --ink-ghost: rgba(var(--tint), .06);
+  --line:      var(--ink-hair);
+  --line-2:    rgba(var(--tint), .32);
 
-  /* accent */
-  --cobalt:   #1D4ED8;
-  --cobalt-2: #1A43BE;
+  /* accent. One ochre. The old names survive as aliases so no page breaks. */
+  --cobalt:      var(--ochre);
+  --cobalt-2:    var(--ochre-2);
+  --accent:      var(--ochre);
+  --accent-hov:  var(--ochre-2);
+  --accent-ink:  var(--on-ochre);
+  --accent-soft: rgba(217, 164, 65, .10);
+  --accent-ring: rgba(217, 164, 65, .50);
 
-  /* punctuation */
-  --lime: #B2FF3F;
+  /* punctuation. Lime was the old one; it is the ochre now. */
+  --lime: var(--ochre);
 
-  /* inverted text */
-  --bone-on-navy:      #F8FAFC;
-  --bone-on-navy-dim:  rgba(248,250,252,.72);
-  --bone-on-navy-hair: rgba(248,250,252,.18);
+  /* the inverted block. On the old bone site this was a navy slab with bone
+     text. On the night it goes the other way: a slab cut deeper than the page,
+     with the same cream ink, and a hairline so it still reads as a block. */
+  --invert:      #0C0F11;
+  --invert-ink:  var(--cream);
+  --invert-dim:  var(--ink-2);
+  --invert-hair: var(--line-2);
+  --bone-on-navy:      var(--invert-ink);
+  --bone-on-navy-dim:  var(--invert-dim);
+  --bone-on-navy-hair: var(--invert-hair);
+
+  /* the bar, translucent over the night */
+  --bone-blur: rgba(21, 25, 28, .92);
 
   /* typography */
   --sans: ui-sans-serif, system-ui, -apple-system, "Inter",
@@ -94,16 +148,18 @@
   --ease-out:      cubic-bezier(0.16, 1, 0.3, 1);
 
   /* ─── v3 legacy token aliases (remove after Phase D HTML migration) ─── */
-  --black:       #0B3A6A;
-  --lime-dim:    var(--ink-2);
-  --lime-hair:   rgba(11,58,106,.15);
-  --lime-ghost:  rgba(11,58,106,.08);
-  --black-dim:   var(--ink-2);
-  --black-hair:  rgba(11,58,106,.15);
-  --black-ghost: rgba(11,58,106,.08);
+  --black:       var(--cream);
+  --lime-dim:    var(--ink-dim);
+  --lime-hair:   var(--ink-hair);
+  --lime-ghost:  var(--ink-ghost);
+  --black-dim:   var(--ink-dim);
+  --black-hair:  var(--ink-hair);
+  --black-ghost: var(--ink-ghost);
   --doc-bg:      var(--bone);
   --doc-ink:     var(--ink);
   --doc-ink-dim: var(--ink-dim);
+
+  color-scheme: dark;
 }
 
 
@@ -191,13 +247,13 @@ h1 em::after {
   content: "";
   position: absolute;
   left: 0; right: 0; bottom: 4%; height: 22%;
-  background: var(--lime);
+  background: rgba(217, 164, 65, .22);
   z-index: -1;
 }
 
 ::selection {
   background: var(--lime);
-  color: var(--navy);
+  color: var(--on-ochre);
 }
 
 
@@ -223,27 +279,27 @@ h1 em::after {
    SECTION WRAPPERS
    ═══════════════════════════════════════════════════ */
 .section-cobalt {
-  background: var(--cobalt);
-  color: var(--bone-on-navy);
+  background: var(--invert);
+  color: var(--invert-ink);
 }
 .section-navy {
-  background: var(--navy);
-  color: var(--bone-on-navy);
+  background: var(--invert);
+  color: var(--invert-ink);
 }
 .section-cobalt ::selection,
 .section-navy ::selection {
   background: var(--lime);
-  color: var(--navy);
+  color: var(--on-ochre);
 }
 
-/* v3 .invert — maps to cobalt during migration */
+/* v3 .invert: the inverted block, which on the night is the deeper night */
 .invert {
-  background: var(--cobalt);
-  color: var(--bone-on-navy);
+  background: var(--invert);
+  color: var(--invert-ink);
 }
 .invert ::selection {
   background: var(--lime);
-  color: var(--navy);
+  color: var(--on-ochre);
 }
 
 /* document mode — kept for Template B pages */
@@ -287,12 +343,12 @@ h1 em::after {
   display: flex;
   flex-direction: column;
 }
-.stack > * + * { margin-top: var(--stack-gap, var(--space-5)); }
+.stack > * + * { margin-top: var(--stack-gap); }
 
 .cluster {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--cluster-gap, var(--space-4));
+  gap: var(--cluster-gap);
   align-items: center;
 }
 
@@ -467,7 +523,7 @@ h1 em::after {
   display: block;
   width: 200px;
   height: 80px;
-  background: var(--lime);
+  background: var(--accent-soft);
   position: absolute;
   right: 0;
   top: -40px;
@@ -513,12 +569,12 @@ h1 em::after {
 .cta-stack button:first-child { border-top: none; }
 .cta-stack .primary {
   background: var(--cobalt);
-  color: var(--bone-on-navy);
+  color: var(--on-ochre);
 }
-.cta-stack .primary:hover { background: var(--navy); border-top-color: var(--navy); }
+.cta-stack .primary:hover { background: var(--invert); border-top-color: var(--invert); }
 .cta-stack a:not(.primary):hover,
 .cta-stack button:not(.primary):hover {
-  background: var(--navy);
+  background: var(--invert);
   color: var(--bone-on-navy);
 }
 
@@ -545,8 +601,8 @@ h1 em::after {
   animation: drop-breathe 3.6s var(--ease-soft) infinite;
 }
 @keyframes drop-breathe {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(178,255,63,0); }
-  50%      { box-shadow: 0 0 0 4px rgba(178,255,63,.18); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 164, 65, 0); }
+  50%      { box-shadow: 0 0 0 4px rgba(217, 164, 65, .18); }
 }
 .drop:hover, .drop:focus-within,
 .dropzone:hover, .dropzone:focus-within {
@@ -557,7 +613,7 @@ h1 em::after {
 .dropzone.drag-over {
   background: var(--ink-ghost);
   border-color: var(--cobalt);
-  box-shadow: 0 0 0 4px rgba(29,78,216,.18);
+  box-shadow: 0 0 0 4px rgba(217, 164, 65, .18);
 }
 
 /* "01" bleeding label */
@@ -567,7 +623,7 @@ h1 em::after {
   top: -1px;
   left: -1px;
   background: var(--lime);
-  color: var(--navy);
+  color: var(--on-ochre);
   padding: var(--space-1) var(--space-3);
   font-family: var(--mono);
   font-size: var(--text-xs);
@@ -643,7 +699,7 @@ h1 em::after {
   width: 100%;
   padding: var(--space-4) var(--space-5);
   background: var(--cobalt);
-  color: var(--bone-on-navy);
+  color: var(--on-ochre);
   font-family: var(--mono);
   font-size: var(--text-sm);
   font-weight: 700;
@@ -656,7 +712,7 @@ h1 em::after {
   transition: background var(--duration-base) var(--ease-sharp);
   margin-top: var(--space-5);
 }
-.drop-btn:hover { background: var(--navy); }
+.drop-btn:hover { background: var(--invert); }
 
 
 /* ═══════════════════════════════════════════════════
@@ -677,7 +733,7 @@ h1 em::after {
   top: -1px;
   left: -1px;
   background: var(--lime);
-  color: var(--navy);
+  color: var(--on-ochre);
   padding: var(--space-1) var(--space-3);
   font-family: var(--mono);
   font-size: var(--text-xs);
@@ -771,7 +827,7 @@ h1 em::after {
   font-family: var(--mono);
   font-size: var(--text-4xl);
   font-weight: 700;
-  color: rgba(29,78,216,.2);
+  color: rgba(217, 164, 65, .2);
   line-height: 1;
   margin-bottom: var(--space-4);
 }
@@ -803,7 +859,7 @@ h1 em::after {
   display: block;
   padding: var(--space-7) var(--space-6);
   text-decoration: none;
-  color: var(--bone-on-navy);
+  color: var(--on-ochre);
   background: var(--cobalt);
   min-height: 340px;
   transition: background var(--duration-base) var(--ease-sharp);
@@ -1053,7 +1109,7 @@ h1 em::after {
   flex-direction: column;
   position: relative;
 }
-.tier.featured { background: var(--lime); }
+.tier.featured { background: var(--night-2); box-shadow: inset 3px 0 0 var(--ochre); }
 
 .pricing-tier,
 .tier-tag {
@@ -1087,7 +1143,7 @@ h1 em::after {
   margin-bottom: var(--space-5);
 }
 .tier.featured .tier-unit,
-.tier.featured .pricing-note { color: rgba(11,58,106,.65); }
+.tier.featured .pricing-note { color: rgba(var(--tint), .65); }
 
 .pricing-card > p,
 .tier > p {
@@ -1161,6 +1217,7 @@ h1 em::after {
   white-space: nowrap;
   line-height: 1;
   user-select: none;
+  border-radius: 12px;
 }
 .btn:active:not(:disabled) {
   transform: translateY(1px);
@@ -1173,22 +1230,23 @@ h1 em::after {
 
 .btn-primary {
   background: var(--cobalt);
-  color: var(--bone-on-navy);
+  color: var(--on-ochre);
   border-color: var(--cobalt);
 }
 .btn-primary:hover {
-  background: var(--navy);
-  border-color: var(--navy);
+  background: var(--ochre-2);
+  border-color: var(--ochre-2);
 }
 
 .btn-secondary {
-  background: transparent;
-  color: var(--navy);
-  border-color: var(--navy);
+  background: var(--card);
+  color: var(--ink);
+  border-color: var(--line-2);
 }
 .btn-secondary:hover {
-  background: var(--navy);
-  color: var(--bone-on-navy);
+  background: var(--card-2);
+  color: var(--ink);
+  border-color: var(--ink);
 }
 
 .btn-tertiary {
@@ -1212,7 +1270,7 @@ h1 em::after {
 .section-navy   .btn-primary,
 .invert         .btn-primary {
   background: var(--lime);
-  color: var(--navy);
+  color: var(--on-ochre);
   border-color: var(--lime);
 }
 .section-cobalt .btn-primary:hover,
@@ -1220,7 +1278,7 @@ h1 em::after {
 .invert         .btn-primary:hover {
   background: var(--bone);
   color: var(--navy);
-  border-color: var(--bone);
+  border-color: var(--invert-ink);
 }
 
 .section-cobalt .btn-secondary,
@@ -1328,7 +1386,7 @@ footer {
    actually for; everything else has a home in the navigation. */
 .footer-grid.footer-slim {
   grid-template-columns: minmax(260px, 2fr) 1fr;
-  gap: var(--space-10, var(--space-8));
+  gap: var(--space-10);
 }
 
 .footer-col-label,
@@ -1659,9 +1717,9 @@ pre code { background: none; padding: 0; }
   border-top: none;
 }
 .section-dark {
-  background: var(--navy);
+  background: var(--invert);
 }
-.section-dark h2 { color: var(--bone); }
+.section-dark h2 { color: var(--invert-ink); }
 .section-dark p  { color: var(--bone-on-navy-dim); }
 
 /* Eyebrow label above hero heading */
@@ -1707,7 +1765,7 @@ pre code { background: none; padding: 0; }
 .dim.mono    { margin-top: 12px; margin-bottom: 40px; }
 .cobalt-text { color: var(--cobalt); font-weight: 600; }
 .strong      { font-weight: 600; color: var(--ink); }
-.warn-text   { color: #C2410C; font-weight: 600; }
+.warn-text   { color: var(--warn-ink); font-weight: 600; }
 
 /* Two-column layout */
 .two-col {
@@ -1720,7 +1778,7 @@ pre code { background: none; padding: 0; }
 
 /* Callout box */
 .callout {
-  background: rgba(11, 58, 106, 0.04);
+  background: rgba(var(--tint), 0.04);
   border-left: 3px solid var(--cobalt);
   padding: 20px 24px;
   margin: 32px 0;
@@ -1742,10 +1800,10 @@ pre code { background: none; padding: 0; }
   margin: 0;
 }
 .callout.warn {
-  background: rgba(178, 255, 63, 0.08);
-  border-left-color: #B2FF3F;
+  background: rgba(217, 164, 65, 0.08);
+  border-left-color: var(--ochre);
 }
-.callout.warn h4 { color: #C2410C; }
+.callout.warn h4 { color: var(--warn-ink); }
 
 /* Pull quote */
 .pull {
@@ -1805,11 +1863,11 @@ pre code { background: none; padding: 0; }
 
 /* Table cell states */
 .compare-table td.yes,
-.ownership-table td.yes   { color: #166534; font-weight: 600; }
+.ownership-table td.yes   { color: var(--ok-ink); font-weight: 600; }
 .compare-table td.no,
-.ownership-table td.no    { color: #991B1B; font-weight: 600; }
+.ownership-table td.no    { color: var(--brick-ink); font-weight: 600; }
 .compare-table td.partial,
-.ownership-table td.partial { color: #92400E; font-weight: 600; }
+.ownership-table td.partial { color: var(--warn-ink); font-weight: 600; }
 
 /* Responsive */
 @media (max-width: 768px) {
@@ -1882,7 +1940,7 @@ pre code { background: none; padding: 0; }
 
 .section-cobalt h3,
 .section-dark h3 {
-  color: var(--bone);
+  color: var(--invert-ink);
   margin-top: 32px;
   margin-bottom: 12px;
 }
@@ -1895,8 +1953,8 @@ pre code { background: none; padding: 0; }
 
 .section-cobalt a,
 .section-dark a {
-  color: var(--bone);
-  border-bottom: 1px solid rgba(248,250,252,0.3);
+  color: var(--invert-ink);
+  border-bottom: 1px solid rgba(var(--tint), 0.3);
 }
 
 /* Marker z-index inside colored sections */
@@ -1909,13 +1967,13 @@ pre code { background: none; padding: 0; }
 /* Callout inside dark sections */
 .section-cobalt .callout,
 .section-dark .callout {
-  background: rgba(248, 250, 252, 0.08);
+  background: rgba(var(--tint), 0.08);
   border-left-color: var(--lime);
 }
 .section-cobalt .callout h4,
 .section-dark .callout h4 { color: var(--lime); }
 .section-cobalt .callout p,
-.section-dark .callout p  { color: var(--bone); }
+.section-dark .callout p  { color: var(--invert-ink); }
 
 @media (max-width: 900px) {
   .section-cobalt .container,
@@ -1981,7 +2039,7 @@ pre code { background: none; padding: 0; }
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1px;
-  background: rgba(248,250,252,0.15);
+  background: rgba(var(--tint), 0.15);
   margin: 32px 0;
 }
 @media (max-width: 640px) {
@@ -1989,7 +2047,7 @@ pre code { background: none; padding: 0; }
 }
 
 .auth-lane {
-  background: rgba(11,58,106,0.35);
+  background: rgba(var(--tint), 0.35);
   padding: 32px 28px;
   display: flex;
   flex-direction: column;
@@ -2005,7 +2063,7 @@ pre code { background: none; padding: 0; }
 .auth-lane h3 {
   font-size: var(--text-md);
   font-weight: 600;
-  color: var(--bone);
+  color: var(--invert-ink);
   margin: 0;
 }
 .auth-lane p {
@@ -2094,7 +2152,7 @@ pre code { background: none; padding: 0; }
   align-items: center;
   gap: 6px;
   background: var(--lime);
-  color: var(--navy);
+  color: var(--on-ochre);
   font-family: var(--mono);
   font-size: var(--text-xs);
   font-weight: 700;
@@ -2182,13 +2240,13 @@ pre code { background: none; padding: 0; }
 
 /* Button additions */
 .btn-danger {
-  background: #dc2626;
-  color: var(--bone);
-  border-color: #dc2626;
+  background: var(--brick);
+  color: var(--invert-ink);
+  border-color: var(--brick);
 }
 .btn-danger:hover {
-  background: #991b1b;
-  border-color: #991b1b;
+  background: var(--brick);
+  border-color: var(--brick);
 }
 .btn-small {
   padding: 6px 10px;
@@ -2264,9 +2322,9 @@ pre code { background: none; padding: 0; }
   font-family: var(--mono);
   font-size: var(--text-sm);
   line-height: 1.5;
-  background: rgba(220,38,38,.06);
-  border-left: 3px solid #dc2626;
-  color: #991b1b;
+  background: rgba(196, 96, 79, .06);
+  border-left: 3px solid var(--brick);
+  color: var(--brick-ink);
 }
 .msg-success {
   display: none;
@@ -2275,7 +2333,7 @@ pre code { background: none; padding: 0; }
   font-family: var(--mono);
   font-size: var(--text-sm);
   line-height: 1.5;
-  background: rgba(178,255,63,.10);
+  background: rgba(217, 164, 65, .10);
   border-left: 3px solid var(--lime);
   color: var(--navy);
 }
@@ -2338,7 +2396,7 @@ pre code { background: none; padding: 0; }
 .secret-display {
   font-family: var(--mono);
   font-size: var(--text-sm);
-  background: rgba(11,58,106,0.04);
+  background: rgba(var(--tint), 0.04);
   padding: 6px 10px;
   letter-spacing: 0.1em;
   color: var(--navy);
@@ -2393,7 +2451,7 @@ pre code { background: none; padding: 0; }
 /* Warning / highlight box */
 .warning-box {
   padding: 16px 20px;
-  background: rgba(178,255,63,.10);
+  background: rgba(217, 164, 65, .10);
   border-left: 3px solid var(--lime);
   margin: 24px 0;
 }
@@ -2420,7 +2478,7 @@ pre code { background: none; padding: 0; }
   border-left: 3px solid;
 }
 .banner-cobalt {
-  background: rgba(29,78,216,.06);
+  background: rgba(217, 164, 65, .06);
   border-left-color: var(--cobalt);
 }
 .banner-label {
@@ -2443,9 +2501,9 @@ pre code { background: none; padding: 0; }
 /* ── Billing ─────────────────────────────────────────────────────────────── */
 .billing-card { border: 1.5px solid var(--ink-hair); padding: var(--space-6); background: var(--bone); }
 .billing-card + .billing-card { margin-top: var(--space-4); }
-.plan-tier-active { display: inline-block; background: var(--cobalt); color: #fff; font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; padding: 3px 8px; margin-left: 8px; vertical-align: middle; }
-.stub-banner { background: #fef3c7; border: 1.5px solid #d97706; padding: var(--space-4) var(--space-5); }
-.stub-banner strong { color: #92400e; }
+.plan-tier-active { display: inline-block; background: var(--cobalt); color: var(--on-ochre); font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; padding: 3px 8px; margin-left: 8px; vertical-align: middle; }
+.stub-banner { background: var(--card); border: 1.5px solid var(--ochre-2); padding: var(--space-4) var(--space-5); }
+.stub-banner strong { color: var(--warn-ink); }
 
 /* De navigatiebalk staat in frontend/nav.css. Die had hier een tweede huis:
    .nav-auth, .nav-signin, .nav-cta, .nav-user en .nav-help stonden in dit
@@ -2479,13 +2537,13 @@ pre code { background: none; padding: 0; }
 }
 .pick-card:hover {
   border-color: var(--cobalt);
-  background: rgba(11,58,106,.03);
+  background: rgba(var(--tint), .03);
 }
 .pick-card-featured {
   border: 2px solid var(--cobalt);
-  background: rgba(11,58,106,.02);
+  background: rgba(var(--tint), .02);
 }
-.pick-card-featured:hover { background: rgba(11,58,106,.06); }
+.pick-card-featured:hover { background: rgba(var(--tint), .06); }
 .pick-label {
   font-family: var(--mono);
   font-size: var(--text-xs);
@@ -2548,7 +2606,7 @@ pre code { background: none; padding: 0; }
   padding-top: var(--space-4);
   margin-top: auto;
 }
-.pick-card-featured .pick-cta { border-top-color: rgba(29,78,216,.2); }
+.pick-card-featured .pick-cta { border-top-color: rgba(217, 164, 65, .2); }
 @media (max-width: 900px) {
   .pick-grid { grid-template-columns: 1fr; }
 }
@@ -2560,44 +2618,44 @@ pre code { background: none; padding: 0; }
 
 /* Text link lime underline on hover */
 a:not(.btn):not(.skip-link):not(.nav-link):not(.nav-logo):not(.footer-link):hover {
-  text-decoration-color: #B2FF3F;
+  text-decoration-color: var(--lime);
   text-underline-offset: 3px;
   text-decoration-thickness: 2px;
 }
 
 /* Secondary button: lime on hover */
 .btn-secondary:hover {
-  background: #B2FF3F !important;
-  color: #0B3A6A !important;
-  border-color: #B2FF3F !important;
+  background: var(--ochre) !important;
+  color: var(--on-ochre) !important;
+  border-color: var(--ochre) !important;
 }
 
 /* Tertiary button: lime on hover */
 .btn-tertiary:hover {
-  color: #0B3A6A !important;
-  text-decoration-color: #B2FF3F !important;
+  color: var(--ink) !important;
+  text-decoration-color: var(--lime) !important;
 }
 
 /* Product picker cards: lime border on hover */
 .pick-card:hover {
-  border-color: #B2FF3F !important;
+  border-color: var(--ochre) !important;
 }
 .pick-card-featured:hover {
-  border-color: #B2FF3F !important;
+  border-color: var(--ochre) !important;
 }
 
 /* Pricing cards: lime border on hover */
 .pricing-card:hover {
-  border-color: #B2FF3F !important;
-  outline: 2px solid #B2FF3F;
+  border-color: var(--ochre) !important;
+  outline: 2px solid var(--ochre);
 }
 
 /* ─── PAGE HERO — reusable gradient band ─────────────────── */
 /* lime-hover-accents (sentinel) */
 .page-hero {
-  background: linear-gradient(180deg, #F0F4F8 0%, rgba(11,58,106,0.04) 100%);
-  border-top: 1px solid rgba(11,58,106,0.08);
-  border-bottom: 1px solid rgba(11,58,106,0.08);
+  background: linear-gradient(180deg, var(--card) 0%, rgba(var(--tint), 0.04) 100%);
+  border-top: 1px solid rgba(var(--tint), 0.08);
+  border-bottom: 1px solid rgba(var(--tint), 0.08);
   padding: 48px 24px;
   margin-bottom: 0;
 }
@@ -2607,8 +2665,8 @@ a:not(.btn):not(.skip-link):not(.nav-link):not(.nav-logo):not(.footer-link):hove
 }
 .page-hero .eyebrow {
   display: inline-block;
-  background: #B2FF3F;
-  color: #0B3A6A;
+  background: var(--ochre);
+  color: var(--on-ochre);
   padding: 2px 10px;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 10px;
@@ -2618,7 +2676,7 @@ a:not(.btn):not(.skip-link):not(.nav-link):not(.nav-logo):not(.footer-link):hove
 }
 .page-hero h1 {
   margin: 0 0 12px;
-  color: #0B3A6A;
+  color: var(--ink);
 }
 .page-hero .lede {
   font-size: var(--text-md);
@@ -2630,23 +2688,23 @@ a:not(.btn):not(.skip-link):not(.nav-link):not(.nav-logo):not(.footer-link):hove
 
 /* ─── DARK BAND — reusable navy section ──────────────────── */
 .dark-band {
-  background: #0B3A6A;
-  color: #F8FAFC;
+  background: var(--bone-2);
+  color: var(--ink);
   padding: 48px 24px;
   margin: 48px 0;
 }
-.dark-band h2, .dark-band h3 { color: #F8FAFC; }
-.dark-band a { color: #B2FF3F; }
+.dark-band h2, .dark-band h3 { color: var(--ink); }
+.dark-band a { color: var(--lime); }
 .dark-band code, .dark-band .tag {
-  background: #B2FF3F;
-  color: #0B3A6A;
+  background: var(--ochre);
+  color: var(--on-ochre);
   padding: 2px 8px;
 }
 
 /* ── SECTION TINT — subtle off-white background for visual rhythm ── */
 /* visual-reset-v3 (sentinel) */
 .section-tint {
-  background: #F8FAFC;
+  background: var(--card);
 }
 
 /* ── Skip to main content — WCAG 2.4.1 ─────────────────── */
@@ -2655,15 +2713,15 @@ a.skip-link,
   position: absolute !important;
   top: -200px !important;
   left: 0 !important;
-  background: #0B3A6A;
-  color: #F8FAFC;
+  background: var(--bone-2);
+  color: var(--ink);
   padding: 12px 20px;
   z-index: 10000;
   text-decoration: none;
   font-family: system-ui, -apple-system, sans-serif;
   font-size: 14px;
   font-weight: 500;
-  border: 2px solid #B2FF3F;
+  border: 2px solid var(--ochre);
   transition: top 120ms ease;
 }
 a.skip-link:focus,
@@ -2682,7 +2740,7 @@ a.skip-link:focus-visible,
   font-family: "IBM Plex Mono", monospace;
   font-size: 11px;
   letter-spacing: 0.18em;
-  color: #64748b;
+  color: var(--ink-dim);
   text-transform: uppercase;
   margin-bottom: 28px;
   display: flex;
@@ -2691,7 +2749,7 @@ a.skip-link:focus-visible,
   gap: 2px;
 }
 .hero-split-eyebrow .eyebrow-dot {
-  color: #B2FF3F;
+  color: var(--lime);
   font-weight: 700;
   margin: 0 10px;
 }
@@ -2699,7 +2757,7 @@ a.skip-link:focus-visible,
   font-size: clamp(40px, 6vw, 80px);
   font-weight: 600;
   line-height: 1.05;
-  color: #0B3A6A;
+  color: var(--ink);
   margin: 0;
   letter-spacing: -0.02em;
 }
@@ -2713,7 +2771,7 @@ a.skip-link:focus-visible,
 }
 .hero-split-divider {
   width: 1px;
-  background: linear-gradient(180deg, transparent 0%, rgba(11,58,106,0.15) 20%, rgba(11,58,106,0.15) 80%, transparent 100%);
+  background: linear-gradient(180deg, transparent 0%, rgba(var(--tint), 0.15) 20%, rgba(var(--tint), 0.15) 80%, transparent 100%);
 }
 .hero-col {
   display: flex;
@@ -2722,8 +2780,8 @@ a.skip-link:focus-visible,
 }
 .hero-col-label {
   display: inline-block;
-  background: #B2FF3F;
-  color: #0B3A6A;
+  background: var(--ochre);
+  color: var(--on-ochre);
   padding: 4px 14px;
   font-family: "IBM Plex Mono", monospace;
   font-size: 12px;
@@ -2735,7 +2793,7 @@ a.skip-link:focus-visible,
 .hero-col-title {
   font-size: 28px;
   font-weight: 600;
-  color: #0B3A6A;
+  color: var(--ink);
   line-height: 1.2;
   margin: 0 0 16px 0;
   letter-spacing: -0.01em;
@@ -2743,7 +2801,7 @@ a.skip-link:focus-visible,
 .hero-col-lede {
   font-size: 16px;
   line-height: 1.6;
-  color: #475569;
+  color: var(--ink-2);
   margin: 0 0 28px 0;
   flex-grow: 1;
 }
@@ -2755,12 +2813,12 @@ a.skip-link:focus-visible,
   list-style: none;
   padding: 20px 0 0 0;
   margin: 0;
-  border-top: 1px solid rgba(11,58,106,0.08);
+  border-top: 1px solid rgba(var(--tint), 0.08);
 }
 .hero-col-specs li {
   font-family: "IBM Plex Mono", monospace;
   font-size: 12px;
-  color: #475569;
+  color: var(--ink-2);
   padding: 4px 0 4px 16px;
   position: relative;
 }
@@ -2768,14 +2826,14 @@ a.skip-link:focus-visible,
   content: "\25B8";
   position: absolute;
   left: 0;
-  color: #B2FF3F;
+  color: var(--lime);
 }
 .hero-trust-strip {
   max-width: 1200px;
   margin: 80px auto 0 auto;
   padding: 24px;
-  background: #0B3A6A;
-  color: #F8FAFC;
+  background: var(--bone-2);
+  color: var(--ink);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 24px;
@@ -2785,18 +2843,18 @@ a.skip-link:focus-visible,
   font-family: "IBM Plex Mono", monospace;
   font-size: 10px;
   letter-spacing: 0.15em;
-  color: #B2FF3F;
+  color: var(--lime);
   text-transform: uppercase;
 }
 .trust-value {
   font-family: "IBM Plex Mono", monospace;
   font-size: 12px;
-  color: #F8FAFC;
+  color: var(--ink);
   line-height: 1.4;
 }
 @media (max-width: 900px) {
   .hero-split-grid { grid-template-columns: 1fr; gap: 48px; }
-  .hero-split-divider { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, rgba(11,58,106,0.15), transparent); }
+  .hero-split-divider { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, rgba(var(--tint), 0.15), transparent); }
   .hero-trust-strip { grid-template-columns: 1fr 1fr; gap: 16px; }
   .hero-col-title { font-size: 22px; }
   .hero-split-title { letter-spacing: -0.01em; }
@@ -2812,7 +2870,7 @@ a.skip-link:focus-visible,
 
 .product-tag--lime {
   background: var(--lime);
-  color: var(--navy);
+  color: var(--on-ochre);
   padding: 2px 8px;
   border-radius: 2px;
   font-family: "IBM Plex Mono", monospace;
@@ -2823,7 +2881,7 @@ a.skip-link:focus-visible,
 }
 .product-tag--cobalt {
   background: var(--cobalt);
-  color: #fff;
+  color: var(--on-ochre);
   padding: 2px 8px;
   border-radius: 2px;
   font-family: "IBM Plex Mono", monospace;
@@ -2833,7 +2891,7 @@ a.skip-link:focus-visible,
   white-space: nowrap;
 }
 .product-card-light {
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: border-color 150ms ease, transform 150ms ease;
 }
 .product-card-light:hover {
@@ -2843,8 +2901,8 @@ a.skip-link:focus-visible,
 
 /* § app-warning — SHA-256 authenticator hard blocker ───────────────────────── */
 .app-warning {
-  background: #FEF2F2;
-  border: 2px solid #DC2626;
+  background: var(--card);
+  border: 2px solid var(--brick);
   padding: 20px 24px;
   margin: 0 0 36px 0;
   font-family: 'Inter', sans-serif;
@@ -2852,13 +2910,13 @@ a.skip-link:focus-visible,
 .app-warning__title {
   font-size: 17px;
   font-weight: 700;
-  color: #B91C1C;
+  color: var(--brick-ink);
   line-height: 1.35;
   margin-bottom: 10px;
 }
 .app-warning__body {
   font-size: 14px;
-  color: #7F1D1D;
+  color: var(--brick-ink);
   line-height: 1.6;
   margin: 0 0 16px 0;
 }
@@ -2879,8 +2937,8 @@ a.skip-link:focus-visible,
   align-items: center;
   gap: 7px;
 }
-.app-warning__no  { color: #B91C1C; }
-.app-warning__yes { color: #166534; }
+.app-warning__no  { color: var(--brick-ink); }
+.app-warning__yes { color: var(--ok-ink); }
 .app-warning__no::before  { content: "✕"; font-size: 12px; }
 .app-warning__yes::before { content: "✓"; font-size: 12px; }
 .app-warning__link {
@@ -2888,11 +2946,11 @@ a.skip-link:focus-visible,
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #B91C1C;
+  color: var(--brick-ink);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.app-warning__link:hover { color: #7F1D1D; }
+.app-warning__link:hover { color: var(--brick-ink); }
 
 /* ── Quota upgrade notice ─────────────────────────────────────────────────────
    Rendered by js/quota-upgrade.js when the relay answers 402
@@ -2904,23 +2962,23 @@ a.skip-link:focus-visible,
   gap: 8px;
   max-width: 480px;
   padding: var(--space-4, 16px) var(--space-5, 20px);
-  border: 1px solid rgba(11, 58, 106, 0.14);
+  border: 1px solid rgba(var(--tint), 0.14);
   border-radius: 14px;
   background: var(--bone, #FAF7F0);
-  box-shadow: 0 4px 14px rgba(11, 58, 106, 0.06);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
   text-align: left;
 }
 .pa-quota-upsell strong {
   font-family: var(--sans);
   font-size: 15px;
   font-weight: 600;
-  color: var(--ink, #0B1622);
+  color: var(--ink);
 }
 .pa-quota-upsell span {
   font-family: var(--sans);
   font-size: 13px;
   line-height: 1.55;
-  color: var(--ink-dim, #5A6B7A);
+  color: var(--ink-dim);
 }
 .pa-quota-upsell .btn { margin-top: 4px; }
 
@@ -2939,8 +2997,8 @@ a.skip-link:focus-visible,
   margin: 12px 0;
   padding: 10px 14px;
   max-width: 560px;
-  border: 1px solid rgba(11, 58, 106, 0.14);
-  border-left: 3px solid var(--lime, #B2FF3F);
+  border: 1px solid rgba(var(--tint), 0.14);
+  border-left: 3px solid var(--lime);
   background: var(--bone, #FAF7F0);
   text-align: left;
 }
@@ -2948,9 +3006,9 @@ a.skip-link:focus-visible,
   font-family: var(--sans);
   font-size: 13px;
   line-height: 1.55;
-  color: var(--ink, #0B1622);
+  color: var(--ink);
 }
-.pa-sign-note a { color: var(--cobalt, #1D4ED8); }
+.pa-sign-note a { color: var(--cobalt); }
 
 /* Heading LEVEL vs heading SIZE. A page needs exactly one h1 for search engines
    and screen readers, but the visual hierarchy does not always match the
@@ -2964,21 +3022,21 @@ h1.paramant-h2 { font-size: var(--text-3xl); font-weight: inherit; letter-spacin
    visitor the three legal documents, so apply-nav.py stamps this one line
    there instead of a second navigation. */
 .legal-strip {
-  border-top: 1px solid var(--ink-hair, #E2E8F0);
+  border-top: 1px solid var(--ink-hair);
   margin-top: var(--space-6, 48px);
   padding: 16px 24px;
   text-align: center;
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.06em;
-  color: var(--ink-dim, #64748b);
+  color: var(--ink-dim);
 }
 .legal-strip a {
-  color: var(--ink-dim, #64748b);
+  color: var(--ink-dim);
   text-decoration: none;
   border-bottom: 1px solid transparent;
   padding: 2px 0;
 }
-.legal-strip a:hover { color: var(--navy, #0B3A6A); border-bottom-color: var(--lime, #B2FF3F); }
-.legal-strip a:focus-visible { outline: 2px solid var(--lime, #B2FF3F); outline-offset: 2px; }
+.legal-strip a:hover { color: var(--navy); border-bottom-color: var(--lime); }
+.legal-strip a:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
 .legal-strip .legal-sep { padding: 0 8px; opacity: 0.5; }

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Documentation · Paramant API and self-hosting</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -20,24 +20,24 @@
 <meta name="twitter:description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0. Your IT can check everything here. The relay never holds a decryption key.">
 <link rel="canonical" href="https://paramant.app/docs">
 
-<link rel="stylesheet" href="/design-system.css?v=25">
-<link rel="stylesheet" href="/nav.css?v=21">
-<link rel="stylesheet" href="/relay-pulse.css?v=1">
+<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/relay-pulse.css?v=4">
   <style>
 *{margin:0;padding:0;box-sizing:border-box}
 a{color:var(--ink);text-decoration:none}
 .layout{display:flex;min-height:calc(100vh - 52px)}
 .sidebar{width:224px;flex-shrink:0;padding:28px 16px 40px;border-right:1px solid var(--ink-hair);position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto}
 .sidebar::-webkit-scrollbar{width:3px}.sidebar::-webkit-scrollbar-track{background:transparent}.sidebar::-webkit-scrollbar-thumb{background:var(--ink-hair)}
-.sidebar h3{font-size:10px;color:#64748b;letter-spacing:.12em;text-transform:uppercase;margin:22px 0 6px;padding:6px 0 4px 10px;font-family:var(--mono);border-left:2px solid #B2FF3F}
+.sidebar h3{font-size:10px;color:var(--ink-dim);letter-spacing:.12em;text-transform:uppercase;margin:22px 0 6px;padding:6px 0 4px 10px;font-family:var(--mono);border-left:2px solid var(--ochre)}
 .sidebar h3:first-child{margin-top:0}
 .sidebar a{display:block;font-size:12px;color:var(--ink-dim);padding:3px 8px 3px 10px;line-height:1.8;transition:color .12s,background .12s,border-left-color .12s;border-left:2px solid transparent}
-.sidebar a:hover{color:#0B3A6A;background:rgba(178,255,63,0.08);border-left-color:#B2FF3F}
-.sidebar a.active{color:#0B3A6A;font-weight:500;background:rgba(29,78,216,0.06);border-left-color:#1D4ED8}
+.sidebar a:hover{color:var(--ink);background:rgba(217, 164, 65, 0.08);border-left-color:var(--ochre)}
+.sidebar a.active{color:var(--ink);font-weight:500;background:rgba(217, 164, 65, 0.06);border-left-color:var(--ochre)}
 .content{flex:1;min-width:0;padding:52px 72px 80px;max-width:840px}
 .content h1{font-size:26px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .subtitle{font-size:14px;color:var(--ink-dim);margin-bottom:52px;line-height:1.8}
-.content h2{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#0B3A6A;margin:56px 0 18px;padding-top:56px;border-top:2px solid #B2FF3F}
+.content h2{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);margin:56px 0 18px;padding-top:56px;border-top:2px solid var(--ochre)}
 .content h2:first-of-type{border-top:none;padding-top:0;margin-top:0}
 .content h3{font-size:13px;font-weight:600;color:var(--ink);margin:28px 0 10px}
 .content p{font-size:13px;color:var(--ink-dim);line-height:1.85;margin-bottom:14px}
@@ -45,13 +45,13 @@ a{color:var(--ink);text-decoration:none}
 .content ul{margin:10px 0 18px 0;padding-left:0;list-style:none}
 .content ul li{font-size:13px;color:var(--ink-dim);padding:3px 0 3px 16px;position:relative}
 .content ul li::before{content:'·';position:absolute;left:4px;color:var(--ink-dim)}
-code{background:rgba(178,255,63,0.14);border:none;padding:2px 7px;font-size:12px;color:#0B3A6A;font-family:var(--mono)}
+code{background:rgba(217, 164, 65, 0.14);border:none;padding:2px 7px;font-size:12px;color:var(--ink);font-family:var(--mono)}
 pre{background:var(--black-hair);border:1px solid var(--ink-hair);padding:20px 24px;margin:14px 0 22px;overflow-x:auto;font-size:12px;color:var(--ink-dim);line-height:1.9;font-family:var(--mono)}
 pre .cm{color:var(--ink-dim)}.pre .kw{color:var(--cobalt)}.pre .st{color:var(--ink-dim)}
 .cb{background:var(--black-hair);border:1px solid var(--ink-hair);overflow:hidden;margin:14px 0 22px}
-.cb-header{padding:8px 16px;border-bottom:none;background:#0B3A6A;display:flex;align-items:center;gap:6px}
-.cb-dots{display:flex;gap:5px}.cb-dot{width:7px;height:7px;background:#B2FF3F}
-.cb-lang{margin-left:auto;font-size:10px;color:#B2FF3F;font-family:var(--mono);letter-spacing:.08em;font-weight:600;text-transform:uppercase}
+.cb-header{padding:8px 16px;border-bottom:none;background:var(--bone-2);display:flex;align-items:center;gap:6px}
+.cb-dots{display:flex;gap:5px}.cb-dot{width:7px;height:7px;background:var(--ochre)}
+.cb-lang{margin-left:auto;font-size:10px;color:var(--lime);font-family:var(--mono);letter-spacing:.08em;font-weight:600;text-transform:uppercase}
 .cb pre{margin:0;border:none;background:transparent;padding:18px 24px}
 table{width:100%;border-collapse:collapse;margin:14px 0 26px;font-size:12px}
 th{text-align:left;font-size:10px;color:var(--ink-dim);letter-spacing:.1em;text-transform:uppercase;padding:9px 14px;border-bottom:1px solid var(--ink-hair);font-family:var(--mono)}
@@ -62,12 +62,12 @@ tr:last-child td{border-bottom:none}
 .get{background:var(--ink-ghost);color:var(--ink);border:1px solid var(--ink-hair)}
 .post{background:var(--black-hair);color:var(--ink-dim);border:1px solid var(--ink-hair)}
 .badge{display:inline-block;padding:2px 8px;border:1px solid var(--ink-hair);font-size:11px;color:var(--ink-dim);margin-right:4px;font-family:var(--mono)}
-.callout{border:none;border-left:4px solid #B2FF3F;background:#0B3A6A;padding:14px 18px;margin:16px 0 22px}
-.callout.warn{border-left-color:#FCA5A5;background:#7F1D1D}
-.callout p{margin:0;color:#F8FAFC;font-size:12.5px;line-height:1.75}
-.callout.warn p{color:#FECACA}.callout-label{display:inline-block;background:#B2FF3F;color:#0B3A6A;padding:2px 8px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px}.callout.warn .callout-label{background:#FCA5A5;color:#7F1D1D}
+.callout{border:none;border-left:4px solid var(--ochre);background:var(--bone-2);padding:14px 18px;margin:16px 0 22px}
+.callout.warn{border-left-color:var(--brick);background:rgba(196, 96, 79, .12)}
+.callout p{margin:0;color:var(--ink);font-size:12.5px;line-height:1.75}
+.callout.warn p{color:var(--ink)}.callout-label{display:inline-block;background:var(--ochre);color: var(--on-ochre);padding:2px 8px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px}.callout.warn .callout-label{background:var(--brick);color:#141414}
 .step-row{display:flex;gap:16px;align-items:flex-start;margin:8px 0}
-.step-num{width:28px;height:28px;background:#B2FF3F;border:none;font-size:13px;font-family:var(--mono);font-weight:700;color:#0B3A6A;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step-num{width:28px;height:28px;background:var(--ochre);border:none;font-size:13px;font-family:var(--mono);font-weight:700;color: var(--on-ochre);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
 .step-body{flex:1}
 .step-body p{margin-bottom:8px}
 .faq-item{border-bottom:1px solid var(--ink-hair);padding:18px 0}
@@ -78,24 +78,24 @@ tr:last-child td{border-bottom:none}
 @media(max-width:900px){.sidebar{display:none}.content{padding:32px 24px 60px}.content table{display:block;overflow-x:auto;max-width:100%}}
 
 /* docs-hero */
-.docs-hero{background:linear-gradient(180deg,#F8FAFC 0%,rgba(11,58,106,0.04) 100%);border-bottom:1px solid rgba(11,58,106,0.08);padding:36px 24px 28px;margin-bottom:0}
+.docs-hero{background:linear-gradient(180deg,var(--card) 0%,rgba(var(--tint), 0.04) 100%);border-bottom:1px solid rgba(var(--tint), 0.08);padding:36px 24px 28px;margin-bottom:0}
 .docs-hero-inner{max-width:840px;margin:0 auto;padding:0 72px}
-.docs-hero .eyebrow{display:inline-block;background:#B2FF3F;color:#0B3A6A;padding:2px 10px;font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:10px}
-.docs-hero h1{font-size:32px;font-weight:700;color:#0B3A6A;margin:0 0 10px;line-height:1.15;letter-spacing:-.02em}
-.docs-hero .lede{font-size:13px;line-height:1.75;color:#475569;margin:0 0 14px;max-width:640px}
-.docs-hero-cta{display:inline-block;font-family:var(--mono);font-size:12px;color:#1D4ED8;text-decoration:underline;text-decoration-color:#B2FF3F;text-decoration-thickness:2px;padding:4px 0}
-.docs-hero .docs-buyer{font-size:13px;line-height:1.7;color:#0B3A6A;margin:0 0 12px;max-width:640px;padding-left:10px;border-left:2px solid #B2FF3F}
-.docs-hero .docs-buyer a{color:#1D4ED8;text-decoration:underline;text-decoration-color:#B2FF3F;text-decoration-thickness:2px}
-.docs-hero .lede a{color:#1D4ED8;text-decoration:underline;text-decoration-color:#B2FF3F;text-decoration-thickness:2px}
+.docs-hero .eyebrow{display:inline-block;background:var(--ochre);color: var(--on-ochre);padding:2px 10px;font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:10px}
+.docs-hero h1{font-size:32px;font-weight:700;color:var(--ink);margin:0 0 10px;line-height:1.15;letter-spacing:-.02em}
+.docs-hero .lede{font-size:13px;line-height:1.75;color:var(--ink-2);margin:0 0 14px;max-width:640px}
+.docs-hero-cta{display:inline-block;font-family:var(--mono);font-size:12px;color:var(--cobalt);text-decoration:underline;text-decoration-color:var(--lime);text-decoration-thickness:2px;padding:4px 0}
+.docs-hero .docs-buyer{font-size:13px;line-height:1.7;color:var(--ink);margin:0 0 12px;max-width:640px;padding-left:10px;border-left:2px solid var(--ochre)}
+.docs-hero .docs-buyer a{color:var(--cobalt);text-decoration:underline;text-decoration-color:var(--lime);text-decoration-thickness:2px}
+.docs-hero .lede a{color:var(--cobalt);text-decoration:underline;text-decoration-color:var(--lime);text-decoration-thickness:2px}
 .docs-hero-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:4px}
-.docs-hero-btn{display:inline-flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;line-height:1;padding:12px 20px;border:1px solid #1D4ED8;border-radius:2px;text-decoration:none;transition:background .12s,color .12s,border-color .12s}
-.docs-hero-btn-primary{background:#1D4ED8;color:#fff}
-.docs-hero-btn-primary:hover{background:#0B3A6A;border-color:#0B3A6A;color:#fff}
-.docs-hero-btn-secondary{background:#fff;color:#1D4ED8}
-.docs-hero-btn-secondary:hover{background:rgba(29,78,216,0.07);color:#0B3A6A}
+.docs-hero-btn{display:inline-flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;line-height:1;padding:12px 20px;border:1px solid var(--ochre);border-radius:2px;text-decoration:none;transition:background .12s,color .12s,border-color .12s}
+.docs-hero-btn-primary{background:var(--ochre);color: var(--on-ochre)}
+.docs-hero-btn-primary:hover{background:var(--bone-2);border-color:var(--line-2);color:var(--ink)}
+.docs-hero-btn-secondary{background:var(--card);color:var(--cobalt)}
+.docs-hero-btn-secondary:hover{background:rgba(217, 164, 65, 0.07);color:var(--ink)}
 .docs-hero-actions .docs-hero-cta{margin-left:6px}
 @media(max-width:640px){.docs-hero-btn{flex:1 1 100%}.docs-hero-actions .docs-hero-cta{margin-left:0;width:100%}}
-.docs-hero-cta:hover{color:#0B3A6A}
+.docs-hero-cta:hover{color:var(--ink)}
 @media(max-width:900px){.docs-hero-inner{padding:0 24px}}
 </style>
 <style>
@@ -107,9 +107,9 @@ tr:last-child td{border-bottom:none}
   font-family: IBM Plex Mono, monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--ink-hair);
   transition: all 140ms ease;
   margin-right: 12px;
 }
@@ -120,26 +120,26 @@ tr:last-child td{border-bottom:none}
   justify-content: center;
   width: 16px;
   height: 16px;
-  border: 1.5px solid #64748b;
+  border: 1.5px solid var(--ink-dim);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--ink-dim);
   font-family: Inter, sans-serif;
   line-height: 1;
 }
 .nav-help:hover {
-  color: #0B3A6A;
-  border-color: #B2FF3F;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(217, 164, 65, 0.08);
 }
 .nav-help:hover::before {
-  border-color: #0B3A6A;
-  color: #0B3A6A;
-  background: #B2FF3F;
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
 }
 .nav-help:focus-visible {
-  outline: 2px solid #B2FF3F;
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 .nav-help-mobile {
@@ -148,13 +148,13 @@ tr:last-child td{border-bottom:none}
   font-family: IBM Plex Mono, monospace;
   font-size: 13px;
   letter-spacing: 0.08em;
-  color: #475569;
+  color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--ink-hair);
 }
 .nav-help-mobile:hover {
-  color: #0B3A6A;
-  background: rgba(178, 255, 63, 0.08);
+  color: var(--ink);
+  background: rgba(217, 164, 65, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -681,7 +681,7 @@ id=tr_XXXX
     <p>Community Edition is free forever for up to 5 users. One <code>docker compose up</code> starts 6 containers: five sector relays and an admin panel.</p>
 
     <div class="callout"><span class="callout-label">Requirements</span>
-      <p><strong style="color:#B2FF3F">Requirements:</strong> Ubuntu 22.04+ / Debian 12+ · Docker 24+ · 1 GB RAM min · swap disabled · a domain with wildcard DNS</p>
+      <p><strong style="color:var(--lime)">Requirements:</strong> Ubuntu 22.04+ / Debian 12+ · Docker 24+ · 1 GB RAM min · swap disabled · a domain with wildcard DNS</p>
     </div>
 
     <div class="callout"><span class="callout-label">Where to start</span>
@@ -791,10 +791,10 @@ open https://your-domain.com/admin/</pre>
     </div>
     <p>Community Edition enforces a hard cap of 5 users: the 6th <code>add</code> returns HTTP 402. Add a <code>PLK_KEY</code> to <code>.env</code> to unlock unlimited users.</p>
     <div class="callout"><span class="callout-label">New in 3.0.0</span>
-      <p><strong style="color:#B2FF3F">Guided setup:</strong> a first-run web wizard at <code>/setup</code> replaces hand-run admin scripts for first-time operators: generating the admin token, enrolling TOTP and minting the first key from the browser. The wizard is gated to first boot (no keys yet) or an explicit <code>SETUP_MODE</code> flag, and runs deeper <code>/v2/health/deep</code> and DNS checks before declaring all-systems-go (design: ADR R005). Once running, <code>/admin/settings</code> exposes relay configuration visually: no more editing <code>.env</code> by hand: and <code>/admin/cli</code> gives admins a browser terminal for debugging without SSH.</p>
+      <p><strong style="color:var(--lime)">Guided setup:</strong> a first-run web wizard at <code>/setup</code> replaces hand-run admin scripts for first-time operators: generating the admin token, enrolling TOTP and minting the first key from the browser. The wizard is gated to first boot (no keys yet) or an explicit <code>SETUP_MODE</code> flag, and runs deeper <code>/v2/health/deep</code> and DNS checks before declaring all-systems-go (design: ADR R005). Once running, <code>/admin/settings</code> exposes relay configuration visually: no more editing <code>.env</code> by hand: and <code>/admin/cli</code> gives admins a browser terminal for debugging without SSH.</p>
     </div>
     <div class="callout"><span class="callout-label">New in 3.0.0</span>
-      <p><strong style="color:#B2FF3F">Plug-and-play serving:</strong> set <code>SERVE_FRONTEND=1</code> to have a single relay serve its own UI from a read-only static handler, so a fresh self-host needs no separate web server (opt-in, default off; ADR R011). Set <code>CRYPTO_MODE</code> to choose the algorithm set the relay advertises on <code>/v2/capabilities</code>: <code>core</code> (the default: ML-KEM-768 + ML-DSA-65) or <code>extended</code> for the full opt-in set (ADR R006).</p>
+      <p><strong style="color:var(--lime)">Plug-and-play serving:</strong> set <code>SERVE_FRONTEND=1</code> to have a single relay serve its own UI from a read-only static handler, so a fresh self-host needs no separate web server (opt-in, default off; ADR R011). Set <code>CRYPTO_MODE</code> to choose the algorithm set the relay advertises on <code>/v2/capabilities</code>: <code>core</code> (the default: ML-KEM-768 + ML-DSA-65) or <code>extended</code> for the full opt-in set (ADR R006).</p>
     </div>
 
     <h2 id="selfhost-upgrade">Upgrade</h2>
@@ -806,14 +806,14 @@ docker compose up -d --build
 <span class="cm"># Named volumes (users.json, CT log, relay identity) are preserved</span></pre>
     </div>
     <div class="callout warn"><span class="callout-label">Important</span>
-      <p><strong style="color:#FECACA">Note:</strong> User data and the CT log persist in Docker named volumes across upgrades. The relay identity keypair (ML-DSA-65) is generated once on first boot and stored at <code>/data/relay-identity.json</code>: do not delete this volume or the relay will lose its registered identity. Since v3.0.0 the ML-DSA-65 signing that backs this identity comes from <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>, the relay's audit-ready Rust crypto dependency (consumed via the <code>@paramant/core</code> NAPI binding): it ships inside the Docker image, so no extra install step is needed.</p>
+      <p><strong style="color:var(--brick-ink)">Note:</strong> User data and the CT log persist in Docker named volumes across upgrades. The relay identity keypair (ML-DSA-65) is generated once on first boot and stored at <code>/data/relay-identity.json</code>: do not delete this volume or the relay will lose its registered identity. Since v3.0.0 the ML-DSA-65 signing that backs this identity comes from <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>, the relay's audit-ready Rust crypto dependency (consumed via the <code>@paramant/core</code> NAPI binding): it ships inside the Docker image, so no extra install step is needed.</p>
     </div>
 
     <!-- ── Admin scripts ─────────────────────────────────────────── -->
     <h2 id="client-deb">Admin scripts</h2>
     <p>Admin scripts ship with the relay repository. After cloning <a href="https://github.com/Apolloccrypt/paramant-relay">paramant-relay</a>, the server-side admin tool lives under <code>deploy/</code>: run <code>python3 deploy/paramant-admin.py [command]</code> directly. Operator helpers (key add/revoke, first-boot setup) live under <code>scripts/</code>. No system-wide install package is currently provided: the SDK packages on PyPI (<code>paramant-sdk</code>) and npm (<code>paramant-sdk</code>) are the canonical client integrations.</p>
     <div class="callout"><span class="callout-label">Coming soon</span>
-      <p><strong style="color:#B2FF3F">Add-ons:</strong> an add-on architecture is specified for integrations that live just beyond the relay core: storage mirrors, notification bridges, SIEM exporters, OIDC/SAML SSO. Container-isolated, manifest-declared capabilities, HomeAssistant-style, working on ciphertext and metadata only (never plaintext or keys). Specification: ADR R007, draft.</p>
+      <p><strong style="color:var(--lime)">Add-ons:</strong> an add-on architecture is specified for integrations that live just beyond the relay core: storage mirrors, notification bridges, SIEM exporters, OIDC/SAML SSO. Container-isolated, manifest-declared capabilities, HomeAssistant-style, working on ciphertext and metadata only (never plaintext or keys). Specification: ADR R007, draft.</p>
     </div>
 
     <h2 id="client-cli">CLI reference</h2>
@@ -925,7 +925,7 @@ python3 scripts/paramant-admin.py sync</pre>
     <p>The threat model assumes network-level attackers, compromised relay operators, and post-quantum adversaries. Encryption uses a hybrid scheme (ML-KEM-768 + ECDH P-256) so that breaking <em>either</em> primitive is not sufficient: both must be broken simultaneously.</p>
 
     <div class="callout"><span class="callout-label">Key insight</span>
-      <p><strong style="color:#B2FF3F">Key insight:</strong> The relay stores encrypted blobs it cannot decrypt and Merkle hashes it cannot forge. A warrant served on the relay operator yields ciphertext and metadata: not plaintext.</p>
+      <p><strong style="color:var(--lime)">Key insight:</strong> The relay stores encrypted blobs it cannot decrypt and Merkle hashes it cannot forge. A warrant served on the relay operator yields ciphertext and metadata: not plaintext.</p>
     </div>
 
     <h3>Jurisdiction</h3>
