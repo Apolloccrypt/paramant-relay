@@ -4,19 +4,19 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Check whether a signed document was changed · Paramant</title>
+<title>Check a signed document or a delivery receipt · Paramant</title>
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Check whether a signed document was changed after it was signed. It happens in your browser, without an account and without uploading the file.">
-<meta property="og:title" content="Check whether a signed document was changed · Paramant">
-<meta property="og:description" content="Check whether a signed document was changed after it was signed. It happens in your browser, without an account and without uploading the file.">
+<meta name="description" content="Check a signed document, or the receipt that proves a file was delivered. Both happen in your browser, without an account and without uploading anything.">
+<meta property="og:title" content="Check a signed document or a delivery receipt · Paramant">
+<meta property="og:description" content="Check a signed document, or the receipt that proves a file was delivered. Both happen in your browser, without an account and without uploading anything.">
 <meta property="og:url" content="https://paramant.app/verify">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Check whether a signed document was changed · Paramant">
-<meta name="twitter:description" content="Check whether a signed document was changed after it was signed. It happens in your browser, without an account and without uploading the file.">
+<meta name="twitter:title" content="Check a signed document or a delivery receipt · Paramant">
+<meta name="twitter:description" content="Check a signed document, or the receipt that proves a file was delivered. Both happen in your browser, without an account and without uploading anything.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/verify">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -25,6 +25,7 @@
 <link rel="stylesheet" href="/nav.css?v=20">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
 <link rel="stylesheet" href="/components-parasign.css?v=3">
+<link rel="stylesheet" href="/receipt-verify.css?v=1">
 <script type="application/ld+json" data-paramant-seo="1">
 {
   "@context": "https://schema.org",
@@ -33,7 +34,7 @@
       "@type": "WebPage",
       "@id": "https://paramant.app/verify#webpage",
       "url": "https://paramant.app/verify",
-      "name": "Check whether a signed document was changed · Paramant",
+      "name": "Check a signed document or a delivery receipt · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -41,7 +42,7 @@
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "Check whether a signed document was changed after it was signed. It happens in your browser, without an account and without uploading the file."
+      "description": "Check a signed document, or the receipt that proves a file was delivered. Both happen in your browser, without an account and without uploading anything."
     },
     {
       "@type": "SoftwareApplication",
@@ -124,10 +125,17 @@
 <main id="main-content" role="main">
 <div class="ps-wrap">
   <header class="ps-head">
-    <p class="ps-kicker">Verify signature</p>
-    <h1 class="ps-title">Verify a .psign envelope</h1>
-    <p class="ps-lede">Check that a document has not been altered since signing. Everything runs in your browser &mdash; the document never leaves your device, and current signatures verify offline with no account or API key.</p>
+    <p class="ps-kicker">Verify</p>
+    <h1 class="ps-title">Check a Paramant proof</h1>
+    <p class="ps-lede">Two kinds of proof come out of Paramant: a signed document, and a receipt that says a file was delivered and then destroyed. Both are checked here, on your own device. Nothing you drop in is uploaded, and neither check needs an account.</p>
   </header>
+
+  <div class="rv-tabs" role="tablist" aria-label="What do you want to check">
+    <button class="rv-tab" type="button" id="tab-doc" role="tab" aria-selected="true" aria-controls="panel-doc">Signed document</button>
+    <button class="rv-tab" type="button" id="tab-receipt" role="tab" aria-selected="false" aria-controls="panel-receipt">Delivery receipt</button>
+  </div>
+
+  <div id="panel-doc" role="tabpanel" aria-labelledby="tab-doc">
 
   <section class="card ps-panel" aria-labelledby="v1">
     <div class="ps-panel-head"><span class="ps-step">1</span><h2 id="v1" class="ps-panel-title">Original document</h2></div>
@@ -160,7 +168,50 @@
     <p class="ps-help">Signatures verify entirely in your browser &mdash; no account, no API key, works offline.</p>
     <p><a href="/dashboard">Open your dashboard &rarr;</a></p>
   </aside>
-</div>
+  </div>
+
+  <div id="panel-receipt" role="tabpanel" aria-labelledby="tab-receipt" hidden>
+    <section class="card ps-panel" aria-labelledby="r1">
+      <div class="ps-panel-head"><span class="ps-step">1</span><h2 id="r1" class="ps-panel-title">The receipt</h2></div>
+      <p class="ps-help">A delivery receipt is the small block of text you get when a file you sent is picked up. It says which file was handed over, at what moment, and whether the copy on the server was destroyed.</p>
+      <label class="rv-drop" id="rv-drop">
+        <input type="file" id="rv-file" accept=".txt,.json,.receipt,application/json,text/plain">
+        <span class="rv-drop-cta">Drop the receipt file here, or choose one</span>
+        <span class="rv-drop-meta" id="rv-file-info">Nothing loaded yet</span>
+      </label>
+      <div class="ps-field">
+        <label class="ps-label" for="rv-input">Or paste the receipt</label>
+        <textarea class="rv-paste" id="rv-input" spellcheck="false" placeholder="Paste the receipt text here. Both the long single-line form and the readable one work."></textarea>
+      </div>
+    </section>
+
+    <section class="card ps-panel" aria-labelledby="r2">
+      <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="r2" class="ps-panel-title">Check it</h2></div>
+      <button class="btn btn-primary" id="rv-check" type="button">Check this receipt</button>
+      <div class="ps-result" id="rv-result" hidden role="status" aria-live="polite"></div>
+    </section>
+
+    <details class="card ps-panel" id="rv-keyblock">
+      <summary class="ps-panel-title">Checking a receipt from another server</summary>
+      <p class="ps-help">This page carries the signing key of the Paramant server, so the usual receipt is checked without asking anything of the network. A receipt from a server you run yourself is checked by pasting that server's key below.</p>
+      <div class="ps-field">
+        <label class="ps-label" for="rv-key">Signing key of the server that issued the receipt</label>
+        <textarea class="rv-paste" id="rv-key" spellcheck="false" placeholder="Leave this empty to use the key that came with this page."></textarea>
+        <p class="ps-help">Paramant publishes its own key at <code class="mono" id="rv-key-hint"></code>.</p>
+      </div>
+    </details>
+
+    <aside class="ps-info">
+      <h2>What is checked</h2>
+      <ul>
+        <li>The receipt is about the file it names and no other</li>
+        <li>The entry it points to really sits in the public transparency log</li>
+        <li>The signature over the whole receipt holds, so nothing was altered</li>
+        <li>The log snapshot the receipt leans on was signed too</li>
+      </ul>
+      <p class="ps-help">All four run on this device. Once the page has loaded you can pull the plug and the answer is the same.</p>
+    </aside>
+  </div>
 </main>
 
 <footer>
@@ -194,5 +245,6 @@
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=7" defer></script>
 <script type="module" src="/parasign-verify.js?v=6"></script>
+<script type="module" src="/js/receipt-verify.js?v=1"></script>
 </body>
 </html>

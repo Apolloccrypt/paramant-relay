@@ -162,6 +162,12 @@ Pass this to `POST /v2/verify-receipt` to cryptographically confirm delivery.
 
 Public. No API key required.
 
+This endpoint asks the relay to check its own signature. To check a receipt
+without the relay, and without a network connection at all, open
+[https://paramant.app/verify#receipt](https://paramant.app/verify#receipt) and
+drop the receipt in. That page carries the relay identity key and repeats the
+same four checks in the browser.
+
 ```bash
 curl -X POST https://relay.paramant.app/v2/verify-receipt \
   -H "Content-Type: application/json" \
