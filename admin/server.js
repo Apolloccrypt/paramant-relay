@@ -3204,7 +3204,10 @@ api.get("/user/billing/status", authUser, async (req, res) => {
 // SECTORS.main and not health, because nginx routes public /v2/ to relay-main
 // (deploy/nginx-paramant-public.conf), so that is the relay the Mollie webhook
 // reaches and the one whose logs a billing question is read out of.
-const INVOICE_NUMBER_RE = /^PS-\d{4}-\d{4,}$/;
+// Two series share the route: PS for an invoice, CN for the credit note that
+// reverses one. Both are served by the relay from the same document keyspace,
+// which checks the number belongs to this account.
+const INVOICE_NUMBER_RE = /^(?:PS|CN)-\d{4}-\d{4,}$/;
 
 api.get("/user/billing/invoices", authUser, async (req, res) => {
   try {
@@ -3277,13 +3280,70 @@ async function billingProfileProxy(req, res, method) {
 api.get("/user/billing/profile", authUser, (req, res) => billingProfileProxy(req, res, "GET"));
 api.post("/user/billing/profile", authUser, (req, res) => billingProfileProxy(req, res, "POST"));
 
+// The customer's billing history, and it used to be only half of one: the audit
+// log records what an ADMIN did to a plan and knows nothing about a self-serve
+// Mollie payment, so a customer who had paid, been invoiced and seen his term
+// run out was shown "No billing events yet".
+//
+// The relay half is what the money did: invoices, credit notes, and the terms
+// that ended, all derived from records it already holds (relay/lib/
+// billing-history.js). The audit half stays, mapped into the same row shape, so
+// an admin plan change still appears in the one list the customer reads. A
+// relay that cannot be reached costs the money rows and keeps the rest, because
+// half a history beats an empty one.
+const AUDIT_LABEL = {
+  plan_changed: (m) => `Plan changed from ${m.from || 'unknown'} to ${m.to || 'unknown'}`,
+  plan_cancellation_scheduled: () => 'Cancellation scheduled',
+  plan_downgraded: (m) => `Plan downgraded to ${m.to || 'Community'}`,
+};
+
 api.get("/user/billing/history", authUser, async (req, res) => {
   const { user_id } = req.userSession;
-  const events = await getAuditEvents(user_id, {
-    limit: 10,
-    event_types: ['plan_changed', 'plan_cancellation_scheduled', 'plan_downgraded'],
+  let events = [];
+  try {
+    events = await getAuditEvents(user_id, {
+      limit: 10,
+      event_types: ['plan_changed', 'plan_cancellation_scheduled', 'plan_downgraded'],
+    });
+  } catch (err) {
+    console.error("[user/billing/history audit]", err.message);
+  }
+  const audit = (events || []).map((e) => {
+    const meta = e.metadata || {};
+    const label = AUDIT_LABEL[e.event_type];
+    return {
+      ts: e.ts,
+      type: e.event_type,
+      label: label ? label(meta) : e.event_type,
+      detail: null,
+      amount: null,
+      currency: null,
+      document: null,
+      // The raw event, so a page that has not been updated still renders.
+      event_type: e.event_type,
+      metadata: meta,
+    };
   });
-  res.json({ history: events });
+
+  let documents = [];
+  try {
+    const r = await fetch(`${SECTORS.main}/v2/billing/history`, {
+      headers: { "X-Api-Key": proxyApiKey(req.userSession) },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (r.ok) {
+      const body = await r.json().catch(() => ({}));
+      if (Array.isArray(body.history)) documents = body.history;
+    }
+  } catch (err) {
+    console.error("[user/billing/history relay]", err.message);
+  }
+
+  const history = documents.concat(audit)
+    .filter((row) => row && row.ts)
+    .sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts))
+    .slice(0, 50);
+  res.json({ history });
 });
 
 

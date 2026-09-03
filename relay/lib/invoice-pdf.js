@@ -174,7 +174,14 @@ function render(record, opts = {}) {
   const right = PAGE.width - MARGIN;
   const seller = record.seller || {};
   const buyer = record.buyer || {};
-  const isInvoice = record.kind === 'invoice';
+  // Three shapes off one layout. A credit note is the same document with the
+  // amounts negative, its own series, and a line naming the invoice it credits
+  // (art. 35a applies to it in full, and without that reference a bookkeeper
+  // cannot match the reversal to anything). `isInvoice` stays what it always
+  // meant: this document may call itself a VAT invoice. A credit note against a
+  // receipt is a refund receipt and says so, on the same footing.
+  const isCredit = record.kind === 'credit_note';
+  const isInvoice = isCredit ? record.credits_kind === 'invoice' : record.kind === 'invoice';
   let y = MARGIN + 6;
 
   // Header: who is sending this, and what it is.
@@ -205,8 +212,16 @@ function render(record, opts = {}) {
     doc.text(k, MARGIN, yy, { size: 9, grey: 0.4 });
     doc.text(v, MARGIN + 110, yy, { font: FONTS.mono, size: 9.5 });
   };
-  label(isInvoice ? 'Invoice date' : 'Receipt date', record.invoice_date || '', y); y += 14;
-  label(isInvoice ? 'Invoice number' : 'Document number', record.number || '', y); y += 14;
+  const dateLabel = isCredit ? (isInvoice ? 'Credit note date' : 'Refund date') : (isInvoice ? 'Invoice date' : 'Receipt date');
+  const numberLabel = isCredit ? (isInvoice ? 'Credit note number' : 'Document number') : (isInvoice ? 'Invoice number' : 'Document number');
+  label(dateLabel, record.invoice_date || '', y); y += 14;
+  label(numberLabel, record.number || '', y); y += 14;
+  // The reference that makes a credit note bookable at all: which invoice, and
+  // of what date. Both, because a number alone sends the reader hunting.
+  if (isCredit) {
+    label('Credit for invoice', record.credit_for || '', y); y += 14;
+    if (record.credit_for_date) { label('Invoice date', String(record.credit_for_date).slice(0, 10), y); y += 14; }
+  }
   label('Payment reference', record.payment_id || '', y); y += 14;
   if (record.service_period_end) { label('Service until', String(record.service_period_end).slice(0, 10), y); y += 14; }
   y += 10;
@@ -255,10 +270,26 @@ function render(record, opts = {}) {
   };
   total('Subtotal excl. VAT', `${cur} ${record.amount_net}`, false);
   total(`VAT ${record.vat_rate}%`, `${cur} ${record.amount_vat}`, false);
-  total('Total', `${cur} ${record.amount_gross}`, true);
+  total(isCredit ? 'Total credited' : 'Total', `${cur} ${record.amount_gross}`, true);
   y += 6;
-  doc.text('Paid in full. No payment is due.', right, y, { size: 9, align: 'right', grey: 0.4 });
+  // What the reader owes, in one line, and it is never "nothing to do here".
+  // On a credit note the money has already moved back, by the same route it
+  // came in, and saying so is what stops a support mail.
+  doc.text(isCredit
+    ? (record.reason === 'chargeback'
+      ? 'This amount was charged back and is no longer due. Nothing is payable.'
+      : 'This amount has been refunded to you. Nothing is payable.')
+    : 'Paid in full. No payment is due.',
+  right, y, { size: 9, align: 'right', grey: 0.4 });
   y += 26;
+
+  // A partial credit note has to say what is left standing, or it reads as a
+  // full reversal of an invoice that is still partly owed and partly booked.
+  if (isCredit && record.partial) {
+    doc.text('Partial credit. The remainder of the invoice named above still stands.',
+      MARGIN, y, { size: 9, grey: 0.35 });
+    y += 18;
+  }
 
   // What the document is not, when it is not an invoice yet.
   if (!isInvoice) {
@@ -266,15 +297,26 @@ function render(record, opts = {}) {
     y += 16;
     doc.text(record.note || '', MARGIN, y, { font: FONTS.bold, size: 10 });
     y += 14;
-    doc.text('This receipt confirms your payment. It is not a VAT invoice: our VAT identification', MARGIN, y, { size: 9, grey: 0.35 }); y += 12;
-    doc.text('number is not yet on file. You will receive the invoice for this payment as soon as it is.', MARGIN, y, { size: 9, grey: 0.35 }); y += 12;
+    if (isCredit) {
+      doc.text('This receipt confirms the refund. It is not a VAT credit note: our VAT identification', MARGIN, y, { size: 9, grey: 0.35 }); y += 12;
+      doc.text('number is not yet on file. You will receive the credit note for this refund as soon as it is.', MARGIN, y, { size: 9, grey: 0.35 }); y += 12;
+    } else {
+      doc.text('This receipt confirms your payment. It is not a VAT invoice: our VAT identification', MARGIN, y, { size: 9, grey: 0.35 }); y += 12;
+      doc.text('number is not yet on file. You will receive the invoice for this payment as soon as it is.', MARGIN, y, { size: 9, grey: 0.35 }); y += 12;
+    }
     y += 10;
   }
 
-  if (record.reversed_at) {
+  // Only on an invoice: a credit note is the document that reverses, and can
+  // never itself be reversed.
+  if (!isCredit && record.reversed_at) {
     doc.text(`Reversed on ${String(record.reversed_at).slice(0, 10)} (chargeback). This document no longer represents money received.`,
       MARGIN, y, { font: FONTS.bold, size: 9 });
     y += 18;
+    if (record.credit_notes && record.credit_notes.length) {
+      doc.text(`Credited by ${record.credit_notes.join(', ')}.`, MARGIN, y, { size: 9, grey: 0.35 });
+      y += 14;
+    }
   }
 
   // Footer, on the last line of the page rather than after the content, so it

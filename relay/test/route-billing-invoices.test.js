@@ -28,6 +28,7 @@ const assert = require('assert');
 const { boot, killAll } = require('./_relay-server');
 const { requireRedis, summary } = require('./_requires');
 const invoice = require('../lib/invoice');
+const creditNote = require('../lib/credit-note');
 
 const KEY_A = 'pgp_invoice_account_a';
 const KEY_B = 'pgp_invoice_account_b';
@@ -234,5 +235,77 @@ test('numbers issued through the relay redis run consecutively', async (t) => {
   const list = await srv.get('/v2/billing/invoices', asA);
   const numbers = list.json.invoices.map((i) => i.number).filter((n) => n.startsWith('PS-2031-'));
   assert.deepStrictEqual(numbers, ['PS-2031-0002', 'PS-2031-0001'], 'newest first, no duplicate');
+  did();
+});
+
+// ── credit notes and the history, on the wire ────────────────────────────────
+// The document half is proved against a Map in test/credit-note.test.js and
+// test/billing-history.test.js. What can only be wrong here is the routing: that
+// a CN number is not rejected as malformed before it is looked up, that it comes
+// back as a PDF, that it is not readable by the neighbour, and that the history
+// route derives a list from documents this same redis holds.
+
+test('a credit note is listed, downloadable, and still only the owner its own', async (t) => {
+  if (!srv) return t.skip('no redis');
+  const paymentId = `tr_credit_${RUN}`;
+  const paid = await issueFor(acct(ACCT_A), paymentId, '603.79', {
+    buyer: { email: 'one@example.test', company: 'Acme One B.V.', address: 'Example Road 12\n1015 BR Example City', vat: '' },
+  });
+  assert.strictEqual(paid.result, 'issued');
+  const note = await creditNote.issueCreditNote({
+    payment: {
+      id: paymentId, status: 'chargeback',
+      amount: { value: '603.79', currency: 'EUR' },
+      amountChargedBack: { value: '603.79', currency: 'EUR' },
+      metadata: { accountId: acct(ACCT_A), product: 'parasign', plan: 'pro', interval: 'yearly' },
+    },
+  }, redis);
+  assert.strictEqual(note.result, 'issued', note.reason);
+  assert.ok(/^CN-\d{4}-\d{4,}$/.test(note.number), `its own series: ${note.number}`);
+
+  const list = await srv.get('/v2/billing/invoices', asA);
+  const row = list.json.invoices.find((i) => i.number === note.number);
+  assert.ok(row, 'the credit note is in the account listing');
+  assert.strictEqual(row.kind, 'credit_note');
+  assert.strictEqual(row.amount_gross, '-603.79');
+  assert.strictEqual(row.credit_for, paid.number);
+  assert.strictEqual(row.reason, 'chargeback');
+  assert.strictEqual(row.partial, false);
+
+  const pdf = await srv.get(row.pdf_url, asA);
+  assert.strictEqual(pdf.status, 200, 'a CN number is not rejected as malformed');
+  assert.strictEqual(pdf.headers['content-type'], 'application/pdf');
+  const text = pdf.buf.toString('latin1');
+  assert.ok(text.includes(note.number), 'the document carries its own number');
+  assert.ok(text.includes(paid.number), 'and the number of the invoice it credits');
+  assert.ok(text.includes('-603.79'), 'with a negative total');
+
+  const stolen = await srv.get(row.pdf_url, asB);
+  assert.strictEqual(stolen.status, 404, 'the neighbour still gets nothing');
+  did();
+});
+
+test('the history route builds one chronological list from the documents', async (t) => {
+  if (!srv) return t.skip('no redis');
+  const unauth = await srv.get('/v2/billing/history');
+  assert.strictEqual(unauth.status, 401, 'it needs a key');
+
+  const r = await srv.get('/v2/billing/history', asA);
+  assert.strictEqual(r.status, 200);
+  assert.ok(Array.isArray(r.json.history), 'it answers a list');
+  assert.ok(r.json.history.length > 0, 'an account that has paid is not "no billing events yet"');
+
+  const stamps = r.json.history.map((row) => Date.parse(row.ts));
+  for (let i = 1; i < stamps.length; i++) {
+    assert.ok(stamps[i - 1] >= stamps[i], `row ${i} is in order`);
+  }
+  assert.ok(r.json.history.some((row) => row.type === 'invoice' && row.amount && row.document),
+    'the payments are in it, with their document numbers');
+  assert.ok(r.json.history.some((row) => row.type === 'credit_note' && String(row.amount).startsWith('-')),
+    'and so is the money that went back');
+
+  const empty = await srv.get('/v2/billing/history', asB);
+  assert.strictEqual(empty.status, 200);
+  assert.ok(Array.isArray(empty.json.history), 'an account with nothing gets a list, not an error');
   did();
 });

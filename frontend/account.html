@@ -410,9 +410,10 @@ main.acct input::placeholder { color: var(--ink-3); }
 
     <hr class="acct-divider">
     <!-- Every payment gets a numbered document, issued by the relay the moment
-         Mollie confirms the money. The list is read-only here: a document is
-         never edited after it is issued. -->
-    <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Invoices</h3>
+         Mollie confirms the money, and every refund or chargeback gets a credit
+         note with its own number that refers back to it. The list is read-only
+         here: a document is never edited after it is issued. -->
+    <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Invoices and credit notes</h3>
     <div id="billing-invoices" style="font-size:var(--text-sm);color:var(--ink-dim)">Loading invoices&hellip;</div>
 
     <hr class="acct-divider">
@@ -443,7 +444,10 @@ main.acct input::placeholder { color: var(--ink-3); }
 
     <hr class="acct-divider">
     <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Billing history</h3>
-    <div id="billing-history" style="font-size:var(--text-sm);color:var(--ink-dim)">No billing events yet.</div>
+    <!-- Payments, credit notes, the terms that ended and any plan change, in one
+         list, newest first. Derived from the documents themselves, so it can
+         never disagree with them. -->
+    <div id="billing-history" style="font-size:var(--text-sm);color:var(--ink-dim)">Loading billing history&hellip;</div>
   </div>
 </section>
 
@@ -462,7 +466,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=8" defer></script>
-<script src="/js/account.inline1.js?v=4"></script>
+<script src="/js/account.inline1.js?v=5"></script>
 
 <script type="module" src="/js/account.inline2.js?v=3"></script>
 <script type="module" src="/js/passkey.js?v=4"></script>
