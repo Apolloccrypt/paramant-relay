@@ -39,7 +39,7 @@ async function loadEnrolledKeys() {
       return '<li style="padding:12px 0;border-bottom:1px solid var(--border-soft, #e5e7eb)">' +
         '<div style="font-weight:600">' + lbl + '</div>' +
         '<div class="mono small" style="margin:4px 0">' + fp + '...</div>' +
-        '<div class="small" style="color:var(--muted, #6b7280)">' + alg + ' &middot; enrolled ' + enrolled + revoked + '</div>' +
+        '<div class="small">' + alg + ' &middot; enrolled ' + enrolled + revoked + '</div>' +
         (btn ? '<div style="margin-top:8px">' + btn + '</div>' : '') +
         '</li>';
     }).join('');

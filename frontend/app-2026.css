@@ -1,0 +1,748 @@
+/* PARAMANT app-2026.css
+   The product surface: dashboard, sign, parashare, signup, account, auth.
+
+   This file implements docs/brand/design-direction.md for the APP screens only.
+   Marketing pages keep design-system.css v4 untouched. Two things happen here:
+
+   1. Tokens. The 2026 palette from the direction (section 2), written three
+      times so an explicit theme choice and the system preference both win, and
+      so no colour exists only inside a media query.
+   2. An alias layer that points the v4 token names at the new values. Every
+      rule already written against --bone / --ink / --ink-hair follows the theme
+      without being rewritten, which is what makes a dark mode on these pages
+      affordable at all.
+
+   Load order matters: this file is the LAST stylesheet in the head, after the
+   page's own <style> blocks, so the hard-coded hexes those blocks still carry
+   can be corrected here for dark mode.
+
+   Contrast: every pair below was computed with the WCAG 2.1 relative-luminance
+   formula against its own background. Values are in the direction document. */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   1. TOKENS, light
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* surface */
+  --paper:        #FBFAF7;
+  --surface:      #FFFFFF;
+  --surface-sunk: #F4F4F1;
+  --surface-ink:  #0C1622;
+
+  /* ink */
+  --ink-1: #0C1B2A;   /* 16.68 on paper */
+  --ink-2: #40505F;   /*  7.95 on paper */
+  --ink-3: #5C6A78;   /*  5.31 on paper */
+
+  /* the one accent */
+  --accent:      #1D4ED8;              /* 6.42 on paper */
+  --accent-hov:  #1A43BE;
+  --accent-ink:  #FFFFFF;              /* 6.70 on accent */
+  --accent-soft: rgba(29,78,216,.08);
+  --accent-ring: rgba(29,78,216,.32);
+
+  /* hairlines: the main shape of the system */
+  --line:       rgba(12,27,42,.11);
+  --line-2:     rgba(12,27,42,.20);
+  --line-ghost: rgba(12,27,42,.05);
+
+  /* lime is a line, never a text background (one exception, see --mark-on) */
+  --mark:     #B2FF3F;
+  --mark-ink: #5C7A12;                 /* 4.90 on paper, readable lime */
+  --mark-on:  #0A1626;                 /* 14.94 on #B2FF3F */
+
+  /* signature states: the four words dashboard.js renders */
+  --sig-wait: #79600F;
+  --sig-move: #1D4ED8;
+  --sig-done: #1B6B45;
+  --sig-stop: #8C3A34;
+  --sig-wait-bg: rgba(121,96,15,.09);
+  --sig-stop-line: rgba(140,58,52,.42);
+  --paper-blur: rgba(251,250,247,.92);
+  --sig-move-bg: rgba(29,78,216,.09);
+  --sig-done-bg: rgba(27,107,69,.09);
+  --sig-stop-bg: rgba(140,58,52,.09);
+
+  /* radius: nul is a choice, soft only where you touch */
+  --r-0: 0;
+  --r-1: 3px;
+  --r-2: 10px;
+  --r-3: 16px;
+  --r-pill: 999px;
+
+  /* shadow: almost nothing, depth comes from hairlines */
+  --sh-1: 0 1px 2px rgba(12,27,42,.04);
+  --sh-2: 0 1px 2px rgba(12,27,42,.05), 0 8px 24px -12px rgba(12,27,42,.14);
+  --sh-3: 0 24px 64px -24px rgba(12,27,42,.28);
+  --ring: 0 0 0 2px var(--paper), 0 0 0 4px var(--accent-ring);
+
+  /* motion: three durations, two curves, and every one of them confirms
+     something. Nothing here loops. */
+  --d-1: 110ms;
+  --d-2: 180ms;
+  --d-3: 260ms;
+  --e-standard: cubic-bezier(.2, 0, 0, 1);
+  --e-enter:    cubic-bezier(.16, 1, .3, 1);
+
+  --tap: 44px;
+
+  /* ── alias layer: the v4 names now resolve to the 2026 values ───────────── */
+  --bone:   var(--paper);
+  --bone-2: var(--surface-sunk);
+  --navy:   var(--ink-1);
+  --navy-2: var(--ink-1);
+  --ink:       var(--ink-1);
+  --ink-dim:   var(--ink-2);
+  --ink-hair:  var(--line);
+  --ink-ghost: var(--line-ghost);
+  --cobalt:   var(--accent);
+  --cobalt-2: var(--accent-hov);
+  --lime:     var(--mark);
+  --bone-on-navy:      #F4F7FA;
+  --bone-on-navy-dim:  rgba(244,247,250,.74);
+  --bone-on-navy-hair: rgba(244,247,250,.18);
+  --black:       var(--ink-1);
+  --black-dim:   var(--ink-2);
+  --black-hair:  var(--line);
+  --black-ghost: var(--line-ghost);
+  --lime-dim:    var(--ink-2);
+  --lime-hair:   var(--line);
+  --lime-ghost:  var(--line-ghost);
+
+  /* an inverted block keeps its own ink regardless of theme */
+  --on-ink:      #F4F7FA;
+  --on-ink-dim:  rgba(244,247,250,.74);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2. TOKENS, dark: an own set and not a filter
+   Written twice below so the system preference and an explicit choice both
+   win, and once more for [data-theme="light"] never being overridden.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:        #0A0F16;
+    --surface:      #10161F;
+    --surface-sunk: #151C26;
+    --surface-ink:  #060A0F;
+
+    --ink-1: #EDF1F6;   /* 16.94 on paper */
+    --ink-2: #B4C1D0;   /* 10.50 */
+    --ink-3: #8D9CAD;   /*  6.86 */
+
+    --accent:      #7FA6FF;   /* 8.05 */
+    --accent-hov:  #9CBAFF;
+    --accent-ink:  #061020;
+    --accent-soft: rgba(127,166,255,.12);
+    --accent-ring: rgba(127,166,255,.40);
+
+    --line:       rgba(237,241,246,.10);
+    --line-2:     rgba(237,241,246,.20);
+    --line-ghost: rgba(237,241,246,.05);
+
+    --mark:     #B2FF3F;   /* 15.80 on paper */
+    --mark-ink: #C7F86E;
+    --mark-on:  #0A1626;
+
+    --sig-wait: #E3C169;
+    --sig-move: #90AEFF;
+    --sig-done: #6FD3A2;
+    --sig-stop: #F09A92;
+    --sig-wait-bg: rgba(227,193,105,.12);
+    --sig-move-bg: rgba(144,174,255,.12);
+    --sig-done-bg: rgba(111,211,162,.12);
+    --sig-stop-bg: rgba(240,154,146,.12);
+    --sig-stop-line: rgba(240,154,146,.44);
+    --paper-blur: rgba(10,15,22,.92);
+
+    --sh-1: 0 1px 2px rgba(0,0,0,.40);
+    --sh-2: 0 1px 2px rgba(0,0,0,.44), 0 8px 24px -12px rgba(0,0,0,.66);
+    --sh-3: 0 24px 64px -24px rgba(0,0,0,.80);
+
+    --bone-on-navy:      #EDF1F6;
+    --bone-on-navy-dim:  rgba(237,241,246,.74);
+    --bone-on-navy-hair: rgba(237,241,246,.18);
+    --on-ink:      #EDF1F6;
+    --on-ink-dim:  rgba(237,241,246,.74);
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper:        #0A0F16;
+  --surface:      #10161F;
+  --surface-sunk: #151C26;
+  --surface-ink:  #060A0F;
+
+  --ink-1: #EDF1F6;
+  --ink-2: #B4C1D0;
+  --ink-3: #8D9CAD;
+
+  --accent:      #7FA6FF;
+  --accent-hov:  #9CBAFF;
+  --accent-ink:  #061020;
+  --accent-soft: rgba(127,166,255,.12);
+  --accent-ring: rgba(127,166,255,.40);
+
+  --line:       rgba(237,241,246,.10);
+  --line-2:     rgba(237,241,246,.20);
+  --line-ghost: rgba(237,241,246,.05);
+
+  --mark:     #B2FF3F;
+  --mark-ink: #C7F86E;
+  --mark-on:  #0A1626;
+
+  --sig-wait: #E3C169;
+  --sig-move: #90AEFF;
+  --sig-done: #6FD3A2;
+  --sig-stop: #F09A92;
+  --sig-wait-bg: rgba(227,193,105,.12);
+  --sig-move-bg: rgba(144,174,255,.12);
+  --sig-done-bg: rgba(111,211,162,.12);
+  --sig-stop-bg: rgba(240,154,146,.12);
+  --sig-stop-line: rgba(240,154,146,.44);
+  --paper-blur: rgba(10,15,22,.92);
+
+  --sh-1: 0 1px 2px rgba(0,0,0,.40);
+  --sh-2: 0 1px 2px rgba(0,0,0,.44), 0 8px 24px -12px rgba(0,0,0,.66);
+  --sh-3: 0 24px 64px -24px rgba(0,0,0,.80);
+
+  --bone-on-navy:      #EDF1F6;
+  --bone-on-navy-dim:  rgba(237,241,246,.74);
+  --bone-on-navy-hair: rgba(237,241,246,.18);
+  --on-ink:      #EDF1F6;
+  --on-ink-dim:  rgba(237,241,246,.74);
+}
+
+:root { color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; } }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3. PAGE
+   ═══════════════════════════════════════════════════════════════════════════ */
+html, body {
+  background: var(--paper);
+  color: var(--ink-1);
+  font-variant-numeric: tabular-nums;
+}
+main { color: var(--ink-1); }
+
+::selection { background: var(--accent-soft); color: var(--ink-1); }
+
+/* One focus ring, the same one everywhere, in both modes. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: var(--r-1);
+}
+
+/* A text link inside a running paragraph is underlined, not just coloured. */
+main :where(p, li, dd, .acct-lead, .ds-lede, .sub) a:not(.btn):not([class*="cta"]) {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   4. SHARED CHROME: nav, footer, skip link
+   The nav ships its own hard-coded hexes on several app pages. They are
+   corrected here rather than in six inline blocks.
+   ═══════════════════════════════════════════════════════════════════════════ */
+nav.nav { background: var(--paper-blur); border-bottom: 1px solid var(--line); }
+nav.nav .nav-logo .logo-para { color: var(--ink-1); }
+nav.nav .nav-link { color: var(--ink-2); }
+nav.nav .nav-link:hover, nav.nav .nav-link[aria-current="page"] { color: var(--accent); }
+.nav-mobile { background: var(--surface); border-bottom: 1px solid var(--line); }
+.nav-mobile a, .nav-mobile-standalone { color: var(--ink-1); }
+.nav-user-menu { background: var(--surface); border: 1px solid var(--line); box-shadow: var(--sh-2); }
+.nav-user-menu a { color: var(--ink-1); }
+.settings-tabs { background: var(--surface); border: 1px solid var(--line); }
+.settings-tabs a { color: var(--ink-2); }
+.settings-tabs a[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
+
+.nav-help {
+  color: var(--ink-2);
+  border-color: var(--line-2);
+  border-radius: var(--r-1);
+}
+.nav-help::before { border-color: var(--ink-3); color: var(--ink-3); }
+.nav-help:hover { color: var(--ink-1); border-color: var(--mark); background: var(--accent-soft); }
+.nav-help:hover::before { border-color: var(--mark-on); color: var(--mark-on); background: var(--mark); }
+.nav-help-mobile { color: var(--ink-2); border-bottom-color: var(--line); }
+.nav-help-mobile:hover { color: var(--ink-1); background: var(--accent-soft); }
+
+footer { background: var(--surface-sunk); border-top: 1px solid var(--line); color: var(--ink-2); }
+footer a { color: var(--ink-2); }
+footer a:hover { color: var(--accent); }
+footer .logo .a { color: var(--ink-1); }
+
+.skip-link {
+  background: var(--accent);
+  color: var(--accent-ink);
+  padding: 10px 16px;
+  border-radius: 0 0 var(--r-1) 0;
+  font: 600 13px/1 var(--sans);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5. COMPONENTS: the app kit
+   Prefix ax- so nothing here can collide with a page's own class names or
+   with a selector a test pins.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Mono label. Radius nul, a dash in front, lime dash in the brand variant. */
+.ax-label {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3); border-radius: var(--r-0);
+}
+.ax-label::before { content: ""; width: 14px; height: 1px; background: currentColor; flex: 0 0 auto; }
+.ax-label.mark::before { background: var(--mark); height: 2px; }
+
+/* Status chip. Four states, named exactly what dashboard.js renders. */
+.ax-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 10px; border-radius: var(--r-pill);
+  font: 600 12px/1.35 var(--sans); white-space: nowrap;
+  color: var(--sig-wait); background: var(--sig-wait-bg);
+}
+.ax-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+.ax-chip.waiting     { color: var(--sig-wait); background: var(--sig-wait-bg); }
+.ax-chip.in_progress { color: var(--sig-move); background: var(--sig-move-bg); }
+.ax-chip.completed   { color: var(--sig-done); background: var(--sig-done-bg); }
+.ax-chip.cancelled   { color: var(--sig-stop); background: var(--sig-stop-bg); }
+
+/* Meter. 3px, radius nul, fills once. Never a percentage without the number. */
+.ax-meter { height: 3px; border-radius: var(--r-0); background: var(--line-2); overflow: hidden; }
+.ax-meter > i {
+  display: block; height: 100%; background: var(--accent);
+  transform-origin: left center; animation: ax-meter-in var(--d-3) var(--e-standard) both;
+}
+@keyframes ax-meter-in { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Skeleton. A loading state that has the shape of the thing that is coming,
+   so nothing jumps when it lands. Two seconds of motion, then it rests. */
+.ax-skel {
+  border-radius: var(--r-1);
+  background: linear-gradient(90deg, var(--surface-sunk) 0%, var(--line-ghost) 40%, var(--surface-sunk) 80%);
+  background-size: 300% 100%;
+  animation: ax-skel-slide 1.25s var(--e-standard) infinite;
+}
+@keyframes ax-skel-slide { from { background-position: 120% 0; } to { background-position: -60% 0; } }
+.ax-skel-row { display: grid; grid-template-columns: minmax(0,1fr) 110px 116px; gap: 22px; align-items: center; padding: 18px 28px; border-bottom: 1px solid var(--line); }
+.ax-skel-row .l1 { height: 13px; width: 62%; }
+.ax-skel-row .l2 { height: 10px; width: 38%; margin-top: 8px; }
+.ax-skel-row .m  { height: 3px;  width: 96px; border-radius: var(--r-0); }
+.ax-skel-row .c  { height: 22px; width: 108px; border-radius: var(--r-pill); }
+@media (max-width: 760px) {
+  .ax-skel-row { grid-template-columns: minmax(0,1fr) auto; gap: 12px; padding: 16px 18px; }
+  .ax-skel-row .m { width: 100%; grid-column: 1 / -1; }
+}
+
+/* Buttons. Precisely one filled accent per screen; everything else hairline. */
+.ax-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--tap); padding: 11px 18px;
+  border: 1px solid var(--line-2); border-radius: var(--r-1);
+  background: transparent; color: var(--ink-1);
+  font: 500 14px/1.2 var(--sans); text-decoration: none; cursor: pointer;
+  transition: border-color var(--d-1) var(--e-standard), background var(--d-1) var(--e-standard), color var(--d-1) var(--e-standard);
+}
+.ax-btn:hover { border-color: var(--ink-3); background: var(--line-ghost); }
+.ax-btn:active { transform: translateY(1px); }
+.ax-btn[disabled], .ax-btn[aria-disabled="true"] { opacity: .5; cursor: default; transform: none; }
+.ax-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.ax-btn.primary:hover { background: var(--accent-hov); border-color: var(--accent-hov); }
+.ax-btn.bare { border-color: transparent; background: transparent; color: var(--accent); }
+.ax-btn.bare:hover { background: var(--accent-soft); border-color: transparent; }
+/* Dangerous work is a hairline that reddens, never the only filled button
+   on the screen. */
+.ax-btn.warn { color: var(--sig-stop); border-color: var(--sig-stop-line); }
+.ax-btn.warn:hover { color: var(--sig-stop); border-color: var(--sig-stop); background: var(--sig-stop-bg); }
+
+/* Marked link: the readable "onward" shape that replaces a second button. */
+.ax-link {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-1); text-decoration: none;
+  border-bottom: 2px solid var(--mark); padding-bottom: 3px;
+}
+.ax-link::after { content: "\2192"; transition: transform var(--d-1) var(--e-standard); }
+.ax-link:hover::after { transform: translateX(3px); }
+
+/* Field. Hover thickens the line, focus colours it and adds the ring. */
+.ax-field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 18px; }
+.ax-field > label { font: 500 13px/1.3 var(--sans); color: var(--ink-1); }
+.ax-field .ax-hint { font: 12px/1.5 var(--sans); color: var(--ink-3); }
+.ax-input {
+  width: 100%; min-height: var(--tap); padding: 11px 13px;
+  border: 1px solid var(--line-2); border-radius: var(--r-1);
+  background: var(--surface); color: var(--ink-1);
+  font: 15px/1.4 var(--sans);
+  transition: border-color var(--d-1) var(--e-standard);
+}
+.ax-input:hover { border-color: var(--ink-3); }
+.ax-input:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+.ax-input::placeholder { color: var(--ink-3); }
+
+/* A field error is text plus a mark, never colour alone. */
+.ax-error {
+  display: flex; align-items: flex-start; gap: 8px;
+  font: 13px/1.5 var(--sans); color: var(--sig-stop);
+}
+.ax-error::before {
+  content: "!"; flex: 0 0 auto;
+  width: 16px; height: 16px; margin-top: 1px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid currentColor; border-radius: 50%;
+  font: 700 11px/1 var(--mono);
+}
+.ax-input[aria-invalid="true"] { border-color: var(--sig-stop); }
+
+/* Alert above a form, for the errors the server sends back. */
+.ax-alert {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 12px 14px; margin-bottom: 18px;
+  border: 1px solid var(--line-2); border-left: 3px solid var(--ink-3);
+  border-radius: var(--r-1); background: var(--surface-sunk);
+  font: 13px/1.55 var(--sans); color: var(--ink-1);
+}
+.ax-alert.bad  { border-left-color: var(--sig-stop); color: var(--ink-1); background: var(--sig-stop-bg); }
+.ax-alert.wait { border-left-color: var(--sig-wait); background: var(--sig-wait-bg); }
+.ax-alert.good { border-left-color: var(--sig-done); background: var(--sig-done-bg); }
+
+/* Visually hidden, still announced. A loading skeleton is decoration for the
+   eye; the screen reader gets the sentence. */
+.pa-sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+/* Empty state. */
+.ax-empty { padding: 48px 28px; text-align: center; }
+.ax-empty strong { display: block; margin-bottom: 8px; font: 600 16px/1.3 var(--sans); color: var(--ink-1); }
+.ax-empty span { display: block; max-width: 52ch; margin: 0 auto; font: 14px/1.6 var(--sans); color: var(--ink-2); }
+
+/* Beacon. Only where something is actually measured; never with an invented
+   number next to it, and never inside a list. */
+.ax-beacon { position: relative; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--sig-done); flex: 0 0 auto; }
+.ax-beacon::after {
+  content: ""; position: absolute; inset: -3px; border-radius: 50%;
+  border: 1px solid currentColor; color: var(--sig-done); opacity: 0;
+  animation: ax-beat 3.4s var(--e-standard) infinite;
+}
+@keyframes ax-beat { 0% { opacity: .55; transform: scale(.7); } 60%, 100% { opacity: 0; transform: scale(1.5); } }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   6. SURFACES: every existing card in the app on the new tokens
+
+   Wrapped in :where() on purpose: these rules carry zero specificity, so they
+   are a default a page can always override from its own stylesheet without an
+   ordering fight, even though this file loads last.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:where(.acct-card, .dh-acct, .dh-onb, .dh-flag-card, .dh-tool, .dh-purpose, .dh-ops-card,
+       .dh-paid, .dh-ask, .dh-start-card, .dh-workspace, .dh-modal-card, .dh-doc-dialog-panel,
+       .ds-mode-card, .ds-delivery-card) {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  box-shadow: var(--sh-1);
+}
+:where(.dh-modal-card, .dh-doc-dialog-panel) { border-radius: var(--r-3); box-shadow: var(--sh-3); }
+
+:where(.ds-info-card, .ds-proof-card, .ds-usage-card, .ds-advanced, .ds-banner,
+       .ds-recipient-row, .ds-party-link-row, .ps-key-slim, .card, .hero-block) {
+  background: var(--surface-sunk);
+  border-color: var(--line);
+  color: var(--ink-1);
+}
+:where(.ds-proof-json, .ds-review-pane) { background: var(--surface); border-color: var(--line); }
+
+/* The one inverted block per screen. It keeps its own ink in both themes. */
+.dh-community, .acct-plan-band.free {
+  background: var(--surface-ink);
+  box-shadow: inset 0 0 0 1px rgba(178,255,63,.20);
+  border: 0;
+  border-radius: var(--r-2);
+}
+.dh-community-lede, .acct-plan-band.free .acct-plan-lede { color: var(--on-ink); }
+.dh-community-adds, .acct-plan-band.free .acct-plan-adds { color: var(--on-ink-dim); }
+.dh-community-kicker, .acct-plan-band.free .acct-plan-kicker { color: var(--mark); }
+.dh-community-cta, .acct-plan-band.free a.acct-plan-cta {
+  min-height: var(--tap); display: inline-flex; align-items: center;
+  background: var(--mark); color: var(--mark-on); border-radius: var(--r-1);
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; text-decoration: none;
+  padding: 0 18px;
+}
+.dh-community-cta:hover, .acct-plan-band.free a.acct-plan-cta:hover { background: #C7F86E; }
+.dh-community-lede a, .acct-plan-band.free .acct-plan-lede a { color: var(--mark); }
+.acct-plan-band.paid { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); }
+.acct-plan-band.paid .acct-plan-kicker { color: var(--accent); }
+.acct-plan-band.paid .acct-plan-lede { color: var(--ink-1); }
+
+/* The signed-out nav CTA is the one allowed lime field, and the only text
+   that may sit on it is #0A1626 (14.94:1). The app pages set this with
+   !important in their own head, so it is corrected with the same weight. */
+.nav-cta, a.nav-cta, .nav .nav-cta { color: var(--mark-on) !important; background: var(--mark); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   7. MOTION AND POINTERS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* A coarse pointer grows the small controls to a real tap target. A text link
+   inside a running line is deliberately exempt: it lives under the reading
+   rule with its underline, not under the button rule. */
+@media (pointer: coarse) {
+  .ax-btn, .ax-input, .dh-btn, .dh-filter, .dh-refresh, .acct-plan-cta,
+  .ds-edit-btn, .ds-tab, button.ax-copy { min-height: var(--tap); }
+  .dh-btn, .dh-filter, .dh-refresh { padding-top: 12px; padding-bottom: 12px; }
+}
+
+/* Reduced motion is proved with a screenshot, not assumed. Everything that
+   moves stops; nothing that carries state disappears. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --d-1: 1ms; --d-2: 1ms; --d-3: 1ms; }
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ax-skel { animation: none; background: var(--surface-sunk); }
+  .ax-meter > i { animation: none; }
+  .ax-beacon::after { animation: none; opacity: 0; }
+  .dh-start-card:hover, .dh-flag-card:hover, .dh-tool:hover,
+  .ds-mode-card:hover, .ax-btn:active { transform: none; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   8. BUTTONS AND FORMS INHERITED FROM design-system.css
+   The v4 button colours were written for a light-only site: .btn-primary puts
+   --bone-on-navy on cobalt, and .btn-lime puts --navy on lime. Both of those
+   invert in dark and land under AA. They are corrected here rather than in
+   the shared file, because only the app screens carry a dark mode.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.btn {
+  min-height: var(--tap);
+  padding: 12px 20px;
+  border-radius: var(--r-1);
+  border-width: 1px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  transition: background var(--d-1) var(--e-standard), border-color var(--d-1) var(--e-standard), color var(--d-1) var(--e-standard);
+}
+.btn:disabled { opacity: .5; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { background: var(--accent-hov); border-color: var(--accent-hov); color: var(--accent-ink); }
+.btn-secondary { background: transparent; border-color: var(--line-2); color: var(--ink-1); font-weight: 500; }
+.btn-secondary:hover { background: var(--line-ghost); border-color: var(--ink-3); color: var(--ink-1); }
+.btn-tertiary { color: var(--ink-2); }
+.btn-tertiary:hover { color: var(--accent); }
+.btn-lime, .section-cobalt .btn-primary, .section-navy .btn-primary, .invert .btn-primary {
+  background: var(--mark); border-color: var(--mark); color: var(--mark-on);
+}
+.btn-outline { border-color: var(--line-2); color: var(--ink-1); border-radius: var(--r-1); }
+.btn-danger { background: transparent; border-color: var(--sig-stop-line); color: var(--sig-stop); }
+.btn-danger:hover { background: var(--sig-stop-bg); border-color: var(--sig-stop); color: var(--sig-stop); }
+
+.form-card {
+  padding: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+}
+.form-card label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 8px;
+}
+.form-card input[type="email"],
+.form-card input[type="text"],
+.form-card input[type="password"],
+.form-card select,
+.form-card textarea {
+  min-height: var(--tap);
+  padding: 11px 13px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-1);
+  background: var(--surface);
+  color: var(--ink-1);
+  transition: border-color var(--d-1) var(--e-standard);
+}
+.form-card input:hover, .form-card select:hover, .form-card textarea:hover { border-color: var(--ink-3); }
+.form-card input:focus, .form-card select:focus, .form-card textarea:focus {
+  outline: none; border-color: var(--accent); box-shadow: var(--ring);
+}
+.form-card input::placeholder { color: var(--ink-3); }
+.form-card input[aria-invalid="true"] { border-color: var(--sig-stop); }
+
+/* An error is a border, an icon and a sentence. Never colour on its own. */
+.error, .msg-error {
+  display: none;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid var(--line-2);
+  border-left: 3px solid var(--sig-stop);
+  border-radius: var(--r-1);
+  background: var(--sig-stop-bg);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-1);
+}
+.error.visible, .msg-error.visible { display: flex; }
+.error::before, .msg-error::before {
+  content: "!"; flex: 0 0 auto;
+  width: 17px; height: 17px; margin-top: 1px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--sig-stop); border-radius: 50%;
+  font: 700 11px/1 var(--mono); color: var(--sig-stop);
+}
+.error a, .msg-error a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.msg-success { border-left-color: var(--sig-done); background: var(--sig-done-bg); color: var(--ink-1); }
+.msg-success::before { content: none; }
+
+.eyebrow { color: var(--ink-3); }
+.eyebrow .bar { background: var(--mark); height: 2px; }
+.footer-text { color: var(--ink-2); }
+.footer-text a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.legal-strip { background: var(--surface-sunk); border-top: 1px solid var(--line); color: var(--ink-3); }
+.legal-strip a { color: var(--ink-2); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   9. AUTH: one narrow column, one card, one primary action
+   The build bar and the legal strip stay: on these four pages they are the
+   only proof that you are on the real site.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.auth-wrap {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: clamp(32px, 8vh, 72px) var(--space-4) var(--space-7);
+}
+.auth-head { text-align: left; margin-bottom: var(--space-5); }
+.auth-head .eyebrow { justify-content: flex-start; margin-bottom: var(--space-3); }
+.auth-head h1 {
+  font-size: clamp(28px, 6vw, 38px); line-height: 1.08; letter-spacing: -.028em;
+  color: var(--ink-1); font-weight: 600; margin: 0;
+}
+.auth-head h1 em { font-style: normal; color: var(--accent); }
+.auth-sub, .auth-hint { text-align: left; color: var(--ink-2); }
+.auth-sub { font: 15px/1.6 var(--sans); margin: var(--space-3) 0 0; max-width: 46ch; }
+.auth-hint { font: 12.5px/1.55 var(--sans); color: var(--ink-3); margin: 9px 0 0; }
+.auth-card { margin: 0; max-width: none; }
+.auth-foot, .auth-altline { text-align: left; }
+.auth-link { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; min-height: 36px; }
+.auth-link:hover { opacity: 1; color: var(--accent-hov); }
+.auth-note {
+  max-width: none; margin: var(--space-3) 0 0; padding: 14px 16px;
+  border: 1px solid var(--line-2); border-left: 3px solid var(--sig-wait);
+  border-radius: var(--r-1); background: var(--sig-wait-bg);
+  color: var(--ink-1); font: 13.5px/1.6 var(--sans);
+}
+.auth-note a { color: var(--accent); }
+
+/* Passkey and code are two ways in, not a first and a second choice. The
+   divider that said "or" is gone; they sit next to each other and the fields
+   for whichever you pick open underneath. */
+.auth-or { display: none; }
+.auth-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: var(--space-4); }
+.auth-choice .btn { width: 100%; justify-content: center; text-align: center; margin-top: 0; }
+@media (max-width: 460px) { .auth-choice { grid-template-columns: 1fr; } }
+
+/* The error sits above the form and announces itself. */
+.auth-alert { margin: 0 0 var(--space-4); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   10. SHARED MARKETING BLOCKS THAT APPEAR ON APP SCREENS
+   .page-hero and .dark-band carry hard-coded hexes in design-system.css. On a
+   page with a dark mode that leaves a white band above a dark shell, which is
+   the exact failure the direction warns about in section 5.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.page-hero {
+  background: var(--surface-sunk);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: clamp(32px, 6vh, 56px) 24px;
+}
+.page-hero .eyebrow {
+  display: inline-flex; align-items: center;
+  background: transparent; color: var(--ink-3);
+  padding: 0; margin-bottom: 14px;
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase;
+}
+.page-hero .eyebrow::before { content: ""; width: 14px; height: 2px; margin-right: 9px; background: var(--mark); }
+.page-hero h1 { color: var(--ink-1); margin: 0 0 12px; }
+.page-hero .lede { color: var(--ink-2); }
+.dark-band { background: var(--surface-ink); color: var(--on-ink); }
+.meta-bar { background: var(--surface-ink); color: var(--on-ink-dim); border-bottom: 1px solid var(--line); }
+.meta-bar a, .meta-bar .meta-link { color: var(--mark); }
+.parapear-bubble { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-2); color: var(--ink-1); }
+.parapear-kicker { color: var(--ink-3); }
+.info-row { border-top: 1px solid var(--line); }
+.info-row .k, .info-row dt { color: var(--ink-3); }
+.info-row .v, .info-row dd { color: var(--ink-1); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   11. LOOSE ENDS THE CONTRAST AND TAP GATES FOUND
+   tests/app-contrast.test.mjs walks every app screen in both themes and reads
+   the computed colour of every text node. What follows is what it found, and
+   nothing here is decorative: each rule closes one measured failure.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Names that older scripts reach for with a hard-coded fallback:
+   var(--muted, #6b7280) resolved to that grey because --muted was never
+   defined anywhere. Defining them makes the fallback unreachable. */
+:root { --muted: var(--ink-3); --danger: var(--sig-stop); --bg: var(--paper); }
+
+/* The build bar is an inverted strip, so every part of it takes inverted ink. */
+.meta-bar, .meta-bar .sep, .meta-bar .right { color: var(--on-ink-dim); }
+.meta-bar b { color: var(--on-ink); }
+.meta-bar a.meta-link { color: var(--mark); text-decoration-color: rgba(178,255,63,.5); }
+.meta-bar a.meta-link:hover, .meta-bar a.meta-link:focus-visible { color: var(--mark); text-decoration-color: var(--mark); }
+
+/* A failure sentence is a sentence in the fault colour of the current theme. */
+.is-bad { color: var(--sig-stop); }
+
+/* Tap targets. On a coarse pointer everything bedienbaar reaches 44px,
+   including the shared chrome: the footer link lists, the legal strip, the
+   settings tabs, the hamburger and the account menu. A text link inside a
+   running paragraph stays exempt, by the reading rule. */
+@media (pointer: coarse) {
+  .footer-links a, .foot-links a, .legal-strip a, .settings-tabs a,
+  .dh-quiet-links a, .nav-user-trigger, .nav-hamburger, .nav-logo,
+  .skip-link, .nav-signin, .nav-cta, .nav-help, .auth-link, .su-linkbtn,
+  .ps-key-change, .ds-note-dismiss, .ds-security-details summary,
+  .acct-advanced > summary, .ds-advanced summary, .btn-small, .btn.btn-small {
+    min-height: var(--tap);
+  }
+  .footer-links a, .foot-links a, .legal-strip a, .settings-tabs a,
+  .dh-quiet-links a, .nav-signin, .nav-logo, .auth-link, .su-linkbtn,
+  .ps-key-change, .ds-note-dismiss {
+    display: inline-flex; align-items: center;
+  }
+  .footer-links, .foot-links { gap: 0; }
+}

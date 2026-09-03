@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<style id="critical-css">:root{color-scheme:light}html,body{background:#FBFAF7;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark}html:not([data-theme="light"]),html:not([data-theme="light"]) body{background:#0A0F16;color:#EDF1F6}}html[data-theme="dark"],html[data-theme="dark"] body{background:#0A0F16;color:#EDF1F6}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Your dashboard · Paramant</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="canonical" href="https://paramant.app/dashboard">
 <meta name="description" content="Sign in to your Paramant dashboard.">
-<meta name="theme-color" content="#0B1622">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://relay.paramant.app">
 <link rel="stylesheet" href="/design-system.css?v=23">
@@ -19,265 +19,329 @@
 /* Dashboard. Client-side rendered from /api/user/me JSON. Auth-gate stays
    hard: on 401 the loader hard-redirects to /auth/login?next=/dashboard
    before any account data is revealed. The placeholder shown during the fetch
-   carries no user data. The signed-in view is a document workspace with one
-   primary action, two secondary actions and relay-measured status. */
-.nav-cta, a.nav-cta, .nav .nav-cta { color: var(--navy) !important; }
+   carries no user data.
 
-main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-7); min-height: 70vh; }
+   The shape follows docs/brand/design-direction.md: hairlines instead of
+   boxes, exactly one filled accent (Request signatures), exactly one inverted
+   block (Community), and the register underneath in three columns that stack
+   in reading order below 760px. Tokens come from /app-2026.css, which is the
+   last stylesheet in the head so this block can be read against it. */
 
-/* Placeholder shown until fetch lands or redirects */
-.pa-loading { padding: var(--space-7) var(--space-4); text-align: center; color: var(--ink-dim); font-family: var(--sans); font-size: 14px; }
-.pa-spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--ink-hair); border-top-color: var(--lime); border-radius: 50%; animation: pa-spin 0.8s linear infinite; vertical-align: middle; margin-right: 10px; }
-@keyframes pa-spin { to { transform: rotate(360deg); } }
-.pa-err-link { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-7); min-height: 70vh; }
 [hidden] { display: none !important; }
 
-/* Hero strip -- compact, identity + plan */
-.dh-hero { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-2) 0 var(--space-4); border-bottom: 1px solid var(--ink-hair); margin-bottom: var(--space-6); }
-.dh-hero h1 { font-family: var(--sans); font-size: clamp(26px, 3.4vw, 36px); line-height: 1.1; letter-spacing: -.018em; margin: 0; color: var(--ink); font-weight: 600; }
-.dh-hero h1 small { display: block; font-size: 14px; font-weight: 400; color: var(--ink-dim); margin-top: var(--space-1); letter-spacing: 0; }
-.dh-hero .dh-plan { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); padding: 4px 10px; border: 1px solid var(--ink-hair); border-radius: 999px; background: var(--bone); }
-.dh-hero .dh-plan strong { color: var(--ink); font-weight: 600; }
-.dh-community { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-4); background: #0a1626; box-shadow: inset 0 0 0 1px rgba(178,255,63,.18); border-radius: 10px; padding: var(--space-5); margin-bottom: var(--space-6); }
+/* ── The placeholder that carries no user data ─────────────────────────────
+   It has the SHAPE of what is coming, so nothing jumps when the data lands. */
+.pa-loading { padding: var(--space-2) 0 var(--space-6); color: var(--ink-2); font: 14px/1.6 var(--sans); }
+.pa-loading .parapear-block { justify-content: flex-start; }
+.pa-spinner { display: inline-block; width: 15px; height: 15px; border: 2px solid var(--line-2); border-top-color: var(--accent); border-radius: 50%; animation: pa-spin .8s linear infinite; vertical-align: -2px; margin-right: 10px; }
+@keyframes pa-spin { to { transform: rotate(360deg); } }
+.pa-err-link { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+#dh-error { border: 1px solid var(--line-2); border-left: 3px solid var(--sig-stop); border-radius: var(--r-1); background: var(--sig-stop-bg); padding: 16px 18px; color: var(--ink-1); }
+
+/* ── Hero: who you are and which plan pays for it ──────────────────────────── */
+.dh-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; padding: var(--space-2) 0 var(--space-5); border-bottom: 1px solid var(--line); margin-bottom: var(--space-6); }
+.dh-hero h1 { font-family: var(--sans); font-size: clamp(28px, 3.6vw, 44px); line-height: 1.08; letter-spacing: -.028em; margin: 0 0 10px; color: var(--ink-1); font-weight: 600; max-width: 20ch; }
+.dh-mission { max-width: 58ch; margin: 0; font: 16px/1.62 var(--sans); color: var(--ink-2); }
+/* The plan pill carries a beacon because the plan is measured, not claimed:
+   dashboard.js writes it from what /api/user/me actually returns. */
+.dh-hero .dh-plan { display: inline-flex; align-items: center; gap: 9px; margin-top: 6px; font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); padding: 7px 14px; border: 1px solid var(--line-2); border-radius: var(--r-pill); background: var(--surface); white-space: nowrap; }
+.dh-hero .dh-plan::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--sig-done); box-shadow: 0 0 0 3px var(--sig-done-bg); }
+.dh-hero .dh-plan strong { color: var(--ink-1); font-weight: 600; }
+
+/* ── Three ways in. One of them is the primary action of this screen. ─────── */
+.dh-start { display: grid; grid-template-columns: minmax(0, 1.35fr) repeat(2, minmax(0, .825fr)); gap: var(--space-3); margin-bottom: var(--space-6); }
+.dh-start-card { min-height: 178px; display: flex; flex-direction: column; padding: 22px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); color: var(--ink-1); text-decoration: none; box-shadow: var(--sh-1); transition: transform var(--d-2) var(--e-standard), border-color var(--d-2) var(--e-standard), box-shadow var(--d-2) var(--e-standard); }
+.dh-start-card:hover { transform: translateY(-1px); border-color: var(--line-2); box-shadow: var(--sh-2); }
+.dh-start-card:focus-visible { outline: none; box-shadow: var(--ring); }
+.dh-start-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: var(--r-1); background: var(--accent-soft); color: var(--accent); font-size: 18px; margin-bottom: auto; }
+.dh-start-kicker { display: block; margin: 18px 0 7px; font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+.dh-start-card h2 { margin: 0 0 6px; font: 600 19px/1.18 var(--sans); letter-spacing: -.014em; color: inherit; }
+.dh-start-card p { margin: 0; font: 14px/1.55 var(--sans); color: var(--ink-2); }
+.dh-start-link { margin-top: 18px; display: inline-flex; align-items: center; gap: 7px; font: 600 13px/1 var(--sans); color: inherit; }
+/* The one filled accent on this screen. */
+.dh-start-card.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: var(--sh-2); }
+.dh-start-card.primary:hover { background: var(--accent-hov); border-color: var(--accent-hov); }
+.dh-start-card.primary .dh-start-icon { background: rgba(255,255,255,.16); color: var(--accent-ink); }
+.dh-start-card.primary .dh-start-kicker { color: var(--accent-ink); opacity: .8; }
+.dh-start-card.primary p { color: var(--accent-ink); opacity: .86; }
+
+/* ── The give-back band. The one inverted block on this screen. ───────────── */
+.dh-community { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-4); padding: var(--space-5); margin-bottom: var(--space-6); }
 .dh-community > div { flex: 1 1 340px; }
-.dh-community-kicker { margin: 0 0 var(--space-2); font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: #B2FF3F; }
-.dh-community-lede { margin: 0 0 var(--space-3); font-size: 15px; line-height: 1.6; color: #F8FAFC; }
-.dh-community-lede a { color: #B2FF3F; text-decoration: none; border-bottom: 1px solid rgba(178,255,63,.5); }
-.dh-community-adds { margin: 0; font-size: 13px; line-height: 1.6; color: rgba(248,250,252,.72); }
-.dh-community-cta { flex: 0 0 auto; font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #0a1626; background: #B2FF3F; text-decoration: none; padding: 10px 16px; border-radius: 4px; }
-.dh-community-cta:hover { background: #F8FAFC; }
-.dh-start-kicker { display: block; margin-bottom: 6px; font-family: var(--mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; opacity: .75; }
-.dh-paid { border: 1px solid rgba(11,58,106,.09); border-radius: 10px; background: rgba(255,255,255,.76); padding: var(--space-4) var(--space-5); margin-bottom: var(--space-6); }
-.dh-paid-kicker { margin: 0 0 var(--space-2); font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--cobalt); }
-.dh-paid-lede { margin: 0 0 var(--space-2); font: 15px/1.6 var(--sans); color: var(--ink); }
-.dh-paid-foot { margin: 0; font: 13px/1.6 var(--sans); color: var(--ink-dim); }
-.dh-paid-foot a { color: var(--cobalt); }
+.dh-community-kicker { margin: 0 0 var(--space-3); font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; }
+.dh-community-lede { margin: 0 0 var(--space-3); font: 15px/1.62 var(--sans); max-width: 62ch; }
+.dh-community-adds { margin: 0; font: 13px/1.62 var(--sans); max-width: 62ch; }
+.dh-community-cta { flex: 0 0 auto; }
 
-/* Buyer questions -- the three things someone asks before he trusts this with
-   a contract, each answered in one line that links to the page that proves it. */
-.dh-ask { border: 1px solid rgba(11,58,106,.09); border-radius: 18px; background: rgba(255,255,255,.72); padding: var(--space-5); margin-bottom: var(--space-7); }
-.dh-ask h2 { margin: 0 0 var(--space-4); font: 600 18px/1.25 var(--sans); letter-spacing: -.01em; color: var(--ink); }
-.dh-ask-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: var(--space-4); margin: 0 0 var(--space-4); }
-.dh-ask-item { margin: 0; }
-.dh-ask-item dt { margin: 0 0 4px; font: 600 15px/1.35 var(--sans); color: var(--ink); }
-.dh-ask-item dd { margin: 0; font: 14px/1.55 var(--sans); color: var(--ink-dim); }
-.dh-ask-item dd a { color: var(--cobalt); font-weight: 600; text-decoration: none; }
-.dh-ask-item dd a:hover { text-decoration: underline; text-underline-offset: 3px; }
-.dh-ask-foot { margin: 0; padding-top: var(--space-3); border-top: 1px solid var(--ink-hair); font: 14px/1.55 var(--sans); color: var(--ink-dim); }
-.dh-ask-foot a { color: var(--cobalt); font-weight: 600; text-decoration: none; }
-.dh-ask-foot a:hover { text-decoration: underline; text-underline-offset: 3px; }
+/* ── What a paying customer bought. No link to a higher tier. ─────────────── */
+.dh-paid { padding: var(--space-4) var(--space-5); margin-bottom: var(--space-6); }
+.dh-paid-kicker { margin: 0 0 var(--space-2); font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+.dh-paid-lede { margin: 0 0 var(--space-2); font: 15px/1.62 var(--sans); color: var(--ink-1); }
+.dh-paid-foot { margin: 0; font: 13px/1.6 var(--sans); color: var(--ink-2); }
 
-/* Onboarding hint (ParaPear, dismissible once) */
-.dh-onb { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-5); border-radius: 16px; background: var(--bone); border: 1px solid var(--ink-hair); margin-bottom: var(--space-5); box-shadow: 0 1px 2px rgba(11,58,106,0.04); }
-.dh-onb img { width: 92px; height: auto; flex-shrink: 0; }
-.dh-onb .dh-onb-text { flex: 1 1 auto; font-family: var(--sans); font-size: 14px; line-height: 1.55; color: var(--ink); }
-.dh-onb .dh-onb-kicker { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 4px; }
-.dh-onb .dh-onb-dismiss { background: transparent; border: none; padding: 8px 10px; font-family: var(--sans); font-size: 13px; color: var(--ink-dim); cursor: pointer; border-radius: 8px; line-height: 1; }
-.dh-onb .dh-onb-dismiss:hover { color: var(--ink); background: var(--ink-ghost); }
-@media (max-width: 600px) { .dh-onb { flex-direction: column; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); } .dh-onb img { width: 96px; } }
+/* ── One-time usage question ───────────────────────────────────────────────── */
+.dh-purpose { padding: var(--space-4) var(--space-5); margin-bottom: var(--space-5); }
+.dh-purpose-kicker { display: block; font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 6px; }
+.dh-purpose h2 { font: 600 18px/1.2 var(--sans); letter-spacing: -.014em; color: var(--ink-1); margin: 0 0 3px; }
+.dh-purpose-sub { font: 13px/1.55 var(--sans); color: var(--ink-2); margin: 0 0 var(--space-3); }
+.dh-purpose-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--space-2); }
+.dh-purpose-opt { text-align: left; cursor: pointer; font: inherit; min-height: var(--tap); padding: var(--space-3) var(--space-4); border-radius: var(--r-1); border: 1px solid var(--line-2); background: var(--surface); transition: border-color var(--d-1) var(--e-standard), background var(--d-1) var(--e-standard); }
+.dh-purpose-opt:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.dh-purpose-opt:focus-visible { outline: none; box-shadow: var(--ring); }
+.dh-purpose-opt:disabled { opacity: .5; cursor: default; }
+.dh-purpose-opt strong { display: block; font: 600 14px/1.3 var(--sans); color: var(--ink-1); margin-bottom: 2px; }
+.dh-purpose-opt span { display: block; font: 12px/1.45 var(--sans); color: var(--ink-2); }
+.dh-purpose-foot { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
+.dh-purpose-note { font: 13px/1.5 var(--sans); color: var(--sig-stop); }
 
-/* Flagship pair -- the two big actions */
-.dh-flagship { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-4); margin-bottom: var(--space-7); }
-.dh-flag-card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-6) var(--space-5) var(--space-5); border-radius: 18px; background: var(--bone); text-decoration: none; color: var(--ink); transition: transform .18s ease, box-shadow .18s ease; box-shadow: 0 1px 2px rgba(11,58,106,0.05), 0 4px 14px rgba(11,58,106,0.04); border: 1px solid rgba(11,58,106,0.06); position: relative; overflow: hidden; }
-.dh-flag-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(11,58,106,0.06), 0 14px 32px rgba(11,58,106,0.08); }
-.dh-flag-card:focus-visible { outline: 2px solid var(--lime); outline-offset: 4px; }
-.dh-flag-icon { width: 56px; height: 56px; display: inline-flex; align-items: center; justify-content: center; border-radius: 16px; background: var(--lime); color: var(--navy); font-family: var(--mono); font-weight: 700; font-size: 24px; margin-bottom: var(--space-2); flex-shrink: 0; }
-.dh-flag-card h2 { font-family: var(--sans); font-size: 22px; line-height: 1.2; letter-spacing: -.01em; margin: 0; color: var(--ink); font-weight: 600; }
-.dh-flag-card p { font-family: var(--sans); font-size: 14.5px; line-height: 1.55; color: var(--ink-dim); margin: 0; flex: 1; }
-.dh-flag-meta { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); padding-top: var(--space-3); border-top: 1px solid var(--ink-hair); margin-top: var(--space-3); }
-.dh-flag-cta { font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--ink); margin-top: var(--space-2); display: inline-flex; align-items: center; gap: 6px; }
-.dh-flag-cta::after { content: "\2192"; transition: transform .18s ease; }
-.dh-flag-card:hover .dh-flag-cta::after { transform: translateX(3px); }
-@media (max-width: 720px) { .dh-flagship { grid-template-columns: 1fr; gap: var(--space-3); margin-bottom: var(--space-6); } .dh-flag-card { padding: var(--space-5) var(--space-4); border-radius: 16px; } .dh-flag-icon { width: 48px; height: 48px; font-size: 20px; border-radius: 14px; } .dh-flag-card h2 { font-size: 19px; } }
+/* ── The register ──────────────────────────────────────────────────────────── */
+.dh-workspace { margin-bottom: var(--space-6); border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); box-shadow: var(--sh-1); overflow: hidden; }
+.dh-workspace-head { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; padding: 24px 26px 16px; }
+.dh-workspace-head h2 { margin: 0 0 4px; font: 600 clamp(19px, 2vw, 22px)/1.18 var(--sans); letter-spacing: -.022em; color: var(--ink-1); }
+.dh-workspace-head p { margin: 0; font: 14px/1.55 var(--sans); color: var(--ink-2); max-width: 58ch; }
+.dh-refresh { flex: 0 0 auto; min-height: 36px; border: 1px solid var(--line-2); border-radius: var(--r-1); background: transparent; color: var(--ink-1); padding: 9px 14px; font: 500 13px/1 var(--sans); cursor: pointer; transition: border-color var(--d-1) var(--e-standard), color var(--d-1) var(--e-standard); }
+.dh-refresh:hover { border-color: var(--accent); color: var(--accent); }
+.dh-refresh:focus-visible { outline: none; box-shadow: var(--ring); }
+.dh-refresh[disabled] { opacity: .55; cursor: default; }
 
-/* Secondary tools row */
-.dh-tools-head { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 var(--space-3); }
-.dh-tools-head h2 { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); margin: 0; font-weight: 600; }
-.dh-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-7); }
-.dh-chip { display: inline-block; width: fit-content; font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; border-radius: 2px; padding: 3px 8px; margin-bottom: 2px; }
-.dh-chip.live { background: var(--lime); color: #0a1626; }
-.dh-chip.beta { background: var(--cobalt); color: #fff; }
-.dh-chip.soon { background: var(--bone); color: var(--ink-dim); border: 1px solid var(--ink-hair); }
-.dh-tool-off { border-style: dashed; background: transparent; pointer-events: none; }
-.dh-tool { display: flex; flex-direction: column; gap: 4px; padding: var(--space-4) var(--space-4); border-radius: 14px; background: var(--bone); text-decoration: none; color: var(--ink); transition: transform .15s ease, box-shadow .15s ease; box-shadow: 0 1px 2px rgba(11,58,106,0.03); border: 1px solid rgba(11,58,106,0.06); }
-.dh-tool:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(11,58,106,0.04), 0 6px 14px rgba(11,58,106,0.06); }
-.dh-tool:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
-.dh-tool h3 { font-family: var(--sans); font-size: 16px; font-weight: 600; margin: 0; color: var(--ink); letter-spacing: -.005em; }
-.dh-tool p { font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0; }
+/* Segmented control. The count is inside the button, because the count is the
+   reason you click it. Active is the inverted field with a lime counter. */
+.dh-filters { display: flex; gap: 0; margin: 0 26px 0; padding: 0 0 16px; overflow-x: auto; scrollbar-width: none; }
+.dh-filters::-webkit-scrollbar { display: none; }
+.dh-filter { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; border: 1px solid var(--line-2); border-right-width: 0; border-radius: var(--r-0); padding: 8px 14px; background: transparent; color: var(--ink-2); font: 500 13px/1 var(--sans); white-space: nowrap; cursor: pointer; transition: background var(--d-1) var(--e-standard), color var(--d-1) var(--e-standard); }
+.dh-filter:first-child { border-top-left-radius: var(--r-1); border-bottom-left-radius: var(--r-1); }
+.dh-filter:last-child { border-right-width: 1px; border-top-right-radius: var(--r-1); border-bottom-right-radius: var(--r-1); }
+.dh-filter:hover { background: var(--line-ghost); color: var(--ink-1); }
+.dh-filter [data-doc-count] { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--ink-3); }
+.dh-filter[aria-pressed="true"] { background: var(--surface-ink); border-color: var(--surface-ink); color: var(--on-ink); }
+.dh-filter[aria-pressed="true"] + .dh-filter { border-left-color: var(--surface-ink); }
+.dh-filter[aria-pressed="true"] [data-doc-count] { color: var(--mark); }
+.dh-filter:focus-visible { outline: none; box-shadow: var(--ring); position: relative; z-index: 1; }
 
-/* Document workspace */
-.dh-mission { max-width: 680px; margin: 0; font-family: var(--sans); font-size: 17px; line-height: 1.6; color: var(--ink-dim); }
-.dh-person { display: block; margin-top: 8px; font-family: var(--sans); font-size: 13px; color: var(--ink-dim); }
-.dh-start { display: grid; grid-template-columns: minmax(0, 1.35fr) repeat(2, minmax(0, .825fr)); gap: var(--space-3); margin-bottom: var(--space-7); }
-.dh-start-card { min-height: 172px; display: flex; flex-direction: column; padding: 24px; border: 1px solid rgba(11,58,106,.09); border-radius: 20px; background: rgba(255,255,255,.72); color: var(--ink); text-decoration: none; box-shadow: 0 10px 30px rgba(11,58,106,.045); transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
-.dh-start-card.primary { background: var(--cobalt); color: #fff; border-color: var(--cobalt); box-shadow: 0 16px 36px rgba(35,80,216,.18); }
-.dh-start-card:hover { transform: translateY(-2px); border-color: rgba(35,80,216,.38); box-shadow: 0 16px 34px rgba(11,58,106,.09); }
-.dh-start-card:focus-visible { outline: 3px solid var(--lime); outline-offset: 3px; }
-.dh-start-icon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: rgba(35,80,216,.08); color: var(--cobalt); font-size: 21px; margin-bottom: auto; }
-.dh-start-card.primary .dh-start-icon { background: rgba(255,255,255,.14); color: #fff; }
-.dh-start-card h2 { margin: 20px 0 5px; font: 600 19px/1.25 var(--sans); letter-spacing: -.01em; color: inherit; }
-.dh-start-card p { margin: 0; font: 14px/1.5 var(--sans); color: var(--ink-dim); }
-.dh-start-card.primary p { color: rgba(255,255,255,.78); }
-.dh-start-link { margin-top: 16px; font: 600 13px/1 var(--sans); color: inherit; }
-.dh-workspace { margin-bottom: var(--space-7); border: 1px solid rgba(11,58,106,.09); border-radius: 22px; background: rgba(255,255,255,.76); box-shadow: 0 12px 34px rgba(11,58,106,.045); overflow: hidden; }
-.dh-workspace-head { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; padding: 26px 28px 18px; }
-.dh-workspace-head h2 { margin: 0 0 5px; font: 600 24px/1.2 var(--sans); letter-spacing: -.015em; color: var(--ink); }
-.dh-workspace-head p { margin: 0; font: 14px/1.5 var(--sans); color: var(--ink-dim); }
-.dh-refresh { flex: 0 0 auto; border: 1px solid var(--ink-hair); border-radius: 10px; background: transparent; color: var(--ink); padding: 9px 13px; font: 600 13px/1 var(--sans); cursor: pointer; }
-.dh-refresh:hover { border-color: var(--cobalt); color: var(--cobalt); }
-.dh-refresh:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
-.dh-filters { display: flex; gap: 6px; padding: 0 28px 17px; overflow-x: auto; }
-.dh-filter { border: 0; border-radius: 999px; padding: 8px 12px; background: transparent; color: var(--ink-dim); font: 600 13px/1 var(--sans); white-space: nowrap; cursor: pointer; }
-.dh-filter[aria-pressed="true"] { background: rgba(35,80,216,.09); color: var(--cobalt); }
-.dh-filter:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
-.dh-documents { border-top: 1px solid var(--ink-hair); }
-.dh-document { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 22px; align-items: center; padding: 18px 28px; border-bottom: 1px solid var(--ink-hair); }
-.dh-document { width:100%; text-align:left; border-left:0; border-right:0; border-top:0; background:transparent; color:inherit; cursor:pointer; }
-.dh-document:hover { background:rgba(35,80,216,.035); }
-.dh-document:focus-visible { outline:3px solid var(--lime); outline-offset:-3px; }
+.dh-documents { border-top: 1px solid var(--line); }
+.dh-document { display: grid; grid-template-columns: minmax(0, 1fr) 132px 148px; gap: 22px; align-items: center; width: 100%; text-align: left; padding: 17px 26px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: inherit; cursor: pointer; transition: background var(--d-1) var(--e-standard); }
+.dh-document:hover { background: var(--accent-soft); }
+.dh-document:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-ring); }
 .dh-document:last-child { border-bottom: 0; }
 .dh-document-name { min-width: 0; }
-.dh-document-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.3 var(--sans); color: var(--ink); }
-.dh-document-name span { display: block; margin-top: 4px; font: 12px/1.4 var(--sans); color: var(--ink-dim); }
-.dh-document-progress { min-width: 96px; }
-.dh-document-progress span { display: block; margin-bottom: 5px; font: 12px/1 var(--sans); color: var(--ink-dim); }
-.dh-progress { width: 96px; height: 5px; overflow: hidden; border-radius: 99px; background: var(--ink-hair); }
-.dh-progress i { display: block; height: 100%; border-radius: inherit; background: var(--cobalt); }
-.dh-status { display: inline-flex; align-items: center; gap: 7px; min-width: 108px; font: 600 12px/1 var(--sans); color: var(--ink); }
-.dh-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #d59a21; }
-.dh-status.completed::before { background: #1b9b63; }
-.dh-status.cancelled::before { background: #8794a5; }
-.dh-empty { padding: 42px 28px; text-align: center; }
-.dh-empty strong { display: block; margin-bottom: 6px; font: 600 16px/1.3 var(--sans); color: var(--ink); }
-.dh-empty span { display: block; max-width: 520px; margin: 0 auto; font: 14px/1.55 var(--sans); color: var(--ink-dim); }
-.dh-invites { display: flex; gap: 14px; align-items: flex-start; margin: 0 28px 24px; padding: 16px 18px; border-radius: 14px; background: rgba(35,80,216,.055); }
-.dh-invites-icon { color: var(--cobalt); font-size: 18px; line-height: 1; }
-.dh-invites strong { display: block; margin-bottom: 3px; font: 600 13px/1.35 var(--sans); color: var(--ink); }
-.dh-invites span { display: block; font: 13px/1.5 var(--sans); color: var(--ink-dim); }
-.dh-doc-dialog { position:fixed; inset:0; z-index:1000; display:grid; place-items:center; padding:14px; background:rgba(11,22,34,.55); }
-.dh-doc-dialog-panel { width:min(620px,100%); max-height:calc(100dvh - 28px); overflow:auto; border-radius:20px; color:var(--ink); background:var(--bone); box-shadow:0 24px 70px rgba(11,22,34,.28); }
-.dh-doc-dialog-head { display:flex; justify-content:space-between; gap:18px; padding:24px 26px 18px; border-bottom:1px solid var(--ink-hair); }
-.dh-doc-dialog-head h2 { margin:0; font:600 21px/1.25 var(--sans); overflow-wrap:anywhere; }
-.dh-doc-close { border:0; background:transparent; color:var(--ink); font-size:25px; cursor:pointer; }
-.dh-doc-dialog-body { padding:22px 26px 26px; }
-.dh-doc-kv { display:grid; grid-template-columns:120px 1fr; gap:9px 16px; margin:0 0 20px; font:13px/1.45 var(--sans); }
-.dh-doc-kv dt { color:var(--ink-dim); } .dh-doc-kv dd { margin:0; overflow-wrap:anywhere; }
-.dh-doc-help { padding:14px 16px; border-radius:12px; background:rgba(35,80,216,.055); color:var(--ink-dim); font:13px/1.55 var(--sans); }
-.dh-doc-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:20px; }
-.dh-doc-actions .danger { color:#a21b1b; border-color:rgba(162,27,27,.35); }
-.dh-doc-message { margin-top:12px; font:13px/1.5 var(--sans); color:var(--ink-dim); }
-.dh-quiet-links { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-bottom: var(--space-7); padding: 0 2px; }
-.dh-quiet-links a { color: var(--ink-dim); font: 600 13px/1.4 var(--sans); text-decoration: none; }
-.dh-quiet-links a:hover { color: var(--cobalt); text-decoration: underline; text-underline-offset: 4px; }
+.dh-document-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.35 var(--sans); color: var(--ink-1); }
+.dh-document-name span { display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-3); }
+.dh-document-progress { min-width: 0; }
+/* Never a bar without the number next to it. */
+.dh-document-progress span { display: block; margin-bottom: 7px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-2); }
+.dh-progress { width: 100%; height: 3px; border-radius: var(--r-0); background: var(--line-2); overflow: hidden; }
+.dh-progress i { display: block; height: 100%; background: var(--accent); transform-origin: left center; animation: dh-meter var(--d-3) var(--e-standard) both; }
+@keyframes dh-meter { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+/* The four states are the four words dashboard.js renders, and nothing else. */
+.dh-status { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: var(--r-pill); font: 600 12px/1.35 var(--sans); white-space: nowrap; color: var(--sig-wait); background: var(--sig-wait-bg); }
+.dh-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+.dh-status.waiting     { color: var(--sig-wait); background: var(--sig-wait-bg); }
+.dh-status.in_progress { color: var(--sig-move); background: var(--sig-move-bg); }
+.dh-status.completed   { color: var(--sig-done); background: var(--sig-done-bg); }
+.dh-status.cancelled   { color: var(--sig-stop); background: var(--sig-stop-bg); }
+
+.dh-empty { padding: 48px 26px; text-align: center; }
+.dh-empty strong { display: block; margin-bottom: 8px; font: 600 16px/1.3 var(--sans); color: var(--ink-1); }
+.dh-empty span { display: block; max-width: 52ch; margin: 0 auto; font: 14px/1.6 var(--sans); color: var(--ink-2); }
+.dh-empty .dh-refresh { margin-top: 12px; }
+
+/* Loading skeleton: the shape of a register row, so the page does not jump. */
+.dh-skel-row { display: grid; grid-template-columns: minmax(0, 1fr) 132px 148px; gap: 22px; align-items: center; padding: 17px 26px; border-bottom: 1px solid var(--line); }
+.dh-skel-row:last-child { border-bottom: 0; }
+.dh-skel { border-radius: var(--r-1); background: linear-gradient(90deg, var(--surface-sunk) 0%, var(--line-ghost) 42%, var(--surface-sunk) 84%); background-size: 300% 100%; animation: dh-skel-slide 1.25s var(--e-standard) infinite; }
+@keyframes dh-skel-slide { from { background-position: 120% 0; } to { background-position: -60% 0; } }
+.dh-skel-row .s-name { height: 13px; width: 58%; }
+.dh-skel-row .s-ref  { height: 10px; width: 34%; margin-top: 9px; }
+.dh-skel-row .s-num  { height: 10px; width: 76px; }
+.dh-skel-row .s-bar  { height: 3px; width: 100%; margin-top: 9px; border-radius: var(--r-0); }
+.dh-skel-row .s-chip { height: 24px; width: 130px; border-radius: var(--r-pill); }
+/* Full-page loading silhouette. Same measurements as the real thing, so the
+   swap costs no layout shift. */
+.dh-skel-page { padding-top: var(--space-2); }
+.dh-skel-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; padding-bottom: var(--space-5); border-bottom: 1px solid var(--line); margin-bottom: var(--space-6); }
+.dh-skel-hero .s-h1 { height: 40px; width: 420px; max-width: 78vw; margin-bottom: 8px; }
+.dh-skel-hero .s-h1.short { width: 300px; max-width: 56vw; margin-bottom: 16px; }
+.dh-skel-hero .s-lede { height: 15px; width: 520px; max-width: 92vw; }
+.dh-skel-hero .s-pill { height: 31px; width: 148px; border-radius: var(--r-pill); margin-top: 6px; }
+.dh-skel-start { display: grid; grid-template-columns: minmax(0, 1.35fr) repeat(2, minmax(0, .825fr)); gap: var(--space-3); margin-bottom: var(--space-6); }
+.dh-skel-start .s-card { height: 178px; border-radius: var(--r-2); }
+.dh-skel-workspace { border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface); }
+.dh-skel-wshead { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; padding: 24px 26px 16px; }
+.dh-skel-wshead .s-h2 { height: 26px; width: 220px; }
+.dh-skel-wshead .s-btn { height: 36px; width: 84px; border-radius: var(--r-1); }
+.dh-skel-filters { display: flex; gap: 0; padding: 0 26px 16px; }
+.dh-skel-filters .s-filter { height: 36px; width: 104px; border-radius: var(--r-0); }
+.dh-skel-rows { border-top: 1px solid var(--line); }
 @media (max-width: 760px) {
+  .dh-skel-start { grid-template-columns: 1fr; }
+  .dh-skel-start .s-card { height: 150px; }
+  .dh-skel-start .s-card:nth-child(n+3) { height: 104px; }
+  .dh-skel-wshead { padding: 20px 18px 14px; }
+  .dh-skel-filters { padding: 0 18px 14px; }
+}
+
+.dh-invites { display: flex; gap: 14px; align-items: flex-start; margin: 0 26px 22px; padding: 14px 16px; border-radius: var(--r-1); border-left: 2px solid var(--mark); background: var(--surface-sunk); }
+.dh-invites-icon { color: var(--accent); font-size: 17px; line-height: 1.4; }
+.dh-invites strong { display: block; margin-bottom: 3px; font: 600 13px/1.4 var(--sans); color: var(--ink-1); }
+.dh-invites span { display: block; font: 13px/1.55 var(--sans); color: var(--ink-2); }
+
+/* ── Document detail ───────────────────────────────────────────────────────── */
+.dh-doc-dialog { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 14px; background: rgba(6,10,15,.62); animation: dh-veil var(--d-2) var(--e-standard) both; }
+@keyframes dh-veil { from { opacity: 0; } to { opacity: 1; } }
+.dh-doc-dialog-panel { width: min(620px, 100%); max-height: calc(100dvh - 28px); overflow: auto; border-radius: var(--r-3); color: var(--ink-1); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--sh-3); animation: dh-panel-in var(--d-3) var(--e-enter) both; }
+@keyframes dh-panel-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.dh-doc-dialog-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; padding: 22px 24px 16px; border-bottom: 1px solid var(--line); }
+.dh-doc-dialog-head h2 { margin: 0; font: 600 20px/1.25 var(--sans); letter-spacing: -.02em; overflow-wrap: anywhere; }
+.dh-doc-close { flex: 0 0 auto; width: var(--tap); height: var(--tap); margin: -10px -10px 0 0; border: 0; border-radius: var(--r-1); background: transparent; color: var(--ink-2); font-size: 24px; line-height: 1; cursor: pointer; }
+.dh-doc-close:hover { background: var(--line-ghost); color: var(--ink-1); }
+.dh-doc-close:focus-visible { outline: none; box-shadow: var(--ring); }
+.dh-doc-dialog-body { padding: 20px 24px 24px; }
+.dh-doc-kv { display: grid; grid-template-columns: 116px 1fr; gap: 10px 16px; margin: 0 0 18px; font: 13px/1.5 var(--sans); }
+.dh-doc-kv dt { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding-top: 2px; }
+.dh-doc-kv dd { margin: 0; color: var(--ink-1); overflow-wrap: anywhere; }
+.dh-doc-help { padding: 14px 16px; border-radius: var(--r-1); border-left: 2px solid var(--accent); background: var(--surface-sunk); color: var(--ink-2); font: 13px/1.6 var(--sans); }
+.dh-doc-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+/* Cancelling is the dangerous action, so it is a hairline that reddens and
+   never the only filled button in the dialog. */
+.dh-doc-actions .danger { color: var(--sig-stop); border-color: var(--sig-stop-line); }
+.dh-doc-actions .danger:hover { color: var(--sig-stop); border-color: var(--sig-stop); background: var(--sig-stop-bg); }
+.dh-doc-message { margin-top: 12px; font: 13px/1.55 var(--sans); color: var(--ink-2); }
+
+/* ── Quiet links and the account drawer ────────────────────────────────────── */
+.dh-quiet-links { display: flex; flex-wrap: wrap; gap: 10px 24px; margin-bottom: var(--space-6); padding: 0 2px; }
+.dh-quiet-links a { display: inline-flex; align-items: center; min-height: 36px; color: var(--ink-2); font: 500 13px/1.4 var(--sans); text-decoration: none; border-bottom: 1px solid transparent; }
+.dh-quiet-links a:hover { color: var(--ink-1); border-bottom-color: var(--mark); }
+
+.dh-ask { padding: var(--space-5); margin-bottom: var(--space-6); }
+.dh-ask h2 { margin: 0 0 var(--space-4); font: 600 18px/1.22 var(--sans); letter-spacing: -.014em; color: var(--ink-1); }
+.dh-ask-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: var(--space-4); margin: 0 0 var(--space-4); }
+.dh-ask-item { margin: 0; }
+.dh-ask-item dt { margin: 0 0 5px; font: 600 15px/1.35 var(--sans); color: var(--ink-1); }
+.dh-ask-item dd { margin: 0; font: 14px/1.6 var(--sans); color: var(--ink-2); }
+.dh-ask-foot { margin: 0; padding-top: var(--space-3); border-top: 1px solid var(--line); font: 14px/1.6 var(--sans); color: var(--ink-2); }
+
+.dh-acct { border-radius: var(--r-2); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--sh-1); overflow: hidden; }
+.dh-acct-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: var(--tap); padding: var(--space-4) var(--space-5); cursor: pointer; user-select: none; flex-wrap: wrap; list-style: none; color: var(--ink-1); }
+.dh-acct-head::-webkit-details-marker { display: none; }
+.dh-acct-head:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-ring); }
+.dh-acct-head h2 { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin: 0; }
+.dh-acct-chev { font-family: var(--mono); font-size: 16px; color: var(--ink-3); transition: transform var(--d-2) var(--e-standard); line-height: 1; }
+.dh-acct[open] .dh-acct-chev { transform: rotate(90deg); }
+.dh-acct-body { padding: 0 var(--space-5) var(--space-5); }
+.dh-acct-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); padding-top: var(--space-2); border-top: 1px solid var(--line); }
+.dh-acct-cell { padding: var(--space-3) 0; }
+.dh-acct-lbl { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 5px; }
+.dh-acct-val { font: 17px/1.35 var(--sans); color: var(--ink-1); letter-spacing: -.008em; }
+.dh-acct-val.mono { font-family: var(--mono); font-size: 13px; letter-spacing: 0; }
+.dh-acct-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; padding-top: var(--space-4); border-top: 1px solid var(--line); margin-top: var(--space-3); }
+
+.dh-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 10px 15px; border-radius: var(--r-1); font: 500 13px/1.2 var(--sans); cursor: pointer; text-decoration: none; border: 1px solid var(--line-2); background: transparent; color: var(--ink-1); transition: border-color var(--d-1) var(--e-standard), background var(--d-1) var(--e-standard); }
+.dh-btn:hover { border-color: var(--ink-3); background: var(--line-ghost); }
+.dh-btn:focus-visible { outline: none; box-shadow: var(--ring); }
+.dh-btn.warn { color: var(--sig-stop); border-color: var(--sig-stop-line); }
+.dh-btn.warn:hover { color: var(--sig-stop); border-color: var(--sig-stop); background: var(--sig-stop-bg); }
+.dh-btn[disabled] { opacity: .5; cursor: default; }
+
+/* ── Setup nudge ───────────────────────────────────────────────────────────── */
+.dh-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: var(--space-4); background: rgba(6,10,15,.62); animation: dh-veil var(--d-2) var(--e-standard) both; }
+.dh-modal-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-3); max-width: 460px; width: 100%; padding: var(--space-6) var(--space-5) var(--space-5); box-shadow: var(--sh-3); text-align: center; animation: dh-panel-in var(--d-3) var(--e-enter) both; }
+.dh-modal-img { display: block; margin: 0 auto var(--space-3); }
+.dh-modal-card h2 { font: 600 21px/1.2 var(--sans); letter-spacing: -.02em; color: var(--ink-1); margin: 0 0 var(--space-2); }
+.dh-modal-sub { font: 14px/1.6 var(--sans); color: var(--ink-2); margin: 0 0 var(--space-4); }
+.dh-pm-item { display: block; text-align: left; text-decoration: none; min-height: var(--tap); padding: var(--space-3) var(--space-4); border-radius: var(--r-1); border: 1px solid var(--line-2); background: var(--surface); margin-bottom: var(--space-3); transition: border-color var(--d-1) var(--e-standard), background var(--d-1) var(--e-standard); }
+.dh-pm-item:hover { border-color: var(--accent); background: var(--accent-soft); }
+.dh-pm-item:focus-visible { outline: none; box-shadow: var(--ring); }
+.dh-pm-item strong { display: block; font: 600 15px/1.35 var(--sans); color: var(--ink-1); margin-bottom: 2px; }
+.dh-pm-item span { display: block; font: 13px/1.5 var(--sans); color: var(--ink-2); }
+.dh-modal-dismiss { margin-top: var(--space-2); min-height: var(--tap); background: transparent; border: 0; font: 13px/1 var(--sans); color: var(--ink-2); cursor: pointer; padding: 8px 12px; border-radius: var(--r-1); }
+.dh-modal-dismiss:hover { color: var(--ink-1); background: var(--line-ghost); }
+.dh-modal-dismiss:focus-visible { outline: none; box-shadow: var(--ring); }
+
+/* ── Developer overview cards (only ever fetched on /developer) ────────────── */
+.dh-ops { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-3); }
+.dh-ops-card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); border-radius: var(--r-2); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--sh-1); }
+.dh-ops-h { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.dh-ops-dim { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+.dh-ops-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.dh-ops-row:last-child { border-bottom: none; }
+.dh-ops-row .mono { font-family: var(--mono); font-size: 12px; color: var(--ink-1); word-break: break-all; }
+.dh-ops-row .dim { font-family: var(--mono); font-size: 11px; color: var(--ink-3); flex: 0 0 auto; }
+.dh-usage-row { margin-bottom: var(--space-3); }
+.dh-usage-lab { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12px; color: var(--ink-1); margin-bottom: 6px; }
+.dh-bar { height: 3px; border-radius: var(--r-0); background: var(--line-2); overflow: hidden; }
+.dh-bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width var(--d-3) var(--e-standard); }
+.dh-bar.warn > i { background: var(--sig-wait); }
+.dh-usage-upsell { display: inline-block; margin-top: 6px; font-family: var(--mono); font-size: 11px; color: var(--accent); text-decoration: none; }
+.dh-usage-upsell:hover { text-decoration: underline; }
+.dh-ops-filter { width: 100%; min-height: var(--tap); box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--line-2); border-radius: var(--r-1); font-family: var(--mono); font-size: 12px; background: var(--surface); color: var(--ink-1); }
+.dh-ops-filter:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+.dh-ops-tl { display: flex; flex-direction: column; max-height: 196px; overflow-y: auto; }
+.dh-tl-row { display: flex; gap: 10px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.dh-tl-row:last-child { border-bottom: none; }
+.dh-tl-row .t { font-family: var(--mono); font-size: 11px; color: var(--ink-3); flex: 0 0 auto; }
+.dh-tl-row .e { font-family: var(--mono); font-size: 11px; color: var(--ink-1); word-break: break-all; }
+
+/* ── Arrival: one 6px step, once, when the data lands ───────────────────────
+   The dialog is excluded on purpose. It is position:fixed, and an animating
+   ancestor becomes its containing block, which drags the whole overlay 6px
+   down the screen for the length of the animation. */
+.dh-loaded > *:not(.dh-doc-dialog) { animation: dh-fade var(--d-3) var(--e-enter) both; }
+.dh-loaded > *:not(.dh-doc-dialog):nth-child(2) { animation-delay: .04s; }
+.dh-loaded > *:not(.dh-doc-dialog):nth-child(3) { animation-delay: .08s; }
+.dh-loaded > *:not(.dh-doc-dialog):nth-child(4) { animation-delay: .12s; }
+.dh-loaded > *:not(.dh-doc-dialog):nth-child(5) { animation-delay: .16s; }
+@keyframes dh-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 980px) {
+  .dh-document, .dh-skel-row { grid-template-columns: minmax(0, 1fr) 116px 132px; gap: 16px; }
+}
+@media (max-width: 760px) {
+  main.pa-main { padding: var(--space-5) var(--space-3) var(--space-6); }
   .dh-start { grid-template-columns: 1fr; }
-  .dh-start-card { min-height: 148px; }
+  .dh-start-card { min-height: 0; }
   /* Two flagship products first, at full size. The third card is the same
      action in a smaller shape, so a phone reads Sign and Send before it reads
      anything else. */
-  .dh-start-card:nth-child(-n+2) h2 { font-size: 22px; }
-  .dh-start-card:nth-child(n+3) { min-height: 0; padding: 16px 18px; border-radius: 14px; }
-  .dh-start-card:nth-child(n+3) .dh-start-icon { width: 30px; height: 30px; font-size: 16px; border-radius: 9px; }
-  .dh-start-card:nth-child(n+3) h2 { margin: 12px 0 4px; font-size: 16px; }
+  .dh-start-card:nth-child(-n+2) h2 { font-size: 21px; }
+  .dh-start-card:nth-child(n+3) { padding: 16px 18px; }
+  .dh-start-card:nth-child(n+3) .dh-start-icon { width: 28px; height: 28px; font-size: 15px; }
+  .dh-start-card:nth-child(n+3) .dh-start-kicker { margin-top: 14px; }
+  .dh-start-card:nth-child(n+3) h2 { font-size: 16px; }
   .dh-start-card:nth-child(n+3) p { font-size: 13px; }
-  .dh-start-card:nth-child(n+3) .dh-start-link { margin-top: 10px; }
-  .dh-ask { padding: var(--space-4); }
-  .dh-document { grid-template-columns: minmax(0,1fr) auto; gap: 12px; padding: 16px 18px; }
-  .dh-document-progress { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; }
-  .dh-document-progress span { margin: 0; }
-  .dh-progress { flex: 1; width: auto; }
-  .dh-workspace-head { padding: 22px 18px 16px; }
-  .dh-filters { padding: 0 18px 14px; }
+  .dh-start-card:nth-child(n+3) .dh-start-link { margin-top: 12px; }
+  .dh-community, .dh-ask, .dh-purpose { padding: var(--space-4); }
+  /* Under 760 the three columns stack in reading order: name, then progress,
+     then state. */
+  .dh-document, .dh-skel-row { grid-template-columns: minmax(0, 1fr) auto; gap: 12px 14px; padding: 16px 18px; }
+  .dh-document-progress, .dh-skel-row .s-progress { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
+  .dh-document-progress span { margin: 0; flex: 0 0 auto; }
+  .dh-progress { flex: 1 1 auto; }
+  .dh-skel-row .s-num { flex: 0 0 auto; }
+  .dh-skel-row .s-bar { margin-top: 0; flex: 1 1 auto; }
+  .dh-workspace-head { padding: 20px 18px 14px; }
+  .dh-filters { margin: 0; padding: 0 18px 14px; }
+  .dh-filter { padding: 8px 11px; }
   .dh-invites { margin: 0 18px 18px; }
+  .dh-empty { padding: 40px 18px; }
+  .dh-doc-dialog-head { padding: 18px 18px 14px; }
+  .dh-doc-dialog-body { padding: 18px; }
+  .dh-doc-kv { grid-template-columns: 1fr; gap: 3px; }
+  .dh-doc-kv dd { margin-bottom: 10px; }
+  .dh-acct-head { padding: var(--space-3) var(--space-4); }
+  .dh-acct-body { padding: 0 var(--space-4) var(--space-4); }
 }
 
-/* Account block -- compact, expandable */
-.dh-acct { border-radius: 16px; background: var(--bone); border: 1px solid rgba(11,58,106,0.06); box-shadow: 0 1px 2px rgba(11,58,106,0.04); overflow: hidden; }
-.dh-acct-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-5); cursor: pointer; user-select: none; flex-wrap: wrap; list-style: none; color: var(--ink); }
-.dh-acct-head::-webkit-details-marker { display: none; }
-.dh-acct-head:focus-visible { outline: 2px solid var(--lime); outline-offset: -2px; }
-.dh-acct-head h2 { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); margin: 0; font-weight: 600; }
-.dh-acct-chev { font-family: var(--mono); font-size: 16px; color: var(--ink-dim); transition: transform .2s ease; line-height: 1; }
-.dh-acct[open] .dh-acct-chev { transform: rotate(90deg); }
-.dh-acct-body { padding: 0 var(--space-5) var(--space-5); }
-.dh-acct-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); padding-top: var(--space-2); border-top: 1px solid var(--ink-hair); }
-.dh-acct-cell { padding: var(--space-3) 0; }
-.dh-acct-lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 4px; }
-.dh-acct-val { font-family: var(--sans); font-size: 18px; color: var(--ink); letter-spacing: -.005em; }
-.dh-acct-val.mono { font-family: var(--mono); font-size: 14px; }
-.dh-acct-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; padding-top: var(--space-4); border-top: 1px solid var(--ink-hair); margin-top: var(--space-3); }
-.dh-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 10px; font-family: var(--sans); font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; border: 1px solid var(--ink-hair); background: transparent; color: var(--ink); transition: border-color .15s ease, background .15s ease; }
-.dh-btn:hover { border-color: var(--ink); background: var(--ink-ghost); }
-.dh-btn:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
-.dh-btn.warn:hover { border-color: var(--ink); background: var(--ink-ghost); color: var(--ink); }
-.dh-btn[disabled] { opacity: .55; cursor: default; }
-@media (max-width: 600px) { .dh-acct-head { padding: var(--space-3) var(--space-4); } .dh-acct-body { padding: 0 var(--space-4) var(--space-4); } }
-
-/* Fade-in once the data lands */
-.dh-loaded > * { animation: dh-fade .3s ease-out both; }
-.dh-loaded > *:nth-child(2) { animation-delay: .04s; }
-.dh-loaded > *:nth-child(3) { animation-delay: .08s; }
-.dh-loaded > *:nth-child(4) { animation-delay: .12s; }
-.dh-loaded > *:nth-child(5) { animation-delay: .16s; }
-@keyframes dh-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .dh-loaded > * { animation: none; } .dh-flag-card, .dh-tool { transition: none; } }
-
-/* Passkey/signing-key setup nudge -- a one-time popup when keys are missing */
-.dh-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: var(--space-4); background: rgba(11,22,34,0.55); backdrop-filter: blur(3px); animation: dh-fade .2s ease-out both; }
-.dh-modal-card { background: var(--bone); border-radius: 20px; max-width: 460px; width: 100%; padding: var(--space-6) var(--space-5) var(--space-5); box-shadow: 0 10px 40px rgba(11,22,34,0.25); text-align: center; }
-.dh-modal-img { display: block; margin: 0 auto var(--space-3); }
-.dh-modal-card h2 { font-family: var(--sans); font-size: 22px; font-weight: 600; letter-spacing: -.01em; color: var(--ink); margin: 0 0 var(--space-2); }
-.dh-modal-sub { font-family: var(--sans); font-size: 14px; line-height: 1.55; color: var(--ink-dim); margin: 0 0 var(--space-4); }
-.dh-pm-item { display: block; text-align: left; text-decoration: none; padding: var(--space-3) var(--space-4); border-radius: 14px; border: 1px solid rgba(11,58,106,0.10); background: var(--bone); margin-bottom: var(--space-3); transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
-.dh-pm-item:hover { transform: translateY(-1px); border-color: var(--lime); box-shadow: 0 4px 14px rgba(11,58,106,0.08); }
-.dh-pm-item:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
-.dh-pm-item strong { display: block; font-family: var(--sans); font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
-.dh-pm-item span { display: block; font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--ink-dim); }
-.dh-modal-dismiss { margin-top: var(--space-2); background: transparent; border: none; font-family: var(--sans); font-size: 13px; color: var(--ink-dim); cursor: pointer; padding: 8px 10px; border-radius: 8px; }
-.dh-modal-dismiss:hover { color: var(--ink); background: var(--ink-ghost); }
-
-/* One-time usage-purpose question (hidden once answered or skipped) */
-.dh-purpose { border: 1px solid rgba(11,58,106,0.10); border-radius: 16px; background: var(--bone); padding: var(--space-4) var(--space-5); margin-bottom: var(--space-5); box-shadow: 0 1px 2px rgba(11,58,106,0.03); }
-.dh-purpose-kicker { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 4px; }
-.dh-purpose h2 { font-family: var(--sans); font-size: 18px; font-weight: 600; letter-spacing: -.01em; color: var(--ink); margin: 0 0 2px; }
-.dh-purpose-sub { font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--ink-dim); margin: 0 0 var(--space-3); }
-.dh-purpose-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--space-2); }
-.dh-purpose-opt { text-align: left; cursor: pointer; font: inherit; padding: var(--space-3) var(--space-4); border-radius: 14px; border: 1px solid rgba(11,58,106,0.10); background: var(--bone); transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
-.dh-purpose-opt:hover:not(:disabled) { transform: translateY(-1px); border-color: var(--lime); box-shadow: 0 4px 14px rgba(11,58,106,0.08); }
-.dh-purpose-opt:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
-.dh-purpose-opt:disabled { opacity: .55; cursor: default; }
-.dh-purpose-opt strong { display: block; font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
-.dh-purpose-opt span { display: block; font-family: var(--sans); font-size: 12px; line-height: 1.45; color: var(--ink-dim); }
-.dh-purpose-foot { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); }
-.dh-purpose-note { font-family: var(--sans); font-size: 12px; color: #B91C1C; }
-
-/* Operations -- read-only live cards (keys, usage, activity) */
-.dh-ops { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-3); }
-.dh-ops-card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); border-radius: 14px; background: var(--bone); border: 1px solid rgba(11,58,106,0.06); box-shadow: 0 1px 2px rgba(11,58,106,0.03); }
-.dh-ops-h { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); }
-.dh-ops-dim { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
-.dh-ops-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--ink-hair); }
-.dh-ops-row:last-child { border-bottom: none; }
-.dh-ops-row .mono { font-family: var(--mono); font-size: 12px; color: var(--ink); word-break: break-all; }
-.dh-ops-row .dim { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); flex: 0 0 auto; }
-.dh-usage-row { margin-bottom: var(--space-3); }
-.dh-usage-lab { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12px; color: var(--ink); margin-bottom: 6px; }
-.dh-bar { height: 6px; border-radius: 999px; background: var(--ink-hair); overflow: hidden; }
-.dh-bar > i { display: block; height: 100%; width: 0; background: var(--cobalt, #0B3A6A); border-radius: 999px; transition: width .4s ease; }
-.dh-bar.warn > i { background: var(--lime); }
-.dh-usage-upsell { display: inline-block; margin-top: 6px; font-family: var(--mono); font-size: 11px; color: var(--cobalt, #0B3A6A); text-decoration: none; }
-.dh-usage-upsell:hover { text-decoration: underline; }
-.dh-ops-filter { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--ink-hair); border-radius: 8px; font-family: var(--mono); font-size: 12px; background: var(--bone); color: var(--ink); }
-.dh-ops-filter:focus { outline: none; border-color: var(--cobalt, #0B3A6A); }
-.dh-ops-tl { display: flex; flex-direction: column; max-height: 196px; overflow-y: auto; }
-.dh-tl-row { display: flex; gap: 10px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--ink-hair); }
-.dh-tl-row:last-child { border-bottom: none; }
-.dh-tl-row .t { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); flex: 0 0 auto; }
-.dh-tl-row .e { font-family: var(--mono); font-size: 11px; color: var(--ink); word-break: break-all; }
-.dh-ops-note { font-family: var(--sans); font-size: 12px; line-height: 1.55; color: var(--ink-dim); border: 1px dashed var(--ink-hair); border-radius: 12px; padding: var(--space-3) var(--space-4); margin-bottom: var(--space-7); }
-.dh-ops-note strong { color: var(--ink); }
-@media (prefers-reduced-motion: reduce) { .dh-bar > i { transition: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .dh-loaded > * { animation: none; }
+  .dh-skel { animation: none; background: var(--surface-sunk); }
+  .dh-progress i, .dh-doc-dialog, .dh-doc-dialog-panel, .dh-modal, .dh-modal-card { animation: none; }
+  .dh-start-card:hover { transform: none; }
+}
 </style>
+<meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A0F16" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="/app-2026.css?v=1">
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -314,12 +378,36 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 
 
 <main id="main-content" class="pa-main">
-  <div id="dh-loading" class="pa-loading">
-    <div class="parapear-block">
-      <img class="parapear-img" src="/assets/parapear/parapear-wait.png" alt="" aria-hidden="true" decoding="async" width="120" height="120">
-      <div class="parapear-bubble">
-        <span class="parapear-kicker">One moment</span>
-        <span class="pa-spinner" aria-hidden="true"></span>Checking your session.
+  <!-- The placeholder shown while /api/user/me is in flight. It carries no
+       user data, and it has the SHAPE of the dashboard rather than a spinner
+       in the middle of an empty page: the hero, the three ways in and the
+       first register rows are all reserved, so the layout does not jump when
+       the real thing arrives. Lighthouse measured CLS 0.236 with the old
+       centred spinner. -->
+  <div id="dh-loading" class="pa-loading" aria-busy="true">
+    <p class="pa-sr-only">Checking your session.</p>
+    <div class="dh-skel-page" aria-hidden="true">
+      <div class="dh-skel-hero">
+        <div>
+          <div class="dh-skel s-h1"></div>
+          <div class="dh-skel s-h1 short"></div>
+          <div class="dh-skel s-lede"></div>
+        </div>
+        <div class="dh-skel s-pill"></div>
+      </div>
+      <div class="dh-skel-start">
+        <div class="dh-skel s-card lead"></div>
+        <div class="dh-skel s-card"></div>
+        <div class="dh-skel s-card"></div>
+      </div>
+      <div class="dh-skel-workspace">
+        <div class="dh-skel-wshead"><div class="dh-skel s-h2"></div><div class="dh-skel s-btn"></div></div>
+        <div class="dh-skel-filters"><div class="dh-skel s-filter"></div><div class="dh-skel s-filter"></div><div class="dh-skel s-filter"></div><div class="dh-skel s-filter"></div></div>
+        <div class="dh-skel-rows">
+          <div class="dh-skel-row"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
+          <div class="dh-skel-row"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
+          <div class="dh-skel-row"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
+        </div>
       </div>
     </div>
   </div>
@@ -412,8 +500,14 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
         <button class="dh-filter" type="button" data-doc-filter="cancelled" aria-pressed="false">Cancelled <span data-doc-count="cancelled">0</span></button>
         <button class="dh-filter" type="button" data-doc-filter="all" aria-pressed="false">All <span data-doc-count="all">0</span></button>
       </div>
-      <div class="dh-documents" id="dh-documents" aria-live="polite">
-        <div class="dh-empty"><strong>Loading your documents</strong><span>Reading status from your account.</span></div>
+      <div class="dh-documents" id="dh-documents" aria-live="polite" aria-busy="true">
+        <!-- Loading state. Three rows in the shape of a register row, so the
+             list does not jump when the real data lands. The screen reader
+             hears the sentence, not the placeholder. -->
+        <p class="pa-sr-only">Loading your documents. Reading status from your account.</p>
+        <div class="dh-skel-row" aria-hidden="true"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
+        <div class="dh-skel-row" aria-hidden="true"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
+        <div class="dh-skel-row" aria-hidden="true"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
       </div>
       <div class="dh-invites">
         <span class="dh-invites-icon" aria-hidden="true">&#9993;</span>
@@ -531,6 +625,6 @@ main.pa-main { max-width: 1080px; margin: 0 auto; padding: var(--space-6) var(--
 
 <script src="/nav.js?v=14" defer></script>
 <script src="/js/nav-auth.js?v=5" defer></script>
-<script src="/js/dashboard.js?v=7" defer></script>
+<script src="/js/dashboard.js?v=8" defer></script>
 </body>
 </html>

@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<style id="critical-css">:root{color-scheme:light}html,body{background:#FBFAF7;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark}html:not([data-theme="light"]),html:not([data-theme="light"]) body{background:#0A0F16;color:#EDF1F6}}html[data-theme="dark"],html[data-theme="dark"] body{background:#0A0F16;color:#EDF1F6}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Confirm authenticator reset · Paramant</title>
 <link rel="canonical" href="https://paramant.app/auth/reset-confirm">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<meta name="theme-color" content="#0B3A6A">
 <link rel="stylesheet" href="/design-system.css?v=23">
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
@@ -31,6 +31,9 @@
     border-radius: 4px;
   }
 </style>
+<meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A0F16" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="/app-2026.css?v=1">
 </head>
 <body>
 
@@ -81,7 +84,7 @@
       Yes, reset my authenticator
     </button>
 
-    <div id="error" class="error mt-3"></div>
+    <div id="error" class="error mt-3" role="alert" aria-live="assertive"></div>
   </div>
 
   <div id="success-view" style="display:none">
@@ -92,7 +95,7 @@
   </div>
 
   <div id="expired-view" style="display:none">
-    <p class="lede" style="color:#dc2626">This confirmation link no longer works.</p>
+    <p class="lede is-bad">This confirmation link no longer works.</p>
     <p>Confirmation links last 60 minutes, so nobody can act on an old mail. Ask for a new one and start again.</p>
     <p class="footer-text mt-4">
       <a href="/auth/request-reset">Request a new reset link</a>
@@ -108,7 +111,7 @@
 
 <script src="/nav.js?v=14" defer></script>
 <script src="/js/nav-auth.js?v=5" defer></script>
-<script src="/js/auth-reset-confirm.js?v=2"></script>
+<script src="/js/auth-reset-confirm.js?v=3"></script>
 <footer class="legal-strip">
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
 </footer>

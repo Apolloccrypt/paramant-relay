@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">:root{color-scheme:light}html,body{background:#FBFAF7;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark}html:not([data-theme="light"]),html:not([data-theme="light"]) body{background:#0A0F16;color:#EDF1F6}}html[data-theme="dark"],html[data-theme="dark"] body{background:#0A0F16;color:#EDF1F6}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Create a free Paramant account</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -24,7 +24,6 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0B3A6A">
 <link rel="stylesheet" href="/design-system.css?v=23">
 <link rel="stylesheet" href="/nav.css?v=19">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
@@ -90,18 +89,39 @@
   .nav-help { display: none; }
 }
 
-/* signup error banner (shown when verify-link already used / expired / etc) */
-.err-banner {
-  background: #FEF3C7;
-  border-left: 3px solid #D97706;
-  padding: 18px 22px;
-  margin: 0 0 32px 0;
-  border-radius: 4px;
-}
-.err-banner strong { color: #92400E; display: block; margin-bottom: 6px; font-size: 15px; }
-.err-banner p { color: #78350F; margin: 0; font-size: 14px; line-height: 1.55; }
-.err-banner code { background: #fff; padding: 2px 6px; border-radius: 3px; font-size: 13px; color: #0B3A6A; }
-.err-banner a { color: #92400E; text-decoration: underline; font-weight: 600; }
+/* One column, 62ch, no marketing panel next to the form. The shared
+   .container-lg / .section rhythm is a marketing rhythm: on a five-step form
+   it leaves holes between the steps, so this page sets its own. */
+main#main-content.container-lg { max-width: 620px; margin: 0 auto; padding: clamp(28px, 6vh, 56px) var(--space-4) var(--space-7); }
+main#main-content .section, main#main-content .section-lg { padding: 0; margin: 0 0 var(--space-6); }
+main#main-content .section:last-of-type { margin-bottom: 0; }
+main#main-content h1 { font-size: clamp(30px, 6vw, 44px); line-height: 1.06; letter-spacing: -.028em; font-weight: 600; color: var(--ink-1); margin: var(--space-3) 0 0; max-width: 18ch; }
+main#main-content h1 em, main#main-content h2 em { font-style: normal; color: var(--accent); }
+main#main-content h2 { font-size: clamp(22px, 4vw, 28px); line-height: 1.14; letter-spacing: -.022em; font-weight: 600; color: var(--ink-1); margin: var(--space-3) 0 0; }
+main#main-content .lede { font-size: clamp(16px, 2.2vw, 18px); line-height: 1.6; color: var(--ink-2); margin: var(--space-3) 0 0; max-width: 58ch; }
+main#main-content .small { font-size: 13.5px; line-height: 1.6; color: var(--ink-2); max-width: 62ch; }
+main#main-content .form-card { max-width: none; margin-top: var(--space-4); }
+main#main-content .btn { width: 100%; justify-content: center; }
+.su-optional { font-weight: 400; letter-spacing: .14em; color: var(--ink-3); }
+.su-dim { color: var(--ink-3); }
+.su-strong-link { color: var(--accent); font-weight: 600; }
+.su-linkbtn { background: none; border: 0; padding: 2px 0; min-height: 32px; font: inherit; font-weight: 600; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.su-linkbtn:hover { color: var(--accent-hov); }
+.su-linkbtn.warn { color: var(--sig-stop); }
+.su-linkbtn:focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--r-1); }
+/* You are already signed in: information, not a fault. */
+.su-signedin { margin: 0 0 var(--space-4); padding: 14px 16px; border: 1px solid var(--line-2); border-left: 3px solid var(--mark); border-radius: var(--r-1); background: var(--surface-sunk); font: 14px/1.6 var(--sans); color: var(--ink-1); }
+.su-signedin p { margin: 0; }
+/* The form on standby: not usable, still readable. Never a blanket opacity,
+   which drags every label below AA. */
+.form-card.is-standby { background: var(--surface-sunk); border-style: dashed; box-shadow: none; }
+.form-card.is-standby .btn { background: transparent; border-color: var(--line-2); color: var(--ink-3); }
+/* A used or expired verify link is a wait state, not an error state. */
+.err-banner { background: var(--sig-wait-bg); border: 1px solid var(--line-2); border-left: 3px solid var(--sig-wait); padding: 16px 18px; margin: 0 0 var(--space-5); border-radius: var(--r-1); }
+.err-banner strong { color: var(--ink-1); display: block; margin-bottom: 5px; font: 600 15px/1.35 var(--sans); }
+.err-banner p { color: var(--ink-2); margin: 0; font: 14px/1.6 var(--sans); }
+.err-banner code { background: var(--surface); border: 1px solid var(--line); padding: 2px 6px; border-radius: var(--r-1); font-size: 13px; color: var(--ink-1); }
+.err-banner a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
 
 </style>
 <script type="application/ld+json" data-paramant-seo="1">
@@ -154,6 +174,9 @@
   ]
 }
 </script>
+<meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A0F16" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="/app-2026.css?v=1">
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -201,16 +224,16 @@
   </p>
   <p class="small mt-2">
     Community accounts get 2 signatures a month and send encrypted files that burn on first read, forever, no card.
-    <a href="/pricing" style="color:var(--cobalt,#1D4ED8)">See the plans</a>.
+    <a href="/pricing">See the plans</a>.
   </p>
 </section>
 
 <section class="section">
-  <div id="already-signed-in" hidden style="margin:24px 0;padding:16px;background:rgba(178,255,63,0.1);border-left:3px solid #B2FF3F;">
+  <div id="already-signed-in" class="su-signedin" hidden>
     <p style="margin:0;">
       You are already signed in as <strong id="already-email"></strong>.
-      <a href="/account" style="color:#1D4ED8;font-weight:600;">Go to your account</a>
-      or <button type="button" id="already-signout" style="background:none;border:none;color:#991b1b;font-weight:600;cursor:pointer;text-decoration:underline;">sign out first</button>.
+      <a href="/account" class="su-strong-link">Go to your account</a>
+      or <button type="button" id="already-signout" class="su-linkbtn warn">sign out first</button>.
     </p>
   </div>
 
@@ -219,7 +242,7 @@
     <input type="email" id="email" name="email" required autocomplete="email"
            placeholder="you@work.com">
 
-    <label for="label" class="mt-3">Label <span style="font-weight:400;color:var(--ink-dim,#64748b)">(optional)</span></label>
+    <label for="label" class="mt-3">Label <span class="su-optional">(optional)</span></label>
     <input type="text" id="label" name="label" autocomplete="organization"
            placeholder="Acme Legal, Ward 3A, Home Lab">
     <p class="small mt-2">A short name for this account. Only you see it.</p>
@@ -234,7 +257,7 @@
       Continue
     </button>
 
-    <div id="error" class="error"></div>
+    <div id="error" class="error" role="alert" aria-live="assertive"></div>
     <div id="success" class="msg-success"></div>
   </form>
 
@@ -252,10 +275,10 @@
   </p>
   <p class="small mt-3">
     Didn't get it? Check spam, or
-    <button type="button" id="resend-btn" style="background:none;border:none;color:#1D4ED8;font-weight:600;cursor:pointer;text-decoration:underline;padding:0;font:inherit;">resend the link</button>.
+    <button type="button" id="resend-btn" class="su-linkbtn">resend the link</button>.
   </p>
   <p class="small mt-2" id="resend-status" aria-live="polite"></p>
-  <p class="small mt-3" style="color:var(--ink-dim,#64748b)">The link works for 14 days.</p>
+  <p class="small mt-3 su-dim">The link works for 14 days.</p>
 </section>
 
 </main>
@@ -265,7 +288,7 @@
 <script src="/js/nav-auth.js?v=5" defer></script>
 <script src="/js/signup.inline1.js?v=1"></script>
 
-<script src="/js/signup.inline2.js?v=1"></script>
+<script src="/js/signup.inline2.js?v=2"></script>
 <script src="/js/signup.inline3.js?v=2"></script>
 
 <footer class="legal-strip">
