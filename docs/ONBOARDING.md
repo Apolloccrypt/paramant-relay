@@ -161,7 +161,7 @@ find . -name '*.sh' -not -path '*/node_modules/*' -not -path '*/.git/*' -print0 
 cd relay
 RELAY_TEST_SKIP=redis node --test --test-reporter=tap $(ls test/*.test.js | grep -vE \
   'inbound-hash-verify|deep-health-gate|billing-stance-boot|parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index|parasign-signs-quota|route-')
-#   # tests 175   # pass 175   # fail 0     ~1.2s
+#   # tests 199   # pass 199   # fail 0     ~1.5s
 ```
 
 The exclusion list is not arbitrary and the reporter is not decoration: see
@@ -171,14 +171,32 @@ section 6.
 
 ```bash
 cd admin && node --test test/*.test.js
-#   # tests 40   # pass 40   # fail 0      ~0.3s
+#   # tests 67   # pass 67   # fail 0      ~1m50s
 ```
+
+Four of those suites boot a real `admin/server.js` (`login-http`,
+`login-timing`, `redis-outage`, `ratelimit-ttl`), so this job now needs a redis
+and the admin's own `node_modules`, which the CI job deliberately did not
+install. `login-timing` additionally boots a real `relay.js` for its
+backup-code case, because the oracle there is ten argon2 verifications and a
+stub would be measuring the stub. That needs `@paramant/core`, which relay.js
+refuses to start without, so the admin CI job declares it (`ADMIN_TEST_SKIP=relay`)
+and the `relay-crypto-tests` job, the one that builds the binding, runs that
+suite for real and fails if it skips there. They declare their precondition the way the relay suites do: without it
+the run fails by name, unless the runner says `ADMIN_TEST_SKIP=redis`.
+
+Most of those two minutes are deliberate waiting rather than work.
+`login-timing` measures at 0, 12 and 20 prior failures, and by design an answer
+at twenty failures is held for 2.25 seconds; its backup-code case is held for at
+least 1.5 seconds per request, because that floor has to sit above ten argon2
+verifications. Every request past the failure threshold also has to carry a real
+2^18 proof-of-work, which `login-http` pays as well.
 
 **Root integration suites** (node builtins plus the root deps, no browser):
 
 ```bash
 node --test $(grep -L "from 'playwright'" tests/*.mjs)
-#   # tests 152   # pass 150   # skipped 2   # fail 0    ~0.9s
+#   # tests 190   # pass 188   # skipped 2   # fail 0    ~1.2s
 ```
 
 The two skips are the external-link checks in `tests/links.test.mjs`; they need
@@ -221,7 +239,7 @@ docker run --rm -d --name paramant-test-redis -p 6399:6379 redis:7.4.8-alpine
 cd relay
 REDIS_URL=redis://127.0.0.1:6399 \
   node --test --test-reporter=tap test/route-*.test.js test/parasign-signs-quota.test.js
-#   # tests 70   # pass 70   # fail 0      ~13s
+#   # tests 91   # pass 91   # fail 0      ~21s
 
 docker rm -f paramant-test-redis
 ```
@@ -318,12 +336,13 @@ the commit message and the added `+` diff lines, and runs from both
 `tests/static-sanity.sh` and `.githooks/pre-push`. Default tooling adds these
 trailers for you; turn them off before your first commit.
 
-**static-sanity is ten checks, and check 10 is the style guard.**
-`tests/static-sanity.sh` runs ten numbered checks: syntax, redisClient
+**static-sanity is eleven checks, and check 10 is the style guard.**
+`tests/static-sanity.sh` runs eleven numbered checks: syntax, redisClient
 initialisation, TOTP helpers (warn), unsafe `req.body` access (warn), orphan code
 (warn), `/request-key` still returning 410, DID-auth replay protection, the
-open-mode envelope signer binding, installer release pinning, and check 10, the
-commit and GitHub style guard delegating to `check-commit-style.sh`. Exit code is
+open-mode envelope signer binding, installer release pinning, check 10, the
+commit and GitHub style guard delegating to `check-commit-style.sh`, and check
+11, the test-scope guard delegating to `check-test-declarations.sh`. Exit code is
 the number of hard failures. It runs in no workflow: its callers are the
 pre-commit hook and `deploy.sh:25`. Check 10 inspects the **last commit**, so on
 a branch with a non-conforming commit checks 1 to 9 pass and the script still

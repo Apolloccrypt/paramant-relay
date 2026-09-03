@@ -774,6 +774,26 @@ could not reach Redis. The code was not rejected and nothing is wrong with the
 account; verification fails closed rather than accepting a code it cannot mark
 as spent. See SECURITY.md.
 
+**Every credential answer on this route is held to a floor**, so a 401 for an
+address that has an account takes exactly as long as one for an address that
+does not. The floor is `PARAMANT_LOGIN_MIN_ANSWER_MS` (default 250 ms) plus what
+the address owes for its own recorded failures: 250 ms per failure past ten,
+capped at 2000 ms. So a clean address is answered at 250 ms and one with twenty
+failures at 2250 ms, either way whether or not it exists.
+
+That second part used to be charged by the relay against the ACCOUNT, and only
+an address with an account could reach it, so the anti-guessing delay was itself
+an existence oracle: 509.91 ms against 251.61 ms at twelve prior failures, with
+no overlap. The `503 totp_unavailable` answer was unfloored for the same reason
+and is floored now too. The 428 and the 429 are not held back: their status
+codes tell them apart whatever the clock says, and the login page is waiting on
+the 428 to start hashing.
+
+An address over the failure threshold still answers 428 where one under it
+answers 401, so the status code remains a distinguisher for an attacker willing
+to burn ten failures and a proof-of-work per address. That is the deliberate
+price of pricing an attempt rather than refusing it.
+
 ### POST /api/user/auth/login-with-backup
 
 ```bash
@@ -784,6 +804,17 @@ curl -X POST https://paramant.app/api/user/auth/login-with-backup \
 ```
 
 Backup codes are single-use. The account is re-locked after use; a new TOTP enrollment is required.
+
+**This route is floored too, and higher.** A wrong backup code is verified
+against every stored hash, so a miss costs ten argon2id verifications at 64 MiB:
+about half a second, and an address with no account pays none of it. Every
+credential answer is held to `PARAMANT_LOGIN_BACKUP_MIN_ANSWER_MS` (default
+1500 ms) plus 250 ms per prior attempt on that address past the first, capped at
+2000 ms. Five attempts per address and ten per source address per fifteen
+minutes are refused outright with a 429.
+
+A body whose `email` or `backup_code` is not a string is a `400 missing_fields`,
+the same answer for every caller.
 
 ### POST /api/user/auth/logout
 
@@ -933,6 +964,8 @@ They are not accessible from the public internet.
 | 428 | `pow_required` | This email address has collected enough failed sign-ins that the next attempt must carry a solved proof-of-work. Not a refusal: solve `GET /api/captcha/challenge` and post again |
 | 429 | `rate_limited` | Too many requests from this IP address |
 | 503 | `totp_unavailable` | The TOTP single-use guard could not reach Redis. Verification fails closed; retry when the relay reports healthy |
+| 503 | `redis_unavailable` | Any other Redis-backed route whose store did not answer inside `PARAMANT_REDIS_DEADLINE_MS` (default 1000 ms). Carries `Retry-After: 5`. Nothing is wrong with the request; the relay refuses rather than waiting for a store that may never answer |
+| 503 | `session_store_unavailable` | The admin could not read the session behind an authenticated request, for the same reason |
 | 500 | `internal` | Unexpected server error; check relay logs |
 
 ### POST /admin/api/admin/force-totp

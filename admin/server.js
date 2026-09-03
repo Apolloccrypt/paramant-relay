@@ -5,7 +5,9 @@ const pow = require('./lib/pow-captcha');
 const http    = require('http');
 const crypto  = require('crypto');
 const path    = require('path');
-const { initRedis, redis, scanKeys } = require('./lib/redis');
+const { initRedis, redis, redisHealthy, scanKeys } = require('./lib/redis');
+const { isRedisOutage } = require('./lib/redis-deadline');
+const { incrInWindow } = require('./lib/redis-counter');
 const { logAuditEvent, getAuditEvents } = require('./lib/audit');
 const { spawn } = require('child_process');
 const cliCommands = require('./lib/cli-commands');
@@ -176,6 +178,28 @@ app.use((req, res, next) => {
 });
 app.use(BASE_PATH || '/', express.static(path.join(__dirname, 'public')));
 
+// GET /health -- liveness, and an honest word about the store.
+//
+// The admin had no health route at all: the container probe was GET
+// /api/auth/check, which answers 401 when nobody is signed in, so "healthy"
+// meant "the process still refuses me". That cannot distinguish an admin that
+// is fine from one whose redis has been gone for an hour, which is exactly the
+// blind spot the regression watchlist is about.
+//
+// Always 200, because the process IS up and still serves its static app and
+// still answers honestly on every other route. The status field is where the
+// truth about redis goes: "degraded" when the store cannot be reached. The
+// probe is bounded like every other redis call, so this route cannot be the one
+// that hangs.
+app.get(`${BASE_PATH}/health`, async (req, res) => {
+  const store = await redisHealthy();
+  res.status(200).json({
+    ok: true,
+    status: store.ok ? 'ok' : 'degraded',
+    redis: { ok: store.ok, detail: store.detail },
+  });
+});
+
 const api = express.Router();
 
 api.post('/auth/login', async (req, res) => {
@@ -341,8 +365,7 @@ api.post('/admin/resend-setup', async (req, res) => {
   if (!user_id || !email) return res.status(400).json({ error: 'missing_fields' });
   // Rate limit: max 10 admin resends per user per 24h
   const adminRlKey = `paramant:ratelimit:admin_resend:${user_id}`;
-  const adminRlCnt = await redis().incr(adminRlKey);
-  if (adminRlCnt === 1) await redis().expire(adminRlKey, 86400);
+  const adminRlCnt = await incrInWindow(redis(), adminRlKey, 86400);
   if (adminRlCnt > 10) return res.status(429).json({ error: 'rate_limited', admin_message: 'Max 10 resends per user per 24h' });
   try {
     await Promise.all([
@@ -730,15 +753,13 @@ api.post("/user/signup", async (req, res) => {
 
   // 3. Per-IP rate limit (10 per hour)
   const ipKey = `paramant:signup:ratelimit:ip:${ip}`;
-  const ipCount = await redis().incr(ipKey);
-  if (ipCount === 1) await redis().expire(ipKey, 3600);
+  const ipCount = await incrInWindow(redis(), ipKey, 3600);
   if (ipCount > 10) return res.status(429).json({ error: "rate_limited" });
 
   // 4. Per-email rate limit (10 verification emails per 24h, hashed for privacy)
   const emailHash = crypto.createHash('sha256').update(norm).digest('hex');
   const emailKey = `paramant:signup:ratelimit:email:${emailHash}`;
-  const emailCount = await redis().incr(emailKey);
-  if (emailCount === 1) await redis().expire(emailKey, 86400);
+  const emailCount = await incrInWindow(redis(), emailKey, 86400);
   if (emailCount > 10) return res.status(429).json({ error: "rate_limited", reason: "too_many_attempts_for_email" });
 
   // 5. Both branches do the same kind of work (one Redis SET + one outbound
@@ -968,10 +989,98 @@ api.post("/user/setup/:token/confirm", async (req, res) => {
 
 // ── Login flow ────────────────────────────────────────────────────────────────
 
+// Every credential answer on /api/user/login leaves at the same point on the
+// clock, whatever the handler had to do to reach it.
+//
+// THE ORACLE THIS CLOSES. The status codes on this route were already
+// identical: an earlier fix folded three different 403s into one 401 precisely
+// so the code could not be read as "this address exists". The WORK was not.
+// An address that exists reaches a second relay call (/v2/user/verify-totp)
+// and one more redis read; one that does not returns two steps earlier. On a
+// booted admin, 200 requests per case, interleaved, one X-Real-IP each:
+//
+//   relay verify-totp cost   exists (p50)   absent (p50)   delta
+//   0 ms (instant stub)          3.02 ms        1.93 ms    1.10 ms
+//   3 ms (a realistic relay)     6.13 ms        1.93 ms    4.20 ms
+//
+// In the second row the two distributions do not overlap at all: the fastest
+// hit (4.58 ms) is slower than the slowest miss (4.02 ms), so ONE request
+// classifies an address, under the rate limit, without ever signing in. The
+// review measured 5.40 against 2.95 ms on the production pair; same channel,
+// different machine.
+//
+// WHAT REPLACES IT. A floor, not a sleep: the answer is held until t0 plus a
+// constant, so what an attacker times is a number this file sets. Padding by a
+// fixed amount would not have worked -- it moves both curves and keeps the
+// distance between them. The not-found branch also does the same shape of redis
+// work as the found one now, so the floor is a safety margin rather than the
+// only thing holding the two paths together.
+//
+// 429 and 428 are deliberately NOT padded. They are not credential answers,
+// their status codes tell them apart anyway, and slowing them down would only
+// cost the honest client who is being asked for a proof-of-work.
+const LOGIN_MIN_ANSWER_MS = (() => {
+  const raw = parseInt(process.env.PARAMANT_LOGIN_MIN_ANSWER_MS || '', 10);
+  // The floor has to sit above the p99 of the slowest branch or it stops being
+  // a floor and the difference leaks again. Zero or nonsense is not an opt-out.
+  return Number.isFinite(raw) && raw > 0 ? raw : 250;
+})();
+
+// /api/user/login-with-backup needs a floor of its own, six times higher, and
+// the reason is argon2.
+//
+// consumeBackupCode verifies the code against EVERY stored hash until one
+// matches, and a wrong code matches none, so a miss costs ten full argon2id
+// verifications at 64 MiB and timeCost 3. Measured on the machine this was
+// written on: one verification p50 49.7 ms, ten of them p50 494.2 ms with a max
+// of 870.9 ms. An address with no account never reaches any of it. That was the
+// whole answer: 472.7 ms for an address that exists against 251.6 ms for one
+// that does not, no overlap, and the admin logged "answer overran its floor"
+// on 40 out of 40 requests, which is the code saying out loud that the floor it
+// was given was not one.
+//
+// 1500 ms is 1.7x the slowest ten-hash miss measured here and 3x the median. A
+// slower box needs more, and it will say so: every overrun is logged. The route
+// is the emergency path a user takes once, when their authenticator is gone, so
+// a second and a half is a cost worth paying to stop the route answering the
+// question "is this address a customer".
+const LOGIN_BACKUP_MIN_ANSWER_MS = (() => {
+  const raw = parseInt(process.env.PARAMANT_LOGIN_BACKUP_MIN_ANSWER_MS || '', 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : 1500;
+})();
+
+// `extraMs` is the per-address throttle this attempt owes, from
+// loginRate.mirrorThrottleMs. It is added to the FLOOR rather than slept before
+// the work, so it cannot be told apart from the work itself, and it is the same
+// number for an address that exists and one that does not, because the counter
+// behind it counts both.
+function answerLoginAt(t0, res, status, body, extraMs = 0, baseMs = LOGIN_MIN_ANSWER_MS) {
+  const floor = baseMs + Math.max(0, extraMs);
+  const wait = floor - (Date.now() - t0);
+  if (wait <= 0) {
+    // Only reachable when the real work took longer than the floor, which means
+    // the floor has stopped being one. Loud, because what happens next is an
+    // existence oracle that nobody is measuring.
+    console.error(`[login] answer overran its floor by ${-wait}ms (floor ${floor}ms); PARAMANT_LOGIN_MIN_ANSWER_MS is too low`);
+    return res.status(status).json(body);
+  }
+  return new Promise((resolve) => setTimeout(resolve, wait)).then(() => res.status(status).json(body));
+}
+
 // POST /api/user/login
 api.post("/user/login", async (req, res) => {
+  // Read before anything else runs: every credential answer below is held until
+  // this moment plus LOGIN_MIN_ANSWER_MS plus whatever the address owes for its
+  // own failures. See answerLoginAt.
+  const t0 = Date.now();
   const { email, totp } = req.body || {};
-  if (!email || !totp) return res.status(400).json({ error: "missing_fields" });
+  // typeof, not truthiness. `{"email": {}}` is truthy and reached
+  // loginRate.emailFailures -> String(email).trim().toLowerCase(), which threw,
+  // so the route answered 500 in about a millisecond: an unhandled throw on an
+  // unauthenticated route, and the fastest answer the handler had.
+  if (typeof email !== "string" || typeof totp !== "string" || !email || !totp) {
+    return res.status(400).json({ error: "missing_fields" });
+  }
 
   const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
 
@@ -986,6 +1095,13 @@ api.post("/user/login", async (req, res) => {
   // same 2^18 challenge signup and password reset already ask for. See
   // lib/login-ratelimit.js.
   const failures = await loginRate.emailFailures(redis(), email);
+  // What this ADDRESS owes for its own failures, hit or miss. The relay used to
+  // charge the same curve against the ACCOUNT, and only an address that exists
+  // could ever reach it, so the delay itself said whether the account was real:
+  // 306 ms against 252 ms at twelve failures, 2006 against 252 at the cap, with
+  // no overlap either time. Charged here, on a counter that does not know
+  // whether the account exists, it says nothing. See lib/login-ratelimit.js.
+  const throttleMs = loginRate.mirrorThrottleMs(failures);
   if (loginRate.powRequired(failures)) {
     const { challenge_id, nonce } = req.body || {};
     const proof = await pow.verifyChallenge(challenge_id, nonce);
@@ -1001,8 +1117,13 @@ api.post("/user/login", async (req, res) => {
 
   const user = await findUserByEmail(email);
   if (!user) {
+    // The read the existing-account branch does next, against a key that cannot
+    // exist. A GET on a random key, no write, so it costs one round trip and
+    // leaves nothing behind: the point is that both branches make the same
+    // number of calls to the same store before they answer.
+    await redis().get(`paramant:user:totp_active:absent_${crypto.randomBytes(16).toString("hex")}`);
     await loginRate.noteEmailFailure(redis(), email);
-    return res.status(401).json({ error: "invalid_credentials" });
+    return answerLoginAt(t0, res, 401, { error: "invalid_credentials" }, throttleMs);
   }
 
   const activeRaw = await redis().get(`paramant:user:totp_active:${user.key}`);
@@ -1023,29 +1144,35 @@ api.post("/user/login", async (req, res) => {
       // fact that the email belongs to a real account with admin-required
       // TOTP not yet set up.
       await loginRate.noteEmailFailure(redis(), email);
-      return res.status(401).json({ error: "invalid_credentials" });
+      return answerLoginAt(t0, res, 401, { error: "invalid_credentials" }, throttleMs);
     }
     // Same 401 for TOTP-not-configured so this branch also does not leak
     // account existence. Was: 403 totp_not_configured.
     await loginRate.noteEmailFailure(redis(), email);
-    return res.status(401).json({ error: "invalid_credentials" });
+    return answerLoginAt(t0, res, 401, { error: "invalid_credentials" }, throttleMs);
   }
 
-  const verifyRes = await callRelay("/v2/user/verify-totp", { user_id: user.key, totp });
+  // throttled_upstream: this attempt's delay is already in the floor above, so
+  // the relay must not charge it a second time. It still counts the failure and
+  // still reports what it would have charged, as throttle_ms.
+  const verifyRes = await callRelay("/v2/user/verify-totp", { user_id: user.key, totp, throttled_upstream: true });
   // The relay's single-use guard could not reach Redis and now fails closed.
   // Pass the 503 through instead of dressing it up as a wrong code, and do not
   // count it against the address: nobody failed, the service is down. During
   // such an outage no sign-in can succeed anyway, because the session store is
   // that same Redis.
-  if (verifyRes.status === 503) return res.status(503).json({ error: "totp_unavailable" });
+  // Floored like every other answer on this route. Unfloored it was a 9 ms
+  // reply where every other answer took 252 ms, and only an address with an
+  // account could ever produce it, so the outage answer was itself the oracle.
+  if (verifyRes.status === 503) return answerLoginAt(t0, res, 503, { error: "totp_unavailable" }, throttleMs);
   if (!verifyRes.ok) {
     await loginRate.noteEmailFailure(redis(), email);
-    return res.status(401).json({ error: "invalid_credentials" });
+    return answerLoginAt(t0, res, 401, { error: "invalid_credentials" }, throttleMs);
   }
   const result = await verifyRes.json();
   if (!result.valid) {
     await loginRate.noteEmailFailure(redis(), email);
-    return res.status(401).json({ error: "invalid_credentials" });
+    return answerLoginAt(t0, res, 401, { error: "invalid_credentials" }, throttleMs);
   }
 
   // A correct code proves who is at the keyboard, so the failures collected in
@@ -1062,20 +1189,34 @@ api.post("/user/login", async (req, res) => {
 
   setUserCookie(res, sessionToken);
 
-  res.json({
+  // The success answer is floored too. A sign-in that came back faster than
+  // every refusal would be its own oracle: the 200 is visible, but so is the
+  // fact that this address got as far as having a code checked at all.
+  return answerLoginAt(t0, res, 200, {
     success: true,
     email: user.email,
     session_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
     // Dual-verify: surface the algorithm so the login page can show a soft SHA-1
     // note. Login already succeeded; this never blocks sign-in.
     totp_algorithm: result.algorithm === "sha1" ? "sha1" : "sha256",
-  });
+  }, throttleMs);
 });
 
 // POST /api/user/login-with-backup
 api.post("/user/login-with-backup", async (req, res) => {
+  // Same clock discipline as /user/login: this route had the same shape of
+  // oracle, an address without an account returning several steps before one
+  // with an account had its code argon2-verified and its per-account throttle
+  // slept out.
+  const t0 = Date.now();
   const { email, backup_code } = req.body || {};
-  if (!email || !backup_code) return res.status(400).json({ error: "missing_fields" });
+  // typeof, not truthiness. `{"email": {}}` is truthy, reaches
+  // String(email).toLowerCase() two lines down, and used to answer 500 in about
+  // a millisecond, which is both an unhandled throw on an unauthenticated route
+  // and the fastest answer this handler has.
+  if (typeof email !== "string" || typeof backup_code !== "string" || !email || !backup_code) {
+    return res.status(400).json({ error: "missing_fields" });
+  }
 
   // This is an unauthenticated, session-granting factor. Without throttling,
   // each wrong code triggers up to 10x 64MB argon2id verifications on the relay
@@ -1086,22 +1227,39 @@ api.post("/user/login-with-backup", async (req, res) => {
   const emailHash = crypto.createHash('sha256').update(String(email).toLowerCase().trim()).digest('hex');
   if (!(await webauthn.rateHit(redis(), `bk:ip:${ip}`, 10, 900)))
     return res.status(429).json({ error: "rate_limited" });
-  if (!(await webauthn.rateHit(redis(), `bk:email:${emailHash}`, 5, 900)))
-    return res.status(429).json({ error: "rate_limited" });
+  // Counted, because this route charges an escalating cost as well as refusing
+  // at the ceiling. The hit happens before findUserByEmail, so the number is the
+  // same for an address with an account and one without, which is the only
+  // reason it can be used as the throttle for both.
+  const bkHit = await webauthn.rateHitCounted(redis(), `bk:email:${emailHash}`, loginRate.BACKUP_ATTEMPT_LIMIT, 900);
+  if (!bkHit.allowed) return res.status(429).json({ error: "rate_limited" });
+  // The relay's per-account delay is suppressed on this route
+  // (throttled_upstream below), so the cost of guessing is charged here instead,
+  // against a counter that does not know whether the account exists. See
+  // lib/login-ratelimit.js backupThrottleMs.
+  const bkThrottleMs = loginRate.backupThrottleMs(bkHit.count - 1);
+  const backupAnswer = (status, body) =>
+    answerLoginAt(t0, res, status, body, bkThrottleMs, LOGIN_BACKUP_MIN_ANSWER_MS);
 
   const user = await findUserByEmail(email);
-  if (!user) return res.status(401).json({ error: "invalid_credentials" });
+  if (!user) return backupAnswer(401, { error: "invalid_credentials" });
 
+  // throttled_upstream, for the reason given on /user/login: the relay's
+  // per-account delay is only ever charged to an address that exists. What
+  // bounds the argon2 work on this route is not that delay but the two hard
+  // caps above, five per address and ten per source address per fifteen
+  // minutes, which refuse rather than slow down.
   const consumeRes = await callRelay("/v2/user/consume-backup", {
     user_id: user.key,
     code: backup_code.trim().toUpperCase(),
+    throttled_upstream: true,
   });
   // Guard the relay response parse: a relay error / non-JSON body must surface
   // as 502 (relay failure), not a 500 from an unhandled JSON.parse throw.
-  if (!consumeRes.ok) return res.status(502).json({ error: "relay_unreachable" });
+  if (!consumeRes.ok) return backupAnswer(502, { error: "relay_unreachable" });
   let result;
-  try { result = await consumeRes.json(); } catch { return res.status(502).json({ error: "relay_unreachable" }); }
-  if (!result || !result.valid) return res.status(401).json({ error: "invalid_credentials" });
+  try { result = await consumeRes.json(); } catch { return backupAnswer(502, { error: "relay_unreachable" }); }
+  if (!result || !result.valid) return backupAnswer(401, { error: "invalid_credentials" });
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await redis().set(
@@ -1111,7 +1269,7 @@ api.post("/user/login-with-backup", async (req, res) => {
   );
 
   setUserCookie(res, sessionToken);
-  res.json({ success: true, email: user.email });
+  return backupAnswer(200, { success: true, email: user.email });
 });
 
 
@@ -1908,10 +2066,9 @@ api.post("/user/auth/request-totp-reset", async (req, res) => {
   const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
   const emailRlKey = `paramant:ratelimit:totp_reset:${emailHash}`;
   const ipRlKey    = `paramant:ratelimit:totp_reset_ip:${ip}`;
-  const [emailCnt, ipCnt] = await Promise.all([redis().incr(emailRlKey), redis().incr(ipRlKey)]);
-  await Promise.all([
-    emailCnt === 1 ? redis().expire(emailRlKey, 86400) : Promise.resolve(),
-    ipCnt    === 1 ? redis().expire(ipRlKey,    3600)  : Promise.resolve(),
+  const [emailCnt, ipCnt] = await Promise.all([
+    incrInWindow(redis(), emailRlKey, 86400),
+    incrInWindow(redis(), ipRlKey, 3600),
   ]);
   if (emailCnt > 5 || ipCnt > 10) {
     logRedacted('warn', `[totp-reset-req] rate limited: emailHash=${emailHash} ip=${maskIpForLog(ip)}`);
@@ -2776,8 +2933,7 @@ api.post("/drop/upload", async (req, res) => {
   // (20/day is generous for a human, bounds anonymous-relay abuse from one host).
   const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
   const ipKey = `paramant:drop:ratelimit:ip:${ip}`;
-  const ipCount = await redis().incr(ipKey);
-  if (ipCount === 1) await redis().expire(ipKey, 86400);
+  const ipCount = await incrInWindow(redis(), ipKey, 86400);
   if (ipCount > 20) {
     return res.status(429).json({
       error: "rate_limited",
@@ -2785,8 +2941,7 @@ api.post("/drop/upload", async (req, res) => {
     });
   }
   const rlKey = `paramant:drop:ratelimit:${email.toLowerCase()}`;
-  const count = await redis().incr(rlKey);
-  if (count === 1) await redis().expire(rlKey, 86400);
+  const count = await incrInWindow(redis(), rlKey, 86400);
   if (count > 3) {
     return res.status(429).json({
       error: "rate_limited",
@@ -3169,9 +3324,10 @@ async function checkAdminRl(scope, id, limit) {
   // where concurrent requests all read the same count and each passed. INCR
   // returns the post-increment value, so the Nth concurrent caller sees N.
   let cnt;
-  try { cnt = await redis().incr(key); }
+  // incrInWindow sets the expiry unconditionally: a counter that lost its TTL
+  // used to refuse this admin for good. See lib/redis-counter.js.
+  try { cnt = await incrInWindow(redis(), key, 86400); }
   catch { return false; } // fail closed if Redis is unavailable
-  if (cnt === 1) await redis().expire(key, 86400).catch(() => {});
   return cnt <= limit;
 }
 
@@ -3638,6 +3794,15 @@ app.get(`${BASE_PATH}/*path`, (req, res) => res.sendFile(path.join(__dirname, 'p
     console.error('[unhandled error]', err.message);
     if (res.headersSent) return next(err);
     if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'payload_too_large' });
+    // Redis unreachable is an availability answer, not a bug. Express 5 forwards
+    // a rejected async handler here by itself, so with every redis command now
+    // bounded (lib/redis-deadline) this one branch turns EVERY redis-backed
+    // route in this file into an honest 503 inside the deadline, instead of a
+    // request that waits for a store that is never going to answer.
+    if (isRedisOutage(err)) {
+      res.setHeader('Retry-After', '5');
+      return res.status(503).json({ error: 'redis_unavailable' });
+    }
     res.status(500).json({ error: 'internal_error' });
   });
 

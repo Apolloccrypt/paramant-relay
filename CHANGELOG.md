@@ -10,6 +10,97 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **No redis call in the relay or the admin panel can hang any more.** node-redis
+  holds commands on an offline queue while it reconnects, and it never times a
+  command out, so against a store that is gone a route neither succeeded nor
+  failed: it waited. #368 bounded one read on the TOTP path and wrote the rest
+  up in SECURITY.md as open. The bound now sits on the client itself
+  (`lib/redis-deadline.js`, `guardRedisClient` plus `disableOfflineQueue`), so
+  all of it is covered, including the `sMembers`/`sRem` pair behind
+  `/v2/user/consume-backup` that the earlier fix left next to the one it fixed.
+  Both mechanisms are needed and neither is enough alone: `disableOfflineQueue`
+  refuses a command issued while the socket is down, and only a deadline catches
+  a connection that stays open and goes silent, where the client still reports
+  itself ready. A third measurement made a rebuild necessary too: after a
+  command is lost that way, node-redis holds every later command behind it and
+  never recovers, so the guard reconnects after two unanswered commands in a
+  row. `PARAMANT_REDIS_DEADLINE_MS` keeps its name and is now the one knob for
+  both services. An outage answers 503 with `Retry-After`, never a 500 and never
+  a wrong-credentials 401.
+- **The relay's request handler now catches.** `http.createServer` was handed a
+  4000-line async callback with nothing behind it, so a throw was an unhandled
+  rejection: no response to the client, and on Node 22 a process exit. It was
+  survivable only because a dead redis hung rather than threw; with the bound
+  above, an outage is the normal throw path.
+- **`/v2/health/deep` mentions redis, and the admin has a `/health` at all.** The
+  deep check reported the same green whether the store that holds every TOTP
+  secret was reachable or not. The admin's container probe was
+  `GET /api/auth/check`, which answers 401 when nobody is signed in, so
+  "healthy" meant "the process still refuses me". The new admin `GET /health` is
+  always 200 and says `status: "degraded"` when redis is unreachable.
+- **`POST /api/user/login` no longer says which addresses are customers.** Two
+  leaks, and the loud one was the anti-guessing delay itself. `relay.js` charges
+  250 ms per failure past ten, capped at two seconds, before it checks a code,
+  and only a request naming an account that EXISTS ever reaches that sleep.
+  Twelve wrong codes from rotating source addresses put an address there, and
+  nothing refuses them. Measured over 100 requests per case on a booted admin:
+  at twelve prior failures 509.91 ms against 251.61 ms, at twenty 2010.23 ms
+  against 251.82 ms, ranges not overlapping either time; the work difference on
+  a clean address was a further 4 ms. The `503 totp_unavailable` answer was
+  unfloored too, and only an address with an account could produce it.
+
+  The delay is now charged by the admin, against the per-address failure counter
+  that counts a miss exactly like a hit, and the relay is told not to charge it
+  again (`throttled_upstream`). Every credential answer on both login routes,
+  including the 503, is held to `PARAMANT_LOGIN_MIN_ANSWER_MS` (default 250 ms)
+  plus what the address owes. Same measurement after: 251.86 against 251.87,
+  751.84 against 751.76, 2251.90 against 2252.11, all overlapping. The 429 and
+  the 428 are deliberately not padded: they are told apart by their status code
+  anyway.
+- **A rate-limit counter that lost its expiry refused for ever.** Every limiter
+  in both services was INCR plus a conditional `if (count === 1) expire(...)`.
+  The redis deadline above makes that gap reachable in one request: if the INCR
+  outlives the deadline while the server still executes it, the expiry is never
+  sent, the next INCR returns 2, and the key is immortal. Measured with redis
+  replies dropped during one login, the per-IP counter stood at 9 with TTL -1
+  and that source address kept getting 429 until the key was deleted by hand.
+  The same shape stranded the login failure counter (a proof-of-work bill that
+  never lifts, on an address anybody may name) and the monthly quota counters in
+  `relay/lib/quota.js` (an account permanently over its limit). All 18 INCR call
+  sites now go through `lib/redis-counter.js`, which sets the expiry after every
+  INCR with `NX`, so a lost window is repaired by the next request instead of
+  never.
+- **`POST /api/user/login-with-backup` answered the same question with argon2.**
+  `consumeBackupCode` verifies the code against every stored hash until one
+  matches, so a wrong code costs ten full argon2id verifications at 64 MiB:
+  measured here, p50 494.2 ms with a max of 870.9 ms. An address with no account
+  pays none of it, and the 250 ms floor the route inherited was far below it, so
+  it read as 472.7 ms against 251.6 ms with no overlap and the admin logged
+  "answer overran its floor" on every request. The route now has a floor of its
+  own (`PARAMANT_LOGIN_BACKUP_MIN_ANSWER_MS`, default 1500 ms) plus a throttle
+  mirrored onto the counter it already keeps for that address.
+- **A request body that was not what it said it was answered 500 in a
+  millisecond.** `{"email": {}}` is truthy, so `if (!email)` waved it through
+  into `String(email).trim().toLowerCase()`, which threw: an unhandled throw on
+  an unauthenticated route, and the fastest answer either login handler had.
+  Both now check the type and answer 400.
+- **`/health` and `/v2/health/deep` repeated the configured redis deadline** in
+  the error text they passed through, unauthenticated. They report a fixed word;
+  the message goes to the log.
+
+### Added
+- **`admin/test/ratelimit-ttl.test.js`**, which boots a real admin behind a proxy
+  that delivers commands and drops replies, and then reads the TTL on its own
+  connection. That is the only shape that reproduces a counter stranded without
+  a window: a full outage never executes the INCR either.
+- **An HTTP test harness for the admin panel** (`admin/test/_admin-server.js`),
+  the counterpart of `relay/test/_relay-server.js`. Every admin suite until now
+  was a lib test or a source-text assertion; none of them ever started the
+  server. `admin/test/login-http.test.js` runs the login limiter scenario
+  against the real process -- ten wrong codes from three addresses, then the
+  owner with a real proof-of-work -- and goes red against the pre-#368 admin,
+  which the test it supplements could not.
+
 - **Every ParaSend limit now reads the product tier, not the unified `plan`.**
   Billing writes a purchase with `setProductPlan` ->
   `entitlements.applyProductTier`, which sets `plan_parasend` (or
