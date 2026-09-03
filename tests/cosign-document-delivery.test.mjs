@@ -3,6 +3,7 @@
 // network APIs. No Redis, account, production request or persistent test data.
 
 import { chromium } from 'playwright';
+import { stableScreenshot } from '../scripts/stable-screenshot.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -110,7 +111,7 @@ let appearanceState = await page.evaluate(() => ({
 }));
 ok('recipient places a visible signature and date on the PDF', appearanceState.fields.length === 2 && appearanceState.fields.some((field) => /Paramant signed/i.test(field.text)) && appearanceState.fields.some((field) => /2026|2027/i.test(field.text)), JSON.stringify(appearanceState));
 ok('placement draft stores coordinates only for refresh recovery', /"type":"seal"/.test(appearanceState.draft) && !/example\.com|agreement/i.test(appearanceState.draft), appearanceState.draft);
-if (process.env.PARAMANT_COSIGN_SCREENSHOT_PATH) await page.screenshot({ path:process.env.PARAMANT_COSIGN_SCREENSHOT_PATH, fullPage:true });
+if (process.env.PARAMANT_COSIGN_SCREENSHOT_PATH) await stableScreenshot(page, { path:process.env.PARAMANT_COSIGN_SCREENSHOT_PATH, fullPage:true });
 const renderedPdf = await page.evaluate(async () => {
   const raw = Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.getItem(sessionStorage.key(i))).find((value) => value && value.includes('"fields"'));
   // Read the url off the page: a repeated ?v= here becomes a second module

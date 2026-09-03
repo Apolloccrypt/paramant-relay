@@ -1,6 +1,7 @@
 // Real Chromium coverage for the ParaSign-only developer dashboard.
 
 import { chromium } from 'playwright';
+import { stableScreenshot } from '../scripts/stable-screenshot.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -58,7 +59,7 @@ ok('dashboard does not request the obsolete tool catalogue', toolsRequests === 0
 ok('signing usage ignores transfer usage', await page.locator('#sign-used').innerText() === '18' && !/400/.test(await page.locator('[aria-labelledby="usage-title"]').innerText()), await page.locator('[aria-labelledby="usage-title"]').innerText());
 ok('existing ParaSign key is visible', /psk_live_abc/.test(await page.locator('#psk-keys').innerText()), await page.locator('#psk-keys').innerText());
 ok('phone viewport has no horizontal overflow', await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 1, await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
-if (process.env.PARAMANT_SCREENSHOT_PATH) await page.screenshot({ path:process.env.PARAMANT_SCREENSHOT_PATH, fullPage:true });
+if (process.env.PARAMANT_SCREENSHOT_PATH) await stableScreenshot(page, { path:process.env.PARAMANT_SCREENSHOT_PATH, fullPage:true });
 
 await page.locator('#psk-new').click();
 await page.locator('#psk-label').fill('Invoice integration');

@@ -1,6 +1,6 @@
 // The reference screenshots under docs/ are opt-in, and this is what holds it.
 //
-// tests/app-shots.mjs used to write 36 PNGs straight into
+// scripts/app-shots.mjs used to write 36 PNGs straight into
 // docs/brand/assets/app-2026/ on every run. Those files are tracked, so any
 // local run of the browser suites left 36 modified files behind and the next
 // `git commit -a` shipped them. Two builders hit that in the same week. Nothing
@@ -14,7 +14,7 @@
 //      tracked directory; and an explicit APP_SHOTS_DIR aimed back into docs/
 //      is refused without the flag, so the opt-in is not one variable away
 //      from meaning nothing.
-//   2. DRY RUN: the real tests/app-shots.mjs, spawned with a scrubbed
+//   2. DRY RUN: the real scripts/app-shots.mjs, spawned with a scrubbed
 //      environment, has to name a directory outside this repo, and the tracked
 //      directory must be byte-identical afterwards. This measures the file
 //      that does the writing, not a second copy of its rules.
@@ -36,7 +36,7 @@ import {
 
 // Built from parts so the static scan below does not match its own pattern.
 const TRACKED_REL = ['docs', 'brand', 'assets'].join('/');
-const SHOTS_SUITE = path.join(REPO_ROOT, 'tests', 'app-shots.mjs');
+const SHOTS_SUITE = path.join(REPO_ROOT, 'scripts', 'app-shots.mjs');
 
 function under(parent, child) {
   const rel = path.relative(parent, child);
@@ -131,9 +131,9 @@ test('a dry run of the real suite names a directory outside the repo and writes 
   const target = line.slice('out-dir: '.length).trim();
 
   assert.ok(!under(REPO_ROOT, target),
-    `tests/app-shots.mjs would write into the repo without ${FLAG}: ${target}`);
+    `scripts/app-shots.mjs would write into the repo without ${FLAG}: ${target}`);
   assert.ok(!isUnderDocs(target),
-    `tests/app-shots.mjs would write under docs/ without ${FLAG}: ${target}`);
+    `scripts/app-shots.mjs would write under docs/ without ${FLAG}: ${target}`);
   assert.match(out, /opt-in: no/);
   assert.equal(snapshot(TRACKED_DIR), before, 'a dry run must leave the tracked references untouched');
 });
@@ -179,5 +179,5 @@ test('nothing else names the tracked screenshot directory without going through 
   assert.deepEqual(offenders, [],
     `these name ${TRACKED_REL}/ but neither import the resolver nor mention ${FLAG}. ` +
     'The reference images are tracked: write to a temp directory by default and ' +
-    'let the flag opt in, the way tests/app-shots.mjs does.');
+    'let the flag opt in, the way scripts/app-shots.mjs does.');
 });

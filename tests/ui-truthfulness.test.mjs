@@ -516,12 +516,13 @@ assert.ok(aboutText.includes(`Mick Beer, ${SANCTIONED_TITLE}`),
 // Direction two: the qualifier that follows his name must use only words
 // /about itself uses, so no new credential can be smuggled in beside it.
 const ABOUT_WORDS = new Set(aboutText.toLowerCase().match(/[a-z]+/g) || []);
-// Pages that SELL on the founder. On these the line is required, not optional:
-// an if-includes gate lets the sentence be deleted and stays green, and the
-// give-back promise is the one thing the signed-in pages are there to make.
-const FOUNDER_REQUIRED = ['index', 'dashboard', 'account'];
+// Mick, 4 September: one note is enough. The name and the title left every page
+// but /about; on the homepage exactly one place keeps them, the signature under
+// the letter, which is checked as a block further down. So index is the only
+// page still required to name him, and no other page may be forced to.
+const FOUNDER_REQUIRED = ['index'];
 // Pages that MAY name him. If they do, the same rules apply.
-const FOUNDER_OPTIONAL = ['pricing', 'parasign'];
+const FOUNDER_OPTIONAL = ['pricing', 'parasign', 'dashboard', 'account'];
 for (const slug of [...FOUNDER_REQUIRED, ...FOUNDER_OPTIONAL]) {
   const text = flatten(read(`frontend/${slug}.html`));
   if (FOUNDER_REQUIRED.includes(slug)) {
@@ -666,11 +667,13 @@ assert.match(pricingVisible, /The architecture is built to support your NIS2 and
   'pricing.html must say what the architecture does and what Paramant does not hold');
 
 // Who is behind it, on the page where a buyer decides to upload client files.
-// The name stood at 1128px, a screen and a half down; pricing-fold.test.mjs
-// measures where it lands now, this pins that it is there at all and that it
-// carries the accountable registration beside it.
-assert.match(pricingVisible, /Mick Beer<\/strong>, privacy and security researcher, founder of\s+Paramantis Solutions B\.V\. \(KvK 42115132\)/,
-  'pricing.html must name the founder with the title /about gives him and the company registration');
+// Mick, 4 September: the name and the title left this page. What has to stay is
+// the party that is accountable, with the registration beside it;
+// pricing-fold.test.mjs measures where that lands on a phone.
+assert.match(pricingVisible, /Built in Harderwijk by <strong[^>]*>Paramantis Solutions B\.V\.<\/strong> \(KvK 42115132\)/,
+  'pricing.html must name the company that is accountable, with its registration');
+assert.doesNotMatch(pricingVisible, /Mick Beer/,
+  'pricing.html must not name the founder in its body copy; /about and the homepage letter carry that');
 
 // The free cards send a visitor to /signup. They used to send them to
 // /dashboard, a page nobody without an account can open.
@@ -947,9 +950,15 @@ assert.doesNotMatch(signVisibleText, /\bFree accounts\b|tier named Free|the tier
 
 // The founder, with the exact title and nothing added to it. No award, no year
 // count, no prior employer, no certification: none of that is on the site.
+// Mick, 4 September: one note is enough, so /about is the only page that still
+// carries the line. The product pages name the company instead.
 const FOUNDER = 'Mick Beer, privacy and security researcher';
-for (const [name, text] of [['about', aboutVisible], ['parasign', parasign], ['parasend', parasend]]) {
-  assert.ok(text.includes(FOUNDER), `${name}.html must name the founder with his exact title`);
+assert.ok(aboutVisible.includes(FOUNDER), 'about.html must name the founder with his exact title');
+for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
+  assert.ok(!text.includes('Mick Beer'),
+    `${name}.html must not name the founder in its body copy; /about carries that line`);
+  assert.ok(text.includes('Paramantis Solutions B.V.'),
+    `${name}.html must still name the company that is accountable`);
 }
 
 // Sentence three of the founder paragraph. It was the one claim on these pages
@@ -957,7 +966,10 @@ for (const [name, text] of [['about', aboutVisible], ['parasign', parasign], ['p
 // than composed, and it is pinned to both ends of the quote.
 const GIVE_BACK = 'The Community plan is his way of giving something back to society; the business plans pay for it.';
 assert.ok(aboutVisible.includes(GIVE_BACK), 'about.html lost the give-back sentence the product pages quote');
-assert.ok(parasend.includes(GIVE_BACK), 'parasend.html must quote the give-back sentence as /about states it');
+// Mick, 4 September: parasend states the same promise without the person, since
+// "his" has nothing to point at once the name is gone.
+assert.ok(parasend.includes('The Community plan is free and stays free; the business plans pay for the servers and keep it that way.'),
+  'parasend.html must keep the promise that the free plan stays free and say what pays for it');
 
 // The limits, stated in the same voice as the promises. Both already shipped
 // before the product pages existed and neither may be softened or moved into
@@ -1226,7 +1238,9 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
     'security.html must offer a next step in the first screen, not only at the foot of the page');
   assert.match(securityHero, /href="\/verify" class="btn btn-secondary"/,
     'security.html must offer the verify step in the first screen');
-  assert.match(securityHero, /Paramantis Solutions B\.V\. in Harderwijk, the Netherlands, KvK 42115132, founded by Mick Beer, privacy and security researcher/,
+  // Mick, 4 September: the founder line left this page. Who is accountable is
+  // the company, where it sits and its registration, and that has to stay.
+  assert.match(securityHero, /Paramantis Solutions B\.V\. in Harderwijk, the Netherlands, KvK 42115132/,
     'security.html says "why you can trust us", so it must name who that is, under the lede');
 
   // The hero promise is bounded where the code is bounded. It used to read "Even

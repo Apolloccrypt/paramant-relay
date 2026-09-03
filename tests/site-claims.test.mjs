@@ -1640,6 +1640,14 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
   assert.ok(termsPage.includes('Automatic renewal is not switched on'),
     'terms: the payment paragraph must say renewal is not automatic while the recurring layer is off');
 
+  // /pricing is where the money is asked for, so the same stance has to stand
+  // next to the prices, not only in the legal pages a buyer never opens.
+  const pricingPage = visible(page('pricing'));
+  assert.ok(pricingPage.includes('Every payment is a one-off for the term you buy'),
+    'pricing: the payment block next to the prices must describe one-off payments, the stance mollie.js takes');
+  assert.ok(pricingPage.includes('Automatic renewal is not switched on'),
+    'pricing: the payment block must say renewal is not automatic while the recurring layer is off');
+
   const stale = [];
   for (const slug of publicPages()) {
     const text = visible(page(slug));
