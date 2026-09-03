@@ -508,7 +508,7 @@ niet met een media query.
     query of een attribuut dat niemand kan zetten is geen functie maar 31 KB.
     Dat is #380, en het is de duurste les van deze reeks.
 11. **Geen verzonnen data in een screenshot dat als bewijs dient.** De
-    documentrijen in de app-screenshots zijn stubdata uit `tests/app-shots.mjs`
+    documentrijen in de app-screenshots zijn stubdata uit `scripts/app-shots.mjs`
     en mogen nooit als bewijs van werking gelden.
 
 ---
@@ -544,7 +544,7 @@ BRAND_SHOTS_DRY_RUN=1 node scripts/brand-shots-direction.mjs         zeg alleen 
 ```
 
 De app-schermen hebben hun eigen 36 referentiebeelden in
-`docs/brand/assets/app-2026/`, geschoten door `tests/app-shots.mjs` onder
+`docs/brand/assets/app-2026/`, geschoten door `scripts/app-shots.mjs` onder
 dezelfde vlag.
 
 ### 7.2 Wat gemeten is, en waar
