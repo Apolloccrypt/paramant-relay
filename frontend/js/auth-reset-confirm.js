@@ -5,7 +5,7 @@
 
   if (!token || token === 'reset-confirm') {
     document.getElementById('initial-view').innerHTML =
-      '<p class="form-subtitle" style="color:#dc2626">This link is incomplete, so we cannot tell which account it belongs to. Mail clients sometimes break a long link across two lines.</p>' +
+      '<p class="form-subtitle is-bad">This link is incomplete, so we cannot tell which account it belongs to. Mail clients sometimes break a long link across two lines.</p>' +
       '<p class="footer-text mt-4"><a href="/auth/request-reset">Request a reset link</a></p>';
     return;
   }
