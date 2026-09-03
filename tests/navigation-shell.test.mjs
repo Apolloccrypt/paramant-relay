@@ -53,7 +53,8 @@ const publicMobilePaint = await publicPage.locator('nav.nav').evaluate((node) =>
   backdropFilter: getComputedStyle(node).backdropFilter,
   webkitBackdropFilter: getComputedStyle(node).getPropertyValue('-webkit-backdrop-filter'),
 }));
-ok('mobile navigation is opaque before opening the menu', publicMobilePaint.background === 'rgb(248, 250, 252)' && publicMobilePaint.backdropFilter === 'none' && (!publicMobilePaint.webkitBackdropFilter || publicMobilePaint.webkitBackdropFilter === 'none'), JSON.stringify(publicMobilePaint));
+// Pinned to the bone hex until 4 September 2026; the homepage now paints the bar in the night colour, so the pin is what it always guarded: fully opaque, no blur.
+ok('mobile navigation is opaque before opening the menu', /^rgb\(/.test(publicMobilePaint.background) && publicMobilePaint.backdropFilter === 'none' && (!publicMobilePaint.webkitBackdropFilter || publicMobilePaint.webkitBackdropFilter === 'none'), JSON.stringify(publicMobilePaint));
 await publicPage.locator('#nav-hamburger').click();
 await publicPage.waitForFunction(() => {
   const nav = document.querySelector('nav.nav')?.getBoundingClientRect();
@@ -255,9 +256,9 @@ const homeSections = await homePage.evaluate(() => {
   };
 });
 ok('the signed-in homepage stops after the hero', homeSections.total > 1 && JSON.stringify(homeSections.visible) === JSON.stringify(['home-hero']), JSON.stringify(homeSections));
-// The founder line stays: it is the one thing on this page that says who is
-// accountable, and tests/ui-truthfulness pins its wording.
-ok('the signed-in hero keeps the name behind the product', (await homePage.locator('[data-home="in"]').innerText()).includes('Mick Beer'), await homePage.locator('[data-home="in"]').innerText());
+// Mick, 4 September: one note is enough. The founder line left both hero states,
+// so what the signed-in hero has to carry is the workspace a customer came for.
+ok('the signed-in hero opens on the documents', (await homePage.locator('[data-home="in"]').innerText()).includes('Your documents'), await homePage.locator('[data-home="in"]').innerText());
 if (process.env.PARAMANT_HOME_SCREENSHOT_PATH) await stableScreenshot(homePage, { path:process.env.PARAMANT_HOME_SCREENSHOT_PATH });
 await homePage.close();
 
