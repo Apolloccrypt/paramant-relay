@@ -47,6 +47,10 @@ const FAKE_KEY = 'pgp_livetestkey0000000000abcd';
 // ── A DOM small enough to read, big enough to run the page script ────────────
 function makeElement(id) {
   const classes = new Set();
+  // Attributes are read back now: step 2 marks its session card aria-disabled
+  // when the relay connection is gone, and a stub that swallowed setAttribute
+  // and answered null could not tell that apart from doing nothing.
+  const attributes = new Map();
   const el = {
     id, value: '', textContent: '', innerHTML: '', className: '',
     hidden: false, disabled: false, files: [], style: {},
@@ -56,7 +60,9 @@ function makeElement(id) {
       toggle: (c, on) => (on === undefined ? (classes.has(c) ? classes.delete(c) : classes.add(c)) : (on ? classes.add(c) : classes.delete(c))),
       contains: (c) => classes.has(c),
     },
-    focus() {}, blur() {}, setAttribute() {}, getAttribute: () => null,
+    focus() {}, blur() {},
+    setAttribute: (name, value) => { attributes.set(name, String(value)); },
+    getAttribute: (name) => (attributes.has(name) ? attributes.get(name) : null),
     addEventListener() {}, appendChild() {}, closest: () => null,
   };
   return el;
@@ -71,7 +77,7 @@ function runPage({ keyResponses, sectorOk = true }) {
   };
   const listeners = new Map();
   const sockets = [];
-  const calls = { key: 0, sector: 0, urls: [], timeouts: [], storage: [] };
+  const calls = { key: 0, sector: 0, urls: [], timeouts: [], storage: [], copied: [] };
   let keyTurn = 0;
 
   const respond = (spec) => ({
@@ -88,7 +94,7 @@ function runPage({ keyResponses, sectorOk = true }) {
     URLSearchParams,
     AbortSignal: { timeout: () => null },
     crypto: globalThis.crypto,
-    navigator: { clipboard: { writeText: async () => {} } },
+    navigator: { clipboard: { writeText: async (text) => { calls.copied.push(text); } } },
     location: { search: '', hash: '', origin: 'https://paramant.app', pathname: '/parashare', reload() {} },
     localStorage: {
       getItem: (k) => { calls.storage.push(['get', k]); return null; },
@@ -160,6 +166,12 @@ function pickAFile(run) {
 }
 
 const wroteTheKey = (run) => run.calls.storage.some(([op, k]) => op === 'set' && k === 'paramant_api_key');
+
+// Press Copy link the way the page does, and let the clipboard promise settle.
+async function copyLinkIn(run) {
+  await evalIn(run, 'copyLink()');
+  for (let i = 0; i < 5; i += 1) await new Promise((r) => setImmediate(r));
+}
 
 // ── 1. The endpoint answers ─────────────────────────────────────────────────
 test('a 200 from /api/user/account/key gives the slim row, a usable button, and nothing in localStorage', async () => {
@@ -335,9 +347,26 @@ test('an empty manual key field is asked to be filled in, not called invalid', a
 // the page wrote the single word "Disconnected" into a status line, which
 // answers none of the three questions a sender has: what happened, where is my
 // file, and what do I do now. Same treatment as the key banner.
+//
+// And the alarm is not the whole screen. A live review found the card still
+// under it: green beacon, "Waiting for receiver...", the dead link, the blue
+// Copy link. The page said the session was gone and offered to share it in the
+// same sentence. The card is switched off with the alarm now, and this measures
+// that as well as the words.
+//
 // Verified by sabotage: put the bare setStatus back, or drop the reopen action,
-// and this goes red.
+// and this goes red; drop the setSessionCardStale call out of setLinkError, or
+// leave the copy button enabled, and the card half goes red by name.
 test('a relay connection that drops before the receiver arrives says so, and offers a way back', async () => {
+  // The grey itself is CSS, so the class the script toggles has to have a rule
+  // behind it or the card would be marked stale and look exactly as live.
+  assert.match(PS_HTML, /<div class="card" id="ps-session-card">/,
+    'the step 2 session card must be findable by id, or nothing can switch it off');
+  assert.match(PS_HTML, /\.card\.is-stale\{opacity:[^;]+;pointer-events:none\}/,
+    '.is-stale must both grey the card and stop it taking taps');
+  assert.match(PS_HTML, /#ps-session-card\.is-stale #waiting-dot\{background:var\(--ink-3\);animation:none\}/,
+    'the beacon has an id rule of its own, so stopping it needs an id rule too');
+
   const run = await loadPage({ keyResponses: [{ status: 200, body: { api_key: FAKE_KEY, revealable: true } }] });
   pickAFile(run);
   await evalIn(run, 'createSession()');
@@ -356,6 +385,22 @@ test('a relay connection that drops before the receiver arrives says so, and off
   assert.match(said, /dropped before your receiver arrived/, 'it says what happened');
   assert.match(said, /Nothing was uploaded/, 'it says the file did not go anywhere');
   assert.match(said, /still here in this browser/, 'it says where the file is');
+  assert.ok(!/to the relay/.test(said), 'and it says it without naming the plumbing: the sender lost a connection, not a relay');
+
+  // The card under the alarm. It kept a beating beacon, "Waiting for
+  // receiver...", the dead link and a blue Copy link, so the screen said the
+  // session was gone and offered to share it in the same breath. Copying that
+  // link sends the receiver to a session that no longer exists.
+  const card = run.getElementById('ps-session-card');
+  assert.equal(card.classList.contains('is-stale'), true,
+    'the session card must grey out with the alarm; the stylesheet keys the grey and the dead beacon off .is-stale');
+  assert.equal(card.getAttribute('aria-disabled'), 'true',
+    'a reader who cannot see the grey has to be told the card is off');
+  assert.equal(run.getElementById('ps-copy-btn').disabled, true, 'the copy button is really disabled, not only dimmed');
+  assert.equal(run.getElementById('session-link').getAttribute('aria-disabled'), 'true',
+    'the link box is a click target of its own, so it is marked off as well');
+  await copyLinkIn(run);
+  assert.deepEqual(run.calls.copied, [], 'and pressing copy on a dead session puts nothing on the clipboard');
 
   // The way back: a fresh session, a new link, and the alarm cleared.
   await evalIn(run, 'reopenSession()');
@@ -364,6 +409,12 @@ test('a relay connection that drops before the receiver arrives says so, and off
   assert.notEqual(run.getElementById('session-link').textContent, firstLink,
     'and a new one-time link: the old token died with the old socket');
   assert.equal(box.classList.contains('is-shown'), false, 'the alarm clears once the session is back');
+  assert.equal(card.classList.contains('is-stale'), false, 'and the card comes back to life with it');
+  assert.equal(card.getAttribute('aria-disabled'), 'false');
+  assert.equal(run.getElementById('ps-copy-btn').disabled, false, 'the new link is copyable');
+  await copyLinkIn(run);
+  assert.deepEqual(run.calls.copied, [run.getElementById('session-link').textContent],
+    'and copy hands over the new link, not the dead one');
 
   // A socket that closes after the receiver is already known is the normal end
   // of the handshake, not a failure.
