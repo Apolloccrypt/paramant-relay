@@ -59,6 +59,11 @@ body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]
 .ds-doc-meta-label{flex:0 0 auto;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
 .ds-doc-meta-name{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-1);font-weight:600}
 .ds-doc-meta-size{flex:0 0 auto;color:var(--ink-3)}
+/* Two steps name the file themselves: the hash-only card and the finished
+   screen, where the name is the SIGNED one and repeating the source above it
+   would say two different things at once. */
+body[data-ds-step="step-hash-only"] #ds-doc-meta,
+body[data-ds-step="step-done"] #ds-doc-meta{display:none}
 .ds-stepper{list-style:none;display:flex;gap:8px;padding:0;margin:0 0 32px;border-bottom:1px solid var(--line);counter-reset:dsstep}
 .ds-stepper li{flex:1;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);padding:14px 0;border-bottom:2px solid transparent;counter-increment:dsstep;text-align:center}
 .ds-stepper li::before{content:counter(dsstep);display:inline-block;width:20px;height:20px;border:1px solid var(--line-2);border-radius:50%;line-height:18px;font-size:10px;margin-right:6px;font-weight:600}
@@ -488,6 +493,14 @@ body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]
     <li data-step="sign">Sign</li>
   </ol>
 
+  <!-- The document under the whole flow, named once and shown on every step
+       after it is picked. It used to live inside the Place step, which the
+       request-signatures flow never visits: that flow went straight from the
+       file picker to the co-signers, so the file was named nowhere and the
+       last thing before "Send for signature" was a screen that did not say
+       what was being sent. -->
+  <p class="ds-doc-meta" id="ds-doc-meta" hidden><span class="ds-doc-meta-label">File</span><span class="ds-doc-meta-name" id="ds-doc-meta-name"></span><span class="ds-doc-meta-size" id="ds-doc-meta-size"></span></p>
+
   <!-- No session: say what this needs BEFORE a document is picked.
        The page used to be behind an nginx auth_request, so a visitor never got
        here at all; he got /auth/login and, measurably, stopped. Serving the page
@@ -562,7 +575,6 @@ body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]
   <section class="ds-step" id="step-place" hidden>
     <h2>Place your signature</h2>
     <p class="ds-sub">Click anywhere on a page to drop the stamp. Click another spot to move it. <span id="ds-place-page-count" style="font-family:var(--mono);font-size:11px;color:var(--ink-dim)"></span></p>
-    <p class="ds-doc-meta" id="ds-doc-meta" hidden><span class="ds-doc-meta-label">File</span><span class="ds-doc-meta-name" id="ds-doc-meta-name"></span><span class="ds-doc-meta-size" id="ds-doc-meta-size"></span></p>
     <p class="ds-hint" id="ds-place-hint">Click a page to drop the signature stamp.</p>
     <div class="ds-zoom" id="ds-zoom" hidden>
       <button id="ds-zoom-out" type="button" aria-label="Zoom out">&minus;</button>

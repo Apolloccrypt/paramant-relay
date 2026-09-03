@@ -144,6 +144,9 @@ const taps = await page.evaluate(() => {
     quiet: h('.dh-quiet-links a'),
     help: h('.dh-ask-foot a'),
     footer: h('footer .footer-links a'),
+    // Every link inside an answer, not just the first: "See the plans" sat at
+    // the end of its line and measured 19px while its neighbours measured 41.
+    faq: Math.min(...[...document.querySelectorAll('.dh-ask-list a')].map((el) => Math.round(el.getBoundingClientRect().height))),
   };
 });
 ok('every control on the phone screen is at least a 44px tap target',

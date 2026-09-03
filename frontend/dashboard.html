@@ -129,7 +129,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-document-name span { display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-3); }
 /* The reference is a whole value or an honestly shortened one. Cut without a
    sign that it was cut, "env_waiting_..." read as the complete id. */
-.dh-doc-ref { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.dh-document-name .dh-doc-ref { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .dh-document-progress { min-width: 0; }
 /* Never a bar without the number next to it. */
 .dh-document-progress span { display: block; margin-bottom: 7px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-2); }
@@ -339,7 +339,9 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
      390px the filter chips and Refresh were 36px, the four quiet links 36px,
      and the two text links in a running line 19px. */
   .dh-filter, .dh-refresh, .dh-btn, .dh-quiet-links a { min-height: var(--tap); }
-  .dh-ask-foot a, footer .footer-links a { display: inline-flex; align-items: center; min-height: var(--tap); }
+  /* The links inside the answers count too: measured at 390 they were 19px
+     ("See the plans", at the end of its line) and 41px. */
+  .dh-ask-list a, .dh-ask-foot a, footer .footer-links a { display: inline-flex; align-items: center; min-height: var(--tap); }
 }
 
 @media (prefers-reduced-motion: reduce) {
