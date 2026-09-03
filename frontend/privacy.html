@@ -208,7 +208,7 @@ footer a{color:var(--ink);text-decoration:none}
 
 <h2>Core principle</h2>
 <p><strong>PARAMANT collects only what is strictly required to operate your account and run the service.</strong></p>
-<p>An email address is required to create an account and recover access; it is personal data, and it is stored. No phone number. We do not log IP addresses for analytics or profiling. An IP is processed for security and abuse-prevention only (rate limiting, the session record, an audit log, and the DPA signature record), and one log holds an address for longer than a timer; it is named below. Only a strictly-necessary session cookie (no tracking cookies). No tracking pixels. No analytics. No advertisements. We never sell your data.</p>
+<p>An email address is required to create an account and recover access; it is personal data, and it is stored. No phone number. We do not log IP addresses for analytics or profiling. An IP is processed for security and abuse-prevention only (rate limiting, the session record, an audit log, and the DPA signature record), the audit trail keeps a masked address for up to 400 days, and one log holds a full address for longer than any timer; both are named below. Only a strictly-necessary session cookie (no tracking cookies). No tracking pixels. No analytics. No advertisements. We never sell your data.</p>
 
 <h2>How Ghost Pipe &amp; ParaShare (the ParaSend web app) work</h2>
 <p>All files are encrypted <strong>client-side in your browser</strong> using post-quantum cryptography (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256) before they ever reach our servers. The relay never sees plaintext at any point.</p>
@@ -237,14 +237,15 @@ footer a{color:var(--ink);text-decoration:none}
 <tr><td>Sign-in factors: passkey public keys, TOTP secret (encrypted), recovery codes (hashed)</td><td>Account authentication</td><td>Stored (server)</td><td>Never</td></tr>
 <tr><td>ParaSign signing public key + fingerprint</td><td>Verifiable signing identity</td><td>Stored (server) &middot; public half only; the private key never leaves your browser</td><td>Public (its hash is in the CT log)</td></tr>
 <tr><td>Plan + anonymised billing reference</td><td>Pro/Enterprise billing</td><td>Stored (server)</td><td>Payment processor (Mollie, EU)</td></tr>
-<tr><td>Client IP + user-agent</td><td>Security, rate limiting, audit log</td><td>Session/rate-limit TTL; the audit log and the edge access log named below are capped by volume, not by time</td><td>Never</td></tr>
+<tr><td>Client IP + user-agent</td><td>Security, rate limiting</td><td>Session/rate-limit TTL</td><td>Never</td></tr>
+<tr><td>Masked IP in the audit log (1.2.x.x)</td><td>Account audit trail</td><td>Redis &middot; at most 400 days, and at most 1000 entries per account</td><td>Never</td></tr>
 </tbody>
 </table>
 
 <h2>What we never do</h2>
 <ul>
 <li>Sell your data, or use it for advertising or profiling</li>
-<li>Log or store IP addresses for analytics or profiling (an IP is used for security and abuse-prevention only, in the log named below)</li>
+<li>Log or store IP addresses for analytics or profiling (an IP is used for security and abuse-prevention only, in the logs named below)</li>
 <li>Use tracking cookies or browser fingerprinting (only a strictly-necessary session cookie is set after login)</li>
 <li>Run advertising or tracking scripts</li>
 <li>Share your data with third parties, except the operational subprocessors needed to run the service (hosting, transactional email, and payments, listed below)</li>
@@ -282,9 +283,10 @@ footer a{color:var(--ink);text-decoration:none}
 <p>One log holds a full client address, and it is not bounded by a timer. We name it rather than let the word &ldquo;transient&rdquo; do work it cannot do.</p>
 <ul>
 <li><strong>Edge access log.</strong> Our own edge writes a server access log with the client address, the timestamp, the path and the user agent. We read it to tell real visitors apart from scanners, never to build a profile of a person, and it is not exported to anyone. The nginx configuration in this repository logs nothing; the edge in front of it does.</li>
+<li><strong>Account audit log.</strong> Every audit entry keeps the network part of the address and drops the host part, so a full address is never written: 1.2.x.x for IPv4 and the first two groups for IPv6. Entries are bounded twice, by age and by count: nothing older than 400 days survives, and an account keeps at most its last 1000 entries. The 400 days is a default an operator can change.</li>
 <li><strong>Admin service log, for contrast.</strong> Three operational lines write about a signup attempt, a pending signup and a rate-limited request to reset a second factor. They used to carry the full address, and one of them the account email in plain text. They no longer do: an address is truncated to its network before it is written (203.0.113.x for IPv4, the first three groups for IPv6) and an email keeps one character and its domain (d***@example.com). What lands in the container log is what is left after that.</li>
 </ul>
-<p>Neither log is used for analytics, profiling or advertising, and neither is shared with a third party.</p>
+<p>None of these is used for analytics, profiling or advertising, and none is shared with a third party.</p>
 
 <h2>Subprocessors</h2>
 <p>A few operational providers are needed to run the service. None is loaded into the site, and none is used for tracking:</p>

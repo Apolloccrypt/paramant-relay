@@ -1251,6 +1251,7 @@ test('the BUSL conversion the site publishes is the one LICENSE grants', () => {
     assert.ok(end > start, `${where}: the Additional Use Grant must sit above the Terms section`);
     return src.slice(start, end).replace(/\s+/g, ' ').trim();
   };
+  const flat = (src) => src.replace(/\s+/g, ' ').trim();
   const boxMatch = /<div class="license-box">([\s\S]*?)<\/div>/.exec(licPage);
   assert.ok(boxMatch, 'license: the full licence text box must still be on the page');
   const copies = [['deploy/LICENSE', read('deploy/LICENSE')], ['license (box)', boxMatch[1]]];
@@ -1261,6 +1262,14 @@ test('the BUSL conversion the site publishes is the one LICENSE grants', () => {
     }
     assert.equal(grantOf(src, where), grantOf(lic, 'LICENSE'),
       `${where}: the Additional Use Grant is not word for word the one LICENSE gives`);
+    // The whole file, not only the fields. The field pins above let a copy drop
+    // a shared paragraph and stay green: the box was missing the MariaDB
+    // trademark clause and the Covenants section, and carrying a line
+    // ("(c) 2026 ... All Rights Reserved.") that LICENSE does not have, while
+    // the page called it reproduced word for word. Whitespace is normalised, so
+    // the box may keep its own column alignment and nothing else.
+    assert.equal(flat(src), flat(lic),
+      `${where}: is not the LICENSE file. Something was added, dropped or reworded; the page calls this a verbatim copy, so copy the file in whole`);
   }
   // The grant permits commercial production use inside the limits, so no page
   // may sell the licence as non-commercial only.
@@ -1304,6 +1313,42 @@ test('the reads a link allows on /privacy are the ones tiers.js grants', () => {
     'privacy: the reads a paid link allows must be the max_views in tiers.js');
   assert.doesNotMatch(priv, /relay server and is permanently and irreversibly destroyed after the first download/,
     'privacy: must not state burn-on-read as a property of every plan');
+
+  // The other half of the same untruth. Fifteen pages still call burn-on-read
+  // universal, and that sweep is a batch of its own; but /press went further and
+  // denied the timer outright ("destroyed on download, not on a timer") while
+  // tiers.js gives every plan a view_ttl_ms. Saying a thing exists where it does
+  // not is a different mistake from denying a thing that does, and the denial is
+  // the one that can be pinned in one line here.
+  const ttls = [...tiers.matchAll(/view_ttl_ms:\s*([\d_]+)/g)].map((m) => Number(m[1].replace(/_/g, '')));
+  assert.ok(ttls.length >= 4 && ttls.every((t) => t > 0),
+    'every tier in tiers.js must still carry a positive view_ttl_ms; if a plan lost its timer, /press may say so');
+  const denials = [];
+  for (const slug of publicPages()) {
+    const m = /not on a timer|destroyed on download, not on a timer/.exec(visible(page(slug)));
+    if (m) denials.push(`${slug}: says "${m[0]}", and tiers.js gives every plan a view_ttl_ms`);
+  }
+  assert.deepEqual(denials, [], `\n  ${denials.join('\n  ')}\n`);
+  // And the ceilings it does name are read off tiers.js, so a changed TTL moves
+  // /press too instead of leaving it quietly stale.
+  const ttlOf = (t) => Number(/view_ttl_ms:\s*([\d_]+)/.exec(tiers.slice(tiers.indexOf(`${t}:`)))[1].replace(/_/g, ''));
+  const hours = (t) => ttlOf(t) / 3_600_000;
+  // Spelled out, the way /press and /terms write these. The shared word() helper
+  // stops at twenty and then jumps to the tens, so twenty-four is not in it;
+  // block 5 keeps its own small map for the same reason.
+  const SPAN_WORD = { 1: 'one', 7: 'seven', 24: 'twenty-four' };
+  const span = (t) => {
+    const h = hours(t);
+    const [n, unit] = h <= 24 ? [h, 'hour'] : [h / 24, 'day'];
+    assert.ok(SPAN_WORD[n], `tiers.js now sets a ${t} ceiling of ${h} hours, which this block cannot spell; add it to SPAN_WORD and to /press`);
+    return `${SPAN_WORD[n]} ${unit}${n === 1 ? '' : 's'}`;
+  };
+  const sentence = `${span('community')} on Community, ${span('pro')} on Pro, ${span('business')} on Business and Enterprise`;
+  assert.equal(ttlOf('business'), ttlOf('enterprise'),
+    'business and enterprise no longer share a ceiling; the /press sentence names them together');
+  const press = visible(page('press'));
+  assert.ok(press.includes(sentence),
+    `press: the expiry bullet must say "${sentence}", the ceilings tiers.js sets, instead of denying the timer`);
 });
 
 // 25 ── The sub-processor lists. /dpa is signed by customers and named two
@@ -1689,14 +1734,14 @@ test('every page that says the signature is not eIDAS-qualified names the level 
 // Verified by sabotage in both directions: deleting the section on /privacy,
 // putting "only transiently" back, and taking the access-log reader out of
 // scripts/ each turn this red.
-test('the access log that holds a client address is the one /privacy names', () => {
+test('the logs that hold an address are the ones /privacy names, with the bounds the code applies', () => {
   const reader = read('scripts/access-log-visitors.mjs');
   assert.match(reader, /access\.log/, 'scripts/access-log-visitors.mjs must still be the tool that reads the edge access log');
   assert.match(reader, /remote_addr|\bip\b/i, 'the reader must still work on client addresses; if it stopped, say so on /privacy');
 
   const priv = visible(page('privacy'));
   assert.ok(priv.includes('<h2>Logs that hold an address</h2>'),
-    'privacy: the section naming the log must still be on the page');
+    'privacy: the section naming the logs must still be on the page');
   assert.ok(priv.includes('Our own edge writes a server access log with the client address'),
     'privacy: the edge access log must be described, because a script in this repository reads it');
   assert.ok(priv.includes('The nginx configuration in this repository logs nothing; the edge in front of it does'),
@@ -1714,4 +1759,94 @@ test('the access log that holds a client address is the one /privacy names', () 
     'privacy: the admin log entry must describe the masking admin/lib/log-redact.js applies');
   assert.doesNotMatch(priv, /Three operational lines write the client IP/,
     'privacy: the admin lines no longer write a client IP; #374 masked them at the call site');
+
+  // The audit trail. The row this block first wrote said the audit log was
+  // "capped by volume, not by time", and both halves of that were wrong:
+  // admin/lib/audit.js trims by score as well as by rank, so there is an age
+  // bound, and what it stores is not a client IP but its network part. A page
+  // that understates a retention is not being careful, it is being wrong in the
+  // direction that flatters us.
+  const audit = stripJsComments(read('admin/lib/audit.js'));
+  const days = /AUDIT_RETENTION_DAYS\s*\|\|\s*'(\d+)'/.exec(audit);
+  assert.ok(days, 'admin/lib/audit.js must still declare a default retention in days');
+  const maxEntries = /MAX_ENTRIES\s*=\s*(\d+)/.exec(audit);
+  assert.ok(maxEntries, 'admin/lib/audit.js must still declare a per-account entry ceiling');
+  assert.match(audit, /zRemRangeByScore\(userKey, 0, cutoff\)/,
+    'admin/lib/audit.js no longer trims the audit trail by age; the 400 day bound on /privacy would be a promise nothing keeps');
+  assert.match(audit, /zRemRangeByRank\(userKey, 0, -1001\)/,
+    'admin/lib/audit.js no longer trims the audit trail by count; the per-account ceiling on /privacy would be unbacked');
+  // The mask shape, read off the code rather than restated: p[0].p[1].x.x is a
+  // /16, which is what the page has to show an example of.
+  const v4mask = /return `\$\{p\[0\]\}\.\$\{p\[1\]\}\.x\.x`/.test(audit);
+  assert.ok(v4mask, 'admin/lib/audit.js no longer masks an audit IPv4 to its /16; rewrite the audit rows on /privacy');
+  assert.match(audit, /s\.split\(':'\)\.slice\(0, 2\)\.join\(':'\) \+ '::x'/,
+    'admin/lib/audit.js no longer masks an audit IPv6 to its first two groups; rewrite the audit rows on /privacy');
+
+  assert.ok(priv.includes(`at most ${days[1]} days, and at most ${maxEntries[1]} entries per account`),
+    `privacy: the audit row must state the ${days[1]} day and ${maxEntries[1]} entry bounds admin/lib/audit.js applies`);
+  assert.ok(priv.includes('1.2.x.x'),
+    'privacy: the audit rows must show the masked form, not claim a full client IP is stored');
+  assert.ok(priv.includes(`nothing older than ${days[1]} days survives, and an account keeps at most its last ${maxEntries[1]} entries`),
+    'privacy: the audit entry must say the trail is bounded by age as well as by count');
+  assert.doesNotMatch(priv, /audit log[^<]*capped by volume, not by time/,
+    'privacy: the audit log is bounded by age too; that sentence is false');
+});
+
+// 36 -- The norm mappings. /pricing said "NEN 7510, eIDAS, and IEC 62443
+// mappings ship with Pro and Enterprise", and the round before this one called
+// that unbacked because the only artefact it looked at was an ASVS checklist.
+// Both readings were wrong. Two of the three mappings are written and in the
+// tree: an IEC 62443 requirement table in docs/ot-guide.md and a NEN 7510 table
+// in docs/dicom-guide.md, and both are served under frontend/docs/ where a
+// Community account reads them for nothing. So the false half of the sentence
+// was never "these exist"; it was "ship with Pro and Enterprise", which sells
+// as a paid deliverable something that is public. eIDAS is the one with no
+// mapping document at all, and the page now says so.
+// Verified by sabotage in both directions: deleting either mapping section, or
+// putting a plan back in front of the mappings on any page, turns this red.
+test('the norm mappings the site claims are the ones written in the tree, and no plan gates them', () => {
+  const iec = read('docs/ot-guide.md');
+  assert.match(iec, /^##\s+IEC 62443 compliance mapping\s*$/m,
+    'docs/ot-guide.md no longer carries the IEC 62443 mapping section; /pricing claims it exists');
+  assert.match(iec, /\|\s*IEC 62443 Requirement\s*\|/,
+    'the IEC 62443 mapping must still be a requirement table, which is what /pricing calls it');
+
+  const nen = read('docs/dicom-guide.md');
+  const nenRows = [...nen.matchAll(/^\|.*NEN 7510.*\|$/gm)];
+  assert.ok(nenRows.length >= 3,
+    `docs/dicom-guide.md carries ${nenRows.length} NEN 7510 table rows; /pricing calls it a mapping table`);
+
+  // Published, not shipped. Both guides are served from frontend/docs/, so the
+  // paid-tier framing was wrong about the delivery as well as the artefact.
+  for (const f of ['ot-guide.md', 'dicom-guide.md']) {
+    assert.ok(fs.existsSync(path.join(ROOT, 'frontend/docs', f)),
+      `frontend/docs/${f} is gone; if a mapping stopped being public, /pricing may not call it free to read`);
+  }
+  assert.match(read('frontend/docs/ot-guide.md'), /^##\s+IEC 62443 compliance mapping\s*$/m,
+    'the served OT guide lost the mapping section the repository copy still has');
+  assert.match(read('frontend/docs/dicom-guide.md'), /NEN 7510/,
+    'the served DICOM guide lost the NEN 7510 mapping the repository copy still has');
+
+  // eIDAS is the one that has no mapping document. If somebody writes one, this
+  // goes red and the sentence on /pricing gets to change with it.
+  const docFiles = fs.readdirSync(path.join(ROOT, 'docs')).filter((f) => f.endsWith('.md') && f !== 'site-claims.md');
+  const eidasMappings = docFiles.filter((f) => /^#{1,3}\s+.*eIDAS.*mapping/im.test(read(`docs/${f}`)));
+  assert.deepEqual(eidasMappings, [],
+    `an eIDAS mapping now exists in ${eidasMappings.join(', ')}; /pricing says there is none`);
+
+  const pricing = visible(page('pricing'));
+  assert.ok(pricing.includes('an IEC 62443 requirement table in the OT guide, and a NEN 7510 table in the DICOM guide'),
+    'pricing: the compliance paragraph must name the two mappings that exist');
+  assert.ok(pricing.includes('There is no eIDAS mapping document.'),
+    'pricing: the one mapping that does not exist must be named as absent');
+
+  const gated = [];
+  for (const slug of publicPages()) {
+    const text = visible(page(slug));
+    for (const re of [/mappings ship with [A-Z]/, /mappings? (?:are )?available (?:on request )?(?:for|to) [A-Z]/, /IEC 62443[^.<]{0,40}\bonly on\b/]) {
+      const m = re.exec(text);
+      if (m) gated.push(`${slug}: says "${m[0]}", and both mappings are public and ungated`);
+    }
+  }
+  assert.deepEqual(gated, [], `\n  ${gated.join('\n  ')}\n`);
 });
