@@ -703,7 +703,9 @@ test('the tier block on /about repeats the numbers /pricing charges for', () => 
     [phrase(sign.Community, /<li>(\d+ signatures? (?:a|per) month)<\/li>/, 'the ParaSign Community signature allowance'), 'ParaSign Community'],
     [phrase(send.Community, /<li>(\d+ hour link expiry)<\/li>/, 'the ParaSend Community link expiry'), 'ParaSend Community'],
     [phrase(send.Pro, /<li>(\d+ hour link expiry)<\/li>/, 'the ParaSend Pro link expiry'), 'ParaSend Pro'],
-    [phrase(send.Pro, /<li>(Up to \d+ reads per link)<\/li>/, 'the ParaSend Pro read limit'), 'ParaSend Pro'],
+    // Captured with the API qualifier, so /about has to repeat that too: the
+    // read count is a benefit of the API route, not of the plan on its own.
+    [phrase(send.Pro, /<li>(Up to \d+ reads per link through the API)<\/li>/, 'the ParaSend Pro read limit'), 'ParaSend Pro'],
     [phrase(send.Pro, /<li>(Up to \d+ registered devices)<\/li>/, 'the ParaSend Pro device limit'), 'ParaSend Pro'],
     [phrase(send.Enterprise, /<li>SLA ([\d.]+%),/, 'the ParaSend Enterprise SLA'), 'ParaSend Enterprise'],
   ];
@@ -1968,6 +1970,17 @@ test('every page that promises burn-on-read says which client and which plan it 
     if (e.isDirectory()) return e.name === 'node_modules' ? [] : jsUnder(`${dir}/${e.name}`);
     return e.isFile() && /\.(js|mjs|ts)$/.test(e.name) ? [`${dir}/${e.name}`] : [];
   });
+  // Why /get, /ontvang and /parashare may still say a link burns after one
+  // download, in the head as well as the body. It is not the web app reason: it
+  // is that the download-token route deletes the blob outright and never looks
+  // at the counter. Only GET /v2/outbound/:hash, the API's own route, spends a
+  // read. So the exemption those three pages get below is not a slug allowlist,
+  // it stands or falls with these two lines.
+  assert.match(relaySrc, /td\.used = true;\s*blobStore\.delete\(blobHash\);/,
+    'the /v2/dl download-token route no longer deletes the blob outright; /get, /ontvang and /parashare call a Paramant link single-use because it does');
+  assert.equal((relaySrc.match(/entry\.views_remaining = \(entry\.views_remaining \?\? 1\) - 1;/g) || []).length, 1,
+    'the read counter is spent in more than one place now; the download-link pages promise single-use because only GET /v2/outbound/:hash spends a read');
+
   const asks = [
     ...['frontend/js/parashare.page.js'].filter((f) => /max_views/.test(stripJsComments(read(f)))),
     ...jsUnder('extensions').filter((f) => /max_views/.test(stripJsComments(read(f)))),
@@ -2010,7 +2023,10 @@ test('every page that promises burn-on-read says which client and which plan it 
   // names ONE read, in either order, plus the handful of phrases that say it
   // without a verb. "after its last read" and "after the last read the link
   // allows" are deliberately not moments: they name no count, which is the
-  // whole point of the site using one formulation for this.
+  // whole point of the site using one formulation for this. The list grows
+  // when a sabotage run gets past it: "gone once it has been downloaded" was
+  // the /parasend meta description, and the first version of MOMENT knew
+  // "once it has been read" and not the three other verbs for the same event.
   const ERASE = 'burn(?:s|ed|ing)?|destroy(?:s|ed|ing)?|wipe(?:s|d)?|erase[sd]?|delete[sd]?|zeroe?[sd]?|remove[sd]?|gone|vanish(?:es)?';
   const MOMENT = [
     'on (?:read|burn|download|opening)',
@@ -2019,7 +2035,7 @@ test('every page that promises burn-on-read says which client and which plan it 
     'after one read',
     'after (?:it is|being|it has been) read',
     'until (?:the|its|a) read\\b',
-    'once (?:it is|it has been) read',
+    'once (?:it is|it has been) (?:read|downloaded|opened|delivered)',
     'opens? (?:it|the link|the file) once',
     'downloads it once',
   ].join('|');
@@ -2068,20 +2084,53 @@ test('every page that promises burn-on-read says which client and which plan it 
   assert.ok(mentioning.size >= 10,
     `only ${mentioning.size} pages still describe how long a transfer lives; the patterns above have stopped matching the site and this block is measuring nothing`);
 
-  // A paid read count on a client page has to say where it comes from. Without
-  // "through the API" the sentence sells the reader something the client he is
-  // reading about will never ask for.
+  // A paid read count sold as a plan benefit has to say where it comes from,
+  // on EVERY page and not only on the client pages. "Up to 10 reads per link"
+  // on a price card is an offer, and a Pro buyer who sends through the web app
+  // or an extension will never see a second read: those clients do not ask for
+  // one. So a benefit line naming reads per link must name the API with it.
   const sold = [];
   for (const slug of everyPage) {
-    if (!CLIENT_ONLY.has(slug)) continue;
-    for (const para of paragraphs(bodyOf(page(slug)))) {
-      const m = /up to (\d+)(?: reads?)? on (?:Pro|Business|Enterprise)/i.exec(para);
-      if (m && !/through the API/i.test(para)) {
-        sold.push(`${slug}: says "${m[0]}", and the client this page is about never sends max_views. Name the API in the same paragraph or drop the number.`);
-      }
+    const clientOnly = CLIENT_ONLY.has(slug);
+    for (const para of [...paragraphs(bodyOf(page(slug))), ...paragraphs(page(slug))]) {
+      if (/through the API/i.test(para)) continue;
+      const benefit = /(?:up to \d+|more) reads? per link/i.exec(para);
+      if (benefit) sold.push(`${slug}: offers "${benefit[0]}" without naming the API; through the web app or an extension a paid plan never gets a second read`);
+      const named = clientOnly && /up to (\d+)(?: reads?)? on (?:Pro|Business|Enterprise)/i.exec(para);
+      if (named) sold.push(`${slug}: says "${named[0]}", and the client this page is about never sends max_views. Name the API in the same paragraph or drop the number.`);
     }
   }
-  assert.deepEqual(sold, [], `\n  ${sold.join('\n  ')}\n`);
+  assert.deepEqual([...new Set(sold)], [], `\n  ${[...new Set(sold)].join('\n  ')}\n`);
+
+  // The heads. A meta description is the sentence that travels: a search result
+  // and a chat preview show it with none of the page around it to qualify it.
+  // The body sweep landed while #380 held the heads open, so this half came a
+  // batch later.
+  const headOf = (html) => {
+    const i = html.search(/<body[\s>]/i);
+    const j = i >= 0 ? i : html.indexOf('</head>');
+    return html.slice(0, j >= 0 ? j : html.length);
+  };
+  const DL_LINK_PAGES = new Set(['get', 'ontvang', 'parashare']);
+  const headClaims = [];
+  for (const slug of everyPage) {
+    if (DL_LINK_PAGES.has(slug)) continue; // pinned to the /v2/dl assertion above
+    const head = headOf(page(slug));
+    const strings = new Set([
+      ...[...head.matchAll(/<title[^>]*>([^<]*)<\/title>/gi)].map((m) => m[1]),
+      ...[...head.matchAll(/<meta[^>]+(?:name|property)=["'](?:description|og:description|twitter:description)["'][^>]+content=["']([^"']*)["']/gi)].map((m) => m[1]),
+      ...[...head.matchAll(/"description":\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]),
+    ]);
+    const clientOnly = CLIENT_ONLY.has(slug);
+    for (const raw of strings) {
+      const text = flatten(raw);
+      const hit = CLAIM.find((re) => re.test(text));
+      if (!hit) continue;
+      const ok = clientOnly ? CLIENT.test(text) : (CLIENT.test(text) || PLAN.some((re) => re.test(text)));
+      if (!ok) headClaims.push(`${slug}: the head says "${hit.exec(text)[0]}" with no page around it to qualify it: "${text.slice(0, 130)}"`);
+    }
+  }
+  assert.deepEqual(headClaims, [], `\n  ${headClaims.join('\n  ')}\n`);
 
   // Every read count the site names is the one tiers.js grants.
   const BY_NAME = { community: 'community', pro: 'pro', business: 'business', enterprise: 'enterprise' };
@@ -2125,14 +2174,16 @@ test('every page that promises burn-on-read says which client and which plan it 
   const pricingSrc = page('pricing');
   assert.ok(pricingSrc.includes('<li>Burn on first read</li>'),
     'pricing: the ParaSend Community card must still say the link burns on the first read');
-  assert.ok(pricingSrc.includes(`<li>Up to ${reads.pro} reads per link</li>`),
-    `pricing: the ParaSend Pro card must offer the ${reads.pro} reads per link tiers.js grants`);
-  assert.ok(pricingSrc.includes(`<li>Up to ${reads.enterprise} reads per link</li>`),
-    `pricing: the ParaSend Enterprise card must offer the ${reads.enterprise} reads per link tiers.js grants`);
+  assert.ok(pricingSrc.includes(`<li>Up to ${reads.pro} reads per link through the API</li>`),
+    `pricing: the ParaSend Pro card must offer the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
+  assert.ok(pricingSrc.includes(`<li>Up to ${reads.enterprise} reads per link through the API</li>`),
+    `pricing: the ParaSend Enterprise card must offer the ${reads.enterprise} reads per link tiers.js grants, and say they come through the API`);
+  assert.ok(page('parasend').includes(`<li>Up to ${reads.pro} reads per link through the API</li>`),
+    `parasend: the Pro card must offer the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
   assert.ok(page('parasend').includes('<li>Burn on first read</li>'),
     'parasend: the Community card must still say the link burns on the first read');
-  assert.ok(flatten(bodyOf(page('index'))).includes(`up to ${reads.pro} reads per link`),
-    `index: the ParaSend Pro price line must name the ${reads.pro} reads per link tiers.js grants`);
+  assert.ok(flatten(bodyOf(page('index'))).includes(`up to ${reads.pro} reads per link through the API`),
+    `index: the ParaSend Pro price line must name the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
 
   // The two pages that spell all four plans out on their own terms.
   const spelled = [
