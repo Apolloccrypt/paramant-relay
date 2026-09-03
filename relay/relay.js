@@ -145,6 +145,9 @@ const invoiceMod       = require('./lib/invoice');            // invoice numberi
 const invoicePdf       = require('./lib/invoice-pdf');        // one-page PDF writer, no dependency
 const creditNote       = require('./lib/credit-note');        // credit notes (CN series) for money that goes back
 const billingHistory   = require('./lib/billing-history');    // one chronological list, derived from the records
+const billingExport    = require('./lib/billing-export');     // period export of both series, CSV/JSON, for the books
+const zipStore         = require('./lib/zip-store');          // store-only zip writer, no dependency
+const moneybird        = require('./lib/moneybird');          // optional Moneybird push (external sales invoices)
 const planExpiry       = require('./lib/plan-expiry');      // paid-term warning + expiry mail (in-process planner)
 
 // Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
@@ -2161,9 +2164,29 @@ async function _issueInvoiceForPayment(payment, outcome) {
       account: String(md.accountId).slice(0, 12), total: out.record.amount_gross,
     });
     _mailInvoice(out.record);
+    _moneybirdPush(out.record);
   } catch (e) {
     log('error', 'billing_invoice_failed', { payment_id: payment && payment.id, err: e.message });
   }
+}
+
+// The document into Mick's bookkeeping, if and only if a Moneybird token and an
+// administration id are configured. AFTERCARE: fired and not awaited, so a slow
+// or unreachable Moneybird cannot hold up a webhook, and pushDocument itself
+// never throws. A failure queues the document for the six-hour sweep started at
+// the bottom of this file; see lib/moneybird.js.
+function _moneybirdPush(record) {
+  if (!record) return;
+  if (!moneybird.configured(moneybird.configFromEnv(process.env))) return;
+  Promise.resolve()
+    .then(() => moneybird.pushDocument({
+      record,
+      redis: (redisClient && redisClient.isReady) ? redisClient : null,
+      env: process.env,
+      renderPdf: (r) => invoicePdf.render(r, { buyerHint: invoiceMod.BUYER_HINT }),
+      log,
+    }))
+    .catch((e) => log('warn', 'moneybird_push_failed', { number: record.number, err: e.message }));
 }
 
 // The document as mail, with the PDF attached. No mail path configured means no
@@ -2230,6 +2253,7 @@ async function _creditNoteForPayment(payment) {
       total: out.record.amount_gross, reason: out.record.reason, partial: out.record.partial,
     });
     _mailCreditNote(out.record);
+    _moneybirdPush(out.record);
     return out;
   } catch (e) {
     log('error', 'billing_credit_note_failed', { payment_id: payment && payment.id, err: e.message });
@@ -5971,6 +5995,90 @@ async function handleRelayRequest(req, res) {
     }));
   }
 
+  // ── GET /v2/admin/billing/export: the books for one period ────────────────
+  // Every document issued between `from` and `to`, both ends inclusive, both
+  // series (PS invoices and receipts, CN credit notes), in the shape the person
+  // doing the VAT return actually opens. Auth: ADMIN_TOKEN, handled above with
+  // every other /v2/admin path; this is the whole customer base's billing in one
+  // response and it may never hang off a customer key.
+  //
+  //   ?from=2026-09-01&to=2026-09-30   the period, on the date the DOCUMENT
+  //                                    states, not on when it was written
+  //   ?format=csv                      default. Semicolon, UTF-8 BOM, comma
+  //                                    decimals: a Dutch Excel opens it as a
+  //                                    table of numbers, not one column of text
+  //   ?format=json                     the same rows with dots and no BOM
+  //   ?pdfs=1                          a zip: one PDF per document plus the
+  //                                    ledger file, so the archive stands alone
+  //
+  // Read-only from end to end. It draws no number, writes no record and cannot
+  // change what a document says; see lib/billing-export.js.
+  if (path === '/v2/admin/billing/export' && req.method === 'GET') {
+    if (!redisClient || !redisClient.isReady) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'export_unavailable', hint: 'the documents live in redis' }));
+    }
+    const from = String(query.from || '').trim();
+    const to = String(query.to || '').trim();
+    const format = String(query.format || 'csv').trim().toLowerCase();
+    if (format !== 'csv' && format !== 'json') {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'bad_format', hint: 'format=csv or format=json' }));
+    }
+    const exported = await billingExport.build({ from, to, redis: redisClient });
+    if (exported.error) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: exported.error, hint: 'from and to are YYYY-MM-DD, from <= to' }));
+    }
+    // A number in the global list with no document behind it is the one gap
+    // lib/invoice.js cannot close (a crash between INCR and the write-back). It
+    // rides along in the JSON body and is logged either way, because a hole in
+    // a numbered series is exactly what an auditor comes looking for.
+    if (exported.missing.length) {
+      log('warn', 'billing_export_missing_documents', {
+        from, to, count: exported.missing.length, numbers: exported.missing.slice(0, 20),
+      });
+    }
+    log('info', 'billing_export', {
+      from, to, format, pdfs: query.pdfs === '1', documents: exported.count, scanned: exported.scanned,
+    });
+
+    const base = billingExport.fileBase(from, to);
+    if (query.pdfs === '1') {
+      const built = billingExport.buildZipEntries(exported, { render: invoicePdf.render, format });
+      if (built.failures.length) {
+        log('warn', 'billing_export_pdf_failed', { from, to, count: built.failures.length });
+      }
+      let zip;
+      try { zip = zipStore.buildZip(built.entries); }
+      catch (e) {
+        log('error', 'billing_export_zip_failed', { from, to, err: e.message });
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'zip_failed' }));
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/zip',
+        'Content-Length': zip.length,
+        'Content-Disposition': `attachment; filename="${base}.zip"`,
+        'Cache-Control': 'private, no-store',
+      });
+      return res.end(zip);
+    }
+
+    if (format === 'json') {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' });
+      return res.end(J(billingExport.asJson(exported)));
+    }
+    const csv = Buffer.from(billingExport.toCsv(exported.rows), 'utf8');
+    res.writeHead(200, {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Length': csv.length,
+      'Content-Disposition': `attachment; filename="${base}.csv"`,
+      'Cache-Control': 'private, no-store',
+    });
+    return res.end(csv);
+  }
+
   // ── POST /v2/admin/keys/erase ─────────────────────────────────────────────
   // Revoke stops a key working; this removes the person. Article 17 GDPR asks for
   // erasure, and until now "delete account" left the email address in users.json
@@ -7621,6 +7729,22 @@ planExpiry.startPlanExpiryPlanner({
   log,
   siteUrl: process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL,
   seed: () => planExpiry.seedIndex(redisClient, accountsWithTerms()),
+});
+
+// ── Moneybird retries ────────────────────────────────────────────────────────
+// The push after an invoice or a credit note is aftercare and is allowed to
+// fail: Moneybird can be down, a token can expire, and neither may cost a
+// customer his plan. What may NOT happen is that the document then quietly
+// stays out of the books, so a failed push queues the document number and this
+// sweep works through the queue every six hours. Same shape as the paid-term
+// planner above and for the same reasons: nothing in process memory, a SET NX
+// lock so exactly one of five containers pushes, and no timer at all when
+// MONEYBIRD_TOKEN and MONEYBIRD_ADMINISTRATION_ID are unset (the default).
+moneybird.startMoneybirdPlanner({
+  redis: redisClient,
+  env: process.env,
+  renderPdf: (r) => invoicePdf.render(r, { buyerHint: invoiceMod.BUYER_HINT }),
+  log,
 });
 
 // One entry per ACCOUNT, not per key: an account with three keys is one

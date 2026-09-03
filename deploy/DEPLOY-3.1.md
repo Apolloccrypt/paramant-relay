@@ -332,6 +332,77 @@ and, once a real payment has come in, that the log line says `result:"issued"`:
 docker compose logs relay-main --since 1h | grep billing_invoice
 ```
 
+### The bookkeeping export (no configuration, always there)
+
+Everything the relay issued in a period, in one download, on the admin token:
+
+```
+curl -s -H "X-Admin-Token: $ADMIN_TOKEN" \
+  "https://relay.paramant.app/v2/admin/billing/export?from=2026-09-01&to=2026-09-30" \
+  -o september.csv
+```
+
+`format=json` gives the same rows as JSON with the totals over the period, and
+`&pdfs=1` gives a zip with the ledger file and one PDF per document. The CSV is
+written for a Dutch Excel: semicolons, a UTF-8 BOM and a comma as the decimal
+mark, so it opens as a table of numbers and not as one column of text. Invoices,
+payment receipts and credit notes are all in it, in the order they happened, with
+the Mollie payment id and (for a credit note) the invoice it reverses on every
+row. Nothing about this needs Moneybird, a token or a restart.
+
+### Moneybird: two variables, off by default
+
+| variable | default | what it does |
+|---|---|---|
+| `MONEYBIRD_TOKEN` | empty | the personal API token; nothing is sent while it is empty |
+| `MONEYBIRD_ADMINISTRATION_ID` | empty | which administration the documents go into; digits only |
+
+With BOTH set, every invoice and every credit note is also pushed to Moneybird
+as an **external sales invoice**. That is Moneybird's own word for a document
+created in another system: our number (`PS-2026-0001`) stays the number, in
+Moneybird's `reference` field, Moneybird draws no number of its own and mails
+nothing to the customer, and the PDF the customer already has is attached to it.
+The contact is found on the email address or created. The Moneybird id is
+written back onto the record, so a document is never sent twice.
+
+The push is **aftercare**. It runs after the entitlement is granted and the
+document is issued, it is never awaited on the payment path, and a Moneybird
+that is down or a token that has expired costs a bookkeeping line and nothing
+else. A failed push is queued in redis and retried by a six-hour sweep, on the
+same lock as the paid-term reminders, so exactly one of the five relay
+containers pushes. Nothing is ever dropped from that queue for being old.
+
+**How to make the token.** In Moneybird: Instellingen, then Externe koppelingen
+(API), then "Nieuw token", or straight to
+<https://moneybird.com/user/applications/new>. Give it the `sales_invoices`
+scope. The value is shown once, so copy it before closing the page. The
+administration id is the long number in the Moneybird URL directly after
+`moneybird.com/`; with the token in hand it also comes back from
+
+```
+curl -s -H "Authorization: Bearer $TOKEN" https://moneybird.com/api/v2/administrations.json
+```
+
+Put both in `/opt/paramant-relay/.env`:
+
+```
+MONEYBIRD_TOKEN=...
+MONEYBIRD_ADMINISTRATION_ID=123456789
+```
+
+They reach the containers through the `x-relay-env` block in
+`docker-compose.yml`, which already carries a line for each, so the relays pick
+them up when they are recreated in step 4. Verify afterwards:
+
+```
+docker compose exec relay-main printenv | grep MONEYBIRD
+docker compose logs relay-main --since 1h | grep moneybird
+```
+
+`moneybird_planner_started` at boot means both variables arrived.
+`moneybird_pushed` is one document in the books. `moneybird_push_failed` carries
+the reason, the attempt count and when the sweep will try again.
+
 ## Step 2: tag the rollback images and back up the state (server)
 
 This is what makes step 8 possible. Same procedure as the 3.0.0 runbook, with
