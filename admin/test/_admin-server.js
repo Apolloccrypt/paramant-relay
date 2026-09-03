@@ -97,6 +97,14 @@ async function stubRelay(state) {
         res.end(JSON.stringify(payload));
       };
       if (url.pathname === '/v2/admin/keys') return send(200, { keys: state.accounts });
+      // GET /v2/user/webauthn/credentials?user_id= : the passkey list the
+      // login/options route uses to build allowCredentials. Answered only when
+      // a suite asked for it by setting state.webauthnCredentials, so every
+      // other suite keeps the 404 it has today (which is the no-passkey path).
+      if (url.pathname === '/v2/user/webauthn/credentials' && state.webauthnCredentials) {
+        const forUser = state.webauthnCredentials[url.searchParams.get('user_id')];
+        return forUser ? send(200, { credentials: forUser }) : send(404, { error: 'no_credentials' });
+      }
       // POST /v2/session-token: the ParaSend session-token mint. Only answered
       // when a suite asked for it by setting state.mintReply, so every other
       // suite keeps the 404 it has today.
