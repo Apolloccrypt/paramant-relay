@@ -74,3 +74,13 @@ heartbeat-evidence/
 
 # Deploy logs (deploy/deploy-3.1.sh writes one per run)
 deploy/logs/
+
+# Backups written next to the checkout. The production checkout is a working
+# directory as well as a checkout, and /opt/paramant-relay/backups turned up in
+# it during deploy run 5 (2026-09-03). No script in THIS repo writes a relative
+# backups/ (deploy/ops/backup-full-state.sh defaults to an absolute
+# /home/paramant/backups/full-state), so what created it is not established;
+# a BACKUP_ROOT or BACKUP_DIR override on the server is the likely candidate.
+# Nothing tracked has ever lived under a backups/ path, so ignoring it costs
+# nothing and keeps the server checkout clean for the next deploy.
+backups/

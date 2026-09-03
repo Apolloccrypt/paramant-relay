@@ -976,9 +976,33 @@ set -euo pipefail
 cd "$1"
 echo "before HEAD = $(git rev-parse --short HEAD)"
 echo "before HEAD long = $(git rev-parse HEAD)"
-if [ -n "$(git status --porcelain)" ]; then
-  git status --porcelain | sed 's/^/  dirty /'
-  echo "FATAL working tree not clean; stash and note what it was before deploying"
+# Only TRACKED changes are dirt. An untracked path is not.
+#
+# Deploy run 5 (TS 20260903-0242) got through phases 0, 1 and 2 and stopped
+# here on "dirty ?? backups/" with nothing else wrong: an untracked directory
+# in the server checkout, which no script in this repo writes, so what put it
+# there is not established. It does not matter. `git pull --ff-only` cannot
+# lose an untracked file, and it CAN lose a modified tracked one, so the
+# tracked half is what the gate is for. The untracked half is reported and
+# left alone, because a server checkout is a working directory too, and a
+# deploy that refuses to run over a stray file it will not touch is a deploy
+# that needs a person for no reason.
+tracked="$(git status --porcelain --untracked-files=no)"
+untracked="$(git ls-files --others --directory --exclude-standard)"
+
+n_unt=0
+[ -n "$untracked" ] && n_unt="$(printf '%s\n' "$untracked" | grep -c . || true)"
+echo "before untracked paths = $n_unt"
+if [ -n "$untracked" ]; then
+  printf '%s\n' "$untracked" | sed 's/^/  untracked /'
+fi
+
+n_trk=0
+[ -n "$tracked" ] && n_trk="$(printf '%s\n' "$tracked" | grep -c . || true)"
+echo "before tracked changes = $n_trk"
+if [ -n "$tracked" ]; then
+  printf '%s\n' "$tracked" | sed 's/^/  dirty /'
+  echo "FATAL working tree not clean: $n_trk tracked file(s) changed; stash and note what it was before deploying"
   exit 1
 fi
 git fetch origin 2>&1 | sed 's/^/  fetch /' || true
@@ -988,6 +1012,14 @@ echo "after HEAD long = $(git rev-parse HEAD)"
 EOF
 
   expect_not 'FATAL working tree not clean' "server working tree was clean before the pull"
+  expect_count "before tracked changes" 0 "no tracked file in the server checkout was modified before the pull"
+  if [ "$DRY_RUN" -eq 0 ]; then
+    local n_unt
+    n_unt="$(remote_field 'before untracked paths')"
+    if [ -n "$n_unt" ] && [ "$n_unt" != 0 ]; then
+      note "$n_unt untracked path(s) in the server checkout, listed above and left alone: a fast-forward pull cannot lose them"
+    fi
+  fi
   if [ "$DRY_RUN" -eq 0 ]; then
     local after_head before_head want
     before_head="$(remote_field 'before HEAD long')"
