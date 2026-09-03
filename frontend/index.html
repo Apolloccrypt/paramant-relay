@@ -32,7 +32,7 @@
   --tint:234,226,206; --cream:#EAE2CE; --night:#15191C; --night-2:#101316;
   --fg:var(--cream); --fg-mid:rgba(var(--tint),.8); --fg-dim:rgba(var(--tint),.62);
   --line:rgba(var(--tint),.16); --line-2:rgba(var(--tint),.32); --card:rgba(var(--tint),.045); --card-line:rgba(var(--tint),.14);
-  --ochre:#D9A441; --ochre-2:#C7912E; --petrol:#155E75; --brick:#C4604F;
+  --ochre:#D9A441; --ochre-2:#C7912E; --petrol:#155E75; --teal:#8FB3C4; --brick:#C4604F;
   --paper:#F1EAD6; --paper-2:#E7DDC4; --paper-ink:#1B1F22; --paper-ink-2:#4A4A44;
   --r:16px; --pad:clamp(16px,4vw,28px); --maxw:780px;
   /* the design system's tokens, re-pointed so the nav, the menu and the footer follow the page */
@@ -47,18 +47,19 @@
 html{background:var(--night)}
 body{background:linear-gradient(180deg,var(--night) 0,var(--night-2) 100%);color:var(--fg);font-family:var(--hp-sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 main{display:block;overflow:hidden}
-nav.nav{background:rgba(21,25,28,.92);border-bottom-color:var(--line)}
+nav.nav{background:var(--night);border-bottom-color:var(--line)}
 nav.nav .nav-logo .logo-para{color:var(--cream)}
 nav.nav .nav-logo .logo-mant{color:var(--ochre)}
 .btn,.btn-primary,nav.nav a.nav-cta,.nav-mobile-cta .btn{color:#141414}
 .hp-wrap{width:min(100% - 2*var(--pad), var(--maxw));margin-inline:auto}
 .hp-kicker{font-family:var(--hp-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-dim);margin:0 0 14px;display:flex;align-items:center;gap:10px}
-.hp-kicker::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--ochre)}
+.hp-kicker::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--fg-dim)}
 .hp-h2{font-size:clamp(1.6rem, 2.2vw + .8rem, 2.5rem);line-height:1.1;letter-spacing:-.02em;font-weight:700;color:var(--fg);margin:0;max-width:22ch}
 .hp-lede{font-size:clamp(1rem, .3vw + .9rem, 1.1rem);line-height:1.65;color:var(--fg-mid);margin:14px 0 0;max-width:58ch}
 .hp-sec{padding:56px 0;scroll-margin-top:64px}
 @media (min-width:900px){.hp-sec{padding:72px 0}}
 .hp-sec + .hp-sec{border-top:1px solid var(--line)}
+.home-hero + .check-sec{border-top:0}
 
 /* buttons: one ochre, one hairline */
 .hp-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 18px;border-radius:12px;font-size:15px;font-weight:600;text-decoration:none;line-height:1;transition:background .15s,color .15s,border-color .15s,transform .15s;white-space:nowrap}
@@ -85,7 +86,7 @@ html[data-session="in"] .home-hero .hp-wrap{grid-template-columns:minmax(0,1fr)}
 html[data-session="in"] .home-hero{padding-bottom:56px}
 
 /* ---------- the band: Harderwijk at first light, one sealed letter on the quay ---------- */
-.hp-band{position:relative;height:clamp(118px,30vw,230px);overflow:hidden;background:var(--paper-2);border-bottom:1px solid var(--line)}
+.hp-band{position:relative;height:clamp(132px,34vw,230px);overflow:hidden;background:var(--paper-2);border-bottom:1px solid var(--line)}
 .hp-band svg{position:absolute;inset:0;width:100%;height:100%;display:block}
 .hp-band-tag{position:absolute;right:var(--pad);top:14px;font-family:var(--hp-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(27,31,34,.82);display:flex;align-items:center;gap:8px}
 .hp-band-tag::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--ochre)}
@@ -101,10 +102,6 @@ html[data-session="in"] .home-hero{padding-bottom:56px}
 .home-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
 .hero-note{font-size:13.5px;line-height:1.5;color:var(--fg-dim);margin:12px 0 0;max-width:46ch}
 .hero-note b{color:var(--fg);font-weight:600}
-.hero-by{display:flex;align-items:center;gap:12px;margin:16px 0 0;padding-top:14px;border-top:1px solid var(--line);font-size:13.5px;line-height:1.45;color:var(--fg-mid);max-width:52ch}
-.hero-by .hp-mono{font-family:var(--hp-mono);font-size:11px;color:var(--fg-dim);letter-spacing:.04em}
-.hero-by strong{color:var(--fg);font-weight:600}
-.hero-by .by-mark{flex:0 0 auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line-2);display:grid;place-items:center;font-family:var(--hp-mono);font-size:11px;color:var(--fg);background:var(--card)}
 .home-hi-name{color:var(--ochre)}
 .hp-proof{font-size:14.5px;line-height:1.5;color:var(--fg-mid);margin:10px 0 0;max-width:40ch}
 @media (min-width:900px){.hp-proof{display:none}}
@@ -179,24 +176,25 @@ html[data-session="in"] .home-hero{padding-bottom:56px}
 @media (min-width:760px){.check-grid li{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) auto;gap:24px;align-items:baseline}}
 .check-grid .ck-fact{font-size:17px;font-weight:600;letter-spacing:-.01em;color:var(--fg);line-height:1.3}
 .check-grid .ck-how{font-size:14.5px;line-height:1.5;color:var(--fg-mid);margin:0}
-.check-grid a{font-family:var(--hp-mono);font-size:13px;font-weight:600;color:var(--ochre);text-decoration:none;padding:6px 0;display:inline-block;white-space:nowrap}
+.check-grid a{font-family:var(--hp-mono);font-size:13px;font-weight:600;color:var(--teal);text-decoration:none;padding:6px 0;display:inline-block;white-space:nowrap}
 .check-grid a:hover{text-decoration:underline}
 
 /* ---------- the gift: two halves ---------- */
-.home-split-sec{padding-top:28px}
+.check-sec{padding-top:28px}
+.home-split-sec{padding-top:56px}
 .gift-grid{display:grid;gap:16px;margin-top:28px}
 .panel{border-radius:var(--r);padding:28px 24px;position:relative;overflow:hidden;min-width:0}
 @media (min-width:900px){.panel{padding:40px 40px}}
 .panel-night{background:var(--paper);color:var(--paper-ink);box-shadow:0 30px 60px -40px rgba(0,0,0,.9)}
-.panel-night::after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle, rgba(217,164,65,.35), transparent 65%);pointer-events:none}
+.panel-night::after{content:none}
 .panel-paper{background:var(--card);border:1px solid var(--card-line)}
 .panel-kicker{font-family:var(--hp-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;margin:0 0 6px}
 .panel p.panel-amt{margin:0 0 18px;font-family:var(--hp-mono);font-size:clamp(1.9rem,3.2vw,2.6rem);font-weight:700;letter-spacing:-.02em;line-height:1;white-space:nowrap}
 .panel p.panel-amt small{font-size:.45em;font-weight:500;letter-spacing:0;color:inherit;opacity:.7;font-family:var(--hp-sans)}
 .panel-night p.panel-amt{color:var(--paper-ink)}
 .panel-paper p.panel-amt{color:var(--fg)}
-.panel-night .panel-kicker{color:var(--ochre-ink)}
-.panel-paper .panel-kicker{color:var(--ochre)}
+.panel-night .panel-kicker{color:var(--paper-ink-2)}
+.panel-paper .panel-kicker{color:var(--fg-dim)}
 .panel h3{font-size:clamp(1.3rem,1.2vw + .9rem,1.75rem);line-height:1.15;letter-spacing:-.02em;margin:0 0 14px;font-weight:700}
 .panel-night h3{color:var(--paper-ink)}
 .panel-paper h3{color:var(--fg)}
@@ -219,7 +217,7 @@ html[data-session="in"] .home-hero{padding-bottom:56px}
 .prod-grid{list-style:none;margin:28px 0 0;padding:0;display:grid;gap:14px}
 .prod-grid li{border:1px solid var(--card-line);border-radius:var(--r);background:var(--card);padding:26px 22px;display:flex;flex-direction:column}
 @media (min-width:900px){.prod-grid li{padding:32px 32px}}
-.prod-name{font-family:var(--hp-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--ochre);display:block;margin-bottom:12px}
+.prod-name{font-family:var(--hp-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-dim);display:block;margin-bottom:12px}
 .prod-grid h3{font-size:clamp(1.25rem,1.1vw + .9rem,1.6rem);line-height:1.15;letter-spacing:-.02em;margin:0 0 14px;max-width:18ch;color:var(--fg)}
 .prod-lines{list-style:none;margin:0;padding:0;display:grid;gap:9px}
 .prod-lines li{font-size:15px;line-height:1.55;color:var(--fg-mid);padding:0 0 0 22px;margin:0;position:relative;border:0;background:none;box-shadow:none;border-radius:0}
@@ -230,7 +228,7 @@ html[data-session="in"] .home-hero{padding-bottom:56px}
 .step-grid{list-style:none;margin:28px 0 0;padding:0;display:grid;gap:0;counter-reset:step;border-top:1px solid var(--line)}
 .step-grid li{padding:20px 0;border-bottom:1px solid var(--line);display:grid;gap:4px}
 @media (min-width:760px){.step-grid li{grid-template-columns:64px 1fr;column-gap:16px}.step-grid li .step-n{grid-row:1/3}}
-.step-n{font-family:var(--hp-mono);font-size:12px;letter-spacing:.12em;color:var(--ochre);display:block;margin-bottom:6px}
+.step-n{font-family:var(--hp-mono);font-size:12px;letter-spacing:.12em;color:var(--fg-dim);display:block;margin-bottom:6px}
 .step-grid h3{font-size:1.15rem;letter-spacing:-.015em;margin:0 0 4px;color:var(--fg)}
 .step-grid p{font-size:15px;line-height:1.55;color:var(--fg-mid);margin:0;max-width:52ch}
 
@@ -257,7 +255,7 @@ html[data-session="in"] .home-hero{padding-bottom:56px}
 .rules-grid h3{font-size:1.05rem;letter-spacing:-.01em;margin:0 0 6px;color:var(--fg)}
 .rules-grid li p{font-size:15px;line-height:1.55;color:var(--fg-mid);margin:0 0 8px;max-width:56ch}
 .rules-grid li p a{color:var(--fg)}
-.r-verify{font-family:var(--hp-mono);font-size:12px;color:var(--ochre);text-decoration:none;letter-spacing:.02em}
+.r-verify{font-family:var(--hp-mono);font-size:12px;color:var(--teal);text-decoration:none;letter-spacing:.02em}
 .r-verify:hover{text-decoration:underline}
 .home-dev{font-size:14px;color:var(--fg-dim);margin:0;padding:24px 0 36px;border-top:1px solid var(--line)}
 .home-dev a{color:var(--fg)}
@@ -433,7 +431,6 @@ footer a{color:var(--fg)}
         <a class="hp-btn hp-btn-line" href="/pricing">Business plans</a>
       </div>
       <p class="hero-note">Free on the <b>Community plan</b>, for good. Paid business plans from &euro;15 a month.</p>
-      <p class="hero-by"><span class="by-mark" aria-hidden="true">MB</span><span><strong>Mick Beer</strong>, privacy and security researcher.<br><span class="hp-mono">Founder, Paramantis Solutions B.V. &middot; Harderwijk</span></span></p>
       <p class="hp-proof">When the file is gone, the proof stays. Anyone can check it without us.</p>
     </div>
     <div class="home-state" data-home="in" hidden>
@@ -444,7 +441,6 @@ footer a{color:var(--fg)}
         <a class="hp-btn hp-btn-line" href="/sign">Start signing</a>
         <a class="hp-btn hp-btn-line" href="/parashare">Send securely</a>
       </div>
-      <p class="hero-by"><span class="by-mark" aria-hidden="true">MB</span><span><strong>Mick Beer</strong>, privacy and security researcher.<br><span class="hp-mono">Founder, Paramantis Solutions B.V. &middot; Harderwijk</span></span></p>
     </div>
     <div class="hp-art" aria-hidden="true">
       <div class="hp-art-glow"></div>
@@ -462,6 +458,21 @@ footer a{color:var(--fg)}
         <div class="rc-foot">When the file is gone, the proof stays. Anyone can check it without us.</div>
       </div>
     </div>
+  </div>
+</section>
+
+<section class="hp-sec check-sec" aria-labelledby="check-h">
+  <div class="hp-wrap">
+    <p class="hp-kicker">Do not take our word for it</p>
+    <h2 id="check-h" class="hp-h2">Five things you can check yourself, today.</h2>
+    <p class="hp-lede">Trust is not something a website can claim. These five facts are on the record, outside this page, and each one has a place where you look it up.</p>
+    <ul class="check-grid">
+      <li><span class="ck-fact">A registered Dutch company</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk. The KvK register lists the company behind every promise on this page.</p><a href="https://www.kvk.nl/zoeken/?source=all&amp;q=42115132">KvK 42115132 &rarr;</a></li>
+      <li><span class="ck-fact">Servers in Germany</span><p class="ck-how">Hetzner in Nuremberg. Which company holds what, and the one exception for e-mail, is written out line by line on the security page.</p><a href="/security">Jurisdiction, line by line &rarr;</a></li>
+      <li><span class="ck-fact">A public log</span><p class="ck-how">Every registered key and every transfer leaves an entry in a tamper-evident log anyone can read. Not a claim about transparency: the log itself.</p><a href="/ct-log">Open the log &rarr;</a></li>
+      <li><span class="ck-fact">What happens when something goes wrong</span><p class="ck-how">A personal data breach is reported to you within 48 hours; that is in the signed Data Processing Agreement, not in a blog post. Your signature receipts verify without us, so they outlive us.</p><a href="/dpa#incidents">Breach notification, clause 8 &rarr;</a></li>
+      <li><span class="ck-fact">Code you can read</span><p class="ck-how">The core and the relay are published. Nine rules, each with a link to the proof, are written down in one place.</p><a href="/rules">The nine rules &rarr;</a></li>
+    </ul>
   </div>
 </section>
 
@@ -503,21 +514,6 @@ footer a{color:var(--fg)}
   </div>
 </section>
 
-<section class="hp-sec check-sec" aria-labelledby="check-h">
-  <div class="hp-wrap">
-    <p class="hp-kicker">Do not take our word for it</p>
-    <h2 id="check-h" class="hp-h2">Five things you can check yourself, today.</h2>
-    <p class="hp-lede">Trust is not something a website can claim. These five facts are on the record, outside this page, and each one has a place where you look it up.</p>
-    <ul class="check-grid">
-      <li><span class="ck-fact">A registered Dutch company</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk. The KvK register lists the company behind every promise on this page.</p><a href="https://www.kvk.nl/zoeken/?source=all&amp;q=42115132">KvK 42115132 &rarr;</a></li>
-      <li><span class="ck-fact">Servers in Germany</span><p class="ck-how">Hetzner in Nuremberg. Which company holds what, and the one exception for e-mail, is written out line by line on the security page.</p><a href="/security">Jurisdiction, line by line &rarr;</a></li>
-      <li><span class="ck-fact">A public log</span><p class="ck-how">Every registered key and every transfer leaves an entry in a tamper-evident log anyone can read. Not a claim about transparency: the log itself.</p><a href="/ct-log">Open the log &rarr;</a></li>
-      <li><span class="ck-fact">What happens when something goes wrong</span><p class="ck-how">A personal data breach is reported to you within 48 hours; that is in the signed Data Processing Agreement, not in a blog post. Your signature receipts verify without us, so they outlive us.</p><a href="/dpa#incidents">Breach notification, clause 8 &rarr;</a></li>
-      <li><span class="ck-fact">Code you can read</span><p class="ck-how">The core and the relay are published. Nine rules, each with a link to the proof, are written down in one place.</p><a href="/rules">The nine rules &rarr;</a></li>
-    </ul>
-  </div>
-</section>
-
 <section class="hp-sec" id="products" aria-labelledby="products-h">
   <div class="hp-wrap">
     <p class="hp-kicker">Two products</p>
@@ -531,8 +527,9 @@ footer a{color:var(--fg)}
           <li>Upload the PDF, place the fields, and mail it to whoever has to sign.</li>
           <li>They sign with the link from that email. Signing an invitation needs no account.</li>
           <li>You keep a receipt anyone can check offline, plus an entry in the public log.</li>
+          <li>A simple electronic signature under eIDAS. Not a qualified one, and we say so.</li>
         </ul>
-        <div class="prod-cta"><a class="hp-btn hp-btn-fill" href="/parasign">What ParaSign is</a><a class="hp-btn hp-btn-line" href="/sign">Sign a document</a></div>
+        <div class="prod-cta"><a class="hp-btn hp-btn-line" href="/parasign">What ParaSign is</a><a class="hp-btn hp-btn-fill" href="/sign">Sign a document</a></div>
       </li>
       <li>
         <span class="prod-name">ParaSend</span>
@@ -541,8 +538,9 @@ footer a{color:var(--fg)}
           <li>The file is encrypted in your browser before it leaves your device.</li>
           <li>Our server only ever holds the sealed file in memory, never on a disk.</li>
           <li>It is wiped after its last read, so there is nothing left to leak later.</li>
+          <li>That holds for the web app and the SDKs. The browser extensions still encrypt on our server, until that is changed.</li>
         </ul>
-        <div class="prod-cta"><a class="hp-btn hp-btn-fill" href="/parasend">What ParaSend is</a><a class="hp-btn hp-btn-line" href="/parashare">Send a file</a></div>
+        <div class="prod-cta"><a class="hp-btn hp-btn-line" href="/parasend">What ParaSend is</a><a class="hp-btn hp-btn-fill" href="/parashare">Send a file</a></div>
       </li>
     </ul>
   </div>
@@ -616,7 +614,7 @@ footer a{color:var(--fg)}
       <li><h3>We never had it</h3><p>Encrypted in your browser before it leaves you, never written to a disk, gone after its last read.</p><a class="r-verify" href="/security">verify: architecture <span aria-hidden="true">&rarr;</span></a></li>
       <li><h3>You own your keys</h3><p>Generated on your device, never sent. We see only the public half.</p><a class="r-verify" href="https://www.npmjs.com/package/paramant-sdk">verify: SDK source <span aria-hidden="true">&rarr;</span></a></li>
       <li><h3>EU soil, EU law</h3><p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path. Email goes out via Resend, as <a href="/privacy">/privacy</a> sets out.</p><a class="r-verify" href="/security">verify: jurisdiction <span aria-hidden="true">&rarr;</span></a></li>
-      <li><h3>Verifiable, not trust-me</h3><p>The code is public, every receipt can be checked without us, and a public log shows when it happened.</p><a class="r-verify" href="/ct-log">verify: CT log <span aria-hidden="true">&rarr;</span></a></li>
+      <li><h3>Verifiable, not trust-me</h3><p>The code is source-available (BUSL 1.1), every receipt can be checked without us, and a public log shows when it happened.</p><a class="r-verify" href="/ct-log">verify: CT log <span aria-hidden="true">&rarr;</span></a></li>
     </ol>
     <div class="sec-more">
       <a class="sec-link" href="/rules">Read all nine rules <span aria-hidden="true">&rarr;</span></a>
