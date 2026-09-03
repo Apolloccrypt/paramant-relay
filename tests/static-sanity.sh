@@ -281,7 +281,7 @@ else
 fi
 
 # ── 12. Test suites do not write into tracked docs/ by default ───────────────
-# tests/app-shots.mjs renders 36 PNGs. It used to write them straight into
+# scripts/app-shots.mjs renders 36 PNGs. It used to write them straight into
 # docs/brand/assets/app-2026/, which is tracked, so every local run of the
 # browser suites left 36 modified files behind and the next `git commit -a`
 # carried them. Refreshing those references is a deliberate act:
