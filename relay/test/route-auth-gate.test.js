@@ -109,6 +109,43 @@ test('a WRONG key also cannot reach validation: still 401, not 400', async () =>
   did();
 });
 
+test('a Bearer that looks like a session token opens nothing on a relay with no store', async () => {
+  // The gate now has a second credential in front of it: an Authorization
+  // Bearer pst_ token, resolved against redis (relay/lib/session-token.js, and
+  // route-session-token.test.js for what it does when there IS a store). This
+  // suite boots WITHOUT redis, which makes it the right place to pin the two
+  // ways that credential must not weaken this gate.
+  //
+  // 1. A pst_-shaped Bearer with no store behind it is 503, not 200 and not a
+  //    principal. Fail closed: "we cannot check this" may never read as "fine".
+  const shaped = await srv.post('/v2/envelopes', {
+    headers: { Authorization: `Bearer pst_${'a'.repeat(64)}` },
+    body: { doc_hash: 'a'.repeat(64), parties: [{ label: 'Demo' }] },
+  });
+  assert.strictEqual(shaped.status, 503, `expected the store-unavailable 503, got ${shaped.status} ${shaped.text}`);
+  assert.strictEqual(shaped.json.error, 'redis_unavailable');
+
+  // 2. Anything that is NOT that exact shape is not a credential at all, so it
+  //    falls straight through to the ordinary 401. In particular the ADMIN
+  //    token as a Bearer stays an admin token and does not become a data-plane
+  //    principal, and an api-key offered as a Bearer is still not an api-key.
+  for (const value of [
+    `Bearer pst_${'z'.repeat(64)}`,   // right prefix, not hex
+    'Bearer pst_short',
+    `Bearer ${LIVE_KEY}`,             // the api-key, in the wrong header
+    `Bearer ${ADMIN}`,                // the admin token, in the wrong plane
+    'Bearer',
+  ]) {
+    const r = await srv.post('/v2/envelopes', {
+      headers: { Authorization: value },
+      body: { doc_hash: 'a'.repeat(64), parties: [{ label: 'Demo' }] },
+    });
+    assert.strictEqual(r.status, 401, `${value} was treated as a credential (${r.status})`);
+    assert.deepStrictEqual(r.json, { error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' });
+  }
+  did();
+});
+
 test('a VALID key gets past the gate: the 503 behind it proves the gate opened', async () => {
   // No redis in this boot, so the envelope store is null (relay.js:5669). The
   // point of the assertion is the code, not the failure: 503 can only be
