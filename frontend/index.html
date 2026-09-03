@@ -42,7 +42,7 @@ main{display:block;overflow:hidden}
 .hp-kicker::before{content:"";width:22px;height:2px;background:var(--hp-lime);border-radius:1px}
 .hp-h2{font-size:clamp(1.65rem, 2.6vw + .8rem, 3rem);line-height:1.06;letter-spacing:-.025em;font-weight:700;color:var(--hp-ink);margin:0;max-width:20ch}
 .hp-lede{font-size:clamp(1rem, .35vw + .9rem, 1.15rem);line-height:1.6;color:var(--hp-ink-2);margin:16px 0 0;max-width:56ch}
-.hp-sec{padding:64px 0}
+.hp-sec{padding:64px 0;scroll-margin-top:64px}
 @media (min-width:900px){.hp-sec{padding:88px 0}}
 .hp-sec + .hp-sec{border-top:1px solid var(--hp-line)}
 
@@ -72,6 +72,8 @@ main{display:block;overflow:hidden}
 .hero-by strong{color:var(--hp-ink);font-weight:600}
 .hero-by .by-mark{flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:1px solid var(--hp-line-2);display:grid;place-items:center;font-family:var(--hp-mono);font-size:11px;color:var(--hp-ink);background:#fff}
 .home-hi-name{color:var(--hp-cobalt)}
+.hp-proof{font-size:14px;line-height:1.5;color:var(--hp-ink-2);margin:12px 0 0;max-width:40ch}
+@media (min-width:760px){.hp-proof{display:none}}
 
 /* the art: a document that gets signed, sealed, and then is gone */
 .hp-art{position:relative;z-index:1;height:150px;pointer-events:none;user-select:none}
@@ -87,7 +89,7 @@ main{display:block;overflow:hidden}
 .hp-doc i.w1{width:92%} .hp-doc i.w2{width:78%} .hp-doc i.w3{width:86%} .hp-doc i.w4{width:54%}
 .hp-doc svg{width:56%;height:auto;margin-top:auto;overflow:visible}
 .hp-doc svg path{fill:none;stroke:var(--hp-cobalt);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:420;stroke-dashoffset:420;animation:hp-sign 16s ease-in-out infinite}
-.hp-seal{position:absolute;right:9%;bottom:12%;width:19%;aspect-ratio:1;border-radius:50%;border:1.5px solid var(--hp-lime-ink);background:radial-gradient(circle at 50% 50%, rgba(178,255,63,.55), rgba(178,255,63,.12) 60%, transparent 62%);display:grid;place-items:center;font-family:var(--hp-mono);font-size:8px;color:var(--hp-lime-ink);letter-spacing:.08em;transform:scale(0);animation:hp-seal 16s ease-in-out infinite}
+.hp-seal{position:absolute;right:8%;top:7%;width:19%;aspect-ratio:1;border-radius:50%;border:1.5px solid var(--hp-lime-ink);background:radial-gradient(circle at 50% 50%, rgba(178,255,63,.55), rgba(178,255,63,.12) 60%, transparent 62%);display:grid;place-items:center;font-family:var(--hp-mono);font-size:8px;color:var(--hp-lime-ink);letter-spacing:.08em;transform:scale(0);animation:hp-seal 16s ease-in-out infinite}
 .hp-dust{position:absolute;left:50%;top:0;width:min(260px, 62vw);height:100%;transform:translateX(-50%);background-image:
   radial-gradient(circle, rgba(12,27,42,.55) 1px, transparent 1.6px),
   radial-gradient(circle, rgba(29,78,216,.5) 1px, transparent 1.6px),
@@ -117,6 +119,36 @@ main{display:block;overflow:hidden}
   .hp-doc,.hp-dust{width:min(360px,34vw);top:6%}
 }
 @media (min-width:1100px){.home-hero{padding:40px 0 36px}.hp-btn{min-height:48px;padding:0 22px;font-size:15px}}
+
+/* the receipt that stays while the document dissolves */
+.hp-receipt{position:absolute;right:2%;bottom:8px;width:min(230px,22vw);background:#fff;border:1px solid var(--hp-line);border-radius:3px;box-shadow:0 24px 50px -28px rgba(12,27,42,.35);padding:14px 14px 12px;transform:rotate(3deg);font-family:var(--hp-mono);font-size:10px;letter-spacing:.04em;color:var(--hp-ink-3);z-index:3}
+.hp-receipt .rc-head{display:flex;justify-content:space-between;align-items:baseline;color:var(--hp-ink);font-weight:600;margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed var(--hp-line-2)}
+.hp-receipt .rc-head span:last-child{color:var(--hp-lime-ink)}
+.hp-receipt .rc-row{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;margin:0 0 7px;opacity:0;transform:translateY(4px);animation:hp-row .5s ease-out forwards}
+.hp-receipt .rc-row:nth-child(2){animation-delay:.6s}.hp-receipt .rc-row:nth-child(3){animation-delay:1.1s}.hp-receipt .rc-row:nth-child(4){animation-delay:1.6s}
+.hp-receipt .rc-row i{display:block;height:6px;border-radius:2px;background:var(--hp-paper-2)}
+.hp-receipt .rc-foot{margin-top:10px;padding-top:8px;border-top:1px dashed var(--hp-line-2);color:var(--hp-ink-2);font-family:var(--hp-sans);font-size:11px;letter-spacing:0;line-height:1.35;opacity:0;animation:hp-row .5s ease-out 2.1s forwards}
+@keyframes hp-row{to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.hp-receipt .rc-row,.hp-receipt .rc-foot{animation:none;opacity:1;transform:none}}
+
+/* ---------- the letter ---------- */
+.letter{font-size:16px;line-height:1.65;color:#D5DDE6;max-width:46ch}
+.letter p{margin:0 0 14px;color:#D5DDE6;font-size:16px}
+.letter-sign{margin-top:22px;padding-top:16px;border-top:1px solid rgba(255,255,255,.14);display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center}
+.letter-sign .by-mark{width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.3);display:grid;place-items:center;font-family:var(--hp-mono);font-size:12px;color:#fff}
+.letter-sign .who{color:#fff;font-weight:600;font-size:15px;display:block}
+.letter-sign .role{color:#B9C5D3;font-size:13.5px;line-height:1.45;display:block}
+
+/* ---------- check it yourself ---------- */
+.check-sec{background:var(--hp-paper-2)}
+.check-grid{list-style:none;margin:32px 0 0;padding:0;display:grid;gap:1px;background:var(--hp-line);border:1px solid var(--hp-line);border-radius:6px;overflow:hidden}
+@media (min-width:760px){.check-grid{grid-template-columns:1fr 1fr}}
+@media (min-width:1100px){.check-grid{grid-template-columns:repeat(5,1fr)}}
+.check-grid li{background:#fff;padding:22px 20px 20px;display:flex;flex-direction:column;gap:8px}
+.check-grid .ck-fact{font-size:17px;font-weight:600;letter-spacing:-.015em;color:var(--hp-ink);line-height:1.25}
+.check-grid .ck-how{font-size:14px;line-height:1.5;color:var(--hp-ink-2);margin:0;flex:1}
+.check-grid a{font-size:14px;font-weight:600;color:var(--hp-cobalt);text-decoration:none;padding:6px 0;display:inline-block}
+.check-grid a:hover{text-decoration:underline}
 
 /* ---------- the gift: two halves ---------- */
 .home-split-sec{padding-top:44px}
@@ -331,6 +363,7 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
       </div>
       <p class="hero-note">Free on the <b>Community plan</b>, for good. Paid business plans from &euro;15 a month.</p>
       <p class="hero-by"><span class="by-mark" aria-hidden="true">MB</span><span><strong>Mick Beer</strong>, privacy and security researcher.<br><span class="hp-mono">Founder, Paramantis Solutions B.V. &middot; Harderwijk</span></span></p>
+      <p class="hp-proof">When the file is gone, the proof stays. Anyone can check it without us.</p>
     </div>
     <div class="home-state" data-home="in" hidden>
       <h2 class="paramant-h1">Your documents<span class="home-hi-name" data-home-name></span>.</h2>
@@ -350,6 +383,13 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
         <svg viewBox="0 0 160 46"><path d="M4 34c14-24 22-26 20-10s-8 20 2 12 18-26 18-14-6 26 6 12 14-22 20-10 2 18 12 10 16-22 22-10 6 18 18 4 20-16 34-10"/></svg>
         <span class="hp-seal">EU</span>
       </div>
+      <div class="hp-receipt">
+        <div class="rc-head"><span>Receipt</span><span>kept</span></div>
+        <div class="rc-row"><span>Fingerprint</span><i></i></div>
+        <div class="rc-row"><span>Signed at</span><i></i></div>
+        <div class="rc-row"><span>Receipt</span><i></i></div>
+        <div class="rc-foot">When the file is gone, the proof stays. Anyone can check it without us.</div>
+      </div>
     </div>
   </div>
 </section>
@@ -363,13 +403,15 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
       <article class="panel panel-night">
         <p class="panel-kicker">Community</p>
         <p class="panel-amt">&euro;0 <small>for good</small></p>
-        <h3>Free, because it is meant to be.</h3>
-        <p>Anyone can get a document signed and send a file safely. No card, no time limit, no trial that runs out. <strong>Community</strong> is the name on the pricing page and on your dashboard.</p>
-        <p>It is not a funnel. It is what Paramant gives back: 2 signatures a month, 10 transfers a month, 5 MB per file, and your files never touch an American cloud.</p>
-        <div class="split-person">
-          <span class="who">Mick Beer, privacy and security researcher</span>
-          <span class="role">Founder of Paramantis Solutions B.V. He built Paramant, and the Community plan is his contribution back to the society the tools came from.</span>
-          <p class="split-org">Paramantis Solutions B.V. &middot; Harderwijk, the Netherlands &middot; KvK 42115132</p>
+        <h3>Why half of this is free.</h3>
+        <div class="letter">
+          <p>I research how personal data leaks from the apps and clouds people trust. Paramant is what I would want a small firm to have: a way to get a document signed and to send a file that keeps client files in Europe, and that leaves proof you can check without us.</p>
+          <p>The <strong>Community</strong> plan is free, and stays free: 2 signatures a month, 10 transfers a month, 5 MB per file, no card and no trial that runs out. That is my contribution back to the society these tools came from.</p>
+          <p>The business plans pay for the servers and for the work, and they keep the free half free.</p>
+        </div>
+        <div class="letter-sign">
+          <span class="by-mark" aria-hidden="true">MB</span>
+          <span><span class="who">Mick Beer, privacy and security researcher</span><span class="role">Founder of Paramantis Solutions B.V. &middot; Harderwijk, the Netherlands &middot; KvK 42115132</span></span>
         </div>
         <div class="split-cta"><a class="hp-btn hp-btn-paper" href="/sign">Sign a document</a></div>
       </article>
@@ -382,11 +424,26 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
           <li><b>Volume.</b> 100 or 1,000 signatures a month instead of 2, and links that live 24 hours or 7 days instead of 1.</li>
           <li><b>Control.</b> Send history and link management, a notice to your own systems on upload and download, up to 50 registered devices, and up to 500 retrievals an hour through the API instead of 50.</li>
           <li><b>Accountability.</b> Named support with a reply within one business day, an audit log you can export, and help answering your customers' security questionnaires.</li>
-          <li><b>Your own server.</b> Enterprise runs on a server of its own, with a signed Data Processing Agreement, an SLA, and for ParaSign a sector server for health, legal or finance.</li>
+          <li><b>Your own server.</b> Enterprise runs on a server of its own, with an SLA, and for ParaSign a sector server for health, legal or finance. The Data Processing Agreement applies to every plan.</li>
         </ul>
         <div class="split-cta"><a class="hp-btn hp-btn-fill" href="/pricing">See the business plans</a></div>
       </article>
     </div>
+  </div>
+</section>
+
+<section class="hp-sec check-sec" aria-labelledby="check-h">
+  <div class="hp-wrap">
+    <p class="hp-kicker">Do not take our word for it</p>
+    <h2 id="check-h" class="hp-h2">Five things you can check yourself, today.</h2>
+    <p class="hp-lede">Trust is not something a website can claim. These five facts are on the record, outside this page, and each one has a place where you look it up.</p>
+    <ul class="check-grid">
+      <li><span class="ck-fact">A registered Dutch company</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk. The KvK register lists the company behind every promise on this page.</p><a href="https://www.kvk.nl/zoeken/?source=all&amp;q=42115132">KvK 42115132 &rarr;</a></li>
+      <li><span class="ck-fact">Servers in Germany</span><p class="ck-how">Hetzner in Nuremberg. Which company holds what, and the one exception for e-mail, is written out line by line on the security page.</p><a href="/security">Jurisdiction, line by line &rarr;</a></li>
+      <li><span class="ck-fact">A public log</span><p class="ck-how">Every registered key and every transfer leaves an entry in a tamper-evident log anyone can read. Not a claim about transparency: the log itself.</p><a href="/ct-log">Open the log &rarr;</a></li>
+      <li><span class="ck-fact">What happens when something goes wrong</span><p class="ck-how">A personal data breach is reported to you within 48 hours; that is in the signed Data Processing Agreement, not in a blog post. Your signature receipts verify without us, so they outlive us.</p><a href="/dpa#incidents">Breach notification, clause 8 &rarr;</a></li>
+      <li><span class="ck-fact">Code you can read</span><p class="ck-how">The core and the relay are published. Nine rules, each with a link to the proof, are written down in one place.</p><a href="/rules">The nine rules &rarr;</a></li>
+    </ul>
   </div>
 </section>
 
@@ -468,7 +525,7 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
         <ul class="tiers">
           <li><span class="tier-price">&euro;0</span><span class="tier-what"><b>Community</b> &middot; 10 transfers a month, 5 MB per file, 1 hour link expiry, burn on first read</span></li>
           <li><span class="tier-price">&euro;15</span><span class="tier-what"><b>Pro</b> &middot; 24 hour expiry, up to 10 reads per link, send history, notices to your own systems</span></li>
-          <li><span class="tier-price">Custom</span><span class="tier-what"><b>Enterprise</b> &middot; your own server, signed DPA, SLA 99.95%, limits set for your organisation</span></li>
+          <li><span class="tier-price">Custom</span><span class="tier-what"><b>Enterprise</b> &middot; your own server, SLA 99.95%, limits set for your organisation</span></li>
         </ul>
         <p class="price-foot">&euro;18.15 a month incl. 21% btw &middot; yearly is cheaper</p>
       </li>
