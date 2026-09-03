@@ -71,7 +71,17 @@ const publicMobileGeometry = await publicPage.evaluate(() => {
     menuTop: menu.top,
   };
 });
-ok('mobile menu has no technical strip or gap above it', publicMobileGeometry.metaDisplay === 'none' && publicMobileGeometry.navTop === 0 && Math.abs(publicMobileGeometry.menuTop - publicMobileGeometry.navBottom) < 0.5, JSON.stringify(publicMobileGeometry));
+// What this asks is "no technical strip above the nav", and there are two ways
+// to satisfy it: the strip is styled away, or it is not in the page at all.
+// Only the first was accepted, so the homepage had to keep an empty
+// <div class="meta-bar" hidden></div> purely to keep this green, which is a
+// test dictating markup rather than describing the result. The strip itself is
+// gone from every page now, so 'absent' is the normal answer and 'none' stays
+// valid for a page that still carries one and hides it. What is NOT optional is
+// the geometry: the nav starts at the top of the viewport and the drawer hangs
+// off its bottom with no gap, which is what turns red if a visible strip
+// returns.
+ok('mobile menu has no technical strip or gap above it', (publicMobileGeometry.metaDisplay === 'absent' || publicMobileGeometry.metaDisplay === 'none') && publicMobileGeometry.navTop === 0 && Math.abs(publicMobileGeometry.menuTop - publicMobileGeometry.navBottom) < 0.5, JSON.stringify(publicMobileGeometry));
 ok('public mobile menu matches desktop without legacy groups', publicMobile.map((item) => item.toLowerCase()).join(',') === publicDesktop.map((item) => item.toLowerCase()).join(',') && await publicPage.locator('#nav-mobile .nav-mobile-group').count() === 0, publicMobile.join(', '));
 ok('public mobile menu fits the phone viewport', await publicPage.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth), await publicPage.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
 await publicPage.locator('#nav-hamburger').click();

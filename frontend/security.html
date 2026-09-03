@@ -195,13 +195,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
-<div class="meta-bar">
-  <span class="">build 3.0.0</span>
-  <span class="sep">·</span>
-  <span class="">aes-256-gcm / <a href="/crypto-agility" class="meta-link">post-quantum</a></span>
-  <span class="sep">·</span>
-  <span class="">eu/de · ram only</span>
-</div>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
@@ -298,7 +291,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <hr class="divider">
 
-
   <h3>Core principle</h3>
   <div class="card">
     <p style="margin:0;line-height:1.8">The relay is an <strong>untrusted intermediary</strong>. It stores only ciphertext and has no access to keys or plaintext. A fully compromised relay cannot read, forge, or retroactively recover any transfer. This is not a policy. It is a cryptographic guarantee.</p>
@@ -339,7 +331,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h3>Hybrid key exchange</h3>
   <p>Authenticated transfers from the ParaSend web app use ML-KEM-768 <em>and</em> ECDH P-256 simultaneously. The shared secret is the concatenation of both, so breaking one provides no advantage. This protects against store-now-decrypt-later attacks while maintaining compatibility with classical infrastructure.</p>
-
 
   <h3>Pre-shared secret (PSS)</h3>
   <p>An optional out-of-band password added to HKDF input. Even a fully compromised relay cannot decrypt PSS-protected transfers: the relay would need to serve the correct ciphertext <em>and</em> know the PSS. Recommended for healthcare and legal workflows.</p>
