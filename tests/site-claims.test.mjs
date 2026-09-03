@@ -1679,11 +1679,18 @@ test('every page that says the signature is not eIDAS-qualified names the level 
 // ${ip} to admin/server.js turns this red, so does changing the admin log
 // rotation in docker-compose.yml, and so does deleting the section on /privacy.
 test('the logs that hold an IP address are the ones /privacy names', () => {
-  const adminSrc = stripJsComments(read('admin/server.js'));
-  const ipLines = [...adminSrc.matchAll(/console\.(?:log|warn|error)\(`[^`]*\$\{ip\}[^`]*`/g)].map((m) => m[0]);
+  // Line based on purpose. The first version of this matched a whole template
+  // literal with a backtick character class, and it found three lines locally
+  // and none in CI, which is the worst kind of pin: green where it is cheap and
+  // red where it counts. A log call is one line in this file, so read it as one
+  // line and skip the ones that are commented out.
+  const ipMarker = '$' + '{ip}';
+  const emailMarker = '$' + '{norm}';
+  const ipLines = read('admin/server.js').split('\n').map((l) => l.trim())
+    .filter((l) => !l.startsWith('//') && /^console\.(?:log|warn|error)\(/.test(l) && l.includes(ipMarker));
   assert.equal(ipLines.length, 3,
     `admin/server.js now writes ${ipLines.length} log lines with a full client IP; /privacy says three`);
-  const withEmail = ipLines.filter((l) => /\$\{norm\}/.test(l));
+  const withEmail = ipLines.filter((l) => l.includes(emailMarker));
   assert.equal(withEmail.length, 1,
     `${withEmail.length} of those lines also write the account email; /privacy says one`);
 
