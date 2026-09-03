@@ -407,23 +407,78 @@
     }
   }
 
+  // ── Billing history ────────────────────────────────────────────────────────
+  // One chronological list: every payment, every credit note, every term that
+  // ended, and the admin plan changes that used to be the only thing here. The
+  // API derives it from the invoice and credit-note records and from the paid
+  // periods on them, so this renders what it is given and invents nothing.
+  //
+  // Built with DOM nodes rather than a string of markup: these rows carry a
+  // document number, a description and an amount that all come from the server,
+  // and this page has no business putting any of them through innerHTML.
+  function historyLabel(e) {
+    if (e.label) return e.label;
+    // A row from an older API, or an event this page does not know by name. The
+    // event name is not pretty, and it is at least true.
+    if (e.event_type === 'plan_changed') {
+      var m = e.metadata || {};
+      return 'Plan changed from ' + (m.from || 'unknown') + ' to ' + (m.to || 'unknown');
+    }
+    if (e.event_type === 'plan_cancellation_scheduled') return 'Cancellation scheduled';
+    return e.event_type || 'Billing event';
+  }
+
+  function historyRow(e) {
+    const row = document.createElement('div');
+    row.className = 'info-row';
+
+    const left = document.createElement('div');
+    left.className = 'info-label';
+    left.appendChild(document.createTextNode(new Date(e.ts).toLocaleDateString()));
+    left.appendChild(document.createTextNode(' · ' + historyLabel(e)));
+    if (e.document) {
+      const num = document.createElement('span');
+      num.style.fontFamily = 'var(--mono)';
+      num.textContent = ' ' + e.document;
+      left.appendChild(num);
+    }
+
+    const right = document.createElement('div');
+    right.className = 'info-value';
+    if (e.amount) {
+      const amount = document.createElement('span');
+      amount.style.fontFamily = 'var(--mono)';
+      amount.textContent = (e.currency || 'EUR') + ' ' + e.amount;
+      right.appendChild(amount);
+    } else if (e.detail) {
+      right.appendChild(document.createTextNode(e.detail));
+    }
+    if (e.document) {
+      right.appendChild(document.createTextNode(' '));
+      const link = document.createElement('a');
+      link.href = '/api/user/billing/invoices/' + encodeURIComponent(e.document) + '.pdf';
+      link.textContent = 'Download PDF';
+      right.appendChild(link);
+    }
+    row.appendChild(left);
+    row.appendChild(right);
+    return row;
+  }
+
   async function loadBillingHistory() {
+    const histEl = document.getElementById('billing-history');
+    if (!histEl) return;
     try {
       const res = await fetch('/api/user/billing/history', { credentials: 'include' });
-      if (!res.ok) return;
+      if (!res.ok) { histEl.textContent = 'Billing history unavailable right now.'; return; }
       const d = await res.json();
-      const histEl = document.getElementById('billing-history');
-      if (!d.history || d.history.length === 0) { histEl.textContent = 'No billing events yet.'; return; }
-      histEl.innerHTML = d.history.map(function(e) {
-        const date = new Date(e.ts).toLocaleString();
-        const label = e.event_type === 'plan_changed'
-          ? 'Plan changed: ' + (e.metadata.from || '?') + ' → ' + (e.metadata.to || '?')
-          : e.event_type === 'plan_cancellation_scheduled'
-          ? 'Cancellation scheduled'
-          : e.event_type;
-        return '<div class="info-row"><div class="info-label">' + date + '</div><div class="info-value">' + label + '</div></div>';
-      }).join('');
-    } catch(err) {}
+      const rows = (d && d.history) || [];
+      if (rows.length === 0) { histEl.textContent = 'No billing events yet.'; return; }
+      histEl.textContent = '';
+      rows.forEach(function(e) { histEl.appendChild(historyRow(e)); });
+    } catch(err) {
+      histEl.textContent = 'Could not load billing history.';
+    }
   }
 
   document.getElementById('billing-cancel-btn').addEventListener('click', async function() {
@@ -460,7 +515,15 @@
         num.textContent = inv.number;
         left.appendChild(num);
         left.appendChild(document.createTextNode(' · ' + new Date(inv.date).toLocaleDateString()));
-        if (inv.kind !== 'invoice') left.appendChild(document.createTextNode(' · receipt'));
+        // Three shapes in one list. A credit note is not a receipt and must not
+        // be labelled as one: it is the document that gives money back, and it
+        // says which invoice it belongs to.
+        if (inv.kind === 'credit_note') {
+          left.appendChild(document.createTextNode(
+            ' · ' + (inv.partial ? 'partial credit for ' : 'credit for ') + inv.credit_for));
+        } else if (inv.kind !== 'invoice') {
+          left.appendChild(document.createTextNode(' · receipt'));
+        }
         if (inv.reversed_at) left.appendChild(document.createTextNode(' · reversed'));
         const right = document.createElement('div');
         right.className = 'info-value';

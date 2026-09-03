@@ -143,6 +143,8 @@ const parasignAuditExport = require('./lib/parasign-audit-export'); // GET /v2/p
 const transferNotify   = require('./lib/transfer-notify');   // ParaSend Pro upload/download mail
 const invoiceMod       = require('./lib/invoice');            // invoice numbering, records and VAT split
 const invoicePdf       = require('./lib/invoice-pdf');        // one-page PDF writer, no dependency
+const creditNote       = require('./lib/credit-note');        // credit notes (CN series) for money that goes back
+const billingHistory   = require('./lib/billing-history');    // one chronological list, derived from the records
 const planExpiry       = require('./lib/plan-expiry');      // paid-term warning + expiry mail (in-process planner)
 
 // Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
@@ -2184,6 +2186,80 @@ function _mailInvoice(record) {
     ``,
     isInvoice ? '' : `${invoiceMod.RECEIPT_NOTE}`,
     invoiceMod.buyerIsComplete(record.buyer) ? '' : `${invoiceMod.BUYER_HINT}.`,
+    ``,
+    `The document is attached, and every document stays available on your account page.`,
+    ``,
+    record.seller.name,
+  ].filter((l, i, a) => !(l === '' && a[i - 1] === ''));
+  return sendResendEmail({
+    to: record.buyer.email,
+    from: 'PARAMANT <billing@paramant.app>',
+    subject,
+    text: lines.join('\n'),
+    attachments: [{ filename: `${record.number}.pdf`, content: pdf.toString('base64') }],
+  });
+}
+
+// The document for money that goes back. A chargeback or a refund reaches us on
+// the SAME tr_ id as the payment, so the invoice it reverses is found from that
+// id alone; the credit note gets its own number in its own series and refers to
+// the invoice by number and date, because an issued invoice may not be
+// withdrawn (see lib/credit-note.js).
+//
+// Runs for a repeat webhook too, and for a partial refund, on the same
+// reasoning as _issueInvoiceForPayment: issueCreditNote is idempotent per
+// reversal, so a retry can only ever repair. Never throws: paperwork must not
+// be able to fail a webhook.
+async function _creditNoteForPayment(payment) {
+  try {
+    const redis = (redisClient && redisClient.isReady) ? redisClient : null;
+    if (!redis) return;
+    const out = await creditNote.issueCreditNote({ payment }, redis);
+    if (out.result !== 'issued') {
+      // 'none' is the ordinary answer for a payment that has no invoice (money
+      // taken before the invoice module existed) and for a repeat of a reversal
+      // already credited in full. Neither is a fault, and neither is silent.
+      log(out.result === 'existing' || out.result === 'none' ? 'info' : 'warn', 'billing_credit_note', {
+        payment_id: payment.id, result: out.result, reason: out.reason, number: out.number,
+      });
+      return out;
+    }
+    log('warn', 'billing_credit_note', {
+      payment_id: payment.id, result: 'issued', number: out.number, credits: out.credited,
+      account: String(out.record.account_id || '').slice(0, 12),
+      total: out.record.amount_gross, reason: out.record.reason, partial: out.record.partial,
+    });
+    _mailCreditNote(out.record);
+    return out;
+  } catch (e) {
+    log('error', 'billing_credit_note_failed', { payment_id: payment && payment.id, err: e.message });
+    return { result: 'unavailable', reason: e.message };
+  }
+}
+
+// The credit note as mail, with the PDF attached. Same shape and same
+// no-mail-path-is-not-an-error rule as _mailInvoice: the record exists and
+// /v2/billing/invoices serves it either way.
+function _mailCreditNote(record) {
+  if (!record || !record.buyer || !record.buyer.email) return false;
+  let pdf;
+  try { pdf = invoicePdf.render(record, { buyerHint: invoiceMod.BUYER_HINT }); }
+  catch (e) { log('warn', 'billing_credit_pdf_failed', { number: record.number, err: e.message }); return false; }
+  const chargedBack = record.reason === 'chargeback';
+  const subject = `${record.title} ${record.number} - ${record.seller.name}`;
+  const lines = [
+    chargedBack
+      ? `Your payment was charged back, so the invoice below has been credited.`
+      : `Your payment has been refunded, so the invoice below has been credited.`,
+    ``,
+    `${record.title} ${record.number}`,
+    `Date: ${record.invoice_date}`,
+    `Credit for invoice ${record.credit_for} of ${record.credit_for_date}`,
+    `${record.description}`,
+    `Total credited: ${record.currency} ${record.amount_gross} (incl. ${record.vat_rate}% VAT, ${record.currency} ${record.amount_vat})`,
+    ``,
+    record.partial ? 'This is a partial credit. The remainder of that invoice still stands.' : '',
+    record.note || '',
     ``,
     `The document is attached, and every document stays available on your account page.`,
     ``,
@@ -6138,11 +6214,26 @@ async function handleRelayRequest(req, res) {
          (outcome.result === 'ignored' && outcome.reason === 'already_processed'))) {
       await _issueInvoiceForPayment(payment, outcome);
     }
-    // A chargeback leaves the invoice standing with its number, and marks it as
-    // reversed. There is no numbered credit note yet (see lib/invoice.js), so a
-    // marker is the honest minimum: the record must not keep claiming money the
-    // customer took back.
-    if (outcome.result === 'revoked' && redisClient && redisClient.isReady) {
+    // Money going back. An issued invoice may not be withdrawn, so the document
+    // for it is a CREDIT NOTE with its own number in its own series, referring
+    // to the invoice it credits (lib/credit-note.js).
+    //
+    // Not gated on outcome.result. A chargeback revokes the entitlement and a
+    // refund does not, but both are money the customer no longer paid, and both
+    // need the document. A partial refund arrives as a still-'paid' payment
+    // with amountRefunded set, which no outcome would ever have caught.
+    if (creditNote.isReversal(payment) && redisClient && redisClient.isReady) {
+      const credit = await _creditNoteForPayment(payment);
+      // The marker on the invoice, and only when the WHOLE invoice went back: a
+      // partly refunded invoice is still partly true, and stamping it reversed
+      // would say the opposite. The credit note is the record either way.
+      if (credit && credit.fully_credited) {
+        const rev = await invoiceMod.recordReversal({ payment }, redisClient);
+        if (rev.result === 'reversed') log('warn', 'billing_invoice_reversed', { payment_id: paymentId, number: rev.number });
+      }
+    } else if (outcome.result === 'revoked' && redisClient && redisClient.isReady) {
+      // A revoke we could not read an amount for. The marker is still the
+      // honest minimum: the record must not keep claiming money that went back.
       const rev = await invoiceMod.recordReversal({ payment }, redisClient);
       if (rev.result === 'reversed') log('warn', 'billing_invoice_reversed', { payment_id: paymentId, number: rev.number });
     }
@@ -6180,9 +6271,31 @@ async function handleRelayRequest(req, res) {
         currency: r.currency, amount_net: r.amount_net, amount_vat: r.amount_vat,
         amount_gross: r.amount_gross, vat_rate: r.vat_rate,
         reversed_at: r.reversed_at || null,
+        // Credit notes ride in the same list, in the same order the customer's
+        // documents happened. These four fields are what tells the page a row
+        // is money going back and which invoice it belongs to.
+        credit_for: r.credit_for || null,
+        reason: r.kind === 'credit_note' ? (r.reason || null) : null,
+        partial: r.kind === 'credit_note' ? !!r.partial : false,
+        credit_notes: r.credit_notes || null,
         pdf_url: `/v2/billing/invoices/${r.number}.pdf`,
       })),
     }));
+  }
+
+  // ── GET /v2/billing/history: one chronological list (authenticated) ──────
+  // Derived, never stored: the invoice and credit-note records for the money,
+  // and the paid periods on those same records (cross-read against the
+  // plan-expiry index) for the terms that ended. See lib/billing-history.js for
+  // why a period end is not simply a date in the past.
+  if (path === '/v2/billing/history' && req.method === 'GET') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    if (!redisClient || !redisClient.isReady) {
+      res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'history_unavailable' }));
+    }
+    const history = await billingHistory.build({ accountId: acctOf(apiKey), redis: redisClient, now: new Date() });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, history }));
   }
 
   // ── GET /v2/billing/invoices/:number.pdf: one document (authenticated) ────
@@ -6192,7 +6305,10 @@ async function handleRelayRequest(req, res) {
   if (path.startsWith('/v2/billing/invoices/') && req.method === 'GET') {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
     const number = decodeURIComponent(path.slice('/v2/billing/invoices/'.length)).replace(/\.pdf$/i, '');
-    if (!invoiceMod.parseNumber(number)) {
+    // Both series: PS for what was charged, CN for what was credited back. They
+    // share one document keyspace and one per-account list, so a credit note is
+    // downloaded by the same route that serves the invoice it credits.
+    if (!invoiceMod.parseDocumentNumber(number)) {
       res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_invoice_number' }));
     }
     if (!redisClient || !redisClient.isReady) {

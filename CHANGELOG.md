@@ -89,6 +89,37 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the message goes to the log.
 
 ### Added
+- **A credit note for money that goes back.** A chargeback used to stamp
+  `reversed_at` on the invoice and stop there, which keeps our own records from
+  lying and is all it does: Dutch VAT law does not let an issued invoice be
+  withdrawn, so the document for a reversal is a SECOND document with its own
+  sequential number that refers to the first (Wet OB art. 35a in full, art. 29
+  for the VAT). `relay/lib/credit-note.js` issues it in its own series,
+  `CN-2026-0001` per calendar year, carrying the number and the date of the
+  invoice it credits, the same description, VAT rate, seller and buyer as that
+  invoice stated, and negative net, VAT and total. It is a PDF on the same
+  renderer, it is mailed, and it appears on /account beside the invoice. One per
+  reversal: the reversal is claimed before a number is drawn, exactly as a
+  payment is, so a Mollie retry finds the document instead of writing a second
+  one. A partial refund gets a credit note for the amount that went back, its
+  VAT pro rata in whole cents; because the split is computed against Mollie's
+  CUMULATIVE counter and issued as the difference, a series of partial credits
+  adds back up to the invoice to the cent, remainder and all, and can never give
+  back more than came in. The invoice is only stamped reversed when the whole of
+  it has been credited.
+- **The billing history on /account is a real history.** It said "No billing
+  events yet" to a customer who had paid, been invoiced and watched his term run
+  out, because the only feed behind it was the admin audit log, which records
+  what an ADMIN did to a plan and knows nothing about a self-serve Mollie
+  payment. `relay/lib/billing-history.js` derives one chronological list from
+  records that already exist: the invoice and credit-note records for the money,
+  and the paid periods on those same records, cross-read against the plan-expiry
+  index and its notice markers (#415), for the terms that ended. No new storage,
+  so nothing can drift from the documents it is derived from. A period end that
+  a renewal extended is not listed as an ending, because the customer never lost
+  a day; a lapse and a later restart are two real endings and both are listed.
+  The admin panel merges its audit events into the same list, so a plan change
+  still shows up in the one place the customer reads.
 - **`admin/test/ratelimit-ttl.test.js`**, which boots a real admin behind a proxy
   that delivers commands and drops replies, and then reads the TTL on its own
   connection. That is the only shape that reproduces a counter stranded without

@@ -44,9 +44,11 @@
 //    here, in integer cents.
 //
 // NOT HERE, ON PURPOSE:
-//   - a credit note for a chargeback. A reversal writes a marker (see
-//     recordReversal) so the record is not silently wrong, but a numbered
-//     credit note with its own series is a separate piece of work.
+//   - the credit note itself. Money that goes back gets its own numbered
+//     document in its own series (CN-2026-0001), and that lives in
+//     lib/credit-note.js. What stays here is recordReversal, the marker that
+//     says an invoice was credited IN FULL, so a reader of the invoice alone
+//     is not misled.
 //   - reverse charge / VAT-MOSS. Every catalog price is 21% Dutch VAT and that
 //     is what was actually charged, so that is what the document states. An
 //     EU customer outside NL with a VAT number is charged the same 21% today;
@@ -144,6 +146,16 @@ function formatNumber(year, seq) {
 function parseNumber(number) {
   const m = /^PS-(\d{4})-(\d{4,})$/.exec(String(number || '').trim());
   return m ? { year: parseInt(m[1], 10), seq: parseInt(m[2], 10) } : null;
+}
+
+// Two series share one document keyspace and one per-account list: PS for what
+// was charged, CN for what was given back (lib/credit-note.js). A reader that
+// only knew PS answered 404 for a credit note it had itself just written into
+// the customer's list, so anything that looks up a stored document goes through
+// this and not through parseNumber.
+function parseDocumentNumber(number) {
+  const m = /^(PS|CN)-(\d{4})-(\d{4,})$/.exec(String(number || '').trim());
+  return m ? { series: m[1], year: parseInt(m[2], 10), seq: parseInt(m[3], 10) } : null;
 }
 
 // ── the record ───────────────────────────────────────────────────────────────
@@ -275,10 +287,12 @@ async function issueDocument({ payment, order, seller, buyer, now, periodEnd }, 
   return { result: 'issued', number, record };
 }
 
-// A chargeback takes the money back on the SAME tr_ id as the payment. There is
-// no credit note yet (see the header), so the least dishonest thing available
-// is a marker on the invoice that was reversed: the document keeps its number
-// and its place in the series, and every reader can see the money went back.
+// A chargeback takes the money back on the SAME tr_ id as the payment. The
+// document that reverses it is a credit note (lib/credit-note.js); this is the
+// marker on the invoice itself, so the invoice keeps its number and its place
+// in the series while every reader can see the money went back. Only ever set
+// when the whole invoice went back: a partial refund leaves an invoice that is
+// still partly true, and stamping it reversed would be the opposite of honest.
 // Never issues a new number.
 async function recordReversal({ payment, now }, redis) {
   if (!redis || !payment || !payment.id) return { result: 'unavailable' };
@@ -322,7 +336,7 @@ async function listFor(accountId, redis, limit = 200) {
 }
 
 async function getFor(accountId, number, redis) {
-  if (!redis || !accountId || !parseNumber(number)) return null;
+  if (!redis || !accountId || !parseDocumentNumber(number)) return null;
   try {
     const raw = await redis.get(K.doc(number));
     if (!raw) return null;
@@ -331,9 +345,22 @@ async function getFor(accountId, number, redis) {
   } catch { return null; }
 }
 
+// The document a payment produced, found from the payment id alone. The claim
+// key is the index: it holds the number once the document exists. Used by the
+// credit-note path, which is handed a chargeback carrying nothing but the tr_
+// id of the payment it reverses.
+async function recordForPayment(paymentId, redis) {
+  if (!redis || !paymentId) return null;
+  let number = null;
+  try { number = await redis.get(K.claim(paymentId)); } catch { return null; }
+  if (!number || !number.startsWith('PS-')) return null;
+  try { return JSON.parse((await redis.get(K.doc(number))) || 'null'); } catch { return null; }
+}
+
 module.exports = {
   CATALOG_VAT_RATE, K, BUYER_HINT, RECEIPT_NOTE, PENDING_TAKEOVER_MS,
   sellerFromEnv, documentKind, documentTitle, buyerIsComplete,
-  centsOf, money, splitVat, formatNumber, parseNumber, describe, buildRecord,
-  issueDocument, recordReversal, listFor, getFor,
+  centsOf, money, splitVat, formatNumber, parseNumber, parseDocumentNumber,
+  describe, buildRecord,
+  issueDocument, recordReversal, recordForPayment, listFor, getFor,
 };

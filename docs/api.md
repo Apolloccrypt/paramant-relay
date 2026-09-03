@@ -974,7 +974,16 @@ Returns current plan and subscription state: `current_plan`, `period`, `amount_e
 
 ### GET /api/user/billing/history
 
-Returns the most recent billing events (plan changes, scheduled cancellations, downgrades).
+Returns one chronological list, newest first: the payments and credit notes the
+relay has documents for, the plan terms that ended, and the admin plan changes
+from the audit log (plan changes, scheduled cancellations, downgrades). Rows
+carry `ts`, `type`, `label`, `detail`, `amount`, `currency` and `document`; a row
+with a `document` is downloadable at
+`/api/user/billing/invoices/<number>.pdf`.
+
+### GET /api/user/billing/invoices
+
+Returns this account's invoices and credit notes, proxied from the relay.
 
 ---
 
@@ -1009,6 +1018,35 @@ Errors: `401 unauthorized` (missing or invalid API key), `400 bad_json` / `unkno
 Called by Mollie with `id=tr_…` (form-encoded). The relay ignores everything else in the webhook body, re-fetches the payment from the Mollie API as the only source of truth, verifies the amount actually paid against the catalog, and grants the product tier idempotently. Responds `200` on every handled event, `400 bad_payment_id` for a malformed id, and `503` on a transient Mollie fetch failure (so Mollie retries).
 
 Not intended to be called by clients.
+
+A refund or a chargeback arrives on the same `tr_` id as the payment. The relay
+issues a **credit note** for it: its own sequential number in its own series
+(`CN-2026-0001`, per calendar year), referring to the invoice it credits by
+number and date, with negative net, VAT and total. One per reversal, idempotent
+against a Mollie retry. A partial refund is credited for the amount that went
+back, with VAT pro rata in whole cents; the invoice itself is only marked
+reversed once the whole of it has been credited.
+
+### GET /v2/billing/invoices: this account's documents
+
+Requires `X-Api-Key`. Returns every document issued to the account, newest
+first: invoices (`PS-…`), payment receipts, and credit notes (`CN-…`, `kind`
+`credit_note`, with `credit_for` naming the invoice and `partial` saying whether
+the rest of it still stands). Each row carries `pdf_url`.
+
+### GET /v2/billing/invoices/:number.pdf: one document
+
+Requires `X-Api-Key`. Serves the PDF for one `PS-` or `CN-` number, rendered on
+demand from the stored record. `400 bad_invoice_number` for a malformed number,
+`404` for a number that does not belong to this account.
+
+### GET /v2/billing/history: one chronological list
+
+Requires `X-Api-Key`. Derived, never stored: the invoice and credit-note records
+for the money, and the paid periods on those same records for the terms that
+ended. Rows carry `ts`, `type` (`invoice`, `credit_note`, `term_ended`), `label`,
+`detail`, `amount`, `currency`, `document` and `pdf_url`. A period end that a
+renewal extended is not an ending and is not listed.
 
 ---
 
