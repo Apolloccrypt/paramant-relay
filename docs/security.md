@@ -373,7 +373,7 @@ Or with ParaShare (browser):
 ## Audit
 
 Pentest by Ryan Williams · Smart Cyber Solutions Pty Ltd (AU) · April 2026  
-Report: [pentest-report-2026-04-08.txt](../pentest-report-2026-04-08.txt)  
+Report: `pentest-report-2026-04-08.txt`  
 Full writeup: [security-audit-2026-04.md](./security-audit-2026-04.md)
 
 All critical/high/medium findings addressed in v2.4.5.

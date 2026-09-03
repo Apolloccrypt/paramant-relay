@@ -187,3 +187,134 @@ test('every external link answers', { skip: !process.env.CHECK_EXTERNAL_LINKS &&
     `\n  These external destinations are gone:\n  ` + dood.sort().join('\n  ') +
     `\n\n  A download button or a payment link that 404s is worse than not offering it.\n`);
 });
+
+// ---------------------------------------------------------------------------
+// The same two questions, for docs/.
+//
+// Everything above guards frontend/, where a dead link is a visitor on the 404
+// page. docs/ has the quieter version of the same failure: a reader following
+// [pentest-report-2026-04-08.txt](../pentest-report-2026-04-08.txt) to a file
+// that the v2.4.0 repo cleanup deleted. Nothing noticed, because nothing looked.
+//
+// Two rules, both resolved on disk with no network:
+//   a link to a path in the repo must reach a file (or a directory, for the
+//   ones that deliberately point at a folder), and a #fragment must exist as a
+//   heading, an id or a name in the file it points into.
+//
+// Code is not prose: fenced blocks, inline spans and HTML comments are removed
+// before anything is read as a link, so a <script src="/js/ready.js"> in an
+// example stays an example. Template placeholders (<naam>, {x}, $VAR) are not
+// destinations either.
+const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const DOCS = path.join(REPO, 'docs');
+
+// Anything with a scheme, or protocol-relative, is somebody else's uptime: the
+// hourly external run above owns those, a pull request does not.
+const EXTERN = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
+const PLACEHOLDER = /[<>{}$|]/;
+
+function docFiles(dir) {
+  const uit = [];
+  for (const naam of fs.readdirSync(dir)) {
+    const p = path.join(dir, naam);
+    const st = fs.statSync(p);
+    if (st.isDirectory()) { if (naam !== 'node_modules') uit.push(...docFiles(p)); }
+    else if (/\.(md|html)$/.test(naam)) uit.push(p);
+  }
+  return uit;
+}
+
+// Fences, inline spans and comments out. An example that shows a link is not a
+// link, and treating it as one is how a link checker earns its reputation.
+function zonderCode(src) {
+  const uit = [];
+  let hek = null;
+  for (const regel of src.replace(/<!--[\s\S]*?-->/g, '').split('\n')) {
+    const m = regel.match(/^\s{0,3}(`{3,}|~{3,})/);
+    if (hek) { if (m && m[1][0] === hek[0] && m[1].length >= hek.length) hek = null; uit.push(''); continue; }
+    if (m) { hek = m[1]; uit.push(''); continue; }
+    uit.push(regel.replace(/`+[^`]*`+/g, ''));
+  }
+  return uit.join('\n');
+}
+
+// Markdown: inline links, reference definitions, and the raw HTML that markdown
+// allows. HTML: the same attributes the frontend scan reads.
+function docDestinations(file) {
+  const ruw = fs.readFileSync(file, 'utf8');
+  const src = file.endsWith('.md') ? zonderCode(ruw) : ruw;
+  const uit = new Set();
+  if (file.endsWith('.md')) {
+    for (const m of src.matchAll(/\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+["'][^"']*["'])?\s*\)/g)) uit.add(m[1]);
+    for (const m of src.matchAll(/^\s{0,3}\[[^\]]+\]:\s*<?(\S+)>?/gm)) uit.add(m[1]);
+  }
+  for (const m of src.matchAll(/(?:href|src|action)\s*=\s*["']([^"']+)["']/g)) uit.add(m[1]);
+  return [...uit];
+}
+
+// GitHub's heading slug: lowercase, punctuation dropped, spaces to hyphens.
+// A repeated heading gets -1, -2, which is why the counter is here.
+function slug(tekst) {
+  return tekst
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[`*_~]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N} \-_]/gu, '')
+    .replace(/ +/g, '-');
+}
+
+// Every fragment a reader can land on in one file.
+function ankers(file) {
+  const ruw = fs.readFileSync(file, 'utf8');
+  const uit = new Set();
+  for (const m of ruw.matchAll(/(?:id|name)\s*=\s*["']([^"']+)["']/g)) uit.add(m[1]);
+  if (!file.endsWith('.md')) return uit;
+  const geteld = new Map();
+  for (const m of zonderCode(ruw).matchAll(/^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/gm)) {
+    const s = slug(m[1]);
+    if (!s) continue;
+    const n = geteld.get(s) || 0;
+    geteld.set(s, n + 1);
+    uit.add(n ? `${s}-${n}` : s);
+  }
+  return uit;
+}
+
+const ankerCache = new Map();
+function heeftAnker(file, fragment) {
+  if (!ankerCache.has(file)) ankerCache.set(file, ankers(file));
+  return ankerCache.get(file).has(fragment) || ankerCache.get(file).has(decodeURIComponent(fragment));
+}
+
+const docs = docFiles(DOCS).flatMap((f) => docDestinations(f).map((d) => ({ d, f })));
+
+test('every link in docs/ points at something that exists', () => {
+  assert(docs.length, 'no links found under docs/ at all, which means the scan stopped reading the files');
+
+  const dood = [];
+  for (const { d, f } of docs) {
+    if (EXTERN.test(d) || PLACEHOLDER.test(d)) continue;
+    const [pad, anker] = [d.split('#')[0].split('?')[0], d.split('#').slice(1).join('#')];
+
+    // A path from the site root is a route, not a file next to the doc, so it
+    // is answered by the same rules as the frontend scan above.
+    if (pad.startsWith('/')) {
+      if (SERVER_ROUTES.some((r) => r.test(pad)) || resolvesOnDisk(pad)) continue;
+      dood.push(`${d}   (from ${path.relative(REPO, f)})`);
+      continue;
+    }
+
+    const doel = pad ? path.resolve(path.dirname(f), decodeURIComponent(pad)) : f;
+    if (!doel.startsWith(REPO)) { dood.push(`${d}   (from ${path.relative(REPO, f)}: leaves the repo)`); continue; }
+    if (!fs.existsSync(doel)) { dood.push(`${d}   (from ${path.relative(REPO, f)})`); continue; }
+    if (!anker) continue;
+    if (!fs.statSync(doel).isFile() || !/\.(md|html)$/.test(doel)) continue;   // no headings to have
+    if (!heeftAnker(doel, anker)) dood.push(`${d}   (from ${path.relative(REPO, f)}: no such heading or id)`);
+  }
+
+  assert.deepEqual([...new Set(dood)].sort(), [],
+    `\n  These links in docs/ lead nowhere:\n  ` +
+    [...new Set(dood)].sort().join('\n  ') +
+    `\n\n  Point them at the file or heading that exists, or take the link off.\n`);
+});
