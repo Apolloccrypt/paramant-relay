@@ -10,6 +10,13 @@ const RELAY_SECTORS = {
 let RELAY_API = RELAY_SECTORS.health; // updated after key validation
 
 let apiKey = '', keyValid = false, selectedFile = null, selectedFiles = [];
+// The credential this page really runs on. `sessionAuth` is a pst_ session
+// token: fifteen minutes, scoped by the relay to the five routes a transfer
+// walks, and minted per browser session. `apiKey` above is now only ever the
+// manual way out, for a self-hosted relay with no /api/user/parasend/token.
+// Exactly one of the two is set; relayAuthHeaders() is the one place that
+// decides which header goes on a request.
+let sessionAuth = '', sessionAuthExp = 0, sessionAuthPending = null;
 // Sector discovery is its own question, kept apart from keyValid: a key can be
 // perfectly good while not one of the four sectors answers. relayReady says a
 // sector was found; relayError carries the reason it was not.
@@ -18,8 +25,16 @@ let relayReady = false, relayError = '';
 // be able to stop it: a second poll on a dead token would keep asking forever.
 let pubkeyPoll = null;
 // nginx puts /api/user/ in the relay_auth zone (burst 5). One fetch for the
-// account key, and at most one retry, 2 s later, when that fetch is throttled.
+// session token, and at most one retry, 2 s later, when that fetch is throttled.
 const KEY_RETRY_MS = 2000;
+// Where the token comes from. The admin mints it against the account this
+// browser is signed in as; the page never sees the account key.
+const TOKEN_URL = '/api/user/parasend/token';
+// Refresh a minute before the relay would stop honouring it. A sender who
+// spends twenty minutes choosing a 4 GB file and comparing a fingerprint must
+// not hit an expiry at the upload, which is the one step that cannot be
+// cheaply retried.
+const TOKEN_MARGIN_MS = 60000;
 let sessionToken = '', ws = null;
 let receiverPubs = null;
 
@@ -69,12 +84,16 @@ function setStepperStage(key) {
 }
 
 // Show the full API-key card. Two callers: the "Change" link in the slim row,
-// and the way out on the error banner, which is the path a self-hoster without
-// /api/user/account/key takes.
+// and the way out on the error banner, which is the path a self-hoster whose
+// deployment cannot mint a session token takes.
 function expandApiKeyCard() {
   var s = $('step-setup');
   if (s) s.classList.add('manual-key');
   setKeyError(false);
+  // Asking for the box means taking over from the session token, so the token
+  // is dropped here rather than left as a second credential the page might
+  // still reach for. One credential at a time, always.
+  sessionAuth = ''; sessionAuthExp = 0; sessionAuthPending = null;
   var inp = $('api-key');
   if (inp) { inp.value = ''; inp.focus(); onKeyInput(); }
   // Legacy only. This page no longer writes the key to localStorage; this
@@ -84,17 +103,15 @@ function expandApiKeyCard() {
 
 // The slim row is the default state of step 1. This fills it in once the
 // session key has really arrived: the mask, the label, and the green dot.
-function applySlimApiKeyView() {
-  var inp = $('api-key');
-  if (!inp || !inp.value) return;
+function applySlimApiKeyView(shown) {
+  if (!shown) return;
   var mask = $('ps-key-mask');
   if (mask) {
-    var v = inp.value;
-    mask.textContent = v.length > 14 ? v.slice(0, 8) + '...' + v.slice(-4) : v;
+    mask.textContent = shown.length > 14 ? shown.slice(0, 8) + '...' + shown.slice(-4) : shown;
     mask.hidden = false;
   }
   var label = $('ps-key-slim-label');
-  if (label) label.textContent = 'Using your account key';
+  if (label) label.textContent = 'Using your account';
   var row = $('ps-key-slim');
   if (row) { row.classList.remove('is-loading'); row.hidden = false; }
   var s = $('step-setup');
@@ -277,16 +294,101 @@ async function showReceiverConnected(kyberPub, ecdhPub) {
   renderFingerprintQR(fp);
 }
 
+// ── The credential, and the one place that presents it ──────────────────────
+// Every relay call on this page goes through relayFetch. Two reasons it is one
+// function and not five copies: the header depends on which credential the page
+// is running (a Bearer token from the session, or a hand-typed key on a
+// self-host), and a token can die halfway through a long send. Spread over five
+// call sites, one of them would eventually be written without the refresh.
+function relayAuthHeaders(extra) {
+  var h = {};
+  for (var k in (extra || {})) if (Object.prototype.hasOwnProperty.call(extra, k)) h[k] = extra[k];
+  if (sessionAuth) h['Authorization'] = 'Bearer ' + sessionAuth;
+  else if (apiKey) h['X-Api-Key'] = apiKey;
+  return h;
+}
+
+// Ask the admin for a token. The account is the one this browser is signed in
+// as; there is nothing to send and nothing the page could name.
+async function fetchSessionToken() {
+  var r = await fetch(TOKEN_URL, { method: 'POST', credentials: 'include' });
+  // nginx rate-limits /api/user/ (zone relay_auth, burst 5). A 429 here is the
+  // page arriving next to its own siblings, not a broken account, so it earns
+  // exactly one retry and then gives up.
+  if (r.status === 429) {
+    await new Promise(function (res) { setTimeout(res, KEY_RETRY_MS); });
+    r = await fetch(TOKEN_URL, { method: 'POST', credentials: 'include' });
+  }
+  // Expected, and marked so: a browser with no session gets 401/403, and a
+  // self-host that never built this endpoint answers 404. Both mean "no token
+  // here", the banner is the whole answer, and neither is worth a line in the
+  // console of every signed-out visitor.
+  if (!r.ok) {
+    var refused = new Error('session token: HTTP ' + r.status);
+    refused.expected = r.status === 401 || r.status === 403 || r.status === 404;
+    throw refused;
+  }
+  var d = await r.json();
+  if (!d || !d.token) {
+    var none = new Error('session token: none for this session');
+    none.expected = true;
+    throw none;
+  }
+  return d;
+}
+
+// One refresh at a time. Two uploads racing an expiry would otherwise mint two
+// tokens and each keep the other's, and the loser would carry a token it had
+// already replaced.
+function refreshSessionAuth() {
+  if (sessionAuthPending) return sessionAuthPending;
+  sessionAuthPending = fetchSessionToken().then(function (d) {
+    sessionAuth = d.token;
+    sessionAuthExp = Date.now() + (d.expires_in_s || 0) * 1000;
+    sessionAuthPending = null;
+    return true;
+  }).catch(function () {
+    // The token is left as it was. A failed refresh is not proof the old one is
+    // dead, and throwing the credential away here would turn a blip in the
+    // admin into a dead page.
+    sessionAuthPending = null;
+    return false;
+  });
+  return sessionAuthPending;
+}
+
+// One relay call, with whichever credential this page is running, and exactly
+// one recovery: a token that expired mid-session is replaced and the call is
+// made again. Once. A 401 that survives a fresh token is a real 401.
+async function relayFetch(url, opts) {
+  opts = opts || {};
+  if (sessionAuth && sessionAuthExp && Date.now() > sessionAuthExp - TOKEN_MARGIN_MS) {
+    await refreshSessionAuth();
+  }
+  var send = {};
+  for (var k in opts) if (Object.prototype.hasOwnProperty.call(opts, k) && k !== 'retried') send[k] = opts[k];
+  send.headers = relayAuthHeaders(opts.headers);
+  var r = await fetch(url, send);
+  if (r.status === 401 && sessionAuth && !opts.retried) {
+    if (await refreshSessionAuth()) {
+      var again = {};
+      for (var k2 in opts) if (Object.prototype.hasOwnProperty.call(opts, k2)) again[k2] = opts[k2];
+      again.retried = true;
+      return relayFetch(url, again);
+    }
+  }
+  return r;
+}
+
 // ── Relay discovery: try all sectors in parallel, pick first valid ──
 // It used to fold two different failures into one null: "a sector answered and
 // refused this key" and "not one sector answered". The first is about the key,
 // the second is about the network, and only the first should ever disable the
 // button. So the two are reported apart.
-async function discoverRelay(key) {
+async function discoverRelay() {
   const results = await Promise.allSettled(
     Object.entries(RELAY_SECTORS).map(async ([sector, url]) => {
-      const r = await fetch(`${url}/v2/check-key`, {
-        headers: { 'X-Api-Key': key },
+      const r = await relayFetch(`${url}/v2/check-key`, {
         signal: AbortSignal.timeout(5000)
       });
       const d = await r.json();
@@ -303,12 +405,58 @@ async function discoverRelay(key) {
   };
 }
 
-// ── Key validation ──
-// The key is never written to localStorage. It comes from the session
-// (/api/user/account/key) or, on a self-host without that endpoint, from the
-// manual card. Persisting it bought nothing and put a bearer credential in a
-// store that outlives the sign-out that was documented to clear it.
+// ── Credential validation ──
+// Nothing is written to localStorage, and on the hosted relay nothing that
+// reaches this page is an API key at all: the credential is a pst_ session
+// token, minted per browser session and scoped by the relay to the five routes
+// a transfer walks. The manual card below is the self-host path, and it is the
+// only one that still holds a pgp_ key.
+//
+// The two paths share everything after the credential: find a sector that
+// accepts the account, and report the result without holding the button
+// hostage to a sector that will not answer.
+async function discoverAndReport() {
+  setStatus('key-status', 'Checking...');
+  updateBtn();
+  let d;
+  try {
+    d = await discoverRelay();
+  } catch (e) {
+    d = { answered: false, rejected: false, found: null };
+  }
+  if (d.found) {
+    RELAY_API = d.found.url;
+    relayReady = true;
+    const sectorLabel = d.found.sector !== 'health' ? ` · ${d.found.sector}` : '';
+    setStatus('key-status', `✓ Valid, plan: ${d.found.plan}${sectorLabel}`, 'ok');
+  } else if (d.rejected) {
+    // A sector answered and said no. On the session path that is a verdict on
+    // the account, not on anything the sender typed, so it is not called a bad
+    // key: there is no key here to be bad.
+    setStatus('key-status', sessionAuth ? 'This account is not active on any relay sector' : 'Invalid or revoked key', 'err');
+    keyValid = false;
+  } else {
+    // Nothing answered. Say so where the user is looking, and let the button
+    // stay live: the failure belongs at the press, with a reason attached.
+    relayError = 'No relay sector answered. Check your connection and press Create secure session again.';
+    setStatus('key-status', 'Could not reach a relay sector. You can still continue.', 'err');
+  }
+  updateBtn();
+}
+
+// The session path: a token is already in hand, so there is nothing to check
+// about its shape and the sector question is the only one left.
+async function useSessionToken() {
+  apiKey = '';
+  keyValid = true; relayReady = false; relayError = '';
+  await discoverAndReport();
+}
+
+// The manual card, for a self-hosted relay with no token endpoint. Typing a key
+// takes over from the session token; expandApiKeyCard has already dropped it,
+// and this drops it again for the case where the box was filled another way.
 async function onKeyInput() {
+  sessionAuth = ''; sessionAuthExp = 0; sessionAuthPending = null;
   apiKey = $('api-key').value.trim();
   setCreateStatus('');
   // An empty box has nothing wrong with it yet. Calling it invalid is what the
@@ -322,33 +470,8 @@ async function onKeyInput() {
     setStatus('key-status', 'That does not look like a key. It starts with pgp_.', 'err');
     keyValid = false; relayReady = false; relayError = ''; updateBtn(); return;
   }
-  // A well-formed key that came from the session is usable now. Whether a
-  // sector answers is a separate question, and it is answered below without
-  // holding the button hostage.
   keyValid = true; relayReady = false; relayError = '';
-  setStatus('key-status', 'Checking...');
-  updateBtn();
-  let d;
-  try {
-    d = await discoverRelay(apiKey);
-  } catch (e) {
-    d = { answered: false, rejected: false, found: null };
-  }
-  if (d.found) {
-    RELAY_API = d.found.url;
-    relayReady = true;
-    const sectorLabel = d.found.sector !== 'health' ? ` · ${d.found.sector}` : '';
-    setStatus('key-status', `✓ Valid, plan: ${d.found.plan}${sectorLabel}`, 'ok');
-  } else if (d.rejected) {
-    setStatus('key-status', 'Invalid or revoked key', 'err');
-    keyValid = false;
-  } else {
-    // Nothing answered. Say so where the user is looking, and let the button
-    // stay live: the failure belongs at the press, with a reason attached.
-    relayError = 'No relay sector answered. Check your connection and press Create secure session again.';
-    setStatus('key-status', 'Could not reach a relay sector. You can still continue.', 'err');
-  }
-  updateBtn();
+  await discoverAndReport();
 }
 
 function setCreateStatus(msg, cls) {
@@ -388,7 +511,11 @@ async function createSession() {
   // answer, say so out loud instead of going quiet.
   if (!relayReady) {
     setCreateStatus('Looking for a relay sector...');
-    await onKeyInput();
+    // The sector question only, not the credential question. Calling onKeyInput
+    // here would re-read the manual box, and on the session path that box is
+    // empty by design: the retry would throw away a working token and report a
+    // missing key instead of a missing sector.
+    await discoverAndReport();
     if (!relayReady) {
       // relayError is the planned sentence. Reaching here without one is a state
       // we did not plan for, so it gets the page's one sentence for that.
@@ -417,7 +544,7 @@ async function connectWebSocket() {
   try {
     // Ticket must come from the same relay host the WS connects to (relay-main)
     const wsHttpBase = RELAY_WS.replace('wss://', 'https://').replace('ws://', 'http://');
-    const tr = await fetch(`${wsHttpBase}/v2/ws-ticket`, {method:'POST',headers:{'X-Api-Key':apiKey},signal:AbortSignal.timeout(5000)});
+    const tr = await relayFetch(`${wsHttpBase}/v2/ws-ticket`, {method:'POST',signal:AbortSignal.timeout(5000)});
     if (tr.ok) { const td = await tr.json(); if (td.ticket) wsUrl += '?ticket=' + encodeURIComponent(td.ticket); }
   } catch {}
   ws = new WebSocket(wsUrl);
@@ -433,7 +560,7 @@ async function connectWebSocket() {
   if (pubkeyPoll) clearInterval(pubkeyPoll);
   pubkeyPoll = setInterval(async () => {
     try {
-      const r = await fetch(`${RELAY_API}/v2/pubkey/${encodeURIComponent(sessionToken)}`, { headers: { 'X-Api-Key': apiKey }, signal: AbortSignal.timeout(3000) });
+      const r = await relayFetch(`${RELAY_API}/v2/pubkey/${encodeURIComponent(sessionToken)}`, { signal: AbortSignal.timeout(3000) });
       if (r.ok) {
         const d = await r.json();
         if (d.kyber_pub && d.ecdh_pub) {
@@ -550,9 +677,9 @@ async function confirmFingerprint() {
         const hashBuf = await crypto.subtle.digest('SHA-256', padded);
         const hash = u8toHex(new Uint8Array(hashBuf));
 
-        const ur = await fetch(RELAY_API + '/v2/inbound', {
+        const ur = await relayFetch(RELAY_API + '/v2/inbound', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             hash, payload: toB64(padded), ttl_ms: ttlMs,
             // file_name omitted — filename is only in the encrypted payload (finding #4)
@@ -584,9 +711,9 @@ async function confirmFingerprint() {
     $('enc-status').textContent = 'Notifying receiver...';
 
     const isVault = files.length > 1;
-    await fetch(RELAY_API + '/v2/pubkey', {
+    await relayFetch(RELAY_API + '/v2/pubkey', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         device_id: sessionToken + '_ready',
         ecdh_pub: isVault ? JSON.stringify(vaultFiles) : vaultFiles[0].tokens.join(','),
@@ -708,56 +835,37 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  loadAccountKey();
+  loadSessionCredential();
   // Small delay so DOM is fully painted before Globe.gl reads dimensions
   setTimeout(() => initGlobe(), 400);
 });
 
-// The session is the only source of the key. localStorage used to be a second
-// one, and it is what the buyer review caught: a stale or hand-typed key sat
-// there, the slim row said "using your account key", and Send died on a key
-// that belonged to nobody. One source, one failure mode, one banner.
-async function fetchAccountKey() {
-  let r = await fetch('/api/user/account/key', { credentials: 'include' });
-  // nginx rate-limits /api/user/ (zone relay_auth, burst 5). A 429 here is the
-  // page arriving next to its own siblings, not a broken account, so it earns
-  // exactly one retry and then gives up.
-  if (r.status === 429) {
-    await new Promise(res => setTimeout(res, KEY_RETRY_MS));
-    r = await fetch('/api/user/account/key', { credentials: 'include' });
-  }
-  // Expected, and marked so: a browser with no session gets 401/403, and a
-  // self-host that never built this endpoint answers 404. Both mean "no key
-  // here", the banner is the whole answer, and neither is worth a line in the
-  // console of every signed-out visitor.
-  if (!r.ok) {
-    const noSession = new Error('account key: HTTP ' + r.status);
-    noSession.expected = r.status === 401 || r.status === 403 || r.status === 404;
-    throw noSession;
-  }
-  const d = await r.json();
-  if (!d || !d.api_key) {
-    const noKey = new Error('account key: none on this session');
-    noKey.expected = true;
-    throw noKey;
-  }
-  return d.api_key;
-}
-
-async function loadAccountKey() {
+// The session is the only source of the credential, and the credential is no
+// longer the account key. The page asks the admin for a pst_ session token; the
+// key stays on the server. What the buyer review caught first was a second
+// source of truth in localStorage, and what the security review caught after it
+// was the key itself: a credential with no expiry and no scope, held for the
+// life of the tab, readable by anything that got to run on the page. There is
+// one source, it hands over something that expires in fifteen minutes, and it
+// opens five routes.
+async function loadSessionCredential() {
   try {
-    const key = await fetchAccountKey();
-    $('api-key').value = key;
-    applySlimApiKeyView();
-    await onKeyInput();
+    const d = await fetchSessionToken();
+    sessionAuth = d.token;
+    sessionAuthExp = Date.now() + (d.expires_in_s || 0) * 1000;
+    // The slim row shows the token, masked, and not the key: there is no key
+    // here to show. The manual box stays empty, which is what makes the two
+    // credentials impossible to confuse.
+    applySlimApiKeyView(d.token);
+    await useSessionToken();
   } catch (e) {
     setKeyError(true);
     // The banner carries the sentence either way. Only the unplanned half gets
     // reported: a 500, or a fetch that never arrived. Reporting the planned half
     // would put a console error on every signed-out page load, which is both
     // noise and a false alarm for the heartbeat that reads that console.
-    if (!e || !e.expected) failureText('account key', e);
-    setStatus('key-status', 'Account key could not be loaded', 'err');
+    if (!e || !e.expected) failureText('session token', e);
+    setStatus('key-status', 'Account session could not be started', 'err');
     keyValid = false;
     updateBtn();
   }

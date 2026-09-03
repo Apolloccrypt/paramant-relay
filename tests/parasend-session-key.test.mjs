@@ -1,31 +1,39 @@
-// ParaSend takes its API key from the session and from nowhere else.
+// ParaSend runs on a session token, and the account key never reaches the
+// browser at all.
 //
-// The bug a buyer walked into: Send in the signed-in navigation opened
-// /parashare on a card headed "Your API key" with an empty box in it, and the
-// key he typed there was not the key of the account he was signed in with. The
-// page had two sources of truth. GET /api/user/account/key was one; a
-// localStorage entry written by any earlier visit, on any account, was the
-// other, and the second outlived the first. A stale or hand-typed key sails
-// past the format check, fails at the relay, and the only thing the sender sees
-// is a button that will not light up.
+// TWO FINDINGS, ONE PAGE. The first was a buyer's: Send in the signed-in
+// navigation opened /parashare on a card headed "Your API key" with an empty box
+// in it, and the key he typed there was not the key of the account he was signed
+// in with. The page had two sources of truth, GET /api/user/account/key and a
+// localStorage entry any earlier visit could have written, and the second
+// outlived the first. That was closed by making the session the only source.
 //
-// So: one source. frontend/js/parashare.page.js reads the account key from the
-// session on every load, keeps it in memory, and never writes it to
-// localStorage. This suite runs that page script for real, in a vm context
-// with a hand-built DOM and a stubbed fetch, node builtins only, so it runs in
-// the "Root integration suites" job next to the other tests/*.mjs, and it
-// measures the three answers the endpoint can give.
+// The second was the security review of #397, and it is about what that single
+// source hands over. An account API key has no expiry and no scope: fetched into
+// a variable, it stays a full data-plane credential for the life of the tab, and
+// anything that gets to run on the page can read it and keep it. So the page now
+// asks POST /api/user/parasend/token and is handed a pst_ session token instead:
+// fifteen minutes, and scoped by the relay to the five routes a transfer walks.
+// The key stays on the server.
 //
-// Verified by sabotage, both directions:
-//   • put `localStorage.setItem('paramant_api_key', apiKey)` back into
+// This suite runs the page script for real, in a vm context with a hand-built
+// DOM and a stubbed fetch, node builtins only, so it runs in the "Root
+// integration suites" job next to the other tests/*.mjs. What it measures is
+// what the page holds, what it sends, and what it does when the token runs out.
+//
+// Verified by sabotage, in both directions:
+//   * put `localStorage.setItem('paramant_api_key', apiKey)` back into
 //     onKeyInput and the "never persists" case goes red (and so does row 28 of
 //     site-claims.test.mjs);
-//   • drop the 429 retry, or make the 500 path silent instead of showing the
+//   * send X-Api-Key instead of the Bearer on any of the five relay calls and
+//     the header case goes red by name;
+//   * drop the 401 refresh, or the proactive one, and the expiry cases go red;
+//   * drop the 429 retry, or make the 500 path silent instead of showing the
 //     banner, and the matching case goes red;
-//   • make keyValid depend on discoverRelay again and "a dead sector does not
+//   * make keyValid depend on discoverRelay again and "a dead sector does not
 //     disable the button" goes red;
-//   • and each case was run against an unpatched parashare.page.js, where the
-//     slim-row, banner and retry cases fail and only the happy path passes.
+//   * and each case was run against an unpatched parashare.page.js, where every
+//     token case fails and only the shape of the old key flow passes.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -41,7 +49,8 @@ const PS_HTML = fs.readFileSync(path.join(PS_ROOT, 'frontend/parashare.html'), '
 // close it over this process's console, and half of what this suite measures is
 // what the page does or does not write to the browser's.
 const PS_ERRORS_JS = fs.readFileSync(path.join(PS_ROOT, 'frontend/js/error-message.js'), 'utf8');
-const KEY_URL = '/api/user/account/key';
+const TOKEN_URL = '/api/user/parasend/token';
+const FAKE_TOKEN = 'pst_' + 'ab12cd34'.repeat(8);
 const FAKE_KEY = 'pgp_livetestkey0000000000abcd';
 
 // ── A DOM small enough to read, big enough to run the page script ────────────
@@ -69,7 +78,7 @@ function makeElement(id) {
 }
 
 // A run of the page: the vm context, the DOM it saw, and what it asked for.
-function runPage({ keyResponses, sectorOk = true }) {
+function runPage({ keyResponses, sectorOk = true, relayStatus = null }) {
   const elements = new Map();
   const getElementById = (id) => {
     if (!elements.has(id)) elements.set(id, makeElement(id));
@@ -77,7 +86,9 @@ function runPage({ keyResponses, sectorOk = true }) {
   };
   const listeners = new Map();
   const sockets = [];
-  const calls = { key: 0, sector: 0, urls: [], timeouts: [], storage: [], copied: [] };
+  // `relay` records every relay call with the headers it carried, which is the
+  // only way to see which credential the page presented.
+  const calls = { key: 0, sector: 0, urls: [], timeouts: [], storage: [], copied: [], relay: [] };
   let keyTurn = 0;
 
   const respond = (spec) => ({
@@ -123,16 +134,22 @@ function runPage({ keyResponses, sectorOk = true }) {
       send() {}
       close() { this.closed = true; }
     },
-    fetch: async (url) => {
+    fetch: async (url, opts) => {
       calls.urls.push(url);
-      if (String(url).endsWith(KEY_URL)) {
+      if (String(url).endsWith(TOKEN_URL)) {
         calls.key += 1;
         const spec = keyResponses[Math.min(keyTurn++, keyResponses.length - 1)];
         return respond(spec);
       }
+      const headers = (opts && opts.headers) || {};
+      calls.relay.push({ url: String(url), method: (opts && opts.method) || 'GET', headers });
       calls.sector += 1;
       if (!sectorOk) throw new Error('sector unreachable');
-      return respond({ status: 200, body: { valid: true, plan: 'pro' } });
+      // A test can make the relay refuse, which is how the mid-session expiry
+      // is driven: the page has to notice a 401 and mint a replacement.
+      const forced = relayStatus && relayStatus(String(url), calls.relay.length);
+      if (forced) return respond(forced);
+      return respond({ status: 200, body: { valid: true, plan: 'pro', ok: true, ticket: 'wst_x', download_token: 'dl_x' } });
     },
   };
   context.window = context;
@@ -166,6 +183,10 @@ function pickAFile(run) {
 }
 
 const wroteTheKey = (run) => run.calls.storage.some(([op, k]) => op === 'set' && k === 'paramant_api_key');
+// The credential every relay call carried, in order. This is the assertion the
+// whole feature rests on: a Bearer, and never an X-Api-Key.
+const relayAuth = (run) => run.calls.relay.map((c) => c.headers.Authorization || c.headers['X-Api-Key'] || null);
+const ok200 = { status: 200, body: { token: FAKE_TOKEN, expires_in_s: 900 } };
 
 // Press Copy link the way the page does, and let the clipboard promise settle.
 async function copyLinkIn(run) {
@@ -174,26 +195,36 @@ async function copyLinkIn(run) {
 }
 
 // ── 1. The endpoint answers ─────────────────────────────────────────────────
-test('a 200 from /api/user/account/key gives the slim row, a usable button, and nothing in localStorage', async () => {
-  const run = await loadPage({ keyResponses: [{ status: 200, body: { api_key: FAKE_KEY, revealable: true } }] });
+test('a 200 from /api/user/parasend/token gives the slim row, a usable button, and no key anywhere', async () => {
+  const run = await loadPage({ keyResponses: [ok200] });
 
-  assert.equal(run.calls.key, 1, 'the account key is fetched exactly once when the endpoint answers');
-  assert.equal(run.getElementById('api-key').value, FAKE_KEY, 'the session key is the key the page holds');
+  assert.equal(run.calls.key, 1, 'the session token is fetched exactly once when the endpoint answers');
+  assert.equal(evalIn(run, 'sessionAuth'), FAKE_TOKEN, 'the token is the credential the page holds');
+  assert.equal(evalIn(run, 'apiKey'), '', 'THE POINT: no API key is held in the page at all');
+  assert.equal(run.getElementById('api-key').value, '',
+    'and the manual box stays empty, so the two credentials cannot be confused');
 
   // The slim row is the state the sender lands in: no empty "API key" box.
   const slim = run.getElementById('ps-key-slim');
   assert.equal(slim.hidden, false, 'the slim row is shown');
   assert.equal(slim.classList.contains('is-loading'), false, 'the slim row stops claiming to be loading');
-  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'Using your account key');
-  assert.equal(run.getElementById('ps-key-mask').hidden, false, 'the masked key is revealed next to the label');
-  assert.match(run.getElementById('ps-key-mask').textContent, /^pgp_.*\.\.\..{4}$/, 'the row shows a masked key, not the whole one');
+  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'Using your account');
+  assert.equal(run.getElementById('ps-key-mask').hidden, false, 'the masked credential is shown next to the label');
+  assert.match(run.getElementById('ps-key-mask').textContent, /^pst_.*\.\.\..{4}$/,
+    'the row shows a masked session token, and it says pst_ because that is what the page is holding');
   assert.equal(run.getElementById('step-setup').classList.contains('manual-key'), false,
     'the manual card stays closed: #step-setup only carries .manual-key when the user asks for the box');
   assert.equal(run.getElementById('ps-key-error').classList.contains('is-shown'), false, 'no banner on the happy path');
 
-  assert.equal(evalIn(run, 'keyValid'), true, 'the key is usable');
+  assert.equal(evalIn(run, 'keyValid'), true, 'the credential is usable');
   assert.equal(pickAFile(run), true, 'pick a file and "Create secure session" is live');
-  assert.equal(wroteTheKey(run), false, 'the account key is never written to localStorage');
+  assert.equal(wroteTheKey(run), false, 'nothing is written to localStorage');
+
+  // Sector discovery is the first thing the token is spent on, and it goes out
+  // as a Bearer. An X-Api-Key here would mean the page still had a key to send.
+  assert.ok(run.calls.relay.length >= 4, 'all four sectors were asked');
+  assert.deepEqual([...new Set(relayAuth(run))], [`Bearer ${FAKE_TOKEN}`],
+    'every relay call must carry the session token as a Bearer, and nothing must carry X-Api-Key');
 });
 
 // ── 2. nginx throttles the page ─────────────────────────────────────────────
@@ -201,34 +232,29 @@ test('a 200 from /api/user/account/key gives the slim row, a usable button, and 
 // burst 5). /parashare loads next to nav-auth's session check and the quota
 // call, so a 429 here is the page arriving in its own crowd, not a broken
 // account. One retry, 2 s later, and then it gives up.
-test('a 429 on the account key is retried once, two seconds later, and then succeeds', async () => {
-  const run = await loadPage({
-    keyResponses: [
-      { status: 429, body: {} },
-      { status: 200, body: { api_key: FAKE_KEY, revealable: true } },
-    ],
-  });
+test('a 429 on the session token is retried once, two seconds later, and then succeeds', async () => {
+  const run = await loadPage({ keyResponses: [{ status: 429, body: {} }, ok200] });
 
   assert.equal(run.calls.key, 2, 'exactly one retry: the rate limiter must not be hammered');
   assert.ok(run.calls.timeouts.includes(2000), `the retry waits 2000 ms; delays asked for were ${run.calls.timeouts.join(', ')}`);
-  assert.equal(run.getElementById('api-key').value, FAKE_KEY, 'the retry is what delivers the key');
+  assert.equal(evalIn(run, 'sessionAuth'), FAKE_TOKEN, 'the retry is what delivers the token');
   assert.equal(run.getElementById('ps-key-slim').hidden, false, 'the slim row is reached through the retry');
   assert.equal(run.getElementById('ps-key-error').classList.contains('is-shown'), false, 'a throttled first try is not an error to the user');
   assert.equal(evalIn(run, 'keyValid'), true);
-  assert.equal(wroteTheKey(run), false, 'the account key is never written to localStorage');
+  assert.equal(wroteTheKey(run), false, 'nothing is written to localStorage');
 });
 
 // ── 3. The endpoint is broken ───────────────────────────────────────────────
-test('a 500 on the account key shows the banner, hides the slim row, and offers a key by hand', async () => {
+test('a 500 on the session token shows the banner, hides the slim row, and offers a key by hand', async () => {
   const run = await loadPage({ keyResponses: [{ status: 500, body: {} }] });
 
   assert.equal(run.calls.key, 1, 'a 500 is not a rate limit: no retry');
   assert.equal(run.getElementById('ps-key-error').classList.contains('is-shown'), true, 'the failure is stated, not swallowed');
   assert.equal(run.getElementById('ps-key-slim').hidden, true,
-    'the slim row may not say "using your account key" when there is no account key');
+    'the slim row may not say "using your account" when there is no session credential');
   assert.equal(evalIn(run, 'keyValid'), false);
-  assert.equal(pickAFile(run), false, 'without a key the button stays disabled, and the banner says why');
-  assert.equal(wroteTheKey(run), false, 'the account key is never written to localStorage');
+  assert.equal(pickAFile(run), false, 'without a credential the button stays disabled, and the banner says why');
+  assert.equal(wroteTheKey(run), false, 'nothing is written to localStorage');
 
   // The way out for a self-host whose deployment has no such endpoint.
   evalIn(run, 'expandApiKeyCard()');
@@ -238,7 +264,7 @@ test('a 500 on the account key shows the banner, hides the slim row, and offers 
 
 // ── 4. The banner's words, and the default state of the markup ──────────────
 test('/parashare ships the banner copy and opens on the slim row, not the manual card', () => {
-  assert.ok(PS_HTML.includes('Your account key could not be loaded. Sign in again; if it keeps happening, mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.'),
+  assert.ok(PS_HTML.includes('Your account session could not be started. Sign in again; if it keeps happening, mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.'),
     'the banner must name the one thing to do and the one address to write to');
   assert.match(PS_HTML, /data-click="expandApiKeyCard">Use a key by hand</, 'the banner must carry the manual way out');
   // error-message.js is a plain script and parashare.page.js reads
@@ -260,6 +286,19 @@ test('/parashare ships the banner copy and opens on the slim row, not the manual
     'parashare.page.js must not persist the account key');
   assert.ok(!/localStorage\.getItem\(\s*['"]paramant_api_key/.test(PS_JS),
     'parashare.page.js must not read a key back out of localStorage: the session is the only source');
+
+  // The reveal route is not what this page runs on any more. It still exists,
+  // for the account page and for a self-hoster, but a call to it from here
+  // would put the key back in the browser through the door this PR closed.
+  assert.ok(!PS_JS.includes('/api/user/account/key'),
+    'parashare.page.js must not fetch the account key: it asks for a session token');
+  assert.ok(PS_JS.includes('/api/user/parasend/token'), 'and it must ask for the token');
+
+  // One place decides which header goes on a relay call. Five copies is how one
+  // of them eventually ships without the refresh, or with the wrong header.
+  const xApiKey = [...PS_JS.matchAll(/X-Api-Key/g)].length;
+  assert.equal(xApiKey, 1,
+    `X-Api-Key appears ${xApiKey} times in parashare.page.js; it belongs only in relayAuthHeaders, which is the manual self-host path`);
 });
 
 // ── 5. A dead sector is an error, not a dead button ─────────────────────────
@@ -267,10 +306,10 @@ test('/parashare ships the banner copy and opens on the slim row, not the manual
 // nothing about the key, and it used to leave the button greyed out with no
 // reason on screen. The key and the sector are now separate questions.
 test('a sector that will not answer leaves the button live and reports itself at the press', async () => {
-  const run = await loadPage({ keyResponses: [{ status: 200, body: { api_key: FAKE_KEY, revealable: true } }], sectorOk: false });
+  const run = await loadPage({ keyResponses: [ok200], sectorOk: false });
 
   assert.ok(run.calls.sector >= 4, 'all four sectors were tried');
-  assert.equal(evalIn(run, 'keyValid'), true, 'the session key is good; only the sector is unreachable');
+  assert.equal(evalIn(run, 'keyValid'), true, 'the session token is good; only the sector is unreachable');
   assert.equal(evalIn(run, 'relayReady'), false);
   assert.equal(pickAFile(run), true, 'the button is usable: a silent disabled button explains nothing');
 
@@ -367,7 +406,7 @@ test('a relay connection that drops before the receiver arrives says so, and off
   assert.match(PS_HTML, /#ps-session-card\.is-stale #waiting-dot\{background:var\(--ink-3\);animation:none\}/,
     'the beacon has an id rule of its own, so stopping it needs an id rule too');
 
-  const run = await loadPage({ keyResponses: [{ status: 200, body: { api_key: FAKE_KEY, revealable: true } }] });
+  const run = await loadPage({ keyResponses: [ok200] });
   pickAFile(run);
   await evalIn(run, 'createSession()');
   for (let i = 0; i < 10; i += 1) await new Promise((r) => setImmediate(r));
@@ -467,27 +506,121 @@ test('steps 1 and 2 are written for the sender, with the jargon moved into "How 
 // the endpoint gets 404, and the banner is the whole answer to both. Reporting
 // them would put a console error on every signed-out visit, and
 // tests/product-heartbeat.test.mjs reads that console: it caught exactly this
-// and went red on "account key: HTTP 404". A 500 is a different thing and does
+// and went red on "session token: HTTP 404". A 500 is a different thing and does
 // get reported. Verified by sabotage in both directions: report the expected
 // half and the 404 case goes red; stop reporting the 500 and the 500 case does.
-test('a missing session key is not a console error, and a broken endpoint is', async () => {
+test('a missing session token is not a console error, and a broken endpoint is', async () => {
   for (const status of [401, 403, 404]) {
     const quiet = await loadPage({ keyResponses: [{ status, body: {} }] });
     assert.equal(quiet.getElementById('ps-key-error').classList.contains('is-shown'), true,
-      `a ${status} must still raise the banner: the sender has to know why there is no key`);
+      `a ${status} must still raise the banner: the sender has to know why there is no credential`);
     assert.deepEqual(quiet.consoleErrors, [],
       `a ${status} is the ordinary "no key here" answer and may not write to the console of every signed-out visit`);
   }
 
   const broken = await loadPage({ keyResponses: [{ status: 500, body: {} }] });
   assert.equal(broken.getElementById('ps-key-error').classList.contains('is-shown'), true);
-  assert.ok(broken.consoleErrors.some((line) => /\[paramant\] account key/.test(line)),
+  assert.ok(broken.consoleErrors.some((line) => /\[paramant\] session token/.test(line)),
     'a 500 is unplanned, and its detail belongs in the console through the one reporter');
 
-  // A 200 that carries no key is the non-revealable account, which is planned
-  // as well: the reveal route says so in as many words.
-  const noKey = await loadPage({ keyResponses: [{ status: 200, body: { api_key: null, revealable: false } }] });
-  assert.equal(noKey.getElementById('ps-key-error').classList.contains('is-shown'), true);
-  assert.deepEqual(noKey.consoleErrors, [],
-    'an account whose key is not revealable is a documented state, not a fault to report');
+  // A 200 that carries no token is an account the relay would not mint for,
+  // which is planned as well: the admin says so with a token_unavailable body.
+  const noToken = await loadPage({ keyResponses: [{ status: 200, body: { error: 'token_unavailable' } }] });
+  assert.equal(noToken.getElementById('ps-key-error').classList.contains('is-shown'), true);
+  assert.deepEqual(noToken.consoleErrors, [],
+    'an account the relay will not mint for is a documented state, not a fault to report');
+});
+
+// ── 12. The self-host way out still sends a key ─────────────────────────────
+// The token endpoint is part of the hosted admin panel. A self-hosted relay may
+// not have it, and for that deployment the banner's "Use a key by hand" is the
+// whole product. So the manual path must still work, and it must send the
+// header a plain relay understands: X-Api-Key, not a Bearer for a token nobody
+// minted. Verified by sabotage: make relayAuthHeaders always send the Bearer
+// and this fails on the header; drop the sessionAuth reset out of onKeyInput
+// and it fails because a dead token is still being presented.
+test('a hand-typed key on a self-host sends X-Api-Key, and takes over from the token', async () => {
+  // Start on the happy path, so there IS a token to take over from. That is the
+  // case that can go wrong quietly: a page that keeps both credentials.
+  const run = await loadPage({ keyResponses: [ok200] });
+  assert.equal(evalIn(run, 'sessionAuth'), FAKE_TOKEN);
+
+  evalIn(run, 'expandApiKeyCard()');
+  assert.equal(evalIn(run, 'sessionAuth'), '',
+    'asking for the box drops the token: one credential at a time, or the page has two sources of truth again');
+
+  run.calls.relay.length = 0;
+  run.getElementById('api-key').value = FAKE_KEY;
+  await evalIn(run, 'onKeyInput()');
+  await new Promise((r) => setImmediate(r));
+
+  assert.equal(evalIn(run, 'apiKey'), FAKE_KEY, 'the typed key is the credential now');
+  assert.equal(evalIn(run, 'keyValid'), true);
+  assert.ok(run.calls.relay.length >= 4, 'the typed key is checked against the sectors');
+  assert.deepEqual([...new Set(relayAuth(run))], [FAKE_KEY],
+    'the self-host path must send the key as X-Api-Key; a plain relay knows nothing about pst_ tokens');
+  for (const c of run.calls.relay) {
+    assert.equal(c.headers.Authorization, undefined, 'and it must not still be waving a token it gave up');
+  }
+});
+
+// ── 13. The token runs out mid-session ──────────────────────────────────────
+// Fifteen minutes is short on purpose, and a send is not. A sender can pick a
+// 4 GB file, wait for a receiver to open the link, compare a fingerprint on the
+// phone and only then press Send, and the upload is the one step that cannot be
+// cheaply retried. There are two guards, and this measures both: the page mints
+// a replacement before the expiry it knows about, and if it is wrong about that
+// it takes one 401 from the relay and mints on the spot.
+//
+// Verified by sabotage: drop the margin refresh and the first case goes red;
+// drop the 401 retry and the second does; make the retry unconditional and the
+// last case never returns at all, which is the loop it exists to forbid.
+test('a token that expires during a long session is replaced, before and after the fact', async () => {
+  const SECOND = 'pst_' + '99887766'.repeat(8);
+
+  // (a) proactively. The page is handed a token that is already inside its
+  // refresh margin, so the very next relay call has to mint first.
+  const soon = await loadPage({
+    keyResponses: [
+      { status: 200, body: { token: FAKE_TOKEN, expires_in_s: 30 } },
+      { status: 200, body: { token: SECOND, expires_in_s: 900 } },
+    ],
+  });
+  assert.equal(soon.calls.key, 2, 'a token inside the margin is replaced before it is spent again');
+  assert.equal(evalIn(soon, 'sessionAuth'), SECOND);
+
+  // (b) after the fact. The token looks healthy, and the relay says otherwise:
+  // a restart, a revocation somewhere else, a clock that disagreed. One 401,
+  // one mint, one retry, and the call succeeds on the second token.
+  let refused = 0;
+  const dead = await loadPage({
+    keyResponses: [ok200, { status: 200, body: { token: SECOND, expires_in_s: 900 } }],
+    // Only the upload is refused, and only while the first token is being used.
+    relayStatus: (url) => {
+      if (!url.includes('/v2/inbound')) return null;
+      refused += 1;
+      return refused === 1 ? { status: 401, body: { error: 'Invalid API key' } } : null;
+    },
+  });
+  assert.equal(dead.calls.key, 1, 'nothing is minted until something is actually refused');
+
+  dead.calls.relay.length = 0;
+  const r = await evalIn(dead, "relayFetch('https://health.paramant.app/v2/inbound', { method: 'POST' })");
+  assert.equal(r.status, 200, 'the retry after a fresh token is what the caller ends up with');
+  assert.equal(dead.calls.key, 2, 'exactly one replacement token was minted');
+  assert.equal(evalIn(dead, 'sessionAuth'), SECOND);
+  assert.deepEqual(dead.calls.relay.map((c) => c.headers.Authorization),
+    [`Bearer ${FAKE_TOKEN}`, `Bearer ${SECOND}`],
+    'the first attempt carried the dead token and the second carried the new one');
+
+  // And it stops there. A relay that keeps saying 401 must not become a mint
+  // loop against a rate-limited endpoint.
+  const stubborn = await loadPage({
+    keyResponses: [ok200],
+    relayStatus: (url) => (url.includes('/v2/inbound') ? { status: 401, body: { error: 'Invalid API key' } } : null),
+  });
+  const before = stubborn.calls.key;
+  const still = await evalIn(stubborn, "relayFetch('https://health.paramant.app/v2/inbound', { method: 'POST' })");
+  assert.equal(still.status, 401, 'a 401 that survives a fresh token is a real 401 and is handed to the caller');
+  assert.ok(stubborn.calls.key - before <= 1, 'one mint, never a loop');
 });

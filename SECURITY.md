@@ -117,6 +117,81 @@ Full report: [docs/security-audit-2026-04.md](docs/security-audit-2026-04.md)
 
 ---
 
+### 2026-09-03: the ParaSend account key leaves the browser
+
+The security review of #397 accepted that /parashare had stopped keeping a key
+in `localStorage` and then said the harder thing: the key should not be in the
+browser at all. This records what was done about it and, more usefully, what is
+still true afterwards.
+
+#### The old ceiling
+
+`/parashare` fetched the account's API key from `GET /api/user/account/key` and
+held it in a variable for the life of the tab. That key is a full data-plane
+credential with no expiry and no scope. Anything that got to run script on
+paramant.app could read it out of the page and keep it: upload and download on
+the account, list and revoke its transfers, enrol a signing key, create ParaSign
+envelopes, read the audit chain. Not for fifteen minutes. Until the owner
+noticed and rotated the key, which is a thing an owner does when something has
+already gone wrong.
+
+The page's own hardening did not touch this. The key was never persisted and
+never logged; it was simply present, in a variable, which is all an injected
+script needs.
+
+#### What replaced it
+
+A `pst_` session token, minted by the admin panel on behalf of a logged-in user
+and handed to the browser instead of the key. Three properties, and the second
+is the one that matters:
+
+- **Fifteen minutes.** Held in the relay's shared Redis, so all five sectors
+  honour the same token; not an operator knob, because a deployment that could
+  set this to a week would have rebuilt the credential this removes.
+- **Five routes.** An allowlist in `relay/lib/session-token.js`, checked above
+  every route comparison in `relay.js`: `/v2/check-key`, `POST /v2/ws-ticket`,
+  `POST /v2/pubkey`, `GET /v2/pubkey/:device`, `POST /v2/inbound`. Everything
+  else is `403`, including `/v2/user/*`, `/v2/outbound`, `/v2/audit`,
+  `/v2/admin/*`, the ParaSign envelope routes, and a second mint: a token cannot
+  extend its own fifteen minutes.
+- **The same account.** Inside that scope the token authenticates as the api-key
+  it was minted for, so quota, the audit chain and the tier ceilings resolve
+  against the owner. A token is a narrower way to present an account, never a
+  second account.
+
+`POST /v2/session-token` needs `X-Internal-Auth` and a live `X-Api-Key`, so the
+admin plane is the only caller and a browser can never name another account.
+Revoking the key sweeps its tokens out of the store, and a token whose owner key
+is inactive grants no principal even when that sweep did not run: the sweep is
+the fast path, not the guarantee.
+
+#### The new ceiling, stated plainly
+
+**A script that runs on paramant.app can still act as the signed-in user for
+fifteen minutes.** It can start a transfer, publish a handshake key and upload a
+blob against the account's monthly quota. What it can no longer do is take the
+key with it: it cannot read the account's downloads or audit log, cannot enrol a
+signing identity, cannot create or sign an envelope, and cannot do any of it
+after the token expires, because minting a new one requires the session cookie
+to still be there and the mint route to be reached through the admin panel.
+
+That is a real reduction and it is not a fix for cross-site scripting. The CSP
+on the site and the escaping in the pages remain the thing that stops a script
+running in the first place; this only bounds what one gets if it does.
+
+#### What is still open
+
+The `GET /api/user/account/key` reveal route still exists. It is not what
+`/parashare` uses, and the page's "Use a key by hand" way out is meant for a
+self-hosted deployment with no admin panel, but the route is reachable from any
+signed-in browser and answers with the raw key. A script with fifteen minutes
+and a session cookie can call it. Closing that means deciding what the account
+page and the self-host flow do instead, which is a separate change; until then,
+the ceiling above is the ceiling for a user who has visited a page that can
+reveal, not for ParaSend alone.
+
+---
+
 ### 2026-09-03: login lockout and TOTP replay (internal review of #367)
 
 Two decisions came out of reviewing the site-claims work in #367, both about

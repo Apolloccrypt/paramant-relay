@@ -2469,6 +2469,55 @@ function maskIp(ip) {
 // top of this file. Audit-chain records keep the full email on purpose (admin
 // traceability); the masked form is only for stdout/journald.
 
+// POST /api/user/parasend/token
+//
+// The route that lets ParaSend stop holding an api-key. /parashare asks for a
+// pst_ session token, the relay mints one for the account this session is
+// signed in as, and the browser is handed the token and nothing else.
+//
+// Three things this route does NOT do, each on purpose:
+//   * it takes no body. The account is the session's, read server-side through
+//     proxyApiKey(); a browser cannot name another one, so there is nothing to
+//     validate and nothing to get wrong;
+//   * it never returns the api-key, not even alongside the token. The whole
+//     point of the token is that the key stops travelling;
+//   * it does not fall back to the key when the relay cannot mint. A fallback
+//     would quietly put the credential back in the browser on exactly the days
+//     something is already wrong.
+//
+// GET /api/user/account/key below stays as it is. It is the reveal a
+// self-hoster and the account page still need, and it is no longer what
+// /parashare uses.
+api.post("/user/parasend/token", authUser, async (req, res) => {
+  const key = proxyApiKey(req.userSession);
+  if (!key) return res.status(403).json({ error: "no_account_key" });
+  try {
+    const rr = await fetch(`${SECTORS.health}/v2/session-token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Auth": INTERNAL_TOKEN,
+        "X-Api-Key": key,
+      },
+      body: "{}",
+      signal: AbortSignal.timeout(10000),
+    });
+    const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    if (rr.status !== 200 || !body.token) {
+      // The relay's status is passed through so the page can tell an outage
+      // (503, worth a retry) from a refusal (401/403, worth the banner). The
+      // relay's body is not: it is written for an operator reading a log, and
+      // relaying it would put relay internals on a page anyone can open.
+      return res.status(rr.status === 200 ? 502 : rr.status).json({ error: "token_unavailable" });
+    }
+    return res.json({ token: body.token, expires_in_s: body.expires_in_s });
+  } catch (err) {
+    console.error("[user/parasend/token]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
 // GET /api/user/account/key
 api.get("/user/account/key", authUser, async (req, res) => {
   // stap 3: reveal the account's PRIMARY api-key (== user_id today), and only

@@ -1504,7 +1504,15 @@ test('the browser storage /privacy lists is the storage the frontend writes', ()
   // sender had typed by hand, because localStorage was a second source of truth
   // next to the session. There is one source now, and it is not this store.
   assert.ok(!keys.has('paramant_api_key'),
-    'a frontend file reads or writes paramant_api_key again. ParaSend takes the account key from GET /api/user/account/key on every load and keeps it in memory; /privacy no longer lists this key, so putting it back in localStorage makes that page untrue.');
+    'a frontend file reads or writes paramant_api_key again. ParaSend runs on a session token fetched from POST /api/user/parasend/token and held in memory; /privacy no longer lists this key, so putting it back in localStorage makes that page untrue.');
+  // And the token that replaced it must not become the next entry on the list.
+  // A pst_ token is a bearer credential with fifteen minutes on it: in
+  // localStorage it would outlive the tab that earned it, and /privacy says in
+  // as many words that it does not.
+  for (const k of keys) {
+    assert.ok(!/pst|parasend[._-]?token|session[._-]?token/i.test(k),
+      `a frontend file stores "${k}". The ParaSend session token is held in memory only, and /privacy says so.`);
+  }
 
   const priv = visible(page('privacy'));
   const list = priv.slice(priv.indexOf('<h2>Local storage in your browser</h2>'), priv.indexOf('</ul>', priv.indexOf('<h2>Local storage in your browser</h2>')));
@@ -2222,4 +2230,56 @@ test('every page that promises burn-on-read says which client and which plan it 
     assert.ok(flatten(bodyOf(page(slug))).includes(sentence),
       `${slug}: must spell the per-plan read counts as "${sentence}", the numbers tiers.js sets`);
   }
+});
+
+// 36 ── The account key and the browser. /privacy now states, in the storage
+// section, that the key is not in the browser at all and that a fifteen-minute
+// session token stands in for it. Three of the four things that sentence claims
+// are facts about code in this repository, so they are checked against it:
+// where the page gets its credential, what the relay honours, and how long.
+// The fourth, that the token is not persisted, is row 28 above.
+//
+// This row exists because the previous version of that paragraph was untrue for
+// months: it said paramant_api_key was "removed when you sign out" and nothing
+// removed it. A privacy page that describes a credential has to be pinned to
+// the credential.
+// Verified by sabotage: move TTL_S off 900, point the page back at
+// /api/user/account/key, or add a sixth route to the relay allowlist, and this
+// fails by name.
+test('the ParaSend credential /privacy describes is the credential the code implements', () => {
+  const priv = visible(page('privacy'));
+
+  // 1. Fifteen minutes, from the relay, not from the copywriter.
+  const ttl = /^const TTL_S = (\d+);/m.exec(stripJsComments(read('relay/lib/session-token.js')));
+  assert.ok(ttl, 'relay/lib/session-token.js must still declare TTL_S');
+  assert.equal(Number(ttl[1]), 900,
+    `the session token now lives ${ttl[1]} s; /privacy says fifteen minutes, so rewrite the sentence deliberately`);
+  assert.ok(priv.includes('That token lives fifteen minutes'),
+    'privacy: the storage section must state the token lifetime');
+
+  // 2. Five requests, and the relay's allowlist is what decides that.
+  const scope = stripJsComments(read('relay/lib/session-token.js'));
+  const rules = (scope.slice(scope.indexOf('const SCOPE = ['), scope.indexOf('function scopeAllows'))
+    .match(/\{ method:/g) || []).length;
+  assert.equal(rules, 5,
+    `the relay allowlist now has ${rules} entries; /privacy says five, so change the page with the code`);
+  assert.ok(priv.includes('the relay accepts it on the five requests a transfer makes and refuses it on everything else'),
+    'privacy: the storage section must state what the token can and cannot do');
+
+  // 3. The page really asks for a token, and really does not ask for the key.
+  const ps = read('frontend/js/parashare.page.js');
+  assert.ok(ps.includes('/api/user/parasend/token'),
+    'parashare.page.js must fetch a session token; /privacy says the browser is never given the key');
+  assert.ok(!ps.includes('/api/user/account/key'),
+    'parashare.page.js fetches the account key again, and /privacy says the page is never given it');
+  assert.ok(priv.includes('it is not in your browser at all'),
+    'privacy: the claim itself must be on the page');
+
+  // 4. The manual self-host escape is named rather than hidden. It is the one
+  // case where a key IS in the browser, and a privacy page that described only
+  // the happy path would be the same half-truth as the last one.
+  assert.ok(priv.includes('On a self-hosted relay without our admin panel you can still type a key by hand'),
+    'privacy: the self-host exception must be stated, because on that path a key really is in the browser');
+  assert.match(page('parashare'), /data-click="expandApiKeyCard">Use a key by hand/,
+    'and /parashare must still offer it, or /privacy describes a door that is not there');
 });

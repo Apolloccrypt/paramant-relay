@@ -45,7 +45,7 @@ h1{font-size:clamp(26px,5vw,38px);font-weight:600;letter-spacing:-.028em;line-he
 .ps-guide strong{color:var(--ink-1);font-weight:600}
 .ps-guide .ps-guide-kicker{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:5px;font-weight:600}
 
-/* The account key comes from the session and from nowhere else, so the slim row
+/* The credential comes from the session and from nowhere else, so the slim row
    is the DEFAULT state of step 1 and the manual card is the exception. It used
    to be the other way round: the card was the default and the slim row appeared
    only after a key had been fetched, which is why a signed-in sender was shown
@@ -70,7 +70,7 @@ h1{font-size:clamp(26px,5vw,38px);font-weight:600;letter-spacing:-.028em;line-he
 #step-setup.manual-key .ps-key-slim{display:none}
 
 /* One alert style, used by both places on this page where something can fail
-   in front of the user: the account key that will not load, and the relay
+   in front of the user: the account session that will not start, and the relay
    connection that drops while step 2 is waiting. Each says what happened, what
    the file is doing meanwhile, and offers the one action that helps. */
 .ps-alert{display:none;flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:16px;padding:12px 14px;border:1px solid var(--line-2);border-left:3px solid var(--sig-stop);border-radius:var(--r-1);background:var(--sig-stop-bg);font:13px/1.62 var(--sans);color:var(--ink-1)}
@@ -466,13 +466,13 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <strong>Choose a file and say how long the link should live.</strong> The file stays on your own computer until step 4. We never hold it in a form we could open.
   </div>
 
-  <div class="ps-key-slim is-loading" id="ps-key-slim" aria-label="Account key">
-    <span class="ps-key-status"><span id="ps-key-slim-label">Loading your account key</span> <span class="ps-key-mask" id="ps-key-mask" hidden></span></span>
+  <div class="ps-key-slim is-loading" id="ps-key-slim" aria-label="Account session">
+    <span class="ps-key-status"><span id="ps-key-slim-label">Starting your account session</span> <span class="ps-key-mask" id="ps-key-mask" hidden></span></span>
     <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Change</button>
   </div>
 
   <div class="ps-alert" id="ps-key-error" role="alert">
-    <p>Your account key could not be loaded. Sign in again; if it keeps happening, mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
+    <p>Your account session could not be started. Sign in again; if it keeps happening, mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
     <div class="ps-alert-actions">
       <a class="ps-alert-primary" href="/auth/login">Sign in again</a>
       <span class="ps-alert-secondary">
@@ -709,7 +709,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
      two different contents under one immutable url is exactly what the ?v= is
      there to prevent, and check-cache-bust cannot see it because both sides
      agree on the number. -->
-<script src="/js/parashare.page.js?v=6" defer></script>
+<script src="/js/parashare.page.js?v=7" defer></script>
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=7" defer></script>
 <footer>
