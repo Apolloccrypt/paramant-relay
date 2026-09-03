@@ -2447,101 +2447,14 @@ pre code { background: none; padding: 0; }
 .stub-banner { background: #fef3c7; border: 1.5px solid #d97706; padding: var(--space-4) var(--space-5); }
 .stub-banner strong { color: #92400e; }
 
-/* === nav auth additions === */
-.nav-auth { display: flex; align-items: center; gap: 12px; margin-left: auto; }
-
-.nav-signin {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ink-mid, #64748b);
-  text-decoration: none;
-  font-weight: 700;
-  padding: 8px 4px;
-}
-.nav-signin:hover { color: var(--navy); }
-
-.nav-cta {
-  display: inline-block;
-  padding: 9px 16px;
-  background: var(--lime);
-  color: var(--navy);
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-weight: 700;
-  text-decoration: none;
-  border: 2px solid var(--lime);
-  transition: background 0.15s, border-color 0.15s;
-}
-.nav-cta:hover { background: var(--navy); border-color: var(--navy); color: var(--bone); }
-
-.nav-user { position: relative; }
-.nav-user-trigger {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  background: transparent;
-  border: 1.5px solid var(--ink-hair);
-  cursor: pointer;
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  color: var(--navy);
-  font-weight: 700;
-}
-.nav-user-trigger:hover { border-color: var(--cobalt); }
-.nav-user-email { text-transform: none; letter-spacing: 0; font-family: var(--sans, system-ui, sans-serif); font-size: 13px; font-weight: 500; }
-.nav-user-chevron { font-size: 10px; color: var(--ink-dim); }
-
-.nav-user-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  min-width: 200px;
-  background: var(--bone);
-  border: 1px solid var(--ink-hair);
-  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.08);
-  padding: 6px 0;
-  z-index: 100;
-}
-.nav-user-menu[hidden] { display: none; }
-.nav-menu-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 10px 16px;
-  font-family: var(--sans, system-ui, sans-serif);
-  font-size: 13px;
-  color: var(--ink);
-  text-decoration: none;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
-.nav-menu-item:hover { background: rgba(29, 78, 216, 0.06); color: var(--cobalt); }
-.nav-menu-signout { color: #991b1b; }
-.nav-menu-signout:hover { background: rgba(220, 38, 38, 0.06); color: #991b1b; }
-.nav-menu-divider { height: 1px; background: var(--ink-hair); margin: 4px 0; }
-
-@media (max-width: 720px) {
-  .nav-auth { gap: 6px; }
-  .nav-signin { font-size: 10px; padding: 8px 2px; letter-spacing: 0.08em; }
-  .nav-cta { padding: 7px 10px; font-size: 9px; letter-spacing: 0.08em; border-width: 1.5px; }
-  .nav-help { padding: 6px 7px; font-size: 9px; letter-spacing: 0.06em; }
-  .nav-user-email { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-}
-
-@media (max-width: 400px) {
-  .nav-auth { gap: 4px; }
-  .nav-signin { font-size: 9px; padding: 6px 2px; }
-  .nav-cta { padding: 6px 8px; font-size: 9px; }
-  .nav-help { padding: 5px 5px; font-size: 9px; border: none; }
-}
-/* === end nav auth === */
+/* De navigatiebalk staat in frontend/nav.css. Die had hier een tweede huis:
+   .nav-auth, .nav-signin, .nav-cta, .nav-user en .nav-help stonden in dit
+   bestand en de rest van de balk in nav.css, met twee losse media-queries
+   die de knop op een telefoon kleiner maakten in plaats van hem ruimte te
+   geven. Een balk die over twee stylesheets ligt is een balk waar niemand
+   het geheel van ziet. Alles staat nu in nav.css. Geen pagina laadt de een
+   zonder de ander: vault.html, billing/checkout.html en claim.html laden
+   design-system.css zonder nav.css en dragen geen van deze klassen. */
 
 
 /* ═══════════════════════════════════════════════════
@@ -2891,37 +2804,6 @@ a.skip-link:focus-visible,
 @media (max-width: 500px) {
   .hero-trust-strip { grid-template-columns: 1fr; }
   .hero-split { padding: 32px 16px 64px 16px; }
-}
-
-/* ── Nav help link ──────────────────────────────────────── */
-.nav-help {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ink-mid, #64748b);
-  text-decoration: none;
-  font-weight: 700;
-  padding: 8px 12px;
-  border: 1px solid var(--ink-hair, #E2E8F0);
-  transition: all 140ms ease;
-  white-space: nowrap;
-}
-.nav-help:hover {
-  color: var(--navy, #0B3A6A);
-  border-color: var(--lime, #B2FF3F);
-  background: rgba(178, 255, 63, 0.08);
-}
-.nav-help:focus-visible {
-  outline: 2px solid var(--lime, #B2FF3F);
-  outline-offset: 2px;
-}
-/* Support must stay reachable on every screen. Below 900px the link shrinks
-   instead of disappearing: the mobile drawer mirrors the desktop nav links and
-   deliberately carries no Help entry, so hiding this one used to leave phone
-   and tablet visitors with no route to /help at all. */
-@media (max-width: 900px) {
-  .nav-help { padding: 7px 9px; font-size: 10px; letter-spacing: 0.08em; }
 }
 
 /* § 05 product grid — light-theme column differentiation ───────────────── */

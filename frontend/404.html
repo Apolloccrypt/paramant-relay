@@ -25,8 +25,8 @@
     footer{padding:20px 24px;text-align:center;font-size:11px;color:#94A3B8;border-top:1px solid #E2E8F0}
   </style>
 <style>.skip-link{position:absolute;top:-200px;left:0;background:#0B3A6A;color:#F8FAFC;padding:12px 20px;z-index:10000;text-decoration:none;font-size:13px;font-family:system-ui,sans-serif;border:2px solid #B2FF3F;transition:top 120ms ease}.skip-link:focus,.skip-link:focus-visible{top:0;outline:none}.skip-link:focus:hover{background:#1D4ED8}</style>
-<link rel="stylesheet" href="/design-system.css?v=24">
-<link rel="stylesheet" href="/nav.css?v=19">
+<link rel="stylesheet" href="/design-system.css?v=25">
+<link rel="stylesheet" href="/nav.css?v=20">
 <link rel="stylesheet" href="/relay-pulse.css?v=1">
 <link rel="stylesheet" href="/parapear.css?v=1">
 <style>
@@ -46,7 +46,7 @@
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">HELP</a>
+    <a href="/help" class="nav-help">Help</a>
     <a href="/auth/login" class="nav-signin">Sign in</a>
     <a href="/signup" class="nav-cta">Create account</a>
   </div>
@@ -61,7 +61,11 @@
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
   <a href="/docs" class="nav-mobile-standalone">Docs</a>
 </div>
-<script src="/nav.js?v=14" defer></script>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
+</div>
+<script src="/nav.js?v=15" defer></script>
 <main id="main-content">
   <div class="wrap">
     <aside class="parapear-block" aria-label="Page not found">
@@ -111,6 +115,6 @@
     </div>
   </div>
 </footer>
-<script src="/js/nav-auth.js?v=5" defer></script>
+<script src="/js/nav-auth.js?v=6" defer></script>
 </body>
 </html>

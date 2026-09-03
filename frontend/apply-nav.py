@@ -16,7 +16,7 @@ NEW_NAV = '''\
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">HELP</a>
+    <a href="/help" class="nav-help">Help</a>
     <a href="/auth/login" class="nav-signin">Sign in</a>
     <a href="/signup" class="nav-cta">Create account</a>
   </div>
@@ -26,12 +26,22 @@ NEW_NAV = '''\
   </button>
 </nav>'''
 
+# The drawer itself carries the four destinations and nothing else: it mirrors
+# the desktop bar, and js/nav-auth.js rewrites its whole inside after the
+# session check. The two secondary routes a phone loses from the bar -- Sign in
+# and Help -- therefore hang under it as their own strip, which nav.js opens
+# and closes with the drawer and nav-auth.js removes once you are signed in
+# (the user menu carries both from then on).
 NEW_MOBILE = '''\
 <div class="nav-mobile" id="nav-mobile">
   <a href="/#products" class="nav-mobile-standalone">Product</a>
   <a href="/security" class="nav-mobile-standalone">Security</a>
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
   <a href="/docs" class="nav-mobile-standalone">Docs</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
 </div>'''
 
 # Footer template - the site-map footer is gone. What stays is the company
@@ -77,10 +87,10 @@ LEGAL_STRIP = '''\
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
 </footer>'''
 
-DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=24">'
-NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=19">'
-NAV_JS    = '<script src="/nav.js?v=14" defer></script>'
-NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=5" defer></script>'
+DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=25">'
+NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=20">'
+NAV_JS    = '<script src="/nav.js?v=15" defer></script>'
+NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=6" defer></script>'
 
 # Pages that don't have <nav class="nav"> yet but should — inject the canonical
 # nav after <body> (or after a skip-link if present). App shells (admin,
@@ -189,7 +199,15 @@ def inject_nav_block(html):
 
 
 def replace_mobile_div(html):
-    """Replace <div class="nav-mobile"...>...</div>, counting nested divs."""
+    """Replace <div class="nav-mobile"...>...</div>, counting nested divs.
+
+    NEW_MOBILE stamps two siblings: the drawer and its tail. An earlier run
+    left a tail behind, and the div counter below stops at the drawer's own
+    </div>, so without this the second run would leave the old tail sitting
+    after the new one and the idempotency gate would go red. The tail holds
+    anchors and no nested divs, so one non-greedy match takes it out."""
+    html = re.sub(r'\n?<div class="nav-mobile-tail".*?</div>', '',
+                  html, flags=re.DOTALL)
     start = html.find('<div class="nav-mobile"')
     if start == -1:
         nav_end = html.find('</nav>') + len('</nav>')

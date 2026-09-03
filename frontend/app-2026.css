@@ -550,10 +550,17 @@ footer .logo .a { color: var(--ink-1); }
 .theme-choice input:focus-visible + span { box-shadow: var(--ring); border-radius: var(--r-1); }
 
 
-/* The signed-out nav CTA is the one allowed lime field, and the only text
-   that may sit on it is #0A1626 (14.94:1). The app pages set this with
-   !important in their own head, so it is corrected with the same weight. */
-.nav-cta, a.nav-cta, .nav .nav-cta { color: var(--mark-on) !important; background: var(--mark); }
+/* The signed-out nav CTA used to be the one allowed lime field, with #0A1626
+   on it. It is cobalt now, in the bar and on the homepage: lime is the
+   punctuation of this brand and not the colour of its primary action, and next
+   to a cobalt hero button a lime bar button read as a second, competing offer.
+   White on #1D4ED8 is 6.3:1. Kept at the same weight as before, so an app page
+   cannot drift back to the lime field it was corrected out of. */
+.nav-cta, a.nav-cta, .nav .nav-cta {
+  color: #FFFFFF !important;
+  background: #1D4ED8 !important;
+  border-color: #1D4ED8 !important;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    7. MOTION AND POINTERS

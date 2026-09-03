@@ -9,8 +9,8 @@
 <meta name="robots" content="noindex,nofollow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#0b3a6a">
-<link rel="stylesheet" href="/design-system.css?v=24">
-<link rel="stylesheet" href="/nav.css?v=19">
+<link rel="stylesheet" href="/design-system.css?v=25">
+<link rel="stylesheet" href="/nav.css?v=20">
 <style>
 *{box-sizing:border-box}
 body{background:linear-gradient(180deg,#f8faff 0,#f5f7fb 460px)}
@@ -61,6 +61,10 @@ pre{margin:0;padding:20px;background:#0d1d33;color:#d7e7f8;overflow:auto;font-fa
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button>
 </nav>
 <div class="nav-mobile" id="nav-mobile"><a href="/dashboard" class="nav-mobile-standalone">Documents</a><a href="/developer" class="nav-mobile-standalone" aria-current="page">Developer settings</a></div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
+</div>
 
 <main id="main" class="dev">
   <nav class="settings-tabs" aria-label="Settings sections">
@@ -151,8 +155,8 @@ curl -X POST https://paramant.app/v1/envelopes \
   </div>
 </div>
 
-<script src="/nav.js?v=14" defer></script>
-<script src="/js/nav-auth.js?v=5" defer></script>
+<script src="/nav.js?v=15" defer></script>
+<script src="/js/nav-auth.js?v=6" defer></script>
 <script src="/js/developer.js?v=7" defer></script>
 </body>
 </html>
