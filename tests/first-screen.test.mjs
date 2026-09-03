@@ -160,6 +160,9 @@ const PAGES = [
       // tier named, on the first screen.
       { name: 'the Community and business plans split', css: '[data-home="out"] p.hero-note', text: 'Community plan', also: ['business plans from'] },
       { name: 'the first action', css: '[data-home="out"] .home-actions a', href: '/sign' },
+      // The founder, by name and title, before the visitor scrolls: the homepage
+      // sells a gift from a person, so the person has to be on the first screen.
+      { name: 'the founder', css: '[data-home="out"] .hero-by', text: 'Mick Beer, privacy and security researcher' },
       { name: 'the heading of the section that explains the split', css: '#split-h', text: 'One half is a gift' },
     ],
   },
