@@ -100,7 +100,34 @@ function scratchEnv(dir) {
   };
 }
 
-// Boot relay.js and wait until /health answers.
+// Boot relay.js and wait until OUR relay.js answers.
+//
+// "OURS" IS THE WHOLE PROBLEM. freePort() asks the OS for a free port, closes
+// the listener and hands the number on, so between that close and the child's
+// own listen() the port belongs to nobody and anybody may take it. The route
+// suites are started as `node --test test/route-*.test.js`, which runs the
+// files in PARALLEL processes, and every one of them boots relays through this
+// function. Two of them being handed the same number is not exotic, it is
+// arithmetic.
+//
+// The old loop then made it invisible. It probed GET /health on the port and
+// took any 200 as "we are up", starting on the very first iteration, long
+// before the child could possibly be listening. So when another suite's relay
+// held the port, THAT relay answered, this function returned a handle pointing
+// at it, and our own child died of EADDRINUSE unnoticed. The test then talked
+// to a stranger with a different ADMIN_TOKEN and got
+// {"error":"ADMIN_TOKEN required for admin endpoints"} with a 401, which is
+// what run 33713795533 saw on route-billing-entitlements #315 after a restart.
+// Nothing about that failure looked like a port clash, which is why it read as
+// a restart bug.
+//
+// So the wait has two halves and neither is optional:
+//   1. our child's own stdout must carry relay_started for THIS port. Only the
+//      process that owns the socket logs that, so it is proof of ownership,
+//      not a guess about timing;
+//   2. when the caller set an ADMIN_TOKEN, one authenticated admin request must
+//      not come back 401, which is the same proof from the other end and the
+//      exact symptom the suite hit.
 //
 // opts.users      – users.json content as an object; goes in USERS_JSON (read
 //                   only) unless opts.usersFile is true, in which case it is
@@ -155,16 +182,46 @@ async function boot(opts = {}) {
     let exited = null;
     child.on('exit', (code) => { exited = code; });
 
+    // relay.js logs one JSON line per event; this is the one server.listen()
+    // fires in its callback (relay.js:6972), and it carries the port it is
+    // actually bound to.
+    const startedOnOurPort = () =>
+      new RegExp(`"msg":"relay_started"[^\\n]*"port":${port}\\b`).test(out);
+
     const deadline = Date.now() + 20000;
     let healthy = false;
     while (Date.now() < deadline && exited === null) {
-      try {
-        const r = await fetch(`http://127.0.0.1:${port}/health`);
-        if (r.ok) { healthy = true; break; }
-      } catch (_) { /* not up yet */ }
-      await new Promise((r) => setTimeout(r, 100));
+      // Do not even ask the port a question until our own child says it owns
+      // it. Asking earlier is how a stranger's relay gets adopted.
+      if (startedOnOurPort()) {
+        try {
+          const r = await fetch(`http://127.0.0.1:${port}/health`);
+          if (r.ok) { healthy = true; break; }
+        } catch (_) { /* listening, not serving yet */ }
+      }
+      await new Promise((r) => setTimeout(r, 50));
     }
     if (healthy) {
+      // Second half: if this suite runs with an admin token, spend one request
+      // proving the process on the other end shares it. A 401 here means the
+      // answer is coming from a relay that is not ours, and returning the
+      // handle anyway is what turned a port clash into a mystery about
+      // restarts.
+      if (env.ADMIN_TOKEN) {
+        const hdr = { 'X-Admin-Token': env.ADMIN_TOKEN };
+        if (env.INTERNAL_AUTH_TOKEN) hdr['X-Internal-Auth'] = env.INTERNAL_AUTH_TOKEN;
+        // Any account id: an unknown one is a 404 from our own relay and a 401
+        // from anyone else's. Only the 401 is disqualifying.
+        const probe = await fetch(
+          `http://127.0.0.1:${port}/v2/admin/entitlements/acct_boot_probe`, { headers: hdr });
+        if (probe.status === 401) {
+          throw new Error(
+            `the relay answering on port ${port} does not share this suite's ADMIN_TOKEN, so it is\n` +
+            '  not the child this boot() started. Our child logged relay_started on that port, which\n' +
+            '  should make that impossible; something else is listening on it.\n' +
+            `stdout/stderr tail:\n${out.slice(-2000)}`);
+        }
+      }
       return makeHandle(child, port, dir, env, () => out, opts);
     }
     _children.delete(child);
@@ -231,15 +288,22 @@ function makeHandle(child, port, dir, env, log, bootOpts) {
     readUsersFile() {
       return JSON.parse(fs.readFileSync(env.USERS_FILE, 'utf8'));
     },
+    // Returns a promise: await it when what happens next depends on this
+    // process being gone. restart() does.
     stop() {
       _children.delete(child);
-      stopChild(child);
+      return stopChild(child);
     },
     // Stop and boot again on the SAME scratch dir: same users.json, same relay
     // identity, new process. This is the shape of the #315 regression test.
     async restart(extra = {}) {
-      handle.stop();
-      await new Promise((r) => setTimeout(r, 150));
+      // Await the exit instead of sleeping 150 ms at it. relay.js zeroizes its
+      // blobs, flushes the CT/STH queues and writes users.json on SIGTERM
+      // (relay.js:6479), and the next boot reads that same users.json. 150 ms
+      // was a guess at how long that takes, and on a loaded runner it is the
+      // wrong guess: the new relay would read a file the old one had not
+      // finished writing.
+      await handle.stop();
       // Same dir, same env, no fresh users payload: the relay must find on disk
       // whatever the previous process wrote there.
       return boot({
