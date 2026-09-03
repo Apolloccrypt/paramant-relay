@@ -1832,10 +1832,10 @@ fi
 # bug is exactly how this check would go quiet. Adding or removing a remote
 # block is a deliberate act, so updating this number is part of it.
 SCAN_BLOCKS="$(grep -cE "^  remote(_soft|_nginx)? \".*<<'EOF'\$" "$SCRIPT" || true)"
-if [ "$SCAN_BLOCKS" = "25" ]; then
-  pass "the scan walked all 25 remote blocks"
+if [ "$SCAN_BLOCKS" = "26" ]; then
+  pass "the scan walked all 26 remote blocks"
 else
-  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 25; update the number here on purpose"
+  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 26; update the number here on purpose"
 fi
 
 # And the three commands that actually read stdin are still there, guarded.
@@ -2341,6 +2341,422 @@ for phase in 2 3 4 5; do
     fail "phase $phase is missing evidence lines (before=$b after=$a)"
   fi
 done
+
+echo ""
+echo "6o. The limit_req zones come from a tracked snippet, never bound twice"
+# Until this round the five zones the two site confs rate limit on were typed
+# into /etc/nginx/nginx.conf on the server by hand. Nothing in the repo said
+# what they were, so a conf review could not see them and a rebuilt server
+# would have had site confs referencing zones that did not exist.
+#
+# The snippet is now tracked, and phase 5d places it. The hard part is that a
+# limit_req_zone may be bound only ONCE: writing a second definition of a name
+# the server already binds is not a warning, it is a config that does not load.
+# So 5d reads what nginx really loads, comments out the lines it would double,
+# and proves with nginx -T that the file it wrote is loaded at all.
+SNIPPET="$ROOT/deploy/nginx/snippets/paramant-limit-req.conf"
+if [ -f "$SNIPPET" ]; then pass "deploy/nginx/snippets/paramant-limit-req.conf exists"; else
+  fail "deploy/nginx/snippets/paramant-limit-req.conf is missing"; fi
+if git -C "$ROOT" ls-files --error-unmatch deploy/nginx/snippets/paramant-limit-req.conf >/dev/null 2>&1; then
+  pass "the snippet is tracked by git, which was the whole point"
+else
+  fail "the snippet is not tracked by git"
+fi
+
+# The zones the two repo confs REFERENCE, and the zones the snippet DEFINES.
+# A referenced zone the snippet does not define is a zone that only exists
+# because someone typed it on the server, which is the situation this closes.
+zones_defined() {
+  sed -nE 's/^[[:space:]]*limit_req_zone[[:space:]]+[^[:space:]]+[[:space:]]+zone=([A-Za-z0-9_]+).*/\1/p' "$@" | sort -u
+}
+zones_referenced() {
+  sed -nE 's/^[[:space:]]*limit_req[[:space:]]+zone=([A-Za-z0-9_]+).*/\1/p' "$@" | sort -u
+}
+SNIP_DEF="$(zones_defined "$SNIPPET" 2>/dev/null || true)"
+CONF_REF="$(zones_referenced "$ROOT/deploy/nginx-paramant-public.conf" "$ROOT/deploy/nginx-paramant-live.conf" 2>/dev/null || true)"
+MISSING=""
+for z in $CONF_REF; do
+  printf '%s\n' "$SNIP_DEF" | grep -qx "$z" || MISSING="${MISSING:+$MISSING }$z"
+done
+if [ -n "$CONF_REF" ]; then
+  pass "the repo confs reference $(printf '%s' "$CONF_REF" | wc -w | tr -d ' ') limit_req zone(s)"
+else
+  fail "no limit_req zone reference found in the repo confs; this check is looking at nothing"
+fi
+if [ -z "$MISSING" ]; then
+  pass "the snippet defines every zone the two repo confs rate limit on"
+else
+  fail "the snippet defines no zone called: $MISSING"
+fi
+# Every zone is per client IP. /help/iot-integration says so in those words and
+# tests/site-claims.test.mjs holds it there, so a key change here would make
+# the site lie.
+if [ -n "$SNIP_DEF" ] \
+   && [ "$(grep -cE '^[[:space:]]*limit_req_zone[[:space:]]+\$binary_remote_addr' "$SNIPPET")" \
+      = "$(grep -cE '^[[:space:]]*limit_req_zone' "$SNIPPET")" ]; then
+  pass "every zone in the snippet is keyed on \$binary_remote_addr, so the limits stay per IP"
+else
+  fail "a zone in the snippet is keyed on something other than \$binary_remote_addr"
+fi
+if grep -qE '^[[:space:]]*limit_req_zone[^#]*rate=[0-9]+r/m;' "$SNIPPET" 2>/dev/null; then
+  pass "the zones carry an explicit rate"
+else
+  fail "a zone in the snippet has no rate= of its own"
+fi
+check_has "$FULL" '5d\. the limit_req zones'          "phase 5 reaches step 5d"
+check_has "$FULL" 'paramant-limit-req\.conf'          "the deploy names the tracked snippet"
+check_has "$FULL" 'nginx -T'                          "5d reads the LOADED config, not the file tree"
+check_has "$FULL" 'limit_req     /etc/nginx/conf\.d/' "the run header says where the snippet lands"
+
+# ------ the real 5d block, against a fixture nginx ------
+LR="$WORK/lr"
+mkdir -p "$LR/bin" "$LR/sites/../available" "$LR/bk" "$LR/etc" "$LR/co/deploy/nginx/snippets"
+mkdir -p "$LR/sites" "$LR/available"
+cp "$SNIPPET" "$LR/co/deploy/nginx/snippets/paramant-limit-req.conf"
+LR_DEST="$LR/etc/paramant-limit-req.conf"
+
+# nginx stub. -t is the config test, -T the dump of every file nginx loaded.
+# LRT_FILES is what the server's own config holds; the destination file is
+# added on top, the way conf.d/*.conf is included by nginx.conf, unless
+# LRT_NO_INCLUDE says this server does not include that directory.
+cat > "$LR/bin/nginx" <<'STUB'
+#!/bin/sh
+case "${1:-}" in
+  -t)
+    if [ "${LRT_T_FAIL:-0}" = 1 ]; then
+      echo 'nginx: [emerg] limit_req_zone "api" is already bound to key "$binary_remote_addr"' >&2
+      exit 1
+    fi
+    echo "nginx: configuration file test is successful"
+    ;;
+  -T)
+    if [ "${LRT_BIG_FAIL:-0}" = 1 ]; then exit 1; fi
+    for f in $LRT_FILES; do
+      [ -f "$f" ] || continue
+      echo "# configuration file $f:"
+      cat "$f"
+    done
+    if [ "${LRT_NO_INCLUDE:-0}" != 1 ] && [ -f "$LRT_DEST" ]; then
+      echo "# configuration file $LRT_DEST:"
+      cat "$LRT_DEST"
+    fi
+    ;;
+esac
+exit 0
+STUB
+cat > "$LR/bin/systemctl" <<'STUB'
+#!/bin/sh
+exit 0
+STUB
+chmod +x "$LR/bin/nginx" "$LR/bin/systemctl"
+
+# A site conf that rate limits, and a server nginx.conf that binds zones.
+cat > "$LR/available/paramant-public.conf" <<'CONF'
+server {
+    server_name paramant.app;
+    location = /v1/paraid/issue-document { deny all; }
+    location ~ ^/v2/inbound {
+        limit_req zone=relay_inbound burst=20 nodelay;
+    }
+    location ~ ^/v2/outbound {
+        limit_req zone=relay_outbound burst=10 nodelay;
+    }
+}
+CONF
+cat > "$LR/available/paramant-live.conf" <<'CONF'
+server {
+    location /api/user/ {
+        limit_req        zone=relay_auth burst=5 nodelay;
+    }
+    location /v2/ {
+        limit_req        zone=api burst=10 nodelay;
+    }
+}
+CONF
+ln -sfn "$LR/available/paramant-public.conf" "$LR/sites/paramant-public.conf"
+ln -sfn "$LR/available/paramant-live.conf"   "$LR/sites/paramant-live.conf"
+LR_SLOTS="paramant-public.conf paramant-live.conf"
+
+# The server config in three shapes: binds nothing, binds everything (which is
+# production today), binds one of the five.
+printf 'http {\n    server_tokens off;\n}\n' > "$LR/etc/nginx-none.conf"
+{
+  echo 'http {'
+  sed -nE 's/^[[:space:]]*(limit_req_zone.*)$/    \1/p' "$SNIPPET"
+  echo '}'
+} > "$LR/etc/nginx-all.conf"
+{
+  echo 'http {'
+  echo '    limit_req_zone $binary_remote_addr zone=relay_auth:10m rate=10r/m;'
+  echo '}'
+} > "$LR/etc/nginx-one.conf"
+
+extract_remote "limit_req zones" > "$LR/5d.sh"
+if [ -s "$LR/5d.sh" ]; then
+  pass "the 5d remote block could be extracted from the script"
+else
+  fail "could not extract the 5d remote block from the script"
+fi
+# The extraction has to be the block and nothing else: the call is one line on
+# purpose, because sed '1d' would otherwise leave half a continuation line of
+# shell in front of the body.
+# remote_nginx prepends the resolver, so the extract is resolver + body. What
+# may NOT be in there is a stray line of the CALL: extract_remote drops one
+# line, so a call spread over two lines would leave its continuation, an
+# argument list, sitting in front of the body as shell to execute.
+if [ "$(grep -cE '^set -euo pipefail$' "$LR/5d.sh")" = "1" ]; then
+  pass "the extracted 5d block carries exactly one strict-mode line"
+else
+  fail "the extracted 5d block has $(grep -cE '^set -euo pipefail$' "$LR/5d.sh") strict-mode lines"
+fi
+if grep -qE '^[[:space:]]+"\$[A-Z_]+"' "$LR/5d.sh"; then
+  fail "the 5d extract carries a leftover argument line, so the call spans more than one line"
+  grep -nE '^[[:space:]]+"\$[A-Z_]+"' "$LR/5d.sh" | head -3 | sed 's/^/        /'
+else
+  pass "no leftover argument line in the 5d extract, so the whole call fits one line"
+fi
+
+run_5d() {   # server-conf, ts, [extra env assignments...]
+  local conf="$1" ts="$2"; shift 2
+  ( cd "$LR" && PATH="$LR/bin:$PATH" LRT_FILES="$conf $LR/available/paramant-public.conf $LR/available/paramant-live.conf" \
+      LRT_DEST="$LR_DEST" env "$@" bash "$LR/5d.sh" "$LR/co" "$ts" "$LR/bk" "$LR_DEST" "$LR/sites" "$LR_SLOTS" </dev/null 2>&1 )
+}
+# zones bound exactly once across everything nginx would load
+bound_once() {   # server-conf
+  local dup
+  dup="$(zones_defined "$1" "$LR_DEST" 2>/dev/null | sort | uniq -d)"
+  [ -z "$dup" ]
+}
+# a name counted across the server conf and the placed file together
+bound_total() { zones_defined "$1" "$LR_DEST" 2>/dev/null | wc -l | tr -d ' '; }
+
+echo ""
+echo "6o-1. A server that binds none of the zones: the snippet supplies all five"
+rm -f "$LR_DEST"
+OUTA="$(run_5d "$LR/etc/nginx-none.conf" 20260101-0000 LRT_X=1)"; RCA=$?
+if [ "$RCA" -eq 0 ]; then pass "5d exits 0 on a server that binds no zone"; else
+  fail "5d exits $RCA on a server that binds no zone"
+  printf '%s\n' "$OUTA" | sed 's/^/        /' | head -20
+fi
+for want in "before duplicate zones:0" "after zone lines left elsewhere:0" \
+            "after snippet loaded:yes" "after zones referenced and undefined:0" \
+            "before dest existed:no" "after snippet changed:yes"; do
+  f="${want%%:*}"; v="${want##*:}"
+  if [ "$(field_5c "$OUTA" "$f")" = "$v" ]; then pass "5d reports $f = $v"; else
+    fail "5d reports $f = '$(field_5c "$OUTA" "$f")', expected $v"; fi
+done
+SNIP_N="$(printf '%s\n' "$SNIP_DEF" | grep -c . || true)"
+if [ "$(field_5c "$OUTA" 'after zone lines written')" = "$SNIP_N" ]; then
+  pass "all $SNIP_N zone(s) of the snippet were written"
+else
+  fail "5d wrote $(field_5c "$OUTA" 'after zone lines written') zone line(s), expected $SNIP_N"
+fi
+if [ -f "$LR_DEST" ]; then pass "the snippet really landed on the server"; else
+  fail "5d reported success but wrote no file"; fi
+if [ "$(zones_defined "$LR_DEST" | wc -l | tr -d ' ')" = "$SNIP_N" ]; then
+  pass "the placed file defines the same $SNIP_N zone(s) as the tracked snippet"
+else
+  fail "the placed file defines $(zones_defined "$LR_DEST" | wc -l | tr -d ' ') zone(s), the snippet has $SNIP_N"
+fi
+if printf '%s\n' "$OUTA" | grep -q 'reloaded nginx for the limit_req snippet'; then
+  pass "5d reloads nginx after placing the snippet"
+else
+  fail "5d never reloaded nginx"
+fi
+if bound_once "$LR/etc/nginx-none.conf"; then
+  pass "no zone is bound twice across the server config and the placed file"
+else
+  fail "a zone is bound twice: $(zones_defined "$LR/etc/nginx-none.conf" "$LR_DEST" | sort | uniq -d | tr '\n' ' ')"
+fi
+
+echo ""
+echo "6o-2. Run it again with the file already there: the snippet is not its own duplicate"
+# The dump nginx -T returns now INCLUDES the file 5d placed a moment ago. Read
+# that naively and every zone reads as "already bound elsewhere", so the second
+# deploy would comment out all five lines and delete the zones it just created.
+OUTB="$(run_5d "$LR/etc/nginx-none.conf" 20260101-0001 LRT_X=1)"; RCB=$?
+if [ "$RCB" -eq 0 ]; then pass "a second 5d over the same state exits 0"; else
+  fail "a second 5d exits $RCB"
+  printf '%s\n' "$OUTB" | sed 's/^/        /' | head -20
+fi
+if printf '%s\n' "$OUTB" | grep -q FATAL; then
+  fail "a second 5d prints FATAL"
+  printf '%s\n' "$OUTB" | grep FATAL | sed 's/^/        /'
+else
+  pass "a second 5d prints no FATAL"
+fi
+for want in "before duplicate zones:0" "after zone lines left elsewhere:0" \
+            "before dest existed:yes" "after snippet changed:no"; do
+  f="${want%%:*}"; v="${want##*:}"
+  if [ "$(field_5c "$OUTB" "$f")" = "$v" ]; then pass "second run reports $f = $v"; else
+    fail "second run reports $f = '$(field_5c "$OUTB" "$f")', expected $v"; fi
+done
+if [ "$(field_5c "$OUTB" 'after zone lines written')" = "$SNIP_N" ]; then
+  pass "the second run keeps all $SNIP_N zone(s), it does not comment out its own file"
+else
+  fail "the second run left $(field_5c "$OUTB" 'after zone lines written') zone line(s) of $SNIP_N"
+fi
+if [ "$(field_5c "$OUTB" 'after snippet backup bytes')" -gt 0 ] 2>/dev/null; then
+  pass "the second run backed the existing file up before writing"
+else
+  fail "the second run wrote over the existing file with no backup"
+fi
+if [ -f "$LR/bk/paramant-limit-req.conf.pre-3.1-20260101-0001" ]; then
+  pass "the backup is filed under the run TS, the way 2b files the site confs"
+else
+  fail "no backup at bk/paramant-limit-req.conf.pre-3.1-20260101-0001"
+fi
+
+echo ""
+echo "6o-3. The server already binds every zone: the deploy binds none of them again"
+# This is production as it stands: all five names are in the server's own
+# nginx.conf. Writing them a second time is an nginx that does not start.
+rm -f "$LR_DEST"
+OUTC="$(run_5d "$LR/etc/nginx-all.conf" 20260101-0002 LRT_X=1)"; RCC=$?
+if [ "$RCC" -eq 0 ]; then pass "5d exits 0 when every zone is already bound"; else
+  fail "5d exits $RCC when every zone is already bound"
+  printf '%s\n' "$OUTC" | sed 's/^/        /' | head -20
+fi
+for want in "after zone lines written:0" "after snippet loaded:yes" \
+            "after zones referenced and undefined:0"; do
+  f="${want%%:*}"; v="${want##*:}"
+  if [ "$(field_5c "$OUTC" "$f")" = "$v" ]; then pass "5d reports $f = $v"; else
+    fail "5d reports $f = '$(field_5c "$OUTC" "$f")', expected $v"; fi
+done
+if [ "$(field_5c "$OUTC" 'before duplicate zones')" = "$SNIP_N" ] \
+   && [ "$(field_5c "$OUTC" 'after zone lines left elsewhere')" = "$SNIP_N" ]; then
+  pass "all $SNIP_N zone(s) were recognised as already bound and left where they are"
+else
+  fail "5d saw $(field_5c "$OUTC" 'before duplicate zones') duplicate(s) and commented out $(field_5c "$OUTC" 'after zone lines left elsewhere')"
+fi
+if [ "$(zones_defined "$LR_DEST" | wc -l | tr -d ' ')" = "0" ]; then
+  pass "the placed file defines no zone at all, so nothing is bound twice"
+else
+  fail "the placed file still defines $(zones_defined "$LR_DEST" | wc -l | tr -d ' ') zone(s) the server already binds"
+fi
+if [ "$(bound_total "$LR/etc/nginx-all.conf")" = "$SNIP_N" ] && bound_once "$LR/etc/nginx-all.conf"; then
+  pass "every zone is bound exactly once across the server config and the placed file"
+else
+  fail "the zones are bound $(bound_total "$LR/etc/nginx-all.conf") time(s) in total, expected $SNIP_N"
+fi
+if grep -qE '^# zone [A-Za-z0-9_]+ is already bound' "$LR_DEST"; then
+  pass "the placed file says in writing which zone it left to the other config"
+else
+  fail "the placed file drops the duplicate lines without saying so"
+fi
+
+echo ""
+echo "6o-4. The server binds one of the five: the other four come from the snippet"
+rm -f "$LR_DEST"
+OUTD="$(run_5d "$LR/etc/nginx-one.conf" 20260101-0003 LRT_X=1)"; RCD=$?
+if [ "$RCD" -eq 0 ]; then pass "5d exits 0 on a partly bound server"; else
+  fail "5d exits $RCD on a partly bound server"
+  printf '%s\n' "$OUTD" | sed 's/^/        /' | head -20
+fi
+if [ "$(field_5c "$OUTD" 'before duplicate zones')" = "1" ] \
+   && [ "$(field_5c "$OUTD" 'after zone lines written')" = "$((SNIP_N - 1))" ] \
+   && [ "$(field_5c "$OUTD" 'after zone lines left elsewhere')" = "1" ]; then
+  pass "one zone left where it was, $((SNIP_N - 1)) written from the snippet"
+else
+  fail "5d wrote $(field_5c "$OUTD" 'after zone lines written') and left $(field_5c "$OUTD" 'after zone lines left elsewhere'), expected $((SNIP_N - 1)) and 1"
+fi
+if [ "$(field_5c "$OUTD" 'before duplicate zone names')" = "relay_auth" ]; then
+  pass "5d names the zone it left alone (relay_auth)"
+else
+  fail "5d named '$(field_5c "$OUTD" 'before duplicate zone names')' as the already bound zone"
+fi
+if [ "$(bound_total "$LR/etc/nginx-one.conf")" = "$SNIP_N" ] && bound_once "$LR/etc/nginx-one.conf"; then
+  pass "still exactly one binding per zone, and all $SNIP_N of them exist"
+else
+  fail "$(bound_total "$LR/etc/nginx-one.conf") binding(s) across the two files, expected $SNIP_N with no duplicate"
+fi
+FIX_REF="$(zones_referenced "$LR/available/paramant-public.conf" "$LR/available/paramant-live.conf" | wc -l | tr -d ' ')"
+if [ "$(field_5c "$OUTD" 'after zones referenced')" = "$FIX_REF" ]; then
+  pass "5d counted every zone the site confs reference ($FIX_REF)"
+else
+  fail "5d counted $(field_5c "$OUTD" 'after zones referenced') referenced zone(s), expected $FIX_REF"
+fi
+
+echo ""
+echo "6o-5. A destination nginx never reads is a FATAL, not a silent no-op"
+# The file can be written, chmodded and still define nothing, because the
+# directory it sits in is not included anywhere. nginx -t passes either way,
+# so only the dump can tell the difference.
+rm -f "$LR_DEST"
+OUTE="$(run_5d "$LR/etc/nginx-none.conf" 20260101-0004 LRT_NO_INCLUDE=1)"; RCE=$?
+if [ "$RCE" -ne 0 ]; then pass "5d exits non-zero when nginx does not load the file it wrote"; else
+  fail "5d exited 0 while nginx never loaded the snippet"; fi
+if printf '%s\n' "$OUTE" | grep -q 'after snippet loaded = no'; then
+  pass "5d says the snippet was not loaded"
+else
+  fail "5d never reported that the snippet was not loaded"
+fi
+if printf '%s\n' "$OUTE" | grep -q 'PARAMANT_LIMIT_REQ_DEST'; then
+  pass "the FATAL names the override that fixes it"
+else
+  fail "the FATAL does not say how to point the snippet somewhere nginx reads"
+fi
+if [ ! -f "$LR_DEST" ]; then
+  pass "the file it wrote is gone again, so a failed 5d leaves no orphan in conf.d"
+else
+  fail "5d left $LR_DEST behind after failing"
+fi
+
+echo ""
+echo "6o-6. nginx -t failing puts the previous file back, byte for byte"
+rm -f "$LR_DEST"
+printf '# an older snippet\nlimit_req_zone $binary_remote_addr zone=leftover:1m rate=1r/m;\n' > "$LR_DEST"
+cp "$LR_DEST" "$LR/etc/expected-restore.conf"
+OUTF="$(run_5d "$LR/etc/nginx-none.conf" 20260101-0005 LRT_T_FAIL=1)"; RCF=$?
+if [ "$RCF" -ne 0 ]; then pass "5d exits non-zero when nginx -t rejects the config"; else
+  fail "5d exited 0 after nginx -t failed"; fi
+if printf '%s\n' "$OUTF" | grep -q 'FATAL nginx -t failed'; then
+  pass "5d says nginx -t was what failed"
+else
+  fail "5d did not report the nginx -t failure"
+fi
+if cmp -s "$LR_DEST" "$LR/etc/expected-restore.conf"; then
+  pass "the file that was there before the phase is back, unchanged"
+else
+  fail "5d left a rewritten file behind after nginx -t failed"
+fi
+
+echo ""
+echo "6o-7. A zone the site confs use that nothing binds is a stop"
+# The bug this catches: relay_auth deleted from the server's nginx.conf while
+# /api/user/ still rate limits on it. nginx would refuse the config, but the
+# deploy should say which zone and why, not leave that to a config test.
+rm -f "$LR_DEST"
+cat > "$LR/available/paramant-live.conf" <<'CONF'
+server {
+    location /api/user/ {
+        limit_req        zone=nowhere_at_all burst=5 nodelay;
+    }
+}
+CONF
+OUTG="$(run_5d "$LR/etc/nginx-none.conf" 20260101-0006 LRT_X=1)"; RCG=$?
+if [ "$RCG" -ne 0 ]; then pass "5d exits non-zero on a zone nothing binds"; else
+  fail "5d exited 0 while a location rate limits on a zone that does not exist"; fi
+if printf '%s\n' "$OUTG" | grep -q 'nowhere_at_all'; then
+  pass "the FATAL names the zone that is missing"
+else
+  fail "the FATAL does not name the missing zone"
+fi
+if [ ! -f "$LR_DEST" ]; then
+  pass "that failure rolls the snippet back too"
+else
+  fail "5d left the snippet in place after the referenced-zone check failed"
+fi
+
+echo ""
+echo "6o-8. A checkout without the snippet stops before anything is written"
+rm -f "$LR_DEST" "$LR/co/deploy/nginx/snippets/paramant-limit-req.conf"
+OUTH="$(run_5d "$LR/etc/nginx-none.conf" 20260101-0007 LRT_X=1)"; RCH=$?
+if [ "$RCH" -ne 0 ]; then pass "5d exits non-zero when the tracked snippet is not in the checkout"; else
+  fail "5d exited 0 with no snippet to place"; fi
+if [ ! -f "$LR_DEST" ]; then pass "and it wrote nothing"; else
+  fail "5d wrote a file anyway"; fi
+cp "$SNIPPET" "$LR/co/deploy/nginx/snippets/paramant-limit-req.conf"
 
 # ---------------------------------------------------------------- 7. secrets --
 echo ""

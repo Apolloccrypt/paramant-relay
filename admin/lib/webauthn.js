@@ -62,6 +62,69 @@ function scopeHash(s) {
   return crypto.createHash('sha256').update(String(s || '')).digest('hex').slice(0, 32);
 }
 
+// ── The address a phone actually sends ───────────────────────────────────────
+// /login/options is the only passkey route that depends on a typed field, and
+// it answered 400 invalid_email to anything its shape check disliked. The
+// browser turned that into "could_not_start (400)" and the customer was stuck,
+// while the cross-device link right below it kept working because it sends no
+// address at all. That asymmetry is the whole bug report of 2026-09-04.
+//
+// What arrives here is not always a bare address. A phone keyboard and an
+// autofill entry both add things that are invisible on screen:
+//
+//   - a no-break space (U+00A0) or a zero-width space (U+200B) pasted along
+//     with the address, in the MIDDLE of it, where .trim() cannot reach;
+//   - a newline or tab from a paste out of a mail client;
+//   - the display form "Mick <mick@example.com>", which is what a contact card
+//     yields when it is dropped into a text field.
+//
+// None of those change which account is meant, so none of them are a reason to
+// refuse to start the ceremony. Stripping them is safe here in a way it would
+// not be elsewhere: this address only selects which credential ids to offer.
+// Identity is established at /login/verify from the assertion itself, never
+// from this field, so a normalisation that picked the wrong account would still
+// hand out nothing a passkey holder could use.
+//
+// Deliberately NOT normalised: anything that changes which mailbox is named.
+// No dots removed, no plus-tag stripped, no unicode confusables folded.
+const INVISIBLE_G = /[\u0000-\u0020\u007f\u00a0\u1680\u2000-\u200f\u2028\u2029\u202f\u205f\u2060\u3000\ufeff]/g;
+const INVISIBLE_1 = new RegExp(INVISIBLE_G.source);
+const ANGLED_RE   = /<([^<>]+)>[^<>]*$/;
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function normalizeLoginEmail(raw) {
+  let s = String(raw == null ? '' : raw);
+  const angled = s.match(ANGLED_RE);
+  if (angled) s = angled[1];                 // "Name <a@b.com>" -> "a@b.com"
+  s = s.replace(INVISIBLE_G, '');            // anywhere, not only at the ends
+  return s.toLowerCase();
+}
+
+// Is this a usable sign-in address, after normalisation?
+function isLoginEmail(s) { return typeof s === 'string' && s.length > 0 && EMAIL_SHAPE.test(s); }
+
+// What the process log is allowed to say about an address it refused.
+//
+// Not the address, not a hash of it, not its domain: only the shape facts that
+// tell the next reader WHICH check failed and why. A length and a handful of
+// booleans identify nobody, and they are exactly what was missing when this
+// came in from a phone we cannot attach a debugger to.
+function loginEmailShape(raw) {
+  const s = String(raw == null ? '' : raw);
+  const n = normalizeLoginEmail(s);
+  return {
+    len: s.length,
+    at_count: (s.match(/@/g) || []).length,
+    dot_after_at: /@[^@]*\./.test(s),
+    invisible: INVISIBLE_1.test(s),
+    inner_space: /\S[ \t\u00a0]+\S/.test(s),
+    angled: ANGLED_RE.test(s),
+    non_ascii: /[^\x20-\x7e]/.test(s),
+    normalised_ok: isLoginEmail(n),
+    changed_by_normalise: n !== s.toLowerCase().trim(),
+  };
+}
+
 // ── One-shot challenge / flow store ──────────────────────────────────────────
 // The flow record holds the expected challenge plus the identity the options
 // step bound it to. Consumed (deleted) at verify BEFORE any crypto, so a
@@ -101,5 +164,6 @@ module.exports = {
   RP_ID, RP_NAME, EXPECTED_ORIGIN,
   counterIsAcceptable,
   LIMITS, rateHit, rateHitCounted, scopeHash,
+  normalizeLoginEmail, isLoginEmail, loginEmailShape,
   newFlowId, putAuthFlow, takeAuthFlow, putRegFlow, takeRegFlow,
 };

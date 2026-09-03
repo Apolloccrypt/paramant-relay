@@ -3,7 +3,7 @@
 **Auditor:** Ryan Williams · Director, [Smart Cyber Solutions Pty Ltd](https://www.linkedin.com/in/ryan-williams-4068351b8/) (Victoria, AU)
 **Scope:** Full codebase review — relay, frontend, SDKs, admin panel, nginx, Docker stack
 **Method:** Independent, uncompensated voluntary review. No prior access to internals.
-**Raw report:** [pentest-report-2026-04-08.txt](../pentest-report-2026-04-08.txt)
+**Raw report:** `pentest-report-2026-04-08.txt`
 **Summary:** 4 critical · 5 high · 6 medium · 5 low
 
 > All findings are being addressed publicly. This page is updated as patches ship.
