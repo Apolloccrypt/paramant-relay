@@ -31,11 +31,20 @@ on:
     # of GitHub schedules on :00 and a job queued there starts late.
     - cron: '43 4 * * *'
   workflow_dispatch:
-  # The selftest is a checkout-only gate and belongs on every change, for the
-  # same reason csp-inline-check is not path-gated: a required check that is
-  # skipped never reports, and the pull request waits on it forever.
-  push:
-    branches: [main]
+  # Pull requests only, deliberately no push to main.
+  #
+  # deploy/deploy-3.1.sh phase 0a gates a deploy on every workflow that runs on
+  # a push to main without a paths: filter, and tests/deploy-3.1-dryrun.test.sh
+  # derives that list from these files so a new one cannot stay outside the
+  # gate. Adding a push trigger here would therefore make a deploy wait on THIS
+  # workflow's last completed run on main, and that run is usually the nightly
+  # scan, which is red on purpose. A red posture is a statement about the DNS
+  # zone and the server, not about whether main is deployable, and blocking
+  # deploys on it is exactly the mistake that runbook already records about
+  # heartbeat.yml.
+  #
+  # The selftest still gates every change, because every change reaches main
+  # through a pull request.
   pull_request:
     branches: [main]
 
