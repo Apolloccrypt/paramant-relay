@@ -21,12 +21,70 @@ async function postJSON(url, body) {
   return { ok: r.ok, status: r.status, data };
 }
 
-function setStatus(el, text, isError) {
+// The status line. `techCode`, when present, is the raw technical detail: it
+// goes on a second, quieter line UNDER the sentence instead of being the whole
+// message. "could_not_start (400)" was the entire thing a customer saw on the
+// login page, which names an HTTP status and no next step. Support still needs
+// the code, so it is kept rather than dropped.
+//
+// Built with createElement/textContent, never innerHTML: this file runs under
+// script-src 'self' with no inline script anywhere (scripts/check-csp-inline.sh).
+function setStatus(el, text, isError, techCode) {
   if (!el) return;
-  el.textContent = text;
+  el.textContent = '';
+  el.appendChild(document.createTextNode(text));
+  if (techCode) {
+    el.appendChild(document.createElement('br'));
+    const code = document.createElement('span');
+    code.className = 'small';
+    code.style.color = 'var(--ink-dim, #6b7280)';
+    code.style.opacity = '.85';
+    code.textContent = techCode;
+    el.appendChild(code);
+  }
   el.classList.toggle('error', !!isError);
   el.classList.add('visible');
   el.style.display = '';
+}
+
+// Why the passkey prompt never opened, said to somebody who wants to sign in.
+//
+// The start call is the one step that can fail before the device is ever asked
+// anything, and the page used to print the bare `could_not_start (<status>)`
+// for all of it. That sentence tells a customer nothing they can act on, and on
+// 2026-09-04 it was the whole of what a real sign-in attempt produced while the
+// cross-device link right below it worked on the first tap. So: plain language
+// plus the one route that is known to still work, and the code kept small
+// underneath for support.
+const PASSKEY_START_FALLBACK =
+  'We could not start the passkey prompt on this device. '
+  + 'Try “My passkey is on another device”, or use a 6-digit code.';
+// Creating a passkey is a different screen with different exits: the
+// cross-device link and the 6-digit code are not on it, so the sign-in sentence
+// would send somebody looking for a button that is not there.
+const PASSKEY_CREATE_FALLBACK =
+  'We could not start the passkey setup on this device. '
+  + 'Reload this page and try again, or set up the authenticator app instead.';
+
+// `kind` picks which exits the sentence may point at: 'login' (default) or
+// 'create'. The technical code is the same in both.
+function passkeyStartFailure(status, serverError, kind) {
+  let text = kind === 'create' ? PASSKEY_CREATE_FALLBACK : PASSKEY_START_FALLBACK;
+  if (serverError === 'invalid_email') {
+    text = 'That email address does not look complete, so we could not look up your passkey. '
+      + 'Check it and try again, or use “My passkey is on another device”.';
+  } else if (serverError === 'setup_token_required' || serverError === 'invalid_setup_token') {
+    text = 'This setup link is no longer valid. Ask for a new one on the sign-in page '
+      + 'under “Email me a new setup link”.';
+  } else if (status === 429) {
+    text = kind === 'create'
+      ? 'Too many attempts from this internet connection. Wait a few minutes and try again.'
+      : 'Too many sign-in attempts from this internet connection. Wait a few minutes, '
+        + 'then try again or use a 6-digit code.';
+  }
+  const e = new Error(text);
+  e.techCode = 'could_not_start (' + status + (serverError ? ' ' + serverError : '') + ')';
+  return e;
 }
 
 function esc(s) {
@@ -51,7 +109,7 @@ function passkeyAuthErrorMessage(e) {
   }
   // NotAllowedError and anything else: ambiguous. Give the actionable options.
   return 'No passkey was used on this device. Sign in with your email and code above, '
-    + 'or tap “Use a passkey on another device” to sign in with the passkey on your phone. '
+    + 'or tap “My passkey is on another device” to sign in with the passkey on your phone. '
     + 'If you cancelled, just try again.';
 }
 
@@ -75,7 +133,7 @@ function wireSetupPasskey() {
     setStatus(status, 'Follow your device prompt to create the passkey…', false);
     try {
       const opt = await postJSON('/api/user/auth/webauthn/register/options', { setup_token: setupToken });
-      if (!opt.ok) throw new Error(opt.data && opt.data.error ? opt.data.error : 'could_not_start (' + opt.status + ')');
+      if (!opt.ok) throw passkeyStartFailure(opt.status, opt.data && opt.data.error, 'create');
 
       let attResp;
       try {
@@ -94,7 +152,7 @@ function wireSetupPasskey() {
 
       showRecoveryCodes(Array.isArray(ver.data.recovery_codes) ? ver.data.recovery_codes : []);
     } catch (e) {
-      setStatus(status, e.message || 'Passkey registration failed.', true);
+      setStatus(status, e.message || 'Passkey registration failed.', true, e.techCode);
       btn.disabled = false;
     }
   });
@@ -176,7 +234,7 @@ function wireLoginPasskey() {
     setStatus(status, 'Follow your device prompt to sign in…', false);
     try {
       const opt = await postJSON('/api/user/auth/webauthn/login/options', { email });
-      if (!opt.ok) throw new Error('could_not_start (' + opt.status + ')');
+      if (!opt.ok) throw passkeyStartFailure(opt.status, opt.data && opt.data.error);
 
       let asseResp;
       try {
@@ -199,7 +257,7 @@ function wireLoginPasskey() {
 
       window.location = returnUrl;
     } catch (e) {
-      setStatus(status, e.message || 'Passkey sign-in failed.', true);
+      setStatus(status, e.message || 'Passkey sign-in failed.', true, e.techCode);
       btn.disabled = false;
     }
   });
@@ -252,7 +310,7 @@ function wireAccountPasskey() {
     try {
       const opt = await postJSON('/api/user/account/webauthn/register/options', { totp });
       if (opt.status === 403) throw new Error('That TOTP code was not accepted. Try the current code from your authenticator.');
-      if (!opt.ok) throw new Error(opt.data && opt.data.error ? opt.data.error : 'could_not_start (' + opt.status + ')');
+      if (!opt.ok) throw passkeyStartFailure(opt.status, opt.data && opt.data.error, 'create');
 
       setStatus(status, 'Follow your device prompt to create the passkey…', false);
       let attResp;
@@ -271,7 +329,7 @@ function wireAccountPasskey() {
       if (totpEl) totpEl.value = '';
       refresh();
     } catch (e) {
-      setStatus(status, e.message || 'Could not activate passkey.', true);
+      setStatus(status, e.message || 'Could not activate passkey.', true, e.techCode);
       btn.disabled = false;
     }
   });
@@ -303,7 +361,7 @@ function wireDiscoverablePasskey() {
     setStatus(status, 'Your browser will show a QR code — scan it with your phone to sign in…', false);
     try {
       const opt = await postJSON('/api/user/auth/webauthn/login/discoverable/options', {});
-      if (!opt.ok) throw new Error('could_not_start (' + opt.status + ')');
+      if (!opt.ok) throw passkeyStartFailure(opt.status, opt.data && opt.data.error);
 
       let asseResp;
       try {
@@ -320,7 +378,7 @@ function wireDiscoverablePasskey() {
 
       window.location = returnUrl;
     } catch (e) {
-      setStatus(status, e.message || 'Cross-device passkey sign-in failed.', true);
+      setStatus(status, e.message || 'Cross-device passkey sign-in failed.', true, e.techCode);
       btn.disabled = false;
     }
   });
