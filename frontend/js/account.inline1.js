@@ -253,11 +253,12 @@
       const free = isFreeAccount(d, d.current_plan);
       if (!free) {
         document.getElementById('billing-active-badge').classList.remove('hidden');
-        // Cancel stops a NEXT collection. With auto_renews false there is no
-        // next collection to stop, and offering the button anyway scheduled a
-        // downgrade on a date nobody had bought, so the term end below is the
-        // whole answer. The button returns the day recurring billing is on.
-        if (d.auto_renews) document.getElementById('billing-cancel-btn').classList.remove('hidden');
+        // A customer who pays gets a way to stop paying. What was wrong here was
+        // never the button but the date behind it: cancel used to schedule the
+        // downgrade at now plus 30 days, so someone who had bought a YEAR was
+        // told his plan ended next month. It now schedules on the term he
+        // actually paid for, the same date shown below.
+        document.getElementById('billing-cancel-btn').classList.remove('hidden');
       }
       // One calm line about what this plan is. On Community it says whose gift
       // it is and what the paid plans add, with a single way up. On a paid plan
