@@ -53,7 +53,8 @@ const publicMobilePaint = await publicPage.locator('nav.nav').evaluate((node) =>
   backdropFilter: getComputedStyle(node).backdropFilter,
   webkitBackdropFilter: getComputedStyle(node).getPropertyValue('-webkit-backdrop-filter'),
 }));
-ok('mobile navigation is opaque before opening the menu', publicMobilePaint.background === 'rgb(248, 250, 252)' && publicMobilePaint.backdropFilter === 'none' && (!publicMobilePaint.webkitBackdropFilter || publicMobilePaint.webkitBackdropFilter === 'none'), JSON.stringify(publicMobilePaint));
+// Pinned to the bone hex until 4 September 2026; the homepage now paints the bar in the night colour, so the pin is what it always guarded: fully opaque, no blur.
+ok('mobile navigation is opaque before opening the menu', /^rgb\(/.test(publicMobilePaint.background) && publicMobilePaint.backdropFilter === 'none' && (!publicMobilePaint.webkitBackdropFilter || publicMobilePaint.webkitBackdropFilter === 'none'), JSON.stringify(publicMobilePaint));
 await publicPage.locator('#nav-hamburger').click();
 await publicPage.waitForFunction(() => {
   const nav = document.querySelector('nav.nav')?.getBoundingClientRect();
