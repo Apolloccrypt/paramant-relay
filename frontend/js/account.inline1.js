@@ -301,6 +301,57 @@
   });
 
 
+  // ── The end of the term that was bought ────────────────────────────────────
+  // Every checkout here is a ONE-OFF payment for one month or one year, so the
+  // date in paid_until_<product> is the day access stops and there is no
+  // collection to announce or to cancel. Before this the account page said
+  // "active" and nothing else, and the first sign a customer had that his term
+  // was over was a refused signature.
+  //
+  // Two products can carry two different dates. The one that matters is the
+  // nearest one still ahead, because that is the one that needs acting on; once
+  // they have all passed it is the last one, because that is the day the
+  // account fell back.
+  var TERM_WARN_DAYS = 7;
+  function termState(d, nowMs) {
+    var now = typeof nowMs === 'number' ? nowMs : Date.now();
+    var ends = [d.paid_until_parasign, d.paid_until_parasend]
+      .map(function (v) { return v ? Date.parse(v) : NaN; })
+      .filter(function (t) { return !isNaN(t); });
+    if (!ends.length) return null;
+    var ahead = ends.filter(function (t) { return t > now; });
+    var at = ahead.length ? Math.min.apply(null, ahead) : Math.max.apply(null, ends);
+    var days = (at - now) / 86400000;
+    return { at: at, ended: at <= now, warn: days > 0 && days <= TERM_WARN_DAYS };
+  }
+
+  // en-GB and not the visitor's locale: the site is in English and the same
+  // date has to read the same here as it does in the reminder mail.
+  function termDate(at) {
+    return new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+  }
+
+  function renderTerm(d) {
+    var term = termState(d);
+    var line = document.getElementById('billing-term-line');
+    var warn = document.getElementById('billing-term-warn');
+    if (line) line.hidden = true;
+    if (warn) warn.hidden = true;
+    if (!term) return;
+    var when = termDate(term.at);
+    if (line) {
+      line.textContent = term.ended
+        ? 'Ended on ' + when + ', now on Community.'
+        : 'Ends on ' + when + ', nothing renews automatically.';
+      line.hidden = false;
+    }
+    if (warn && term.warn) {
+      var text = warn.querySelector('[data-term="text"]');
+      if (text) text.textContent = 'Your plan ends on ' + when + '. Renew for another month or year, or let it fall back to Community. Nothing is charged automatically.';
+      warn.hidden = false;
+    }
+  }
+
   async function loadBilling() {
     try {
       const res = await fetch('/api/user/billing/status', { credentials: 'include' });
@@ -345,6 +396,7 @@
         const note = document.getElementById('billing-renew-note');
         if (note) note.hidden = !!d.auto_renews;
       }
+      renderTerm(d);
       if (d.cancellation_scheduled_at) {
         document.getElementById('billing-cancel-row').style.display = 'flex';
         document.getElementById('billing-cancel-date').textContent = 'Downgrade scheduled ' + new Date(d.cancellation_scheduled_at).toLocaleDateString();

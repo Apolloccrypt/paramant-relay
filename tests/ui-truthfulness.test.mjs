@@ -396,8 +396,14 @@ for (const [file, html] of [['dashboard.html', dashboardHtml], ['account.html', 
 // The free band is the one upgrade path, so it gets exactly one link to
 // /pricing. Two was the old bridge sentence explaining that Community was
 // called Free over there; /pricing says Community now and the sentence is gone.
-for (const [file, html, id] of [['dashboard.html', dashboardHtml, 'dh-community'], ['account.html', accountHtml, 'billing-community']]) {
-  const band = (html.match(new RegExp(`id="${id}"[\\s\\S]*?<\\/(aside|div)>\\s*<\\/?(aside|div|p)`)) || [''])[0];
+// The cut is the band's OWN closing tag. It used to be "the first block close
+// followed by another block", which is not a boundary at all: on dashboard.html
+// that ran 4224 characters past the band and swallowed three sections that have
+// nothing to do with the upgrade path, so any link added anywhere below the
+// free band failed this check. Naming the tag per band bounds it to the element
+// the rule is about.
+for (const [file, html, id, close] of [['dashboard.html', dashboardHtml, 'dh-community', 'aside'], ['account.html', accountHtml, 'billing-community', 'div']]) {
+  const band = (html.match(new RegExp(`id="${id}"[\\s\\S]*?<\\/${close}>`)) || [''])[0];
   assert.ok(band, `${file} must carry the free-plan band`);
   assert.equal((band.match(/href="\/pricing"/g) || []).length, 1,
     `${file} must offer exactly one upgrade link in the free band`);
