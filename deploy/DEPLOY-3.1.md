@@ -282,11 +282,55 @@ What has to be true before step 2:
 | `BILLING_MODE` | the recurring layer | **empty**. Do not set it in this deploy. |
 | `MOLLIE_API_KEY` | one-off checkout, as since 08-08 | set, `live_` prefix, unchanged |
 | `PARASIGN_CANARY_KEY` | the hourly ParaSign canary in `product-heartbeat.yml` | not a relay variable: a GitHub Actions secret holding a `psk_test_` key with the parasign scope. See step 7. |
+| `BILLING_SELLER_ADDRESS` | the supplier address on every invoice | set, with `\n` between lines. Empty prints an empty address block, which makes the document invalid under Wet OB art. 35a. |
+| `BILLING_SELLER_VAT` | whether a paid customer gets an invoice or a receipt | **not known yet.** Leave empty until the btw-id is on file. See below. |
 
 If `INTERNAL_AUTH_TOKEN` is empty: generate one (`openssl rand -hex 32`), add
 `INTERNAL_AUTH_TOKEN=...` to `/opt/paramant-relay/.env`, and know that the
 containers only pick it up when recreated in step 4. Do not restart anything
 for it now.
+
+### Invoices: the four seller variables
+
+Since this deploy the relay issues one numbered document per paid Mollie
+payment. The number comes from a redis counter per calendar year
+(`PS-2026-0001`), the record is kept in redis without a TTL because bookkeeping
+retention is seven years, and the PDF is mailed to the account address through
+the existing Resend key. Nothing about the payment path itself changes.
+
+| variable | default | what it does |
+|---|---|---|
+| `BILLING_SELLER_NAME` | `Paramantis Solutions B.V.` | the name on the document |
+| `BILLING_SELLER_ADDRESS` | empty | the address block; `\n` separates lines |
+| `BILLING_SELLER_KVK` | `42115132` | printed in the footer (Handelsregisterwet art. 25) |
+| `BILLING_SELLER_VAT` | empty | the btw-id; **decides what the document is** |
+
+`BILLING_SELLER_VAT` is the one that matters. A document without the supplier's
+VAT identification number is not an invoice, and a customer who files it cannot
+deduct the VAT. So while the variable is empty the relay does not pretend:
+
+- the document is titled **Payment receipt**, not Invoice;
+- it carries the line *Invoice with VAT number follows*;
+- the relay logs one `billing_invoice_no_vat_number` warning per process, not
+  one per payment;
+- the customer still gets the PDF, still sees it on `/account`, and the record
+  is still kept.
+
+Set the variable and every document issued after the restart is a full VAT
+invoice. Documents already issued keep the form they were issued in on purpose:
+an invoice is a record of what was sent, not a template that reprints.
+
+Verify after the deploy, on any relay container:
+
+```
+docker compose exec relay-main printenv | grep BILLING_SELLER
+```
+
+and, once a real payment has come in, that the log line says `result:"issued"`:
+
+```
+docker compose logs relay-main --since 1h | grep billing_invoice
+```
 
 ## Step 2: tag the rollback images and back up the state (server)
 
