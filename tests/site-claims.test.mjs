@@ -1646,6 +1646,43 @@ test('the DPA the pages offer is the public endpoint relay.js serves', () => {
   for (const slug of ['pricing', 'privacy', 'audit-log-export']) {
     assert.ok(visible(page(slug)).toLowerCase().includes(SCOPE), `${slug}: must say the DPA ${SCOPE}, because the endpoint has no gate`);
   }
+  // The homepage is the page a buyer reads first, and it listed a signed DPA as
+  // an Enterprise feature while the endpoint asks nobody for a plan. #382 fixed
+  // the sentence; this is what stops it coming back, on any page, in any tier
+  // list. Scoped to list items that name a tier, because /index says "that is
+  // in the signed Data Processing Agreement" in a breach-notification sentence
+  // where the phrase is right.
+  assert.ok(visible(page('index')).includes('The Data Processing Agreement applies to every plan.'),
+    'index: the homepage must say the DPA applies to every plan, because the endpoint gates on nothing');
+  // Two shapes carry a tier's feature list, and the sweep has to know both: the
+  // one-line form on /index (<li> ... <b>Enterprise</b> ... </li>) and the card
+  // on /pricing (a tier-name heading followed by its own <ul>). Scanning only
+  // the <li> found the first and walked straight past the second.
+  const ENTERPRISE_REGIONS = (html) => {
+    const out = [];
+    for (const li of html.match(/<li\b[\s\S]*?<\/li>/g) || []) {
+      if (/<b>Enterprise<\/b>/.test(li)) out.push(li);
+    }
+    let at = html.indexOf('tier-name">Enterprise');
+    while (at !== -1) {
+      const end = html.indexOf('</ul>', at);
+      out.push(html.slice(at, end === -1 ? at + 2000 : end));
+      at = html.indexOf('tier-name">Enterprise', at + 1);
+    }
+    return out;
+  };
+  const tierGated = [];
+  let regionsSeen = 0;
+  for (const slug of publicPages()) {
+    for (const region of ENTERPRISE_REGIONS(page(slug))) {
+      regionsSeen += 1;
+      const m = /signed DPA|signed Data Processing Agreement/i.exec(region);
+      if (m) tierGated.push(`${slug}: lists "${m[0]}" as an Enterprise feature, and /v2/sign-dpa asks nobody for a plan`);
+    }
+  }
+  assert.ok(regionsSeen >= 3, `only ${regionsSeen} Enterprise feature lists found; the sweep stopped seeing the lists it exists for`);
+  assert.deepEqual(tierGated, [], `\n  ${tierGated.join('\n  ')}\n`);
+
   const gated = [];
   const GATES = [
     /available on request for all paid tiers/i,
