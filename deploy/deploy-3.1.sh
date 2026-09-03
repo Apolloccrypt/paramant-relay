@@ -334,8 +334,25 @@ RESOLVER
 )"
 
 # remote_nginx: remote(), with resolve_conf_slots() already defined in the body.
+#
+# NOT a pipeline. The first version was
+#
+#   { printf '%s\n' "$NGINX_RESOLVE_SNIPPET"; cat; } | remote "$@"
+#
+# and every stage of a pipeline is a subshell, so remote() and _remote_run()
+# ran in a child: REMOTE_OUT and REMOTE_RC were set there and thrown away when
+# it exited. Every expect after a remote_nginx call then judged whatever the
+# PREVIOUS remote block had left in REMOTE_OUT. Deploy run 4 (TS 20260903-0216)
+# stopped in 2b on "the server never printed 'after .env backup bytes'" while
+# the server had printed exactly that, 1420 bytes.
+#
+# So read the body here and hand remote() its stdin through a redirect. The
+# printf runs in a subshell, remote() does not, and the two variables land in
+# the caller.
 remote_nginx() {
-  { printf '%s\n' "$NGINX_RESOLVE_SNIPPET"; cat; } | remote "$@"
+  local body
+  body="$(cat)"
+  remote "$@" < <(printf '%s\n%s\n' "$NGINX_RESOLVE_SNIPPET" "$body")
 }
 
 # expect: assert against the output of the last remote call. Skipped, loudly,

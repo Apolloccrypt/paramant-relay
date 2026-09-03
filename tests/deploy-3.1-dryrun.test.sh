@@ -1160,6 +1160,123 @@ else
 fi
 
 echo ""
+echo "6i-8. remote_nginx must not run remote() in a subshell"
+# Deploy run 4 (TS 20260903-0216) stopped in phase 2b on "the server never
+# printed 'after .env backup bytes'" while the server had printed exactly that,
+# 1420 bytes, and had resolved both confs. The wrapper was a pipeline,
+#
+#   { printf '%s\n' "$NGINX_RESOLVE_SNIPPET"; cat; } | remote "$@"
+#
+# and every stage of a pipeline is a subshell, so remote() and _remote_run()
+# set REMOTE_OUT and REMOTE_RC in a child that then exited. Every expect after
+# a remote_nginx call read whatever the PREVIOUS block had left behind.
+#
+# The block-level tests above extract heredoc bodies and never touch the
+# wrapper, which is why 252 green checks missed this. This one drives the real
+# remote_nginx(), with _remote_run() stubbed, and asks the calling shell what
+# it can see afterwards.
+WRAP="$WORK/wrap"
+mkdir -p "$WRAP"
+
+# The stub stands in for the ssh call: it records the body it was handed and
+# sets the two variables the way _remote_run() does on a real run.
+cat > "$WRAP/stub.sh" <<'STUB'
+die() { echo "die: $*" >&2; return 1; }
+_remote_run() {
+  cat > "$WRAPDIR/stdin.txt"
+  REMOTE_OUT="after .env backup bytes = 1420"
+  REMOTE_RC=0
+  return 0
+}
+STUB
+
+# harness <wrapper-source-file>: source the stub, the snippet, remote() and one
+# spelling of remote_nginx(), call it, and report what the CALLER can see.
+cat > "$WRAP/harness.sh" <<'HARNESS'
+set -uo pipefail
+WRAPDIR="$1"; WRAPPER="$2"; SCRIPT="$3"
+# shellcheck source=/dev/null
+. "$WRAPDIR/stub.sh"
+eval "$(sed -n '/^NGINX_RESOLVE_SNIPPET=/,/^)"$/p' "$SCRIPT")"
+eval "$(sed -n '/^remote() {$/,/^}$/p' "$SCRIPT")"
+# shellcheck source=/dev/null
+. "$WRAPPER"
+REMOTE_OUT="stale output from the previous block"
+REMOTE_RC=7
+remote_nginx "unit" one two <<'BODY'
+set -euo pipefail
+echo body-marker
+BODY
+echo "PARENT REMOTE_OUT=[$REMOTE_OUT]"
+echo "PARENT REMOTE_RC=[$REMOTE_RC]"
+HARNESS
+
+# The wrapper as the script spells it today.
+sed -n '/^remote_nginx() {$/,/^}$/p' "$SCRIPT" > "$WRAP/wrapper-now.sh"
+if [ -s "$WRAP/wrapper-now.sh" ]; then
+  pass "remote_nginx() could be extracted from the script"
+else
+  fail "could not extract remote_nginx() from the script"
+fi
+
+WOUT="$(WRAPDIR="$WRAP" bash "$WRAP/harness.sh" "$WRAP" "$WRAP/wrapper-now.sh" "$SCRIPT" 2>&1)"
+if printf '%s\n' "$WOUT" | grep -q 'PARENT REMOTE_OUT=\[after \.env backup bytes = 1420\]'; then
+  pass "REMOTE_OUT set by the remote call is visible in the shell that called remote_nginx"
+else
+  fail "REMOTE_OUT did not reach the caller; every expect after a remote_nginx would judge the previous block"
+  printf '%s\n' "$WOUT" | sed 's/^/        /' | head -10
+fi
+if printf '%s\n' "$WOUT" | grep -q 'PARENT REMOTE_RC=\[0\]'; then
+  pass "REMOTE_RC reaches the caller too, so a failing block still stops the deploy"
+else
+  fail "REMOTE_RC did not reach the caller (got: $(printf '%s\n' "$WOUT" | sed -n 's/^PARENT REMOTE_RC=//p'))"
+fi
+# The body still has to arrive whole, and the resolver still has to come first.
+if [ -f "$WRAP/stdin.txt" ]; then
+  R_LINE="$(grep -n '^resolve_conf_slots() {' "$WRAP/stdin.txt" | head -1 | cut -d: -f1)"
+  B_LINE="$(grep -n '^echo body-marker$' "$WRAP/stdin.txt" | head -1 | cut -d: -f1)"
+  if [ -n "$R_LINE" ] && [ -n "$B_LINE" ] && [ "$R_LINE" -lt "$B_LINE" ]; then
+    pass "the resolver is defined before the block body in what the server receives"
+  else
+    fail "the stdin the server would get is wrong (resolver at '${R_LINE:-none}', body at '${B_LINE:-none}')"
+    sed 's/^/        /' "$WRAP/stdin.txt" | head -8
+  fi
+  if grep -q '^set -euo pipefail$' "$WRAP/stdin.txt"; then
+    pass "the body arrives intact, strict mode and all"
+  else
+    fail "the block body did not survive the wrapper"
+  fi
+else
+  fail "the stub was never handed a body"
+fi
+
+# Negative control: the pipeline spelling, so this test cannot pass by accident
+# on a harness that would wave the bug through.
+cat > "$WRAP/wrapper-pipe.sh" <<'OLD'
+remote_nginx() {
+  { printf '%s\n' "$NGINX_RESOLVE_SNIPPET"; cat; } | remote "$@"
+}
+OLD
+POUT="$(WRAPDIR="$WRAP" bash "$WRAP/harness.sh" "$WRAP" "$WRAP/wrapper-pipe.sh" "$SCRIPT" 2>&1)"
+if printf '%s\n' "$POUT" | grep -q 'PARENT REMOTE_OUT=\[stale output from the previous block\]'; then
+  pass "negative control: the pipeline spelling really does lose REMOTE_OUT in a subshell"
+else
+  fail "the negative control no longer reproduces the run-4 bug, so the check above proves nothing"
+  printf '%s\n' "$POUT" | sed 's/^/        /' | head -10
+fi
+
+# And no remote call anywhere may be piped into again. Comment lines are left
+# out: the wrapper writes down the spelling that caused this, on purpose.
+PIPED="$(grep -nE '\|[[:space:]]*remote(_soft|_nginx)?[[:space:]]+"' "$SCRIPT" \
+         | grep -vE '^[0-9]+:[[:space:]]*#' || true)"
+if [ -n "$PIPED" ]; then
+  fail "a remote call is piped into, which puts it in a subshell and loses REMOTE_OUT"
+  printf '%s\n' "$PIPED" | sed 's/^/        /'
+else
+  pass "no remote call is on the right-hand side of a pipe"
+fi
+
+echo ""
 echo "6d. The CI gate on main is one verdict per required workflow"
 # The old gate was `gh run list --branch main -L 5`: five runs of whichever
 # workflows happened to run last, with a stop on any `failure` among them. On
