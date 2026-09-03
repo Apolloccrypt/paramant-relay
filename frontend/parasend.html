@@ -201,17 +201,17 @@
   <div class="container-md">
     <div class="sec-head">
       <span class="num">00</span>
-      <h1 class="paramant-h2">Send a file that burns after one read.</h1>
-      <span class="mono-eyebrow">ParaSend &middot; sending files without leaving a copy behind &middot; one read on Community, up to 10 reads on Pro</span>
+      <h1 class="paramant-h2">Send a file that deletes itself after reading.</h1>
+      <span class="mono-eyebrow">ParaSend &middot; sending files without leaving a copy behind</span>
     </div>
-    <p class="ps-lede">Your file is locked on your own device before it is sent, and on the Community plan it is gone the moment the person you sent it to has opened it. Servers in Germany, under EU law.</p>
+    <p class="ps-lede">Your file is locked on your own device before it is sent, and our copy is wiped after its last read. Servers in Germany, under EU law.</p>
     <p class="ps-who">For offices that email client documents, contracts and personal data today, and would rather not leave them sitting in a mailbox.</p>
     <div class="ps-actions">
       <a href="/parashare" class="btn btn-primary">Send a file &rarr;</a>
       <a href="/pricing" class="btn btn-secondary">See pricing &rarr;</a>
     </div>
-    <p class="ps-sub">Free on the Community plan, forever, no card: 10 transfers a month, 5 MB a file, links that last an hour and are gone after one read. Organisations pay for volume, never for security.</p>
-    <p class="ps-note">Sending needs a free account. Receiving does not: the person you send to opens the link, gets the file, and the copy is wiped once the reads the link allows are spent. Keep your own copy, because a file that is gone cannot be fetched again.</p>
+    <p class="ps-sub">Free on the Community plan, forever, no card: 10 transfers a month, 5 MB a file, links that last an hour, and a web app link that is gone after one read. Organisations pay for volume, never for security.</p>
+    <p class="ps-note">Sending needs a free account. Receiving does not: the person you send to opens the link, gets the file, and the copy is wiped after its last read. Keep your own copy, because a file that is gone cannot be fetched again.</p>
   </div>
 </section>
 
@@ -222,7 +222,7 @@
   <div class="container-md">
     <span class="mono-eyebrow">01 / Free for everyone</span>
     <h2 style="margin-top:var(--space-2)">Free for everyone. Paid for organisations.</h2>
-    <p><strong>The Community plan is free, forever.</strong> It is not a trial and not a funnel. Businesses pay for the higher limits (longer links, more reads, more devices, a dedicated relay), not to unlock features, and that is what keeps the Community plan free.</p>
+    <p><strong>The Community plan is free, forever.</strong> It is not a trial and not a funnel. Businesses pay for the higher limits (longer links, more reads through the API, more devices, a dedicated relay), not to unlock features, and that is what keeps the Community plan free. More reads is not a weaker promise: it is one link a whole team can open, or a counterparty reopening it after a misclick, instead of you sending the file a second time.</p>
     <p><strong>Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.</strong></p>
     <p class="ps-sub">The plans and what each one costs are <a href="#plans">further down this page</a>. Checkout and the full comparison are on the <a href="/pricing">pricing page</a>.</p>
   </div>
@@ -232,7 +232,7 @@
 <section class="ps-band">
   <div class="container-md">
     <span class="mono-eyebrow">02 / What it does</span>
-    <h2 style="margin-top:var(--space-2)">Scrambled here, unreadable in transit, gone when the last read is spent</h2>
+    <h2 style="margin-top:var(--space-2)">Scrambled here, unreadable in transit, gone after its last read</h2>
     <p>ParaSend is the transfer half of Paramant. It runs on the same post-quantum core as ParaSign. Your file is encrypted before it leaves your device, so our servers hold nothing they could hand over or lose.</p>
     <div class="check-grid">
       <div class="check-card">
@@ -240,8 +240,8 @@
         <p>Your browser locks the file on your own device. Our servers only ever hold the locked version, never the file itself and never the key that opens it.</p>
       </div>
       <div class="check-card">
-        <div class="k">Gone after one read on Community</div>
-        <p>Nothing is written to disk. The file sits in server memory and is wiped once the reads its link allows are spent, which on Community is the first download, or when the link runs out, whichever comes first. A Pro link allows up to 10 reads.</p>
+        <div class="k">Gone after its last read</div>
+        <p>Nothing is written to disk. The file sits in server memory and is wiped after the last read the link allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Pro, 25 on Business and 100 on Enterprise. It goes the same way when the link runs out, whichever comes first.</p>
       </div>
       <div class="check-card">
         <div class="k">No account for receivers</div>
@@ -270,9 +270,9 @@
     <h2 style="margin-top:var(--space-2)">Three steps to a file that disappears</h2>
     <p>Sending needs a Paramant account. Receiving needs nothing at all.</p>
     <ol class="ps-steps">
-      <li><strong><a href="/signup">Create a free account</a>.</strong> No card, no time limit. The Community tier sends with a 1 hour link that burns on first read, forever.</li>
+      <li><strong><a href="/signup">Create a free account</a>.</strong> No card, no time limit. The Community tier sends with a 1 hour link, and the web app burns it on the first read, forever.</li>
       <li><strong><a href="/parashare">Open the ParaSend web app</a> and pick your file.</strong> It is scrambled in your browser before anything is uploaded, so what our servers receive is unreadable, and they keep it in memory only.</li>
-      <li><strong>Share the link.</strong> The recipient opens it once and the file is wiped. On the free tier the link expires after an hour whether it is opened or not.</li>
+      <li><strong>Share the link.</strong> The recipient opens it and the file is wiped after its last read. On the Community plan the link expires after an hour whether it is opened or not.</li>
     </ol>
   </div>
 </section>
@@ -362,7 +362,7 @@
     <div class="check-grid">
       <div class="check-card">
         <div class="k">We never had it</div>
-        <p>AES-256-GCM with a key your browser generates. The relay only ever holds ciphertext, never the plaintext and never the key, and it holds it in RAM until the read burns it. A web app transfer is stored at a fixed 5 MB, so its size says nothing about the file. The retention row is on the <a href="/security">security page</a>.</p>
+        <p>AES-256-GCM with a key your browser generates. The relay only ever holds ciphertext, never the plaintext and never the key, and it holds it in RAM until its last read burns it. A web app transfer is stored at a fixed 5 MB, so its size says nothing about the file. The retention row is on the <a href="/security">security page</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">The wire format, in full</div>
@@ -395,7 +395,7 @@
     </div>
     <div class="scope-note">
       <p><strong>What the compliance documentation is.</strong> Architecture documents, security controls mappings and technical reference materials aligned to IEC 62443, NIS2 and NEN 7510. This is documentation you can use as input for your own compliance process. Paramant does not hold third-party certification for these frameworks.</p>
-      <p><strong>What burn-on-read costs you.</strong> A file is wiped once the reads its link allows are spent, which on Community is the first download, or on expiry, whichever comes first. There is no disk storage, so a file that is gone cannot be fetched again. Keep your own copy.</p>
+      <p><strong>What burn-on-read costs you.</strong> A file is wiped after its last read, or on expiry, whichever comes first. There is no disk storage, so a file that is gone cannot be fetched again. Keep your own copy.</p>
     </div>
     <div class="ps-actions">
       <a href="/parashare" class="btn btn-primary">Send a file &rarr;</a>

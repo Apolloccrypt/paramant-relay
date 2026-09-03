@@ -220,7 +220,7 @@ footer a{color:var(--ink);text-decoration:none}
 <tr><td>Encrypted blob (5 MB padded chunks)</td><td>One-time secure transfer</td><td>RAM only &middot; burn-on-read</td><td>Never</td></tr>
 <tr><td>ParaSign encrypted document capsule</td><td>Deliver the document with a signing request</td><td>Redis &middot; expires with the envelope</td><td>Hosting provider stores ciphertext only</td></tr>
 <tr><td>Personal ParaSign invitation link</td><td>Bind one recipient to one encrypted document and signing slot</td><td>Processed during delivery; not written to application logs</td><td>Resend only when you choose email delivery</td></tr>
-<tr><td>SHA-256 hash of blob</td><td>Routing &amp; delivery confirmation</td><td>RAM only &middot; deleted on burn</td><td>Never</td></tr>
+<tr><td>SHA-256 hash of blob</td><td>Routing &amp; delivery confirmation</td><td>RAM only &middot; deleted after its last read</td><td>Never</td></tr>
 <tr><td>API key (Pro/Enterprise)</td><td>Authentication &amp; rate limiting</td><td>Loaded from config at startup</td><td>Never</td></tr>
 <tr><td>Device ID (SDK users)</td><td>Key routing between sender and receiver</td><td>RAM only &middot; cleared on restart</td><td>Never</td></tr>
 <tr><td>Device ID hash (CT log)</td><td>Public tamper-evident audit log</td><td>Disk &middot; /data/ct-log.json &middot; SHA3-256 one-way hash only</td><td>Never</td></tr>

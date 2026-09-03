@@ -266,7 +266,7 @@
       <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Free for everyone, paid for organisations</span>
     </div>
     <p style="font-size:var(--text-md);color:var(--ink);line-height:1.6;margin:0 0 var(--space-3)">
-      Sign documents and send files that vanish after one read on Community.
+      Sign documents and send files that delete themselves after reading.
     </p>
     <p style="font-size:var(--text-md);color:var(--ink);line-height:1.6;margin:0 0 var(--space-3)">
       <strong>Community is &euro;0 a month, forever:</strong> 2 signatures a month, 10 transfers a month, 5 MB per file, no card.
@@ -404,7 +404,7 @@
       <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Product</span>
       <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-top:var(--space-2)">ParaSend · Send a file that disappears</h3>
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;max-width:760px;margin-top:var(--space-3)">
-        Send a file over a link that expires and, on Community, burns on the first read. Community covers 10 transfers a month at 5 MB per file, forever. Organisations that send every week pay for longer links, up to 10 reads on Pro, and more registered devices.
+        Send a file over a link that expires and wipes the file after the last read it allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Pro, 25 on Business and 100 on Enterprise. Community covers 10 transfers a month at 5 MB per file, forever. Organisations that send every week pay for longer links, more reads through the API and more registered devices. More reads is not a weaker promise: it is one link a whole team can open, or a counterparty reopening it after a misclick, instead of you sending the file a second time.
       </p>
     </div>
     <div class="tier-grid">
@@ -534,7 +534,7 @@
 
     <div class="faq-item">
       <p class="faq-q">What happens to my file after the recipient downloads it?</p>
-      <div class="faq-a">All files are RAM-only. They exist only in server memory and are wiped once the reads the link allows are spent, which on Community is the first download, or on TTL expiry. A Pro link allows up to 10 reads, Business 25 and Enterprise 100. Nothing persists after expiry on any tier. There is no disk storage.</div>
+      <div class="faq-a">All files are RAM-only. They exist only in server memory and are wiped after the last read the link allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Pro, 25 on Business and 100 on Enterprise. TTL expiry wipes them too. Nothing persists after expiry on any tier. There is no disk storage.</div>
     </div>
 
     <div class="faq-item">

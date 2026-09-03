@@ -1888,36 +1888,54 @@ test('the norm mappings the site claims are the ones written in the tree, and no
   assert.deepEqual(gated, [], `\n  ${gated.join('\n  ')}\n`);
 });
 
-// 37 -- Burn-on-read as a universal property: the fifteen pages block 24 named
-// and left for a batch of its own. tiers.js gives a Community link one read and
-// a paid link more (Pro 10, Business 25, Enterprise 100), so "the file is gone
-// after the first read" is true on the free plan and false on every plan a
-// customer pays for. The rule this block enforces is narrow on purpose: a page
-// may sell burn-on-read as loudly as it likes, but wherever it states the claim
-// the same paragraph has to say which plan it holds for.
+// 37 -- Burn-on-read, and the two things the site was wrong about at once.
 //
-// Three ways for a paragraph to be right, and the third is not a loophole:
-//   1. it names Community, the plan that really does burn on the first read;
-//   2. it names the read count a paid link buys, read off tiers.js;
-//   3. it says "web app". frontend/js/parashare.page.js never sends max_views
-//      and relay.js defaults a transfer without one to a single read on every
-//      plan, so a web app transfer does burn on the first read whatever the
-//      sender pays. Both halves are pinned below, so the day either changes the
-//      pages that lean on it go red instead of quietly becoming false.
+// WHICH PLAN. tiers.js gives a link 1 read on Community and more on a paid plan
+// (Pro 10, Business 25, Enterprise 100), so "the file is gone after the first
+// read" is true on the free plan and false on every plan a customer pays for.
+// That was the sweep block 24 named and left for a batch of its own.
 //
-// Tier-card feature lists are cut out of the sweep before it runs. A bullet
-// inside a card is scoped by the card, not by the sentence, and repeating the
-// plan name in every bullet would be noise; the cards are pinned against
-// tiers.js directly instead, which is the stronger check.
+// WHICH CLIENT. The read count is an API parameter, and the clients most of the
+// site is about never send it. frontend/js/parashare.page.js does not, and
+// neither does extensions/shared/paramant-core.js, which is the single upload
+// path for both the Chromium extension and the Outlook add-in. relay.js
+// defaults a transfer that asks for nothing to a single read on every plan, so
+// through the web app and through either extension the file really does go on
+// the first read whatever the sender pays. The first version of this block
+// treated that as an escape hatch for those pages. It is the opposite: on a
+// page about a client that cannot ask for more reads, offering the reader "up
+// to 10 reads on Pro" sells something that client will never do. So the pages
+// in CLIENT_ONLY below may qualify a claim ONLY by naming the client, and a
+// paid read count may appear there only with the API named in the same breath.
 //
-// Verified by sabotage in both directions:
-//   * put any rewritten sentence back to its universal form (drop "on
-//     Community" from /rules, or "On the Community plan" from /security) and
-//     this goes red naming the page and the sentence;
-//   * set pro.max_views to 1 in tiers.js and it goes red too, because the
-//     qualification is then false the other way round: the pages would be
-//     promising reads the relay no longer grants.
-test('every page that promises burn-on-read says which plan it holds for', () => {
+// One formulation, site-wide: "wiped after the last read the link allows",
+// short-formed as "after its last read". A sentence in that shape needs no
+// qualification because it names no count; a sentence that says one read does.
+// The earlier round left five wordings of the same idea on the page and this
+// block now forbids the ones it replaced.
+//
+// Why the first pattern list missed five true sentences (parasend "opens it
+// once and the file is wiped" and "until the read burns it", index "gone after
+// it is read", security "Deleted on burn" and "zeroed immediately on
+// download"): it was written FROM the sentences the grep had surfaced, so it
+// matched those wordings and nothing else. Every miss was a different erase
+// verb (zeroed, deleted), a different name for the moment (on burn, not on
+// read), or the two halves in the other order. The list below is built from two
+// vocabularies crossed against each other instead of from a list of sentences.
+//
+// The sweep also covers the signed-in screens now. /dashboard and /auth/setup
+// are outside publicPages and both carried the flat claim.
+//
+// Verified by sabotage in every direction:
+//   * universalise any rewritten sentence: red, naming page and sentence;
+//   * put "up to 10 reads on Pro" back on /parasend: red, because /parasend is
+//     about the web app and the count is not the API's there;
+//   * tiers.js pro.max_views 10 -> 1: red, the qualification is then false the
+//     other way round;
+//   * pro 10 -> 12: red, the copy numbers stop matching;
+//   * make the web app or either extension send max_views: red, the client
+//     formulation loses its ground.
+test('every page that promises burn-on-read says which client and which plan it holds for', () => {
   const tiersSrc = read('relay/lib/tiers.js');
   const viewsOf = (tier) => {
     const m = /max_views:\s*(\d+)/.exec(tiersSrc.slice(tiersSrc.indexOf(`${tier}:`)));
@@ -1925,10 +1943,8 @@ test('every page that promises burn-on-read says which plan it holds for', () =>
     return Number(m[1]);
   };
   const reads = {
-    community: viewsOf('community'),
-    pro: viewsOf('pro'),
-    business: viewsOf('business'),
-    enterprise: viewsOf('enterprise'),
+    community: viewsOf('community'), pro: viewsOf('pro'),
+    business: viewsOf('business'), enterprise: viewsOf('enterprise'),
   };
   assert.equal(reads.community, 1,
     'community no longer burns on the first read; the Community qualification this block requires is now the wrong sentence');
@@ -1937,14 +1953,27 @@ test('every page that promises burn-on-read says which plan it holds for', () =>
       `${paid} now allows ${reads[paid]} reads, the same as Community: burn-on-read is universal again, and every page that says a paid link buys more reads is promising something the relay does not grant`);
   }
 
-  // The web app escape hatch, pinned to the two lines that make it true.
+  // The clients that cannot ask for a second read, pinned to the lines that
+  // make that true. Any of these changing turns the client sentences false.
   const relaySrc = stripJsComments(read('relay/relay.js'));
   assert.match(relaySrc, /const maxViews = Math\.max\(1, Math\.min\(parseInt\(reqMaxViews \|\| 1\) \|\| 1, _psend\.limits\.max_views \|\| 1\)\)/,
-    'relay.js no longer defaults a transfer that asks for no max_views to a single read; the pages that say the ParaSend web app burns on the first read have lost their ground');
+    'relay.js no longer defaults a transfer that asks for no max_views to a single read; every page that says the web app or an extension goes on the first read has lost its ground');
   assert.match(relaySrc, /apiKey: null, max_views: 1, views_remaining: 1/,
     'the anonymous inbound path no longer pins a single read');
-  assert.doesNotMatch(stripJsComments(read('frontend/js/parashare.page.js')), /max_views/,
-    'the ParaSend web app now asks for a read count of its own; a paragraph may no longer say "web app" instead of naming the plan');
+  assert.match(read('frontend/js/parashare.page.js'), /hash, payload: toB64\(padded\), ttl_ms: ttlMs,/,
+    'the ParaSend web app upload body changed shape; check it still asks for no read count before trusting the sentences that say so');
+  assert.match(read('extensions/shared/paramant-core.js'), /const body = JSON\.stringify\(\{ hash, payload: toBase64\(padded\), ttl_ms: ttlMs, meta \}\);/,
+    'the extension upload body changed shape; both extension pages promise the file goes on the first read on every plan because this body carries no max_views');
+  const jsUnder = (dir) => fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((e) => {
+    if (e.isDirectory()) return e.name === 'node_modules' ? [] : jsUnder(`${dir}/${e.name}`);
+    return e.isFile() && /\.(js|mjs|ts)$/.test(e.name) ? [`${dir}/${e.name}`] : [];
+  });
+  const asks = [
+    ...['frontend/js/parashare.page.js'].filter((f) => /max_views/.test(stripJsComments(read(f)))),
+    ...jsUnder('extensions').filter((f) => /max_views/.test(stripJsComments(read(f)))),
+  ];
+  assert.deepEqual(asks, [],
+    `${asks.join(', ')} now asks the relay for a read count; the pages about that client may no longer say the file goes on the first read on every plan`);
 
   // What a visitor reads, body only. /docs ships no <body> tag at all, so fall
   // back to the end of the head rather than scanning the JSON-LD and the meta
@@ -1957,9 +1986,8 @@ test('every page that promises burn-on-read says which plan it holds for', () =>
       .replace(/<script[\s\S]*?<\/script>/gi, ' ')
       .replace(/<style[\s\S]*?<\/style>/gi, ' ');
     // Tier-card feature lists out: scoped by their card, pinned separately.
-    body = body.replace(/<ul[^>]*>[\s\S]*?<\/ul>/gi, (m, off, src) =>
+    return body.replace(/<ul[^>]*>[\s\S]*?<\/ul>/gi, (m, off, src) =>
       /tier-name|tier-card/.test(src.slice(Math.max(0, off - 500), off)) ? ' ' : m);
-    return body;
   };
   const flatten = (s) => s
     .replace(/<[^>]+>/g, ' ')
@@ -1978,59 +2006,122 @@ test('every page that promises burn-on-read says which plan it holds for', () =>
     return at.slice(0, -1).map((start, i) => flatten(body.slice(start, at[i + 1]))).filter(Boolean);
   };
 
-  // The sentences that state burn-on-read as a property of the transfer rather
-  // than of a plan. The bare compound noun is a feature name and is left alone:
-  // "a burn-on-read link" says nothing false, "burns it on read" does.
+  // Two vocabularies. A claim is an erase verb standing next to a moment that
+  // names ONE read, in either order, plus the handful of phrases that say it
+  // without a verb. "after its last read" and "after the last read the link
+  // allows" are deliberately not moments: they name no count, which is the
+  // whole point of the site using one formulation for this.
+  const ERASE = 'burn(?:s|ed|ing)?|destroy(?:s|ed|ing)?|wipe(?:s|d)?|erase[sd]?|delete[sd]?|zeroe?[sd]?|remove[sd]?|gone|vanish(?:es)?';
+  const MOMENT = [
+    'on (?:read|burn|download|opening)',
+    'on (?:the )?first (?:read|open|opening|download)',
+    'after (?:the )?(?:first|one|a single)(?: successful)? (?:read|open|opening|download)',
+    'after one read',
+    'after (?:it is|being|it has been) read',
+    'until (?:the|its|a) read\\b',
+    'once (?:it is|it has been) read',
+    'opens? (?:it|the link|the file) once',
+    'downloads it once',
+  ].join('|');
   const CLAIM = [
-    /\b(?:burn|destroy|wipe|erase)(?:s|ed|ing)?\b[^.<]{0,15}\bon (?:the )?first (?:read|open|download)\b/i,
-    /\b(?:burn|destroy|wipe|erase)(?:s|ed|ing)?\b[^.<]{0,15}\bon read\b/i,
-    /\b(?:burn|destroy|wipe|erase)(?:s|ed|ing)?\b[^.<]{0,25}\bafter (?:one|a single|the first)(?: successful)? (?:read|download|open|delivery)\b/i,
-    /\bburn-on-first-read\b/i,
-    /\b(?:destroyed|wiped|erased|deleted|gone)\b[^.<]{0,40}\bafter (?:the )?(?:first|one)(?: successful)? (?:read|download|open)\b/i,
-    /\b(?:vanish(?:es)?|gone)\b[^.<]{0,25}\bafter one read\b/i,
+    new RegExp(`\\b(?:${ERASE})\\b[^.<]{0,40}\\b(?:${MOMENT})`, 'i'),
+    new RegExp(`\\b(?:${MOMENT})\\b[^.<]{0,60}\\b(?:${ERASE})\\b`, 'i'),
     /\bgone the moment\b/i,
-    /\buntil (?:the )?first (?:read|download|open)\b/i,
-    /\b(?:wiped|destroyed|erased|deleted)\b[^.<]{0,20}\bimmediately on download\b/i,
-    /\bone (?:download|retrieval|read) only\b/i,
     /\bexactly one opening\b/i,
     /\bsingle-use guarantee\b/i,
-    /\bdownloads it once; then it is gone\b/i,
+    /\bone (?:download|retrieval|read|opening) only\b/i,
+    /\bburn-on-first-read\b/i,
+    /\buntil (?:the )?first (?:read|download|open)\b/i,
   ];
-  const QUALIFIED = [/\bCommunity\b/, /\bweb app\b/i, new RegExp(`\\bup to ${reads.pro} reads\\b`, 'i')];
+
+  // The screens a customer reaches after signing in are not in publicPages, and
+  // both of them carried the flat claim. /get, /ontvang and /parashare are the
+  // share flow, which anyone with a link opens without an account.
+  const SIGNED_IN = ['dashboard', 'auth/setup', 'get', 'ontvang', 'parashare'];
+  const everyPage = [...publicPages(), ...SIGNED_IN];
+  // Pages about a client that never sends max_views. Naming a plan is not a
+  // qualification here; naming the client is.
+  const CLIENT_ONLY = new Set([
+    'parasend', 'get', 'ontvang', 'parashare', 'dashboard', 'auth/setup',
+    'help/gmail-extension', 'help/outlook-extension',
+  ]);
+  const CLIENT = /\bweb app\b|\bextensions?\b|\badd-in\b/i;
+  const PLAN = [/\bCommunity\b/, new RegExp(`up to ${reads.pro} reads`, 'i')];
 
   const unqualified = [];
-  const claiming = new Set();
-  for (const slug of publicPages()) {
+  const mentioning = new Set();
+  for (const slug of everyPage) {
+    const clientOnly = CLIENT_ONLY.has(slug);
     for (const para of paragraphs(bodyOf(page(slug)))) {
       if (/^burn[- ]on[- ]read$/i.test(para)) continue; // the feature's name, used as a heading
+      if (/\bburn|last read|deletes itself|first read|wiped after|destroyed after\b/i.test(para)) mentioning.add(slug);
       const hit = CLAIM.find((re) => re.test(para));
       if (!hit) continue;
-      claiming.add(slug);
-      if (QUALIFIED.some((re) => re.test(para))) continue;
-      unqualified.push(`${slug}: "${hit.exec(para)[0]}" states burn-on-read for every plan, and tiers.js gives Pro ${reads.pro} reads per link. Paragraph: ${para.slice(0, 160)}`);
+      const ok = clientOnly ? CLIENT.test(para) : (CLIENT.test(para) || PLAN.some((re) => re.test(para)));
+      if (ok) continue;
+      unqualified.push(clientOnly
+        ? `${slug}: "${hit.exec(para)[0]}" is a page about a client that never sends max_views, so it must name that client, not a plan. Paragraph: ${para.slice(0, 160)}`
+        : `${slug}: "${hit.exec(para)[0]}" states burn-on-read for every plan, and tiers.js gives Pro ${reads.pro} reads per link. Paragraph: ${para.slice(0, 160)}`);
     }
   }
   assert.deepEqual(unqualified, [], `\n  ${unqualified.join('\n  ')}\n`);
-  assert.ok(claiming.size >= 10,
-    `only ${claiming.size} public pages still make the burn-on-read claim; the patterns above have stopped matching the site and this block is measuring nothing`);
+  assert.ok(mentioning.size >= 10,
+    `only ${mentioning.size} pages still describe how long a transfer lives; the patterns above have stopped matching the site and this block is measuring nothing`);
 
-  // Every read count the site names is the one tiers.js grants. This is the
-  // half that catches the other sabotage: with pro.max_views at 1 the number
-  // in the copy stops matching, on every page that carries it.
-  const PLAN = { community: 'community', pro: 'pro', business: 'business', enterprise: 'enterprise' };
+  // A paid read count on a client page has to say where it comes from. Without
+  // "through the API" the sentence sells the reader something the client he is
+  // reading about will never ask for.
+  const sold = [];
+  for (const slug of everyPage) {
+    if (!CLIENT_ONLY.has(slug)) continue;
+    for (const para of paragraphs(bodyOf(page(slug)))) {
+      const m = /up to (\d+)(?: reads?)? on (?:Pro|Business|Enterprise)/i.exec(para);
+      if (m && !/through the API/i.test(para)) {
+        sold.push(`${slug}: says "${m[0]}", and the client this page is about never sends max_views. Name the API in the same paragraph or drop the number.`);
+      }
+    }
+  }
+  assert.deepEqual(sold, [], `\n  ${sold.join('\n  ')}\n`);
+
+  // Every read count the site names is the one tiers.js grants.
+  const BY_NAME = { community: 'community', pro: 'pro', business: 'business', enterprise: 'enterprise' };
   const drifted = [];
-  for (const slug of publicPages()) {
+  for (const slug of everyPage) {
     const text = flatten(bodyOf(page(slug)));
     for (const m of text.matchAll(/up to (\d+) reads? on (Community|Pro|Business|Enterprise)/gi)) {
-      const want = reads[PLAN[m[2].toLowerCase()]];
+      const want = reads[BY_NAME[m[2].toLowerCase()]];
       if (Number(m[1]) !== want) drifted.push(`${slug}: says "${m[0]}", tiers.js grants ${want}`);
     }
   }
   assert.deepEqual(drifted, [], `\n  ${drifted.join('\n  ')}\n`);
 
-  // The ParaSend tier cards, which are where a buyer reads the number before
-  // he pays for it. Community's card is the one page element allowed to say
-  // "Burn on first read" flat, because the card it sits in is the plan.
+  // One formulation. These are the wordings it replaced, and they may not come
+  // back beside it: five ways of saying the same thing is how the site drifted
+  // into saying it wrong in the first place.
+  const stale = [];
+  for (const slug of everyPage) {
+    const m = /once the reads[^.<]{0,30}spent|when the last read is spent/i.exec(flatten(bodyOf(page(slug))));
+    if (m) stale.push(`${slug}: says "${m[0]}"; the site says this one way, "after the last read the link allows"`);
+  }
+  assert.deepEqual(stale, [], `\n  ${stale.join('\n  ')}\n`);
+
+  // The sentence itself, on the pages that have to carry it whole, with the
+  // numbers written off tiers.js so a policy change moves the copy with it.
+  const unified = `The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to ${reads.pro} reads on Pro, ${reads.business} on Business and ${reads.enterprise} on Enterprise.`;
+  for (const slug of ['parasend', 'pricing', 'help/gmail-extension', 'help/outlook-extension']) {
+    assert.ok(flatten(bodyOf(page(slug))).includes(unified),
+      `${slug}: must carry the client-and-plan sentence in full: "${unified}"`);
+  }
+  // And the buyer has to be told why more reads is worth paying for, or the
+  // honest version reads as a downgrade next to "burns on the first read".
+  for (const slug of ['parasend', 'pricing']) {
+    assert.ok(flatten(bodyOf(page(slug))).includes('one link a whole team can open'),
+      `${slug}: more reads has to be sold as a feature, not confessed as a weaker promise`);
+  }
+
+  // The ParaSend tier cards, which are where a buyer reads the number before he
+  // pays for it. Community's card is the one page element allowed to say "Burn
+  // on first read" flat, because the card it sits in is the plan.
   const pricingSrc = page('pricing');
   assert.ok(pricingSrc.includes('<li>Burn on first read</li>'),
     'pricing: the ParaSend Community card must still say the link burns on the first read');
@@ -2043,11 +2134,9 @@ test('every page that promises burn-on-read says which plan it holds for', () =>
   assert.ok(flatten(bodyOf(page('index'))).includes(`up to ${reads.pro} reads per link`),
     `index: the ParaSend Pro price line must name the ${reads.pro} reads per link tiers.js grants`);
 
-  // The three sentences that spell out all four plans at once. Written off
-  // tiers.js so a policy change moves them instead of leaving them stale.
+  // The two pages that spell all four plans out on their own terms.
   const spelled = [
-    ['architecture', `up to ${reads.pro} reads on Pro, ${reads.business} on Business and ${reads.enterprise} on Enterprise`],
-    ['pricing', `A Pro link allows up to ${reads.pro} reads, Business ${reads.business} and Enterprise ${reads.enterprise}.`],
+    ['architecture', `after the last read the link allows: one on Community, up to ${reads.pro} on Pro, ${reads.business} on Business and ${reads.enterprise} on Enterprise`],
     ['docs', `Community gets 1 hour and 1 read, Pro 24 hours and up to ${reads.pro} reads, Business 7 days and ${reads.business} reads, Enterprise 7 days and ${reads.enterprise} reads`],
   ];
   for (const [slug, sentence] of spelled) {

@@ -282,7 +282,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <tr><td>Server location</td><td>Hetzner Nuremberg, Germany</td></tr>
         <tr><td>Legal jurisdiction</td><td>EU / Germany (GDPR)</td></tr>
         <tr><td>US CLOUD Act</td><td>No US provider in the data path: files and keys stay in the EU. Transactional email goes via Resend, a US provider, which never receives the document. See <a href="/privacy">privacy</a>.</td></tr>
-        <tr><td>Data retained</td><td>No plaintext, no keys. Only: transfer hash, creation timestamp, approximate encrypted size (up to 5 MB; exact 5 MB for the ParaSend web app), view count. Deleted on burn.</td></tr>
+        <tr><td>Data retained</td><td>No plaintext, no keys. Only: transfer hash, creation timestamp, approximate encrypted size (up to 5 MB; exact 5 MB for the ParaSend web app), view count. Deleted after its last read.</td></tr>
         <tr><td>IP logging</td><td>Nginx access logging is switched off in the deploy configuration (<code>access_log off</code> on every server block that serves the site and the relays in <code>deploy/nginx-paramant-live.conf</code>). Not linked to transfer content. No separate retention period is promised. A relay you host yourself is the other way round: <code>deploy/nginx-selfhost.conf</code> writes an access log whose first field is the client address, so switch it off if you do not want it.</td></tr>
         <tr><td>Analytics</td><td>None. No third-party scripts on the relay or API.</td></tr>
       </tbody>
@@ -346,7 +346,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Burn-on-read</div>
-      <p style="margin:0">On the Community plan each blob is destroyed after the first successful download; a paid link is destroyed once the reads it allows are spent, up to 10 reads on Pro. Memory is zeroed immediately. There is no second chance to retrieve it.</p>
+      <p style="margin:0">Each blob is destroyed after the last read the link allows: one on Community, up to 10 on Pro. Memory is zeroed immediately. There is no second chance to retrieve it.</p>
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">5 MB padding</div>
@@ -365,7 +365,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <div><span class="check">&#10003;</span><span>Substitute a registered public key (after TOFU or PSS is used)</span></div>
       <div><span class="check">&#10003;</span><span>Decrypt any stored ciphertext: no key access</span></div>
       <div><span class="check">&#10003;</span><span>Read an exact file size: every web app block is a fixed 5 MB, and only the block count is visible</span></div>
-      <div><span class="check">&#10003;</span><span>Recover burned blobs: memory is zeroed immediately on download</span></div>
+      <div><span class="check">&#10003;</span><span>Recover burned blobs: memory is zeroed the moment the last read is spent</span></div>
       <div><span class="check">&#10003;</span><span>Forge CT log entries: Merkle chain is append-only and tamper-evident</span></div>
       <div><span class="check">&#10003;</span><span>Break ML-KEM-768: NIST FIPS 203, post-quantum secure</span></div>
     </div>
