@@ -70,11 +70,21 @@ async function processPayment(payment, deps) {
     return { result: 'refused', level: 'error', account: accountId, product, reason: `unknown_plan:${order.error}` };
   }
 
-  // Rule 3: idempotency. If we already recorded a terminal outcome, no-op.
+  // Rule 3: idempotency. A payment id we already settled changes nothing when it
+  // arrives again SAYING THE SAME THING. It is not "this id is finished
+  // forever": a refund or a chargeback reaches us on the very same tr_ id as the
+  // payment it reverses, so a flat id check swallowed the revoke and left an
+  // account that had taken its money back sitting on the paid tier. What the
+  // marker records is the outcome, and only a repeat of that outcome is a no-op.
+  const revoking = status === 'chargeback' || status === 'charged_back';
+  const wanted = revoking ? 'revoked' : 'granted';
   if (typeof d.isProcessed === 'function') {
     let done = false;
     try { done = await d.isProcessed(payment.id); } catch { done = false; }
-    if (done) return { result: 'ignored', level: 'info', account: accountId, product, reason: 'already_processed' };
+    // A truthy non-string (an older marker, or a boolean-shaped dep) is read as
+    // 'granted', which is what every marker written before this meant.
+    const seen = typeof done === 'string' ? done : (done ? 'granted' : null);
+    if (seen === wanted) return { result: 'ignored', level: 'info', account: accountId, product, reason: 'already_processed' };
   }
 
   if (status === 'paid') {

@@ -179,6 +179,62 @@ async function main() {
     ok('Mollie 5xx and timeout -> retryable, warn level');
   }
 
+  // ── a reversal arrives on the id of the payment it reverses ────────────────
+  // The marker is per payment id, and Mollie sends a chargeback under the SAME
+  // tr_ id as the payment. A guard that only asked "have I seen this id" let the
+  // account keep the tier after the money had gone back.
+  {
+    const set = spySetter();
+    const marker = { 'tr_CB': 'granted' };
+    const deps = {
+      setProductPlan: set,
+      isProcessed: async (id) => marker[id] || false,
+      markProcessed: async (id, val) => { marker[id] = val; },
+    };
+    const paid = await billing.processPayment(payment({ _id: 'CB', id: 'tr_CB' }), deps);
+    assert.strictEqual(paid.result, 'ignored', 'a repeat of the SAME outcome stays a no-op');
+    assert.strictEqual(paid.reason, 'already_processed');
+    assert.strictEqual(set.calls.length, 0, 'a duplicate paid webhook must not touch the entitlement');
+
+    const back = await billing.processPayment(payment({ _id: 'CB', id: 'tr_CB', status: 'chargeback' }), deps);
+    assert.strictEqual(back.result, 'revoked', 'money taken back must revoke even though the id was seen');
+    assert.strictEqual(back.tier, 'free', 'parasign floors to free');
+    assert.strictEqual(set.calls.length, 1);
+    assert.strictEqual(set.calls[0].tier, 'free');
+    assert.strictEqual(marker['tr_CB'], 'revoked', 'the marker records the new outcome');
+
+    const again = await billing.processPayment(payment({ _id: 'CB', id: 'tr_CB', status: 'chargeback' }), deps);
+    assert.strictEqual(again.result, 'ignored', 'a repeated chargeback is a no-op');
+    assert.strictEqual(set.calls.length, 1, 'and does not revoke twice');
+    ok('chargeback on an already-granted payment id revokes, and only repeats are ignored');
+  }
+  // A boolean-shaped marker is what every deployment wrote before the outcome
+  // was recorded, so it has to keep meaning 'granted'.
+  {
+    const set = spySetter();
+    const r = await billing.processPayment(payment({ _id: 'LEG', id: 'tr_LEG' }), {
+      setProductPlan: set, isProcessed: async () => true,
+    });
+    assert.strictEqual(r.result, 'ignored', 'a legacy boolean marker still blocks a duplicate grant');
+    assert.strictEqual(set.calls.length, 0);
+    ok('a legacy boolean idempotency marker is read as granted');
+  }
+  // A duplicate grant must not buy a second period. The guard is what stops it:
+  // extendFrom starts from the paid_until already on file, so a grant that runs
+  // twice adds a month twice off one payment.
+  {
+    const set = spySetter();
+    const until = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    const r = await billing.processPayment(payment({ _id: 'DUP', id: 'tr_DUP' }), {
+      setProductPlan: set,
+      currentPaidUntil: async () => until,
+      isProcessed: async () => 'granted',
+    });
+    assert.strictEqual(r.result, 'ignored');
+    assert.strictEqual(set.calls.length, 0, 'one payment, one period');
+    ok('a duplicate paid webhook cannot extend the paid period');
+  }
+
   console.log(`\nPASS billing: ${passed} checks`);
 }
 

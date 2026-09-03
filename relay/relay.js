@@ -5597,6 +5597,15 @@ async function handleRelayRequest(req, res) {
       // (mirrors getEntitlements' fallback) so an operator never sees a blank.
       plan_parasign: v.plan_parasign || entitlements.derivePlanParasign(v.plan, v.parasign),
       plan_parasend: v.plan_parasend || entitlements.derivePlanParasend(v.plan),
+      // The period the tier was paid for. WITHOUT this the tier above is the
+      // whole story a reader gets, and "no period" is read everywhere as "never
+      // expires" (entitlements.effectiveProductTier, and the same rule mirrored
+      // client-side in dashboard.js/account.inline1.js). Every account surface
+      // in admin/ is built on this projection, so leaving it out made a lapsed
+      // account render as "Pro, active" long after the relay's own gates had
+      // floored it to free. The date is on the record; it just never left.
+      paid_until_parasign: v[entitlements.PRODUCT_PAID_UNTIL_FIELD.parasign] || null,
+      paid_until_parasend: v[entitlements.PRODUCT_PAID_UNTIL_FIELD.parasend] || null,
       usage_purpose: v.usage_purpose || null, usage_purpose_at: v.usage_purpose_at || null /*MARK:parasign_list*/
     }));
     const licenseInfo = { edition: EDITION, active_keys: keys.length, key_limit: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS, ...(LICENSE_PAYLOAD ? { license_expires: LICENSE_PAYLOAD.expires_at } : {}) };
@@ -5623,6 +5632,8 @@ async function handleRelayRequest(req, res) {
       active: v.active, is_primary: !!v.is_primary, scope: v.scope || 'full', parasign: !!v.parasign, created: v.created || null,
       plan_parasign: v.plan_parasign || entitlements.derivePlanParasign(v.plan, v.parasign),
       plan_parasend: v.plan_parasend || entitlements.derivePlanParasend(v.plan),
+      paid_until_parasign: v[entitlements.PRODUCT_PAID_UNTIL_FIELD.parasign] || null,
+      paid_until_parasend: v[entitlements.PRODUCT_PAID_UNTIL_FIELD.parasend] || null,
       usage_purpose: v.usage_purpose || null, usage_purpose_at: v.usage_purpose_at || null }));/*MARK:parasign_reveal*/
   }
 
@@ -5851,6 +5862,10 @@ async function handleRelayRequest(req, res) {
     }
     const _rok = () => !!(redisClient && redisClient.isReady);
     const _idemKey = (id) => `paramant:billing:done:${id}`;
+    // The payment id that bought the period currently on file, per product.
+    // Stored on the account record (and so in users.json) alongside the Mollie
+    // pointers, which is what makes the idempotency guard durable.
+    const _paidByField = (product) => `paid_by_${product}`;
     const outcome = await billing.processPayment(payment, {
       setProductPlan,
       // Lets a renewal extend from where the paid period ends instead of from
@@ -5859,8 +5874,32 @@ async function handleRelayRequest(req, res) {
         const rec = accounts.get(accountId);
         return (rec && rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[product]]) || null;
       },
-      isProcessed: async (id) => { if (!_rok()) return false; try { return !!(await redisClient.get(_idemKey(id))); } catch { return false; } },
-      markProcessed: async (id, val) => { if (!_rok()) return; try { await redisClient.set(_idemKey(id), String(val), { EX: 60 * 86400 }); } catch { /* best effort */ } },
+      // Redis holds the marker, but redis is a cache here and users.json is the
+      // record. When redis is down or has been flushed, isProcessed used to
+      // answer 'no' and the grant ran a second time -- and since a grant extends
+      // from the paid_until already on file, one payment bought two months. So
+      // the account record carries the payment id that bought its current
+      // period, and that answer survives anything redis does.
+      isProcessed: async (id) => {
+        if (_rok()) {
+          try { const v = await redisClient.get(_idemKey(id)); if (v) return v; } catch { /* fall through to disk */ }
+        }
+        const rec = _billingRecordOf((payment.metadata || {}).accountId);
+        if (!rec) return false;
+        for (const p of entitlements.PRODUCTS) if (rec[_paidByField(p)] === id) return 'granted';
+        return false;
+      },
+      markProcessed: async (id, val) => {
+        const md = payment.metadata || {};
+        // Persist first: this is the half that has to outlive a restart.
+        if (md.accountId && entitlements.PRODUCTS.includes(md.product)) {
+          // A revoke takes the money back, so the id that bought the period goes
+          // with it; leaving it would make the reversal look like a live grant.
+          _setMolliePointer(md.accountId, _paidByField(md.product), val === 'granted' ? id : null);
+        }
+        if (!_rok()) return;
+        try { await redisClient.set(_idemKey(id), String(val), { EX: 60 * 86400 }); } catch { /* best effort */ }
+      },
     });
     // The collecting half. A grant only says what this payment bought; without
     // a subscription nothing asks for the next period. Deliberately AFTER the
