@@ -31,11 +31,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const PS_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PS_JS = fs.readFileSync(path.join(PS_ROOT, 'frontend/js/parashare.page.js'), 'utf8');
 const PS_HTML = fs.readFileSync(path.join(PS_ROOT, 'frontend/parashare.html'), 'utf8');
+// The real error module, in the context, so the page's one failure sentence is
+// the one this suite measures rather than the fallback copy inside failureText.
+const PS_ERRORS = createRequire(import.meta.url)('../frontend/js/error-message.js');
 const KEY_URL = '/api/user/account/key';
 const FAKE_KEY = 'pgp_livetestkey0000000000abcd';
 
@@ -102,6 +106,7 @@ function runPage({ keyResponses, sectorOk = true }) {
     clearTimeout: () => {}, setInterval: () => 0, clearInterval: () => {},
     queueMicrotask,
     act: () => {},
+    paramantErrors: PS_ERRORS,
     // A socket the test can drive: step 2 has to be measurable when the relay
     // connection dies, which is the case that used to print "Disconnected".
     WebSocket: class {
@@ -217,6 +222,12 @@ test('/parashare ships the banner copy and opens on the slim row, not the manual
   assert.ok(PS_HTML.includes('Your account key could not be loaded. Sign in again; if it keeps happening, mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.'),
     'the banner must name the one thing to do and the one address to write to');
   assert.match(PS_HTML, /data-click="expandApiKeyCard">Use a key by hand</, 'the banner must carry the manual way out');
+  // error-message.js is a plain script and parashare.page.js reads
+  // window.paramantErrors at call time, so the order of these two tags is what
+  // decides whether this page speaks the shared failure sentence or its own
+  // fallback copy of it.
+  assert.ok(PS_HTML.indexOf('/js/error-message.js') < PS_HTML.indexOf('/js/parashare.page.js'),
+    'error-message.js must load before parashare.page.js, or the page falls back to its own copy of the sentence');
 
   // The class logic, the other way round from what shipped: the slim row is the
   // default and the card is the exception.

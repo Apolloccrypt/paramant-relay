@@ -105,8 +105,10 @@ function applySlimApiKeyView() {
 // The banner. Shown only when the account key could not be loaded at all, and
 // it takes the slim row with it: a row that says "using your account key" while
 // there is no key would be the same lie the manual box used to tell.
-// TODO(#396): route the wording through failureText() in js/error-message.js
-// once that file is on main, so this page has one failure voice.
+// The banner keeps its own words on purpose: failureText is the sentence for
+// what we did not plan for, and a key that will not load is planned, with a
+// better next step than "try again in a minute". Its unplanned tail goes
+// through failureText like everything else on this page.
 function setKeyError(on) {
   var box = $('ps-key-error');
   if (box) box.classList.toggle('is-shown', !!on);
@@ -364,7 +366,9 @@ async function createSession() {
     setCreateStatus('Looking for a relay sector...');
     await onKeyInput();
     if (!relayReady) {
-      setCreateStatus(relayError || 'No relay sector answered. Try again in a moment.', 'err');
+      // relayError is the planned sentence. Reaching here without one is a state
+      // we did not plan for, so it gets the page's one sentence for that.
+      setCreateStatus(relayError || failureText('relay sector discovery', new Error('no sector answered')), 'err');
       return;
     }
   }
@@ -712,6 +716,9 @@ async function loadAccountKey() {
     await onKeyInput();
   } catch (e) {
     setKeyError(true);
+    // The banner carries the sentence; failureText logs the detail through the
+    // one reporter and keeps the console readable when three things fail at once.
+    failureText('account key', e);
     setStatus('key-status', 'Account key could not be loaded', 'err');
     keyValid = false;
     updateBtn();
