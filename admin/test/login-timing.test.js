@@ -20,9 +20,45 @@
 // real floor and the real throttle values, and a level of zero on its own is
 // not enough to pass it.
 //
-// It costs about a minute: at twenty failures every answer is held for 2.25 s
-// by design, and each request past the threshold has to carry a real 2^18
-// proof-of-work, solved before the clock starts so the hashing is not measured.
+// WHY THE STATISTIC WAS CHANGED AGAIN. The first version of this suite took
+// eight samples per case and asserted two things per level: the medians within
+// 10 ms, and the two [min, max] ranges overlapping. The medians never wobbled.
+// The ranges did: on a pull-request run the twelve-failure level measured
+// 752.29 ms against 751.44 ms, a difference of 0.85 ms, and the two ranges
+// missed each other by a hair. Green on the rerun. A [min, max] range is an
+// extreme-value statistic, so it is decided by the single slowest and single
+// fastest request in each group, and at eight samples those are two draws from
+// the tail. Resampled 20 000 times from 40 real measurements per case on a
+// loaded machine, eight samples put the false-red rate of that assertion at
+// 6.9% to 8.9% per level, or roughly one run in five over the three levels.
+//
+// What replaced it, and it is a STRICTER claim, not a weaker one:
+//
+//   * 24 samples per case per level instead of 8.
+//   * The medians must differ by less than max(2 ms, 1% of the answer's
+//     designed time). At 250 ms that is 2.5 ms, four times tighter than the
+//     10 ms it replaces; at 2250 ms it is 22.5 ms, still two orders of
+//     magnitude under the gap this suite exists to catch.
+//   * The central 80% of the two groups must overlap: p10..p90, not min..max.
+//     Every band inside [min, max] is a harder property to satisfy than the
+//     range overlap it replaces, and quantiles at 24 samples do not swing on
+//     one slow request the way min and max do.
+//   * One repeat of the level before the assertion fails. A machine that was
+//     briefly busy costs a rerun; a machine that is leaking the answer fails
+//     both rounds.
+//
+// Measured the same way, at 24 samples: false-red 0.000% per level on the two
+// groups as they really are, and at most 0.075% with an artificial 0.85 ms
+// offset injected, the difference that turned the run above red. It still
+// catches a real 5 ms offset 94% to 100% of the time and a 20 ms one always.
+// The old assertion, at its own eight samples, caught 5 ms 67% to 94% of the
+// time while going falsely red 6.9% to 8.9% of the time. This one is better on
+// both counts, which is the only reason to change a detector.
+//
+// It costs about three minutes: at twenty failures every answer is held for
+// 2.25 s by design, and each request past the threshold has to carry a real
+// 2^18 proof-of-work, solved before the clock starts so the hashing is not
+// measured.
 //
 // Run: REDIS_URL=redis://127.0.0.1:6399 node --test admin/test/login-timing.test.js
 
@@ -39,7 +75,10 @@ const TIMING_FLOOR_MS = 250;
 const TIMING_RELAY_MS = 3;
 // relay/lib/auth-throttle.js, via the stub. This is the finding.
 const TIMING_LEVELS = [0, 12, 20];
-const TIMING_SAMPLES = 8;
+// 24, not 8. See "why the statistic was changed again" above: at eight samples
+// a group's band is pinned by two draws from a tail, and it misses the other
+// group's band on roughly one level in thirteen even when nothing is wrong.
+const TIMING_SAMPLES = 24;
 const TIMING_RUN = crypto.randomBytes(5).toString('hex');
 const TIMING_PRESENT_KEY = `pgp_present_account_for_the_timing_suite_${TIMING_RUN}`;
 const TIMING_PRESENT_EMAIL = `present_${TIMING_RUN}@example.com`;
@@ -104,9 +143,58 @@ after(async () => {
 
 const ready = () => tSrv !== null;
 
-function median(xs) {
+// ── the statistic ────────────────────────────────────────────────────────────
+
+// Linear-interpolated quantile, so p10 and p90 do not snap to a sample index
+// and change meaning with the sample count.
+function quantile(xs, p) {
   const s = [...xs].sort((a, b) => a - b);
-  return s[Math.floor(s.length / 2)];
+  const i = (s.length - 1) * p;
+  const lo = Math.floor(i);
+  const hi = Math.min(lo + 1, s.length - 1);
+  return s[lo] + (s[hi] - s[lo]) * (i - lo);
+}
+const median = (xs) => quantile(xs, 0.5);
+// The central 80% of a group. This is the band that has to interleave with the
+// other one: robust where [min, max] is not, and a claim about the bulk of the
+// distribution rather than about its middle alone.
+const band = (xs) => [quantile(xs, 0.10), quantile(xs, 0.90)];
+
+// The verdict on one level, given the time the answer is DESIGNED to take.
+// Three properties, each asserted separately by the caller so a failure names
+// which one broke.
+function judge({ owed, floorSlack, present, absent }) {
+  const pMed = median(present), aMed = median(absent);
+  const [pLo, pHi] = band(present), [aLo, aHi] = band(absent);
+  // The same shape as the floor: 1% of the designed answer time, never under
+  // 2 ms. Not a flat number, because the noise a floor of 2250 ms carries is
+  // not the noise a floor of 250 ms carries, and a flat 10 ms was both too
+  // loose at the bottom and arbitrary at the top.
+  const tol = Math.max(2, owed * 0.01);
+  const show = (label, xs, med, lo, hi) =>
+    `${label} p50=${med.toFixed(2)} p10..p90=[${lo.toFixed(2)}, ${hi.toFixed(2)}] ` +
+    `min..max=[${Math.min(...xs).toFixed(2)}, ${Math.max(...xs).toFixed(2)}]`;
+  const v = {
+    tol,
+    floorOk: pMed >= owed - floorSlack && aMed >= owed - floorSlack,
+    medOk: Math.abs(pMed - aMed) < tol,
+    bandOk: pLo <= aHi && aLo <= pHi,
+    detail: `${show('exists', present, pMed, pLo, pHi)}, ${show('absent', absent, aMed, aLo, aHi)}`,
+  };
+  v.ok = v.floorOk && v.medOk && v.bandOk;
+  return v;
+}
+
+// Measure a level, and if anything about it fails, measure it once more and
+// judge on the second round. One repeat, not a loop: a machine that was busy
+// for a few seconds costs a rerun, a machine that is leaking the answer fails
+// both rounds and the first round's numbers go into the message.
+async function judgeWithOneRepeat(opts, sample) {
+  let v = judge({ ...opts, ...(await sample()) });
+  if (v.ok) return { v, note: '' };
+  const first = v.detail;
+  v = judge({ ...opts, ...(await sample()) });
+  return { v, note: ` [first round, discarded: ${first}]` };
 }
 
 // Put this address on exactly `n` recorded failures. Both the admin's counter
@@ -148,44 +236,45 @@ test('the refusal takes the same time whether the address has an account or not'
   // round trips, and they would land in whichever group ran first.
   for (let i = 0; i < 4; i++) await sampleOne(TIMING_PRESENT_EMAIL, 0, TIMING_PRESENT_KEY);
 
-  for (const level of TIMING_LEVELS) {
+  // One round of TIMING_SAMPLES per case at one level. Interleaved, so a drift
+  // in machine load hits both cases equally.
+  const round = async (level) => {
     const present = [];
     const absent = [];
-    // Interleaved, so a drift in machine load hits both cases equally.
     for (let i = 0; i < TIMING_SAMPLES; i++) {
       present.push(await sampleOne(TIMING_PRESENT_EMAIL, level, TIMING_PRESENT_KEY));
       absent.push(await sampleOne(TIMING_ABSENT_EMAIL, level, null));
     }
-    const pMed = median(present);
-    const aMed = median(absent);
-    const pMin = Math.min(...present), pMax = Math.max(...present);
-    const aMin = Math.min(...absent), aMax = Math.max(...absent);
-    const detail = `at ${level} prior failures: exists p50=${pMed.toFixed(2)} [${pMin.toFixed(2)}, ${pMax.toFixed(2)}], ` +
-                   `absent p50=${aMed.toFixed(2)} [${aMin.toFixed(2)}, ${aMax.toFixed(2)}]`;
+    return { present, absent };
+  };
 
+  for (const level of TIMING_LEVELS) {
     // The floor is doing the work, and it grows with the failure count exactly
     // as the relay's throttle does: 250 ms base, plus 250 ms per failure past
     // ten, capped at two seconds. If the mirror were missing, the absent case
     // would sit at 250 ms while the present one climbed.
     const owed = TIMING_FLOOR_MS + Math.min(Math.max(level - 10, 0) * 250, 2000);
-    for (const [label, med] of [['exists', pMed], ['absent', aMed]]) {
-      assert.ok(med >= owed - 10,
-        `${label} must be held to its floor of ${owed}ms; ${detail}`);
-    }
+    const { v, note } = await judgeWithOneRepeat({ owed, floorSlack: 10 }, () => round(level));
+    const detail = `at ${level} prior failures: ${v.detail}${note}`;
+
+    assert.ok(v.floorOk,
+      `both cases must be held to the floor of ${owed}ms; ${detail}`);
     tDid();
 
-    // The gap this closes was 258 ms at twelve failures and 1758 ms at twenty.
-    // Ten is a generous ceiling on a loaded machine and two orders of magnitude
-    // below a usable signal.
-    assert.ok(Math.abs(pMed - aMed) < 10,
-      `the medians must not separate the two cases; ${detail}`);
+    // The gap this closes was 258 ms at twelve failures and 1758 ms at twenty,
+    // so a tolerance of 2.5 ms at the bottom level and 22.5 ms at the top is
+    // two orders of magnitude below a usable signal and still four times
+    // tighter than the flat 10 ms it replaces.
+    assert.ok(v.medOk,
+      `the medians must not separate the two cases by ${v.tol.toFixed(2)}ms or more; ${detail}`);
     tDid();
 
-    // The property that actually kills the oracle: the ranges overlap, so no
-    // threshold classifies an address from one request. Before the fix the
-    // fastest hit was slower than the slowest miss at both levels above zero.
-    assert.ok(pMin < aMax && aMin < pMax,
-      `the two ranges must overlap, or one request still classifies an address; ${detail}`);
+    // The property that actually kills the oracle: the bulk of the two groups
+    // interleaves, so no threshold classifies an address from one request.
+    // Before the fix the fastest hit was slower than the slowest miss at both
+    // levels above zero.
+    assert.ok(v.bandOk,
+      `the central 80% of the two groups must overlap, or one request still classifies an address; ${detail}`);
     tDid();
   }
 });
@@ -220,7 +309,12 @@ test('the relay is told the delay was already charged, so it is never charged tw
 // default, plus the per-address throttle. Nothing is stubbed here: it is a real
 // relay doing real argon2 against ten real stored hashes, because the finding
 // is the cost of that work and a stub would be measuring the stub.
-const BK_SAMPLES = 6;
+// Same 24 as the other route, for the same reason, and it is what makes this
+// case cost about three minutes: every attempt here is held for at least 1.5 s
+// by design. Resampled from 24 real measurements per case on a loaded machine,
+// the false-red rate of the band assertion is 0.01% at 24 samples against 1.9%
+// at 8, and a real 5 ms offset is still caught every time.
+const BK_SAMPLES = 24;
 // The route refuses at five hits per address per window, so the last attempt it
 // answers with a verdict is the fifth: four before it. Five before it is a 429
 // for BOTH cases, which is not a credential answer and carries no information.
@@ -310,33 +404,34 @@ test('the backup-code route answers in the same time whether the address has an 
   // module and the first 64 MiB allocation.
   for (let i = 0; i < 2; i++) await attempt(BK_PRESENT_EMAIL, 0);
 
-  for (const level of BK_LEVELS) {
+  const bkRound = async (level) => {
     const present = [];
     const absent = [];
     for (let i = 0; i < BK_SAMPLES; i++) {
       present.push(await attempt(BK_PRESENT_EMAIL, level));
       absent.push(await attempt(BK_ABSENT_EMAIL, level));
     }
-    const pMed = median(present), aMed = median(absent);
-    const pMin = Math.min(...present), pMax = Math.max(...present);
-    const aMin = Math.min(...absent), aMax = Math.max(...absent);
-    const detail = `at ${level} prior attempts: exists p50=${pMed.toFixed(2)} [${pMin.toFixed(2)}, ${pMax.toFixed(2)}], ` +
-                   `absent p50=${aMed.toFixed(2)} [${aMin.toFixed(2)}, ${aMax.toFixed(2)}]`;
+    return { present, absent };
+  };
 
+  for (const level of BK_LEVELS) {
     // The floor must be above the argon2 worst case, or the work shows through
     // it. 250 ms per attempt past the first, same step as the other route.
     const owed = BK_FLOOR_MS + Math.min(Math.max(level - 1, 0) * 250, 2000);
-    for (const [label, med] of [['exists', pMed], ['absent', aMed]]) {
-      assert.ok(med >= owed - 20, `${label} must be held to its floor of ${owed}ms; ${detail}`);
-    }
+    const { v, note } = await judgeWithOneRepeat({ owed, floorSlack: 20 }, () => bkRound(level));
+    const detail = `at ${level} prior attempts: ${v.detail}${note}`;
+
+    assert.ok(v.floorOk, `both cases must be held to the floor of ${owed}ms; ${detail}`);
     tDid();
 
-    assert.ok(Math.abs(pMed - aMed) < 25,
-      `the medians must not separate the two cases; ${detail}`);
+    // 15 ms at the bottom level, 22.5 ms at the top, against a gap of 221 ms
+    // before the floor was put on this route.
+    assert.ok(v.medOk,
+      `the medians must not separate the two cases by ${v.tol.toFixed(2)}ms or more; ${detail}`);
     tDid();
 
-    assert.ok(pMin < aMax && aMin < pMax,
-      `the two ranges must overlap, or one request still classifies an address; ${detail}`);
+    assert.ok(v.bandOk,
+      `the central 80% of the two groups must overlap, or one request still classifies an address; ${detail}`);
     tDid();
   }
 
