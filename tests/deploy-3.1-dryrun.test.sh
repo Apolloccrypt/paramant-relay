@@ -572,8 +572,8 @@ check_has "$FULL"   'before edits pending'  "the dry run shows the pending-edit 
 check_has "$FULL"   'before sign state'     "the dry run shows the per-edit state read"
 check_has "$SCRIPT" 'location = /pararules { return 301 https://\$host/rules; }' \
   "phase 5c writes the permanent 301 from /pararules to /rules"
-check_has "$SCRIPT" 'the four nginx changes' \
-  "the 5c step name counts the /pararules redirect as one of the edits"
+check_has "$SCRIPT" 'the six nginx changes' \
+  "the 5c step name counts the /pararules redirect and the :8090 access_log as edits"
 
 echo ""
 echo "6g-4. A multi-line auth_request on /sign is todo, never already applied"
@@ -630,6 +630,226 @@ if [ "$RC4" -ne 0 ] && printf '%s\n' "$OUT4" | grep -q 'still carry an auth_requ
 else
   fail "5c exited $RC4 with /sign still gated"
   printf '%s\n' "$OUT4" | sed 's/^/        /' | head -20
+fi
+
+echo ""
+echo "6g-5. access_log off lands in the :8090 block that backs /dicom/"
+# The sixth 5c edit. #374 put `access_log off;` in the :8090 server block of
+# deploy/nginx-paramant-live.conf and wrote "repo only, so far" above it,
+# because 5c edits the live confs by anchor and never copies a repo file over
+# them: the line did not travel with a deploy. /security claims logging is off
+# on every block that serves the site, and this is the block that made that a
+# half-truth on the server.
+#
+# The anchor is the listen line, not the hostname: the :8090 block carries no
+# server_name and no ParaID deny, so neither of the anchors the other five
+# edits use marks it.
+make_dicom_conf() {   # file, alog(missing|present|none)
+  local f="$1" alog="$2"
+  {
+    echo 'server {'
+    echo '    server_name paramant.app;'
+    echo '    access_log off;'
+    echo '    location = /sign { try_files /sign.html =404; }'
+    echo '    location = /dicom { return 404; }'
+    echo '    location = /v1/paraid/issue-document { deny all; }'
+    echo '    location = /pararules { return 301 https://$host/rules; }'
+    echo '    location /dicom/ { proxy_pass http://127.0.0.1:8090; }'
+    echo '    location ~ ^/v2/outbound {'
+    echo '        proxy_buffer_size 32k;'
+    echo '        proxy_buffers 8 32k;'
+    echo '        proxy_busy_buffers_size 64k;'
+    echo '        proxy_pass http://relay;'
+    echo '    }'
+    echo '}'
+    if [ "$alog" != none ]; then
+      echo 'server {'
+      echo '    listen 127.0.0.1:8090;'
+      [ "$alog" = present ] && echo '    access_log off;'
+      echo '    location = /outlook/taskpane { alias /home/paramant/app/outlook/taskpane.html; }'
+      echo '    location / { proxy_pass https://fly-upstream; }'
+      echo '}'
+    fi
+  } > "$f"
+}
+
+# The public conf has no :8090 block, exactly as on the server. Every other
+# edit is already applied in both, so the access_log line is the ONLY thing
+# left to do and the counters below cannot be read as some other edit's work.
+make_dicom_conf "$NG/available/paramant-public.conf" none
+make_dicom_conf "$NG/available/paramant-live.conf"   missing
+seed_2b_backups "$NG/sites" "$NG/bk" 20260101-0004 "paramant-public.conf paramant-live.conf"
+PUB_BEFORE="$(cat "$NG/available/paramant-public.conf")"
+OUT5="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0004 "$NG/sites" "$NG/bk" \
+        "paramant-public.conf paramant-live.conf" </dev/null 2>&1)"; RC5=$?
+if [ "$RC5" -eq 0 ]; then pass "5c exits 0 on a conf whose :8090 block still logs"; else
+  fail "5c exits $RC5 on a conf whose :8090 block still logs"
+  printf '%s\n' "$OUT5" | sed 's/^/        /' | head -20
+fi
+if [ "$(field_5c "$OUT5" 'before 8090 blocks')" = "1" ] \
+   && [ "$(field_5c "$OUT5" 'before 8090 blocks with access_log off')" = "0" ]; then
+  pass "the fixture starts with one :8090 block and no access_log off, so the edit has work to do"
+else
+  fail "the fixture reads $(field_5c "$OUT5" 'before 8090 blocks with access_log off') of $(field_5c "$OUT5" 'before 8090 blocks') :8090 block(s) already off; this run would prove nothing"
+fi
+if [ "$(field_5c "$OUT5" 'before edits pending')" = "1" ]; then
+  pass "the access_log line is counted as a pending edit in its own right"
+else
+  fail "5c counted $(field_5c "$OUT5" 'before edits pending') pending edit(s), expected exactly 1"
+fi
+if [ "$(field_5c "$OUT5" 'after 8090 blocks with access_log off')" \
+   = "$(field_5c "$OUT5" 'after 8090 blocks')" ] \
+   && [ "$(field_5c "$OUT5" 'after 8090 blocks')" = "1" ]; then
+  pass "the :8090 block came out with access_log off"
+else
+  fail "access_log off landed in $(field_5c "$OUT5" 'after 8090 blocks with access_log off') of $(field_5c "$OUT5" 'after 8090 blocks') :8090 block(s)"
+fi
+if [ "$(field_5c "$OUT5" 'after edited files')" = "1" ]; then
+  pass "only the conf that carries the :8090 block was rewritten"
+else
+  fail "5c rewrote $(field_5c "$OUT5" 'after edited files') conf(s), expected 1"
+fi
+if [ "$PUB_BEFORE" = "$(cat "$NG/available/paramant-public.conf")" ]; then
+  pass "the conf without a :8090 block is byte-identical afterwards"
+else
+  fail "5c changed the conf that has no :8090 block"
+  diff <(printf '%s\n' "$PUB_BEFORE") "$NG/available/paramant-public.conf" | sed 's/^/        /' | head -10
+fi
+# One line, after the listen line, inside the :8090 block. Not two, and not in
+# the site block at the top, which already had one.
+if [ "$(grep -c '^    access_log off;$' "$NG/available/paramant-live.conf")" = "2" ]; then
+  pass "the live conf carries exactly two access_log off lines: the site block's and the new one"
+else
+  fail "the live conf carries $(grep -c '^    access_log off;$' "$NG/available/paramant-live.conf") access_log off line(s), expected 2"
+fi
+if grep -A1 '^    listen 127\.0\.0\.1:8090;$' "$NG/available/paramant-live.conf" \
+   | grep -q '^    access_log off;$'; then
+  pass "the line sits directly under the listen line it is anchored on"
+else
+  fail "the inserted line is not directly under listen 127.0.0.1:8090"
+  sed 's/^/        /' "$NG/available/paramant-live.conf" | head -30
+fi
+
+echo ""
+echo "6g-6. A second run over the same confs writes nothing: the diff is empty"
+cp -a "$NG/available/paramant-live.conf"   "$WORK/live-after-first.conf"
+cp -a "$NG/available/paramant-public.conf" "$WORK/pub-after-first.conf"
+seed_2b_backups "$NG/sites" "$NG/bk" 20260101-0005 "paramant-public.conf paramant-live.conf"
+OUT6="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0005 "$NG/sites" "$NG/bk" \
+        "paramant-public.conf paramant-live.conf" </dev/null 2>&1)"; RC6=$?
+if [ "$RC6" -eq 0 ]; then pass "a second 5c over the edited confs exits 0"; else
+  fail "a second 5c over the edited confs exits $RC6"
+  printf '%s\n' "$OUT6" | sed 's/^/        /' | head -20
+fi
+for want in "before 8090 blocks:1" "before 8090 blocks with access_log off:1" \
+            "before edits pending:0" "before everything already applied:yes" \
+            "after edited files:0"; do
+  f="${want%%:*}"; v="${want##*:}"
+  if [ "$(field_5c "$OUT6" "$f")" = "$v" ]; then pass "second run reports $f = $v"; else
+    fail "second run reports $f = '$(field_5c "$OUT6" "$f")', expected $v"; fi
+done
+if diff -u "$WORK/live-after-first.conf" "$NG/available/paramant-live.conf" > "$WORK/live-diff.txt" \
+   && diff -u "$WORK/pub-after-first.conf" "$NG/available/paramant-public.conf" >> "$WORK/live-diff.txt"; then
+  pass "the second run leaves both confs byte-identical, so the edit is idempotent"
+else
+  fail "the second run changed a conf that was already correct"
+  sed 's/^/        /' "$WORK/live-diff.txt" | head -20
+fi
+
+echo ""
+echo "6g-7. A :8090 block that already has the line is left alone from the start"
+# The no-op case on a conf that was never edited by this script, which is what
+# a server that had the line put there by hand looks like.
+make_dicom_conf "$NG/available/paramant-public.conf" none
+make_dicom_conf "$NG/available/paramant-live.conf"   present
+cp -a "$NG/available/paramant-live.conf" "$WORK/live-present.conf"
+seed_2b_backups "$NG/sites" "$NG/bk" 20260101-0006 "paramant-public.conf paramant-live.conf"
+OUT7A="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0006 "$NG/sites" "$NG/bk" \
+         "paramant-public.conf paramant-live.conf" </dev/null 2>&1)"; RC7A=$?
+if [ "$RC7A" -eq 0 ]; then pass "5c exits 0 on a conf whose :8090 block is already off"; else
+  fail "5c exits $RC7A on a conf whose :8090 block is already off"
+  printf '%s\n' "$OUT7A" | sed 's/^/        /' | head -20
+fi
+for want in "before 8090 blocks:1" "before 8090 blocks with access_log off:1" \
+            "before edits pending:0" "after edited files:0"; do
+  f="${want%%:*}"; v="${want##*:}"
+  if [ "$(field_5c "$OUT7A" "$f")" = "$v" ]; then pass "the no-op run reports $f = $v"; else
+    fail "the no-op run reports $f = '$(field_5c "$OUT7A" "$f")', expected $v"; fi
+done
+if cmp -s "$WORK/live-present.conf" "$NG/available/paramant-live.conf"; then
+  pass "a conf that already had the line is byte-identical afterwards"
+else
+  fail "5c rewrote a conf whose :8090 block was already correct"
+  diff -u "$WORK/live-present.conf" "$NG/available/paramant-live.conf" | sed 's/^/        /' | head -20
+fi
+if printf '%s\n' "$OUT7A" | grep -q 'reloaded nginx'; then
+  pass "the no-op run still tests and reloads nginx"
+else
+  fail "the no-op run never reloaded nginx"
+fi
+
+check_has "$SCRIPT" 'print "    access_log off;"' \
+  "phase 5c writes access_log off into the :8090 block"
+check_has "$SCRIPT" 'ALOG_AWK' \
+  "the access_log edit is a two-pass awk, like the buffer and the /pararules edits"
+check_has "$FULL"   'before 8090 blocks with access_log off' \
+  "the dry run shows the :8090 access_log counters"
+
+echo ""
+echo "6g-8. A :8090 block that logs to a FILE is refused, not quietly stacked"
+# `access_log off;` written above an `access_log /var/log/nginx/dicom.log;`
+# leaves two access_log directives on the same level, and it undoes a log
+# somebody put there on purpose. Neither is a deploy's call to make, so the
+# phase counts those blocks, says how many it found and stops before it writes
+# anything.
+make_dicom_conf "$NG/available/paramant-public.conf" none
+make_dicom_conf "$NG/available/paramant-live.conf"   missing
+# One line, straight into the :8090 block: the shape a server gets when someone
+# wants that gateway logged.
+sed -i 's|^    listen 127\.0\.0\.1:8090;$|    listen 127.0.0.1:8090;\n    access_log /var/log/nginx/dicom.log;|' \
+  "$NG/available/paramant-live.conf"
+cp -a "$NG/available/paramant-live.conf" "$WORK/live-filelog.conf"
+seed_2b_backups "$NG/sites" "$NG/bk" 20260101-0007 "paramant-public.conf paramant-live.conf"
+OUT8="$(cd "$NG" && PATH="$NG/bin:$PATH" bash "$NG/5c.sh" 20260101-0007 "$NG/sites" "$NG/bk" \
+        "paramant-public.conf paramant-live.conf" </dev/null 2>&1)"; RC8B=$?
+if [ "$(field_5c "$OUT8" 'before 8090 blocks logging to a file')" = "1" ]; then
+  pass "the phase counts the :8090 block that logs to a file"
+else
+  fail "the file-logging block is counted as $(field_5c "$OUT8" 'before 8090 blocks logging to a file'), expected 1"
+fi
+if [ "$RC8B" -ne 0 ] && printf '%s\n' "$OUT8" | grep -q 'write their access log to a FILE'; then
+  pass "5c stops and names it instead of writing access_log off above it"
+else
+  fail "5c exited $RC8B on a :8090 block that logs to a file"
+  printf '%s\n' "$OUT8" | sed 's/^/        /' | head -20
+fi
+if cmp -s "$WORK/live-filelog.conf" "$NG/available/paramant-live.conf"; then
+  pass "nothing was written: the conf is byte-identical after the refusal"
+else
+  fail "5c wrote to the conf before refusing it"
+  diff -u "$WORK/live-filelog.conf" "$NG/available/paramant-live.conf" | sed 's/^/        /' | head -20
+fi
+# And the awk itself, with the FATAL out of the way, still refuses that block.
+# If the precondition is ever loosened, this is the lock that is left.
+eval "$(sed -n "/^ALOG_AWK='/,/^}'\$/p" "$SCRIPT")"
+awk "$ALOG_AWK" "$WORK/live-filelog.conf" "$WORK/live-filelog.conf" > "$WORK/live-filelog-out.conf"
+if cmp -s "$WORK/live-filelog.conf" "$WORK/live-filelog-out.conf"; then
+  pass "the edit awk on its own leaves a file-logging :8090 block untouched"
+else
+  fail "the edit awk would stack access_log off on top of a file log"
+  diff -u "$WORK/live-filelog.conf" "$WORK/live-filelog-out.conf" | sed 's/^/        /' | head -10
+fi
+# The plain fixtures must read zero, or the counter would be meaningless.
+if [ "$(field_5c "$OUT5" 'before 8090 blocks logging to a file')" = "0" ] \
+   && [ "$(field_5c "$OUT5" 'after 8090 blocks logging to a file')" = "0" ]; then
+  pass "a :8090 block with no access_log at all does not read as logging to a file"
+else
+  fail "the plain fixture reads $(field_5c "$OUT5" 'before 8090 blocks logging to a file') file-logging block(s), expected 0"
+fi
+if [ "$(field_5c "$OUT7A" 'before 8090 blocks logging to a file')" = "0" ]; then
+  pass "access_log off itself does not read as logging to a file"
+else
+  fail "a block with access_log off reads as logging to a file"
 fi
 
 echo ""
@@ -1500,7 +1720,7 @@ STDIN_SCAN="$WORK/stdin-scan.txt"
 # here-string or the loop it belongs to is redirected by a later `done <`.
 # That covers every shape this script uses. Something in another shape gets
 # flagged, which is the safe direction to be wrong in.
-awk '
+STDIN_AWK="$(cat <<'AWKPROG'
   # Blank every quoted span to a single token Q, so a "|" inside a string is
   # not read as a pipe and an argument is still visibly an argument. Q keeps
   # `cat "$f"` looking like cat-with-an-operand, which "" would not.
@@ -1523,8 +1743,15 @@ awk '
             || line ~ /<[[:space:]]*\// || line ~ /<</ || line ~ /<[[:space:]]*Q/)
   }
   # The command with no operand: end of segment, or only flags after it.
+  #
+  # ">" is in the closing class next to ";", "&", ")" and the backtick. An
+  # output redirect is not an operand: `cat > /tmp/x` and `sort > /tmp/y` read
+  # stdin exactly as a bare `cat` does, and both shapes slipped through while
+  # the class ended at ")". `cat file > out` still does not match, because the
+  # file operand sits between the command and the ">", which is the whole
+  # distinction this function is for.
   function bare(seg, cmd,   re) {
-    re = "(^|[;&(`]|[[:space:]]|[$][(])" cmd "([[:space:]]+-[^[:space:]]+)*[[:space:]]*($|[;&)`])"
+    re = "(^|[;&(`]|[[:space:]]|[$][(])" cmd "([[:space:]]+-[^[:space:]]+)*[[:space:]]*($|[;&)`>])"
     return (seg ~ re)
   }
   /^  remote(_soft|_nginx)? ".*<<\047EOF\047$/ {
@@ -1588,7 +1815,9 @@ awk '
     if (pend ~ /\\$/) { sub(/\\$/, "", pend); next }
     n++; body[n] = pend; bln[n] = pl; pend = ""
   }
-' "$SCRIPT" > "$STDIN_SCAN"
+AWKPROG
+)"
+awk "$STDIN_AWK" "$SCRIPT" > "$STDIN_SCAN"
 
 if [ ! -s "$STDIN_SCAN" ]; then
   pass "every stdin-reading command in every remote block reads from somewhere that is not the script"
@@ -1618,6 +1847,64 @@ check_has "$SCRIPT" 'docker exec "\$cid" grep -c _paraidAuth /app/relay\.js </de
   "the rollback paraidAuth probe reads from /dev/null"
 check_has "$FULL" 'effective outbound buffers' \
   "the line run 6 lost is still in the 6h block"
+
+echo ""
+echo "6k-1. The guard itself, against a block written to break it"
+# The scan above is only worth its green if it goes red on the shape it is for.
+# It did not. `bare()` accepted a command as bare when what followed it was the
+# end of the segment or one of ; & ) `, and an output redirect is none of
+# those, so `cat > /tmp/x` and `sort > /tmp/y` read as "cat with an operand"
+# and walked straight through. Both of them eat the rest of the script exactly
+# as a lone `cat` does; the redirect only decides where the swallowed text
+# lands.
+#
+# The other direction matters just as much, and it is why ">" cannot simply be
+# treated as the end of the command: `cat file > out` reads the FILE, not
+# stdin, and flagging it would push a </dev/null onto a line that does not need
+# one. The distinction is whether an operand sits between the command and the
+# redirect, which is what bare() already measures.
+STDIN_FIX="$WORK/stdin-fixture.sh"
+cat > "$STDIN_FIX" <<'FIX'
+  remote "guard fixture" "$COMPOSE_DIR" <<'EOF'
+cat > /tmp/x
+sort > /tmp/y
+cat file > out
+sort file > out
+grep -c foo "$f" > /tmp/z
+cat "$f" > "$g"
+cat </dev/null > /tmp/ok
+wc -l < "$f" > /tmp/n
+printf '%s\n' "$x" | cat > /tmp/piped
+EOF
+FIX
+FIXSCAN="$WORK/stdin-fixture-scan.txt"
+awk "$STDIN_AWK" "$STDIN_FIX" > "$FIXSCAN"
+
+if grep -q 'BARE-cat.*cat > /tmp/x' "$FIXSCAN"; then
+  pass "the scan catches a bare cat that redirects its output"
+else
+  fail "'cat > /tmp/x' walks through the scan; it eats the rest of the script"
+fi
+if grep -q 'BARE-sort.*sort > /tmp/y' "$FIXSCAN"; then
+  pass "the scan catches a bare sort that redirects its output"
+else
+  fail "'sort > /tmp/y' walks through the scan; it eats the rest of the script"
+fi
+for safe in 'cat file > out' 'sort file > out' 'grep -c foo' 'cat "$f" > "$g"' \
+            'cat </dev/null' 'wc -l < "$f"' '| cat > /tmp/piped'; do
+  if grep -qF -- "$safe" "$FIXSCAN"; then
+    fail "the scan flags '$safe', which reads a file or a pipe and not the script"
+    grep -F -- "$safe" "$FIXSCAN" | sed 's/^/        /' | head -3
+  else
+    pass "the scan leaves '$safe' alone"
+  fi
+done
+if [ "$(wc -l < "$FIXSCAN")" = "2" ]; then
+  pass "the fixture yields exactly the two findings it was written for"
+else
+  fail "the fixture yields $(wc -l < "$FIXSCAN") finding(s), expected 2"
+  sed 's/^/        /' "$FIXSCAN" | head -10
+fi
 
 echo ""
 echo "6l. --verify-only finishes a deploy that died in the checks"
@@ -1828,6 +2115,143 @@ if printf '%s\n' "$BEHIND_BRANCH" | grep -q '\bdie\b'; then
 else
   pass "nothing in the behind-the-tip branch stops the run"
 fi
+
+echo ""
+echo "6n. post-deploy-verify.sh probes a route the relay actually serves"
+# Phase 6g runs scripts/post-deploy-verify.sh on the server. That script probed
+# a bare /health/deep, which relay.js has never had: the route is
+# /v2/health/deep. So the check answered 404 on every run, the suite could
+# never exit 0, and 6g swallowed it with a warn that said the probe is "known
+# red". A permanently red non-critical check is a check nobody reads, and it
+# was the only thing standing between 6g and a hard verdict.
+PDV="$ROOT/scripts/post-deploy-verify.sh"
+check_has "$PDV" '/v2/health/deep' "the verify suite asks for /v2/health/deep"
+# Comments may still name the old path, that is where the history is written.
+# The runnable lines may not.
+if grep -vE '^[[:space:]]*#' "$PDV" | grep -qE '(^|[^2])/health/deep'; then
+  fail "a runnable line still names the bare /health/deep"
+  grep -nvE '^[[:space:]]*#' "$PDV" | grep -E '(^|[^2])/health/deep' | sed 's/^/        /' | head -5
+else
+  pass "every /health/deep outside a comment is the v2 route"
+fi
+# 401 is the pass. Outside RELAY_MODE=full the route is behind X-Internal-Auth
+# (#322) and this script holds no token, so a shut gate is the strongest thing
+# it can prove without one. A 200 would mean the gate is open.
+check_has "$PDV" 'check "/v2/health/deep closed without a token" "401"' \
+  "an unauthenticated caller is expected to be refused, not served"
+# The suite has to be able to reach exit 0, or 6g cannot be hard.
+if grep -qE '^\s*check .*"/health/deep' "$PDV"; then
+  fail "a check still expects the old path, so the suite can never exit 0"
+else
+  pass "no check in the suite expects a path the relay does not serve"
+fi
+# And 6g now treats anything other than 0 as a finding.
+check_lacks "$SCRIPT" 'probe is known red' "6g no longer excuses a red probe"
+check_lacks "$SCRIPT" 'exit 2 blocks'    "the 6g step name no longer says only exit 2 blocks"
+check_has   "$SCRIPT" 'any non-zero exit blocks' "the 6g step name says every non-zero exit blocks"
+PDV_BRANCH="$(awk '/vrc="\$\(remote_field .verify exit.\)"/,/^    fi$/' "$SCRIPT")"
+if printf '%s\n' "$PDV_BRANCH" | grep -q 'warn '; then
+  fail "6g can still pass a non-zero verify exit off as a warning"
+  printf '%s\n' "$PDV_BRANCH" | grep -n 'warn ' | sed 's/^/        /'
+else
+  pass "no branch of the 6g verdict warns instead of stopping"
+fi
+if [ "$(printf '%s\n' "$PDV_BRANCH" | grep -c 'die ')" = "2" ]; then
+  pass "both non-zero exits of the verify suite stop the deploy"
+else
+  fail "the 6g verdict has $(printf '%s\n' "$PDV_BRANCH" | grep -c 'die ') die branch(es), expected 2"
+  printf '%s\n' "$PDV_BRANCH" | sed 's/^/        /' | head -20
+fi
+
+echo ""
+echo "6n-1. One bad answer may not kill a healthy deploy"
+# 6g is hard now, so every probe in post-deploy-verify.sh is a stop. curl writes
+# 000 when the transfer never produced a status line at all: DNS did not
+# resolve, the connection was refused or reset, TLS did not come up, the
+# deadline passed. Without a retry, one CDN hiccup or one DNS blip ends a deploy
+# that is completely healthy, AFTER the work landed and BEFORE 6h, 6i and the
+# phase 7a marker. That is deploy run 6 all over again, and the missing marker
+# is what stops the NEXT run in 1a.
+#
+# So: --retry-all-errors inside the curl, and one more whole curl around it when
+# the answer is still 000. This runs the real http_code() out of the script,
+# with curl stubbed, because the retry has to be provable and not just written
+# down.
+check_has "$PDV" 'curl -sS --max-time 15 --retry 2 --retry-delay 2 --retry-all-errors' \
+  "the shared curl retries, transport errors included"
+check_has "$PDV" 'HTTP_RETRIES' "http_code has a retry budget of its own"
+
+RTY="$WORK/retry"
+mkdir -p "$RTY/bin"
+# The stub answers from a script it is given: one line per call, "<code> <exit>".
+cat > "$RTY/bin/curl" <<'STUB'
+#!/bin/sh
+n=$(cat "$RETRY_STATE" 2>/dev/null || echo 0)
+n=$((n + 1))
+echo "$n" > "$RETRY_STATE"
+line=$(sed -n "${n}p" "$RETRY_PLAN")
+[ -n "$line" ] || line=$(tail -1 "$RETRY_PLAN")
+printf '%s' "${line% *}"
+exit "${line#* }"
+STUB
+chmod +x "$RTY/bin/curl"
+
+# http_code(), verbatim from the script, with the two variables it reads.
+{
+  echo 'CURL="curl"'
+  sed -n '/^HTTP_RETRIES=/,/^}$/p' "$PDV"
+} > "$RTY/http_code.sh"
+if grep -q '^http_code() {' "$RTY/http_code.sh"; then
+  pass "http_code could be extracted from the verify suite"
+else
+  fail "could not extract http_code from the verify suite"
+fi
+
+# Green: the first attempt never got a status, the second did.
+printf '000 7\n200 0\n' > "$RTY/plan"
+export RETRY_PLAN="$RTY/plan" RETRY_STATE="$RTY/state"
+: > "$RETRY_STATE"
+GREEN="$(PATH="$RTY/bin:$PATH" PARAMANT_VERIFY_HTTP_RETRY_DELAY=0 \
+         bash -c ". '$RTY/http_code.sh'; http_code https://example.invalid/health")"
+if [ "$GREEN" = "200" ]; then
+  pass "a 000 followed by a 200 answers 200, so one blip does not stop the deploy"
+else
+  fail "a 000 followed by a 200 answered '$GREEN', expected 200"
+fi
+if [ "$(cat "$RETRY_STATE")" = "2" ]; then
+  pass "it took exactly two attempts to get there, so the retry really happened"
+else
+  fail "the probe made $(cat "$RETRY_STATE") attempt(s), expected 2"
+fi
+
+# Red: nothing answers, twice. That is not a blip and it must not be swallowed.
+: > "$RETRY_STATE"
+printf '000 7\n000 7\n' > "$RTY/plan"
+RED="$(PATH="$RTY/bin:$PATH" PARAMANT_VERIFY_HTTP_RETRY_DELAY=0 \
+       bash -c ". '$RTY/http_code.sh'; http_code https://example.invalid/health")"
+if [ "$RED" = "000" ]; then
+  pass "two 000s in a row are still reported as 000, so a real outage still fails"
+else
+  fail "two 000s answered '$RED', expected 000"
+fi
+if [ "$(cat "$RETRY_STATE")" = "2" ]; then
+  pass "it gave up after the second attempt instead of retrying forever"
+else
+  fail "the probe made $(cat "$RETRY_STATE") attempt(s) on a dead host, expected 2"
+fi
+
+# A real status is an answer, whatever it is. Retrying a 503 would turn a
+# genuine failure into a slow one and hide it behind a second reading.
+: > "$RETRY_STATE"
+printf '503 0\n200 0\n' > "$RTY/plan"
+KEEP="$(PATH="$RTY/bin:$PATH" PARAMANT_VERIFY_HTTP_RETRY_DELAY=0 \
+        bash -c ". '$RTY/http_code.sh'; http_code https://example.invalid/health")"
+if [ "$KEEP" = "503" ] && [ "$(cat "$RETRY_STATE")" = "1" ]; then
+  pass "a 503 is reported as a 503 on the first attempt, never retried into a 200"
+else
+  fail "a 503 became '$KEEP' after $(cat "$RETRY_STATE") attempt(s)"
+fi
+unset RETRY_PLAN RETRY_STATE
 
 echo ""
 echo "6d. The CI gate on main is one verdict per required workflow"

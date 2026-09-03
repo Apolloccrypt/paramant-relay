@@ -503,12 +503,66 @@ carries no `server_name`, so the hostname is not usable as an anchor there).
 It is idempotent: a block that already has the line is left alone. If you are
 doing step 5c by hand instead of through the script, this is the line to add.
 
+**And a sixth edit, on the `:8090` block that backs `/dicom/`**:
+
+```nginx
+server {
+    listen 127.0.0.1:8090;
+    access_log off;          # <- this line
+```
+
+It was the only server block in `paramant-live.conf` still writing a combined
+line, and /security claims logging is off on every block that serves the site.
+#374 put it in the repo conf and could go no further, because 5c edits the live
+confs by anchor and never copies a repo file over them: without an edit of its
+own the line does not travel with a deploy. What it was recording is the
+request line, the URI, the timing, the status, the referrer and the user-agent
+of each `/dicom/` call, **not** the client IP: `set_real_ip_from` and
+`real_ip_header` live in the `:8080` block and `location /dicom/` forwards no
+`X-Real-IP`, so `$remote_addr` here is `127.0.0.1` on every request.
+
+The anchor is the `listen` line itself, because this block carries neither a
+`server_name` nor the ParaID deny that the other five edits key on. In practice
+that means slot 2, the live conf: `paramant-public.conf` has no `:8090` block,
+so the edit is a no-op there. Two passes, like the buffers and the `/pararules`
+301, so a block that already has the line is left untouched.
+
+A `:8090` block that logs to a **file** is refused, not edited. The phase
+prints `before 8090 blocks logging to a file` and stops if that is not zero.
+`access_log off;` written above an `access_log /var/log/nginx/dicom.log;` would
+leave two `access_log` directives on the same level and would undo a log
+somebody put there on purpose. Neither is a deploy's call: decide by hand which
+of the two the block should have, then run the phase again.
+
+### What the block counters do not see: an indented `server {`
+
+Both block-counting edits, the `/pararules` 301 and this one, walk the conf by
+counting `^server[[:space:]]*{`. That anchor is pinned to **column 0**. Every
+`server` block in both confs and in the repo files starts there, and nginx
+config written by hand or by this repo has always looked like that, so the
+count is right for the confs that exist today. It is a convention, not a rule
+nginx enforces: nginx would happily read
+
+```nginx
+    server {
+        listen 127.0.0.1:8090;
+    }
+```
+
+and both counters would miss it. What that means in practice is that an
+indented block is invisible to the walk, not that it gets edited wrongly: an
+unseen block is never counted and never written into, and the after-counters
+then agree with the before-counters, so the phase passes with the block
+untouched. If a conf on some server ever indents its `server` blocks, the
+counts are the thing to read: `before 8090 blocks = 0` on a server that does
+have the gateway is the symptom, and the anchor is what needs widening.
+
 The server files carry the 01-09 ParaID deny that the repo files do not, so
-**do not copy the repo files over them**. Apply the four changes by hand and
+**do not copy the repo files over them**. Apply the six changes by hand and
 keep the deny:
 
 ```bash
-nginx -T 2>/dev/null | grep -n 'paraid/issue\|location = /sign\|/compliance\|location = /dicom\|/pararules'
+nginx -T 2>/dev/null | grep -n 'paraid/issue\|location = /sign\|/compliance\|location = /dicom\|/pararules\|127.0.0.1:8090'
 # edit /etc/nginx/sites-enabled/paramant-public.conf and the backend conf accordingly
 nginx -t && systemctl reload nginx
 ```
@@ -517,7 +571,7 @@ Which files those are is the slot question from step 2: the backend conf is
 `paramant-live.conf` on one server and `paramant.conf` on another. 5c resolves
 the slots exactly as 2b did and prints the same `nginxconf <slot> resolved to
 <name>` lines before it touches anything, followed by a `target <name> -> <path>`
-line per conf. Read those two first: they say which files the four edits are
+line per conf. Read those two first: they say which files the six edits are
 about to land in. A slot with no candidate at all is FATAL here, and a resolved
 conf without the ParaID deny is FATAL too, with the resolved names in the
 message.
@@ -528,11 +582,11 @@ round, not in this one.
 
 ### Running step 5 twice
 
-All five nginx changes are idempotent, and the script reads the three rewrites
-as being in one of three states before it edits anything. The two additions,
-the `/v2/outbound` buffers and the `/pararules` 301, are counted per block
-instead: a block that lacks one is a pending edit, a block that has one is left
-untouched.
+All six nginx changes are idempotent, and the script reads the three rewrites
+as being in one of three states before it edits anything. The three additions,
+the `/v2/outbound` buffers, the `/pararules` 301 and `access_log off` on
+`:8090`, are counted per block instead: a block that lacks one is a pending
+edit, a block that has one is left untouched.
 
 | state | what the conf carries | what happens |
 |---|---|---|
@@ -569,7 +623,8 @@ What is asserted after the edits is where the weight sits: no `auth_request` on
 `/sign`, zero `/compliance` locations, `/dicom` answering `return 404`, the
 ParaID deny still present, `proxy_buffer_size 32k` inside **every**
 `location ~ ^/v2/outbound` block, the `/pararules` 301 inside **every** site
-block, and `nginx -t` clean before the reload. A run that changed nothing still tests and reloads nginx, so a hand
+block, `access_log off` inside **every** `:8090` block, and `nginx -t` clean
+before the reload. A run that changed nothing still tests and reloads nginx, so a hand
 edit made between deploys cannot hide behind "already applied".
 
 ## Step 6: smoke tests
@@ -636,9 +691,24 @@ tests/auth-smoke.sh https://paramant.app
 bash scripts/post-deploy-verify.sh https://paramant.app http://127.0.0.1:3000
 ```
 
-`post-deploy-verify.sh` still probes `/health/deep`, a path main does not
-serve (the route is `/v2/health/deep`). That check is marked non-critical in
-the script; expect it red and read the real one by hand:
+`post-deploy-verify.sh` used to probe `/health/deep`, a path the relay has
+never served (the route is `/v2/health/deep`), so it answered 404 on every run
+and the suite could never exit 0. It now asks `/v2/health/deep` and expects the
+`401` the #322 gate gives a caller with no token, which is the strongest thing
+that script can prove: it reads no `.env` and takes no secret on its command
+line. Phase 6g therefore stops the deploy on **any** non-zero exit, not only on
+exit 2.
+
+Because 6g is hard, the probes retry. The shared curl carries
+`--retry 2 --retry-delay 2 --retry-all-errors`, and `http_code` asks once more,
+from scratch, when the answer is still `000`. `000` is not a status the server
+sent: it is what curl writes when the transfer never produced a status line at
+all. Without that, one CDN hiccup, one 429 or one DNS blip ends a deploy that
+is entirely healthy, and it ends it after the work landed and before 6h, 6i and
+the phase 7a marker, which is deploy run 6 all over again. A real status is
+never retried, so a genuine 503 stays a 503 and does not become a slow one.
+
+The authenticated `200` is step 6c, which does have the token:
 
 ```bash
 # 6c. the deep check from #322: 200 with the token, 401 without
@@ -663,7 +733,9 @@ for c in main health finance legal iot; do printf '%-8s' $c; docker logs paraman
 
 Stop and roll back (step 8) on: a relay that does not reach `healthy`,
 `auth-smoke.sh` exit 1, `post-deploy-verify.sh` exit 2, `/health` without
-`3.1.0`, or a `billing_config` line with `recurring:true`.
+`3.1.0`, or a `billing_config` line with `recurring:true`. A
+`post-deploy-verify.sh` exit 1 stops the script too, but it is a non-critical
+failure: read the list, fix it, do not roll back on it.
 
 ## A rule for every remote block: `</dev/null`
 
