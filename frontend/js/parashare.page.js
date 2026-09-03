@@ -15,6 +15,18 @@ let receiverPubs = null;
 
 // ── Helpers ──
 function $(id) { return document.getElementById(id); }
+// The same apology the signer gives, from the same file, so sending and signing
+// cannot drift into two different sentences. This page is a classic script and
+// cannot import, so js/error-message.js is loaded above it as a plain script and
+// hangs its namespace off the global. The fallback string exists for the case
+// where that tag is missing; it is never the normal path.
+function failureText(where, e) {
+  var errors = window.paramantErrors;
+  if (errors) return errors.reportFailure(where, e).message;
+  console.error('[paramant] ' + where, e);
+  return 'Something went wrong on our side. Try again in a minute; if it keeps happening, ' +
+         'mail privacy@paramant.app with the time and what you did.';
+}
 function showStep(id) {
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   $(id).classList.add('active');
@@ -306,8 +318,7 @@ async function connectWebSocket() {
         setStatus('waiting-status', 'Receiver disconnected', 'err');
       }
     } catch(err) {
-      console.error('ws.onmessage handler error:', err);
-      setStatus('waiting-status', 'Error processing receiver message — ' + err.message, 'err');
+      setStatus('waiting-status', failureText('receiver message', err), 'err');
     }
   };
 
@@ -447,7 +458,7 @@ async function confirmFingerprint() {
       $('enc-status').className = 'status-line';
       $('enc-status').innerHTML = window.paQuotaUpgrade.html(e.quota);
     } else {
-      $('enc-status').textContent = 'Error: ' + e.message;
+      $('enc-status').textContent = failureText('encrypt and upload', e);
       $('enc-status').className = 'status-line err';
     }
   }
@@ -540,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
     tbDownload(tbTokens, decodeURIComponent(sp.get('n') || 'download'), decodeURIComponent(tbRelay), tbKeys)
       .catch(e => {
         $('tb-dl-status').className = 'status-line err';
-        $('tb-dl-status').textContent = 'Error: ' + e.message;
+        $('tb-dl-status').textContent = failureText('download', e);
         $('tb-dl-dot').className = 'dot red';
       });
     setTimeout(() => initGlobe(), 400);

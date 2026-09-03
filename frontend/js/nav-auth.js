@@ -53,16 +53,28 @@
 
   function renderLoggedIn(email) {
     setNavigation(APP_NAV, 'Workspace');
-    // The drawer tail offers Sign in and Help to a visitor who is not signed
-    // in. Once you are, both are wrong there: the user menu below carries
-    // Help, and Sign in is not an action you still need.
+    // Support survives signing in. The tail used to be REMOVED here, on the
+    // reasoning that the user menu carries Help from then on. On a phone that
+    // left no Help at all: the bar sheds .nav-help below 700px, the drawer is
+    // pinned to the five workspace links, and the menu behind the email
+    // address is not where anyone looks for support. A signed-in customer with
+    // a stuck signature had to type the url.
+    //
+    // So the strip stays and carries the one route the bar handed over. Sign in
+    // does go: it is not an action you still need. Help lands in the same place
+    // as it does signed out, one tap under the drawer, 48px tall.
     var tail = document.getElementById('nav-mobile-tail');
-    if (tail) tail.remove();
+    if (tail) tail.innerHTML = '<a href="/help" class="nav-tail-link">Help</a>';
     var shortEmail = email.length > 24 ? email.slice(0, 18) + '...' : email;
+    // Help sits where it sits signed out: a text link left of the account
+    // control. nav.css hides it below 700px, where the drawer tail above takes
+    // over, and gives it a 44px target from 1023px down.
+    //
     // Never interpolate the email into innerHTML (stored/self DOM XSS): the
     // signup regex permits HTML metacharacters. Build static markup, then set
     // the email via textContent (mirrors home-auth.js / dashboard.js).
     container.innerHTML =
+      '<a href="/help" class="nav-help">Help</a>' +
       '<div class="nav-user">' +
         '<button type="button" class="nav-user-trigger" aria-expanded="false">' +
           '<span class="nav-user-email"></span>' +

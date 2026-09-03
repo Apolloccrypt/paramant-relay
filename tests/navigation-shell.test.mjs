@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const MIME = { '.js':'text/javascript', '.css':'text/css', '.html':'text/html', '.svg':'image/svg+xml', '.png':'image/png', '.woff2':'font/woff2' };
-const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/account':'/account.html', '/developer':'/developer.html', '/pricing':'/pricing.html' };
+const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/account':'/account.html', '/developer':'/developer.html', '/pricing':'/pricing.html', '/help':'/help/index.html' };
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   pathname = aliases[pathname] || pathname;
@@ -235,8 +235,44 @@ await homePage.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
 await homePage.locator('[data-home="in"]:not([hidden])').waitFor();
 await homePage.locator('.nav-user').waitFor();
 ok('signed-in homepage leads to the document workspace', JSON.stringify(await homePage.locator('[data-home="in"] .home-actions a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))) === JSON.stringify(['/dashboard','/sign','/parashare']), await homePage.locator('[data-home="in"] .home-actions').innerText());
+// And the hero is where the signed-in homepage ENDS. Under it sat the whole
+// sales page -- why half of it is free, the two products, the price table, the
+// founder letter -- so a customer who had already bought got three actions and
+// then eight screens of pitch on a phone. js/home-auth.js stamps
+// data-session="in" on <html> and the page hides the rest off that one
+// attribute in CSS; this measures what is on screen rather than the attribute,
+// because the attribute being set is not the thing anyone cares about.
+const homeSections = await homePage.evaluate(() => {
+  const visible = Array.from(document.querySelectorAll('main > section'))
+    .filter((section) => getComputedStyle(section).display !== 'none')
+    .map((section) => section.className || section.id || section.tagName);
+  return {
+    session: document.documentElement.getAttribute('data-session'),
+    visible,
+    total: document.querySelectorAll('main > section').length,
+    scrollHeight: document.documentElement.scrollHeight,
+  };
+});
+ok('the signed-in homepage stops after the hero', homeSections.total > 1 && JSON.stringify(homeSections.visible) === JSON.stringify(['home-hero']), JSON.stringify(homeSections));
+// The founder line stays: it is the one thing on this page that says who is
+// accountable, and tests/ui-truthfulness pins its wording.
+ok('the signed-in hero keeps the name behind the product', (await homePage.locator('[data-home="in"]').innerText()).includes('Mick Beer'), await homePage.locator('[data-home="in"]').innerText());
 if (process.env.PARAMANT_HOME_SCREENSHOT_PATH) await homePage.screenshot({ path:process.env.PARAMANT_HOME_SCREENSHOT_PATH });
 await homePage.close();
+
+// Signed OUT, nothing above applies and the page is the page it was: the whole
+// pitch, in order, with no attribute on <html>.
+const homeOutPage = await browser.newPage({ viewport:{ width:390, height:844 } });
+await homeOutPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
+await homeOutPage.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
+await homeOutPage.locator('[data-home="out"]:not([hidden])').waitFor();
+const homeOutSections = await homeOutPage.evaluate(() => ({
+  session: document.documentElement.getAttribute('data-session'),
+  visible: Array.from(document.querySelectorAll('main > section')).filter((section) => getComputedStyle(section).display !== 'none').length,
+  total: document.querySelectorAll('main > section').length,
+}));
+ok('the signed-out homepage still shows the whole pitch', homeOutSections.session === null && homeOutSections.visible === homeOutSections.total && homeOutSections.total > 1, JSON.stringify(homeOutSections));
+await homeOutPage.close();
 
 const appPage = await browser.newPage({ viewport:{ width:390, height:844 } });
 await appPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
@@ -252,7 +288,104 @@ await appPage.locator('#nav-hamburger').click();
 const appMobile = await appPage.locator('#nav-mobile a').allInnerTexts();
 ok('signed-in mobile menu matches the workspace', appMobile.map((item) => item.toLowerCase()).join(',') === appDesktop.map((item) => item.toLowerCase()).join(','), appMobile.join(', '));
 ok('developer tools are settings, not a sixth product', await appPage.locator('.nav-user-menu a', { hasText:'Developer settings' }).count() === 1 && !appMobile.includes('Developer settings'), appMobile.join(', '));
+
+// Support survives signing in, and it is measured in TAPS.
+//
+// Signed out, a phone reaches /help in two: the menu button, then the strip
+// under the drawer. Signed in, js/nav-auth.js used to delete that strip, on the
+// reasoning that the user menu carries Help from then on. What that left on a
+// 390px screen was no Help at all in the two places anyone looks: the bar sheds
+// .nav-help below 700px, and the drawer is pinned to the five workspace links
+// by the check above. The only route was the menu behind the email address,
+// which is where you go to sign out, not where you go when a signature is
+// stuck. A customer had to type the url.
+//
+// So the strip stays and carries Help alone. The drawer is open at this point
+// (one tap), so anything found here is the second tap and no deeper. Anything
+// inside .nav-user-menu is explicitly NOT counted: that menu is closed, so it
+// costs a tap of its own and would make three.
+const signedInHelp = await appPage.evaluate(() => {
+  const inClosedMenu = (node) => !!node.closest('.nav-user-menu');
+  return Array.from(document.querySelectorAll('a[href="/help"]'))
+    .filter((link) => !inClosedMenu(link))
+    .map((link) => {
+      const box = link.getBoundingClientRect();
+      return {
+        where: link.closest('#nav-mobile-tail') ? 'drawer strip' : (link.closest('nav.nav') ? 'bar' : 'page'),
+        display: getComputedStyle(link).display,
+        width: Math.round(box.width),
+        height: Math.round(box.height),
+      };
+    });
+});
+ok('signed in, support is two taps away on a phone', signedInHelp.some((link) => link.display !== 'none' && link.width > 0 && link.height >= 44), JSON.stringify(signedInHelp));
+ok('signed in, the strip under the drawer is what carries support', signedInHelp.some((link) => link.where === 'drawer strip' && link.height >= 44), JSON.stringify(signedInHelp));
+// Sign in is not an action you still need, so the strip may not keep offering
+// it. Read without a locator wait: when the strip is gone entirely (the bug
+// this replaces) the answer is "no strip", reported in a line, not a 30-second
+// timeout that buries every check under it.
+const tailState = await appPage.evaluate(() => {
+  const tail = document.getElementById('nav-mobile-tail');
+  if (!tail) return { present:false, hrefs:[] };
+  return { present:true, hrefs:Array.from(tail.querySelectorAll('a')).map((link) => link.getAttribute('href')) };
+});
+ok('the signed-in drawer keeps its strip', tailState.present, JSON.stringify(tailState));
+ok('the signed-in drawer strip drops sign in', tailState.present && !tailState.hrefs.includes('/auth/login'), JSON.stringify(tailState));
+// And the second tap goes somewhere. A 44px target on a dead link is worse
+// than no target: it looks like support and answers nothing.
+if (tailState.hrefs.includes('/help')) {
+  await appPage.locator('#nav-mobile-tail a[href="/help"]').click();
+  await appPage.waitForURL('**/help');
+}
+ok('the second tap actually opens the help centre', new URL(appPage.url()).pathname === '/help', appPage.url());
 await appPage.close();
+
+// The signed-in bar itself, on the same phone. Adding Help back to the nav is
+// only right if it does not put a fifth thing in a bar that two reviews already
+// called full: nav.css hides the text link below 700px and the strip takes over.
+const appBarPage = await browser.newPage({ viewport:{ width:390, height:844 } });
+await appBarPage.route('**/api/user/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
+await appBarPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
+await appBarPage.goto(ORIGIN + '/dashboard', { waitUntil:'domcontentloaded' });
+await appBarPage.locator('.nav-user').waitFor();
+const appBar = await appBarPage.evaluate(() => {
+  const items = Array.from(document.querySelectorAll('nav.nav a, nav.nav button'))
+    .filter((node) => {
+      const box = node.getBoundingClientRect();
+      return getComputedStyle(node).display !== 'none' && box.width > 0 && box.height > 0 && !node.closest('.nav-user-menu');
+    })
+    .map((node) => {
+      const box = node.getBoundingClientRect();
+      return { label:node.textContent.trim().slice(0, 24) || node.getAttribute('aria-label'), left:Math.round(box.left), right:Math.round(box.right), height:Math.round(box.height) };
+    })
+    .sort((first, second) => first.left - second.left);
+  return { items, gaps:items.slice(1).map((item, index) => Math.round(item.left - items[index].right)) };
+});
+ok('the signed-in phone bar carries one account control beside the menu button', appBar.items.length <= 3, JSON.stringify(appBar.items));
+ok('nothing in the signed-in phone bar touches its neighbour', appBar.gaps.length > 0 && appBar.gaps.every((gap) => gap >= 12), JSON.stringify(appBar));
+ok('every target in the signed-in phone bar is finger-sized', appBar.items.every((item) => item.height >= 44), JSON.stringify(appBar.items));
+await appBarPage.close();
+
+// A signed-in tablet has the room the phone does not, so Help is a text link in
+// the bar there, exactly as it is signed out. One tap, and the same place the
+// same person used before he had an account.
+const appTabletPage = await browser.newPage({ viewport:{ width:820, height:1180 } });
+await appTabletPage.route('**/api/user/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
+await appTabletPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
+await appTabletPage.goto(ORIGIN + '/dashboard', { waitUntil:'domcontentloaded' });
+await appTabletPage.locator('.nav-user').waitFor();
+// Bounded, and the failure is swallowed on purpose: when the link is gone this
+// check has to report "no Help in the bar" in one line, not stall for the
+// default thirty seconds and then throw away every result collected above it.
+await appTabletPage.waitForSelector('nav.nav .nav-auth a[href="/help"]', { timeout:5000 }).catch(() => {});
+const appTabletHelp = await appTabletPage.evaluate(() => {
+  const link = document.querySelector('nav.nav .nav-auth a[href="/help"]');
+  if (!link) return null;
+  const box = link.getBoundingClientRect();
+  return { display:getComputedStyle(link).display, width:Math.round(box.width), height:Math.round(box.height) };
+});
+ok('signed in, support is one tap in the bar on a tablet', !!appTabletHelp && appTabletHelp.display !== 'none' && appTabletHelp.width > 0 && appTabletHelp.height >= 44, JSON.stringify(appTabletHelp));
+await appTabletPage.close();
 
 const accountPage = await browser.newPage({ viewport:{ width:390, height:844 } });
 await accountPage.route('**/api/user/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));

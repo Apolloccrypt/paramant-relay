@@ -57,6 +57,18 @@ main{display:block;overflow:hidden}
 .hp-btn:focus-visible{outline:3px solid rgba(29,78,216,.35);outline-offset:2px}
 .hp-btn:active{transform:translateY(1px)}
 
+/* ---------- signed in: the hero is the whole page ----------
+   js/home-auth.js stamps data-session="in" on <html> once the session check
+   comes back authenticated. Everything under the hero is the sales page, and a
+   customer who has already bought does not need to be sold to: on a phone the
+   three actions were followed by eight screens of pitch, ending in the founder
+   letter. The selector names the sections rather than a list of ids, so a
+   section added tomorrow is covered the day it lands. The nav, the hero and
+   the footer stay; the footer is where the legal documents are. Signed out,
+   nothing here applies and the page is exactly what it was. */
+html[data-session="in"] main > section:not(.home-hero){display:none}
+html[data-session="in"] .home-hero{padding-bottom:48px}
+
 /* ---------- hero ---------- */
 .home-hero{position:relative;padding:28px 0 32px;background:linear-gradient(180deg,#F8FAFC 0,var(--hp-paper) 160px)}
 .home-hero .hp-wrap{position:relative;display:grid;gap:28px}
@@ -588,7 +600,7 @@ footer{background:var(--hp-paper-2);border-top:1px solid var(--hp-line)}
   </div>
 </footer>
 <script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=6" defer></script>
-<script src="/js/home-auth.js?v=1" defer></script>
+<script src="/js/nav-auth.js?v=7" defer></script>
+<script src="/js/home-auth.js?v=2" defer></script>
 </body>
 </html>
