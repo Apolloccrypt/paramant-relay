@@ -623,4 +623,20 @@ test('a token that expires during a long session is replaced, before and after t
   const still = await evalIn(stubborn, "relayFetch('https://health.paramant.app/v2/inbound', { method: 'POST' })");
   assert.equal(still.status, 401, 'a 401 that survives a fresh token is a real 401 and is handed to the caller');
   assert.ok(stubborn.calls.key - before <= 1, 'one mint, never a loop');
+
+  // (c) and when minting itself is what is broken, one call spends one attempt,
+  // not two. nginx allows a burst of five on /api/user/, and a page that tries
+  // twice per relay call turns one bad minute into a rate limit of its own.
+  const mintDown = await loadPage({
+    keyResponses: [
+      { status: 200, body: { token: FAKE_TOKEN, expires_in_s: 30 } },
+      { status: 503, body: { error: 'token_unavailable' } },
+    ],
+    relayStatus: (url) => (url.includes('/v2/inbound') ? { status: 401, body: { error: 'Invalid API key' } } : null),
+  });
+  const spent = mintDown.calls.key;
+  const answer = await evalIn(mintDown, "relayFetch('https://health.paramant.app/v2/inbound', { method: 'POST' })");
+  assert.equal(answer.status, 401);
+  assert.equal(mintDown.calls.key - spent, 1,
+    'a call whose refresh already failed must not mint a second time on the 401 it was always going to get');
 });

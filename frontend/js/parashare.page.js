@@ -362,14 +362,19 @@ function refreshSessionAuth() {
 // made again. Once. A 401 that survives a fresh token is a real 401.
 async function relayFetch(url, opts) {
   opts = opts || {};
+  // A refresh already tried and failed on this call means minting is broken
+  // right now, and a 401 below is not something a second attempt will fix. Two
+  // mints per call, against an endpoint nginx allows a burst of five, is how a
+  // page turns one bad minute into a rate limit of its own.
+  var minted = true;
   if (sessionAuth && sessionAuthExp && Date.now() > sessionAuthExp - TOKEN_MARGIN_MS) {
-    await refreshSessionAuth();
+    minted = await refreshSessionAuth();
   }
   var send = {};
   for (var k in opts) if (Object.prototype.hasOwnProperty.call(opts, k) && k !== 'retried') send[k] = opts[k];
   send.headers = relayAuthHeaders(opts.headers);
   var r = await fetch(url, send);
-  if (r.status === 401 && sessionAuth && !opts.retried) {
+  if (r.status === 401 && sessionAuth && !opts.retried && minted) {
     if (await refreshSessionAuth()) {
       var again = {};
       for (var k2 in opts) if (Object.prototype.hasOwnProperty.call(opts, k2)) again[k2] = opts[k2];
