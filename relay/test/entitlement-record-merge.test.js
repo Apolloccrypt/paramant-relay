@@ -33,7 +33,7 @@ const ok = (n) => { passed++; console.log('  ok -', n); };
   const e = ent.getEntitlements(merged).parasign;
   assert.strictEqual(e.tier, 'pro');
   assert.strictEqual(e.quotas.signs_month, 100);
-  assert.strictEqual(e.overage.rate_eur, 0.40);
+  assert.strictEqual(e.overage, undefined, 'no tier meters past its quota any more');
   ok('paid plan_parasign on a key beats a legacy community summary');
 }
 

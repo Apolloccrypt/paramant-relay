@@ -184,9 +184,11 @@ test('every amount rendered on the page is a price the catalog can charge', asyn
   const text = await page.evaluate(() => document.body.innerText.replace(/\s+/g, ' '));
   await page.close();
 
-  // What the page is allowed to print: zero, the per-signature overage, and
-  // both bases of every plan that is on sale.
-  const allowed = new Set(['0', '0.40']);
+  // What the page is allowed to print: zero, and both bases of every plan that
+  // is on sale. Nothing else. EUR 0.40 used to sit in this set as the metered
+  // per-signature rate; it was the one amount here that no catalog line could
+  // charge, which is precisely why it should never have been waved through.
+  const allowed = new Set(['0']);
   for (const { product, plan } of catalog.ON_SALE) {
     for (const interval of catalog.INTERVALS) {
       allowed.add(euros(Number(catalog.priceOf(product, plan, interval))));

@@ -2989,7 +2989,8 @@ a.skip-link:focus-visible,
 
 /* ── Inline sign-quota notice ─────────────────────────────────────────────────
    Rendered by js/quota-upgrade.js signNotice() after a successful sign:
-   free second signature, pro overage. Informational, not an error. */
+   free second signature, Firm last included signature. Informational, not an
+   error. */
 .pa-sign-note {
   display: flex;
   flex-direction: column;

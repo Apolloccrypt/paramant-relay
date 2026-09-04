@@ -74,17 +74,20 @@ const PARASIGN_TIER_TO_TIERS = Object.freeze({
   enterprise: 'enterprise',
 });
 
-// ── ParaSign metered overage (Mick's tier brief) ─────────────────────────────
-// Pro is the ONLY tier that meters past its included quota instead of blocking:
-// 100 signs included, EUR 0.40 per sign from the 101st, and a HARD stop at
-// 1000 signs per calendar month (402, never a silent run-up). Free and Business
-// block at their included quota; enterprise runs to its config ceiling. These
-// numbers live HERE (the single entitlements source), not in the sign paths.
-const PARASIGN_OVERAGE = Object.freeze({
-  pro: Object.freeze({ rate_eur: 0.40, hard_cap: 1000 }),
-});
-const NO_OVERAGE = Object.freeze({ rate_eur: null, hard_cap: null });
-
+// ── No metered overage on any ParaSign tier ──────────────────────────────────
+// Pro used to meter past its 100 included signs at EUR 0.40 each up to a hard
+// cap of 1000, and six places on the site promised the buyer that those extra
+// signatures would appear on his next invoice. They never could. Nothing reads
+// the billable counter: billing-catalog.js sells fixed monthly and yearly
+// amounts only, there is no usage line anywhere in billing.js, invoice.js or
+// billing-recurring.js, and no code path turns a metered signature into money.
+// So the meter charged nobody and the promise was untrue to the one group that
+// had paid.
+//
+// The honest shape is the one every other tier already had: the included quota
+// IS the limit. Every ParaSign tier now blocks at quotas.signs_month, and a
+// buyer who needs more moves up a tier. Reintroducing a meter means adding the
+// billing line first; until that line exists, this file must not describe one.
 // Turn a raw tiers.js metered value into a finite number (Infinity/-1 -> ceiling).
 function _meteredFinite(v) {
   return tiers.isUnlimited(v) ? ENTERPRISE_MONTHLY_CEILING : v;
@@ -302,10 +305,6 @@ function _parasignEntitlement(tier) {
     quotas: Object.freeze({
       signs_month: _meteredFinite(tiers.tierLimit(row, 'signs_month')),
     }),
-    // overage: how the tier behaves PAST quotas.signs_month. rate_eur/hard_cap
-    // are null for tiers that simply block at the quota (free, business,
-    // enterprise); pro meters at rate_eur per sign up to hard_cap.
-    overage: PARASIGN_OVERAGE[t] || NO_OVERAGE,
     limits: Object.freeze({
       file_mb: tiers.tierLimitNum(row, 'file_mb'),
     }),
@@ -444,9 +443,6 @@ function mergeAccountRecord(acctRec, keyRecs, now) {
 // Convenience: the metered monthly quota a gate should enforce, per product.
 function transfersQuota(account) { return getEntitlements(account).parasend.quotas.transfers_month; }
 function signsQuota(account)     { return getEntitlements(account).parasign.quotas.signs_month; }
-// Convenience: the ParaSign overage policy ({ rate_eur, hard_cap }, nulls when
-// the tier blocks at its quota instead of metering).
-function signsOverage(account)   { return getEntitlements(account).parasign.overage; }
 
 // ── users.json migration ──────────────────────────────────────────────────────
 // migrateUserEntry: return a NEW api_keys entry with plan_parasend/plan_parasign
@@ -498,7 +494,6 @@ module.exports = {
   mergeProductGrantInto,
   transfersQuota,
   signsQuota,
-  signsOverage,
   migrateUserEntry,
   migrateUsersData,
   // exposed for tests/tooling

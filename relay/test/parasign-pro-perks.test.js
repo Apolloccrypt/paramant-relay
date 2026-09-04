@@ -1,13 +1,13 @@
 'use strict';
 // ParaSign Pro perk delivery. The pricing page (frontend/pricing.html, ParaSign
 // Pro card) promises, per perk:
-//   1. "100 signatures a month, then EUR 0.40 each, up to 1,000"
+//   1. "100 signatures a month; after that signing waits for the new month"
 //   2. "500 ParaSend transfers a month - API access"
 //
 // These prove, per perk, what a per-product grant of parasign=pro (the exact
 // effect of setProductPlan(account,'parasign','pro') and of a Mollie ParaSign
 // Pro purchase) turns ON, using the REAL enforcement primitives:
-//   - entitlements.getEntitlements  : the signs_month quota + overage policy
+//   - entitlements.getEntitlements  : the signs_month quota
 //   - quota.signGateDecision        : the real sign-gate 402 decision
 //   - keysTable.accountHasParasignEntitlement : the real /v1-API entitlement gate
 //   - entitlements.applyProductTier : the field mutation the grant applies
@@ -26,34 +26,35 @@ function freeAccount() {
   return { key: 'pgp_perk', account_id: 'pgp_perk', plan: 'community', plan_parasend: 'community', plan_parasign: 'free', parasign: false };
 }
 
-// ── PERK 1: signatures quota + overage ────────────────────────────────────────
-test('PERK signatures: parasign=pro raises the sign cap to 100 + EUR 0.40 overage up to 1,000', () => {
+// ── PERK 1: signatures quota ──────────────────────────────────────────────────
+test('PERK signatures: parasign=pro raises the sign cap to 100, and 100 is where it stops', () => {
   const acct = freeAccount();
 
-  // BEFORE: free = 2 signs, no metering (blocks at the included quota).
+  // BEFORE: free = 2 signs, blocking at the included quota.
   const before = ent.getEntitlements(acct).parasign;
   assert.strictEqual(before.tier, 'free');
   assert.strictEqual(before.quotas.signs_month, 2, 'free includes 2 signatures');
-  assert.strictEqual(before.overage.rate_eur, null, 'free does not meter');
+  assert.strictEqual(before.overage, undefined, 'no tier carries a meter');
   assert.strictEqual(quota.signGateDecision(2, before).allowed, false, 'free blocks at 2');
 
   // Grant.
   ent.applyProductTier(acct, 'parasign', 'pro');
 
-  // AFTER: 100 included, EUR 0.40/sign overage, HARD cap 1,000.
+  // AFTER: 100 included, and the 101st is refused. The page used to promise
+  // EUR 0.40 a signature past 100 up to 1,000; nothing ever charged for those,
+  // so the included quota is the whole story on every tier now.
   const after = ent.getEntitlements(acct).parasign;
   assert.strictEqual(after.tier, 'pro');
   assert.strictEqual(after.quotas.signs_month, 100, 'pro includes 100 signatures (matches the page)');
-  assert.strictEqual(after.overage.rate_eur, 0.40, 'EUR 0.40 per sign past 100 (matches the page)');
-  assert.strictEqual(after.overage.hard_cap, 1000, 'hard stop at 1,000 (matches the page on this main-based branch)');
+  assert.strictEqual(after.overage, undefined, 'pro does not meter past its quota');
 
-  // Gate behaviour: allowed at 100 (metered), still allowed at 999, blocked at 1,000.
-  assert.strictEqual(quota.signGateDecision(100, after).allowed, true, 'metered past the included 100');
-  assert.strictEqual(quota.signGateDecision(999, after).allowed, true, 'metered up to the cap');
-  const capped = quota.signGateDecision(1000, after);
-  assert.strictEqual(capped.allowed, false, 'hard stop at 1,000');
-  assert.strictEqual(capped.reason, 'hard_cap');
-  assert.strictEqual(capped.limit, 1000);
+  // Gate behaviour: allowed at 99, blocked at 100 and past it.
+  assert.strictEqual(quota.signGateDecision(99, after).allowed, true, 'the 100th signature is included');
+  const capped = quota.signGateDecision(100, after);
+  assert.strictEqual(capped.allowed, false, 'the 101st is refused');
+  assert.strictEqual(capped.reason, 'quota');
+  assert.strictEqual(capped.limit, 100);
+  assert.strictEqual(quota.signGateDecision(999, after).allowed, false, 'no second, higher ceiling behind it');
 });
 
 // ── PERK 2: API access (the /v1 developer API) ────────────────────────────────

@@ -49,12 +49,15 @@ function firstOfNextMonth() {
 // ── isQuota402 ───────────────────────────────────────────────────────────────
 assert(q && typeof q.isQuota402 === 'function' && typeof q.html === 'function' && typeof q.signNotice === 'function');
 assert(q.isQuota402(402, { error: 'monthly_sign_quota_reached' }));
-assert(q.isQuota402(402, { error: 'monthly_sign_hard_cap_reached' }));
 assert(q.isQuota402(402, { error: 'monthly_transfer_quota_reached' }));
 assert(!q.isQuota402(402, { error: 'something_else' }));
 assert(!q.isQuota402(200, { error: 'monthly_sign_quota_reached' }));
 assert(!q.isQuota402(402, null));
-ok('isQuota402 accepts the three quota errors and nothing else');
+// monthly_sign_hard_cap_reached is not one of them: the relay no longer emits a
+// second, higher sign block, because the meter that ran between the two stops
+// charged nobody.
+assert(!q.isQuota402(402, { error: 'monthly_sign_hard_cap_reached' }));
+ok('isQuota402 accepts the two quota errors and nothing else');
 
 // ── Community sign 402: the upgrade card, copy verbatim ─────────────────────
 const free = q.html({ error: 'monthly_sign_quota_reached', plan: 'free', limit: 2, used: 2, reset_date: '2026-08-01' });
@@ -62,7 +65,7 @@ for (const s of [
   "You've used both signatures this month.",
   'Community gives you 2 a month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.',
   'Firm - EUR 29/month',
-  '100 signatures a month, then EUR 0.40 each, up to 1,000. API access. 500 transfers a month on ParaSend, in the same payment.',
+  '100 signatures a month. API access. 500 transfers a month on ParaSend, in the same payment.',
   'Upgrade to Firm',
   'Maybe later',
   'Your limit resets on 2026-08-01.',
@@ -83,13 +86,18 @@ assert(freeBadDate.includes('Your limit resets on ' + firstOfNextMonth() + '.'),
 assert(!freeBadDate.includes('<img>'), 'reset_date must be shape-validated before interpolation');
 ok('reset_date falls back client-side and is never interpolated raw');
 
-// ── Pro hard cap 402 ────────────────────────────────────────────────────────
-const cap = q.html({ error: 'monthly_sign_hard_cap_reached', plan: 'pro', limit: 1000, overage_count: 900, reset_date: '2026-08-01' });
-assert(cap.includes('1,000 signatures this month, the Firm ceiling'), 'hard cap card names the Firm ceiling');
-assert(cap.includes('Business gives you 1,000 included at EUR 299/month, which is already cheaper than what you\'re paying in overage.'), 'hard cap card pitches Business verbatim');
-assert(cap.includes('Upgrade to Business') && cap.includes('href="/pricing"'), 'Upgrade to Business links to /pricing');
-assert(!cap.includes('No cap, no block'), 'the false No cap, no block claim is gone');
-ok('pro hard cap renders the upgrade card verbatim, linking to /pricing');
+// ── Firm sign 402: one stop, at the quota Firm includes ─────────────────────
+// This is what a Firm account now actually gets at 100. No card may tell it
+// that anything keeps working for a fee, because nothing does and no fee is
+// ever charged.
+const firmStop = q.html({ error: 'monthly_sign_quota_reached', dimension: 'signs_month', plan: 'pro', limit: 100, used: 100, reset_date: '2026-08-01' });
+assert(firmStop.includes('Firm monthly limit reached.'), 'the Firm sign 402 names the tier that decided');
+assert(firmStop.includes('You have used all 100 signatures included in your plan this month.'),
+  'the Firm sign 402 prints the ceiling the relay reported');
+assert(firmStop.includes('Upgrade to ParaSign Business (EUR 299/month excl. VAT) for 1000 signatures a month'),
+  'the Firm sign 402 offers the rung above');
+assert(!/0\.40|overage|next invoice/i.test(firmStop), 'no sign card may price a signature the kassa never charges');
+ok('the Firm sign 402 renders one honest stop, linking to /pricing');
 
 // ── The transfer 402 card ───────────────────────────────────────────────────
 const legacy = q.html({ error: 'monthly_transfer_quota_reached', dimension: 'transfers_month', plan: 'free', limit: 10 });
@@ -181,28 +189,30 @@ assert(noLimit.includes('all ' + tiers.tierLimit('pro', 'transfers_month') + ' t
 ok('missing limit falls back to the tiers.js ceiling, not to Community');
 
 // ── signNotice: the inline 200-response notices ─────────────────────────────
-const second = q.signNotice({ used: 2, included: 2, overage_count: 0, overage_rate_eur: null, hard_cap: null, reset_date: '2026-08-01' });
+const second = q.signNotice({ used: 2, included: 2, reset_date: '2026-08-01' });
 assert(second.includes("That's your second signature this month. One more and you'll need Firm (EUR 29/month, 100 signatures)."),
   'free second-signature notice must carry the copy verbatim');
 ok('free second signature renders the inline notice verbatim');
 
-const over = q.signNotice({ used: 101, included: 100, overage_count: 1, overage_rate_eur: 0.4, hard_cap: 1000, reset_date: '2026-08-01' });
+const last = q.signNotice({ used: 100, included: 100, reset_date: '2026-08-01' });
 for (const s of [
-  "You've passed 100 signatures this month. Everything keeps working. Additional signatures are EUR 0.40 each and appear on your next invoice, up to 1,000 a month.",
-  'Signing more than 600 a month? Business (EUR 299) works out cheaper.',
+  'That was the 100th signature your Firm plan includes this month. Signing starts again on 2026-08-01. Business (EUR 299/month) includes 1,000 a month.',
   'Compare plans',
 ]) {
-  assert(over.includes(s), 'pro overage notice misses: ' + s);
+  assert(last.includes(s), 'Firm last-included notice misses: ' + s);
 }
-assert(over.includes('href="/pricing"'), 'Compare plans must link to /pricing');
-ok('pro overage renders the inline notice verbatim, linking to /pricing');
+assert(last.includes('href="/pricing"'), 'Compare plans must link to /pricing');
+assert(!/0\.40|next invoice|overage/i.test(last), 'the notice may not price the signature after this one');
+ok('the last signature Firm includes renders the inline notice verbatim, linking to /pricing');
 
 // Nothing to say -> empty string (defensive against older backends and other plans).
 assert.strictEqual(q.signNotice(undefined), '');
 assert.strictEqual(q.signNotice({}), '');
 assert.strictEqual(q.signNotice({ used: 1, included: 2 }), '');
 assert.strictEqual(q.signNotice({ used: 2, included: 100 }), '', 'pro second signature must NOT trigger the free warning');
-assert.strictEqual(q.signNotice({ used: 57, included: 100, overage_count: 0 }), '');
+assert.strictEqual(q.signNotice({ used: 57, included: 100 }), '');
+assert.strictEqual(q.signNotice({ used: 101, included: 100 }), '',
+  'past the quota there is nothing left to announce; the 402 card speaks instead');
 assert.strictEqual(q.signNotice({ used: 'x', included: 'y' }), '');
 ok('signNotice stays silent on missing fields, other plans, and mid-quota signs');
 
