@@ -420,11 +420,41 @@ const PROBE = async () => {
   return { ground: hex(pageGround), rows };
 };
 
-export async function sweep({ shotDir = null, pages = PUBLIC_PAGES, appPages = APP_PAGES, themes = THEMES, sizes = SIZES, keepAll = false } = {}) {
+// The static server and the browser are opened here and closed in the finally,
+// and that is the whole point of splitting this from measure() below.
+//
+// It used to open both at the top of one long function and close them at the
+// bottom, on the happy path only. On 2026-09-04 that took the "Root integration
+// suites (no browser)" job on main from a 20-minute run to a job that never
+// ended: tests/ui-elements-contrast.test.mjs had landed in that job (see
+// scripts/browser-suites.mjs for why), the job installs no Chromium, so
+// chromium.launch() rejected. The rejection is the correct outcome and would
+// have been a red test in seconds, except the listening http server was already
+// up and nothing closed it. `node --test` waits for the event loop to drain, an
+// open listener never drains, and the child process sat there with the failure
+// it had already decided on. Three runs on main and one pull request hung on
+// exactly that.
+//
+// So: anything that opens a handle in here is closed on the way out, whichever
+// way out it is.
+export async function sweep(options = {}) {
   const server = serve();
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  let browser = null;
+  try {
+    browser = await chromium.launch({ headless:true, ...(EXE ? { executablePath:EXE } : {}) });
+    return await measure(server, browser, options);
+  } finally {
+    if (browser) await browser.close().catch(() => { /* closing over a crash */ });
+    // A keep-alive socket the browser left behind holds the process open long
+    // after the last page is measured. Node 18 gave us the hammer for that.
+    if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
+    server.close();
+  }
+}
+
+async function measure(server, browser, { shotDir = null, pages = PUBLIC_PAGES, appPages = APP_PAGES, themes = THEMES, sizes = SIZES, keepAll = false } = {}) {
   const origin = `http://localhost:${server.address().port}`;
-  const browser = await chromium.launch({ headless:true, ...(EXE ? { executablePath:EXE } : {}) });
   const findings = [];
   const decorative = [];
   const everything = [];
@@ -515,12 +545,6 @@ export async function sweep({ shotDir = null, pages = PUBLIC_PAGES, appPages = A
       await guarded('app ' + screen.slug, screen.slug, theme, w, h, { app:true, ready:screen.ready, signedIn:screen.signedIn });
     }
   }
-  await browser.close();
-  // A keep-alive socket the browser left behind holds the process open long
-  // after the last page is measured. Node 18 gave us the hammer for that.
-  if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
-  server.close();
-
   // One row per place and colour pair; 390 and 1440 see the same defect twice.
   const key = (r) => `${r.page}|${r.theme}|${r.kind}|${r.sel}|${r.colour}|${r.ground}`;
   const uniq = (list) => [...new Map(list.map((r) => [key(r), r])).values()];

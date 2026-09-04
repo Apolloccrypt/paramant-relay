@@ -85,3 +85,45 @@ test('the helper is defined before every use', () => {
   assert.ok(/^function productPlanFields/m.test(SERVER),
     'productPlanFields must stay a top-level function declaration');
 });
+
+// ── The two usage endpoints ask the relay for the ceilings ──────────────────
+//
+// Same rule as above, one layer down: the unified `plan` may not decide a
+// number a customer reads. /api/user/dashboard/overview and
+// /api/user/developer/snapshot used to look the account up by email, take its
+// `plan`, and run it through a tier table copied into admin/lib. That table had
+// no `business` row and the field it was keyed on never moves on a purchase, so
+// a ParaSign Pro customer was shown "2 signatures" where the relay grants 100.
+//
+// The relay owns the tiers and enforces them, so the relay is asked. This is a
+// source-text test because reaching these handlers needs Redis, a session
+// cookie and a live relay; what can go wrong is the lookup quietly reverting to
+// the plan field, and that is what source inspection catches.
+// admin/test/developer-snapshot.test.js pins the resulting numbers.
+test('the usage endpoints read caps from the relay, not from a plan field', () => {
+  for (const route of ['"/user/dashboard/overview"', '"/user/developer/snapshot"']) {
+    const start = SERVER.indexOf(`api.get(${route}`);
+    assert.notEqual(start, -1, `admin/server.js must serve GET ${route}`);
+    const body = SERVER.slice(start, start + 1600);
+    const handler = body.slice(0, body.indexOf('\n});') + 1);
+
+    assert.match(handler, /readAccountEntitlements\(/,
+      `GET ${route} must ask the relay for this account's entitlements`);
+    assert.match(handler, /entitlements:\s*ents\b/,
+      `GET ${route} must hand those entitlements to buildSnapshot`);
+    assert.doesNotMatch(handler, /\bplan\s*[=:]/,
+      `GET ${route} must not resolve a plan of its own; the caps come per product from the relay`);
+    assert.match(handler, /entitlements_unavailable/,
+      `GET ${route} must refuse rather than render a guessed cap when the relay cannot answer`);
+  }
+});
+
+test('readAccountEntitlements reads the relay endpoint and returns null on failure', () => {
+  const start = SERVER.indexOf('async function readAccountEntitlements(');
+  assert.notEqual(start, -1, 'admin/server.js must define readAccountEntitlements()');
+  const fn = SERVER.slice(start, start + 1200);
+  assert.match(fn, /\/v2\/admin\/entitlements\//,
+    'it must read GET /v2/admin/entitlements/:account_id, the relay\'s own entitlement answer');
+  assert.match(fn, /return null/,
+    'an unreachable or unhappy relay must yield null, so the caller can refuse instead of guess');
+});

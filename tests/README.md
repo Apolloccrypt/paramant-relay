@@ -28,6 +28,7 @@ Guards the auth + TOTP stack against the class of breakage that hit production r
 | `tests/signed-in-home.test.mjs` | sign-e2e job `Browser suites` (selected by its playwright import) | The signed-in homepage at 390x844, in five states (open requests, only finished documents, a brand new account, every route down, and documents waiting for the reader's own signature), with the API mocked the way `navigation-shell` mocks it. Holds three things: the big figure on screen is the number in the mocked API, no state leaves the reader with three buttons over a hole (measured as the gap between the last thing drawn in `<main>` and the top of the footer, 120px), and no relay vocabulary reaches the words. Written after the owner read his own homepage on a phone on 4 September 2026 and got a heading, one paragraph, three buttons and an empty screen: "I see ONLY 3 buttons, as if it were a test page". The fifth state also presses "Send me the link again" and holds that it asks once, says which address the mail went to, and turns a capped resend into a sentence rather than a status code |
 | `relay/test/parasign-party-index.test.js` | relay job `Route suites` (needs redis and `@paramant/core`) | The party worklist index behind "Waiting for your signature", against a real store: `create()` puts an email-bound envelope on every invited party's list, the row carries no invite token and no document hash, index membership is not authority (a hand-written member shows nobody anything), signing or withdrawing takes the row off, the resend hands back the token that was already stored rather than minting one, and the backfill fills the index for older envelopes, is idempotent, and does not resurrect a row that signing removed |
 | `relay/test/route-parasign-inbox.test.js` | relay job `Route suites` (needs redis and `@paramant/core`) | The same two routes over HTTP, for the one property the store cannot show: the address is derived from the authenticated key, so asserting somebody else's hash on the wire buys nothing, and the resend is internal-auth only and answers the same 404 for a wrong address as for a missing envelope |
+| `tests/no-uncaught-errors.test.mjs` | sign-e2e job `Browser suites` (selected by its playwright import) | Every page in the `theme-contrast` list plus the app and auth screens, 25 pages and 32 session states, in light and dark, at 390 and 1440: 128 visits that each load the page, wait for network idle plus 1500ms so the animations have run, perform the first obvious interaction (hamburger on a phone, else the first tab, else the first button that neither navigates nor destroys anything), and fail on any uncaught page error, unhandled promise rejection or `console.error`. Written after PR #431 moved `GLOBE_ACCENT_RGB` inside `initGlobe()` while two other functions read it, so /parashare threw on every animation tick. Note what this does and does not fix: `product-heartbeat` already caught that one on the pull request and went red at 10:41:28Z, and #431 was merged 15 seconds later past a required check that `enforce_admins: false` does not enforce. This suite adds breadth (heartbeat sees 7 pages, signed out, one width, on load only), not the missing gate. The `KNOWN` list of deliberately ignored messages carries a reason per line and may only ever get shorter |
 
 ## Running manually
 
@@ -67,9 +68,26 @@ Moving the file changes nothing about the workflow's selection line. The real
 browser suites it selects are the same sixteen minus this one:
 
 ```bash
-# What the sign-e2e Browser suites step runs, before and after:
-grep -l "from 'playwright'" tests/*.mjs | grep -vE 'sign-full|product-heartbeat'
+# What the sign-e2e Browser suites step runs:
+node scripts/browser-suites.mjs --browser | grep -vE 'sign-full|product-heartbeat'
 ```
+
+### Which half a suite belongs to is decided by the import graph
+
+That selection line used to be `grep -l "from 'playwright'" tests/*.mjs`, which
+reads the test file and nothing it imports. `tests/ui-elements-contrast.test.mjs`
+imports `scripts/ui-contrast-sweep.mjs`, and the sweep is what imports
+playwright, so the grep called it a no-browser suite. On 2026-09-04 that sent it
+to the `Root integration suites (no browser)` job in test.yml, which installs no
+Chromium on purpose. `chromium.launch()` rejected, the sweep's static server was
+already listening and nothing closed it, and `node --test` waited for an event
+loop that would never drain: three runs on main and a pull request hung in that
+step for hours instead of failing in seconds. The suite also ran in no browser
+job at all, so the only new gate of that pull request was measuring nothing.
+
+`scripts/browser-suites.mjs` answers the same question by walking the relative
+imports from each suite as deep as they go. A helper that grows a browser
+dependency takes its suites with it on the next run, with no list to keep.
 
 The rule this leaves behind: a file under `tests/` is a gate and asserts
 something. A file that only produces artefacts belongs in `scripts/`, whether or
