@@ -925,6 +925,58 @@ assert.ok(!/no US company/i.test(security),
 assert.ok(security.includes('No US provider in the data path'),
   'security.html must carry proof 1 in the data-path wording the guide fixes');
 
+// ── "Why Dutch matters", 5 September ────────────────────────────────────────
+// Mick: "the pride in being Dutch is missing, it is too well behaved". The
+// homepage now argues the ownership case instead of only stating it, and this
+// block is the pin on the three claims that carry it. Each one is checkable:
+// the KvK number and the governing-law clause are in this repository, the
+// acquisitions are external and carry their sources on the page itself, and the
+// data-path line is proof 1 in its own words with the Resend exception beside
+// it. The row in docs/site-claims.md records the external half as UNCOVERED,
+// which is the same footing the competitor facts on /vs stand on.
+const bandTag = (read('frontend/index.html').match(/<span class="hp-band-tag">([\s\S]*?)<\/span>/) || [, ''])[1];
+assert.equal(bandTag, 'Dutch owned. Built in Harderwijk, hosted in Nuremberg, answerable to no one in Virginia.',
+  'index.html: the band tag is the one line above the fold that says whose product this is; change it deliberately, and update tests/first-screen with it');
+const whyNl = visible0((read('frontend/index.html').match(/<section class="hp-sec why-nl-sec"[\s\S]*?<\/section>/) || [''])[0]);
+assert.ok(whyNl, 'index.html must keep the "Why Dutch matters" section');
+for (const claim of [
+  // The ownership facts. Sourced on the page, not in the code, so the wording is
+  // pinned here and the sources line is required to travel with it.
+  'The parent of WeTransfer has been Bending Spoons in Milan since July 2024.',
+  'Zivver has been part of Kiteworks in California since June 2025.',
+  'Signhost went to Entrust in 2022, SignRequest to Box in 2021, and QuoVadis is on the Dutch trust list today as DigiCert Europe Netherlands.',
+  // Who owns Paramant. The number is the one every other page carries.
+  'Paramantis Solutions B.V., Harderwijk, KvK 42115132, with no parent company anywhere else.',
+  'Dutch law governs the terms you agree to, and a Dutch court hears the dispute.',
+  // Proof 1, in this section\u2019s own words, with the exception in the same breath.
+  'No US provider is in the data path.',
+  'The one exception is transactional email, which goes out through Resend, an American company: it receives the address and the invite link, never the document.',
+  // The sentence that carries the pride. It claims nothing a reader cannot check.
+  'We are Dutch, and we would rather say so than hide behind a Delaware address.',
+]) {
+  assert.ok(whyNl.includes(claim), `index.html: "Why Dutch matters" lost the line: ${claim}`);
+}
+assert.ok(/Ownership sources: .*Checked 3 September 2026\./.test(whyNl),
+  'index.html: the ownership facts are external, so the sources line and its check date must stay with them');
+// terms.html \u00a713 is what "Dutch law governs the terms" points at.
+assert.match(read('frontend/terms.html'), /<h2 id="law">/,
+  'terms.html must keep the #law anchor the homepage sends the reader to');
+assert.match(read('frontend/terms.html'), /Dutch law applies\. Disputes go to the competent court in the district where Paramantis Solutions B\.V\. is established/,
+  'terms.html must keep the governing-law sentence the homepage summarises');
+// /security carries the same claim once, above the table where it is checked.
+// It deliberately avoids the exact "No US provider in the data path" wording, so
+// the window check above still measures the two occurrences it was written for.
+assert.match(read('frontend/security.html'), /A Dutch company owns this: Paramantis Solutions B\.V\. in Harderwijk, KvK 42115132\./,
+  'security.html must name the owner above the jurisdiction table');
+// /pricing: who takes the money is part of the same answer. Mollie B.V. is the
+// Netherlands row in the /dpa sub-processor table, so this is not a new claim.
+const pricingPay = read('frontend/pricing.html');
+assert.match(pricingPay, /You pay a Dutch company, in euros, through a Dutch payment provider \(Mollie\)\./,
+  'pricing.html must say who is paid and where they sit, in the payment paragraph');
+assert.match(read('frontend/dpa.html'), /<td>Mollie B\.V\.<\/td><td>Netherlands \(EU\)<\/td>/,
+  'the /pricing line rests on the /dpa row that puts Mollie B.V. in the Netherlands');
+console.log('ui-truthfulness: the homepage argues the Dutch case with facts it can source');
+
 // Proof 2. The three /about sentences the signing claim rests on.
 for (const claim of [
   'ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay.',

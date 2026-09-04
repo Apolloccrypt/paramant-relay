@@ -278,6 +278,12 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
 .check-grid .ck-how{font-size:14.5px;line-height:1.5;color:var(--fg-mid);margin:0}
 .check-grid a{font-family:var(--hp-mono);font-size:13px;font-weight:600;color:var(--teal);text-decoration:none;padding:6px 0;display:inline-block;white-space:nowrap}
 .check-grid a:hover{text-decoration:underline}
+/* "Why Dutch matters" reuses the five-facts list. Two columns instead of three:
+   two of the three rows carry no checkpoint link, so the third column would sit
+   empty and pull the prose narrow. */
+@media (min-width:760px){.why-grid li{grid-template-columns:minmax(0,.85fr) minmax(0,2fr) auto;gap:24px}}
+.why-proud{font-size:clamp(1.05rem,.4vw + .95rem,1.25rem);line-height:1.5;font-weight:600;letter-spacing:-.01em;color:var(--fg);margin:26px 0 0;max-width:34ch;border-left:2px solid var(--ochre-ink);padding-left:14px}
+.why-src{font-family:var(--hp-mono);font-size:11.5px;line-height:1.7;color:var(--fg-dim);margin:20px 0 0;max-width:64ch}
 
 /* ---------- the gift: two halves ---------- */
 .check-sec{padding-top:28px}
@@ -518,7 +524,7 @@ footer a{color:var(--fg)}
     <path d="M0 208h1440v22H0z" fill="#4E6E72"/>
     <path d="M0 208h1440" stroke="#EAE2CE" stroke-opacity=".35"/>
   </svg>
-  <span class="hp-band-tag">Paramant &middot; made in the Netherlands, hosted in the EU</span>
+  <span class="hp-band-tag">Dutch owned. Built in Harderwijk, hosted in Nuremberg, answerable to no one in Virginia.</span>
 </div>
 
 <section class="home-hero">
@@ -653,6 +659,21 @@ footer a{color:var(--fg)}
       <li><span class="ck-fact">What happens when something goes wrong</span><p class="ck-how">A personal data breach is reported to you within 48 hours; that is in the signed Data Processing Agreement, not in a blog post. Your signature receipts verify without us, so they outlive us.</p><a href="/dpa#incidents">Breach notification, clause 8 &rarr;</a></li>
       <li><span class="ck-fact">Code you can read</span><p class="ck-how">The core and the relay are published. Nine rules, each with a link to the proof, are written down in one place.</p><a href="/rules">The nine rules &rarr;</a></li>
     </ul>
+  </div>
+</section>
+
+<section class="hp-sec why-nl-sec" aria-labelledby="why-nl-h">
+  <div class="hp-wrap">
+    <p class="hp-kicker">Why Dutch matters</p>
+    <h2 id="why-nl-h" class="hp-h2">Dutch is a fact here, not a flag.</h2>
+    <p class="hp-lede">Where a supplier is owned decides which law reaches your client files and who can be ordered to hand them over. So it is a purchasing question, and here are the three answers.</p>
+    <ul class="check-grid why-grid">
+      <li><span class="ck-fact">The Dutch names were sold</span><p class="ck-how">The parent of WeTransfer has been Bending Spoons in Milan since July 2024. Zivver has been part of Kiteworks in California since June 2025. Signhost went to Entrust in 2022, SignRequest to Box in 2021, and QuoVadis is on the Dutch trust list today as DigiCert Europe Netherlands. The names stayed Dutch. The owners did not.</p></li>
+      <li><span class="ck-fact">This one was not</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk, KvK 42115132, with no parent company anywhere else. Dutch law governs the terms you agree to, and a Dutch court hears the dispute.</p><a href="/terms#law">Governing law &rarr;</a></li>
+      <li><span class="ck-fact">And neither is the data path</span><p class="ck-how">Servers at Hetzner in Nuremberg, Germany. DNS at Bunny in Slovenia. No US provider is in the data path. The one exception is transactional email, which goes out through Resend, an American company: it receives the address and the invite link, never the document.</p><a href="/privacy">The sub-processors &rarr;</a></li>
+    </ul>
+    <p class="why-proud">We are Dutch, and we would rather say so than hide behind a Delaware address.</p>
+    <p class="why-src">Ownership sources: the Kiteworks announcement of the Zivver acquisition (17 June 2025); the Bending Spoons announcement of the WeTransfer acquisition (31 July 2024); Entrust on Signhost (2022); Box on SignRequest (2021); the RDI trust service status list, which carries QuoVadis as DigiCert Europe Netherlands B.V. Checked 3 September 2026.</p>
   </div>
 </section>
 
