@@ -45,6 +45,31 @@ function extendFrom(currentPaidUntil, now) {
   return cur.getTime() > now.getTime() ? cur : now;
 }
 
+// A BUNDLE buys one term for several products at once, so it needs ONE anchor
+// for all of them. The anchor is the EARLIEST of the per-product anchors: a
+// bundle month must add a month to the product that has the least time left,
+// never silently hand a year of the other product to somebody who paid for a
+// month. Nobody loses time either, because the term written per product is
+// clamped upwards below (keepLonger).
+function bundleExtendFrom(currentPaidUntils, now) {
+  let anchor = null;
+  for (const cur of currentPaidUntils || []) {
+    const a = extendFrom(cur, now);
+    if (!anchor || a.getTime() < anchor.getTime()) anchor = a;
+  }
+  return anchor || now;
+}
+
+// Never shorten a period that is already on file. A customer holding ParaSign
+// Pro until next June who buys one month of Firm gets ParaSend Pro for that
+// month and KEEPS his June on ParaSign. Rule 4 of the Firm brief: an existing
+// paying customer may not lose a single day by our changing what we sell.
+function keepLonger(candidate, currentPaidUntil) {
+  const cur = currentPaidUntil ? new Date(currentPaidUntil) : null;
+  if (!cur || Number.isNaN(cur.getTime())) return candidate;
+  return cur.getTime() > candidate.getTime() ? cur : candidate;
+}
+
 // deps: {
 //   setProductPlan(accountId, product, tier) -> { ok, ... }  (sync or async)
 //   isProcessed(paymentId) -> boolean                        (async; optional)
@@ -101,39 +126,67 @@ async function processPayment(payment, deps) {
     // asked for a one-off payment, so no second collection follows, and the
     // entitlement used to stay on the paid tier forever. An interval we cannot
     // turn into a date is refused rather than granted open-endedly.
+    //
+    // One anchor for the whole order, so a bundle writes ONE term across the
+    // products it covers instead of two dates that drift apart on every renewal.
     const now = d.now instanceof Date ? d.now : new Date();
-    const paidUntil = periodEnd(extendFrom(
-      typeof d.currentPaidUntil === 'function' ? await d.currentPaidUntil(accountId, product) : null,
-      now,
-    ), interval);
+    const currents = [];
+    for (const g of order.grants) {
+      currents.push(typeof d.currentPaidUntil === 'function' ? await d.currentPaidUntil(accountId, g.product) : null);
+    }
+    const paidUntil = periodEnd(bundleExtendFrom(currents, now), interval);
     if (!paidUntil) {
       return { result: 'refused', level: 'error', account: accountId, product, reason: `no_period_for_interval:${interval}` };
     }
 
-    // Grant ONLY this product's tier. setProductPlan never touches the other
-    // product (rule: product A must not move product B).
-    let set;
-    try { set = await d.setProductPlan(accountId, product, order.tier, paidUntil); }
-    catch (e) { set = { ok: false, reason: e.message }; }
-    if (!set || !set.ok) {
-      return { result: 'refused', level: 'error', account: accountId, product, reason: `grant_failed:${set && set.reason}` };
+    // Grant each product in the order. setProductPlan moves ONE product per
+    // call and never touches a product this order does not name, so a ParaSign
+    // Business holder buying nothing keeps what he has. `bundle` is passed on so
+    // the expiry index can tell the customer what he actually bought.
+    const granted = [];
+    for (let i = 0; i < order.grants.length; i++) {
+      const g = order.grants[i];
+      const until = keepLonger(paidUntil, currents[i]);
+      let set;
+      try { set = await d.setProductPlan(accountId, g.product, g.tier, until, order.bundle || null); }
+      catch (e) { set = { ok: false, reason: e.message }; }
+      if (!set || !set.ok) {
+        return {
+          result: 'refused', level: 'error', account: accountId, product,
+          reason: `grant_failed:${g.product}:${set && set.reason}`,
+          granted: granted.slice(),
+        };
+      }
+      granted.push({ product: g.product, tier: g.tier, paidUntil: until.toISOString() });
     }
     if (typeof d.markProcessed === 'function') { try { await d.markProcessed(payment.id, 'granted'); } catch { /* best effort */ } }
     return {
       result: 'granted', level: 'info', account: accountId, product, tier: order.tier,
+      bundle: order.bundle || null,
+      grants: granted,
       paidUntil: paidUntil.toISOString(),
-      reason: `${product}->${order.tier} until ${paidUntil.toISOString().slice(0, 10)}`,
+      reason: `${granted.map((g) => `${g.product}->${g.tier}`).join(' + ')} until ${paidUntil.toISOString().slice(0, 10)}`,
     };
   }
 
   if (status === 'chargeback' || status === 'charged_back') {
     // Money reclaimed. Revoke: drop this product to its floor tier.
-    const floor = catalog.floorTier(product);
-    // null clears the period along with the tier: money reclaimed leaves no
-    // paid time on record.
-    try { await d.setProductPlan(accountId, product, floor, null); } catch { /* logged by caller via reason */ }
+    // EVERY product the order bought goes back to its floor. A bundle that
+    // granted two entitlements and revoked one would leave the customer holding
+    // half a plan he has taken the money back for.
+    const revoked = [];
+    for (const g of order.grants) {
+      const floor = catalog.floorTier(g.product);
+      // null clears the period along with the tier: money reclaimed leaves no
+      // paid time on record.
+      try { await d.setProductPlan(accountId, g.product, floor, null, null); } catch { /* logged by caller via reason */ }
+      revoked.push({ product: g.product, tier: floor });
+    }
     if (typeof d.markProcessed === 'function') { try { await d.markProcessed(payment.id, 'revoked'); } catch { /* best effort */ } }
-    return { result: 'revoked', level: 'warn', account: accountId, product, tier: floor, reason: 'chargeback' };
+    return {
+      result: 'revoked', level: 'warn', account: accountId, product,
+      bundle: order.bundle || null, tier: revoked[0].tier, grants: revoked, reason: 'chargeback',
+    };
   }
 
   // failed | expired | canceled | open | pending -> no entitlement change.
@@ -166,4 +219,4 @@ function classifyFetchError(err) {
   return { retry: true, level: 'warn', reason: status ? `mollie_${status}` : (msg || 'fetch_error') };
 }
 
-module.exports = { processPayment, classifyFetchError, periodEnd, extendFrom };
+module.exports = { processPayment, classifyFetchError, periodEnd, extendFrom, bundleExtendFrom, keepLonger };

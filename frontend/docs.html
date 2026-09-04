@@ -248,7 +248,7 @@ tr:last-child td{border-bottom:none}
     <span class="eyebrow">REFERENCE</span>
     <h1>Documentation</h1>
     <p class="docs-buyer">Evaluating Paramant? Your IT can check everything here. Plans and prices are on <a href="/pricing">Pricing</a>.</p>
-    <p class="lede">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT v3.0.0. The relay is untrusted by design: it never holds a decryption key. The ParaSign API is available from ParaSign Pro; see <a href="/pricing">pricing</a>.</p>
+    <p class="lede">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT v3.0.0. The relay is untrusted by design: it never holds a decryption key. The ParaSign API is available from Firm; see <a href="/pricing">pricing</a>.</p>
     <div class="docs-hero-actions">
       <a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">Quick start</a>
       <a href="/pricing" class="docs-hero-btn docs-hero-btn-secondary">See plans and prices</a>
@@ -482,7 +482,7 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
       <tr><td><span class="method get">GET</span></td><td>/v2/relays</td><td>Registered relay nodes and status</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/audit</td><td>Merkle audit chain: JSON + CSV export</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/team/devices</td><td>List team devices</td><td>Key</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/team/add-device</td><td>Add device to team (Pro+)</td><td>Key</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/team/add-device</td><td>Add device to team (Firm or higher)</td><td>Key</td></tr>
     </table>
 
     <h2 id="inbound">POST /v2/inbound</h2>
@@ -498,10 +498,10 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
 <span class="cm">200: { "ok": true, "hash": "...", "ttl_ms": 3600000 }
 409: hash already exists
 503: relay at capacity (memory limit)</span></pre>
-    <p>TTL and <code>max_views</code> are both clamped to the plan maximum: Community gets 1 hour and 1 read, Pro 24 hours and up to 10 reads, Enterprise 7 days and 100 reads. Leave <code>max_views</code> out and the link burns on the first read on every plan, which is what the ParaSend web app does. The <code>hash</code> field is the SHA-256 of the <em>padded</em> payload (not the original file). The SDK computes this automatically.</p>
+    <p>TTL and <code>max_views</code> are both clamped to the plan maximum: Community gets 1 hour and 1 read, Firm 24 hours and up to 10 reads, Enterprise 7 days and 100 reads. Leave <code>max_views</code> out and the link burns on the first read on every plan, which is what the ParaSend web app does. The <code>hash</code> field is the SHA-256 of the <em>padded</em> payload (not the original file). The SDK computes this automatically.</p>
 
     <h2 id="outbound">GET /v2/outbound/:hash</h2>
-    <p><strong>Spends one read of the link.</strong> A Community link has one read, so this call is the only retrieval; a paid link can have more, up to 10 reads on Pro. On the last read the blob buffer is overwritten with random bytes and removed from RAM. There is no recovery.</p>
+    <p><strong>Spends one read of the link.</strong> A Community link has one read, so this call is the only retrieval; a paid link can have more, up to 10 reads on Firm. On the last read the blob buffer is overwritten with random bytes and removed from RAM. There is no recovery.</p>
     <pre>GET /v2/outbound/abc123...
 X-Api-Key: pgp_xxx
 
@@ -553,7 +553,7 @@ ws.onmessage = e => {
     <!-- ── ParaSign API (/v1) ───────────────────────────────────── -->
     <span id="parasign-api" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
     <h2 id="v1-envelopes">ParaSign API (/v1)</h2>
-    <p>Hosted signing ceremonies from your own stack: create an envelope from a PDF plus a signer list, route each signer to a hosted signing page, and pull the completed <code>.psign</code> proof. Authenticate with <code>Authorization: Bearer psk_live_...</code> (mint keys in the <a href="/developer">developer dashboard</a>; API access is part of Pro).</p>
+    <p>Hosted signing ceremonies from your own stack: create an envelope from a PDF plus a signer list, route each signer to a hosted signing page, and pull the completed <code>.psign</code> proof. Authenticate with <code>Authorization: Bearer psk_live_...</code> (mint keys in the <a href="/developer">developer dashboard</a>; API access is part of Firm).</p>
     <pre><span class="cm">Endpoints:</span>
 POST   /v1/envelopes                Create an envelope; returns id + one sign_url per signer
 GET    /v1/envelopes/:id            Envelope status and per-signer progress
@@ -582,7 +582,7 @@ curl https://paramant.app/v1/envelopes/env_.../receipt \
     <table>
       <tr><th>Field</th><th>Value</th></tr>
       <tr><td>Auth</td><td><code>X-Api-Key: pgp_...</code></td></tr>
-      <tr><td>Tier</td><td>Pro or higher on ParaSend <em>or</em> ParaSign. Community &rarr; <code>403</code>.</td></tr>
+      <tr><td>Tier</td><td>Firm or higher on ParaSend <em>or</em> ParaSign. Community &rarr; <code>403</code>.</td></tr>
       <tr><td>Query</td><td><code>?limit=</code> (default 100, max 1000)</td></tr>
     </table>
     <pre>GET /v2/user/history?limit=100
@@ -603,14 +603,14 @@ X-Api-Key: pgp_xxx
 
 <span class="cm"># 403 plan too low</span>
 { "error": "tier_upgrade_required", "feature": "history",
-  "message": "Send history and link management require a Pro plan or higher." }</pre>
+  "message": "Send history and link management require a Firm plan or higher." }</pre>
 
     <h2 id="audit-export">GET /v2/parasign/audit-export</h2>
     <p>The compliance half of the ParaSign paid ladder: it hands an auditor the account's tamper-evident signing trail, the Certificate-Transparency signed tree head (STH) that anchors it, and the full per-envelope <code>.psign</code> proofs for every completed envelope, as CSV or JSON. No document bytes leave the relay; the export carries hashes and signatures only.</p>
     <table>
       <tr><th>Field</th><th>Value</th></tr>
       <tr><td>Auth</td><td><code>X-Api-Key: pgp_...</code></td></tr>
-      <tr><td>Tier</td><td>Business or higher (the <code>audit_export</code> entitlement). Pro and below &rarr; <code>403</code>.</td></tr>
+      <tr><td>Tier</td><td>Business or higher (the <code>audit_export</code> entitlement). Firm and below &rarr; <code>403</code>.</td></tr>
       <tr><td>Query</td><td><code>?format=csv</code> for CSV (default JSON); <code>?limit=</code> (default 1000, max 10000)</td></tr>
     </table>
     <pre><span class="cm"># JSON (default)</span>
@@ -642,14 +642,15 @@ curl "https://paramant.app/v2/parasign/audit-export?format=csv" \
   "message": "The ParaSign audit export requires a Business plan or higher." }</pre>
 
     <h2 id="billing">Billing API: POST /v2/billing/checkout</h2>
-    <p>Start a Mollie payment for a ParaSend or ParaSign plan. The price is never supplied by the caller: it is looked up server-side from the billing catalog by <code>(product, plan, interval)</code>, and the webhook re-verifies the amount actually paid before granting anything. Authenticate with your <code>pgp_</code> key.</p>
+    <p>Start a Mollie payment for a Paramant plan. The price is never supplied by the caller: it is looked up server-side from the billing catalog by <code>(product, plan, interval)</code>, and the webhook re-verifies the amount actually paid before granting anything. Authenticate with your <code>pgp_</code> key.</p>
     <table>
       <tr><th>Field</th><th>Value</th></tr>
       <tr><td>Auth</td><td><code>X-Api-Key: pgp_...</code> (a valid key). No key &rarr; <code>401</code>.</td></tr>
-      <tr><td>product</td><td><code>parasend</code> or <code>parasign</code></td></tr>
-      <tr><td>plan</td><td>ParaSend: <code>pro</code>. ParaSign: <code>pro</code> or <code>business</code>.</td></tr>
+      <tr><td>product</td><td><code>firm</code>, or <code>parasign</code> for Business</td></tr>
+      <tr><td>plan</td><td>Firm: product <code>firm</code>, plan <code>firm</code>, which grants the ParaSign and ParaSend paid limits together. ParaSign: <code>business</code>.</td></tr>
       <tr><td>interval</td><td><code>monthly</code> or <code>yearly</code></td></tr>
     </table>
+    <p>The separate <code>parasign</code>/<code>pro</code> and <code>parasend</code>/<code>pro</code> plans are no longer sold. They stay resolvable in the catalog so an outstanding renewal and an existing Mollie subscription keep working.</p>
     <pre>curl -X POST https://paramant.app/v2/billing/checkout \
   -H "X-Api-Key: pgp_xxx" \
   -H "Content-Type: application/json" \
@@ -898,7 +899,7 @@ python3 scripts/paramant-admin.py sync</pre>
     <table>
       <tr><th>Plan</th><th>Default TTL</th><th>Maximum TTL</th><th>Max file size</th></tr>
       <tr><td>Community (pgp_)</td><td>1 hour</td><td>1 hour</td><td>5 MB (padded)</td></tr>
-      <tr><td>Pro</td><td>1 hour</td><td>24 hours</td><td>5 MB</td></tr>
+      <tr><td>Firm</td><td>1 hour</td><td>24 hours</td><td>5 MB</td></tr>
       <tr><td>Enterprise</td><td>1 hour</td><td>7 days</td><td>5 MB</td></tr>
     </table>
 
@@ -1028,7 +1029,7 @@ python3 scripts/paramant-admin.py sync</pre>
 
     <div class="faq-item">
       <div class="faq-q">What is Ghost Pipe?</div>
-      <div class="faq-a">Ghost Pipe is the relay protocol: a WebSocket-based, post-quantum encrypted transfer protocol where data is stored in RAM only, destroyed after the last read the link allows (one on Community, up to 10 reads on Pro), and padded to a fixed size. It is designed for adversarial environments where the relay itself may be compromised.</div>
+      <div class="faq-a">Ghost Pipe is the relay protocol: a WebSocket-based, post-quantum encrypted transfer protocol where data is stored in RAM only, destroyed after the last read the link allows (one on Community, up to 10 reads on Firm), and padded to a fixed size. It is designed for adversarial environments where the relay itself may be compromised.</div>
     </div>
 
     <div class="faq-item">

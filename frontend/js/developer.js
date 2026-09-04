@@ -44,7 +44,7 @@
     if (email) email.textContent = data.email || '--';
     // This is the ParaSign developer page, so the tier it names is the ParaSign
     // tier. It used to print the unified `plan`, which a purchase never moves,
-    // so a ParaSign Pro buyer read COMMUNITY next to his own email. The snapshot
+    // so a Firm buyer read COMMUNITY next to his own email. The snapshot
     // now carries a tier per product because an account can hold two different
     // ones at once.
     var tiers = data.tiers || {};

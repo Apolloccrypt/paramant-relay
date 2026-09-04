@@ -102,16 +102,18 @@ page calls it anything else.
 **For organisations** (same names, same prices, always excl. btw with the incl.
 figure beside it, exactly as /pricing does it):
 
-- ParaSign Pro. EUR 49/month excl. btw (EUR 59.29 incl.). 100 signatures a
-  month, then EUR 0.40 each up to 1,000. API access. Annual EUR 499 excl.
+- Firm. EUR 29/month excl. btw (EUR 35.09 incl.). Annual EUR 290/year excl. btw
+  (EUR 350.90 incl.), 16.7% off. One plan and one payment for both products: it
+  grants the ParaSign Pro and ParaSend Pro limits together. On ParaSign, 100
+  signatures a month, then EUR 0.40 each up to 1,000, plus API access. On
+  ParaSend, 500 transfers a month, 24 hour expiry, up to 10 reads, up to 50
+  registered devices, send history, webhooks, no IP rate limit. The two Pro
+  plans it replaced are off sale.
 - ParaSign Business. EUR 299/month excl. btw (EUR 361.79 incl.). 1,000
   signatures a month, named support with a response within one business day,
   exportable audit log with CT tree head (CSV or JSON). Annual EUR 2,990 excl.
 - ParaSign Enterprise. "Let's talk", per organisation. Dedicated relay instance,
   sector relay, SLA with service credits, self-hosting licence, audit support.
-- ParaSend Pro. EUR 15/month excl. btw (EUR 18.15 incl.). 24 hour expiry, up to
-  10 reads, up to 50 registered devices, send history, webhooks, no IP rate
-  limit.
 - ParaSend Enterprise. Custom. Dedicated relay, SLA 99.9%, IEC 62443 / NIS2 /
   NEN 7510 documentation, signed DPA.
 
@@ -346,7 +348,7 @@ page is for.
   reaches the relay. A signed document verifies without contacting us.
 - **Primary CTA:** Sign a document, to /sign.
 - **Order:** same four movements as the homepage, signing only. Free tier limits
-  first, then ParaSign Pro, Business and Enterprise, then the proof, then the
+  first, then Firm, ParaSign Business and Enterprise, then the proof, then the
   SES limit.
 
 ### /sign
@@ -449,7 +451,7 @@ way; the URL keeps its name, the copy does not)
   /pricing.
 - **H1:** Documentation. (unchanged)
 - **First paragraph:** unchanged, plus one line stating that the ParaSign API is
-  available from ParaSign Pro, with a link to /pricing.
+  available from Firm, with a link to /pricing.
 - **Primary CTA:** Quick start.
 - **Rule:** no marketing copy, no founder block, no tier comparison beyond that
   one line.

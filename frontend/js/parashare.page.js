@@ -846,7 +846,7 @@ function humanDuration(ms) {
   const n = Number(ms);
   if (!Number.isFinite(n) || n <= 0) return '';
   const days = n / 86400000, hours = n / 3600000, mins = n / 60000;
-  // Hours win up to two days. tiers.js Pro is 86_400_000, and "1 day on Pro"
+  // Hours win up to two days. tiers.js pro is 86_400_000, and "1 day on Firm"
   // next to "1 hour on Community" reads as a smaller step than it is; the
   // pricing page has always sold that row as 24 hours, and the two have to
   // agree word for word or a buyer thinks they are two different limits.
@@ -865,19 +865,25 @@ function applyPlanTtls(found) {
   const el = $('ps-mode-link-ttl');
   if (!el || !planTtlByPlan) return;
   const c = humanDuration(planTtlByPlan.community);
+  // The table the relay serves is keyed by ENTITLEMENT TIER (tiers.js rows:
+  // community, pro, business, enterprise). The sentence names the PLAN a reader
+  // can buy, and since 6 September 2026 the plan that grants the 'pro' row is
+  // Firm; nobody can buy a plan called Pro any more. So the key stays 'pro' and
+  // the word beside it is Firm: 24 hours is what Firm actually gives you, which
+  // is the same 24 hour link expiry the Firm card prints on /pricing.
   const pr = humanDuration(planTtlByPlan.pro);
   // Enterprise, not Business. tiers.js carries a business row and it is
   // load-bearing server-side, but the ParaSend price table sells Community,
-  // Pro and Enterprise, so a reader on none of them can only be told about a
+  // Firm and Enterprise, so a reader on none of them can only be told about a
   // plan he could buy. The two rows hold the same ceiling today anyway.
   const ent = humanDuration(planTtlByPlan.enterprise);
   if (!c || !pr || !ent) return;
   // "web app" is not decoration. tests/site-claims.test.mjs block 37 holds every
   // page about a client that never sends max_views to naming that client beside
-  // a single-read claim, because "up to 10 reads on Pro" is something this page
+  // a single-read claim, because "up to 10 reads on Firm" is something this page
   // will never do: it asks the relay for no read count at all.
   el.textContent = 'The sealed file waits on our server for up to ' + c + ' on Community, ' +
-    pr + ' on Pro and ' + ent + ' on Enterprise, and a link from this web app is wiped after the first download.';
+    pr + ' on Firm and ' + ent + ' on Enterprise, and a link from this web app is wiped after the first download.';
   // The TTL picker in step 1 offers 24 hours to an account whose plan stops at
   // one, and POST /v2/inbound silently clamps it. Saying the ceiling here is
   // cheaper than letting the sender pick a number the relay will not honour.

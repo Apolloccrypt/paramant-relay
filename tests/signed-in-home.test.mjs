@@ -262,7 +262,12 @@ ok('recent only: the figure is the signatures left this month, from the API', se
 ok('recent only: the figure is named in plain words', seen.recent.cap === 'signatures left this month', seen.recent.cap);
 ok('recent only: the reader is told when the count starts again', /^The count resets on \d+ [A-Z][a-z]+ \d{4}\.$/.test(seen.recent.sub), seen.recent.sub);
 ok('recent only: nothing is open, so the waiting card is not drawn', !seen.recent.waiting && seen.recent.recent && seen.recent.recentRows.length === 3, JSON.stringify(seen.recent.recentRows));
-ok('recent only: a paid term names its end and says nothing renews', seen.recent.plan === `ParaSign Pro, ends on ${day(PRO_ENDS)}, nothing renews automatically.`, seen.recent.plan);
+// "Firm", not "ParaSign Firm": the stored tier is per product because the
+// entitlement layer is, but the plan that grants it is one payment for both
+// products, so a product prefix would name a plan that is not sold and would
+// tell a Firm customer that half of what he bought runs out by itself.
+// ParaSign Business, which IS sold on its own, keeps its prefix.
+ok('recent only: a paid term names its end and says nothing renews', seen.recent.plan === `Firm, ends on ${day(PRO_ENDS)}, nothing renews automatically.`, seen.recent.plan);
 ok('recent only: a term 29 days out does not shout Renew yet', !seen.recent.renew, String(seen.recent.renew));
 
 // 3. A new account. Not a hole: one card, its own object, two ways out, and the

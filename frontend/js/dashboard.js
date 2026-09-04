@@ -68,7 +68,7 @@
   var PLAN_ALIASES = { free: 'community', dev: 'community', licensed: 'enterprise' };
   var PLAN_NAMES = {
     community: 'Community',
-    pro:       'Pro',
+    pro:       'Firm',
     business:  'Business',
     enterprise:'Enterprise',
   };
@@ -91,7 +91,7 @@
   // tier counts as paid only when it is one of these three. A floor word, a
   // renamed tier or a typo all come out unpaid, which is the safe direction.
   var PRODUCT_LADDER = ['pro', 'business', 'enterprise'];
-  var PRODUCT_NAMES = { pro: 'Pro', business: 'Business', enterprise: 'Enterprise' };
+  var PRODUCT_NAMES = { pro: 'Firm', business: 'Business', enterprise: 'Enterprise' };
 
   // A product tier counts as paid only while its period still runs, which is
   // the rule effectiveProductTier() applies server-side: the floor tier never
@@ -149,17 +149,19 @@
   }
 
   // What a paying customer already has, per product, quoted from /pricing. It
-  // is per product because a self-serve purchase moves one ladder only: someone
-  // who bought ParaSend Pro has no signature allowance to read about. Nothing
-  // here is an upsell. A customer who has paid should read what he bought.
+  // stays keyed per product because the entitlement layer is: the tier keys are
+  // still 'pro' and 'business' per product, and a legacy single-product term
+  // still lands on one ladder only. Firm writes both at once, so a Firm buyer
+  // reads both lines. Nothing here is an upsell. A customer who has paid should
+  // read what he bought.
   var PRODUCT_INCLUDES = {
     parasign: {
-      pro: 'ParaSign Pro: 100 signatures a month, then \u20ac0.40 each up to 1,000, and a connection you can plug into your own systems.',
+      pro: 'Firm on ParaSign: 100 signatures a month, then \u20ac0.40 each up to 1,000, and a connection you can plug into your own systems.',
       business: 'ParaSign Business: 1,000 signatures a month, support with a name on it that answers within one business day, help answering your customers\u2019 security questionnaires, and an audit trail you can export as a file.',
       enterprise: 'ParaSign Enterprise: your own dedicated relay, a sector relay for health, legal or finance, a service level agreement with credits, a self-hosting licence and audit support.'
     },
     parasend: {
-      pro: 'ParaSend Pro: links that stay open 24 hours, up to 10 reads each, up to 50 registered devices, a record of what you sent, and no rate limit.',
+      pro: 'Firm on ParaSend: links that stay open 24 hours, up to 10 reads each, up to 50 registered devices, a record of what you sent, and no rate limit.',
       enterprise: 'ParaSend Enterprise: links that stay open 7 days, up to 100 reads each, unlimited devices, your own dedicated relay, a signed Data Processing Agreement and 99.95% uptime.'
     }
   };
@@ -789,7 +791,8 @@
       var b = opsBar(used, cap);
       return '<div class="dh-usage-row"><div class="dh-usage-lab"><span>' + label + '</span><span><b>' + (used || 0) + '</b> / ' + b.capTxt + '</span></div>' +
         '<div class="dh-bar' + (b.warn ? ' warn' : '') + '"><i style="width:' + b.pct + '%"></i></div>' +
-        (b.warn ? '<a class="dh-usage-upsell" href="/pricing">Upgrade to Pro</a>' : '') + '</div>';
+        // The link goes to /pricing, so it has to name a card that is on it.
+        (b.warn ? '<a class="dh-usage-upsell" href="/pricing">Upgrade to Firm</a>' : '') + '</div>';
     }
     var usageEl = document.getElementById('dh-ops-usage');
     if (usageEl) {

@@ -37,13 +37,17 @@ function handle({ res, J, keyData, memberKeys, auditFor, query }) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     return res.end(J({ error: 'API key required' }));
   }
-  // Tier gate: Pro+ on ParaSend or ParaSign. Free/community -> 403.
+  // Tier gate: the paid rungs on ParaSend or ParaSign. Free/community -> 403.
+  // The GATE reads the entitlement tier ('pro' and up, unchanged); the MESSAGE
+  // names the plan the reader can buy, and since 6 September 2026 that is Firm.
+  // Sending him to /pricing to look for a Pro card is sending him to a page
+  // that no longer has one.
   if (!tierGate.isHistoryAllowed(keyData)) {
     res.writeHead(403, { 'Content-Type': 'application/json' });
     return res.end(J({
       error: 'tier_upgrade_required',
       feature: 'history',
-      message: 'Send history and link management require a Pro plan or higher.',
+      message: 'Send history and link management require the Firm plan or higher.',
     }));
   }
 

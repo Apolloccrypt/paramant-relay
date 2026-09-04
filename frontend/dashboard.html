@@ -521,7 +521,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     <p class="plan-term-line" id="dh-term-line" hidden>--</p>
 
     <!-- What a paying customer bought, in the words /pricing sells it in. Shown
-         by dashboard.js only on Pro, Business or Enterprise, and it carries no
+         by dashboard.js only on Firm, Business or Enterprise, and it carries no
          link to a higher tier: someone who already pays is not a lead. -->
     <aside class="dh-paid" id="dh-plan-paid" aria-label="Your plan" hidden>
       <p class="dh-paid-kicker"><span data-dh="paid-name">--</span> plan &middot; active</p>
@@ -606,15 +606,13 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
       <dl class="dh-ask-list">
         <div class="dh-ask-item">
           <dt>What does it cost?</dt>
-          <!-- Two products, two prices, and this answer used to name only the
-               cheaper one. "Paid plans start at &euro;15 a month" is true of
-               sending and says nothing about signing, which is what this
-               dashboard is for: /help answers the same question with
-               "ParaSign Pro &euro;49". One customer, two pages, two numbers.
-               Both amounts are on /pricing and both are pinned to
+          <!-- Two products used to be two prices, and this answer named only
+               the cheaper one, so /help and this page quoted two numbers at one
+               customer. Firm ended that: one plan, one payment, both products.
+               The amount is on /pricing and pinned to
                relay/lib/billing-catalog.js by relay/test/pricing-page.test.js,
-               so neither can move here on its own. -->
-          <dd>Community is free forever, with no card. Sending starts at &euro;15 a month excl. btw, which is ParaSend Pro; signing starts at &euro;49 a month excl. btw, which is ParaSign Pro. <a href="/pricing">See the plans</a></dd>
+               so it cannot move here on its own. -->
+          <dd>Community is free forever, with no card. ParaSign and ParaSend together start at &euro;29 a month excl. btw, which is Firm: one payment for both. <a href="/pricing">See the plans</a></dd>
         </div>
         <div class="dh-ask-item">
           <dt>Who can read what I send?</dt>
@@ -709,6 +707,6 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=8" defer></script>
-<script src="/js/dashboard.js?v=14" defer></script>
+<script src="/js/dashboard.js?v=15" defer></script>
 </body>
 </html>

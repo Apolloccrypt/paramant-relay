@@ -193,9 +193,16 @@
   // one that matters is the nearest one still ahead, and once they have all
   // passed it is the last one, because that is the day the account fell back.
   var TERM_WARN_DAYS = 7;
-  var PRODUCT_NAMES = { pro: 'Pro', business: 'Business', enterprise: 'Enterprise' };
+  // Entitlement tier on the left, the name it is SOLD under on the right. They
+  // stopped being the same word on 6 September 2026: the tier is still 'pro'
+  // everywhere in relay/lib/entitlements.js, and the plan that grants it is
+  // Firm, one payment covering ParaSign and ParaSend together. /account and
+  // /dashboard print the sale name from their own copy of this map; this page
+  // still printed 'Pro', so one account read Firm on one screen and Pro on the
+  // next.
+  var PRODUCT_NAMES = { pro: 'Firm', business: 'Business', enterprise: 'Enterprise' };
   var PLAN_ALIASES = { free: 'community', dev: 'community', licensed: 'enterprise' };
-  var PLAN_NAMES = { community: 'Community', pro: 'Pro', business: 'Business', enterprise: 'Enterprise' };
+  var PLAN_NAMES = { community: 'Community', pro: 'Firm', business: 'Business', enterprise: 'Enterprise' };
 
   function normalisePlan(plan) {
     var id = String(plan == null ? '' : plan).toLowerCase();
@@ -227,9 +234,16 @@
     };
   }
 
+  // The name of the term that is ending. The product prefix is only right for a
+  // plan that IS one product: ParaSign Business is sold on its own, so it keeps
+  // it. Firm is one payment for both, so "ParaSign Firm" would name a plan that
+  // does not exist and would tell a Firm customer that half of what he bought
+  // runs out on its own. The tier is per product because the entitlement layer
+  // is; the name is not.
   function termLabel(term) {
     var tier = PRODUCT_NAMES[term.tier];
     if (!tier) return '';
+    if (term.tier === 'pro') return tier;
     return (term.product === 'parasign' ? 'ParaSign ' : 'ParaSend ') + tier;
   }
 

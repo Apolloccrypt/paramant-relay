@@ -33,15 +33,14 @@
   // is why no card here may call a ceiling absent, and why the word itself is
   // banned from this file by the render test.
   //
-  // These are TRANSFER numbers and they belong to a TRANSFER card. The ParaSign
-  // Pro pitch below used to end by promising transfers with no cap, and the
-  // honest version of that sentence is no sentence: transfers are a ParaSend
-  // capacity on plan_parasend, and applyProductTier(acct,'parasign','pro')
-  // deliberately never touches it, so a ParaSign Pro buyer keeps the ParaSend
-  // tier he already had (10 a month for a free account). Naming 500 there would
-  // have been as untrue as naming none. relay/test/parasign-pro-perks.test.js
-  // is the source for that; relay/test/quota-upgrade-render.test.js pins the
-  // pitch negatively against it.
+  // These are TRANSFER numbers and they belong to a TRANSFER card. When the two
+  // Pro plans were sold apart, the signing pitch could not promise transfers:
+  // transfers are a ParaSend capacity on plan_parasend, and
+  // applyProductTier(acct,'parasign','pro') never touched it, so a signing
+  // buyer kept the ParaSend tier he already had. Firm removes that split by
+  // paying for both products in one payment, which is why the card below may
+  // name both ceilings. relay/test/quota-upgrade-render.test.js renders every
+  // card and pins the numbers.
   //
   // Baked in because this is a plain browser script with no way to require the
   // relay module. relay/test/quota-upgrade-render.test.js renders every card
@@ -54,15 +53,17 @@
 
   // The rung above the tier that decided, with the ceiling that rung carries
   // and the price /pricing lists for it (excl. btw, one basis for the whole
-  // site). A tier with no entry gets no upsell: offering ParaSend Pro to a Pro
-  // account is what a hardcoded upsell does, and since #361 the 402 says which
-  // tier it was.
+  // site). A tier with no entry gets no upsell: offering Firm to an account
+  // that already has it is what a hardcoded upsell does, and since #361 the 402
+  // says which tier it was. Firm is one rung for both dimensions now: the two
+  // separate Pro plans it replaced are off sale, and one payment lifts both
+  // ceilings at once.
   var NEXT = {
     transfers_month: {
-      community: { name: 'ParaSend Pro', price: 'EUR 15/month excl. VAT', limit: 500 }
+      community: { name: 'Firm', price: 'EUR 29/month excl. VAT', limit: 500 }
     },
     signs_month: {
-      community: { name: 'ParaSign Pro',      price: 'EUR 49/month excl. VAT', limit: 100 },
+      community: { name: 'Firm',              price: 'EUR 29/month excl. VAT', limit: 100 },
       pro:       { name: 'ParaSign Business', price: 'EUR 299/month excl. VAT', limit: 1000 }
     }
   };
@@ -70,12 +71,12 @@
   // The tier that DECIDED the 402, as the relay reports it. Since #361 the
   // monthly_transfer_quota_reached body carries `plan` = the ParaSend
   // entitlement tier and `limit` = that tier's ceiling, instead of the unified
-  // account plan. The card printed "Community" whatever came back, so a Pro
+  // account plan. The card printed "Community" whatever came back, so a Firm
   // account over its 500 was told it was on Community. Unknown or absent falls
   // back to community, which is what this card assumed unconditionally before.
   var PLAN_LABEL = {
     community: 'Community', free: 'Community', dev: 'Community',
-    pro: 'Pro', business: 'Business', enterprise: 'Enterprise', licensed: 'Enterprise'
+    pro: 'Firm', business: 'Business', enterprise: 'Enterprise', licensed: 'Enterprise'
   };
   var PLAN_KEY = {
     community: 'community', free: 'community', dev: 'community',
@@ -117,19 +118,19 @@
     return '<div class="pa-quota-upsell pa-quota-card" role="status">' +
       '<strong>You\'ve used both signatures this month.</strong>' +
       '<span>Community gives you 2 a month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.</span>' +
-      '<span><strong>Pro - EUR 49/month</strong><br>100 signatures a month, then EUR 0.40 each, up to 1,000. API access.</span>' +
+      '<span><strong>Firm - EUR 29/month</strong><br>100 signatures a month, then EUR 0.40 each, up to 1,000. API access. 500 transfers a month on ParaSend, in the same payment.</span>' +
       '<span class="pa-quota-actions">' +
-        '<a class="btn btn-primary" href="/pricing">Upgrade to Pro</a>' +
+        '<a class="btn btn-primary" href="/pricing">Upgrade to Firm</a>' +
         '<button type="button" class="btn btn-secondary" data-pa-quota-dismiss>Maybe later</button>' +
       '</span>' +
       '<span>Your limit resets on ' + resetDate(data) + '.</span>' +
       '</div>';
   }
 
-  // Pro hard cap at 1,000, the Pro ceiling: the upgrade moment. Business includes 1,000.
+  // Firm hard cap at 1,000, the Firm ceiling: the upgrade moment. Business includes 1,000.
   function hardCapHtml(data) {
     return '<div class="pa-quota-upsell pa-quota-card" role="status">' +
-      '<strong>You\'ve reached 1,000 signatures this month, the Pro ceiling.</strong>' +
+      '<strong>You\'ve reached 1,000 signatures this month, the Firm ceiling.</strong>' +
       '<span>Business gives you 1,000 included at EUR 299/month, which is already cheaper than what you\'re paying in overage.</span>' +
       '<span class="pa-quota-actions">' +
         '<a class="btn btn-primary" href="/pricing">Upgrade to Business</a>' +
@@ -173,8 +174,8 @@
 
   // Inline notice after a SUCCESSFUL sign (200 quota block). Returns '' when
   // there is nothing to say or the fields are absent (older backend).
-  // included distinguishes the plan (2 = free, 100 = pro) so a pro account's
-  // second signature never triggers the free warning.
+  // included distinguishes the plan (2 = free, 100 = the paid floor) so a Firm
+  // account's second signature never triggers the free warning.
   function signNotice(quota) {
     if (!quota || typeof quota !== 'object') return '';
     var used = Number(quota.used);
@@ -182,7 +183,7 @@
     if (!isFinite(used) || !isFinite(included)) return '';
     if (included === 2 && used === 2) {
       return '<div class="pa-sign-note" role="status">' +
-        '<span>That\'s your second signature this month. One more and you\'ll need Pro (EUR 49/month, 100 signatures).</span>' +
+        '<span>That\'s your second signature this month. One more and you\'ll need Firm (EUR 29/month, 100 signatures).</span>' +
         '</div>';
     }
     var over = Number(quota.overage_count);

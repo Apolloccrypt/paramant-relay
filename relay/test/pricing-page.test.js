@@ -1,5 +1,5 @@
 'use strict';
-// The pricing page shows the four ParaSign tiers (Community / Pro / Business /
+// The pricing page shows the four ParaSign tiers (Community / Firm / Business /
 // Enterprise) with the agreed copy, keeps all six paid checkout links wired
 // for the API-first billing flow (data-billing-* attributes resolvable in the
 // server catalog, no-JS href pointing at sign-in), states that checkout
@@ -22,15 +22,27 @@ const html = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'prici
 let passed = 0;
 function ok(name) { passed++; console.log('  ok -', name); }
 
-// The six paid variants and the excl-btw amounts behind the buttons.
+// What the page sells, and the excl-btw amounts behind the buttons. Firm is one
+// plan over both products, so its card stands in BOTH product grids with the
+// same price and the same two buttons: a visitor who came to send must not have
+// to read the signing section to find the plan that covers him. That is why
+// there are four variants behind six buttons.
 const VARIANTS = [
-  { product: 'parasend', plan: 'pro',      interval: 'monthly', excl: 15 },
-  { product: 'parasend', plan: 'pro',      interval: 'yearly',  excl: 150 },
-  { product: 'parasign', plan: 'pro',      interval: 'monthly', excl: 49 },
-  { product: 'parasign', plan: 'pro',      interval: 'yearly',  excl: 499 },
+  { product: 'firm',     plan: 'firm',     interval: 'monthly', excl: 29 },
+  { product: 'firm',     plan: 'firm',     interval: 'yearly',  excl: 290 },
   { product: 'parasign', plan: 'business', interval: 'monthly', excl: 299 },
   { product: 'parasign', plan: 'business', interval: 'yearly',  excl: 2990 },
 ];
+
+// The two Pro plans Firm replaced are off the page and still in the catalog, so
+// an outstanding renewal link and a Mollie subscription created before Firm keep
+// resolving. Neither may be sold from here any more.
+for (const legacy of [['parasign', 'pro'], ['parasend', 'pro']]) {
+  assert(!catalog.isOnSale(legacy[0], legacy[1]), legacy.join('/') + ' must be off sale');
+  assert(!catalog.resolveOrder({ product: legacy[0], plan: legacy[1], interval: 'monthly' }).error,
+    legacy.join('/') + ' must still resolve for an existing customer');
+}
+assert(!/data-billing-plan="pro"/.test(html), 'the page must not sell a plan called pro any more');
 
 // One annotated checkout button per variant. The href is the no-JS fallback and
 // must NOT be a static Mollie payment link: those carry no metadata, so the
@@ -43,6 +55,8 @@ const btnRe = /<a\s+href="([^"]+)"\s+data-billing-product="([a-z]+)"\s+data-bill
 const buttons = [];
 for (let m; (m = btnRe.exec(html)); ) buttons.push({ href: m[1], product: m[2], plan: m[3], interval: m[4] });
 assert.strictEqual(buttons.length, 6, 'expected 6 annotated checkout buttons, got ' + buttons.length);
+assert.strictEqual(buttons.filter((b) => b.product === 'firm').length, 4,
+  'the Firm card stands in both product grids, so it carries four of the six buttons');
 ok('6 checkout buttons with data-billing-*');
 
 for (const b of buttons) {
@@ -76,12 +90,14 @@ const PARASIGN_COPY = [
   'No limit on receiving',
   'Full post-quantum crypto - Public verification log',
   'No card required',
-  // PRO - EUR 49/month
-  '&euro;49<',
+  // FIRM - EUR 29/month, both products in one payment
+  '&euro;29<',
+  '>Firm<',
   '100 signatures a month, then &euro;0.40 each, up to 1,000',
   'Past 1,000 a month, Business is cheaper anyway',
+  '500 transfers a month, 24 hour link expiry',
   'API access',
-  'Annual: &euro;499 excl. &middot; 15.1% off',
+  'Annual: &euro;290 excl. &middot; 16.7% off',
   // BUSINESS - EUR 299/month
   '&euro;299<',
   '1,000 signatures a month',
@@ -113,11 +129,11 @@ ok('FAQ names the Business exportable audit log');
 assert(!/No cap, no block/i.test(html), 'pricing page must not carry the No cap, no block claim');
 ok('no "No cap, no block" claim on the pricing page');
 
-// ParaSend keeps its displayed excl-btw amounts.
-for (const s of ['&euro;15<', 'Annual &euro;150 excl.']) {
-  assert(html.includes(s), 'missing displayed ParaSend price fragment: ' + s);
+// The Firm card in the ParaSend grid keeps its displayed excl-btw amounts.
+for (const s of ['&euro;29<', 'Annual &euro;290 excl.']) {
+  assert(html.includes(s), 'missing displayed Firm price fragment in the ParaSend grid: ' + s);
 }
-ok('ParaSend excl-btw amounts visible in the markup');
+ok('Firm excl-btw amounts visible in the ParaSend grid');
 
 // Excl-btw framing plus the incl-21% checkout notice.
 assert(/excl\. btw/.test(html), 'missing "excl. btw" mention');
@@ -190,7 +206,7 @@ ok('the ParaShare crypto claim matches the register on /crypto-agility');
 
 // Every paid card shows the incl-btw amount up-front, next to the excl price,
 // so the amount on Mollie's page does not surprise the buyer.
-const INCL_ONCARD = ['&euro;18.15/mo incl', '&euro;59.29/mo incl', '&euro;361.79/mo incl'];
+const INCL_ONCARD = ['&euro;35.09/mo incl', '&euro;361.79/mo incl'];
 for (const s of INCL_ONCARD) {
   assert(html.includes(s), 'paid card must show its btw-incl amount up-front: ' + s);
 }
@@ -311,9 +327,12 @@ money.set(0, 'free tier');
 // it is not in the catalog; listed here so the sweep below stays exhaustive.
 money.set(0.4, 'ParaSign overage per signature');
 
+// Only what the page is SELLING. The plans Firm replaced are still priced in
+// the catalog for the customers who hold them, and requiring their amounts here
+// would put a price back on the page that nobody can buy.
 const pctByPlan = new Map();
-for (const product of catalog.PRODUCTS) {
-  for (const plan of Object.keys(catalog.CATALOG[product])) {
+for (const { product, plan } of catalog.ON_SALE) {
+  {
     const perInterval = {};
     for (const interval of catalog.INTERVALS) {
       const incl = Number(catalog.priceOf(product, plan, interval));
@@ -362,8 +381,9 @@ for (const [v, label] of money) {
 }
 ok('every catalog price appears on the page, on both bases');
 
-// The yearly discount is stated as the real percentage. "Two months free" is
-// 16.7%: true for ParaSend Pro and ParaSign Business, false for ParaSign Pro.
+// The yearly discount is stated as the real percentage. Both plans on sale give
+// two months free, which is 16.7%; the wording is still banned because it was
+// false for ParaSign Pro and a price change must not quietly make it true again.
 assert(!/two months free/i.test(VISIBLE), 'the page must state the real discount, not "two months free"');
 const shownPcts = [...VISIBLE.matchAll(/(\d+\.\d)% off/g)].map(m => m[1]);
 const expectedPcts = [...pctByPlan.values()];
@@ -373,8 +393,11 @@ for (const p of shownPcts) {
 for (const [key, p] of pctByPlan) {
   assert(shownPcts.includes(p), 'missing the yearly discount for ' + key + ' (catalog says ' + p + '% off)');
 }
-assert.strictEqual(shownPcts.length, pctByPlan.size,
-  'expected one stated discount per paid plan, got ' + shownPcts.length + ' for ' + pctByPlan.size + ' plans');
+// One stated discount per PAID CARD, not per plan: Firm's card stands in both
+// grids, so its discount is printed twice and both printings must be right. The
+// per-card block below is what binds each one to the plan whose card it is in.
+assert.strictEqual(shownPcts.length, monthlyPrimary,
+  'expected one stated discount per paid card, got ' + shownPcts.length + ' for ' + monthlyPrimary + ' cards');
 ok('yearly discount stated per plan and matches the catalog (' + expectedPcts.join(' / ') + '%)');
 
 // One promise about starting for free. The page carried "30 days, no credit
@@ -436,13 +459,16 @@ for (const raw of cards) {
   // come from the subscription catalog; it hangs off the tier itself. Read it
   // from there rather than allowing any stray number through, so a wrong overage
   // rate is still caught.
-  const ent = entitlements.getEntitlements(
-    product === 'parasign' ? { plan_parasign: plan } : { plan_parasend: plan },
-  )[product];
-  const rate = ent && ent.overage && ent.overage.rate_eur;
-  if (rate != null) {
-    allowed.add(Number(rate).toFixed(2));
-    allowed.add(String(Number(rate)));
+  // A bundle card may print the overage of every product it grants, so the rate
+  // is read off the grants and not off the sold key, which is not a product.
+  for (const g of catalog.grantsOf(product, plan) || []) {
+    const acct = g.product === 'parasign' ? { plan_parasign: g.tier } : { plan_parasend: g.tier };
+    const ent = entitlements.getEntitlements(acct)[g.product];
+    const rate = ent && ent.overage && ent.overage.rate_eur;
+    if (rate != null) {
+      allowed.add(Number(rate).toFixed(2));
+      allowed.add(String(Number(rate)));
+    }
   }
 
   for (let m; (m = cardMoney.exec(card)); ) {
@@ -476,15 +502,17 @@ ok('every amount and discount sits on the card of the plan it belongs to (' + bo
 // without the other turns this suite red instead of leaving two prices on the
 // site for the same plan. The pages carry no checkout button of their own; they
 // send the buyer to /pricing, which is where the data-billing-* buttons live.
+// Firm covers both products, so both product pages have to quote it; ParaSign
+// Business is quoted on /parasign only, which is the only page that sells it.
 const PRODUCT_PAGES = [
-  { product: 'parasign', file: 'parasign.html' },
-  { product: 'parasend', file: 'parasend.html' },
+  { product: 'parasign', file: 'parasign.html', sells: ['firm/firm', 'parasign/business'] },
+  { product: 'parasend', file: 'parasend.html', sells: ['firm/firm'] },
 ];
 const productHtml = {};
 for (const page of PRODUCT_PAGES) {
   const pageHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', page.file), 'utf8');
   productHtml[page.product] = pageHtml;
-  for (const v of VARIANTS.filter(x => x.product === page.product)) {
+  for (const v of VARIANTS.filter(x => page.sells.includes(x.product + '/' + x.plan))) {
     const order = catalog.resolveOrder({ product: v.product, plan: v.plan, interval: v.interval });
     assert(!order.error, 'catalog rejects ' + v.plan + '/' + v.interval + ': ' + order.error);
     const excl = '&euro;' + v.excl.toLocaleString('en-US');
@@ -615,44 +643,65 @@ for (const [name, pageHtml] of [['parasign.html', productHtml.parasign], ['paras
   ok('"No limit on receiving" holds: no receiving dimension in tiers.js or in the entitlement quotas');
 })();
 
-// ── A ParaSign card states no transfer figure at all ────────────────────────
+// ── A signing card states a transfer figure only if the plan delivers one ───
 //
-// This block used to assert the opposite: "a ParaSign plan derives its ParaSend
-// tier (entitlements.js derivePlanParasend), so where /parasign quotes a
-// transfer number it must be that tier's number". derivePlanParasend only fires
-// on a legacy UNIFIED `plan`. The path that sells ParaSign Pro is
-// applyProductTier(acct,'parasign','pro') -- the Mollie webhook and the admin
-// grant -- and it writes plan_parasign alone, deliberately leaving
-// plan_parasend where it was. So a ParaSign Pro buyer derives nothing: he keeps
-// the ParaSend tier he already had, 10 transfers a month for a free account.
-// relay/test/parasign-pro-perks.test.js pins exactly that.
+// This block used to assert that a ParaSign card may state no transfer number
+// at all. That was right while ParaSign Pro was sold on its own: the path that
+// granted it, applyProductTier(acct,'parasign','pro'), writes plan_parasign
+// alone and deliberately leaves plan_parasend where it was, so a ParaSign Pro
+// buyer kept the 10 transfers a month of a free account.
+// relay/test/parasign-pro-perks.test.js still pins exactly that, and it still
+// holds for the two Pro plans that remain in the catalog for the customers who
+// have them.
 //
-// The page therefore may not quote 500, and it may not go back to promising no
-// cap either. It states neither, and this asks the entitlement layer whether
-// that is still the right answer instead of hardcoding it: bundle a ParaSend
-// entitlement into ParaSign Pro and the branch flips by itself.
-(function parasignCardsClaimNoTransfers() {
-  const acct = { key: 'k', account_id: 'k', plan: 'community', plan_parasend: 'community', plan_parasign: 'free' };
-  entitlements.applyProductTier(acct, 'parasign', 'pro');
-  const delivered = entitlements.getEntitlements(acct).parasend.quotas.transfers_month;
+// Firm is the case the old comment invited: "bundle a ParaSend entitlement into
+// ParaSign and the branch flips by itself". It does, per card, because the two
+// cards in the ParaSign grid now sell different things. So the question is asked
+// of the PLAN THE CARD SELLS: apply every grant that plan carries to a free
+// account and ask the entitlement layer what ParaSend then delivers. A card may
+// name a transfer ceiling exactly when its own plan hands one over.
+(function signingCardsClaimOnlyDeliveredTransfers() {
   const TRANSFER_FIGURE = /[\d][\d,]*\s*(?:ParaSend\s+)?transfers/i;
-  // The ParaSign half of /pricing, and the ParaSign product page's plan cards.
   const parasignGrid = html.slice(html.indexOf('<!-- TIER CARDS: PARASIGN -->'), html.indexOf('<!-- TIER CARDS: PARASEND -->'));
   assert(parasignGrid.length > 500, 'the ParaSign tier grid markers moved; this gate would read nothing');
-  const scopes = [['pricing.html ParaSign grid', parasignGrid], ['parasign.html', productHtml.parasign]];
-  if (delivered === entitlements.PARASEND.pro.quotas.transfers_month) {
-    for (const [name, scope] of scopes) {
-      assert(TRANSFER_FIGURE.test(scope),
-        name + ': a parasign=pro grant now delivers the ParaSend Pro ceiling, so the card may (and should) state it');
-    }
-  } else {
-    for (const [name, scope] of scopes) {
-      const m = TRANSFER_FIGURE.exec(scope);
-      assert(!m, name + ' quotes "' + (m ? m[0] : '') + '" on a ParaSign card, but a parasign=pro grant leaves ' +
-        'ParaSend at ' + delivered + ' a month (relay/test/parasign-pro-perks.test.js). Bundle the entitlement or drop the line.');
-    }
+
+  // What ParaSend actually delivers after buying (product, plan), from a free
+  // account, through the same setter the webhook calls.
+  function transfersAfterBuying(product, plan) {
+    const acct = { key: 'k', account_id: 'k', plan: 'community', plan_parasend: 'community', plan_parasign: 'free' };
+    for (const g of catalog.grantsOf(product, plan) || []) entitlements.applyProductTier(acct, g.product, g.tier);
+    return entitlements.getEntitlements(acct).parasend.quotas.transfers_month;
   }
-  ok('the ParaSign cards claim no transfer ceiling the ParaSign grant does not deliver (grant gives ' + delivered + ')');
+
+  const community = entitlements.PARASEND.community.quotas.transfers_month;
+  let checked = 0;
+  for (const raw of parasignGrid.split(/<div class="tier-card/).slice(1)) {
+    const card = raw.replace(/<!--[\s\S]*?-->/g, '');
+    const btn = /data-billing-product="([a-z]+)"\s+data-billing-plan="([a-z]+)"/.exec(card);
+    if (!btn) continue;                       // free card: it buys nothing
+    const [, product, plan] = btn;
+    const delivered = transfersAfterBuying(product, plan);
+    const m = TRANSFER_FIGURE.exec(card);
+    if (delivered > community) {
+      assert(m, product + '/' + plan + ' delivers ' + delivered + ' transfers a month and its card says nothing about it');
+      assert(new RegExp('\\b' + delivered.toLocaleString('en-US') + '\\b').test(card) ||
+             new RegExp('\\b' + delivered + '\\b').test(card),
+        product + '/' + plan + ' card quotes "' + m[0] + '", but the plan delivers ' + delivered + ' transfers a month');
+    } else {
+      assert(!m, product + '/' + plan + ' card quotes "' + (m ? m[0] : '') + '", but buying it leaves ParaSend at ' +
+        delivered + ' transfers a month (relay/test/parasign-pro-perks.test.js). Bundle the entitlement or drop the line.');
+    }
+    checked++;
+  }
+  assert(checked >= 2, 'expected at least two paid cards in the ParaSign grid, checked ' + checked);
+
+  // /parasign repeats the same cards, so it is held to the Firm answer.
+  const firmDelivers = transfersAfterBuying('firm', 'firm');
+  assert(firmDelivers === entitlements.PARASEND.pro.quotas.transfers_month,
+    'Firm must deliver the ParaSend Pro ceiling, got ' + firmDelivers);
+  assert(TRANSFER_FIGURE.test(productHtml.parasign),
+    'parasign.html sells Firm, which delivers ' + firmDelivers + ' transfers a month, and states no transfer figure');
+  ok('a signing card names a transfer ceiling only when its own plan delivers one (Firm gives ' + firmDelivers + ')');
 })();
 ok('the ParaSend limits on both product pages come from relay/lib/tiers.js (' +
    tiers.tierLimit('community', 'transfers_month') + '/' + tiers.tierLimit('pro', 'transfers_month') + ' transfers, ' +
@@ -734,17 +783,18 @@ ok('the compliance bullet on /parasend carries its own limit');
 //
 // A customer who signs in lands on /dashboard, and the FAQ there answered "what
 // does it cost?" with "Paid plans start at &euro;15 a month, which is ParaSend
-// Pro". True, and beside the point on the page whose whole job is signing:
-// /help answers the same question with "ParaSign Pro at &euro;49 a month". One
-// customer, two of our own pages, two numbers, and the cheaper one on the
-// surface he reads first.
+// Pro". True at the time, and beside the point on the page whose whole job is
+// signing: /help answered the same question with "ParaSign Pro at &euro;49 a
+// month". One customer, two of our own pages, two numbers, and the cheaper one
+// on the surface he reads first. The answer then had to name both products with
+// both prices.
 //
-// So the dashboard answer names BOTH products with BOTH prices, and this pins
-// it the way the cards above are pinned. The chain is the same one: the amount
-// in the sentence is the excl-btw price of the monthly variant in
-// relay/lib/billing-catalog.js, which is where checkout reads what to charge.
-// billing-catalog holds prices; relay/lib/tiers.js holds LIMITS, and it is
-// pinned here too, for the plan name the same sentence uses. Neither can move
+// Firm ends the split at the source: one plan, one price, both products. So the
+// answer names ONE amount, and this pins it the same way. The chain is the same
+// one: the amount in the sentence is the excl-btw price of the monthly Firm
+// variant in relay/lib/billing-catalog.js, which is where checkout reads what to
+// charge. billing-catalog holds prices; relay/lib/tiers.js holds LIMITS, and it
+// is pinned here too, for the plan name the same sentence uses. Neither can move
 // without this going red.
 (function dashboardPriceAnswer() {
   const dashHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'dashboard.html'), 'utf8');
@@ -753,34 +803,27 @@ ok('the compliance bullet on /parasend carries its own limit');
   assert(answerMatch, 'dashboard.html must still answer "What does it cost?"');
   const answer = answerMatch[1];
 
-  // Both products, by the names /pricing sells them under.
-  for (const productName of ['ParaSend Pro', 'ParaSign Pro']) {
+  // The plan by the name /pricing sells it under, and both products it covers,
+  // so a reader can tell that one payment is the whole account and not half.
+  assert(/\bFirm\b/.test(answer), 'the dashboard price answer must name the Firm plan');
+  assert(html.includes('>Firm<'), '/pricing no longer sells Firm, so the dashboard answer points at nothing');
+  for (const productName of ['ParaSend', 'ParaSign']) {
     assert(answer.includes(productName),
       'the dashboard price answer must name ' + productName + '; naming one product prices half the account');
-    assert(html.includes(productName.split(' ')[0]),
-      '/pricing no longer sells ' + productName + ', so the dashboard answer points at nothing');
   }
 
-  // The amounts are the catalog's, read back out of it rather than typed here.
-  const exclOf = (product) => {
-    const order = catalog.resolveOrder({ product, plan: 'pro', interval: 'monthly' });
-    assert(!order.error, 'billing-catalog has no monthly Pro price for ' + product + ': ' + order.error);
-    return Math.round((parseFloat(order.amount) / 1.21) * 100) / 100;
-  };
-  const sendExcl = exclOf('parasend');
-  const signExcl = exclOf('parasign');
-  assert(sendExcl !== signExcl,
-    'sending and signing are priced apart; if the catalog ever agrees, this answer is no longer a split');
-  assert(new RegExp('&euro;' + sendExcl + ' a month excl\\. btw, which is ParaSend Pro').test(answer),
-    'the dashboard must price SENDING at the ParaSend Pro catalog amount (&euro;' + sendExcl + '), got: ' + answer.trim());
-  assert(new RegExp('&euro;' + signExcl + ' a month excl\\. btw, which is ParaSign Pro').test(answer),
-    'the dashboard must price SIGNING at the ParaSign Pro catalog amount (&euro;' + signExcl + '), got: ' + answer.trim());
+  // The amount is the catalog's, read back out of it rather than typed here.
+  const order = catalog.resolveOrder({ product: 'firm', plan: 'firm', interval: 'monthly' });
+  assert(!order.error, 'billing-catalog has no monthly Firm price: ' + order.error);
+  const firmExcl = Math.round((parseFloat(order.amount) / 1.21) * 100) / 100;
+  assert(new RegExp('&euro;' + firmExcl + ' a month excl\\. btw').test(answer),
+    'the dashboard must price Firm at the catalog amount (&euro;' + firmExcl + '), got: ' + answer.trim());
 
   // ui-truthfulness in one line: no amount here that a reader cannot find on
-  // the page he is sent to. The boundary matters -- a bare &euro;15 is
-  // satisfied by &euro;150 sitting elsewhere on /pricing.
+  // the page he is sent to. The boundary matters -- a bare &euro;29 is
+  // satisfied by &euro;290 sitting elsewhere on /pricing.
   const amounts = [...new Set([...answer.matchAll(/&euro;([\d.,]+)/g)].map((m) => m[1]))];
-  assert(amounts.length >= 2, 'expected the dashboard answer to quote both prices, found ' + amounts.length);
+  assert(amounts.length >= 1, 'expected the dashboard answer to quote the price, found none');
   for (const amount of amounts) {
     assert(new RegExp('&euro;' + amount.replace(/[.]/g, '\\.') + '(?![\\d.,])').test(html),
       'the dashboard names &euro;' + amount + ', which is not on /pricing');
@@ -793,14 +836,13 @@ ok('the compliance bullet on /parasend carries its own limit');
   assert(/\bCommunity is free forever\b/.test(answer),
     'the dashboard answer must still name the free plan Community');
 
-  // And /help answers the same question with the same two amounts, so the two
-  // pages a customer reads in the same minute cannot disagree again.
+  // And /help answers the same question with the same amount, so the two pages
+  // a customer reads in the same minute cannot disagree again.
   const helpHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'help', 'index.html'), 'utf8');
-  for (const excl of [signExcl]) {
-    assert(new RegExp('&euro;' + excl + '(?![\\d.,])').test(helpHtml),
-      '/help must still name the ParaSign Pro price (&euro;' + excl + ') the dashboard now agrees with');
-  }
-  ok('the dashboard price answer names both products and both catalog amounts');
+  assert(new RegExp('&euro;' + firmExcl + '(?![\\d.,])').test(helpHtml),
+    '/help must still name the Firm price (&euro;' + firmExcl + ') the dashboard agrees with');
+  assert(/\bFirm\b/.test(helpHtml), '/help must name the plan by the name /pricing sells it under');
+  ok('the dashboard price answer names Firm, both products and the catalog amount');
 })();
 
 console.log('pricing-page: ' + passed + ' checks passed');

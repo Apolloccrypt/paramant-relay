@@ -117,10 +117,11 @@ test('the first screen at 390px carries the amount, the audience, the company an
     ['what', 'Sign documents and send files that delete themselves after reading'],
     ['amount', '€0 a month, forever'],
     ['limit', '2 signatures a month, 10 transfers a month, 5 MB per file'],
-    // Both paid amounts, because they buy different products and a buyer who
-    // only sees €15 has been told the price of the other one.
-    ['sending', '€15 a month'],
-    ['signing', '€49 a month'],
+    // The paid amount. It used to be two, because sending and signing were two
+    // purchases and a buyer who only saw €15 had been told the price of the
+    // other one. Firm is one plan over both products, so there is one figure
+    // and it has to cover both by name.
+    ['paid', '€29 a month', true],
     ['audience', 'one-person practice, a volunteer board or a household'],
     // Mick, 4 September: the name and the title left every page but /about and
     // the letter on the homepage. What the first screen still has to carry is
@@ -147,6 +148,8 @@ test('the first screen at 390px carries the amount, the audience, the company an
   // Order is the argument: what it does, then what it costs, then who it is
   // for, and only then the button. The company line closes the block.
   assert.ok(seen.what.top < seen.amount.top, 'what the product does stands above what it costs');
+  assert.ok(/signing and sending together on Firm/.test(seen.foldText),
+    'the paid figure on the first screen must say it covers both products');
   assert.ok(seen.amount.top <= seen.audience.top, 'the amount stands above the audience line');
   assert.ok(seen.audience.top < cta.top, 'the audience line stands above the first action');
   assert.match(seen.company.text, /Harderwijk.*KvK 42115132/,

@@ -121,6 +121,19 @@ const PRODUCT_PAID_UNTIL_FIELD = Object.freeze({
   parasign: 'paid_until_parasign',
 });
 
+// Which BUNDLE bought the period on record, when one did. A bundle (today only
+// `firm`, see lib/billing-catalog.js) sells one price that grants two products,
+// so plan_parasign and plan_parasend both land on 'pro' and neither field
+// remembers that the customer bought one thing and not two. This field does,
+// and only the expiry mail reads it: without it a Firm customer got two mails
+// about plans he never bought under those names. It carries no entitlement of
+// its own, is cleared whenever the tier drops to its floor, and an account from
+// before Firm existed simply has no such field.
+const PRODUCT_BUNDLE_FIELD = Object.freeze({
+  parasend: 'bundle_parasend',
+  parasign: 'bundle_parasign',
+});
+
 // The tier a product falls back to when a paid period runs out. Mirrors
 // billing-catalog.floorTier; kept here too so the entitlement layer can answer
 // without importing the billing layer (the dependency runs the other way).
@@ -184,7 +197,7 @@ function validateProductPlan(product, tier) {
 // normalised (idempotent), so passing an already-normalised value is safe.
 // Returns { field, tier, changed, parasignGranted }; `changed` reflects the
 // plan-field move only (an already-set access flag is not a plan change).
-function applyProductTier(rec, product, tier, paidUntil) {
+function applyProductTier(rec, product, tier, paidUntil, bundle) {
   const field = PRODUCT_PLAN_FIELD[product];
   const norm = product === 'parasign' ? normaliseParasignTier(tier) : normaliseParasendTier(tier);
   let changed = false;
@@ -196,14 +209,22 @@ function applyProductTier(rec, product, tier, paidUntil) {
   // undefined leaves whatever is there alone, which keeps every existing caller
   // (admin grants, migrations) behaving exactly as before.
   const untilField = PRODUCT_PAID_UNTIL_FIELD[product];
+  const bundleField = PRODUCT_BUNDLE_FIELD[product];
   if (norm === floorTierOf(product)) {
     if (rec[untilField] !== undefined) { delete rec[untilField]; changed = true; }
+    if (rec[bundleField] !== undefined) delete rec[bundleField];
   } else if (paidUntil !== undefined) {
     const iso = paidUntil === null ? null : new Date(paidUntil).toISOString();
     if (iso === null) { if (rec[untilField] !== undefined) { delete rec[untilField]; changed = true; } }
     else if (rec[untilField] !== iso) { rec[untilField] = iso; changed = true; }
   }
-  return { field, tier: norm, changed, parasignGranted, paidUntil: rec[untilField] || null };
+  // The bundle travels with the period, on the same undefined-means-leave-alone
+  // rule: an admin grant that names no bundle does not erase one.
+  if (norm !== floorTierOf(product) && bundle !== undefined) {
+    if (!bundle) { if (rec[bundleField] !== undefined) delete rec[bundleField]; }
+    else if (rec[bundleField] !== bundle) rec[bundleField] = bundle;
+  }
+  return { field, tier: norm, changed, parasignGranted, paidUntil: rec[untilField] || null, bundle: rec[bundleField] || null };
 }
 
 // ── Migration: legacy single `plan` (+ parasign flag) -> per-product plan ─────
@@ -386,6 +407,12 @@ function mergeProductGrantInto(target, source, product, now) {
   target[planField] = source[planField];
   if (source[paidField] == null) delete target[paidField];
   else target[paidField] = source[paidField];
+  // The bundle marker belongs to the period it was written with, so it travels
+  // with it or it goes; a leftover marker would name a plan the winning record
+  // never bought.
+  const bundleField = PRODUCT_BUNDLE_FIELD[product];
+  if (source[bundleField] == null) delete target[bundleField];
+  else target[bundleField] = source[bundleField];
   return target;
 }
 
@@ -462,6 +489,7 @@ module.exports = {
   normaliseParasignTier,
   PRODUCT_PLAN_FIELD,
   PRODUCT_PAID_UNTIL_FIELD,
+  PRODUCT_BUNDLE_FIELD,
   validateProductPlan,
   applyProductTier,
   effectiveProductTier,

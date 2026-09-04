@@ -43,6 +43,7 @@
 const invoice = require('./invoice');
 const planExpiry = require('./plan-expiry');
 const entitlements = require('./entitlements');
+const catalog = require('./billing-catalog');
 
 // Per account, append-only, no TTL: it is the only trace that a term was a gift
 // and not a sale. Written by POST /v2/billing/redeem, read here and nowhere
@@ -100,9 +101,19 @@ function termEndsFromDocuments(records, nowMs) {
     const end = Date.parse(rec.service_period_end);
     const issued = Date.parse(rec.issued_at);
     if (Number.isNaN(end)) continue;
-    const list = byProduct.get(rec.product) || [];
-    list.push({ end, issued: Number.isNaN(issued) ? end : issued, plan: rec.plan, iso: rec.service_period_end });
-    byProduct.set(rec.product, list);
+    // A BUNDLE invoice (Firm) is one document that bought a term on TWO
+    // products, and `product` on it is the bundle key, not an entitlement
+    // product. Expanding it here is what keeps the dedupe against the expiry
+    // index (keyed product|endsAt) working: without it a Firm term produced a
+    // "firm term ended" row on top of the two real ones.
+    const bought = Array.isArray(rec.grants) && rec.grants.length
+      ? rec.grants
+      : (catalog.grantsOf(rec.product, rec.plan) || [{ product: rec.product, tier: rec.plan }]);
+    for (const g of bought) {
+      const list = byProduct.get(g.product) || [];
+      list.push({ end, issued: Number.isNaN(issued) ? end : issued, plan: g.tier || rec.plan, iso: rec.service_period_end });
+      byProduct.set(g.product, list);
+    }
   }
   const out = [];
   for (const [product, list] of byProduct) {

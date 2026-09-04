@@ -13,7 +13,7 @@
   var PLAN_ALIASES = { free: 'community', dev: 'community', licensed: 'enterprise' };
   var PLAN_NAMES = {
     community: 'Community',
-    pro:       'Pro',
+    pro:       'Firm',
     business:  'Business',
     enterprise:'Enterprise',
   };
@@ -35,7 +35,7 @@
   // tier counts as paid only when it is one of these three. A floor word, a
   // renamed tier or a typo all come out unpaid, which is the safe direction.
   var PRODUCT_LADDER = ['pro', 'business', 'enterprise'];
-  var PRODUCT_NAMES = { pro: 'Pro', business: 'Business', enterprise: 'Enterprise' };
+  var PRODUCT_NAMES = { pro: 'Firm', business: 'Business', enterprise: 'Enterprise' };
 
   // A product tier counts as paid only while its period still runs, the rule
   // effectiveProductTier() applies server-side: the floor tier never expires,

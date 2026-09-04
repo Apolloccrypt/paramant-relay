@@ -15,14 +15,17 @@
 
 const catalog = require('./billing-catalog');
 
-// One Mollie customer per Paramant account, and one subscription per PRODUCT.
-// Per product, because ParaSend Pro and ParaSign Pro are bought separately and
-// cancelled separately; a single subscription field would make cancelling one
-// silently stop collecting for the other.
+// One Mollie customer per Paramant account, and one subscription per SOLD LINE.
+// Per line, because the ParaSign and ParaSend plans that predate Firm are
+// bought separately and cancelled separately; a single subscription field would
+// make cancelling one silently stop collecting for the other. Firm is one line
+// that covers both products, so it gets its own field: cancelling Firm stops
+// one collection, and it is the only collection there is.
 const CUSTOMER_FIELD = 'mollie_customer_id';
 const PRODUCT_SUBSCRIPTION_FIELD = Object.freeze({
   parasend: 'mollie_subscription_parasend',
   parasign: 'mollie_subscription_parasign',
+  firm: 'mollie_subscription_firm',
 });
 
 function subscriptionFieldOf(product) {
@@ -69,7 +72,7 @@ function subscriptionPayload({ order, paidUntil, accountId, webhookUrl, mollieIn
       amount: { currency: order.currency, value: order.amount },
       interval,
       startDate,
-      description: `Paramant ${order.product} ${order.plan} (${order.interval})`,
+      description: `Paramant ${catalog.orderLabel(order)} (${order.interval})`,
       webhookUrl,
       // The metadata a renewal webhook is attributed by. A subscription payment
       // carries the subscription's metadata, not the first payment's, so

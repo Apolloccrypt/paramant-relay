@@ -158,7 +158,7 @@ curl -X POST https://relay.paramant.app/v2/inbound \
 `download_token` is 24 random bytes as 48 hex characters. `ttl_ms` is the value
 the relay actually applied, which is **not** always the one you asked for: the
 upload clamps your request to the account's ParaSend tier ceiling (`view_ttl_ms`
-in `relay/lib/tiers.js`: 1 hour on Community, 24 hours on Pro, 7 days on
+in `relay/lib/tiers.js`: 1 hour on Community, 24 hours on Firm, 7 days on
 Enterprise, and the table under "ParaSend limits per tier" above is
 generated from the same rows). Compute the expiry the receiver is told from the
 `ttl_ms` that came back, never from the one you sent.
@@ -265,7 +265,7 @@ Three things can take it away, and all three answer with the same 404:
 | | |
 |---|---|
 | **Time** | 15 minutes from the download. |
-| **Your own volume** | The relay keeps your account's most recent receipts, up to twice your ParaSend tier's hourly download ceiling: Community 100, Pro 1000, legacy business 4000, Enterprise 10000. Past that your oldest receipts drop. Another account's downloads can never take yours. |
+| **Your own volume** | The relay keeps your account's most recent receipts, up to twice your ParaSend tier's hourly download ceiling: Community 100, Firm 1000, legacy business 4000, Enterprise 10000. Past that your oldest receipts drop. Another account's downloads can never take yours. |
 | **A relay without redis** | A relay configured with `REDIS_URL` keeps receipts in redis, so they survive a restart of the relay process. A relay without one keeps them in memory, and then a restart or a deploy loses every outstanding receipt. |
 
 If none of that is acceptable for your use, the receipt can still be delivered
@@ -730,7 +730,7 @@ other. A ParaSend purchase raises `plan_parasend` alone, and every gate reads
 that, so the limits a customer is held to are the limits the pricing page sold
 him. An account with no tier on file is held to Community.
 
-| | Community | Pro | Enterprise |
+| | Community | Firm | Enterprise |
 |---|---|---|---|
 | Transfers per month | 10 | 500 | 1,000,000 |
 | Link lifetime (max TTL) | 1 hour | 24 hours | 7 days |
@@ -758,7 +758,7 @@ Notes:
   devices working and is refused only a new one.
 - A legacy `business` plan is a ParaSign tier name. On ParaSend it keeps its own
   row (2000 transfers a month, 100 devices, a 7 day link, 25 reads, 2000
-  downloads an hour) rather than being raised to Enterprise or cut to Pro. It is
+  downloads an hour) rather than being raised to Enterprise or cut to Firm. It is
   resolved, never sold: ParaSend cannot be bought or granted at that tier.
 
 ---
@@ -1089,15 +1089,29 @@ Requires an API key. The body names a product, plan, and interval; the price is 
 curl -X POST https://relay.paramant.app/v2/billing/checkout \
   -H "X-Api-Key: pgp_your_key" \
   -H "Content-Type: application/json" \
-  -d '{"product":"parasign","plan":"pro","interval":"monthly"}'
+  -d '{"product":"firm","plan":"firm","interval":"monthly"}'
 # {"ok":true,"payment_id":"tr_…","checkout_url":"https://www.mollie.com/checkout/…","mode":"live"}
 ```
 
 | Field | Values |
 |-------|--------|
-| `product` | `parasend`, `parasign` |
-| `plan` | `pro` (parasend); `pro` or `business` (parasign) |
+| `product` | `firm`, `parasign`, `parasend` |
+| `plan` | `firm` (firm); `business` (parasign); legacy `pro` (parasign, parasend) |
 | `interval` | `monthly`, `yearly` |
+
+`firm`/`firm` is the bundle, and the only paid plan sold alongside
+`parasign`/`business`. One payment grants **both** product entitlements,
+ParaSign `pro` and ParaSend `pro`, from one catalog amount and with **one**
+`paid_until` written to both, so a Firm term ends on one day. The single
+exception is upward: a product that already carries a LATER `paid_until`, bought
+before the change, keeps it. Buying Firm never shortens a term somebody paid
+for, so it can only ever leave one product ahead of the other, never behind.
+
+`parasign`/`pro` and `parasend`/`pro` are no longer sold. They stay resolvable
+in the catalog on purpose: an outstanding renewal of a term bought before the
+change still checks out at its own price, and an existing Mollie subscription
+created against one of them keeps charging and keeps being granted. Nothing on
+the site links to them.
 
 Redirect the buyer to `checkout_url` to complete the payment; Mollie then redirects back to `/dashboard?billing=return`. `mode` is `live` or `test`, controlled by `BILLING_MODE` and which Mollie key (`MOLLIE_API_KEY` / `MOLLIE_TEST_API_KEY`) is configured. The recurring layer (a Mollie customer, a `sequenceType: first` payment and a subscription created after the grant) runs only when `BILLING_MODE` is set explicitly to `live` or `test`; with `BILLING_MODE` empty the relay creates plain one-off payments, and the `billing_config` log line at boot says which stance is active.
 
@@ -1107,10 +1121,21 @@ Errors: `401 unauthorized` (missing or invalid API key), `400 bad_json` / `unkno
 
 Called by Mollie with `id=tr_…` (form-encoded). The relay ignores everything else in the webhook body, re-fetches the payment from the Mollie API as the only source of truth, verifies the amount actually paid against the catalog, and grants the product tier idempotently. Responds `200` on every handled event, `400 bad_payment_id` for a malformed id, and `503` on a transient Mollie fetch failure (so Mollie retries).
 
+A `firm` payment is a bundle: one handled event sets **two** entitlements,
+ParaSign to `pro` and ParaSend to `pro`, both with the same `paid_until`. A
+single-product payment (the legacy `pro` plans, or `parasign`/`business`) sets
+one. Idempotency is per payment id, so a Mollie retry of a bundle grants both
+again without extending either term.
+
 Not intended to be called by clients.
 
-A refund or a chargeback arrives on the same `tr_` id as the payment. The relay
-issues a **credit note** for it: its own sequential number in its own series
+A refund or a chargeback arrives on the same `tr_` id as the payment. A
+**chargeback** also takes the entitlement back: a charged-back `firm` payment
+returns **both** products to their floor, ParaSign to `free` and ParaSend to
+`community`, because the one payment is what held both up, and it clears the
+paid period with them. A charged-back single-product payment returns only that
+product. A **refund** moves no entitlement; the credit note is the record. The
+relay issues a **credit note** for either: its own sequential number in its own series
 (`CN-2026-0001`, per calendar year), referring to the invoice it credits by
 number and date, with negative net, VAT and total. One per reversal, idempotent
 against a Mollie retry. A partial refund is credited for the amount that went

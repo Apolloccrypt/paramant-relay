@@ -107,8 +107,10 @@
       histLoad.disabled = false; histLoad.textContent = orig;
       if (res.status === 200) { renderHistory(res.body && res.body.entries); return; }
       if (res.status === 403) {
+        // Fallback only; the relay sends its own message. Both name Firm,
+        // the plan /pricing actually sells, not the tier key behind the gate.
         histBody.innerHTML = upsell((res.body && res.body.message) ||
-          'Send history and link management require a Pro plan or higher.', '/pricing');
+          'Send history and link management require the Firm plan or higher.', '/pricing');
         return;
       }
       if (res.status === 401) {

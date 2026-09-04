@@ -95,6 +95,9 @@ test('every catalog price splits into an exact net amount and 21% VAT', () => {
     '18.15': '15.00', '181.50': '150.00',
     '59.29': '49.00', '603.79': '499.00',
     '361.79': '299.00', '3617.90': '2990.00',
+    // Firm: 29 and 290 excl. btw. Both land on the cent, which is what let the
+    // plan be priced at 29 rather than at a number that splits badly.
+    '35.09': '29.00', '350.90': '290.00',
   };
   for (const [product, plans] of Object.entries(catalog.CATALOG)) {
     for (const [plan, intervals] of Object.entries(plans)) {
