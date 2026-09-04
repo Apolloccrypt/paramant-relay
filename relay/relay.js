@@ -150,6 +150,7 @@ const billingExport    = require('./lib/billing-export');     // period export o
 const zipStore         = require('./lib/zip-store');          // store-only zip writer, no dependency
 const moneybird        = require('./lib/moneybird');          // optional Moneybird push (external sales invoices)
 const planExpiry       = require('./lib/plan-expiry');      // paid-term warning + expiry mail (in-process planner)
+const coupon           = require('./lib/coupon');             // gift codes: a term given away, never a sale
 const partyBackfill    = require('./lib/parasign-party-backfill'); // one-shot fill of the party worklist index
 
 // Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
@@ -6408,6 +6409,110 @@ async function handleRelayRequest(req, res) {
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
+  // ── /v2/admin/coupons: create, list, withdraw ──────────────────────────
+  // On the ordinary admin gate above (ADMIN_TOKEN, checked once for every
+  // /v2/admin path), and on nothing else: a coupon raises a tier without a
+  // payment, so the ability to mint one is exactly the ability to give the
+  // product away. No session token of either purpose can reach these paths.
+  //
+  // The three verbs are deliberately not four. There is no edit: raising the
+  // cap on a code people are already redeeming against, or changing what it
+  // grants under them, is how two customers end up with different answers for
+  // the same code. Withdraw it and make another.
+  //
+  // The withdraw carries the code IN THE PATH and takes no body. A DELETE with
+  // a body that the auth gate above refuses before reading is a request whose
+  // bytes are still on the wire when the 401 goes out, and the next request on
+  // that kept-alive connection is answered by a socket that has lost its place.
+  // Nothing needs a body here, so nothing sends one.
+  if (path === '/v2/admin/coupons') {
+    if (!redisClient || !redisClient.isReady) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'coupons_unavailable', hint: 'the coupon store lives in redis' }));
+    }
+    try {
+      if (req.method === 'GET') {
+        const list = await coupon.listCoupons(redisClient);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ ok: true, coupons: list }));
+      }
+      if (req.method === 'POST') {
+        const body = JSON.parse((await readBody(req, 2048)).toString() || '{}');
+        const out = await coupon.createCoupon(redisClient, {
+          code: body.code,
+          // Omitting `grants` means the campaign default: both products on Pro
+          // for ninety days. One number, in lib/coupon.js, not in a curl line.
+          grants: body.grants || undefined,
+          max_redemptions: body.max_redemptions,
+          valid_until: body.valid_until,
+          created_by: body.created_by || 'admin',
+          note: body.note,
+        });
+        if (!out.ok) {
+          res.writeHead(out.error === 'code_exists' ? 409 : 400, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: out.error }));
+        }
+        log('info', 'coupon_created', {
+          code: out.coupon.code, max: out.coupon.max_redemptions,
+          grants: out.coupon.grants.map((g) => `${g.product}:${g.tier}:${g.days}d`).join(','),
+          valid_until: out.coupon.valid_until,
+        });
+        res.writeHead(201, { 'Content-Type': 'application/json' });
+        return res.end(J({ ok: true, coupon: out.coupon }));
+      }
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: e.message }));
+    }
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    return res.end(J({ error: 'method_not_allowed' }));
+  }
+
+  // ── /v2/admin/coupons/:code ────────────────────────────────────────────────
+  // GET .../redemptions: the counter on the list says how many, this says which
+  // accounts and when. It is the trail behind a term that was given rather than
+  // sold, so it is the one thing a coupon leaves that an auditor can follow.
+  //
+  // DELETE .../:code: withdraw. A stamp, not a delete: the redemptions that
+  // already happened are the record of terms that were given away, and they
+  // stay readable. No term already granted is taken back.
+  if (path.startsWith('/v2/admin/coupons/')) {
+    if (!redisClient || !redisClient.isReady) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'coupons_unavailable' }));
+    }
+    const rest = path.slice('/v2/admin/coupons/'.length);
+    const wantsRedemptions = rest.endsWith('/redemptions');
+    const c = coupon.normaliseCode(decodeURIComponent(
+      wantsRedemptions ? rest.slice(0, -'/redemptions'.length) : rest));
+    if (!c.ok) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_code' })); }
+    try {
+      if (wantsRedemptions && req.method === 'GET') {
+        const doc = await coupon.getCoupon(redisClient, c.code);
+        if (!doc) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unknown_code' })); }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ ok: true, coupon: doc, redemptions: await coupon.redemptionsOf(redisClient, c.code) }));
+      }
+      if (!wantsRedemptions && req.method === 'DELETE') {
+        const out = await coupon.revokeCoupon(redisClient, c.code);
+        if (!out.ok) {
+          res.writeHead(out.error === 'unknown_code' ? 404 : 400, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: out.error }));
+        }
+        log('info', 'coupon_revoked', { code: out.coupon.code, used: out.coupon.used });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ ok: true, coupon: out.coupon }));
+      }
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: e.message }));
+    }
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    return res.end(J({ error: 'method_not_allowed' }));
+  }
+
   // ── POST /v2/billing/checkout — start a Mollie payment (authenticated) ───────
   // The amount comes from the server-side catalog, NEVER from the request body.
   // The caller only names product+plan+interval; it can never set a price.
@@ -6655,6 +6760,121 @@ async function handleRelayRequest(req, res) {
     const history = await billingHistory.build({ accountId: acctOf(apiKey), redis: redisClient, now: new Date() });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, history }));
+  }
+
+  // -- POST /v2/billing/redeem: spend a gift code (authenticated) -------------
+  // The one path to a paid tier that involves no money. It is deliberately NOT
+  // a checkout with a 100% discount: nothing reaches Mollie, no invoice number
+  // is drawn, and nothing lands in the books as revenue, because nothing was
+  // sold. What it shares with a payment is the half the customer cares about,
+  // and it shares it by calling the SAME setProductPlan the webhook calls, so
+  // the entitlement layer, the expiry index and the reminder mails see an
+  // ordinary paid term and need no special case for a gift.
+  //
+  // Reachable on a pst_ session token with purpose `app` (lib/session-token.js
+  // APP_SCOPE), because the two pages carrying the field hold no api-key. The
+  // ACCOUNT IS THE ONE THE RELAY RESOLVED, never one the body names: a code is
+  // spent on the caller's own account or not at all.
+  if (path === '/v2/billing/redeem' && req.method === 'POST') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    if (!redisClient || !redisClient.isReady) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis }));
+    }
+    let body;
+    try { body = JSON.parse((await readBody(req, 512)).toString() || '{}'); }
+    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_json' })); }
+    const accountId = acctOf(apiKey);
+
+    // The seat is taken FIRST, atomically, and given back below if the grant
+    // that should follow it does not happen. The other order lets the hundred
+    // and first request be granted while the cap is being read.
+    let claim;
+    try { claim = await coupon.claim(redisClient, { code: body && body.code, accountId, now: new Date() }); }
+    catch (e) {
+      if (redisOutage503(e, res)) return;
+      log('warn', 'coupon_claim_failed', { account: String(accountId).slice(0, 12), err: e.message });
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis }));
+    }
+    if (!claim.ok) {
+      // 409 for a code that exists and cannot be spent (run out, already used,
+      // expired, withdrawn), 404 for one we have never heard of. Both carry the
+      // plain sentence the page prints; the machine-readable error is for logs
+      // and tests, never for the reader.
+      const status = claim.error === 'unknown' || claim.error === 'bad_code' ? 404 : 409;
+      log('info', 'coupon_refused', { account: String(accountId).slice(0, 12), reason: claim.error });
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: claim.error, message: coupon.messageFor(claim.error) }));
+    }
+
+    // Rule 3 (lib/coupon.js): the gift is ADDED to a term that is still
+    // running, never substituted for it. grantEnd is billing.extendFrom plus
+    // the days, so paying customers keep every day they bought.
+    const rec = entitlementRecordOf(accountId) || {};
+    // ONE instant for the whole redemption. Reading the clock per product gives
+    // the two halves of a single gift dates a millisecond apart, which is a lie
+    // on /account and a needless second entry in the expiry index.
+    const at = new Date();
+    const granted = [];
+    let failure = null;
+    for (const g of claim.grants) {
+      const current = rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[g.product]] || null;
+      const ends = coupon.grantEnd(current, at, g.days);
+      let out;
+      try { out = setProductPlan(accountId, g.product, g.tier, ends); }
+      catch (e) { out = { ok: false, reason: e.message }; }
+      if (!out || !out.ok) { failure = (out && out.reason) || 'not_applied'; break; }
+      granted.push({ product: g.product, tier: out.tier, days: g.days, ends: ends.toISOString() });
+    }
+    if (failure) {
+      // Nothing half-given: the seat goes back so the code is not silently one
+      // shorter than the cap says, and the reader is told to try again.
+      await coupon.release(redisClient, claim.code, accountId);
+      log('error', 'coupon_grant_failed', { account: String(accountId).slice(0, 12), code: claim.code, reason: failure });
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'grant_failed', message: coupon.MESSAGES.grant_failed }));
+    }
+
+    // The line on /account. Written after the term is really on the account, so
+    // a row here always has a term behind it, and written to its own store
+    // because no invoice series may hold a document for a thing that was given.
+    const redeemedAt = at.toISOString();
+    await billingHistory.recordGift(redisClient, accountId, {
+      code: claim.code,
+      label: coupon.historyLabel(claim.code, claim.grants),
+      grants: granted,
+      redeemed_at: redeemedAt,
+    });
+
+    // One mail, on the existing route. Not an invoice and not a receipt: there
+    // is nothing to put a number on.
+    const to = (rec && rec.email) || (accounts.get(accountId) || {}).email || '';
+    if (to) {
+      const msg = coupon.redeemMail({
+        code: claim.code,
+        grants: granted.map((g) => ({ ...g, ends: g.ends })),
+        siteUrl: process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL,
+      });
+      if (msg) {
+        Promise.resolve(sendResendEmail({ to, subject: msg.subject, text: msg.text, html: msg.html }))
+          .catch((e) => log('warn', 'coupon_mail_failed', { err: e.message }));
+      }
+    }
+
+    log('info', 'coupon_redeemed', {
+      account: String(accountId).slice(0, 12), code: claim.code, used: claim.used,
+      products: granted.map((g) => `${g.product}:${g.tier}`).join(','),
+    });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({
+      ok: true,
+      code: claim.code,
+      granted,
+      // The sentence the page prints. Built here so the mail, the history line
+      // and the page all name the same plans and the same dates.
+      message: coupon.successMessage(granted),
+    }));
   }
 
   // ── GET /v2/billing/invoices/:number.pdf: one document (authenticated) ────

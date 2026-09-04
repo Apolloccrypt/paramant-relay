@@ -9,10 +9,10 @@
  * pages, so the key stops reaching the browser on the normal path at all.
  *
  * WHAT IT HANDS OUT. POST /api/user/app/token mints a pst_ session token with
- * purpose `app`: fifteen minutes, and the relay accepts it on four routes
- * (POST /v2/billing/checkout, GET /v2/user/history,
- * GET /v2/parasign/audit-export, GET /v2/parasign/inbox) and refuses it on
- * everything else. It is a DIFFERENT token from the one /parashare holds, not a
+ * purpose `app`: fifteen minutes, and the relay accepts it on five routes
+ * (POST /v2/billing/checkout, POST /v2/billing/redeem,
+ * GET /v2/user/history, GET /v2/parasign/audit-export,
+ * GET /v2/parasign/inbox) and refuses it on everything else. It is a DIFFERENT token from the one /parashare holds, not a
  * wider one: neither allowlist contains the other, so giving these pages a
  * credential did not give the send page anything extra. See
  * relay/lib/session-token.js for the lists.

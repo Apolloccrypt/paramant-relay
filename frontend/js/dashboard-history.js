@@ -11,9 +11,9 @@
  * it stayed open. It now runs on the short-lived scoped token /parashare got in
  * #401. js/app-session-token.js mints a pst_ token with purpose `app`, the
  * relay accepts it on exactly GET /v2/user/history,
- * GET /v2/parasign/audit-export, POST /v2/billing/checkout and
- * GET /v2/parasign/inbox, and refuses it on everything else, including every
- * other route under /v2/user/*. Fifteen minutes, held in memory, never
+ * GET /v2/parasign/audit-export, POST /v2/billing/checkout,
+ * POST /v2/billing/redeem and GET /v2/parasign/inbox, and refuses it on
+ * everything else, including every other route under /v2/user/*. Fifteen minutes, held in memory, never
  * persisted. A 403 still renders an honest
  * upgrade/lock message; a 401 mints once more before it is believed.
  *

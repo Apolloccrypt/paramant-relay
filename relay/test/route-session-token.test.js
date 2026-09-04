@@ -253,7 +253,7 @@ test('THE SCOPE: every route outside the transfer path is 403, above the handler
 // would pass the "app routes work" half of this and fail the wall below, which
 // is why both halves are here.
 
-test('an app-purpose token opens the four app routes and nothing from the transfer path', async (t) => {
+test('an app-purpose token opens the five app routes and nothing from the transfer path', async (t) => {
   if (!rc) return t.skip('no redis');
   const minted = await mint(OWNER, srv, 'app');
   assert.strictEqual(minted.status, 200, minted.text);
@@ -269,10 +269,24 @@ test('an app-purpose token opens the four app routes and nothing from the transf
     ['GET', '/v2/parasign/audit-export', undefined],
     ['GET', '/v2/parasign/inbox', undefined],
     ['POST', '/v2/billing/checkout', { product: 'parasend', plan: 'pro', interval: 'month' }],
+    ['POST', '/v2/billing/redeem', { code: 'NOSUCHCODE' }],
   ]) {
     const r = await srv.req(method, path, { headers: h, body });
     assert.notStrictEqual(r.json && r.json.error, 'session_token_out_of_scope',
       `${method} ${path} was refused by scope, and it is what an app token is for: ${r.text}`);
+  }
+
+  // The rest of /v2/billing is NOT opened by the redeem entry: it is one exact
+  // path, not a prefix. The webhook is Mollie's, the cancel path moves a
+  // subscription, and neither may be walked with a credential a tab can hold.
+  for (const [method, path, body] of [
+    ['POST', '/v2/billing/webhook', undefined],
+    ['POST', '/v2/billing/cancel', { product: 'parasign' }],
+    ['GET', '/v2/admin/coupons', undefined],
+  ]) {
+    const r = await srv.req(method, path, { headers: h, body });
+    assert.strictEqual(r.status, 403, `${method} ${path} answered ${r.status}, not 403: ${r.text}`);
+    assert.strictEqual(r.json.error, 'session_token_out_of_scope');
   }
 
   // The resend beside the inbox is on NEITHER list. It reads the stored invite
@@ -307,6 +321,7 @@ test('a ParaSend token is 403 on every app route: the two lists are disjoint', a
     ['GET', '/v2/parasign/audit-export', undefined],
     ['GET', '/v2/parasign/inbox', undefined],
     ['POST', '/v2/billing/checkout', { product: 'parasend', plan: 'pro', interval: 'month' }],
+    ['POST', '/v2/billing/redeem', { code: 'NOSUCHCODE' }],
   ]) {
     const r = await srv.req(method, path, { headers: h, body });
     assert.strictEqual(r.status, 403, `${method} ${path} answered ${r.status}, not 403: ${r.text}`);

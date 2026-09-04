@@ -178,10 +178,13 @@ test('the per-device pubkey read is exactly one path segment deep', () => {
 // holds. If that ever stops being true, the honest thing is for these cases to
 // go red rather than for the send page to quietly gain a checkout.
 
-test('the app purpose opens exactly the four routes the signed-in pages need', () => {
+test('the app purpose opens exactly the five routes the signed-in pages need', () => {
   const open = [
     // /pricing: pressing a price button creates the Mollie payment.
     ['POST', '/v2/billing/checkout'],
+    // /pricing and /account, "Have a code?": spending a gift code on the
+    // account the relay resolved from the token, never one the body names.
+    ['POST', '/v2/billing/redeem'],
     // /dashboard: the account's own history, and its own signing-audit export.
     ['GET', '/v2/user/history'],
     ['GET', '/v2/parasign/audit-export'],
@@ -192,8 +195,8 @@ test('the app purpose opens exactly the four routes the signed-in pages need', (
     assert.strictEqual(st.scopeAllows(method, path, 'app'), true,
       `${method} ${path} is what an app-purpose token exists for`);
   }
-  assert.strictEqual(st.APP_SCOPE.length, 4,
-    'the app allowlist grew; /privacy names four requests, so change the page with the code');
+  assert.strictEqual(st.APP_SCOPE.length, 5,
+    'the app allowlist grew; /privacy names five requests, so change the page with the code');
   // The resend beside the inbox reads a stored invite token back so it can be
   // mailed. A route that produces a capability must not be reachable from a
   // browser, so it is behind internal auth and in NO token scope.
@@ -208,8 +211,8 @@ test('THE WALL: neither purpose can do the other\'s work', () => {
     assert.strictEqual(st.scopeAllows(method, path, 'app'), false,
       `${method} ${path} is a transfer route; a token minted on /pricing must not walk it`);
   }
-  for (const [method, path] of [['POST', '/v2/billing/checkout'], ['GET', '/v2/user/history'],
-    ['GET', '/v2/parasign/audit-export']]) {
+  for (const [method, path] of [['POST', '/v2/billing/checkout'], ['POST', '/v2/billing/redeem'],
+    ['GET', '/v2/user/history'], ['GET', '/v2/parasign/audit-export']]) {
     assert.strictEqual(st.scopeAllows(method, path, 'parasend'), false,
       `${method} ${path} is an app route; a token minted on /parashare must not reach it. ` +
       'Merging the two lists is how a narrow credential becomes an api-key again.');
@@ -238,6 +241,14 @@ test('the app purpose shuts everything the review named, exactly as parasend doe
   assert.strictEqual(st.scopeAllows('GET', '/v2/user/history/all', 'app'), false);
   assert.strictEqual(st.scopeAllows('POST', '/v2/user/history', 'app'), false);
   assert.strictEqual(st.scopeAllows('POST', '/v2/parasign/audit-export', 'app'), false);
+  // The redeem route is named on its own too. The rest of /v2/billing/* is the
+  // Mollie webhook, the admin export and the cancel path, and a browser
+  // credential may reach none of them.
+  assert.strictEqual(st.scopeAllows('POST', '/v2/billing/webhook', 'app'), false);
+  assert.strictEqual(st.scopeAllows('POST', '/v2/billing/cancel', 'app'), false);
+  assert.strictEqual(st.scopeAllows('GET', '/v2/admin/coupons', 'app'), false);
+  assert.strictEqual(st.scopeAllows('POST', '/v2/admin/coupons', 'app'), false);
+  assert.strictEqual(st.scopeAllows('GET', '/v2/billing/redeem', 'app'), false);
   did();
 });
 

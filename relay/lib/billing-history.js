@@ -31,9 +31,23 @@
 // (and when), which is worth showing; a term that ended while the mailer was
 // unconfigured still ended, and still gets its line.
 
+// ONE EXCEPTION TO "NO NEW STORAGE": a gift. A coupon (lib/coupon.js) gives a
+// term without a payment, so it draws no invoice and leaves no credit note, and
+// there is nothing to derive it from. The period it writes does reach this list
+// through the expiry index, but only once it has RUN OUT, so a customer who
+// redeemed a code yesterday would read "No billing events yet" about the one
+// thing that changed his account this week. The redemption therefore writes one
+// small record of its own, and what it records is a term that was GIVEN, which
+// is precisely the thing an invoice series may not contain.
+
 const invoice = require('./invoice');
 const planExpiry = require('./plan-expiry');
 const entitlements = require('./entitlements');
+
+// Per account, append-only, no TTL: it is the only trace that a term was a gift
+// and not a sale. Written by POST /v2/billing/redeem, read here and nowhere
+// else.
+const GIFT_LIST = (accountId) => `paramant:billing:gift:list:${accountId}`;
 
 const PRODUCT_NAME = Object.freeze({ parasign: 'ParaSign', parasend: 'ParaSend' });
 
@@ -147,6 +161,48 @@ function termRow({ product, endsAt, tier, notifiedAt }) {
   };
 }
 
+// ── the gift rows ────────────────────────────────────────────────────────────
+// The amount is null and stays null. A gift with a 0.00 in the money column
+// would add up correctly and still read as a sale of nothing; an empty column
+// reads as what it is, a line that is not about money at all.
+function giftRow(rec) {
+  return {
+    ts: rec.redeemed_at,
+    type: 'gift',
+    label: rec.label,
+    detail: 'No payment, no invoice',
+    amount: null,
+    currency: null,
+    document: null,
+    code: rec.code || null,
+    grants: Array.isArray(rec.grants) ? rec.grants : [],
+  };
+}
+
+// Append one. Called by the redeem route after the term is actually on the
+// account, so a line here always has a term behind it.
+async function recordGift(redis, accountId, entry) {
+  if (!redis || !accountId || !entry) return { ok: false };
+  try { await redis.rPush(GIFT_LIST(accountId), JSON.stringify(entry)); }
+  catch (e) { return { ok: false, reason: e.message }; }
+  return { ok: true };
+}
+
+async function giftsFor(accountId, redis, limit = 200) {
+  if (!accountId || !redis) return [];
+  let raw = [];
+  try { raw = (await redis.lRange(GIFT_LIST(accountId), -limit, -1)) || []; }
+  catch { return []; }
+  const out = [];
+  for (const r of raw) {
+    try {
+      const rec = JSON.parse(r);
+      if (rec && rec.redeemed_at && rec.label) out.push(rec);
+    } catch { /* one bad record must not empty the list */ }
+  }
+  return out;
+}
+
 // ── the list ─────────────────────────────────────────────────────────────────
 // Never throws and never half-answers: a redis that drops out mid-read costs
 // the rows it had not reached, and the customer still sees the rest. `limit`
@@ -161,6 +217,12 @@ async function build({ accountId, redis, now, limit = 100 } = {}) {
   const rows = [];
   for (const rec of records) {
     try { rows.push(documentRow(rec)); } catch { /* one bad record must not empty the list */ }
+  }
+
+  // The gifts, on the same never-half-answer rule: an unreadable gift list
+  // costs its own rows and leaves the money rows standing.
+  for (const rec of await giftsFor(accountId, redis)) {
+    try { rows.push(giftRow(rec)); } catch { /* as above */ }
   }
 
   // Both sources of a term end, deduplicated on the period itself: the index
@@ -183,4 +245,7 @@ async function build({ accountId, redis, now, limit = 100 } = {}) {
   return rows.slice(0, limit);
 }
 
-module.exports = { build, documentRow, termRow, termEndsFromDocuments, termEndFromIndex, productName, tierName };
+module.exports = {
+  build, documentRow, termRow, giftRow, recordGift, giftsFor,
+  termEndsFromDocuments, termEndFromIndex, productName, tierName, GIFT_LIST,
+};

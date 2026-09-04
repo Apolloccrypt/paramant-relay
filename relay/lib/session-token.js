@@ -171,11 +171,32 @@ const SCOPE = [
 //     api-key, never taken from the request. A header a browser can set would
 //     have turned a fifteen-minute token into a way to read anybody's worklist.
 //
+//   POST /v2/billing/redeem          /pricing and /account, "Have a code?".
+//     The only route on either list that CHANGES what an account is entitled
+//     to, so it is the one that had to earn its place rather than inherit it.
+//
+//     It is here for the reason the checkout is here. The field sits on two
+//     signed-in pages that deliberately hold no api-key, and the alternative
+//     was to put the key back in the tab so somebody could type a coupon into
+//     it. It is named ON ITS OWN and never as a /v2/billing/* prefix: the rest
+//     of that prefix is the Mollie webhook, the admin export and the cancel
+//     path, and none of those may be reachable by a browser credential.
+//
+//     What a stolen token can do with it is bounded by the coupon store, not by
+//     this list. lib/coupon.js takes one seat per ACCOUNT per code, atomically,
+//     and the account is the one the relay resolved from the token, never one
+//     the request names. So the worst a thief achieves is spending a gift on
+//     his victim's own account, which is what the victim wanted anyway. The
+//     token cannot read a code back, list the codes, create one or raise a cap:
+//     that is all /v2/admin/coupons, behind ADMIN_TOKEN, and admin paths are
+//     refused under BOTH purposes.
+//
 // What stays out, under BOTH purposes: /v2/keys, the signing-key and TOTP
 // routes, /v2/outbound, /v2/admin/*, and /v2/session-token itself. No token
 // mints another one, whatever it was minted for.
 const APP_SCOPE = [
   { method: 'POST', path: '/v2/billing/checkout' },
+  { method: 'POST', path: '/v2/billing/redeem' },
   { method: 'GET', path: '/v2/user/history' },
   { method: 'GET', path: '/v2/parasign/audit-export' },
   { method: 'GET', path: '/v2/parasign/inbox' },

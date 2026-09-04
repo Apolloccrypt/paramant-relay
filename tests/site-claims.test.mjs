@@ -1662,6 +1662,50 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
   assert.deepEqual(stale, [], `\n  ${stale.join('\n  ')}\n`);
 });
 
+// 39 ── A code gives a term, and never charges anything. /pricing had one claim
+// about money and it was "every payment is a one-off"; a gift code is not a
+// payment at all, and a page that only knows about payments cannot describe it.
+// The sentence the page now carries is the strong one: nothing is charged, now
+// or later. That is a claim about a code path, not about an intention, so it is
+// read off the code path: relay/lib/coupon.js may not touch Mollie or the
+// invoice series, and the redeem route in relay.js may not either.
+// Sabotage runs both ways: making the redeem route issue an invoice or create a
+// Mollie payment turns this red, and so does dropping the sentence.
+test('a gift code charges nothing, on the page and in the code that answers it', () => {
+  const pricing = visible(page('pricing'));
+
+  // 1. The page says it, next to the prices and in the field itself.
+  assert.ok(pricing.includes('A code is not a payment at all: it gives you a term as a gift, so nothing is ever charged for it.'),
+    'pricing: the payment block must say what a code is, beside the sentence about payments');
+  assert.ok(pricing.includes('It is not a discount and not a payment: nothing is charged, now or later'),
+    'pricing: the redeem field must repeat the claim where somebody is about to type a code');
+
+  // 2. The module that grants it cannot spend money: no Mollie, no invoice
+  // series, no credit note. This is the whole difference between a gift and a
+  // 100% discount, and it is a property of the file, not of a comment in it.
+  const cpn = stripJsComments(read('relay/lib/coupon.js'));
+  for (const forbidden of ['mollie', 'invoice', 'credit-note', 'amount']) {
+    assert.ok(!cpn.includes(forbidden),
+      `relay/lib/coupon.js now mentions "${forbidden}"; a gift may not reach the money path, and /pricing promises it does not`);
+  }
+
+  // 3. The route that answers the field cannot either. Sliced from the relay so
+  // a later edit inside it is what turns this red.
+  const rly = stripJsComments(read('relay/relay.js'));
+  const at = rly.indexOf("path === '/v2/billing/redeem'");
+  assert.ok(at > 0, 'relay.js must still handle POST /v2/billing/redeem');
+  const handler = rly.slice(at, rly.indexOf('\n  // ', at + 10));
+  assert.ok(handler.length > 500, 'the redeem handler could not be sliced; this block would assert on nothing');
+  for (const forbidden of [/mollie\./, /invoiceMod\./, /creditNote\./, /issueDocument/, /createPayment/]) {
+    assert.doesNotMatch(handler, forbidden,
+      'the redeem route now reaches the money path; /pricing says a code never charges anything');
+  }
+  // It DOES write the term the ordinary way, which is the other half of the
+  // claim: the plan and the date on /account are real, not a special case.
+  assert.match(handler, /setProductPlan\(/,
+    'the redeem route must grant through setProductPlan, the same path a payment uses');
+});
+
 // 32 ── Who gets a DPA. POST /v2/sign-dpa is in the ALLOWED path list for every
 // relay profile and its handler checks a name, an organisation, an email and a
 // rate limit, and nothing else: no API key, no plan, no account. So the DPA is
@@ -2291,9 +2335,9 @@ test('the ParaSend credential /privacy describes is the credential the code impl
   assert.ok(priv.includes('the relay accepts it on the five requests a transfer makes and refuses it on everything else'),
     'privacy: the storage section must state what the token can and cannot do');
   const appRules = countRules('const APP_SCOPE = [', 'const PURPOSE_PARASEND');
-  assert.equal(appRules, 4,
-    `the relay's app allowlist now has ${appRules} entries; /privacy says four, so change the page with the code`);
-  assert.ok(priv.includes('which the relay accepts on four requests'),
+  assert.equal(appRules, 5,
+    `the relay's app allowlist now has ${appRules} entries; /privacy says five, so change the page with the code`);
+  assert.ok(priv.includes('which the relay accepts on five requests'),
     'privacy: the pricing/dashboard token must be described by what it can do');
 
   // 3. /parashare really asks for a token, and really does not ask for the key.
