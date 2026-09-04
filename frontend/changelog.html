@@ -158,12 +158,23 @@ footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex
       <h2>Unreleased</h2>
     </div>
     <p class="release-summary">Features in active development.</p>
+    <h3>Added</h3>
+    <ul>
+      <!-- Billing left the Planned list below, where it stood as "Mollie
+           integration for billing (currently stub mode)". That has not been
+           true since payments went live: relay.js POST /v2/billing/checkout
+           calls Mollie unconditionally and the webhook issues the document by
+           itself. Same facts as CHANGELOG.md under Unreleased. -->
+      <li>Payments through Mollie: one payment per term, no subscription and no direct debit</li>
+      <li>A numbered document per payment, issued automatically: an invoice, or a payment receipt while our VAT number is pending</li>
+      <li>A numbered credit note when money goes back, on a chargeback or a refund</li>
+      <li>Both appear on your account page and arrive by email as a PDF</li>
+    </ul>
     <h3>Planned</h3>
     <ul>
       <li>Prometheus + Grafana monitoring via Tailscale-only access</li>
       <li>Outlook add-in (<code>addin.paramant.app</code>): source scaffold done</li>
       <li>Chrome Web Store public listing</li>
-      <li>Mollie integration for billing (currently stub mode)</li>
       <li>Team accounts + SSO</li>
       <li>WebAuthn / Passkey second-factor option</li>
       <li>Admin email preview modal with per-user send actions</li>

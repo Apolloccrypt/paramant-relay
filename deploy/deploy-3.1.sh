@@ -1384,7 +1384,7 @@ EOF
     fi
   fi
 
-  step "5c. the six nginx changes, by hand, keeping the ParaID deny"
+  step "5c. the seven nginx changes, by hand, keeping the ParaID deny"
   remote_nginx "nginx edits" "$TS" "$NGINX_SITES" "$NGINX_BACKUP_DIR" "$NGINX_CONF_SLOTS" <<'EOF'
 set -euo pipefail
 TS="$1"; SITES="$2"; NGBK="$3"; SLOTS="$4"
@@ -1445,6 +1445,7 @@ SIGN_LOC_RE='location = /sign[[:space:]]*\{'
 DICOM404_RE='location = /dicom[[:space:]]*\{[[:space:]]*return 404'
 PARAID_RE='paraid/issue'
 RULES_RE='location = /pararules'
+ADMIN_RE='location = /admin\.html|location = /js/admin\.page\.js'
 OUT_RE='^[[:space:]]*location[[:space:]]*~[[:space:]]*\^/v2/outbound[[:space:]]*\{'
 BUF_RE='proxy_buffer_size 32k'
 
@@ -1487,6 +1488,58 @@ RULES_COUNT_AWK='
 END { for (i in deny) { t++; if (has[i]) w++ } printf "%d %d\n", t+0, w+0 }'
 
 count_rules() { awk "$RULES_COUNT_AWK" $TARGETS | awk '{t+=$1; w+=$2} END{printf "%d %d\n", t, w}'; }
+
+# /admin.html and /js/admin.page.js answer 404.
+#
+# There are two admin screens in this repository. The one that is served is
+# admin/public/index.html, behind the admin container on :4200, which asks for
+# a session. The other, frontend/admin.html, is routed from nowhere, and phase
+# 5a rsyncs the whole of frontend/ into the docroot, so it lands on disk anyway
+# and the generic `try_files $uri $uri.html` picks it up: /admin.html answered
+# 200 with the full admin markup to anyone who typed the name. Its loader,
+# /js/admin.page.js, was served by the versioned-asset regex location for the
+# same reason and has no other consumer.
+#
+# The files are not pruned. tests/ui-truthfulness.test.mjs reads both admin
+# screens by name, and 5b prunes only what git says was deleted. This is the
+# treatment /developer.html already has in the repo conf: the markup stays, the
+# URL stops existing.
+#
+# The anchor is the ParaID deny, for the same reason as the /pararules edit:
+# paramant-live.conf carries no server_name, so the deny is the only line that
+# marks a block as one that answers for this site in both confs. Two passes,
+# and each of the two lines is judged on its own, so a conf that already
+# carries one of them gets only the other.
+ADMIN_AWK='
+FNR==NR {
+  if ($0 ~ /^server[[:space:]]*\{/) b++
+  if ($0 ~ /location = \/admin\.html/) hashtml[b]=1
+  if ($0 ~ /location = \/js\/admin\.page\.js/) hasjs[b]=1
+  if ($0 ~ /paraid\/issue/) deny[b]=1
+  next
+}
+{
+  print
+  if ($0 ~ /^server[[:space:]]*\{/) j++
+  if ($0 ~ /paraid\/issue/ && deny[j] && !ins[j]) {
+    if (!hashtml[j]) print "    location = /admin.html { return 404; }"
+    if (!hasjs[j])   print "    location = /js/admin.page.js { return 404; }"
+    ins[j]=1
+  }
+}'
+
+# Count the server blocks that answer for the site and how many of those carry
+# BOTH 404s. Half of the pair is not done: admin.html without its loader still
+# leaves the script on the open web, and the loader without the page leaves the
+# page on it.
+ADMIN_COUNT_AWK='
+/^server[[:space:]]*\{/ { b++ }
+/paraid\/issue/ { deny[b]=1 }
+/location = \/admin\.html/ { hashtml[b]=1 }
+/location = \/js\/admin\.page\.js/ { hasjs[b]=1 }
+END { for (i in deny) { t++; if (hashtml[i] && hasjs[i]) w++ } printf "%d %d\n", t+0, w+0 }'
+
+count_admin() { awk "$ADMIN_COUNT_AWK" $TARGETS | awk '{t+=$1; w+=$2} END{printf "%d %d\n", t, w}'; }
 
 # access_log off in the server block that backs /dicom/, the one on
 # listen 127.0.0.1:8090. It was the only block in paramant-live.conf still
@@ -1630,6 +1683,10 @@ read -r _abt _abw _abf <<< "$(count_alog)"
 echo "before 8090 blocks = $_abt"
 echo "before 8090 blocks with access_log off = $_abw"
 echo "before 8090 blocks logging to a file = $_abf"
+read -r _dbt _dbw <<< "$(count_admin)"
+echo "before admin guard blocks = $_dbt"
+echo "before admin guard blocks with 404 = $_dbw"
+echo "before admin guard lines = $(count "$ADMIN_RE")"
 
 # Each edit is in one of three states, and only one of them is a stop:
 #
@@ -1683,11 +1740,13 @@ for st in "$SIGN_STATE" "$COMP_STATE" "$DICOM_STATE"; do
   [ "$st" = todo ] && pending=$((pending + 1))
 done
 # A /v2/outbound block without the buffer is a fourth thing still to do, a
-# site block without the /pararules redirect a fifth, and a :8090 block that
-# still writes an access log a sixth.
+# site block without the /pararules redirect a fifth, a :8090 block that
+# still writes an access log a sixth, and a site block that still serves the
+# second admin screen a seventh.
 pending=$((pending + _obt - _obw))
 pending=$((pending + _rbt - _rbw))
 pending=$((pending + _abt - _abw))
+pending=$((pending + _dbt - _dbw))
 echo "before edits pending = $pending"
 if [ "$pending" -eq 0 ]; then
   echo "before everything already applied = yes"
@@ -1742,6 +1801,11 @@ for f in $TARGETS; do
   awk "$ALOG_AWK" "$f" "$f" > "/tmp/nginx-alog.$$"
   cat "/tmp/nginx-alog.$$" > "$f"
   rm -f "/tmp/nginx-alog.$$"
+  # 7. the second admin screen answers 404: /admin.html and its only loader
+  #    /js/admin.page.js, one pair per site block.
+  awk "$ADMIN_AWK" "$f" "$f" > "/tmp/nginx-admin.$$"
+  cat "/tmp/nginx-admin.$$" > "$f"
+  rm -f "/tmp/nginx-admin.$$"
   if ! cmp -s "$f" "/tmp/nginx-pre-3.1-$(basename "$f").$TS"; then
     echo "edited $(basename "$f")"
     edited=$((edited + 1))
@@ -1767,6 +1831,10 @@ read -r _aat _aaw _aaf <<< "$(count_alog)"
 echo "after 8090 blocks = $_aat"
 echo "after 8090 blocks with access_log off = $_aaw"
 echo "after 8090 blocks logging to a file = $_aaf"
+read -r _dat _daw <<< "$(count_admin)"
+echo "after admin guard blocks = $_dat"
+echo "after admin guard blocks with 404 = $_daw"
+echo "after admin guard lines = $(count "$ADMIN_RE")"
 
 # Restore exactly the confs this phase edited, not whatever the backup dir
 # happens to hold for this TS. The precondition above proved every one of them
@@ -1797,6 +1865,18 @@ if [ "$_saw" -gt 0 ]; then
   exit 1
 fi
 
+# The second admin screen is the one edit whose failure is silent: nothing
+# breaks, the deploy goes green, and https://paramant.app/admin.html keeps
+# answering 200 with admin markup to anyone who asks. Assert the end state
+# rather than trust the insert.
+if [ "$_daw" -ne "$_dat" ]; then
+  echo "FATAL $((_dat - _daw)) of $_dat site block(s) still serve the second admin screen after the edit:"
+  echo "FATAL /admin.html or /js/admin.page.js has no 'return 404' there, so the unrouted admin"
+  echo "FATAL markup stays on the open web. Restoring the backed up confs."
+  restore
+  exit 1
+fi
+
 rc=0
 nginx -t > /tmp/paramant-nginxt.$$ 2>&1 || rc=$?
 sed 's/^/  nginxt /' /tmp/paramant-nginxt.$$
@@ -1820,8 +1900,9 @@ EOF
   # holds is the END state, and that is asserted hard just below: no
   # auth_request on /sign, no /compliance locations, /dicom answering 404, a
   # buffer inside every /v2/outbound block, the /pararules 301 inside every
-  # block that answers for the site, and access_log off inside every :8090
-  # block. Those six are the deploy.
+  # block that answers for the site, access_log off inside every :8090 block,
+  # and a 404 on /admin.html and /js/admin.page.js in every block that answers
+  # for the site. Those seven are the deploy.
   if [ "$DRY_RUN" -eq 1 ]; then
     printf '  SKIP  assert (dry-run): both named confs were rewritten, unless every edit was already applied\n'
   else
@@ -1831,7 +1912,7 @@ EOF
     [ -n "$pend" ] && [ -n "$edited" ] \
       || die "could not read the nginx edit state from the server"
     if [ "$pend" = yes ]; then
-      ok "nginx: already applied. All three edits, the outbound buffers, the /pararules 301 and access_log off on :8090 were in place before this run, so nothing was rewritten (edited files = $edited)"
+      ok "nginx: already applied. All three edits, the outbound buffers, the /pararules 301, access_log off on :8090 and the 404 on the second admin screen were in place before this run, so nothing was rewritten (edited files = $edited)"
     else
       [ "$edited" -ge 1 ] \
         || die "$(remote_field 'before edits pending') nginx edit(s) were still pending but no conf was rewritten"
@@ -1844,6 +1925,8 @@ EOF
   expect_min "after dicom 404" 1 "/dicom now returns 404"
   expect_min "before outbound locations" 1 "the /v2/outbound location the buffers go on exists"
   expect_min "after pararules redirect lines" 1 "/pararules answers a 301 to /rules"
+  expect_min "after admin guard lines" 1 \
+    "/admin.html and /js/admin.page.js answer 404, so the unrouted second admin screen is off the open web"
   expect 'reloaded nginx' "nginx reloaded"
   if [ "$DRY_RUN" -eq 0 ]; then
     local ol bf

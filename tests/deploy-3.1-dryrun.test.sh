@@ -511,6 +511,35 @@ if [ "$(field_5c "$OUT1" 'after pararules redirect lines')" = "2" ]; then
 else
   fail "5c wrote $(field_5c "$OUT1" 'after pararules redirect lines') redirect line(s), expected 2"
 fi
+# The second admin screen. frontend/admin.html is routed from nowhere, but 5a
+# rsyncs all of frontend/ into the docroot and the generic try_files served it:
+# /admin.html answered 200 with the full admin markup and no session asked for.
+# The 404 has to travel with a deploy, or the next one puts the page back on the
+# open web. Same block anchor as the /pararules 301, so it is read the same way:
+# every site block, both lines, once each.
+if [ "$(field_5c "$OUT1" 'before admin guard blocks with 404')" = "0" ]; then
+  pass "the fixture starts serving the second admin screen, so the edit has work to do"
+else
+  fail "the fixture already carries the admin 404s; this run would prove nothing"
+fi
+if [ "$(field_5c "$OUT1" 'after admin guard blocks with 404')" \
+   = "$(field_5c "$OUT1" 'after admin guard blocks')" ] \
+   && [ "$(field_5c "$OUT1" 'after admin guard blocks')" = "2" ]; then
+  pass "every site block came out with /admin.html and /js/admin.page.js on 404"
+else
+  fail "the admin 404s landed in $(field_5c "$OUT1" 'after admin guard blocks with 404') of $(field_5c "$OUT1" 'after admin guard blocks') site blocks"
+fi
+if [ "$(field_5c "$OUT1" 'after admin guard lines')" = "4" ]; then
+  pass "both 404 lines were written once per conf, not twice"
+else
+  fail "5c wrote $(field_5c "$OUT1" 'after admin guard lines') admin 404 line(s), expected 4"
+fi
+if grep -q 'location = /admin\.html { return 404; }' "$NG/available/paramant-live.conf" \
+   && grep -q 'location = /js/admin\.page\.js { return 404; }' "$NG/available/paramant-live.conf"; then
+  pass "the guard is in the conf on disk, not only in the counters"
+else
+  fail "neither 404 reached paramant-live.conf on disk"
+fi
 
 echo ""
 echo "6g-2. Second run on the same confs: already applied, not FATAL"
@@ -531,6 +560,8 @@ for want in "before sign state:done" "before compliance state:done" "before dico
             "before edits pending:0" "before everything already applied:yes" \
             "before pararules blocks with redirect:2" \
             "after pararules redirect lines:2" \
+            "before admin guard blocks with 404:2" \
+            "after admin guard lines:4" \
             "after edited files:0"; do
   f="${want%%:*}"; v="${want##*:}"
   if [ "$(field_5c "$OUT2" "$f")" = "$v" ]; then pass "second run reports $f = $v"; else
@@ -572,8 +603,21 @@ check_has "$FULL"   'before edits pending'  "the dry run shows the pending-edit 
 check_has "$FULL"   'before sign state'     "the dry run shows the per-edit state read"
 check_has "$SCRIPT" 'location = /pararules { return 301 https://\$host/rules; }' \
   "phase 5c writes the permanent 301 from /pararules to /rules"
-check_has "$SCRIPT" 'the six nginx changes' \
-  "the 5c step name counts the /pararules redirect and the :8090 access_log as edits"
+check_has "$SCRIPT" 'the seven nginx changes' \
+  "the 5c step name counts the /pararules redirect, the :8090 access_log and the admin 404 as edits"
+check_has "$SCRIPT" 'location = /admin\.html \{ return 404; \}' \
+  "phase 5c writes the 404 on the second admin screen"
+check_has "$SCRIPT" 'location = /js/admin\.page\.js \{ return 404; \}' \
+  "phase 5c writes the 404 on the loader that screen is the only consumer of"
+# The repo confs and the phase have to agree. 5c edits the live confs by anchor
+# and never copies a repo file over them, so a guard that lives in only one of
+# the two is a guard that a rebuilt server, or a hand-applied 5c, would miss.
+for conf in nginx-paramant-live.conf nginx-paramant-public.conf; do
+  check_has "$ROOT/deploy/$conf" 'location = /admin\.html \{ return 404; \}' \
+    "$conf 404s /admin.html, so the repo conf says what the phase does"
+  check_has "$ROOT/deploy/$conf" 'location = /js/admin\.page\.js \{ return 404; \}' \
+    "$conf 404s /js/admin.page.js"
+done
 
 echo ""
 echo "6g-4. A multi-line auth_request on /sign is todo, never already applied"
@@ -654,6 +698,8 @@ make_dicom_conf() {   # file, alog(missing|present|none)
     echo '    location = /dicom { return 404; }'
     echo '    location = /v1/paraid/issue-document { deny all; }'
     echo '    location = /pararules { return 301 https://$host/rules; }'
+    echo '    location = /admin.html { return 404; }'
+    echo '    location = /js/admin.page.js { return 404; }'
     echo '    location /dicom/ { proxy_pass http://127.0.0.1:8090; }'
     echo '    location ~ ^/v2/outbound {'
     echo '        proxy_buffer_size 32k;'

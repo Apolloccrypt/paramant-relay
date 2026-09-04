@@ -389,7 +389,17 @@ async function loadBilling(){
   const dist=d.plan_distribution||{};
   const total=Object.values(dist).reduce((a,b)=>a+b,0)||1;
   el.innerHTML=
-    '<div class="banner stub" role="status"><strong>Beta billing</strong> &mdash; Payment processing (Mollie) is in integration. Customers are manually invoiced. Data shown is stub only.'+'</div>'+
+    /* The same line, and the same correction, as admin/public/app.js. Every
+       clause of what stood here was false by September 2026: relay.js POST
+       /v2/billing/checkout calls mollie.createPayment against api.mollie.com
+       unconditionally, and the webhook issues a numbered invoice
+       (lib/invoice.js, PS-YYYY-NNNN) or a credit note (lib/credit-note.js,
+       CN-YYYY-NNNN) on its own. Nobody is invoiced by hand and the tab is not
+       a fixture. This screen is served by nothing (nginx sends /admin/ to the
+       admin container), and it is corrected rather than deleted because
+       tests/ui-truthfulness.test.mjs reads it by name, and because a wrong
+       copy left lying next to a right one is how the wrong one comes back. */
+    '<div class="banner info" role="status"><strong>Billing</strong> Mollie payments are live: one payment per term, no subscription and no direct debit. A numbered invoice or credit note is issued automatically from the payment webhook. This tab shows plan distribution and admin plan changes, not payments or revenue.</div>'+
       '<div class="card"><div class="card-hdr">Recent plan changes <small>'+( d.recent_checkouts?.length||0)+' events</small></div>'+
         (d.recent_checkouts&&d.recent_checkouts.length?
           '<table class="tbl"><thead><tr><th>Time</th><th>User</th><th>Event</th></tr></thead><tbody>'+
