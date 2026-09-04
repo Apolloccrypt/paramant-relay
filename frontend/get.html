@@ -32,6 +32,7 @@
 <link rel="stylesheet" href="/design-system.css?v=28">
 <link rel="stylesheet" href="/nav.css?v=23">
 <link rel="stylesheet" href="/relay-pulse.css?v=4">
+<link rel="stylesheet" href="/done-state.css?v=1">
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bone);color:var(--ink);font-family:var(--sans);min-height:100vh}
@@ -196,26 +197,31 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   </div>
 </div>
 
-<!-- Done -->
+<!-- Done. The one end screen, shared with /ontvang and /parashare: see
+     done-state.css. Small mark, one heading, one sentence, one button, and the
+     technical account folded away rather than deleted. -->
 <div class="step" id="step-done">
-  <h1>File received</h1>
-  <p class="sub">Decrypted in your browser. The relay copy has been permanently destroyed.</p>
+  <div class="done-state">
+    <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
+    <h1 class="done-title">You have the file.</h1>
+    <p class="done-line" id="done-line">It is saved on your device. Our copy has been permanently destroyed.</p>
 
-  <div class="card">
-    <div class="card-head"><div class="dot"></div><div class="card-head-title">Download complete</div></div>
-    <div class="card-body">
-      <div class="file-name" id="done-filename"></div>
-      <div class="file-size" id="done-filesize"></div>
+    <div class="done-payload"></div>
+
+    <div class="done-actions">
+      <button class="btn done-primary" id="done-save" type="button" data-click="saveAgain">Save it again</button>
+      <a class="done-quiet" href="/dashboard">Open your dashboard</a>
     </div>
-  </div>
 
-  <div style="margin-bottom:24px">
-    <span class="tag green">Decrypted locally</span>
-    <span class="tag green">Relay copy burned</span>
-    <span class="tag green">AES-256-GCM</span>
+    <details class="done-details">
+      <summary>What made this safe</summary>
+      <div class="done-details-body">
+        <p>The unlocking happened here, in your browser. The file arrived sealed and was opened with the key that sat in the link after the <code>#</code>, which is the part of a link a browser never sends to a server (<code>AES-256-GCM</code>).</p>
+        <p>A link from this web app opens once. Now that this download has finished, the copy on our side is wiped and the link will not open a second time.</p>
+        <p>The file name travelled inside the sealed bytes rather than beside them, so it was never something we could read either.</p>
+      </div>
+    </details>
   </div>
-
-  <a href="/dashboard" class="btn btn-outline">Open your dashboard</a>
 </div>
 
 <!-- PDF preview (rendered in-browser, no auto-download) -->
@@ -300,6 +306,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <script src="/js/nav-auth.js?v=8" defer></script>
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/js/delegate.js?v=1" defer></script>
-<script src="/js/get.page.js?v=2" defer></script>
+<script src="/js/done-state.js?v=1" defer></script>
+<script src="/js/get.page.js?v=3" defer></script>
 </body>
 </html>

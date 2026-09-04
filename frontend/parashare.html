@@ -67,6 +67,20 @@ h1{font-size:clamp(26px,5vw,38px);font-weight:600;letter-spacing:-.028em;line-he
 .ps-link-state.is-waiting{color:var(--sig-wait)}
 .ps-link-state.is-delivered{color:var(--sig-done)}
 .ps-link-state.is-expired{color:var(--ink-3)}
+/* Inside an end screen the copy button is not the loud one. Exactly one filled
+   button is on the screen and it is "Send another file"; the row's own copy
+   button and the status refresh sit a step quieter so the eye has one place to
+   land. */
+/* The hero sells the product to somebody who has not started yet. On an end
+   screen it is a screenful of pitch above the answer, so it goes with the
+   chooser and the stage bar. parashare.page.js stamps the class. */
+body.ps-ended .page-hero{display:none}
+.done-state .ps-link-row{text-align:left}
+.done-state .ps-link-url{margin-top:6px;margin-bottom:10px}
+.done-state .ps-copy{background:transparent;color:var(--ink-1);border-color:var(--line-2)}
+.done-state .ps-copy:hover{background:transparent;border-color:var(--ink-1)}
+.done-state .ps-copy.is-copied{background:transparent;border-color:var(--mark);color:var(--mark)}
+.done-state #ps-link-refresh{margin-top:12px;font-weight:400}
 
 /* Inline along-the-way guide -- explains what is happening at each step */
 .ps-guide{font-family:var(--sans);font-size:13.5px;line-height:1.62;color:var(--ink-2);padding:13px 15px;border:1px solid var(--line);border-left:2px solid var(--mark);background:var(--surface-sunk);margin-bottom:18px;border-radius:0 var(--r-1) var(--r-1) 0}
@@ -408,6 +422,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 </script>
 <meta name="theme-color" content="#15191C">
 <link rel="stylesheet" href="/app-2026.css?v=7">
+<link rel="stylesheet" href="/done-state.css?v=1">
 <script src="/js/theme.js?v=4"></script>
 </head>
 <body>
@@ -689,55 +704,56 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <!-- SEND A LINK: the link is ready. Reached only from the Send-a-link stand;
      the live stand never shows this step. -->
 <div class="step" id="step-link">
-  <h2 class="paramant-h1">Your link is ready</h2>
-  <p class="sub">Send it any way you like. The key sits after the # in the link, which browsers never send to a server, so we cannot open the file even though we are holding it.</p>
+  <div class="done-state">
+    <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
+    <h2 class="done-title">Your link is ready.</h2>
+    <p class="done-line" id="ps-link-line">Send it any way you like. We are holding the sealed file for you and we cannot open it.</p>
 
-  <div class="card">
-    <div class="card-head"><div class="dot"></div><div class="card-head-title">Sent links</div></div>
-    <div class="card-body">
+    <div class="done-payload">
       <ul class="ps-links" id="ps-link-list"></ul>
-      <p class="ps-meta" id="ps-link-note">Each link works once. The first completed download wipes the file from our relay; if nobody opens it, it is destroyed when it expires.</p>
-      <p class="ps-meta" id="ps-link-receipt-note">There is no signed delivery receipt for a link download yet: the relay signs one for the API download path, not for this one. What a row says is the link's own status plus this page's clock, and it lives only as long as this tab.</p>
       <button type="button" class="ps-copy" id="ps-link-refresh" data-click="refreshSentLinks">Check again</button>
     </div>
-  </div>
 
-  <div style="margin-top:16px;display:flex;gap:4px;flex-wrap:wrap">
-    <span class="tag green">AES-256-GCM in your browser</span>
-    <span class="tag green">Key in the URL fragment</span>
-    <span class="tag green">Spent by one download</span>
-  </div>
+    <div class="done-actions">
+      <button class="btn done-primary" data-click="reload">Send another file</button>
+      <button type="button" class="done-quiet" id="ps-link-receipt" hidden>Keep the receipt</button>
+    </div>
 
-  <button class="btn btn-outline" data-click="reload" style="margin-top:16px">Send another file</button>
+    <details class="done-details">
+      <summary>What made this safe</summary>
+      <div class="done-details-body">
+        <p>Your browser locked the file before it left this device, under a key it made here and nowhere else (<code>AES-256-GCM</code>). The key sits in the link after the <code>#</code>, and a browser never puts that part on the wire, so we are holding bytes we have no way to open.</p>
+        <p>The link works once. The first finished download wipes the file from our server, and if nobody comes it is destroyed when it runs out.</p>
+        <p><strong>Keep the receipt</strong> saves the entry this file made in our public log, which anyone can check at <a href="/ct-log">the log</a>: the entry, where it sits in the tree, and the signed tree head. It is proof that we took the sealed file in, not proof that somebody came for it.</p>
+        <p id="ps-link-receipt-note">There is no signed delivery receipt for a link download: the relay signs one for the API download path and not for this one. The status on each link above is this page reading the link's own state against its own clock.</p>
+      </div>
+    </details>
+  </div>
 </div>
 
 <div class="step" id="step-done">
-  <aside class="parapear-block is-success" aria-label="Transfer complete">
-    <img class="parapear-img" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" loading="lazy" decoding="async" width="120" height="120">
-    <div class="parapear-bubble">
-      <span class="parapear-kicker">ParaPear</span>
-      <strong>Done.</strong> And cryptographically proven. Receipt signed with ML-DSA-65 (FIPS 204); the relay never saw your key.
+  <div class="done-state">
+    <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
+    <h2 class="done-title" id="done-title">Sent to the other side.</h2>
+    <p class="done-line" id="done-status">Your file is on its way.</p>
+
+    <div class="done-payload"></div>
+
+    <div class="done-actions">
+      <button class="btn done-primary" data-click="reload">Send another file</button>
+      <button type="button" class="done-quiet" id="done-receipt" hidden>Keep the receipt</button>
     </div>
-  </aside>
 
-  <h2 class="paramant-h1">Sent.</h2>
-  <p class="sub">The receiver can now download the file. This is a web app link, so after one download it is permanently destroyed.</p>
-
-  <div class="card">
-    <div class="card-head"><div class="dot"></div><div class="card-head-title">Transfer complete</div></div>
-    <div class="card-body">
-      <div class="status-line ok" id="done-status">—</div>
-      <div style="margin-top:16px;display:flex;gap:4px;flex-wrap:wrap">
-        <span class="tag green">ML-KEM-768</span>
-        <span class="tag green">Burn-on-read</span>
-        <span class="tag green">Fingerprint verified</span>
-        <span class="tag green">Relay never saw key</span>
-        <span class="tag green" id="vault-badge" style="display:none">Vault mode</span>
+    <details class="done-details">
+      <summary>What made this safe</summary>
+      <div class="done-details-body">
+        <p>The lock was made in your browser, not on our server. Your file was sealed for the other person's own key before it left this device (<code>ML-KEM-768</code> with <code>ECDH</code> for the key exchange, <code>AES-256-GCM</code> for the file itself), and every block was signed on the way out (<code>ML-DSA-65</code>, the signature scheme in FIPS 204).</p>
+        <p>The short code you read out to each other is worked out by both browsers from the other side's public keys. Two screens showing the same code means nobody swapped a key in between, and that is the whole reason we ask you to compare it somewhere we do not run.</p>
+        <p>We are holding a sealed copy and never held the key, so it is not ours to open. It is wiped the moment the other side takes it, and destroyed on its own clock if that never happens.</p>
+        <p><strong>Keep the receipt</strong> saves the entry this transfer made in our public log, which anyone can check at <a href="/ct-log">the log</a>: the entry, where it sits in the tree, and the signed tree head.</p>
       </div>
-    </div>
+    </details>
   </div>
-
-  <button class="btn btn-outline" data-click="reload" style="margin-top:8px">Send another file</button>
 </div>
 
 </main>
@@ -806,7 +822,8 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
      an expiry moment, and a slashed locale date next to "24 hours on Pro"
      is the exact ambiguity that file exists to kill. -->
 <script src="/js/format-date.js?v=1" defer></script>
-<script src="/js/parashare.page.js?v=8" defer></script>
+<script src="/js/done-state.js?v=1" defer></script>
+<script src="/js/parashare.page.js?v=9" defer></script>
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=8" defer></script>
 <footer>

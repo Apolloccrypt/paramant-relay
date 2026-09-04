@@ -76,8 +76,15 @@ function showStep(id) {
   // The receiver-only download path never walks it, and neither does the
   // Send-a-link stand, which has no share-and-compare stage to be at. Showing it
   // there would put a sender on "3 . Compare" in a flow with nothing to compare.
+  // An end screen is an end screen: the two stands you already chose between
+  // and the five-stage bar you already walked have nothing left to offer, and
+  // on a phone they are the first two screenfuls above the answer. Both go.
+  var ENDED = (id === 'step-done' || id === 'step-link' || id === 'step-tb-download');
+  var mode = $('ps-mode');
+  if (mode) mode.style.display = ENDED ? 'none' : '';
+  document.body.classList.toggle('ps-ended', ENDED);
   var stepper = $('ps-stepper');
-  if (stepper) stepper.style.display = (id === 'step-tb-download' || sendMode === 'link') ? 'none' : '';
+  if (stepper) stepper.style.display = (ENDED || sendMode === 'link') ? 'none' : '';
   var stepperKey = ({
     'step-setup': 'setup',
     'step-waiting': 'share',
@@ -654,6 +661,7 @@ async function confirmFingerprint() {
     const CHUNK_PLAIN = 4.5 * 1024 * 1024;
     const META_MAGIC = new Uint8Array([0x50, 0x52, 0x53, 0x48]);
     const ttlMs = parseInt($('ttl-select').value);
+    const proofs = [];
 
     // Helper: encrypt + upload one file, returns token array
     async function encryptFile(file, fileIndex, totalFiles) {
@@ -722,6 +730,12 @@ async function confirmFingerprint() {
         }
         if (!ud.ok) throw new Error(ud.error || 'Upload failed: ' + file.name);
         tokens.push(ud.download_token);
+        // POST /v2/inbound answers with the entry this block made in the public
+        // CT log: leaf hash, index, audit path and the signed tree head. It is
+        // the one piece of real proof the SENDER is handed, so it is kept here
+        // rather than thrown away, and the quiet line on the end screen writes
+        // it out. A relay that answers without one simply gets no line.
+        if (ud.merkle_proof) proofs.push({ file: file.name, chunk: i + 1, proof: ud.merkle_proof });
       }
       return { name: file.name, size: file.size, tokens };
     }
@@ -750,10 +764,26 @@ async function confirmFingerprint() {
       })
     });
 
-    const label = isVault
-      ? files.length + ' files sent — vault ready for receiver'
-      : files[0].name + ' sent securely';
-    $('done-status').textContent = '✓ ' + label;
+    // The end screen, in the words somebody who just handed over a photo would
+    // use. What it may NOT say is that the receiver has the file: the sender's
+    // page is never told that. It knows the sealed blocks are on the relay and
+    // the receiver has been notified, so that is what it says.
+    const what = isVault
+      ? files.length + ' files are on their way'
+      : files[0].name + ' is on its way';
+    // No code in the sentence. The fingerprint is twenty-four characters of hex
+    // and reads as noise in a line of prose; what the sender needs to recognise
+    // is the person, and they have just been on the phone with them.
+    window.paramantDone.fill('step-done', {
+      title: 'Sent to the other side.',
+      line: what + ' to the person you compared the code with. ' +
+            'Our copy is sealed and goes the moment they take it.',
+    });
+    window.paramantDone.proof('step-done', {
+      label: 'Keep the receipt',
+      filename: 'paramant-receipt-' + new Date().toISOString().slice(0, 10) + '.json',
+      data: proofs.length ? { kind: 'paramant-ct-inclusion', sent_utc: new Date().toISOString(), entries: proofs } : null,
+    });
     showStep('step-done');
 
   } catch(e) {
@@ -920,6 +950,8 @@ async function sealAndUpload(file, ttlMs) {
   if (!ud.ok) throw new Error(ud.error || 'Upload failed: ' + file.name);
   return {
     name: file.name, size: file.size, token: ud.download_token,
+    // The sender's one piece of real proof, see the note in js/done-state.js.
+    proof: ud.merkle_proof || null,
     // The relay's ttl_ms, not the one that was asked for: POST /v2/inbound
     // clamps to the tier, and the expiry the sender is shown has to be the one
     // the relay will actually act on.
@@ -971,6 +1003,14 @@ async function createLink() {
     }
     setSealProgress(100);
     renderSentLinks();
+    window.paramantDone.proof('step-link', {
+      label: 'Keep the receipt',
+      filename: 'paramant-receipt-' + new Date().toISOString().slice(0, 10) + '.json',
+      data: sentLinks.some(r => r.proof)
+        ? { kind: 'paramant-ct-inclusion', sent_utc: new Date().toISOString(),
+            entries: sentLinks.filter(r => r.proof).map(r => ({ file: r.name, chunk: 1, proof: r.proof })) }
+        : null,
+    });
     showStep('step-link');
     refreshSentLinks();
   } catch (e) {
@@ -1015,27 +1055,9 @@ function renderSentLinks() {
     li.appendChild(name);
 
     const url = document.createElement('div');
-    url.className = 'ps-link-url';
+    url.className = 'ps-link-url done-link';
     url.textContent = row.url;
     li.appendChild(url);
-
-    const meta = document.createElement('div');
-    meta.className = 'ps-link-meta';
-    const state = document.createElement('span');
-    state.className = 'ps-link-state is-' + row.state;
-    state.textContent = linkStateLabel(row);
-    meta.appendChild(state);
-    const exp = document.createElement('span');
-    // One date format for the whole site (#424): day, month in full, year, and
-    // the clock in UTC, because a one-hour link is a moment and not a day.
-    exp.textContent = 'Expires ' + (window.paramantDate
-      ? window.paramantDate.moment(row.expires_ms)
-      : new Date(row.expires_ms).toISOString());
-    meta.appendChild(exp);
-    const once = document.createElement('span');
-    once.textContent = 'Works once';
-    meta.appendChild(once);
-    li.appendChild(meta);
 
     const copy = document.createElement('button');
     copy.type = 'button';
@@ -1044,6 +1066,22 @@ function renderSentLinks() {
     copy.setAttribute('data-link-index', String(i));
     copy.textContent = 'Copy link';
     li.appendChild(copy);
+
+    // One line, one date format (#424): day, month in full, year and a 24-hour
+    // clock in UTC, because a one-hour link is a moment and not a day. The two
+    // things a sender needs about a link are how often it opens and when it
+    // stops, so they are one sentence and not two badges.
+    const meta = document.createElement('p');
+    meta.className = 'ps-link-meta done-link-meta';
+    meta.textContent = 'Works once, until ' + (window.paramantDate
+      ? window.paramantDate.moment(row.expires_ms)
+      : new Date(row.expires_ms).toISOString());
+    li.appendChild(meta);
+
+    const state = document.createElement('p');
+    state.className = 'ps-link-state done-link-meta is-' + row.state;
+    state.textContent = linkStateLabel(row);
+    li.appendChild(state);
 
     list.appendChild(li);
   });

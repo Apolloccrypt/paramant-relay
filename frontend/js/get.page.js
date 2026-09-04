@@ -219,8 +219,21 @@ async function init() {
 
     setStatus('Done.', 100);
 
-    document.getElementById('done-filename').textContent = filename;
-    document.getElementById('done-filesize').textContent = formatSize(fileData.length);
+    // The end screen. One sentence in ordinary words; the algorithm names live
+    // in the folded <details> next to it, not on the reader's face.
+    window.paramantDone.fill('step-done', {
+      title: 'You have the file.',
+      line: filename + ' (' + formatSize(fileData.length) + ') is saved on your device. ' +
+            'Our copy has been permanently destroyed.',
+    });
+    // A browser can refuse or a person can dismiss a save dialog, and the bytes
+    // are then unreachable for good: the link is spent and will not open again.
+    // So the one primary button on this screen offers the save a second time.
+    // The bytes are held for exactly as long as this tab is in front of
+    // somebody, and dropped the moment it is not, which is the same bargain
+    // /ontvang already makes on its own done screen.
+    savedFile = { name: filename, bytes: fileData };
+    document.addEventListener('visibilitychange', dropSavedFile);
     showStep('step-done');
 
   } catch (e) {
@@ -228,6 +241,22 @@ async function init() {
   }
 }
 
+// The file this tab may still hand over a second time, and the rule for
+// letting go of it. See the note where it is filled, above.
+let savedFile = null;
+function dropSavedFile() {
+  if (!document.hidden) return;
+  savedFile = null;
+  document.removeEventListener('visibilitychange', dropSavedFile);
+  const btn = document.getElementById('done-save');
+  if (btn) btn.hidden = true;
+}
+function saveAgain() {
+  if (!savedFile) return;
+  downloadBytes(savedFile.bytes, savedFile.name, 'application/octet-stream');
+}
+
 window.addEventListener('DOMContentLoaded', init);
 
 act('click','goReceive',()=>goReceive());
+act('click','saveAgain',()=>saveAgain());

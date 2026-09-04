@@ -74,6 +74,18 @@ body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]
    would say two different things at once. */
 body[data-ds-step="step-hash-only"] #ds-doc-meta,
 body[data-ds-step="step-done"] #ds-doc-meta{display:none}
+/* The five-stage bar is a map of a walk that is over. */
+body[data-ds-step="step-done"] .ds-stepper{display:none}
+/* The end screen sets its own rhythm; the shape is done-state.css. */
+#step-done .done-title{font-size:22px;line-height:1.25;margin:0 0 12px}
+#step-done .ds-sub{margin:0 auto;max-width:30rem}
+#step-done .ds-proof-scope{max-width:30rem;margin:16px auto 0;text-align:left;font-size:13px;line-height:1.6;color:var(--ink-2);border-left:2px solid var(--line-2);padding-left:12px}
+#step-done #ds-signed-preview{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:var(--r-1)}
+#step-done #ds-signed-preview:empty{display:none}
+#step-done .ds-usage-card{text-align:left}
+#step-done .ds-pl-copy{background:transparent;border:1px solid var(--line-2);color:var(--ink-1);font-weight:500}
+#step-done .ds-pl-copy:hover{border-color:var(--ink-1);background:transparent}
+#step-done .done-details-body .ds-info-card{margin-top:14px}
 .ds-stepper{list-style:none;display:flex;gap:8px;padding:0;margin:0 0 32px;border-bottom:1px solid var(--line);counter-reset:dsstep}
 .ds-stepper li{flex:1;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);padding:14px 0;border-bottom:2px solid transparent;counter-increment:dsstep;text-align:center}
 .ds-stepper li::before{content:counter(dsstep);display:inline-block;width:20px;height:20px;border:1px solid var(--line-2);border-radius:50%;line-height:18px;font-size:10px;margin-right:6px;font-weight:600}
@@ -469,6 +481,7 @@ body[data-ds-step="step-done"] #ds-doc-meta{display:none}
 </script>
 <meta name="theme-color" content="#15191C">
 <link rel="stylesheet" href="/app-2026.css?v=7">
+<link rel="stylesheet" href="/done-state.css?v=1">
 <script src="/js/theme.js?v=4"></script>
 </head>
 <body>
@@ -862,68 +875,89 @@ body[data-ds-step="step-done"] #ds-doc-meta{display:none}
     </div>
   </section>
 
-  <!-- Done -->
+  <!-- Done. The one end screen, shared with /parashare, /get and /ontvang:
+       see done-state.css. A small mark, one heading, one sentence, one primary
+       button and one quiet line, with the whole technical account folded away
+       under "What made this safe" rather than deleted. The wording is written
+       in by sign-flow.js, which knows whether this was a signature of your own
+       or a set of invitations on their way out. -->
   <section class="ds-step" id="step-done" hidden>
-    <!-- What the proof says, and what it does not. An open-mode envelope has no
-         invited email and no verified signer: recipe version 4 binds the
-         SIGNER'S PUBLIC KEY into the signed message, so the proof commits to
-         "key K signed slot i of document D" and to nothing about who holds K.
-         Saying more than that would be the same overclaim the ParaID assurance
-         rung was renamed for (substantial -> mrz-unverified). Shown by
-         sign-flow.js only for binding_mode 'open'. -->
-    <p class="ds-proof-scope" id="ds-proof-scope" hidden>
-      <strong>Signer not verified.</strong> This document was signed in open mode, so no
-      email invitation tied a person to a slot. The proof shows that a specific key signed
-      this exact document, and that the key is the one recorded in the envelope. It does not
-      show who holds that key. For a signature bound to an invited email address, use
-      <em>Request signatures</em> instead.
-    </p>
-    <div class="ds-success" id="ds-success-banner" hidden></div>
-    <h2>Your signed document</h2>
-    <p class="ds-sub">Here is what your signature looks like on the document. Scroll the preview to inspect the stamp. The downloads below are self-contained: anyone with your public key can verify them offline, with or without the Paramant relay.</p>
+    <div class="done-state">
+      <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
+      <h2 class="done-title">Signed.</h2>
+      <p class="ds-sub done-line" id="ds-done-line">Your signature is on the document.</p>
 
-    <div id="ds-signed-preview" style="margin:14px 0"></div>
+      <!-- Kept on the face of the screen and never folded away: it is the one
+           thing here that takes something back. What the proof says, and what it
+           does not. An open-mode envelope has no invited email and no verified
+           signer: recipe version 4 binds the SIGNER'S PUBLIC KEY into the signed
+           message, so the proof commits to "key K signed slot i of document D"
+           and to nothing about who holds K. Saying more than that would be the
+           same overclaim the ParaID assurance rung was renamed for (substantial
+           -> mrz-unverified). Shown by sign-flow.js only for binding_mode
+           'open'. -->
+      <p class="ds-proof-scope" id="ds-proof-scope" hidden>
+        <strong>Signer not verified.</strong> This document was signed in open mode, so no
+        email invitation tied a person to a slot. The proof shows that a specific key signed
+        this exact document, and that the key is the one recorded in the envelope. It does not
+        show who holds that key. For a signature bound to an invited email address, use
+        <em>Request signatures</em> instead.
+      </p>
 
-    <div class="ds-info-card">
-      <dl>
-        <dt>Document</dt>       <dd id="ds-done-name">-</dd>
-        <dt>Mode</dt>           <dd id="ds-done-mode">-</dd>
-        <dt>Key fingerprint</dt><dd id="ds-done-fingerprint">-</dd>
-        <dt>Relay record</dt>   <dd id="ds-done-notary">-</dd>
-      </dl>
-    </div>
-    <div class="ds-banner warn" role="note"><strong>Save both files now.</strong> Paramant does not keep a plaintext recovery copy. Download the signed document and its `.psign` proof before closing this tab. Keep them together.</div>
-    <div class="ds-actions">
-      <button class="btn btn-primary" id="ds-dl-pdf" type="button" hidden>Download signed PDF</button>
-      <button class="btn btn-secondary" id="ds-dl-psign" type="button">Download .psign envelope</button>
-      <a class="btn btn-tertiary" href="/verify">Verify an envelope</a>
-      <button class="btn btn-tertiary" id="ds-restart" type="button">Sign another</button>
-    </div>
+      <div class="done-payload">
+        <div class="ds-banner err" id="ds-success-banner" hidden></div>
+        <div id="ds-signed-preview"></div>
 
-    <div class="ds-usage-card" id="ds-party-links-card" hidden>
-      <h3 class="ds-proof-h">Share with your recipients</h3>
-      <p class="ds-usage-p" id="ds-party-links-copy">Each recipient gets a personal link. The encrypted document opens and is verified in their browser before signing is enabled.</p>
-      <div class="ds-banner" id="ds-invite-delivery-result" hidden role="status" aria-live="polite"></div>
-      <div class="ds-party-links" id="ds-party-links"></div>
-      <button class="btn btn-secondary" id="ds-invite-retry" type="button" hidden>Retry failed emails</button>
-      <p class="ds-usage-p" style="font-size:11px;color:var(--ink-dim)">Status of all parties is visible at any time via <a id="ds-envelope-status-link" href="#">the envelope status page</a>.</p>
-    </div>
+        <div class="ds-usage-card" id="ds-party-links-card" hidden>
+          <h3 class="ds-proof-h">Their personal links</h3>
+          <p class="ds-usage-p" id="ds-party-links-copy">Each signer gets a link of their own, and it opens only for them.</p>
+          <div class="ds-banner" id="ds-invite-delivery-result" hidden role="status" aria-live="polite"></div>
+          <div class="ds-party-links" id="ds-party-links"></div>
+          <button class="btn btn-secondary" id="ds-invite-retry" type="button" hidden>Retry failed emails</button>
+          <p class="ds-usage-p" style="font-size:11px;color:var(--ink-dim)">See where everyone stands on <a id="ds-envelope-status-link" href="#">the status page for this request</a>.</p>
+        </div>
+      </div>
 
-    <div class="ds-usage-card">
-      <h3 class="ds-proof-h">How to use your signature</h3>
-      <p class="ds-usage-p">Share <strong>both</strong> files with the recipient. They prove ownership only as a pair.</p>
-      <ol class="ds-usage-list" id="ds-usage-files"></ol>
-      <p class="ds-usage-p"><strong>Recipients verify in either of two ways:</strong></p>
-      <ol class="ds-usage-list">
-        <li>Open <a href="/verify">paramant.app/verify</a>, drop both files in, and hit Verify. The page recomputes SHA3-256 of the document, runs ML-DSA-65 verify against the public key in the envelope, and (if the envelope was counter-signed) confirms the relay's signature against Paramant's published <a href="/ct-log">CT log</a>.</li>
-        <li>Or run the CLI: <code>paramant-sign verify &lt;file&gt; &lt;envelope.psign&gt;</code> from <a href="/docs#operator-scripts">paramant-sign</a>. Same checks, offline.</li>
-      </ol>
-      <p class="ds-usage-p"><strong>A green 'verified' result means three things at once:</strong></p>
-      <ul class="ds-usage-list">
-        <li>The document bytes have not changed since you signed.</li>
-        <li>The signature was produced by the holder of the private key matching the public key in the envelope.</li>
-        <li id="ds-usage-notary-line"></li>
-      </ul>
+      <div class="done-actions">
+        <button class="btn btn-primary done-primary" id="ds-dl-pdf" type="button" hidden>Download signed PDF</button>
+        <button class="done-quiet" id="ds-dl-psign" type="button">Keep the proof file</button>
+        <button class="done-quiet" id="ds-restart" type="button">Sign another</button>
+      </div>
+
+      <!-- The invitations end screen has a different account to give: nothing
+           has been signed yet, so the self-signed text below would be untrue on
+           it. Swapped in by sign-flow.js. -->
+      <details class="done-details" id="ds-invite-details" hidden>
+        <summary>What made this safe</summary>
+        <div class="done-details-body">
+          <p>The document was sealed in your browser before any of it left this device, and each personal link carries that one person's key after the <code>#</code>, which is the part of a link a browser never sends to a server. What sits on our side is bytes we have no way to read.</p>
+          <p>A link is bound to the address you gave it, so it opens for that signer and not for whoever else it is forwarded to. When they sign, the signature is made on their own device with a key of their own (<code>ML-DSA-65</code>) and recorded on our relay and in the public <a href="/ct-log">CT log</a>, so you can show later that it happened and when.</p>
+          <p>Nobody has signed anything yet. This screen is the moment the requests went out.</p>
+        </div>
+      </details>
+
+      <details class="done-details" id="ds-signed-details">
+        <summary>What made this safe</summary>
+        <div class="done-details-body">
+          <p>The signature was made here, on this device, by a key that never left the browser and was unlocked by your face, your fingerprint or your security key at the moment you signed (<code>ML-DSA-65</code>, the signature scheme in FIPS 204). We hold the public half and the record of it. We never held the half that signs.</p>
+          <p>The proof file travels with the document and stands on its own. Anyone can check the pair without an account and without us: at <a href="/verify">paramant.app/verify</a>, which recomputes the document's own digest (<code>SHA3-256</code>), checks the signature against the public key inside the envelope and, when the envelope was counter-signed, checks our signature against the public <a href="/ct-log">CT log</a>. Or offline, with <code>paramant-sign verify &lt;file&gt; &lt;envelope.psign&gt;</code> from <a href="/docs#operator-scripts">paramant-sign</a>.</p>
+          <p>A green result there means three things at once: the bytes have not changed since you signed, the signature came from the holder of that key, and <span id="ds-usage-notary-line"></span></p>
+
+          <div class="ds-info-card">
+            <dl>
+              <dt>Document</dt>       <dd id="ds-done-name">-</dd>
+              <dt>Mode</dt>           <dd id="ds-done-mode">-</dd>
+              <dt>Key fingerprint</dt><dd id="ds-done-fingerprint">-</dd>
+              <dt>Relay record</dt>   <dd id="ds-done-notary">-</dd>
+            </dl>
+          </div>
+
+          <div class="ds-usage-card">
+            <h3 class="ds-proof-h">The files, and what each one is</h3>
+            <ol class="ds-usage-list" id="ds-usage-files"></ol>
+          </div>
+        </div>
+      </details>
     </div>
   </section>
 </div>
@@ -963,6 +997,7 @@ body[data-ds-step="step-done"] #ds-doc-meta{display:none}
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=4" defer></script>
-<script type="module" src="/sign-flow.js?v=53"></script>
+<script src="/js/done-state.js?v=1" defer></script>
+<script type="module" src="/sign-flow.js?v=54"></script>
 </body>
 </html>
