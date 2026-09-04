@@ -118,7 +118,11 @@ function runPage({ keyResponses, sectorOk = true, relayStatus = null }) {
       querySelectorAll: () => [],
       createElement: () => makeElement('created'),
       head: { appendChild() {} },
-      body: { appendChild() {} },
+      // A real element, not a bag with appendChild on it. showStep() marks the
+      // body .ps-ended once a stand has finished, and a body without a
+      // classList made every step change throw where a browser does nothing at
+      // all. That is the harness lagging the page, not the page misbehaving.
+      body: makeElement('body'),
       addEventListener: (type, fn) => { listeners.set(type, (listeners.get(type) || []).concat(fn)); },
     },
     // Every timer resolves on the next microtask; the delay asked for is
