@@ -152,6 +152,12 @@ ORG = {
     "knowsLanguage": ["nl", "en"]}
 
 
+# The one page written in Dutch. Everything else on the site is English, and
+# inLanguage was hardcoded to match; a Dutch page carrying inLanguage "en" is a
+# small lie in the one block that exists to be machine-read.
+DUTCH = {"gereedschap"}
+
+
 def graph_for(slug, title, desc):
     """The JSON-LD graph for one page.
 
@@ -168,7 +174,7 @@ def graph_for(slug, title, desc):
         "name": clean(title),
         "isPartOf": {"@id": f"{ORIGIN}/#website"},
         "publisher": {"@id": f"{ORIGIN}/#organization"},
-        "inLanguage": "en"}
+        "inLanguage": "nl" if slug in DUTCH else "en"}
     if desc:
         page["description"] = desc
     nodes = [page]

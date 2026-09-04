@@ -29,9 +29,13 @@ function ok(name, condition, detail='') { checks.push({ name, pass:!!condition, 
 const publicPage = await browser.newPage({ viewport:{ width:390, height:844 } });
 await publicPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
 await publicPage.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
-await publicPage.waitForFunction(() => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === 'Product,Security,Pricing,Docs');
+await publicPage.waitForFunction(() => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === 'Product,Gereedschap,Security,Pricing,Docs');
 const publicDesktop = await publicPage.locator('nav.nav .nav-links .nav-link').allInnerTexts();
-ok('public navigation has four clear destinations', JSON.stringify(publicDesktop) === JSON.stringify(['Product','Security','Pricing','Docs']), publicDesktop.join(', '));
+// The bar carries the free tools as their own destination. Everything a
+// visitor can use without an account lived one level down, behind /pricing or
+// a body link, so the page that collects it was the least reachable thing on
+// the site. It is the front door of the ladder, so it sits next to Product.
+ok('public navigation names its destinations, including the free tools', JSON.stringify(publicDesktop) === JSON.stringify(['Product','Gereedschap','Security','Pricing','Docs']), publicDesktop.join(', '));
 // The signed-out hero now offers ONE primary action and one secondary, not
 // three. Three equal buttons is three decisions before the visitor knows what
 // the product is; ParaSend keeps its own call to action further down the page,

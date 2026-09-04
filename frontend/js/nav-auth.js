@@ -4,10 +4,11 @@
 
   // Keep this list identical to the <ul class="nav-links"> that
   // frontend/apply-nav.py stamps into every page. The generator is the source
-  // of truth; this array only re-renders the same four links after the session
+  // of truth; this array only re-renders the same links after the session
   // check, so a visitor never sees the navigation move under them.
   var PUBLIC_NAV = [
     ['Product', '/#products'],
+    ['Gereedschap', '/gereedschap'],
     ['Security', '/security'],
     ['Pricing', '/pricing'],
     ['Docs', '/docs']
