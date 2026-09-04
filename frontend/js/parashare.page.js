@@ -865,6 +865,12 @@ function applyPlanTtls(found) {
   const el = $('ps-mode-link-ttl');
   if (!el || !planTtlByPlan) return;
   const c = humanDuration(planTtlByPlan.community);
+  // The table the relay serves is keyed by ENTITLEMENT TIER (tiers.js rows:
+  // community, pro, business, enterprise). The sentence names the PLAN a reader
+  // can buy, and since 6 September 2026 the plan that grants the 'pro' row is
+  // Firm; nobody can buy a plan called Pro any more. So the key stays 'pro' and
+  // the word beside it is Firm: 24 hours is what Firm actually gives you, which
+  // is the same 24 hour link expiry the Firm card prints on /pricing.
   const pr = humanDuration(planTtlByPlan.pro);
   // Enterprise, not Business. tiers.js carries a business row and it is
   // load-bearing server-side, but the ParaSend price table sells Community,

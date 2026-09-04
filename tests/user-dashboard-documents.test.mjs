@@ -270,14 +270,21 @@ ok('the empty document list offers the action that fills it',
   (await emptyCta.getAttribute('href')).startsWith('/sign') &&
   emptyCtaBox.height >= 44, JSON.stringify({ href: await emptyCta.getAttribute('href'), height: emptyCtaBox && Math.round(emptyCtaBox.height) }));
 
+// The stored tier is 'pro' and the badge says Firm. Those are two different
+// things and both are right: 'pro' is the entitlement tier the relay writes
+// (relay/lib/entitlements.js PARASIGN_TIERS, unchanged), Firm is the plan that
+// grants it since 6 September 2026. What is under test here is the GATE, not
+// the word: the decision that this account is paid runs off PRODUCT_LADDER,
+// the tier keys, so renaming what is printed cannot move it. band === false is
+// the half that would go red if it ever did.
 const paidPlan = await planCase({ plan:'community', plan_parasign:'pro', paid_until_parasign:future });
-ok('a paid ParaSign tier is never called free', paidPlan.badge === 'Pro' && paidPlan.band === false, JSON.stringify(paidPlan));
+ok('a paid ParaSign tier is never called free', paidPlan.badge === 'Firm' && paidPlan.band === false, JSON.stringify(paidPlan));
 
 const lapsedPlan = await planCase({ plan:'community', plan_parasign:'pro', paid_until_parasign:past });
 ok('an expired paid period falls back to Community', lapsedPlan.badge === 'Community' && lapsedPlan.band === true, JSON.stringify(lapsedPlan));
 
 const sendPlan = await planCase({ plan:'community', plan_parasend:'pro', paid_until_parasend:future });
-ok('a paid ParaSend tier counts too', sendPlan.badge === 'Pro' && sendPlan.band === false, JSON.stringify(sendPlan));
+ok('a paid ParaSend tier counts too', sendPlan.badge === 'Firm' && sendPlan.band === false, JSON.stringify(sendPlan));
 
 const licensedPlan = await planCase({ plan:'licensed' });
 ok('a licensed account reads as Enterprise, not as a machine string', licensedPlan.badge === 'Enterprise' && licensedPlan.band === false, JSON.stringify(licensedPlan));
@@ -350,8 +357,14 @@ ok('an unrecognised tier fails closed rather than unlocking a subscription',
   acctUnknown.current === 'Community' && acctUnknown.active === false && acctUnknown.cancel === false, JSON.stringify(acctUnknown));
 
 const acctPaid = await acctCase({ plan:'community', plan_parasign:'pro', paid_until_parasign:future });
+// Same split as on the dashboard above: the tier on file is 'pro', the plan it
+// is sold as is Firm. The four booleans are the point of this check and none of
+// them reads a name: active, cancel, giveBack and bought all come off
+// paidProductTier(), which walks the tier keys and fails closed on anything it
+// does not recognise. A give-back band decided by the plan NAME is exactly the
+// bug this line was written for, and it would show up here as giveBack true.
 ok('a self-serve customer gets the badge and the cancel button he pays for',
-  acctPaid.chip === 'Pro' && acctPaid.current === 'Pro' &&
+  acctPaid.chip === 'Firm' && acctPaid.current === 'Firm' &&
   acctPaid.active === true && acctPaid.cancel === true &&
   acctPaid.giveBack === false && acctPaid.bought === true, JSON.stringify(acctPaid));
 
