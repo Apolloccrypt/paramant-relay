@@ -180,9 +180,12 @@ ok('a session says the day and names the clock it is on',
 // ── /dashboard ───────────────────────────────────────────────────────────────
 // "Created Aug 31, 2026" sat one card away from "Ends on 8 September". Same
 // page, same kind of fact, two notations.
+// The term line and the document rows come from two separate fetches; under
+// CI load the rows landed after the read and the row check flaked (main at
+// 3268d4a9). Wait for both before reading the page.
 const dashboard = await open('/dashboard', () => {
   const line = document.getElementById('dh-term-line');
-  return line && !line.hidden;
+  return line && !line.hidden && /Created /.test(document.body.innerText);
 });
 const dash = await dashboard.evaluate(() => ({
   body: document.body.innerText,
