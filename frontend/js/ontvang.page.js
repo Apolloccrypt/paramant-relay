@@ -294,6 +294,7 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
     $('recv-status').textContent = 'Saving file...';
 
     let totalSize = 0;
+    let savedBlob = null;
     if (fileWriter) {
       // Streaming: sluit schrijfstream — bestand al opgeslagen op disk
       await fileWriter.close();
@@ -304,6 +305,7 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
       // Expliciet octet-stream zodat de browser geen .txt-extensie afleidt.
       const blob = new Blob(chunks, { type: 'application/octet-stream' });
       totalSize = blob.size;
+      savedBlob = blob;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = fileName; a.click();
@@ -311,18 +313,17 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
     }
 
     if (!opts.silent) {
-      const sizeStr = totalSize > 0 ? ' (' + (totalSize/1024/1024).toFixed(2) + ' MB)' : '';
-      $('done-status').textContent = '✓ ' + fileName + sizeStr + ' — decrypted and saved';
-      const receiptEl = $('burn-receipt');
-      if (receiptEl && burnedHashes.length) {
-        receiptEl.textContent = burnedHashes.map(b => 'chunk ' + b.chunk + '  hash:' + b.hash + '...  burned: ' + b.ts).join('\n');
-        receiptEl.style.display = 'block';
-      }
-      if (msg.ttl_ms) {
-        const exp = new Date(Date.now() + msg.ttl_ms);
-        $('ttl-note').textContent = 'Relay copy auto-expired at: ' + exp.toLocaleTimeString();
-        $('ttl-note').style.display = 'block';
-      }
+      // The end screen. What somebody who has just received a photo wants to
+      // know is that they have it and that nothing is left lying about, in that
+      // order. The chunk hashes and the algorithm names still exist, one fold
+      // down under "What made this safe".
+      const sizeStr = totalSize > 0 ? ' (' + formatSize(totalSize) + ')' : '';
+      window.paramantDone.fill('step-done', {
+        title: 'You have the file.',
+        line: fileName + sizeStr + ' is saved on your device. Our copy has been permanently destroyed.',
+      });
+      offerSaveAgain(savedBlob, fileName);
+      renderBurnReceipt(burnedHashes);
       showStep('step-done');
       if (ws) ws.close();
     }
@@ -331,7 +332,8 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
     const _burnOnHide = () => {
       if (document.hidden) {
         chunks.length = 0;  // leeg de chunk array
-        $('done-status').textContent += ' — memory cleared (tab hidden)';
+        // The offer to save again goes with it: it is the same bytes.
+        offerSaveAgain(null, null);
         document.removeEventListener('visibilitychange', _burnOnHide);
       }
     };
@@ -359,17 +361,65 @@ async function receiveVault(vaultFiles, ttl_ms, kyberSec, ecdhPriv) {
     $('recv-status').textContent = 'Vault: ' + (fi+1) + '/' + vaultFiles.length + ' downloaded';
   }
 
-  $('done-status').textContent = '✓ Vault opened — ' + vaultFiles.length + ' files decrypted and saved';
-  const ttlNote = $('ttl-note');
-  if (ttlNote) {
-    ttlNote.textContent = 'All vault blobs burned. TTL: ' + (ttl_ms/1000) + 's';
-    ttlNote.style.display = 'block';
-  }
+  window.paramantDone.fill('step-done', {
+    title: 'You have the files.',
+    line: vaultFiles.length + ' files are saved on your device. Our copies have been permanently destroyed.',
+  });
+  // Each file in a vault saved itself as it arrived; there is no single blob
+  // left to hand over again, so the screen keeps the dashboard as its one
+  // button rather than offering a save it cannot perform.
+  offerSaveAgain(null, null);
+  renderBurnReceipt(burnedHashes);
   showStep('step-done');
   if (ws) ws.close();
 }
+// ── The end screen's two moving parts ────────────────────────────────────────
+//
+// A browser can refuse a save and a person can dismiss the dialog, and on this
+// page the bytes are then unreachable for good: every block was burned on the
+// relay as it was read. So the screen offers the save a second time while it
+// still can, and says so with the one primary button it has. When there is
+// nothing to hand over again the dashboard link takes that place instead, so
+// the screen is never a dead end and never has two loud buttons.
+let savedFile = null;
+function offerSaveAgain(blob, name) {
+  const btn = $('done-save');
+  const dash = $('done-dashboard');
+  savedFile = (blob && name) ? { blob, name } : null;
+  if (btn) btn.hidden = !savedFile;
+  if (dash) dash.className = savedFile ? 'done-quiet' : 'btn done-primary';
+}
+function saveAgain() {
+  if (!savedFile) return;
+  const url = URL.createObjectURL(savedFile.blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = savedFile.name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+// What the relay reported as each block went. Machine detail, so it lives
+// inside the folded <details> and not on the face of the screen.
+function renderBurnReceipt(burnedHashes) {
+  const el = $('burn-receipt');
+  if (!el) return;
+  if (!burnedHashes || !burnedHashes.length) { el.hidden = true; return; }
+  el.textContent = burnedHashes
+    .map(b => 'block ' + b.chunk + '  hash ' + b.hash + '...  wiped ' + b.ts)
+    .join('\n');
+  el.hidden = false;
+}
+
+// Bytes into something a person reads. Same rounding as /get.
+function formatSize(n) {
+  if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
+  if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
+  return n + ' B';
+}
+
 // init() waits for the ML-KEM library itself, so there is nothing to listen for
 // and no event left to miss.
 if (tokenValid) init();
 
 act('click','reload',()=>location.reload());
+act('click','saveAgain',()=>saveAgain());

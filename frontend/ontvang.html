@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="/design-system.css?v=28">
 <link rel="stylesheet" href="/nav.css?v=23">
 <link rel="stylesheet" href="/relay-pulse.css?v=4">
+<link rel="stylesheet" href="/done-state.css?v=1">
 <meta name="description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download.">
 <meta property="og:title" content="A secure file is waiting · Paramant">
 <meta property="og:description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download. Nothing is stored on the server.">
@@ -199,29 +200,34 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   </div>
 </div>
 
-<!-- STEP 4: Done -->
+<!-- STEP 4: Done. The one end screen, shared with /get and /parashare: see
+     done-state.css. Small mark, one heading, one sentence, one button, and the
+     technical account folded away rather than deleted. -->
 <div class="step" id="step-done">
-  <h1>File received.</h1>
-  <p class="sub">The file has been decrypted and downloaded. The relay copy has been permanently destroyed.</p>
+  <div class="done-state">
+    <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
+    <h1 class="done-title">You have the file.</h1>
+    <p class="done-line" id="done-status">It is saved on your device. Our copy has been permanently destroyed.</p>
 
-  <div class="card">
-    <div class="card-head"><div class="dot"></div><div class="card-head-title">Transfer complete</div></div>
-    <div class="card-body">
-      <div class="status-line ok" id="done-status">-</div>
-      <div id="ttl-note" style="display:none;font-size:10px;color:var(--ink-dim);margin-top:6px;padding:4px 0"></div>
-      <pre id="burn-receipt" style="display:none;font-size:10px;color:var(--ink-dim);margin-top:10px;padding:10px;background:var(--bone);border:1px solid var(--ink-hair);overflow-x:auto;line-height:1.8"></pre>
-      <div style="margin-top:16px;display:flex;gap:4px;flex-wrap:wrap">
-        <span class="tag green">ML-KEM-768</span>
-        <span class="tag green">Burn-on-read</span>
-        <span class="tag green">Fingerprint verified</span>
-        <span class="tag green">Private key never left browser</span>
-        <span class="tag green" id="vault-badge" style="display:none">Vault</span>
-      </div>
+    <div class="done-payload"></div>
+
+    <div class="done-actions">
+      <button class="btn done-primary" id="done-save" type="button" data-click="saveAgain" hidden>Save it again</button>
+      <a class="done-quiet" id="done-dashboard" href="/dashboard">Open your dashboard</a>
     </div>
+
+    <details class="done-details">
+      <summary>What made this safe</summary>
+      <div class="done-details-body">
+        <p>Your browser made its own pair of keys when this page opened and kept the private half here, where it still is. The sender locked the file for the public half before it left their device, so what travelled was sealed for you and for nobody else (<code>ML-KEM-768</code> with <code>ECDH P-256</code> for the key exchange, <code>AES-256-GCM</code> for the file).</p>
+        <p>The short code you both read out was worked out on this side too, from your own keys. Two screens showing the same code is what tells you nobody swapped a key in between.</p>
+        <p>A transfer through this web app is read once. Each block was wiped on our side as your browser took it, and our copy is destroyed on its own clock as well if nobody ever comes for it. What our relay reported on the way is written below.</p>
+        <pre id="burn-receipt" hidden></pre>
+      </div>
+    </details>
   </div>
 </div>
 
-<!-- STEP: Error -->
 <div class="step" id="step-error">
   <h1>Transfer failed</h1>
   <div class="card">
@@ -267,7 +273,8 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <script type="module" src="/noble-mlkem-loader.js?v=5"></script>
 <script type="module" src="/js/ontvang.inline1.js?v=2"></script>
 <script src="/js/delegate.js?v=1" defer></script>
-<script src="/js/ontvang.page.js?v=2" defer></script>
+<script src="/js/done-state.js?v=1" defer></script>
+<script src="/js/ontvang.page.js?v=3" defer></script>
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=8" defer></script>
 </body>

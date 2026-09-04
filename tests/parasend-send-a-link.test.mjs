@@ -168,11 +168,14 @@ ok('the key travels in the URL fragment', fragment.length >= 58 && !shownLink.sp
   'fragment: ' + fragment.slice(0, 12) + '...');
 ok('the fragment is unpadded base64url', /^[A-Za-z0-9_-]+$/.test(fragment), fragment.slice(0, 12));
 
-const metaText = (await sender.locator('#ps-link-list .ps-link-meta').first().textContent()).replace(/\s+/g, ' ');
+const metaText = (await sender.locator('#ps-link-list .ps-link-row').first().textContent()).replace(/\s+/g, ' ');
 // One date format for the whole site (#424): a month written out, a year, and a
 // named zone. A slashed date here is the exact ambiguity that rule exists for.
+// The two things a sender needs about a link, how often it opens and when it
+// stops, are now one sentence rather than two badges: "Works once, until
+// 6 September 2026, 14:10 UTC".
 ok('the expiry is written in the one site date format',
-  /Expires \d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}, \d{2}:\d{2} UTC/.test(metaText),
+  /until \d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}, \d{2}:\d{2} UTC/.test(metaText),
   metaText);
 ok('the row warns the link works once', /Works once/.test(metaText), metaText);
 ok('the row starts out waiting for the receiver', /Waiting for the receiver/.test(metaText), metaText);
@@ -210,7 +213,7 @@ ok('the file comes back byte for byte', Buffer.compare(back, Buffer.from(PAYLOAD
 
 await receiver.waitForSelector('#step-done.active', { timeout: 15000 });
 ok('the receiver is told the relay copy is gone',
-  /permanently destroyed/i.test(await receiver.locator('#step-done .sub').textContent()));
+  /permanently destroyed/i.test(await receiver.locator('#step-done .done-line').textContent()));
 
 // ── The second open ──────────────────────────────────────────────────────────
 const second = await receiverCtx.newPage();

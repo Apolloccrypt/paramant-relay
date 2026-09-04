@@ -3067,8 +3067,8 @@ function renderSignQuotaNotice(quota) {
   const div = document.createElement('div');
   div.id = 'ds-quota-note';
   div.innerHTML = html;
-  const h = host.querySelector('h2');
-  if (h && h.nextSibling) host.insertBefore(div, h.nextSibling);
+  const payload = host.querySelector('.done-payload');
+  if (payload) payload.appendChild(div);
   else host.appendChild(div);
 }
 
@@ -3106,19 +3106,26 @@ function showDone() {
   renderSignQuotaNotice(r && r.quota);
   if (state.signingMode === 'invite') { showDoneInvite(r); return; }
 
-  // Success banner: the signature was produced locally (the private key never
-  // left the browser); the relay only recorded the public signature + CT entry.
+  // The banner used to repeat, in algorithm names, what the heading already
+  // says in words. On a screen that went well there is nothing for it to add,
+  // so it stays out of the way and is kept for the case where something did go
+  // wrong (see showDoneInvite). The names live under "What made this safe".
   const sb = $('ds-success-banner');
-  if (sb) {
-    sb.hidden = false;
-    sb.className = 'ds-success';
-    sb.innerHTML =
-      '<div class="ds-success-icon" aria-hidden="true">&#10003;</div>' +
-      '<div><strong>Signed locally with ML-DSA-65.</strong>' +
-      ' <span>Your private key never left this browser. The envelope below is self-contained and verifiable offline.</span></div>';
-  }
+  if (sb) { sb.hidden = true; sb.textContent = ''; }
+  const inviteDetails = $('ds-invite-details'); if (inviteDetails) inviteDetails.hidden = true;
 
-  if (state.totpSha1) renderTotpSha1Note(sb);
+  const signedName = r.stampedBytes ? signedDocName() : state.doc.name;
+  paDone().fill('step-done', {
+    title: 'Signed.',
+    line: r.stampedBytes
+      ? 'Your signature is on ' + signedName + '. Save both files now and keep them together, ' +
+        'because we do not hold a copy you could come back for.'
+      : 'Your signature covers ' + signedName + ', which is left exactly as it was. ' +
+        'Save the proof file now and keep it with the document, because we do not hold a copy ' +
+        'you could come back for.',
+  });
+
+  if (state.totpSha1) renderTotpSha1Note($('ds-done-line'));
 
   $('ds-done-fingerprint').textContent = r.fingerprint;
   $('ds-done-name').textContent = state.doc.name;
@@ -3134,6 +3141,11 @@ function showDone() {
 
   const psignName = (state.mode === 'pdf' ? 'signed-' + state.doc.name : state.doc.name).replace(/\.[^.]+$/, '') + '.psign';
   $('ds-dl-psign').onclick = () => downloadBytes(new TextEncoder().encode(JSON.stringify(r.envelope, null, 2)), psignName, 'application/json');
+  // One loud button per end screen. When there is a stamped document it is the
+  // one people came for and the proof file is the quiet line beside it; in
+  // hash-only mode the proof file IS the document's only companion, so it takes
+  // the loud place instead.
+  setDonePrimary(r.stampedBytes ? 'ds-dl-pdf' : 'ds-dl-psign');
   if (r.stampedBytes) {
     $('ds-dl-pdf').hidden = false;
     $('ds-dl-pdf').textContent = state.mode === 'pdf' ? 'Download signed PDF' : 'Download signed image';
@@ -3162,12 +3174,12 @@ function showDone() {
       filesList.appendChild(li1);
     }
     const li2 = document.createElement('li');
-    li2.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(psignName)}</span><span class="ds-usage-files-note">the cryptographic envelope (ML-DSA-65 signature + your public key + metadata)</span>`;
+    li2.innerHTML = `<span class="ds-usage-files-file">${escapeHtml(psignName)}</span><span class="ds-usage-files-note">the proof: the signature, your public key and what was signed</span>`;
     filesList.appendChild(li2);
   }
   const notaryLine = $('ds-usage-notary-line');
   if (notaryLine) {
-    notaryLine.textContent = 'Your signature is recorded on the Paramant relay and written to the public CT log, so recipients get an independent witness of when this signing happened.';
+    notaryLine.textContent = 'it was recorded on our relay and written to the public CT log, which gives the reader an independent witness of when this happened.';
   }
 
   // Multi-party: render share-links for the recipients (party 1..N).
@@ -3208,23 +3220,54 @@ function showDoneInvite(r) {
   const emailMode = state.deliveryMode === 'email';
   const emailOk = emailMode && delivery?.ok;
   const emailPartial = emailMode && delivery && !delivery.ok;
+  // The banner earns its place only when something went wrong. A screen where
+  // everything worked says so once, in the heading, and then stops talking.
   const sb = $('ds-success-banner');
   if (sb) {
-    sb.hidden = false; sb.className = emailPartial ? 'ds-banner err' : 'ds-success';
+    sb.hidden = !emailPartial;
+    sb.className = 'ds-banner err';
     sb.innerHTML = emailPartial
       ? '<strong>Request created, but not every email was delivered.</strong> Use Retry or copy the failed personal links below.'
-      : '<div class="ds-success-icon" aria-hidden="true">&#10003;</div>' +
-        `<div><strong>${emailOk ? 'Invitations sent.' : 'Signing request ready.'}</strong> <span>The encrypted document opens automatically and is decrypted only in each recipient's browser.</span></div>`;
+      : '';
   }
-  const h = document.querySelector('#step-done h2'); if (h) h.textContent = emailOk ? 'Sent for signature' : 'Ready for signature';
-  const sub = document.querySelector('#step-done .ds-sub'); if (sub) sub.textContent = emailOk
-    ? 'Every recipient received a personal signing link by email. You can still copy a link below.'
-    : 'Each signer has a personal link containing the document key. Share the complete link and follow progress below.';
+  paDone().fill('step-done', {
+    title: emailPartial ? 'Not every invitation went out.'
+         : emailOk      ? 'Invitations are on their way.'
+         :                'Ready for signature.',
+    line: emailPartial
+      ? 'Some of the emails could not be delivered. Retry them below, or copy that person\'s own link and send it yourself.'
+      : emailOk
+        ? 'Everyone you named has a link of their own in their inbox. You can follow who has signed, and copy a link again, below.'
+        : 'Each signer has a link of their own below. Send it to them any way you like and follow progress here.',
+  });
   const preview = $('ds-signed-preview'); if (preview) preview.hidden = true;
   ['ds-dl-pdf', 'ds-dl-psign'].forEach(id => { const el = $(id); if (el) el.hidden = true; });
+  // Nothing to download here, so the one loud button is the way onward. The
+  // per-recipient copy buttons stay quiet: they sit inside a card that
+  // already draws the eye, and there is one of them per signer.
+  const restart = $('ds-restart');
+  if (restart) restart.textContent = 'Send another document';
+  setDonePrimary('ds-restart');
   const info = document.querySelector('#step-done .ds-info-card'); if (info) info.hidden = true;
   document.querySelectorAll('#step-done .ds-usage-card').forEach(c => { if (c.id !== 'ds-party-links-card') c.hidden = true; });
+  const signedDetails = $('ds-signed-details'); if (signedDetails) signedDetails.hidden = true;
+  const inviteDetails = $('ds-invite-details'); if (inviteDetails) inviteDetails.hidden = false;
   if (r.envelope.multiparty && r.envelope.multiparty.party_links) renderPartyLinks(r.envelope.multiparty);
+}
+
+// The end screen's shared helper, and the rule it keeps: exactly one button on
+// the screen carries the loud paint, and every other way out sits beside it as
+// a quiet line. Which one is loud depends on what actually happened, so it is
+// decided at the end and not written into the markup.
+function paDone() {
+  return window.paramantDone || { fill: () => {}, payload: () => {}, proof: () => {} };
+}
+function setDonePrimary(id) {
+  ['ds-dl-pdf', 'ds-dl-psign', 'ds-restart'].forEach((btn) => {
+    const el = $(btn);
+    if (!el) return;
+    el.className = (btn === id) ? 'btn btn-primary done-primary' : 'done-quiet';
+  });
 }
 
 function renderPartyLinks(mp) {
@@ -3296,7 +3339,10 @@ function renderPartyLinks(mp) {
   const statusLink = $('ds-envelope-status-link');
   if (statusLink) {
     statusLink.href = RELAY_PUBLIC + '/v2/envelopes/' + mp.envelope_id;
-    statusLink.textContent = 'envelope ' + mp.envelope_id.slice(0, 10) + '... on the relay';
+    // The id and the machine it sits on are in the href, where a person who
+    // wants them can get at them. On the face of an end screen they were two
+    // pieces of plumbing in the middle of a sentence.
+    statusLink.textContent = 'the status page for this request';
   }
 }
 
