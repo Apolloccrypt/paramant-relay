@@ -2799,3 +2799,60 @@ test('every ParaSend link lifetime on the site names a plan ParaSend sells, with
   }
   assert.deepEqual(named, [], `\n  ${named.join('\n  ')}\n`);
 });
+
+// ── /gereedschap: the page that says what works without an account ──────────
+//
+// This page is written in Dutch and every sweep above matches English, so none
+// of them can read it. That is exactly why it needs its own block: its whole
+// value is the promise "this works without signing up", and that promise is a
+// property of nginx, of vault.js and of tiers.js, not of the copy. If any of
+// those four move, the page starts lying and nothing else in this repository
+// notices.
+test('the tools page only calls a tool account-free while the code keeps it that way', () => {
+  const tools = page('gereedschap');
+  const nginx = read('deploy/nginx-paramant-live.conf');
+
+  // The routes the page hands a visitor as free. None of them may be sitting
+  // behind the login redirect.
+  const gated = nginx.split('\n').filter((l) => l.includes('auth_request /api/user/check'));
+  for (const route of ['/vault', '/verify', '/ct-log', '/get']) {
+    assert.ok(tools.includes(`href="${route}"`), `gereedschap: must still offer ${route}`);
+    assert.ok(!gated.some((l) => l.includes(`location = ${route} `) || l.includes(`location = ${route}{`)),
+      `gereedschap: ${route} is offered as account-free and nginx now gates it`);
+  }
+
+  // And the two it calls out as needing one. /parashare is gated in nginx;
+  // /sign is not gated at the door but cannot finish without a session, which
+  // is why the page says so in words instead of letting a visitor find out at
+  // the last step.
+  assert.ok(gated.some((l) => l.includes('location = /parashare')),
+    'gereedschap: says sending asks you to sign in first, and nginx no longer gates /parashare');
+  assert.ok(tools.includes('href="/parashare"') && tools.includes('href="/sign"'),
+    'gereedschap: must still name both account-only tools');
+  assert.match(read('frontend/sign-flow.js'), /\/api\/user\/account\/signing-key/,
+    'gereedschap: says signing itself needs an account, and sign-flow.js no longer asks the account for a signing key');
+
+  // "De pagina doet geen enkel netwerkverzoek" about /vault, and "geen enkel
+  // verzoek de deur uit" about the receipt check. Both are checkable.
+  for (const [file, claim] of [['frontend/vault.js', 'locking a file'], ['frontend/js/receipt-verify.js', 'checking a receipt']]) {
+    assert.doesNotMatch(read(file), /\bfetch\s*\(|XMLHttpRequest|sendBeacon|new WebSocket|new EventSource/,
+      `gereedschap: says ${claim} sends nothing, and ${file} now reaches the network`);
+  }
+
+  // The Community numbers the page prints, from the table that enforces them.
+  const community = read('relay/lib/tiers.js').split('community:')[1].split('}')[0];
+  const limit = (name) => Number(new RegExp(`${name}:\\s*(\\d+)`).exec(community)[1]);
+  assert.equal(limit('signs_month'), 2, 'tiers.js community.signs_month moved');
+  assert.equal(limit('transfers_month'), 10, 'tiers.js community.transfers_month moved');
+  assert.equal(limit('file_mb'), 5, 'tiers.js community.file_mb moved');
+  assert.ok(tools.includes('twee handtekeningen per maand'), 'gereedschap: must state the Community signing limit');
+  assert.ok(tools.includes('tien verzendingen per maand, tot 5 MB per bestand'), 'gereedschap: must state the Community sending limit');
+
+  // The ladder quotes Firm at the price the pricing page charges.
+  assert.ok(/&euro;29</.test(page('pricing')), 'pricing: Firm is no longer 29');
+  assert.ok(tools.includes('29 euro per maand'), 'gereedschap: the ladder must quote the Firm price the pricing page charges');
+
+  // The page promises no gratis limit it cannot show. It may name Community,
+  // never "Free", and it may not invent a free allowance of its own.
+  assert.doesNotMatch(tools, /\bgratis\b[^.]{0,40}\bonbeperkt\b/i, 'gereedschap: no unlimited free allowance');
+});

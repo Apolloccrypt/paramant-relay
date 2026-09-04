@@ -54,6 +54,7 @@ const aliases = {
   '/security':'/security.html', '/trust':'/trust.html', '/docs':'/docs.html',
   '/about':'/about.html', '/help':'/help/index.html', '/download':'/download.html',
   '/login':'/auth/login.html', '/verify':'/verify.html',
+  '/gereedschap':'/gereedschap.html',
 };
 const PAGES = Object.keys(aliases);
 const SIZES = [[390, 844], [1440, 900]];
