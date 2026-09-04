@@ -8,7 +8,7 @@
   // check, so a visitor never sees the navigation move under them.
   var PUBLIC_NAV = [
     ['Product', '/#products'],
-    ['Gereedschap', '/gereedschap'],
+    ['Tools', '/gereedschap'],
     ['Security', '/security'],
     ['Pricing', '/pricing'],
     ['Docs', '/docs']

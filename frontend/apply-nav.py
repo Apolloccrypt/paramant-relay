@@ -10,7 +10,7 @@ NEW_NAV = '''\
 
   <ul class="nav-links">
     <li><a href="/#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/security" class="nav-link">Security</a></li>
     <li><a href="/pricing" class="nav-link">Pricing</a></li>
     <li><a href="/docs" class="nav-link">Docs</a></li>
@@ -38,7 +38,7 @@ NEW_NAV = '''\
 NEW_MOBILE = '''\
 <div class="nav-mobile" id="nav-mobile">
   <a href="/#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/security" class="nav-mobile-standalone">Security</a>
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
   <a href="/docs" class="nav-mobile-standalone">Docs</a>

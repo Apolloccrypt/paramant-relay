@@ -2827,8 +2827,21 @@ test('the tools page only calls a tool account-free while the code keeps it that
   // the last step.
   assert.ok(gated.some((l) => l.includes('location = /parashare')),
     'gereedschap: says sending asks you to sign in first, and nginx no longer gates /parashare');
-  assert.ok(tools.includes('href="/parashare"') && tools.includes('href="/sign"'),
-    'gereedschap: must still name both account-only tools');
+
+  // The trap this page exists not to repeat: /sign is open at the door and
+  // refuses at the last request, so a visitor picks a file, places a signature
+  // and only then meets a login. Neither account-only button here may point at
+  // the tool itself; both go to the sign-in screen, which carries the visitor
+  // on afterwards. A future edit that "simplifies" these back to /sign and
+  // /parashare rebuilds the trap, so it turns this red.
+  for (const route of ['/sign', '/parashare']) {
+    assert.ok(tools.includes(`href="/auth/login?next=${route}"`),
+      `gereedschap: the button for ${route} must go to the sign-in screen, not into a flow that refuses at the end`);
+    assert.ok(!new RegExp(`href="${route}"`).test(tools),
+      `gereedschap: ${route} needs an account, so the page must not hand a visitor straight into it`);
+  }
+  assert.match(read('frontend/js/auth-login.js'), /params\.get\('next'\)/,
+    'gereedschap: both account-only buttons pass ?next=, and auth-login.js no longer reads it');
   assert.match(read('frontend/sign-flow.js'), /\/api\/user\/account\/signing-key/,
     'gereedschap: says signing itself needs an account, and sign-flow.js no longer asks the account for a signing key');
 
