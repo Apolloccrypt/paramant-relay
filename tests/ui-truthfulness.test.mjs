@@ -320,7 +320,11 @@ const pricing = read('frontend/pricing.html');
 // ever said &euro;150. The digits must be followed by something that is not
 // another digit or a decimal separator.
 const homePrices = [...new Set([...home.matchAll(/&euro;([\d.,]+)/g)].map((m) => m[1]))];
-assert.ok(homePrices.length >= 6, `expected the homepage to quote its tiers, found ${homePrices.length} prices`);
+// Five: the three tier prices (0, 29, 299) and the two incl.-btw figures under
+// them. It was six while the Firm line also quoted a EUR 0.40 per-signature
+// rate; that rate was never charged and the line is gone, so the floor moved
+// down with it rather than the check being weakened for something else.
+assert.ok(homePrices.length >= 5, `expected the homepage to quote its tiers, found ${homePrices.length} prices`);
 const priceOnPricingPage = (amount) => new RegExp(`&euro;${amount.replace(/[.]/g, '\\.')}(?![\\d.,])`).test(pricing);
 const drifted = homePrices.filter((p) => !priceOnPricingPage(p));
 assert.deepEqual(drifted, [],
@@ -1729,6 +1733,87 @@ console.log('ui-truthfulness: /download says the desktop app is unmaintained, an
 })();
 
 console.log('ui-truthfulness: no page or script promises transfers without a ceiling');
+
+
+// ── No page may bill for something the kassa cannot collect ─────────────────
+//
+// For six releases /pricing, /parasign, the homepage, the dashboard and the
+// inline sign notice all told a Firm customer that signatures past 100 cost
+// EUR 0.40 each "and appear on your next invoice". None of that could happen.
+// relay/lib/billing-catalog.js holds fixed monthly and yearly amounts and
+// nothing else; no usage line exists in billing.js, invoice.js or
+// billing-recurring.js; the metered counter in quota.js had no reader but a
+// test. The money was never asked for and there was no second invoice to ask
+// on, because a Firm subscription collects its own fixed amount.
+//
+// Both gates that should have caught it were counting amounts. This one counts
+// the PROMISE, which is the part that costs trust: a per-unit rate, or a charge
+// deferred to a later bill. Either may only appear on the site once the catalog
+// can actually charge it, and the catalog is asked here rather than trusted to
+// have stayed the same.
+(function noChargeThePriceListCannotMake() {
+  const require_ = createRequire(import.meta.url);
+  const catalog = require_('../relay/lib/billing-catalog.js');
+
+  const TEXT_EXT = ['.html', '.js', '.mjs'];
+  const SKIP_DIR = ['node_modules', 'vendor', 'assets'];
+  const walk = (dir) => fs.readdirSync(new URL('../' + dir, import.meta.url), { withFileTypes: true })
+    .flatMap((e) => {
+      if (e.isDirectory()) return SKIP_DIR.includes(e.name) ? [] : walk(`${dir}/${e.name}`);
+      return TEXT_EXT.some((x) => e.name.endsWith(x)) && !e.name.endsWith('.min.js')
+        ? [`${dir}/${e.name}`] : [];
+    });
+  const files = walk('frontend');
+  assert.ok(files.length > 20, `the frontend walk found only ${files.length} text files; the ban would be vacuous`);
+
+  // What a person reads. Comments are stripped for the same reason as above:
+  // the note explaining a removed promise has to be free to quote it.
+  const strip = (s2) => s2
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/^[ \t]*\/\/.*$/gm, ' ');
+
+  const CURRENCY = '(?:&euro;|\u20ac|EUR\\s*)';
+  const FORBIDDEN = [
+    // A charge pushed to a later bill. The only invoice Paramant issues is the
+    // one for the payment that was just taken (relay/lib/invoice.js, issued from
+    // the webhook), so there is no later bill to put anything on.
+    [/next invoice|volgende factuur|on your next bill|added to your invoice/i,
+      'a charge deferred to a later invoice; relay/lib/invoice.js only ever documents a payment already taken'],
+    // A per-unit rate. Every amount the site prints has to be resolvable by
+    // catalog.resolveOrder, and a per-signature rate is not.
+    [new RegExp(`${CURRENCY}\\s*[\\d.,]+\\s*(?:each|a piece|per\\s+(?:extra\\s+)?(?:signature|sign|transfer|document|user|seat))`, 'i'),
+      'a per-unit rate; relay/lib/billing-catalog.js sells whole plans, so nothing collects it'],
+    [/\bovergebruik\b|\boverage\b/i,
+      'metered overage; no tier meters and no billing line collects one'],
+  ];
+
+  const hits = [];
+  for (const file of files) {
+    const visible = strip(read(file));
+    for (const [rx, why] of FORBIDDEN) {
+      const m = rx.exec(visible);
+      if (m) hits.push(`${file}: "${m[0].replace(/\s+/g, ' ')}" (${why})`);
+    }
+  }
+  assert.deepEqual(hits, [],
+    'no page may promise a charge the price list cannot make:\n  ' + hits.join('\n  '));
+
+  // And the reason it cannot: the catalog holds plan prices, per interval, and
+  // has no per-unit line to hang a metered rate on. Asked, not assumed, so the
+  // day a usage line is added this check is what points at the rule to revisit.
+  for (const { product, plan } of catalog.ON_SALE) {
+    for (const interval of catalog.INTERVALS) {
+      const order = catalog.resolveOrder({ product, plan, interval });
+      assert.ok(!order.error && order.amount,
+        `${product}/${plan}/${interval} must resolve to one chargeable amount`);
+    }
+  }
+  assert.strictEqual(catalog.priceOf('parasign', 'pro', 'per_signature'), null,
+    'the catalog must have no per-signature interval; add the billing line before the site names a rate');
+})();
+
+console.log('ui-truthfulness: no page bills for something billing-catalog.js cannot charge');
 
 
 // ── A ParaSign surface states no transfers figure at all ────────────────────

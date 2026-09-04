@@ -47,6 +47,28 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   at the list.
 
 ### Fixed
+- **Signatures past a plan's monthly quota are no longer priced at a rate nobody
+  collects.** Six places told a paying customer that extra ParaSign signatures
+  above 100 cost EUR 0.40 each and would appear on the next invoice: the Firm
+  card on `/pricing` and its billing FAQ, the Firm card on `/parasign`, the tier
+  line on the homepage, the plan summary on `/dashboard`, and the inline notice
+  after a signature in `frontend/js/quota-upgrade.js`. None of it could happen.
+  `relay/lib/billing-catalog.js` holds fixed monthly and yearly amounts and no
+  per-unit line, there is no usage line in `billing.js`, `invoice.js` or
+  `billing-recurring.js`, and the billable counter in `relay/lib/quota.js` had no
+  reader outside its own test; a Firm subscription collects its own fixed amount
+  rather than issuing a larger one later. The meter is gone from
+  `relay/lib/entitlements.js`, from both sign paths and from the pages. Every
+  tier now stops at the quota it includes and answers one 402,
+  `monthly_sign_quota_reached`, which also ends a disagreement between the two
+  paths: the `/v1` create gate already blocked a Firm account at 100 while
+  `POST /v2/envelopes/:id/sign` let the same account run to 1000. The card a
+  customer sees at the limit names the ceiling that stopped him, the date it
+  resets, and Business as the plan that includes more. `tests/ui-truthfulness.test.mjs`
+  now sweeps every frontend page and script for a per-unit rate or a charge
+  deferred to a later invoice, and asks `billing-catalog.js` whether such a line
+  could be charged at all, so a promise about money has to exist in the price
+  list before it may exist on the site.
 - **The public CT log listing numbers its entries by position again.** On the
   live log at `/v2/ct/log` five entries reported the indices 4 to 8 a second
   time while 42 to 46 were missing: they sat at positions 42 to 46 and had kept

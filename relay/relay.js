@@ -3008,8 +3008,7 @@ async function handleRelayRequest(req, res) {
       // LIMIT comes from entitlements (plan_parasign, legacy-plan fallback), the
       // per-product ParaSign tier, never the product-blind tiers.js helpers.
       // Decision is shared with the R018 sign path (quota.signGateDecision):
-      // tiers without overage block at the included quota; Pro meters overage
-      // and only blocks at its hard cap.
+      // every tier blocks AT its included quota, this one included.
       signQuotaGate: async (accountId, rec) => {
         const ent = entitlements.getEntitlements(rec || {}).parasign;
         if (!accountId || !Number.isFinite(ent.quotas.signs_month)) return { allowed: true, over_limit: false };
@@ -3021,7 +3020,6 @@ async function handleRelayRequest(req, res) {
             allowed: dec.allowed, over_limit: !dec.allowed,
             reason: dec.reason, plan: ent.tier, limit: dec.limit,
             used: u.signs_this_month,
-            overage_count: Math.max(0, u.signs_this_month - ent.quotas.signs_month),
             reset_date: quota.nextResetDate(),
           };
         } catch { return { allowed: true, over_limit: false }; }
@@ -7750,23 +7748,23 @@ async function handleRelayRequest(req, res) {
       // or an unknown account: a signer is never blocked by infra.
       const _signerPlan = (accounts.get(accountId) && accounts.get(accountId).plan)
         || (apiKeys.get(accountId) && apiKeys.get(accountId).plan) || 'community';
-      // Signs limit + overage policy from ENTITLEMENTS (plan_parasign,
-      // legacy-plan fallback), the per-product ParaSign tier -- never the
-      // product-blind tiers.js helpers. Tier behaviour (Mick's brief):
+      // Signs limit from ENTITLEMENTS (plan_parasign, legacy-plan fallback), the
+      // per-product ParaSign tier -- never the product-blind tiers.js helpers.
+      // Tier behaviour: every tier blocks AT its included quota.
       //   free      2 included, blocks at 2
-      //   pro       100 included, overage EUR 0.40/sign from the 101st,
-      //             HARD stop at 1000 (402, never a silent run-up)
+      //   pro       100 included, blocks at 100
       //   business  1000 included, blocks at 1000
       //   enterprise config ceiling, unchanged
-      // The block/meter decision itself is quota.signGateDecision, shared with
-      // the /v1 create gate so both paths can never diverge.
+      // Pro used to meter past 100 at EUR 0.40 a signature up to 1000. No
+      // billing line ever collected that money, so the meter was a promise the
+      // kassa could not keep; it is gone, here and on the site.
+      // The block decision itself is quota.signGateDecision, shared with the
+      // /v1 create gate so both paths can never diverge.
       // entitlementRecordOf merges the accounts summary with the per-product
       // plans on the account's keys; reading `accounts` alone hid paid upgrades.
       const _signerRec = entitlementRecordOf(accountId) || { plan: _signerPlan };
       const _signEnt = entitlements.getEntitlements(_signerRec).parasign;
       const _signIncluded = _signEnt.quotas.signs_month;
-      const _signOverage = _signEnt.overage; // { rate_eur, hard_cap }, nulls when the tier blocks at its quota
-      const _signMetered = _signOverage.rate_eur != null && Number.isFinite(_signOverage.hard_cap);
       let _signUsed = null; // best-effort count this month, feeds the 200 quota field
       if (accountId && Number.isFinite(_signIncluded)) {
         try {
@@ -7777,12 +7775,6 @@ async function handleRelayRequest(req, res) {
             if (!_dec.allowed) {
               log('info', 'quota_sign_declined', { account: String(accountId).slice(0, 12), plan: _signEnt.tier, reason: _dec.reason, limit: _dec.limit, used: _signUsed });
               res.writeHead(402, { 'Content-Type': 'application/json' });
-              if (_dec.reason === 'hard_cap') {
-                return res.end(J({ error: 'monthly_sign_hard_cap_reached', dimension: 'signs_month',
-                  plan: _signEnt.tier, limit: _dec.limit,
-                  overage_count: Math.max(0, _signUsed - _signIncluded),
-                  reset_date: quota.nextResetDate() }));
-              }
               return res.end(J({ error: 'monthly_sign_quota_reached', dimension: 'signs_month',
                 plan: _signEnt.tier, limit: _dec.limit, used: _signUsed,
                 reset_date: quota.nextResetDate() }));
@@ -7814,13 +7806,12 @@ async function handleRelayRequest(req, res) {
       }
 
       // Count exactly one signature per NEW accepted party-signature (signs_month
-      // is a signature counter, so multi-party envelopes count per party), plus
-      // one billable overage sign once past the included quota. An 'idem' retry
-      // never reaches recordSignTiered, so neither counter double-counts on
-      // retry. Awaited (single INCR) so the 200 below reports fresh numbers;
+      // is a signature counter, so multi-party envelopes count per party). An
+      // 'idem' retry never reaches recordSign, so the counter cannot double-count
+      // on retry. Awaited (single INCR) so the 200 below reports fresh numbers;
       // fail-open: a redis hiccup never blocks the signer's 200.
       if (out.code === 'new' && accountId) {
-        const _r = await quota.recordSignTiered(redisClient, accountId, _signIncluded, log);
+        const _r = await quota.recordSign(redisClient, accountId, log);
         if (_r.counted) _signUsed = _r.used;
         else if (_signUsed != null) _signUsed += 1; // count failed: still reflect this sign best-effort
       }
@@ -7846,15 +7837,12 @@ async function handleRelayRequest(req, res) {
 
       // API contract with the dashboard: every successful sign response carries
       // a `quota` field so the frontend can render usage without a second call.
-      // Overage fields are null for tiers that block at their quota (free,
-      // business, enterprise); only Pro meters. Omitted entirely when there is
+      // Two numbers, because there are only two: what this account has signed
+      // this month and what its tier includes. Omitted entirely when there is
       // no account or redis could not be read (fail-open, field is best-effort).
       const _quotaField = (accountId && _signUsed != null && Number.isFinite(_signIncluded)) ? {
         used: _signUsed,
         included: _signIncluded,
-        overage_count: _signMetered ? Math.max(0, _signUsed - _signIncluded) : null,
-        overage_rate_eur: _signMetered ? _signOverage.rate_eur : null,
-        hard_cap: _signMetered ? _signOverage.hard_cap : null,
         reset_date: quota.nextResetDate(),
       } : null;
 

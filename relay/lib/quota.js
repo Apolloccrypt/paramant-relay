@@ -7,10 +7,6 @@
 // new month starts a fresh key, so every counter resets on the 1st):
 //   paramant:quota:transfers:<account_id>:<YYYY-MM>       INCR + EXPIRE 35d
 //   paramant:quota:signs:<account_id>:<YYYY-MM>           INCR + EXPIRE 35d
-//   paramant:quota:signs_overage:<account_id>:<YYYY-MM>   INCR + EXPIRE 100d
-//                                                     (billable overage signs;
-//                                                      longer TTL so billing can
-//                                                      invoice after month close)
 //   paramant:quota:seen:<account_id>:<chunk_hash>     SET + EXPIRE 24h
 //                                                     (dedup for 111-chunk
 //                                                     ParaShare uploads)
@@ -23,8 +19,7 @@ const { incrInWindow } = require('./redis-counter');
 
 const crypto = require('crypto');
 
-const MONTH_TTL_SECONDS   = 35 * 86400;        // 35 days: covers a full month plus a safety tail
-const OVERAGE_TTL_SECONDS = 100 * 86400;       // ~3 months: billing reads this AFTER month close
+const MONTH_TTL_SECONDS = 35 * 86400;          // 35 days: covers a full month plus a safety tail
 const SEEN_TTL_SECONDS  = 86400;               // 24 h dedup window
 const SEEN_HASH_LEN     = 32;                  // first 32 hex chars (128 bit prefix) is plenty
 
@@ -46,7 +41,6 @@ function nextResetDate(date) {
 
 function transfersKey(accountId, ym)    { return `paramant:quota:transfers:${accountId}:${ym || ymKey()}`; }
 function signsKey(accountId, ym)        { return `paramant:quota:signs:${accountId}:${ym || ymKey()}`; }
-function signsOverageKey(accountId, ym) { return `paramant:quota:signs_overage:${accountId}:${ym || ymKey()}`; }
 function seenKey(accountId, hashHex)  { return `paramant:quota:seen:${accountId}:${hashHex.slice(0, SEEN_HASH_LEN)}`; }
 
 // Compute a stable hash of the first chunk of a blob.
@@ -81,78 +75,43 @@ async function recordTransfer(redisClient, accountId, chunkHash, log) {
   }
 }
 
-// Count a sign for account_id (no dedup -- every sign is a billable event).
+// Count a sign for account_id (no dedup -- every signature is its own event).
+// Returns the fresh month count as `used` so a caller that has just counted a
+// signature can report the number without a second read. Never throws.
 async function recordSign(redisClient, accountId, log) {
-  if (!accountId) return { counted: false, error: 'no_account_id' };
-  if (!redisClient || !redisClient.isReady) return { counted: false, error: 'redis_not_ready' };
+  if (!accountId) return { counted: false, used: null, error: 'no_account_id' };
+  if (!redisClient || !redisClient.isReady) return { counted: false, used: null, error: 'redis_not_ready' };
   try {
     const sk = signsKey(accountId);
     const n  = await incrInWindow(redisClient, sk, MONTH_TTL_SECONDS);
-    return { counted: true, error: null };
+    return { counted: true, used: n, error: null };
   } catch (e) {
     if (log) log('warn', 'quota_sign_record_failed', { account: String(accountId).slice(0, 12), err: e.message });
-    return { counted: false, error: e.message };
+    return { counted: false, used: null, error: e.message };
   }
 }
 
-// ── Tiered sign metering (included quota + Pro overage, Mick's tier brief) ───
+// ── The sign gate: the included quota IS the limit ───────────────────────────
 // signGateDecision is the ONE pure decision both sign paths (the R018
 // /v2/envelopes/:id/sign pre-gate and the /v1 create gate) share. `used` is the
 // account's signs count this calendar month; `ent` is the parasign entitlement
-// from entitlements.getEntitlements (quotas.signs_month + overage). Tiers
-// WITHOUT overage (free, business, enterprise) block AT the included quota
-// (used >= included -> 402 monthly_sign_quota_reached). Tiers WITH overage
-// (pro) sail past the included quota, metering each extra sign, until the HARD
-// cap (used >= hard_cap -> 402 monthly_sign_hard_cap_reached, never a silent
-// run-up). Limits come exclusively from the entitlement object.
+// from entitlements.getEntitlements (quotas.signs_month). EVERY tier blocks at
+// its included quota (used >= included -> 402 monthly_sign_quota_reached).
+//
+// Pro used to be the exception: it sailed past 100 metering each extra sign at
+// EUR 0.40 up to a hard cap of 1000. Nothing ever charged for those signatures
+// (see the note in entitlements.js), and the two sign paths did not even agree
+// about it: the /v1 create gate has always blocked pro at 100 while this one
+// let it through to 1000. One rule, applied the same on both paths, is now both
+// the truthful one and the consistent one. Limits come exclusively from the
+// entitlement object.
 function signGateDecision(used, ent) {
   const included = ent && ent.quotas ? ent.quotas.signs_month : Infinity;
-  const ov = ent && ent.overage;
-  const metered = !!(ov && ov.rate_eur != null && Number.isFinite(ov.hard_cap));
   if (!Number.isFinite(used) || !Number.isFinite(included)) {
     return { allowed: true, reason: null, limit: null };
   }
-  if (metered) {
-    if (used >= ov.hard_cap) return { allowed: false, reason: 'hard_cap', limit: ov.hard_cap };
-    return { allowed: true, reason: null, limit: ov.hard_cap };
-  }
   if (used >= included) return { allowed: false, reason: 'quota', limit: included };
   return { allowed: true, reason: null, limit: included };
-}
-
-// Count ONE accepted signature and, past the included quota, ONE billable
-// overage sign. The caller (the R018 sign route) invokes this ONLY for a
-// genuinely NEW accepted party-signature (store.sign() -> 'new'); an idempotent
-// retry never reaches here, so neither counter can double-count on retry. Both
-// keys are calendar-month scoped; the overage key keeps a longer TTL so billing
-// can invoice after the month closes. Never throws; fail-open like recordSign.
-// Returns { counted, used, overage_count, error }.
-async function recordSignTiered(redisClient, accountId, included, log) {
-  if (!accountId) return { counted: false, used: null, overage_count: null, error: 'no_account_id' };
-  if (!redisClient || !redisClient.isReady) return { counted: false, used: null, overage_count: null, error: 'redis_not_ready' };
-  try {
-    const sk = signsKey(accountId);
-    const n  = await incrInWindow(redisClient, sk, MONTH_TTL_SECONDS);
-    let overage = 0;
-    if (Number.isFinite(included) && n > included) {
-      const ok = signsOverageKey(accountId);
-      overage = await incrInWindow(redisClient, ok, OVERAGE_TTL_SECONDS);
-    }
-    return { counted: true, used: n, overage_count: overage, error: null };
-  } catch (e) {
-    if (log) log('warn', 'quota_sign_tiered_record_failed', { account: String(accountId).slice(0, 12), err: e.message });
-    return { counted: false, used: null, overage_count: null, error: e.message };
-  }
-}
-
-// Read the billable overage count for one account and calendar month. Used by
-// billing/tests; returns null when redis is unavailable.
-async function readSignsOverage(redisClient, accountId, ym) {
-  if (!accountId || !redisClient || !redisClient.isReady) return null;
-  try {
-    const v = await redisClient.get(signsOverageKey(accountId, ym));
-    return v == null ? 0 : parseInt(v, 10);
-  } catch { return null; }
 }
 
 // ── Phase 4 enforcement ──────────────────────────────────────────────────────
@@ -238,17 +197,13 @@ module.exports = {
   recordTransfer,
   recordSign,
   signGateDecision,
-  recordSignTiered,
-  readSignsOverage,
   gateTransfer,
   gateSign,
   readUsage,
   // exported for tests / admin tooling
   transfersKey,
   signsKey,
-  signsOverageKey,
   seenKey,
   MONTH_TTL_SECONDS,
-  OVERAGE_TTL_SECONDS,
   SEEN_TTL_SECONDS,
 };
