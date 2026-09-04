@@ -25,6 +25,7 @@ Guards the auth + TOTP stack against the class of breakage that hit production r
 | `tests/brand-shots-optin.test.mjs` | Root integration suites, and `tests/static-sanity.sh` (pre-commit) | The reference screenshots under `docs/brand/assets/app-2026/` are opt-in. `scripts/app-shots.mjs` used to write 36 tracked PNGs on every run, so `git status` was never clean after a browser suite and the next `git commit -a` shipped them. Three layers: the resolver's own rules, a real dry run of `scripts/app-shots.mjs` that has to name a directory outside the repo and leave the references byte-identical, and a scan so no other suite hardcodes the path. See [Refreshing the app screenshots](#refreshing-the-app-screenshots) |
 | `tests/env-documented.test.mjs` | Root integration suites | Every `process.env` name the relay or admin reads must be in [deploy/.env.example](../deploy/.env.example) with a purpose, a default and the file that reads it. Nothing may be documented there that no code reads, and every `read in:` pointer must name a file that exists and mentions the variable. 40 of 57 were undocumented on 2026-09-02 |
 | `tests/end-screen-calm.test.mjs` | sign-e2e job `Browser suites` (selected by its playwright import) | The four end screens of the product (ParaSend live and Send-a-link, ParaSign after signing and after sending invitations, and both receiving pages) held to one shape at 390x844: no algorithm name on the face of the screen, exactly one button with the loud paint, the answer fitting a phone with the `<details>` shut, and that fold closed on arrival. Written after the owner read the ParaSend end screen on a phone on 4 September 2026 and found the same fact stated four times in jargon, one statement of it untrue of a live hand-over |
+| `tests/signed-in-home.test.mjs` | sign-e2e job `Browser suites` (selected by its playwright import) | The signed-in homepage at 390x844, in four states (open requests, only finished documents, a brand new account, and every route down), with the API mocked the way `navigation-shell` mocks it. Holds three things: the big figure on screen is the number in the mocked API, no state leaves the reader with three buttons over a hole (measured as the gap between the last thing drawn in `<main>` and the top of the footer, 120px), and no relay vocabulary reaches the words. Written after the owner read his own homepage on a phone on 4 September 2026 and got a heading, one paragraph, three buttons and an empty screen: "I see ONLY 3 buttons, as if it were a test page" |
 
 ## Running manually
 
@@ -94,9 +95,11 @@ move the ground under assertions taken after the shot and would make the
 reduced-motion pair in `app-shots.mjs` identical to the normal pair.
 
 The suites that write a screenshot as a byproduct call it too: `navigation-shell`,
-`cosign-document-delivery`, `user-dashboard-documents`, `sign-invite-delivery`
-and `developer-parasign-dashboard`. Those calls are gated on a
-`PARAMANT_*_SCREENSHOT_PATH` variable and never fire in CI, but a builder taking
+`cosign-document-delivery`, `user-dashboard-documents`, `sign-invite-delivery`,
+`signed-in-home` and `developer-parasign-dashboard`. Those calls are gated on a
+`PARAMANT_*_SCREENSHOT_PATH` variable (`signed-in-home` takes a directory, in
+`PARAMANT_HOME_IN_SCREENSHOT_DIR`, because it photographs four states) and never
+fire in CI, but a builder taking
 one by hand on a busy laptop hits the same wall the runner did.
 
 ### Refreshing the app screenshots

@@ -99,6 +99,104 @@ html[data-session="in"] .home-hero{padding-bottom:56px}
 .hp-proof{font-size:14.5px;line-height:1.5;color:var(--fg-mid);margin:10px 0 0;max-width:40ch}
 @media (min-width:900px){.hp-proof{display:none}}
 
+/* ---------- signed in: the work, not a page of buttons ----------
+   Mick read this on his phone on 4 September and got a band, his name, one
+   paragraph and three buttons over an empty screen: "I see ONLY 3 buttons, as
+   if it were a test page." The yardstick he set is BeerWeer, which opens on the
+   one reading that matters (22 degrees), draws a small object next to it, and
+   lays the rest out in quiet cards underneath.
+
+   So this hero carries the same rhythm:
+
+     one figure, large, with a small drawn object beside it
+     a hairline strip of secondary readings under it, in mono
+     a card of the requests that are still open, one row each
+     a card of the last three documents, with a way to all of them
+     one line about the plan
+     the three buttons, UNDER the work rather than instead of it
+
+   Every card holds its height whether or not it has data, so a new account gets
+   a page that looks intended rather than a page with a hole in it. The figures
+   come from the routes /dashboard already reads; js/home-auth.js fills them and
+   hides whatever did not arrive. */
+.hw{margin-top:22px;max-width:40rem}
+.hw-card{border:1px solid var(--line);border-radius:16px;background:var(--card);padding:16px 16px 18px;margin-top:16px}
+.hw-kicker{font-family:var(--hp-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--fg-dim);margin:0;font-weight:500;display:flex;align-items:center;gap:8px}
+.hw-kicker::before{content:"";flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--ochre)}
+
+/* the figure card. The number is cream and the qualifier next to it is dim,
+   the same weighting BeerWeer gives 22 and the degree sign. */
+.hw-figure{min-height:208px;display:flex;flex-direction:column}
+.hw-figure-body{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex:1 1 auto}
+.hw-figure-words{min-width:0}
+.hw-read{display:flex;align-items:baseline;gap:10px;margin-top:10px}
+.hw-num{font-size:clamp(3.4rem,16vw,4.8rem);line-height:.9;font-weight:700;letter-spacing:-.045em;color:var(--fg)}
+.hw-of{font-family:var(--hp-mono);font-size:clamp(1rem,4.2vw,1.3rem);color:var(--fg-dim)}
+.hw-cap{font-size:16px;line-height:1.35;font-weight:600;color:var(--fg);margin:12px 0 0;max-width:20ch}
+.hw-sub{font-size:14px;line-height:1.5;color:var(--fg-mid);margin:6px 0 0;max-width:34ch}
+
+/* the small drawn object: the band's own hand, one sheet with a seal. */
+.hw-obj{flex:0 0 auto;width:88px;height:88px;display:block;margin-top:4px}
+@media (max-width:359px){.hw-obj{width:68px;height:68px}}
+
+/* the strip of secondary readings, the H / L / humidity row of this page. */
+.hw-strip{display:flex;flex-wrap:wrap;gap:6px 20px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--hp-mono);font-size:12px;letter-spacing:.04em}
+.hw-strip-item{display:inline-flex;align-items:baseline;gap:7px}
+.hw-strip-lab{color:var(--fg-dim);text-transform:uppercase;letter-spacing:.12em;font-size:10.5px}
+.hw-strip-val{color:var(--fg);font-weight:600}
+
+/* the two lists. One row per document: a status dot, the name, the date in
+   mono, and the progress. Rows read; they do not pretend to be buttons. */
+.hw-list-card{min-height:150px;display:flex;flex-direction:column}
+.hw-list{list-style:none;margin:12px 0 0;padding:0;flex:1 1 auto}
+.hw-row{display:flex;align-items:flex-start;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
+.hw-row:first-child{padding-top:2px}
+.hw-row:last-child{border-bottom:0}
+.hw-dot{flex:0 0 auto;width:9px;height:9px;border-radius:50%;background:var(--fg-dim);margin-top:6px}
+.hw-dot.wait{background:var(--ochre)}
+.hw-dot.busy{background:var(--teal)}
+.hw-dot.done{background:rgba(var(--tint),.42)}
+.hw-row-main{min-width:0;flex:1 1 auto}
+.hw-name{display:block;font-size:15px;font-weight:600;color:var(--fg);line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hw-meta{display:block;font-family:var(--hp-mono);font-size:11.5px;letter-spacing:.06em;color:var(--fg-mid);margin-top:3px}
+.hw-tail{flex:0 0 auto;font-size:12.5px;color:var(--fg-mid);text-align:right;line-height:1.35;padding-top:1px}
+.hw-more{display:inline-block;margin-top:14px;font-size:14px;font-weight:600;color:var(--fg-mid);text-decoration:underline;text-underline-offset:4px}
+.hw-more:hover,.hw-more:focus-visible{color:var(--fg)}
+
+/* a new account. The same card, the same height, its own object: nothing here
+   is allowed to read as a page that failed to load. */
+.hw-empty{min-height:196px;display:flex;flex-direction:column;justify-content:center}
+.hw-empty-body{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.hw-empty strong{display:block;font-size:17px;line-height:1.3;color:var(--fg);margin:10px 0 6px}
+.hw-empty p{font-size:14.5px;line-height:1.6;color:var(--fg-mid);margin:0;max-width:34ch}
+.hw-empty-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+
+/* the plan, one line, and a way to renew only once the term is close. */
+.hw-plan{font-size:14px;line-height:1.55;color:var(--fg-mid);margin:18px 0 0}
+.hw-plan b{color:var(--fg);font-weight:600}
+.hw-renew{color:var(--ochre);text-decoration:underline;text-underline-offset:4px;margin-left:8px;font-weight:600;white-space:nowrap}
+.hw-renew:hover,.hw-renew:focus-visible{color:var(--ochre-2)}
+
+/* a route did not answer. One calm line inside the card that would have held
+   the reading, so the shape of the page does not change under a reader. */
+.hw-quiet{font-size:15px;line-height:1.6;color:var(--fg-mid);margin:14px 0 0;max-width:34ch}
+
+html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
+/* A new account already has both first steps inside its own card, so the row
+   underneath would be the same two buttons a second time. js/home-auth.js sets
+   data-hw-state="empty" and this takes the repeat away; Documents stays one tap
+   away in the nav's user menu, which every signed-in page carries. */
+.hw[data-hw-state="empty"] + .home-actions{display:none}
+
+@media (min-width:900px){
+  .hw{max-width:none}
+  .hw-figure{min-height:236px}
+  .hw-num{font-size:5.4rem}
+  .hw-obj{width:108px;height:108px}
+  .hw-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+  .hw-cols > .hw-card{margin-top:0}
+}
+
 /* the art: a document that gets signed, sealed, and then is gone. Desktop only; on a phone the band is the picture. */
 .hp-art{position:relative;z-index:1;height:150px;pointer-events:none;user-select:none}
 .hp-art-glow{position:absolute;inset:-40% -20%;background:
@@ -428,7 +526,78 @@ footer a{color:var(--fg)}
     </div>
     <div class="home-state" data-home="in" hidden>
       <h2 class="paramant-h1">Your documents<span class="home-hi-name" data-home-name></span>.</h2>
-      <p class="lede">Pick up an open request, get a new document signed with ParaSign, or send a file with the ParaSend web app, which deletes it after the first read.</p>
+
+      <!-- The workbench. Every value in here is written by js/home-auth.js from
+           /api/user/documents, /api/user/dashboard/overview and
+           /api/user/billing/status, the same routes /dashboard and /account
+           read. Nothing is filled in by the markup, and a block whose route did
+           not answer hides itself rather than showing a zero it cannot stand
+           behind. -->
+      <div class="hw" data-hw>
+
+        <div class="hw-card hw-figure">
+          <p class="hw-kicker" data-hw-kicker>Your month</p>
+          <div class="hw-figure-body">
+            <div class="hw-figure-words">
+              <div class="hw-read" data-hw-read hidden>
+                <span class="hw-num" data-hw-num></span>
+                <span class="hw-of" data-hw-of hidden></span>
+              </div>
+              <p class="hw-cap" data-hw-cap hidden></p>
+              <p class="hw-sub" data-hw-sub hidden></p>
+              <p class="hw-quiet" data-hw-quiet hidden>Your documents are not loading right now. Nothing on the account has changed. Open documents below, or try again in a minute.</p>
+            </div>
+            <svg class="hw-obj" viewBox="0 0 96 96" aria-hidden="true" focusable="false">
+              <rect x="17" y="5" width="59" height="76" rx="4" fill="var(--cream, #EAE2CE)" opacity=".93"/>
+              <g fill="var(--night, #15191C)" opacity=".5">
+                <rect x="27" y="20" width="39" height="4.5" rx="2.25"/>
+                <rect x="27" y="33" width="39" height="4.5" rx="2.25"/>
+                <rect x="27" y="46" width="24" height="4.5" rx="2.25"/>
+              </g>
+              <circle cx="69" cy="70" r="13.5" fill="var(--ochre, #D9A441)" stroke="var(--night, #15191C)" stroke-width="3.5"/>
+            </svg>
+          </div>
+          <div class="hw-strip" data-hw-strip hidden></div>
+        </div>
+
+        <div class="hw-cols">
+          <div class="hw-card hw-list-card" data-hw-waiting hidden>
+            <p class="hw-kicker">Waiting on a signature</p>
+            <ul class="hw-list" data-hw-waiting-list></ul>
+            <a class="hw-more" href="/dashboard">Open requests</a>
+          </div>
+
+          <div class="hw-card hw-list-card" data-hw-recent hidden>
+            <p class="hw-kicker">Recent</p>
+            <ul class="hw-list" data-hw-recent-list></ul>
+            <a class="hw-more" href="/dashboard">All documents</a>
+          </div>
+        </div>
+
+        <div class="hw-card hw-empty" data-hw-empty hidden>
+          <div class="hw-empty-body">
+            <div>
+              <p class="hw-kicker">Your first minute</p>
+              <strong>Nothing here yet.</strong>
+              <p>Sign your first document or send your first file; both take under a minute.</p>
+            </div>
+            <svg class="hw-obj" viewBox="0 0 96 96" aria-hidden="true" focusable="false">
+              <g transform="translate(8 21)">
+                <rect x="0" y="0" width="80" height="54" rx="3" fill="var(--cream, #EAE2CE)" opacity=".93"/>
+                <path d="M0 3l40 29 40-29" fill="none" stroke="var(--night, #15191C)" stroke-opacity=".5" stroke-width="3.5" stroke-linejoin="round"/>
+                <circle cx="40" cy="33" r="9.5" fill="var(--ochre, #D9A441)" stroke="var(--night, #15191C)" stroke-width="3"/>
+              </g>
+            </svg>
+          </div>
+          <div class="hw-empty-actions">
+            <a class="hp-btn hp-btn-fill" href="/sign">Start signing</a>
+            <a class="hp-btn hp-btn-line" href="/parashare">Send securely</a>
+          </div>
+        </div>
+
+        <p class="hw-plan" data-hw-plan hidden><span data-hw-plan-text></span><a class="hw-renew" href="/pricing" data-hw-renew hidden>Renew</a></p>
+      </div>
+
       <div class="home-actions">
         <a class="hp-btn hp-btn-fill" href="/dashboard">Open documents</a>
         <a class="hp-btn hp-btn-line" href="/sign">Start signing</a>
@@ -652,6 +821,7 @@ footer a{color:var(--fg)}
 </footer>
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=8" defer></script>
-<script src="/js/home-auth.js?v=2" defer></script>
+<script src="/js/format-date.js?v=1" defer></script>
+<script src="/js/home-auth.js?v=3" defer></script>
 </body>
 </html>
