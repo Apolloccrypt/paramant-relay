@@ -4353,7 +4353,9 @@ async function handleRelayRequest(req, res) {
     // /v2/inbound clamps against, so the page cannot promise what the upload
     // will not give. `link_ttl_ms_by_plan` is the plain tiers.js table the
     // chooser needs to say "1 hour on Community, 24 hours on Pro, 7 days on
-    // Business" to a reader who is on none of them yet.
+    // Enterprise" to a reader who is on none of them yet. Business stays in
+    // the payload because it is a real server-side ceiling; it is not a
+    // ParaSend plan, so the page does not name it.
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({
       valid: !!(kd?.active),
