@@ -758,9 +758,13 @@ async function confirmFingerprint() {
       body: JSON.stringify({
         device_id: sessionToken + '_ready',
         ecdh_pub: isVault ? JSON.stringify(vaultFiles) : vaultFiles[0].tokens.join(','),
+        // One writer, one reader: frontend/js/handshake-meta.js. The receiver
+        // read this field with its own split() until 4 September 2026 and was
+        // one field out of step, which is how a block count ended up in ttl.
         kyber_pub: isVault
-          ? 'vault|' + files.length + '|' + ttlMs
-          : files[0].name + '|' + vaultFiles[0].tokens.length + '|' + ttlMs
+          ? window.paramantHandshake.encode({ kind: 'vault', chunks: files.length, ttlMs: ttlMs })
+          : window.paramantHandshake.encode({ kind: 'file', name: files[0].name,
+              chunks: vaultFiles[0].tokens.length, ttlMs: ttlMs })
       })
     });
 

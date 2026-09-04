@@ -131,6 +131,48 @@ async function audit(page, label, sel) {
   return text;
 }
 
+// A real one-page PDF, built here rather than fetched, so the /get PDF branch is
+// driven by bytes pdf.js will actually open. The offsets in the xref table are
+// counted off the assembled body, which is what makes this a document and not
+// just a blob that starts with %PDF.
+function minimalPdf(title) {
+  const objs = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] ' +
+      '/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  const stream = `BT /F1 24 Tf 60 760 Td (${title}) Tj ET`;
+  objs.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+
+  let out = '%PDF-1.4\n';
+  const offsets = [];
+  objs.forEach((body, i) => {
+    offsets.push(out.length);
+    out += `${i + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const xref = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
+  for (const o of offsets) out += String(o).padStart(10, '0') + ' 00000 n \n';
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, 'latin1');
+}
+
+// Both /get endings open the same envelope, so seal it in one place:
+// [uint32-LE nameLen][name][file], AES-256-GCM, key and iv in the fragment.
+async function sealForGet(fileName, fileBytes) {
+  const nameBytes = Buffer.from(fileName, 'utf8');
+  const head = Buffer.alloc(4); head.writeUInt32LE(nameBytes.length, 0);
+  const rawKey = wc.getRandomValues(new Uint8Array(32));
+  const iv = wc.getRandomValues(new Uint8Array(12));
+  const key = await wc.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt']);
+  const ct = Buffer.from(await wc.subtle.encrypt({ name: 'AES-GCM', iv }, key,
+    Buffer.concat([head, nameBytes, Buffer.from(fileBytes)])));
+  return { ct, frag: Buffer.concat([Buffer.from(rawKey), Buffer.from(iv)]).toString('base64url') };
+}
+
+
 // ── /parashare, both stands ─────────────────────────────────────────────────
 const MERKLE = { leaf_hash: 'b'.repeat(64), leaf_index: 41, tree_size: 42,
   audit_path: ['c'.repeat(64)], root: 'd'.repeat(64), sth: { signature: 'e'.repeat(40) },
@@ -217,14 +259,7 @@ async function stubSender(page) {
 {
   const FILE_NAME = 'loonstrook-2026-09.pdf';
   const fileBytes = Buffer.from(Array.from({ length: 1777 }, (_, i) => (i * 37 + 11) % 256));
-  const nameBytes = Buffer.from(FILE_NAME, 'utf8');
-  const head = Buffer.alloc(4); head.writeUInt32LE(nameBytes.length, 0);
-  const rawKey = wc.getRandomValues(new Uint8Array(32));
-  const iv = wc.getRandomValues(new Uint8Array(12));
-  const key = await wc.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt']);
-  const ct = Buffer.from(await wc.subtle.encrypt({ name: 'AES-GCM', iv },
-    key, Buffer.concat([head, nameBytes, fileBytes])));
-  const frag = Buffer.concat([Buffer.from(rawKey), Buffer.from(iv)]).toString('base64url');
+  const { ct, frag } = await sealForGet(FILE_NAME, fileBytes);
 
   const ctx = await browser.newContext({ viewport: PHONE, acceptDownloads: true });
   const page = await ctx.newPage();
@@ -237,6 +272,49 @@ async function stubSender(page) {
   const text = await audit(page, '/get', '#step-done');
   ok('/get: it says the file is here and that our copy is gone',
     /is saved on your device/.test(text) && /permanently destroyed/.test(text), text.slice(0, 200));
+  await ctx.close();
+}
+
+// ── /get, and the file is a PDF ─────────────────────────────────────────────
+//
+// A PDF does not save itself: the page draws it and waits, because there is
+// something worth looking at. Until 4 September 2026 that meant a fifth ending
+// with a headline of its own ("Document received"), a card headed PDF PREVIEW,
+// three badges reading Decrypted locally / Relay copy burned / Rendered in
+// browser, and two buttons of equal weight. It is the same end screen as the
+// rest now, with the document itself in the payload slot.
+{
+  const FILE_NAME = 'loonstrook-2026-09.pdf';
+  const { ct, frag } = await sealForGet(FILE_NAME, minimalPdf('Loonstrook september 2026'));
+
+  const ctx = await browser.newContext({ viewport: PHONE, acceptDownloads: true });
+  const page = await ctx.newPage();
+  await page.route('https://health.paramant.app/v2/dl/**/get', (r) =>
+    r.fulfill({ status: 200, contentType: 'application/octet-stream', body: ct }));
+  await page.goto(`${ORIGIN}/get?t=${'a'.repeat(48)}&r=health#${frag}`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#step-done.active', { timeout: 40000 });
+  await page.locator('#step-done .done-payload canvas').first().waitFor({ timeout: 40000 });
+  const text = await audit(page, '/get PDF', '#step-done');
+  ok('/get PDF: the fifth end screen is gone', (await page.locator('#step-preview').count()) === 0);
+  ok('/get PDF: it uses the same heading as every other arrival',
+    /You have the file\./.test(text), text.slice(0, 220));
+  ok('/get PDF: it names the document and claims no save that has not happened',
+    text.includes(FILE_NAME) && /1 page/.test(text) && /is open here in this tab/.test(text) &&
+    !/is saved on your device/.test(text), text.slice(0, 260));
+  ok('/get PDF: it says our copy is gone', /permanently destroyed/.test(text), text.slice(0, 260));
+  ok('/get PDF: the badges are gone', (await page.locator('#step-done .tag').count()) === 0);
+  ok('/get PDF: the document itself is on the screen',
+    (await page.locator('#step-done .done-payload canvas').count()) === 1);
+  ok('/get PDF: the one loud button is the save',
+    (await page.locator('#done-save').textContent()).trim() === 'Save');
+
+  // And it does what it says: the original bytes, under the original name.
+  const [saved] = await Promise.all([
+    page.waitForEvent('download', { timeout: 20000 }),
+    page.locator('#done-save').click(),
+  ]);
+  ok('/get PDF: Save hands the document over under its own name',
+    saved.suggestedFilename() === FILE_NAME, saved.suggestedFilename());
   await ctx.close();
 }
 

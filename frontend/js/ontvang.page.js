@@ -206,16 +206,26 @@ async function init() {
             if (_transferClaimed) return;
             _transferClaimed = true;
             clearInterval(pollTransfer);
-            const parts = d.kyber_pub.split('|');
-            if (parts[0] === 'vault') {
-              // Vault mode: meerdere bestanden
-              const ttl_ms = parseInt(parts[2]) || 3600000;
-              const vaultFiles = JSON.parse(d.ecdh_pub);
-              await receiveVault(vaultFiles, ttl_ms, myPrivateKey_MLKEM, myPrivateKey_ECDH_RAW);
+            // The sender wrote this field with frontend/js/handshake-meta.js and
+            // this side reads it with the same module. Reading it here by hand
+            // is what put the block count in ttl until 4 September 2026.
+            const meta = window.paramantHandshake.decode(d.kyber_pub);
+            // 'vault' is a hint from a name field, so confirm it against the
+            // thing a vault actually carries: a JSON list of files. A single
+            // file that happens to be named "vault" then still arrives.
+            let vaultFiles = null;
+            if (meta.kind === 'vault') {
+              try { vaultFiles = JSON.parse(d.ecdh_pub); } catch (_) { vaultFiles = null; }
+              if (!Array.isArray(vaultFiles)) vaultFiles = null;
+            }
+            if (vaultFiles) {
+              await receiveVault(vaultFiles, meta.ttlMs, myPrivateKey_MLKEM, myPrivateKey_ECDH_RAW);
             } else {
-              // Enkelvoudig bestand — formaat: total_chunks|ttl_ms (bestandsnaam zit alleen in encrypted payload)
-              const ttl_ms = parseInt(parts[1]) || 3600000;
-              await receiveFile({ tokens: d.ecdh_pub, file_name: 'download', total_chunks: parseInt(parts[0]) || 1, ttl_ms }, myPrivateKey_MLKEM, myPrivateKey_ECDH_RAW);
+              // The name is a courtesy from the handshake and only used until
+              // chunk 0 arrives: the real name travels inside the sealed bytes,
+              // and receiveFile() overwrites this with it.
+              await receiveFile({ tokens: d.ecdh_pub, file_name: meta.name || 'download',
+                total_chunks: meta.chunks, ttl_ms: meta.ttlMs }, myPrivateKey_MLKEM, myPrivateKey_ECDH_RAW);
             }
           }
         }
