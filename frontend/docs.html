@@ -498,7 +498,7 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
 <span class="cm">200: { "ok": true, "hash": "...", "ttl_ms": 3600000 }
 409: hash already exists
 503: relay at capacity (memory limit)</span></pre>
-    <p>TTL and <code>max_views</code> are both clamped to the plan maximum: Community gets 1 hour and 1 read, Pro 24 hours and up to 10 reads, Business 7 days and 25 reads, Enterprise 7 days and 100 reads. Leave <code>max_views</code> out and the link burns on the first read on every plan, which is what the ParaSend web app does. The <code>hash</code> field is the SHA-256 of the <em>padded</em> payload (not the original file). The SDK computes this automatically.</p>
+    <p>TTL and <code>max_views</code> are both clamped to the plan maximum: Community gets 1 hour and 1 read, Pro 24 hours and up to 10 reads, Enterprise 7 days and 100 reads. Leave <code>max_views</code> out and the link burns on the first read on every plan, which is what the ParaSend web app does. The <code>hash</code> field is the SHA-256 of the <em>padded</em> payload (not the original file). The SDK computes this automatically.</p>
 
     <h2 id="outbound">GET /v2/outbound/:hash</h2>
     <p><strong>Spends one read of the link.</strong> A Community link has one read, so this call is the only retrieval; a paid link can have more, up to 10 reads on Pro. On the last read the blob buffer is overwritten with random bytes and removed from RAM. There is no recovery.</p>

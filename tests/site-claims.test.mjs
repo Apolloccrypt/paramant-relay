@@ -1311,7 +1311,10 @@ test('the reads a link allows on /privacy are the ones tiers.js grants', () => {
   const priv = visible(page('privacy'));
   assert.ok(priv.includes('On the Community plan it is permanently and irreversibly destroyed after the first download'),
     'privacy: burn-on-read must be attributed to the plan that has it');
-  assert.ok(priv.includes(`up to ${views('pro')} on Pro, ${views('business')} on Business and ${views('enterprise')} on Enterprise`),
+  // Business dropped from the reads sentence on 2026-09-04: tiers.js carries a
+  // business row, but /pricing sells ParaSend as Community, Pro and Enterprise
+  // only, so naming Business here sold a plan a ParaSend buyer cannot buy.
+  assert.ok(priv.includes(`up to ${views('pro')} on Pro and ${views('enterprise')} on Enterprise`),
     'privacy: the reads a paid link allows must be the max_views in tiers.js');
   assert.doesNotMatch(priv, /relay server and is permanently and irreversibly destroyed after the first download/,
     'privacy: must not state burn-on-read as a property of every plan');
@@ -2200,8 +2203,13 @@ test('every page that promises burn-on-read says which client and which plan it 
 
   // The sentence itself, on the pages that have to carry it whole, with the
   // numbers written off tiers.js so a policy change moves the copy with it.
-  const unified = `The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to ${reads.pro} reads on Pro, ${reads.business} on Business and ${reads.enterprise} on Enterprise.`;
-  for (const slug of ['parasend', 'pricing', 'help/gmail-extension', 'help/outlook-extension']) {
+  // Business is not in this sentence: the ParaSend price table sells Community,
+  // Pro and Enterprise, so the paid read counts the site may name are the two
+  // that belong to a plan a ParaSend buyer can actually reach. /security joined
+  // the list on 2026-09-04; it used to carry a shorter sentence of its own that
+  // named Pro and stopped there.
+  const unified = `The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to ${reads.pro} reads on Pro and ${reads.enterprise} on Enterprise.`;
+  for (const slug of ['parasend', 'pricing', 'security', 'help/gmail-extension', 'help/outlook-extension']) {
     assert.ok(flatten(bodyOf(page(slug))).includes(unified),
       `${slug}: must carry the client-and-plan sentence in full: "${unified}"`);
   }
@@ -2231,8 +2239,8 @@ test('every page that promises burn-on-read says which client and which plan it 
 
   // The two pages that spell all four plans out on their own terms.
   const spelled = [
-    ['architecture', `after the last read the link allows: one on Community, up to ${reads.pro} on Pro, ${reads.business} on Business and ${reads.enterprise} on Enterprise`],
-    ['docs', `Community gets 1 hour and 1 read, Pro 24 hours and up to ${reads.pro} reads, Business 7 days and ${reads.business} reads, Enterprise 7 days and ${reads.enterprise} reads`],
+    ['architecture', `after the last read the link allows: one on Community, up to ${reads.pro} on Pro and ${reads.enterprise} on Enterprise`],
+    ['docs', `Community gets 1 hour and 1 read, Pro 24 hours and up to ${reads.pro} reads, Enterprise 7 days and ${reads.enterprise} reads`],
   ];
   for (const [slug, sentence] of spelled) {
     assert.ok(flatten(bodyOf(page(slug))).includes(sentence),
@@ -2552,4 +2560,80 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
     assert.ok(said >= 0 && button >= 0 && said < button,
       `${slug}: the live-handshake sentence must stand ABOVE the button (sentence at ${said}, button at ${button}); after it is where it already was`);
   }
+});
+
+// 39 ── The plans ParaSend actually has, and the reads they actually buy.
+//
+// Found by a writer reading the live site on 4 September 2026: /pricing and
+// /parasend offered "up to 10 reads on Pro, 25 on Business and 100 on
+// Enterprise", and the ParaSend price table on that same page sells three
+// tiers, Community, Pro and Enterprise. There is no ParaSend Business plan to
+// buy, so a quarter of that sentence pointed at nothing. /security meanwhile
+// carried a fourth wording of its own, "one on Community, up to 10 on Pro",
+// which stopped before Enterprise and never said the count is the API's.
+//
+// tiers.js does carry a business row, and it is load-bearing: normalisePlan
+// maps a stored `business` plan onto it so a ParaSign Business account is not
+// silently held to community caps. That row is a server-side ceiling, not an
+// offer, and this block is the line between the two: the site may name a read
+// count only for a plan its own ParaSend price table sells.
+//
+// Verified by sabotage: put "25 on Business" back on any of the three pages
+// (red, by page and sentence); add a fourth ParaSend tier card named Business
+// to /pricing without adding it to the copy (red, the table and the sentence
+// disagree); change pro.max_views in tiers.js (red, the numbers drift).
+test('the ParaSend read counts are the ones tiers.js grants to plans ParaSend sells', () => {
+  const tiersSrc = read('relay/lib/tiers.js');
+  const viewsOf = (tier) => {
+    const m = /max_views:\s*(\d+)/.exec(tiersSrc.slice(tiersSrc.indexOf(`${tier}:`)));
+    assert.ok(m, `tiers.js ${tier} must declare a literal max_views`);
+    return Number(m[1]);
+  };
+
+  // Which tiers /pricing sells for ParaSend, read off the price table itself:
+  // the ParaSend tier grid is the one carrying the parasend checkout buttons.
+  const pricingSrc = page('pricing');
+  const grids = [...pricingSrc.matchAll(/<div class="tier-grid">([\s\S]*?)<\/section>/g)].map((m) => m[1]);
+  const parasendGrid = grids.find((g) => /data-billing-product="parasend"/.test(g));
+  assert.ok(parasendGrid, '/pricing no longer has a ParaSend tier grid with a parasend checkout button in it');
+  const sold = [...parasendGrid.matchAll(/<div class="tier-name">([^<]+)<\/div>/g)].map((m) => m[1].trim());
+  assert.deepEqual(sold, ['Community', 'Pro', 'Enterprise'],
+    `the ParaSend price table now sells ${sold.join(', ')}; the read sentence on /pricing, /parasend and /security names Pro and Enterprise and must move with it`);
+
+  // The three pages the writer checked, each carrying the same sentence with
+  // the numbers off tiers.js. Community's count is the burn-on-first-read half
+  // of it and is not written as a digit anywhere in the sentence.
+  assert.equal(viewsOf('community'), 1,
+    'community no longer burns on the first read; the "after the first read on every plan" half of the sentence is now false');
+  const sentence = `Through the API a paid link can allow more reads: up to ${viewsOf('pro')} reads on Pro and ${viewsOf('enterprise')} on Enterprise.`;
+  for (const slug of ['pricing', 'parasend', 'security']) {
+    assert.ok(visible(page(slug)).replace(/\s+/g, ' ').includes(sentence),
+      `${slug}: must name the API read counts as "${sentence}", the max_views tiers.js grants to the plans ParaSend sells`);
+  }
+
+  // And Business may not come back beside a ParaSend read count anywhere on the
+  // site. Scoped to reads on purpose: the ParaSend link TTL sentences on /terms
+  // and /press still say "seven days on Business and Enterprise", which is a
+  // separate untruth of the same family and is pinned elsewhere; this block
+  // does not silently claim to have fixed it.
+  //
+  // A read claim is a COUNT beside the plan name, which is what makes it an
+  // offer. "seven days on Business" is a duration and is caught by neither
+  // pattern, on purpose.
+  const READ_CLAIM = [
+    /up to \d+[^.]{0,40}\bon Business\b/i,
+    /\bBusiness\b[^.]{0,24}\b\d+ reads?\b/i,
+    /\b\d+ reads? on Business\b/i,
+  ];
+  const offenders = [];
+  for (const slug of allPages()) {
+    const text = visible(page(slug)).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    for (const sentence of text.split(/(?<=\.)\s+/)) {
+      if (!/\bBusiness\b/.test(sentence)) continue;
+      if (/ParaSign|signature/i.test(sentence)) continue; // ParaSign does sell Business
+      const hit = READ_CLAIM.find((re) => re.test(sentence));
+      if (hit) offenders.push(`${slug}: "${sentence.trim().slice(0, 180)}" names Business in a read claim, and ParaSend has no Business plan`);
+    }
+  }
+  assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}\n`);
 });
