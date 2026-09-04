@@ -209,8 +209,8 @@ footer a{color:var(--ink);text-decoration:none}
 
 <h2>How Ghost Pipe &amp; ParaShare (the ParaSend web app) work</h2>
 <p>All files are encrypted <strong>client-side in your browser</strong> using post-quantum cryptography (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256) before they ever reach our servers. The relay never sees plaintext at any point.</p>
-<p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server. On the Community plan it is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>); a paid plan buys more reads per link through the API before that same destruction, up to 10 on Pro and 100 on Enterprise. Encrypted payload data is never written to disk. From a <em>transfer</em>, the only thing persisted to disk is cryptographic hashes in the public Certificate Transparency log: no file content, no keys, no plaintext. (Account data, listed below, is stored separately to run your account.)</p>
-<p>Community plan blobs expire after 1 hour maximum. Pro blobs after 24 hours. Enterprise blobs after 7 days. All are destroyed earlier once the last read of the link is spent.</p>
+<p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server. On the Community plan it is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>); a paid plan buys more reads per link through the API before that same destruction, up to 10 on Firm and 100 on Enterprise. Encrypted payload data is never written to disk. From a <em>transfer</em>, the only thing persisted to disk is cryptographic hashes in the public Certificate Transparency log: no file content, no keys, no plaintext. (Account data, listed below, is stored separately to run your account.)</p>
+<p>Community plan blobs expire after 1 hour maximum. Firm blobs after 24 hours. Enterprise blobs after 7 days. All are destroyed earlier once the last read of the link is spent.</p>
 
 <h2>How ParaSign document delivery works</h2>
 <p>When you request signatures, your browser encrypts the document with AES-256-GCM before upload. The signing relay stores the encrypted capsule with the envelope until its expiry: 30 days unless the request asks for another term, and never longer than 365 days. The relay does not receive document plaintext or the document key. The personal signing link contains the key in its URL fragment; browsers do not send that fragment to the relay.</p>
@@ -306,7 +306,7 @@ footer a{color:var(--ink);text-decoration:none}
 
 <h2>GDPR / AVG</h2>
 <p>We process the minimum personal data needed to run your account, on a lawful basis (performing the service you request, and our legitimate interest in keeping it secure). You can request access to, or deletion of, your account data by emailing us. The standard <strong>Data Processing Agreement (DPA)</strong> is published at <a href="/dpa">/dpa</a> and applies to all plans; anyone can sign it electronically, with no account and no paid tier required.</p>
-<p>Temporary relay data is never retained longer than the applicable TTL (1 hour for Community, 24 hours for Pro, 7 days for Enterprise). In practice it is destroyed much earlier on download.</p>
+<p>Temporary relay data is never retained longer than the applicable TTL (1 hour for Community, 24 hours for Firm, 7 days for Enterprise). In practice it is destroyed much earlier on download.</p>
 
 <h2>Children</h2>
 <p>PARAMANT is not directed at children under 13. We do not knowingly collect data from minors.</p>

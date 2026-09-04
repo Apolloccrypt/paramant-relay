@@ -248,7 +248,7 @@ test('link expiry per tier on pricing and privacy matches tiers.js', () => {
   assert.equal(free, 1); assert.equal(pro, 24); assert.equal(ent, 7 * 24);
   const pricing = visible(page('pricing'));
   assert.ok(pricing.includes(`${free} hour link expiry`), `pricing: Community must say ${free} hour link expiry`);
-  assert.ok(pricing.includes(`${pro} hour link expiry`), `pricing: Pro must say ${pro} hour link expiry`);
+  assert.ok(pricing.includes(`${pro} hour link expiry`), `pricing: Firm must say ${pro} hour link expiry`);
   assert.ok(pricing.includes(`${ent / 24} day link expiry`), `pricing: Enterprise must say ${ent / 24} day link expiry`);
   // Business dropped from both duration sentences on 2026-09-04. tiers.js does
   // carry a business row holding the Enterprise ceiling, and it stays there
@@ -257,10 +257,12 @@ test('link expiry per tier on pricing and privacy matches tiers.js', () => {
   // lifetime hung on Business offered a plan a ParaSend buyer cannot buy.
   // Block 40 sweeps the whole site for that shape.
   const priv = visible(page('privacy'));
-  assert.ok(priv.includes(`${free} hour for Community, ${pro} hours for Pro, ${ent / 24} days for Enterprise`), 'privacy: retention line must match tiers.js');
-  assert.ok(priv.includes(`Community plan blobs expire after ${free} hour maximum. Pro blobs after ${pro} hours. Enterprise blobs after ${ent / 24} days.`), 'privacy: expiry paragraph must match tiers.js');
+  // The tiers.js row is 'pro'; the plan it is SOLD under has been Firm since
+  // 6 September 2026, and the pages name the plan a reader can buy.
+  assert.ok(priv.includes(`${free} hour for Community, ${pro} hours for Firm, ${ent / 24} days for Enterprise`), 'privacy: retention line must match tiers.js');
+  assert.ok(priv.includes(`Community plan blobs expire after ${free} hour maximum. Firm blobs after ${pro} hours. Enterprise blobs after ${ent / 24} days.`), 'privacy: expiry paragraph must match tiers.js');
   const WORD = { 1: 'one', 24: 'twenty-four', 7: 'seven' };
-  assert.ok(visible(page('terms')).includes(`${WORD[free]} hour on Community, ${WORD[pro]} hours on Pro and ${WORD[ent / 24]} days on Enterprise`),
+  assert.ok(visible(page('terms')).includes(`${WORD[free]} hour on Community, ${WORD[pro]} hours on Firm and ${WORD[ent / 24]} days on Enterprise`),
     'terms: the time-to-live sentence must match tiers.js');
 });
 
@@ -685,8 +687,9 @@ test('the tier block on /about repeats the numbers /pricing charges for', () => 
   // (docs/brand/messaging.md section 3) makes that name the rule rather than a
   // preference. /about has to use the same word or a reader cannot find the
   // card the sentence is about.
-  for (const [label, set, names] of [['ParaSend', send, ['Community', 'Pro', 'Enterprise']],
-                                     ['ParaSign', sign, ['Community', 'Pro', 'Business', 'Enterprise']]]) {
+  // Firm is one plan over both products, so its card stands in both grids.
+  for (const [label, set, names] of [['ParaSend', send, ['Community', 'Firm', 'Enterprise']],
+                                     ['ParaSign', sign, ['Community', 'Firm', 'Business', 'Enterprise']]]) {
     for (const n of names) assert.ok(set[n], `pricing.html no longer has a ${label} ${n} tier`);
   }
 
@@ -702,11 +705,11 @@ test('the tier block on /about repeats the numbers /pricing charges for', () => 
   const facts = [
     [phrase(sign.Community, /<li>(\d+ signatures? (?:a|per) month)<\/li>/, 'the ParaSign Community signature allowance'), 'ParaSign Community'],
     [phrase(send.Community, /<li>(\d+ hour link expiry)<\/li>/, 'the ParaSend Community link expiry'), 'ParaSend Community'],
-    [phrase(send.Pro, /<li>(\d+ hour link expiry)<\/li>/, 'the ParaSend Pro link expiry'), 'ParaSend Pro'],
+    [phrase(send.Firm, /<li>(\d+ hour link expiry)<\/li>/, 'the Firm link expiry'), 'Firm'],
     // Captured with the API qualifier, so /about has to repeat that too: the
     // read count is a benefit of the API route, not of the plan on its own.
-    [phrase(send.Pro, /<li>(Up to \d+ reads per link through the API)<\/li>/, 'the ParaSend Pro read limit'), 'ParaSend Pro'],
-    [phrase(send.Pro, /<li>(Up to \d+ registered devices)<\/li>/, 'the ParaSend Pro device limit'), 'ParaSend Pro'],
+    [phrase(send.Firm, /<li>(Up to \d+ reads per link through the API)<\/li>/, 'the Firm read limit'), 'Firm'],
+    [phrase(send.Firm, /<li>(Up to \d+ registered devices)<\/li>/, 'the Firm device limit'), 'Firm'],
     [phrase(send.Enterprise, /<li>SLA ([\d.]+%),/, 'the ParaSend Enterprise SLA'), 'ParaSend Enterprise'],
   ];
   for (const [expected, tier] of facts) {
@@ -724,9 +727,11 @@ test('the tier block on /about repeats the numbers /pricing charges for', () => 
 
   // And the paid tiers are named the way /pricing names them, so a reader can
   // find the card the sentence is about.
+  // Firm replaced the two Pro plans on 6 September 2026: one payment, both
+  // products, so there is one name for it and not two.
   for (const name of ['ParaSign Community', 'ParaSend Community',
-                      'ParaSign Pro', 'ParaSign Business', 'ParaSign Enterprise',
-                      'ParaSend Pro', 'ParaSend Enterprise']) {
+                      'Firm', 'ParaSign Business', 'ParaSign Enterprise',
+                      'ParaSend Enterprise']) {
     assert.ok(about.includes(name), `about: the tier block must name ${name} the way /pricing does`);
   }
   // Scoped to /about in the first version of this check, which is exactly how
@@ -1314,7 +1319,7 @@ test('the reads a link allows on /privacy are the ones tiers.js grants', () => {
   // Business dropped from the reads sentence on 2026-09-04: tiers.js carries a
   // business row, but /pricing sells ParaSend as Community, Pro and Enterprise
   // only, so naming Business here sold a plan a ParaSend buyer cannot buy.
-  assert.ok(priv.includes(`up to ${views('pro')} on Pro and ${views('enterprise')} on Enterprise`),
+  assert.ok(priv.includes(`up to ${views('pro')} on Firm and ${views('enterprise')} on Enterprise`),
     'privacy: the reads a paid link allows must be the max_views in tiers.js');
   assert.doesNotMatch(priv, /relay server and is permanently and irreversibly destroyed after the first download/,
     'privacy: must not state burn-on-read as a property of every plan');
@@ -1351,7 +1356,7 @@ test('the reads a link allows on /privacy are the ones tiers.js grants', () => {
   // Enterprise, not Business, since 2026-09-04: the ParaSend price table sells
   // three tiers and Business is not one of them, so /press may not put a link
   // lifetime on it. The tiers.js business row is a server-side ceiling only.
-  const sentence = `${span('community')} on Community, ${span('pro')} on Pro, ${span('enterprise')} on Enterprise`;
+  const sentence = `${span('community')} on Community, ${span('pro')} on Firm, ${span('enterprise')} on Enterprise`;
   const press = visible(page('press'));
   assert.ok(press.includes(sentence),
     `press: the expiry bullet must say "${sentence}", the ceilings tiers.js sets, instead of denying the timer`);
@@ -2249,11 +2254,12 @@ test('every page that promises burn-on-read says which client and which plan it 
   // The sentence itself, on the pages that have to carry it whole, with the
   // numbers written off tiers.js so a policy change moves the copy with it.
   // Business is not in this sentence: the ParaSend price table sells Community,
-  // Pro and Enterprise, so the paid read counts the site may name are the two
+  // Firm and Enterprise, so the paid read counts the site may name are the two
   // that belong to a plan a ParaSend buyer can actually reach. /security joined
   // the list on 2026-09-04; it used to carry a shorter sentence of its own that
-  // named Pro and stopped there.
-  const unified = `The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to ${reads.pro} reads on Pro and ${reads.enterprise} on Enterprise.`;
+  // named Pro and stopped there. The tiers.js row is still 'pro'; the plan it is
+  // sold under has been Firm since 6 September 2026.
+  const unified = `The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to ${reads.pro} reads on Firm and ${reads.enterprise} on Enterprise.`;
   for (const slug of ['parasend', 'pricing', 'security', 'help/gmail-extension', 'help/outlook-extension']) {
     assert.ok(flatten(bodyOf(page(slug))).includes(unified),
       `${slug}: must carry the client-and-plan sentence in full: "${unified}"`);
@@ -2272,15 +2278,15 @@ test('every page that promises burn-on-read says which client and which plan it 
   assert.ok(pricingSrc.includes('<li>Burn on first read</li>'),
     'pricing: the ParaSend Community card must still say the link burns on the first read');
   assert.ok(pricingSrc.includes(`<li>Up to ${reads.pro} reads per link through the API</li>`),
-    `pricing: the ParaSend Pro card must offer the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
+    `pricing: the ParaSend Firm card must offer the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
   assert.ok(pricingSrc.includes(`<li>Up to ${reads.enterprise} reads per link through the API</li>`),
     `pricing: the ParaSend Enterprise card must offer the ${reads.enterprise} reads per link tiers.js grants, and say they come through the API`);
   assert.ok(page('parasend').includes(`<li>Up to ${reads.pro} reads per link through the API</li>`),
-    `parasend: the Pro card must offer the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
+    `parasend: the Firm card must offer the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
   assert.ok(page('parasend').includes('<li>Burn on first read</li>'),
     'parasend: the Community card must still say the link burns on the first read');
   assert.ok(flatten(bodyOf(page('index'))).includes(`up to ${reads.pro} reads per link through the API`),
-    `index: the ParaSend Pro price line must name the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
+    `index: the ParaSend Firm price line must name the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
 
   // The two pages that spell the ParaSend plans out on their own terms. The
   // durations on /docs come off view_ttl_ms since 2026-09-04, so a tier change
@@ -2292,8 +2298,8 @@ test('every page that promises burn-on-read says which client and which plan it 
     return `${n} ${unit}${n === 1 ? '' : 's'}`;
   };
   const spelled = [
-    ['architecture', `after the last read the link allows: one on Community, up to ${reads.pro} on Pro and ${reads.enterprise} on Enterprise`],
-    ['docs', `Community gets ${span('community')} and 1 read, Pro ${span('pro')} and up to ${reads.pro} reads, Enterprise ${span('enterprise')} and ${reads.enterprise} reads`],
+    ['architecture', `after the last read the link allows: one on Community, up to ${reads.pro} on Firm and ${reads.enterprise} on Enterprise`],
+    ['docs', `Community gets ${span('community')} and 1 read, Firm ${span('pro')} and up to ${reads.pro} reads, Enterprise ${span('enterprise')} and ${reads.enterprise} reads`],
   ];
   for (const [slug, sentence] of spelled) {
     assert.ok(flatten(bodyOf(page(slug))).includes(sentence),
@@ -2645,20 +2651,27 @@ test('the ParaSend read counts are the ones tiers.js grants to plans ParaSend se
 
   // Which tiers /pricing sells for ParaSend, read off the price table itself:
   // the ParaSend tier grid is the one carrying the parasend checkout buttons.
+  // The ParaSend grid is the one under the PARASEND marker. It used to be found
+  // by its parasend checkout button; Firm is sold as one line over both
+  // products, so that button now says firm and the marker is the stable anchor.
   const pricingSrc = page('pricing');
-  const grids = [...pricingSrc.matchAll(/<div class="tier-grid">([\s\S]*?)<\/section>/g)].map((m) => m[1]);
-  const parasendGrid = grids.find((g) => /data-billing-product="parasend"/.test(g));
-  assert.ok(parasendGrid, '/pricing no longer has a ParaSend tier grid with a parasend checkout button in it');
+  const parasendHalf = pricingSrc.slice(pricingSrc.indexOf('<!-- TIER CARDS: PARASEND -->'));
+  assert.ok(parasendHalf.length > 500, '/pricing no longer carries the PARASEND tier-card marker');
+  const parasendGrid = /<div class="tier-grid">([\s\S]*?)<\/section>/.exec(parasendHalf)?.[1];
+  assert.ok(parasendGrid, '/pricing no longer has a ParaSend tier grid');
+  assert.match(parasendGrid, /data-billing-product="firm"/, 'the ParaSend grid must carry the Firm checkout button');
   const sold = [...parasendGrid.matchAll(/<div class="tier-name">([^<]+)<\/div>/g)].map((m) => m[1].trim());
-  assert.deepEqual(sold, ['Community', 'Pro', 'Enterprise'],
-    `the ParaSend price table now sells ${sold.join(', ')}; the read sentence on /pricing, /parasend and /security names Pro and Enterprise and must move with it`);
+  assert.deepEqual(sold, ['Community', 'Firm', 'Enterprise'],
+    `the ParaSend price table now sells ${sold.join(', ')}; the read sentence on /pricing, /parasend and /security names Firm and Enterprise and must move with it`);
 
   // The three pages the writer checked, each carrying the same sentence with
   // the numbers off tiers.js. Community's count is the burn-on-first-read half
   // of it and is not written as a digit anywhere in the sentence.
   assert.equal(viewsOf('community'), 1,
     'community no longer burns on the first read; the "after the first read on every plan" half of the sentence is now false');
-  const sentence = `Through the API a paid link can allow more reads: up to ${viewsOf('pro')} reads on Pro and ${viewsOf('enterprise')} on Enterprise.`;
+  // Firm reads the 'pro' row of tiers.js: it grants the ParaSend Pro tier, and
+  // the entitlement tier names never moved, only the name the plan is sold under.
+  const sentence = `Through the API a paid link can allow more reads: up to ${viewsOf('pro')} reads on Firm and ${viewsOf('enterprise')} on Enterprise.`;
   for (const slug of ['pricing', 'parasend', 'security']) {
     assert.ok(visible(page(slug)).replace(/\s+/g, ' ').includes(sentence),
       `${slug}: must name the API read counts as "${sentence}", the max_views tiers.js grants to the plans ParaSend sells`);
@@ -2722,12 +2735,18 @@ test('every ParaSend link lifetime on the site names a plan ParaSend sells, with
 
   // Which plans a duration may be hung on, read off the price table itself --
   // the same grid block 39 reads, so the two cannot drift apart.
-  const grids = [...page('pricing').matchAll(/<div class="tier-grid">([\s\S]*?)<\/section>/g)].map((m) => m[1]);
-  const parasendGrid = grids.find((g) => /data-billing-product="parasend"/.test(g));
-  assert.ok(parasendGrid, '/pricing no longer has a ParaSend tier grid with a parasend checkout button in it');
+  const pricingSrc = page('pricing');
+  const parasendHalf = pricingSrc.slice(pricingSrc.indexOf('<!-- TIER CARDS: PARASEND -->'));
+  assert.ok(parasendHalf.length > 500, '/pricing no longer carries the PARASEND tier-card marker');
+  const parasendGrid = /<div class="tier-grid">([\s\S]*?)<\/section>/.exec(parasendHalf)?.[1];
+  assert.ok(parasendGrid, '/pricing no longer has a ParaSend tier grid');
   const sold = [...parasendGrid.matchAll(/<div class="tier-name">([^<]+)<\/div>/g)].map((m) => m[1].trim().toLowerCase());
-  assert.deepEqual(sold, ['community', 'pro', 'enterprise'],
-    `the ParaSend price table now sells ${sold.join(', ')}; the link-lifetime sentences on /terms, /press and /privacy name Community, Pro and Enterprise and must move with it`);
+  assert.deepEqual(sold, ['community', 'firm', 'enterprise'],
+    `the ParaSend price table now sells ${sold.join(', ')}; the link-lifetime sentences on /terms, /press and /privacy name Community, Firm and Enterprise and must move with it`);
+  // The tiers.js row each sold plan reads its numbers from. Firm is the name on
+  // the card; 'pro' is the entitlement tier it grants, and entitlement tier
+  // names did not move.
+  const ROW_OF = { community: 'community', firm: 'pro', enterprise: 'enterprise' };
 
   // "seven days on Enterprise", "24 hours for Pro": a span, then a plan name,
   // in either register the site writes. Spelled numbers included, because
@@ -2735,7 +2754,7 @@ test('every ParaSend link lifetime on the site names a plan ParaSend sells, with
   // pages as carrying no claim at all.
   const NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, 'twenty-four': 24 };
   const numberOf = (s) => (/^\d+$/.test(s) ? Number(s) : NUM[s.toLowerCase()]);
-  const NAMED = /\b(\d+|one|two|three|four|five|six|seven|twenty-four)[\s-](hour|day)s?\b[^.]{0,30}?\b(?:on|for)\s+(Community|Pro|Business|Enterprise)\b/g;
+  const NAMED = /\b(\d+|one|two|three|four|five|six|seven|twenty-four)[\s-](hour|day)s?\b[^.]{0,30}?\b(?:on|for)\s+(Community|Firm|Pro|Business|Enterprise)\b/g;
   const flat = (slug) => visible(page(slug)).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
   const wrong = [];
@@ -2748,9 +2767,10 @@ test('every ParaSend link lifetime on the site names a plan ParaSend sells, with
         wrong.push(`${slug}: "${m[0]}" hangs a link lifetime on ${m[3]}, and the ParaSend price table does not sell that plan`);
         continue;
       }
+      const row = ROW_OF[tier];
       const stated = m[2].toLowerCase() === 'day' ? numberOf(m[1]) * 24 : numberOf(m[1]);
-      if (stated !== hoursOf(tier)) {
-        wrong.push(`${slug}: "${m[0]}" states ${stated} hours, and tiers.js gives ${tier} ${hoursOf(tier)}`);
+      if (stated !== hoursOf(row)) {
+        wrong.push(`${slug}: "${m[0]}" states ${stated} hours, and tiers.js gives ${row} ${hoursOf(row)}`);
       }
     }
   }

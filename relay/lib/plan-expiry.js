@@ -149,15 +149,28 @@ function planLabel(product, tier) {
   return `${p} ${t}`;
 }
 
+// What a BUNDLE is called in a mail, and what it actually contains. A Firm
+// customer paid once for two products, so telling him "your ParaSend Pro ends"
+// names something he never bought under that name, and telling him twice is
+// worse. The bundle name comes first and the products it covers follow, so the
+// sentence is both the name on his invoice and the thing he loses.
+const BUNDLE_LABEL = Object.freeze({
+  firm: 'Paramant Firm plan (ParaSign Pro and ParaSend Pro)',
+});
+
+function bundleLabel(bundle) {
+  return BUNDLE_LABEL[bundle] || null;
+}
+
 // ── The two mails ────────────────────────────────────────────────────────────
 // Plain sentences, no urgency, no offer. The customer bought a term; he is
 // being told when it stops and that nothing happens to his card unless he says
 // so. That last half is the point: on a one-off payment "your plan ends" reads
 // as a threat of a charge unless it says otherwise.
-function expiryMail({ product, tier, paidUntil, kind, siteUrl }) {
+function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle }) {
   const date = formatDate(paidUntil);
   if (!date) return null;
-  const plan = planLabel(product, tier);
+  const plan = bundleLabel(bundle) || planLabel(product, tier);
   const pricing = `${String(siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, '')}/pricing`;
   if (kind === 'ended') {
     const subject = `Your ${plan} has ended`;
@@ -211,7 +224,7 @@ function htmlBody(subject, text, pricing) {
 // A record on the floor tier, or without a period, is REMOVED rather than
 // skipped: that is the chargeback path (setProductPlan(..., floor, null)) and
 // an entry left behind would mail a customer about a plan he no longer has.
-async function upsertExpiry(redis, { accountId, product, tier, paidUntil, email }) {
+async function upsertExpiry(redis, { accountId, product, tier, paidUntil, email, bundle }) {
   if (!redis || !accountId || (product !== 'parasign' && product !== 'parasend')) {
     return { indexed: false, reason: 'bad_args' };
   }
@@ -226,11 +239,13 @@ async function upsertExpiry(redis, { accountId, product, tier, paidUntil, email 
     return { indexed: false, reason: 'not_paid' };
   }
   await redis.zAdd(INDEX_ZSET, { score: at, value: member });
-  await redis.hSet(META_HASH, member, JSON.stringify({
+  const meta = {
     email: email || '',
     tier: norm,
     paid_until: new Date(at).toISOString(),
-  }));
+  };
+  if (bundleLabel(bundle)) meta.bundle = bundle;
+  await redis.hSet(META_HASH, member, JSON.stringify(meta));
   return { indexed: true, member, score: at };
 }
 
@@ -262,7 +277,10 @@ async function seedIndex(redis, records) {
       const tier = rec[entitlements.PRODUCT_PLAN_FIELD[product]];
       const paidUntil = rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[product]];
       if (!paidUntil) continue;
-      const r = await upsertExpiry(redis, { accountId, product, tier, paidUntil, email: rec.email });
+      const r = await upsertExpiry(redis, {
+        accountId, product, tier, paidUntil, email: rec.email,
+        bundle: rec[entitlements.PRODUCT_BUNDLE_FIELD[product]] || null,
+      });
       if (r.indexed) indexed++;
     }
   }
@@ -376,11 +394,13 @@ async function runSweep(deps) {
       // repeat inside one sweep, but it is also what makes a crash between the
       // send and the write impossible to turn into a second mail. The
       // reservation is given back below when the mail did not actually leave.
-      const key = noticeKey(kind, accountId, product, meta.paid_until);
+      // Keyed on the BUNDLE when there is one, so the two index entries a Firm
+      // term leaves behind produce ONE mail and not two about the same term.
+      const key = noticeKey(kind, accountId, meta.bundle || product, meta.paid_until);
       const reserved = await redis.set(key, String(now), { NX: true, EX: NOTICE_TTL_S });
       if (!(reserved === 'OK' || reserved === true)) { out.skipped++; continue; }
 
-      const msg = expiryMail({ product, tier, paidUntil: at, kind, siteUrl });
+      const msg = expiryMail({ product, tier, paidUntil: at, kind, siteUrl, bundle: meta.bundle });
       let sent = false;
       try {
         sent = !!(typeof sendEmail === 'function' && await sendEmail({
@@ -471,7 +491,7 @@ module.exports = {
   INDEX_ZSET, META_HASH, LOCK_KEY, NOTICE_PREFIX,
   WARN_DAYS, WARN_WINDOW_MS, ENDED_GRACE_MS, PRUNE_AFTER_MS,
   NOTICE_TTL_S, SWEEP_INTERVAL_MS, LOCK_TTL_MS, DEFAULT_SITE_URL,
-  formatDate, memberOf, parseMember, noticeKey, planLabel, expiryMail,
+  formatDate, memberOf, parseMember, noticeKey, planLabel, bundleLabel, BUNDLE_LABEL, expiryMail,
   upsertExpiry, forgetAccount, seedIndex,
   acquireLock, releaseLock, runSweep, startPlanExpiryPlanner,
 };

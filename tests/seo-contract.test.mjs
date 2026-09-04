@@ -415,7 +415,7 @@ const PINNED = {
   },
   pricing: {
     title: 'Pricing · What is free, and what businesses pay · Paramant',
-    desc: 'The Community plan is free, forever. Organisations pay for higher limits: sending from 15 euro a month, signing from 49, excl. btw. From Paramantis Solutions B.V.',
+    desc: 'The Community plan is free, forever. Organisations pay for higher limits: signing and sending on Firm, 29 euro a month excl. btw. From Paramantis Solutions B.V.',
   },
   about: {
     title: 'About Paramant · Founded by Mick Beer',

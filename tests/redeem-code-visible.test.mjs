@@ -185,12 +185,13 @@ test('a redeemed code refreshes the plan block on /account', async () => {
   // field must not do.
   const { page } = await open('/account', (route) => json(route, GRANTED));
   // The page loaded on the Community answer from stubPage. From here on the
-  // account is Pro, so the block can only say so if it was actually read again.
+  // account holds the `pro` tier, which /account and /pricing both name Firm
+  // since 6 September 2026, so the block can only say so if it was read again.
   await page.waitForFunction(() => {
     const el = document.getElementById('billing-plan');
     return el && el.textContent && el.textContent.trim() !== '\u2014';
   }, null, { timeout: 10000 });
-  assert.doesNotMatch(await page.textContent('#billing-plan'), /Pro/,
+  assert.doesNotMatch(await page.textContent('#billing-plan'), /Firm/,
     'the account has to start on Community, or this test cannot tell a refresh from the first read');
 
   await page.route('**/api/user/billing/status', (route) => json(route, {
@@ -204,10 +205,10 @@ test('a redeemed code refreshes the plan block on /account', async () => {
   await typeAndSubmit(page, 'COFFEE');
   await page.waitForFunction(() => {
     const el = document.getElementById('billing-plan');
-    return el && /Pro/.test(el.textContent || '');
+    return el && /Firm/.test(el.textContent || '');
   }, null, { timeout: 10000 });
   const plan = await page.textContent('#billing-plan');
-  assert.match(plan, /Pro/, `the plan block still says ${plan} after a code was redeemed`);
+  assert.match(plan, /Firm/, `the plan block still says ${plan} after a code was redeemed`);
   await page.close();
 });
 

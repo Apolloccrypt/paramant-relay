@@ -621,25 +621,30 @@ for (const rx of [/post-quantum signatures/, /public proof log/, /dedicated rela
 // rather than typed in here, and relay/test/pricing-page.test.js binds those
 // cards to relay/lib/billing-catalog.js, so the chain runs lead -> card ->
 // catalog and no link in it can move on its own.
-const proCardPrice = (heading) => {
+//
+// SINCE 6 SEPTEMBER 2026 the split is gone at the source. Firm is one plan for
+// both products at one price, so a lead that names two figures would be the
+// untruth now. What survives is the rule that made the split necessary: the
+// figure in the lead is read off the card the buyer will click, not typed here,
+// and the card stands in BOTH product sections with the SAME price, so no
+// visitor is anchored on a number the table then contradicts.
+const firmCardPrice = (heading) => {
   const start = pricingVisible.indexOf(heading);
   assert.ok(start > 0, `pricing.html must still have the "${heading}" section`);
   const section = pricingVisible.slice(start, pricingVisible.indexOf('</section>', start));
-  const m = /<div class="tier-name">Pro<\/div>\s*<div class="tier-price">&euro;([\d.,]+)/.exec(section);
-  assert.ok(m, `the "${heading}" section must still have a Pro card with a price`);
+  const m = /<div class="tier-name">Firm<\/div>\s*<div class="tier-price">&euro;([\d.,]+)/.exec(section);
+  assert.ok(m, `the "${heading}" section must still have a Firm card with a price`);
   return m[1];
 };
-const sending = proCardPrice('ParaSend · Send a file that disappears');
-const signing = proCardPrice('ParaSign · Get a document signed');
-assert.notEqual(sending, signing,
-  'sending and signing are priced separately; if their Pro cards ever agree, the lead below is no longer a split');
-assert.match(heroText, new RegExp(`from <strong>&euro;${sending} a month</strong> for sending`),
-  `the lead must name the ParaSend Pro price (&euro;${sending}) as the price of SENDING`);
-assert.match(heroText, new RegExp(`<strong>&euro;${signing} a month</strong> for signing`),
-  `the lead must name the ParaSign Pro price (&euro;${signing}) as the price of SIGNING`);
-// And it must not go back to quoting one figure for both products.
-assert.doesNotMatch(heroText, /pay for the business plans, from <strong>&euro;\d+ a month<\/strong> excl/,
-  'the lead must not price both products with one amount');
+const sending = firmCardPrice('ParaSend · Send a file that disappears');
+const signing = firmCardPrice('ParaSign · Get a document signed');
+assert.equal(sending, signing,
+  'Firm is one plan over both products; its card must show the same price in both sections');
+assert.match(heroText, new RegExp(`<strong>&euro;${signing} a month</strong> for signing and sending together on Firm`),
+  `the lead must name the Firm price (&euro;${signing}) as the price of BOTH products`);
+// And it must not go back to two figures for what is now one purchase.
+assert.doesNotMatch(heroText, /for sending, from/,
+  'the lead must not price the two products apart again');
 
 // One term for the free limit, on both pages a buyer reads in the same minute.
 // /pricing said "2 signatures a month" and /signup said "sign 2 documents a
@@ -728,22 +733,22 @@ assert.equal(helpAnswers.split('\n').length, 3,
 // gives the buyer a button of the same weight as the developer's Quick start.
 assert.match(docsHtml, /<p class="docs-buyer">Evaluating Paramant\? Your IT can check everything here\./,
   'docs.html must open with the visible line that tells a buyer what this page is for');
-assert.match(docsHtml, /<p class="lede">[^<]*The ParaSign API is available from ParaSign Pro/,
+assert.match(docsHtml, /<p class="lede">[^<]*The ParaSign API is available from Firm/,
   'docs.html must state in the visible lede which plan the ParaSign API needs');
 const docsActions = (docsHtml.match(/<div class="docs-hero-actions">[\s\S]*?<\/div>/) || [''])[0];
 assert.match(docsActions, /<a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">/,
   'the developer keeps the primary button on /docs: Quick start');
 assert.match(docsActions, /<a href="\/pricing" class="docs-hero-btn docs-hero-btn-secondary">/,
   'the buyer gets a real button to /pricing beside it, not only a text link');
-assert.match(developerHtml, /<p class="lede">[^<]*(?:<a[^>]*>[^<]*<\/a>[^<]*)*API access is included from ParaSign Pro/,
+assert.match(developerHtml, /<p class="lede">[^<]*(?:<a[^>]*>[^<]*<\/a>[^<]*)*API access is included from Firm/,
   'developer.html must state in its visible lede which plan the ParaSign API needs');
 // /developer is noindex and only reachable once signed in, so it addresses the
 // developer reading it, never the buyer who sent them.
 assert.doesNotMatch(developerHtml, /your IT can check/i,
   'developer.html talks to the developer on the screen, not to their buyer');
-// Both plan lines are only true while /pricing sells API access on ParaSign Pro.
+// Both plan lines are only true while /pricing sells API access on Firm.
 assert.match(pricing, /<li>API access<\/li>/,
-  'pricing.html must still list API access on the ParaSign Pro tier');
+  'pricing.html must still list API access on the Firm tier');
 
 // Answer 1: signing without an account. Quoted from /sign, which is pinned above.
 assert.match(helpAnswers, /Signing a document needs an account/i,
@@ -762,13 +767,13 @@ assert.ok(parasignGrid.length > 0 && parasignGrid.length < pricing.length,
   'pricing.html must keep the ParaSign tier grid this block reads from');
 assert.match(parasignGrid, /<div class="tier-name">Community<\/div>[\s\S]{0,400}?<li>2 signatures a month<\/li>/,
   'pricing.html is the source of the ParaSign Community allowance quoted on /help');
-assert.match(pricing, /&euro;49<span/,
-  'pricing.html is the source of the ParaSign Pro price quoted on /help');
-assert.match(pricing, /charged &euro;59\.29\/mo incl\. 21% btw/,
+assert.match(pricing, /&euro;29<span/,
+  'pricing.html is the source of the Firm price quoted on /help');
+assert.match(pricing, /charged &euro;35\.09\/mo incl\. 21% btw/,
   'pricing.html is the source of the incl. btw figure quoted on /help');
 assert.match(helpAnswers, /ParaSign Community is free, forever, and no card is required\. It covers 2 signatures a month\./,
   'help/index.html must name the free allowance, not just promise that free exists');
-assert.match(helpAnswers, /ParaSign Pro at &euro;49 a month excl\. btw \(&euro;59\.29 incl\.\)/,
+assert.match(helpAnswers, /Firm at &euro;29 a month excl\. btw \(&euro;35\.09 incl\.\)/,
   'help/index.html must name the first paid price the way /pricing prints it');
 // Proof 3 of the messaging guide, quoted from /pricing. The slogan that follows
 // it there ("Pay for volume, never for security") stays on the page that sells;
@@ -1418,7 +1423,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // /pricing sells four ParaSign tiers. "Businesses pay for Pro or Enterprise"
   // silently dropped Business, and the sentence sat on the page that exists to
   // be checkable.
-  for (const name of ['ParaSign Community', 'ParaSend Community', 'ParaSign Pro, Business and Enterprise']) {
+  for (const name of ['ParaSign Community', 'ParaSend Community', 'Firm, ParaSign Business and Enterprise']) {
     assert.ok(trustRaw.includes(name), `trust.html must name the plans as /pricing names them: "${name}"`);
   }
   assert.doesNotMatch(trustRaw, /Businesses pay for Pro or Enterprise/,
@@ -1711,24 +1716,37 @@ console.log('ui-truthfulness: no page or script promises transfers without a cei
 // while the grant does not move one. The gate ASKS the entitlement layer rather
 // than restating its answer, so bundling a ParaSend entitlement into ParaSign
 // Pro flips this from "must not state" to "must state" on its own.
-(function parasignSurfacesClaimNoTransfers() {
+(function signingSurfacesStateOnlyDeliveredTransfers() {
   // The relay is CommonJS; this file is ESM. createRequire loads the real
-  // module rather than a copy of its numbers, which is the whole point: the
+  // modules rather than a copy of their numbers, which is the whole point: the
   // gate has to move when the entitlement layer does.
-  const { applyProductTier, getEntitlements, PARASEND } =
-    createRequire(import.meta.url)('../relay/lib/entitlements.js');
-  const acct = { key: 'k', account_id: 'k', plan: 'community', plan_parasend: 'community', plan_parasign: 'free' };
-  applyProductTier(acct, 'parasign', 'pro');
-  const delivered = getEntitlements(acct).parasend.quotas.transfers_month;
-  const TRANSFER_FIGURE = /[\d][\d,]*\s*(?:ParaSend\s+)?transfers/i;
+  const require_ = createRequire(import.meta.url);
+  const { applyProductTier, getEntitlements, PARASEND } = require_('../relay/lib/entitlements.js');
+  const catalog = require_('../relay/lib/billing-catalog.js');
 
-  // Every surface that pitches ParaSign Pro, scoped to the ParaSign part of it.
+  // What a signing surface may promise is what the plan it pitches actually
+  // hands over. Firm grants both products, so its ParaSend ceiling is real; a
+  // bare parasign=pro grant still grants nothing on ParaSend, which is what
+  // relay/test/parasign-pro-perks.test.js pins and why this gate exists.
+  const afterBuying = (product, plan) => {
+    const acct = { key: 'k', account_id: 'k', plan: 'community', plan_parasend: 'community', plan_parasign: 'free' };
+    for (const g of catalog.grantsOf(product, plan) || []) applyProductTier(acct, g.product, g.tier);
+    return getEntitlements(acct).parasend.quotas.transfers_month;
+  };
+  const delivered = afterBuying('firm', 'firm');
+  assert.equal(delivered, PARASEND.pro.quotas.transfers_month,
+    `Firm must deliver the ParaSend Pro ceiling, got ${delivered}`);
+  assert.equal(afterBuying('parasign', 'pro'), PARASEND.community.quotas.transfers_month,
+    'a bare parasign=pro grant still moves nothing on ParaSend; that is what makes this gate necessary');
+
+  const TRANSFER_FIGURE = /([\d][\d,]*)\s*(?:ParaSend\s+)?transfers/i;
   const pricingHtml = read('frontend/pricing.html');
   const between = (src, a, b) => src.slice(src.indexOf(a), b ? src.indexOf(b) : undefined);
   const dashJs = read('frontend/js/dashboard.js');
   const quotaJs = read('frontend/js/quota-upgrade.js');
+  const parasignGridScope = between(pricingHtml, '<!-- TIER CARDS: PARASIGN -->', '<!-- TIER CARDS: PARASEND -->');
   const scopes = [
-    ['pricing.html ParaSign grid', between(pricingHtml, '<!-- TIER CARDS: PARASIGN -->', '<!-- TIER CARDS: PARASEND -->')],
+    ['pricing.html ParaSign grid', parasignGridScope],
     ['parasign.html plan cards', between(read('frontend/parasign.html'), '<h3', '')],
     ['dashboard.js PRODUCT_INCLUDES.parasign', between(dashJs, 'parasign: {', 'parasend: {')],
     ['quota-upgrade.js freeSignHtml', between(quotaJs, 'function freeSignHtml', 'function hardCapHtml')],
@@ -1737,21 +1755,20 @@ console.log('ui-truthfulness: no page or script promises transfers without a cei
     assert.ok(scope.length > 200, `${name}: the scope markers moved; this gate would read nothing`);
   }
 
-  if (delivered === PARASEND.pro.quotas.transfers_month) {
-    for (const [name, scope] of scopes) {
-      assert.match(scope, TRANSFER_FIGURE,
-        `${name}: a parasign=pro grant now delivers the ParaSend Pro ceiling, so this surface may state it`);
-    }
-  } else {
-    const hits = scopes
-      .map(([name, scope]) => [name, TRANSFER_FIGURE.exec(scope)])
-      .filter(([, m]) => m)
-      .map(([name, m]) => `${name}: "${m[0]}"`);
-    assert.deepEqual(hits, [],
-      'a ParaSign surface prints a transfers figure, but entitlements.applyProductTier(acct, "parasign", "pro") ' +
-      `leaves ParaSend at ${delivered} a month (relay/test/parasign-pro-perks.test.js). ` +
-      'Bundle a ParaSend entitlement into ParaSign Pro, or keep the line off the card:\n  ' + hits.join('\n  '));
+  // Any transfers figure on a signing surface has to be the one Firm delivers.
+  const wrong = [];
+  for (const [name, scope] of scopes) {
+    const m = TRANSFER_FIGURE.exec(scope);
+    if (!m) continue;
+    if (Number(m[1].replace(/,/g, '')) !== delivered) wrong.push(`${name}: "${m[0]}" against ${delivered} delivered`);
   }
+  assert.deepEqual(wrong, [],
+    'a signing surface prints a transfers figure the plan it pitches does not deliver:\n  ' + wrong.join('\n  '));
+
+  // And the card that SELLS Firm has to say so: the second product is half of
+  // what the buyer is paying for, and a card that hides it undersells itself.
+  assert.match(parasignGridScope, TRANSFER_FIGURE,
+    'the Firm card in the ParaSign grid must state the ParaSend ceiling it grants');
 })();
 
 console.log('ui-truthfulness: no ParaSign surface sells a transfers ceiling the ParaSign grant does not deliver');

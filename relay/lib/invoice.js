@@ -54,6 +54,8 @@
 //     EU customer outside NL with a VAT number is charged the same 21% today;
 //     changing that is a pricing decision, not a formatting one.
 
+const catalog = require('./billing-catalog');
+
 const CATALOG_VAT_RATE = 21;
 
 // ── redis key shapes ─────────────────────────────────────────────────────────
@@ -164,10 +166,13 @@ function parseDocumentNumber(number) {
 // what was true on the day it was issued, and a later address change must not
 // rewrite history.
 function describe(order) {
-  const product = order.product === 'parasign' ? 'ParaSign' : 'ParaSend';
-  const plan = String(order.plan || '').replace(/^./, (c) => c.toUpperCase());
   const interval = order.interval === 'yearly' ? 'yearly' : 'monthly';
-  return `Paramant ${product} ${plan}, ${interval} plan`;
+  // One naming function for the statement line, the invoice line and the
+  // billing history (lib/billing-catalog.orderLabel). A bundle spells out the
+  // products it supplied, because "Firm" alone describes no supply.
+  const label = catalog.orderLabel(order)
+    || `${order.product === 'parasign' ? 'ParaSign' : 'ParaSend'} ${String(order.plan || '').replace(/^./, (c) => c.toUpperCase())}`;
+  return `Paramant ${label}, ${interval} plan`;
 }
 
 function buildRecord({ number, kind, seller, buyer, order, payment, split, now, periodEnd }) {
@@ -185,6 +190,9 @@ function buildRecord({ number, kind, seller, buyer, order, payment, split, now, 
     paid_at: payment.paidAt || issued.toISOString(),
     product: order.product,
     plan: order.plan,
+    // Which products this line actually entitled, so /account and the billing
+    // history do not have to re-derive it from the catalog of the day they run.
+    grants: Array.isArray(order.grants) ? order.grants.map((g) => ({ product: g.product, tier: g.tier })) : null,
     interval: order.interval,
     description: describe(order),
     service_period_end: periodEnd || null,

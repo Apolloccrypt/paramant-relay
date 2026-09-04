@@ -2020,7 +2020,7 @@ function grantParasignOnPaidPlan(accountId) {
 // paidUntil travels with the tier: a Date (or ISO string) sets the period this
 // grant is paid for, null clears it, and undefined leaves whatever is on record
 // alone. That last case keeps every admin grant behaving exactly as before.
-function setProductPlan(accountId, product, tier, paidUntil) {
+function setProductPlan(accountId, product, tier, paidUntil, bundle) {
   if (!accountId || (product !== 'parasend' && product !== 'parasign')) return { ok: false, reason: 'bad_args' };
   const norm = product === 'parasign'
     ? entitlements.normaliseParasignTier(tier)
@@ -2033,7 +2033,7 @@ function setProductPlan(accountId, product, tier, paidUntil) {
     if (!mv) continue;
     // Single field-level rule (writes only this product's field + the parasign
     // access flag; never the other product or the unified `plan`).
-    if (entitlements.applyProductTier(mv, product, norm, paidUntil).changed) changed++;
+    if (entitlements.applyProductTier(mv, product, norm, paidUntil, bundle).changed) changed++;
   }
   // Mirror onto the accounts summary too. Readers that only hold an account_id
   // (the ParaSign web sign gate among them) resolve through entitlementRecordOf,
@@ -2041,7 +2041,7 @@ function setProductPlan(accountId, product, tier, paidUntil) {
   // outvote a paid grant on any future read path either.
   const _acct = accounts.get(accountId);
   if (_acct) {
-    entitlements.applyProductTier(_acct, product, norm, paidUntil);
+    entitlements.applyProductTier(_acct, product, norm, paidUntil, bundle);
     _acct.plan_updated = new Date().toISOString();
   }
   // paidUntil is passed on to the DISK write as well. Without it the period
@@ -2052,7 +2052,7 @@ function setProductPlan(accountId, product, tier, paidUntil) {
   _mutateUsersJson(ud => {
     for (const entry of ud.api_keys) {
       if ((entry.account_id || entry.key) === accountId) {
-        entitlements.applyProductTier(entry, product, norm, paidUntil);
+        entitlements.applyProductTier(entry, product, norm, paidUntil, bundle);
         entry.plan_updated = new Date().toISOString();
       }
     }
@@ -2085,6 +2085,7 @@ function _indexAccountExpiry(accountId, product) {
       product: prod,
       tier: rec[entitlements.PRODUCT_PLAN_FIELD[prod]],
       paidUntil: rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[prod]] || null,
+      bundle: rec[entitlements.PRODUCT_BUNDLE_FIELD[prod]] || null,
       email,
     }).catch(e => log('warn', 'plan_expiry_index_failed', { product: prod, err: e.message }));
   }
@@ -6553,7 +6554,7 @@ async function handleRelayRequest(req, res) {
       const customerId = cust.customerId;
       const payment = await mollie.createPayment(mode, Object.assign({
         amount: { currency: order.currency, value: order.amount },
-        description: `Paramant ${order.product} ${order.plan} (${order.interval})`,
+        description: `Paramant ${billingCatalog.orderLabel(order)} (${order.interval})`,
         redirectUrl: `${origin}/dashboard?billing=return`,
         webhookUrl: `${origin}/v2/billing/webhook`,
         metadata: { accountId, product: order.product, plan: order.plan, interval: order.interval },
@@ -6607,6 +6608,11 @@ async function handleRelayRequest(req, res) {
     // Stored on the account record (and so in users.json) alongside the Mollie
     // pointers, which is what makes the idempotency guard durable.
     const _paidByField = (product) => `paid_by_${product}`;
+    // The entitlement products one line item covers: one for a product plan,
+    // two for the Firm bundle. Unknown metadata yields none, and nothing is
+    // written for a payment we could not attribute.
+    const catalogGrantsOf = (product, plan) => (billingCatalog.grantsOf(product, plan) || [])
+      .filter((g) => entitlements.PRODUCTS.includes(g.product));
     const outcome = await billing.processPayment(payment, {
       setProductPlan,
       // Lets a renewal extend from where the paid period ends instead of from
@@ -6633,10 +6639,17 @@ async function handleRelayRequest(req, res) {
       markProcessed: async (id, val) => {
         const md = payment.metadata || {};
         // Persist first: this is the half that has to outlive a restart.
-        if (md.accountId && entitlements.PRODUCTS.includes(md.product)) {
-          // A revoke takes the money back, so the id that bought the period goes
-          // with it; leaving it would make the reversal look like a live grant.
-          _setMolliePointer(md.accountId, _paidByField(md.product), val === 'granted' ? id : null);
+        // Every product this payment granted, so a Firm payment is remembered on
+        // both halves. Reading only md.product would leave the parasend side
+        // with no id on file, and a redis flush would then let the same bundle
+        // payment grant a second month.
+        const bought = catalogGrantsOf(md.product, md.plan);
+        if (md.accountId && bought.length) {
+          for (const g of bought) {
+            // A revoke takes the money back, so the id that bought the period goes
+            // with it; leaving it would make the reversal look like a live grant.
+            _setMolliePointer(md.accountId, _paidByField(g.product), val === 'granted' ? id : null);
+          }
         }
         if (!_rok()) return;
         try { await redisClient.set(_idemKey(id), String(val), { EX: 60 * 86400 }); } catch { /* best effort */ }
@@ -6824,7 +6837,10 @@ async function handleRelayRequest(req, res) {
       const current = rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[g.product]] || null;
       const ends = coupon.grantEnd(current, at, g.days);
       let out;
-      try { out = setProductPlan(accountId, g.product, g.tier, ends); }
+      // null, not undefined: a gift is not a Firm purchase, so any bundle
+      // marker from an earlier Firm term goes with the term it belonged to.
+      // Leaving it would make the expiry mail call a gifted month a Firm plan.
+      try { out = setProductPlan(accountId, g.product, g.tier, ends, null); }
       catch (e) { out = { ok: false, reason: e.message }; }
       if (!out || !out.ok) { failure = (out && out.reason) || 'not_applied'; break; }
       granted.push({ product: g.product, tier: out.tier, days: g.days, ends: ends.toISOString() });
@@ -6976,7 +6992,15 @@ async function handleRelayRequest(req, res) {
     // What the buyer needs to see: nothing more will be collected, and until
     // when he still has what he paid for.
     const _rec = _billingRecordOf(accountId);
-    const until = (_rec && _rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[product]]) || null;
+    // A bundle is not an entitlement product and holds no paid_until of its own,
+    // so the date the buyer keeps is the EARLIEST of the products it covers:
+    // that is the day the plan he cancelled stops being whole. Reading
+    // PRODUCT_PAID_UNTIL_FIELD['firm'] answered null and told a Firm customer
+    // who had just cancelled that he had nothing left.
+    const _untilOf = (p) => (_rec && _rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[p]]) || null;
+    const _covered = (billingCatalog.BUNDLES[product] || { grants: [{ product }] }).grants
+      .map((g) => _untilOf(g.product)).filter(Boolean).sort();
+    const until = _covered[0] || null;
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, cancelled: out.result === 'cancelled', product, access_until: until }));
   }

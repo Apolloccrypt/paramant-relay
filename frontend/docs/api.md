@@ -90,7 +90,7 @@ curl -X POST https://relay.paramant.app/v2/inbound \
 `download_token` is 24 random bytes as 48 hex characters. `ttl_ms` is the value
 the relay actually applied, which is **not** always the one you asked for: the
 upload clamps your request to the account's ParaSend tier ceiling (`view_ttl_ms`
-in `relay/lib/tiers.js`: 1 hour on Community, 24 hours on Pro, 7 days on
+in `relay/lib/tiers.js`: 1 hour on Community, 24 hours on Firm, 7 days on
 Enterprise, and the table under "ParaSend limits per tier" above is
 generated from the same rows). Compute the expiry the receiver is told from the
 `ttl_ms` that came back, never from the one you sent.
@@ -657,7 +657,7 @@ other. A ParaSend purchase raises `plan_parasend` alone, and every gate reads
 that, so the limits a customer is held to are the limits the pricing page sold
 him. An account with no tier on file is held to Community.
 
-| | Community | Pro | Enterprise |
+| | Community | Firm | Enterprise |
 |---|---|---|---|
 | Transfers per month | 10 | 500 | 1,000,000 |
 | Link lifetime (max TTL) | 1 hour | 24 hours | 7 days |
@@ -685,7 +685,7 @@ Notes:
   devices working and is refused only a new one.
 - A legacy `business` plan is a ParaSign tier name. On ParaSend it keeps its own
   row (2000 transfers a month, 100 devices, a 7 day link, 25 reads, 2000
-  downloads an hour) rather than being raised to Enterprise or cut to Pro. It is
+  downloads an hour) rather than being raised to Enterprise or cut to Firm. It is
   resolved, never sold: ParaSend cannot be bought or granted at that tier.
 
 ---

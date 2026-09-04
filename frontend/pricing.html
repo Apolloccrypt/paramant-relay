@@ -9,15 +9,15 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="The Community plan is free, forever. Organisations pay for higher limits: sending from 15 euro a month, signing from 49, excl. btw. From Paramantis Solutions B.V.">
+<meta name="description" content="The Community plan is free, forever. Organisations pay for higher limits: signing and sending on Firm, 29 euro a month excl. btw. From Paramantis Solutions B.V.">
 <meta property="og:title" content="Pricing · What is free, and what businesses pay · Paramant">
-<meta property="og:description" content="The Community plan is free, forever. Organisations pay for higher limits: sending from 15 euro a month, signing from 49, excl. btw. From Paramantis Solutions B.V.">
+<meta property="og:description" content="The Community plan is free, forever. Organisations pay for higher limits: signing and sending on Firm, 29 euro a month excl. btw. From Paramantis Solutions B.V.">
 <meta property="og:url" content="https://paramant.app/pricing">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Pricing · What is free, and what businesses pay · Paramant">
-<meta name="twitter:description" content="The Community plan is free, forever. Organisations pay for higher limits: sending from 15 euro a month, signing from 49, excl. btw. From Paramantis Solutions B.V.">
+<meta name="twitter:description" content="The Community plan is free, forever. Organisations pay for higher limits: signing and sending on Firm, 29 euro a month excl. btw. From Paramantis Solutions B.V.">
 <link rel="canonical" href="https://paramant.app/pricing">
 <link rel="stylesheet" href="/design-system.css?v=28">
 <link rel="stylesheet" href="/nav.css?v=24">
@@ -153,7 +153,7 @@
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "The Community plan is free, forever. Organisations pay for higher limits: sending from 15 euro a month, signing from 49, excl. btw. From Paramantis Solutions B.V."
+      "description": "The Community plan is free, forever. Organisations pay for higher limits: signing and sending on Firm, 29 euro a month excl. btw. From Paramantis Solutions B.V."
     },
     {
       "@type": "Organization",
@@ -239,7 +239,7 @@
      first 60px of the fold while meaning nothing.
 
      The two amounts are named separately because they buy different products.
-     "From &euro;15 a month" on its own is ParaSend Pro, and an office that came
+     "From &euro;15 a month" on its own was ParaSend Pro, and an office that came
      here to sign anchors on it and then meets &euro;49 in the table.
      tests/ui-truthfulness.test.mjs reads both figures off the Pro cards
      themselves, and relay/test/pricing-page.test.js binds those cards to
@@ -275,8 +275,8 @@
     <p style="font-size:var(--text-md);color:var(--ink);line-height:1.6;margin:0 0 var(--space-3)">
       <strong>Community is &euro;0 a month, forever:</strong> 2 signatures a month, 10 transfers a month, 5 MB per file, no card.
       Organisations that need higher limits, signing built into their own software, a named contact or a server of
-      their own pay for the business plans: from <strong>&euro;15 a month</strong> for sending, from
-      <strong>&euro;49 a month</strong> for signing, both excl. btw.
+      their own pay for the business plans: <strong>&euro;29 a month</strong> for signing and sending together on Firm,
+      excl. btw.
     </p>
     <p style="font-size:var(--text-base);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-4)">
       For a one-person practice, a volunteer board or a household, and for the offices that sign and send every week.
@@ -318,8 +318,8 @@
      btw; read side by side that looks like paying yearly costs more.
 
      Yearly discount is stated as a percentage, not as "two months free". Two
-     months free is 16.7%, which holds for ParaSend Pro and ParaSign Business
-     but not for ParaSign Pro (15.1%: 59.29 x 12 = 711.48 against 603.79).
+     months free is 16.7%, which is what both plans on sale give: Firm (290
+     against 12 x 29) and ParaSign Business (2,990 against 12 x 299).
 
      Number format is English throughout (dot decimal, comma thousands) and the
      currency is always &euro;, never the string "EUR". The page mixed all four
@@ -334,7 +334,7 @@
       <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Product</span>
       <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-top:var(--space-2)">ParaSign · Get a document signed</h3>
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;max-width:760px;margin-top:var(--space-3)">
-        Sign a PDF yourself, or send it to the people who have to sign it. Community covers 2 signatures a month, forever. Organisations pay for volume: 100 a month on Pro, 1,000 a month on Business with a named contact. ParaSign is priced separately from ParaSend, and from Pro it comes with a <strong>developer API</strong> with its own <a href="/docs#parasign-api" style="color:var(--cobalt)">documentation</a> and webhooks, so signing can run inside your own software.
+        Sign a PDF yourself, or send it to the people who have to sign it. Community covers 2 signatures a month, forever. Organisations pay for volume: 100 a month on Firm, 1,000 a month on Business with a named contact. Firm is one payment for both products, ParaSign and ParaSend together, and it comes with a <strong>developer API</strong> with its own <a href="/docs#parasign-api" style="color:var(--cobalt)">documentation</a> and webhooks, so signing can run inside your own software.
       </p>
     </div>
     <div class="tier-grid tier-grid-4">
@@ -353,19 +353,27 @@
         <a href="/signup" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Create a free account &rarr;</a>
       </div>
 
+      <!-- FIRM. One plan, one payment, both products. The two Pro plans it
+           replaces were sold apart at 49 and 15 a month excl. btw, which asked
+           an office that signs AND sends for 64 a month while a competitor
+           sells signing and sharing together from 14. The card is repeated in
+           the ParaSend grid below with the same price and the same buttons: it
+           is one purchase, and a visitor who came here to send must not have to
+           read the signing section to find it. -->
       <div class="tier-card featured">
-        <div class="tier-name">Pro</div>
-        <div class="tier-price">&euro;49<span style="font-size:var(--text-sm);color:var(--ink-dim)">/month</span></div>
-        <div class="tier-price-note">excl. btw &middot; <span class="incl">charged &euro;59.29/mo incl. 21% btw</span></div>
-        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For an office that signs every week, and for putting signing inside your own software through the API.</p>
+        <div class="tier-name">Firm</div>
+        <div class="tier-price">&euro;29<span style="font-size:var(--text-sm);color:var(--ink-dim)">/month</span></div>
+        <div class="tier-price-note">excl. btw &middot; <span class="incl">charged &euro;35.09/mo incl. 21% btw</span></div>
+        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">One payment for both products, for an office that signs and sends every week, and for putting signing inside your own software through the API.</p>
         <ul class="tier-features">
           <li>100 signatures a month, then &euro;0.40 each, up to 1,000</li>
           <li>Past 1,000 a month, Business is cheaper anyway</li>
+          <li>500 transfers a month, 24 hour link expiry</li>
           <li>API access</li>
-          <li>Annual: &euro;499 excl. &middot; 15.1% off</li>
+          <li>Annual: &euro;290 excl. &middot; 16.7% off</li>
         </ul>
-        <a href="/auth/login?next=/pricing" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Get ParaSign Pro &rarr; <span style="font-weight:400;opacity:.85">&euro;59.29/mo incl.</span></a>
-        <div style="text-align:center"><a href="/auth/login?next=/pricing" data-billing-product="parasign" data-billing-plan="pro" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; &euro;603.79/yr incl. &rarr;</a></div>
+        <a href="/auth/login?next=/pricing" data-billing-product="firm" data-billing-plan="firm" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Get Firm &rarr; <span style="font-weight:400;opacity:.85">&euro;35.09/mo incl.</span></a>
+        <div style="text-align:center"><a href="/auth/login?next=/pricing" data-billing-product="firm" data-billing-plan="firm" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; &euro;350.90/yr incl. &rarr;</a></div>
       </div>
 
       <div class="tier-card">
@@ -402,7 +410,7 @@
         Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.
       </p>
     </div>
-    <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4)">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Pro &euro;59.29/mo or &euro;603.79/yr, Business &euro;361.79/mo or &euro;3,617.90/yr.</p>
+    <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4)">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Firm &euro;35.09/mo or &euro;350.90/yr, Business &euro;361.79/mo or &euro;3,617.90/yr.</p>
     <!-- HOW PAYMENT WORKS. Every sentence here is what the code does today.
          relay/lib/mollie.js: BILLING_MODE is unset in production, so
          billingStance().recurring is false and relay/lib/billing-recurring.js
@@ -417,7 +425,7 @@
     <div style="text-align:left;max-width:760px;margin:var(--space-6) auto 0;padding:var(--space-4) var(--space-5);border:1px solid var(--ink-hair);border-left:3px solid var(--cobalt);background:var(--bone)">
       <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt);margin:0 0 var(--space-3)">How payment works</p>
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0">
-        You pay a Dutch company, in euros, through a Dutch payment provider (Mollie). Every payment is a one-off for the term you buy: one month, or one year paid up front. Automatic renewal is not switched on, so there is no direct debit mandate and no subscription that renews by itself. ParaSign and ParaSend each carry their own paid term. When a term ends, that product falls back to its free Community plan, and nothing is charged again unless you buy the next term yourself. A code is not a payment at all: it gives you a term as a gift, so nothing is ever charged for it.
+        You pay a Dutch company, in euros, through a Dutch payment provider (Mollie). Every payment is a one-off for the term you buy: one month, or one year paid up front. Automatic renewal is not switched on, so there is no direct debit mandate and no subscription that renews by itself. Firm is one payment for one term on both products. ParaSign Business is its own term. When a term ends, the products it paid for fall back to their free Community plan, and nothing is charged again unless you buy the next term yourself. A code is not a payment at all: it gives you a term as a gift, so nothing is ever charged for it.
       </p>
     </div>
 
@@ -456,7 +464,7 @@
       <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Product</span>
       <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-top:var(--space-2)">ParaSend · Send a file that disappears</h3>
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;max-width:760px;margin-top:var(--space-3)">
-        Send a file over a link that expires and wipes the file after the last read it allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Pro and 100 on Enterprise. Community covers 10 transfers a month at 5 MB per file, forever. Organisations that send every week pay for longer links, more reads through the API and more registered devices. More reads is not a weaker promise: it is one link a whole team can open, or a counterparty reopening it after a misclick, instead of you sending the file a second time.
+        Send a file over a link that expires and wipes the file after the last read it allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Firm and 100 on Enterprise. Community covers 10 transfers a month at 5 MB per file, forever. Organisations that send every week pay for longer links, more reads through the API and more registered devices. More reads is not a weaker promise: it is one link a whole team can open, or a counterparty reopening it after a misclick, instead of you sending the file a second time.
       </p>
       <!-- Which route a buyer actually has, before he picks a plan. The web app
            is a live handshake, and until 3 September 2026 that stood only on
@@ -484,10 +492,10 @@
       </div>
 
       <div class="tier-card featured">
-        <div class="tier-name">Pro</div>
-        <div class="tier-price">&euro;15<span style="font-size:var(--text-sm);color:var(--ink-dim)">/mo</span></div>
-        <div class="tier-price-note">excl. btw &middot; <span class="incl">charged &euro;18.15/mo incl. 21% btw</span><br>Annual &euro;150 excl. &middot; 16.7% off</div>
-        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For professionals who send regularly. Features, not bigger files.</p>
+        <div class="tier-name">Firm</div>
+        <div class="tier-price">&euro;29<span style="font-size:var(--text-sm);color:var(--ink-dim)">/mo</span></div>
+        <div class="tier-price-note">excl. btw &middot; <span class="incl">charged &euro;35.09/mo incl. 21% btw</span><br>Annual &euro;290 excl. &middot; 16.7% off</div>
+        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">The same Firm plan as above: one payment covers sending and signing together. For professionals who send regularly. Features, not bigger files.</p>
         <ul class="tier-features">
           <li>Everything in Community</li>
           <li>24 hour link expiry</li>
@@ -497,6 +505,7 @@
           <li>Webhooks on upload and download</li>
           <li>Email notifications via Resend</li>
           <li>500 transfers a month</li>
+          <li>100 signatures a month on ParaSign, in the same payment</li>
         </ul>
 <!-- Prices live in relay/lib/billing-catalog.js, server side, and the button
      only carries product/plan/interval. pricing-billing.js turns a click into
@@ -507,8 +516,8 @@
      It used to hold six static Mollie payment links; all six returned 404 on
      2026-08-08, and even alive they carried no metadata, which is how the
      first paying customer got nothing on 2026-07-21. -->
-        <a href="/auth/login?next=/pricing" data-billing-product="parasend" data-billing-plan="pro" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center">Get ParaSend Pro &rarr; <span style="font-weight:400;opacity:.85">&euro;18.15/mo incl.</span></a>
-        <div style="text-align:center"><a href="/auth/login?next=/pricing" data-billing-product="parasend" data-billing-plan="pro" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; &euro;181.50/yr incl. &rarr;</a></div>
+        <a href="/auth/login?next=/pricing" data-billing-product="firm" data-billing-plan="firm" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center">Get Firm &rarr; <span style="font-weight:400;opacity:.85">&euro;35.09/mo incl.</span></a>
+        <div style="text-align:center"><a href="/auth/login?next=/pricing" data-billing-product="firm" data-billing-plan="firm" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; &euro;350.90/yr incl. &rarr;</a></div>
       </div>
 
       <div class="tier-card">
@@ -517,7 +526,7 @@
         <div class="tier-price-note">Dedicated relay &middot; SLA &middot; compliance</div>
         <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">Dedicated infrastructure, compliance, and support.</p>
         <ul class="tier-features">
-          <li>Everything in Pro</li>
+          <li>Everything in Firm</li>
           <li>7 day link expiry</li>
           <li>Up to 100 reads per link through the API</li>
           <li>Unlimited registered devices</li>
@@ -532,7 +541,7 @@
       </div>
 
     </div>
-    <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4)">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Pro &euro;18.15/mo or &euro;181.50/yr.</p>
+    <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4)">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Firm &euro;35.09/mo or &euro;350.90/yr.</p>
   </div>
 </section>
 
@@ -557,7 +566,7 @@
 
     <div class="prose-section">
       <h3>Support</h3>
-      <p>The Community plan is self-service via public documentation and the CT log. Pro tier includes email support with published response targets. Enterprise customers get a named contact, a 99.95% SLA, priority incident handling, and deployment assistance for air-gapped and regulated environments.</p>
+      <p>The Community plan is self-service via public documentation and the CT log. The Firm plan includes email support with published response targets. Enterprise customers get a named contact, a 99.95% SLA, priority incident handling, and deployment assistance for air-gapped and regulated environments.</p>
     </div>
 
     <div class="prose-section">
@@ -592,7 +601,7 @@
 
     <div class="faq-item">
       <p class="faq-q">What happens to my file after the recipient downloads it?</p>
-      <div class="faq-a">All files are RAM-only. They exist only in server memory and are wiped after the last read the link allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Pro and 100 on Enterprise. TTL expiry wipes them too. Nothing persists after expiry on any tier. There is no disk storage.</div>
+      <div class="faq-a">All files are RAM-only. They exist only in server memory and are wiped after the last read the link allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Firm and 100 on Enterprise. TTL expiry wipes them too. Nothing persists after expiry on any tier. There is no disk storage.</div>
     </div>
 
     <div class="faq-item">
@@ -601,13 +610,13 @@
     </div>
 
     <div class="faq-item">
-      <p class="faq-q">Is there a free trial for Pro?</p>
-      <div class="faq-a">There is no separate trial: every product has a Community tier forever, so you can try the core flow at no cost and upgrade to Pro or Business when you need higher limits. <a href="/signup">Create a free account</a> to start, no card required; the Pro and Business buttons above take you straight to checkout.</div>
+      <p class="faq-q">Is there a free trial for Firm?</p>
+      <div class="faq-a">There is no separate trial: every product has a Community tier forever, so you can try the core flow at no cost and upgrade to Firm or Business when you need higher limits. <a href="/signup">Create a free account</a> to start, no card required; the Firm and Business buttons above take you straight to checkout.</div>
     </div>
 
     <div class="faq-item">
       <p class="faq-q">How does ParaSign pricing work?</p>
-      <div class="faq-a">ParaSign is priced by signature volume, not by feature. Community covers 2 signatures a month; Pro (&euro;49/mo or &euro;499/yr, excl. btw) includes 100 a month, then &euro;0.40 each, with API access; Business (&euro;299/mo or &euro;2,990/yr, excl. btw) includes 1,000 a month with named support and an exportable audit log. Every tier uses the same ML-DSA-65 post-quantum cryptography and public CT-log verification. A ParaSign signature is a Simple Electronic Signature (SES) under eIDAS, not an advanced (AES) or a qualified (QES) signature. QES is coming via an EU QTSP partner.</div>
+      <div class="faq-a">ParaSign is priced by signature volume, not by feature. Community covers 2 signatures a month; Firm (&euro;29/mo or &euro;290/yr, excl. btw) includes 100 a month, then &euro;0.40 each, with API access, and covers ParaSend in the same payment; Business (&euro;299/mo or &euro;2,990/yr, excl. btw) includes 1,000 a month with named support and an exportable audit log. Every tier uses the same ML-DSA-65 post-quantum cryptography and public CT-log verification. A ParaSign signature is a Simple Electronic Signature (SES) under eIDAS, not an advanced (AES) or a qualified (QES) signature. QES is coming via an EU QTSP partner.</div>
     </div>
 
     <div class="faq-item">
@@ -665,7 +674,7 @@
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=8" defer></script>
 <script src="/js/app-session-token.js?v=1" defer></script>
-<script src="/js/pricing-billing.js?v=2" defer></script>
+<script src="/js/pricing-billing.js?v=3" defer></script>
 <script src="/js/redeem-code.js?v=1" defer></script>
 </body>
 </html>

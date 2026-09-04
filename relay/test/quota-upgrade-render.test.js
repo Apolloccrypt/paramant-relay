@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const tiers = require('../lib/tiers');
+const catalog = require('../lib/billing-catalog');
 const ent = require('../lib/entitlements');
 
 const src = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'js', 'quota-upgrade.js'), 'utf8');
@@ -60,15 +61,15 @@ const free = q.html({ error: 'monthly_sign_quota_reached', plan: 'free', limit: 
 for (const s of [
   "You've used both signatures this month.",
   'Community gives you 2 a month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.',
-  'Pro - EUR 49/month',
-  '100 signatures a month, then EUR 0.40 each, up to 1,000. API access.',
-  'Upgrade to Pro',
+  'Firm - EUR 29/month',
+  '100 signatures a month, then EUR 0.40 each, up to 1,000. API access. 500 transfers a month on ParaSend, in the same payment.',
+  'Upgrade to Firm',
   'Maybe later',
   'Your limit resets on 2026-08-01.',
 ]) {
   assert(free.includes(s), 'free 402 card misses: ' + s);
 }
-assert(free.includes('href="/pricing"'), 'Upgrade to Pro must link to /pricing');
+assert(free.includes('href="/pricing"'), 'Upgrade to Firm must link to /pricing');
 assert(free.includes('data-pa-quota-dismiss'), 'Maybe later must be dismissable');
 ok('free 402 renders the upgrade card with the copy verbatim');
 
@@ -84,7 +85,7 @@ ok('reset_date falls back client-side and is never interpolated raw');
 
 // ── Pro hard cap 402 ────────────────────────────────────────────────────────
 const cap = q.html({ error: 'monthly_sign_hard_cap_reached', plan: 'pro', limit: 1000, overage_count: 900, reset_date: '2026-08-01' });
-assert(cap.includes('1,000 signatures this month, the Pro ceiling'), 'hard cap card names the Pro ceiling');
+assert(cap.includes('1,000 signatures this month, the Firm ceiling'), 'hard cap card names the Firm ceiling');
 assert(cap.includes('Business gives you 1,000 included at EUR 299/month, which is already cheaper than what you\'re paying in overage.'), 'hard cap card pitches Business verbatim');
 assert(cap.includes('Upgrade to Business') && cap.includes('href="/pricing"'), 'Upgrade to Business links to /pricing');
 assert(!cap.includes('No cap, no block'), 'the false No cap, no block claim is gone');
@@ -93,7 +94,7 @@ ok('pro hard cap renders the upgrade card verbatim, linking to /pricing');
 // ── The transfer 402 card ───────────────────────────────────────────────────
 const legacy = q.html({ error: 'monthly_transfer_quota_reached', dimension: 'transfers_month', plan: 'free', limit: 10 });
 assert(legacy.includes('Community monthly limit reached.'), 'transfer 402 keeps the legacy notice');
-assert(legacy.includes('ParaSend Pro'), 'transfer 402 keeps the ParaSend upgrade');
+assert(legacy.includes('Upgrade to Firm'), 'transfer 402 keeps the upgrade, now the one plan that covers sending');
 assert(legacy.includes('all 10 transfers'), 'transfer 402 keeps the limit interpolation');
 ok('transfer 402 falls back to the existing notice');
 
@@ -104,30 +105,38 @@ ok('transfer 402 falls back to the existing notice');
 // that safe: it renders the real cards and compares each figure against the two
 // modules the relay gates on, so a tier edit that does not reach the frontend
 // turns red here instead of shipping a card that promises the old number.
-// The ParaSign Pro pitch names NO transfer figure, and that is the point of the
-// negative pin. It used to say "Unlimited transfers", which is false for every
-// tier. Replacing it with 500 would have been false too, for a sharper reason:
+// The signing pitch may name a transfers figure only when the plan it pitches
+// actually delivers one. It used to say "Unlimited transfers", which was false
+// for every tier, and 500 would have been false too for a sharper reason:
 // transfers are a ParaSEND capacity held on plan_parasend, and the grant behind
-// this card (applyProductTier(acct,'parasign','pro'), the Mollie ParaSign Pro
-// purchase) deliberately never touches that field. So a ParaSign Pro buyer
-// keeps whatever ParaSend tier he already had.
+// the old card, applyProductTier(acct,'parasign','pro'), deliberately never
+// touched that field, so a ParaSign Pro buyer kept whatever ParaSend tier he
+// already had. relay/test/parasign-pro-perks.test.js is still the source of
+// that, and it is READ here rather than restated.
 //
-// relay/test/parasign-pro-perks.test.js is the source, and it is READ here
-// rather than restated, so the day a ParaSend entitlement IS bundled into
-// ParaSign Pro this pin lifts itself instead of holding a true line off the
-// card. Until then: no transfers number in a ParaSign pitch.
+// Firm is the case that comment invited: one payment, both products, so the
+// card the free account is now shown DOES deliver the ParaSend ceiling and has
+// to say so. The gate asks the catalog which grants the pitched plan carries
+// and puts them through the same setter the webhook calls.
+const firmSend = (() => {
+  const acct = { key: 'k', account_id: 'k', plan: 'community', plan_parasend: 'community', plan_parasign: 'free' };
+  for (const g of catalog.grantsOf('firm', 'firm')) ent.applyProductTier(acct, g.product, g.tier);
+  return ent.getEntitlements(acct).parasend.quotas.transfers_month;
+})();
 const parasignProSend = (() => {
   const acct = { key: 'k', account_id: 'k', plan: 'community', plan_parasend: 'community', plan_parasign: 'free' };
   ent.applyProductTier(acct, 'parasign', 'pro');
   return ent.getEntitlements(acct).parasend.quotas.transfers_month;
 })();
-if (parasignProSend === ent.PARASEND.pro.quotas.transfers_month) {
-  assert(/transfers/i.test(free),
-    'a parasign=pro grant now DOES deliver the ParaSend Pro transfers ceiling, so the Pro pitch may state it');
+assert.strictEqual(parasignProSend, ent.PARASEND.community.quotas.transfers_month,
+  'a bare parasign=pro grant still moves nothing on ParaSend; that is what makes this gate necessary');
+if (firmSend === ent.PARASEND.pro.quotas.transfers_month) {
+  assert(new RegExp(firmSend + ' transfers').test(free),
+    'Firm delivers the ParaSend Pro ceiling (' + firmSend + '), so the signing pitch must state it');
 } else {
   assert(!/transfers/i.test(free),
-    'the ParaSign Pro pitch names a transfers figure, but a parasign=pro grant leaves ParaSend at ' +
-    parasignProSend + ' a month (see relay/test/parasign-pro-perks.test.js). Bundle the entitlement or drop the line.');
+    'the signing pitch names a transfers figure, but the plan it pitches leaves ParaSend at ' +
+    firmSend + ' a month (see relay/test/parasign-pro-perks.test.js). Bundle the entitlement or drop the line.');
 }
 ok('the ParaSign Pro pitch claims no transfers ceiling the grant does not deliver');
 
@@ -138,7 +147,8 @@ ok('the ParaSign Pro pitch claims no transfers ceiling the grant does not delive
 for (const [plan, tier, label] of [
   ['free', 'community', 'Community'],
   ['community', 'community', 'Community'],
-  ['pro', 'pro', 'Pro'],
+  // The entitlement tier is still 'pro'; the name it is SOLD under is Firm.
+  ['pro', 'pro', 'Firm'],
   ['business', 'business', 'Business'],
   ['enterprise', 'enterprise', 'Enterprise'],
 ]) {
@@ -149,11 +159,13 @@ for (const [plan, tier, label] of [
     'the transfer 402 card must name the tier that decided (' + plan + ' -> ' + label + ')');
   assert(card.includes('You have used all ' + limit + ' transfers included in your plan this month.'),
     'the transfer 402 card must print the deciding tier ceiling (' + tier + ' = ' + limit + ')');
-  // Only the tier below Pro is offered an upgrade; a Pro account is not sold Pro.
+  // Only the tier below the paid floor is offered an upgrade; a paid account is
+  // not sold the plan it already has. Firm is the one rung now, and it carries
+  // both dimensions, so the sending card and the signing card name one plan.
   if (tier === 'community') {
-    assert(card.includes('Upgrade to ParaSend Pro (EUR 15/month excl. VAT) for ' +
+    assert(card.includes('Upgrade to Firm (EUR 29/month excl. VAT) for ' +
       tiers.tierLimit('pro', 'transfers_month') + ' transfers a month'),
-      'the Community transfer card must name the ParaSend Pro ceiling from tiers.js');
+      'the Community transfer card must name the ParaSend ceiling Firm delivers, from tiers.js');
   } else {
     assert(!card.includes('Upgrade to'), tier + ' must not be upsold the tier it already has');
     assert(card.includes('Your quota resets next month.'), tier + ' still learns when the quota resets');
@@ -170,7 +182,7 @@ ok('missing limit falls back to the tiers.js ceiling, not to Community');
 
 // ── signNotice: the inline 200-response notices ─────────────────────────────
 const second = q.signNotice({ used: 2, included: 2, overage_count: 0, overage_rate_eur: null, hard_cap: null, reset_date: '2026-08-01' });
-assert(second.includes("That's your second signature this month. One more and you'll need Pro (EUR 49/month, 100 signatures)."),
+assert(second.includes("That's your second signature this month. One more and you'll need Firm (EUR 29/month, 100 signatures)."),
   'free second-signature notice must carry the copy verbatim');
 ok('free second signature renders the inline notice verbatim');
 
