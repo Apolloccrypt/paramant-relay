@@ -24,7 +24,7 @@
 <link rel="canonical" href="https://paramant.app/sign">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="stylesheet" href="/design-system.css?v=28">
-<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/nav.css?v=24">
 <link rel="stylesheet" href="/relay-pulse.css?v=4">
 <link rel="stylesheet" href="/components-parasign.css?v=6">
 <style>
@@ -366,9 +366,13 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
    stamp that no printer will ever produce. So the document layer is pinned to
    fixed values here, on purpose, and it is the one place in the app where a
    token is deliberately not used, and it is why the night edition left it
-   alone: frontend/js/sign-flow.js draws the seal into the PDF with these exact
+   alone: frontend/sign-flow.js draws the seal into the PDF with these exact
    values, so a preview in cream on a warm dark ground would be a preview of a
-   document that does not exist. */
+   document that does not exist. The cobalt #1D4ED8 in particular is the seal's
+   own colour and it STAYS: it is what the customer gets in the PDF. The
+   non-text sweep, scripts/ui-contrast-sweep.mjs, measures this layer against
+   the white page it is drawn on rather than against the app around it, which
+   is the same reason. */
 .ds-page-wrap canvas,
 .ds-review-pane.has-pdf,
 .ds-signature-sheet-preview,

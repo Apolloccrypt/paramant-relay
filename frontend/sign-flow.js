@@ -1260,6 +1260,13 @@ function onPenDown(e) {
   live.height = Math.max(1, Math.round(rect.height * density));
   const ctx = live.getContext('2d');
   ctx.setTransform(density, 0, 0, density, 0, 0);
+  // DOCUMENT INK. Every #0b3a6a in this file is the ink that ends up in the
+  // PDF: the pen stroke, the drawn annotation, the seal border and its band.
+  // A page is white paper in every theme, so this colour does NOT follow the
+  // night edition's tokens, the same way sign.html pins its document layer.
+  // Recolouring it in cream would preview a document no printer will produce.
+  // scripts/ui-contrast-sweep.mjs carries the document layer as a named
+  // exception for that reason and no other.
   ctx.strokeStyle = '#0b3a6a';
   ctx.lineWidth = PEN_STROKE_PT * (rect.width / wrap._pdfPage.width);
   ctx.lineCap = 'round';

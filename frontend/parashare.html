@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="/design-system.css?v=28">
-<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/nav.css?v=24">
 <link rel="stylesheet" href="/relay-pulse.css?v=4">
 <link rel="stylesheet" href="/parapear.css?v=4">
 <style>
@@ -30,7 +30,11 @@ h1{font-size:clamp(26px,5vw,38px);font-weight:600;letter-spacing:-.028em;line-he
 /* Stepper at the top of the flow -- gives the user a "you are here" sense */
 .ps-stepper{list-style:none;margin:0 0 28px;padding:0;display:flex;gap:0;position:relative}
 .ps-step{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;min-width:0}
-.ps-step-dot{width:10px;height:10px;border-radius:50%;background:var(--surface);border:1.5px solid var(--line-2);transition:background var(--d-2) var(--e-standard),border-color var(--d-2) var(--e-standard),transform var(--d-2) var(--e-standard);position:relative;z-index:2}
+/* The ring is the state. It was a --surface disc inside a --line-2 ring,
+   which measures 1.07:1 and 1.6:1 on the night: a step indicator nobody
+   can see is not an indicator. The disc is gone and the ring carries it at
+   3.8:1, which is what WCAG 2.1 SC 1.4.11 asks of a state. */
+.ps-step-dot{width:10px;height:10px;border-radius:50%;background:transparent;border:1.5px solid rgba(var(--tint), .45);transition:background var(--d-2) var(--e-standard),border-color var(--d-2) var(--e-standard),transform var(--d-2) var(--e-standard);position:relative;z-index:2}
 .ps-step.active .ps-step-dot{background:var(--accent);border-color:var(--accent);transform:scale(1.2);box-shadow:0 0 0 4px var(--accent-soft)}
 .ps-step.done .ps-step-dot{background:var(--sig-done);border-color:var(--sig-done)}
 .ps-step-label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);text-align:center;line-height:1.3;transition:color var(--d-2) var(--e-standard)}
@@ -824,7 +828,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <script src="/js/format-date.js?v=1" defer></script>
 <script src="/js/done-state.js?v=1" defer></script>
 <script src="/js/handshake-meta.js?v=1" defer></script>
-<script src="/js/parashare.page.js?v=10" defer></script>
+<script src="/js/parashare.page.js?v=11" defer></script>
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=8" defer></script>
 <footer>

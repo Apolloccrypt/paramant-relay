@@ -49,7 +49,7 @@ test('a crawler that really renders is reported apart, not as a person', () => {
   const ua = 'Mozilla/5.0 (compatible; heritrix/3.14.2-SNAPSHOT-20250101 +http://archive.org)';
   const r = analyse([
     line({ ip: '7.7.7.7', path: '/', ua }),
-    line({ ip: '7.7.7.7', path: '/nav.css?v=23', ua }),
+    line({ ip: '7.7.7.7', path: '/nav.css?v=24', ua }),
   ]);
   assert.equal(r.atMostVisitors, 0, 'a named crawler was counted as a possible visitor');
   assert.equal(r.verdicts.declared_automation, 1);
