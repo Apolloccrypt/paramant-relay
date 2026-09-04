@@ -65,15 +65,24 @@ async function waitForPdfjs() {
   return window.ready.within('pdfjs', 10000, 'PDF.js');
 }
 
-async function renderPdfPreview(bytes, name) {
+// A PDF is the one arrival that has something worth putting on the end screen:
+// the document itself. So it goes in the payload slot of the shared done state
+// (see frontend/done-state.css) rather than on a fifth screen of its own with
+// its own headline, its own card and its own row of badges, which is what this
+// page had until 4 September 2026.
+//
+// Returns the element to hand to paramantDone.payload(), plus the page count
+// for the one sentence above it.
+async function renderPdfPreview(bytes) {
   const pdfjs = await waitForPdfjs();
   // PDF.js mutates the input buffer. Pass a copy so the original stays intact
-  // for the download-original path.
+  // for the save path.
   const copy = new Uint8Array(bytes);
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
 
-  const container = document.getElementById('preview-canvas-list');
-  container.innerHTML = '';
+  const container = document.createElement('div');
+  container.className = 'done-preview';
+  container.id = 'preview-canvas-list';
   const MAX_PAGES = Math.min(pdf.numPages, 30);
   for (let i = 1; i <= MAX_PAGES; i++) {
     const page = await pdf.getPage(i);
@@ -84,7 +93,6 @@ async function renderPdfPreview(bytes, name) {
     const wrap = document.createElement('div');
     wrap.className = 'page-wrap';
     wrap.dataset.pageIndex = String(i - 1);
-    wrap._pdfPage = { width: baseViewport.width, height: baseViewport.height, index: i - 1 };
     const canvas = document.createElement('canvas');
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
@@ -93,14 +101,7 @@ async function renderPdfPreview(bytes, name) {
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
   }
 
-  document.getElementById('preview-filename').textContent = name;
-  document.getElementById('preview-pagecount').textContent =
-    pdf.numPages + ' page' + (pdf.numPages === 1 ? '' : 's') +
-    (pdf.numPages > MAX_PAGES ? ' (showing first ' + MAX_PAGES + ')' : '');
-  document.getElementById('preview-filesize').textContent = formatSize(bytes.length);
-
-  const dlBtn = document.getElementById('preview-download');
-  dlBtn.onclick = () => downloadBytes(bytes, name, 'application/pdf');
+  return { node: container, pages: pdf.numPages, shown: MAX_PAGES };
 }
 
 function downloadBytes(bytes, name, mime) {
@@ -193,15 +194,36 @@ async function init() {
                   fileData[2] === 0x44 && fileData[3] === 0x46;
 
     if (isPdf) {
-      setStatus('Rendering PDF in browser...', 90);
+      setStatus('Opening the document...', 90);
       try {
-        await renderPdfPreview(fileData, filename);
+        const preview = await renderPdfPreview(fileData);
         setStatus('Done.', 100);
-        showStep('step-preview');
+        // Same heading and same shape as every other ending. The sentence says
+        // what is true of THIS branch: nothing has been written to disk yet,
+        // and the link is already spent, so saving is the one thing left to do.
+        const pageCount = preview.pages + ' page' + (preview.pages === 1 ? '' : 's') +
+          (preview.pages > preview.shown ? ', first ' + preview.shown + ' shown' : '');
+        window.paramantDone.fill('step-done', {
+          title: 'You have the file.',
+          line: filename + ' (' + pageCount + ', ' + formatSize(fileData.length) + ') is open ' +
+                'here in this tab. Our copy has been permanently destroyed, so save it now if ' +
+                'you want to keep it.',
+        });
+        window.paramantDone.payload('step-done', preview.node);
+        const note = document.getElementById('done-pdf-note');
+        if (note) note.hidden = false;
+        // One loud button, and on this branch it is the save that has not
+        // happened yet. The bytes are deliberately NOT dropped when the tab
+        // goes to the background: the document is on the screen, and a reader
+        // who comes back to it has to still be able to save it.
+        savedFile = { name: filename, bytes: fileData, mime: 'application/pdf' };
+        const saveBtn = document.getElementById('done-save');
+        if (saveBtn) saveBtn.textContent = 'Save';
+        showStep('step-done');
         return;
       } catch (e) {
-        // Fall through to download if preview fails for any reason.
-        setStatus('Preview unavailable, downloading instead...', 95);
+        // Fall through to the plain save if the document will not open.
+        setStatus('The document would not open here, saving it instead...', 95);
       }
     }
 
@@ -253,7 +275,7 @@ function dropSavedFile() {
 }
 function saveAgain() {
   if (!savedFile) return;
-  downloadBytes(savedFile.bytes, savedFile.name, 'application/octet-stream');
+  downloadBytes(savedFile.bytes, savedFile.name, savedFile.mime || 'application/octet-stream');
 }
 
 window.addEventListener('DOMContentLoaded', init);

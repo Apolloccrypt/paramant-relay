@@ -37,11 +37,16 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bone);color:var(--ink);font-family:var(--sans);min-height:100vh}
 main{max-width:520px;margin:0 auto;padding:80px 24px}
-main:has(#step-preview.active){max-width:880px}
-#preview-canvas-list canvas{width:100%;height:auto;display:block;border:1px solid var(--ink-hair);margin-bottom:12px;background:var(--card)}
-.page-wrap{position:relative;margin-bottom:12px}
-.btn-row{display:flex;gap:10px;flex-wrap:wrap}
-.btn-row .btn{flex:1;margin:0}
+/* The PDF, inside the end screen's payload slot. Capped and scrollable on
+   purpose: the answer ("you have it, here it is, save it") has to stay on one
+   phone screen, and a document is as long as it is. */
+.done-preview{max-height:min(40vh,460px);overflow-y:auto;border:1px solid var(--ink-hair);border-radius:10px;padding:8px;background:var(--bone-2,var(--bone))}
+/* A page is paper. PDF.js paints its own white ground into the bitmap; this
+   puts the same ground on the element, so a canvas that is sized but not yet
+   drawn does not flash the dark app background through the document. */
+.done-preview canvas{width:100%;height:auto;display:block;border:1px solid var(--ink-hair);background:#ffffff}
+.done-preview .page-wrap{position:relative;margin-bottom:8px}
+.done-preview .page-wrap:last-child{margin-bottom:0}
 h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .sub{font-size:13px;color:var(--ink-dim);margin-bottom:32px;line-height:1.7}
 .step{display:none;animation:fadeIn .2s ease}
@@ -59,8 +64,6 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .status-line{font-family:var(--mono);font-size:11px;color:var(--ink-dim);padding:2px 0;line-height:1.7}
 .status-line.ok{color:var(--cobalt)}
 .status-line.err{color:rgba(196, 96, 79, 1)}
-.file-name{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--navy);margin:8px 0 4px;word-break:break-all}
-.file-size{font-family:var(--mono);font-size:11px;color:var(--ink-dim)}
 .burned-icon{font-size:36px;margin-bottom:16px;display:block;text-align:center}
 .burned-msg{font-size:14px;color:var(--ink);text-align:center;line-height:1.7;margin-bottom:8px}
 .burned-sub{font-size:11px;color:var(--ink-dim);text-align:center;line-height:1.7}
@@ -68,8 +71,6 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .btn:hover{opacity:.85}
 .btn-outline{background:transparent;color:var(--ink);border:1px solid var(--ink-hair)}
 .btn-outline:hover{color:var(--cobalt);border-color:var(--cobalt)}
-.tag{display:inline-block;font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid var(--ink-hair);color:var(--ink-dim);margin-right:4px;margin-top:4px}
-.tag.green{border-color:var(--cobalt);color:var(--cobalt)}
 @media(max-width:640px){main{padding:48px 16px}h1{font-size:19px}}
 </style>
 <style>
@@ -217,39 +218,12 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
       <summary>What made this safe</summary>
       <div class="done-details-body">
         <p>The unlocking happened here, in your browser. The file arrived sealed and was opened with the key that sat in the link after the <code>#</code>, which is the part of a link a browser never sends to a server (<code>AES-256-GCM</code>).</p>
-        <p>A link from this web app opens once. Now that this download has finished, the copy on our side is wiped and the link will not open a second time.</p>
+        <p>A link from this web app opens once. The copy on our side was wiped as your browser took it, so the link will not open a second time.</p>
         <p>The file name travelled inside the sealed bytes rather than beside them, so it was never something we could read either.</p>
+        <p id="done-pdf-note" hidden>The pages above were drawn by this browser out of the file itself. Nothing was sent anywhere to draw them, and nothing of the document stays behind when you close this tab.</p>
       </div>
     </details>
   </div>
-</div>
-
-<!-- PDF preview (rendered in-browser, no auto-download) -->
-<div class="step" id="step-preview">
-  <h1>Document received</h1>
-  <p class="sub">Decrypted in your browser. The relay copy has been permanently destroyed.</p>
-
-  <div class="card">
-    <div class="card-head"><div class="dot"></div><div class="card-head-title">PDF preview</div></div>
-    <div class="card-body">
-      <div class="file-name" id="preview-filename"></div>
-      <div class="file-size"><span id="preview-pagecount"></span> &middot; <span id="preview-filesize"></span></div>
-    </div>
-  </div>
-
-  <div id="preview-canvas-list" style="margin:16px 0"></div>
-
-  <div style="margin-bottom:24px">
-    <span class="tag green">Decrypted locally</span>
-    <span class="tag green">Relay copy burned</span>
-    <span class="tag green">Rendered in browser</span>
-  </div>
-
-  <div class="btn-row" id="preview-actions">
-    <a class="btn" href="/sign">Sign this document</a>
-    <button class="btn btn-outline" id="preview-download" type="button">Download original PDF</button>
-  </div>
-  <a href="/dashboard" class="btn btn-outline" style="margin-top:12px">Open your dashboard</a>
 </div>
 
 <!-- Burned / already used -->
@@ -307,6 +281,6 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/js/delegate.js?v=1" defer></script>
 <script src="/js/done-state.js?v=1" defer></script>
-<script src="/js/get.page.js?v=3" defer></script>
+<script src="/js/get.page.js?v=4" defer></script>
 </body>
 </html>
