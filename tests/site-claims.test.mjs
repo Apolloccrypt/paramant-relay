@@ -2283,9 +2283,9 @@ test('the ParaSend credential /privacy describes is the credential the code impl
   assert.ok(priv.includes('the relay accepts it on the five requests a transfer makes and refuses it on everything else'),
     'privacy: the storage section must state what the token can and cannot do');
   const appRules = countRules('const APP_SCOPE = [', 'const PURPOSE_PARASEND');
-  assert.equal(appRules, 3,
-    `the relay's app allowlist now has ${appRules} entries; /privacy says three, so change the page with the code`);
-  assert.ok(priv.includes('which the relay accepts on three requests'),
+  assert.equal(appRules, 4,
+    `the relay's app allowlist now has ${appRules} entries; /privacy says four, so change the page with the code`);
+  assert.ok(priv.includes('which the relay accepts on four requests'),
     'privacy: the pricing/dashboard token must be described by what it can do');
 
   // 3. /parashare really asks for a token, and really does not ask for the key.

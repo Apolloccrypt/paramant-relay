@@ -291,6 +291,7 @@
 
     checkKeySetup();
     loadOperations();
+    loadInbox();
     loadDocuments();
   }
 
@@ -315,6 +316,16 @@
       if (act === 'documents-refresh') {
         ev.preventDefault();
         loadDocuments();
+        return;
+      }
+      if (act === 'inbox-refresh') {
+        ev.preventDefault();
+        loadInbox();
+        return;
+      }
+      if (act === 'inbox-resend') {
+        ev.preventDefault();
+        resendInvitation(t.getAttribute('data-document-id'), t);
         return;
       }
       if (act === 'document-close') {
@@ -507,6 +518,94 @@
       list.innerHTML = '<div class="dh-empty"><strong>Document status is unavailable</strong><span>Your documents are unchanged. <button class="dh-refresh" type="button" data-pa-action="documents-refresh">Try again</button></span></div>';
     }).finally(function () {
       if (refresh) { refresh.disabled = false; refresh.textContent = 'Refresh'; }
+    });
+  }
+
+  // ── Waiting for your signature ─────────────────────────────────────────────
+  // The other side of the worklist above. That one lists what this account
+  // SENT; this lists what was sent to it, off the party index the relay writes
+  // per invited address.
+  //
+  // WHAT IT CANNOT DO, and why the rows are not buttons. The route hands back a
+  // name, a sender and two dates, and deliberately never the per-party invite
+  // token: that capability lives only in the invitation email, which is what
+  // keeps a signed-in page from becoming a second way into somebody's document.
+  // So there is nothing to open here, and the one control is a request to have
+  // that email sent again, to the address this session is signed in with.
+  //
+  // Silent when it is empty. A reader with nothing to sign should see the page
+  // he had yesterday, not an empty card explaining an absence.
+  function loadInbox() {
+    var section = document.getElementById('dh-inbox');
+    var list = document.getElementById('dh-inbox-list');
+    var refresh = document.getElementById('dh-inbox-refresh');
+    if (!section || !list) return;
+    if (refresh) { refresh.disabled = true; refresh.textContent = 'Refreshing'; }
+    fetch('/api/user/parasign/inbox', {
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    }).then(function (r) {
+      if (!r.ok) throw new Error('http_' + r.status);
+      return r.json();
+    }).then(function (body) {
+      var rows = Array.isArray(body.documents) ? body.documents : [];
+      if (!rows.length) { hide(section); return; }
+      list.innerHTML = rows.map(function (doc) {
+        var name = doc.document || 'Signing request';
+        // Who and when, and only what arrived. An unnamed sender is left out
+        // rather than guessed at.
+        var from = String(doc.sender || '').trim();
+        var when = doc.sent_at ? fmtDate(doc.sent_at) : '';
+        var bits = [];
+        if (from) bits.push('From ' + esc(from));
+        if (when) bits.push((from ? 'sent ' : 'Sent ') + esc(when));
+        if (doc.signing_closes_at) bits.push('signing closes ' + esc(fmtDate(doc.signing_closes_at)));
+        return '<div class="dh-inbox-row">' +
+          '<div class="dh-inbox-name"><strong title="' + esc(name) + '">' + esc(name) + '</strong>' +
+          (bits.length ? '<span>' + bits.join(' &middot; ') + '</span>' : '') + '</div>' +
+          '<button class="dh-inbox-act" type="button" data-pa-action="inbox-resend" data-document-id="' + esc(doc.id || '') + '">Send me the link again</button>' +
+          '</div>';
+      }).join('');
+      show(section);
+    }).catch(function () {
+      // A worklist that could not be read says nothing at all. Claiming an
+      // empty inbox on a failed fetch would be the one lie this card could
+      // tell, and it is the expensive one: the reader stops looking.
+      hide(section);
+    }).finally(function () {
+      if (refresh) { refresh.disabled = false; refresh.textContent = 'Refresh'; }
+    });
+  }
+
+  // One press, one answer, and the answer stays on the button. Capped at one an
+  // hour per document by the server, so the reader is told which of the two
+  // things happened rather than left pressing it again.
+  function resendInvitation(id, button) {
+    if (!id || !button || button.disabled) return;
+    button.disabled = true;
+    button.textContent = 'Sending';
+    fetch('/api/user/parasign/inbox/' + encodeURIComponent(id) + '/resend', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: '{}',
+      cache: 'no-store'
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (body) {
+        if (r.status === 429) throw new Error('rate_limited');
+        if (!r.ok) throw new Error(body.error || 'failed');
+        return body;
+      });
+    }).then(function (body) {
+      // The address comes back from the server and is the reader's own: it is
+      // the only address the mail could have gone to.
+      button.textContent = body && body.sent_to ? 'Sent to ' + body.sent_to : 'Sent';
+    }).catch(function (err) {
+      button.textContent = err.message === 'rate_limited'
+        ? 'Already sent, try again in an hour'
+        : 'Could not send, try again later';
+      if (err.message !== 'rate_limited') button.disabled = false;
     });
   }
 

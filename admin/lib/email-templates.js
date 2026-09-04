@@ -672,17 +672,39 @@ ${BASE_URL}`;
   };
 }
 
-function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, documentName, expiresAt, subject, message, envelopeId, partyIndex }) {
+// The invitation to sign, and the same mail sent a second time on request.
+//
+// documentIncluded: whether the link carries the key to the sender's encrypted
+// copy of the document. The sender's browser builds the first invitation, and
+// that key lives in the URL fragment, which browsers never transmit: the relay
+// has never held it and the admin only ever saw it in flight. So a resend the
+// SERVER builds can rebuild the signing link and cannot rebuild that fragment.
+//
+// The flag exists so the mail says which of the two it is. Promising an
+// encrypted copy that the link does not carry would be the kind of small lie
+// that costs a reader ten minutes and the product its credibility; the resent
+// mail says the document is not attached and what to do instead. Everything
+// else about the mail, the subject, the reference id, the sender line and the
+// closing date, is identical, so it threads with the original.
+function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, documentName, expiresAt, subject, message, envelopeId, partyIndex, documentIncluded = true }) {
   const safeSubject = String(subject || '').trim().slice(0, 140) || `Signature requested for ${documentName || 'a document'}`;
   const greeting = recipientLabel ? `Hi ${recipientLabel},` : 'Hi,';
   const sender = senderLabel || 'A Paramant user';
   const expiry = expiresAt ? formatTS(expiresAt) : '7 days after creation';
   const note = String(message || '').trim().slice(0, 1000);
+  const carriesText = documentIncluded
+    ? `The document is encrypted. The complete personal link below opens it in your
+browser, verifies it against the signing request and enables signing.`
+    : `This link opens the signing request and enables signing. It does not carry
+the sender's encrypted copy of the document, so open the file you already have
+when the page asks for it, or ask the sender for the original link.`;
+  const carriesHtml = documentIncluded
+    ? 'The document is encrypted. The personal link opens it in your browser and verifies it against the signing request before signing is enabled.'
+    : 'This link opens the signing request and enables signing. It does not carry the sender\'s encrypted copy of the document, so open the file you already have when the page asks for it, or ask the sender for the original link.';
   const text = `${greeting}
 
 ${sender} has asked you to review and sign ${documentName || 'a document'}.
-The document is encrypted. The complete personal link below opens it in your
-browser, verifies it against the signing request and enables signing.
+${carriesText}
 
 Review and sign:
 ${inviteUrl}
@@ -696,7 +718,7 @@ ${BASE_URL}`;
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Signature requested</h1>
     <p style="margin:0 0 16px 0;line-height:1.6;">${escHtml(greeting)}</p>
     <p style="margin:0 0 16px 0;line-height:1.6;"><strong>${escHtml(sender)}</strong> has asked you to review and sign <strong>${escHtml(documentName || 'a document')}</strong>.</p>
-    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">The document is encrypted. The personal link opens it in your browser and verifies it against the signing request before signing is enabled.</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">${escHtml(carriesHtml)}</p>
     ${note ? `<div style="margin:20px 0;padding:14px 16px;background:#F8FAFC;border:1px solid #E2E8F0;line-height:1.6;color:#334155;">${escHtml(note).replace(/\n/g, '<br>')}</div>` : ''}
     ${btn(inviteUrl, 'Review and sign')}
     <p style="margin:20px 0 8px 0;line-height:1.6;color:#92400E;font-size:13px;"><strong>Sign in with this invited email address to open the document. Do not forward the link.</strong></p>

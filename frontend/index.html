@@ -163,6 +163,15 @@ html[data-session="in"] .home-hero{padding-bottom:56px}
 .hw-more{display:inline-block;margin-top:14px;font-size:14px;font-weight:600;color:var(--fg-mid);text-decoration:underline;text-underline-offset:4px}
 .hw-more:hover,.hw-more:focus-visible{color:var(--fg)}
 
+/* the one row that IS a control. Every other row on this page reads; a document
+   waiting on the reader is the only one with something to press, and it is the
+   modest ask "mail me that link again", not a way into the document. 44px tall
+   so it is a real tap target on a phone. */
+.hw-act{flex:0 0 auto;min-height:44px;padding:0 13px;border:1px solid var(--line);border-radius:9px;background:transparent;font:inherit;font-size:13px;font-weight:600;color:var(--fg-mid);cursor:pointer}
+.hw-act:hover,.hw-act:focus-visible{color:var(--fg);border-color:var(--fg-dim)}
+.hw-act[disabled]{cursor:default;color:var(--fg-dim);border-color:var(--line)}
+.hw-note{margin:14px 0 0;font-size:13px;line-height:1.5;color:var(--fg-mid)}
+
 /* a new account. The same card, the same height, its own object: nothing here
    is allowed to read as a page that failed to load. */
 .hw-empty{min-height:196px;display:flex;flex-direction:column;justify-content:center}
@@ -560,6 +569,15 @@ footer a{color:var(--fg)}
           <div class="hw-strip" data-hw-strip hidden></div>
         </div>
 
+        <!-- Waiting for YOU. Full width and above the pair below, because it is
+             the only list on this page about work the reader owes rather than
+             work the reader is owed. -->
+        <div class="hw-card hw-list-card" data-hw-inbox hidden>
+          <p class="hw-kicker">Waiting for your signature</p>
+          <ul class="hw-list" data-hw-inbox-list></ul>
+          <p class="hw-note">Each document opens from the personal link in its invitation email.</p>
+        </div>
+
         <div class="hw-cols">
           <div class="hw-card hw-list-card" data-hw-waiting hidden>
             <p class="hw-kicker">Waiting on a signature</p>
@@ -822,6 +840,6 @@ footer a{color:var(--fg)}
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=8" defer></script>
 <script src="/js/format-date.js?v=1" defer></script>
-<script src="/js/home-auth.js?v=3" defer></script>
+<script src="/js/home-auth.js?v=4" defer></script>
 </body>
 </html>

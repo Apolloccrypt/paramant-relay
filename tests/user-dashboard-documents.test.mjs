@@ -30,6 +30,8 @@ const page = await browser.newPage({ viewport:{ width:390, height:844 } });
 let overviewRequests = 0;
 let documentRequests = 0;
 let cancelRequests = 0;
+let inboxRequests = 0;
+let resendRequests = 0;
 await page.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
 await page.route('**/api/user/me', (route) => route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({
   email:'demo@example.com', label:'Demo', plan:'pro', created_at:'2026-06-01T10:00:00.000Z',
@@ -50,6 +52,23 @@ await page.route('**/api/user/documents', (route) => {
 await page.route('**/api/user/documents/env_waiting_abcdefghijklmnop/cancel', (route) => {
   cancelRequests++;
   return route.fulfill({ status:200, contentType:'application/json', body:'{"ok":true,"status":"void"}' });
+});
+// The other side of the worklist: what somebody else sent to this reader. The
+// resend stub is registered LAST, because Playwright tries handlers newest
+// first and the inbox pattern would otherwise swallow it.
+await page.route('**/api/user/parasign/inbox', (route) => {
+  inboxRequests++;
+  return route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ ok:true, count:2, documents:[
+    { id:'AbCdEfGhIjKlMnOpQrStUvWx', document:'Shareholder agreement.pdf', sender:'notary@example.com',
+      sent_at:'2026-07-20T10:00:00.000Z', signing_closes_at:'2026-07-27T10:00:00.000Z', status:'sent', party_count:2, signed_count:1 },
+    // Somebody else chose this file name. It has to reach the screen as text.
+    { id:'ZyXwVuTsRqPoNmLkJiHgFeDc', document:'<img src=x onerror=window.inboxInjected=1>', sender:'purchasing@example.com',
+      sent_at:'2026-07-19T10:00:00.000Z', signing_closes_at:'2026-07-26T10:00:00.000Z', status:'sent', party_count:3, signed_count:0 }
+  ] }) });
+});
+await page.route('**/api/user/parasign/inbox/*/resend', (route) => {
+  resendRequests++;
+  return route.fulfill({ status:200, contentType:'application/json', body:'{"ok":true,"sent_to":"demo@example.com"}' });
 });
 
 const checks = [];
@@ -148,10 +167,49 @@ const taps = await page.evaluate(() => {
     // Every link inside an answer, not just the first: "See the plans" sat at
     // the end of its line and measured 19px while its neighbours measured 41.
     faq: Math.min(...[...document.querySelectorAll('.dh-ask-list a')].map((el) => Math.round(el.getBoundingClientRect().height))),
+    resend: h('.dh-inbox-act'),
   };
 });
 ok('every control on the phone screen is at least a 44px tap target',
   Object.values(taps).every((height) => height >= 44), JSON.stringify(taps));
+
+// 2b. Waiting for your signature. The section above "Open documents", and the
+// only list on this page about work the reader owes rather than work the reader
+// is owed. It was impossible before the party index: the dashboard could show an
+// account its outbox and nothing else, and the page said so in the box at the
+// bottom of the workspace, which told a reader to go and look in his email.
+const inbox = await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('.dh-inbox-row')];
+  return {
+    shown: !document.getElementById('dh-inbox').hidden,
+    rows: rows.map((r) => r.innerText.replace(/\s+/g, ' ').trim()),
+    acts: rows.map((r) => (r.querySelector('.dh-inbox-act') || {}).textContent),
+    // A row is not a button here: this page holds no way to open somebody
+    // else's document, and a row that looked clickable would say it does.
+    openers: rows.filter((r) => r.matches('button') || r.querySelector('a')).length,
+    injected: !window.inboxInjected,
+    // The inbox is above the outbox in the document, not merely styled that way.
+    beforeOutbox: !!(document.getElementById('dh-inbox').compareDocumentPosition(document.getElementById('dh-documents')) & Node.DOCUMENT_POSITION_FOLLOWING),
+  };
+});
+ok('the inbox is fetched once and drawn above the account own requests',
+  inboxRequests === 1 && inbox.shown && inbox.beforeOutbox, `${inboxRequests} requests, ${JSON.stringify([inbox.shown, inbox.beforeOutbox])}`);
+ok('each waiting document names its sender and both of its dates',
+  inbox.rows.length === 2
+  && inbox.rows[0].includes('Shareholder agreement.pdf')
+  && inbox.rows[0].includes('From notary@example.com')
+  && inbox.rows[0].includes('sent 20 July 2026')
+  && inbox.rows[0].includes('signing closes 27 July 2026'), JSON.stringify(inbox.rows));
+ok('a file name chosen by somebody else reaches the screen as text, never as markup',
+  inbox.injected && inbox.rows[1].includes('<img src=x'), JSON.stringify(inbox.rows[1]));
+ok('the inbox offers the one thing it can do and pretends no way in',
+  inbox.openers === 0 && inbox.acts.every((t) => t === 'Send me the link again'), JSON.stringify(inbox.acts));
+
+await page.locator('.dh-inbox-act').first().click();
+await page.waitForFunction(() => /Sent/.test(document.querySelector('.dh-inbox-act').textContent));
+ok('send me the link again asks once and says which address it went to',
+  resendRequests === 1 && (await page.locator('.dh-inbox-act').first().textContent()).trim() === 'Sent to demo@example.com',
+  `${resendRequests} requests :: ${await page.locator('.dh-inbox-act').first().textContent()}`);
 
 await page.setViewportSize({ width:1280, height:900 });
 ok('desktop uses a three-action row without overflow', await page.evaluate(() => getComputedStyle(document.querySelector('.dh-start')).gridTemplateColumns.split(' ').length === 3 && document.documentElement.scrollWidth - document.documentElement.clientWidth <= 1), await page.evaluate(() => getComputedStyle(document.querySelector('.dh-start')).gridTemplateColumns));

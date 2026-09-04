@@ -140,6 +140,37 @@ const SCOPE = [
 //     read-only over the same chain, tier-gated at Business+ by the route
 //     itself. It is an export of what the account already did.
 //
+//   GET  /v2/parasign/inbox          the signed-in homepage and /dashboard,
+//     "Waiting for your signature". The other three routes answer questions
+//     about what the account DID; this one answers what is waiting ON it, off
+//     the party index in relay/envelope.js.
+//
+//     The two pages that show it today reach it through the admin proxy, on the
+//     session cookie, like every other fetch they make. It is on this list all
+//     the same, and from the day the route is born rather than later: the proxy
+//     forwards the ACCOUNT'S OWN API-KEY, which is the credential #401 and its
+//     follow-up spent two changes taking out of these pages. A route that only
+//     ever answers a key is a route that has to be re-authorised the day a page
+//     moves off keys, and that is the moment somebody widens a list under time
+//     pressure. Naming it here means the narrow credential is never the one
+//     thing that cannot read it.
+//
+//     It is in scope because of what it CANNOT hand out, not because of who
+//     asks for it. The route returns a document name, who sent it, when it went
+//     out and when signing closes. It does not return the per-party invite
+//     token, the document hash, the capsule, or the other parties' email
+//     hashes. So a stolen token buys the knowledge that a document is waiting,
+//     which the thief's victim already had, and not the capability to open or
+//     sign it: that still lives only in the link in the mail. The resend action
+//     next to it (POST /v2/parasign/inbox/<id>/resend) is deliberately NOT
+//     here. It reads the stored invite token back to put it in a mail, so it
+//     stays behind internal auth on the admin hop, where a browser cannot
+//     reach it at all.
+//
+//     The address it answers for is derived by the relay from the resolved
+//     api-key, never taken from the request. A header a browser can set would
+//     have turned a fifteen-minute token into a way to read anybody's worklist.
+//
 // What stays out, under BOTH purposes: /v2/keys, the signing-key and TOTP
 // routes, /v2/outbound, /v2/admin/*, and /v2/session-token itself. No token
 // mints another one, whatever it was minted for.
@@ -147,6 +178,7 @@ const APP_SCOPE = [
   { method: 'POST', path: '/v2/billing/checkout' },
   { method: 'GET', path: '/v2/user/history' },
   { method: 'GET', path: '/v2/parasign/audit-export' },
+  { method: 'GET', path: '/v2/parasign/inbox' },
 ];
 
 const PURPOSE_PARASEND = 'parasend';

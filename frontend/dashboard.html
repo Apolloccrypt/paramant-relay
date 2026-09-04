@@ -194,6 +194,20 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-invites strong { display: block; margin-bottom: 3px; font: 600 13px/1.4 var(--sans); color: var(--ink-1); }
 .dh-invites span { display: block; font: 13px/1.55 var(--sans); color: var(--ink-2); }
 
+/* ── Waiting for your signature ─────────────────────────────────────────────
+   The register row of the outbox is a button that opens a detail dialog. These
+   rows are not: this page holds no way to open somebody else's document, so the
+   only control is the modest "mail me that link again". */
+.dh-inbox-list { display: grid; gap: 1px; padding: 0 26px 22px; }
+.dh-inbox-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.dh-inbox-row:last-child { border-bottom: 0; }
+.dh-inbox-name { min-width: 0; }
+.dh-inbox-name strong { display: block; font: 600 15px/1.35 var(--sans); color: var(--ink-1); overflow-wrap: anywhere; }
+.dh-inbox-name span { display: block; margin-top: 3px; font: 13px/1.5 var(--sans); color: var(--ink-2); }
+.dh-inbox-act { min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--r-1); background: var(--surface); font: 600 13px/1 var(--sans); color: var(--ink-2); cursor: pointer; }
+.dh-inbox-act:hover, .dh-inbox-act:focus-visible { color: var(--ink-1); border-color: var(--accent); }
+.dh-inbox-act[disabled] { cursor: default; color: var(--ink-3, var(--ink-2)); border-color: var(--line); }
+
 /* ── Document detail ───────────────────────────────────────────────────────── */
 .dh-doc-dialog { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 14px; background: rgba(0, 0, 0, .62); animation: dh-veil var(--d-2) var(--e-standard) both; }
 @keyframes dh-veil { from { opacity: 0; } to { opacity: 1; } }
@@ -534,6 +548,20 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
       </div>
     </aside>
 
+    <!-- Waiting for YOU. Above "Open documents" because that section is the
+         outbox: requests this account started and other people owe. This one is
+         the inbox, and it is the only list here the reader can act on now. -->
+    <section class="dh-workspace dh-inbox" id="dh-inbox" aria-labelledby="dh-inbox-title" hidden>
+      <div class="dh-workspace-head">
+        <div>
+          <h2 id="dh-inbox-title">Waiting for your signature</h2>
+          <p>Documents other people sent you. Each one opens from the personal link in its invitation email.</p>
+        </div>
+        <button class="dh-refresh" type="button" id="dh-inbox-refresh">Refresh</button>
+      </div>
+      <div class="dh-inbox-list" id="dh-inbox-list" aria-live="polite"></div>
+    </section>
+
     <section class="dh-workspace" aria-labelledby="dh-documents-title">
       <div class="dh-workspace-head">
         <div>
@@ -559,7 +587,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
       </div>
       <div class="dh-invites">
         <span class="dh-invites-icon" aria-hidden="true">&#9993;</span>
-        <div><strong>Looking for a request sent to you?</strong><span>Open the personal invitation in your email. Your account is checked before the encrypted document opens.</span></div>
+        <div><strong>Looking for a request sent to you?</strong><span>Requests waiting for your signature are listed above. Each one opens from the personal link in its invitation email, and your account is checked before the encrypted document opens.</span></div>
       </div>
     </section>
 
@@ -681,6 +709,6 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=8" defer></script>
-<script src="/js/dashboard.js?v=12" defer></script>
+<script src="/js/dashboard.js?v=13" defer></script>
 </body>
 </html>
