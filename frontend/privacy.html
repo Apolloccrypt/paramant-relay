@@ -225,7 +225,7 @@ footer a{color:var(--ink);text-decoration:none}
 <tr><td>ParaSign encrypted document capsule</td><td>Deliver the document with a signing request</td><td>Redis &middot; expires with the envelope</td><td>Hosting provider stores ciphertext only</td></tr>
 <tr><td>Personal ParaSign invitation link</td><td>Bind one recipient to one encrypted document and signing slot</td><td>Processed during delivery; not written to application logs</td><td>Resend only when you choose email delivery</td></tr>
 <tr><td>SHA-256 hash of blob</td><td>Routing &amp; delivery confirmation</td><td>RAM only &middot; deleted after its last read</td><td>Never</td></tr>
-<tr><td>API key (Pro/Enterprise)</td><td>Authentication &amp; rate limiting</td><td>Loaded from config at startup</td><td>Never</td></tr>
+<tr><td>API key (Firm/Enterprise)</td><td>Authentication &amp; rate limiting</td><td>Loaded from config at startup</td><td>Never</td></tr>
 <tr><td>Device ID (SDK users)</td><td>Key routing between sender and receiver</td><td>RAM only &middot; cleared on restart</td><td>Never</td></tr>
 <tr><td>Device ID hash (CT log)</td><td>Public tamper-evident audit log</td><td>Disk &middot; /data/ct-log.json &middot; SHA3-256 one-way hash only</td><td>Never</td></tr>
 <tr><td>Signed delivery receipt</td><td>Proof that a transfer was delivered</td><td>Redis &middot; 15 minutes, then deleted</td><td>Never</td></tr>
@@ -233,7 +233,7 @@ footer a{color:var(--ink);text-decoration:none}
 <tr><td>Email address</td><td>Account identity, login, recovery, signing-invite delivery</td><td>Stored (server) &middot; also kept as a hash for rate-limiting</td><td>Email provider (Resend) for messages we send you</td></tr>
 <tr><td>Sign-in factors: passkey public keys, TOTP secret (encrypted), recovery codes (hashed)</td><td>Account authentication</td><td>Stored (server)</td><td>Never</td></tr>
 <tr><td>ParaSign signing public key + fingerprint</td><td>Verifiable signing identity</td><td>Stored (server) &middot; public half only; the private key never leaves your browser</td><td>Public (its hash is in the CT log)</td></tr>
-<tr><td>Plan + anonymised billing reference</td><td>Pro/Enterprise billing</td><td>Stored (server)</td><td>Payment processor (Mollie, EU)</td></tr>
+<tr><td>Plan + anonymised billing reference</td><td>Firm/Enterprise billing</td><td>Stored (server)</td><td>Payment processor (Mollie, EU)</td></tr>
 <tr><td>Client IP + user-agent</td><td>Security, rate limiting</td><td>Session/rate-limit TTL</td><td>Never</td></tr>
 <tr><td>Masked IP in the audit log (1.2.x.x)</td><td>Account audit trail</td><td>Redis &middot; at most 400 days, and at most 1000 entries per account</td><td>Never</td></tr>
 </tbody>
