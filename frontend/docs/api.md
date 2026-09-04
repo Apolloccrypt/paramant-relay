@@ -91,7 +91,7 @@ curl -X POST https://relay.paramant.app/v2/inbound \
 the relay actually applied, which is **not** always the one you asked for: the
 upload clamps your request to the account's ParaSend tier ceiling (`view_ttl_ms`
 in `relay/lib/tiers.js`: 1 hour on Community, 24 hours on Pro, 7 days on
-Business and Enterprise, and the table under "ParaSend limits per tier" above is
+Enterprise, and the table under "ParaSend limits per tier" above is
 generated from the same rows). Compute the expiry the receiver is told from the
 `ttl_ms` that came back, never from the one you sent.
 

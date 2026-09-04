@@ -250,17 +250,17 @@ test('link expiry per tier on pricing and privacy matches tiers.js', () => {
   assert.ok(pricing.includes(`${free} hour link expiry`), `pricing: Community must say ${free} hour link expiry`);
   assert.ok(pricing.includes(`${pro} hour link expiry`), `pricing: Pro must say ${pro} hour link expiry`);
   assert.ok(pricing.includes(`${ent / 24} day link expiry`), `pricing: Enterprise must say ${ent / 24} day link expiry`);
-  // Business exists in tiers.js with the same ceiling as Enterprise, and the
-  // privacy policy used to skip it: a Business customer read the page and found
-  // no row that was theirs. Both sentences now name it, and this asserts the two
-  // tiers really do share the ceiling before it lets them share a sentence.
-  const bus = hours(ttl('business'));
-  assert.equal(bus, ent, 'business and enterprise no longer share a ceiling; split the sentence on /privacy and /terms');
+  // Business dropped from both duration sentences on 2026-09-04. tiers.js does
+  // carry a business row holding the Enterprise ceiling, and it stays there
+  // because normalisePlan maps a stored ParaSign Business account onto it, but
+  // the ParaSend price table sells Community, Pro and Enterprise, so a link
+  // lifetime hung on Business offered a plan a ParaSend buyer cannot buy.
+  // Block 40 sweeps the whole site for that shape.
   const priv = visible(page('privacy'));
-  assert.ok(priv.includes(`${free} hour for Community, ${pro} hours for Pro, ${ent / 24} days for Business and Enterprise`), 'privacy: retention line must match tiers.js');
-  assert.ok(priv.includes(`Community plan blobs expire after ${free} hour maximum. Pro blobs after ${pro} hours. Business and Enterprise blobs after ${ent / 24} days.`), 'privacy: expiry paragraph must match tiers.js');
+  assert.ok(priv.includes(`${free} hour for Community, ${pro} hours for Pro, ${ent / 24} days for Enterprise`), 'privacy: retention line must match tiers.js');
+  assert.ok(priv.includes(`Community plan blobs expire after ${free} hour maximum. Pro blobs after ${pro} hours. Enterprise blobs after ${ent / 24} days.`), 'privacy: expiry paragraph must match tiers.js');
   const WORD = { 1: 'one', 24: 'twenty-four', 7: 'seven' };
-  assert.ok(visible(page('terms')).includes(`${WORD[free]} hour on Community, ${WORD[pro]} hours on Pro and ${WORD[ent / 24]} days on Business and Enterprise`),
+  assert.ok(visible(page('terms')).includes(`${WORD[free]} hour on Community, ${WORD[pro]} hours on Pro and ${WORD[ent / 24]} days on Enterprise`),
     'terms: the time-to-live sentence must match tiers.js');
 });
 
@@ -1348,9 +1348,10 @@ test('the reads a link allows on /privacy are the ones tiers.js grants', () => {
     assert.ok(SPAN_WORD[n], `tiers.js now sets a ${t} ceiling of ${h} hours, which this block cannot spell; add it to SPAN_WORD and to /press`);
     return `${SPAN_WORD[n]} ${unit}${n === 1 ? '' : 's'}`;
   };
-  const sentence = `${span('community')} on Community, ${span('pro')} on Pro, ${span('business')} on Business and Enterprise`;
-  assert.equal(ttlOf('business'), ttlOf('enterprise'),
-    'business and enterprise no longer share a ceiling; the /press sentence names them together');
+  // Enterprise, not Business, since 2026-09-04: the ParaSend price table sells
+  // three tiers and Business is not one of them, so /press may not put a link
+  // lifetime on it. The tiers.js business row is a server-side ceiling only.
+  const sentence = `${span('community')} on Community, ${span('pro')} on Pro, ${span('enterprise')} on Enterprise`;
   const press = visible(page('press'));
   assert.ok(press.includes(sentence),
     `press: the expiry bullet must say "${sentence}", the ceilings tiers.js sets, instead of denying the timer`);
@@ -2237,10 +2238,18 @@ test('every page that promises burn-on-read says which client and which plan it 
   assert.ok(flatten(bodyOf(page('index'))).includes(`up to ${reads.pro} reads per link through the API`),
     `index: the ParaSend Pro price line must name the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
 
-  // The two pages that spell all four plans out on their own terms.
+  // The two pages that spell the ParaSend plans out on their own terms. The
+  // durations on /docs come off view_ttl_ms since 2026-09-04, so a tier change
+  // moves the sentence instead of leaving a stale hour beside a live read count.
+  const ttlOf = (tier) => Number(/view_ttl_ms:\s*([\d_]+)/.exec(tiersSrc.slice(tiersSrc.indexOf(`${tier}:`)))[1].replace(/_/g, ''));
+  const span = (tier) => {
+    const h = ttlOf(tier) / 3_600_000;
+    const [n, unit] = h <= 24 ? [h, 'hour'] : [h / 24, 'day'];
+    return `${n} ${unit}${n === 1 ? '' : 's'}`;
+  };
   const spelled = [
     ['architecture', `after the last read the link allows: one on Community, up to ${reads.pro} on Pro and ${reads.enterprise} on Enterprise`],
-    ['docs', `Community gets 1 hour and 1 read, Pro 24 hours and up to ${reads.pro} reads, Enterprise 7 days and ${reads.enterprise} reads`],
+    ['docs', `Community gets ${span('community')} and 1 read, Pro ${span('pro')} and up to ${reads.pro} reads, Enterprise ${span('enterprise')} and ${reads.enterprise} reads`],
   ];
   for (const [slug, sentence] of spelled) {
     assert.ok(flatten(bodyOf(page(slug))).includes(sentence),
@@ -2612,14 +2621,12 @@ test('the ParaSend read counts are the ones tiers.js grants to plans ParaSend se
   }
 
   // And Business may not come back beside a ParaSend read count anywhere on the
-  // site. Scoped to reads on purpose: the ParaSend link TTL sentences on /terms
-  // and /press still say "seven days on Business and Enterprise", which is a
-  // separate untruth of the same family and is pinned elsewhere; this block
-  // does not silently claim to have fixed it.
+  // site. Still scoped to reads on purpose: the link lifetimes are the other
+  // half of the same untruth and block 40 owns those, so each block fails on
+  // the claim it actually holds.
   //
   // A read claim is a COUNT beside the plan name, which is what makes it an
-  // offer. "seven days on Business" is a duration and is caught by neither
-  // pattern, on purpose.
+  // offer. "seven days on Business" is a duration, and block 40 catches it.
   const READ_CLAIM = [
     /up to \d+[^.]{0,40}\bon Business\b/i,
     /\bBusiness\b[^.]{0,24}\b\d+ reads?\b/i,
@@ -2636,4 +2643,95 @@ test('the ParaSend read counts are the ones tiers.js grants to plans ParaSend se
     }
   }
   assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}\n`);
+});
+
+// 40 ── The plans a ParaSend link lifetime may name, and the durations tiers.js
+// sets for them.
+//
+// The sequel to block 39, the same family of untruth one claim over. /terms and
+// /press said a ParaSend link lives "seven days on Business and Enterprise" and
+// /privacy said it twice in its own register, while the ParaSend price table on
+// /pricing sells Community, Pro and Enterprise. Business is a real row in
+// tiers.js and stays there -- normalisePlan maps a stored ParaSign Business
+// account onto it, so a paying Business customer is not silently held to
+// community caps -- but it is a server-side ceiling, not a ParaSend offer, and
+// a duration hung on it sold a plan nobody can buy. /terms is a contract, so
+// the correction there is the plan name and nothing else; the terms carry a
+// version and an effective date, and both moved with it.
+//
+// Block 39 owns the read counts. This block owns the durations, and does it
+// without a hand-written list of pages: it reads every duration the site hangs
+// on a plan name, on any page under frontend/, and holds each one to the
+// view_ttl_ms of the plan it names.
+//
+// Verified by sabotage: put "seven days on Business and Enterprise" back on
+// /terms (red twice, on the sold-plan check and on the Business sweep); set
+// enterprise.view_ttl_ms to three days (red on /terms, /press and /privacy at
+// once, which is the point of reading the number instead of writing it).
+test('every ParaSend link lifetime on the site names a plan ParaSend sells, with the duration tiers.js gives it', () => {
+  const tiersSrc = read('relay/lib/tiers.js');
+  const hoursOf = (tier) => {
+    const m = /view_ttl_ms:\s*([\d_]+)/.exec(tiersSrc.slice(tiersSrc.indexOf(`${tier}:`)));
+    assert.ok(m, `tiers.js ${tier} must declare a literal view_ttl_ms`);
+    return Number(m[1].replace(/_/g, '')) / 3_600_000;
+  };
+
+  // Which plans a duration may be hung on, read off the price table itself --
+  // the same grid block 39 reads, so the two cannot drift apart.
+  const grids = [...page('pricing').matchAll(/<div class="tier-grid">([\s\S]*?)<\/section>/g)].map((m) => m[1]);
+  const parasendGrid = grids.find((g) => /data-billing-product="parasend"/.test(g));
+  assert.ok(parasendGrid, '/pricing no longer has a ParaSend tier grid with a parasend checkout button in it');
+  const sold = [...parasendGrid.matchAll(/<div class="tier-name">([^<]+)<\/div>/g)].map((m) => m[1].trim().toLowerCase());
+  assert.deepEqual(sold, ['community', 'pro', 'enterprise'],
+    `the ParaSend price table now sells ${sold.join(', ')}; the link-lifetime sentences on /terms, /press and /privacy name Community, Pro and Enterprise and must move with it`);
+
+  // "seven days on Enterprise", "24 hours for Pro": a span, then a plan name,
+  // in either register the site writes. Spelled numbers included, because
+  // /terms and /press write them out and a digit-only sweep would read those
+  // pages as carrying no claim at all.
+  const NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, 'twenty-four': 24 };
+  const numberOf = (s) => (/^\d+$/.test(s) ? Number(s) : NUM[s.toLowerCase()]);
+  const NAMED = /\b(\d+|one|two|three|four|five|six|seven|twenty-four)[\s-](hour|day)s?\b[^.]{0,30}?\b(?:on|for)\s+(Community|Pro|Business|Enterprise)\b/g;
+  const flat = (slug) => visible(page(slug)).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
+  const wrong = [];
+  const seen = {};
+  for (const slug of allPages()) {
+    for (const m of flat(slug).matchAll(NAMED)) {
+      const tier = m[3].toLowerCase();
+      seen[slug] = (seen[slug] || 0) + 1;
+      if (!sold.includes(tier)) {
+        wrong.push(`${slug}: "${m[0]}" hangs a link lifetime on ${m[3]}, and the ParaSend price table does not sell that plan`);
+        continue;
+      }
+      const stated = m[2].toLowerCase() === 'day' ? numberOf(m[1]) * 24 : numberOf(m[1]);
+      if (stated !== hoursOf(tier)) {
+        wrong.push(`${slug}: "${m[0]}" states ${stated} hours, and tiers.js gives ${tier} ${hoursOf(tier)}`);
+      }
+    }
+  }
+  assert.deepEqual(wrong, [], `\n  ${wrong.join('\n  ')}\n`);
+
+  // And the sentences have to still be there. A sweep alone passes on a page
+  // that quietly dropped the claim, which is how a buyer ends up with no
+  // expiry stated anywhere.
+  for (const slug of ['terms', 'press', 'privacy']) {
+    assert.ok((seen[slug] || 0) >= 3,
+      `${slug}: must still state the link lifetime for all three ParaSend plans; found ${seen[slug] || 0} of them`);
+  }
+
+  // The other register, where the plan comes first: "Business and Enterprise
+  // blobs after 7 days". The sweep above cannot see that shape, and it is the
+  // one /privacy used. ParaSign sentences are exempt because ParaSign does sell
+  // a Business plan.
+  const DURATION = /\b(?:\d+|one|two|three|four|five|six|seven|twenty-four)[\s-](?:hour|day)s?\b/;
+  const named = [];
+  for (const slug of allPages()) {
+    for (const sentence of flat(slug).split(/(?<=\.)\s+/)) {
+      if (!/\bBusiness\b/.test(sentence) || !DURATION.test(sentence)) continue;
+      if (/ParaSign|signature/i.test(sentence)) continue;
+      named.push(`${slug}: "${sentence.trim().slice(0, 180)}" gives Business a link lifetime, and ParaSend has no Business plan`);
+    }
+  }
+  assert.deepEqual(named, [], `\n  ${named.join('\n  ')}\n`);
 });

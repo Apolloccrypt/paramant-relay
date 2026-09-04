@@ -866,14 +866,18 @@ function applyPlanTtls(found) {
   if (!el || !planTtlByPlan) return;
   const c = humanDuration(planTtlByPlan.community);
   const pr = humanDuration(planTtlByPlan.pro);
-  const b = humanDuration(planTtlByPlan.business);
-  if (!c || !pr || !b) return;
+  // Enterprise, not Business. tiers.js carries a business row and it is
+  // load-bearing server-side, but the ParaSend price table sells Community,
+  // Pro and Enterprise, so a reader on none of them can only be told about a
+  // plan he could buy. The two rows hold the same ceiling today anyway.
+  const ent = humanDuration(planTtlByPlan.enterprise);
+  if (!c || !pr || !ent) return;
   // "web app" is not decoration. tests/site-claims.test.mjs block 37 holds every
   // page about a client that never sends max_views to naming that client beside
   // a single-read claim, because "up to 10 reads on Pro" is something this page
   // will never do: it asks the relay for no read count at all.
   el.textContent = 'The sealed file waits on our server for up to ' + c + ' on Community, ' +
-    pr + ' on Pro and ' + b + ' on Business, and a link from this web app is wiped after the first download.';
+    pr + ' on Pro and ' + ent + ' on Enterprise, and a link from this web app is wiped after the first download.';
   // The TTL picker in step 1 offers 24 hours to an account whose plan stops at
   // one, and POST /v2/inbound silently clamps it. Saying the ceiling here is
   // cheaper than letting the sender pick a number the relay will not honour.

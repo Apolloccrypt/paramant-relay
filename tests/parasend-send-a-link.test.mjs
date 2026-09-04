@@ -119,7 +119,7 @@ ok('the live stand is the one selected on arrival',
 await sender.waitForFunction(() => /Community/.test(document.getElementById('ps-mode-link-ttl').textContent), null, { timeout: 15000 });
 const ttlSentence = await sender.locator('#ps-mode-link-ttl').textContent();
 ok('the chooser names the per-plan link lifetimes from the plan API',
-  /1 hour on Community/.test(ttlSentence) && /24 hours on Pro/.test(ttlSentence) && /7 days on Business/.test(ttlSentence),
+  /1 hour on Community/.test(ttlSentence) && /24 hours on Pro/.test(ttlSentence) && /7 days on Enterprise/.test(ttlSentence),
   ttlSentence);
 ok('the chooser says the file is wiped after the first download',
   /wiped after the first download/.test(ttlSentence), ttlSentence);
@@ -128,7 +128,7 @@ ok('the chooser says the file is wiped after the first download',
 // chooser explains the rule by quoting it.
 const markup = fs.readFileSync(path.join(ROOT, 'parashare.html'), 'utf8').replace(/<!--[\s\S]*?-->/g, ' ');
 ok('no per-plan link lifetime is hardcoded in the chooser markup',
-  !/on Community/.test(markup) && !/on Pro/.test(markup) && !/on Business/.test(markup),
+  !/on Community/.test(markup) && !/on Pro/.test(markup) && !/on Enterprise/.test(markup),
   'the times must come from tiers.js through the plan API, never from the page');
 
 await sender.locator('#ps-mode-link').click();

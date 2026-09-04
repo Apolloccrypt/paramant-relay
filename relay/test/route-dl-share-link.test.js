@@ -184,6 +184,6 @@ test('the plan API serves the per-plan link lifetimes the chooser prints', async
   // sentence should say fails here and not in front of a buyer.
   assert.equal(r.json.link_ttl_ms_by_plan.community, 3_600_000, 'the chooser says "1 hour on Community"');
   assert.equal(r.json.link_ttl_ms_by_plan.pro, 86_400_000, 'the chooser says "24 hours on Pro"');
-  assert.equal(r.json.link_ttl_ms_by_plan.business, 604_800_000, 'the chooser says "7 days on Business"');
+  assert.equal(r.json.link_ttl_ms_by_plan.enterprise, 604_800_000, 'the chooser says "7 days on Enterprise"');
   dlDid();
 });
