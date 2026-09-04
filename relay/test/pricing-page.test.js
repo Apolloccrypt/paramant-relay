@@ -93,8 +93,8 @@ const PARASIGN_COPY = [
   // FIRM - EUR 29/month, both products in one payment
   '&euro;29<',
   '>Firm<',
-  '100 signatures a month, then &euro;0.40 each, up to 1,000',
-  'Past 1,000 a month, Business is cheaper anyway',
+  '100 signatures a month; after that signing waits for the new month',
+  'Need more than 100 a month? Business includes 1,000',
   '500 transfers a month, 24 hour link expiry',
   'API access',
   'Annual: &euro;290 excl. &middot; 16.7% off',
@@ -246,7 +246,7 @@ function showsAmountOnCard(pageHtml, amount, interval) {
 // to one page without the other turns this suite red instead of leaving two
 // prices on the site.
 const parasignHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'parasign.html'), 'utf8');
-for (const s of ['2 signatures a month', '100 signatures a month, then &euro;0.40 each, up to 1,000', '1,000 signatures a month']) {
+for (const s of ['2 signatures a month', '100 signatures a month; after that signing waits for the new month', '1,000 signatures a month']) {
   assert(parasignHtml.includes(s), 'parasign.html lost the quota line: ' + s);
 }
 assert(/excl\. btw/.test(parasignHtml) && /incl\. 21% btw/.test(parasignHtml), 'parasign.html must state excl. btw and the incl. 21% btw checkout amount');
@@ -323,9 +323,10 @@ const VAT = 1.21;
 const centsOf = (n) => Math.round(n * 100);
 const money = new Map(); // euros -> label, everything the page is allowed to print
 money.set(0, 'free tier');
-// Per-signature overage. Metered on top of a plan, never a checkout amount, so
-// it is not in the catalog; listed here so the sweep below stays exhaustive.
-money.set(0.4, 'ParaSign overage per signature');
+// Nothing else. Every amount the site prints is now a checkout amount out of
+// the catalog. EUR 0.40 stood here as the metered per-signature rate, the one
+// figure on the page that was not a catalog price; it was also the one figure
+// nothing ever charged, so it is off the page and out of this map.
 
 // Only what the page is SELLING. The plans Firm replaced are still priced in
 // the catalog for the customers who hold them, and requiring their amounts here
@@ -455,21 +456,10 @@ for (const raw of cards) {
     allowed.add(Math.round(excl).toLocaleString('en-US'));
   }
 
-  // The per-signature overage rate is a real amount on this card and it does not
-  // come from the subscription catalog; it hangs off the tier itself. Read it
-  // from there rather than allowing any stray number through, so a wrong overage
-  // rate is still caught.
-  // A bundle card may print the overage of every product it grants, so the rate
-  // is read off the grants and not off the sold key, which is not a product.
-  for (const g of catalog.grantsOf(product, plan) || []) {
-    const acct = g.product === 'parasign' ? { plan_parasign: g.tier } : { plan_parasend: g.tier };
-    const ent = entitlements.getEntitlements(acct)[g.product];
-    const rate = ent && ent.overage && ent.overage.rate_eur;
-    if (rate != null) {
-      allowed.add(Number(rate).toFixed(2));
-      allowed.add(String(Number(rate)));
-    }
-  }
+  // No per-tier amounts are added on top any more. A tier card used to be able
+  // to print one figure the catalog does not hold, the metered per-signature
+  // rate off the entitlement; no tier meters, so a card that prints an amount
+  // the catalog cannot resolve is simply wrong.
 
   for (let m; (m = cardMoney.exec(card)); ) {
     const raw = m[1].replace(/,/g, '');
@@ -716,9 +706,9 @@ for (const line of ['Email notifications via Resend']) {
 }
 ok('the ParaSend Pro feature bullets quoted from /pricing are still quotes');
 
-// The signature quota lines stay pinned to the words /pricing uses: those three
-// are billing copy (the overage rate and the hard cap), not a tiers.js row.
-for (const line of ['2 signatures a month', '100 signatures a month, then &euro;0.40 each, up to 1,000', '1,000 signatures a month']) {
+// The signature quota lines stay pinned to the words /pricing uses: they are
+// billing copy, not a tiers.js row.
+for (const line of ['2 signatures a month', '100 signatures a month; after that signing waits for the new month', '1,000 signatures a month']) {
   assert(productHtml.parasign.includes(line), 'parasign.html lost the quota line: ' + line);
 }
 assert(tiers.tierLimit('community', 'signs_month') === 2,

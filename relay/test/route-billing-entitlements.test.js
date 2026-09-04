@@ -381,23 +381,26 @@ test('the four plan ids map to the tiers and quotas the pricing rests on', async
   did();
 });
 
-test('only ParaSign Pro meters overage, and only Business+ may export the audit trail', async () => {
+test('no tier meters past its quota, and only Business+ may export the audit trail', async () => {
   const srv = await withUsers('perks', [
     { key: 'pgp_o_pro', plan: 'pro', active: true, parasign: true, account_id: 'acct_o_pro', email: 'op@example.test' },
     { key: 'pgp_o_bus', plan: 'business', active: true, parasign: true, account_id: 'acct_o_bus', email: 'ob@example.test' },
     { key: 'pgp_o_com', plan: 'community', active: true, account_id: 'acct_o_com', email: 'oc@example.test' },
   ]);
+  // Pro was the metering tier: EUR 0.40 a signature past 100, up to 1000. It is
+  // served to the frontend from here, so the entitlement a client reads may not
+  // carry a rate that nothing in billing collects.
   const pro = (await entitlementsOf(srv, 'acct_o_pro')).json.entitlements.parasign;
-  assert.strictEqual(pro.overage.rate_eur, 0.4, 'ParaSign Pro is the metering tier');
-  assert.strictEqual(pro.overage.hard_cap, 1000);
+  assert.strictEqual(pro.overage, undefined, 'ParaSign Pro no longer meters');
+  assert.strictEqual(pro.quotas.signs_month, 100, 'and 100 is what it includes and where it stops');
 
   const bus = (await entitlementsOf(srv, 'acct_o_bus')).json.entitlements.parasign;
-  assert.strictEqual(bus.overage.rate_eur, null, 'Business buys its volume up front, it does not meter');
+  assert.strictEqual(bus.overage, undefined, 'Business buys its volume up front');
   assert.strictEqual(bus.features.audit_export, true);
   assert.strictEqual(pro.features.audit_export, false, 'audit export is a Business+ feature');
 
   const com = (await entitlementsOf(srv, 'acct_o_com')).json.entitlements.parasign;
-  assert.strictEqual(com.overage.rate_eur, null);
+  assert.strictEqual(com.overage, undefined);
   assert.strictEqual(com.features.audit_export, false);
   srv.stop();
   did();

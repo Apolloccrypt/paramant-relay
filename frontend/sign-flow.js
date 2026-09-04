@@ -3061,7 +3061,8 @@ function downloadBytes(bytes, name, mime) {
 }
 
 // Inline sign-quota notice on the done step (free: second signature used;
-// pro: overage running). The quota block is optional in the 200 response --
+// Firm: last included signature used). The quota block is optional in the 200
+// response --
 // an older backend sends none and nothing is shown (signNotice returns '').
 function renderSignQuotaNotice(quota) {
   const host = document.getElementById('step-done');

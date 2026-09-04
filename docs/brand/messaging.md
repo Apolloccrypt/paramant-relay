@@ -105,7 +105,8 @@ figure beside it, exactly as /pricing does it):
 - Firm. EUR 29/month excl. btw (EUR 35.09 incl.). Annual EUR 290/year excl. btw
   (EUR 350.90 incl.), 16.7% off. One plan and one payment for both products: it
   grants the ParaSign Pro and ParaSend Pro limits together. On ParaSign, 100
-  signatures a month, then EUR 0.40 each up to 1,000, plus API access. On
+  signatures a month and no metered extras: when the 100 are used, signing waits
+  for the new month or for a bigger plan. Plus API access. On
   ParaSend, 500 transfers a month, 24 hour expiry, up to 10 reads, up to 50
   registered devices, send history, webhooks, no IP rate limit. The two Pro
   plans it replaced are off sale.
