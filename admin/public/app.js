@@ -433,7 +433,17 @@ async function loadBilling(){
   const dist=d.plan_distribution||{};
   const total=Object.values(dist).reduce((a,b)=>a+b,0)||1;
   el.innerHTML=
-    '<div class="banner stub" role="status"><strong>Beta billing</strong> &mdash; Payment processing (Mollie) is in integration. Customers are manually invoiced. Data shown is stub only.'+'</div>'+
+    /* This line used to announce a billing beta: Mollie not yet connected,
+       customers invoiced by hand, figures made up. Every clause of that was
+       false by September 2026. relay.js POST
+       /v2/billing/checkout calls mollie.createPayment against api.mollie.com
+       unconditionally, and the webhook issues a numbered invoice (lib/invoice.js,
+       series PS-YYYY-NNNN) or a credit note (lib/credit-note.js, CN-YYYY-NNNN)
+       on its own. BILLING_MODE is empty in production, which turns the recurring
+       layer off and nothing else: payments are real, they are one-off per term.
+       What IS worth saying is the limit of this tab, because the card below it
+       counts admin plan_changed audit events and never a self-serve payment. */
+    '<div class="banner info" role="status"><strong>Billing</strong> Mollie payments are live: one payment per term, no subscription and no direct debit. A numbered invoice or credit note is issued automatically from the payment webhook. This tab shows plan distribution and admin plan changes, not payments or revenue.</div>'+
       '<div class="card"><div class="card-hdr">Recent plan changes <small>'+( d.recent_checkouts?.length||0)+' events</small></div>'+
         (d.recent_checkouts&&d.recent_checkouts.length?
           '<table class="tbl"><thead><tr><th>Time</th><th>User</th><th>Event</th></tr></thead><tbody>'+
@@ -444,7 +454,134 @@ async function loadBilling(){
           '</tr>').join('')+'</tbody></table>':
           '<div class="empty">No plan changes recorded yet</div>')+
       '</div>'+
+      renderCouponsShell()+
     '</div>';
+  fetchCoupons();
+}
+
+/* ── Gift codes ────────────────────────────────────────
+   A code gives somebody a term, and no money moves: relay/lib/coupon.js holds
+   the rules, /admin/coupons in admin/server.js is the hop that carries this
+   panel's X-Session to the relay, and this is the window on both. Two things
+   belong on the screen and nothing else does: how to make a code, and how many
+   seats of each one are gone.
+
+   There is deliberately no edit. Raising the cap on a code people are already
+   redeeming against, or changing what it grants under them, is how two
+   customers get different answers for the same code. Withdraw it and make
+   another; the terms already granted are never taken back. */
+
+// The relay answers in machine words. Nobody minting a code should have to
+// know what bad_valid_until means, so every one of them is said in a sentence
+// that names the field and what to do about it.
+const COUPON_ERRORS={
+  code_exists:'That code already exists. Withdraw the old one, or pick another name.',
+  bad_code:'A code is 3 to 32 characters long: letters, digits and dashes only.',
+  bad_valid_until:'That end date is not a date. Pick one from the calendar, or leave it empty for no end date.',
+  bad_max_redemptions:'Maximum redemptions must be a whole number between 1 and 100000.',
+  bad_days:'Days must be a whole number between 1 and 3650.',
+  unknown_code:'That code no longer exists.',
+  coupons_unavailable:'The coupon store is not reachable, so nothing was changed. Try again in a moment.',
+  no_redis:'The coupon store is not reachable, so nothing was changed. Try again in a moment.',
+  rate_limited:'Too many coupon changes in a row. Wait a minute and try again.',
+};
+function couponError(r){
+  const err=(r&&r.data&&r.data.error)||'';
+  if(COUPON_ERRORS[err])return COUPON_ERRORS[err];
+  if(!r||r.status===0)return 'The relay could not be reached, so nothing was changed.';
+  if(r.status===502||r.status===503||r.status===504)return 'The relay could not be reached, so nothing was changed.';
+  if(r.status===401||r.status===403)return 'Your admin session has expired. Sign in again.';
+  return err?('Failed: '+err):'Something went wrong, and nothing was changed.';
+}
+
+// api() lets a network failure throw. Everywhere else on this screen that ends
+// in an unhandled rejection and a tab that just stops; here it has to become
+// the sentence above, so the throw is caught and given a status of its own.
+async function couponApi(path,opts){
+  try{return await api(path,opts||{});}catch{return{ok:false,status:0,data:null};}
+}
+
+function couponMsg(text,ok){
+  const msg=document.getElementById('c-msg');
+  if(!msg)return;
+  msg.style.color=ok?'#059669':'#dc2626';
+  msg.textContent=text;
+}
+
+function renderCouponsShell(){
+  return '<div class="card"><div class="card-hdr">Gift codes <small>a term given, no payment, no invoice</small></div>'+
+    '<div class="fb">'+
+      '<input id="c-code" placeholder="CODE" style="width:160px;text-transform:uppercase" aria-label="Code">'+
+      '<input id="c-max" type="number" min="1" value="100" style="width:110px" title="Maximum redemptions" aria-label="Maximum redemptions">'+
+      '<input id="c-days" type="number" min="1" value="90" style="width:90px" title="Days granted" aria-label="Days granted">'+
+      '<input id="c-until" type="date" style="width:160px" title="Valid until" aria-label="Valid until">'+
+      '<div class="sp"></div>'+
+      '<button class="btn" data-click="doCreateCoupon">Create code</button>'+
+      '<button class="btn out" data-click="fetchCoupons">Refresh</button>'+
+    '</div>'+
+    '<div id="c-msg" role="status" style="font-size:12px;margin-bottom:8px"></div>'+
+    '<div id="c-results"><div class="empty"><span class="sp-icon"></span>Loading…</div></div>'+
+  '</div>';
+}
+
+async function fetchCoupons(){
+  const el=document.getElementById('c-results');
+  if(!el)return;
+  const r=await couponApi('/admin/coupons');
+  if(!r.ok){el.innerHTML='<div class="empty">'+esc(couponError(r))+'</div>';return}
+  const list=(r.data&&r.data.coupons)||[];
+  if(!list.length){el.innerHTML='<div class="empty">No gift codes yet</div>';return}
+  el.innerHTML='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Code</th><th>Gives</th><th>Used</th><th>Valid until</th><th>Status</th><th></th></tr></thead><tbody>'+
+    list.map(c=>'<tr>'+
+      '<td class="mono">'+esc(c.code)+'</td>'+
+      '<td style="font-size:12px">'+esc(c.describes||'')+'</td>'+
+      '<td class="mono">'+esc(c.used+' of '+c.max_redemptions)+'</td>'+
+      '<td style="font-size:12px">'+esc(c.valid_until?c.valid_until.slice(0,10):'no end date')+'</td>'+
+      '<td>'+(c.revoked_at?'<span class="chip revoked">withdrawn</span>':(c.remaining>0?'<span class="chip active">open</span>':'<span class="chip none">used up</span>'))+'</td>'+
+      '<td>'+(c.revoked_at?'':'<button class="btn out" data-click="doRevokeCoupon" data-code="'+esc(c.code)+'">Withdraw</button>')+'</td>'+
+    '</tr>').join('')+'</tbody></table></div>';
+}
+
+async function doCreateCoupon(){
+  const code=(document.getElementById('c-code')?.value||'').trim().toUpperCase();
+  const max=parseInt(document.getElementById('c-max')?.value||'0',10);
+  const days=parseInt(document.getElementById('c-days')?.value||'0',10);
+  const until=(document.getElementById('c-until')?.value||'').trim();
+  if(!code){couponMsg('Enter a code first.',false);return}
+  if(!/^[A-Z0-9-]{3,32}$/.test(code)){couponMsg(COUPON_ERRORS.bad_code,false);return}
+  if(!(max>=1)){couponMsg(COUPON_ERRORS.bad_max_redemptions,false);return}
+  if(!(days>=1)){couponMsg(COUPON_ERRORS.bad_days,false);return}
+  // An empty date means no end date. A date that is not a date is refused here
+  // rather than read as one, the same rule coupon.js validateValidUntil follows.
+  if(until&&Number.isNaN(Date.parse(until+'T23:59:59Z'))){couponMsg(COUPON_ERRORS.bad_valid_until,false);return}
+  /* Both products on Pro is the campaign this shipped for. The relay validates
+     every field again; nothing sent from here is trusted. */
+  const body={code:code,max_redemptions:max,grants:[
+    {product:'parasign',tier:'pro',days:days},
+    {product:'parasend',tier:'pro',days:days},
+  ]};
+  if(until)body.valid_until=until+'T23:59:59Z';
+  couponMsg('Creating…',true);
+  const r=await couponApi('/admin/coupons',{method:'POST',body:JSON.stringify(body)});
+  if(r.ok){
+    couponMsg('Created '+code+': '+((r.data&&r.data.coupon&&r.data.coupon.describes)||'')+', '+max+' redemptions.',true);
+    const inp=document.getElementById('c-code');if(inp)inp.value='';
+    fetchCoupons();
+  }else{
+    couponMsg(couponError(r),false);
+  }
+}
+
+async function doRevokeCoupon(el){
+  const code=el&&el.dataset?el.dataset.code:'';
+  if(!code)return;
+  const r=await couponApi('/admin/coupons/'+encodeURIComponent(code),{method:'DELETE'});
+  if(r.ok){
+    couponMsg(code+' withdrawn. Terms already redeemed keep running.',true);
+    fetchCoupons();
+  }else{
+    couponMsg(couponError(r),false);
+  }
 }
 
 /* ── Relay ───────────────────────────────────────────────────────────────── */
@@ -744,6 +881,9 @@ act('click', 'doCreateKey', () => doCreateKey());
 act('click', 'showNewKeyModal', () => showNewKeyModal());
 act('click', 'exportAuditCSV', () => exportAuditCSV());
 act('click', 'fetchAudit', () => fetchAudit());
+act('click', 'doCreateCoupon', () => doCreateCoupon());
+act('click', 'doRevokeCoupon', (el) => doRevokeCoupon(el));
+act('click', 'fetchCoupons', () => fetchCoupons());
 act('click', 'fetchRelay', () => fetchRelay());
 act('click', 'uAction', (el) => uAction(el.dataset.uact, el));
 act('click', 'toggleMenu', (el, ev) => toggleMenu(ev, el.dataset.menu));
