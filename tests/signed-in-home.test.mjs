@@ -101,8 +101,12 @@ const inboxWaiting = { ok:true, count:2, documents:[
 ]};
 const inboxNone = { ok:true, count:0, documents:[] };
 
-const overviewCommunity = { plan:'community', quota:{ transfers:1, signs:0, caps:{ transfers:10, signs:2 } }, audit:[] };
-const overviewPro       = { plan:'pro', quota:{ transfers:12, signs:3, caps:{ transfers:500, signs:100 } }, audit:[] };
+// The overview names a tier per product, not one plan word: the caps come from
+// the relay's entitlement layer, where ParaSign Pro and ParaSend Community can
+// sit on the same account. That is why overviewPro pairs 100 signatures with
+// the community transfer ceiling the ParaSign grant leaves alone.
+const overviewCommunity = { tiers:{ parasend:'community', parasign:'free' }, quota:{ transfers:1, signs:0, caps:{ transfers:10, signs:2 } }, audit:[] };
+const overviewPro       = { tiers:{ parasend:'community', parasign:'pro' }, quota:{ transfers:12, signs:3, caps:{ transfers:10, signs:100 } }, audit:[] };
 
 const PRO_ENDS = inDays(29);
 const billingCommunity = { current_plan:'community', plan_parasign:'free', plan_parasend:'community', paid_until_parasign:null, paid_until_parasend:null, auto_renews:false, access_until:null };

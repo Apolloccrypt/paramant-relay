@@ -102,7 +102,7 @@ cd ..
 # root integration suites, no browser. CI installs the root deps first, and so
 # must you: tests/heartbeat-lib.test.mjs imports @noble/post-quantum.
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci
-node --test $(grep -L "from 'playwright'" tests/*.mjs)
+node --test $(node scripts/browser-suites.mjs --no-browser)
 
 # the static gates
 tests/static-sanity.sh

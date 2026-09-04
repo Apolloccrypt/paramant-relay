@@ -68,9 +68,26 @@ Moving the file changes nothing about the workflow's selection line. The real
 browser suites it selects are the same sixteen minus this one:
 
 ```bash
-# What the sign-e2e Browser suites step runs, before and after:
-grep -l "from 'playwright'" tests/*.mjs | grep -vE 'sign-full|product-heartbeat'
+# What the sign-e2e Browser suites step runs:
+node scripts/browser-suites.mjs --browser | grep -vE 'sign-full|product-heartbeat'
 ```
+
+### Which half a suite belongs to is decided by the import graph
+
+That selection line used to be `grep -l "from 'playwright'" tests/*.mjs`, which
+reads the test file and nothing it imports. `tests/ui-elements-contrast.test.mjs`
+imports `scripts/ui-contrast-sweep.mjs`, and the sweep is what imports
+playwright, so the grep called it a no-browser suite. On 2026-09-04 that sent it
+to the `Root integration suites (no browser)` job in test.yml, which installs no
+Chromium on purpose. `chromium.launch()` rejected, the sweep's static server was
+already listening and nothing closed it, and `node --test` waited for an event
+loop that would never drain: three runs on main and a pull request hung in that
+step for hours instead of failing in seconds. The suite also ran in no browser
+job at all, so the only new gate of that pull request was measuring nothing.
+
+`scripts/browser-suites.mjs` answers the same question by walking the relative
+imports from each suite as deep as they go. A helper that grows a browser
+dependency takes its suites with it on the next run, with no list to keep.
 
 The rule this leaves behind: a file under `tests/` is a gate and asserts
 something. A file that only produces artefacts belongs in `scripts/`, whether or

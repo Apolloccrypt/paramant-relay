@@ -31,7 +31,7 @@ let createBody = null;
 let revokeBody = null;
 let toolsRequests = 0;
 await page.route('**/api/user/developer/snapshot', (route) => route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({
-  email:'developer@example.com', plan:'pro', quota:{ signs:18, transfers:400, caps:{ signs:100, transfers:500 } },
+  email:'developer@example.com', tiers:{ parasend:'pro', parasign:'pro' }, quota:{ signs:18, transfers:400, caps:{ signs:100, transfers:500 } },
   audit:[{ event_type:'envelope_created', ts:Date.now() }, { event_type:'transfer_sent', ts:Date.now() - 1000 }],
 }) }));
 await page.route('**/api/user/developer/tools', (route) => { toolsRequests++; return route.fulfill({ status:500, body:'' }); });
