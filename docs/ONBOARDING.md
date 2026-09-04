@@ -196,7 +196,7 @@ verifications. Every request past the failure threshold also has to carry a real
 **Root integration suites** (node builtins plus the root deps, no browser):
 
 ```bash
-node --test $(grep -L "from 'playwright'" tests/*.mjs)
+node --test $(node scripts/browser-suites.mjs --no-browser)
 #   # tests 190   # pass 188   # skipped 2   # fail 0    ~1.2s
 ```
 
@@ -259,7 +259,7 @@ npx playwright install chromium
 node tests/sign-full.test.mjs
 #   33/33 passed                          ~4s
 
-node --test $(grep -l "from 'playwright'" tests/*.mjs | grep -vE 'sign-full|product-heartbeat')
+node --test $(node scripts/browser-suites.mjs --browser | grep -vE 'sign-full|product-heartbeat')
 #   # tests 12   # pass 12   # fail 0     ~7s
 ```
 

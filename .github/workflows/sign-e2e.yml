@@ -46,5 +46,13 @@ jobs:
       # exception. The rule: tests/ is for files that assert something, and a
       # file that only produces artefacts goes in scripts/, browser or not.
       # Same move as the heartbeat canaries in test.yml. See tests/README.md.
+      #
+      # Selected by scripts/browser-suites.mjs, which walks the imports instead
+      # of grepping the first lines of the test file. A suite that reaches
+      # playwright through a helper is a browser suite too, and until 2026-09-04
+      # it was in neither half: tests/ui-elements-contrast.test.mjs got its
+      # browser from scripts/ui-contrast-sweep.mjs, so the grep left it out of
+      # this step and handed it to the job that installs no Chromium, where it
+      # hung the run rather than failing it.
       - name: Browser suites
-        run: node --test $(grep -l "from 'playwright'" tests/*.mjs | grep -vE 'sign-full|product-heartbeat')
+        run: node --test $(node scripts/browser-suites.mjs --browser | grep -vE 'sign-full|product-heartbeat')
