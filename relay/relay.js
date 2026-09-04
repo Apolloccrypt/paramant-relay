@@ -150,6 +150,7 @@ const billingExport    = require('./lib/billing-export');     // period export o
 const zipStore         = require('./lib/zip-store');          // store-only zip writer, no dependency
 const moneybird        = require('./lib/moneybird');          // optional Moneybird push (external sales invoices)
 const planExpiry       = require('./lib/plan-expiry');      // paid-term warning + expiry mail (in-process planner)
+const partyBackfill    = require('./lib/parasign-party-backfill'); // one-shot fill of the party worklist index
 
 // Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
 // setting PARAMANT_WIRE_VERSION=1 activates the self-describing v1 header
@@ -1420,6 +1421,23 @@ function apiKeyFromHash(hash) {
 // keys built from acctOf(apiKey) are byte-identical to the old apiKey-scoped
 // ones — behaviour-neutral now, account-shared once a second key is added.
 function acctOf(apiKey) { const v = apiKeys.get(apiKey); return (v && v.account_id) || apiKey; }
+// How an account is named to somebody it sent a signing request to. The address
+// on the account, because that is exactly what the invitation mail already put
+// in front of this reader: admin/server.js sends signingInviteEmail with
+// senderLabel = the sender's session address. Showing the same string back on
+// the worklist tells the recipient nothing new and lets them match the row to
+// the mail. Precedence is the one _indexAccountExpiry() uses: a member key's
+// address first, the account summary second.
+//
+// Returns '' when the account cannot be named. The caller then says so rather
+// than dropping a document somebody is waiting on: an unnamed sender is a worse
+// row, an invisible request is a worse product.
+function senderLabelOf(accountId) {
+  if (!accountId) return '';
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  for (const m of members) { const mv = apiKeys.get(m); if (mv && mv.email) return mv.email; }
+  return (accounts.get(accountId) || {}).email || '';
+}
 // Resolve the record an ENTITLEMENT decision must read. The accounts map is a
 // summary ({account_id, plan, email, primary_api_key, label}) and never carries
 // the per-product plans: setProductPlan writes plan_parasign/plan_parasend onto
@@ -3722,6 +3740,56 @@ async function handleRelayRequest(req, res) {
     }
   }
 
+  // ── POST /v2/parasign/inbox/:id/resend: send me that invitation again ──────
+  // Internal auth plus an asserted verified email hash, the same pair the
+  // recipient-side document and participant-receipt reads take. It is NOT in
+  // any session-token scope: it reads the stored per-party invite token back so
+  // the admin can put it in a mail, and a route that can produce a capability
+  // must never be reachable from a browser.
+  //
+  // IT MINTS NOTHING. getPartyInvite() returns the token create() wrote. A fresh
+  // capability would keep an invite alive past its window and orphan the link
+  // already in the party's mailbox; the seven-day window runs from created_at
+  // and is untouched, so the resent link dies at the same moment as the first.
+  //
+  // The relay does not send mail and does not hold addresses, so it answers with
+  // the material and the admin does the sending, to the session address whose
+  // hash it just asserted. That address is the only one the mail can reach.
+  //
+  // It sits up here beside the other internal /v2/user routes rather than beside
+  // GET /v2/parasign/inbox further down, because the api-key gate stands between
+  // the two and this request carries no api-key: the admin authenticates as
+  // itself, not as the account.
+  const parasignResendMatch = path.match(/^\/v2\/parasign\/inbox\/([A-Za-z0-9_-]{20,64})\/resend$/);
+  if (parasignResendMatch && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'envelope_store_unavailable' })); }
+    const verifiedEmailHash = (req.headers['x-verified-email-hash'] || '').toString().trim().toLowerCase();
+    try {
+      const invite = await store.getPartyInvite(parasignResendMatch[1], verifiedEmailHash);
+      // One answer for "no such envelope", "not your envelope" and "not waiting
+      // on you any more". A caller who is not the party learns nothing, not even
+      // that the id exists.
+      if (!invite) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' });
+      return res.end(J({
+        ok: true,
+        party_index: invite.party_index,
+        party_label: invite.party_label,
+        invite_token: invite.invite_token,
+        document: invite.document,
+        sender: senderLabelOf(invite.sender_account_id),
+        sent_at: invite.sent_at,
+        signing_closes_at: invite.signing_closes_at,
+      }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      console.error('[parasign/inbox resend]', err.message);
+      res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'internal' }));
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // Account-bound signing identity (ML-DSA-65 public-key enrollment)
   // ═══════════════════════════════════════════════════════════════════════
@@ -5811,6 +5879,53 @@ async function handleRelayRequest(req, res) {
     });
   }
 
+  // ── GET /v2/parasign/inbox: what is waiting for THIS account's signature ─────
+  // The mirror of the worklist behind POST /v2/user/envelopes. That one lists
+  // what the account SENT, off the per-account index; this one lists what was
+  // sent TO it, off the per-party index in envelope.js. Until it existed a
+  // signed-in recipient could not learn a signing request existed at all: the
+  // only handle on an envelope was the per-party invite token in the mail, and
+  // losing the mail meant losing the document.
+  //
+  // THE ADDRESS IS DERIVED HERE, NEVER SUPPLIED. The account is already
+  // authenticated (api-key, or an app-purpose session token resolved to the
+  // same key, above), and its registered address is on the key record. Hashing
+  // that with the canonical partyEmailHash is the whole authorisation: an
+  // account can only ever be handed the worklist of the address it signed in
+  // with. Accepting a hash from a header instead would have made this route a
+  // way to read anybody's worklist, which is why the trusted-header pattern the
+  // /v2/envelopes/:id/document route uses is deliberately NOT copied here.
+  //
+  // WHAT IT WILL NOT SAY. No invite token, no document hash, no capsule, no
+  // envelope-wide party list. The answer is knowing-THAT a document waits, from
+  // whom, since when and until when. Opening it still takes the link in the
+  // mail, so this route cannot become a second way in.
+  if (path === '/v2/parasign/inbox' && req.method === 'GET') {
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'envelope_store_unavailable' })); }
+    const acct = acctOf(apiKey);
+    // The address on the key, falling back to the account summary. Same
+    // precedence _indexAccountExpiry() uses for the address it mails.
+    const selfEmail = (keyData && keyData.email) || (accounts.get(acct) || {}).email || '';
+    const selfHash = envelopeMod.partyEmailHash(selfEmail);
+    // An account with no address on record is a party to nothing: the hash of
+    // an empty string is not a party hash, so answering empty is the truth.
+    if (!selfHash) {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: true, documents: [], count: 0 }));
+    }
+    const limit = Math.max(1, Math.min(parseInt((Array.isArray(query.limit) ? query.limit[0] : query.limit) || '50', 10) || 50, 200));
+    try {
+      const documents = await store.listPartyEnvelopes(selfHash, { limit, resolveSender: senderLabelOf });
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: true, documents, count: documents.length }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      console.error('[parasign/inbox]', err.message);
+      res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'internal' }));
+    }
+  }
+
   // ── POST /v2/did/register ────────────────────────────────────────────────────
   if (path === '/v2/did/register' && req.method === 'POST') {
     try {
@@ -7865,6 +7980,23 @@ planExpiry.startPlanExpiryPlanner({
   log,
   siteUrl: process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL,
   seed: () => planExpiry.seedIndex(redisClient, accountsWithTerms()),
+});
+
+// ── The party worklist migration ─────────────────────────────────────────────
+// One run, ever, across the estate: fill the per-party envelope index for the
+// envelopes created before that index existed. Same shape as the two planners
+// around it (nothing in process memory, a SET NX lock so one of five containers
+// does the scan), with one difference: it is a migration and not a sweep, so a
+// finished run writes a redis marker and no later boot scans anything.
+partyBackfill.startPartyIndexBackfill({
+  redis: redisClient,
+  // Its own store, not the request-scoped one. The migration reads envelope
+  // hashes and writes index members: no signature is verified and no CT entry
+  // is appended, so it needs neither engine, and a boot job that reached into a
+  // request closure for a dependency would be a boot job that only runs once a
+  // request has already happened.
+  store: redisClient ? new envelopeMod.EnvelopeStore(redisClient) : null,
+  log,
 });
 
 // ── Moneybird retries ────────────────────────────────────────────────────────

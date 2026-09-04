@@ -9,6 +9,43 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **A signed-in account can see what is waiting for its own signature.** Until
+  now a signing request was reachable only through the per-party invite token in
+  its invitation email: `relay/envelope.js` indexed an envelope under its
+  creator and nowhere else, so the signed-in homepage and `/dashboard` could
+  show an account its outbox and nothing more, and a recipient who lost the mail
+  had lost the document. `create()` now also writes a per-party index
+  (`parasign:party:<party-email-hash>:envelopes`, a sorted set keyed on the same
+  namespaced sha3-256 the envelope record already stores, never on the address),
+  and a slot leaves it the moment it is signed or the envelope is completed or
+  withdrawn. Envelopes made before the index existed are filled in by a one-shot
+  migration at boot, under a redis `SET NX PX` lock so one of the five relay
+  containers does the scan, with a redis marker so no later restart repeats it;
+  it adds only slots that are still waiting, so a second run cannot resurrect a
+  row that signing removed. `GET /v2/parasign/inbox` answers with a document
+  name, who sent it, when it went out and when signing closes, and deliberately
+  with no invite token, no document hash and no capsule: the worklist is
+  knowing-that, and opening a document still takes the link in the mail. The
+  address it answers for is derived by the relay from the authenticated key and
+  is never read off a request header. The route is the fourth entry in the app
+  session-token allowlist; `SECURITY.md` carries the table and the reason.
+  `POST /v2/parasign/inbox/<id>/resend` is in no token scope at all, because it
+  reads the stored invite token back so the admin can mail the invitation again:
+  it is internal auth plus an asserted verified email hash, it mints nothing (the
+  seven-day signing window still runs from `created_at`, so a resent link dies
+  with the first one), it can only mail the address of the session that asked,
+  and it is capped at one per document per hour. The resent mail is the same
+  invitation template and says the one thing that differs: the sender's
+  encrypted copy of the document is unlocked by a key that lives in the URL
+  fragment, which no server ever received, so a server-built resend carries the
+  signing link and not that key. The signed-in homepage leads on the new number
+  ("2 documents are waiting for your signature"), with a "Waiting for your
+  signature" card above "Waiting on a signature" and a "Send me the link again"
+  button on each row; `/dashboard` gets the same section above its own requests,
+  and the box that used to tell a reader to go and look in his email now points
+  at the list.
+
 ### Fixed
 - **The public CT log listing numbers its entries by position again.** On the
   live log at `/v2/ct/log` five entries reported the indices 4 to 8 a second

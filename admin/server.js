@@ -2578,7 +2578,7 @@ api.post("/user/parasend/token", authUser, (req, res) =>
 // no scope into any tab that visited them.
 //
 // A DIFFERENT token from the ParaSend one, not a wider one. The relay judges an
-// `app` token against APP_SCOPE (checkout, history, audit-export) and a
+// `app` token against APP_SCOPE (checkout, history, audit-export, inbox) and a
 // `parasend` token against SCOPE (the five transfer routes); neither list
 // contains the other, so this route gives /pricing and /dashboard what they
 // need without giving /parashare anything it did not already have.
@@ -2675,6 +2675,105 @@ api.get("/user/documents/:id/receipt", authUser, async (req, res) => {
     console.error("[user/documents receipt]", err.message);
     return res.status(502).json({ error: "relay_unreachable" });
   }
+});
+
+// ── The other side of the worklist: what is waiting for THIS account ─────────
+// /api/user/documents lists what the account SENT. These two list what was sent
+// TO it and let the reader get the invitation mail again, which until now was
+// the one thing a recipient who lost that mail could not do: the only handle on
+// an envelope was the per-party invite token inside it.
+//
+// GET /api/user/parasign/inbox: the account's own key goes to the relay, and the
+// relay derives the address from that key. The browser names nobody. The answer
+// carries a document name, who sent it, when it went out and when signing
+// closes, and never an invite token or a document hash.
+api.get("/user/parasign/inbox", authUser, async (req, res) => {
+  try {
+    const rr = await fetch(`${SECTORS.health}/v2/parasign/inbox?limit=50`, {
+      headers: { "X-Api-Key": proxyApiKey(req.userSession) },
+      signal: AbortSignal.timeout(10000),
+    });
+    const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    return res.status(rr.status).json(body);
+  } catch (err) {
+    console.error("[user/parasign/inbox]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// POST /api/user/parasign/inbox/:id/resend: send me that invitation again.
+//
+// The mail can only ever go to req.userSession.email. That is not a policy this
+// route enforces on top of something looser, it is the only address in play:
+// the relay is asked for the invite of the party whose email hash matches that
+// session address, so a caller who is not that party gets a 404 and there is no
+// second address for the mail to be sent to.
+//
+// NOTHING IS MINTED. The relay hands back the invite token it stored when the
+// envelope was created, and the seven-day signing window still runs from
+// created_at, so the resent link expires at the same moment as the first one and
+// the link already in the reader's mailbox keeps working.
+//
+// WHAT THE RESENT LINK CANNOT CARRY. The sender's encrypted copy of the document
+// is unlocked by a key that lives in the URL fragment. Browsers never send a
+// fragment, so no server ever held it: the first invitation was assembled in the
+// sender's browser. The resend therefore rebuilds the signing link and not that
+// key, and says so in the mail (documentIncluded: false).
+//
+// One per envelope per hour, per account. The bucket is keyed on the session
+// account and the envelope together, never on the envelope alone: an id the
+// caller gets to name must be able to cost that caller something, never to deny
+// somebody else their own resend.
+api.post("/user/parasign/inbox/:id/resend", authUser, async (req, res) => {
+  const id = (req.params.id || "").toString();
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return res.status(404).json({ error: "not_found" });
+  const { user_id, email } = req.userSession;          // identity from the session, never the client
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  if (!(await webauthn.rateHit(redis(), `resend:ip:${ip}`, 20, 3600))) return res.status(429).json({ error: "rate_limited" });
+  if (!(await webauthn.rateHit(redis(), `resend:env:${webauthn.scopeHash(user_id + ":" + id)}`, 1, 3600))) return res.status(429).json({ error: "rate_limited" });
+
+  let invite;
+  try {
+    const rr = await fetch(`${SECTORS.health}/v2/parasign/inbox/${encodeURIComponent(id)}/resend`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Auth": INTERNAL_TOKEN,
+        "X-Verified-Email-Hash": partyEmailHashAdmin(email),
+      },
+      body: JSON.stringify({}),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (rr.status === 404) return res.status(404).json({ error: "not_found" });
+    if (!rr.ok) return res.status(rr.status === 503 ? 503 : 502).json({ error: "resend_unavailable" });
+    invite = await rr.json();
+  } catch (err) {
+    console.error("[user/parasign/inbox resend]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+
+  // The signing link, rebuilt from the stored token. Same origin, same path and
+  // same parameters the sender's browser used, minus the fragment nobody has.
+  const inviteUrl = `${new URL(SITE_URL).origin}/co-sign?env=${encodeURIComponent(id)}&p=${encodeURIComponent(invite.party_index)}&t=${encodeURIComponent(invite.invite_token)}`;
+  try {
+    await emailTemplates.sendEmail(email, emailTemplates.signingInviteEmail({
+      inviteUrl,
+      recipientLabel: invite.party_label || "",
+      senderLabel: invite.sender || "",
+      documentName: invite.document,
+      expiresAt: invite.signing_closes_at,
+      envelopeId: id,
+      partyIndex: invite.party_index,
+      documentIncluded: false,
+    }));
+  } catch (err) {
+    console.error("[user/parasign/inbox resend mail]", err.message);
+    return res.status(502).json({ error: "email_delivery_failed" });
+  }
+  // The address is echoed so the page can say where it went, and it is the
+  // reader's own: it came out of their session, not out of the envelope.
+  return res.json({ ok: true, sent_to: email });
 });
 
 // ── Account-bound signing identity (proxies to relay /v2/user/signing-key) ──

@@ -223,6 +223,11 @@ jobs:
       # here and not in the unit job below because relay.js requires `redis` and
       # @paramant/core at load, and this is the job that installs both.
       #
+      # parasign-party-index rides along for the same reason: it drives a real
+      # EnvelopeStore against redis and the real ML-DSA-65 engine, so the unit
+      # job below could only ever skip it, and a skipped suite is what this gate
+      # exists to catch.
+      #
       # parasign-signs-quota rides along here because it needs the same redis and
       # nothing else. It was the LAST suite in the repo that asserted nothing in
       # any CI job: it ran only in the no-install unit job, where it has no redis
@@ -238,7 +243,7 @@ jobs:
           # --test-reporter=tap: see the unit job below. This gate parses the
           # same TAP diagnostic lines, and its expected set is empty too, so
           # the spec reporter would leave it green over anything.
-          node --test --test-reporter=tap test/route-*.test.js test/parasign-signs-quota.test.js 2>&1 | tee /tmp/relay-routes.log
+          node --test --test-reporter=tap test/route-*.test.js test/parasign-signs-quota.test.js test/parasign-party-index.test.js 2>&1 | tee /tmp/relay-routes.log
           # The same gate as the unit job below: a suite that runs and asserts
           # NOTHING still reports green, and that is how four ParaSign suites
           # came to mean nothing for weeks. This job has redis AND the engine,
@@ -329,7 +334,7 @@ jobs:
           # job exists to prevent, so the reporter is pinned rather than
           # inherited from whatever Node decides a default should be.
           node --test --test-reporter=tap $(ls test/*.test.js | grep -vE \
-            'inbound-hash-verify|deep-health-gate|billing-stance-boot|parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index|parasign-signs-quota|route-') \
+            'inbound-hash-verify|deep-health-gate|billing-stance-boot|parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index|parasign-party-index|parasign-signs-quota|route-') \
             2>&1 | tee /tmp/relay-units.log
           # Which suites ran and asserted nothing. The line comes from
           # summary() in test/_requires.js.

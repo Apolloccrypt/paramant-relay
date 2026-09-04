@@ -178,20 +178,27 @@ test('the per-device pubkey read is exactly one path segment deep', () => {
 // holds. If that ever stops being true, the honest thing is for these cases to
 // go red rather than for the send page to quietly gain a checkout.
 
-test('the app purpose opens exactly the three routes the signed-in pages need', () => {
+test('the app purpose opens exactly the four routes the signed-in pages need', () => {
   const open = [
     // /pricing: pressing a price button creates the Mollie payment.
     ['POST', '/v2/billing/checkout'],
     // /dashboard: the account's own history, and its own signing-audit export.
     ['GET', '/v2/user/history'],
     ['GET', '/v2/parasign/audit-export'],
+    // The homepage and /dashboard: what is waiting for this account's signature.
+    ['GET', '/v2/parasign/inbox'],
   ];
   for (const [method, path] of open) {
     assert.strictEqual(st.scopeAllows(method, path, 'app'), true,
       `${method} ${path} is what an app-purpose token exists for`);
   }
-  assert.strictEqual(st.APP_SCOPE.length, 3,
-    'the app allowlist grew; /privacy names three requests, so change the page with the code');
+  assert.strictEqual(st.APP_SCOPE.length, 4,
+    'the app allowlist grew; /privacy names four requests, so change the page with the code');
+  // The resend beside the inbox reads a stored invite token back so it can be
+  // mailed. A route that produces a capability must not be reachable from a
+  // browser, so it is behind internal auth and in NO token scope.
+  assert.strictEqual(st.scopeAllows('POST', '/v2/parasign/inbox/EnvelopeIdPlaceholder00/resend', 'app'), false,
+    'the resend hands back an invite token; no session token may reach it');
   did();
 });
 

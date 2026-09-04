@@ -47,9 +47,10 @@ Three credential types are in use across different API surfaces:
 >   (`POST /api/user/parasend/token`, used by `/parashare`) opens
 >   `/v2/check-key`, `POST /v2/ws-ticket`, `POST /v2/pubkey`,
 >   `GET /v2/pubkey/:device` and `POST /v2/inbound`. `app`
->   (`POST /api/user/app/token`, used by `/pricing` and `/dashboard`) opens
->   `POST /v2/billing/checkout`, `GET /v2/user/history` and
->   `GET /v2/parasign/audit-export`. The two lists are disjoint: neither purpose
+>   (`POST /api/user/app/token`, used by `/pricing`, `/dashboard` and the
+>   signed-in homepage) opens `POST /v2/billing/checkout`,
+>   `GET /v2/user/history`, `GET /v2/parasign/audit-export` and
+>   `GET /v2/parasign/inbox`. The two lists are disjoint: neither purpose
 >   can do the other's work. The purpose is fixed by the admin route, not by the
 >   caller, and an unknown one is refused at the mint with `400 unknown_purpose`.
 > - **Scope.** The allowlist is checked above every route handler. Any path not

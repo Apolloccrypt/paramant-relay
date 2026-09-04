@@ -89,6 +89,18 @@ const documentsDone = { ok:true, count:3, documents:[
 ]};
 const documentsNone = { ok:true, count:0, documents:[] };
 
+// The other side of the worklist: documents somebody else sent to this reader.
+// Shape copied from relay/envelope.js listPartyEnvelopes, which deliberately
+// carries no invite token and no document hash, so neither appears here either.
+const INBOX_FIRST = agoDays(4);
+const inboxWaiting = { ok:true, count:2, documents:[
+  { id:'AbCdEfGhIjKlMnOpQrStUvWx', document:'Shareholder agreement.pdf', sender:'notary@example.com',
+    sent_at:INBOX_FIRST, signing_closes_at:inDays(3), status:'sent', party_count:2, signed_count:1 },
+  { id:'ZyXwVuTsRqPoNmLkJiHgFeDc', document:'Supplier terms 2026.pdf', sender:'purchasing@example.com',
+    sent_at:agoDays(1), signing_closes_at:inDays(6), status:'sent', party_count:3, signed_count:0 },
+]};
+const inboxNone = { ok:true, count:0, documents:[] };
+
 const overviewCommunity = { plan:'community', quota:{ transfers:1, signs:0, caps:{ transfers:10, signs:2 } }, audit:[] };
 const overviewPro       = { plan:'pro', quota:{ transfers:12, signs:3, caps:{ transfers:500, signs:100 } }, audit:[] };
 
@@ -96,18 +108,32 @@ const PRO_ENDS = inDays(29);
 const billingCommunity = { current_plan:'community', plan_parasign:'free', plan_parasend:'community', paid_until_parasign:null, paid_until_parasend:null, auto_renews:false, access_until:null };
 const billingPro       = { current_plan:'community', plan_parasign:'pro', plan_parasend:'community', paid_until_parasign:PRO_ENDS, paid_until_parasend:null, auto_renews:false, access_until:PRO_ENDS };
 
-async function openHome({ documents, overview, billing, down = false }) {
+// How many resends the page asked for, and what the last answer was. Kept out
+// here so the interaction case below can read it after the page is gone.
+let resendCalls = 0;
+
+async function openHome({ documents, overview, billing, inbox = inboxNone, down = false, resend = null }) {
   const page = await browser.newPage({ viewport:{ width:390, height:844 } });
   await page.route('**/api/user/session/verify', (r) => r.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ authenticated:true, email:'mickbr@example.com' }) }));
   const answer = (payload) => (r) => (down
     ? r.fulfill({ status:500, contentType:'application/json', body:'{"error":"unavailable"}' })
     : r.fulfill({ status:200, contentType:'application/json', body:JSON.stringify(payload) }));
+  // The resend goes on FIRST, because Playwright tries handlers newest-first
+  // and '**/api/user/parasign/inbox/*/resend' would otherwise never be reached
+  // if a broader pattern were registered after it.
+  if (resend) {
+    await page.route('**/api/user/parasign/inbox/*/resend', (r) => {
+      resendCalls++;
+      return r.fulfill({ status:resend.status, contentType:'application/json', body:JSON.stringify(resend.body) });
+    });
+  }
+  await page.route('**/api/user/parasign/inbox', answer(inbox));
   await page.route('**/api/user/documents', answer(documents));
   await page.route('**/api/user/dashboard/overview', answer(overview));
   await page.route('**/api/user/billing/status', answer(billing));
   await page.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
   await page.locator('[data-home="in"]:not([hidden])').waitFor();
-  // The workbench is filled by three fetches that resolve after the swap, so
+  // The workbench is filled by four fetches that resolve after the swap, so
   // wait for the state each case is actually about rather than for a timer.
   await page.waitForFunction(() => {
     const fig = document.querySelector('[data-hw-read]');
@@ -145,6 +171,15 @@ async function measure(page) {
       sub: vis(document.querySelector('[data-hw-sub]')) ? document.querySelector('[data-hw-sub]').textContent : '',
       quiet: vis(document.querySelector('[data-hw-quiet]')),
       strip: vis(document.querySelector('[data-hw-strip]')) ? document.querySelector('[data-hw-strip]').innerText.replace(/\s+/g, ' ').trim() : '',
+      inbox: vis(document.querySelector('[data-hw-inbox]')),
+      inboxRows: Array.from(document.querySelectorAll('[data-hw-inbox-list] .hw-row')).map((r) => r.innerText.replace(/\s+/g, ' ').trim()),
+      inboxActs: Array.from(document.querySelectorAll('[data-hw-inbox-list] [data-hw-resend]')).map((b) => b.textContent.trim()),
+      // The tap target on the one control this page has. A phone reader who
+      // cannot hit it has no way to get the mail back.
+      actHeight: (() => {
+        const b = document.querySelector('[data-hw-inbox-list] [data-hw-resend]');
+        return b ? Math.round(b.getBoundingClientRect().height) : 0;
+      })(),
       waiting: vis(document.querySelector('[data-hw-waiting]')),
       waitingRows: Array.from(document.querySelectorAll('[data-hw-waiting-list] .hw-row')).map((r) => r.innerText.replace(/\s+/g, ' ').trim()),
       recent: vis(document.querySelector('[data-hw-recent]')),
@@ -171,6 +206,7 @@ const states = [
   { key:'recent', title:'recent documents only', args:{ documents:documentsDone, overview:overviewPro, billing:billingPro } },
   { key:'empty',  title:'a new account',        args:{ documents:documentsNone, overview:overviewCommunity, billing:billingCommunity } },
   { key:'down',   title:'every route down',     args:{ documents:documentsOpen, overview:overviewCommunity, billing:billingCommunity, down:true } },
+  { key:'inbox',  title:'documents waiting for you', args:{ documents:documentsOpen, overview:overviewCommunity, billing:billingCommunity, inbox:inboxWaiting } },
 ];
 
 const seen = {};
@@ -244,11 +280,70 @@ ok('every other state keeps the three actions on screen', seen.open.buttons.leng
 // page keeps its shape.
 ok('every route down: no figure is invented', seen.down.quiet && seen.down.cap === '' && seen.down.of === '', JSON.stringify([seen.down.quiet, seen.down.cap]));
 ok('every route down: the reader gets a sentence, not a status code', /not loading right now/.test(seen.down.text) && !/error|failed|500/i.test(seen.down.text), '');
-ok('every route down: no half-filled cards are left behind', !seen.down.waiting && !seen.down.recent && !seen.down.empty && seen.down.plan === '', JSON.stringify([seen.down.waiting, seen.down.recent, seen.down.empty, seen.down.plan]));
+ok('every route down: no half-filled cards are left behind', !seen.down.waiting && !seen.down.recent && !seen.down.empty && !seen.down.inbox && seen.down.plan === '', JSON.stringify([seen.down.waiting, seen.down.recent, seen.down.empty, seen.down.inbox, seen.down.plan]));
+
+// 5. Documents waiting for the READER. Until the party index existed this page
+// could count only what the account had SENT, and said so in its own header
+// comment. Two documents are waiting on this reader and two of the account's
+// own requests are waiting on somebody else; the figure has to be the first
+// number, because it is the only one the reader can act on.
+ok('waiting for you: the figure counts what waits on the reader, not what the account sent', seen.inbox.num === '2' && seen.inbox.of === '', `${seen.inbox.num} ${seen.inbox.of}`);
+ok('waiting for you: the line says whose signature it is waiting for', seen.inbox.cap === 'documents are waiting for your signature', seen.inbox.cap);
+ok('waiting for you: the first one is dated in the one notation', seen.inbox.sub === `The first one arrived on ${day(INBOX_FIRST)}.`, seen.inbox.sub);
+ok('waiting for you: both are listed, each named by its sender and its date', seen.inbox.inbox
+  && seen.inbox.inboxRows.length === 2
+  && seen.inbox.inboxRows[0].includes('Shareholder agreement.pdf')
+  && seen.inbox.inboxRows[0].includes('From notary@example.com')
+  && seen.inbox.inboxRows[0].includes(`sent ${day(INBOX_FIRST)}`)
+  && seen.inbox.inboxRows[1].includes('Supplier terms 2026.pdf'), JSON.stringify(seen.inbox.inboxRows));
+ok('waiting for you: every row offers the one thing this page can do', seen.inbox.inboxActs.length === 2
+  && seen.inbox.inboxActs.every((t) => t === 'Send me the link again'), JSON.stringify(seen.inbox.inboxActs));
+ok('waiting for you: that button is a real tap target on a phone', seen.inbox.actHeight >= 44, `${seen.inbox.actHeight}px`);
+// The account's own open requests do not disappear; they stop being the
+// headline. Two big numbers arguing on one screen is the fault this ordering
+// exists to avoid.
+ok('waiting for you: the account own open requests move into the strip, not away', /YOUR OPEN REQUESTS 2/i.test(seen.inbox.strip) && seen.inbox.waiting, seen.inbox.strip);
+// The card can say a document is waiting. It cannot open one: the route hands
+// back no invite token, so a link here would be a promise the page cannot keep.
+ok('waiting for you: the card promises no way in that it does not have', /opens from the personal link in its invitation email/.test(seen.inbox.text)
+  && seen.inbox.inboxRows.every((r) => !/open|view|sign now/i.test(r)), JSON.stringify(seen.inbox.inboxRows));
 
 // And the paragraph that used to sit above the buttons is gone in every state.
 // It described the three buttons in prose, one line above the three buttons.
 ok('the hero no longer explains its own buttons in a paragraph', !/Pick up an open request/.test(seen.open.text + seen.empty.text), '');
+
+// 6. Pressing the button. One request, and the answer stays on the button and
+// names the address the mail went to, which is the reader's own and the only
+// one it could have gone to.
+{
+  const page = await openHome({
+    documents:documentsNone, overview:overviewCommunity, billing:billingCommunity, inbox:inboxWaiting,
+    resend:{ status:200, body:{ ok:true, sent_to:'mickbr@example.com' } },
+  });
+  await page.locator('[data-hw-inbox-list] [data-hw-resend]').first().click();
+  await page.waitForFunction(() => /Sent/.test(document.querySelector('[data-hw-inbox-list] [data-hw-resend]').textContent));
+  const label = await page.locator('[data-hw-inbox-list] [data-hw-resend]').first().textContent();
+  ok('send me the link again: one press, one request, and it says where it went',
+    resendCalls === 1 && label.trim() === 'Sent to mickbr@example.com', `${resendCalls} calls, "${label}"`);
+  await page.close();
+}
+
+// And a second press inside the hour. The server caps a resend at one per
+// document per hour, so the reader has to be told which of the two things
+// happened rather than left pressing a button that looks unchanged.
+{
+  resendCalls = 0;
+  const page = await openHome({
+    documents:documentsNone, overview:overviewCommunity, billing:billingCommunity, inbox:inboxWaiting,
+    resend:{ status:429, body:{ error:'rate_limited' } },
+  });
+  await page.locator('[data-hw-inbox-list] [data-hw-resend]').first().click();
+  await page.waitForFunction(() => /again in an hour/.test(document.querySelector('[data-hw-inbox-list] [data-hw-resend]').textContent));
+  const m = await measure(page);
+  ok('send me the link again: a capped resend is a sentence, not a status code',
+    !/429|rate_limited|error/i.test(m.text), (m.text.match(/429|rate_limited|error/i) || [''])[0]);
+  await page.close();
+}
 
 await browser.close();
 server.close();

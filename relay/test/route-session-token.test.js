@@ -249,11 +249,11 @@ test('THE SCOPE: every route outside the transfer path is 403, above the handler
 // ── 3b. The other purpose, over HTTP ─────────────────────────────────────────
 // /pricing and /dashboard run on a token minted with purpose `app`. What matters
 // on the wire is that the two purposes are not interchangeable: each opens its
-// own three-or-five routes and is 403 on the other's. A single flat allowlist
+// own four-or-five routes and is 403 on the other's. A single flat allowlist
 // would pass the "app routes work" half of this and fail the wall below, which
 // is why both halves are here.
 
-test('an app-purpose token opens the three app routes and nothing from the transfer path', async (t) => {
+test('an app-purpose token opens the four app routes and nothing from the transfer path', async (t) => {
   if (!rc) return t.skip('no redis');
   const minted = await mint(OWNER, srv, 'app');
   assert.strictEqual(minted.status, 200, minted.text);
@@ -267,11 +267,21 @@ test('an app-purpose token opens the three app routes and nothing from the trans
   for (const [method, path, body] of [
     ['GET', '/v2/user/history', undefined],
     ['GET', '/v2/parasign/audit-export', undefined],
+    ['GET', '/v2/parasign/inbox', undefined],
     ['POST', '/v2/billing/checkout', { product: 'parasend', plan: 'pro', interval: 'month' }],
   ]) {
     const r = await srv.req(method, path, { headers: h, body });
     assert.notStrictEqual(r.json && r.json.error, 'session_token_out_of_scope',
       `${method} ${path} was refused by scope, and it is what an app token is for: ${r.text}`);
+  }
+
+  // The resend beside the inbox is on NEITHER list. It reads the stored invite
+  // token back so the admin can put it in a mail, and a route that produces a
+  // capability must not be reachable with a credential a tab can hold.
+  {
+    const r = await srv.req('POST', `/v2/parasign/inbox/${'E'.repeat(24)}/resend`, { headers: h, body: {} });
+    assert.strictEqual(r.status, 403, `the resend answered ${r.status}, not 403: ${r.text}`);
+    assert.strictEqual(r.json.error, 'session_token_out_of_scope');
   }
 
   // Out of scope: the whole ParaSend transfer path, which this token was never
@@ -295,6 +305,7 @@ test('a ParaSend token is 403 on every app route: the two lists are disjoint', a
   for (const [method, path, body] of [
     ['GET', '/v2/user/history', undefined],
     ['GET', '/v2/parasign/audit-export', undefined],
+    ['GET', '/v2/parasign/inbox', undefined],
     ['POST', '/v2/billing/checkout', { product: 'parasend', plan: 'pro', interval: 'month' }],
   ]) {
     const r = await srv.req(method, path, { headers: h, body });

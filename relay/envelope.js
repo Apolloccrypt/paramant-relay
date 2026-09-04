@@ -329,6 +329,33 @@ class EnvelopeStore {
   // can then still label an expired envelope instead of silently dropping it.
   _acctIndexKey(accountId) { return 'parasign:acct:' + accountId + ':envelopes'; }
 
+  // Redis key for a PARTY's worklist (sorted set: member = '<envelope id>#<party
+  // index>', score = created_at ms). The mirror image of the account index above:
+  // that one answers "what did I send", this one answers "what is waiting for me".
+  //
+  // WHY THE HASH AND NEVER THE ADDRESS. The key NAME is the only place an address
+  // could have ended up in the clear, and key names are the least private thing
+  // redis has: SCAN output, keyspace listings, the slowlog and MONITOR all show
+  // them. So the name carries partyEmailHash(email), the same namespaced sha3-256
+  // the envelope record already stores in p<i>_email_hash. This index therefore
+  // teaches the store nothing it did not already hold, and a read-only leak of
+  // the keyspace is a leak of hashes.
+  //
+  // WHY THE PARTY INDEX SITS IN THE MEMBER. One address can hold two slots in one
+  // envelope (the same person signing in two capacities). Keyed on the envelope
+  // alone the second slot would be invisible, and resendInvite() below could not
+  // name which invite to send. '#' is a safe separator: envelope ids are
+  // base64url, which is [A-Za-z0-9_-] and never contains it.
+  //
+  // Persistent (no TTL), like the account index. Membership is NOT authority:
+  // every read re-checks the email hash against the envelope record itself, so a
+  // stale, hand-written or backfilled member shows nobody anything.
+  _partyIndexKey(emailHash) { return 'parasign:party:' + emailHash + ':envelopes'; }
+
+  // The member name for one party slot. Kept in one place so the writer, the
+  // reader, the pruner and the backfill cannot drift apart.
+  _partyMember(id, partyIndex) { return id + '#' + partyIndex; }
+
   async create({ creatorPkHash, creatorApiKeyHash, accountId, docHash, parties, originalFilename, expiresInDays, bindingMode, recipeVersion: recipeVersionArg, requestedAppearance }) {
     if (!this.available()) throw new Error('redis unavailable');
     if (!/^[0-9a-f]{64}$/.test(docHash)) throw new Error('doc_hash must be 64-char sha3-256 hex');
@@ -413,6 +440,23 @@ class EnvelopeStore {
     // an otherwise-created envelope, and backfillAccountIndex() repairs a miss.
     if (accountId) {
       try { await this.redis.zAdd(this._acctIndexKey(accountId), { score: now.getTime(), value: id }); }
+      catch { /* index miss -> recoverable via backfill */ }
+    }
+
+    // Per-party worklist index, one entry per slot that has a bound address. An
+    // open envelope's slots carry no email hash and get no entry: nobody is
+    // waiting on a named person there, and an entry under the empty hash would
+    // pool every anonymous slot on the estate into one bucket.
+    //
+    // Best-effort for the same reason as the line above: a store hiccup must not
+    // fail an envelope that was otherwise created and whose invites are about to
+    // go out. backfillPartyIndex() repairs a miss, and the reader is authorised
+    // by the record, not by this set, so a miss costs visibility and never
+    // safety.
+    for (let i = 0; i < parties.length; i++) {
+      const emailHash = hash['p' + i + '_email_hash'];
+      if (!emailHash) continue;
+      try { await this.redis.zAdd(this._partyIndexKey(emailHash), { score: now.getTime(), value: this._partyMember(id, i) }); }
       catch { /* index miss -> recoverable via backfill */ }
     }
 
@@ -670,6 +714,195 @@ class EnvelopeStore {
     return { scanned, indexed, unresolved };
   }
 
+  // ── The recipient's side of the same records ─────────────────────────────────
+  // Everything above answers "what did this account send". The three methods
+  // below answer "what is waiting for me", off the party index written in
+  // create(). They exist because that question had no answer at all: an envelope
+  // was reachable only by its per-party invite token, so a signed-in recipient
+  // who lost the mail had no way to learn a request existed, and the signed-in
+  // pages could only ever show an account its own outbox.
+  //
+  // WHAT THEY DELIBERATELY DO NOT RETURN. Not the invite token, not the document
+  // hash, not the capsule, not the other parties' email hashes. The worklist is
+  // knowing-THAT: a document is waiting, from whom, since when, until when.
+  // OPENING it still needs the capability in the mailed link, exactly as before.
+  // That separation is the whole reason this index is safe to expose to a
+  // fifteen-minute session token.
+
+  // One row, or null when this slot is not (or no longer) waiting on this
+  // address. The single place the rules live, so the listing, the prune and the
+  // resend cannot disagree about what "waiting" means.
+  //
+  // Index membership is never the authority. The email hash is re-checked
+  // against the record with a constant-time compare, so a member somebody wrote
+  // by hand into another person's set resolves to nothing.
+  _partyWaitingRow(h, id, pi, emailHash, nowMs) {
+    if (!h || !h.doc_hash) return null;                       // record gone (TTL) or not an envelope
+    const partyCount = parseInt(h.party_count, 10) || 0;
+    if (!Number.isInteger(pi) || pi < 0 || pi >= partyCount) return null;
+    if (!safeHexEqual(h['p' + pi + '_email_hash'] || '', emailHash)) return null;
+    if (h.status === 'complete' || h.status === 'void') return null;   // nothing is waiting on a closed envelope
+    if (h['p' + pi + '_sig']) return null;                    // this party already signed
+    const mode = h.binding_mode || 'open';
+    // An open slot is not bound to a person, so nothing is waiting on one in the
+    // sense this list means. It also carries no email hash, so it is never
+    // indexed; the check is here so a hand-written member cannot become a row.
+    if (mode !== 'email') return null;
+    if (signInviteClosed(h.created_at, nowMs)) return null;   // the 7d signing window closed
+    const expiresAt = Date.parse(h.expires_at || '');
+    if (Number.isFinite(expiresAt) && nowMs > expiresAt) return null;
+    return {
+      id: h.id || id,
+      // The name the sender gave the file. The document itself is not here and
+      // neither is its hash: the row says what is waiting, not what it contains.
+      document: h.original_filename || null,
+      // The account that created it, for the caller to turn into a name. Kept as
+      // the raw account id here so the store stays free of the users table.
+      sender_account_id: h.account_id || '',
+      sent_at: h.created_at || null,
+      // The date that actually matters to a signer: when the invite stops being
+      // signable, not when the record stops being kept.
+      signing_closes_at: signInviteExpiresAt(h.created_at),
+      status: h.status || 'sent',
+      party_count: partyCount,
+      signed_count: parseInt(h.signed_count, 10) || 0,
+    };
+  }
+
+  // Newest-first worklist for one address, by its party-email hash. `limit` caps
+  // the return.
+  //
+  // resolveSender: (accountId) -> string|null, injected. The store holds account
+  // ids, the relay holds the users table; keeping the lookup out here means this
+  // module never has to know what an account is called. A resolver that throws
+  // or returns nothing leaves the row's sender null, and the page then says the
+  // honest thing rather than dropping a document the reader is waiting on.
+  //
+  // The prune is the same lazy one the account index uses, widened by one case:
+  // an entry drops out not only when its envelope hash has expired, but also
+  // when the slot has been signed or the envelope has closed. Those are terminal
+  // (a signature is never withdrawn, a closed envelope never reopens), so a
+  // dropped member can never have to come back, and the set stays the size of
+  // the work rather than the size of the history. Fail-open on a redis fault:
+  // an errored EXISTS keeps the member, so a hiccup never silently forgets work.
+  async listPartyEnvelopes(emailHash, { limit = 100, prune = true, resolveSender, now } = {}) {
+    if (!this.available()) throw new Error('redis unavailable');
+    if (!emailHash || !/^[0-9a-f]{64}$/.test(emailHash)) return [];
+    const n = Math.max(1, Math.min((limit | 0) || 100, 1000));
+    const members = await this.redis.zRange(this._partyIndexKey(emailHash), 0, n - 1, { REV: true });
+    if (!Array.isArray(members) || members.length === 0) return [];
+    const nowMs = Number.isFinite(now) ? now : Date.now();
+    const rows = [];
+    const stale = [];
+    for (const member of members) {
+      const sep = member.lastIndexOf('#');
+      if (sep <= 0) { stale.push(member); continue; }
+      const id = member.slice(0, sep);
+      const pi = parseInt(member.slice(sep + 1), 10);
+      let h;
+      try { h = await this.redis.hGetAll('env:' + id); }
+      catch { continue; }                                     // fail-open: keep the member, skip the row
+      const row = this._partyWaitingRow(h, id, pi, emailHash, nowMs);
+      if (!row) { stale.push(member); continue; }
+      if (typeof resolveSender === 'function') {
+        try { row.sender = resolveSender(row.sender_account_id) || null; } catch { row.sender = null; }
+      } else {
+        row.sender = null;
+      }
+      delete row.sender_account_id;
+      rows.push(row);
+    }
+    if (prune && stale.length) {
+      try { await this.redis.zRem(this._partyIndexKey(emailHash), stale); } catch { /* best effort */ }
+    }
+    return rows;
+  }
+
+  // The material to re-send one invitation to the address it was already bound
+  // to. Returns null unless that exact address is still waiting on that exact
+  // envelope, so a caller who is not the party learns nothing, not even that the
+  // envelope exists.
+  //
+  // THIS MINTS NOTHING. It reads back the token create() wrote, which is the
+  // point: a resend that issued a fresh capability would be a way to keep an
+  // invite alive forever, and would invalidate the link already in the party's
+  // mailbox. The seven-day window is measured from created_at and is untouched
+  // here, so a resent link dies at exactly the same moment the first one does.
+  //
+  // The token leaves this process only towards the trusted admin over internal
+  // auth, which puts it in a mail and never in a response to a browser.
+  async getPartyInvite(id, emailHash, { now } = {}) {
+    if (!this.available()) throw new Error('redis unavailable');
+    if (!emailHash || !/^[0-9a-f]{64}$/.test(emailHash)) return null;
+    const h = await this.redis.hGetAll('env:' + id);
+    if (!h || !h.doc_hash) return null;
+    const nowMs = Number.isFinite(now) ? now : Date.now();
+    const partyCount = parseInt(h.party_count, 10) || 0;
+    for (let pi = 0; pi < partyCount; pi++) {
+      const row = this._partyWaitingRow(h, id, pi, emailHash, nowMs);
+      if (!row) continue;
+      const token = h['p' + pi + '_invite_token'] || '';
+      if (!token) return null;
+      return {
+        party_index: pi,
+        party_label: h['p' + pi + '_label'] || '',
+        invite_token: token,
+        document: row.document,
+        sender_account_id: h.account_id || '',
+        sent_at: row.sent_at,
+        signing_closes_at: row.signing_closes_at,
+      };
+    }
+    return null;
+  }
+
+  // Drop one slot from a party's worklist. Best-effort by design: the reader
+  // filters on the record anyway, so a failed removal costs a wasted lookup on
+  // the next read and nothing else. Called where a slot stops waiting.
+  async _dropFromPartyIndex(id, partyIndex, emailHash) {
+    if (!emailHash) return;
+    try { await this.redis.zRem(this._partyIndexKey(emailHash), this._partyMember(id, partyIndex)); }
+    catch { /* the reader filters on the record; a miss is cosmetic */ }
+  }
+
+  // One-shot backfill of the party index from existing env:* keys, for the
+  // envelopes created before the index existed. Mirrors backfillAccountIndex():
+  // a SCAN over the envelope hashes, and a zAdd per slot.
+  //
+  // IDEMPOTENT TWICE OVER. A zAdd of a member that is already there only
+  // refreshes its score, and the score is created_at, so it does not move. And
+  // only slots that are still WAITING are added, using the same
+  // _partyWaitingRow() rule the reader applies, so a second run after somebody
+  // signed does not resurrect the row that signing removed. Returns
+  // { scanned, indexed, skipped }.
+  async backfillPartyIndex({ dryRun = false, log, now } = {}) {
+    if (!this.available()) throw new Error('redis unavailable');
+    let cursor = '0';                                    // redis v5 wants a string cursor
+    let scanned = 0, indexed = 0, skipped = 0;
+    const nowMs = Number.isFinite(now) ? now : Date.now();
+    do {
+      const reply = await this.redis.scan(cursor, { MATCH: 'env:*', COUNT: 200 });
+      cursor = String(reply.cursor);
+      for (const key of (reply.keys || [])) {
+        const h = await this.redis.hGetAll(key);
+        if (!h || !h.doc_hash) continue;                 // not an envelope hash
+        scanned++;
+        const id = h.id || key.slice('env:'.length);
+        const partyCount = parseInt(h.party_count, 10) || 0;
+        const score = Date.parse(h.created_at || '') || 0;
+        for (let pi = 0; pi < partyCount; pi++) {
+          const emailHash = h['p' + pi + '_email_hash'] || '';
+          if (!emailHash) { skipped++; continue; }
+          if (!this._partyWaitingRow(h, id, pi, emailHash, nowMs)) { skipped++; continue; }
+          if (dryRun) { indexed++; continue; }
+          try { await this.redis.zAdd(this._partyIndexKey(emailHash), { score, value: this._partyMember(id, pi) }); indexed++; }
+          catch (e) { if (typeof log === 'function') log('warn', 'party_backfill_zadd_fail', { id, party_index: pi, err: e.message }); }
+        }
+      }
+    } while (String(cursor) !== '0');
+    return { scanned, indexed, skipped };
+  }
+
   // Party-scoped view for the co-signer: exactly what the client needs to
   // recompute the sign-message (doc_hash, recipe_version, this party's
   // email_hash) plus presentation fields. For email-bound envelopes the
@@ -801,6 +1034,16 @@ class EnvelopeStore {
     if (code === 'not_found') return { ok: false, code: 'not_found' };
     if (code === 'already_complete') return { ok: false, code: 'already_complete' };
     if (code === 'idem') return { ok: true, code: 'idem', status: 'void', voided_at: voidedAt || null };
+    // Nobody is waiting on a withdrawn envelope, so every slot leaves every
+    // worklist. Read the parties back rather than remembering them: void is the
+    // one mutation that can arrive without the caller having seen the record.
+    try {
+      const h = await this.redis.hGetAll(key);
+      const partyCount = parseInt((h || {}).party_count, 10) || 0;
+      for (let i = 0; i < partyCount; i++) {
+        await this._dropFromPartyIndex(id, i, h['p' + i + '_email_hash'] || '');
+      }
+    } catch { /* the reader filters on status; a miss is cosmetic */ }
     try {
       this.ctAppend('envelope_void', id, safeReason
         ? {
@@ -902,6 +1145,12 @@ class EnvelopeStore {
       appearance_hash: appearanceHashHex || null,
     };
     if (outcome === 'new') {
+      // This slot has stopped waiting, so it leaves the party's worklist. Done
+      // here and not inside SIGN_LUA on purpose: the script is the atomic
+      // authority over the signature itself, and a best-effort index write has
+      // no business inside it. The reader filters on the record anyway, so the
+      // worst a failure here can do is cost one wasted lookup on the next read.
+      await this._dropFromPartyIndex(id, pi, h['p' + pi + '_email_hash'] || '');
       try {
         this.ctAppend('envelope_sign', id, {
           party_index: pi,

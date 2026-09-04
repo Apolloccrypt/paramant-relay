@@ -225,18 +225,31 @@ scope.
 **A token is minted FOR a purpose, and the purpose picks the allowlist.**
 `relay/lib/session-token.js` holds two lists. `SCOPE` is the ParaSend one and is
 unchanged: the five transfer routes above. `APP_SCOPE` is the new one and holds
-three routes, each because one page needed exactly it:
+four routes, each because one page needed exactly it:
 
 | Route | Page | Why |
 |-------|------|-----|
 | `POST /v2/billing/checkout` | `/pricing` | pressing a price button creates the Mollie payment |
 | `GET /v2/user/history` | `/dashboard` | the account's own send/envelope history, read-only |
 | `GET /v2/parasign/audit-export` | `/dashboard` | the account's own signing audit, read-only, Business+ |
+| `GET /v2/parasign/inbox` | `/` signed in, `/dashboard` | what is waiting for this account's signature, read-only |
+
+`GET /v2/parasign/inbox` is in the list because of what it cannot hand out. It
+answers with a document name, who sent it, when it went out and when signing
+closes; it does not answer with the per-party invite token, the document hash or
+the capsule, and the address it answers for is derived by the relay from the
+resolved api-key rather than read from a header a browser could set. So a stolen
+app token buys the knowledge that a document is waiting, and not the capability
+to open or sign it, which still lives only in the link in the invitation mail.
+`POST /v2/parasign/inbox/:id/resend` is deliberately in NO scope: it reads that
+stored invite token back so the admin can put it in a mail, so it stays behind
+`X-Internal-Auth` plus an asserted `X-Verified-Email-Hash`, where a browser
+cannot reach it.
 
 The two lists are **disjoint**. A token minted on `/parashare` is `403` on all
-three app routes, and a token minted on `/pricing` is `403` on all five transfer
+four app routes, and a token minted on `/pricing` is `403` on all five transfer
 routes. Merging them into one flat allowlist would have widened the ParaSend
-token by three routes to give three other pages a credential they needed, which
+token by four routes to give three other pages a credential they needed, which
 is how a narrow credential quietly becomes an api-key again. `/v2/user/history`
 is named on its own path, never as a prefix, so the rest of `/v2/user/*` (the
 signing-key and TOTP surface) stays shut under both purposes, as do `/v2/keys`,
@@ -268,7 +281,7 @@ whose job is to show it to you and a self-hoster genuinely needs it. So a script
 that runs on paramant.app with a session cookie can still ask for the key
 directly. What changed is that it no longer finds one lying in a variable on a
 page nobody opened for that reason, and that the two pages which used to put it
-there now run on a credential that expires and opens three routes.
+there now run on a credential that expires and opens four routes.
 
 ---
 

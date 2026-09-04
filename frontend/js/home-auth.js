@@ -18,27 +18,35 @@
  * numbers waiting for him one page away; a homepage that shows him none of them
  * is a menu, not a workbench.
  *
- * So this reads three routes that /dashboard and /account already read, and
+ * So this reads four routes that /dashboard and /account already read, and
  * writes the answers into slots the markup owns:
  *
+ *   GET /api/user/parasign/inbox       what is waiting for YOUR signature
  *   GET /api/user/documents            the account's own signing requests
  *   GET /api/user/dashboard/overview   quota.signs and quota.caps.signs
  *   GET /api/user/billing/status       the plan and the end of the term
  *
- * WHAT IT DOES NOT SAY, and why
+ * THE SENTENCE THIS FILE COULD NOT WRITE BEFORE
  *
- * "2 waiting for YOUR signature" is not a sentence this page can honestly
- * write. /api/user/documents is the SENT list: relay/envelope.js indexes an
- * envelope under its creator (parsign:acct:<id>:envelopes, written once, in
- * create()), and there is no reverse index from a party's email hash to the
- * envelopes it appears in. Nothing on the relay can answer "which documents are
- * waiting for me to sign" without a fleet-wide scan, and an invited signer
- * reaches his document by the capability link in the mail. So the figure counts
- * requests that are open and says exactly that: waiting ON a signature, not FOR
- * yours. The day a party index exists this file gains a fourth fetch and a
- * truer sentence; until then it does not borrow one.
+ * Until the party index existed, "2 waiting for YOUR signature" was not a
+ * sentence this page could honestly write: /api/user/documents is the SENT
+ * list, relay/envelope.js indexed an envelope under its creator only, and there
+ * was no way from a party's address to the envelopes it appears in. The reverse
+ * index exists now (parasign:party:<hash>:envelopes), so the fourth fetch is
+ * here and the sentence is true.
  *
- * NO KEY IN THE BROWSER. All three routes ride the session cookie the same way
+ * It goes FIRST, above everything else on the page, because it is the only
+ * reading on this account that is waiting on the reader personally. Everything
+ * else here is waiting on somebody else.
+ *
+ * WHAT THE WORKLIST STILL DOES NOT DO. It does not open a document. The route
+ * answers with a name, a sender and two dates and never with the per-party
+ * invite token, so the only way in is still the link in the invitation mail.
+ * That is why the card carries "Send me the link again" rather than a link it
+ * cannot build: the button asks the server to mail the invitation to the
+ * reader's own address, once an hour at most.
+ *
+ * NO KEY IN THE BROWSER. All four routes ride the session cookie the same way
  * /dashboard does. Nothing here mints or holds a credential, so #413 stands:
  * the account's pgp_ key never reaches this page.
  *
@@ -242,11 +250,13 @@
   }
 
   // ── The one big reading ────────────────────────────────────────────────────
-  // Open requests first, because a request nobody has signed is the only thing
-  // on this account that is actually waiting. Nothing open, and the reading
-  // becomes the month's signature balance, which is the number the buyer review
-  // of 5 September found nowhere on the site while the route already had it.
-  function renderFigure(docs, overview) {
+  // What is waiting for the READER first. A document somebody else has to sign
+  // is somebody else's queue; a document waiting on you is the only thing on
+  // this page you can act on now, so it takes the number. Nothing waiting for
+  // you and the reading is the account's own open requests, then the month's
+  // signature balance, which is the number the buyer review of 5 September
+  // found nowhere on the site while the route already had it.
+  function renderFigure(docs, overview, inbox) {
     var kicker = pick('hw-kicker');
     var read = pick('hw-read');
     var num = pick('hw-num');
@@ -273,6 +283,28 @@
     if (docs && docs.length) {
       items.push(['Documents', String(docs.length)]);
       items.push(['Completed', String(done.length)]);
+    }
+
+    if (inbox && inbox.length) {
+      var earliest = inbox.reduce(function (best, d) {
+        var t = Date.parse(d.sent_at || '');
+        if (isNaN(t)) return best;
+        return (!best || t < best.t) ? { t: t } : best;
+      }, null);
+      show(quiet, false);
+      words(kicker, 'For you');
+      words(num, String(inbox.length));
+      show(of, false);
+      words(cap, inbox.length === 1 ? 'document is waiting for your signature' : 'documents are waiting for your signature');
+      words(sub, earliest ? 'The first one arrived on ' + day(earliest.t) + '.' : 'Sent to you by someone else.');
+      show(read, true); show(cap, true); show(sub, true);
+      // The account's own open requests move down into the strip: still worth a
+      // glance, no longer the headline, and never a second big number arguing
+      // with the first.
+      if (open && open.length) items.push(['Your open requests', String(open.length)]);
+      if (capped) items.push(['Signatures left', left + ' of ' + limit]);
+      strip(pick('hw-strip'), items);
+      return;
     }
 
     if (open && open.length) {
@@ -326,6 +358,96 @@
   function resetDate() {
     var now = new Date();
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  }
+
+  // ── Waiting for your signature ─────────────────────────────────────────────
+  // The card the page did not have, and the only one on it about work the
+  // reader owes rather than work the reader is owed. It sits above "Waiting on
+  // a signature" for that reason and for no other.
+  //
+  // WHY THERE IS NO LINK ON THE ROW. The worklist route deliberately does not
+  // hand out the per-party invite token, so this page cannot build a link that
+  // opens the document, and a row that linked to /dashboard would be a promise
+  // it cannot keep either. What it can do is ask the server to mail the
+  // invitation again, to the address the reader is signed in with, so the
+  // button says exactly that and nothing more.
+  function inboxRow(doc) {
+    var li = document.createElement('li');
+    li.className = 'hw-row';
+
+    var mark = document.createElement('span');
+    mark.className = 'hw-dot wait';
+    li.appendChild(mark);
+
+    var main = document.createElement('div');
+    main.className = 'hw-row-main';
+    var name = document.createElement('span');
+    name.className = 'hw-name';
+    name.textContent = doc.document || 'Signing request';
+    name.title = name.textContent;
+    main.appendChild(name);
+
+    // Who and when, and only what arrived. An unnamed sender is left out
+    // rather than guessed at: the row is still worth showing without it.
+    var from = String(doc.sender || '').trim();
+    var when = day(doc.sent_at);
+    var bits = [];
+    if (from) bits.push('From ' + from);
+    if (when) bits.push(from ? 'sent ' + when : 'Sent ' + when);
+    if (bits.length) {
+      var meta = document.createElement('span');
+      meta.className = 'hw-meta';
+      meta.textContent = bits.join(' \u00b7 ');
+      main.appendChild(meta);
+    }
+    li.appendChild(main);
+
+    var act = document.createElement('button');
+    act.type = 'button';
+    act.className = 'hw-act';
+    act.textContent = 'Send me the link again';
+    act.setAttribute('data-hw-resend', String(doc.id || ''));
+    li.appendChild(act);
+    return li;
+  }
+
+  // One button, one answer, and the answer stays on the row. A resend is capped
+  // at one an hour per document, so the reader has to be told which of the two
+  // things happened rather than left to press it again.
+  function resend(button, id) {
+    if (!id || button.disabled) return;
+    button.disabled = true;
+    button.textContent = 'Sending';
+    fetch('/api/user/parasign/inbox/' + encodeURIComponent(id) + '/resend', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: '{}',
+      cache: 'no-store'
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (body) {
+        if (r.status === 429) throw new Error('rate_limited');
+        if (!r.ok) throw new Error(body.error || 'failed');
+        return body;
+      });
+    }).then(function (body) {
+      // The address comes back from the server and is the reader's own. Saying
+      // it out loud is the whole point: it is the one place the mail can go.
+      button.textContent = body && body.sent_to ? 'Sent to ' + body.sent_to : 'Sent';
+    }).catch(function (err) {
+      button.textContent = err.message === 'rate_limited'
+        ? 'Already sent, try again in an hour'
+        : 'Could not send, try again later';
+      // A rate limit is not a fault to retry into; anything else may be.
+      if (err.message !== 'rate_limited') button.disabled = false;
+    });
+  }
+
+  function renderInbox(rows) {
+    var card = pick('hw-inbox');
+    if (!rows || !rows.length) { show(card, false); return; }
+    fill(pick('hw-inbox-list'), rows.slice(0, 3).map(inboxRow));
+    show(card, true);
   }
 
   function renderDocuments(docs) {
@@ -396,17 +518,30 @@
     show(host, true);
   }
 
+  // One delegated listener on the signed-in half, so a card re-rendered later
+  // needs no rewiring.
+  inn.addEventListener('click', function (ev) {
+    var button = ev.target.closest && ev.target.closest('[data-hw-resend]');
+    if (!button) return;
+    ev.preventDefault();
+    resend(button, button.getAttribute('data-hw-resend'));
+  });
+
   function load() {
     Promise.all([
+      getJSON('/api/user/parasign/inbox'),
       getJSON('/api/user/documents'),
       getJSON('/api/user/dashboard/overview'),
       getJSON('/api/user/billing/status')
     ]).then(function (answers) {
-      var body = answers[0];
+      var mine = answers[0];
+      var inbox = mine && Array.isArray(mine.documents) ? mine.documents : null;
+      var body = answers[1];
       var docs = body && Array.isArray(body.documents) ? body.documents : null;
-      renderFigure(docs, answers[1]);
+      renderFigure(docs, answers[2], inbox);
+      renderInbox(inbox);
       renderDocuments(docs);
-      renderPlan(answers[2]);
+      renderPlan(answers[3]);
     });
   }
 
