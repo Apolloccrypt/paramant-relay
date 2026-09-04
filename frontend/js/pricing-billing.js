@@ -22,8 +22,8 @@
  * data-plane credential in the tab for as long as it stayed open. It now runs
  * on the same kind of short-lived scoped token /parashare got in #401: js/
  * app-session-token.js mints a pst_ token with purpose `app`, which the relay
- * accepts on POST /v2/billing/checkout and two dashboard reads, and refuses
- * everywhere else. Fifteen minutes, held in memory, never persisted.
+ * accepts on POST /v2/billing/checkout, the redeem route the code field on this
+ * page uses, and the dashboard reads, and refuses everywhere else. Fifteen minutes, held in memory, never persisted.
  *
  * NOTHING IS FETCHED ON LOAD. The token is minted on the first click, not when
  * the page opens, so simply reading the prices asks for no credential at all.

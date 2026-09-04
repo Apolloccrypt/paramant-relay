@@ -400,7 +400,89 @@ async function loadBilling(){
           '</tr>').join('')+'</tbody></table>':
           '<div class="empty">No plan changes recorded yet</div>')+
       '</div>'+
+      renderCouponsShell()+
     '</div>';
+  fetchCoupons();
+}
+
+/* ── Coupons ─────────────────────────────────────────────────────────────
+   Gift codes: a term given away, never a sale. relay/lib/coupon.js holds the
+   rules; this is the window on them. Two things belong on the screen and
+   nothing else does: how to make one, and how many seats of each are gone.
+   There is deliberately no edit. Raising the cap on a code people are already
+   redeeming against, or changing what it grants under them, is how two
+   customers get different answers for the same code. Withdraw it and make
+   another. */
+function renderCouponsShell(){
+  return '<div class="card"><div class="card-hdr">Gift codes <small>a term given, no payment, no invoice</small></div>'+
+    '<div class="fb">'+
+      '<input id="c-code" placeholder="CODE" style="width:160px;text-transform:uppercase">'+
+      '<input id="c-max" type="number" min="1" value="100" style="width:90px" title="Maximum redemptions">'+
+      '<input id="c-days" type="number" min="1" value="90" style="width:90px" title="Days granted">'+
+      '<input id="c-until" type="date" style="width:150px" title="Valid until">'+
+      '<div class="sp"></div>'+
+      '<button class="btn" data-click="doCreateCoupon">Create code</button>'+
+      '<button class="btn out" data-click="fetchCoupons">Refresh</button>'+
+    '</div>'+
+    '<div id="c-msg" style="font-size:12px;margin-bottom:8px"></div>'+
+    '<div id="c-results"><div class="empty"><span class="sp-icon"></span>Loading…</div></div>'+
+  '</div>';
+}
+
+async function fetchCoupons(){
+  const el=document.getElementById('c-results');
+  if(!el)return;
+  const r=await api('/admin/coupons');
+  if(!r.ok){el.innerHTML='<div class="empty">Error loading gift codes</div>';return}
+  const list=(r.data&&r.data.coupons)||[];
+  if(!list.length){el.innerHTML='<div class="empty">No gift codes yet</div>';return}
+  el.innerHTML='<table class="tbl"><thead><tr><th>Code</th><th>Gives</th><th>Used</th><th>Valid until</th><th>Status</th><th></th></tr></thead><tbody>'+
+    list.map(c=>'<tr>'+
+      '<td class="mono">'+esc(c.code)+'</td>'+
+      '<td style="font-size:12px">'+esc(c.describes||'')+'</td>'+
+      '<td class="mono">'+esc(c.used+' / '+c.max_redemptions)+'</td>'+
+      '<td style="font-size:12px">'+esc(c.valid_until?c.valid_until.slice(0,10):'no end date')+'</td>'+
+      '<td>'+(c.revoked_at?'<span class="chip">withdrawn</span>':(c.remaining>0?'<span class="chip active">open</span>':'<span class="chip">used up</span>'))+'</td>'+
+      '<td>'+(c.revoked_at?'':'<button class="btn out" data-click="doRevokeCoupon" data-code="'+esc(c.code)+'">Withdraw</button>')+'</td>'+
+    '</tr>').join('')+'</tbody></table>';
+}
+
+async function doCreateCoupon(){
+  const code=(document.getElementById('c-code')?.value||'').trim().toUpperCase();
+  const max=parseInt(document.getElementById('c-max')?.value||'0',10);
+  const days=parseInt(document.getElementById('c-days')?.value||'0',10);
+  const until=document.getElementById('c-until')?.value||'';
+  const msg=document.getElementById('c-msg');
+  if(!code){if(msg){msg.style.color='var(--brick-ink)';msg.textContent='Enter a code.';}return}
+  /* Both products on Pro is the campaign this shipped for. The relay validates
+     every field again; nothing here is trusted. */
+  const body={code:code,max_redemptions:max,grants:[
+    {product:'parasign',tier:'pro',days:days},
+    {product:'parasend',tier:'pro',days:days},
+  ]};
+  if(until)body.valid_until=until+'T23:59:59Z';
+  const r=await api('/admin/coupons',{method:'POST',body:JSON.stringify(body)});
+  if(msg){
+    msg.style.color=r.ok?'#059669':'var(--brick-ink)';
+    msg.textContent=r.ok
+      ?('Created '+code+': '+((r.data&&r.data.coupon&&r.data.coupon.describes)||'')+', '+max+' redemptions.')
+      :('Failed: '+((r.data&&r.data.error)||'unknown'));
+  }
+  if(r.ok){document.getElementById('c-code').value='';fetchCoupons();}
+}
+
+async function doRevokeCoupon(el){
+  const code=el&&el.dataset?el.dataset.code:'';
+  if(!code)return;
+  const r=await api('/admin/coupons/'+encodeURIComponent(code),{method:'DELETE'});
+  const msg=document.getElementById('c-msg');
+  if(msg){
+    msg.style.color=r.ok?'#059669':'var(--brick-ink)';
+    msg.textContent=r.ok
+      ?(code+' withdrawn. Codes already redeemed keep their term.')
+      :('Failed: '+((r.data&&r.data.error)||'unknown'));
+  }
+  if(r.ok)fetchCoupons();
 }
 
 /* ── Relay ───────────────────────────────────────────────────────────────── */
@@ -638,6 +720,7 @@ act('click','epTab',(el)=>epTab(el.dataset.arg,el));
 act('click','doSendEmail',()=>doSendEmail());act('click','doChangePlan',()=>doChangePlan());
 act('click','doDisableKey',()=>doDisableKey());act('click','doDeleteAccount',()=>doDeleteAccount());
 act('click','doForceTotpRequirement',()=>doForceTotpRequirement());act('click','doCreateKey',()=>doCreateKey());
+act('click','doCreateCoupon',()=>doCreateCoupon());act('click','doRevokeCoupon',(el)=>doRevokeCoupon(el));act('click','fetchCoupons',()=>fetchCoupons());
 act('click','showNewKeyModal',()=>showNewKeyModal());act('click','exportAuditCSV',()=>exportAuditCSV());
 act('click','fetchAudit',()=>fetchAudit());act('click','fetchRelay',()=>fetchRelay());
 act('click','uAction',(el)=>uAction(el.dataset.uact,el));

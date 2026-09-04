@@ -593,6 +593,17 @@
     });
   }
 
+  // A redeemed code changes the plan and the term on this very page, so the two
+  // blocks that show them are read again rather than left saying what was true
+  // before the click. js/redeem-code.js fires this once the relay has
+  // confirmed the grant; a browser that cannot make a CustomEvent simply keeps
+  // the old block and the success sentence, which already names the plans and
+  // the dates.
+  document.addEventListener('paramant:plan-changed', function() {
+    loadBilling();
+    loadBillingHistory();
+  });
+
   loadAccount();
   loadBilling();
   loadBillingHistory();

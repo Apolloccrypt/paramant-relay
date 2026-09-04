@@ -49,8 +49,8 @@ Three credential types are in use across different API surfaces:
 >   `GET /v2/pubkey/:device` and `POST /v2/inbound`. `app`
 >   (`POST /api/user/app/token`, used by `/pricing`, `/dashboard` and the
 >   signed-in homepage) opens `POST /v2/billing/checkout`,
->   `GET /v2/user/history`, `GET /v2/parasign/audit-export` and
->   `GET /v2/parasign/inbox`. The two lists are disjoint: neither purpose
+>   `POST /v2/billing/redeem`, `GET /v2/user/history`,
+>   `GET /v2/parasign/audit-export` and `GET /v2/parasign/inbox`. The two lists are disjoint: neither purpose
 >   can do the other's work. The purpose is fixed by the admin route, not by the
 >   caller, and an unknown one is refused at the mint with `400 unknown_purpose`.
 > - **Scope.** The allowlist is checked above every route handler. Any path not
@@ -1168,6 +1168,120 @@ PDF per document, stored without compression.
 `400 bad_period` for a date that is not `YYYY-MM-DD` or a `from` after the `to`;
 `400 bad_format` for anything but `csv` or `json`; `503 export_unavailable` when
 redis is not reachable, because the documents live there.
+
+## Gift codes
+
+A code gives an account a term without any money moving. It is **not** a
+checkout with a 100% discount: nothing reaches Mollie, no invoice number is
+drawn, and nothing lands in the books as revenue, because nothing was sold. What
+a redemption does share with a payment is the half the customer cares about, and
+it shares it by calling the same `setProductPlan` the webhook calls, so
+`plan_<product>` and `paid_until_<product>` are written the ordinary way and the
+entitlement layer, the expiry index and the reminder mails need no special case.
+
+Rules the store enforces (`relay/lib/coupon.js`):
+
+- codes are case-insensitive, `A-Z`, `0-9` and `-`, 3 to 32 characters;
+- one redemption per **account** per code;
+- the cap is real: the claim is a single Lua script, so the redemption after the
+  last seat is refused rather than racing past it;
+- a term is **added**, never substituted. An account with a paid term still
+  running gets the gift days after that term, not instead of it.
+
+### POST /v2/admin/coupons: create a code
+
+Requires `X-Admin-Token` (`ADMIN_TOKEN`), like every other `/v2/admin/*` path.
+
+The example below is the live campaign: the code handed to the Buy Me a Coffee
+supporters, three months of both products, a hundred places, redeemable up to
+and including 30 September 2026.
+
+```bash
+curl -X POST https://health.paramant.app/v2/admin/coupons \
+  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"code":"COFFEE","max_redemptions":100,"valid_until":"2026-09-30T23:59:59Z",
+       "created_by":"mick","note":"Buy Me a Coffee supporters",
+       "grants":[{"product":"parasign","tier":"pro","days":90},
+                 {"product":"parasend","tier":"pro","days":90}]}'
+# 201 {"ok":true,"coupon":{"code":"COFFEE","used":0,"remaining":100,
+#      "describes":"3 months of ParaSign Pro and ParaSend Pro", ...}}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `code` | The code itself. Upper-cased; `A-Z0-9-`, 3 to 32 characters |
+| `grants` | One entry per product: `{product, tier, days}`. Optional; the default is ParaSign Pro and ParaSend Pro for 90 days. Every entry must carry the same `days` |
+| `max_redemptions` | The cap. Default 100, ceiling 100000 |
+| `valid_until` | Optional end date. Absent means no end date |
+| `created_by`, `note` | Free text, for the admin's own trail |
+
+Errors: `400 bad_code`, `400 invalid_product` / `invalid_tier` / `floor_tier` /
+`bad_days` / `mixed_days` / `bad_max_redemptions` / `bad_valid_until`,
+`409 code_exists` (a code is created once; withdraw it and make another rather
+than changing a cap people are already redeeming against), `503
+coupons_unavailable` when redis is not reachable.
+
+### GET /v2/admin/coupons: every code with its counter
+
+Requires `X-Admin-Token`. Returns each code with `grants`, `max_redemptions`,
+`used`, `remaining`, `valid_until`, `revoked_at` and `describes` (the one-line
+English summary of what it gives).
+
+### DELETE /v2/admin/coupons/:code: withdraw a code
+
+Requires `X-Admin-Token`. The code is in the path and the request carries no
+body, deliberately: a DELETE body that the admin gate refuses before reading
+leaves those bytes on the wire and desynchronises a kept-alive connection.
+
+Stamps `revoked_at`; the code stops being redeemable immediately. Nothing is
+deleted and no term already given is taken back: the redemptions are the record
+of what was given away. `404 unknown_code` for a code that was never created.
+
+### GET /v2/admin/coupons/:code/redemptions: who took a seat
+
+Requires `X-Admin-Token`. The coupon plus one row per redemption
+(`account`, `at`).
+
+### POST /v2/billing/redeem: spend a code
+
+Authenticated as the account, either with `X-Api-Key` or with a `pst_` session
+token minted with purpose `app` (it is one of the five routes in that
+allowlist). Body `{"code":"COFFEE"}`. **The account is the one the relay
+resolved from the credential, never one the body names.**
+
+```bash
+curl -X POST https://relay.paramant.app/v2/billing/redeem \
+  -H "X-Api-Key: pgp_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"code":"COFFEE"}'
+# {"ok":true,"code":"COFFEE",
+#  "granted":[{"product":"parasign","tier":"pro","days":90,"ends":"2026-12-03T…"},
+#             {"product":"parasend","tier":"pro","days":90,"ends":"2026-12-03T…"}],
+#  "message":"Your code is redeemed. You now have ParaSign Pro until 3 December
+#             2026 and ParaSend Pro until 3 December 2026. Nothing was charged."}
+```
+
+Every answer carries `message`, one plain English sentence meant to be printed
+to the person who typed the code. The machine-readable `error` is for logs and
+tests:
+
+| Status | `error` | What the reader is told |
+|---|---|---|
+| 404 | `unknown` | We do not know that code. Check the spelling and try again. |
+| 409 | `expired` | That code has expired. |
+| 409 | `already_used` | You have already used this code on this account. |
+| 409 | `exhausted` | That code has been fully claimed. It has run out. |
+| 409 | `revoked` | That code is no longer valid. |
+| 500 | `grant_failed` | Nothing was changed; the seat is given back. |
+| 503 | `redeem_unavailable` | The coupon store did not answer. |
+
+A redemption writes **one line in the billing history** (`GET
+/v2/billing/history`, type `gift`, e.g. `Gift: 3 months of ParaSign Pro and
+ParaSend Pro, code COFFEE`, with no amount and no document) and sends **one
+confirmation mail**. It writes no invoice and no credit note. The seven-day
+expiry warning and the "your plan has ended" mail follow on their own, because
+`paid_until_<product>` was written the ordinary way.
 
 ### Moneybird
 

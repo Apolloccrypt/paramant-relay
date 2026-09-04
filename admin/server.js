@@ -3611,6 +3611,60 @@ api.get("/admin/billing", authMiddleware, async (req, res) => {
   } catch (err) { console.error("[admin/billing]", err.message); res.status(500).json({ error: "internal" }); }
 });
 
+// ── /admin/coupons ───────────────────────────────────────────────
+// The panel's window on relay/lib/coupon.js. Straight pass-through to
+// /v2/admin/coupons on ONE sector: coupons live in redis, which all five relays
+// share, so there is nothing to fan out and a fan-out would only invent five
+// answers to a question with one. The browser never holds ADMIN_TOKEN; it holds
+// an X-Session that authMiddleware swaps for it.
+//
+// A coupon raises a paid tier without a payment, so creating and withdrawing
+// one is written to the audit log like any other plan change.
+api.get('/admin/coupons', authMiddleware, async (req, res) => {
+  try {
+    const r = await relayFetch('health', '/v2/admin/coupons', 'GET', null, false, req.sessionToken);
+    res.status(r.status).json(r.body);
+  } catch (e) { res.status(502).json({ error: e.message }); }
+});
+
+api.post('/admin/coupons', authMiddleware, async (req, res) => {
+  if (!await checkAdminRl('coupons', 'admin', 50)) return res.status(429).json({ error: 'rate_limited' });
+  try {
+    const r = await relayFetch('health', '/v2/admin/coupons', 'POST', req.body || {}, false, req.sessionToken);
+    if (r.status === 201) {
+      try {
+        await logAuditEvent('admin', 'admin_coupon_created', {
+          code: (r.body && r.body.coupon && r.body.coupon.code) || '',
+          max: (r.body && r.body.coupon && r.body.coupon.max_redemptions) || 0,
+          admin_ip: req.headers['x-real-ip'] || 'unknown',
+        });
+      } catch {}
+    }
+    res.status(r.status).json(r.body);
+  } catch (e) { res.status(502).json({ error: e.message }); }
+});
+
+// The code travels in the path and the request carries no body. A DELETE whose
+// body the relay's admin gate refuses before reading leaves those bytes on the
+// wire, and the next request on that kept-alive connection is answered by a
+// socket that has lost its place.
+api.delete('/admin/coupons/:code', authMiddleware, async (req, res) => {
+  if (!await checkAdminRl('coupons', 'admin', 50)) return res.status(429).json({ error: 'rate_limited' });
+  const code = String(req.params.code || '').trim().toUpperCase();
+  if (!/^[A-Z0-9-]{3,32}$/.test(code)) return res.status(400).json({ error: 'bad_code' });
+  try {
+    const r = await relayFetch('health', `/v2/admin/coupons/${encodeURIComponent(code)}`, 'DELETE', null, false, req.sessionToken);
+    if (r.status === 200) {
+      try {
+        await logAuditEvent('admin', 'admin_coupon_revoked', {
+          code, admin_ip: req.headers['x-real-ip'] || 'unknown',
+        });
+      } catch {}
+    }
+    res.status(r.status).json(r.body);
+  } catch (e) { res.status(502).json({ error: e.message }); }
+});
+
 api.get("/admin/relay-detail", authMiddleware, async (req, res) => {
   try {
     const details = {};

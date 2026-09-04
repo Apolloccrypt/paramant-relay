@@ -411,6 +411,25 @@ main.acct input::placeholder { color: var(--ink-3); }
       <button id="billing-cancel-btn" class="btn btn-danger btn-small hidden">Cancel plan</button>
     </div>
 
+    <!-- HAVE A CODE. The same form as the one on /pricing, driven by the same
+         js/redeem-code.js, because two copies of a box that grants a paid tier
+         is two chances for them to disagree about what happened. It sits with
+         the plan rather than with the invoices: a code is not a payment, it
+         leaves no invoice and no credit note, and the only thing it changes is
+         the plan and the date above. See relay/lib/coupon.js. -->
+    <form data-redeem-form class="acct-form" style="margin-top:var(--space-4)">
+      <p class="acct-plan-kicker" style="margin:0 0 8px">Have a code?</p>
+      <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)">A code gives you a term as a gift. It is not a discount and not a payment: nothing is charged, now or later, and there is nothing to cancel. If you already have a paid term running, the gift is added after it.</p>
+      <label class="acct-field">
+        <span class="acct-field-label">Your code</span>
+        <input type="text" name="code" data-redeem-input maxlength="32" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      </label>
+      <div class="acct-actions">
+        <button type="submit" class="btn btn-secondary btn-small" data-redeem-submit>Redeem code</button>
+        <span data-redeem-message role="status" hidden style="font-size:var(--text-sm);color:var(--ink-dim)"></span>
+      </div>
+    </form>
+
     <hr class="acct-divider">
     <!-- Every payment gets a numbered document, issued by the relay the moment
          Mollie confirms the money, and every refund or chargeback gets a credit
@@ -469,7 +488,9 @@ main.acct input::placeholder { color: var(--ink-3); }
 
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=8" defer></script>
-<script src="/js/account.inline1.js?v=6"></script>
+<script src="/js/account.inline1.js?v=7"></script>
+<script src="/js/app-session-token.js?v=1" defer></script>
+<script src="/js/redeem-code.js?v=1" defer></script>
 
 <script type="module" src="/js/account.inline2.js?v=4"></script>
 <script type="module" src="/js/passkey.js?v=5"></script>
