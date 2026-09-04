@@ -746,10 +746,14 @@
     var day = d.getDate() + ' ' + mon + (d.getFullYear() !== now.getFullYear() ? ' ' + d.getFullYear() : '');
     return day + ' ' + hm;
   }
+  // The caps arrive per product from the relay's own entitlement layer, which
+  // is the thing that enforces them. A missing cap therefore means "not read",
+  // never "no ceiling": no tier is unbounded. So an absent number draws as --
+  // with an empty bar rather than as an infinity sign nobody is entitled to.
   function opsBar(used, cap) {
-    var unlimited = (cap == null);
-    var pct = unlimited ? 4 : Math.min(100, Math.round(((used || 0) / Math.max(1, cap)) * 100));
-    return { pct: pct, warn: !unlimited && pct >= 80, capTxt: unlimited ? '&#8734;' : String(cap) };
+    var known = (typeof cap === 'number');
+    var pct = known ? Math.min(100, Math.round(((used || 0) / Math.max(1, cap)) * 100)) : 0;
+    return { pct: pct, warn: known && pct >= 80, capTxt: known ? String(cap) : '--' };
   }
   function renderOpsTimeline() {
     var el = document.getElementById('dh-ops-timeline');

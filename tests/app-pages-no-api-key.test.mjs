@@ -73,7 +73,9 @@ const BODIES = {
   [KEY_URL]: { api_key: FAKE_KEY, revealable: true },
   '/api/user/me': { email: 'demo@example.com', plan: 'pro', usage_purpose: 'organisation' },
   '/api/user/documents': { documents: [] },
-  '/api/user/dashboard/overview': { plan: 'pro', quota: { transfers: 1, signs: 1, caps: {} }, audit: [] },
+  // Per product: the overview carries no unified plan any more, because one
+  // word cannot say ParaSign Pro and ParaSend Community at once.
+  '/api/user/dashboard/overview': { tiers: { parasend: 'pro', parasign: 'pro' }, quota: { transfers: 1, signs: 1, caps: { transfers: 500, signs: 100 } }, audit: [] },
   '/api/user/app/token': { token: 'pst_' + 'ab12cd34'.repeat(8), expires_in_s: 900 },
 };
 
