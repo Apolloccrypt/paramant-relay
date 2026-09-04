@@ -791,7 +791,8 @@
       var b = opsBar(used, cap);
       return '<div class="dh-usage-row"><div class="dh-usage-lab"><span>' + label + '</span><span><b>' + (used || 0) + '</b> / ' + b.capTxt + '</span></div>' +
         '<div class="dh-bar' + (b.warn ? ' warn' : '') + '"><i style="width:' + b.pct + '%"></i></div>' +
-        (b.warn ? '<a class="dh-usage-upsell" href="/pricing">Upgrade to Pro</a>' : '') + '</div>';
+        // The link goes to /pricing, so it has to name a card that is on it.
+        (b.warn ? '<a class="dh-usage-upsell" href="/pricing">Upgrade to Firm</a>' : '') + '</div>';
     }
     var usageEl = document.getElementById('dh-ops-usage');
     if (usageEl) {
