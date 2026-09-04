@@ -393,7 +393,18 @@ jobs:
         # running in no workflow, which is what let a skipping canary report
         # green for as long as it did. What guards scripts/heartbeat/ itself is
         # tests/heartbeat-lib.test.mjs, picked up by the same glob.
-        run: node --test $(grep -L "from 'playwright'" tests/*.mjs)
+        #
+        # The half is chosen by scripts/browser-suites.mjs, not by a grep for
+        # "from 'playwright'" in the test file. That grep read one file deep and
+        # on 2026-09-04 it put tests/ui-elements-contrast.test.mjs in this job:
+        # the suite imports scripts/ui-contrast-sweep.mjs and the sweep is what
+        # imports playwright. This job installs no Chromium, the launch failed,
+        # the sweep's http server stayed up, and this step never returned. Three
+        # runs on main and a pull request hung on it. The selector now follows
+        # the imports as deep as they go; the sweep closes its server whatever
+        # happens (scripts/ui-contrast-sweep.mjs), so a job without a browser
+        # goes red in seconds instead of silent for hours.
+        run: node --test $(node scripts/browser-suites.mjs --no-browser)
 
   admin-unit-tests:
     name: admin - unit suite
