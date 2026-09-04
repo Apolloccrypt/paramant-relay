@@ -1290,6 +1290,13 @@ function loadScript(src) {
   });
 }
 
+// Module scope on purpose: initGlobe() and the state machine below both read
+// these, and a const inside initGlobe was out of reach for setGlobeState,
+// which threw GLOBE_ACCENT_RGB is not defined on every ring tick (main at
+// 23bf6006, caught by the heartbeat).
+const GLOBE_ACCENT = '#D9A441';
+const GLOBE_ACCENT_RGB = '217,164,65';
+
 async function initGlobe() {
   if (globeInstance) { startGlobePoll(); return; }
 
@@ -1315,8 +1322,6 @@ async function initGlobe() {
   // is the ochre of design-system.css (--ochre, #D9A441). It used to be the
   // old lime #B2FF3F, which is a colour the night edition retired from the UI
   // in PR #417 and which survived here only because no stylesheet touches it.
-  const GLOBE_ACCENT = '#D9A441';
-  const GLOBE_ACCENT_RGB = '217,164,65';
   globeInstance = Globe({ animateIn: true })
     .globeImageUrl('/images/globe/earth-night.jpg')
     .bumpImageUrl('/images/globe/earth-topology.png')
