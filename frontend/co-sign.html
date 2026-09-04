@@ -26,7 +26,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#15191C">
 <link rel="stylesheet" href="/design-system.css?v=28">
-<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/nav.css?v=24">
 <link rel="stylesheet" href="/relay-pulse.css?v=4">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -67,8 +67,12 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .banner.ok{border-color:var(--cobalt);color:var(--cobalt);background:rgba(var(--tint), 0.04)}
 .banner.err{border-color:rgba(196, 96, 79, 0.6);color:rgba(196, 96, 79, 1);background:rgba(196, 96, 79, 0.06)}
 .banner.warn{border-color:#d4a017;background:var(--card);color:var(--warn-ink)}
-.disclaimer{background:var(--card);border:1px solid #d4a017;padding:10px 14px;font-size:12px;color:var(--warn-ink);margin-bottom:14px;line-height:1.5}
-.disclaimer strong{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;color:#7a5300}
+/* The warning band. Its border was #d4a017 and its heading #7a5300, both from
+   the days of a bone page: on the night the heading is a dark ochre on a dark
+   card and there is nothing left to read. The band keeps its meaning and takes
+   the system's warning ink. */
+.disclaimer{background:var(--card);border:1px solid var(--ochre);padding:10px 14px;font-size:12px;color:var(--warn-ink);margin-bottom:14px;line-height:1.5}
+.disclaimer strong{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;color:var(--warn-ink)}
 .tag{display:inline-block;font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid var(--ink-hair);color:var(--ink-dim);margin-right:4px}
 .tag.green{border-color:var(--cobalt);color:var(--cobalt)}
 .tag.red{border-color:rgba(196, 96, 79, 0.6);color:rgba(196, 96, 79, 1)}
@@ -87,6 +91,15 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .doc-page canvas,.doc-page img{display:block;width:100%;height:auto;border:1px solid var(--ink-hair);background:#FFFFFF}
 .doc-page.appearance-page{position:relative;cursor:crosshair}
 .appearance-layer{position:absolute;inset:0;pointer-events:auto;cursor:crosshair}
+/* ── The document layer ──
+   Everything with .appearance-* on it is drawn ON the page being signed, and a
+   page is white paper in every theme. The blue is the ink that ends up in the
+   PDF, the same #1D4ED8 the seal is drawn with in frontend/js/sign-flow.js and
+   pinned in sign.html: a box the signer sees in cream on a warm dark ground
+   would be a preview of a document nobody will ever receive. So these values
+   are fixed on purpose, they are the one place on this page where a token is
+   deliberately not used, and scripts/ui-contrast-sweep.mjs has them on its
+   known list for that reason and no other. */
 .appearance-field{position:absolute;display:flex;align-items:center;overflow:hidden;border:2px solid #1D4ED8;background:rgba(255,255,255,.94);color:#0C1B2A;padding:5px 8px;font:600 10px/1.25 var(--sans);box-shadow:0 3px 12px rgba(0, 0, 0, .16);pointer-events:auto}
 .appearance-field.date{border-color:#5C6A78;font-family:var(--mono);font-weight:500}
 /* The box the SENDER asked for, before the signer has touched it. It must not

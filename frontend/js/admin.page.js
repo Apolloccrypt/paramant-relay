@@ -185,7 +185,7 @@ const PURPOSE_LABELS={personal:'Personal use',organisation:'Organisation',client
 function purposeLine(u){
   if(!u.usage_purpose)return '';
   const hot=u.usage_purpose==='organisation'||u.usage_purpose==='client_management';
-  return '<div class="mono" style="font-size:11px;color:'+(hot?'#0B3A6A;font-weight:600':'#475569')+'" title="Usage purpose ('+esc(u.usage_purpose_at?u.usage_purpose_at.split('T')[0]:'')+')">use: '+esc(PURPOSE_LABELS[u.usage_purpose]||u.usage_purpose)+'</div>';
+  return '<div class="mono" style="font-size:11px;color:'+(hot?'var(--ochre);font-weight:600':'var(--ink-dim)')+'" title="Usage purpose ('+esc(u.usage_purpose_at?u.usage_purpose_at.split('T')[0]:'')+')">use: '+esc(PURPOSE_LABELS[u.usage_purpose]||u.usage_purpose)+'</div>';
 }
 function usersTable(users){
   if(!users.length)return '<div class="empty">No users match filters</div>';
@@ -286,9 +286,9 @@ function uAction(action,btn){
 }
 function showNewKeyModal(){
   const o=document.createElement('div');
-  o.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(11,58,106,.4);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px';
-  o.innerHTML='<div style="background:#F8FAFC;border:1.5px solid rgba(11,58,106,.12);padding:28px;max-width:480px;width:100%">'+
-    '<div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#475569;margin-bottom:16px">Create new API key</div>'+
+  o.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(12, 15, 17, .72);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px';
+  o.innerHTML='<div style="background:var(--bone-2);border:1.5px solid var(--line);padding:28px;max-width:480px;width:100%;color:var(--ink)">'+
+    '<div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px">Create new API key</div>'+
     '<label class="l-lbl">Label</label><input id="nk-l" class="l-inp" placeholder="acme-corp"><br>'+
     '<label class="l-lbl">Plan</label><select id="nk-p" class="l-inp"><option value="community">community</option><option value="pro" selected>pro</option><option value="enterprise">enterprise</option><option value="trial">trial</option></select><br>'+
     '<label class="l-lbl">Email (optional)</label><input id="nk-e" class="l-inp" type="email" placeholder="client@example.com"><br>'+
@@ -310,11 +310,11 @@ async function doCreateKey(){
   const res=document.getElementById('nk-res');
   if(r.ok&&r.data?.created?.length){
     const key=r.data.created[0]?.key||'(see response)';
-    res.innerHTML='<div style="background:#fff;border:1px solid rgba(11,58,106,.12);padding:12px;word-break:break-all;color:#0B3A6A">'+esc(key)+'</div>'+
+    res.innerHTML='<div style="background:var(--card-2);border:1px solid var(--line);padding:12px;word-break:break-all;color:var(--ochre)">'+esc(key)+'</div>'+
       '<div style="color:#059669;margin-top:6px">Key created. Save it — shown once.</div>';
     LOADED.users=false;
   }else{
-    res.innerHTML='<div style="color:#dc2626">Failed: '+esc(r.data?.failed?.[0]?.error||r.data?.error||'unknown')+'</div>';
+    res.innerHTML='<div style="color:var(--brick-ink)">Failed: '+esc(r.data?.failed?.[0]?.error||r.data?.error||'unknown')+'</div>';
   }
 }
 
@@ -361,7 +361,7 @@ async function fetchAudit(){
       '<td class="mono" style="font-size:11px;white-space:nowrap">'+esc(e.ts?new Date(e.ts).toISOString().replace('T',' ').slice(0,19):'—')+'</td>'+
       '<td><span class="chip active">'+esc(e.event_type||'—')+'</span></td>'+
       '<td class="mono" style="font-size:11px;color:#475569">'+esc((e.user_id||'').slice(0,20))+'</td>'+
-      '<td><details><summary style="cursor:pointer;font-size:11px;color:#475569">show</summary><pre style="font-size:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin-top:4px;color:#0B3A6A;white-space:pre-wrap">'+esc(JSON.stringify(e.metadata||{},null,2))+'</pre></details></td>'+
+      '<td><details><summary style="cursor:pointer;font-size:11px;color:var(--ink-dim)">show</summary><pre style="font-size:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin-top:4px;color:var(--ink-2);white-space:pre-wrap">'+esc(JSON.stringify(e.metadata||{},null,2))+'</pre></details></td>'+
     '</tr>').join('')+'</tbody></table>';
 }
 
@@ -437,7 +437,7 @@ async function fetchRelay(){
   }).join('');
   const cards=document.getElementById('r-cards');
   if(cards)cards.innerHTML=Object.entries(sectors).map(([name,s])=>{
-    if(s.error)return '<div class="card"><div class="card-hdr">'+esc(name)+' <small style="color:#dc2626">offline</small></div><div class="empty">'+esc(s.error)+'</div></div>';
+    if(s.error)return '<div class="card"><div class="card-hdr">'+esc(name)+' <small style="color:var(--brick-ink)">offline</small></div><div class="empty">'+esc(s.error)+'</div></div>';
     const st=s.stats||{};
     return '<div class="card"><div class="card-hdr">'+esc(name)+' relay<small>v'+esc(s.version||'?')+'</small></div>'+
       '<table class="tbl"><tbody>'+

@@ -160,10 +160,10 @@ function renderReview() {
   ];
   var html = '<dl class="review-list">';
   rows.forEach(function (r) {
-    html += '<div class="review-row" style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #eee">' +
-      '<dt style="color:#666">' + esc(r.label) + '</dt>' +
+    html += '<div class="review-row" style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)">' +
+      '<dt style="color:var(--ink-dim)">' + esc(r.label) + '</dt>' +
       '<dd style="margin:0;text-align:right"><span>' + esc(r.value) + '</span> ' +
-      '<button type="button" class="edit-link" data-edit="' + r.step + '" style="background:none;border:none;color:#1d4ed8;cursor:pointer;font-size:12px">Edit</button></dd>' +
+      '<button type="button" class="edit-link" data-edit="' + r.step + '" style="background:none;border:none;color:var(--ochre);cursor:pointer;font-size:12px">Edit</button></dd>' +
       '</div>';
   });
   html += '</dl>';

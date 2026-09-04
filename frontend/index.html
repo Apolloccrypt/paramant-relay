@@ -23,7 +23,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="/design-system.css?v=28">
-<link rel="stylesheet" href="/nav.css?v=23">
+<link rel="stylesheet" href="/nav.css?v=24">
 <style>
 /* Homepage 2026, night edition: the same hand as BeerWeer. The night itself is
    no longer here: frontend/design-system.css carries it for the whole site, so
@@ -80,7 +80,9 @@ html[data-session="in"] .home-hero{padding-bottom:56px}
 .hp-band{position:relative;height:clamp(132px,34vw,230px);overflow:hidden;background:var(--paper-2);border-bottom:1px solid var(--line)}
 .hp-band svg{position:absolute;inset:0;width:100%;height:100%;display:block}
 .hp-band-tag{position:absolute;right:var(--pad);top:14px;font-family:var(--hp-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(27,31,34,.82);display:flex;align-items:center;gap:8px}
-.hp-band-tag::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--ochre)}
+/* The dot next to the strip line. Full ochre on the band's cream sky is
+   1.66:1; the ochre-as-ink token is the same hue at 4.7:1 on that paper. */
+.hp-band-tag::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--ochre-ink)}
 @media (min-width:900px){.hp-band-tag{right:max(var(--pad), calc((100% - var(--maxw)) / 2))}}
 
 /* ---------- hero ---------- */

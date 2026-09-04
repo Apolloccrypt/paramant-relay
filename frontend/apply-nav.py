@@ -90,7 +90,7 @@ LEGAL_STRIP = '''\
 </footer>'''
 
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=28">'
-NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=23">'
+NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=24">'
 NAV_JS    = '<script src="/nav.js?v=15" defer></script>'
 NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=8" defer></script>'
 

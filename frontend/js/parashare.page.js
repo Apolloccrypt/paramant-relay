@@ -527,7 +527,7 @@ function onFileSelect() {
     const vl = $('vault-list');
     vl.style.display = 'block';
     vl.innerHTML = [...files].map(f =>
-      '<div style="font-size:10px;color:rgba(248,250,252,.65);padding:2px 0;font-family:var(--mono)">' + f.name + ' <span style="color:rgba(248,250,252,.5)">(' + (f.size/1024/1024).toFixed(1) + ' MB)</span></div>'
+      '<div style="font-size:10px;color:var(--ink-2);padding:2px 0;font-family:var(--mono)">' + f.name + ' <span style="color:var(--ink-dim)">(' + (f.size/1024/1024).toFixed(1) + ' MB)</span></div>'
     ).join('');
   }
   updateBtn();
@@ -1267,8 +1267,8 @@ function toggleGlobe() {
     // Fullscreen HUD mode: hide UI, show HUD panels
     overlay.classList.add('globe-fullscreen');
     if (mainEl) mainEl.style.display = 'none';
-    const _gb = document.getElementById('globe-btn'); if (_gb) _gb.style.color = '#B2FF3F';
-    if (_gb) _gb.style.boxShadow = '0 0 12px rgba(178,255,63,.3)';
+    const _gb = document.getElementById('globe-btn'); if (_gb) _gb.style.color = 'var(--ochre)';
+    if (_gb) _gb.style.boxShadow = '0 0 12px rgba(217, 164, 65, .3)';
     if (_gb) _gb.textContent = '✕ Close';
   } else {
     // Background mode: restore UI, hide HUD panels
@@ -1310,12 +1310,19 @@ async function initGlobe() {
   const wrap = document.getElementById('globe-canvas-wrap');
 
   // Globe.gl instantiëren
+  // The globe is WebGL: three.js is handed colours, not a cascade, so it cannot
+  // read a custom property and the accent has to be written out. GLOBE_ACCENT
+  // is the ochre of design-system.css (--ochre, #D9A441). It used to be the
+  // old lime #B2FF3F, which is a colour the night edition retired from the UI
+  // in PR #417 and which survived here only because no stylesheet touches it.
+  const GLOBE_ACCENT = '#D9A441';
+  const GLOBE_ACCENT_RGB = '217,164,65';
   globeInstance = Globe({ animateIn: true })
     .globeImageUrl('/images/globe/earth-night.jpg')
     .bumpImageUrl('/images/globe/earth-topology.png')
     .backgroundImageUrl('/images/globe/night-sky.png')
     .showAtmosphere(true)
-    .atmosphereColor('#B2FF3F')
+    .atmosphereColor(GLOBE_ACCENT)
     .atmosphereAltitude(0.18)
     // HTML dots — crisp DOM elements, no pixelation at any zoom
     .htmlElementsData([
@@ -1324,7 +1331,7 @@ async function initGlobe() {
     ])
     .htmlElement(d => {
       const wrap = document.createElement('div');
-      const color = d.type === 'relay' ? '#B2FF3F' : 'var(--ink-dim)';
+      const color = d.type === 'relay' ? GLOBE_ACCENT : 'var(--ink-dim)';
       wrap.innerHTML = `<div title="${d.label}" style="
         width:14px;height:14px;border-radius:50%;
         background:${color};
@@ -1344,7 +1351,7 @@ async function initGlobe() {
       {
         startLat: userLat, startLng: userLng,
         endLat: RELAY_LOC.lat, endLng: RELAY_LOC.lng,
-        color: ['rgba(178,255,63,0)', '#B2FF3F', '#B2FF3F', 'rgba(178,255,63,0)'],
+        color: [`rgba(${GLOBE_ACCENT_RGB},0)`, GLOBE_ACCENT, GLOBE_ACCENT, `rgba(${GLOBE_ACCENT_RGB},0)`],
         label: 'Ghost Pipe · Encrypted Channel',
       }
     ])
@@ -1355,11 +1362,11 @@ async function initGlobe() {
     .arcStroke(0.4)
     .arcAltitudeAutoScale(0.35)
     .arcLabel(d => `<div style="font:10px monospace;background:rgba(12,12,12,.9);
-      border:1px solid rgba(178,255,63,.25);padding:4px 8px;color:#B2FF3F">${d.label}</div>`)
+      border:1px solid rgba(217, 164, 65, .25);padding:4px 8px;color:${GLOBE_ACCENT}">${d.label}</div>`)
     // Pulserende ringen op knooppunten
     .ringsData([
-      { lat: userLat, lng: userLng, maxR: 3, propagationSpeed: 2.5, repeatPeriod: 1200, color: () => 'rgba(178,255,63,' },
-      { lat: RELAY_LOC.lat, lng: RELAY_LOC.lng, maxR: 2.5, propagationSpeed: 2, repeatPeriod: 1600, color: () => 'rgba(178,255,63,' },
+      { lat: userLat, lng: userLng, maxR: 3, propagationSpeed: 2.5, repeatPeriod: 1200, color: () => `rgba(${GLOBE_ACCENT_RGB},` },
+      { lat: RELAY_LOC.lat, lng: RELAY_LOC.lng, maxR: 2.5, propagationSpeed: 2, repeatPeriod: 1600, color: () => `rgba(${GLOBE_ACCENT_RGB},` },
     ])
     .ringColor(d => t => `${d.color()}${1 - t})`)
     .ringMaxRadius('maxR')
@@ -1454,17 +1461,17 @@ function updateSessionsPanel() {
     ? sessions.map(s => `<div class="hud-session">
         <span class="hud-dot${s.active ? '' : ' amber'}"></span>
         <span style="flex:1">${s.label}</span>
-        <span style="color:rgba(178,255,63,.5);font-size:9px">${s.status}</span>
+        <span style="color:var(--ink-dim);font-size:9px">${s.status}</span>
       </div>`).join('')
     : '<div class="hud-session"><span class="hud-dot amber"></span><span>No active session</span></div>';
 }
 
 // ── Globe state machine ───────────────────────────────────────────────────────
 const _GLOBE_STATES = {
-  idle:       { arcSpeed: 2800, arcColor: ['rgba(178,255,63,0)','#B2FF3F','#B2FF3F','rgba(178,255,63,0)'], ringSpeed: 1800, ringMax: 2.5, label: 'Ghost Pipe · Encrypted Channel' },
-  waiting:    { arcSpeed: 1800, arcColor: ['rgba(178,255,63,0)','var(--ink-dim)','var(--ink-dim)','rgba(178,255,63,0)'], ringSpeed: 1200, ringMax: 3,   label: 'Ghost Pipe · Receiver Connected' },
-  encrypting: { arcSpeed: 700,  arcColor: ['rgba(178,255,63,0)','#fff','var(--ink-dim)','rgba(178,255,63,0)'],   ringSpeed: 600,  ringMax: 4,   label: 'Ghost Pipe · Transmitting ▶' },
-  done:       { arcSpeed: 2800, arcColor: ['rgba(178,255,63,0)','#B2FF3F','#B2FF3F','rgba(178,255,63,0)'], ringSpeed: 1800, ringMax: 2.5, label: 'Ghost Pipe · Transfer Complete ✓' },
+  idle:       { arcSpeed: 2800, arcColor: ['rgba(217,164,65,0)','#D9A441','#D9A441','rgba(217,164,65,0)'], ringSpeed: 1800, ringMax: 2.5, label: 'Ghost Pipe · Encrypted Channel' },
+  waiting:    { arcSpeed: 1800, arcColor: ['rgba(217,164,65,0)','var(--ink-dim)','var(--ink-dim)','rgba(217,164,65,0)'], ringSpeed: 1200, ringMax: 3,   label: 'Ghost Pipe · Receiver Connected' },
+  encrypting: { arcSpeed: 700,  arcColor: ['rgba(217,164,65,0)','#fff','var(--ink-dim)','rgba(217,164,65,0)'],   ringSpeed: 600,  ringMax: 4,   label: 'Ghost Pipe · Transmitting ▶' },
+  done:       { arcSpeed: 2800, arcColor: ['rgba(217,164,65,0)','#D9A441','#D9A441','rgba(217,164,65,0)'], ringSpeed: 1800, ringMax: 2.5, label: 'Ghost Pipe · Transfer Complete ✓' },
 };
 
 function _globeApplyState(name) {
@@ -1482,8 +1489,8 @@ function _globeApplyState(name) {
     .arcColor(d => d.color)
     .arcDashAnimateTime(s.arcSpeed)
     .ringsData([
-      { lat: uLat, lng: uLng, maxR: s.ringMax, propagationSpeed: 2.5, repeatPeriod: s.ringSpeed, color: () => 'rgba(178,255,63,' },
-      { lat: rLat, lng: rLng, maxR: s.ringMax * 0.9, propagationSpeed: 2, repeatPeriod: s.ringSpeed * 1.15, color: () => 'rgba(178,255,63,' },
+      { lat: uLat, lng: uLng, maxR: s.ringMax, propagationSpeed: 2.5, repeatPeriod: s.ringSpeed, color: () => `rgba(${GLOBE_ACCENT_RGB},` },
+      { lat: rLat, lng: rLng, maxR: s.ringMax * 0.9, propagationSpeed: 2, repeatPeriod: s.ringSpeed * 1.15, color: () => `rgba(${GLOBE_ACCENT_RGB},` },
     ])
     .ringColor(d => t => `${d.color()}${1 - t})`)
     .ringMaxRadius('maxR')
@@ -1498,8 +1505,8 @@ function _globeBurst() {
   // Big burst rings — 3 waves from relay and user
   const burstRings = [];
   for (let i = 0; i < 3; i++) {
-    burstRings.push({ lat: rLat, lng: rLng, maxR: 8 + i * 4, propagationSpeed: 5 + i, repeatPeriod: 99999, color: () => 'rgba(178,255,63,' });
-    burstRings.push({ lat: uLat, lng: uLng, maxR: 6 + i * 3, propagationSpeed: 4 + i, repeatPeriod: 99999, color: () => 'rgba(178,255,63,' });
+    burstRings.push({ lat: rLat, lng: rLng, maxR: 8 + i * 4, propagationSpeed: 5 + i, repeatPeriod: 99999, color: () => `rgba(${GLOBE_ACCENT_RGB},` });
+    burstRings.push({ lat: uLat, lng: uLng, maxR: 6 + i * 3, propagationSpeed: 4 + i, repeatPeriod: 99999, color: () => `rgba(${GLOBE_ACCENT_RGB},` });
   }
   globeInstance
     .ringsData(burstRings)
@@ -1512,7 +1519,7 @@ function _globeBurst() {
   globeInstance.arcsData([{
     startLat: uLat, startLng: uLng,
     endLat: rLat, endLng: rLng,
-    color: ['rgba(255,255,255,0)', '#fff', 'var(--ink-dim)', 'rgba(178,255,63,0)'],
+    color: ['rgba(255,255,255,0)', '#fff', 'var(--ink-dim)', 'rgba(217,164,65,0)'],
     label: 'Ghost Pipe · Transfer Complete ✓',
   }]).arcDashAnimateTime(400);
 

@@ -276,7 +276,12 @@ nav.nav .nav-hamburger span {
   display: block;
   width: 22px;
   height: 2px;
-  background: var(--invert);
+  /* The three bars are the whole button: it has no label. They were painted in
+     --invert, which on the bone site was the navy slab and read as ink, and
+     which the night edition turned into #0C0F11, a shade DEEPER than the bar
+     it sits on. That is 1.09:1 against the nav on a phone, on every page of
+     the site, for the one control that opens the menu. It is the ink now. */
+  background: var(--ink);
   transition: transform var(--duration-base) var(--ease-out),
               opacity var(--duration-fast) var(--ease-out);
   pointer-events: none;
