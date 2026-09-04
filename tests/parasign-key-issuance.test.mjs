@@ -180,7 +180,7 @@ test('entitlement: a paid plan (pro/enterprise/licensed) entitles the account', 
 });
 
 // ---- 6) key → plan → quota → 402 -------------------------------------------
-test('quota: /v1 creates count against the plan ParaSign sign quota; overage → 402 monthly_sign_quota_reached', async () => {
+test('quota: /v1 creates count against the plan ParaSign sign quota; past it → 402 monthly_sign_quota_reached', async () => {
   // A minted key on the community plan. community.signs_month = 2 (tiers.js).
   const b = keysTable.buildParasignKeyRecord({ accountId: 'acct_q', plan: 'community', randomHex: RAND() });
   const apiKeys = new Map([[b.key, b.record]]);

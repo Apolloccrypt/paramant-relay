@@ -3,16 +3,20 @@
  * (parashare) and modules (sign-flow, co-sign).
  *
  * 402 input (relay JSON, passed through by the admin proxy):
- *   free sign quota:  { error:'monthly_sign_quota_reached', plan, limit, used, reset_date }
- *   pro hard cap:     { error:'monthly_sign_hard_cap_reached', plan, limit, overage_count, reset_date }
+ *   sign quota:       { error:'monthly_sign_quota_reached', plan, limit, used, reset_date }
  *   transfers:        { error:'monthly_transfer_quota_reached', dimension, plan, limit }
  *                     `plan`/`limit` are the tier that DECIDED and its ceiling
  *                     (relay.js, #361), not the account's unified plan.
- * 200 input (sign response): quota { used, included, overage_count,
- *   overage_rate_eur, hard_cap, reset_date } -> signNotice() renders the
- *   inline notices (free second signature, pro overage). Older backends send
- *   none of the new fields: the transfer notice keeps its prior rendering and
- *   signNotice returns ''.
+ * 200 input (sign response): quota { used, included, reset_date } ->
+ *   signNotice() renders the inline notice when the last signature the plan
+ *   includes has just been used. Older backends send none of these fields: the
+ *   transfer notice keeps its prior rendering and signNotice returns ''.
+ *
+ * ONE sign 402, because there is one stop: the quota the plan includes. The
+ * second, higher stop this file used to render (monthly_sign_hard_cap_reached
+ * at 1,000 for Firm) belonged to a meter that charged EUR 0.40 a signature
+ * above 100 and put it on the next invoice. No invoice ever carried that line,
+ * so the meter is gone and so is the card that explained it.
  *
  * Prices shown excl. VAT and kept in ONE place here. This file only renders
  * the notices; the limits themselves live server-side and are unchanged. Every
@@ -91,8 +95,7 @@
   function isQuota402(status, data) {
     return status === 402 && !!data &&
       (data.error === 'monthly_transfer_quota_reached' ||
-       data.error === 'monthly_sign_quota_reached' ||
-       data.error === 'monthly_sign_hard_cap_reached');
+       data.error === 'monthly_sign_quota_reached');
   }
 
   // First day of the next month (client clock), the fallback when the 402 body
@@ -118,23 +121,12 @@
     return '<div class="pa-quota-upsell pa-quota-card" role="status">' +
       '<strong>You\'ve used both signatures this month.</strong>' +
       '<span>Community gives you 2 a month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.</span>' +
-      '<span><strong>Firm - EUR 29/month</strong><br>100 signatures a month, then EUR 0.40 each, up to 1,000. API access. 500 transfers a month on ParaSend, in the same payment.</span>' +
+      '<span><strong>Firm - EUR 29/month</strong><br>100 signatures a month. API access. 500 transfers a month on ParaSend, in the same payment.</span>' +
       '<span class="pa-quota-actions">' +
         '<a class="btn btn-primary" href="/pricing">Upgrade to Firm</a>' +
         '<button type="button" class="btn btn-secondary" data-pa-quota-dismiss>Maybe later</button>' +
       '</span>' +
       '<span>Your limit resets on ' + resetDate(data) + '.</span>' +
-      '</div>';
-  }
-
-  // Firm hard cap at 1,000, the Firm ceiling: the upgrade moment. Business includes 1,000.
-  function hardCapHtml(data) {
-    return '<div class="pa-quota-upsell pa-quota-card" role="status">' +
-      '<strong>You\'ve reached 1,000 signatures this month, the Firm ceiling.</strong>' +
-      '<span>Business gives you 1,000 included at EUR 299/month, which is already cheaper than what you\'re paying in overage.</span>' +
-      '<span class="pa-quota-actions">' +
-        '<a class="btn btn-primary" href="/pricing">Upgrade to Business</a>' +
-      '</span>' +
       '</div>';
   }
 
@@ -166,7 +158,6 @@
   }
 
   function html(data) {
-    if (data && data.error === 'monthly_sign_hard_cap_reached') return hardCapHtml(data);
     if (data && data.error === 'monthly_sign_quota_reached' &&
         (data.plan === 'free' || data.plan == null)) return freeSignHtml(data);
     return legacyHtml(data);
@@ -186,11 +177,14 @@
         '<span>That\'s your second signature this month. One more and you\'ll need Firm (EUR 29/month, 100 signatures).</span>' +
         '</div>';
     }
-    var over = Number(quota.overage_count);
-    if (included === 100 && isFinite(over) && over >= 1) {
+    // The last signature Firm includes. Said once, when it happens, so nobody
+    // discovers the limit only by being stopped by it. It used to say the next
+    // signature would cost EUR 0.40 on the next invoice; there is no such line
+    // and no such invoice, so it now says what does happen: signing waits for
+    // the new month, or for a bigger plan.
+    if (included === 100 && used === 100) {
       return '<div class="pa-sign-note" role="status">' +
-        '<span>You\'ve passed 100 signatures this month. Everything keeps working. Additional signatures are EUR 0.40 each and appear on your next invoice, up to 1,000 a month.</span>' +
-        '<span>Signing more than 600 a month? Business (EUR 299) works out cheaper. <a href="/pricing">Compare plans</a></span>' +
+        '<span>That was the 100th signature your Firm plan includes this month. Signing starts again on ' + resetDate(quota) + '. Business (EUR 299/month) includes 1,000 a month. <a href="/pricing">Compare plans</a></span>' +
         '</div>';
     }
     return '';
