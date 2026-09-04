@@ -545,6 +545,35 @@ async function callRelay(endpoint, body, method = "POST", sector = "health") {
   return res;
 }
 
+// The effective entitlements of ONE account, straight from the relay.
+//
+// This is the only place a limit shown to a customer may come from. The relay
+// owns the tier table (relay/lib/tiers.js) and the product split
+// (relay/lib/entitlements.js), and it is the thing that actually says no at the
+// quota gate, so it is also the thing that gets to say what the ceiling is. The
+// admin image does not ship the relay package and must not carry a copy of the
+// numbers: a second table is a table that drifts, and it drifted. It had no
+// `business` row and it was keyed on the unified `plan`, which a purchase never
+// moves (entitlements.applyProductTier writes plan_parasign / plan_parasend and
+// nothing else), so a paying ParaSign Pro account was shown the community cap.
+//
+// Returns the { parasend, parasign } entitlement object, or null when the relay
+// could not answer. Callers must read null as "unknown" and refuse to render a
+// cap at all, never as a reason to fall back to a guess.
+async function readAccountEntitlements(accountId) {
+  if (!accountId) return null;
+  try {
+    const r = await callRelay(`/v2/admin/entitlements/${encodeURIComponent(accountId)}`, null, "GET");
+    if (!r.ok) return null;
+    const body = await r.json().catch(() => null);
+    if (!body || body.ok !== true || !body.entitlements) return null;
+    return body.entitlements;
+  } catch (err) {
+    console.error("[entitlements read]", err.message);
+    return null;
+  }
+}
+
 // Find API key entry by email (queries health relay).
 // reveal=1: the returned entry's full .key becomes the session user_id (Redis
 // id + relay operation token), so this server-to-server lookup needs the raw
@@ -2410,10 +2439,12 @@ api.get("/user/developer/snapshot", authUser, developerGate, async (req, res) =>
   const uid = req.userSession.user_id;
   const hit = _snapCache.get(uid);
   if (hit && Date.now() - hit.at < 3000) return res.json(hit.data);
-  let plan = "community";
-  try { const u = await findUserByEmail(req.userSession.email); if (u && u.plan) plan = u.plan; } catch {}
+  // The caps come from the relay, per account and per product. No local table,
+  // and no unified `plan` anywhere near a limit.
+  const ents = await readAccountEntitlements(uid);
+  if (!ents) return res.status(503).json({ error: "entitlements_unavailable" });
   try {
-    const data = await buildSnapshot({ redis, getAuditEvents, plan }, req.userSession);
+    const data = await buildSnapshot({ redis, getAuditEvents, entitlements: ents }, req.userSession);
     _snapCache.set(uid, { at: Date.now(), data });
     if (_snapCache.size > 500) _snapCache.clear();
     res.json(data);
@@ -2602,15 +2633,19 @@ api.get("/user/dashboard/overview", authUser, async (req, res) => {
   const uid = req.userSession.user_id;
   const hit = _ovCache.get(uid);
   if (hit && Date.now() - hit.at < 3000) return res.json(hit.data);
-  let plan = "community";
-  try { const u = await findUserByEmail(req.userSession.email); if (u && u.plan) plan = u.plan; } catch {}
+  // Same one source as the developer snapshot. When the relay cannot answer we
+  // say so with a 503 and the page keeps whatever it last drew; it does NOT
+  // fall back to a community cap, which is how a Pro customer came to read
+  // "2 signatures left" on a page his own supplier served him.
+  const ents = await readAccountEntitlements(uid);
+  if (!ents) return res.status(503).json({ error: "entitlements_unavailable" });
   try {
-    const snap = await buildSnapshot({ redis, getAuditEvents, plan }, req.userSession);
+    const snap = await buildSnapshot({ redis, getAuditEvents, entitlements: ents }, req.userSession);
     // key_masked is deliberately NOT passed on. /dashboard no longer prints a
     // key in any form, and a payload that still carries one is a payload that
     // will be printed again by the next person who reads it and assumes it is
     // there to be used. The account key lives on /account, behind its fold.
-    const data = { plan: snap.plan, quota: snap.quota, audit: snap.audit };
+    const data = { tiers: snap.tiers, quota: snap.quota, audit: snap.audit };
     _ovCache.set(uid, { at: Date.now(), data });
     if (_ovCache.size > 500) _ovCache.clear();
     res.json(data);

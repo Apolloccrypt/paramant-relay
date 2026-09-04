@@ -42,17 +42,28 @@
     var email = document.querySelector('[data-dv="email"]');
     var plan = document.querySelector('[data-dv="plan"]');
     if (email) email.textContent = data.email || '--';
-    if (plan) plan.textContent = String(data.plan || '--').toUpperCase();
+    // This is the ParaSign developer page, so the tier it names is the ParaSign
+    // tier. It used to print the unified `plan`, which a purchase never moves,
+    // so a ParaSign Pro buyer read COMMUNITY next to his own email. The snapshot
+    // now carries a tier per product because an account can hold two different
+    // ones at once.
+    var tiers = data.tiers || {};
+    if (plan) plan.textContent = String(tiers.parasign || '--').toUpperCase();
     byId('api-status-dot').className = 'status-dot ok';
 
     var quota = data.quota || {};
     var used = Number(quota.signs || 0);
     var cap = quota.caps && quota.caps.signs;
     byId('sign-used').textContent = String(used);
-    byId('sign-cap').textContent = cap == null ? 'no fixed limit' : 'of ' + cap;
-    var percent = cap == null ? (used ? 8 : 0) : Math.min(100, Math.round((used / Math.max(1, cap)) * 100));
+    // A missing cap means the relay could not be asked, not that there is no
+    // ceiling: every tier has a finite monthly one (relay/lib/entitlements.js
+    // holds even enterprise to a real number). So the honest reading of an
+    // absent cap is "we do not know right now", and the page says that instead
+    // of promising a limit nobody grants.
+    byId('sign-cap').textContent = cap == null ? 'of --' : 'of ' + cap;
+    var percent = cap == null ? 0 : Math.min(100, Math.round((used / Math.max(1, cap)) * 100));
     var bar = byId('sign-bar'); bar.style.width = percent + '%'; bar.className = percent >= 80 ? 'warn' : '';
-    byId('usage-note').textContent = cap == null ? 'Your current plan has no fixed monthly signing cap.' : Math.max(0, cap - used) + ' signatures remain in the current month.';
+    byId('usage-note').textContent = cap == null ? 'Your monthly signing allowance could not be read just now.' : Math.max(0, cap - used) + ' signatures remain in the current month.';
     renderActivity((data.audit || []).filter(isSignEvent));
   }
 
@@ -106,7 +117,11 @@
     button.disabled = true; button.textContent = 'Creating'; error.hidden = true;
     json(API, { method:'POST', headers:{ 'Content-Type':'application/json', Accept:'application/json' }, body:JSON.stringify({ label:label }) }).then(function (data) {
       byId('psk-secret').textContent = data.key || '';
-      byId('psk-meta').textContent = 'Key ' + (data.kid || '--') + ' · ' + (data.mode || 'live') + ' · plan ' + (data.plan || snapshot && snapshot.plan || '--');
+      // The key's own plan when the relay named one, otherwise the account's
+      // ParaSign tier from the snapshot. Not the unified plan: this is a
+      // ParaSign key, so the tier beside it is the ParaSign one.
+      var snapTier = snapshot && snapshot.tiers && snapshot.tiers.parasign;
+      byId('psk-meta').textContent = 'Key ' + (data.kid || '--') + ' · ' + (data.mode || 'live') + ' · plan ' + (data.plan || snapTier || '--');
       showView('secret'); loadKeys();
     }).catch(function (failure) {
       error.textContent = failure.status === 403 ? 'Your account does not have ParaSign API access. Check the plan or ask an administrator to enable it.' : 'The key could not be created. ' + failure.message;
