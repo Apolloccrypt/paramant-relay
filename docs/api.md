@@ -1040,19 +1040,18 @@ Revokes all sessions except the current one.
 
 Generates a new set of backup codes and invalidates all previous ones.
 
-### POST /api/user/billing/checkout
+### POST /api/user/billing/checkout (410 Gone)
 
-Creates a pending plan-change order and returns an internal confirmation URL. This flow does not charge a payment method (see the `stub_notice` field on billing status); paid ParaSend and ParaSign upgrades are billed through the Mollie checkout on the relay, see [Billing (Mollie)](#billing-mollie) below.
+Removed on 20 July 2026 and kept as a 410 so a stale client gets a clean answer: it granted a plan without a payment. `GET /api/user/billing/checkout/:token` and `POST /api/user/billing/checkout/:token/confirm` answer the same.
 
 ```bash
 curl -X POST https://paramant.app/api/user/billing/checkout \
-  -H "Cookie: paramant_user_session=<token>" \
-  -H "Content-Type: application/json" \
-  -d '{"plan_id":"pro","period":"monthly"}'
-# {"checkout_url":"/billing/checkout/<token>","expires_at":"2026-…"}
+  -H "Cookie: paramant_user_session=<token>"
+# 410
+# {"error":"billing_stub_removed","message":"Checkout moved to Mollie; this endpoint no longer grants plans."}
 ```
 
-The order expires after one hour. `GET /api/user/billing/checkout/:token` returns the pending order (`plan_id`, `plan_name`, `period`, `amount_eur`, `email`, `status`). `POST /api/user/billing/checkout/:token/confirm` applies the plan change and returns `{"success":true,"new_plan":"pro","effective_from":"…"}`.
+The one path to a paid plan is the Mollie checkout on the relay, `POST /v2/billing/checkout`, see [Billing (Mollie)](#billing-mollie) below. The tier is granted by `/v2/billing/webhook` only after Mollie confirms the payment as paid for the amount the catalog names, and that same webhook issues the invoice or payment receipt. The `stub_notice` field this section used to point at is gone from `GET /api/user/billing/status` too.
 
 ### POST /api/user/billing/cancel
 

@@ -274,7 +274,23 @@ https://paramant.app`;
 }
 
 // ── 4. BILLING CONFIRMATION ───────────────────────────────────────────────────
-function billingConfirmationEmail({ planName, period, amountStr, stub = true }) {
+// Sent by the admin panel when a plan is set on an account from the inside.
+// Every caller of this template is that path, and the note it carries used to
+// say the opposite of the truth: that payments were in beta, that the customer
+// would be invoiced by hand, that real invoicing was still waiting on Mollie.
+// All three were false by September 2026. relay.js POST /v2/billing/checkout
+// calls mollie.createPayment against api.mollie.com unconditionally, the
+// webhook only grants on a re-fetched status paid (lib/billing.js), and it
+// issues a numbered document per payment on its own: lib/invoice.js, series
+// PS-YYYY-NNNN, an invoice when a seller VAT number is configured and a payment
+// receipt when it is not, plus lib/credit-note.js (CN-YYYY-NNNN) when money
+// goes back.
+//
+// What IS true of THIS mail is the other half: an admin-set plan is not a
+// purchase. No payment was taken, so no document is issued for it, and the
+// customer should not go looking for one. noPayment says exactly that and
+// nothing more.
+function billingConfirmationEmail({ planName, period, amountStr, noPayment = true }) {
   const preheader = `Your Paramant plan is now ${planName}.`;
   const periodLabel = period === 'yearly' ? 'Yearly' : period === 'monthly' ? 'Monthly' : 'Admin-provisioned';
 
@@ -285,7 +301,7 @@ Your Paramant plan has been upgraded.
 Plan:    ${planName}
 Billing: ${periodLabel}
 Amount:  ${amountStr || 'N/A'}
-${stub ? '\nNote: payment processing is in beta. This confirmation reflects the\nplan change on your account. Formal invoicing follows when Mollie\nintegration goes live.\n' : ''}
+${noPayment ? '\nNote: Paramant set this plan on your account. Nothing was charged for\nit, so this change has no invoice. A plan bought on paramant.app is paid\nthrough Mollie, and every payment gets a numbered invoice or payment\nreceipt that stays on your account page.\n' : ''}
 Questions about billing? Reply to this email.
 
 Paramant
@@ -299,7 +315,7 @@ https://paramant.app`;
       <tr><td style="padding:10px 0;border-bottom:1px solid rgba(11,58,106,0.06);color:#64748b;font-size:14px;">Billing</td><td style="padding:10px 0;border-bottom:1px solid rgba(11,58,106,0.06);font-weight:600;text-align:right;">${periodLabel}</td></tr>
       <tr><td style="padding:10px 0;color:#64748b;font-size:14px;">Amount</td><td style="padding:10px 0;font-weight:700;color:#1D4ED8;text-align:right;">${amountStr || 'N/A'}</td></tr>
     </table>
-    ${stub ? '<div style="background:#FEF3C7;border-left:3px solid #D97706;padding:12px 16px;margin:24px 0;"><p style="margin:0;line-height:1.5;color:#92400E;font-size:13px;"><strong>Beta note:</strong> payment processing is not yet live. This confirmation reflects the plan change on your account. Formal invoicing follows when Mollie integration goes live.</p></div>' : ''}
+    ${noPayment ? '<div style="background:rgba(11,58,106,0.04);border-left:3px solid #1D4ED8;padding:12px 16px;margin:24px 0;"><p style="margin:0;line-height:1.5;color:#475569;font-size:13px;"><strong>No payment for this change:</strong> Paramant set this plan on your account, so nothing was charged and this change has no invoice. A plan bought on paramant.app is paid through Mollie, and every payment gets a numbered invoice or payment receipt that stays on your account page.</p></div>' : ''}
     <p style="margin:16px 0 0 0;line-height:1.6;color:#475569;font-size:14px;">Questions about billing? Reply to this email.</p>
   `);
 
@@ -312,9 +328,10 @@ https://paramant.app`;
 // ── 4b. PER-PRODUCT PLAN CHANGE ───────────────────────────────────────────────
 // Sent when an admin sets a SINGLE product's tier (ParaSign or ParaSend) without
 // touching the other product or the unified plan. Deliberately carries NO
-// "beta / no charge / stub" language: this is a scoped entitlement change, not a
-// billing-stub confirmation. productName is a display name ("ParaSign"),
-// tierName the tier ("Pro"); both are constants from the caller.
+// billing note of any kind: this is a scoped entitlement change, and the mail
+// above is the one that answers for a plan and its money. productName is a
+// display name ("ParaSign"), tierName the tier ("Pro"); both are constants
+// from the caller.
 function productPlanChangeEmail({ productName, tierName }) {
   const safeProduct = escHtml(productName || 'your product');
   const safeTier = escHtml(tierName || '');

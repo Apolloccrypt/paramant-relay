@@ -3233,12 +3233,17 @@ const PLANS = [
   },
 ];
 
+// No caller since the stub checkout was hard-disabled below; the plan-change
+// route mails its own copy. Left in place, and the note is derived rather than
+// forced on: a plan the admin set was not paid for and says so, a plan that
+// arrived through a payment is already answered by the relay, which mails the
+// numbered invoice or receipt with the PDF attached (relay/lib/invoice.js).
 async function sendBillingConfirmation(email, plan, amount, period) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) { console.warn('[billing] RESEND_API_KEY not set'); return; }
   const planName = PLANS.find(p => p.id === plan)?.name || plan;
   const amountStr = amount === 0 ? 'Free' : `€${amount}/${period === 'yearly' ? 'yr' : 'mo'}`;
-  const msg = emailTemplates.billingConfirmationEmail({ planName, period, amountStr, stub: true });
+  const msg = emailTemplates.billingConfirmationEmail({ planName, period, amountStr, noPayment: period === 'admin' });
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -3601,10 +3606,14 @@ api.get("/admin/billing", authMiddleware, async (req, res) => {
       telemetry.getPlanDistribution(relayFetch, ADMIN_TOKEN),
       telemetry.getRecentAuditEvents(200),
     ]);
+    // stub_mode, mrr_eur and churn_this_month are gone. The first said billing
+    // was a stub, which stopped being true when Mollie went live; the other two
+    // were hardcoded zeros, a revenue and a churn figure this route never
+    // counted. Nothing read any of the three: the served admin screen
+    // (admin/public/app.js) renders plan_distribution and recent_checkouts and
+    // says in the tab itself that it shows neither payments nor revenue.
     res.json({
-      stub_mode: true, mrr_eur: 0,
       total_customers: Object.values(planDist).reduce((a, b) => a + b, 0),
-      churn_this_month: 0,
       plan_distribution: planDist,
       recent_checkouts: recentAudit.filter(e => e.event_type === "plan_changed").slice(0, 20),
     });
@@ -3863,7 +3872,7 @@ api.post('/admin/change-plan', authMiddleware, async (req, res) => {
     const allOk = mutation.failed.length === 0 && readBack.failed.length === 0 && mismatched.length === 0;
     if (allOk && notify && meta.email) {
       const planName = new_plan.charAt(0).toUpperCase() + new_plan.slice(1);
-      emailTemplates.sendEmail(meta.email, emailTemplates.billingConfirmationEmail({ planName, period: 'admin', amountStr: 'admin-provisioned', stub: true })).catch(e => console.error('[admin/change-plan] email:', e.message));
+      emailTemplates.sendEmail(meta.email, emailTemplates.billingConfirmationEmail({ planName, period: 'admin', amountStr: 'admin-provisioned', noPayment: true })).catch(e => console.error('[admin/change-plan] email:', e.message));
     }
     try { await logAuditEvent(key, 'admin_plan_changed', { from: meta.plan, to: new_plan, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
     res.status(allOk ? 200 : 207).json({ ok: allOk, partial_failure: !allOk, error: allOk ? null : 'fleet_not_consistent', from: meta.plan, to: new_plan, failed_sectors: mutation.failed, read_back_failed: readBack.failed, verification_failed: mismatched, retried_sectors: mutation.retried, entitlements_by_sector: readBack.results, sector_count: Object.keys(SECTORS).length, email_sent: !!(allOk && notify && meta.email) });
@@ -3877,7 +3886,7 @@ api.post('/admin/change-plan', authMiddleware, async (req, res) => {
 // path as change-plan via callRelay), then reloads users fleet-wide so the
 // entitlement is observable at once. An unknown product or a tier not on that
 // product's ladder is rejected 400. Optional notify uses the per-product mail
-// (productPlanChangeEmail) - NO billing-stub / no-charge language.
+// (productPlanChangeEmail), which carries no billing note at all.
 api.post('/admin/set-product-plan', authMiddleware, async (req, res) => {
   const { key, product, tier, notify = false } = req.body || {};
   const LADDERS = { parasign: ['free', 'pro', 'business', 'enterprise'], parasend: ['community', 'pro', 'enterprise'] };
@@ -4051,7 +4060,11 @@ api.get('/admin/user-details/:key', authMiddleware, async (req, res) => {
       created: meta.created_at || k.created || null,
       totp_status,
       active_sessions: sessionCount,
-      billing: billing || { plan: k.plan || 'community', stub: true },
+      // No billing record in redis means this account never went through a
+      // payment, so the fallback says the plan and nothing else. The old
+      // `stub: true` on that fallback claimed the billing system was a stub,
+      // which it has not been since Mollie went live, and nothing read it.
+      billing: billing || { plan: k.plan || 'community' },
       audit_events: auditEvents,
     });
   } catch (err) { console.error('[admin/user-details]', err.message); res.status(500).json({ error: 'internal' }); }
@@ -4073,7 +4086,10 @@ api.post('/admin/preview-email', authMiddleware, async (req, res) => {
     if (type === 'welcome') tpl = emailTemplates.welcomeEmail({ apiKey: key || 'pgp_preview00000000', plan: meta.plan, label: meta.label, sectors: meta.sectors });
     else if (type === 'setup') tpl = emailTemplates.setupEmail({ token: fakeToken, requestedAt: Date.now(), requestIP: '0.0.0.0', isReset: options.isReset || false });
     else if (type === 'reset-confirm') tpl = emailTemplates.resetConfirmationEmail({ confirmToken: fakeToken, requestedAt: Date.now(), requestIP: '0.0.0.0' });
-    else if (type === 'billing') { const planName = (options.plan || meta.plan || 'pro'); tpl = emailTemplates.billingConfirmationEmail({ planName: planName.charAt(0).toUpperCase()+planName.slice(1), period: 'monthly', amountStr: '€9/mo', stub: true }); }
+    // Previewed as the admin-set plan, because that is the only shape this mail
+    // is ever sent in: /admin/change-plan is its one live caller. A preview
+    // showing "Monthly, EUR 9/mo" showed a mail nobody receives.
+    else if (type === 'billing') { const planName = (options.plan || meta.plan || 'pro'); tpl = emailTemplates.billingConfirmationEmail({ planName: planName.charAt(0).toUpperCase()+planName.slice(1), period: 'admin', amountStr: 'admin-provisioned', noPayment: true }); }
     else if (type === 'cancellation') { const planName = meta.plan || 'pro'; tpl = emailTemplates.billingCancellationEmail({ planName: planName.charAt(0).toUpperCase()+planName.slice(1), cancelDate: new Date(Date.now()+30*86_400_000).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) }); }
     else if (type === 'deletion') tpl = emailTemplates.accountDeletionEmail({ email, deletedAt: Date.now(), reason: options.reason || 'preview' });
     res.json({ ...tpl, recipient: email });

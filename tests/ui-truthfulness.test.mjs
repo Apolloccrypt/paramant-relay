@@ -33,7 +33,39 @@ assert.doesNotMatch(email, /sign up again|Files already relayed are not affected
 // same thing: the check digits add up and nothing about the document itself
 // was verified. Matched on the claim, not on one exact sentence.
 
-console.log('ui-truthfulness: deactivation and MRZ scope are stated honestly');
+// ── Billing stopped being a stub, so the copy has to stop saying it is ───────
+// Payments run through Mollie for real (relay/lib/mollie.js, called
+// unconditionally by POST /v2/billing/checkout), the webhook grants only on a
+// re-fetched paid status (relay/lib/billing.js), and it issues a numbered
+// document by itself: relay/lib/invoice.js (PS-YYYY-NNNN) or
+// relay/lib/credit-note.js (CN-YYYY-NNNN) when money goes back. Nobody is
+// invoiced by hand, nothing waits on an integration, and no figure on the
+// billing tab is a fixture.
+//
+// admin/test/admin-ui-coupons.test.js guards admin/public/app.js, the screen
+// that is served. This guards the two copies that test does not read: the
+// unrouted second admin screen, which carried the same banner and is exactly
+// how a corrected line gets copied back in, and the customer email, where the
+// claim actually reached a customer.
+// Both admin screens carry a block comment explaining which sentence used to
+// stand there and why it was false, so they quote the very wording this check
+// forbids. Same problem, same answer as signVisible below: read what a person
+// sees, not what the file says about itself.
+const adminJsVisible = adminJs.replace(/\/\*[\s\S]*?\*\//g, '');
+const emailVisible = email.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const billingLies = /Beta billing|beta note|payment processing is (in beta|not yet live)|manually invoiced|invoiced by hand|stub only|Mollie[^.]{0,40}(is in integration|goes live)|Formal invoicing follows/i;
+assert.doesNotMatch(adminJsVisible, billingLies,
+  'no admin screen may call billing a beta or a stub: Mollie payments are live');
+assert.doesNotMatch(emailVisible, billingLies,
+  'no customer email may promise invoicing that already happens');
+// And the mail has to say what IS true of an admin-set plan: it was not paid
+// for, so it has no document, while a plan that IS paid for gets one.
+assert.match(email, /Nothing was charged for[\s\S]{0,4}it, so this change has no invoice/,
+  'the plan-change mail must say an admin-set plan was not charged for');
+assert.match(email, /numbered invoice or payment receipt/,
+  'the plan-change mail must say what a real payment does get');
+
+console.log('ui-truthfulness: deactivation, MRZ scope and billing are stated honestly');
 
 
 // ── The signing page now that /sign is served to everyone ────────────────────
