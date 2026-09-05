@@ -1350,30 +1350,29 @@ setInterval(() => {
 // Blobs live in RAM and only in RAM. That is a promise this product makes in
 // terms.html, in press.html and in the Art. 28 processing register in dpa.html,
 // so the way to carry bigger files is to hold each one for a shorter time, not
-// to spill it to disk. Capacity here is therefore a memory budget, and it has to
-// be an honest one.
+// to spill it to disk. Capacity here is therefore a memory budget.
 //
-// RAM_LIMIT_MB is ALL the memory this process may use. It should match the
-// container limit (docker-compose.yml `deploy.resources.limits.memory`).
-// RAM_RESERVE_MB is the slice of that reserved for Node itself: heap, TLS
-// buffers, the request currently being parsed. What is left is what blobs may
-// occupy.
+// THE TWO NUMBERS, and this is the meaning scripts/check-guards.mjs enforces:
+// RAM_LIMIT_MB is what blobs may occupy, and RAM_RESERVE_MB is headroom ADDED
+// on top of it for the process itself. The guard trips at the SUM, so the sum
+// is what has to stay below the container's cgroup limit. It did not: the
+// health relay ran 8192 + 512 inside a container capped at 8192, so the kernel
+// always got there first and the guard was dead code. That was fixed by moving
+// the numbers to 6656 + 512, and check-guards.mjs now fails the build if the
+// sum ever climbs back to the cap.
 //
-// It used to be the other way round: the guard allowed RAM_LIMIT_MB +
-// RAM_RESERVE_MB and treated the reserve as extra headroom on top. On the
-// production health relay that put the guard's ceiling at 8704 MB inside an
-// 8192 MB container, so the OOM killer always arrived first and the guard could
-// never actually refuse anything. A budget that sits above the hard limit is not
-// a budget.
+// What changes here is only HOW the budget is spent, not what the two numbers
+// mean: the ceiling used to be a count of 5 MB slots, which stopped being the
+// right unit once a single transfer could be a hundred of them. It is bytes
+// now. Do not reinterpret RAM_RESERVE_MB as a slice held back below the limit;
+// operators and self-host installs set these, and check-guards.mjs reads them
+// the way they are described above.
 const RAM_LIMIT_MB    = parseInt(process.env.RAM_LIMIT_MB    || '512');
 const RAM_RESERVE_MB  = parseInt(process.env.RAM_RESERVE_MB  || '256');
-// What blobs may occupy, in bytes. Never negative, and never zero: a relay
-// configured with reserve >= limit still has to be able to answer.
-const BLOB_BUDGET_BYTES = Math.max(32 * 1048576, (RAM_LIMIT_MB - RAM_RESERVE_MB) * 1048576);
-// Kept as a blob COUNT for the status view and for the self-host installs that
-// read it, but it is derived from the byte budget now rather than being the
-// budget itself. Counting 5 MB units stopped being the right unit the moment a
-// single transfer could be a hundred of them.
+// What blobs may occupy, in bytes.
+const BLOB_BUDGET_BYTES = Math.max(32 * 1048576, RAM_LIMIT_MB * 1048576);
+// Kept as a blob COUNT for the status view and the self-host installs that read
+// it, but derived from the byte budget rather than being the budget itself.
 const BLOB_SIZE_MB    = 5;
 const MAX_BLOBS       = Math.floor(BLOB_BUDGET_BYTES / (BLOB_SIZE_MB * 1048576));
 
@@ -1399,8 +1398,9 @@ function ramStats() {
 //
 //   1. the blob budget: what is already held, plus what is mid-upload, plus the
 //      one being asked about, must fit in BLOB_BUDGET_BYTES.
-//   2. actual process memory: RSS must stay under RAM_LIMIT_MB, which is the
-//      container's hard limit. This catches the memory a blob costs on the way
+//   2. actual process memory: RSS must stay under RAM_LIMIT_MB + RAM_RESERVE_MB,
+//      which scripts/check-guards.mjs holds below the container's cgroup limit,
+//      so this branch can actually fire. It catches the memory a blob costs on the way
 //      in that the budget does not model -- a 5 MiB blob arrives base64'd inside
 //      a JSON body, so it is roughly 19 MB of transient buffers before it
 //      becomes a 5 MiB Buffer.
@@ -1408,7 +1408,7 @@ function ramOk() {
   const { rssMB } = ramStats();
   const wouldHold = blobBytesHeld + (inFlightInbound + 1) * MAX_BLOB;
   if (wouldHold > BLOB_BUDGET_BYTES) return false;
-  if (rssMB + Math.ceil(((inFlightInbound + 1) * MAX_BLOB * 4) / 1048576) > RAM_LIMIT_MB) return false;
+  if (rssMB + Math.ceil(((inFlightInbound + 1) * MAX_BLOB * 4) / 1048576) > RAM_LIMIT_MB + RAM_RESERVE_MB) return false;
   return true;
 }
 
