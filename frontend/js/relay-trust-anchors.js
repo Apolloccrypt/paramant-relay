@@ -7,22 +7,74 @@
 // its own key, and the verifier recomputes that fingerprint rather than
 // trusting the string below.
 //
+// WHY THERE ARE FIVE. A receipt is signed by the relay that handed the file
+// over, and that is almost never relay.paramant.app: the app picks a sector
+// relay (frontend/js/parashare.page.js RELAY_SECTORS) and prefers health. Each
+// relay generates its own identity on first boot and keeps it on its own volume
+// (relay/relay.js:513-548, RELAY_IDENTITY_FILE), so the five have five
+// different keys. Pinning only the first one meant every real receipt was
+// checked against the wrong key and shown to its owner as a forgery.
+//
+// WHY THESE FIVE KEYS ARE OURS. Every entry below was read over TLS from its
+// own host, and all five hosts sit on one Let's Encrypt certificate together
+// with relay.paramant.app, whose key this file already trusted
+// (CN=paramant.app, SAN: addin, finance, health, iot, legal, paramant.app,
+// relay). Issuing that certificate required proving control of every one of
+// those names, so the confirmation comes from the CA's domain validation and
+// not from the relays' own say-so. Recorded at pin time, 2026-09-05:
+//   relay    3d9b960c…befd61      health   8376424b…5126
+//   legal    10f3313c…e859        finance  48a26c5b…4d03
+//   iot      ce56ff0f…28c6
+//
 // If a relay ever rotates its identity key, receipts signed by the new key show
 // up as "signed by a key this page does not recognise" and stay checkable by
 // pasting the current key. That is the intended failure mode: never a false
-// "genuine", never a false "forged". Refresh a pin from the endpoint in
-// PUBKEY_URL and update the fingerprint in the same commit.
-//
-// relay.paramant.app, pinned 2026-09-03 from https://relay.paramant.app/v2/pubkey
+// "genuine", never a false "forged". Refresh a pin from that relay's own
+// /v2/pubkey and update the fingerprint in the same commit. Adding a relay to
+// RELAY_SECTORS without adding it here turns tests/verify-knows-the-fleet.test.mjs
+// red on purpose.
 export const PUBKEY_URL = 'https://relay.paramant.app/v2/pubkey';
 
 export const RELAY_TRUST_ANCHORS = [
   {
     name: 'the Paramant relay',
     host: 'relay.paramant.app',
+    sector: 'relay',
     alg: 'ML-DSA-65',
     fingerprint: '3d9b960c107a5145dc7412b5953d52c0f5d5b89a654f2da296b1133164befd61',
     key: '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',
+  },
+  {
+    name: 'the Paramant health relay',
+    host: 'health.paramant.app',
+    sector: 'health',
+    alg: 'ML-DSA-65',
+    fingerprint: '8376424bc4128148103a4b604bc257efbe5d7cb3fbd826a78306c905f39e5126',
+    key: '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',
+  },
+  {
+    name: 'the Paramant legal relay',
+    host: 'legal.paramant.app',
+    sector: 'legal',
+    alg: 'ML-DSA-65',
+    fingerprint: '10f3313c87cbabdc38c8fd349fb9eb1b309a525894ae81262d9e810912f5e859',
+    key: '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',
+  },
+  {
+    name: 'the Paramant finance relay',
+    host: 'finance.paramant.app',
+    sector: 'finance',
+    alg: 'ML-DSA-65',
+    fingerprint: '48a26c5b9ae76a760cb170313c6850679c584e57525eb15217ad152729284d03',
+    key: '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',
+  },
+  {
+    name: 'the Paramant IoT relay',
+    host: 'iot.paramant.app',
+    sector: 'iot',
+    alg: 'ML-DSA-65',
+    fingerprint: 'ce56ff0fafeedaa160c91dc7afee038b17dfb397665a9b2c88b0d3f77acd28c6',
+    key: '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',
   },
 ];
 
@@ -32,4 +84,27 @@ export function defaultAnchor() {
 
 export function anchorByFingerprint(fingerprint) {
   return RELAY_TRUST_ANCHORS.find((a) => a.fingerprint === fingerprint) || null;
+}
+
+// A receipt names its issuer in `relay_id`, which relay.js writes as either a
+// full URL (RELAY_SELF_URL, e.g. https://health.paramant.app) or a bare host
+// (SECTOR + '.paramant.app'). Both reduce to the same host here.
+export function hostOfRelayId(relayId) {
+  const raw = String(relayId == null ? '' : relayId).trim();
+  if (!raw) return '';
+  try { return new URL(raw).host.toLowerCase(); } catch { /* not a URL */ }
+  return raw.replace(/^\/\//, '').split('/')[0].split(':')[0].toLowerCase();
+}
+
+export function anchorByHost(host, anchors = RELAY_TRUST_ANCHORS) {
+  const h = String(host || '').toLowerCase();
+  return anchors.find((a) => a.host.toLowerCase() === h) || null;
+}
+
+// The anchor that should check this receipt, or null when the receipt was
+// issued by a relay this build does not ship. Null is not a verdict on the
+// receipt: it means this page cannot speak about the signature, which is a
+// different thing from the signature being wrong.
+export function anchorForReceipt(receipt, anchors = RELAY_TRUST_ANCHORS) {
+  return anchorByHost(hostOfRelayId(receipt && receipt.relay_id), anchors);
 }
