@@ -25,7 +25,14 @@ async function load() {
 
     var keyRegCount   = allEntries.filter(function(e){ return !e.type || e.type === 'key_reg'; }).length;
     var transferCount = allEntries.filter(function(e){ return e.type === 'transfer' || e.type === 'pubkey'; }).length;
-    document.getElementById('stat-total').textContent = d.size != null ? d.size : allEntries.length;
+    var logSize = d.size != null ? d.size : allEntries.length;
+    document.getElementById('stat-total').textContent = logSize;
+    // The composition sentence names the same number the counter shows. It is
+    // filled in here rather than typed into ct-log.html so it can never go
+    // stale; if this never runs the sentence keeps its own word "entries" and
+    // still reads correctly, which is why the fallback is not "n/a".
+    var compEl = document.getElementById('composition-count');
+    if (compEl && logSize) compEl.textContent = logSize + ' entries';
     document.getElementById('stat-count').textContent = keyRegCount;
     document.getElementById('stat-transfers').textContent = transferCount;
     const root = d.root || '';
