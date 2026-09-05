@@ -511,6 +511,50 @@ test('the SLA figures are consistent across pages and the measurement described 
   assert.match(visible(sla), /measured from your (own )?browser/);
 });
 
+// 8b ── TLS. /dpa row: "TLS 1.3 minimum on all relay endpoints", in an article
+// 28 agreement customers sign electronically. Until 5 September 2026 every
+// nginx config in the repository allowed TLS 1.2 as well, and the Outlook
+// add-in vhost named no protocols at all and so inherited the host default,
+// which admits older still. Nothing asserted on it, which is why it survived a
+// full claims round.
+//
+// What this block can and cannot show: it reads the configs IN THIS REPOSITORY.
+// Production paramant.app terminates TLS in Caddy, whose configuration is not
+// here (deploy/nginx-paramant-live.conf listens on 127.0.0.1:8080 behind it),
+// so a green run means the repository keeps its own promise, not that the live
+// edge does. SECURITY.md, section "TLS 1.3 only", says the same out loud.
+test('every TLS-terminating server block in the repository is TLS 1.3 only', () => {
+  const CONFS = [
+    'deploy/nginx-paramant-public.conf',
+    'deploy/nginx-selfhost.conf',
+    'nginx-selfhost.conf',
+    'deploy/nginx/addin.paramant.app.conf',
+  ];
+  const problems = [];
+  let terminators = 0;
+  for (const file of CONFS) {
+    const conf = read(file).replace(/#.*$/gm, '');
+    // Every block that terminates TLS has to say which protocols it accepts.
+    // Silence is the worst answer, not a neutral one: it inherits the default.
+    const listens = (conf.match(/^\s*listen\s+[^;]*\bssl\b/gm) || []).length;
+    const speaks = (conf.match(/^\s*ssl_protocols\s+([^;]+);/gm) || []);
+    terminators += listens;
+    if (listens > 0 && speaks.length < listens) {
+      problems.push(`${file}: ${listens} block(s) terminate TLS but only ${speaks.length} name a protocol; a block that names none inherits the host default`);
+    }
+    for (const line of speaks) {
+      const value = line.replace(/^\s*ssl_protocols\s+/, '').replace(/;$/, '').trim();
+      if (value !== 'TLSv1.3') {
+        problems.push(`${file}: ssl_protocols is "${value}"; /dpa promises TLS 1.3 minimum on all relay endpoints`);
+      }
+    }
+  }
+  assert.ok(terminators >= 9, `expected at least 9 TLS-terminating blocks, found ${terminators}; a config was renamed or dropped and this block stopped looking at it`);
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+  // And the page still says it, so retiring the promise retires the test.
+  assert.match(read('frontend/dpa.html'), /TLS 1\.3 minimum on all relay endpoints/);
+});
+
 // 9 ── IP logging. The deploy configuration in the repository switches nginx
 // access logging off on every public server block, and there is no
 // log-rotation config, so the page may neither describe access logs as a
