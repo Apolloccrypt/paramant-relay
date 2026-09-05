@@ -2804,6 +2804,222 @@ if [ ! -f "$LR_DEST" ]; then pass "and it wrote nothing"; else
   fail "5d wrote a file anyway"; fi
 cp "$SNIPPET" "$LR/co/deploy/nginx/snippets/paramant-limit-req.conf"
 
+# ------------------------------------ 6p. the deep-health verdict is judged --
+#
+# Step 6c printed "deep overall = red" and reported OK twice, on every run from
+# 2026-09-03 02:59 to 2026-09-05 17:48, because it asserted the two HTTP status
+# codes and never looked at the body. The codes are about the auth gate in
+# front of the route; the route answers 200 whatever it thinks of the relay.
+#
+# Two things are tested here, and both need to be, because they fail in
+# different places: the remote block has to EXPRESS the verdict and name what
+# is not green, and expect_verdict has to JUDGE it.
+echo ""
+echo "6p. The deep-health verdict is expressed and judged"
+
+DH="$WORK/deephealth"
+mkdir -p "$DH"
+
+# --- 6p-1. the remote block turns a body into lines a human can act on -------
+# The python that parses the response, lifted out of the 6c heredoc exactly as
+# the server runs it. Everything between the -c quote and the closing quote.
+sed -n "/^  remote \"deep health\"/,/^EOF\$/p" "$SCRIPT" \
+  | sed -n "/| python3 -c '/,/^' 2>\/dev\/null/p" | sed '1d;$d' > "$DH/parse.py"
+if [ -s "$DH/parse.py" ]; then
+  pass "the deep-health parser could be extracted from the 6c block"
+else
+  fail "could not extract the deep-health parser from the 6c block"
+fi
+
+cat > "$DH/red.json" <<'JSON'
+{"overall":"red","version":"3.1.0","sector":"main","checks":[
+ {"name":"relay","status":"green","detail":"relay 3.1.0 (main) up"},
+ {"name":"storage","status":"red","detail":"not writable (/app): EROFS"},
+ {"name":"tls","status":"yellow","detail":"TLS terminated at the edge (not on this relay)"}]}
+JSON
+cat > "$DH/green.json" <<'JSON'
+{"overall":"green","version":"3.1.0","sector":"main","checks":[
+ {"name":"relay","status":"green","detail":"relay 3.1.0 (main) up"},
+ {"name":"storage","status":"green","detail":"data dir writable (/data)"}]}
+JSON
+
+PARSED_RED="$(python3 "$DH/parse.py" < "$DH/red.json" 2>&1 || true)"
+if printf '%s\n' "$PARSED_RED" | grep -q '^deep overall = red$'; then
+  pass "the parser prints the verdict"
+else
+  fail "the parser did not print 'deep overall = red'"
+  printf '%s\n' "$PARSED_RED" | sed 's/^/        /'
+fi
+if printf '%s\n' "$PARSED_RED" | grep -q '^deep component storage = red -- not writable (/app): EROFS$'; then
+  pass "the parser names the red component, its state and its detail"
+else
+  fail "the parser did not name the red component; the verdict would be a colour with no reason"
+  printf '%s\n' "$PARSED_RED" | sed 's/^/        /'
+fi
+if printf '%s\n' "$PARSED_RED" | grep -q '^deep component tls = yellow -- '; then
+  pass "and the yellow one too, not only the red"
+else
+  fail "the parser skipped the yellow component"
+fi
+if printf '%s\n' "$PARSED_RED" | grep -q '^deep not-green = 2$'; then
+  pass "the parser counts the components that are not green"
+else
+  fail "the parser did not print 'deep not-green = 2'"
+fi
+PARSED_GREEN="$(python3 "$DH/parse.py" < "$DH/green.json" 2>&1 || true)"
+if printf '%s\n' "$PARSED_GREEN" | grep -q '^deep not-green = 0$' \
+   && ! printf '%s\n' "$PARSED_GREEN" | grep -q '^deep component '; then
+  pass "an all-green body produces no component lines"
+else
+  fail "the parser invented a component line for an all-green body"
+  printf '%s\n' "$PARSED_GREEN" | sed 's/^/        /'
+fi
+
+# --- 6p-2. expect_verdict judges what the block printed ---------------------
+# Driven the way section 6n drives remote_nginx: the real function out of the
+# script, a synthetic REMOTE_OUT, and a look at what the caller can see. die()
+# is the script's own, so a stop is a non-zero exit and a STOP line.
+cat > "$DH/harness.sh" <<'HARNESS'
+set -uo pipefail
+SCRIPT="$1"; VERDICT_OUT="$2"
+DRY_RUN=0
+WARNINGS=0
+SUMMARY=""
+LOG="/dev/null"
+eval "$(sed -n '/^ok()    {/,/^  OK    \$\*"; }$/p' "$SCRIPT")"
+eval "$(sed -n '/^warn()  {/,/^  WARN  \$\*"; }$/p' "$SCRIPT")"
+eval "$(sed -n '/^die()   {/,/^          exit 1; }$/p' "$SCRIPT")"
+eval "$(grep '^remote_field() {' "$SCRIPT")"
+eval "$(sed -n '/^expect_verdict() {/,/^}$/p' "$SCRIPT")"
+REMOTE_OUT="$VERDICT_OUT"
+expect_verdict "deep overall" "deep component" "the deep-health verdict"
+echo "SURVIVED warnings=$WARNINGS"
+HARNESS
+
+# Not a command substitution. A $( ) puts the call in a subshell, and then
+# RV_RC is set in a child that exits, which is the run-4 bug section 6n exists
+# for. The output goes to a file and the exit code stays in this shell.
+RV_RC=0
+run_verdict() {   # remote-output text -> $DH/out.txt, RV_RC
+  RV_RC=0
+  bash "$DH/harness.sh" "$SCRIPT" "$1" > "$DH/out.txt" 2>&1 || RV_RC=$?
+}
+
+RED_OUT="deep noauth code = 401
+deep auth code = 200
+deep overall = red
+deep not-green = 1
+deep component storage = red -- not writable (/app): EROFS"
+
+YELLOW_OUT="deep overall = yellow
+deep not-green = 1
+deep component tls = yellow -- TLS terminated at the edge (not on this relay)"
+
+GREEN_OUT="deep overall = green
+deep not-green = 0"
+
+run_verdict "$RED_OUT"; V="$(cat "$DH/out.txt")"
+if [ "$RV_RC" -ne 0 ] && printf '%s\n' "$V" | grep -q 'STOP'; then
+  pass "a red verdict stops the run"
+else
+  fail "a red verdict did not stop the run (exit $RV_RC)"
+  printf '%s\n' "$V" | sed 's/^/        /'
+fi
+if printf '%s\n' "$V" | grep -q 'not green: deep component storage = red -- not writable (/app): EROFS'; then
+  pass "and the stop names the component that is red"
+else
+  fail "the stop did not name the red component"
+  printf '%s\n' "$V" | sed 's/^/        /'
+fi
+if printf '%s\n' "$V" | grep -q 'SURVIVED'; then
+  fail "the run continued past a red verdict"
+else
+  pass "nothing after the red verdict ran"
+fi
+
+run_verdict "$GREEN_OUT"; V="$(cat "$DH/out.txt")"
+if [ "$RV_RC" -eq 0 ] && printf '%s\n' "$V" | grep -q '^  OK    .*green' \
+   && printf '%s\n' "$V" | grep -q 'SURVIVED warnings=0'; then
+  pass "a green verdict passes, without a warning"
+else
+  fail "a green verdict did not pass cleanly (exit $RV_RC)"
+  printf '%s\n' "$V" | sed 's/^/        /'
+fi
+
+run_verdict "$YELLOW_OUT"; V="$(cat "$DH/out.txt")"
+if [ "$RV_RC" -eq 0 ] && printf '%s\n' "$V" | grep -q 'SURVIVED warnings=1' \
+   && printf '%s\n' "$V" | grep -q '^  WARN  '; then
+  pass "a yellow verdict warns and lets the run continue"
+else
+  fail "a yellow verdict was not a warning (exit $RV_RC)"
+  printf '%s\n' "$V" | sed 's/^/        /'
+fi
+if printf '%s\n' "$V" | grep -q 'not green: deep component tls = yellow'; then
+  pass "and the warning names the yellow component"
+else
+  fail "the warning did not name the yellow component"
+fi
+
+run_verdict "deep noauth code = 401
+deep auth code = 200"; V="$(cat "$DH/out.txt")"
+if [ "$RV_RC" -ne 0 ] && printf '%s\n' "$V" | grep -q 'never printed'; then
+  pass "a missing verdict stops the run"
+else
+  fail "a missing verdict was waved through (exit $RV_RC)"
+  printf '%s\n' "$V" | sed 's/^/        /'
+fi
+
+run_verdict "deep overall = unparseable"; V="$(cat "$DH/out.txt")"
+if [ "$RV_RC" -ne 0 ]; then
+  pass "an unparseable body stops the run, because an unreadable verdict is not a pass"
+else
+  fail "'unparseable' was read as a pass (exit $RV_RC)"
+  printf '%s\n' "$V" | sed 's/^/        /'
+fi
+
+# --- 6p-3. negative control -------------------------------------------------
+# The old 6c, spelled out: the two status-code assertions and nothing else,
+# against the same red output. It has to pass, otherwise the checks above are
+# not proving that anything changed.
+cat > "$DH/old.sh" <<'OLD'
+set -uo pipefail
+SCRIPT="$1"; VERDICT_OUT="$2"
+DRY_RUN=0
+SUMMARY=""
+LOG="/dev/null"
+eval "$(sed -n '/^ok()    {/,/^  OK    \$\*"; }$/p' "$SCRIPT")"
+eval "$(sed -n '/^die()   {/,/^          exit 1; }$/p' "$SCRIPT")"
+eval "$(grep '^remote_field() {' "$SCRIPT")"
+eval "$(sed -n '/^expect_count() {/,/^}$/p' "$SCRIPT")"
+REMOTE_OUT="$VERDICT_OUT"
+expect_count "deep noauth code" 401 "/v2/health/deep is 401 without X-Internal-Auth"
+expect_count "deep auth code" 200 "/v2/health/deep is 200 with X-Internal-Auth"
+echo "SURVIVED"
+OLD
+OLDRC=0
+bash "$DH/old.sh" "$SCRIPT" "$RED_OUT" > "$DH/old-out.txt" 2>&1 || OLDRC=$?
+OLDV="$(cat "$DH/old-out.txt")"
+if [ "$OLDRC" -eq 0 ] && printf '%s\n' "$OLDV" | grep -q 'SURVIVED' \
+   && [ "$(printf '%s\n' "$OLDV" | grep -c '^  OK    ')" -eq 2 ]; then
+  pass "negative control: the status-code assertions alone really do report OK twice on a red relay"
+else
+  fail "the negative control no longer reproduces the bug, so the checks above prove nothing"
+  printf '%s\n' "$OLDV" | sed 's/^/        /'
+fi
+
+# --- 6p-4. and 6c must keep calling it --------------------------------------
+DEEP_BLOCK="$(sed -n '/step "6c\./,/step "6d\./p' "$SCRIPT")"
+if printf '%s\n' "$DEEP_BLOCK" | grep -q 'expect_verdict "deep overall"'; then
+  pass "step 6c judges the verdict, not only the two status codes"
+else
+  fail "step 6c no longer judges the deep-health verdict"
+fi
+if printf '%s\n' "$DEEP_BLOCK" | grep -q 'deep component %s = %s'; then
+  pass "step 6c still prints the components that are not green"
+else
+  fail "step 6c stopped printing the components behind the verdict"
+fi
+
 # ---------------------------------------------------------------- 7. secrets --
 echo ""
 echo "7. No line the script would print can carry a key value"

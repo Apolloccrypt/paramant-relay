@@ -17,6 +17,9 @@
 
 const { test, after } = require('node:test');
 const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { bootHealthyRelay, killSpawnedRelays } = require('./_boot-relay');
 
 const TOKEN = 'deephealth-test-token';
@@ -92,4 +95,71 @@ test('full mode: stays public for the setup wizard', async () => {
   const anon = await deep(port);
   assert.strictEqual(anon.status, 200, 'full mode must keep the public read');
   assert.ok(Array.isArray(anon.body.checks) && anon.body.checks.length > 0);
+});
+
+// The storage probe, which was wrong twice over and said so in a field nobody
+// read. Written 2026-09-03, the deploy printed "deep overall = red" on all 34
+// runs from then until 2026-09-05 17:48, and step 6c reported OK underneath
+// it because it asserted the HTTP status codes and not the body.
+//
+// Fault one: the request handler declares `const path = parsed.pathname`,
+// which shadows the path module for its whole body, so `path.join(...)` threw
+// "path.join is not a function" inside the try. Fault two, underneath it: the
+// probe wrote in process.cwd(), and every relay container runs read_only with
+// WORKDIR /app (docker-compose.yml, relay/Dockerfile), so even a working
+// path.join would have answered EROFS on a perfectly healthy relay. The
+// directory the relay actually writes to is the volume USERS_FILE names.
+//
+// Both tests below pass a USERS_FILE outside the working directory, so a
+// probe that fell back to cwd would be visible: cwd is writable in CI, and a
+// green from the wrong directory proves nothing.
+function deepCheck(body, name) {
+  return (body.checks || []).find((c) => c.name === name);
+}
+
+test('storage: green, and it probes the directory USERS_FILE names', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deep-health-ok-'));
+  const { port } = await bootHealthyRelay({
+    RELAY_MODE: 'full',
+    USERS_FILE: path.join(dataDir, 'users.json'),
+  });
+  const r = await deep(port);
+  assert.strictEqual(r.status, 200);
+
+  const storage = deepCheck(r.body, 'storage');
+  assert.ok(storage, 'storage check present');
+  assert.strictEqual(storage.status, 'green',
+    `storage must be green on a writable data dir, got ${storage.status}: ${storage.detail}`);
+  assert.ok(storage.detail.includes(dataDir),
+    `storage must say which directory it probed, got: ${storage.detail}`);
+  assert.ok(!/is not a function/.test(storage.detail),
+    `the path module must not be shadowed here, got: ${storage.detail}`);
+
+  // The same directory, for the same reason: free space on the image layer
+  // says nothing about the volume the relay fills.
+  const disk = deepCheck(r.body, 'disk');
+  assert.ok(disk, 'disk check present');
+  assert.ok(disk.detail.includes(dataDir) || disk.status === 'yellow',
+    `disk must measure the data dir, got: ${disk.detail}`);
+
+  // Nothing is left behind: the probe writes and unlinks.
+  assert.deepStrictEqual(fs.readdirSync(dataDir), [],
+    'the write probe must clean up after itself');
+});
+
+test('storage: red, and the whole verdict goes red with it, when the data dir cannot be written', async () => {
+  // A directory that does not exist. The relay boots anyway (a missing users
+  // file is a warning, not a fatal), so this is a running relay whose state
+  // directory is gone, which is exactly what the check is for.
+  const missing = path.join(os.tmpdir(), 'deep-health-absent-' + process.pid, 'users.json');
+  const { port } = await bootHealthyRelay({ RELAY_MODE: 'full', USERS_FILE: missing });
+  const r = await deep(port);
+  assert.strictEqual(r.status, 200, 'the route answers 200 even when the verdict is red');
+
+  const storage = deepCheck(r.body, 'storage');
+  assert.strictEqual(storage.status, 'red',
+    `storage must be red on an unwritable data dir, got ${storage.status}: ${storage.detail}`);
+  assert.ok(storage.detail.includes(path.dirname(missing)),
+    `the red must name the directory it tried, got: ${storage.detail}`);
+  assert.strictEqual(r.body.overall, 'red', 'one red component makes the verdict red');
 });

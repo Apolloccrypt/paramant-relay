@@ -23,16 +23,15 @@ const http   = require('http');
 const crypto = require('crypto');
 const https  = require('https');
 const fs     = require('fs');
-// Named nodePath, not path. `path` is what every route comparison in
-// handleRelayRequest calls the request pathname (`const path = parsed.pathname`),
-// and a function-scoped const of the same name shadowed this import for the
-// whole 5700-line handler. Four calls sat under that shadow and threw
-// "path.join is not a function": the setup wizard's .env write, and three in
-// /v2/health/deep, where the throw was caught and reported forever as
-// "storage: red, not writable" on a perfectly healthy disk. A self-test that
-// measures something other than what it says is worse than no self-test.
-// The 2026-09-05 review, finding 16.
-const nodePath = require('path');
+const path   = require('path');
+// Same module, second name. The request handler declares `const path =
+// parsed.pathname`, which shadows the module for the whole body of that
+// function, so a path.join() below that line is a method call on a string and
+// throws. Inside a try/catch that is not a crash but a permanent wrong answer:
+// the storage probe of /v2/health/deep has reported "not writable: path.join
+// is not a function" on every request since it was written. Code inside the
+// request handler uses nodePath.
+const nodePath = path;
 const url_   = require('url');
 const { createClient } = require('redis');
 const clientIpLib = require('./lib/client-ip');
@@ -2517,14 +2516,18 @@ function _publishSharedGrant(accountId) {
 // .mergeProductGrantInto, which copies a grant only when it beats the one on
 // file. An account this container has no key for is skipped; it will be picked
 // up by the reseed once the admin key fan-out has reached this sector.
-function _hydrateSharedGrant(accountId, grant) {
-  if (!accountId || !grant) return [];
+// `revoked` says the shared row carries revoked_at: the fleet's record is that
+// this account has no paid term at all. That is the ONE downgrade this path
+// applies, and it exists because the container that took the money back is not
+// the container the customer's screens are served from.
+function _hydrateSharedGrant(accountId, grant, revoked) {
+  if (!accountId || (!grant && !revoked)) return [];
   const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
   if (members.size === 0) return [];
   // Decide once, against the account's best current grant, so five member keys
   // do not each answer the question differently.
   const merged = { ...(entitlementRecordOf(accountId) || {}) };
-  const moved = sharedGrants.applyTo(merged, grant);
+  const moved = grant ? sharedGrants.applyTo(merged, grant) : sharedGrants.applyRevocation(merged);
   if (moved.length === 0) return [];
   for (const product of moved) {
     const tier = merged[entitlements.PRODUCT_PLAN_FIELD[product]];
@@ -2549,7 +2552,7 @@ function _hydrateSharedGrant(accountId, grant) {
       ud.updated = new Date().toISOString();
     }).catch(we => log('warn', 'shared_grant_persist_failed', { err: we.message }));
   }
-  log('info', 'shared_grant_hydrated', {
+  log(revoked && !grant ? 'warn' : 'info', revoked && !grant ? 'shared_grant_revoked' : 'shared_grant_hydrated', {
     account: String(accountId).slice(0, 12), products: moved.join(','), keys: members.size });
   return moved;
 }
@@ -2557,9 +2560,9 @@ function _hydrateSharedGrant(accountId, grant) {
 // Pull one account's shared grant and apply it. Used by the subscriber.
 async function _pullSharedGrant(accountId) {
   if (!redisClient || !redisClient.isReady || !accountId) return [];
-  const grant = await sharedGrants.read(redisClient, accountId);
-  if (!grant) return [];
-  return _hydrateSharedGrant(accountId, grant);
+  const row = await sharedGrants.readRow(redisClient, accountId);
+  if (!row) return [];
+  return _hydrateSharedGrant(accountId, row.grant, !!row.revokedAt);
 }
 
 // One reconciliation pass, both directions, over the accounts that have a term.
@@ -2576,34 +2579,37 @@ async function _pullSharedGrant(accountId) {
 // leave exactly the customers this change is for -- the ones already holding a
 // term nobody else can see -- untouched until they bought a second one.
 //
-// It can only ever improve a row. What is published is the shared row with this
-// container's own grant merged INTO it (mergeProductGrantInto, so a lesser local
-// term changes nothing), never the local record on its own. Without that, five
-// containers with five different views would take turns overwriting each other
-// and the row would end up carrying whichever one happened to boot last.
+// It fills in accounts redis has NO row for, and nothing else. That restriction
+// is the whole safety of the downgrade half: a container holding a record that
+// is a minute out of date must never be able to write it over a fresher fact,
+// and a revoked account keeps its row precisely so this pass leaves it alone.
+// Before the restriction, relay-health reseeding its own still-paid record put a
+// charged-back customer straight back on Pro, one second after relay-main had
+// taken it away.
 async function _reseedSharedGrants() {
   if (!redisClient || !redisClient.isReady) return 0;
   let rows = [];
   try { rows = await sharedGrants.readAll(redisClient); }
   catch (e) { log('warn', 'shared_grant_reseed_failed', { err: e.message }); return 0; }
-  const shared = new Map(rows.map((r) => [r.accountId, r.grant]));
+  const shared = new Map(rows.map((r) => [r.accountId, r]));
 
-  // Outbound: what this container holds that the shared row does not.
+  // Outbound: terms this container holds that redis has never heard of.
   for (const { accountId, record } of accountsWithTerms()) {
+    if (shared.has(accountId)) continue;
     const local = sharedGrants.grantOf(record);
     if (!local) continue;
-    const merged = { ...(shared.get(accountId) || {}) };
-    if (sharedGrants.applyTo(merged, local).length === 0) continue;
-    const out = await sharedGrants.publish(redisClient, accountId, merged);
+    const out = await sharedGrants.publish(redisClient, accountId, local);
     if (!out.ok) { log('warn', 'shared_grant_publish_failed', { account: String(accountId).slice(0, 12), err: out.error }); continue; }
-    shared.set(accountId, sharedGrants.grantOf(merged));
+    shared.set(accountId, { grant: local, revokedAt: null });
     log('info', 'shared_grant_seeded', { account: String(accountId).slice(0, 12) });
   }
 
-  // Inbound: what the shared row holds that this container does not.
+  // Inbound: what the shared row holds that this container does not, in both
+  // directions -- a term it has not been told about, and a term it should no
+  // longer be handing out.
   let hydrated = 0;
-  for (const [accountId, grant] of shared) {
-    if (_hydrateSharedGrant(accountId, grant).length) hydrated++;
+  for (const [accountId, row] of shared) {
+    if (_hydrateSharedGrant(accountId, row.grant, !!row.revokedAt).length) hydrated++;
   }
   return hydrated;
 }
@@ -3505,6 +3511,38 @@ async function handleRelayRequest(req, res) {
     }));
   }
 
+  // -- The scope of a v2 API key ----------------------------------------------
+  // Beside the session-token allowlist above, and for the same reason: one
+  // choke point above every route comparison, so no route has to remember it.
+  //
+  // A key is minted read-only / send-only / sign-only, the relay stores that
+  // scope and shows it back in the key list and on the dashboard, and until now
+  // it enforced none of it. Every key, whatever its label said, could write
+  // anywhere on the v2 plane. The route table and the scope matrix both live in
+  // lib/keys-table.js (pure, unit-tested); relay.js only asks the question.
+  //
+  // Only runs when a real key resolved. Keyless and public routes keep keyData
+  // null and are untouched, as does the inv_ receiver-session bypass. A legacy
+  // key without a scope, and any key minted 'full', is allowed every action by
+  // construction, so nothing that works today stops working.
+  //
+  // 403, not 401: the key is real and active, it just does not carry authority
+  // for this route, and a 401 would send the caller off to re-authenticate with
+  // the same key and be refused again.
+  if (keyData) {
+    const _scopeAction = keysTable.scopeActionFor(req.method, path);
+    if (!keysTable.requireScope(keyData, _scopeAction)) {
+      log('warn', 'insufficient_scope', { method: req.method, path, scope: keyData.scope || 'full', required: _scopeAction });
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({
+        error: 'insufficient_scope',
+        required_action: _scopeAction,
+        scope: keyData.scope || 'full',
+        hint: 'this API key was issued with a narrower scope than this route needs',
+      }));
+    }
+  }
+
   // ── Code-transparency manifest: publiek leesbaar, vóór de /v1-Bearer-gate ───
   // The SHA3-256 inventory of the deployed frontend, CT-anchored on publish.
   // Independent monitors fetch this and compare it against the live assets.
@@ -3874,21 +3912,33 @@ async function handleRelayRequest(req, res) {
     add('crypto', mlDsa ? 'green' : 'yellow',
       mlDsa ? ('ML-DSA-65 loaded, mode=' + cmode) : ('ML-DSA-65 unavailable (build @paramant/core), mode=' + cmode));
 
+    // The directory the relay really writes to, which in the shipped compose is
+    // NOT the working directory. Every relay container runs with
+    // read_only: true and WORKDIR /app (docker-compose.yml x-relay-hardening,
+    // relay/Dockerfile), so a probe in process.cwd() throws EROFS on a
+    // perfectly healthy relay. The state lives on the /data volume named by
+    // USERS_FILE and CT_FILE, and that is the only directory whose
+    // writability this check has any reason to care about. cwd stays the
+    // fallback for a bare-metal install that sets neither.
+    const dataDir = process.env.SETUP_ENV_FILE ? nodePath.dirname(process.env.SETUP_ENV_FILE)
+      : (process.env.USERS_FILE ? nodePath.dirname(process.env.USERS_FILE) : process.cwd());
+
     try {
-      const dir = process.env.SETUP_ENV_FILE ? nodePath.dirname(process.env.SETUP_ENV_FILE) : process.cwd();
-      const probe = nodePath.join(dir, '.health-write-' + process.pid);
+      const probe = nodePath.join(dataDir, '.health-write-' + process.pid);
       fs.writeFileSync(probe, 'ok'); fs.unlinkSync(probe);
-      add('storage', 'green', 'data dir writable');
-    } catch (e) { add('storage', 'red', 'not writable: ' + (e.code || e.message)); }
+      add('storage', 'green', 'data dir writable (' + dataDir + ')');
+    } catch (e) { add('storage', 'red', 'not writable (' + dataDir + '): ' + (e.code || e.message)); }
 
     const rs = ramStatus();
     add('memory', rs.ram_ok ? 'green' : 'yellow', rs.rss_mb + 'MB rss / ' + rs.ram_limit_mb + 'MB limit');
 
     try {
       if (typeof fs.statfsSync === 'function') {
-        const st = fs.statfsSync(process.cwd());
+        // Same directory as the write probe: free space on the /app image
+        // layer says nothing about the volume the relay fills.
+        const st = fs.statfsSync(dataDir);
         const freeGb = (st.bsize * st.bavail) / 1e9;
-        add('disk', freeGb > 1 ? 'green' : 'yellow', freeGb.toFixed(1) + 'GB free');
+        add('disk', freeGb > 1 ? 'green' : 'yellow', freeGb.toFixed(1) + 'GB free on ' + dataDir);
       } else { add('disk', 'yellow', 'statfs unavailable on this Node'); }
     } catch (e) { add('disk', 'yellow', e.code || 'unknown'); }
 
@@ -6000,6 +6050,13 @@ async function handleRelayRequest(req, res) {
     (req.method === 'POST' && (path.endsWith('/view') || path.endsWith('/sign')))
   );
   const isBillingWebhook = path === '/v2/billing/webhook' && req.method === 'POST';
+  // The admin plane cancelling on behalf of a logged-in session. It carries
+  // X-Internal-Auth, which no public caller can set, and the route itself
+  // resolves the account from the user_id in the body. Without this line the
+  // pipeline answered "Invalid API key" before the route was ever reached, and
+  // the Cancel plan button on /account had no way to stop a collection at all.
+  const isInternalBillingCancel = path === '/v2/billing/cancel'
+    && req.method === 'POST' && _internalOk();
   if (isAdminPath) {
     const adminHeader = (req.headers['x-admin-token'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '') || '').trim();
     const validAdmin = !!adminHeader && !!process.env.ADMIN_TOKEN && safeEqual(adminHeader, process.env.ADMIN_TOKEN);
@@ -6008,7 +6065,7 @@ async function handleRelayRequest(req, res) {
       return res.end(J({ error: 'ADMIN_TOKEN required for admin endpoints' }));
     }
     // Fall through to admin endpoint handlers below
-  } else if (!keyData?.active && !isEnvelopePublic && !isBillingWebhook) {
+  } else if (!keyData?.active && !isEnvelopePublic && !isBillingWebhook && !isInternalBillingCancel) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
   }
@@ -6968,6 +7025,14 @@ async function handleRelayRequest(req, res) {
       // floored it to free. The date is on the record; it just never left.
       paid_until_parasign: v[entitlements.PRODUCT_PAID_UNTIL_FIELD.parasign] || null,
       paid_until_parasend: v[entitlements.PRODUCT_PAID_UNTIL_FIELD.parasend] || null,
+      // Is there a collection standing behind this account. The account page
+      // told every customer auto_renews:false because nothing on this
+      // projection could say otherwise, and with BILLING_MODE set that is the
+      // opposite of the truth: checkout opens a mandate and a subscription, and
+      // Mollie collects again on its own. A page that says a plan does not
+      // renew, next to a plan that does, is the one thing the buyer cannot
+      // check for himself.
+      auto_renews: Object.values(billingRecurring.PRODUCT_SUBSCRIPTION_FIELD).some((f) => !!v[f]),
       usage_purpose: v.usage_purpose || null, usage_purpose_at: v.usage_purpose_at || null /*MARK:parasign_list*/
     }));
     const licenseInfo = { edition: EDITION, active_keys: keys.length, key_limit: LICENSE_MAX_KEYS === Infinity ? null : LICENSE_MAX_KEYS, ...(LICENSE_PAYLOAD ? { license_expires: LICENSE_PAYLOAD.expires_at } : {}) };
@@ -7781,28 +7846,55 @@ async function handleRelayRequest(req, res) {
   // for runs to its end and the tier goes with it. Anything else would be taking
   // back time that was bought.
   if (path === '/v2/billing/cancel' && req.method === 'POST') {
-    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
-    const accountId = acctOf(apiKey);
     let body;
     try { body = JSON.parse((await readBody(req, 1024)).toString() || '{}'); }
     catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_json' })); }
+    // TWO CALLERS. An api-key caller cancels its own account, as before. The
+    // ADMIN PLANE calls with X-Internal-Auth and the session's user_id, because
+    // the Cancel plan button on /account is the only cancel a customer will ever
+    // use and it had no way to reach this route at all: there was no proxy, and
+    // an app-scoped session token is denied this path (session-token.js). So the
+    // button wrote a redis marker, mailed "cancellation scheduled", and left the
+    // Mollie subscription collecting.
+    const internal = _internalOk();
+    const _who = internal ? (body && body.user_id) : apiKey;
+    if (!internal && !keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
+    if (internal && (!_who || !apiKeys.has(_who))) {
+      res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unknown_account' }));
+    }
+    const accountId = acctOf(_who);
+    // No product named means every collection this account has: the buyer who
+    // presses Cancel is cancelling his plan, not one line of it, and he cannot
+    // be expected to know that a Firm subscription is a different row from a
+    // ParaSign one.
     const product = body && body.product;
-    if (!billingRecurring.subscriptionFieldOf(product)) {
+    if (product && !billingRecurring.subscriptionFieldOf(product)) {
       res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unknown_product' }));
     }
     const mode = mollie.billingMode();
-    const out = await billingRecurring.cancelForProduct(accountId, product, {
-      mode,
-      getAccount: (aid) => _billingRecordOf(aid),
-      saveSubscription: (aid, p, id) => _setMolliePointer(aid, billingRecurring.subscriptionFieldOf(p), id),
-      mollie,
-    });
-    log(out.level || 'info', 'billing_cancel', {
-      account: String(accountId).slice(0, 12), product, result: out.result, reason: out.reason, mode,
-    });
+    const _rec0 = _billingRecordOf(accountId) || {};
+    const products = product
+      ? [product]
+      : Object.keys(billingRecurring.PRODUCT_SUBSCRIPTION_FIELD)
+        .filter((p) => !!_rec0[billingRecurring.subscriptionFieldOf(p)]);
+    const results = [];
+    let out = { result: 'noop', reason: 'no_subscription' };
+    for (const p of (products.length ? products : [product || 'firm'])) {
+      out = await billingRecurring.cancelForProduct(accountId, p, {
+        mode,
+        getAccount: (aid) => _billingRecordOf(aid),
+        saveSubscription: (aid, pp, id) => _setMolliePointer(aid, billingRecurring.subscriptionFieldOf(pp), id),
+        mollie,
+      });
+      results.push({ product: p, result: out.result, reason: out.reason });
+      log(out.level || 'info', 'billing_cancel', {
+        account: String(accountId).slice(0, 12), product: p, result: out.result, reason: out.reason, mode,
+      });
+      if (out.result === 'failed' || out.result === 'refused') break;
+    }
     if (out.result === 'failed' || out.result === 'refused') {
       res.writeHead(502, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'cancel_failed', reason: out.reason }));
+      return res.end(J({ error: 'cancel_failed', reason: out.reason, results }));
     }
     // What the buyer needs to see: nothing more will be collected, and until
     // when he still has what he paid for.
@@ -7813,11 +7905,12 @@ async function handleRelayRequest(req, res) {
     // PRODUCT_PAID_UNTIL_FIELD['firm'] answered null and told a Firm customer
     // who had just cancelled that he had nothing left.
     const _untilOf = (p) => (_rec && _rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[p]]) || null;
-    const _covered = (billingCatalog.BUNDLES[product] || { grants: [{ product }] }).grants
+    const _forDate = product || (results.find((r) => r.result === 'cancelled') || {}).product || 'firm';
+    const _covered = (billingCatalog.BUNDLES[_forDate] || { grants: [{ product: _forDate }] }).grants
       .map((g) => _untilOf(g.product)).filter(Boolean).sort();
-    const until = _covered[0] || null;
+    const until = _covered[0] || entitlements.PRODUCTS.map((p) => _untilOf(p)).filter(Boolean).sort()[0] || null;
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, cancelled: out.result === 'cancelled', product, access_until: until }));
+    return res.end(J({ ok: true, cancelled: results.some((r) => r.result === 'cancelled'), results, product: _forDate, access_until: until }));
   }
 
   // ── POST /v2/admin/keys/update-plan ─────────────────────────────────────────
@@ -9094,12 +9187,19 @@ setInterval(() => {
 // The seed is what makes the index complete. Accounts live in users.json, per
 // container; every container puts what it knows into the shared index once at
 // boot, so an account that paid before this existed is still warned.
+//
+// PLAN_EXPIRY_BOOT_DELAY_MS shortens the boot delay. It exists so a test can
+// watch the one thing this planner promises the customer -- the mail seven days
+// before his term ends -- inside a test run instead of waiting the production
+// 30 to 60 seconds. Unset (production) the delay is unchanged.
+const _expiryBootDelay = parseInt(process.env.PLAN_EXPIRY_BOOT_DELAY_MS || '', 10);
 planExpiry.startPlanExpiryPlanner({
   redis: redisClient,
   sendEmail: ({ to, subject, text, html }) => sendResendEmail({ to, subject, text, html }),
   log,
   siteUrl: process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL,
   seed: () => planExpiry.seedIndex(redisClient, accountsWithTerms()),
+  ...(Number.isFinite(_expiryBootDelay) ? { bootDelayMs: _expiryBootDelay } : {}),
 });
 
 // ── Paid terms granted on another container ──────────────────────────────────

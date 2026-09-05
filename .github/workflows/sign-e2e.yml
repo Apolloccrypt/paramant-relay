@@ -54,5 +54,14 @@ jobs:
       # browser from scripts/ui-contrast-sweep.mjs, so the grep left it out of
       # this step and handed it to the job that installs no Chromium, where it
       # hung the run rather than failing it.
+      #
+      # --browser-no-stack, not --browser. A suite that also BOOTS a relay needs
+      # this job's opposite: the relay's node_modules, the @paramant/core
+      # binding, the admin dependencies and a redis server, none of which this
+      # workflow installs and none of which it should. On 2026-09-05
+      # koper-hele-weg landed here on the strength of importing playwright and
+      # failed nine times over with "Cannot find module admin/node_modules/redis".
+      # It runs in relay-crypto-tests, the job that builds a backend. The two
+      # lists partition the browser suites, so nothing falls between them.
       - name: Browser suites
-        run: node --test $(node scripts/browser-suites.mjs --browser | grep -vE 'sign-full|product-heartbeat')
+        run: node --test $(node scripts/browser-suites.mjs --browser-no-stack | grep -vE 'sign-full|product-heartbeat')

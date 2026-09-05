@@ -11,10 +11,138 @@
 const crypto = require('crypto');
 const entitlements = require('./entitlements'); // per-product plan derivation
 
-// Scopes are reserved now (every key is "full"); the relay does not yet gate on
-// them. Kept as an allow-list so the enum stays stable for a non-breaking
-// future migration to composite grants.
+// The scopes a v2 API key can carry. ENFORCED, by requireScope() and
+// scopeActionFor() below, which relay.js calls once per request. Kept as an
+// allow-list so the enum stays stable for a non-breaking future migration to
+// composite grants.
 const VALID_SCOPES = new Set(['full', 'send-only', 'sign-only', 'read-only', 'parasign']);
+
+// -- Scope enforcement (single source of truth) -------------------------------
+// A v2 key is minted with a scope (relay.js POST /v2/admin/keys), the scope is
+// stored on the record, and it is shown back in every key listing and in the
+// dashboard. Until now it did nothing: `requireScope` did not exist and no
+// route consulted rec.scope, so a key handed out as read-only had full write
+// authority over the whole v2 plane, /v2/admin/* included. That is privilege
+// escalation dressed up as a security feature. sec/relay-scope-enforcement
+// found it on 16 July 2026; it stayed unlanded for 51 days.
+//
+// The design is a per-request choke point, not a per-route check, for the same
+// reason session-token.js gives: a gate each route has to remember to call is a
+// gate the next route forgets.
+//
+//   action  full  send-only  sign-only  read-only  parasign
+//   read     y       y          y          y          y     safe methods, verify, lookup
+//   common   y       y          y          .          y     shared infra writes both flows need
+//   send     y       y          .          .          .     ParaSend upload / transfer session
+//   sign     y       .          y          .          y     ParaSign envelope / signing key
+//   admin    y       .          .          .          .     account, key, credential, billing
+//   write    y       .          .          .          .     any v2 write not classified below
+//
+// Two properties this table is held to by test/keys-table-scope.test.js:
+//
+//   1. `full` is denied nothing. Every key in production today is full (or is a
+//      legacy key with no scope, normalised to full at load), so enforcement
+//      turns on without changing a single existing flow.
+//   2. Every other scope is denied something. A scope that restricts nothing is
+//      the bug this whole change exists to fix, and the test fails the moment a
+//      new name is added to VALID_SCOPES without a row here.
+//
+// `write` is the fallback, and it is full-only ON PURPOSE. An unclassified
+// mutating v2 route fails closed for narrow keys rather than being waved
+// through as a read, so a route added next year cannot silently reopen the
+// hole. The cost is bounded by property 1: it can never break a full key.
+const SCOPE_ACTIONS = {
+  read:   new Set(['full', 'send-only', 'sign-only', 'read-only', 'parasign']),
+  common: new Set(['full', 'send-only', 'sign-only', 'parasign']),
+  send:   new Set(['full', 'send-only']),
+  sign:   new Set(['full', 'sign-only', 'parasign']),
+  admin:  new Set(['full']),
+  write:  new Set(['full']),
+};
+
+// Safe methods never mutate, so they are always 'read'. Asking the method first
+// is deliberate: the 2026-07 branch classified by path first, which made
+// GET /v2/user/envelopes an 'admin' action and would have locked a read-only
+// key out of its own document list.
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+// Account, key, credential and billing management. Full keys only.
+const ADMIN_WRITE_PREFIXES = [
+  '/v2/admin/',
+  '/v2/user/webauthn/',
+  '/v2/billing/',
+];
+const ADMIN_WRITE_PATHS = new Set([
+  '/v2/admin',
+  '/v2/user/parasign-keys',      // mints and revokes API keys
+  '/v2/user/setup-totp', '/v2/user/verify-totp', '/v2/user/activate-totp',
+  '/v2/user/delete-totp', '/v2/user/get-totp-provisional',
+  '/v2/user/consume-backup', '/v2/user/regenerate-backup',
+  '/v2/claim/reveal',            // hands back a key
+  '/v2/reload-users', '/v2/setup/apply',
+  '/v2/relays/register', '/v2/team/add-device',
+]);
+
+// ParaSend data plane.
+const SEND_PATHS = new Set(['/v2/inbound', '/v2/anon-inbound', '/v2/session/create']);
+
+// ParaSign data plane.
+const SIGN_PREFIXES = ['/v2/parasign/', '/v2/user/signing-key'];
+const SIGN_PATHS = new Set([
+  '/v2/envelopes', '/v2/sign', '/v2/sign-dpa', '/v2/qes/sign', '/v2/user/envelopes',
+]);
+
+// Writes both flows need, and which are not by themselves send or sign.
+const COMMON_PATHS = new Set([
+  '/v2/pubkey', '/v2/did/register', '/v2/attest', '/v2/ack', '/v2/webhook',
+  '/v2/ws-ticket', '/v2/session/join', '/v2/session-token', '/v2/sth/ingest',
+  '/v2/user/usage-purpose', '/v2/billing/webhook',
+]);
+
+// POST routes that only read: verification and diagnostics. A read-only key
+// must be able to reach these, or "read-only" does not describe the product.
+const READ_POSTS = new Set([
+  '/v2/verify', '/v2/verify-receipt', '/v2/pubkey/verify',
+  '/v2/setup/check', '/v2/setup/dns-check',
+]);
+
+const INBOUND_ABORT_RE = /^\/v2\/inbound\/[a-f0-9]{64}$/;
+
+// Map an HTTP (method, path) onto the scope action it needs. Pure; the whole
+// route table lives here so relay.js carries no policy of its own.
+function scopeActionFor(method, path) {
+  const m = String(method || '').toUpperCase();
+  const p = String(path || '');
+  // /v1 has its own psk_ Bearer gate (lib/parasign-open-api.js) and returns
+  // before this one, and /health, /metrics and the static frontend are not the
+  // v2 data plane. Nothing outside /v2 is classified here.
+  if (!p.startsWith('/v2')) return 'read';
+  if (SAFE_METHODS.has(m)) return 'read';
+  if (READ_POSTS.has(p)) return 'read';
+
+  // The Stripe webhook lives under /v2/billing/ but carries no key at all.
+  if (p !== '/v2/billing/webhook'
+      && (ADMIN_WRITE_PATHS.has(p) || ADMIN_WRITE_PREFIXES.some((x) => p.startsWith(x)))) {
+    return 'admin';
+  }
+  if (SEND_PATHS.has(p) || INBOUND_ABORT_RE.test(p)) return 'send';
+  if (SIGN_PATHS.has(p) || SIGN_PREFIXES.some((x) => p.startsWith(x))) return 'sign';
+  if (p.startsWith('/v2/envelopes/')) return 'sign';   // party view / sign / resend
+  if (COMMON_PATHS.has(p)) return 'common';
+  return 'write';                                      // unclassified: full only
+}
+
+// May a key with this record's scope perform `action`? Default-deny on an
+// unknown action. A missing scope, or a scope string no longer in the enum, is
+// normalised to 'full', which is exactly what parseAccountFields does at load,
+// so legacy records behave identically before and after this gate exists.
+function requireScope(keyData, action) {
+  const allowed = SCOPE_ACTIONS[action];
+  if (!allowed) return false;
+  let scope = (keyData && keyData.scope) || 'full';
+  if (!VALID_SCOPES.has(scope)) scope = 'full';
+  return allowed.has(scope);
+}
 
 // ParaSign Open-API (/v1) entitlement check. A key grants the parasign scope
 // when its record says so in any of three accepted shapes, so this survives the
@@ -367,4 +495,4 @@ function erasePersonalData(data, accountOrKey) {
 
 module.exports = {
   PERSONAL_DATA_FIELDS,
-  erasePersonalData, VALID_SCOPES, hasParaSignScope, computeKid, maskApiKey, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary, buildParasignKeyRecord, accountHasParasignEntitlement, PARASIGN_ENTITLED_PLANS };
+  erasePersonalData, VALID_SCOPES, SCOPE_ACTIONS, requireScope, scopeActionFor, hasParaSignScope, computeKid, maskApiKey, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary, buildParasignKeyRecord, accountHasParasignEntitlement, PARASIGN_ENTITLED_PLANS };

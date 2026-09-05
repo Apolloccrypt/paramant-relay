@@ -66,16 +66,6 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   produce 64 hex characters, so an integrator following the message built a
   session that could never be joined and only found out at a 403 blaming their
   secret.
-- **The deep health check reported a failure it was causing itself.** `path` was
-  shadowed by the request pathname for the whole 5700-line request handler, so
-  four calls under that shadow threw `path.join is not a function`. Three of them
-  are in `/v2/health/deep`, inside a try, which meant every relay had reported
-  `storage: red, not writable` since the check was written, on a perfectly
-  healthy disk, dragging the overall verdict to red. The fourth is the setup
-  wizard's `.env` write, which minted the enterprise key, saved it, and then
-  failed with a 400 before showing it to the owner. The import is renamed so
-  nothing can shadow it, and the gate on that route now reads the verdicts
-  instead of only counting that the checks exist.
 - **A stranger could delete a transfer they could never read.** An anonymous blob
   is stored without an owner, and the owner check was skipped entirely when there
   was none. For reading that is the design and it is written down: the hash is

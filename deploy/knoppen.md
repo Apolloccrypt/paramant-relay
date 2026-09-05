@@ -2,10 +2,10 @@
 
 Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. Nergens anders.
 
-- **99 omgevingsvariabelen** die de relay en de admin lezen staan in
+- **100 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **167 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **170 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -70,8 +70,8 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | waarde | plek A | plek B | staat het uiteen? |
 |---|---|---|---|
 | 5 MB | `MAX_BLOB` `relay/relay.js:105` | `BLOB_SIZE_MB` `:1339`, `ANON_MAX` `:5360`, `TRIAL_MAX_SIZE` `:5545`, `tiers.js:47,56,65`, `parashare.page.js:829`, `paramant-core.js:30` | acht kopieen, een instelbaar |
-| sector naar poort | `admin/server.js:40-44` (3000/3005/3002/3003/3004) | `docker-compose.yml:311-315` (alle vijf 3000) | **ja, vier van vijf** |
-| `RELAY_HEALTH` | `admin/server.js:41` → `:3005` | poort 3005 bestaat nergens in de repo | **ja** |
+| sector naar poort | `admin/server.js:39-45` (alle vijf 3000) | `docker-compose.yml:311-315` (alle vijf 3000) | nee, gepind door `tests/sector-fallback-ports.test.mjs` |
+| `RELAY_HEALTH` | `admin/server.js:41` → `:3000` | de compose-listener staat op 3000 | nee, rechtgezet; stond op `:3005`, een poort die nergens in de repo bestaat |
 | `nginx-selfhost.conf` | de kopie in de wortel: geen bodygrens, `inbound` 10r/m | `deploy/nginx-selfhost.conf`: 35M, `inbound` 5r/m | **ja, twee bestanden met dezelfde naam** |
 | `install.sh` | de kopie in de wortel, 535 regels | `frontend/install.sh`, 466 regels, dit is de kopie die op paramant.app staat | **ja, 111 regels verschil** |
 | admin-paneel JS | `admin/public/app.js`, 895 regels | `frontend/js/admin.page.js`, 742 regels | **ja, 343 regels verschil** |
@@ -113,6 +113,8 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `CHECK_EXTERNAL_LINKS` | `tests/links.test.mjs` | geen | zet de externe-linkcontrole aan; staat alleen aan in heartbeat.yml, en die workflow is uit |
 | `CLEVERBASE_SANDBOX` | `tests/qes-cleverbase-live.test.mjs` | `test op '1'` | zet de live QES-suite aan; staat in geen enkele workflow, draait dus nergens |
 | `DEV_PORT` | `scripts/dev-local-proxy.js` | `'8080'` | poort van de dev-proxy |
+| `FAKE_MOLLIE_URL` | `tests/helpers/mollie-intercept.cjs` | geen | stuurt https-verkeer naar api.mollie.com door naar de nagebouwde Mollie van de koperspoort; leeg (productie) doet de preload niets |
+| `FAKE_RESEND_URL` | `tests/helpers/mollie-intercept.cjs` | geen | zelfde omleiding voor api.resend.com, zodat een test de facturen en waarschuwingsmails kan lezen die anders ongezien vertrekken |
 | `FLEET_LIVE` | `tests/verify-knows-the-fleet.test.mjs` | geen | zet de test aan die de gepinde sleutels tegen de live relays houdt; staat in geen enkele workflow, draait dus nergens |
 | `GH_TOKEN` | `scripts/guards-live.mjs` | valt terug op `GITHUB_TOKEN`, dan leeg | token waarmee de waarborgcontrole de GitHub-API leest |
 | `GITHUB_OUTPUT` | `scripts/guards-live.mjs` | geen | pad waar de waarborgcontrole zijn uitkomst voor de workflow neerlegt; ontbreekt hij, dan schrijft hij niets en meldt dat niet |
@@ -127,6 +129,7 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `HEARTBEAT_SLOW_MS` | `scripts/heartbeat/lib.mjs` | `2500` | drempel waarboven een heartbeat-stap traag heet |
 | `HEARTBEAT_SLOW_SIGN_MS` | `scripts/heartbeat/lib.mjs` | `15000` | zelfde drempel, maar voor het tekenpad |
 | `HEARTBEAT_TEST_SECRET` | `tests/heartbeat-lib.test.mjs` | geen | fixture, wordt door de test zelf gezet en weer weggehaald |
+| `KOPER_REDIS_DB` | `tests/helpers/koper-stack.cjs` | `11` | welke redisdatabase de koperspoort gebruikt en als enige leegt, zodat hij een server kan delen met de routesuites zonder hun sleutelruimte te raken |
 | `PARAMANT_BASE_URL` | `scripts/heartbeat/lib.mjs`, `tests/links.test.mjs` en 1 meer | `'https://paramant.app'` | welke site de heartbeat en de linkcontrole meten |
 | `PARAMANT_COSIGN_SCREENSHOT_PATH` | `tests/cosign-document-delivery.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
 | `PARAMANT_DASHBOARD_DETAIL_SCREENSHOT_PATH` | `tests/user-dashboard-documents.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
@@ -309,7 +312,7 @@ controle valt om.
 | `relay/envelope.js` | `DEFAULT_TTL_DAYS` | `30 x2` | bewaartermijn van een envelop; parasign-store telt zijn eigen 30 dagen |
 | `relay/lib/entitlements.js` | `ENTERPRISE_MONTHLY_CEILING` | `1_000_000` | wat onbeperkt in de praktijk betekent |
 | `admin/lib/audit.js` | `AUDIT_RETENTION_DAYS` | `400` | bewaartermijn van het auditlog; ongecontroleerde parseInt, 0 wist het log |
-| `admin/server.js` | `RELAY_HEALTH` | `3005` | terugvalpoort voor de health-relay; compose luistert op 3000 |
+| `admin/server.js` | `RELAY_HEALTH` | `3000` | terugvalpoort voor de health-relay; de container-interne listener, gepind aan docker-compose.yml |
 | `frontend/crypto-bridge.js` | `WASM_SHA256` | `30f1ae35` | integriteitspin op de wasm-module; verandert bij elke herbouw |
 | `deploy/deploy-3.1.sh` | `EXPECT_VERSION` | `3.1.0` | welke versie de deploy verwacht aan te treffen; niet instelbaar |
 | `deploy/deploy-3.1.sh` | `EXPECT_PROD_COMMIT` | `41501bb` | de startcommit uit het draaiboek |
