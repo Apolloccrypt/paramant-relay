@@ -468,7 +468,7 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
       <tr><th>Method</th><th>Endpoint</th><th>Description</th><th>Auth</th></tr>
       <tr><td><span class="method get">GET</span></td><td>/health</td><td>Node status, version, uptime, edition</td><td>n/a</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/inbound</td><td>Upload encrypted blob from an authenticated client (RAM-only)</td><td>Key</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/anon-inbound</td><td>Deprecated. Anonymous upload retained for sdk-js 3.x backward compatibility; removed in a future major release. New integrations must use <code>/v2/inbound</code>.</td><td>n/a</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/anon-inbound</td><td>Deprecated, sunset 31 December 2026 (the date the relay sends in the <code>Sunset</code> response header). Anonymous upload retained for sdk-js 3.x backward compatibility. New integrations must use <code>/v2/inbound</code>.</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/outbound/:hash</td><td>Download + burn: spends one read of the link</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/status/:hash</td><td>Check blob availability without consuming</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/ack</td><td>Confirm delivery, log latency to CT</td><td>Key</td></tr>
