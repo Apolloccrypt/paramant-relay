@@ -41,8 +41,14 @@ permissions:
   issues: write
 
 concurrency:
-  group: guards-${{ github.ref }}
-  cancel-in-progress: true
+  # The event is part of the group on purpose. With only the ref in it, a push to
+  # main shares a group with the daily scheduled run on the same ref, and
+  # cancel-in-progress would let a push silently cancel the one run that opens
+  # the issue. A cancelled run reports neither red nor green, which is the same
+  # invisible non-result this workflow exists to make impossible. Pull request
+  # runs still supersede each other, which is all that was wanted from it.
+  group: guards-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   guards:
