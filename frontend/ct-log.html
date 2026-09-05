@@ -300,41 +300,54 @@ body { min-height:100vh; }
 <div class="hero">
   <div class="tag">Public Audit Log</div>
   <h1>Certificate <span>Transparency</span></h1>
-  <p>Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered: without seeing the payload. Analogous to HTTPS certificate transparency logs.</p>
+  <p>Key registrations, transfers and relay announcements are all appended to one tamper-evident Merkle tree. Anyone can check that an entry is in the tree without seeing the payload, the way HTTPS certificate transparency logs work.</p>
 </div>
 
 <div class="tabs">
-  <button class="tab active" id="tab-log"    data-click="switchTab" data-tab="log">Key Registrations</button>
+  <button class="tab active" id="tab-log"    data-click="switchTab" data-tab="log">Log entries</button>
   <button class="tab"        id="tab-relays" data-click="switchTab" data-tab="relays">Registered Relays</button>
 </div>
 
 <div id="pane-log">
 <!--
-  What the count is made of. On 5 September 2026 this log held 891 entries, 855
-  of them transfers, and the transfers were made by the hourly self-test in
-  .github/workflows/heartbeat.yml rather than by customers: the last transfer by
-  a person was on 18 August 2026. Every one of those entries is a real transfer
-  through the real relay, so no line in the log is untrue, but a visitor reading
-  a busy log as busy customers would be, and that reading is the thing this
-  notice corrects.
+  Which log this is, and what the count is made of.
 
-  Two things are deliberate in the wording. The entries are described in the
-  past tense, because the self-test is gated on HEARTBEAT_ENABLED and /sla says
-  so; this page may not imply a check that is not running. And the number is
-  filled in from /v2/ct/log by js/ct-log.page.js instead of being typed here, so
-  it cannot go stale. With no relay reachable the sentence keeps its own word
-  "entries" and still reads correctly.
+  js/ct-log.page.js reads https://health.paramant.app. That is the relay the
+  web app on this site actually sends through: parashare.page.js starts at the
+  health sector and discoverRelay() prefers it over the other three, and
+  co-sign.js and sign-flow.js name it outright. So health is the log a visitor
+  of this page has a reason to look at, and the page now says so by name.
 
-  tests/ui-truthfulness.test.mjs holds this notice in place: remove the sentence
-  and that gate goes red.
+  It is not the only log. Each of the five relays we run keeps its own, and the
+  hourly self-test in .github/workflows/heartbeat.yml writes to a different one,
+  relay.paramant.app. The notice that shipped on 5 September 2026 said the
+  self-test had made most of the entries here; measured against this log that
+  was false, because the self-test never writes here at all. It was measured on
+  relay.paramant.app (891 entries, 855 of them self-test transfers) and printed
+  beside the count of this one (4771). Text and number have to be about the same
+  log, and the gate in tests/ui-truthfulness.test.mjs now holds them together by
+  reading the host out of ct-log.page.js.
+
+  What this log really is: on 5 September 2026, 3399 of its 4771 entries were
+  relay_reg, written by relay.js registerSelf() when a container announces
+  itself at boot to RELAY_PRIMARY_URL, which docker-compose.yml points at
+  relay-health for all five. In the last thousand entries, the ones this page
+  renders, it was 963 out of 1000. So the count is dominated by our own
+  containers restarting, not by customers.
+
+  The number is filled in from /v2/ct/log by js/ct-log.page.js instead of being
+  typed here, so it cannot go stale. With no relay reachable the sentence keeps
+  its own word "entries" and still reads correctly.
 -->
 <div class="notice" id="composition-notice">
   <div class="body">
-    <strong>What is in this log</strong>
-    <span>This log records every transfer and every signature. Most of the
-    <span id="composition-count">entries</span> below were made by the hourly self-test with
-    which we check that the relay still works, not by customer traffic, so the number of
-    entries is not a measure of how much the service is used.</span>
+    <strong>What is in this log, and whose it is</strong>
+    <span>You are looking at the log of one relay, <code>health.paramant.app</code>, the one
+    the web app on this site sends through. Each of the relays we run keeps its own log, so
+    this is not a total. Most of the <span id="composition-count">entries</span> below are not
+    transfers at all: every one of our relays writes a line here each time it restarts and
+    announces itself. The number of entries is therefore not a measure of how much the service
+    is used.</span>
   </div>
 </div>
 <div class="notice" id="persistence-notice">
@@ -353,11 +366,15 @@ body { min-height:100vh; }
   </div>
   <div class="stat">
     <div class="val" id="stat-count">n/a</div>
-    <div class="lbl">Registered relays</div>
+    <div class="lbl">Key registrations</div>
   </div>
   <div class="stat">
     <div class="val" id="stat-transfers">n/a</div>
     <div class="lbl">Transfer proofs</div>
+  </div>
+  <div class="stat">
+    <div class="val" id="stat-relayreg">n/a</div>
+    <div class="lbl">Relay announcements</div>
   </div>
   <div class="stat">
     <div class="val dim" id="stat-root">n/a</div>

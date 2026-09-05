@@ -257,13 +257,14 @@ section h2{display:flex;align-items:baseline;gap:11px}
   <p class="subtitle">
     The history of cryptography is a history of algorithms being broken.
     Paramant is built so the next break does not break Paramant: the relay
-    runs the full NIST post-quantum suite today, and nothing about it is
-    hardcoded.
+    carries the NIST post-quantum suite and nothing about the choice is
+    hardcoded. What it loads by default is two of them, ML-KEM-768 and
+    ML-DSA-65, and that is what <code>/v2/capabilities</code> answers today.
   </p>
   <ul class="hero-stats">
-    <li><b>3</b><span>ML-KEM key encapsulations (FIPS 203)</span></li>
-    <li><b>18</b><span>signature algorithms (FIPS 204 / 205 / 206)</span></li>
-    <li><b>21</b><span>algorithm IDs live in /v2/capabilities</span></li>
+    <li><b>3</b><span>ML-KEM key encapsulations shipped (FIPS 203)</span></li>
+    <li><b>17</b><span>signature algorithms shipped (FIPS 204 / 205 / 206)</span></li>
+    <li><b>2</b><span>loaded in the default core mode, and answered by /v2/capabilities</span></li>
   </ul>
 </div>
 
@@ -475,15 +476,15 @@ FLAGS    1 byte    reserved for future features</pre>
           <td>Chromium extension</td>
           <td>n/a</td>
           <td>n/a</td>
-          <td>server-side path (relay encrypts)</td>
-          <td>client-side crypto in progress</td>
+          <td>AES-256-GCM, key in URL fragment</td>
+          <td>client-side, no identity-binding</td>
         </tr>
         <tr>
           <td>Outlook add-in</td>
           <td>n/a</td>
           <td>n/a</td>
-          <td>server-side path (relay encrypts)</td>
-          <td>client-side crypto in progress</td>
+          <td>AES-256-GCM, key in URL fragment</td>
+          <td>client-side, no identity-binding</td>
         </tr>
       </tbody>
     </table>
@@ -494,10 +495,13 @@ FLAGS    1 byte    reserved for future features</pre>
       KEM / SIG IDs through <code>/v2/capabilities</code>.
     </p>
     <p style="font-size:12px;color:var(--ink-dim);margin-top:6px;line-height:1.7">
-      Server-side path: the extension authenticates and uploads, and the
-      relay performs encryption with a per-blob key. This is weaker than
-      end-to-end and is being replaced. Until the migration lands, do not
-      treat extension uploads as zero-knowledge.
+      The extensions do encrypt on your own machine, but not with the hybrid
+      above: <code>extensions/shared/paramant-core.js</code> generates an
+      AES-256-GCM key with Web Crypto and puts it in the URL fragment, exactly
+      like the browser-encrypted link. There is no key exchange and therefore
+      no binding to a recipient, so whoever the link reaches can open the file.
+      Treat an extension upload as a sealed link, not as an end-to-end transfer
+      to a named person.
     </p>
   </section>
 

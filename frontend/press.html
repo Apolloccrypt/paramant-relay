@@ -223,7 +223,7 @@ td{color:var(--cobalt)}
 
   <div class="blurb">
     <strong>50 words</strong>
-    <p>PARAMANT is a post-quantum encrypted file relay built for regulated industries. Files are encrypted client-side with ML-KEM-768 before upload, stored in RAM only, and destroyed after the link's last read, the first on Community. Nothing is written to disk. EU/DE jurisdiction. Self-hostable. NIS2, NEN7510, and IEC 62443 ready.</p>
+    <p>PARAMANT is a post-quantum encrypted file relay built for regulated industries. Files are encrypted client-side before upload, on the authenticated paths with an ML-KEM-768 and ECDH P-256 hybrid, stored in RAM only, and destroyed after the link's last read, the first on Community. Nothing is written to disk. EU/DE jurisdiction. Self-hostable. NIS2, NEN7510, and IEC 62443 ready.</p>
   </div>
 
   <div class="blurb">
@@ -261,7 +261,7 @@ td{color:var(--cobalt)}
   <h2>What makes PARAMANT different</h2>
 
   <ul class="bullet-list">
-    <li><strong>No plaintext, ever.</strong> Encryption happens client-side in Rust/WASM before upload. The relay cannot read your file — even under court order, because it never had it.</li>
+    <li><strong>No plaintext, ever.</strong> Encryption happens on your own machine before upload, in Rust compiled to WASM on the hybrid path and in Web Crypto on the link path. The relay cannot read your file, not even under court order, because it never had it.</li>
     <li><strong>Burn-on-read, and a ceiling.</strong> A blob is destroyed when the last read its link allows is spent, which on Community is the first one. It is destroyed on a timer too if that read never comes: one hour on Community, twenty-four hours on Firm, seven days on Enterprise. Whichever comes first, an attacker who compromises the relay afterwards finds nothing.</li>
     <li><strong>EU jurisdiction by design.</strong> Infrastructure is on Hetzner Nuremberg DE, and no US entity ever holds ciphertext or a key. One sub-processor is American: Resend Inc. sends transactional email under Standard Contractual Clauses, as the <a href="/dpa">DPA</a> states. No CLOUD Act exposure for transfer content. GDPR-compliant by architecture, not by policy.</li>
     <li><strong>Sector compartmentalisation.</strong> Five separate relay containers — healthcare, legal, finance, IoT, general. A breach or subpoena targeting the finance relay cannot reach health data.</li>

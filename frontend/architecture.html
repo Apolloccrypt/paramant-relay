@@ -720,8 +720,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <tbody>
         <tr>
           <td><strong>Relay</strong></td>
-          <td>Node.js, Hetzner Nuremberg. Validates inbound v1 blobs, advertises 3 KEMs and 18 signatures via <code>/v2/capabilities</code>, rejects unsupported algorithm IDs with HTTP 415.</td>
-          <td>Wire format v1. Full NIST suite (FIPS 203, 204, 205, 206) loaded.</td>
+          <td>Node.js, Hetzner Nuremberg. Validates inbound v1 blobs, advertises through <code>/v2/capabilities</code> the algorithms it has actually loaded, and rejects every other algorithm ID with HTTP 415.</td>
+          <td>Wire format v1. 3 KEMs and 17 signatures ship in the image; the default core mode loads two of them, ML-KEM-768 and ML-DSA-65, and those are the two the endpoint answers.</td>
         </tr>
         <tr>
           <td><strong>sdk-py 3.0.0</strong></td>
@@ -741,18 +741,18 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <tr>
           <td><strong>Chromium extension</strong></td>
           <td>Right-click upload from any tab.</td>
-          <td>Currently uses a server-side encryption path: the relay performs encryption with a per-blob key. Client-side ML-KEM crypto is staged in the codebase but not yet wired up.</td>
+          <td>Encrypts on your own machine, but with AES-256-GCM from Web Crypto and the key in the URL fragment, not with the ML-KEM hybrid. No key exchange, so no binding to a named recipient. A staged ML-KEM module sits in the codebase unused.</td>
         </tr>
         <tr>
           <td><strong>Outlook add-in</strong></td>
           <td>Encrypts attachments inside Outlook before send.</td>
-          <td>Uploads attachment bytes to the relay, which performs encryption server-side. Migration to client-side hybrid crypto is in progress.</td>
+          <td>Same path as the Chromium extension: AES-256-GCM in the add-in, key in the URL fragment, no key exchange. Migration to the ML-KEM hybrid is not done.</td>
         </tr>
       </tbody>
     </table>
 
     <div class="arch-takeaway">
-      <p><strong>The relay never sees plaintext for SDK and WebApp transfers.</strong> The two extensions currently take a server-side path while their client-side crypto is finished &mdash; that is called out openly here rather than papered over. See <a href="/crypto-agility#06">crypto-agility § 06</a> for the per-client wire format and migration table.</p>
+      <p><strong>The relay never sees plaintext.</strong> Every client on this table encrypts before it uploads, the two extensions included. What differs is the key exchange: the SDKs and the web app bind the file to a recipient's public key, while the extensions and the browser-encrypted link put a symmetric key in the URL fragment and bind it to nobody. Anyone holding that link can open the file, so the channel you send it over is the security. See <a href="/crypto-agility#06">crypto-agility § 06</a> for the per-client wire format and migration table.</p>
     </div>
   </div>
 </section>

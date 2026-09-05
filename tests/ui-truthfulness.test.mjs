@@ -2135,47 +2135,104 @@ console.log('ui-truthfulness: the appearance switch says only what theme.js and 
 
 console.log('ui-truthfulness: /parashare says the receiver has to be online, and the flow really waits for them');
 
-// ── /ct-log says whose traffic the log is made of ────────────────────────────
+// ── /ct-log names the log it is showing, and describes that one ─────────────
 //
-// The transparency page prints a live count of log entries and nothing else
-// about them. On 5 September 2026 that count was 891, of which 855 were
-// transfers, and those transfers were made by the hourly self-test in
-// .github/workflows/heartbeat.yml, not by customers: the last transfer by a
-// person was 18 August 2026. Every line is a real transfer through the real
-// relay, so the log itself is honest. What was not honest is the impression a
-// busy count leaves on a page that sells the product, and an impression is the
-// thing this file exists to hold.
+// The page prints a live count of log entries. Until 5 September 2026 it printed
+// nothing else about them, and a busy count on a page that sells the product
+// reads as busy customers. A notice was added that day to correct that, and the
+// notice was wrong: it described relay.paramant.app (891 entries, 855 of them
+// made by the hourly self-test) and printed it beside the count of
+// health.paramant.app (4771 entries, of which the self-test made none). The
+// sentence was true of a log the page does not show.
 //
-// The public projection at /v2/ct/log deliberately gives no way to tell the two
-// apart: relay.js strips device_hash and coarsens the timestamp to the hour so
-// nobody can reconstruct who moved what and when. Labelling the self-test in
-// the log would undo exactly that, because every entry left unlabelled would
-// then be provably customer traffic. So the disclosure is on the page, where it
-// costs the log nothing, and this block is what keeps it there.
+// So the rule this block enforces is not "the page must contain sentence X". It
+// is: the page must name the host it fetches, and every claim it makes about the
+// composition of that log must be backed by code that writes into that same
+// host's log. That is the class of error, not the instance.
+//
+// The public projection at /v2/ct/log deliberately gives no way to tell entry
+// kinds apart for a reader who wants to profile traffic: relay.js strips
+// device_hash and coarsens the timestamp to the hour. Labelling the self-test
+// inside the log would undo exactly that, because every entry left unlabelled
+// would then be provably customer traffic. So the disclosure lives on the page.
 (() => {
   const ctLogHtml = read('frontend/ct-log.html');
   const ctLogJs = read('frontend/js/ct-log.page.js');
   // Comments are not read by visitors and this page's comment quotes the very
-  // sentence being required, so a gate that scanned the raw file would stay
-  // green on a page that had lost the sentence. Everything below reads what a
-  // person sees.
-  const ctLogSeen = ctLogHtml.replace(/<!--[\s\S]*?-->/g, '');
+  // sentences being required, so a gate that scanned the raw file would stay
+  // green on a page that had lost them. Everything below reads what a person sees.
+  // Newlines inside a sentence are the page's line wrapping, not the reader's:
+  // a required phrase must match whether or not the source happens to break it.
+  const ctLogSeen = ctLogHtml.replace(/<!--[\s\S]*?-->/g, '').replace(/\s+/g, ' ');
+  const ctLogJsSeen = ctLogJs.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
   // The trigger: this page shows a count, so it owes the reader its composition.
   assert.match(ctLogSeen, /id="stat-total"/,
     'ct-log no longer shows a live entry count; if the count is gone, retire this block deliberately');
-  assert.match(ctLogSeen, /hourly self-test/i,
-    'ct-log prints a count of log entries, so it must name the hourly self-test that made most of them');
-  assert.match(ctLogSeen, /not a measure of how much the service is used/i,
-    'ct-log must say what the count is not, or the number sells activity the service does not have');
 
-  // The sentence has to stand before the number it explains, not below it.
+  // 1. Which log. The host the page fetches has to be the host the copy names,
+  //    or the reader is being told about one log while looking at another.
+  const ctHostM = /const RELAY = 'https:\/\/([a-z0-9.-]+)'/.exec(ctLogJsSeen);
+  assert.ok(ctHostM, 'ct-log.page.js no longer declares its relay as a single const RELAY; this gate reads the host from there');
+  const ctHost = ctHostM[1];
+  assert.ok(ctLogSeen.includes(ctHost),
+    `ct-log fetches ${ctHost} and never names it; a visitor cannot tell which of our relays' logs they are reading`);
+  // And no other relay host may be named in the copy without the one being shown
+  // standing beside it, which is the shape that produced the 5 September error.
+  for (const other of [...ctLogSeen.matchAll(/\b([a-z0-9-]+\.paramant\.app)\b/g)].map((m) => m[1])) {
+    assert.equal(other, ctHost,
+      `ct-log names ${other} in its copy but fetches ${ctHost}; text and number must be about the same log`);
+  }
+
+  // 2. Whatever the page blames for the bulk of the entries has to be something
+  //    that writes into THIS log.
+  //
+  //    a. The hourly self-test. It posts to PARAMANT_RELAY_URL in heartbeat.yml,
+  //       and that is a different host from the one this page reads today. If the
+  //       copy ever blames the self-test again, the two hosts must agree first.
+  const heartbeat = read('.github/workflows/heartbeat.yml');
+  const hbHostM = /PARAMANT_RELAY_URL:\s*https:\/\/([a-z0-9.-]+)/.exec(heartbeat);
+  assert.ok(hbHostM, 'heartbeat.yml no longer names the relay it tests; this gate reads the host from there');
+  if (/self-test/i.test(ctLogSeen)) {
+    assert.equal(hbHostM[1], ctHost,
+      `ct-log blames the hourly self-test for its entries, but the self-test writes to ${hbHostM[1]} and this page reads ${ctHost}`);
+    assert.match(heartbeat, /- cron: '\d+ \* \* \* \*'/,
+      'ct-log calls the self-test hourly; heartbeat.yml no longer runs hourly');
+    assert.match(read('scripts/heartbeat/parasend.mjs'), /\$\{RELAY\}\/v2\/anon-inbound/,
+      'the self-test must still send a real transfer, or it makes no log entries to disclose');
+  }
+
+  //    b. Relay announcements, which is what this log is actually full of. The
+  //       claim only stands while relay.js still writes a CT entry when a relay
+  //       announces itself, and while the relays still announce to this host.
+  if (/restarts?|announce/i.test(ctLogSeen)) {
+    const relaySrc = read('relay/relay.js');
+    assert.match(relaySrc, /function registerSelf/,
+      'ct-log says our relays announce themselves; relay.js no longer has registerSelf');
+    assert.match(relaySrc, /RELAY_PRIMARY_URL/,
+      'ct-log says our relays announce themselves to one relay; RELAY_PRIMARY_URL is gone');
+    const relayRegRoute = relaySrc.slice(relaySrc.indexOf("path === '/v2/relays/register'"));
+    assert.ok(relayRegRoute.length > 0, 'the relay-registration route is gone; ct-log blames it for entries it no longer makes');
+    assert.match(relayRegRoute.slice(0, 4000), /ctAppendRelayReg\(/,
+      'a relay announcing itself no longer appends to the CT log, so ct-log blames it for nothing');
+    const compose = read('docker-compose.yml');
+    assert.match(compose, new RegExp(`RELAY_PRIMARY_URL:\\s*"http://relay-${ctHost.split('.')[0]}:`),
+      `ct-log reads ${ctHost} and says our relays announce themselves there; docker-compose.yml points them somewhere else`);
+    // The page owes the reader a counter for the kind it blames, or the three
+    // numbers under the table still do not add up to the total.
+    assert.match(ctLogSeen, /id="stat-relayreg"/,
+      'ct-log blames relay announcements for most entries and shows no count of them');
+    assert.match(ctLogJsSeen, /e\.type === 'relay_reg'/,
+      "ct-log.page.js must count relay_reg entries for the counter the page shows");
+  }
+
+  // 3. The sentence has to stand before the number it explains, not below it.
   const noticeAt = ctLogSeen.indexOf('id="composition-notice"');
   const statsAt = ctLogSeen.indexOf('id="stat-total"');
   assert.ok(noticeAt > 0 && noticeAt < statsAt,
     'the composition notice must stand above the counters, which is where a visitor reads before the number');
 
-  // No page may sell the volume as demand. These are the shapes that would.
+  // 4. No page may sell the volume as demand. These are the shapes that would.
   for (const shape of [
     /(shows?|proves?|reflects?|measures?)[^.<]{0,30}(real |actual |live )?customer (use|usage|traffic|activity|demand)/i,
     /see how (much|often)[^.<]{0,30}is used/i,
@@ -2183,48 +2240,35 @@ console.log('ui-truthfulness: /parashare says the receiver has to be online, and
     /growing (steadily|fast)/i,
   ]) {
     assert.doesNotMatch(ctLogSeen, shape,
-      'ct-log must not present the entry count as customer use; most of the entries are our own self-test');
+      'ct-log must not present the entry count as customer use; most of the entries are not customer traffic');
   }
+  assert.match(ctLogSeen, /not a measure of how much the service is used/i,
+    'ct-log must say what the count is not, or the number sells activity the service does not have');
 
-  // The count is fetched, never typed, so it cannot age into a lie. Read the
+  // 5. The count is fetched, never typed, so it cannot age into a lie. Read the
   // notice as a whole rather than a window around the word "entries": the
   // number sits in a span of its own, so any regex that steps over tags misses
   // exactly the paste it is meant to catch. No figure belongs in this notice
   // that /v2/ct/log did not just answer, so no literal number belongs here.
-  const ctLogNoticeEnd = ctLogSeen.indexOf('</div>\n</div>', noticeAt);
+  const ctLogNoticeEnd = ctLogSeen.indexOf('</div> </div>', noticeAt);
   assert.ok(ctLogNoticeEnd > noticeAt, 'the composition notice no longer closes as a notice block');
   const ctLogNotice = ctLogSeen.slice(noticeAt, ctLogNoticeEnd);
   assert.match(ctLogNotice, /id="composition-count"/,
     'the count in the sentence must be a slot the page fills, not text');
   assert.doesNotMatch(ctLogNotice, /\d{2,}/,
     'the entry count in the copy must come from /v2/ct/log, not be typed into the page');
-  assert.match(ctLogJs, /getElementById\('composition-count'\)/,
+  assert.match(ctLogJsSeen, /getElementById\('composition-count'\)/,
     'ct-log.page.js must fill the count in the sentence; without it the page names no number at all');
-  assert.match(ctLogJs, /var logSize = d\.size != null \? d\.size : allEntries\.length;/,
+  assert.match(ctLogJsSeen, /var logSize = d\.size != null \? d\.size : allEntries\.length;/,
     'the sentence and the counter must name the same number, off the same read of /v2/ct/log');
 
-  // The self-test the page blames is real, hourly, and really does write to
-  // this log. A disclosure that named a check nobody runs would be its own lie.
-  const heartbeat = read('.github/workflows/heartbeat.yml');
-  assert.match(heartbeat, /- cron: '\d+ \* \* \* \*'/,
-    'ct-log calls the self-test hourly; heartbeat.yml no longer runs hourly');
-  assert.match(read('scripts/heartbeat/parasend.mjs'), /\$\{RELAY\}\/v2\/anon-inbound/,
-    'the self-test must still send a real transfer, or it makes no log entries to disclose');
-  const relaySrc = read('relay/relay.js');
-  const anonInbound = relaySrc.slice(
-    relaySrc.indexOf("path === '/v2/anon-inbound'"),
-    relaySrc.indexOf("path === '/v2/inbound'"));
-  assert.match(anonInbound, /ctAppendTransfer\(/,
-    'the route the self-test posts to no longer appends to the CT log, so the page blames it for nothing');
-
-  // Same rule as block 8 of site-claims.test.mjs, on the page next door: while
+  // 6. Same rule as block 8 of site-claims.test.mjs, on the page next door: while
   // HEARTBEAT_ENABLED gates the workflow, /sla says the check is switched off
   // until its credentials are in place, and this page may not say otherwise.
-  // The entries are described in the past tense for that reason.
   if (/vars\.HEARTBEAT_ENABLED\s*==\s*'true'/.test(heartbeat)) {
     assert.doesNotMatch(ctLogSeen, /self-test (is )?(running|runs) (right )?now|every hour, (all day|around the clock)|around the clock/i,
       'the self-test is gated off, so ct-log must not imply it is running; /sla carries the same caveat');
   }
 })();
 
-console.log('ui-truthfulness: /ct-log says the count is mostly its own self-test, and the count is read not typed');
+console.log('ui-truthfulness: /ct-log names the relay whose log it shows, and every claim about the mix is backed by code that writes into that log');
