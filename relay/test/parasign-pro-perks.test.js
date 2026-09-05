@@ -78,7 +78,7 @@ test('parasign=pro leaves the unified plan and ParaSend entitlement untouched', 
   const acct = freeAccount();
   const sendBefore = ent.getEntitlements(acct).parasend;
   assert.strictEqual(sendBefore.tier, 'community');
-  assert.strictEqual(sendBefore.quotas.transfers_month, 10, 'community transfers cap');
+  assert.strictEqual(sendBefore.quotas.transfers_month, 50, 'community transfers cap');
 
   ent.applyProductTier(acct, 'parasign', 'pro');
 
@@ -86,7 +86,7 @@ test('parasign=pro leaves the unified plan and ParaSend entitlement untouched', 
   assert.strictEqual(acct.plan_parasend, 'community', 'plan_parasend untouched');
   const sendAfter = ent.getEntitlements(acct).parasend;
   assert.strictEqual(sendAfter.tier, 'community', 'ParaSend entitlement unchanged');
-  assert.strictEqual(sendAfter.quotas.transfers_month, 10, 'ParaSend transfers cap unchanged');
+  assert.strictEqual(sendAfter.quotas.transfers_month, 50, 'ParaSend transfers cap unchanged');
 });
 
 // ── FINDING (regression-locked): the transfers line is NOT delivered ─────────
@@ -108,7 +108,7 @@ test('FINDING: a parasign=pro grant does NOT move the ParaSend transfers ceiling
   const acct = freeAccount();
   ent.applyProductTier(acct, 'parasign', 'pro');
   const transfers = ent.getEntitlements(acct).parasend.quotas.transfers_month;
-  assert.strictEqual(transfers, 10, 'ParaSign Pro grant leaves transfers at the free ParaSend cap, NOT at the 500 the card names');
+  assert.strictEqual(transfers, 50, 'ParaSign Pro grant leaves transfers at the free ParaSend cap, NOT at the 500 the card names');
   // And the highest ParaSend tier is finite, so no card may drop the ceiling.
   assert.strictEqual(ent.PARASEND.enterprise.quotas.transfers_month, ent.ENTERPRISE_MONTHLY_CEILING);
   assert.notStrictEqual(ent.PARASEND.enterprise.quotas.transfers_month, Infinity, 'no ParaSend tier is unbounded');

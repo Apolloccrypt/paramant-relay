@@ -482,11 +482,11 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <div class="ps-mode" id="ps-mode" role="radiogroup" aria-label="How do you want to send this file">
   <button type="button" class="ps-mode-card" id="ps-mode-live" role="radio" aria-checked="true" data-click="chooseModeLive">
     <span class="ps-mode-title">Hand over live</span>
-    <span class="ps-mode-body">Both of you are online, you compare a code, and nothing is ever stored.</span>
+    <span class="ps-mode-body">Both of you are online, you compare a code, and nothing is ever stored. This way cuts the file into chunks and takes a file up to 500 MB.</span>
   </button>
   <button type="button" class="ps-mode-card" id="ps-mode-link" role="radio" aria-checked="false" data-click="chooseModeLink">
     <span class="ps-mode-title">Send a link</span>
-    <span class="ps-mode-body">The receiver opens it later. <span id="ps-mode-link-ttl">The sealed file waits on our server until its link expires, and a link from this web app is wiped after the first download.</span></span>
+    <span class="ps-mode-body">The receiver opens it later. One link is one sealed block, so this way takes a file up to 5 MB. <span id="ps-mode-link-ttl">The sealed file waits on our server until its link expires, and a link from this web app is wiped after the first download.</span></span>
   </button>
 </div>
 

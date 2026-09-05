@@ -51,7 +51,7 @@
   // and compares each number against tiers.js and entitlements.js, so a tier
   // edit that does not reach this file turns the suite red.
   var CEILINGS = {
-    transfers_month: { community: 10, pro: 500, business: 2000, enterprise: 1000000 },
+    transfers_month: { community: 50, pro: 500, business: 2000, enterprise: 1000000 },
     signs_month:     { community: 2,  pro: 100, business: 1000, enterprise: 1000000 }
   };
 

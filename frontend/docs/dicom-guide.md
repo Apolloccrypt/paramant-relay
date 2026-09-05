@@ -209,8 +209,8 @@ No. Ciphertext is held in RAM only. It is destroyed immediately after the first 
 **Q: Can we run paramant entirely on-premise?**  
 Yes. The relay is source-available (BUSL-1.1). Run it in your own Kubernetes cluster or on a VPS. The receiver and sender still apply client-side encryption — the operator of the relay never has access to plaintext.
 
-**Q: What about DICOM files > 5 MB?**  
-The relay currently pads all transfers to 5 MB and has a hard limit. For large CT/MRI series, split by series UID or use the streaming WebSocket mode (available in Enterprise tier).
+**Q: What about DICOM files larger than one block?**  
+Every transfer is padded to 5 MB blocks, so nothing leaks the size, but that is the block size and not a file limit. A study is sent as a run of blocks up to the tier ceiling (`file_mb`, 500 MB on the hosted relay). For series beyond that, split by series UID.
 
 **Q: Is there a DICOM WADO-RS / STOW-RS adapter?**  
 Yes, in Enterprise. The DICOM gateway at `/dicom/` proxies STOW-RS-compatible uploads directly into the Ghost Pipe relay. Contact privacy@paramant.app.

@@ -1,9 +1,12 @@
 # Paramant Business Model — v1.0
 
+> Prices in this document are out of date. It still names Pro at 12 euro and Team at 49 euro; neither plan is on sale. `frontend/pricing.html` is the leading source for what a plan costs and what it includes. The file sizes and the RAM-only reasoning below were corrected on 2026-09-05; the rest is v1.0 as written.
+
 ## Core philosophy
 
 RAM-only is not a limitation. It is the product.
-5 MB is enough for every document that matters: contracts, medical records, legal filings, sensor payloads, firmware chunks, financial transfers.
+RAM-only does not mean small. The relay never holds a whole file. It holds blocks of a fixed 5 MiB, in working memory, and a file is cut into chunks that each travel as one block. So a 500 MB file moves through a relay that still writes nothing to disk and still holds no file.
+500 MB covers every document that matters: contracts, medical records, legal filings, sensor payloads, firmware chunks, financial transfers, and the scans and slide decks that used to be too big.
 If you need to send a movie, use WeTransfer. If you need zero trace, use Paramant.
 
 ---
@@ -15,7 +18,8 @@ If you need to send a movie, use WeTransfer. If you need zero trace, use Paraman
 Both Zivver and OT use cases.
 
 **Zivver kant:**
-- 5 MB per transfer
+- 500 MB per file over the live hand-over, the same ceiling as every paid tier
+- 5 MB per file over a one-time link, because one link is one sealed block
 - Up to 10 transfers/day (IP-limited, no account)
 - Burn-on-read
 - 1h TTL
@@ -38,7 +42,7 @@ Both Zivver and OT use cases.
 For professionals who send sensitive documents regularly.
 
 **Zivver kant:**
-- 50 MB per transfer (disk-backed AES-256-GCM, auto-wiped on TTL; RAM-only for ≤5 MB)
+- 500 MB per file, the same as the free tier: size is not what a plan sells. Every block stays in RAM, nothing is disk-backed
 - Unlimited transfers
 - Email notification to recipient
 - TTL options: 1h / 24h / 7d / 30d
@@ -95,17 +99,17 @@ Everything in Team, plus:
 
 ## Key decisions
 
-### 5 MB on free tier — intentional
-- Enough for: contracts (PDF), medical referrals, legal filings, sensor payloads, firmware chunks
-- Not enough for: slide decks, videos, large archives
-- "We don't store files. That means limits. If you need more storage, use Dropbox. If you need zero trace, use us."
+### 500 MB on every tier, including free
+- Size is not what a plan sells. The file ceiling is `file_mb` in `relay/lib/tiers.js` and it is 500 MB on every capped row
+- Reached by chunking: the file is cut up in the browser and each chunk travels as one fixed 5 MiB block. Nothing is disk-backed and nothing is written to disk
+- Enough for: contracts (PDF), medical referrals, legal filings, sensor payloads, firmware chunks, scans, slide decks
+- Not enough for: video libraries and large archives
+- "We don't store files. If you need storage, use Dropbox. If you need zero trace, use us."
 
-### 50 MB on Pro — disk-backed exception
-- Only for Pro and above
-- Stored encrypted at rest (AES-256-GCM, server-side key)
-- Auto-wiped on TTL expiry, guaranteed
-- NOT RAM-only — document this clearly in the UI
-- "Files over 5 MB are stored encrypted on disk and wiped on expiry. Files under 5 MB are RAM-only and leave no disk trace."
+### Three numbers that are not the same number
+- The block on the wire is a fixed 5 MiB. That is the padding, a privacy measure, and it does not move
+- The live hand-over cuts a file into chunks, so it reaches 500 MB a file. The receiver has to be online while you send, and you compare a short code
+- A one-time link is one block under one token, so that way stops at 5 MB a file. The receiver does not have to be online
 
 ### OT evaluation mode — 1000 transfers / 30 days
 - Free daily cap (10/day) would kill SCADA evaluation (5-min intervals × 24h = 288 transfers/day)
@@ -120,7 +124,7 @@ Everything in Team, plus:
 
 ### Freemium conversion logic
 Free users hit two natural upgrade triggers:
-1. File > 5 MB → "Upgrade to Pro for up to 50 MB"
+1. File > 5 MB in the link mode → "Hand it over live, or upgrade for longer links" (the size itself is the same on every plan)
 2. TTL expired before recipient downloaded → "Upgrade to Pro for 7-day links"
 
 ### DPA availability

@@ -621,8 +621,24 @@ assert.match(pricingVisible, /Sign documents and send files that delete themselv
 // The promise carries its own number. "Free forever" on its own reads as
 // generous until the table says two signatures a month, and a buyer who finds
 // that out one screen later has been sold to rather than told.
-assert.match(pricingVisible, /Community is &euro;0 a month, forever:<\/strong> 2 signatures a month, 10 transfers a month, 5 MB per file, no card\./,
+//
+// The numbers come out of tiers.js rather than being typed here, so the sentence
+// cannot drift away from the table that enforces it. It used to pin the literal
+// "10 transfers a month, 5 MB per file": correct at the time, but it meant the
+// sentence and the tier row could only ever be changed together by someone who
+// knew this line existed, and the file ceiling in particular sat wrong for
+// months partly because moving it broke tests that read like copy checks.
+const _tiersSrc = read('relay/lib/tiers.js');
+const _community = _tiersSrc.slice(_tiersSrc.indexOf('community:'), _tiersSrc.indexOf('pro:'));
+const _dim = (name) => Number(new RegExp(`${name}:\\s*([\\d_]+)`).exec(_community)[1].replace(/_/g, ''));
+assert.match(pricingVisible, /Community is &euro;0 a month, forever:<\/strong>[^<]*no card\./,
   'the free promise on pricing.html must carry the limits it actually means');
+for (const [dim, phrase] of [['signs_month', `${_dim('signs_month')} signatures a month`],
+                             ['transfers_month', `${_dim('transfers_month')} transfers a month`],
+                             ['file_mb', `${_dim('file_mb')} MB`]]) {
+  assert.ok(pricingVisible.includes(phrase),
+    `the free promise on pricing.html must state ${dim} as tiers.js declares it: "${phrase}"`);
+}
 // And they must be the limits the relay enforces, not the per-IP rate on the
 // deprecated anonymous endpoint. relay/test/pricing-page.test.js reads the
 // numbers out of relay/lib/tiers.js; this keeps the phrase off the page.

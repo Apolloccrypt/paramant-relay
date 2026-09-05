@@ -637,6 +637,65 @@ async function connectWebSocket() {
   };
 }
 
+// ── Streaming hand-over ──────────────────────────────────────────────────────
+// A file is sent as a run of padded 5 MB blocks. Until now every block of a file
+// was uploaded before the receiver was told anything, so the relay held the
+// whole file at once: 112 blocks, 560 MB, for a 500 MB send. Blobs live in RAM
+// and only in RAM, so that is 560 MB of the relay's memory tied up for one
+// transfer, and 560 MB that a restart throws away.
+//
+// Now each block is announced the moment it lands, the receiver takes it, and
+// the sender stays a few blocks ahead instead of a whole file. The relay holds a
+// sliding window rather than the file, which is what makes 500 MB possible
+// without buying memory, and it shrinks the window in which a restart can lose
+// something to a few seconds.
+//
+// SEND_WINDOW is how many blocks the sender may be ahead of the receiver. Three
+// keeps the upload saturated (one in flight, one waiting, one being taken)
+// without parking the file on the relay.
+const SEND_WINDOW = 3;
+// If the receiver stalls we stop waiting and carry on. Back-pressure is an
+// optimisation, not a boundary: the relay's own memory guard is the boundary,
+// and it answers 503 when it is really full. Blocking a transfer forever
+// because a receiver paused would be worse than letting the guard decide.
+const SEND_WINDOW_WAIT_MS = 60000;
+
+// Has the receiver taken this block? /v2/status answers available:false once a
+// blob is burned or expired, which is exactly the signal, and it does not burn
+// anything itself.
+async function blockTaken(hash) {
+  try {
+    const r = await relayFetch(RELAY_API + '/v2/status/' + hash, { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) return true;            // cannot tell: do not hold the sender up
+    const d = await r.json();
+    return d.available === false;
+  } catch (e) { return true; }
+}
+
+async function waitForWindow(hash) {
+  const until = Date.now() + SEND_WINDOW_WAIT_MS;
+  while (Date.now() < until) {
+    if (await blockTaken(hash)) return true;
+    await new Promise(r => setTimeout(r, 500));
+  }
+  return false;
+}
+
+// Announce one block. Best-effort on purpose: the full token list still goes out
+// on the `_ready` registration at the end of the send, so a receiver that never
+// saw the manifest still gets the file the way it always did. This only makes it
+// arrive sooner, and hold less while it does.
+async function announceBlock(sessionId, index, token, totalChunks, meta) {
+  try {
+    await relayFetch(RELAY_API + '/v2/session/' + sessionId + '/manifest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ index, token, total_chunks: totalChunks, meta: meta || undefined }),
+      signal: AbortSignal.timeout(10000)
+    });
+  } catch (e) { /* the end-of-send registration is the fallback */ }
+}
+
 // ── Fingerprint confirmed — encrypt & send ──
 async function confirmFingerprint() {
   if (!receiverPubs) return;
@@ -669,13 +728,28 @@ async function confirmFingerprint() {
       const fileId = u8toHex(crypto.getRandomValues(new Uint8Array(8)));
       const tokens = [];
 
-      // Grootte-waarschuwing bij > 500MB
+      // Grootte-melding boven de verkochte grens van de live overdracht:
+      // file_mb in relay/lib/tiers.js is 500 MB en de relay telt de blokken van
+      // deze overdracht daartegen. Deze regel belooft niets over de afloop, hij
+      // zegt alleen wat de browser aan het doen is; de weigering komt van de
+      // relay, niet van hier.
       if (file.size > 500 * 1024 * 1024) {
-        $('enc-status').textContent = 'Large file (' + (file.size/1024/1024/1024).toFixed(2) + ' GB) — streaming mode, reading chunk by chunk...';
+        $('enc-status').textContent = 'Large file (' + Math.round(file.size/1024/1024) + ' MB). Reading and encrypting chunk by chunk...';
         await new Promise(r => setTimeout(r, 400));
       }
 
+      // Announce blocks as they land, but only for a single-file send. A vault
+      // (more than one file) still uses the end-of-send registration: its wire
+      // shape is a JSON list of files and the manifest carries one run of
+      // blocks, so streaming a vault is its own change and not this one.
+      const streaming = (totalFiles === 1);
+      const chunkHashes = [];
       for (let i = 0; i < totalChunks; i++) {
+        // Stay at most SEND_WINDOW blocks ahead of the receiver, so the relay
+        // holds a window instead of the whole file.
+        if (streaming && i >= SEND_WINDOW) {
+          await waitForWindow(chunkHashes[i - SEND_WINDOW]);
+        }
         const globalPct = Math.round(
           ((fileIndex + (i / totalChunks)) / totalFiles) * 85
         );
@@ -730,6 +804,16 @@ async function confirmFingerprint() {
         }
         if (!ud.ok) throw new Error(ud.error || 'Upload failed: ' + file.name);
         tokens.push(ud.download_token);
+        chunkHashes[i] = hash;
+        if (streaming) {
+          // The first block carries the handshake meta, so a receiver working
+          // from the manifest alone knows the name and the block count without
+          // waiting for the registration at the end.
+          const mfMeta = (i === 0)
+            ? window.paramantHandshake.encode({ kind: 'file', name: file.name, chunks: totalChunks, ttlMs: ttlMs })
+            : null;
+          await announceBlock(sessionToken, i, ud.download_token, totalChunks, mfMeta);
+        }
         // POST /v2/inbound answers with the entry this block made in the public
         // CT log: leaf hash, index, audit path and the signed tree head. It is
         // the one piece of real proof the SENDER is handed, so it is kept here
@@ -823,9 +907,15 @@ async function confirmFingerprint() {
 // public key. There is nothing to do a key exchange with, so the file is sealed
 // under a symmetric key that travels beside the link instead.
 
-// The ceiling POST /v2/inbound enforces: MAX_BLOB, 5 MB, on every ParaSend tier
-// today. One link is one blob, so a file bigger than that cannot be sent this
-// way and is refused here with the number, rather than at the upload with a 413.
+// THIS IS NOT THE PRODUCT'S FILE CEILING. It is MAX_BLOB, the fixed 5 MiB block
+// POST /v2/inbound accepts, which is the padding size on the wire and the same
+// on every tier. The file ceiling the product sells is file_mb in
+// relay/lib/tiers.js, 500 MB, and the live hand-over reaches it by cutting the
+// file into chunks and sending one block per chunk.
+//
+// The link stand cannot do that: one link is one token over one blob, so a link
+// stops at one block. A bigger file is refused here with the number and pointed
+// at the live hand-over, rather than at the upload with a 413.
 const LINK_MAX_BLOB = 5 * 1024 * 1024;
 // AES-GCM tag (16) + the 4-byte name-length header. The file name itself is
 // counted per file, below.
@@ -935,8 +1025,10 @@ async function startSend() {
 async function sealAndUpload(file, ttlMs) {
   const nameBytes = new TextEncoder().encode(file.name);
   if (file.size + nameBytes.length + LINK_OVERHEAD > LINK_MAX_BLOB) {
-    throw new Error(file.name + ' is too big for a link. One link is one 5 MB block; ' +
-      'send it with the live hand-over, which splits a file into chunks.');
+    throw new Error(file.name + ' is too big for a link. A link is one sealed 5 MB block, ' +
+      'so 5 MB a file is the ceiling for this way of sending. Hand it over live instead: ' +
+      'that way cuts the file into chunks and takes a file up to 500 MB. ' +
+      'The receiver has to be online while you send.');
   }
   const plain = concat(u32le(nameBytes.length), nameBytes, new Uint8Array(await file.arrayBuffer()));
   const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);

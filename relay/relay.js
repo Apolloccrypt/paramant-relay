@@ -102,6 +102,19 @@ if (RELAY_REDIS_URL) {
 const PORT       = parseInt(process.env.PORT       || '3000');
 const USERS_FILE = process.env.USERS_FILE          || './users.json';
 const TTL_MS     = parseInt(process.env.TTL_MS     || '300000');
+// The largest single BLOB the relay accepts on the wire, in bytes. Every blob a
+// client sends is padded to exactly this size (crypto-wasm BLOCK), so the length
+// of an upload says nothing about the file inside it.
+//
+// THIS IS NOT THE FILE SIZE LIMIT, and reading it as one is the bug this file
+// carried for a long time. The relay never sees a file: a 500 MB file arrives as
+// 112 separate padded blobs, each one of these. The file ceiling is a product
+// number and lives in relay/lib/tiers.js as `file_mb`; it is enforced by
+// counting a file's blocks (see FILE_CEILING below), not by comparing one blob
+// against it. `Math.min(MAX_BLOB, file_mb * 1048576)` on a single blob was that
+// confusion written down, and it held every file on every tier to 5 MB.
+//
+// Move this number only when the wire format or the memory budget changes.
 const MAX_BLOB   = parseInt(process.env.MAX_BLOB   || '5242880');
 const MAX_AUDIT  = parseInt(process.env.MAX_AUDIT  || '1000');
 const CLAIM_TTL_SECONDS = parseInt(process.env.CLAIM_TTL_SECONDS || String(7 * 86400)); // one-time API-key claim link lifetime
@@ -1334,26 +1347,68 @@ setInterval(() => {
 
 
 // ── RAM guard ────────────────────────────────────────────────────────────────
+// Blobs live in RAM and only in RAM. That is a promise this product makes in
+// terms.html, in press.html and in the Art. 28 processing register in dpa.html,
+// so the way to carry bigger files is to hold each one for a shorter time, not
+// to spill it to disk. Capacity here is therefore a memory budget.
+//
+// THE TWO NUMBERS, and this is the meaning scripts/check-guards.mjs enforces:
+// RAM_LIMIT_MB is what blobs may occupy, and RAM_RESERVE_MB is headroom ADDED
+// on top of it for the process itself. The guard trips at the SUM, so the sum
+// is what has to stay below the container's cgroup limit. It did not: the
+// health relay ran 8192 + 512 inside a container capped at 8192, so the kernel
+// always got there first and the guard was dead code. That was fixed by moving
+// the numbers to 6656 + 512, and check-guards.mjs now fails the build if the
+// sum ever climbs back to the cap.
+//
+// What changes here is only HOW the budget is spent, not what the two numbers
+// mean: the ceiling used to be a count of 5 MB slots, which stopped being the
+// right unit once a single transfer could be a hundred of them. It is bytes
+// now. Do not reinterpret RAM_RESERVE_MB as a slice held back below the limit;
+// operators and self-host installs set these, and check-guards.mjs reads them
+// the way they are described above.
 const RAM_LIMIT_MB    = parseInt(process.env.RAM_LIMIT_MB    || '512');
 const RAM_RESERVE_MB  = parseInt(process.env.RAM_RESERVE_MB  || '256');
+// What blobs may occupy, in bytes.
+const BLOB_BUDGET_BYTES = Math.max(32 * 1048576, RAM_LIMIT_MB * 1048576);
+// Kept as a blob COUNT for the status view and the self-host installs that read
+// it, but derived from the byte budget rather than being the budget itself.
 const BLOB_SIZE_MB    = 5;
-const MAX_BLOBS       = Math.floor(RAM_LIMIT_MB / BLOB_SIZE_MB);
+const MAX_BLOBS       = Math.floor(BLOB_BUDGET_BYTES / (BLOB_SIZE_MB * 1048576));
+
+// Running total of blob bytes, kept as blobs are stored and dropped. The old
+// version summed the whole map on every call, and ramOk() runs on every upload:
+// at a hundred blobs per transfer that is a full scan per chunk.
+let blobBytesHeld = 0;
 
 function ramStats() {
   const mem    = process.memoryUsage();
   const heapMB = Math.round(mem.heapUsed / 1024 / 1024);
   const rssMB  = Math.round(mem.rss      / 1024 / 1024);
-  let blobBytes = 0;
-  for (const e of blobStore.values()) blobBytes += (e.size || 0);
-  const blobMB  = Math.round(blobBytes / 1024 / 1024);
-  return { heapMB, rssMB, blobMB, blobCount: blobStore.size };
+  return {
+    heapMB, rssMB,
+    blobBytes: blobBytesHeld,
+    blobMB: Math.round(blobBytesHeld / 1024 / 1024),
+    blobCount: blobStore.size,
+  };
 }
 
+// Is there room for one more blob? Two independent questions, and both have to
+// answer yes.
+//
+//   1. the blob budget: what is already held, plus what is mid-upload, plus the
+//      one being asked about, must fit in BLOB_BUDGET_BYTES.
+//   2. actual process memory: RSS must stay under RAM_LIMIT_MB + RAM_RESERVE_MB,
+//      which scripts/check-guards.mjs holds below the container's cgroup limit,
+//      so this branch can actually fire. It catches the memory a blob costs on the way
+//      in that the budget does not model -- a 5 MiB blob arrives base64'd inside
+//      a JSON body, so it is roughly 19 MB of transient buffers before it
+//      becomes a 5 MiB Buffer.
 function ramOk() {
-  const { rssMB, blobCount } = ramStats();
-  const effective = blobCount + inFlightInbound;
-  if (effective >= MAX_BLOBS) return false;
-  if (rssMB + BLOB_SIZE_MB * (inFlightInbound + 1) > RAM_LIMIT_MB + RAM_RESERVE_MB) return false;
+  const { rssMB } = ramStats();
+  const wouldHold = blobBytesHeld + (inFlightInbound + 1) * MAX_BLOB;
+  if (wouldHold > BLOB_BUDGET_BYTES) return false;
+  if (rssMB + Math.ceil(((inFlightInbound + 1) * MAX_BLOB * 4) / 1048576) > RAM_LIMIT_MB + RAM_RESERVE_MB) return false;
   return true;
 }
 
@@ -1367,8 +1422,10 @@ function ramStatus() {
     heap_mb:          s.heapMB,
     rss_mb:           s.rssMB,
     ram_limit_mb:     RAM_LIMIT_MB,
+    blob_budget_mb:   Math.round(BLOB_BUDGET_BYTES / 1048576),
+    blob_budget_free_mb: Math.max(0, Math.round((BLOB_BUDGET_BYTES - s.blobBytes) / 1048576)),
     ram_ok:           ramOk(),
-    available_slots:  Math.max(0, MAX_BLOBS - s.blobCount - inFlightInbound),
+    available_slots:  Math.max(0, Math.floor((BLOB_BUDGET_BYTES - s.blobBytes) / MAX_BLOB) - inFlightInbound),
   };
 }
 
@@ -1482,15 +1539,98 @@ function _reportLimit(v) {
   return v === Infinity ? tiers.UNLIMITED : v;
 }
 
-// The file ceiling an upload is really held to, in MB. POST /v2/inbound takes
-// the LOWER of the operator's MAX_BLOB and the tier's file_mb, so a tier whose
-// row says "uncapped" is still held to MAX_BLOB and the views must say so.
-// Reporting the bare tier value put -1 on an enterprise row while the gate was
-// enforcing 5 MB, and that is the one number an operator would act on.
+// The file ceiling an upload is really held to, in MB.
+//
+// This used to return min(MAX_BLOB, file_mb) because the gate compared a single
+// blob against file_mb, which meant every tier was really held to one 5 MB
+// block. It no longer does: a file is carried as many blobs and the ceiling is
+// enforced by counting them (FILE_MAX_BLOCKS below), so the number an operator
+// sees here is the tier's own, and MAX_BLOB does not enter into it.
 function _effectiveFileMb(ent) {
-  return Math.min(MAX_BLOB / 1048576, ent.parasend.limits.file_mb);
+  // Through _reportLimit, so an uncapped row reports -1 and not null.
+  //
+  // This used to be Math.min(MAX_BLOB / 1048576, file_mb), which happened to
+  // launder Infinity into a finite 5 on the way out. Removing the min removed
+  // that accident too: the enterprise row is Infinity, JSON.stringify turns
+  // Infinity into null, and an operator reads null as "no data" rather than
+  // "no cap". The whole point of _reportLimit is that -1 is how this API says
+  // uncapped.
+  return _reportLimit(ent.parasend.limits.file_mb);
+}
+
+// How many padded blocks a file of `fileMb` may occupy.
+//
+// The relay cannot see a file. It sees blobs, and it learns which blobs belong
+// together from the `meta.file_id` the sender already sends for quota dedup. So
+// the file ceiling is enforced as a block count, and the conversion needs the
+// plaintext each block actually carries.
+//
+// CLIENT_CHUNK_PLAIN is the chunk size the web app uses (parashare.page.js
+// CHUNK_PLAIN). It is deliberately under MAX_BLOB so the wire prelude, the AEAD
+// tag and the per-chunk metadata header fit in the same block. A client that
+// chunks smaller than this simply gets fewer bytes through before it hits the
+// ceiling; that is its own problem and not a security boundary. The security
+// boundaries are MAX_BLOB, the relay's memory budget and the monthly quota, and
+// all three sit underneath this. Hence the slack: this number is a product
+// limit, and it should err towards letting an honest 500 MB file finish.
+const CLIENT_CHUNK_PLAIN = 4.5 * 1024 * 1024;
+const FILE_BLOCK_SLACK   = 4;
+function fileMaxBlocks(fileMb) {
+  if (!Number.isFinite(fileMb) || fileMb < 0) return Infinity;
+  return Math.ceil((fileMb * 1048576) / CLIENT_CHUNK_PLAIN) + FILE_BLOCK_SLACK;
+}
+
+// Blocks seen per file, so a file ceiling can be enforced across the uploads
+// that make up one file. Keyed by the sender's file_id, scoped to the account so
+// two accounts cannot collide or interfere. Entries are short-lived: a transfer
+// is minutes, and the sweep below drops anything idle for an hour.
+const fileBlocks = new Map(); // `${account}:${file_id}` → { blocks, ts }
+const FILE_BLOCKS_TTL_MS = 3600_000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of fileBlocks.entries()) {
+    if (now - v.ts > FILE_BLOCKS_TTL_MS) fileBlocks.delete(k);
+  }
+}, 300_000).unref?.();
+
+// Blobs currently held per account, for the concurrent_blobs ceiling. Kept as a
+// counter rather than scanned out of blobStore: this is read on every upload.
+const accountBlobs = new Map(); // account_id → count
+function accountBlobsAdd(acct, n) {
+  if (!acct) return;
+  const next = (accountBlobs.get(acct) || 0) + n;
+  if (next <= 0) accountBlobs.delete(acct); else accountBlobs.set(acct, next);
 }
 const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
+
+// Every write to blobStore goes through these two, so blobBytesHeld cannot drift
+// away from what is really held. It is the number the capacity guard decides on,
+// and a guard reading a stale total is worse than no guard: it refuses uploads
+// the relay could take, or accepts ones it cannot.
+function blobPut(hash, entry) {
+  const prev = blobStore.get(hash);
+  if (prev) { blobBytesHeld -= (prev.size || 0); accountBlobsAdd(prev.account_id, -1); }
+  blobBytesHeld += (entry.size || 0);
+  accountBlobsAdd(entry.account_id, 1);
+  blobStore.set(hash, entry);
+}
+// Drops the entry and wipes the bytes. zeroBuffer is what makes "destroyed"
+// true rather than "dereferenced", so it belongs here and not at each call site
+// where it can be forgotten.
+// wipe=false is for the one case where the bytes are still needed: a burn-on-read
+// drops the entry BEFORE the response is written, so that a second reader cannot
+// find it, but the buffer itself is what is being sent. Those callers wipe on
+// 'finish' instead. Everywhere else the default is right.
+function blobDrop(hash, wipe = true) {
+  const e = blobStore.get(hash);
+  if (!e) return false;
+  blobBytesHeld -= (e.size || 0);
+  if (blobBytesHeld < 0) blobBytesHeld = 0;
+  accountBlobsAdd(e.account_id, -1);
+  blobStore.delete(hash);
+  if (wipe) zeroBuffer(e.blob);
+  return true;
+}
 
 const anonInboundIpRequests = new Map(); // ip → [timestamps] for /v2/anon-inbound rate limit
 const invDidIpRequests = new Map(); // ip → [timestamps] for keyless inv_ DID registration
@@ -1629,10 +1769,20 @@ function _parasignStore() {
   return _parasignStore._inst;
 }
 
-// Per-IP rate limit for /v2/status/:hash (max 60/min) — prevents hash enumeration
+// Per-IP rate limit for /v2/status/:hash.
+//
+// Raised from 60/min. A streaming send asks this once per block to see whether
+// the receiver has taken the one it is waiting on, and a 500 MB file is 112
+// blocks: at 60/min a fast upload tripped its own back-pressure check and fell
+// back to sending blind, which is the behaviour the window exists to prevent.
+//
+// The old comment called this an anti-enumeration limit. It is not really doing
+// that work: the argument is a 64-hex hash, so guessing one is not something a
+// rate limit is holding back. What it bounds is cost, and 240/min is still a
+// small number of map lookups.
 const statusRateLimits = new Map();
 function statusRateOk(ip) {
-  return rateLimit.fixedWindowAllow(statusRateLimits, ip, 60, 60000);
+  return rateLimit.fixedWindowAllow(statusRateLimits, ip, 240, 60000);
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of statusRateLimits) if (now > v.resetAt + 60000) statusRateLimits.delete(k); }, 120_000);
 
@@ -2653,8 +2803,7 @@ setInterval(() => {
   const now = Date.now();
   for (const [h, e] of blobStore.entries()) {
     if (now - e.ts > e.ttl) {
-      zeroBuffer(e.blob);
-      blobStore.delete(h);
+      blobDrop(h);
       log('info', 'blob_ttl_expired', { hash: h.slice(0,16) });
     }
   }
@@ -5072,7 +5221,7 @@ async function handleRelayRequest(req, res) {
     // Fix 4: only burn blob after response has fully flushed to the client
     res.on('finish', () => {
       td.used = true;
-      blobStore.delete(blobHash);
+      blobDrop(blobHash);
       try { blob.fill(0); } catch {}
     });
     // Fix 4: on socket error before finish, allow retry
@@ -5405,14 +5554,14 @@ async function handleRelayRequest(req, res) {
       }
       const ttl     = Math.min(parseInt(ttl_ms || TTL_MS), 86_400_000); // max 24h for anon
       const ctEntry = ctAppendTransfer(hash, SECTOR);
-      blobStore.set(hash, {
+      blobPut(hash, {
         blob, ts: now, ttl, size: blob.length,
         apiKey: null, max_views: 1, views_remaining: 1, sector: SECTOR,
         ct_entry: { index: ctEntry.index, leaf_hash: ctEntry.leaf_hash, tree_hash: ctEntry.tree_hash,
                     tree_size: ctEntry.index + 1, audit_path: ctEntry.proof, sth: ctEntry.sth || null,
                     ts: ctEntry.ts },
       });
-      setTimeout(() => { const e = blobStore.get(hash); if (e) { zeroBuffer(e.blob); blobStore.delete(hash); } }, ttl);
+      setTimeout(() => { blobDrop(hash); }, ttl);
       ipTimes.push(now);
       anonInboundIpRequests.set(ip, ipTimes);
       const dlToken = require('crypto').randomBytes(24).toString('hex');
@@ -5499,6 +5648,67 @@ async function handleRelayRequest(req, res) {
       joined_at: sess.joined_at,
       expires_ms: sess.expires_ms,
     }));
+  }
+
+  // ── The streaming manifest ───────────────────────────────────────────────────
+  //
+  // WHY THIS EXISTS. The sender used to upload every block of a file and only
+  // then tell the receiver, by registering `<session>_ready` with the full token
+  // list. For a 500 MB file that is 112 blocks sitting in the relay's memory at
+  // once, for as long as the whole upload takes, and blobs live in RAM: that is
+  // 560 MB held for one transfer, and it is also 560 MB that a restart throws
+  // away. The fleet restarted hourly for twenty-one days in July and August and
+  // nobody lost a transfer, but only because there was almost no traffic.
+  //
+  // With a manifest the receiver learns each token as it is minted and takes the
+  // block straight away, so the sender can keep a small sliding window instead of
+  // the whole file. The same change cuts the memory a transfer costs and the
+  // window in which a restart can lose something.
+  //
+  // WHY NOT REUSE `_ready`. POST /v2/pubkey answers 409 on a second write to the
+  // same slot: first registration wins, and that is a property worth keeping.
+  // A manifest is append-only by nature and needed its own door.
+  //
+  // The manifest hangs off the session, so it expires with it and needs no sweep
+  // of its own. Writing needs the session's API key, exactly like the pubkey
+  // route above. Reading needs only the session id, exactly like
+  // GET /v2/pubkey/:device, which is how the receiver already reads `_ready`:
+  // knowing the pss_ token IS the capability, and the tokens it hands back are
+  // useless without the private key that decrypts what they point at.
+  const sessMfm = path.match(/^\/v2\/session\/(pss_[a-f0-9]{48})\/manifest$/);
+  if (sessMfm && req.method === 'POST') {
+    if (!keyData) { res.writeHead(401); return res.end(J({ error: 'Valid API key required' })); }
+    const sess = sessions.get(sessMfm[1]);
+    if (!sess)                   { res.writeHead(404); return res.end(J({ error: 'Session not found or expired' })); }
+    if (sess.api_key !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Session belongs to a different API key' })); }
+    let d;
+    try { d = JSON.parse((await readBody(req, 8192)).toString()); }
+    catch (e) { res.writeHead(400); return res.end(J({ error: 'bad_request' })); }
+    const idx   = Number(d.index);
+    const total = Number(d.total_chunks);
+    const token = typeof d.token === 'string' ? d.token : '';
+    if (!Number.isInteger(idx) || idx < 0 || idx > 100000) { res.writeHead(400); return res.end(J({ error: 'index must be a non-negative integer' })); }
+    if (!Number.isInteger(total) || total < 1 || total > 100000) { res.writeHead(400); return res.end(J({ error: 'total_chunks must be a positive integer' })); }
+    if (idx >= total) { res.writeHead(400); return res.end(J({ error: 'index must be below total_chunks' })); }
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(token)) { res.writeHead(400); return res.end(J({ error: 'token must be a download token' })); }
+    if (!sess.manifest) sess.manifest = { total, tokens: new Map(), meta: null };
+    if (sess.manifest.total !== total) { res.writeHead(409); return res.end(J({ error: 'total_chunks changed mid-transfer' })); }
+    // First write wins per index, for the same reason the pubkey slot does: a
+    // second token for a block the receiver may already have taken would point
+    // it at a blob that is gone.
+    if (!sess.manifest.tokens.has(idx)) sess.manifest.tokens.set(idx, token);
+    if (typeof d.meta === 'string' && d.meta.length <= 2048 && !sess.manifest.meta) sess.manifest.meta = d.meta;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, have: sess.manifest.tokens.size, total }));
+  }
+  if (sessMfm && req.method === 'GET') {
+    const sess = sessions.get(sessMfm[1]);
+    if (!sess)          { res.writeHead(404); return res.end(J({ error: 'Session not found or expired' })); }
+    if (!sess.manifest) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true, total: 0, chunks: [], complete: false })); }
+    const m = sess.manifest;
+    const chunks = [...m.tokens.entries()].sort((a, b) => a[0] - b[0]).map(([index, token]) => ({ index, token }));
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, total: m.total, meta: m.meta, chunks, complete: chunks.length === m.total }));
   }
 
   // ── GET /v2/session/:id/status — Poll of receiver al gejoind is ─────────────
@@ -5596,14 +5806,59 @@ async function handleRelayRequest(req, res) {
       // never held. The honest client sends hash = sha256(payload bytes), so this
       // is non-breaking. Rejected before peek / ctAppendTransfer / blobStore.set.
       if (crypto.createHash('sha256').update(blob).digest('hex') !== hash) { res.writeHead(400); return res.end(J({ error: 'hash_mismatch' })); }
-      // The blob ceiling: the operator's MAX_BLOB is the hard roof (it bounds
-      // relay memory and must stay the last word), and the tier may only be
-      // stricter. Every ParaSend row in tiers.js is 5 MB today and enterprise
-      // is uncapped, so the number is unchanged; what changes is that file_mb
-      // now sits on the product axis with the other five ceilings.
       const _psend = parasendLimitsOf(keyData);
-      const planMaxSize = Math.min(MAX_BLOB, _psend.limits.file_mb * 1048576);
-      if (blob.length > planMaxSize) { res.writeHead(413); return res.end(J({ error: `Max ${Math.round(planMaxSize/1048576)}MB` })); }
+
+      // ── Two ceilings, and they are not the same ceiling ──────────────────
+      //
+      // 1. THE BLOB CEILING. MAX_BLOB is the wire-format roof: every blob is
+      //    padded to exactly this, so anything larger is malformed rather than
+      //    merely big. It is the operator's number and no tier may exceed it.
+      //    This is not a product limit and does not vary by plan.
+      if (blob.length > MAX_BLOB) {
+        res.writeHead(413);
+        return res.end(J({ error: 'blob_too_large', max_bytes: MAX_BLOB,
+          hint: 'one blob is one padded block; split the file into chunks' }));
+      }
+
+      // 2. THE FILE CEILING. The tier's file_mb, enforced across the blocks
+      //    that make up one file. This is the number the site sells. Comparing
+      //    a single blob against it, which is what this code used to do, held
+      //    every file to the size of one block and made file_mb unsellable.
+      //
+      //    A sender without a file_id is sending one standalone block, which is
+      //    by definition inside any file ceiling, so there is nothing to count.
+      const _fileMb = _psend.limits.file_mb;
+      const _fileId = meta && meta.file_id ? String(meta.file_id).slice(0, 128) : null;
+      if (_fileId && Number.isFinite(_fileMb)) {
+        const _fk   = `${acctOf(apiKey)}:${_fileId}`;
+        const _seen = fileBlocks.get(_fk);
+        const _n    = (_seen ? _seen.blocks : 0) + 1;
+        if (_n > fileMaxBlocks(_fileMb)) {
+          log('info', 'file_ceiling_reached', { account: String(keyData?.account_id || '').slice(0, 12), plan: _psend.tier, file_mb: _fileMb });
+          res.writeHead(413, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'file_too_large', dimension: 'file_mb',
+            plan: _psend.tier, limit_mb: _fileMb,
+            message: `Max ${_fileMb}MB per file on ${_psend.tier}` }));
+        }
+        fileBlocks.set(_fk, { blocks: _n, ts: Date.now() });
+      }
+
+      // 3. THE CONCURRENCY CEILING. Blobs live in RAM, so what one account may
+      //    hold at once is a real resource and not a paperwork limit. The
+      //    relay-wide budget (ramOk, above) is the harder floor underneath;
+      //    this one stops a single account from taking the whole pool while
+      //    everyone else gets the 503.
+      const _maxConc = _psend.limits.concurrent_blobs;
+      if (Number.isFinite(_maxConc) && keyData && keyData.account_id) {
+        const _held = accountBlobs.get(acctOf(apiKey)) || 0;
+        if (_held >= _maxConc) {
+          log('info', 'concurrency_ceiling_reached', { account: String(keyData.account_id).slice(0, 12), plan: _psend.tier, held: _held, limit: _maxConc });
+          res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '5' });
+          return res.end(J({ error: 'too_many_blocks_in_flight', dimension: 'concurrent_blobs',
+            plan: _psend.tier, limit: _maxConc, held: _held, retry_after_s: 5,
+            hint: 'blocks free up as the receiver takes them' }));
+        }
+      }
 
       try { peekInboundBlob(blob); }
       catch(e) {
@@ -5664,7 +5919,8 @@ async function handleRelayRequest(req, res) {
 
       // Append transfer to CT log before storing — so proof is available at outbound time
       const ctEntry = ctAppendTransfer(hash, SECTOR);
-      blobStore.set(hash, { blob, ts: Date.now(), ttl, size: blob.length,
+      blobPut(hash, { blob, ts: Date.now(), ttl, size: blob.length,
+        account_id: acctOf(apiKey),
         sig_valid: sigResult.valid, apiKey, max_views: maxViews, views_remaining: maxViews, pw_hash,
         sector: SECTOR,
         ct_entry: {
@@ -5678,8 +5934,7 @@ async function handleRelayRequest(req, res) {
         }
       });
       setTimeout(() => {
-        const e = blobStore.get(hash);
-        if (e) { zeroBuffer(e.blob); blobStore.delete(hash); }
+        blobDrop(hash);
       }, ttl);
 
       const deviceId = meta?.device_id;
@@ -5738,8 +5993,7 @@ async function handleRelayRequest(req, res) {
     const entry = blobStore.get(delm[1]);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Not found' })); }
     if (entry.apiKey && entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
-    zeroBuffer(entry.blob);
-    blobStore.delete(delm[1]);
+    blobDrop(delm[1]);
     // Remove associated download token if present
     for (const [t, d] of downloadTokens.entries()) { if (d.hash === delm[1]) { downloadTokens.delete(t); break; } }
     auditAppend(apiKey, 'inbound_aborted', { hash: delm[1].slice(0,16)+'...' });
@@ -5786,7 +6040,12 @@ async function handleRelayRequest(req, res) {
     const blob = entry.blob;
     if (entry.pw_hash) entry._verifying = false; // release lock now that decision is finalized
     if (burned) {
-      blobStore.delete(outm[1]);
+      // Unlisted immediately so a concurrent reader cannot find it, but NOT
+      // wiped: `blob` below is the buffer being served. Wiping here handed the
+      // downloader five megabytes of zeroes.
+      blobDrop(outm[1], false);
+      res.on('finish', () => zeroBuffer(blob));
+      res.on('close',  () => zeroBuffer(blob));
       incMetric('blobs_burned'); stats.burned++;
     }
     incMetric('bytes_out_total', blob.length);

@@ -183,9 +183,9 @@ Set when you create a key with `--plan`.
 
 | Plan | Transfers/month | Max file size | TTL | Views/blob | Downloads/hour |
 |------|-----------------|---------------|-----|------------|----------------|
-| `free` | 10 | 5 MB | 1 hour | 1 | 50 |
-| `pro` | 500 | 5 MB | 24 hours | 10 | 500 |
-| `enterprise` | 1,000,000 | 5 MB | 7 days | 100 | unlimited |
+| `free` | 50 | 500 MB | 1 hour | 1 | 50 |
+| `pro` | 500 | 500 MB | 24 hours | 10 | 500 |
+| `enterprise` | 1,000,000 | unlimited | 7 days | 100 | unlimited |
 
 Every figure comes from `relay/lib/tiers.js`, the single source the relay reads.
 The table used to say `pro` and `enterprise` had unlimited uploads and a 500 MB

@@ -900,10 +900,11 @@ python3 scripts/paramant-admin.py sync</pre>
     <h2 id="retention">Retention policy</h2>
     <table>
       <tr><th>Plan</th><th>Default TTL</th><th>Maximum TTL</th><th>Max file size</th></tr>
-      <tr><td>Community (pgp_)</td><td>1 hour</td><td>1 hour</td><td>5 MB (padded)</td></tr>
-      <tr><td>Firm</td><td>1 hour</td><td>24 hours</td><td>5 MB</td></tr>
-      <tr><td>Enterprise</td><td>1 hour</td><td>7 days</td><td>5 MB</td></tr>
+      <tr><td>Community (pgp_)</td><td>1 hour</td><td>1 hour</td><td>500 MB</td></tr>
+      <tr><td>Firm</td><td>1 hour</td><td>24 hours</td><td>500 MB</td></tr>
+      <tr><td>Enterprise</td><td>1 hour</td><td>7 days</td><td>500 MB, or the limit set for your own relay</td></tr>
     </table>
+    <p>Size is not what the plans sell, so the file ceiling is the same on every one of them. Two other numbers are often read as this one and are not it. A blob on <code>POST /v2/inbound</code> is a fixed 5 MB block, which is the padding size on the wire, so a file larger than one block travels as several blocks. And a one-time link from the ParaSend web app is one block under one token, so that one way of sending stops at 5 MB a file; the live hand-over in the same web app cuts the file into chunks and reaches the 500 MB in this table.</p>
 
     <h2 id="sectors">Relay sectors</h2>
     <p>All sector nodes run <strong>identical Ghost Pipe relay software</strong>. Sectors are routing domains: they provide traffic isolation and sector-specific compliance documentation. The crypto stack and API surface are identical.</p>
@@ -1036,7 +1037,7 @@ python3 scripts/paramant-admin.py sync</pre>
 
     <div class="faq-item">
       <div class="faq-q">How do I get a pgp_ API key?</div>
-      <div class="faq-a"><a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant.app/signup</a>: create a free account to receive your API key with TOTP protection. Community plan: 10 transfers a month, 5 MB per file, 1-hour TTL, burn-on-first-read. See <a href="/pricing">/pricing</a> for tier details.</div>
+      <div class="faq-a"><a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant.app/signup</a>: create a free account to receive your API key with TOTP protection. Community plan: 50 transfers a month, 500 MB per file sent as 5 MB blocks, 1-hour TTL, burn-on-first-read. A one-time link from the web app is a single block, so that way stops at 5 MB a file. See <a href="/pricing">/pricing</a> for tier details.</div>
     </div>
 
   </div>

@@ -227,7 +227,7 @@
       <a href="/parashare" class="btn btn-primary">Send a file &rarr;</a>
       <a href="/pricing" class="btn btn-secondary">See pricing &rarr;</a>
     </div>
-    <p class="ps-sub">Free on the Community plan, forever, no card: 10 transfers a month, 5 MB a file, links that last an hour, and a web app link that is gone after one read. Organisations pay for volume, never for security.</p>
+    <p class="ps-sub">Free on the Community plan, forever: 50 transfers a month, 500 MB a file handed over live, 5 MB by one-time link, links that last an hour, and a web app link gone after one read.</p>
     <p class="ps-note">Sending needs a free account. Receiving does not: the person you send to opens the link, gets the file, and the copy is wiped after its last read. Keep your own copy, because a file that is gone cannot be fetched again.</p>
   </div>
 </section>
@@ -320,8 +320,9 @@
         <div class="tier-note">Forever &middot; no card required</div>
         <ul>
           <li>Encrypted in your browser, key never sent</li>
-          <li>10 transfers a month</li>
-          <li>5 MB per file, on every plan</li>
+          <li>50 transfers a month</li>
+          <li>500 MB per file over the live hand-over, on every plan</li>
+          <li>5 MB per file over a one-time link, on every plan</li>
           <li>1 hour link expiry</li>
           <li>Burn on first read</li>
           <li>Up to 50 retrievals an hour through the API</li>
@@ -380,7 +381,7 @@
     <div class="check-grid">
       <div class="check-card">
         <div class="k">We never had it</div>
-        <p>AES-256-GCM with a key your browser generates. The relay only ever holds ciphertext, never the plaintext and never the key, and it holds it in RAM until its last read burns it. A web app transfer is stored at a fixed 5 MB, so its size says nothing about the file. The retention row is on the <a href="/security">security page</a>.</p>
+        <p>AES-256-GCM with a key your browser generates. The relay only ever holds ciphertext, never the plaintext and never the key, and it holds it in RAM until its last read burns it. A web app transfer is stored in blocks of a fixed 5 MB, so a block says nothing about the size of the file. The retention row is on the <a href="/security">security page</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">The wire format, in full</div>
