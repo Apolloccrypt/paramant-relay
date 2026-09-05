@@ -102,6 +102,19 @@ if (RELAY_REDIS_URL) {
 const PORT       = parseInt(process.env.PORT       || '3000');
 const USERS_FILE = process.env.USERS_FILE          || './users.json';
 const TTL_MS     = parseInt(process.env.TTL_MS     || '300000');
+// The largest single BLOB the relay accepts on the wire, in bytes. Every blob a
+// client sends is padded to exactly this size (crypto-wasm BLOCK), so the length
+// of an upload says nothing about the file inside it.
+//
+// THIS IS NOT THE FILE SIZE LIMIT, and reading it as one is the bug this file
+// carried for a long time. The relay never sees a file: a 500 MB file arrives as
+// 112 separate padded blobs, each one of these. The file ceiling is a product
+// number and lives in relay/lib/tiers.js as `file_mb`; it is enforced by
+// counting a file's blocks (see FILE_CEILING below), not by comparing one blob
+// against it. `Math.min(MAX_BLOB, file_mb * 1048576)` on a single blob was that
+// confusion written down, and it held every file on every tier to 5 MB.
+//
+// Move this number only when the wire format or the memory budget changes.
 const MAX_BLOB   = parseInt(process.env.MAX_BLOB   || '5242880');
 const MAX_AUDIT  = parseInt(process.env.MAX_AUDIT  || '1000');
 const CLAIM_TTL_SECONDS = parseInt(process.env.CLAIM_TTL_SECONDS || String(7 * 86400)); // one-time API-key claim link lifetime
@@ -358,7 +371,35 @@ const CT_MAX = 10000;
 // pruned index return null instead of the wrong entry.
 const { CtWindow, reindexEntries } = require('./lib/ct-window');
 const ctWindow = new CtWindow(CT_MAX);
-const CT_FILE     = process.env.CT_FILE     || null; // opt-in only — auto-derive disabled to preserve RAM-only default
+// Where the transparency log lives on disk.
+//
+// This used to be `process.env.CT_FILE || null`: opt-in, RAM-only unless a
+// deployment remembered to set it. docker-compose.yml does set it, so
+// production was fine and nobody looked again. Every other relay - a self-host,
+// a community node, a `node relay.js` on a laptop - kept its whole log in
+// memory and lost it on restart, and losing it is not the worst part.
+//
+// Measured on a booted relay: four entries, restart, and the log comes back at
+// size 0 while RELAY_IDENTITY_FILE brings the SAME signing key back, and
+// STH_FILE brings the old signed heads back with it. The relay then signs
+// tree_size 1 again over a different root, so /v2/sth/history ends up holding
+// two contradictory heads for the same tree size under one key. Not an empty
+// log: a forked one, published, signed, and indistinguishable from tampering.
+// Every receipt issued before the restart also stops resolving - /v2/ct/proof
+// answers 404 for an index that is now beyond the log's own size.
+//
+// So persistence is the default now, and it lands wherever the signed heads
+// already land: the head and the tree it attests to belong on the same volume,
+// and a deployment that sets STH_FILE to a writable path was already saying
+// where that is. An explicitly EMPTY CT_FILE still selects RAM-only, for the
+// caller who means it; unset no longer means it by accident.
+const _ctFileDefault = () => {
+  const sth = process.env.STH_FILE;
+  return sth ? path.join(path.dirname(sth), 'ct-log.json') : '/data/ct-log.json';
+};
+const CT_FILE = process.env.CT_FILE !== undefined
+  ? (process.env.CT_FILE || null)   // explicit, empty means RAM-only on purpose
+  : _ctFileDefault();
 const CT_MAX_SIZE = parseInt(process.env.CT_MAX_SIZE || String(100 * 1024 * 1024)); // 100 MB default
 
 // Fix 8: async CT write stream with queued writes and log rotation
@@ -368,8 +409,21 @@ let _ctDraining  = false;
 
 function _ctOpenStream() {
   if (!CT_FILE) return;
-  _ctStream = fs.createWriteStream(CT_FILE, { flags: 'a' });
-  _ctStream.on('error', e => log('warn', 'ct_stream_error', { err: e.message }));
+  // mkdir first, as _sthOpenStream already did. Without it a fresh volume that
+  // has no /data yet takes the CT log back to RAM-only silently, which is the
+  // state this default exists to end.
+  try {
+    fs.mkdirSync(path.dirname(CT_FILE), { recursive: true });
+    _ctStream = fs.createWriteStream(CT_FILE, { flags: 'a' });
+    _ctStream.on('error', e => log('warn', 'ct_stream_error', { err: e.message }));
+  } catch (e) {
+    log('error', 'ct_log_not_persisted', {
+      err: e.message, file: CT_FILE,
+      hint: 'The transparency log is RAM-only: it is lost on restart and the relay '
+          + 'will refuse to sign a tree head that contradicts one it already signed. '
+          + 'Point CT_FILE at a writable path.',
+    });
+  }
 }
 
 async function _ctRotate() {
@@ -511,6 +565,26 @@ try {
 }
 _sthOpenStream();
 
+// What this relay has already put its name to. Two things, because they catch
+// two different halves of the same break:
+//   _sthSignedRoots  tree_size -> sha3_root, for the heads still in sthLog. It
+//                    is pruned in step with sthLog, so it stays bounded by
+//                    STH_MAX and does not grow with the log.
+//   _sthMaxSignedSize the largest tree_size ever signed. One number, never
+//                    pruned, and the half that survives the window: a tree that
+//                    walked BACKWARDS is a contradiction even when the head it
+//                    contradicts has aged out of memory.
+const _sthSignedRoots = new Map();
+let _sthMaxSignedSize = -1;
+for (const s of sthLog) {
+  if (!s || typeof s.tree_size !== 'number' || !s.sha3_root) continue;
+  _sthSignedRoots.set(s.tree_size, s.sha3_root);
+  if (s.tree_size > _sthMaxSignedSize) _sthMaxSignedSize = s.tree_size;
+}
+// Set once the relay has caught a contradiction. It is not cleared: a log that
+// has forked stays forked until someone looks at it.
+let ctLogForked = null;
+
 // ── Relay identity — ML-DSA-65 keypair for relay authentication ───────────────
 let relayIdentity = null; // { sk: Buffer, pk: Buffer, pk_hash: string }
 
@@ -602,15 +676,86 @@ function ctLeafHash(deviceIdHash, pubKeyHex, ts) {
 // CT-log hash primitives live in ./lib/ct-hash (pure, unit-tested there).
 const { ctNodeHash, ctTreeHash, ctInclusionProof, blobLeafHash } = require('./lib/ct-hash');
 
-// Coarsen an ISO timestamp to the top of its hour for PUBLIC projections only.
-// The full-precision ts stays in the stored entry (and is committed in the leaf
-// hash); this just blunts millisecond traffic-analysis in the public CT log.
+// The field gate. Every name that reaches a log entry, a leaf preimage or an
+// entry type is declared in ./lib/ct-fields, and relay/test/ct-fields.test.js
+// holds that declaration against a hand-written copy AND against the literals
+// this file really passes. The log is the one place where a stray field is
+// permanent and public at once, so it is the one place worth this much
+// ceremony. See the header of ct-fields.js for what went wrong without it.
+const ctFields = require('./lib/ct-fields');
+
+// Strip anything undeclared off an entry before it is stored, written to
+// CT_FILE or projected onto a public route, and say loudly that it happened.
+// Stripping rather than throwing: an undeclared field is by construction one no
+// reader knows about, so dropping it breaks nothing that exists, while letting
+// it through publishes it forever.
+function ctGateEntry(family, entry) {
+  const { entry: gated, rejected } = ctFields.gateEntry(family, entry);
+  if (rejected.length) {
+    log('error', 'ct_entry_field_rejected', {
+      family, type: entry.type || 'key_reg', rejected,
+      hint: 'A field reached a CT log entry without being declared in relay/lib/ct-fields.js. '
+          + 'It was dropped. If the log should carry it, add it there and to '
+          + 'relay/test/ct-fields.test.js, which is where someone has to write down why.',
+    });
+  }
+  return gated;
+}
+
+// The same gate for a payload, applied BEFORE the leaf is hashed. Order is
+// load-bearing: the leaf commits to the payload, so gating after hashing would
+// commit to a field the stored entry no longer has, and every recomputation of
+// that leaf would then fail.
+function ctGatePayload(eventType, payload) {
+  const { payload: gated, rejected } = ctFields.gatePayload(eventType, payload);
+  if (rejected.length) {
+    log('error', 'ct_payload_field_rejected', {
+      type: eventType, rejected,
+      hint: 'Declare it in PAYLOAD_FIELDS in relay/lib/ct-fields.js, or leave it out of the log.',
+    });
+  }
+  return gated;
+}
+
+// An event type is a leaf format: it is concatenated into the entry type and,
+// for the signing-key and envelope families, hashed into the leaf preimage. An
+// undeclared one throws, and that is safe to do BECAUSE ct-fields.test.js scans
+// this file and envelope.js for the literals actually passed and fails if any
+// of them is missing from the list. Without that scan this is exactly the guard
+// that silently broke trust-on-first-use enrolment for months.
+function ctRequireEventType(family, eventType) {
+  if (!ctFields.isAllowedEventType(family, eventType)) {
+    throw new Error(`ct-fields: undeclared ${family} event type "${eventType}": `
+      + 'add it to EVENT_TYPES in relay/lib/ct-fields.js and say why in relay/test/ct-fields.test.js');
+  }
+}
+
+// ── The hour, defined once ───────────────────────────────────────────────────
+// Everything the CT log publishes about WHEN something happened is rounded to
+// the top of its hour, and every route that does that rounding goes through one
+// of these two functions. One definition, so a new public projection cannot
+// quietly pick a different resolution, and so relay/test/route-ct-public-time.test.js
+// has a single thing to hold every route to.
+//
+// The full-precision timestamp stays in the stored entry (it is committed in
+// the leaf hash, so a receipt must carry it back for /v2/verify-receipt) and in
+// the receipt the customer keeps. Precision belongs in the private receipt;
+// coarseness belongs in the public log.
+const CT_HOUR_MS = 3_600_000;
+
+// Epoch milliseconds -> the top of that hour, still epoch milliseconds.
+function ctCoarseMs(ms) {
+  const n = typeof ms === 'number' ? ms : Number(ms);
+  if (!Number.isFinite(n)) return ms;
+  return Math.floor(n / CT_HOUR_MS) * CT_HOUR_MS;
+}
+
+// ISO timestamp -> the top of its hour, as an ISO timestamp.
 function ctCoarseTs(ts) {
   if (!ts) return ts;
   const d = new Date(ts);
   if (isNaN(d.getTime())) return ts;
-  d.setUTCMinutes(0, 0, 0);
-  return d.toISOString();
+  return new Date(ctCoarseMs(d.getTime())).toISOString();
 }
 
 // Recursive canonical JSON (sorted keys, no whitespace) — used for signing receipts + STH.
@@ -634,7 +779,7 @@ function ctAppend(deviceId, pubKeyHex, apiKey) {
   const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
   const proof = ctInclusionProof(allEntries, allEntries.length - 1); // real audit path at the new leaf position
-  const entry = { index, leaf_hash, tree_hash, device_hash: deviceIdHash, ts, proof };
+  const entry = ctGateEntry('key_reg', { index, leaf_hash, tree_hash, device_hash: deviceIdHash, ts, proof });
   ctWindow.append(entry);
   // Fix 8: async write via stream queue instead of appendFileSync
   ctWrite(entry);
@@ -654,14 +799,14 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
   const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
   const proof = ctInclusionProof(allEntries, allEntries.length - 1);
-  const entry = {
+  const entry = ctGateEntry('relay_reg', {
     index, type: 'relay_reg', leaf_hash, tree_hash,
     device_hash: pkHash,          // reused field — relay public key hash
     relay_url: relayUrl, relay_sector: sector,
     relay_version: version, relay_edition: edition,
     relay_pk_hash: pkHash,
     ts, proof
-  };
+  });
   ctWindow.append(entry);
   // Fix 8: async write via stream queue
   ctWrite(entry);
@@ -680,10 +825,10 @@ function ctAppendTransfer(blobHash, sector) {
   const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
   const proof = ctInclusionProof(allEntries, allEntries.length - 1);
-  const entry = {
+  const entry = ctGateEntry('transfer', {
     index, type: 'transfer', leaf_hash, tree_hash,
     blob_hash: blobHash, sector, ts, proof
-  };
+  });
   ctWindow.append(entry);
   ctWrite(entry);
   const sth = produceSth(allEntries.length, entry.tree_hash);
@@ -701,10 +846,10 @@ function ctAppendParasign(documentHashHex, signerPkHash) {
   const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
   const proof = ctInclusionProof(allEntries, allEntries.length - 1);
-  const entry = {
+  const entry = ctGateEntry('parasign', {
     index, type: 'parasign', leaf_hash, tree_hash,
     document_hash: documentHashHex, signer_pk_hash: signerPkHash, ts, proof
-  };
+  });
   ctWindow.append(entry);
   ctWrite(entry);
   produceSth(allEntries.length, entry.tree_hash);
@@ -715,19 +860,37 @@ function ctAppendParasign(documentHashHex, signerPkHash) {
 // the CT log. The relay never sees the document - the leaf commits only to
 // the envelope id, event type, and a sha3-256 over the structured payload.
 function ctAppendEnvelope(eventType, envelopeId, payload) {
+  // `type` is the event name as given, not 'envelope_' + it. Every call site in
+  // envelope.js already passes the full name ('envelope_sign', 'envelope_void',
+  // ...), so the old concatenation published 'envelope_envelope_sign', and
+  // scripts/heartbeat/parasign.mjs has been filtering the public log for
+  // `type === 'envelope_sign'` against a value that never existed. That check
+  // is the strongest evidence the ParaSign heartbeat collects, and it could not
+  // fire. The declared list below is what would have caught it, which is why
+  // this repair rides along with the gate rather than as a separate errand.
+  //
+  // Nothing already signed moves: the leaf preimage is
+  // ctLeafHash(envelopeId, sha3(eventType|id|payload), ts) and takes the raw
+  // eventType, never this string. `type` lives on the entry and in the public
+  // projection only, so no inclusion proof and no receipt changes value.
+  const type = eventType;
+  ctRequireEventType('envelope', type);
+  // Gated first, then hashed: the leaf commits to this object, so it must be
+  // the same object the entry stores.
+  const gatedPayload = ctGatePayload(type, payload);
   const ts = new Date().toISOString();
   const valueHash = crypto.createHash('sha3-256')
     .update(eventType).update('|').update(envelopeId).update('|')
-    .update(JSON.stringify(payload || {})).digest('hex');
+    .update(JSON.stringify(gatedPayload)).digest('hex');
   const leaf_hash = ctLeafHash(envelopeId, valueHash, ts);
   const index = ctWindow.nextIndex();
   const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
   const proof = ctInclusionProof(allEntries, allEntries.length - 1);
-  const entry = {
-    index, type: 'envelope_' + eventType, leaf_hash, tree_hash,
-    envelope_id: envelopeId, payload: payload || {}, ts, proof
-  };
+  const entry = ctGateEntry('envelope', {
+    index, type, leaf_hash, tree_hash,
+    envelope_id: envelopeId, payload: gatedPayload, ts, proof
+  });
   ctWindow.append(entry);
   ctWrite(entry);
   produceSth(allEntries.length, entry.tree_hash);
@@ -737,11 +900,15 @@ function ctAppendEnvelope(eventType, envelopeId, payload) {
 // Appends a signing-pubkey lifecycle event (enroll / revoke) to the CT log so
 // identity changes are tamper-evident. user_id is hashed (SHA3-256) before
 // emission — verifiers see a stable identity-handle without the raw API key.
-// `eventType` must be 'signing_pk_enrolled' or 'signing_pk_revoked'.
+// `eventType` is one of EVENT_TYPES.signing_pk in relay/lib/ct-fields.js.
 function ctAppendSigningPkEvent(eventType, userId, signerPkHash) {
-  if (eventType !== 'signing_pk_enrolled' && eventType !== 'signing_pk_revoked') {
-    throw new Error('invalid eventType: ' + eventType);
-  }
+  // This guard used to name two of the four types its own call sites pass:
+  // 'signing_pk_enrolled_tofu' and 'signing_pk_enrolled_attested' threw here,
+  // the route's outer catch turned that into a 500 AFTER the key was stored,
+  // and neither enrolment path ever reached the transparency log. The list now
+  // lives in ct-fields.js with a test that scans the call sites, so a name can
+  // no longer be missing from it without the build saying so.
+  ctRequireEventType('signing_pk', eventType);
   const ts = new Date().toISOString();
   const userIdHash = crypto.createHash('sha3-256').update(String(userId)).digest('hex');
   const leaf_hash = ctLeafHash(userIdHash, signerPkHash, ts);
@@ -749,10 +916,10 @@ function ctAppendSigningPkEvent(eventType, userId, signerPkHash) {
   const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
   const proof = ctInclusionProof(allEntries, allEntries.length - 1);
-  const entry = {
+  const entry = ctGateEntry('signing_pk', {
     index, type: eventType, leaf_hash, tree_hash,
     user_id_hash: userIdHash, signer_pk_hash: signerPkHash, ts, proof
-  };
+  });
   ctWindow.append(entry);
   ctWrite(entry);
   produceSth(allEntries.length, entry.tree_hash);
@@ -765,7 +932,61 @@ function ctAppendSigningPkEvent(eventType, userId, signerPkHash) {
 function produceSth(tree_size, sha3_root) {
   if (!mlDsa || !relayIdentity) return null;
   const relay_id = RELAY_SELF_URL || (SECTOR + '.paramant.app');
-  const payload  = { relay_id, sha3_root, timestamp: Date.now(), tree_size, version: 1 };
+  // Append-only, enforced. A transparency log's whole claim is that tree_size
+  // only ever grows and that a size, once signed, keeps its root forever. Both
+  // break at once when the tree is lost but the key and the head history are
+  // not: the relay walks back to tree_size 1 and signs a second, different root
+  // for it. That signature is real, so no verifier can tell it from tampering,
+  // and the relay produced it without a single warning.
+  //
+  // So a head that contradicts one already signed is not produced at all. A
+  // missing head is visible and recoverable; a forged-looking one is neither.
+  // Re-signing the SAME root at the same size is allowed: that is idempotent,
+  // not a contradiction.
+  const priorRoot = _sthSignedRoots.get(tree_size);
+  const contradicts = priorRoot !== undefined && priorRoot !== sha3_root;
+  const wentBackwards = tree_size < _sthMaxSignedSize;
+  if (contradicts || wentBackwards) {
+    if (!ctLogForked) {
+      ctLogForked = {
+        tree_size, max_signed_size: _sthMaxSignedSize,
+        signed_root: priorRoot || null, refused_root: sha3_root,
+        reason: contradicts ? 'root_differs_at_same_size' : 'tree_size_went_backwards',
+        at: new Date().toISOString(),
+      };
+    }
+    log('error', 'sth_refused_would_fork', {
+      tree_size, max_signed_size: _sthMaxSignedSize,
+      reason: contradicts ? 'root_differs_at_same_size' : 'tree_size_went_backwards',
+      signed_root: priorRoot ? priorRoot.slice(0, 16) + '…' : null,
+      refused_root: String(sha3_root).slice(0, 16) + '…',
+      hint: 'This relay has already signed a larger or different tree. The usual cause is a '
+          + 'restart with a persisted STH log and a CT log that was not persisted. Restore CT_FILE '
+          + 'from backup, or start a new relay identity; do not delete the STH log.',
+    });
+    return null;
+  }
+  // The timestamp is coarsened to the hour BEFORE it is signed, because it is
+  // the sharpest of the three doors onto the exact time of a leaf, not the
+  // mildest. An STH is produced on every single append, so tree_size N is leaf
+  // N-1, and this timestamp used to be Date.now() taken microseconds after that
+  // leaf's own ts. Measured on a booted relay: given the leaf hash from
+  // /v2/ct/log and the STH at tree_size = index + 1 from /v2/sth/history, a
+  // candidate document was confirmed in ONE hash. That is worse than the feed
+  // was: the feed carried fifty entries, the history carries a thousand, the
+  // heads are mirrored to every peer, and the leak was inside a signature, so
+  // coarsening it in the projection would have been a lie rather than a fix.
+  // Hence at production. Old heads on disk keep the precise timestamp they were
+  // signed with and still verify: verification recomputes the canonical payload
+  // from whatever fields the head carries, both in receipt-verify.js and in
+  // /v2/sth/ingest, and neither pins a resolution.
+  //
+  // The cost is real and worth naming: an archiver can no longer tell from a
+  // head alone where in the hour it was signed. tree_size still orders the
+  // heads, monotonically and per append, so freshness monitoring and the
+  // consistency proofs are untouched. The log's own resolution has been an hour
+  // everywhere else all along; the head was the one place still saying more.
+  const payload  = { relay_id, sha3_root, timestamp: ctCoarseMs(Date.now()), tree_size, version: 1 };
   // Canonical JSON: keys sorted alphabetically
   const sortedKeys = Object.keys(payload).sort();
   const canonical  = JSON.stringify(Object.fromEntries(sortedKeys.map(k => [k, payload[k]])));
@@ -777,8 +998,12 @@ function produceSth(tree_size, sha3_root) {
     return null;
   }
   const sth = { ...payload, signature };
+  _sthSignedRoots.set(tree_size, sha3_root);
+  if (tree_size > _sthMaxSignedSize) _sthMaxSignedSize = tree_size;
   sthLog.push(sth);
-  if (sthLog.length > STH_MAX) sthLog.shift();
+  // Prune the root map in step with the head window so it stays bounded.
+  // _sthMaxSignedSize is what keeps the guard whole past this point.
+  if (sthLog.length > STH_MAX) { const dropped = sthLog.shift(); _sthSignedRoots.delete(dropped.tree_size); }
   sthWrite(sth);
   // Broadcast to peers asynchronously — non-blocking, best-effort
   setImmediate(() => broadcastSTH(sth).catch(() => {}));
@@ -977,7 +1202,12 @@ function renderPrometheus() {
     L.push(`# TYPE paramant_${k} counter`);
     L.push(`paramant_${k}{sector="${SECTOR}",v="${VERSION}"} ${v}`);
   }
-  for(const [k,v] of [['blobs_in_flight',blobStore.size],['pubkeys',pubkeys.size],['edition',EDITION==='licensed'?1:0],['did_registry',didRegistry.size],['ct_log',ctWindow.size],['uptime_s',Math.floor(process.uptime())],['heap_bytes',process.memoryUsage().heapUsed]]){
+  // ct_log_persisted and ct_log_forked are the two the transparency log is
+  // actually judged on. A relay whose log is RAM-only is one restart away from
+  // signing a second history, and a relay that has refused to sign has stopped
+  // producing heads entirely. Both were invisible before: the first showed as
+  // nothing at all, the second as a log that simply went quiet.
+  for(const [k,v] of [['blobs_in_flight',blobStore.size],['pubkeys',pubkeys.size],['edition',EDITION==='licensed'?1:0],['did_registry',didRegistry.size],['ct_log',ctWindow.size],['ct_log_persisted',CT_FILE?1:0],['ct_log_forked',ctLogForked?1:0],['uptime_s',Math.floor(process.uptime())],['heap_bytes',process.memoryUsage().heapUsed]]){
     L.push(`# TYPE paramant_${k} gauge`);
     L.push(`paramant_${k}{sector="${SECTOR}"} ${v}`);
   }
@@ -1334,26 +1564,68 @@ setInterval(() => {
 
 
 // ── RAM guard ────────────────────────────────────────────────────────────────
+// Blobs live in RAM and only in RAM. That is a promise this product makes in
+// terms.html, in press.html and in the Art. 28 processing register in dpa.html,
+// so the way to carry bigger files is to hold each one for a shorter time, not
+// to spill it to disk. Capacity here is therefore a memory budget.
+//
+// THE TWO NUMBERS, and this is the meaning scripts/check-guards.mjs enforces:
+// RAM_LIMIT_MB is what blobs may occupy, and RAM_RESERVE_MB is headroom ADDED
+// on top of it for the process itself. The guard trips at the SUM, so the sum
+// is what has to stay below the container's cgroup limit. It did not: the
+// health relay ran 8192 + 512 inside a container capped at 8192, so the kernel
+// always got there first and the guard was dead code. That was fixed by moving
+// the numbers to 6656 + 512, and check-guards.mjs now fails the build if the
+// sum ever climbs back to the cap.
+//
+// What changes here is only HOW the budget is spent, not what the two numbers
+// mean: the ceiling used to be a count of 5 MB slots, which stopped being the
+// right unit once a single transfer could be a hundred of them. It is bytes
+// now. Do not reinterpret RAM_RESERVE_MB as a slice held back below the limit;
+// operators and self-host installs set these, and check-guards.mjs reads them
+// the way they are described above.
 const RAM_LIMIT_MB    = parseInt(process.env.RAM_LIMIT_MB    || '512');
 const RAM_RESERVE_MB  = parseInt(process.env.RAM_RESERVE_MB  || '256');
+// What blobs may occupy, in bytes.
+const BLOB_BUDGET_BYTES = Math.max(32 * 1048576, RAM_LIMIT_MB * 1048576);
+// Kept as a blob COUNT for the status view and the self-host installs that read
+// it, but derived from the byte budget rather than being the budget itself.
 const BLOB_SIZE_MB    = 5;
-const MAX_BLOBS       = Math.floor(RAM_LIMIT_MB / BLOB_SIZE_MB);
+const MAX_BLOBS       = Math.floor(BLOB_BUDGET_BYTES / (BLOB_SIZE_MB * 1048576));
+
+// Running total of blob bytes, kept as blobs are stored and dropped. The old
+// version summed the whole map on every call, and ramOk() runs on every upload:
+// at a hundred blobs per transfer that is a full scan per chunk.
+let blobBytesHeld = 0;
 
 function ramStats() {
   const mem    = process.memoryUsage();
   const heapMB = Math.round(mem.heapUsed / 1024 / 1024);
   const rssMB  = Math.round(mem.rss      / 1024 / 1024);
-  let blobBytes = 0;
-  for (const e of blobStore.values()) blobBytes += (e.size || 0);
-  const blobMB  = Math.round(blobBytes / 1024 / 1024);
-  return { heapMB, rssMB, blobMB, blobCount: blobStore.size };
+  return {
+    heapMB, rssMB,
+    blobBytes: blobBytesHeld,
+    blobMB: Math.round(blobBytesHeld / 1024 / 1024),
+    blobCount: blobStore.size,
+  };
 }
 
+// Is there room for one more blob? Two independent questions, and both have to
+// answer yes.
+//
+//   1. the blob budget: what is already held, plus what is mid-upload, plus the
+//      one being asked about, must fit in BLOB_BUDGET_BYTES.
+//   2. actual process memory: RSS must stay under RAM_LIMIT_MB + RAM_RESERVE_MB,
+//      which scripts/check-guards.mjs holds below the container's cgroup limit,
+//      so this branch can actually fire. It catches the memory a blob costs on the way
+//      in that the budget does not model -- a 5 MiB blob arrives base64'd inside
+//      a JSON body, so it is roughly 19 MB of transient buffers before it
+//      becomes a 5 MiB Buffer.
 function ramOk() {
-  const { rssMB, blobCount } = ramStats();
-  const effective = blobCount + inFlightInbound;
-  if (effective >= MAX_BLOBS) return false;
-  if (rssMB + BLOB_SIZE_MB * (inFlightInbound + 1) > RAM_LIMIT_MB + RAM_RESERVE_MB) return false;
+  const { rssMB } = ramStats();
+  const wouldHold = blobBytesHeld + (inFlightInbound + 1) * MAX_BLOB;
+  if (wouldHold > BLOB_BUDGET_BYTES) return false;
+  if (rssMB + Math.ceil(((inFlightInbound + 1) * MAX_BLOB * 4) / 1048576) > RAM_LIMIT_MB + RAM_RESERVE_MB) return false;
   return true;
 }
 
@@ -1367,8 +1639,10 @@ function ramStatus() {
     heap_mb:          s.heapMB,
     rss_mb:           s.rssMB,
     ram_limit_mb:     RAM_LIMIT_MB,
+    blob_budget_mb:   Math.round(BLOB_BUDGET_BYTES / 1048576),
+    blob_budget_free_mb: Math.max(0, Math.round((BLOB_BUDGET_BYTES - s.blobBytes) / 1048576)),
     ram_ok:           ramOk(),
-    available_slots:  Math.max(0, MAX_BLOBS - s.blobCount - inFlightInbound),
+    available_slots:  Math.max(0, Math.floor((BLOB_BUDGET_BYTES - s.blobBytes) / MAX_BLOB) - inFlightInbound),
   };
 }
 
@@ -1482,15 +1756,98 @@ function _reportLimit(v) {
   return v === Infinity ? tiers.UNLIMITED : v;
 }
 
-// The file ceiling an upload is really held to, in MB. POST /v2/inbound takes
-// the LOWER of the operator's MAX_BLOB and the tier's file_mb, so a tier whose
-// row says "uncapped" is still held to MAX_BLOB and the views must say so.
-// Reporting the bare tier value put -1 on an enterprise row while the gate was
-// enforcing 5 MB, and that is the one number an operator would act on.
+// The file ceiling an upload is really held to, in MB.
+//
+// This used to return min(MAX_BLOB, file_mb) because the gate compared a single
+// blob against file_mb, which meant every tier was really held to one 5 MB
+// block. It no longer does: a file is carried as many blobs and the ceiling is
+// enforced by counting them (FILE_MAX_BLOCKS below), so the number an operator
+// sees here is the tier's own, and MAX_BLOB does not enter into it.
 function _effectiveFileMb(ent) {
-  return Math.min(MAX_BLOB / 1048576, ent.parasend.limits.file_mb);
+  // Through _reportLimit, so an uncapped row reports -1 and not null.
+  //
+  // This used to be Math.min(MAX_BLOB / 1048576, file_mb), which happened to
+  // launder Infinity into a finite 5 on the way out. Removing the min removed
+  // that accident too: the enterprise row is Infinity, JSON.stringify turns
+  // Infinity into null, and an operator reads null as "no data" rather than
+  // "no cap". The whole point of _reportLimit is that -1 is how this API says
+  // uncapped.
+  return _reportLimit(ent.parasend.limits.file_mb);
+}
+
+// How many padded blocks a file of `fileMb` may occupy.
+//
+// The relay cannot see a file. It sees blobs, and it learns which blobs belong
+// together from the `meta.file_id` the sender already sends for quota dedup. So
+// the file ceiling is enforced as a block count, and the conversion needs the
+// plaintext each block actually carries.
+//
+// CLIENT_CHUNK_PLAIN is the chunk size the web app uses (parashare.page.js
+// CHUNK_PLAIN). It is deliberately under MAX_BLOB so the wire prelude, the AEAD
+// tag and the per-chunk metadata header fit in the same block. A client that
+// chunks smaller than this simply gets fewer bytes through before it hits the
+// ceiling; that is its own problem and not a security boundary. The security
+// boundaries are MAX_BLOB, the relay's memory budget and the monthly quota, and
+// all three sit underneath this. Hence the slack: this number is a product
+// limit, and it should err towards letting an honest 500 MB file finish.
+const CLIENT_CHUNK_PLAIN = 4.5 * 1024 * 1024;
+const FILE_BLOCK_SLACK   = 4;
+function fileMaxBlocks(fileMb) {
+  if (!Number.isFinite(fileMb) || fileMb < 0) return Infinity;
+  return Math.ceil((fileMb * 1048576) / CLIENT_CHUNK_PLAIN) + FILE_BLOCK_SLACK;
+}
+
+// Blocks seen per file, so a file ceiling can be enforced across the uploads
+// that make up one file. Keyed by the sender's file_id, scoped to the account so
+// two accounts cannot collide or interfere. Entries are short-lived: a transfer
+// is minutes, and the sweep below drops anything idle for an hour.
+const fileBlocks = new Map(); // `${account}:${file_id}` → { blocks, ts }
+const FILE_BLOCKS_TTL_MS = 3600_000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of fileBlocks.entries()) {
+    if (now - v.ts > FILE_BLOCKS_TTL_MS) fileBlocks.delete(k);
+  }
+}, 300_000).unref?.();
+
+// Blobs currently held per account, for the concurrent_blobs ceiling. Kept as a
+// counter rather than scanned out of blobStore: this is read on every upload.
+const accountBlobs = new Map(); // account_id → count
+function accountBlobsAdd(acct, n) {
+  if (!acct) return;
+  const next = (accountBlobs.get(acct) || 0) + n;
+  if (next <= 0) accountBlobs.delete(acct); else accountBlobs.set(acct, next);
 }
 const blobStore  = new Map();  // hash → {blob, ts, ttl, size, sig?}
+
+// Every write to blobStore goes through these two, so blobBytesHeld cannot drift
+// away from what is really held. It is the number the capacity guard decides on,
+// and a guard reading a stale total is worse than no guard: it refuses uploads
+// the relay could take, or accepts ones it cannot.
+function blobPut(hash, entry) {
+  const prev = blobStore.get(hash);
+  if (prev) { blobBytesHeld -= (prev.size || 0); accountBlobsAdd(prev.account_id, -1); }
+  blobBytesHeld += (entry.size || 0);
+  accountBlobsAdd(entry.account_id, 1);
+  blobStore.set(hash, entry);
+}
+// Drops the entry and wipes the bytes. zeroBuffer is what makes "destroyed"
+// true rather than "dereferenced", so it belongs here and not at each call site
+// where it can be forgotten.
+// wipe=false is for the one case where the bytes are still needed: a burn-on-read
+// drops the entry BEFORE the response is written, so that a second reader cannot
+// find it, but the buffer itself is what is being sent. Those callers wipe on
+// 'finish' instead. Everywhere else the default is right.
+function blobDrop(hash, wipe = true) {
+  const e = blobStore.get(hash);
+  if (!e) return false;
+  blobBytesHeld -= (e.size || 0);
+  if (blobBytesHeld < 0) blobBytesHeld = 0;
+  accountBlobsAdd(e.account_id, -1);
+  blobStore.delete(hash);
+  if (wipe) zeroBuffer(e.blob);
+  return true;
+}
 
 const anonInboundIpRequests = new Map(); // ip → [timestamps] for /v2/anon-inbound rate limit
 const invDidIpRequests = new Map(); // ip → [timestamps] for keyless inv_ DID registration
@@ -1629,10 +1986,20 @@ function _parasignStore() {
   return _parasignStore._inst;
 }
 
-// Per-IP rate limit for /v2/status/:hash (max 60/min) — prevents hash enumeration
+// Per-IP rate limit for /v2/status/:hash.
+//
+// Raised from 60/min. A streaming send asks this once per block to see whether
+// the receiver has taken the one it is waiting on, and a 500 MB file is 112
+// blocks: at 60/min a fast upload tripped its own back-pressure check and fell
+// back to sending blind, which is the behaviour the window exists to prevent.
+//
+// The old comment called this an anti-enumeration limit. It is not really doing
+// that work: the argument is a 64-hex hash, so guessing one is not something a
+// rate limit is holding back. What it bounds is cost, and 240/min is still a
+// small number of map lookups.
 const statusRateLimits = new Map();
 function statusRateOk(ip) {
-  return rateLimit.fixedWindowAllow(statusRateLimits, ip, 60, 60000);
+  return rateLimit.fixedWindowAllow(statusRateLimits, ip, 240, 60000);
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of statusRateLimits) if (now > v.resetAt + 60000) statusRateLimits.delete(k); }, 120_000);
 
@@ -2660,8 +3027,7 @@ setInterval(() => {
   const now = Date.now();
   for (const [h, e] of blobStore.entries()) {
     if (now - e.ts > e.ttl) {
-      zeroBuffer(e.blob);
-      blobStore.delete(h);
+      blobDrop(h);
       log('info', 'blob_ttl_expired', { hash: h.slice(0,16) });
     }
   }
@@ -2883,16 +3249,20 @@ catch (e) { if (e.code !== 'ENOENT') log('warn', 'code_manifest_load_error', { e
 // this same function, so it outlives the product it was named after. `did`
 // is any opaque subject identifier, not necessarily a DID.
 function ctAppendEvent(eventType, did, payload) {
+  ctRequireEventType('did_event', eventType);
+  // Gated before it is hashed, as in ctAppendEnvelope: the leaf commits to this
+  // object, so the entry must store the same one.
+  const gatedPayload = ctGatePayload(eventType, payload);
   const ts = new Date().toISOString();
   const valueHash = crypto.createHash('sha3-256')
     .update(eventType).update('|').update(did).update('|')
-    .update(JSON.stringify(payload || {})).digest('hex');
+    .update(JSON.stringify(gatedPayload)).digest('hex');
   const leaf_hash = ctLeafHash(did, valueHash, ts);
   const index = ctWindow.nextIndex();
   const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
   const proof = ctInclusionProof(allEntries, allEntries.length - 1);
-  const entry = { index, type: eventType, leaf_hash, tree_hash, did, payload: payload || {}, ts, proof };
+  const entry = ctGateEntry('did_event', { index, type: eventType, leaf_hash, tree_hash, did, payload: gatedPayload, ts, proof });
   ctWindow.append(entry);
   ctWrite(entry);
   produceSth(allEntries.length, entry.tree_hash);
@@ -4684,6 +5054,19 @@ async function handleRelayRequest(req, res) {
   if (path === '/ct/feed' && req.method === 'GET') {
     // `i` comes from the window position (start_index + i), never from the
     // entry's stored index field. See /v2/ct/log below.
+    //
+    // `t` is coarsened by ctCoarseTs, exactly like /v2/ct/log and /v2/ct/proof.
+    // It used to be the stored full-precision ts, and that turned the hour
+    // rounding on the other two routes into decoration. A leaf commits to the
+    // millisecond timestamp, so anyone holding a candidate document could take
+    // the exact `t` from this feed, join it to the full leaf_hash that
+    // /v2/ct/log publishes at the same index, and confirm the document in ONE
+    // hash - no search at all - for the fifty most recent entries, which is
+    // precisely the traffic worth hiding. Coarsening here does not fix the
+    // underlying unsalted leaf (that needs a salted tree), but it puts the
+    // free path back behind the same hour of brute force as the rest of the
+    // log. Every projection that leaves this process goes through ctCoarseTs;
+    // the full ts stays in the stored entry and in the receipt.
     const last50 = ctWindow.recentPage(50);
     const root   = ctWindow.last() ? ctWindow.last().tree_hash : '0'.repeat(64);
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
@@ -4695,7 +5078,7 @@ async function handleRelayRequest(req, res) {
       root,
       entries: last50.entries.map((e, i) => ({
         i:    last50.start_index + i,
-        t:    e.ts,
+        t:    ctCoarseTs(e.ts),
         h:    e.leaf_hash ? e.leaf_hash.slice(0, 16) + '...' : null,
         type: e.type || 'key_reg',
         s:    e.relay_sector || SECTOR,
@@ -4744,7 +5127,11 @@ async function handleRelayRequest(req, res) {
     const latest = sthLog.length ? sthLog[sthLog.length - 1] : null;
     if (!latest) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'No STH yet — CT log is empty' })); }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, sth: latest }));
+    // `forked` is present only when this relay has refused to sign a head that
+    // would contradict one it already signed. It is on the PUBLIC endpoint on
+    // purpose: an outside monitor watching heads would otherwise see nothing but
+    // a log that stopped advancing, and could not tell that from a quiet week.
+    return res.end(J({ ok: true, sth: latest, ...(ctLogForked ? { forked: ctLogForked } : {}) }));
   }
   if (path === '/v2/sth/history' && req.method === 'GET') {
     const limit = Math.min(parseInt(query.limit || '100'), 100);
@@ -5079,7 +5466,7 @@ async function handleRelayRequest(req, res) {
     // Fix 4: only burn blob after response has fully flushed to the client
     res.on('finish', () => {
       td.used = true;
-      blobStore.delete(blobHash);
+      blobDrop(blobHash);
       try { blob.fill(0); } catch {}
     });
     // Fix 4: on socket error before finish, allow retry
@@ -5412,14 +5799,14 @@ async function handleRelayRequest(req, res) {
       }
       const ttl     = Math.min(parseInt(ttl_ms || TTL_MS), 86_400_000); // max 24h for anon
       const ctEntry = ctAppendTransfer(hash, SECTOR);
-      blobStore.set(hash, {
+      blobPut(hash, {
         blob, ts: now, ttl, size: blob.length,
         apiKey: null, max_views: 1, views_remaining: 1, sector: SECTOR,
         ct_entry: { index: ctEntry.index, leaf_hash: ctEntry.leaf_hash, tree_hash: ctEntry.tree_hash,
                     tree_size: ctEntry.index + 1, audit_path: ctEntry.proof, sth: ctEntry.sth || null,
                     ts: ctEntry.ts },
       });
-      setTimeout(() => { const e = blobStore.get(hash); if (e) { zeroBuffer(e.blob); blobStore.delete(hash); } }, ttl);
+      setTimeout(() => { blobDrop(hash); }, ttl);
       ipTimes.push(now);
       anonInboundIpRequests.set(ip, ipTimes);
       const dlToken = require('crypto').randomBytes(24).toString('hex');
@@ -5513,6 +5900,67 @@ async function handleRelayRequest(req, res) {
       joined_at: sess.joined_at,
       expires_ms: sess.expires_ms,
     }));
+  }
+
+  // ── The streaming manifest ───────────────────────────────────────────────────
+  //
+  // WHY THIS EXISTS. The sender used to upload every block of a file and only
+  // then tell the receiver, by registering `<session>_ready` with the full token
+  // list. For a 500 MB file that is 112 blocks sitting in the relay's memory at
+  // once, for as long as the whole upload takes, and blobs live in RAM: that is
+  // 560 MB held for one transfer, and it is also 560 MB that a restart throws
+  // away. The fleet restarted hourly for twenty-one days in July and August and
+  // nobody lost a transfer, but only because there was almost no traffic.
+  //
+  // With a manifest the receiver learns each token as it is minted and takes the
+  // block straight away, so the sender can keep a small sliding window instead of
+  // the whole file. The same change cuts the memory a transfer costs and the
+  // window in which a restart can lose something.
+  //
+  // WHY NOT REUSE `_ready`. POST /v2/pubkey answers 409 on a second write to the
+  // same slot: first registration wins, and that is a property worth keeping.
+  // A manifest is append-only by nature and needed its own door.
+  //
+  // The manifest hangs off the session, so it expires with it and needs no sweep
+  // of its own. Writing needs the session's API key, exactly like the pubkey
+  // route above. Reading needs only the session id, exactly like
+  // GET /v2/pubkey/:device, which is how the receiver already reads `_ready`:
+  // knowing the pss_ token IS the capability, and the tokens it hands back are
+  // useless without the private key that decrypts what they point at.
+  const sessMfm = path.match(/^\/v2\/session\/(pss_[a-f0-9]{48})\/manifest$/);
+  if (sessMfm && req.method === 'POST') {
+    if (!keyData) { res.writeHead(401); return res.end(J({ error: 'Valid API key required' })); }
+    const sess = sessions.get(sessMfm[1]);
+    if (!sess)                   { res.writeHead(404); return res.end(J({ error: 'Session not found or expired' })); }
+    if (sess.api_key !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Session belongs to a different API key' })); }
+    let d;
+    try { d = JSON.parse((await readBody(req, 8192)).toString()); }
+    catch (e) { res.writeHead(400); return res.end(J({ error: 'bad_request' })); }
+    const idx   = Number(d.index);
+    const total = Number(d.total_chunks);
+    const token = typeof d.token === 'string' ? d.token : '';
+    if (!Number.isInteger(idx) || idx < 0 || idx > 100000) { res.writeHead(400); return res.end(J({ error: 'index must be a non-negative integer' })); }
+    if (!Number.isInteger(total) || total < 1 || total > 100000) { res.writeHead(400); return res.end(J({ error: 'total_chunks must be a positive integer' })); }
+    if (idx >= total) { res.writeHead(400); return res.end(J({ error: 'index must be below total_chunks' })); }
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(token)) { res.writeHead(400); return res.end(J({ error: 'token must be a download token' })); }
+    if (!sess.manifest) sess.manifest = { total, tokens: new Map(), meta: null };
+    if (sess.manifest.total !== total) { res.writeHead(409); return res.end(J({ error: 'total_chunks changed mid-transfer' })); }
+    // First write wins per index, for the same reason the pubkey slot does: a
+    // second token for a block the receiver may already have taken would point
+    // it at a blob that is gone.
+    if (!sess.manifest.tokens.has(idx)) sess.manifest.tokens.set(idx, token);
+    if (typeof d.meta === 'string' && d.meta.length <= 2048 && !sess.manifest.meta) sess.manifest.meta = d.meta;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, have: sess.manifest.tokens.size, total }));
+  }
+  if (sessMfm && req.method === 'GET') {
+    const sess = sessions.get(sessMfm[1]);
+    if (!sess)          { res.writeHead(404); return res.end(J({ error: 'Session not found or expired' })); }
+    if (!sess.manifest) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true, total: 0, chunks: [], complete: false })); }
+    const m = sess.manifest;
+    const chunks = [...m.tokens.entries()].sort((a, b) => a[0] - b[0]).map(([index, token]) => ({ index, token }));
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, total: m.total, meta: m.meta, chunks, complete: chunks.length === m.total }));
   }
 
   // ── GET /v2/session/:id/status — Poll of receiver al gejoind is ─────────────
@@ -5610,14 +6058,59 @@ async function handleRelayRequest(req, res) {
       // never held. The honest client sends hash = sha256(payload bytes), so this
       // is non-breaking. Rejected before peek / ctAppendTransfer / blobStore.set.
       if (crypto.createHash('sha256').update(blob).digest('hex') !== hash) { res.writeHead(400); return res.end(J({ error: 'hash_mismatch' })); }
-      // The blob ceiling: the operator's MAX_BLOB is the hard roof (it bounds
-      // relay memory and must stay the last word), and the tier may only be
-      // stricter. Every ParaSend row in tiers.js is 5 MB today and enterprise
-      // is uncapped, so the number is unchanged; what changes is that file_mb
-      // now sits on the product axis with the other five ceilings.
       const _psend = parasendLimitsOf(keyData);
-      const planMaxSize = Math.min(MAX_BLOB, _psend.limits.file_mb * 1048576);
-      if (blob.length > planMaxSize) { res.writeHead(413); return res.end(J({ error: `Max ${Math.round(planMaxSize/1048576)}MB` })); }
+
+      // ── Two ceilings, and they are not the same ceiling ──────────────────
+      //
+      // 1. THE BLOB CEILING. MAX_BLOB is the wire-format roof: every blob is
+      //    padded to exactly this, so anything larger is malformed rather than
+      //    merely big. It is the operator's number and no tier may exceed it.
+      //    This is not a product limit and does not vary by plan.
+      if (blob.length > MAX_BLOB) {
+        res.writeHead(413);
+        return res.end(J({ error: 'blob_too_large', max_bytes: MAX_BLOB,
+          hint: 'one blob is one padded block; split the file into chunks' }));
+      }
+
+      // 2. THE FILE CEILING. The tier's file_mb, enforced across the blocks
+      //    that make up one file. This is the number the site sells. Comparing
+      //    a single blob against it, which is what this code used to do, held
+      //    every file to the size of one block and made file_mb unsellable.
+      //
+      //    A sender without a file_id is sending one standalone block, which is
+      //    by definition inside any file ceiling, so there is nothing to count.
+      const _fileMb = _psend.limits.file_mb;
+      const _fileId = meta && meta.file_id ? String(meta.file_id).slice(0, 128) : null;
+      if (_fileId && Number.isFinite(_fileMb)) {
+        const _fk   = `${acctOf(apiKey)}:${_fileId}`;
+        const _seen = fileBlocks.get(_fk);
+        const _n    = (_seen ? _seen.blocks : 0) + 1;
+        if (_n > fileMaxBlocks(_fileMb)) {
+          log('info', 'file_ceiling_reached', { account: String(keyData?.account_id || '').slice(0, 12), plan: _psend.tier, file_mb: _fileMb });
+          res.writeHead(413, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'file_too_large', dimension: 'file_mb',
+            plan: _psend.tier, limit_mb: _fileMb,
+            message: `Max ${_fileMb}MB per file on ${_psend.tier}` }));
+        }
+        fileBlocks.set(_fk, { blocks: _n, ts: Date.now() });
+      }
+
+      // 3. THE CONCURRENCY CEILING. Blobs live in RAM, so what one account may
+      //    hold at once is a real resource and not a paperwork limit. The
+      //    relay-wide budget (ramOk, above) is the harder floor underneath;
+      //    this one stops a single account from taking the whole pool while
+      //    everyone else gets the 503.
+      const _maxConc = _psend.limits.concurrent_blobs;
+      if (Number.isFinite(_maxConc) && keyData && keyData.account_id) {
+        const _held = accountBlobs.get(acctOf(apiKey)) || 0;
+        if (_held >= _maxConc) {
+          log('info', 'concurrency_ceiling_reached', { account: String(keyData.account_id).slice(0, 12), plan: _psend.tier, held: _held, limit: _maxConc });
+          res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '5' });
+          return res.end(J({ error: 'too_many_blocks_in_flight', dimension: 'concurrent_blobs',
+            plan: _psend.tier, limit: _maxConc, held: _held, retry_after_s: 5,
+            hint: 'blocks free up as the receiver takes them' }));
+        }
+      }
 
       try { peekInboundBlob(blob); }
       catch(e) {
@@ -5678,7 +6171,8 @@ async function handleRelayRequest(req, res) {
 
       // Append transfer to CT log before storing — so proof is available at outbound time
       const ctEntry = ctAppendTransfer(hash, SECTOR);
-      blobStore.set(hash, { blob, ts: Date.now(), ttl, size: blob.length,
+      blobPut(hash, { blob, ts: Date.now(), ttl, size: blob.length,
+        account_id: acctOf(apiKey),
         sig_valid: sigResult.valid, apiKey, max_views: maxViews, views_remaining: maxViews, pw_hash,
         sector: SECTOR,
         ct_entry: {
@@ -5692,8 +6186,7 @@ async function handleRelayRequest(req, res) {
         }
       });
       setTimeout(() => {
-        const e = blobStore.get(hash);
-        if (e) { zeroBuffer(e.blob); blobStore.delete(hash); }
+        blobDrop(hash);
       }, ttl);
 
       const deviceId = meta?.device_id;
@@ -5752,8 +6245,7 @@ async function handleRelayRequest(req, res) {
     const entry = blobStore.get(delm[1]);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Not found' })); }
     if (entry.apiKey && entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
-    zeroBuffer(entry.blob);
-    blobStore.delete(delm[1]);
+    blobDrop(delm[1]);
     // Remove associated download token if present
     for (const [t, d] of downloadTokens.entries()) { if (d.hash === delm[1]) { downloadTokens.delete(t); break; } }
     auditAppend(apiKey, 'inbound_aborted', { hash: delm[1].slice(0,16)+'...' });
@@ -5800,7 +6292,12 @@ async function handleRelayRequest(req, res) {
     const blob = entry.blob;
     if (entry.pw_hash) entry._verifying = false; // release lock now that decision is finalized
     if (burned) {
-      blobStore.delete(outm[1]);
+      // Unlisted immediately so a concurrent reader cannot find it, but NOT
+      // wiped: `blob` below is the buffer being served. Wiping here handed the
+      // downloader five megabytes of zeroes.
+      blobDrop(outm[1], false);
+      res.on('finish', () => zeroBuffer(blob));
+      res.on('close',  () => zeroBuffer(blob));
       incMetric('blobs_burned'); stats.burned++;
     }
     incMetric('bytes_out_total', blob.length);

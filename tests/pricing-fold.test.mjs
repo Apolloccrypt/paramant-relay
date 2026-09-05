@@ -116,7 +116,12 @@ test('the first screen at 390px carries the amount, the audience, the company an
     ['h1', '^Pricing$'],
     ['what', 'Sign documents and send files that delete themselves after reading'],
     ['amount', '€0 a month, forever'],
-    ['limit', '2 signatures a month, 10 transfers a month, 5 MB per file'],
+    // All three limits still in one line above the fold. The file size now says
+    // which way the file travels, because 500 MB is true of the live hand-over
+    // and false of a one-time link, and a bare figure would be wrong about one
+    // of them. The other way's 5 MB is named further down the page and pinned by
+    // relay/test/pricing-page.test.js.
+    ['limit', '2 signatures a month, 50 transfers a month, and files up to 500 MB'],
     // The paid amount. It used to be two, because sending and signing were two
     // purchases and a buyer who only saw €15 had been told the price of the
     // other one. Firm is one plan over both products, so there is one figure

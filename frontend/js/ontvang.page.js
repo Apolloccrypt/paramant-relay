@@ -194,6 +194,64 @@ async function init() {
 
     // Poll voor transfer_ready via HTTP
     let _transferClaimed = false;
+
+    // ── The streaming manifest ────────────────────────────────────────────────
+    // A sender that streams announces each block as it lands, so we can start
+    // taking blocks while it is still sealing the rest. That is what keeps the
+    // relay from holding a whole file: every block we take is a block it drops.
+    //
+    // The `_ready` registration below still arrives at the end of the send and
+    // still carries the full token list, so a sender that does not stream, or
+    // one whose manifest writes failed, is handled exactly as before. Whichever
+    // gets there first claims the transfer.
+    const manifestCache = new Map();   // index → token
+    let   manifestTotal = 0;
+    let   manifestMeta  = null;
+
+    async function refreshManifest() {
+      try {
+        const r = await fetch(RELAY_API + '/v2/session/' + encodeURIComponent(sessionToken) + '/manifest',
+                              { signal: AbortSignal.timeout(3000) });
+        if (!r.ok) return false;
+        const d = await r.json();
+        if (!d || !d.total) return false;
+        manifestTotal = d.total;
+        if (d.meta && !manifestMeta) manifestMeta = d.meta;
+        for (const c of (d.chunks || [])) manifestCache.set(c.index, c.token);
+        return true;
+      } catch (e) { return false; }
+    }
+
+    // Wait for block i to be announced. The sender is uploading it while we ask,
+    // so this is a normal wait and not an error until the whole send has had
+    // time to fail: the TTL is the real deadline and the relay enforces it.
+    async function awaitManifestToken(i) {
+      if (manifestCache.has(i)) return manifestCache.get(i);
+      const until = Date.now() + 180000;
+      while (Date.now() < until) {
+        await new Promise(r => setTimeout(r, 1000));
+        await refreshManifest();
+        if (manifestCache.has(i)) return manifestCache.get(i);
+      }
+      return null;
+    }
+
+    const pollManifest = setInterval(async () => {
+      if (_transferClaimed) return;
+      if (!(await refreshManifest())) return;
+      if (!manifestCache.has(0) || !manifestMeta) return;
+      if (_transferClaimed) return;
+      _transferClaimed = true;
+      clearInterval(pollManifest);
+      clearInterval(pollTransfer);
+      const meta = window.paramantHandshake.decode(manifestMeta);
+      await receiveFile(
+        { tokens: '', file_name: meta.name || 'download', total_chunks: manifestTotal, ttl_ms: meta.ttlMs },
+        myPrivateKey_MLKEM, myPrivateKey_ECDH_RAW,
+        { awaitToken: awaitManifestToken }
+      );
+    }, 1000);
+
     const pollTransfer = setInterval(async () => {
       if (_transferClaimed) return;
       try {
@@ -206,6 +264,7 @@ async function init() {
             if (_transferClaimed) return;
             _transferClaimed = true;
             clearInterval(pollTransfer);
+            clearInterval(pollManifest);
             // The sender wrote this field with frontend/js/handshake-meta.js and
             // this side reads it with the same module. Reading it here by hand
             // is what put the block count in ttl until 4 September 2026.
@@ -237,22 +296,31 @@ async function init() {
   }
 }
 
+// awaitToken(i) resolves the download token for block i, waiting for it to be
+// announced if it is not known yet. A streaming send publishes each block the
+// moment it lands, so the receiver takes block 0 while the sender is still
+// sealing block 1 and the relay never holds more than a few blocks of the file.
+// Without it this loop reads a token list that is complete before it starts,
+// which is what made the relay hold a whole 500 MB file at once.
 async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
   showStep('step-receiving');
-  const tokens = msg.tokens.split(',');
-  const totalChunks = parseInt(msg.total_chunks) || 1;
+  const tokens = msg.tokens ? msg.tokens.split(',') : [];
+  const awaitToken = opts.awaitToken || (async (i) => tokens[i]);
+  const totalChunks = parseInt(msg.total_chunks) || tokens.length || 1;
   let fileName = msg.file_name || 'download';
   const chunks = [];
   const burnedHashes = [];
   let fileWriter = null;  // File System Access API streaming writer
 
   try {
-    for (let i = 0; i < tokens.length; i++) {
-      const pct = Math.round(10 + (i / tokens.length) * 75);
+    for (let i = 0; i < totalChunks; i++) {
+      const pct = Math.round(10 + (i / totalChunks) * 75);
       $('recv-progress').style.width = pct + '%';
-      $('recv-status').textContent = `Downloading chunk ${i+1}/${tokens.length}...`;
+      $('recv-status').textContent = `Downloading chunk ${i+1}/${totalChunks}...`;
 
-      const r = await fetch(`${RELAY_API}/v2/dl/${tokens[i]}/get`, {
+      const tok = await awaitToken(i);
+      if (!tok) throw new Error('Chunk ' + (i+1) + ' was never announced by the sender');
+      const r = await fetch(`${RELAY_API}/v2/dl/${tok}/get`, {
         signal: AbortSignal.timeout(60000)
       });
       if (!r.ok) throw new Error('Download failed for chunk ' + (i+1) + ': ' + r.status + ' - blob expired or already burned');
@@ -260,7 +328,7 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
       burnedHashes.push({ chunk: i+1, hash: burnHash.slice(0,16), ts: new Date().toISOString() });
       const raw = new Uint8Array(await r.arrayBuffer());
 
-      $('recv-status').textContent = `Decrypting chunk ${i+1}/${tokens.length} with ML-KEM-768...`;
+      $('recv-status').textContent = `Decrypting chunk ${i+1}/${totalChunks} with ML-KEM-768...`;
 
       if (!window._cryptoBridge) throw new Error('WASM crypto bridge not ready');
       const plainPadded = await window._cryptoBridge.decryptBlob(raw, kyberSec, ecdhPrivRaw);

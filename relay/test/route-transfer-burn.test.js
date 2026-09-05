@@ -813,17 +813,23 @@ test('a caller may delete its own blob before anyone reads it, and only its own'
         const b = blob('quota');
         return srv2.post('/v2/inbound', { headers: { 'X-Api-Key': key }, body: { hash: b.hash, payload: b.payload.toString('base64') } });
       };
-      // community.transfers_month = 10.
-      for (let i = 1; i <= 10; i++) assert.strictEqual((await send(COM)).status, 200, `community transfer ${i}`);
+      // The community cap, read from the table that enforces it rather than
+      // typed. It moved from 10 to 50 and a literal here would have gone on
+      // asserting that the eleventh transfer is refused, which is a claim about
+      // a number this tier no longer has.
+      const tiers = require('../lib/tiers');
+      const cap = tiers.tierLimit('community', 'transfers_month');
+      for (let i = 1; i <= cap; i++) assert.strictEqual((await send(COM)).status, 200, `community transfer ${i}`);
       const over = await send(COM);
-      assert.strictEqual(over.status, 402, 'the eleventh community transfer is over the monthly cap');
-      assert.strictEqual(over.json.limit, 10);
+      assert.strictEqual(over.status, 402, `community transfer ${cap + 1} is over the monthly cap`);
+      assert.strictEqual(over.json.limit, cap);
       assert.strictEqual(over.json.plan, 'community', 'the 402 names the tier that decided, not the unified plan');
 
-      // The webhook-shaped record has the same unified plan and must not stop at 10.
-      for (let i = 1; i <= 11; i++) {
+      // The webhook-shaped record has the same unified plan and must not stop at
+      // the community cap: one past it is the whole point.
+      for (let i = 1; i <= cap + 1; i++) {
         assert.strictEqual((await send(HOOK)).status, 200,
-          `transfer ${i} on a webhook-written ParaSend Pro tier (500 a month, not the community 10)`);
+          `transfer ${i} on a webhook-written ParaSend Pro tier (its own ceiling, not the community ${cap})`);
       }
       srv2.stop();
       did();

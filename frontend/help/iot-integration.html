@@ -329,7 +329,7 @@ print(resp.json()["url"])</div>
 
   <h2>Rate limits</h2>
 
-  <p>Request rate limits are per IP address, not per API key: the nginx configuration in this repository puts general API traffic in a <strong>60 requests a minute</strong> zone and uploads in a stricter one (<code>nginx-selfhost.conf</code>). The ceiling that is per key applies to retrieval, not upload: <strong>50 downloads an hour</strong> on Community and <strong>500 an hour</strong> on Firm (<code>outbound_per_hour</code> in <code>relay/lib/tiers.js</code>), answered with a 429. For high-frequency sensor data, batch readings into a single file before uploading rather than sending one file per measurement. Files up to 5 MB are supported.</p>
+  <p>Request rate limits are per IP address, not per API key: the nginx configuration in this repository puts general API traffic in a <strong>60 requests a minute</strong> zone and uploads in a stricter one (<code>nginx-selfhost.conf</code>). The ceiling that is per key applies to retrieval, not upload: <strong>50 downloads an hour</strong> on Community and <strong>500 an hour</strong> on Firm (<code>outbound_per_hour</code> in <code>relay/lib/tiers.js</code>), answered with a 429. For high-frequency sensor data, batch readings into a single file before uploading rather than sending one file per measurement. A file is held to 500 MB on every plan (<code>file_mb</code> in <code>relay/lib/tiers.js</code>); it travels as blocks of a fixed 5 MB, so one upload call carries one block.</p>
 
   <hr class="divider">
 

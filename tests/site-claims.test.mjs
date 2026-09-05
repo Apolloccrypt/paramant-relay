@@ -213,24 +213,30 @@ test('the symmetric primitives named on the site are the ones in the code', () =
   for (const slug of ['sign', 'verify']) assert.ok(visible(page(slug)).includes('SHA3-256'), `${slug}: must name SHA3-256`);
 });
 
-// 4 ── "5 MB". relay.js MAX_BLOB defaults to 5242880; tiers.js mirrors it.
-test('the 5 MB limit on the site is the relay default', () => {
+// 4 ── "5 MB". This is the BLOCK size: relay.js MAX_BLOB, the size every packet
+// is padded to. tiers.js file_mb is a different number and no longer mirrors it;
+// the file ceiling has its own gate, block 13.
+test('the 5 MB block size on the site is the relay default', () => {
   const m = /MAX_BLOB\s*=\s*parseInt\(process\.env\.MAX_BLOB\s*\|\|\s*'(\d+)'\)/.exec(read('relay/relay.js'));
   assert.ok(m, 'relay.js must define MAX_BLOB with a literal default');
   const mb = Number(m[1]) / (1024 * 1024);
   assert.equal(mb, 5);
+  // The file ceiling is a SEPARATE number and is allowed to differ. It used to
+  // be asserted equal here, which is what kept every file on every tier at the
+  // size of one block: raising the product limit failed this test, so nobody
+  // raised it. Block 13 holds file_mb to what the site promises.
   const tiers = read('relay/lib/tiers.js');
-  for (const t of ['community', 'pro', 'business']) {
-    const block = tiers.slice(tiers.indexOf(`${t}:`));
-    assert.match(block, new RegExp(`file_mb:\\s*${mb}\\b`), `tiers.js ${t}.file_mb must be ${mb}`);
-  }
+  const fileMb = Number(/file_mb:\s*(\d+)/.exec(tiers.slice(tiers.indexOf('community:')))[1]);
   const problems = [];
   for (const slug of ['privacy', 'security', 'vs']) {
     if (!visible(page(slug)).includes(`${mb} MB`)) problems.push(`${slug}: must state the ${mb} MB block size`);
   }
+  // A page may state either number, but only those two. Anything else is a
+  // figure the relay does not enforce.
   for (const slug of publicPages()) {
     for (const hit of visible(page(slug)).matchAll(/(\d+) MB (file limit|per file|file size limit)/g)) {
-      if (Number(hit[1]) !== mb) problems.push(`${slug}: claims "${hit[0]}", relay default is ${mb} MB`);
+      const n = Number(hit[1]);
+      if (n !== mb && n !== fileMb) problems.push(`${slug}: claims "${hit[0]}", and the relay enforces ${mb} MB per block and ${fileMb} MB per file`);
     }
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
@@ -611,7 +617,8 @@ test('the Community plan limits on the site are the ones tiers.js declares', () 
   const relay = read('relay/relay.js');
   assert.match(relay, /monthly_transfer_quota_reached/, 'relay.js must enforce transfers_month');
   assert.match(relay, /dimension:\s*'transfers_month'/, 'relay.js must decline on the transfers_month dimension');
-  assert.match(relay, /Max \$\{Math\.round\(planMaxSize\/1048576\)\}MB/, 'relay.js must enforce the per-file size cap');
+  assert.match(relay, /Max \$\{_fileMb\}MB per file on \$\{_psend\.tier\}/, 'relay.js must enforce the per-file size cap');
+  assert.match(relay, /error: 'file_too_large', dimension: 'file_mb'/, 'relay.js must refuse on the file_mb dimension');
 
   const problems = [];
   const says = (where, text, phrase) => { if (!text.includes(phrase)) problems.push(`${where}: must state "${phrase}"`); };
@@ -744,37 +751,117 @@ test('the tier block on /about repeats the numbers /pricing charges for', () => 
   }
 });
 
-// 13 ── The file size a page tells you it will take. relay.js MAX_BLOB and the
-// file_mb column in tiers.js are the only two numbers that decide it, and they
-// are 5 MB. Two help pages said "Files up to 5 GB are supported": a thousand
-// times the ceiling, on the two pages a buyer reads while deciding whether the
-// product fits their attachment. Test 4 did not catch it because it scans for a
-// size in MB, and these two said GB. This one reads the ceiling out of the code
-// and then refuses any file-size figure on the site that is not it.
-test('the file size the site promises is the ceiling relay.js and tiers.js enforce', () => {
+// 13 ── The file size the site promises, against every ceiling the server
+// really has between a sender and a stored block.
+//
+// The old version of this block asserted MAX_BLOB === file_mb * 1048576, on the
+// theory that they were one number. They are not. MAX_BLOB is the padding size
+// (one block on the wire); file_mb is the largest FILE a plan may send, and a
+// file is a run of blocks. Holding them equal is what capped every file on every
+// tier at 5 MB, and it meant raising the product limit failed the test suite, so
+// nobody raised it.
+//
+// What replaces it is the promise-to-server check Mick asked for: a file size on
+// the site must be a number the server will actually carry, end to end. That is
+// more than one comparison, because a 500 MB file has to get past the tier gate,
+// the blob gate, the body reader and nginx, and a single one of those set too low
+// turns the number on the pricing page into a lie on the first attempt.
+//
+// SABOTAGE: each of these has been tried against this block and each goes red.
+//   * tiers.js file_mb 500 -> 5 while the site still says 500: red (site/tier).
+//   * tiers.js file_mb 5000 while the site says 500: red (site/tier).
+//   * delete the file_too_large gate from relay.js: red (nothing enforces it).
+//   * nginx client_max_body_size 12M -> 1M: red (a block cannot reach the relay).
+//   * readBody's default cap MAX_BLOB * 2 -> MAX_BLOB / 2: red (same).
+//   * crypto-wasm truncating instead of erroring: red (the silent failure).
+test('the file size the site promises is one the server will actually carry', () => {
   const tiersSrc = read('relay/lib/tiers.js');
+  const relaySrc = read('relay/relay.js');
+
+  // ── 1. the number the product sells ────────────────────────────────────────
   const declared = [...tiersSrc.matchAll(/file_mb:\s*(-?[\d_]+|UNLIMITED)/g)].map((m) => m[1]);
   assert.ok(declared.length >= 4, 'tiers.js must declare file_mb on every tier row');
   const capped = [...new Set(declared.filter((v) => /^\d/.test(v)).map((v) => Number(v.replace(/_/g, ''))))];
   assert.equal(capped.length, 1, `every capped tier must share one file_mb, found ${capped.join(', ')}`);
-  const mb = capped[0];
-  const blob = Number(/MAX_BLOB\s*=\s*parseInt\(process\.env\.MAX_BLOB\s*\|\|\s*'(\d+)'\)/.exec(read('relay/relay.js'))[1]);
-  assert.equal(blob, mb * 1048576, 'MAX_BLOB and tiers.js file_mb must be the same ceiling');
-  // And it is still the relay that refuses a larger upload, or the number is a
-  // constant nobody reads (same reasoning as test 11).
-  assert.match(read('relay/relay.js'), /Max \$\{Math\.round\(planMaxSize\/1048576\)\}MB/,
-    'relay.js must still refuse an oversized upload');
+  const fileMb = capped[0];
 
-  const problems = [];
-  // The two help pages that quote a supported file size have to quote this one.
-  for (const slug of ['help/gmail-extension', 'help/iot-integration']) {
-    if (!visible(page(slug)).includes(`${mb} MB are supported`)) {
-      problems.push(`${slug}: must say "Files up to ${mb} MB are supported"`);
+  // ── 2. the relay enforces it, on the file and not on one blob ─────────────
+  assert.match(relaySrc, /error: 'file_too_large', dimension: 'file_mb'/,
+    'relay.js must refuse an oversized FILE on the file_mb dimension');
+  assert.match(relaySrc, /fileMaxBlocks/,
+    'relay.js must convert file_mb into a block count; a file is never one blob');
+  // Comments are stripped first: the code carries a written explanation of the
+  // old expression so the next reader does not reinvent it, and that prose is
+  // not the bug coming back.
+  const relayCode = relaySrc.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
+  assert.doesNotMatch(relayCode, /Math\.min\(MAX_BLOB,\s*[^)]*file_mb/,
+    'the file ceiling must not be min(MAX_BLOB, file_mb) again: that is the bug this block exists for');
+
+  // ── 3. one block still has its own, separate ceiling ──────────────────────
+  const blockBytes = Number(/MAX_BLOB\s*=\s*parseInt\(process\.env\.MAX_BLOB\s*\|\|\s*'(\d+)'\)/.exec(relaySrc)[1]);
+  assert.match(relaySrc, /error: 'blob_too_large'/, 'relay.js must still refuse an oversized BLOB');
+
+  // ── 4. a block can actually reach the relay ───────────────────────────────
+  // A blob travels base64'd inside a JSON envelope, so the body is 4/3 of it
+  // plus the envelope. Every ceiling in the path has to clear that or the
+  // promise dies on the first upload.
+  const bodyBytes = Math.ceil(blockBytes * 4 / 3) + 4096;
+
+  const readBodyCap = /function readBody\(req, max = MAX_BLOB \* (\d+)\)/.exec(relaySrc);
+  assert.ok(readBodyCap, 'readBody must keep a literal default cap derived from MAX_BLOB');
+  assert.ok(blockBytes * Number(readBodyCap[1]) >= bodyBytes,
+    `readBody caps a body at ${blockBytes * Number(readBodyCap[1])} bytes and one block needs ${bodyBytes}`);
+
+  // Every nginx conf in the repo that proxies /v2/ has to accept one block.
+  // A conf that states no ceiling at all is the same failure with no evidence:
+  // nginx then defaults to 1m, which is a fifth of a block, and nothing in the
+  // repo would say why every upload 413s.
+  const confProblems = [];
+  for (const f of fs.readdirSync('deploy').filter((n) => n.startsWith('nginx') && n.endsWith('.conf'))) {
+    const conf = read(`deploy/${f}`);
+    // Only the locations an upload can actually travel through. An exact-match
+    // endpoint (`location = /v2/check-key`) with a 16k body is deliberate
+    // hardening and must stay small; requiring 12M there would be asking for a
+    // hole. What has to clear one block is the PREFIX location that a POST to
+    // /v2/inbound falls into: `location /` or `location /v2/`.
+    const re = /location\s+(=\s*)?(~\*?\s*)?([^\s{]+)\s*\{/g;
+    let m;
+    while ((m = re.exec(conf))) {
+      const [, exact, regex, locPath] = m;
+      if (exact || regex) continue;
+      if (locPath !== '/' && locPath !== '/v2/') continue;
+      const body = conf.slice(m.index, conf.indexOf('}', m.index) + 1);
+      if (!/proxy_pass\s+http:\/\/127\.0\.0\.1:300\d/.test(body)) continue;
+      const c = /client_max_body_size\s+(\d+)([MmKk])/.exec(body);
+      if (!c) { confProblems.push(`${f}: "location ${locPath}" proxies the relay and states no client_max_body_size, so nginx defaults to 1m and one ${Math.round(blockBytes / 1048576)} MB block cannot get through`); continue; }
+      const bytes = Number(c[1]) * (/[Mm]/.test(c[2]) ? 1048576 : 1024);
+      if (bytes < bodyBytes) confProblems.push(`${f}: "location ${locPath}" caps a body at ${c[1]}${c[2]}, below the ${Math.ceil(bodyBytes / 1048576)} MB one block needs`);
     }
   }
-  // Nowhere on the site may a Paramant file size be stated in gigabytes. The
-  // competitor comparison on /vs quotes other vendors' gigabyte allowances and
-  // is the one page this sweep leaves alone.
+  assert.deepEqual(confProblems, [], `\n  ${confProblems.join('\n  ')}\n`);
+
+  // ── 5. the sealing side refuses rather than truncating ────────────────────
+  // A block that does not fit used to be cut short and returned as a success,
+  // which reaches the far end as an unexplained decryption failure.
+  const wasm = read('crypto-wasm/src/lib.rs');
+  assert.doesNotMatch(wasm, /let copy = pkt\.len\(\)\.min\(BLOCK\)/,
+    'encrypt_blob must not silently truncate an oversized packet');
+  assert.match(wasm, /if pkt\.len\(\) > BLOCK \{[\s\S]{0,200}return Err/,
+    'encrypt_blob must refuse a packet that does not fit one block');
+
+  // ── 6. and the site says that number, and no larger one ───────────────────
+  const problems = [];
+  // The two help pages that quote a supported file size have to quote this one.
+  // The wording is theirs; the number is not. Pinning the whole sentence, which
+  // this block used to do, made an accurate rewrite fail and left the number as
+  // the only thing nobody could improve around.
+  for (const slug of ['help/gmail-extension', 'help/iot-integration']) {
+    if (!visible(page(slug)).includes(`${fileMb} MB`)) {
+      problems.push(`${slug}: must state the ${fileMb} MB file ceiling`);
+    }
+  }
+  // Nowhere on the site may a Paramant file size be stated in gigabytes. /vs
+  // quotes other vendors' gigabyte allowances and is the one page left alone.
   const GB = [/\b(\d+(?:[.,]\d+)?)\s*GB\b[^.<]{0,40}\b(?:are supported|per file|file size|file limit|maximum)/i,
               /\b(?:files?|uploads?|attachments?)\b[^.<]{0,40}\b(\d+(?:[.,]\d+)?)\s*GB\b/i];
   for (const slug of publicPages()) {
@@ -782,7 +869,11 @@ test('the file size the site promises is the ceiling relay.js and tiers.js enfor
     const text = visible(page(slug));
     for (const re of GB) {
       const m = re.exec(text);
-      if (m) problems.push(`${slug}: states a file size of "${m[0].trim()}", and the relay refuses anything over ${mb} MB`);
+      if (m) problems.push(`${slug}: states a file size of "${m[0].trim()}", and the relay carries ${fileMb} MB`);
+    }
+    // And no page may promise MORE than the tier allows.
+    for (const hit of text.matchAll(/(\d+)\s*MB\s*(?:per file|file limit|file size limit)/gi)) {
+      if (Number(hit[1]) > fileMb) problems.push(`${slug}: promises "${hit[0]}" and the relay stops at ${fileMb} MB`);
     }
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
@@ -2073,7 +2164,7 @@ test('every page that promises burn-on-read says which client and which plan it 
   // at the counter. Only GET /v2/outbound/:hash, the API's own route, spends a
   // read. So the exemption those three pages get below is not a slug allowlist,
   // it stands or falls with these two lines.
-  assert.match(relaySrc, /td\.used = true;\s*blobStore\.delete\(blobHash\);/,
+  assert.match(relaySrc, /td\.used = true;\s*blobDrop\(blobHash\);/,
     'the /v2/dl download-token route no longer deletes the blob outright; /get, /ontvang and /parashare call a Paramant link single-use because it does');
   assert.equal((relaySrc.match(/entry\.views_remaining = \(entry\.views_remaining \?\? 1\) - 1;/g) || []).length, 1,
     'the read counter is spent in more than one place now; the download-link pages promise single-use because only GET /v2/outbound/:hash spends a read');
@@ -2856,10 +2947,10 @@ test('the tools page only calls a tool account-free while the code keeps it that
   const community = read('relay/lib/tiers.js').split('community:')[1].split('}')[0];
   const limit = (name) => Number(new RegExp(`${name}:\\s*(\\d+)`).exec(community)[1]);
   assert.equal(limit('signs_month'), 2, 'tiers.js community.signs_month moved');
-  assert.equal(limit('transfers_month'), 10, 'tiers.js community.transfers_month moved');
-  assert.equal(limit('file_mb'), 5, 'tiers.js community.file_mb moved');
+  assert.equal(limit('transfers_month'), 50, 'tiers.js community.transfers_month moved');
+  assert.equal(limit('file_mb'), 500, 'tiers.js community.file_mb moved');
   assert.ok(tools.includes('twee handtekeningen per maand'), 'gereedschap: must state the Community signing limit');
-  assert.ok(tools.includes('tien verzendingen per maand, tot 5 MB per bestand'), 'gereedschap: must state the Community sending limit');
+  assert.ok(tools.includes('vijftig verzendingen per maand'), 'gereedschap: must state the Community sending limit');
 
   // The ladder quotes Firm at the price the pricing page charges.
   assert.ok(/&euro;29</.test(page('pricing')), 'pricing: Firm is no longer 29');

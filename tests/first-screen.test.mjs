@@ -208,7 +208,7 @@ const PAGES = [
     claims: [
       { name: 'the line that says who it is for', css: 'p.ps-who', text: 'For offices that email client documents' },
       { name: 'the first action', css: '.ps-actions a.btn-primary', href: '/parashare' },
-      { name: 'the free limit', css: 'p.ps-sub', text: '10 transfers a month' },
+      { name: 'the free limit', css: 'p.ps-sub', text: '50 transfers a month' },
     ],
   },
   {

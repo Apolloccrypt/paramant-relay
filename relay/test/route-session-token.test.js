@@ -40,6 +40,7 @@ const { boot, killAll } = require('./_relay-server');
 const { requireRedis, summary } = require('./_requires');
 const sessionTokens = require('../lib/session-token');
 const quota = require('../lib/quota');
+const tiers = require('../lib/tiers');
 
 const DEFAULT_REDIS = 'redis://127.0.0.1:6399';
 const INTERNAL = 'internal-token-for-the-session-token-suite';
@@ -386,18 +387,22 @@ test('QUOTA: an upload made with a token counts on the owner account', async (t)
 
 test('QUOTA: the owner over its monthly cap is the token over its cap too', async (t) => {
   if (!rc) return t.skip('no redis');
-  // community transfers_month is 10 (relay/lib/tiers.js). Planted directly, so
-  // the suite does not have to spend ten uploads to reach it.
+  // Planted directly at the community cap, so the suite does not have to spend
+  // a month's worth of uploads to reach it. Read from tiers.js rather than
+  // typed: the number moved from 10 to 50 and a literal here would test that
+  // the owner is over SOME number rather than over its actual cap, which is a
+  // weaker assertion wearing the same name.
+  const cap = tiers.tierLimit('community', 'transfers_month');
   const counter = quota.transfersKey(OWNER_ACCT);
   const saved = await rc.get(counter);
-  await rc.set(counter, '10', { EX: 300 });
+  await rc.set(counter, String(cap), { EX: 300 });
   try {
     const { token } = (await mint()).json;
     const r = await upload(bearer(token), blob('quota-over'));
     assert.strictEqual(r.status, 402, `over the cap the token must be declined like the key: ${r.text}`);
     assert.strictEqual(r.json.error, 'monthly_transfer_quota_reached');
     assert.strictEqual(r.json.dimension, 'transfers_month');
-    assert.strictEqual(r.json.limit, 10);
+    assert.strictEqual(r.json.limit, cap);
   } finally {
     if (saved === null) await rc.del(counter); else await rc.set(counter, saved, { EX: 300 });
   }

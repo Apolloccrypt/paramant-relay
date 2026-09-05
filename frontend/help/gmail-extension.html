@@ -314,7 +314,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-body">
       <h2>Click the Paramant icon and select a file</h2>
       <p>Click the shield icon. A file picker opens. Select the file you want to send. The extension uploads it to Paramant in the background — you can see a progress indicator in the compose toolbar.</p>
-      <p>Files up to 5 MB are supported. That is the per-file ceiling on every plan (<code>file_mb</code> in <code>relay/lib/tiers.js</code>, bounded again by the relay's <code>MAX_BLOB</code>); a larger file is refused with a 413.</p>
+      <p>Files up to 500 MB are supported. That is the per-file ceiling on every plan (<code>file_mb</code> in <code>relay/lib/tiers.js</code>). The extension cuts the file into chunks and uploads one fixed 5 MB block per chunk, so the 5 MB block size is the wire format and not the size of the file you may send.</p>
     </div>
   </div>
 

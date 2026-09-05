@@ -9,7 +9,73 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- **The public transparency log gave away the exact second, so anyone holding a
+  copy of a document could prove it went through Paramant.** A leaf is
+  `SHA3-256(0x02 || sha256(file) || SHA3-256(sector) || ts)`, with no salt and no
+  secret: the file hash is known to whoever has the file, the sector is one of
+  five, and the only thing left is the time. Rounding the published time to the
+  hour leaves 3.6e6 x 5 candidates, measured at 57 seconds on one core, which is
+  bad. Two routes left none at all. `GET /ct/feed` published the stored
+  millisecond `t`, and joining it on the index to the full `leaf_hash` that
+  `/v2/ct/log` publishes confirmed a candidate document in ONE hash for the fifty
+  most recent entries. The signed tree head was worse: one is produced on every
+  append, so `tree_size` N is leaf N-1, and its `timestamp` was `Date.now()`
+  taken microseconds after that leaf's own, one thousand deep in
+  `/v2/sth/history`, mirrored to every peer, and inside a signature where a
+  projection could not fix it. Both are now rounded to the hour, the head before
+  it is signed rather than after. Heads signed earlier keep their precise
+  timestamp and still verify, because verification rebuilds the canonical
+  payload from the fields a head carries and pins no resolution. The
+  full-precision timestamp stays where it belongs: in the stored entry, and in
+  the receipt the customer keeps and can recompute his own leaf from.
+  `relay/test/route-ct-public-time.test.js` runs the attack itself, and its last
+  case walks every public CT route and fails on any value carrying sub-hour
+  precision, so a route added later is covered without being listed.
+- **A relay that lost its log signed a second, contradictory history under the
+  same key.** `CT_FILE` defaulted to none, so persistence was opt-in;
+  `docker-compose.yml` opted in and production was fine, while every self-host
+  and every `node relay.js` kept the whole log in RAM. Measured: four entries,
+  restart, and `/v2/ct/log` comes back at size 0 while the ML-DSA-65 identity and
+  the signed head history come back intact, so the relay signs `tree_size` 1 a
+  second time over a different root and `/v2/sth/history` ends up holding two
+  contradictory heads for one tree size. Every receipt issued before the restart
+  also stops resolving: `/v2/ct/proof` answers 404 for an index past the log's
+  own size. The log is now persisted by default, beside the signed heads it
+  attests to (the directory of `STH_FILE`, else `/data/ct-log.json`), and an
+  explicitly empty `CT_FILE` still selects RAM-only for the caller who means it.
+  Independently of the default, `produceSth` now refuses to sign a head that
+  contradicts one already signed, or that walks `tree_size` backwards: it logs
+  `sth_refused_would_fork` at error level, exposes `forked` on the public
+  `/v2/sth` so an outside monitor can tell a frozen log from a quiet week, and
+  adds the `ct_log_persisted` and `ct_log_forked` gauges.
+- **Trust-on-first-use and attested signing-key enrolment answered 500 and never
+  reached the log.** `ctAppendSigningPkEvent` accepted exactly
+  `signing_pk_enrolled` and `signing_pk_revoked` and threw on anything else,
+  while two of its four call sites passed `signing_pk_enrolled_tofu` and
+  `signing_pk_enrolled_attested`. Both threw into the route's outer catch, after
+  the key had already been stored. All four names are now declared.
+- **The ParaSign heartbeat searched the log for an entry type nothing
+  published.** `ctAppendEnvelope` prefixed `envelope_` onto names that already
+  carried it, so the log held `envelope_envelope_sign` while
+  `scripts/heartbeat/parasign.mjs` filtered for `envelope_sign`. That filter is
+  the strongest evidence the heartbeat collects and it could not fire. Nothing
+  already signed moves: the leaf preimage takes the raw event name, never this
+  string, so no inclusion proof and no receipt changes value.
+
 ### Added
+- **A field gate on the transparency log.** `relay/lib/ct-fields.js` declares,
+  by name, every field that may appear on a log entry, every event type each
+  entry family may use, and every key each payload may carry. Every `ctAppend*`
+  passes its entry through it: an undeclared field is stripped before anything
+  is stored, written to `CT_FILE` or published, and logged at error level, and an
+  undeclared event type throws. `relay/test/ct-fields.test.js` is what makes it a
+  gate rather than a list: it holds the declaration against a hand-written second
+  copy, so adding a field turns the build red until someone writes down what it
+  is, and it scans `relay.js`, `envelope.js` and the heartbeat for the literals
+  they really pass, which is what makes throwing safe and what found the two
+  guards above. The log is the one place where a stray field is permanent and
+  public at the same time, and there is no taking one back out.
 - **A signed-in account can see what is waiting for its own signature.** Until
   now a signing request was reachable only through the per-party invite token in
   its invitation email: `relay/envelope.js` indexed an envelope under its
