@@ -272,6 +272,18 @@ HEARTBEAT_DRY_RUN=1 node scripts/heartbeat/run.mjs parasend
 Or from the Actions tab: **heartbeat** has `workflow_dispatch`, which ignores the
 `HEARTBEAT_ENABLED` gate, so a run can always be started by hand.
 
+## Wie merkt het als deze zelftest zelf stilvalt
+
+Deze workflow niet. Het alarm hierboven is een stap *in* de job die
+`HEARTBEAT_ENABLED` uitzet, dus zolang die schakelaar uit staat wordt de job
+overgeslagen, vuurt `if: failure()` nooit, en meldt niets dat er niets gemeten
+wordt. Zo bleef het van 2 tot 5 september stil: negentien geplande runs op rij
+overgeslagen, en een overgeslagen run is bij GitHub grijs, niet rood.
+
+Dat is nu van buiten belegd bij [`guards.yml`](../.github/workflows/guards.yml),
+die dagelijks kijkt of deze job werkelijk een geslaagde run heeft opgeleverd en
+er anders één issue voor open zet. Zie [guards.md](guards.md).
+
 Environment: `PARAMANT_RELAY_URL` (default `https://relay.paramant.app`),
 `PARAMANT_BASE_URL` (default `https://paramant.app`), `HEARTBEAT_EVIDENCE_DIR`
 (default `heartbeat-evidence`).

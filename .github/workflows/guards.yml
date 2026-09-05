@@ -1,0 +1,153 @@
+name: guards
+
+# Do the guards still bark?
+#
+# Every other workflow here watches the product. This one watches the watchers,
+# because in one night three separate safeguards turned out to be decoration and
+# all three looked, in the code, exactly like a working check.
+#
+# The one it exists for: heartbeat.yml raises its alarm from a step INSIDE the
+# job that a repository variable switches off. With HEARTBEAT_ENABLED unset the
+# job is skipped, `if: failure()` never fires, and the only thing that could
+# report the silence is silenced by the same switch. Nineteen scheduled runs in
+# a row came back "skipped" between 2 and 5 September; GitHub renders a skipped
+# run grey and notifies nobody, so nothing went red and nobody knew.
+#
+# An alarm cannot cover its own absence. Something outside it has to, and that
+# is the whole job of this file.
+#
+# THIS WORKFLOW HAS NO OFF SWITCH, and that is enforced, not just intended:
+# scripts/check-guards.mjs fails the build if any job here gains an `if:` that
+# reads a variable or a secret, or if the schedule or the pull_request trigger
+# goes away. A gate on the watchdog is the exact bug it was built to catch.
+on:
+  schedule:
+    # 07:11, once a day. Deliberately not hourly. The repository already learned
+    # that lesson the other way round: an alarm that fires every hour for a known
+    # reason is one people train themselves to ignore, and that is how the last
+    # monitor died. Once a day, into a single issue that stays open and counts
+    # the days, is a signal that survives being ignored for a week.
+    - cron: '11 7 * * *'
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # Read the run history of the workflows being watched, and file the one issue.
+  actions: read
+  issues: write
+
+concurrency:
+  group: guards-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guards:
+    name: guards - can every check still fire
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      # The static half: every way a guard could be silenced is declared, and
+      # every declared silencer is still there. No network, so this half is a
+      # hard gate on every pull request. tests/guards-can-fire.test.mjs runs the
+      # same code in the test job; it is repeated here so that this workflow
+      # fails for its own reasons rather than only reporting on others.
+      - name: Every silencer is declared and watched
+        run: node scripts/check-guards.mjs
+
+      # The live half: is the switch on, and has the job behind it actually
+      # produced a passing run inside its window. Asked of the JOB, not the run:
+      # security-posture.yml reports "success" for a run whose production job was
+      # skipped and whose self-test job passed.
+      - name: Is every watched guard actually running
+        id: live
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          # The switch values, read here because a workflow cannot list its own
+          # repository variables by name from inside a script. Unset renders as
+          # the empty string, which is what "off" looks like.
+          SWITCH_HEARTBEAT_ENABLED: ${{ vars.HEARTBEAT_ENABLED }}
+          SWITCH_SECURITY_POSTURE_ENABLED: ${{ vars.SECURITY_POSTURE_ENABLED }}
+          # Red on the daily run, reported on a pull request. While the switch is
+          # off, and only the holder of the canary secrets can turn it on, a hard
+          # failure on every pull request would block work that cannot fix it,
+          # and a check that is always red gets routed around. The daily run
+          # costs a red run and an open issue instead.
+          GUARDS_ENFORCE: ${{ github.event_name == 'schedule' && '1' || '0' }}
+        # set -o pipefail is load-bearing, not decoration. GitHub runs a `run:`
+        # block as `bash -e`, which does NOT set pipefail, so the exit code of
+        # `node ... | tee` is tee's, and tee always succeeds. Without this line
+        # the enforcing run could never go red: the watchdog would report a
+        # silent guard and then exit 0, which is the failure it exists to catch,
+        # inside the thing built to catch it. scripts/check-guards.mjs now fails
+        # the build on any piped run block that does not set it.
+        run: |
+          set -o pipefail
+          node scripts/guards-live.mjs | tee "$GITHUB_STEP_SUMMARY"
+
+      # One issue, reopened and commented rather than duplicated, closed again
+      # when every guard is running. Same shape as the heartbeat's own alarm,
+      # for the same reason: an issue list that tracks reality instead of
+      # collecting noise. The difference is that this one cannot be switched off.
+      - name: Open or update the issue while a guard is silent
+        if: always() && steps.live.outputs.silent != '0' && github.event_name == 'schedule'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const title = 'Een waakhond blaft niet';
+            const body = [
+              `**${process.env.SUMMARY.split('\n')[0]}**`,
+              '',
+              process.env.SUMMARY.split('\n').slice(1).join('\n'),
+              '',
+              'A guard that cannot fire is worse than no guard, because it produces calm.',
+              'This issue stays open, and is updated once a day, until every guard above is running.',
+              '',
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              '',
+              `_${new Date().toISOString()}_`,
+            ].join('\n');
+            // state:all, newest first: the previous episode's issue was closed by
+            // the run that ended it, so looking only at open issues would file a
+            // fresh one every episode, which is the noise this prevents.
+            const all = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'all', labels: 'guards',
+              sort: 'created', direction: 'desc', per_page: 100,
+            });
+            const mine = all.data.filter(i => !i.pull_request && i.title === title);
+            if (!mine.length) {
+              await github.rest.issues.create({ ...context.repo, title, body, labels: ['guards'] });
+            } else {
+              const issue = mine.find(i => i.state === 'open') || mine[0];
+              if (issue.state !== 'open') {
+                await github.rest.issues.update({ ...context.repo, issue_number: issue.number, state: 'open' });
+              }
+              await github.rest.issues.createComment({ ...context.repo, issue_number: issue.number, body });
+            }
+        env:
+          SUMMARY: ${{ steps.live.outputs.body }}
+
+      - name: Close the issue when every guard is running again
+        if: steps.live.outputs.silent == '0' && github.event_name == 'schedule'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const open = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: 'guards',
+            });
+            for (const issue of open.data) {
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: issue.number,
+                body: `Every watched guard has run and passed within its window, as of run ${context.runId}. Closing.`,
+              });
+              await github.rest.issues.update({ ...context.repo, issue_number: issue.number, state: 'closed' });
+            }
