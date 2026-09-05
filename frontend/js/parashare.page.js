@@ -821,7 +821,11 @@ async function confirmFingerprint() {
         // it out. A relay that answers without one simply gets no line.
         if (ud.merkle_proof) proofs.push({ file: file.name, chunk: i + 1, proof: ud.merkle_proof });
       }
-      return { name: file.name, size: file.size, tokens };
+      // Tokens only. The name and the size used to ride along here and end
+      // up in the handshake record on the relay, in the clear, for an hour.
+      // Both already travel sealed inside chunk 0, so what left here was a
+      // duplicate the receiver never read. See frontend/js/handshake-meta.js.
+      return { tokens };
     }
 
     // Upload all files
@@ -841,13 +845,17 @@ async function confirmFingerprint() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         device_id: sessionToken + '_ready',
-        ecdh_pub: isVault ? JSON.stringify(vaultFiles) : vaultFiles[0].tokens.join(','),
+        // Where the sealed blocks are, and nothing about what is in them. A
+        // vault lists one token array per file; the file names and sizes that
+        // used to sit beside them here are gone, because the relay stored this
+        // record verbatim and /dpa promises it holds no readable filename.
+        ecdh_pub: isVault ? JSON.stringify(vaultFiles.map((f) => ({ tokens: f.tokens }))) : vaultFiles[0].tokens.join(','),
         // One writer, one reader: frontend/js/handshake-meta.js. The receiver
         // read this field with its own split() until 4 September 2026 and was
         // one field out of step, which is how a block count ended up in ttl.
         kyber_pub: isVault
           ? window.paramantHandshake.encode({ kind: 'vault', chunks: files.length, ttlMs: ttlMs })
-          : window.paramantHandshake.encode({ kind: 'file', name: files[0].name,
+          : window.paramantHandshake.encode({ kind: 'file',
               chunks: vaultFiles[0].tokens.length, ttlMs: ttlMs })
       })
     });

@@ -11,6 +11,11 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
+<!-- Which product path this page describes. tests/crypto-claims.test.mjs holds every
+     algorithm this page names against the code that runs on that path, instead of
+     against the codebase as a whole: naming an algorithm the product has, on a route
+     that does not run it, is the class of untrue sentence that reads as a fact. -->
+<meta name="paramant:path" content="link">
 <meta name="description" content="Deliver GDPR Article 30 evidence to a supervisory authority or an auditor without a second exposure. The web app destroys the file after the first read.">
 <meta property="og:title" content="Send audit logs to a regulator without a second leak · Paramant">
 <meta property="og:description" content="Deliver GDPR Article 30 evidence to a supervisory authority or an auditor without a second exposure. The web app destroys the file after the first read.">
@@ -181,7 +186,7 @@ section p+p{margin-top:14px}
     <span class="sec-eyebrow">What Paramant adds</span>
     <h2>Burn-on-read delivery with a cryptographic receipt.</h2>
     <p>Paramant encrypts the audit package with ML-KEM-768 + AES-256-GCM. After the investigator or auditor downloads, the relay wipes its copy from RAM. The ML-DSA-65 signed receipt records the file hash, the relay that served it, the retrieval timestamp and the package's place in the transparency log. It names no recipient, and it cannot: the relay never learns who collected the package, which is the same design that stops it reading the contents. So the receipt proves this package, this hash, delivered once, at this time, not to whom.</p>
-    <p>The relay holds only ciphertext. It cannot read what it carries. EU/DE hosting means no US CLOUD Act production orders apply. The transmission does not create a second data controller for the audit evidence.</p>
+    <p>On this route, which is a ParaSend web app transfer, the relay holds only ciphertext and cannot read what it carries. EU/DE hosting means no US CLOUD Act production orders apply. The transmission does not create a second data controller for the audit evidence.</p>
   </section>
 
   <section>
@@ -190,7 +195,7 @@ section p+p{margin-top:14px}
     <div class="workflow-block">
       <div class="step-list">
         <div class="step-row"><div class="step-num">01</div><div class="step-body"><strong>DPO or legal counsel</strong> exports the audit log package and uploads via the ParaSend web app</div></div>
-        <div class="step-row"><div class="step-num">02</div><div class="step-body"><strong>Paramant generates</strong> an encrypted one-time link; relay holds only ciphertext</div></div>
+        <div class="step-row"><div class="step-num">02</div><div class="step-body"><strong>Paramant generates</strong> an encrypted one-time link; relay holds only ciphertext on this ParaSend route</div></div>
         <div class="step-row"><div class="step-num">03</div><div class="step-body"><strong>Link is transmitted</strong> to the DPA investigator or auditor (the sensitive data does not travel by email)</div></div>
         <div class="step-row"><div class="step-num">04</div><div class="step-body"><strong>Investigator downloads</strong>; relay RAM is cleared immediately after</div></div>
         <div class="step-row"><div class="step-num">05</div><div class="step-body"><strong>Chain-of-custody receipt</strong> archived by both parties; CT log entry provides independent verification</div></div>

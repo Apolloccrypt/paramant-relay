@@ -255,7 +255,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">The key stays on your device</div>
-      <p style="margin:0 0 10px">ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay. The relay holds only ciphertext.</p>
+      <p style="margin:0 0 10px">ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay. For a request you create in a browser the relay holds only ciphertext; for the hosted signing ceremony on the <code>/v1</code> API it holds the document, because that is what a hosted ceremony is.</p>
       <p style="margin:0;font-size:var(--text-sm)"><a href="/crypto-agility">Check the algorithm registry &rarr;</a></p>
     </div>
     <div class="card">
@@ -307,7 +307,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h3 id="core-principle">Core principle</h3>
   <div class="card">
-    <p style="margin:0;line-height:1.8">The relay is an <strong>untrusted intermediary</strong>. It stores only ciphertext and has no access to keys or plaintext. A fully compromised relay cannot read, forge, or retroactively recover any transfer. This is not a policy. It is a cryptographic guarantee.</p>
+    <p style="margin:0;line-height:1.8">The relay is an <strong>untrusted intermediary</strong>. For transfers and for signing requests created in a browser it stores only ciphertext and has no access to keys or plaintext, and a fully compromised relay cannot read, forge, or retroactively recover any of them. That is not a policy, it is a cryptographic guarantee. It does not cover the hosted signing ceremony on the <code>/v1</code> API, where the relay is given the document so it can run the ceremony; there the protection is a policy, and we say so rather than let the guarantee cover ground it cannot hold.</p>
   </div>
 
   <div class="card" style="margin-top:14px;border-left:3px solid var(--cobalt)">
@@ -376,7 +376,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <h3>What a compromised relay cannot do</h3>
   <div class="card">
     <div style="display:flex;flex-direction:column;gap:10px">
-      <div><span class="check">&#10003;</span><span>Read file contents: relay holds only ciphertext, never keys</span></div>
+      <div><span class="check">&#10003;</span><span>Read file contents: outside the hosted <code>/v1</code> signing ceremony the relay holds only ciphertext, never keys</span></div>
       <div><span class="check">&#10003;</span><span>Substitute a registered public key once your own browser has pinned it (TOFU), or once you have compared the short code out of band</span></div>
       <div><span class="check">&#10003;</span><span>Decrypt any stored ciphertext: no key access</span></div>
       <div><span class="check">&#10003;</span><span>Read an exact file size: every web app block is a fixed 5 MB, and only the block count is visible</span></div>

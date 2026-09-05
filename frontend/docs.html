@@ -837,7 +837,7 @@ paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/ap
 
     <!-- ── Crypto stack ─────────────────────────────────────────── -->
     <h2 id="crypto">Crypto stack</h2>
-    <p>All encryption happens client-side. The relay never sees plaintext and never holds a private key.</p>
+    <p>Encryption happens client-side on every route on this page except one. The relay never sees plaintext and never holds a private key, apart from the hosted signing ceremony on the <code>/v1</code> API: the curl example above uploads a PDF as <code>content_base64</code>, and that is the relay reading a document because that request asked it to.</p>
     <table>
       <tr><th>Algorithm</th><th>Role</th><th>Standard</th></tr>
       <tr><td>ML-KEM-768</td><td>Post-quantum key encapsulation</td><td>NIST FIPS 203</td></tr>
