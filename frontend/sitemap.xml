@@ -147,6 +147,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://paramant.app/redeem</loc>
+    <lastmod>2026-09-05</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://paramant.app/rules</loc>
     <lastmod>2026-09-05</lastmod>
     <priority>0.6</priority>
