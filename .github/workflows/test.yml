@@ -406,6 +406,31 @@ jobs:
         # goes red in seconds instead of silent for hours.
         run: node --test $(node scripts/browser-suites.mjs --no-browser)
 
+  landen:
+    name: landen, geen tak te lang buiten main
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 is hier niet genoeg. actions/checkout haalt met een volle
+      # diepte wel de historie op, maar met een refspec die alleen de gevraagde
+      # ref schrijft, dus refs/remotes/origin/* blijft bijna leeg. De poort telt
+      # takken; op een gefilterde clone zou hij er nul zien en stil groen gaan.
+      # De fetch hieronder haalt ze alsnog binnen.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Alle takken van origin binnenhalen
+        run: git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+      # gh is op de runner aanwezig en GH_TOKEN zet laag 2 aan, de laag die
+      # squash-merges herkent. Valt die weg, dan draait de poort door op de drie
+      # git-lagen en meldt dat in de kop; hij faalt dan hooguit te streng.
+      - name: Poort
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/check-landen.mjs
+
   admin-unit-tests:
     name: admin - unit suite
     runs-on: ubuntu-latest

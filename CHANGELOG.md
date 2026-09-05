@@ -9,6 +9,27 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **A gate that counts the work that never landed.** `fix/sector-port-drift` was
+  ready on 10 June 2026 and fixes four fallback ports in `admin/server.js` that
+  point at listeners which do not exist. It was never merged, PR #199 was closed,
+  and on 5 September a second investigation found the same bug and fixed it
+  again. That is the cost this measures: not tidiness, paying twice to find one
+  bug because we did not pay once to merge it. `scripts/check-landen.mjs` decides
+  "landed" in four layers, because `git branch --merged` is useless against a
+  squash merge and counts the whole backlog twice: ancestry, a MERGED pull
+  request for the branch, patch-id equality via `git cherry`, and whether the
+  branch's net diff already reverse-applies to main's tree. On origin on 5
+  September it reads 71 branches, 64 it cannot find in main and 50 outside it for
+  longer than seven days, the oldest at 100 days. It turns red on any
+  branch unlanded for more than seven days without a dated entry in
+  `deploy/landen-uitstel.json`, so a freeze needs an end date and the backlog
+  comes back on its own schedule. `deploy/landen.md` carries the method and the
+  reasoning behind the term, `deploy/landen-inhaalslag.md` the triage of all 64
+  unlanded branches into three piles, and `tests/landen-poort.test.mjs` proves on
+  throwaway repositories that a squash reads as landed and that a branch left
+  lying turns the gate red.
+
 ### Fixed
 - **The public transparency log gave away the exact second, so anyone holding a
   copy of a document could prove it went through Paramant.** A leaf is
