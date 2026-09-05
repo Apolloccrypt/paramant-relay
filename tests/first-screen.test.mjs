@@ -164,10 +164,11 @@ const PAGES = [
       // Mick, 4 September: one note is enough. The founder line left both hero
       // states; the letter signature further down the page is the one place the
       // homepage still names him, and tests/ui-truthfulness pins that block.
-      // Mick, 5 September: the old tag ("made in the Netherlands, hosted in the
-      // EU") was true and toneless. This one carries the same two frames plus
-      // the ownership claim, in the words he already publishes on LinkedIn.
-      { name: 'the band tag, once, with the two frames that sell (5 September: a merge left it doubled and garbled)', css: '.hp-band-tag', text: 'Built in Harderwijk, hosted in Nuremberg, answerable to no one in Virginia' },
+      // Mick, 5 September: the English ownership line became a Dutch tile with
+      // one quiet fact under it. Two lines where there was one, so this claim
+      // now also measures the bottom of the second: the block is absolutely
+      // positioned inside .hp-band, which is why it cannot push the hero down.
+      { name: 'the band tile and the fact under it', css: '.hp-band-tag', text: 'Beter een goede buur dan een verre vriend.', also: ['Onze servers staan in Neurenberg.'] },
       { name: 'the heading of the five facts, which now come before the gift (panel of 4 September: facts convince, the letter can wait)', css: '#check-h', text: 'Five things you can check' },
     ],
   },
