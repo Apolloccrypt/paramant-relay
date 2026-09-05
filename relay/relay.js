@@ -3476,6 +3476,38 @@ async function handleRelayRequest(req, res) {
     }));
   }
 
+  // -- The scope of a v2 API key ----------------------------------------------
+  // Beside the session-token allowlist above, and for the same reason: one
+  // choke point above every route comparison, so no route has to remember it.
+  //
+  // A key is minted read-only / send-only / sign-only, the relay stores that
+  // scope and shows it back in the key list and on the dashboard, and until now
+  // it enforced none of it. Every key, whatever its label said, could write
+  // anywhere on the v2 plane. The route table and the scope matrix both live in
+  // lib/keys-table.js (pure, unit-tested); relay.js only asks the question.
+  //
+  // Only runs when a real key resolved. Keyless and public routes keep keyData
+  // null and are untouched, as does the inv_ receiver-session bypass. A legacy
+  // key without a scope, and any key minted 'full', is allowed every action by
+  // construction, so nothing that works today stops working.
+  //
+  // 403, not 401: the key is real and active, it just does not carry authority
+  // for this route, and a 401 would send the caller off to re-authenticate with
+  // the same key and be refused again.
+  if (keyData) {
+    const _scopeAction = keysTable.scopeActionFor(req.method, path);
+    if (!keysTable.requireScope(keyData, _scopeAction)) {
+      log('warn', 'insufficient_scope', { method: req.method, path, scope: keyData.scope || 'full', required: _scopeAction });
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({
+        error: 'insufficient_scope',
+        required_action: _scopeAction,
+        scope: keyData.scope || 'full',
+        hint: 'this API key was issued with a narrower scope than this route needs',
+      }));
+    }
+  }
+
   // ── Code-transparency manifest: publiek leesbaar, vóór de /v1-Bearer-gate ───
   // The SHA3-256 inventory of the deployed frontend, CT-anchored on publish.
   // Independent monitors fetch this and compare it against the live assets.

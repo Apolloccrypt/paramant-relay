@@ -70,8 +70,8 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | waarde | plek A | plek B | staat het uiteen? |
 |---|---|---|---|
 | 5 MB | `MAX_BLOB` `relay/relay.js:105` | `BLOB_SIZE_MB` `:1339`, `ANON_MAX` `:5360`, `TRIAL_MAX_SIZE` `:5545`, `tiers.js:47,56,65`, `parashare.page.js:829`, `paramant-core.js:30` | acht kopieen, een instelbaar |
-| sector naar poort | `admin/server.js:40-44` (3000/3005/3002/3003/3004) | `docker-compose.yml:311-315` (alle vijf 3000) | **ja, vier van vijf** |
-| `RELAY_HEALTH` | `admin/server.js:41` → `:3005` | poort 3005 bestaat nergens in de repo | **ja** |
+| sector naar poort | `admin/server.js:39-45` (alle vijf 3000) | `docker-compose.yml:311-315` (alle vijf 3000) | nee, gepind door `tests/sector-fallback-ports.test.mjs` |
+| `RELAY_HEALTH` | `admin/server.js:41` → `:3000` | de compose-listener staat op 3000 | nee, rechtgezet; stond op `:3005`, een poort die nergens in de repo bestaat |
 | `nginx-selfhost.conf` | de kopie in de wortel: geen bodygrens, `inbound` 10r/m | `deploy/nginx-selfhost.conf`: 35M, `inbound` 5r/m | **ja, twee bestanden met dezelfde naam** |
 | `install.sh` | de kopie in de wortel, 535 regels | `frontend/install.sh`, 466 regels, dit is de kopie die op paramant.app staat | **ja, 111 regels verschil** |
 | admin-paneel JS | `admin/public/app.js`, 895 regels | `frontend/js/admin.page.js`, 742 regels | **ja, 343 regels verschil** |
@@ -312,7 +312,7 @@ controle valt om.
 | `relay/envelope.js` | `DEFAULT_TTL_DAYS` | `30 x2` | bewaartermijn van een envelop; parasign-store telt zijn eigen 30 dagen |
 | `relay/lib/entitlements.js` | `ENTERPRISE_MONTHLY_CEILING` | `1_000_000` | wat onbeperkt in de praktijk betekent |
 | `admin/lib/audit.js` | `AUDIT_RETENTION_DAYS` | `400` | bewaartermijn van het auditlog; ongecontroleerde parseInt, 0 wist het log |
-| `admin/server.js` | `RELAY_HEALTH` | `3005` | terugvalpoort voor de health-relay; compose luistert op 3000 |
+| `admin/server.js` | `RELAY_HEALTH` | `3000` | terugvalpoort voor de health-relay; de container-interne listener, gepind aan docker-compose.yml |
 | `frontend/crypto-bridge.js` | `WASM_SHA256` | `30f1ae35` | integriteitspin op de wasm-module; verandert bij elke herbouw |
 | `deploy/deploy-3.1.sh` | `EXPECT_VERSION` | `3.1.0` | welke versie de deploy verwacht aan te treffen; niet instelbaar |
 | `deploy/deploy-3.1.sh` | `EXPECT_PROD_COMMIT` | `41501bb` | de startcommit uit het draaiboek |
