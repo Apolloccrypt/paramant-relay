@@ -1815,6 +1815,17 @@ async function serverHasSigningKey() {
 async function showSigningIdentity() {
   const el = $('ds-signing-identity');
   if (!el) return;
+  // Wait for the session answer before asking anything else. This runs at page
+  // load, so without the wait the guard below would always read 'unknown'.
+  await sessionKnown;
+  // No session: /api/user/account/signing-key answers 401, and the fallback
+  // copy below would promise this browser a sign-in passkey we cannot see.
+  // Claim nothing, and ask nothing.
+  if (sessionState === 'out') {
+    el.className = 'ds-hint';
+    el.textContent = 'Sign in to see which signing key will sign this document.';
+    return;
+  }
   try {
     const k = await resolvePasskeySigningKey();
     state.signer.fingerprint = k.fingerprint;
@@ -2159,6 +2170,12 @@ function fillReview() {
 // Fill the signing-key fingerprint into the review card from PUBLIC vault
 // metadata (no unlock). On a device with no signing passkey, say so plainly.
 async function fillReviewKeyFingerprint() {
+  // Same as showSigningIdentity: signed out there is no key to read, and
+  // '(unavailable)' would read as a fault rather than as a missing session.
+  if (sessionState === 'out') {
+    const fpEl = $('ds-proof-fp'); if (fpEl) fpEl.textContent = '(after you sign in)';
+    return;
+  }
   try {
     const k = await resolvePasskeySigningKey();
     state.signer.fingerprint = k.fingerprint;
@@ -3474,9 +3491,20 @@ function wireNav() {
   $('ds-identity-continue').addEventListener('click', () => {
     fillReview();
     setActive('step-sign');
+    // Last, so it wins over the button label this step ships with.
+    applySessionToSignButton();
   });
   $('ds-sign-back').addEventListener('click', () => setActive('step-identity'));
-  $('ds-sign-now').addEventListener('click', doSign);
+  $('ds-sign-now').addEventListener('click', () => {
+    // Signed out: this button is the sign-in, and doSign must not run. Its
+    // first call is the step-up options, which is the 401 this gate exists to
+    // stop; applySessionToSignButton has already said so above the button.
+    if ($('ds-sign-now').dataset.signInFirst === '1') {
+      location.href = '/auth/login?next=/sign';
+      return;
+    }
+    doSign();
+  });
   $('ds-restart').addEventListener('click', () => location.reload());
 }
 
@@ -3564,6 +3592,9 @@ function wireLiveStampUpdates() {
 }
 
 function init() {
+  // First, before anything that might want to ask the API a question only a
+  // session can answer: initStepIdentity() below is one such caller.
+  sessionKnown = showSessionRequirement();
   revealQesOption().catch(() => { /* the option simply stays hidden */ });
   initStepMode();
   initStepDoc();
@@ -3583,13 +3614,19 @@ function init() {
   } else {
     setActive('step-mode');
   }
-  showSessionRequirement();
 }
 
 // What the probe answered, kept so every later step can ask the same question
 // without a second round trip. 'unknown' until it has answered at all: nothing
 // on this page may claim "you are not signed in" before it has.
 let sessionState = 'unknown';   // 'unknown' | 'in' | 'out'
+
+// The probe itself, so anything that must not run before the answer can wait
+// for it. initStepIdentity() fires at page load, long before the visitor picks
+// a workflow, and its hint used to ask /api/user/account/signing-key straight
+// away: a 401 on load, for every signed-out visitor, in all three workflows.
+// Resolved (never rejected) by showSessionRequirement.
+let sessionKnown = Promise.resolve();
 
 function showServiceNote() {
   const note = $('ds-service-note');
@@ -3608,6 +3645,7 @@ function applySignedOut() {
   // the three workflows are before deciding whether the account is worth it.
   if (el) el.hidden = false;
   applySessionToSendButton();
+  applySessionToSignButton();
 }
 
 // The one irreversible action in the invite flow is "Send for signature": it
@@ -3633,6 +3671,28 @@ function applySessionToSendButton() {
   if (!$('step-recipients').hidden) {
     showRecipientsHint('Your document has not been uploaded and stays in this browser. Signing in reloads this page, so you pick the file and the recipients again afterwards.', false);
   }
+}
+
+// The same gate, on the two workflows that do not end at Send. 'Sign it
+// myself' and 'Sign together' end at 'Sign this document', and that button
+// opens with POST /api/user/account/signing-key/step-up/options. Signed out
+// that is a 401 raised after the file, the stamp, the identity and the review:
+// the exact dead end the invite flow was already spared, still standing on the
+// other two. So the last button is the sign-in there too, and it says up front
+// that the prepared document does not travel with it.
+//
+// Unlike the send gate this one does not test the mode: every mode that
+// reaches this step signs, and the invite flow never reaches it.
+function applySessionToSignButton() {
+  const btn = $('ds-sign-now');
+  if (!btn) return;
+  const gate = sessionState === 'out';
+  btn.dataset.signInFirst = gate ? '1' : '';
+  if (!gate) return;
+  btn.textContent = 'Sign in to sign';
+  btn.disabled = false;
+  const hint = $('ds-sign-signin-hint');
+  if (hint) hint.hidden = false;
 }
 
 // The page is served to everyone (nginx no longer gates /sign), so a visitor
