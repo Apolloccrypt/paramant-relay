@@ -10,6 +10,7 @@ NEW_NAV = '''\
 
   <ul class="nav-links">
     <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/security" class="nav-link">Security</a></li>
     <li><a href="/pricing" class="nav-link">Pricing</a></li>
     <li><a href="/docs" class="nav-link">Docs</a></li>
@@ -37,6 +38,7 @@ NEW_NAV = '''\
 NEW_MOBILE = '''\
 <div class="nav-mobile" id="nav-mobile">
   <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/security" class="nav-mobile-standalone">Security</a>
   <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
   <a href="/docs" class="nav-mobile-standalone">Docs</a>
@@ -92,7 +94,7 @@ LEGAL_STRIP = '''\
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=28">'
 NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=24">'
 NAV_JS    = '<script src="/nav.js?v=15" defer></script>'
-NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=8" defer></script>'
+NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=9" defer></script>'
 
 # Pages that don't have <nav class="nav"> yet but should — inject the canonical
 # nav after <body> (or after a skip-link if present). App shells (admin,
@@ -102,6 +104,7 @@ ADD_NAV_TO = {
     '404.html',
     'changelog.html',
     'download.html',
+    'gereedschap.html',
     'partners.html',
     'security/acknowledgements.html',
     'signup/verified.html',
@@ -238,9 +241,16 @@ def renumber_shared_assets(fpath, html):
     these two stylesheets. Bumping the version here and nowhere else left them
     pointing at the old cache key, which scripts/check-cache-bust.sh fails on
     ("one file, two cache keys") while the idempotency gate stayed green. This
-    only rewrites links that are already there; it injects nothing."""
+    only rewrites links that are already there; it injects nothing.
+
+    developer.html links nav.js and nav-auth.js as well, and those were left
+    behind by the same omission: bumping NAV_AUTH_JS moved every stamped
+    page and not that one, which is "one file, two cache keys" again on a
+    different file."""
     updated = re.sub(r'<link rel="stylesheet" href="/design-system\.css(?:\?v=\d+)?">', DS_LINK, html)
     updated = re.sub(r'<link rel="stylesheet" href="/nav\.css(?:\?v=\d+)?">', NAV_LINK, updated)
+    updated = re.sub(r'<script src="/nav\.js(?:\?v=\d+)?" defer></script>', NAV_JS, updated)
+    updated = re.sub(r'<script src="/js/nav-auth\.js(?:\?v=\d+)?" defer></script>', NAV_AUTH_JS, updated)
     if updated == html:
         return False
     with open(fpath, 'w', encoding='utf-8') as f:

@@ -85,6 +85,7 @@ const ALIAS = {
   '/security':'/security.html', '/trust':'/trust.html', '/docs':'/docs.html',
   '/about':'/about.html', '/help':'/help/index.html', '/download':'/download.html',
   '/login':'/auth/login.html', '/verify':'/verify.html',
+  '/gereedschap':'/gereedschap.html',
   '/architecture':'/architecture.html', '/crypto-agility':'/crypto-agility.html',
   '/co-sign':'/co-sign.html',
   '/developer':'/developer.html',
@@ -97,7 +98,7 @@ const ALIAS = {
 export const PUBLIC_PAGES = [
   '/', '/pricing', '/parasign', '/parasend', '/sign', '/signup', '/security',
   '/trust', '/docs', '/about', '/help', '/download', '/login', '/verify',
-  '/architecture', '/crypto-agility', '/co-sign', '/developer',
+  '/architecture', '/crypto-agility', '/co-sign', '/developer', '/gereedschap',
 ];
 
 // The signed-in screens, with the same stubs as tests/navigation-shell.test.mjs

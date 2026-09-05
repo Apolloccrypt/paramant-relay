@@ -235,7 +235,11 @@ server every `/v2/envelopes` route answers 503 and the ParaSign lifecycle is
 untestable):
 
 ```bash
-docker run --rm -d --name paramant-test-redis -p 6399:6379 redis:7.4.8-alpine
+docker run --rm -d --name paramant-test-redis -p 127.0.0.1:6399:6379 redis:7.4.8-alpine
+
+> De binding op `127.0.0.1` is bewust. Zonder dat voorvoegsel publiceert Docker
+> de poort op alle netwerkkaarten en staat er een redis zonder wachtwoord open
+> voor iedereen op hetzelfde netwerk.
 
 cd relay
 REDIS_URL=redis://127.0.0.1:6399 \
