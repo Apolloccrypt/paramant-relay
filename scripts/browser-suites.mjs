@@ -20,8 +20,27 @@
 // helper that grows a browser dependency moves its suites with it, on the run
 // after the commit, with no list to keep.
 //
-//   node scripts/browser-suites.mjs --browser      needs a browser
-//   node scripts/browser-suites.mjs --no-browser   the rest
+// A BROWSER IS NOT THE ONLY THING A SUITE CAN NEED. On 2026-09-05 the same
+// blind spot cost a red run again, one question further along:
+// tests/koper-hele-weg.test.mjs drives a browser AND boots two real relay.js
+// processes plus the admin server, and sign-e2e is self-contained by design
+// (it serves frontend/ and stubs /api, and installs no relay deps, no
+// @paramant/core and no redis). Being a browser suite put it in the only job
+// that could not possibly run it: nine failures, all of them
+// "Cannot find module .../admin/node_modules/redis".
+//
+// So the same import walk answers a second question. Anything a suite reaches
+// that spawns relay.js means the suite needs the full stack, and the two
+// answers together split the browser suites into the job that stubs the
+// backend and the job that builds one. Asked of the import graph, so a suite
+// that grows a backend dependency moves jobs on the run after the commit,
+// with no list to keep. The two browser lists partition the set, so a suite
+// cannot fall out of both.
+//
+//   node scripts/browser-suites.mjs --browser            needs a browser
+//   node scripts/browser-suites.mjs --no-browser         the rest
+//   node scripts/browser-suites.mjs --browser-no-stack   browser, stubbed backend
+//   node scripts/browser-suites.mjs --stack              boots a real relay.js
 //
 // Paths are printed one per line, sorted, relative to the repo root, so the
 // output drops straight into `node --test $(...)`.
@@ -56,15 +75,19 @@ function resolveLocal(from, spec) {
   return null;
 }
 
-export function needsBrowser(entry) {
+// Walk the relative imports from `entry` as deep as they go, and ask `hit` of
+// every file reached and of every bare specifier it names. One walk, two
+// questions, so the answers can never be asked of different graphs.
+function reaches(entry, hit) {
   const seen = new Set();
   const queue = [path.resolve(entry)];
   while (queue.length) {
     const file = queue.pop();
     if (seen.has(file)) continue;
     seen.add(file);
-    for (const spec of specifiers(file)) {
-      if (BROWSER_PACKAGES.has(spec) || [...BROWSER_PACKAGES].some((p) => spec.startsWith(p + '/'))) return true;
+    const specs = specifiers(file);
+    if (hit({ file, specs })) return true;
+    for (const spec of specs) {
       if (spec.startsWith('.')) {
         const local = resolveLocal(file, spec);
         if (local) queue.push(local);
@@ -74,20 +97,43 @@ export function needsBrowser(entry) {
   return false;
 }
 
+export function needsBrowser(entry) {
+  return reaches(entry, ({ specs }) => specs.some((spec) =>
+    BROWSER_PACKAGES.has(spec) || [...BROWSER_PACKAGES].some((p) => spec.startsWith(p + '/'))));
+}
+
+// Does anything this suite reaches START A RELAY. A helper that spawns
+// relay.js needs everything a relay needs: the relay's own node_modules, the
+// @paramant/core binding it loads eagerly at boot, the admin dependencies and
+// a reachable redis. Naming the file it spawns is the honest signal, and it is
+// in the source of the helper rather than in a list here.
+const RELAY_ENTRYPOINT = /['"]relay\.js['"]/;
+export function needsStack(entry) {
+  return reaches(entry, ({ file }) => {
+    if (path.resolve(file) === path.resolve(entry)) return false;
+    try { return RELAY_ENTRYPOINT.test(fs.readFileSync(file, 'utf8')); } catch { return false; }
+  });
+}
+
 const suites = fs.readdirSync(path.join(ROOT, 'tests'))
   .filter((name) => name.endsWith('.test.mjs'))
   .map((name) => path.join('tests', name))
   .sort();
 
-const wanted = process.argv.includes('--browser') ? true
-  : process.argv.includes('--no-browser') ? false
-  : null;
+const MODES = {
+  '--browser': (b) => b,
+  '--no-browser': (b) => !b,
+  '--browser-no-stack': (b, s) => b && !s,
+  '--stack': (b, s) => s,
+};
+const mode = Object.keys(MODES).find((flag) => process.argv.includes(flag));
 
-if (wanted === null) {
-  process.stderr.write('usage: node scripts/browser-suites.mjs --browser | --no-browser\n');
+if (!mode) {
+  process.stderr.write(`usage: node scripts/browser-suites.mjs ${Object.keys(MODES).join(' | ')}\n`);
   process.exit(2);
 }
 
 for (const suite of suites) {
-  if (needsBrowser(path.join(ROOT, suite)) === wanted) console.log(suite);
+  const full = path.join(ROOT, suite);
+  if (MODES[mode](needsBrowser(full), needsStack(full))) console.log(suite);
 }

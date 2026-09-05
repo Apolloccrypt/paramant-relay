@@ -69,8 +69,18 @@ test('the status reports the end of the term that was actually bought', () => {
     'and it must be the computed term end, not a value from elsewhere');
   assert.match(body, /termEndOf\(/,
     'access_until must be derived from the relay period, not from an unwritten Redis record');
-  assert.match(body, /auto_renews:\s*false/,
-    'every checkout is a one-off for its term, so the response must not imply a renewal');
+  // auto_renews used to be the literal `false`, and this line used to pin it
+  // there: production bills one-off, so nothing renews. That is true only while
+  // BILLING_MODE is empty. Set it and checkout opens a Mollie mandate AND a
+  // subscription, and the account page went on telling the customer that
+  // nothing would be collected again while Mollie collected. A page may not
+  // answer this question from a constant; it has to read the account. What is
+  // pinned now is the source, not the answer.
+  assert.match(body, /auto_renews:\s*renews\b/,
+    'auto_renews must come from the relay record, never from a hard-coded false');
+  assert.match(body, /"main",\s*"\/v2\/admin\/keys\?reveal=1"/,
+    'the subscription pointers are written by the webhook on relay-main, so that '
+    + 'is the relay this has to ask; health has never seen them');
 
   // The derivation itself: both products carry a term, only a term still in the
   // future counts, and the later of the two is the one access runs to.
