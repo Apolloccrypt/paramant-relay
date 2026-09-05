@@ -50,6 +50,29 @@ test('ghost_pipe: internal auth reads the deep check, the open internet gets 401
     assert.ok(names.includes(expected), `check "${expected}" present`);
   }
 
+  // ── A check must MEASURE, not just appear ──────────────────────────────────
+  // Presence was all this asserted, and presence was all it ever got. From the
+  // day /v2/health/deep was written until 2026-09-05 the storage check threw
+  // inside its own try and reported "not writable: path.join is not a function"
+  // on every relay, healthy disk or not, because `path` was shadowed by the
+  // request pathname for the whole handler. Nobody saw it, because the only
+  // gate on this route counted names. So the names are still counted, and now
+  // the verdicts are read too: on a booted relay with a writable working
+  // directory the storage check is green, and no check may report a failure
+  // whose text is a JavaScript TypeError. That second half is the general one.
+  // Any check that answers with "is not a function", "undefined", "is not
+  // defined" or "Cannot read" is reporting on the checker, not on the thing.
+  const byName = Object.fromEntries(authed.body.checks.map((c) => [c.name, c]));
+  assert.strictEqual(byName.storage.status, 'green',
+    `storage must be green on a relay that can write its own working directory, got ` +
+    `"${byName.storage.status}: ${byName.storage.detail}". A red here with a JavaScript ` +
+    `error in the detail is the checker failing, not the disk.`);
+  for (const c of authed.body.checks) {
+    assert.doesNotMatch(String(c.detail || ''), /is not a function|is not defined|Cannot read|undefined is not/,
+      `check "${c.name}" reports a JavaScript error as its verdict: "${c.detail}". ` +
+      `A self-test that measures its own bug reports the same answer forever.`);
+  }
+
   // A wrong token is not a lucky token.
   const wrong = await deep(port, { 'X-Internal-Auth': TOKEN + 'x' });
   assert.strictEqual(wrong.status, 401, 'wrong token must be refused');

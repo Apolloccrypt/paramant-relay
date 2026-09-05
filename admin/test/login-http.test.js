@@ -16,6 +16,11 @@
 // in. So this suite starts admin/server.js, points it at a stub relay, and
 // speaks HTTP to it. See _admin-server.js for what is real and what is not.
 //
+// The same reasoning brought two more request-level properties in here, both
+// from the 2026-09-05 review and both untestable without a running handler:
+// the byte-vs-character compare on the ADMIN_TOKEN gate, and the absolute
+// lifetime of a user session. See their tests at the bottom of the file.
+//
 // Run: REDIS_URL=redis://127.0.0.1:6399 node --test admin/test/login-http.test.js
 
 const { test, before, after } = require('node:test');
@@ -340,5 +345,122 @@ test('an unknown address and a known one are both a plain 401', async (t) => {
   assert.equal(unknown.status, 401);
   assert.equal(known.status, 401);
   assert.deepEqual(unknown.json, known.json, 'and the bodies are identical too');
+  httpDid();
+});
+
+// ── The ADMIN_TOKEN gate compares bytes, not characters ─────────────────────
+
+test('a token of the right character length but the wrong byte length is a 401, not a 500', async (t) => {
+  if (!ready()) return t.skip('no redis');
+  // POST /admin/resend-setup used to guard timingSafeEqual with
+  // `tok.length !== ADMIN_TOKEN.length`. String#length counts UTF-16 code
+  // units; Buffer.from() counts utf8 bytes. One multibyte character keeps the
+  // first number equal and changes the second, so the guard waved the token
+  // through and timingSafeEqual threw a RangeError on the buffer mismatch,
+  // which express 5 answers as a 500. A 500 for one wrong token and a 401 for
+  // another is an oracle on the length of the configured token, free to ask and
+  // unauthenticated.
+  const real = httpSrv.env.ADMIN_TOKEN;
+  const body = { user_id: 'acct_demo', email: 'demo@example.com' };
+
+  const sameChars = real.slice(0, -1) + '\u00e9';
+  assert.equal(sameChars.length, real.length, 'the probe has the same character count');
+  assert.notEqual(Buffer.byteLength(sameChars, 'utf8'), Buffer.byteLength(real, 'utf8'),
+    'and a different byte count, which is the whole point of it');
+  const multibyte = await httpSrv.post('/api/admin/resend-setup', {
+    headers: { 'X-Admin-Token': sameChars }, body,
+  });
+  assert.equal(multibyte.status, 401,
+    `a same-length wrong token must be refused with 401, got ${multibyte.status} ${multibyte.text}`);
+  assert.equal(multibyte.json && multibyte.json.error, 'unauthorized');
+
+  // The two controls: a plainly wrong token and none at all answer the same.
+  for (const [what, headers] of [['a plainly wrong token', { 'X-Admin-Token': 'nope' }], ['no token at all', {}]]) {
+    const r = await httpSrv.post('/api/admin/resend-setup', { headers, body });
+    assert.equal(r.status, 401, `${what} must be a 401, got ${r.status} ${r.text}`);
+    assert.deepEqual(r.json, multibyte.json, `${what} must be answered identically`);
+  }
+
+  // And the gate still opens for the real token: the next thing it reaches is
+  // the body check, so a 400 here proves the refusals above are the compare and
+  // not a route that refuses everything.
+  const opened = await httpSrv.post('/api/admin/resend-setup', {
+    headers: { 'X-Admin-Token': real }, body: {},
+  });
+  assert.equal(opened.status, 400, `the real token must get past the gate, got ${opened.status} ${opened.text}`);
+  assert.equal(opened.json && opened.json.error, 'missing_fields');
+  httpDid();
+});
+
+// ── A session ends, whether or not it is being used ─────────────────────────
+
+// Sign in for real and hand back the session cookie's token.
+async function signInForSession() {
+  const email = freshEmail();
+  const key = `pgp_session_${crypto.randomBytes(5).toString('hex')}`;
+  await withAccount(email, key);
+  const r = await httpSrv.login({ email, totp: HTTP_SECRET, ip: nextIp() });
+  assert.equal(r.status, 200, `sign-in failed: ${r.status} ${r.text}`);
+  const raw = [].concat(r.headers['set-cookie'] || []).join('; ');
+  const m = raw.match(/paramant_user_session=([^;]+)/);
+  assert.ok(m, `no session cookie in ${raw}`);
+  return { token: m[1], email, key };
+}
+
+test('a session has an absolute lifetime, and a last_seen that is actually last seen', async (t) => {
+  if (!ready()) return t.skip('no redis');
+  // authUser refreshed the redis TTL on every request and enforced nothing
+  // else, so a session used once an hour never ended: an unbounded sliding
+  // window against a standard (SESS-01) that asks for both halves. created_at
+  // was written by every issuing path and read by nobody except a cosmetic
+  // line that printed it under the label "last_seen".
+  const { token } = await signInForSession();
+  const cookie = { Cookie: `paramant_user_session=${token}` };
+  const key = `paramant:user:session:${token}`;
+
+  const first = await httpSrv.get('/api/user/account', { headers: cookie });
+  assert.equal(first.status, 200, `a fresh session must be accepted: ${first.status} ${first.text}`);
+  const stored = JSON.parse(await httpRedis.get(key));
+  assert.equal(typeof stored.last_seen, 'number', 'authUser stamps last_seen on the record');
+  assert.ok(stored.last_seen >= stored.created_at, 'and it is never older than the login itself');
+  const mine = (first.json.sessions || []).find((s) => s.current);
+  assert.ok(mine, 'the account view lists the session the request arrived on');
+  assert.equal(mine.last_seen, new Date(stored.last_seen).toISOString(),
+    'and the column labelled last_seen prints last_seen, not the creation time');
+  httpDid();
+
+  // The cap. Backdate the record past twelve hours and leave the TTL exactly
+  // where an hourly request would have kept it: a full hour still to run.
+  stored.created_at = Date.now() - (13 * 3600 * 1000);
+  await httpRedis.set(key, JSON.stringify(stored), { EX: 3600 });
+  const expired = await httpSrv.get('/api/user/account', { headers: cookie });
+  assert.equal(expired.status, 401,
+    `past the absolute lifetime the session must be refused, got ${expired.status} ${expired.text}`);
+  assert.equal(expired.json && expired.json.error, 'session_expired');
+  assert.equal(await httpRedis.get(key), null,
+    'and the record is deleted rather than left behind with a freshly extended TTL');
+  httpDid();
+});
+
+test('a session record written before created_at existed is capped, not exempted', async (t) => {
+  if (!ready()) return t.skip('no redis');
+  // Refusing a record without created_at would sign every logged-in customer
+  // out on deploy; exempting it would leave a population of sessions that can
+  // never expire. So the first request that touches one stamps it, and the cap
+  // runs from then.
+  const token = crypto.randomBytes(32).toString('hex');
+  const key = `paramant:user:session:${token}`;
+  await httpRedis.set(key, JSON.stringify(
+    { user_id: HTTP_OWNER_KEY, email: HTTP_OWNER_EMAIL, ip: '203.0.113.9', ua: 'probe', via: 'totp' },
+  ), { EX: 3600 });
+  const r = await httpSrv.get('/api/user/account', {
+    headers: { Cookie: `paramant_user_session=${token}` },
+  });
+  assert.equal(r.status, 200, `a record without created_at must keep working: ${r.status} ${r.text}`);
+  const stored = JSON.parse(await httpRedis.get(key));
+  assert.equal(typeof stored.created_at, 'number',
+    'and it is stamped on the way through, so its cap starts now instead of never');
+  assert.equal(typeof stored.last_seen, 'number', 'with a last_seen to match');
+  await httpRedis.del(key);
   httpDid();
 });

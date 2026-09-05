@@ -46,6 +46,79 @@ const SECTORS = {
 
 if (!ADMIN_TOKEN) { console.error('[PARAMANT-ADMIN] ADMIN_TOKEN is not set — refusing to start'); process.exit(1); }
 
+// Absolute session lifetime, on top of the one-hour idle window that authUser
+// refreshes on every request. Without it the sliding expire() below is an
+// unbounded window: a session used once an hour never ends, and a stolen cookie
+// that is kept warm is permanent. docs/security/PARAMANT-SECURITY-STANDARD.md
+// SESS-01 asks for both a short idle timeout AND an absolute lifetime; this is
+// the second half. Twelve hours = one working day, then re-authenticate.
+// The key the passkey decoy credential is derived from. It must be secret: a
+// decoy that is a plain hash of a known input is recomputable by anyone, which
+// makes it perfectly recognisable and turns the anti-enumeration measure into
+// the oracle it was meant to remove. ADMIN_TOKEN is the secret this process
+// already has, and using it keeps the decoy stable across restarts so two
+// probes for the same unknown address agree.
+//
+// It defaults to empty, and an empty HMAC key is exactly the recomputable case,
+// so an unconfigured admin gets a per-process random one instead. That costs
+// stability across restarts, which only matters to an attacker patient enough
+// to probe across a deploy; being unpredictable matters more, and an admin
+// running without ADMIN_TOKEN is a development one. A dedicated secret would be
+// tidier than borrowing this one, and is noted for the owner rather than
+// invented here.
+const DECOY_SECRET = ADMIN_TOKEN || crypto.randomBytes(32);
+
+const USER_SESSION_MAX_AGE_MS = 12 * 3600 * 1000;
+// How stale last_seen may get before authUser rewrites the session record. A
+// write per request would double the redis traffic of every dashboard poll for
+// a field that is only ever rendered to the minute.
+const LAST_SEEN_REFRESH_MS = 60 * 1000;
+
+// ── Process-wide failure handling ───────────────────────────────────────────
+// Modelled on relay/relay.js: name the failure in the log, then leave. The
+// relay exits to zeroize its key material; the admin holds no such state, but
+// it must still not die anonymously. Node runs with
+// --unhandled-rejections=throw by default, and lib/redis.js throws
+// RedisUnavailableError whenever the client is not ready, so one unawaited
+// redis call anywhere in this file used to end the panel with a bare stack and
+// no cause. Registered before any work starts, so nothing can fail earlier than
+// these can report it. The supervisor (docker restart: unless-stopped) brings
+// the panel back; what this buys is a log line that says why.
+process.on('unhandledRejection', (reason) => {
+  const stack = (reason instanceof Error) ? reason.stack : String(reason);
+  console.error('[PARAMANT-ADMIN] unhandled_rejection:', String(reason).slice(0, 200), (stack || '').slice(0, 1000));
+  process.exit(1);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[PARAMANT-ADMIN] uncaught_exception:', String(err && err.message || err).slice(0, 200), (err && err.code) || '');
+  process.exit(1);
+});
+
+// ── Constant-time secret compare ────────────────────────────────────────────
+// A copy of safeEqual from relay/lib/auth-gate.js, kept in step with it by
+// hand. Copied and not required: the admin image ships server.js, lib/ and
+// public/ and nothing else (admin/Dockerfile), so ../relay/ does not exist at
+// runtime and requiring it would crash the container on boot.
+// Why it compares BYTES: String#length counts UTF-16 code units while
+// Buffer.from() counts utf8 bytes. A token with the same character count but
+// one multibyte character passes a `a.length !== b.length` guard and then makes
+// crypto.timingSafeEqual throw a RangeError, which express 5 answers as a 500
+// where a 401 belongs. That difference is an oracle on the length of the
+// configured token. On a length mismatch this still runs a compare against
+// padding, so the refusal costs the same either way.
+function safeEqual(a, b) {
+  try {
+    const ba = Buffer.from(String(a || ''), 'utf8');
+    const bb = Buffer.from(String(b || ''), 'utf8');
+    if (ba.length !== bb.length) {
+      const pad = Buffer.alloc(Math.max(ba.length, bb.length));
+      crypto.timingSafeEqual(pad, pad);
+      return false;
+    }
+    return crypto.timingSafeEqual(ba, bb);
+  } catch { return false; }
+}
+
 async function createSession() {
   const sid = crypto.randomBytes(32).toString('hex');
   await redis().set(`paramant:admin:session:${sid}`, '1', { EX: 3600 });
@@ -358,8 +431,10 @@ api.post('/keys/all/revoke', authMiddleware, async (req, res) => {
 
 api.post('/admin/resend-setup', async (req, res) => {
   const tok = (req.headers['x-admin-token'] || req.headers['x-api-key'] || '').trim();
-  if (!ADMIN_TOKEN || tok.length !== ADMIN_TOKEN.length ||
-      !crypto.timingSafeEqual(Buffer.from(tok), Buffer.from(ADMIN_TOKEN)))
+  // safeEqual, not a hand-rolled length check plus timingSafeEqual: see its
+  // definition above for why the character count and the byte count are not the
+  // same number, and why the difference used to be a 500 and an oracle.
+  if (!ADMIN_TOKEN || !safeEqual(tok, ADMIN_TOKEN))
     return res.status(401).json({ error: 'unauthorized' });
   const { user_id, email } = req.body || {};
   if (!user_id || !email) return res.status(400).json({ error: 'missing_fields' });
@@ -658,11 +733,41 @@ async function sendResetConfirmEmail(email, confirmToken, maskedIp, requestedAt)
 async function authUser(req, res, next) {
   const token = parseCookies(req).paramant_user_session;
   if (!token) return res.status(401).json({ error: "unauthenticated" });
+  const key = `paramant:user:session:${token}`;
   try {
-    const raw = await redis().get(`paramant:user:session:${token}`);
+    const raw = await redis().get(key);
     if (!raw) return res.status(401).json({ error: "session_expired" });
-    await redis().expire(`paramant:user:session:${token}`, 3600);
-    req.userSession = JSON.parse(raw);
+    // Parse BEFORE the TTL is refreshed. The refresh used to be the first thing
+    // this middleware did, which meant a session was extended and only then
+    // inspected, so a record about to be thrown away had just been handed
+    // another hour of life.
+    let sess;
+    try { sess = JSON.parse(raw); }
+    catch { await redis().del(key).catch(() => {}); return res.status(401).json({ error: "session_expired" }); }
+
+    const now = Date.now();
+    // created_at is written by every issuing path (password+TOTP, backup code,
+    // passkey login, passkey register). A record from before this field existed
+    // has none: rather than refusing it (which logs everyone out on deploy) or
+    // exempting it forever, treat now as its start and stamp it, so it is
+    // capped from here on instead of never.
+    let created = Number(sess.created_at);
+    let rewrite = false;
+    if (!Number.isFinite(created) || created <= 0) { created = now; sess.created_at = now; rewrite = true; }
+    if (now - created > USER_SESSION_MAX_AGE_MS) {
+      await redis().del(key).catch(() => {});
+      return res.status(401).json({ error: "session_expired" });
+    }
+    // last_seen is what GET /api/user/account prints per session. It used to
+    // print created_at under that label, so the column said "last seen" and
+    // showed the login time. Written at most once a minute (see
+    // LAST_SEEN_REFRESH_MS) so an open dashboard does not add a write per poll.
+    if (!(now - Number(sess.last_seen) < LAST_SEEN_REFRESH_MS)) { sess.last_seen = now; rewrite = true; }
+    // One command either way: SET with EX both stores and slides the window.
+    if (rewrite) await redis().set(key, JSON.stringify(sess), { EX: 3600 });
+    else await redis().expire(key, 3600);
+
+    req.userSession = sess;
     req.userSessionToken = token;
     next();
   } catch (err) {
@@ -1348,14 +1453,52 @@ api.post("/user/auth/webauthn/login/options", async (req, res) => {
       const r = await callRelay(`/v2/user/webauthn/credentials?user_id=${encodeURIComponent(userId)}`, null, "GET");
       if (r.status === 200) {
         const body = await r.json().catch(() => ({}));
-        allowCredentials = (body.credentials || []).map(c => ({ id: c.credId, transports: c.transports }));
+        // transports is forced to an array here as well as at the relay
+        // (relay/lib/user-webauthn.js), because a missing field would drop the
+        // key from the JSON and hand back the very difference the decoy below
+        // exists to erase.
+        allowCredentials = (body.credentials || []).map(c => ({
+          id: c.credId,
+          transports: Array.isArray(c.transports) ? c.transports : [],
+        }));
       }
+    } else {
+      // The call the known branch makes next, against a user_id that cannot
+      // exist. Same route, same store, one round trip, answer discarded: the
+      // point is that both branches make the same number of calls to the same
+      // store before they answer. The pattern is /user/login above, which does
+      // the same with a totp_active read against an absent key.
+      await callRelay(`/v2/user/webauthn/credentials?user_id=${encodeURIComponent("absent_" + crypto.randomBytes(16).toString("hex"))}`, null, "GET");
     }
   } catch (e) { /* fall through to decoy */ }
-  // Residual: a populated allowCredentials reveals "this account has >=1
-  // passkey" (not "exists" -- an account without passkeys also gets the decoy).
+  // The decoy: what an address with no passkeys, and an address that names no
+  // account at all, both get. It only works if it is shaped like a real entry.
+  // Until 2026-09-05 it was not: scopeHash truncates sha256 to 32 hex, so the
+  // decoy id was 16 bytes against a real credential's full length, and it
+  // carried no transports field at all while a real one always does. Two fields,
+  // both answering for free the question the comment at the top of this route
+  // promises they do not answer.
+  //
+  // Keyed on the admin token instead of a bare sha256 of the address: an
+  // unkeyed hash of a known input is computable by anyone who can read this
+  // source, so the decoy would be recognisable on sight. HMAC keeps it
+  // deterministic per address (two starts for the same unknown address agree)
+  // and stable across restarts, without being predictable from outside.
+  //
+  // KNOWN RESIDUALS, both deliberate:
+  //  - the NUMBER of entries still differs. An account with two passkeys
+  //    answers with two, the decoy always with one, so a populated list still
+  //    says "this account has passkeys" and a list of two says how many. Padding
+  //    to a fixed count changes what an honest user's browser offers, which is
+  //    the owner's call and not a fix to make here.
+  //  - a real credential id is variable length and this one is always 32 bytes.
+  //    32 is the common case; a decoy that does not know the account it stands
+  //    in for cannot match a shorter or longer one.
   if (allowCredentials.length === 0) {
-    allowCredentials = [{ id: Buffer.from(webauthn.scopeHash("decoy:" + email), "hex").toString("base64url") }];
+    allowCredentials = [{
+      id: crypto.createHmac("sha256", DECOY_SECRET).update("webauthn-decoy:" + email).digest("base64url"),
+      transports: ["internal", "hybrid"],
+    }];
   }
 
   let options;
@@ -1477,7 +1620,9 @@ api.post("/user/auth/webauthn/login/verify", async (req, res) => {
   //   both non-zero -> new MUST be strictly higher, else refuse with NO session.
   const newCounter = verification.authenticationInfo.newCounter;
   if (!webauthn.counterIsAcceptable(lookup.counter, newCounter)) {
-    try { logAuditEvent("webauthn_counter_regression", { user_id: String(authedUserId).slice(0, 12) + "…", stored: lookup.counter | 0, presented: newCounter | 0 }); } catch {}
+    // The account id IS the audit key, so it goes in the first slot, whole: a
+    // truncated or constant key files the alarm where no reader looks.
+    try { await logAuditEvent(authedUserId, "webauthn_counter_regression", { stored: lookup.counter | 0, presented: newCounter | 0 }); } catch {}
     return res.status(401).json({ error: "invalid_credentials" });
   }
   // Persist the advanced counter (auth already succeeded; best-effort).
@@ -1494,7 +1639,7 @@ api.post("/user/auth/webauthn/login/verify", async (req, res) => {
     { EX: 3600 }
   );
   setUserCookie(res, sessionToken);
-  try { logAuditEvent(String(authedUserId).slice(0, 12) + "…", "webauthn_login", {}); } catch {}
+  try { await logAuditEvent(authedUserId, "webauthn_login", { via: flow.discoverable ? "webauthn_xdev" : "webauthn" }); } catch {}
   res.json({ success: true, email: authedEmail });
 });
 
@@ -1661,7 +1806,7 @@ api.post("/user/auth/webauthn/register/verify", async (req, res) => {
     { EX: 3600 }
   );
   setUserCookie(res, sessionToken);
-  try { logAuditEvent(String(flow.user_id).slice(0, 12) + "…", "webauthn_register", {}); } catch {}
+  try { await logAuditEvent(flow.user_id, "webauthn_register", {}); } catch {}
   res.json({ success: true, email: flow.email, recovery_codes: recoveryCodes });
 });
 
@@ -1747,7 +1892,7 @@ api.post("/user/account/webauthn/register/verify", authUser, async (req, res) =>
 
   // No new session (already logged in). No backup-code regeneration (would wipe
   // the account's existing recovery). Additive factor -> lockout-safe.
-  try { logAuditEvent("webauthn_account_passkey_added", { user_id: String(req.userSession.user_id).slice(0, 12) + "…" }); } catch {}
+  try { await logAuditEvent(req.userSession.user_id, "webauthn_account_passkey_added", {}); } catch {}
   res.json({ success: true });
 });
 
@@ -2097,7 +2242,9 @@ api.post("/user/sign/submit", authUser, async (req, res) => {
       if (r.status === 402) return res.status(402).json(body);
       return res.status(r.status).json({ error: body.error || "sign_failed" });
     }
-    try { logAuditEvent(String(user_id).slice(0, 12) + "…", "parasign_doc_signed", { envelope: String(act.envelope_id).slice(0, 10) + "…", party: act.party_index }); } catch {}
+    // The signature receipt. Truncating the envelope id INSIDE the metadata is
+    // harmless (it is a label); truncating the key is not (it is the address).
+    try { await logAuditEvent(user_id, "parasign_doc_signed", { envelope: String(act.envelope_id).slice(0, 10) + "…", party: act.party_index }); } catch {}
     return res.json({
       ok: true,
       signed_count: body.signed_count,
@@ -2285,7 +2432,13 @@ api.get("/user/me", authUser, async (req, res) => {
       created_at: user?.created_at || null,
       api_key_masked: user_id.slice(0, 8) + "..." + user_id.slice(-4),
       backup_codes_remaining: backupCount,
-      session_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      // The earlier of the idle window and the absolute cap: with an absolute
+      // lifetime in force, "an hour from now" stops being true in a session's
+      // last hour.
+      session_expires_at: new Date(Math.min(
+        Date.now() + 3600 * 1000,
+        (Number(req.userSession.created_at) || Date.now()) + USER_SESSION_MAX_AGE_MS,
+      )).toISOString(),
       // One-time dashboard survey: null while unanswered -> the dashboard
       // shows the usage-purpose question; any stored value hides it forever.
       usage_purpose: user?.usage_purpose ?? null,
@@ -2503,7 +2656,11 @@ api.get("/user/account", authUser, async (req, res) => {
       sessions.push({
         ip_masked: maskIp(s.ip || ""),
         user_agent_short: (s.ua || "").split(" ")[0].slice(0, 40) || "—",
-        last_seen: new Date(s.created_at).toISOString(),
+        // last_seen, now that authUser maintains one. Falls back to the login
+        // time for a record not touched since the field was introduced, and to
+        // now for one written before created_at existed. Never to
+        // `new Date(undefined)`, which throws inside toISOString.
+        last_seen: new Date(s.last_seen || s.created_at || Date.now()).toISOString(),
         current: token === req.userSessionToken,
         via: s.via || "totp",
       });
@@ -2517,7 +2674,13 @@ api.get("/user/account", authUser, async (req, res) => {
       created_at: user?.created_at || null,
       api_key_masked: user_id.slice(0, 8) + "..." + user_id.slice(-4),
       backup_codes_remaining: backupCount,
-      session_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      // The earlier of the idle window and the absolute cap: with an absolute
+      // lifetime in force, "an hour from now" stops being true in a session's
+      // last hour.
+      session_expires_at: new Date(Math.min(
+        Date.now() + 3600 * 1000,
+        (Number(req.userSession.created_at) || Date.now()) + USER_SESSION_MAX_AGE_MS,
+      )).toISOString(),
       sessions,
     });
   } catch (err) {
@@ -2943,7 +3106,7 @@ api.post("/user/account/signing-key/step-up/bind", authUser, async (req, res) =>
   // Cloned-authenticator guard (the same rule as login/verify).
   const newCounter = verification.authenticationInfo.newCounter;
   if (!webauthn.counterIsAcceptable(lookup.counter, newCounter)) {
-    try { logAuditEvent("webauthn_counter_regression", { user_id: String(user_id).slice(0, 12) + "…", stored: lookup.counter | 0, presented: newCounter | 0 }); } catch {}
+    try { await logAuditEvent(user_id, "webauthn_counter_regression", { stored: lookup.counter | 0, presented: newCounter | 0, at: "signing-key-step-up" }); } catch {}
     return res.status(401).json({ error: "step_up_required" });
   }
   try { await callRelay("/v2/user/webauthn/counter", { user_id, cred_id: lookup.credId, counter: newCounter }); } catch {}

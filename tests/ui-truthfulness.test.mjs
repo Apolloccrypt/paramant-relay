@@ -2229,7 +2229,11 @@ console.log('ui-truthfulness: /parashare says the receiver has to be online, and
       'ct-log says our relays announce themselves to one relay; RELAY_PRIMARY_URL is gone');
     const relayRegRoute = relaySrc.slice(relaySrc.indexOf("path === '/v2/relays/register'"));
     assert.ok(relayRegRoute.length > 0, 'the relay-registration route is gone; ct-log blames it for entries it no longer makes');
-    assert.match(relayRegRoute.slice(0, 4000), /ctAppendRelayReg\(/,
+    // Window widened from 4000 to 8000 on 2026-09-05: the route grew a per-IP
+    // budget at the top (review finding 21, an unauthenticated route that writes
+    // to an on-disk log and gossips a signed head on every append), which pushed
+    // the append past the old cut. The claim being guarded is unchanged.
+    assert.match(relayRegRoute.slice(0, 8000), /ctAppendRelayReg\(/,
       'a relay announcing itself no longer appends to the CT log, so ct-log blames it for nothing');
     const compose = read('docker-compose.yml');
     assert.match(compose, new RegExp(`RELAY_PRIMARY_URL:\\s*"http://relay-${ctHost.split('.')[0]}:`),

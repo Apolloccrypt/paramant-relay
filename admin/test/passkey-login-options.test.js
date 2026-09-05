@@ -24,6 +24,8 @@
 //   1. drop webauthn.normalizeLoginEmail back to .toLowerCase().trim()
 //   2. put the address (or its domain) into the refusal log line
 //   3. let a bare "not-an-address" through into a ceremony
+//   4. give the decoy back its truncated id (webauthn.scopeHash) or drop its
+//      transports field, either of which makes the two branches tell apart
 //
 // Run: REDIS_URL=redis://127.0.0.1:6399 node --test admin/test/passkey-login-options.test.js
 
@@ -38,7 +40,10 @@ const RUN = crypto.randomBytes(5).toString('hex');
 const OWNER_KEY = `pgp_passkey_owner_${RUN}`;
 const OWNER_EMAIL = `passkey_${RUN}@example.com`;
 // A credential id in the shape the relay stores them: base64url, no padding.
-const CRED_ID = crypto.randomBytes(16).toString('base64url');
+// 32 bytes, which is what a platform authenticator produces and what the route's
+// decoy is fixed at. The length matters to the shape assertion below: a fixture
+// of some other size would be measuring the fixture instead of the decoy.
+const CRED_ID = crypto.randomBytes(32).toString('base64url');
 
 // Its own /8 per run: the per-IP window on /login/options is fifteen minutes
 // and thirty hits wide, and a rerun inside that window must not inherit them.
@@ -176,6 +181,47 @@ test('the refusal is logged with the shape of the input and nothing about the pe
   assert.ok(!log.includes(OWNER_EMAIL), 'the log may not carry the account address');
   assert.doesNotMatch(log, /[A-Za-z0-9._%+-]{2,}@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/,
     'no plaintext address may reach the process log');
+  did();
+});
+
+test('a known and an unknown address are answered in the same shape', async (t) => {
+  if (!ready()) return t.skip('no redis');
+  // The PROPERTY, not the case. The comment at the top of the route promises a
+  // "uniform response shape regardless of whether the email exists / has
+  // passkeys ... so it is not an account-existence oracle". Until 2026-09-05 it
+  // was not kept: the decoy carried a 16-byte id where a real credential is
+  // full length, and no transports field where a real one always has one. Two
+  // free answers to the question the route refuses to answer.
+  //
+  // What is asserted is the shape, never the content: the ids differ and must.
+  // The same set of fields, and the same id length, on both branches.
+  const unknownEmail = `absent_${crypto.randomBytes(6).toString('hex')}@example.com`;
+  const known = await options({ email: OWNER_EMAIL });
+  const unknown = await options({ email: unknownEmail });
+  assert.equal(known.status, 200, known.text);
+  assert.equal(unknown.status, 200, unknown.text);
+
+  const real = known.json.options.allowCredentials;
+  const decoy = unknown.json.options.allowCredentials;
+  assert.ok(Array.isArray(real) && real.length >= 1, 'a known account is offered its own credentials');
+  assert.ok(Array.isArray(decoy) && decoy.length >= 1, 'an unknown address is offered a decoy, not an empty list');
+  assert.ok(!decoy.some((c) => c.id === CRED_ID), 'and the decoy is not the account credential itself');
+
+  const fields = (c) => Object.keys(c).sort().join(',');
+  assert.equal(fields(decoy[0]), fields(real[0]),
+    `same field set on both branches; real=[${fields(real[0])}] decoy=[${fields(decoy[0])}]`);
+  const idBytes = (c) => Buffer.from(String(c.id), 'base64url').length;
+  assert.equal(idBytes(decoy[0]), idBytes(real[0]),
+    `same credential-id length on both branches; real=${idBytes(real[0])}B decoy=${idBytes(decoy[0])}B`);
+  assert.ok(Array.isArray(real[0].transports) && Array.isArray(decoy[0].transports),
+    'transports is an array on both, present on both');
+
+  // Stable per address: a decoy that changed between two starts would say, on
+  // the second call, that it was a decoy.
+  const again = await options({ email: unknownEmail });
+  assert.equal(again.status, 200, again.text);
+  assert.deepEqual(again.json.options.allowCredentials, decoy,
+    'the same unknown address must be answered with the same decoy every time');
   did();
 });
 

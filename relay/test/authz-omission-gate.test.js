@@ -86,12 +86,17 @@ const ALLOW = [
   {
     file: 'relay/relay.js',
     guard: 'entry.apiKey && entry.apiKey !== apiKey',
-    count: 2,
+    count: 1,
     reason:
       'Review 2026-09-05 finding 22 (anonymous blobs). An anonymous blob is stored ' +
-      'with apiKey: null, so the owner check is skipped for it. Bounded by the ' +
-      '64-hex blob hash, which is CSPRNG and unguessable, so it is not a door; it ' +
-      'gets its own round with the rest of the blob ownership model.',
+      'with apiKey: null, so the owner check is skipped for it. On the READ side ' +
+      '(GET /v2/outbound/:hash) that is the design and it is written down: the hash ' +
+      'IS the capability, the payload is encrypted with a key in the URL fragment ' +
+      'the relay never sees, and it burns after one read. Was 2 until 2026-09-05: ' +
+      'the second copy guarded DELETE /v2/inbound/:hash, and destroying is not ' +
+      'reading. Whoever glimpsed the hash in a log could end a transfer they could ' +
+      'never open, so that one is now `!entry.apiKey || entry.apiKey !== apiKey` and ' +
+      'a blob with no owner has no owner who can abort it either.',
   },
   {
     file: 'relay/relay.js',
