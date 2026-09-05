@@ -79,10 +79,19 @@ html[data-session="in"] .home-hero{padding-bottom:56px}
 /* ---------- the band: Harderwijk at first light, one sealed letter on the quay ---------- */
 .hp-band{position:relative;height:clamp(132px,34vw,230px);overflow:hidden;background:var(--paper-2);border-bottom:1px solid var(--line)}
 .hp-band svg{position:absolute;inset:0;width:100%;height:100%;display:block}
-.hp-band-tag{position:absolute;right:var(--pad);top:14px;font-family:var(--hp-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(27,31,34,.82);display:flex;align-items:center;gap:8px}
+/* Two lines instead of one: the tile is the eye-catcher, the fact under it is
+   the quiet half. The block is absolutely positioned, so a second line does not
+   push the band open; max-width keeps it off the left edge on a 320px phone. */
+.hp-band-tag{position:absolute;right:var(--pad);top:14px;font-family:var(--hp-mono);text-transform:uppercase;color:rgba(27,31,34,.82);text-align:right;max-width:min(26rem,calc(100% - var(--pad) * 2))}
+.hp-band-say{display:block;font-size:12px;font-weight:600;letter-spacing:.1em;line-height:1.4}
 /* The dot next to the strip line. Full ochre on the band's cream sky is
-   1.66:1; the ochre-as-ink token is the same hue at 4.7:1 on that paper. */
-.hp-band-tag::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--ochre-ink)}
+   1.66:1; the ochre-as-ink token is the same hue at 4.7:1 on that paper. It
+   rides in the first line rather than beside the block, so on a 320px phone,
+   where the tile wraps onto two lines, it stays against the words. */
+.hp-band-say::before{content:"";display:inline-block;vertical-align:middle;width:9px;height:9px;border-radius:50%;background:var(--ochre-ink);margin:-2px 8px 0 0}
+/* 10px at .7 alpha is rgb(87,87,81) on the sky, 5.1:1, so the quieter half is
+   still readable rather than decorative. */
+.hp-band-sub{display:block;margin-top:4px;font-size:10px;letter-spacing:.12em;line-height:1.45;color:rgba(27,31,34,.7)}
 @media (min-width:900px){.hp-band-tag{right:max(var(--pad), calc((100% - var(--maxw)) / 2))}}
 
 /* ---------- hero ---------- */
@@ -526,7 +535,10 @@ footer a{color:var(--fg)}
     <path d="M0 208h1440v22H0z" fill="#4E6E72"/>
     <path d="M0 208h1440" stroke="#EAE2CE" stroke-opacity=".35"/>
   </svg>
-  <span class="hp-band-tag">Dutch owned. Built in Harderwijk, hosted in Nuremberg, answerable to no one in Virginia.</span>
+  <span class="hp-band-tag">
+    <span class="hp-band-say">Beter een goede buur dan een verre vriend.</span>
+    <span class="hp-band-sub">Onze servers staan in Neurenberg.</span>
+  </span>
 </div>
 
 <section class="home-hero">

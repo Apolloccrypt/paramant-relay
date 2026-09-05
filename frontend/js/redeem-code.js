@@ -1,11 +1,16 @@
 /* "Have a code?": spending a gift code from the browser.
  *
  * WHAT IT IS FOR. A supporter is handed a code and has to be able to type it
- * in somewhere. There are exactly two places worth putting that box: /pricing,
- * where somebody who has just read the prices finds out he does not have to pay
- * them, and /account, next to the plan the code changes. One file drives both,
- * because two copies of a form that grants a paid tier is two chances for them
- * to disagree about what happened.
+ * in somewhere. Three pages carry that box: /pricing, where somebody who has
+ * just read the prices finds out he does not have to pay them, /account, next
+ * to the plan the code changes, and /redeem, which is the box and nothing else
+ * and is where a link in a mail lands. One file drives all three, because
+ * copies of a form that grants a paid tier are chances for them to disagree
+ * about what happened.
+ *
+ * /redeem is the one that is normally read by somebody with no account at all,
+ * so it answers window.paRedeemBeforeSubmit below and sends him to the sign-up
+ * before he types. The other two are pages you reach by signing in first.
  *
  * THE CREDENTIAL. The same short-lived scoped token the price buttons run on:
  * js/app-session-token.js mints a pst_ token with purpose `app`, fifteen
@@ -72,6 +77,19 @@
     if (ev) ev.preventDefault();
     var input = form.querySelector('[data-redeem-input]');
     var code = input ? String(input.value || '').trim() : '';
+
+    /* A page that already knows this browser has no session answers here, and
+     * nothing is sent. /redeem asks /api/user/session/verify on load because it
+     * has to decide what its one button says anyway, so it can take the visitor
+     * to the sign-up before he types rather than after he presses; without this
+     * the only thing that tells him anything is the 401 below, which on a page
+     * that is nothing but this form is the whole page failing at its last
+     * request. /pricing and /account define nothing here and are unchanged.
+     * Asked before the empty box is refused: a visitor with no account has
+     * nothing useful to do with "Enter your code first." */
+    if (typeof window.paRedeemBeforeSubmit === 'function' &&
+        window.paRedeemBeforeSubmit(code, form) === false) return;
+
     if (!code) { say(form, EMPTY, 'error'); if (input) input.focus(); return; }
 
     if (!window.paAppToken) { say(form, NO_HELPER, 'error'); return; }

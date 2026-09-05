@@ -151,6 +151,7 @@ const zipStore         = require('./lib/zip-store');          // store-only zip 
 const moneybird        = require('./lib/moneybird');          // optional Moneybird push (external sales invoices)
 const planExpiry       = require('./lib/plan-expiry');      // paid-term warning + expiry mail (in-process planner)
 const coupon           = require('./lib/coupon');             // gift codes: a term given away, never a sale
+const sharedGrants     = require('./lib/shared-grants');     // one paid term, visible on every relay container
 const partyBackfill    = require('./lib/parasign-party-backfill'); // one-shot fill of the party worklist index
 
 // Outbound wire format selector. Default 0 keeps the legacy on-the-wire format;
@@ -2063,7 +2064,137 @@ function setProductPlan(accountId, product, tier, paidUntil, bundle) {
   // This is the ONLY thing that lets a container which has never seen this
   // account mail its owner: users.json is per container, redis is not.
   _indexAccountExpiry(accountId, product);
+  // And into the ONE store all five relay containers share. Everything above
+  // this line is local: the api-key records are in this process, users.json is
+  // on this container's own volume (docker-compose.yml gives every relay a
+  // volume of its own), so without this the term is true on exactly the relay
+  // that happened to serve the request. nginx sends public /v2/ to relay-main,
+  // which is where both customer grant paths land -- the Mollie webhook and
+  // POST /v2/billing/redeem -- while every screen and the ParaSign signature
+  // gate are served off relay-health by the admin plane. See lib/shared-grants.
+  _publishSharedGrant(accountId);
   return { ok: true, product, tier: norm, keys: members.size, changed };
+}
+
+// ── The shared half of a grant (lib/shared-grants) ───────────────────────────
+// Publish what this container now holds for the account, so the other four can
+// hydrate it. Reads the record back rather than trusting the arguments, exactly
+// as _indexAccountExpiry does, so a grant that left one product alone publishes
+// what is really on file for both. Fire-and-forget: a redis outage may delay the
+// other containers, never the grant itself.
+function _publishSharedGrant(accountId) {
+  if (!redisClient || !redisClient.isReady || !accountId) return;
+  const rec = entitlementRecordOf(accountId);
+  if (!rec) return;
+  Promise.resolve(sharedGrants.publish(redisClient, accountId, rec))
+    .then((r) => {
+      if (!r || r.ok) return;
+      log('warn', 'shared_grant_publish_failed', { account: String(accountId).slice(0, 12), err: r.error });
+    })
+    .catch(e => log('warn', 'shared_grant_publish_failed', { account: String(accountId).slice(0, 12), err: e.message }));
+}
+
+// Apply a shared grant to THIS container's own records: every member key, the
+// accounts summary, and users.json. After this the local table is the one that
+// answers /v2/admin/keys, /v2/admin/entitlements and the signs_month gate, so
+// nothing downstream needs to know that the term was granted elsewhere.
+//
+// Never publishes. This is the read side of the same row, and a hydration that
+// published would have five containers writing each other's messages forever.
+//
+// Never downgrades either: sharedGrants.applyTo is entitlements
+// .mergeProductGrantInto, which copies a grant only when it beats the one on
+// file. An account this container has no key for is skipped; it will be picked
+// up by the reseed once the admin key fan-out has reached this sector.
+function _hydrateSharedGrant(accountId, grant) {
+  if (!accountId || !grant) return [];
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  if (members.size === 0) return [];
+  // Decide once, against the account's best current grant, so five member keys
+  // do not each answer the question differently.
+  const merged = { ...(entitlementRecordOf(accountId) || {}) };
+  const moved = sharedGrants.applyTo(merged, grant);
+  if (moved.length === 0) return [];
+  for (const product of moved) {
+    const tier = merged[entitlements.PRODUCT_PLAN_FIELD[product]];
+    const paidUntil = merged[entitlements.PRODUCT_PAID_UNTIL_FIELD[product]] || null;
+    const bundle = merged[entitlements.PRODUCT_BUNDLE_FIELD[product]] || null;
+    for (const m of members) {
+      const mv = apiKeys.get(m);
+      if (mv) entitlements.applyProductTier(mv, product, tier, paidUntil, bundle);
+    }
+    const acct = accounts.get(accountId);
+    if (acct) {
+      entitlements.applyProductTier(acct, product, tier, paidUntil, bundle);
+      acct.plan_updated = new Date().toISOString();
+    }
+    _mutateUsersJson(ud => {
+      for (const entry of ud.api_keys) {
+        if ((entry.account_id || entry.key) === accountId) {
+          entitlements.applyProductTier(entry, product, tier, paidUntil, bundle);
+          entry.plan_updated = new Date().toISOString();
+        }
+      }
+      ud.updated = new Date().toISOString();
+    }).catch(we => log('warn', 'shared_grant_persist_failed', { err: we.message }));
+  }
+  log('info', 'shared_grant_hydrated', {
+    account: String(accountId).slice(0, 12), products: moved.join(','), keys: members.size });
+  return moved;
+}
+
+// Pull one account's shared grant and apply it. Used by the subscriber.
+async function _pullSharedGrant(accountId) {
+  if (!redisClient || !redisClient.isReady || !accountId) return [];
+  const grant = await sharedGrants.read(redisClient, accountId);
+  if (!grant) return [];
+  return _hydrateSharedGrant(accountId, grant);
+}
+
+// One reconciliation pass, both directions, over the accounts that have a term.
+// Runs shortly after boot and then on a slow timer. This is the net under the
+// channel, and it is what makes the mechanism safe rather than clever: a
+// container that was down for the deploy, a subscriber that lost its socket, a
+// message published while this process was still loading users.json -- all of
+// them heal here, without anybody noticing and without a customer having to
+// redeem twice.
+//
+// THE OUTBOUND HALF IS NOT OPTIONAL, and it is the half that matters on the day
+// this ships. Every term granted BEFORE this existed lives only on the container
+// that granted it and has no shared row at all, so a pass that only pulled would
+// leave exactly the customers this change is for -- the ones already holding a
+// term nobody else can see -- untouched until they bought a second one.
+//
+// It can only ever improve a row. What is published is the shared row with this
+// container's own grant merged INTO it (mergeProductGrantInto, so a lesser local
+// term changes nothing), never the local record on its own. Without that, five
+// containers with five different views would take turns overwriting each other
+// and the row would end up carrying whichever one happened to boot last.
+async function _reseedSharedGrants() {
+  if (!redisClient || !redisClient.isReady) return 0;
+  let rows = [];
+  try { rows = await sharedGrants.readAll(redisClient); }
+  catch (e) { log('warn', 'shared_grant_reseed_failed', { err: e.message }); return 0; }
+  const shared = new Map(rows.map((r) => [r.accountId, r.grant]));
+
+  // Outbound: what this container holds that the shared row does not.
+  for (const { accountId, record } of accountsWithTerms()) {
+    const local = sharedGrants.grantOf(record);
+    if (!local) continue;
+    const merged = { ...(shared.get(accountId) || {}) };
+    if (sharedGrants.applyTo(merged, local).length === 0) continue;
+    const out = await sharedGrants.publish(redisClient, accountId, merged);
+    if (!out.ok) { log('warn', 'shared_grant_publish_failed', { account: String(accountId).slice(0, 12), err: out.error }); continue; }
+    shared.set(accountId, sharedGrants.grantOf(merged));
+    log('info', 'shared_grant_seeded', { account: String(accountId).slice(0, 12) });
+  }
+
+  // Inbound: what the shared row holds that this container does not.
+  let hydrated = 0;
+  for (const [accountId, grant] of shared) {
+    if (_hydrateSharedGrant(accountId, grant).length) hydrated++;
+  }
+  return hydrated;
 }
 
 // Mirror one product's paid period into the redis expiry index (lib/plan-expiry).
@@ -8215,6 +8346,57 @@ planExpiry.startPlanExpiryPlanner({
   siteUrl: process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL,
   seed: () => planExpiry.seedIndex(redisClient, accountsWithTerms()),
 });
+
+// ── Paid terms granted on another container ──────────────────────────────────
+// The half of a grant that is not this container's own (lib/shared-grants). A
+// term bought or redeemed on relay-main has to be true on relay-health too,
+// because that is the relay the account page, the homepage figure and the
+// ParaSign signature gate are all served from.
+//
+// Two mechanisms, on purpose. The CHANNEL is what makes it immediate: the
+// customer redeems a code and reloads the page a second later, and a mechanism
+// that took a minute to catch up would show him the same "Community, free for
+// good" that this whole change exists to end. The RESEED is what makes it
+// reliable: a container that was down for the deploy, or a subscriber whose
+// socket dropped, heals on the next pass instead of staying wrong until
+// somebody notices.
+//
+// The subscriber is its own connection because a subscribed node-redis client
+// can run nothing else, and a raw one because the deadline guard on the shared
+// client bounds single commands and has no business wrapping a subscription
+// that is meant to stay open.
+const SHARED_GRANT_RESEED_MS = 60_000;
+if (redisClient && RELAY_REDIS_URL) {
+  // One pass at a time. The pass reads redis once per granted account, so on a
+  // large estate a slow store could otherwise start a second pass on top of the
+  // first and have the two publish over each other.
+  let reseeding = false;
+  const seedOnce = () => {
+    if (reseeding) return Promise.resolve();
+    reseeding = true;
+    return _reseedSharedGrants()
+      .then((n) => { if (n) log('info', 'shared_grants_reseeded', { hydrated: n }); })
+      .catch(e => log('warn', 'shared_grant_reseed_failed', { err: e.message }))
+      .finally(() => { reseeding = false; });
+  };
+  // A short delay so the first pass runs after loadUsers and after the client
+  // has had a chance to connect; a container with nothing to hydrate pays one
+  // SMEMBERS for it.
+  setTimeout(seedOnce, 2000).unref?.();
+  setInterval(seedOnce, SHARED_GRANT_RESEED_MS).unref?.();
+
+  const subscriber = createClient({ url: RELAY_REDIS_URL, ...redisDeadlines.redisClientBounds() });
+  subscriber.on('error', (err) => log('warn', 'shared_grant_subscriber_error', { err: err.message }));
+  subscriber.connect()
+    .then(() => subscriber.subscribe(sharedGrants.CHANNEL, (message) => {
+      const accountId = String(message || '').trim();
+      if (!accountId) return;
+      _pullSharedGrant(accountId)
+        .catch(e => log('warn', 'shared_grant_pull_failed', { account: accountId.slice(0, 12), err: e.message }));
+    }))
+    .then(() => log('info', 'shared_grant_subscriber_ready', { channel: sharedGrants.CHANNEL }))
+    .catch(e => log('warn', 'shared_grant_subscriber_failed', { err: e.message }));
+}
 
 // ── The party worklist migration ─────────────────────────────────────────────
 // One run, ever, across the estate: fill the per-party envelope index for the
