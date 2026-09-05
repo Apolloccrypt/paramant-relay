@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **97 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **162 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **167 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -114,6 +114,11 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `CLEVERBASE_SANDBOX` | `tests/qes-cleverbase-live.test.mjs` | `test op '1'` | zet de live QES-suite aan; staat in geen enkele workflow, draait dus nergens |
 | `DEV_PORT` | `scripts/dev-local-proxy.js` | `'8080'` | poort van de dev-proxy |
 | `FLEET_LIVE` | `tests/verify-knows-the-fleet.test.mjs` | geen | zet de test aan die de gepinde sleutels tegen de live relays houdt; staat in geen enkele workflow, draait dus nergens |
+| `GH_TOKEN` | `scripts/guards-live.mjs` | valt terug op `GITHUB_TOKEN`, dan leeg | token waarmee de waarborgcontrole de GitHub-API leest |
+| `GITHUB_OUTPUT` | `scripts/guards-live.mjs` | geen | pad waar de waarborgcontrole zijn uitkomst voor de workflow neerlegt; ontbreekt hij, dan schrijft hij niets en meldt dat niet |
+| `GITHUB_REPOSITORY` | `scripts/guards-live.mjs` | `'Apolloccrypt/paramant-relay'` | welke repo de waarborgcontrole bekijkt |
+| `GITHUB_TOKEN` | `scripts/guards-live.mjs` | `''` | de terugval van `GH_TOKEN` |
+| `GUARDS_ENFORCE` | `scripts/guards-live.mjs` | geen, test op `'1'` | zonder deze meldt de waarborgcontrole een stille waarborg wel, maar kleurt de taak niet rood |
 | `GITHUB_RUN_ID` | `scripts/heartbeat/lib.mjs`, `scripts/heartbeat/run.mjs` | geen | runnummer in het heartbeat-bewijs |
 | `GITHUB_SHA` | `scripts/heartbeat/lib.mjs` | geen | commit in het heartbeat-bewijs |
 | `GITHUB_STEP_SUMMARY` | `scripts/heartbeat/run.mjs` | geen | pad waar de heartbeat zijn samenvatting schrijft |
