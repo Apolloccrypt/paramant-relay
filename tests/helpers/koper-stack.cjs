@@ -37,6 +37,29 @@ const fakeResend = require('./fake-resend.cjs');
 const children = new Set();
 const dirs = new Set();
 
+// The redis client, from whichever tree has it. It was a hard path into
+// admin/node_modules, which is true in a checkout where `npm ci` has run in
+// admin/ and false everywhere else: in CI that read as
+// "Cannot find module .../admin/node_modules/redis" and took nine checks down
+// at once. Both service trees ship it and the root may too, so ask all three
+// and say plainly what is missing rather than naming one path that happened to
+// work on one machine.
+function requireRedis() {
+  const tries = [
+    path.join(ROOT, 'admin', 'node_modules', 'redis'),
+    path.join(ROOT, 'relay', 'node_modules', 'redis'),
+    'redis',
+  ];
+  for (const one of tries) {
+    try { return require(one); } catch (_) { /* next */ }
+  }
+  throw new Error(
+    'the redis client is not installed. This suite boots a real relay.js and a '
+    + 'real admin server, so it needs `npm ci` in admin/ and `npm install` in '
+    + 'relay/ (which also file-links @paramant/core), plus a reachable redis in '
+    + 'REDIS_URL. See the relay-crypto-tests job in .github/workflows/test.yml.');
+}
+
 function freePort() {
   return new Promise((resolve, reject) => {
     const srv = net.createServer();
@@ -80,7 +103,7 @@ async function start(opts = {}) {
 
   const redisUrl = redisUrlWithDb(process.env.REDIS_URL || 'redis://127.0.0.1:6379', REDIS_DB);
   // Wipe our own database, never anyone else's.
-  const { createClient } = require(path.join(ROOT, 'admin', 'node_modules', 'redis'));
+  const { createClient } = requireRedis();
   const rc = createClient({ url: redisUrl });
   await rc.connect();
   await rc.flushDb();

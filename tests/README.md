@@ -20,6 +20,7 @@ Guards the auth + TOTP stack against the class of breakage that hit production r
 | `tests/heartbeat-lib.test.mjs` | Root integration suites | Guards the hourly monitor itself: the ML-DSA-65 argument order (a swapped one throws rather than returning false), the recipe-v4 sign message, that `runStep` fails a step which recorded no evidence, that a missing secret is a named failure and never a skip, and that a dry run cannot exit 0. Nothing watched `scripts/heartbeat/` before this |
 | `tests/test_directie_signalen.py` | by hand | The directie signals (`scripts/directie/signalen.py`) with a stubbed `gh`: both states of the hourly heartbeat (off gives one orange signal, on reads surface, parasend and parasign out of the run's evidence artifact), plus every case where a green tick would not be earned: an expired or missing artifact, a dry run, an outcome older than two hours, and a run that failed outside the three proof steps. No network |
 | `tests/crypto-claims.test.mjs` | Root integration suites | Every claim on the site about a cryptographic algorithm, against what the code does with it. The facts are read out of `crypto-wasm/src/lib.rs`, `relay/crypto/bootstrap.js`, `relay/crypto/impls/*.js`, `frontend/js/parashare.page.js`, `frontend/vault.js` and `extensions/shared/paramant-core.js` at run time, so a block whose footing moves fails rather than passing quietly. Eight rules: the per-client register on /crypto-agility matches each client's source; the encryption is never called post-quantum without saying it is hybrid; no page says a sent file is signed while neither send path signs; no page claims the pre-shared secret protects the ciphertext; no page has the whole NIST suite running while core mode loads two algorithms; no page dates an algorithm earlier than the CHANGELOG does; no page names a primitive no source file contains; /vault does not borrow the post-quantum story. Link-preview text (meta, og, twitter, JSON-LD) counts as what a page says, because that is where four copies of "post-quantum encryption end to end" lived and where the two existing claim gates never looked |
+| `tests/koper-hele-weg.test.mjs` | test.yml job `relay-crypto-tests`, step `The whole way of a paying customer` (selected by `browser-suites.mjs --stack`) | The whole path of a paying customer in a real browser against a real backend: two relay.js processes (main and health, each with its own users.json, as in production), the admin server, the frontend behind the dev proxy, redis, and a virtual WebAuthn authenticator. Only api.mollie.com and api.resend.com are stand-ins, reached by redirecting the https layer, so `lib/mollie.js`, the checkout route and the webhook route run untouched and the payment is made by clicking Betaal rather than by calling the webhook by hand. Nine checks: the till charges what the button says, the four screens agree afterwards, both relays know the same right and it is what the plan promises, the buyer can use what the plan sells him, the invoice adds up and its number runs on, cancelling really stops the collection, a refund produces a credit note that matches, a chargeback removes the right on BOTH relays, and the term ends the way the site announces. Written for poort 6 of the sellable list, after five measured gaps of which the worst was a chargeback that relay-health undid one second later by reseeding its own still-paid record |
 | `tests/auth-smoke.sh` | `deploy.sh` step 4 | 21 live HTTP assertions against production |
 | `deploy.sh` | manual deploy | Chains: sanity → build → health wait → smoke |
 | `tests/version-consistency.test.mjs` | Root integration suites | One version in one place: root `package.json` versus the relay and admin packages, both lockfiles, both image labels, the `VERSION` read in `relay.js`, the CHANGELOG section and the deploy check. Four places once gave three answers; see [docs/RELEASE.md](../docs/RELEASE.md) |
@@ -70,7 +71,7 @@ browser suites it selects are the same sixteen minus this one:
 
 ```bash
 # What the sign-e2e Browser suites step runs:
-node scripts/browser-suites.mjs --browser | grep -vE 'sign-full|product-heartbeat'
+node scripts/browser-suites.mjs --browser-no-stack | grep -vE 'sign-full|product-heartbeat'
 ```
 
 ### Which half a suite belongs to is decided by the import graph
@@ -93,6 +94,33 @@ dependency takes its suites with it on the next run, with no list to keep.
 The rule this leaves behind: a file under `tests/` is a gate and asserts
 something. A file that only produces artefacts belongs in `scripts/`, whether or
 not it drives a browser.
+
+### A browser is not the only thing a suite can need
+
+The same blind spot came back one question further along on 2026-09-05.
+`tests/koper-hele-weg.test.mjs` drives a browser AND boots two real relay.js
+processes plus the admin server, and sign-e2e is self-contained on purpose: it
+serves `frontend/`, stubs `/api`, and installs no relay dependencies, no
+`@paramant/core` and no redis. Importing playwright was enough to send it to the
+one job that could not possibly run it, and all nine of its checks failed with
+`Cannot find module .../admin/node_modules/redis`.
+
+So the walk answers a second question. A suite needs the full stack when
+anything it reaches names `relay.js` as a process to spawn, which is the honest
+signal and lives in the helper rather than in a list:
+
+```bash
+node scripts/browser-suites.mjs --browser-no-stack   # sign-e2e, stubbed backend
+node scripts/browser-suites.mjs --stack              # test.yml relay-crypto-tests
+```
+
+Those two partition the browser suites, so a suite cannot fall out of both, and
+the `--stack` step fails when its list comes back empty rather than reporting
+green over nothing. The full-stack suite runs in `relay-crypto-tests` because
+that is the only job that builds `@paramant/core` and has a redis service, for
+the same reason the route suites live there. It takes its own redis database
+(`KOPER_REDIS_DB`, 11) and flushes only that one, so it shares a server with the
+route suites without sharing a keyspace.
 
 ### Every screenshot goes through one helper
 

@@ -15,24 +15,7 @@ on:
 jobs:
   sign-e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # tests/koper-hele-weg.test.mjs walks a paying customer from checkout to
-    # credit note against TWO real relay.js processes, and everything that makes
-    # that path work -- the entitlement row the relays share, the invoice
-    # numbering, the expiry index -- lives in redis. Without a server that suite
-    # cannot run at all, and the bug it exists for is invisible on one relay.
-    services:
-      redis:
-        image: redis:7.4.8-alpine
-        ports:
-          - 6399:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-    env:
-      REDIS_URL: redis://127.0.0.1:6399
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7
@@ -71,5 +54,14 @@ jobs:
       # browser from scripts/ui-contrast-sweep.mjs, so the grep left it out of
       # this step and handed it to the job that installs no Chromium, where it
       # hung the run rather than failing it.
+      #
+      # --browser-no-stack, not --browser. A suite that also BOOTS a relay needs
+      # this job's opposite: the relay's node_modules, the @paramant/core
+      # binding, the admin dependencies and a redis server, none of which this
+      # workflow installs and none of which it should. On 2026-09-05
+      # koper-hele-weg landed here on the strength of importing playwright and
+      # failed nine times over with "Cannot find module admin/node_modules/redis".
+      # It runs in relay-crypto-tests, the job that builds a backend. The two
+      # lists partition the browser suites, so nothing falls between them.
       - name: Browser suites
-        run: node --test $(node scripts/browser-suites.mjs --browser | grep -vE 'sign-full|product-heartbeat')
+        run: node --test $(node scripts/browser-suites.mjs --browser-no-stack | grep -vE 'sign-full|product-heartbeat')
