@@ -233,8 +233,8 @@ export async function meet(root = ROOT) {
     } catch (e) { h.fout = String(e.message || e); }
     try {
       const r = await haal('http://' + naam + '/');
-      h.klaarhttp = { status: r.status, server: r.koppen.server, location: r.koppen.location };
-    } catch (e) { h.klaarhttp = { fout: String(e.message || e) }; }
+      h.viaHttp = { status: r.status, server: r.koppen.server, location: r.koppen.location };
+    } catch (e) { h.viaHttp = { fout: String(e.message || e) }; }
     if (v.sector) {
       try {
         const r = await haal('https://' + naam + '/health');
@@ -360,8 +360,8 @@ export function vergelijk(verw, meting) {
     zeg(naam, 'staat achter ' + rand.naam, rand.viaKop, m.via, rand.bron, m.via === rand.viaKop);
     zeg(naam, 'wordt bediend door nginx', 'nginx', m.server, PUBLIEKE_CONF, m.server === 'nginx');
     zeg(naam, 'stuurt http door naar https', String(rand.httpStatus) + ' via ' + rand.naam,
-      (m.klaarhttp || {}).status + ' via ' + (m.klaarhttp || {}).server, rand.bron,
-      (m.klaarhttp || {}).status === rand.httpStatus && (m.klaarhttp || {}).server === rand.serverKop);
+      (m.viaHttp || {}).status + ' via ' + (m.viaHttp || {}).server, rand.bron,
+      (m.viaHttp || {}).status === rand.httpStatus && (m.viaHttp || {}).server === rand.serverKop);
 
     if (v.hsts) zeg(naam, 'zet HSTS zoals de conf zegt', v.hsts, m.hsts,
       PUBLIEKE_CONF, (m.hsts || '').includes(v.hsts));
