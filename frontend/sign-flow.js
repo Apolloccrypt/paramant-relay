@@ -3277,7 +3277,7 @@ function showDoneInvite(r) {
     line: emailPartial
       ? 'Some notices were not delivered. Retry below. Either way each signer still needs their link from you.'
       : emailOk
-        ? 'The email is a notice and carries no key. The link below does, so send each person theirs.'
+        ? 'The email is a notice and carries no key. Send each person their link below.'
         : 'Each signer has a link of their own below. Send it to them any way you like and follow progress here.',
   });
   const preview = $('ds-signed-preview'); if (preview) preview.hidden = true;
@@ -3328,10 +3328,10 @@ function renderPartyLinks(mp) {
   if (result) {
     if (state.deliveryMode === 'copy') {
       result.hidden = false; result.className = 'ds-banner';
-      result.textContent = 'No email was sent. Copy each complete personal link below and send it yourself.';
+      result.textContent = 'No email was sent. Send each person their link yourself.';
     } else if (state.inviteDelivery?.ok) {
       result.hidden = false; result.className = 'ds-banner ok';
-      result.textContent = 'All notices were delivered to the mail provider. Now send each person their link below.';
+      result.textContent = 'All notices were delivered. Now send each person their link.';
     } else if (state.inviteDelivery) {
       const failedCount = state.inviteDelivery.failed_party_indexes?.length || 0;
       result.hidden = false; result.className = 'ds-banner err';

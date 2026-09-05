@@ -143,7 +143,7 @@ ok('document is uploaded once as an encrypted capsule', documentUploads.length =
 ok('the posted invitation carries no document key', firstUrl && firstUrl.hash === '' && !firstInvite.invite_url.includes('#'), firstInvite?.invite_url);
 ok('the posted invitation still names the request itself', firstUrl?.pathname === '/co-sign' && firstUrl?.searchParams.get('env') === ENV_ID && /^t{43}$/.test(firstUrl?.searchParams.get('t') || ''), firstUrl?.href);
 ok('the sender is shown the complete link, key and all', /#doc=v1\.[A-Za-z0-9_-]{43}$/.test((await page.locator('.ds-pl-url').first().getAttribute('title')) || ''), await page.locator('.ds-pl-url').first().getAttribute('title'));
-ok('the screen says the sender has to hand that link over', /now send them the links|send each person theirs|why it is not in the email/i.test(await page.locator('#step-done').innerText()), await page.locator('#step-done').innerText().then((t) => t.slice(0, 220)));
+ok('the screen says the sender has to hand that link over', /now send them the links|send each person their link|needs their link from you|the key is in the link/i.test(await page.locator('#step-done').innerText()), await page.locator('#step-done').innerText().then((t) => t.slice(0, 220)));
 ok('email invitation is bound to the intended party and address', firstInvite?.party_index === 0 && firstInvite?.email === 'signer@example.com', JSON.stringify(firstInvite));
 ok('partial email failure is not shown as success', /not every notice was delivered/i.test(await page.locator('#ds-success-banner').innerText()), await page.locator('#ds-success-banner').innerText());
 ok('failed email offers a retry', await page.locator('#ds-invite-retry').isVisible(), await page.locator('#ds-invite-retry').innerText());
