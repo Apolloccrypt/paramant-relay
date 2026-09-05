@@ -286,6 +286,47 @@ jobs:
           silent=$(grep -oE '^# [a-z0-9-]+: SKIPPED - 0 checks ran' /tmp/admin-timing.log || true)
           if [ -n "$silent" ]; then echo "silent suite(s):"; echo "$silent"; exit 1; fi
 
+      # THE WHOLE WAY OF A PAYING CUSTOMER, in a real browser against a real
+      # backend (tests/koper-hele-weg.test.mjs). It boots TWO relay.js
+      # processes (main and health, each with its own users.json, as in
+      # production) plus the admin server behind the dev proxy, because the bug
+      # poort 6 exists for -- rights granted on the relay that took the money
+      # and read from the relay every screen is served off -- is invisible on
+      # one relay.
+      #
+      # It lives here and not in sign-e2e for the same reason the route suites
+      # live here: relay.js requires `redis` and @paramant/core at load, and
+      # this is the only job that builds both. sign-e2e is self-contained by
+      # design and installs neither. The suite selects itself into this step
+      # (scripts/browser-suites.mjs --stack, which walks the imports and asks
+      # whether anything the suite reaches spawns relay.js), so the two lists
+      # partition the browser suites and a new full-stack suite lands here on
+      # the run after the commit.
+      #
+      # Root deps for playwright; the browser is a separate install, as in
+      # sign-e2e. The relay and admin dependencies are already installed above.
+      - name: Install root deps (playwright)
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: The whole way of a paying customer (browser + a real backend)
+        env:
+          REDIS_URL: redis://127.0.0.1:6399
+        run: |
+          set -o pipefail
+          suites=$(node scripts/browser-suites.mjs --stack)
+          # An empty list here would be a green step over nothing, which is the
+          # exact failure this workflow keeps writing comments about.
+          if [ -z "$suites" ]; then
+            echo "::error::no full-stack browser suite was selected. Either the"
+            echo "suite was removed or the selector stopped recognising it."
+            exit 1
+          fi
+          echo "full-stack browser suites: $suites"
+          node --test $suites
+
   relay-unit-tests:
     name: relay - unit suite (no native deps)
     runs-on: ubuntu-latest

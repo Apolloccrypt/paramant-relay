@@ -2264,6 +2264,28 @@ function productPlanFields(rec) {
   };
 }
 
+// The name of the plan this account is on, in the words the pricing page uses.
+// ONE function, because three places were naming the same plan differently: the
+// account page said FIRM PLAN, this API said "community", and the cancellation
+// mail said "your Paramant Pro plan" -- to one customer, about one purchase, on
+// the same afternoon. `pro` is Firm because Firm is what /pricing sells that
+// grants it (billing-catalog ON_SALE); a legacy ParaSign Pro buyer sees the
+// same word his own screens show him.
+const PLAN_NAMES = { pro: 'Firm', business: 'Business', enterprise: 'Enterprise' };
+function effectivePaidTier(fields) {
+  const live = (plan, until) => (plan && plan !== 'free' && plan !== 'community'
+    && (!until || Date.parse(until) > Date.now())) ? plan : null;
+  const order = ['enterprise', 'business', 'pro'];
+  const held = [live(fields.plan_parasign, fields.paid_until_parasign),
+    live(fields.plan_parasend, fields.paid_until_parasend)].filter(Boolean);
+  for (const tier of order) if (held.includes(tier)) return tier;
+  return null;
+}
+function planNameOf(fields) {
+  const tier = effectivePaidTier(fields);
+  return tier ? (PLAN_NAMES[tier] || tier) : 'Community';
+}
+
 // GET /api/user/me
 // JSON identity + account-summary endpoint backing the client-side /dashboard.
 // Same authUser cookie middleware as /api/user/account. Returns just what the
@@ -2336,6 +2358,51 @@ api.get("/user/check", authUser, (req, res) => {
 // to login. A valid session that is NOT on the developer allowlist gets 403,
 // which nginx remaps to 404 so the page's existence stays hidden. Allowlisted
 // session -> 200 and nginx serves /developer.html.
+// ── ParaSign /v1 API keys, for the customer who bought them ─────────────────
+// /pricing sells Firm with "a developer API with its own documentation and
+// webhooks, so signing can run inside your own software", and until now a buyer
+// had no way to get a key. The only route that mints one sat behind
+// developerGate, an operator EMAIL ALLOWLIST that answers 404, so the account
+// page's own "Developer settings" link was a dead end for every paying
+// customer. These three are the same relay route with the customer's session
+// instead of the allowlist; the entitlement check stays where it belongs, on
+// the relay (403 parasign_not_entitled for an account with no paid ParaSign
+// tier), so a free account still gets nothing.
+api.post("/user/parasign-keys", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const rr = await callRelay("/v2/user/parasign-keys", { user_id, label: req.body?.label, test: req.body?.test === true }, "POST");
+    const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(rr.status).json(body);
+  } catch (err) {
+    console.error("[user/parasign-keys POST]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+api.get("/user/parasign-keys", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const rr = await callRelay(`/v2/user/parasign-keys?user_id=${encodeURIComponent(user_id)}`, null, "GET");
+    const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(rr.status).json(body);
+  } catch (err) {
+    console.error("[user/parasign-keys GET]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+api.delete("/user/parasign-keys", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const rr = await callRelay("/v2/user/parasign-keys", { user_id, kid: req.body?.kid }, "DELETE");
+    const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(rr.status).json(body);
+  } catch (err) {
+    console.error("[user/parasign-keys DELETE]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
 api.get("/user/developer/check", authUser, (req, res) => {
   if (!isDeveloper(req.userSession.email)) return res.status(403).end();
   res.status(200).end();
@@ -3297,10 +3364,36 @@ api.post("/user/billing/cancel", authUser, async (req, res) => {
     || billing?.next_billing_date
     || new Date(Date.now() + 30 * 86_400_000).toISOString();
   await redis().set(`paramant:user:plan_cancel_at:${user_id}`, cancelAt);
-  await logAuditEvent(user_id, 'plan_cancellation_scheduled', { cancel_at: cancelAt, plan: billing?.plan || 'pro', via: 'user_request' });
-  try { await sendCancellationScheduled(email, billing?.plan || 'pro', cancelAt); }
+  // STOP THE COLLECTION. This used to write the marker above, send the mail
+  // below and stop, so "Cancellation scheduled" was a note to ourselves. With
+  // BILLING_MODE set, checkout opens a Mollie mandate and a subscription, and
+  // nothing here ever told Mollie to stop: the customer read that his plan was
+  // cancelled and was charged again the following month. The relay owns the
+  // Mollie side (POST /v2/billing/cancel, which cancels the NEXT collection and
+  // leaves the paid term running), and it answers 'noop' when there is no
+  // subscription, which is what a one-off deployment gets.
+  let stopped = null;
+  try {
+    // SECTORS.main, niet health. De Mollie-aanwijzers (mollie_customer_id en
+    // mollie_subscription_*) worden door de webhook geschreven, en nginx stuurt
+    // publiek /v2 naar relay-main, dus daar staan ze. Een cancel naar health
+    // vindt geen abonnement, antwoordt 'noop' en zegt dat er niets te stoppen
+    // was terwijl de incasso doorloopt: exact dezelfde fout, één relay verderop.
+    const rr = await callRelay('/v2/billing/cancel', { user_id }, 'POST', 'main');
+    const rb = await rr.json().catch(() => null);
+    stopped = rb && rb.results ? rb.results : (rb || null);
+    if (!rr.ok) console.error('[billing] relay cancel returned', rr.status, JSON.stringify(rb));
+  } catch (err) {
+    // The marker and the mail have already been written; the customer's
+    // cancellation is not lost because Mollie was slow. Loud, because a
+    // subscription that survives a cancellation is money we may not take.
+    console.error('[billing] relay cancel failed:', err.message);
+  }
+  const planName = planNameOf(productPlanFields(cancelUser));
+  await logAuditEvent(user_id, 'plan_cancellation_scheduled', { cancel_at: cancelAt, plan: planName, via: 'user_request' });
+  try { await sendCancellationScheduled(email, planName, cancelAt); }
   catch (err) { console.error('[billing] cancel email failed:', err.message); }
-  res.json({ scheduled_downgrade_at: cancelAt });
+  res.json({ scheduled_downgrade_at: cancelAt, plan_name: planName, subscription: stopped });
 });
 
 api.get("/user/billing/status", authUser, async (req, res) => {
@@ -3310,6 +3403,18 @@ api.get("/user/billing/status", authUser, async (req, res) => {
   const cancelAt = await redis().get(`paramant:user:plan_cancel_at:${user_id}`);
   const keysRes = await relayFetch("health", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
   const currentKey = (keysRes.body?.keys || []).find(k => k.key === user_id);
+  // Whether a collection stands behind this plan is the ONE thing on this page
+  // that health cannot answer: the Mollie pointers are written by the webhook,
+  // and public /v2 goes to relay-main. Read from health, auto_renews was false
+  // for every customer who did have a subscription. Best effort: a main that
+  // cannot answer leaves the row at whatever health knows rather than failing
+  // the whole page.
+  let renews = !!currentKey?.auto_renews;
+  try {
+    const mainRes = await relayFetch("main", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
+    const mainKey = (mainRes.body?.keys || []).find(k => k.key === user_id);
+    if (mainKey) renews = !!mainKey.auto_renews;
+  } catch (err) { console.error("[billing status] main read failed:", err.message); }
   // What the account page shows about money has to be what actually happened.
   // Two things were wrong here. The record this used to read,
   // paramant:user:billing:<id>, is written by nothing in this codebase, so
@@ -3320,7 +3425,12 @@ api.get("/user/billing/status", authUser, async (req, res) => {
   const fields = productPlanFields(currentKey);
   const accessUntil = termEndOf(fields);
   res.json({
-    current_plan: currentKey?.plan || 'community',
+    // The plan the account is actually on, not the legacy unified `plan` field.
+    // A purchase writes plan_parasign / plan_parasend and deliberately never
+    // touches `plan`, so this said "community" to every paying customer since
+    // billing existed.
+    current_plan: effectivePaidTier(fields) || 'community',
+    plan_name: planNameOf(fields),
     ...fields,
     period: billing?.period || null,
     amount_eur: billing?.amount_eur ?? null,
@@ -3329,7 +3439,8 @@ api.get("/user/billing/status", authUser, async (req, res) => {
     // unless another payment is made, not the day a collection is attempted.
     access_until: accessUntil,
     next_billing_date: billing?.next_billing_date || null,
-    auto_renews: false,
+    // From the relay record, not a constant. See the projection in relay.js.
+    auto_renews: renews,
     cancellation_scheduled_at: cancelAt || null,
   });
 });
