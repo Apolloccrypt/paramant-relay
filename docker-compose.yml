@@ -145,7 +145,16 @@ services:
       SECTOR: "health"
       RELAY_SELF_URL: "https://health.paramant.app"
       RELAY_PRIMARY_URL: "http://localhost:3000"
-      RAM_LIMIT_MB: "8192"
+      # Below the 8g cap above, and it has to be. relay.js:1356 refuses an
+      # upload when rss + 5*(inFlight+1) > RAM_LIMIT_MB + RAM_RESERVE_MB, and
+      # RAM_RESERVE_MB is ADDED there, so the guard trips at the sum of the two.
+      # This was 8192 + 512 = 8704 inside a container capped at 8192, so the
+      # kernel always reached its own limit first: the relay never answered "at
+      # capacity", it vanished mid-upload instead. 6656 + 512 = 7168 leaves a
+      # gigabyte between the guard and the OOM killer, which is the whole point
+      # of having a guard. scripts/check-guards.mjs fails the build if the sum
+      # ever climbs back up to the cap.
+      RAM_LIMIT_MB: "6656"
       RAM_RESERVE_MB: "512"
     ports:
       - "127.0.0.1:3001:3000"

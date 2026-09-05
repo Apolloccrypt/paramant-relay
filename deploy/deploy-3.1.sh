@@ -161,7 +161,15 @@ HOSTS="paramant.app health.paramant.app legal.paramant.app finance.paramant.app 
 #                       those is a statement about the DNS zone or the server,
 #                       not about whether main deploys. Same reasoning as
 #                       heartbeat.yml, one row up.
-REQUIRED_WORKFLOWS="${PARAMANT_REQUIRED_WORKFLOWS:-test.yml csp-inline-check.yml sign-e2e.yml product-heartbeat.yml}"
+#
+# guards.yml IS in the list, unlike the two above, and the difference is worth
+# stating. On a push to main it runs only its static half: every way a gate could
+# be silenced is declared, and every declaration still real. That is a statement
+# about this repository, and it is answerable from the checkout alone. Its live
+# half, which reads whether the switched-off guards have actually run, is set to
+# report rather than fail on anything but the daily schedule, so a deploy is
+# never blocked by a switch that only Mick can turn on.
+REQUIRED_WORKFLOWS="${PARAMANT_REQUIRED_WORKFLOWS:-test.yml csp-inline-check.yml sign-e2e.yml product-heartbeat.yml guards.yml}"
 
 # A required workflow still in_progress or queued on the sha we would deploy is
 # neither a pass nor a failure: it is an answer that has not arrived. The old
