@@ -46,7 +46,7 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 
 | knop | waar | wat er stil gebeurt |
 |---|---|---|
-| `client_max_body_size` | `deploy/nginx-paramant-public.conf`, `nginx-selfhost.conf`, `deploy/nginx/addin.paramant.app.conf` | nginx neemt zijn eigen 1 MB, zonder waarschuwing. Dit is hoe de limiet onzichtbaar werd |
+| `client_max_body_size` | `nginx-selfhost.conf`, `deploy/nginx/addin.paramant.app.conf` | nginx neemt zijn eigen 1 MB, zonder waarschuwing. Dit is hoe de limiet onzichtbaar werd. `deploy/nginx-paramant-public.conf` had hem tot d8bf7a71 ook niet en zet nu 12M |
 | `HEARTBEAT_ENABLED` | `.github/workflows/heartbeat.yml:56` | de variabele bestaat niet, de taak slaat over, de run is groen |
 | `FLEET_LIVE` | `tests/verify-knows-the-fleet.test.mjs:320` | de test die de gepinde sleutels tegen de live relays houdt, staat in geen enkele workflow en heeft dus nooit gedraaid |
 | `CLEVERBASE_SANDBOX` | `tests/qes-cleverbase-live.test.mjs:31` | de hele QES-suite slaat over, overal |
@@ -242,15 +242,15 @@ deze regels doorbreken.
 
 | bestand | richtlijn | waarde |
 |---|---|---|
-| `deploy/nginx-paramant-live.conf` | `client_max_body_size` | `4k / 64k / 16k / 16k / 50M / 30M / 35M` |
+| `deploy/nginx-paramant-live.conf` | `client_max_body_size` | `4k / 64k / 16k / 16k / 50M / 30M / 12M / 35M / 12M / 12M / 12M` |
 | `deploy/nginx-paramant-live.conf` | `limit_req_zone` | `afwezig` |
 | `deploy/nginx-paramant-live.conf` | `limit_conn` | `afwezig` |
-| `deploy/nginx-paramant-live.conf` | `proxy_read_timeout` | `3600s / 3600s` |
+| `deploy/nginx-paramant-live.conf` | `proxy_read_timeout` | `3600s / 3600s / 3600s / 3600s / 3600s` |
 | `deploy/nginx-paramant-live.conf` | `client_body_timeout` | `afwezig` |
-| `deploy/nginx-paramant-public.conf` | `client_max_body_size` | `afwezig` |
+| `deploy/nginx-paramant-public.conf` | `client_max_body_size` | `12M / 12M / 12M / 12M / 12M / 12M` |
 | `deploy/nginx-paramant-public.conf` | `limit_req_zone` | `afwezig` |
 | `deploy/nginx-paramant-public.conf` | `limit_conn` | `afwezig` |
-| `deploy/nginx-paramant-public.conf` | `proxy_read_timeout` | `3600s / 30s / 3600s / 3600s` |
+| `deploy/nginx-paramant-public.conf` | `proxy_read_timeout` | `3600s / 3600s / 3600s / 3600s / 3600s / 30s / 3600s / 3600s / 3600s` |
 | `deploy/nginx-paramant-public.conf` | `client_body_timeout` | `300s` |
 | `deploy/nginx-selfhost.conf` | `client_max_body_size` | `35M / 35M` |
 | `deploy/nginx-selfhost.conf` | `limit_req_zone` | `$binary_remote_addr zone=inbound:10m rate=5r/m / $binary_remote_addr zone=pubkey:10m rate=20r/m / $binary_remote_addr zone=auth:10m rate=10r/m / $binary_remote_addr zone=api:10m rate=60r/m / $binary_remote_addr zone=health_chk:10m rate=6r/m / $binary_remote_addr zone=sign_dpa:1m rate=3r/m` |
@@ -281,8 +281,9 @@ deze regels doorbreken.
 ## Constanten die instellingen zijn
 
 Een getal dat bepaalt wat het product doet is een instelling, of hij nu uit de omgeving
-te veranderen is of niet. Deze zijn gepind: verander er een zonder deze pagina bij te
-werken en de controle valt om.
+te veranderen is of niet. Deze zijn gepind op bestand, naam, waarde en aantal: `x3` betekent dat het getal op
+drie regels hoort te staan. Verander er een zonder deze pagina bij te werken en de
+controle valt om.
 
 <!-- knoppen:constanten -->
 
@@ -290,10 +291,10 @@ werken en de controle valt om.
 |---|---|---|---|
 | `relay/relay.js` | `MAX_BLOB` | `5242880` | de enige instelbare bovengrens per blob, 5 MB; niet in enige compose environment-blok, dus in productie altijd deze |
 | `relay/relay.js` | `readBody` | `MAX_BLOB * 2` | de werkelijke globale body-grens, 10 MB; afgeleid, niet los instelbaar |
-| `relay/relay.js` | `BLOB_SIZE_MB` | `5` | de RAM-bewaking rekent met 5 MB per slot; verhoog MAX_BLOB en deze blijft staan |
+| `relay/relay.js` | `BLOB_SIZE_MB` | `5 x2` | de RAM-bewaking rekent met 5 MB per slot; verhoog MAX_BLOB en deze blijft staan |
 | `relay/relay.js` | `ANON_MAX` | `5 * 1024 * 1024` | eigen 5 MB voor de anonieme route, niet van MAX_BLOB afgeleid |
 | `relay/relay.js` | `TRIAL_MAX_SIZE` | `5 * 1024 * 1024` | eigen 5 MB voor de proefroute, niet van MAX_BLOB afgeleid |
-| `relay/lib/tiers.js` | `file_mb` | `: 5,` | driemaal 5 MB in de tarieftabel, met een commentaar dat zegt dat het MAX_BLOB spiegelt |
+| `relay/lib/tiers.js` | `file_mb` | `: 500, x3` | de tarieftabel verkoopt 500 MB per bestand; sinds d8bf7a71 is dit bewust niet meer hetzelfde getal als MAX_BLOB, en het bestand zegt dat er zelf bij |
 | `frontend/js/parashare.page.js` | `LINK_MAX_BLOB` | `5 * 1024 * 1024` | dezelfde 5 MB, nu in de browser |
 | `extensions/shared/paramant-core.js` | `PADDED_BLOCK` | `5 * 1024 * 1024` | hier is 5 MB wel een blokgrootte en geen grens; dit is de opvulling |
 | `relay/lib/qes/pades.js` | `DEFAULT_CONTENTS_BYTES` | `16384` | de echte reserveringsgrootte in het PDF-handtekeningveld; geen grens |
@@ -305,11 +306,11 @@ werken en de controle valt om.
 | `relay/relay.js` | `COMMUNITY_KEY_LIMIT` | `5` | vaste licentiegrens, bewust niet instelbaar |
 | `relay/lib/auth-throttle.js` | `FAIL_THRESHOLD` | `10` | aantal mislukkingen voor de vertraging inzet; staat ook in admin/lib/login-ratelimit.js |
 | `relay/lib/redis-deadline.js` | `DEFAULT_DEADLINE_MS` | `1000` | geexporteerde constante; de functie ernaast geeft een los getypte 1000 terug |
-| `relay/envelope.js` | `DEFAULT_TTL_DAYS` | `30` | bewaartermijn van een envelop; parasign-store telt zijn eigen 30 dagen |
+| `relay/envelope.js` | `DEFAULT_TTL_DAYS` | `30 x2` | bewaartermijn van een envelop; parasign-store telt zijn eigen 30 dagen |
 | `relay/lib/entitlements.js` | `ENTERPRISE_MONTHLY_CEILING` | `1_000_000` | wat onbeperkt in de praktijk betekent |
 | `admin/lib/audit.js` | `AUDIT_RETENTION_DAYS` | `400` | bewaartermijn van het auditlog; ongecontroleerde parseInt, 0 wist het log |
 | `admin/server.js` | `RELAY_HEALTH` | `3005` | terugvalpoort voor de health-relay; compose luistert op 3000 |
-| `frontend/crypto-bridge.js` | `WASM_SHA256` | `3a5b1a2b` | integriteitspin op de wasm-module |
+| `frontend/crypto-bridge.js` | `WASM_SHA256` | `30f1ae35` | integriteitspin op de wasm-module; verandert bij elke herbouw |
 | `deploy/deploy-3.1.sh` | `EXPECT_VERSION` | `3.1.0` | welke versie de deploy verwacht aan te treffen; niet instelbaar |
 | `deploy/deploy-3.1.sh` | `EXPECT_PROD_COMMIT` | `41501bb` | de startcommit uit het draaiboek |
 | `install.sh` | `PARAMANT_VERSION` | `v3.0.0` | welke tag de zelf-installateur kloont; een minor achter op de deploy |

@@ -248,7 +248,10 @@ function nginxConfs() {
 
 function directiveValues(file, directive) {
   const src = readFileSync(join(ROOT, file), 'utf8');
-  const re = new RegExp(`^\\s*${directive}\\s+([^;]+);`, 'gm');
+  // Not anchored to the line start: deploy/nginx-paramant-public.conf packs a whole
+  // location block onto one line, so `{ client_max_body_size 12M; proxy_pass ...` has
+  // to count too. A line-anchored regex read those files as having no limit at all.
+  const re = new RegExp(`(?:^|[{;])\\s*${directive}\\s+([^;]+);`, 'gm');
   return [...src.matchAll(re)].map((m) => m[1].trim().replace(/\s+/g, ' '));
 }
 
@@ -318,10 +321,18 @@ test('K5 every registered constant still holds the value the registry records', 
       continue;
     }
     const src = readFileSync(join(ROOT, file), 'utf8');
-    // The name and the value must occur on the same line: that is what pins the
-    // constant rather than merely proving both strings live in the file.
-    const hit = src.split('\n').some((l) => l.includes(name) && l.includes(value));
-    if (!hit) wrong.push(`${file}: no line carries both ${name} and ${value}`);
+    // The name and the value must occur on the SAME line, and as often as the
+    // registry says. Counting matters: relay/lib/tiers.js writes file_mb three
+    // times, and a "does it appear at all" check let one of the three be changed
+    // without a word. A `xN` suffix on the value records how many; no suffix means
+    // exactly one.
+    const m = value.match(/^(.*?)\s*x(\d+)$/);
+    const literal = m ? m[1] : value;
+    const want = m ? Number(m[2]) : 1;
+    const got = src.split('\n').filter((l) => l.includes(name) && l.includes(literal)).length;
+    if (got !== want) {
+      wrong.push(`${file}: ${want} line(s) should carry both ${name} and ${literal}, found ${got}`);
+    }
   }
   assert.deepEqual(wrong, [],
     `A constant the registry pins has moved or changed. Update the row in ${REGISTRY} ` +
