@@ -469,13 +469,17 @@ class EnvelopeStore {
       binding_mode: mode,
       recipe_version: recipeVersion,
       party_count: parties.length,
-      // For 'email' envelopes the invite token is part of the link and is also
-      // returned raw so the caller can email it. For 'open' envelopes the link
-      // is the legacy token-free path (byte-identical to before).
+      // The per-party invite token is the capability that binds a slot to the
+      // party allowed to fill it, and it now does that in BOTH modes. It used to
+      // be withheld for 'open' envelopes, and the store asked for no token there
+      // either: whoever learned the envelope id could read any slot, mark it
+      // viewed and sign it in someone else's name. A signature anyone can place
+      // is not a signature, so the token is issued, returned and required
+      // everywhere. The creator receives it once, here, to build the invite.
       party_links: parties.map((_, i) => ({
         party_index: i,
-        sign_path: '/co-sign?env=' + id + '&p=' + i + (mode === 'email' ? '&t=' + inviteTokens[i] : ''),
-        invite_token: mode === 'email' ? inviteTokens[i] : null,
+        sign_path: '/co-sign?env=' + id + '&p=' + i + '&t=' + inviteTokens[i],
+        invite_token: inviteTokens[i],
       })),
     };
   }
@@ -529,6 +533,18 @@ class EnvelopeStore {
     return safeTextEqual(stored, accountId);
   }
 
+  // The account that owns this envelope, as written at create() from the
+  // creating API key. This is the server-side answer to "who is metered for a
+  // signature on this envelope", so no request field can steer the meter.
+  // Returns null when no such envelope exists (the caller keeps that a 404) and
+  // '' for a record written before account_id was stored.
+  async ownerAccountId(id) {
+    if (!this.available()) throw new Error('redis unavailable');
+    const h = await this.redis.hGetAll('env:' + id);
+    if (!h || !h.doc_hash) return null;
+    return h.account_id || '';
+  }
+
   // Constant-time check of a per-party invite token against the stored value.
   async checkInviteToken(id, partyIndex, token) {
     if (!this.available()) throw new Error('redis unavailable');
@@ -542,7 +558,8 @@ class EnvelopeStore {
   // they are a participant of THIS envelope without needing to know their slot
   // index. Constant-time per comparison and it scans every slot (no early
   // return) so the matching position is not timing-distinguishable. Returns the
-  // matching party index, or -1 (open envelopes carry no tokens -> always -1).
+  // matching party index, or -1. Every mode mints per-party tokens, so an open
+  // envelope resolves here exactly like an email-bound one.
   async isParticipantToken(id, token) {
     if (!this.available()) throw new Error('redis unavailable');
     if (typeof token !== 'string' || token.length === 0) return -1;
@@ -905,10 +922,15 @@ class EnvelopeStore {
 
   // Party-scoped view for the co-signer: exactly what the client needs to
   // recompute the sign-message (doc_hash, recipe_version, this party's
-  // email_hash) plus presentation fields. For email-bound envelopes the
-  // per-party invite token MUST match, else this returns null (a generic miss,
-  // so a wrong/absent token is indistinguishable from a non-existent envelope).
-  // For open envelopes the token is not required -- the slot is public by design.
+  // email_hash) plus presentation fields. The per-party invite token MUST match
+  // in EVERY binding mode, else this returns null (a generic miss, so a wrong or
+  // absent token is indistinguishable from a non-existent envelope).
+  //
+  // Open mode used to be exempt, on the reading that its slots were "public by
+  // design". They are not: this view is the gate in front of POST /view, and the
+  // slot behind it is a party's place in a piece of evidence. Without the token
+  // an outsider who knew the id could read every slot and stamp a viewed-at into
+  // the CT log for a party that never opened anything.
   async getForParty(id, partyIndex, token) {
     if (!this.available()) throw new Error('redis unavailable');
     const h = await this.redis.hGetAll('env:' + id);
@@ -917,7 +939,7 @@ class EnvelopeStore {
     const pi = parseInt(partyIndex, 10);
     if (!Number.isInteger(pi) || pi < 0 || pi >= partyCount) return null;
     const mode = h.binding_mode || 'open';
-    if (mode === 'email' && !safeTokenEqual(h['p' + pi + '_invite_token'], token)) return null;
+    if (!safeTokenEqual(h['p' + pi + '_invite_token'], token)) return null;
     const sig = h['p' + pi + '_sig'] || '';
     return {
       id: h.id,
@@ -1086,6 +1108,24 @@ class EnvelopeStore {
       if (signInviteClosed(h.created_at, Date.now())) return { ok: false, code: 'invite_expired' };
       if (!opts.internalTrusted) return { ok: false, code: 'email_binding_required' };
       if (!safeHexEqual(opts.verifiedEmailHash, emailHash)) return { ok: false, code: 'email_mismatch' };
+    } else {
+      // Open mode has no mailbox to bind to, so the per-party invite token IS
+      // the binding: it is minted at create(), handed to the creator once, and
+      // never published by any read path. Requiring it here is the same rule the
+      // email branch enforces one line up, expressed in the only credential this
+      // mode has.
+      //
+      // Until this check existed, sign() asked open slots for NOTHING. The only
+      // binding was recipe v4, which commits the signature to the submitter's own
+      // public key -- that proves the message was signed by the key presented,
+      // and says nothing about whether that key belongs to the named party. So
+      // anyone holding the envelope id could take Alice's slot with their own
+      // key, drive the envelope to 'complete', lock the real Alice out for good
+      // and leave a CT entry recording it as evidence. Fail closed: an absent or
+      // wrong token is a refusal, never a pass.
+      if (!safeTokenEqual(h['p' + pi + '_invite_token'], opts.inviteToken)) {
+        return { ok: false, code: 'invite_token_required' };
+      }
     }
 
     // Verify the signature server-side. The relay only sees doc_hash, id,

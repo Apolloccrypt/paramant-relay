@@ -5371,6 +5371,32 @@ async function handleRelayRequest(req, res) {
       if (INVITE_RE.test(d.device_id)) {
         // Store without API key suffix — readable by any party who knows the session token
         const invFp = computeFingerprint(d.kyber_pub || '', d.ecdh_pub);
+        // FIRST REGISTRATION WINS, the same rule the keyed branch below enforces
+        // and the same rule the session manifest cites as "a property worth
+        // keeping". This branch did not have it: it did an unconditional set, so
+        // anyone who saw the ?s= token in the share link (an access log, browser
+        // history, an extension, the chat the link travelled through) could
+        // overwrite BOTH key slots with their own ECDH and ML-KEM keys after the
+        // honest parties had registered. Sender and receiver would then encrypt
+        // to the attacker, with only a manual fingerprint comparison in the way.
+        // A slot is a one-time capability; once filled it is filled.
+        //
+        // The one thing that must keep working is a refresh: the receiver stores
+        // its keypair in sessionStorage and re-registers the identical keys after
+        // a reload. Byte-identical content is therefore a replay and answers 200
+        // with the same fingerprint. Anything else is a takeover attempt: 409.
+        const heldInvite = pubkeys.get(d.device_id);
+        if (heldInvite && (!heldInvite.expires || Date.now() < heldInvite.expires)) {
+          const same = safeEqual(heldInvite.ecdh_pub || '', String(d.ecdh_pub || ''))
+                    && safeEqual(heldInvite.kyber_pub || '', String(d.kyber_pub || ''));
+          if (!same) {
+            log('warn', 'pubkey_invite_overwrite_refused', { device: d.device_id.slice(0, 12) });
+            res.writeHead(409, { 'Content-Type': 'application/json' });
+            return res.end(J({ error: 'Pubkey already registered for this session: first registration wins' }));
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          return res.end(J({ ok: true, fingerprint: heldInvite.fingerprint }));
+        }
         pubkeys.set(d.device_id, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', fingerprint: invFp, ts: new Date().toISOString(), registered_at: new Date().toISOString(), expires: Date.now() + INVITE_PUBKEY_TTL });
         log('info', 'pubkey_registered_invite', { device: d.device_id.slice(0, 12), fp: invFp });
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -5418,7 +5444,7 @@ async function handleRelayRequest(req, res) {
       const attestResult = verifyAttestation(d.ecdh_pub, d.device_id, d.attestation || null);
       const existingPubkey = pubkeys.get(_pkSlot);
       if (existingPubkey && (!existingPubkey.expires || Date.now() < existingPubkey.expires)) {
-        res.writeHead(409); return res.end(J({ error: 'Pubkey already registered for this session — first registration wins' }));
+        res.writeHead(409); return res.end(J({ error: 'Pubkey already registered for this session: first registration wins' }));
       }
       const fp = computeFingerprint(d.kyber_pub || '', d.ecdh_pub);
       const regAt = new Date().toISOString();
@@ -8042,10 +8068,10 @@ async function handleRelayRequest(req, res) {
             ? 'sha3_256(envelope.id || doc_hash || party_index_as_decimal || party_email_hash_bytes)'
             : 'sha3_256(envelope.id || doc_hash || party_index_as_decimal)');
     try {
-      // ?p=<i>&t=<invite_token> -> party-scoped view. For email-bound envelopes
-      // the token must match (getForParty returns null otherwise); for open
-      // envelopes the token is not required. This gives the co-signer exactly
-      // what it needs to recompute the (possibly v2) sign-message locally.
+      // ?p=<i>&t=<invite_token> -> party-scoped view. The token must match in
+      // every binding mode (getForParty returns null otherwise, as a plain 404).
+      // This gives the co-signer exactly what it needs to recompute the
+      // (possibly v2) sign-message locally, and gives a passer-by nothing.
       if (query.p !== undefined) {
         const pi = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
         const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
@@ -8075,9 +8101,11 @@ async function handleRelayRequest(req, res) {
       const d = JSON.parse((await readBody(req, 4096)).toString() || '{}');
       const pi = parseInt(d.party_index, 10);
       if (!Number.isInteger(pi) || pi < 0) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
-      // For email-bound envelopes the per-party invite token must match before
-      // we record a view; getForParty returns null on a bad/absent token (and
-      // does not require one for open envelopes).
+      // The per-party invite token must match before we record a view, in every
+      // binding mode; getForParty returns null on a bad or absent token. A view
+      // is written into the CT log as evidence of when a party opened the
+      // document, so an unauthenticated stamp on someone else's slot is a
+      // falsified record, not a cosmetic one.
       const gate = await store.getForParty(id, pi, (d.token || '').toString());
       if (!gate) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
       const ok = await store.markViewed(id, pi);
@@ -8102,20 +8130,66 @@ async function handleRelayRequest(req, res) {
       const pi = parseInt(d.party_index, 10);
       const signerPub = (d.signer_public_key || '').toString();
       const sig = (d.signature || '').toString();
-      const accountId = (d.account_id || '').toString();
+      // The per-party invite capability. Open-mode slots have no mailbox to bind
+      // to, so this token is what proves the submitter is the party whose slot
+      // this is; the store refuses an open slot without it.
+      const inviteToken = (d.token || d.invite_token || '').toString();
+      // Email-bound envelopes (R018): the store accepts the signature only when
+      // a trusted internal caller (the admin proxy, which verified the signer's
+      // authenticated session email) asserts a matching verified_email_hash.
+      // _internalOk() gates that trust on the X-Internal-Auth header; a public
+      // caller cannot set it, so it can never satisfy an email-bound slot. Read
+      // here rather than at the call, because it also decides whether the
+      // account_id in the body may be believed at all (see below).
+      const internalTrusted = _internalOk();
+      const verifiedEmailHash = (d.verified_email_hash || '').toString();
       if (!Number.isInteger(pi) || pi < 0 || !signerPub || !sig) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         return res.end(J({ error: 'party_index, signer_public_key, signature required' }));
       }
+
+      // ── WHOSE METER RUNS, and where that answer comes from ──────────────────
+      // It used to come straight out of the body (`d.account_id`), and every
+      // quota decision below sat inside `if (accountId)`. Leaving the field out
+      // therefore skipped the pre-gate AND the increment, while the signature was
+      // accepted all the same: unlimited signing on a plan that sells two a
+      // month. Absence was read as permission.
+      //
+      // The account is now resolved server-side, and absence is a refusal:
+      //   1. an internal-auth caller (the admin proxy) may name the SIGNER's
+      //      account -- that is the claim the enrolled-key pin below verifies;
+      //   2. otherwise the envelope's OWN stored account_id, written at create()
+      //      from the creating API key and not writable from any request;
+      //   3. neither -> 403. A signature that no account answers for is refused
+      //      rather than waved through.
+      // A public caller naming account_id is ignored outright, so the body can no
+      // longer steer whose meter runs, nor drain a stranger's quota.
+      const claimedAccountId = internalTrusted ? (d.account_id || '').toString() : '';
+      let ownerAccountId;
+      try { ownerAccountId = await store.ownerAccountId(id); }
+      catch (e) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
+      // No record at all stays a plain 404, exactly as before: the account rule
+      // must not turn into an oracle for which envelope ids exist.
+      if (ownerAccountId === null) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+      const accountId = claimedAccountId || ownerAccountId;
+      if (!accountId) {
+        log('warn', 'sign_no_account', { envelope: String(id).slice(0, 10) });
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'account_required' }));
+      }
+
       // Crypto M1: when the trusted admin proxy names the signer's account_id,
       // pin the submitted key to that account's ENROLLED active signing keys.
       // The email-binding check proves *which mailbox*; this proves the signature
       // was made by a key the account actually enrolled — so a leaked internal
       // token can't fill an email-bound slot with an attacker-substituted key.
       // Fail-closed (Redis is already a hard dependency of the envelope store).
-      if (accountId) {
+      // Only the CLAIMED account is pinned: the envelope owner is the party being
+      // billed, not the party holding the pen, and open-mode signers enrol no
+      // keys with us at all.
+      if (claimedAccountId) {
         try {
-          const active = await userSigning.getActiveSigningPks(redisClient, accountId);
+          const active = await userSigning.getActiveSigningPks(redisClient, claimedAccountId);
           const subj = Buffer.from(signerPub, 'base64');
           const enrolled = active.some(e => {
             try { return Buffer.from(e.pk_b64, 'base64').equals(subj); } catch { return false; }
@@ -8156,7 +8230,10 @@ async function handleRelayRequest(req, res) {
       const _signEnt = entitlements.getEntitlements(_signerRec).parasign;
       const _signIncluded = _signEnt.quotas.signs_month;
       let _signUsed = null; // best-effort count this month, feeds the 200 quota field
-      if (accountId && Number.isFinite(_signIncluded)) {
+      // No `accountId &&` here on purpose: the account is resolved above and an
+      // absent one already returned 403, so this gate can no longer be skipped by
+      // leaving a field out of the request.
+      if (Number.isFinite(_signIncluded)) {
         try {
           const _u = await quota.readUsage(redisClient, accountId);
           if (_u.available && Number.isFinite(_u.signs_this_month)) {
@@ -8173,23 +8250,18 @@ async function handleRelayRequest(req, res) {
         } catch (qe) { log('warn', 'quota_sign_pregate_failed', { err: qe.message }); }
       }
 
-      // Email-bound envelopes (R018): the store accepts the signature only when
-      // a trusted internal caller (the admin proxy, which verified the signer's
-      // authenticated session email) asserts a matching verified_email_hash.
-      // _internalOk() gates that trust on the X-Internal-Auth header; a public
-      // caller cannot set it, so it can never satisfy an email-bound slot.
-      const internalTrusted = _internalOk();
-      const verifiedEmailHash = (d.verified_email_hash || '').toString();
       const out = await store.sign(id, pi, signerPub, sig, {
         internalTrusted,
         verifiedEmailHash,
+        inviteToken,
         appearance: d.appearance,
       });
       if (!out.ok) {
         const code = out.code === 'not_found' ? 404
           : (out.code === 'bad_signature' || out.code === 'invalid_appearance') ? 400
           : (out.code === 'closed' || out.code === 'voided' || out.code === 'invite_expired') ? 410
-          : (out.code === 'email_binding_required' || out.code === 'email_mismatch') ? 403
+          : (out.code === 'email_binding_required' || out.code === 'email_mismatch'
+             || out.code === 'invite_token_required') ? 403
           : 409;
         res.writeHead(code, { 'Content-Type': 'application/json' });
         return res.end(J({ error: out.code }));
@@ -8200,7 +8272,7 @@ async function handleRelayRequest(req, res) {
       // 'idem' retry never reaches recordSign, so the counter cannot double-count
       // on retry. Awaited (single INCR) so the 200 below reports fresh numbers;
       // fail-open: a redis hiccup never blocks the signer's 200.
-      if (out.code === 'new' && accountId) {
+      if (out.code === 'new') {
         const _r = await quota.recordSign(redisClient, accountId, log);
         if (_r.counted) _signUsed = _r.used;
         else if (_signUsed != null) _signUsed += 1; // count failed: still reflect this sign best-effort
@@ -8228,9 +8300,10 @@ async function handleRelayRequest(req, res) {
       // API contract with the dashboard: every successful sign response carries
       // a `quota` field so the frontend can render usage without a second call.
       // Two numbers, because there are only two: what this account has signed
-      // this month and what its tier includes. Omitted entirely when there is
-      // no account or redis could not be read (fail-open, field is best-effort).
-      const _quotaField = (accountId && _signUsed != null && Number.isFinite(_signIncluded)) ? {
+      // this month and what its tier includes. Omitted entirely when redis could
+      // not be read (fail-open, the field is best-effort). There is always an
+      // account by this point; a request without one never got here.
+      const _quotaField = (_signUsed != null && Number.isFinite(_signIncluded)) ? {
         used: _signUsed,
         included: _signIncluded,
         reset_date: quota.nextResetDate(),
