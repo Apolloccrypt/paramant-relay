@@ -145,8 +145,8 @@ services:
       SECTOR: "health"
       RELAY_SELF_URL: "https://health.paramant.app"
       RELAY_PRIMARY_URL: "http://localhost:3000"
-      # Below the 8g cap above, and it has to be. relay.js:1356 refuses an
-      # upload when rss + 5*(inFlight+1) > RAM_LIMIT_MB + RAM_RESERVE_MB, and
+      # Below the 8g cap above, and it has to be. relay.js refuses an upload when
+      # rss + BLOB_SIZE_MB * (inFlight + 1) > RAM_LIMIT_MB + RAM_RESERVE_MB, and
       # RAM_RESERVE_MB is ADDED there, so the guard trips at the sum of the two.
       # This was 8192 + 512 = 8704 inside a container capped at 8192, so the
       # kernel always reached its own limit first: the relay never answered "at

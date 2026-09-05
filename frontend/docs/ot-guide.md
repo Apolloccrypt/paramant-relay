@@ -263,7 +263,7 @@ Ghost Pipe is not designed for hard real-time (< 1 ms) control loops — use it 
 
 **"Invalid API key"** — Verify the key format (`pgp_` or `plk_` prefix) and that it was issued for the IoT sector (`iot.paramant.app`).
 
-**"Data te groot"** — Default pad-block is 5 MB. Payload must be under ~5 MB. For firmware larger than 5 MB, split into chunks and send sequentially.
+**"Data te groot"**: one padded block is 5 MB, so a single payload must fit inside one. That is the block size and not the file limit: firmware larger than that is sent as a run of blocks under one `meta.file_id`, up to the tier ceiling (`file_mb`, 500 MB on the hosted relay).
 
 **Relay unreachable from OT network** — Check that the OT host can reach `iot.paramant.app:443` (HTTPS). If using a self-hosted relay, verify the firewall allows one-way outbound from the OT sender to the relay host on port 3000 (or your configured port).
 

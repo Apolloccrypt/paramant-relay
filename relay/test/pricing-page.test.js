@@ -184,10 +184,22 @@ function statesLine(pageHtml, line) { return line instanceof RegExp ? line.test(
 
 assert(new RegExp(`<li>${communityTransfers} transfers (?:a|per) month</li>`).test(html),
   `the Community card must name the transfers_month limit from tiers.js (${communityTransfers})`);
-assert(new RegExp(`<li>${communityFileMb} MB per file</li>`).test(html),
+// The card may qualify WHICH way the file travels, and it should: the live
+// hand-over carries file_mb and a one-time link is a single sealed block, so a
+// bare "500 MB per file" would be true of one way and false of the other. What
+// is pinned is the number and that it is stated per file; the qualifier after
+// it is the page's business.
+assert(new RegExp(`<li>${communityFileMb} MB per file[^<]*</li>`).test(html),
   `the Community card must name the file_mb limit from tiers.js (${communityFileMb} MB)`);
-assert(new RegExp(`${communityTransfers} transfers (?:a|per) month, ${communityFileMb} MB per file`).test(html),
-  'the lead must carry the same two Community limits as the card');
+// The lead carries the same two limits. Not necessarily side by side: it reads
+// as a sentence, and pinning the two numbers as adjacent text stopped the lead
+// being able to say which of the two send paths the size belongs to.
+const leadM = /<strong>Community is &euro;0 a month, forever:<\/strong>([^<]*)/.exec(html);
+assert(leadM, 'the lead must carry the Community promise');
+assert(new RegExp(`${communityTransfers} transfers (?:a|per) month`).test(leadM[1]),
+  'the lead must carry the same transfers limit as the card');
+assert(new RegExp(`${communityFileMb} MB`).test(leadM[1]),
+  'the lead must carry the same file size as the card');
 assert(new RegExp(`<li>${proTransfers} transfers (?:a|per) month</li>`).test(html),
   `the ParaSend Pro card must name its transfers_month limit from tiers.js (${proTransfers})`);
 assert(!/uploads per hour/i.test(htmlVisible),

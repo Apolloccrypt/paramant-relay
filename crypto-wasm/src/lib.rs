@@ -19,6 +19,14 @@ use sha2::Sha256;
 use rand_core::OsRng;
 
 const INFO: &[u8] = b"paramant-v2";
+// The PADDING SIZE, and nothing else. Every packet this module emits is exactly
+// this long, so an observer learns nothing from the size of what you sent.
+//
+// This is NOT the largest file the product carries. A file is split into chunks
+// by the caller and each chunk becomes one padded block, so the file size limit
+// is a product decision that lives in relay/lib/tiers.js (`file_mb`), not here.
+// The two were read as one number for a long time; they are different things and
+// changing one must never quietly change the other.
 const BLOCK: usize = 5 * 1024 * 1024;
 
 // Wire-format magic byte. 0x02 = legacy v0 (no AAD). 0x03 = current (AAD-bound).
@@ -99,13 +107,27 @@ pub fn encrypt_blob(plaintext: &[u8], kem_pub: &[u8], ecdh_pub: &[u8]) -> Result
     pkt.extend_from_slice(&aad);
     pkt.extend_from_slice(&ct);
 
-    // Pad to 5 MB with random bytes
-    let mut padded = vec![0u8; BLOCK];
-    let copy = pkt.len().min(BLOCK);
-    padded[..copy].copy_from_slice(&pkt[..copy]);
-    if copy < BLOCK {
-        getrandom::getrandom(&mut padded[copy..]).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    // Pad to BLOCK with random bytes.
+    //
+    // BLOCK is the PADDING SIZE: every packet leaves here at exactly this size so
+    // its length says nothing about the file. It is not the file size limit. A
+    // caller that wants to send more than one block's worth splits the file into
+    // chunks and calls this once per chunk; see the chunked send in
+    // frontend/js/parashare.page.js.
+    //
+    // A packet that does not fit used to be TRUNCATED here (`pkt.len().min(BLOCK)`)
+    // and returned as Ok, so an oversized input produced a well-formed blob whose
+    // ciphertext was cut short. That decrypts to an AEAD failure at the far end,
+    // with nothing on the sending side to say why. Refuse instead: the caller is
+    // asking for something this function cannot do, and it should hear so.
+    if pkt.len() > BLOCK {
+        return Err(JsValue::from_str(
+            "plaintext does not fit one padding block; split the file into chunks",
+        ));
     }
+    let mut padded = vec![0u8; BLOCK];
+    padded[..pkt.len()].copy_from_slice(&pkt);
+    getrandom::getrandom(&mut padded[pkt.len()..]).map_err(|e| JsValue::from_str(&e.to_string()))?;
     Ok(padded)
 }
 

@@ -14,7 +14,7 @@
 
 All data-plane endpoints require: `X-Api-Key: your_key`
 
-- `pgp_` prefix, end user key. Community plan: 10 transfers a month, 5 MB per file.
+- `pgp_` prefix, end user key. Community plan: 50 transfers a month, 500 MB per file.
 - `plk_` prefix — operator license key (unlimited, from `.env`)
 
 CT log and STH endpoints are **public** — no API key required.
@@ -663,7 +663,8 @@ him. An account with no tier on file is held to Community.
 | Link lifetime (max TTL) | 1 hour | 24 hours | 7 days |
 | Reads per link (max views) | 1 | 10 | 100 |
 | Registered devices | 5 | 50 | unlimited |
-| Max blob size | 5 MB | 5 MB | 5 MB (relay `MAX_BLOB`) |
+| Max file size | 500 MB | 500 MB | 500 MB (tier `file_mb`) |
+| Max blob size | 5 MB | 5 MB | 5 MB (relay `MAX_BLOB`, one padded block) |
 | Downloads per hour | 50 | 500 | unlimited |
 
 Notes:
@@ -672,21 +673,12 @@ Notes:
   `GET /v2/outbound/:hash`; over it the relay answers `429`. It also sets how
   many delivery receipts your account keeps (twice this number, see above).
 - **Max blob size** is the lower of the tier's ceiling and the operator's
-  `MAX_BLOB`, which is 5 MB on the hosted relay and bounds relay memory. The
-  operator's value is always the last word, which is why an Enterprise account
-  is held to 5 MB as well and why `GET /v2/admin/usage` reports 5 rather than
-  "uncapped" for it.
-- **Reads per link** and **link lifetime** are ceilings, not defaults: a request
-  asking for more gets the ceiling back in the upload response, so the clamp is
-  visible to the caller. Asking for less is honoured as asked.
-- **Registered devices** is a ceiling on how many device public keys an account
-  may hold, not a limit on requests. A device the account already holds may
-  always re-register, so an account that is over the ceiling keeps its existing
-  devices working and is refused only a new one.
-- A legacy `business` plan is a ParaSign tier name. On ParaSend it keeps its own
-  row (2000 transfers a month, 100 devices, a 7 day link, 25 reads, 2000
-  downloads an hour) rather than being raised to Enterprise or cut to Firm. It is
-  resolved, never sold: ParaSend cannot be bought or granted at that tier.
+  `MAX_BLOB`, which is 5 MB on the hosted relay: that is the size every packet
+  is padded to, so a blob larger than one block is malformed rather than merely
+  big. It is not the file limit. A file is sent as a run of blocks, so the file
+  ceiling is the tier's `file_mb` (500 MB), enforced by counting the blocks that
+  share a `meta.file_id`. `GET /v2/admin/usage` reports `file_mb`, the number
+  you can actually send, and not the block size.
 
 ---
 

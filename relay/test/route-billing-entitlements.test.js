@@ -459,17 +459,23 @@ test('the usage view reports the tier that is ENFORCED, not the plan billing lef
 
   const none = await srv.get('/v2/admin/usage/acct_v_none', { headers: { 'X-Admin-Token': ADMIN } });
   assert.strictEqual(none.json.parasend_tier, 'community', 'a missing plan is not evidence of a paid one');
-  assert.strictEqual(none.json.limits.transfers_month, 10);
+  assert.strictEqual(none.json.limits.transfers_month, 50);
   assert.strictEqual(none.json.limits.devices, 5);
   srv.stop();
   did();
 });
 
 test('the usage view reports the file ceiling the upload gate really applies', async () => {
-  // POST /v2/inbound takes the LOWER of the operator's MAX_BLOB and the tier's
-  // file_mb, so an uncapped tier row is still held to MAX_BLOB. Reporting the
-  // bare tier value put -1 on an enterprise account while the gate was
-  // enforcing 5 MB, and file_mb is the one number an operator would act on.
+  // This used to assert 5 for EVERY tier, enterprise included, because the gate
+  // was Math.min(MAX_BLOB, file_mb) and MAX_BLOB is 5 MB. That was the view
+  // honestly reporting a bug: the file ceiling and the blob ceiling had been
+  // folded into one number, so every plan really was held to one 5 MB block
+  // whatever its row said.
+  //
+  // They are separate now. MAX_BLOB still bounds one BLOB, but a file is a run
+  // of blobs and its ceiling is the tier's own file_mb, enforced by counting
+  // blocks. So the view reports the tier value, and an uncapped row reports
+  // uncapped because that is what is now true of it.
   const srv = await withUsers('usage-file-mb', [
     { key: 'pgp_f_ent', plan: 'enterprise', active: true, account_id: 'acct_f_ent', email: 'fe@example.test' },
     { key: 'pgp_f_com', plan: 'community', active: true, account_id: 'acct_f_com', email: 'fc@example.test' },
@@ -477,21 +483,19 @@ test('the usage view reports the file ceiling the upload gate really applies', a
   const ent = await srv.get('/v2/admin/usage/acct_f_ent', { headers: { 'X-Admin-Token': ADMIN } });
   assert.strictEqual(ent.status, 200, ent.text);
   assert.strictEqual(ent.json.parasend_tier, 'enterprise');
-  assert.strictEqual(ent.json.limits.file_mb, 5,
-    'the enterprise row says uncapped, the relay enforces MAX_BLOB, and the view must say what is enforced');
-  assert.notStrictEqual(ent.json.limits.file_mb, -1, 'never report uncapped for a ceiling that is capped');
-  // devices really is uncapped on enterprise, and that still reports as -1, so
-  // the fix is about the file ceiling and not about flattening every -1.
+  assert.strictEqual(ent.json.limits.file_mb, -1,
+    'the enterprise row is uncapped on file size and nothing downstream caps it any more');
   assert.strictEqual(ent.json.limits.devices, -1);
 
   const com = await srv.get('/v2/admin/usage/acct_f_com', { headers: { 'X-Admin-Token': ADMIN } });
-  assert.strictEqual(com.json.limits.file_mb, 5, 'a capped tier reads its own value, unchanged');
+  assert.strictEqual(com.json.limits.file_mb, 500, 'a capped tier reads its own value');
 
   // The list view is the same view over every account and must not disagree.
   const list = await srv.get('/v2/admin/usage', { headers: { 'X-Admin-Token': ADMIN } });
   assert.strictEqual(list.status, 200, list.text);
   for (const row of list.json.accounts) {
-    assert.strictEqual(row.limits.file_mb, 5, `${row.account_id} in the list view`);
+    const expected = row.parasend_tier === 'enterprise' ? -1 : 500;
+    assert.strictEqual(row.limits.file_mb, expected, `${row.account_id} in the list view`);
   }
   srv.stop();
   did();

@@ -32,7 +32,7 @@ test('account pro on parasign + community on parasend gets SEPARATE limits', () 
   assert.strictEqual(e.parasign.tier, 'pro');
   assert.strictEqual(e.parasend.tier, 'community');
   assert.strictEqual(e.parasign.quotas.signs_month, 100);     // pro signs
-  assert.strictEqual(e.parasend.quotas.transfers_month, 10);  // community transfers
+  assert.strictEqual(e.parasend.quotas.transfers_month, 50);  // community transfers
 });
 
 test('the mirror case: parasend pro + parasign free is independent too', () => {
@@ -128,7 +128,7 @@ test('specific migration cases match the brief', () => {
   const comm = ent.getEntitlements(ent.migrateUserEntry({ plan: 'community' }));
   assert.strictEqual(comm.parasend.tier, 'community');
   assert.strictEqual(comm.parasign.tier, 'free');
-  assert.strictEqual(comm.parasend.quotas.transfers_month, 10);
+  assert.strictEqual(comm.parasend.quotas.transfers_month, 50);
   assert.strictEqual(comm.parasign.quotas.signs_month, 2);
 
   // business: parasign stays business (1000); parasend keeps its OWN row.
@@ -151,7 +151,7 @@ test('specific migration cases match the brief', () => {
   // is uncapped: that is what separates it from enterprise.
   assert.strictEqual(biz.parasend.quotas.transfers_month, 2000);
   assert.deepStrictEqual(biz.parasend.limits, {
-    file_mb: 5, devices: 100, view_ttl_ms: 604_800_000, max_views: 25, outbound_per_hour: 2000,
+    file_mb: 500, devices: 100, view_ttl_ms: 604_800_000, max_views: 25, outbound_per_hour: 2000,
   });
   // And it is not a tier anyone can be sold or granted.
   assert.strictEqual(ent.PARASEND_TIERS.includes('business'), false);
