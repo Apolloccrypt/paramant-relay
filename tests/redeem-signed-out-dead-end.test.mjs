@@ -215,6 +215,15 @@ for (const [label, raw] of [
   const content = robots ? await page.locator('meta[name="robots"]').first().getAttribute('content') : '';
   ok('signed out, /redeem is not marked noindex', !/noindex/i.test(content || ''), content || '(no robots meta)');
   ok('there is exactly one h1', await page.locator('h1').count() === 1);
+  // One box and one button, on the screen a phone gives you, without scrolling
+  // for either. The page is nothing but this, so if it does not fit here it
+  // does not fit anywhere.
+  const buttonBottom = await page.evaluate(() =>
+    Math.round(document.getElementById('rd-submit').getBoundingClientRect().bottom));
+  ok('the box and the button are on the first screen of a phone',
+    buttonBottom > 0 && buttonBottom <= 844, `${buttonBottom}px`);
+  ok('and the page does not scroll sideways',
+    await page.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth));
   await ctx.close();
 }
 
@@ -262,6 +271,24 @@ for (const refusal of REFUSALS) {
     /ParaSign Pro until 3 December 2026/.test(line) && /Nothing was charged/.test(line), line);
   ok('the ending has exactly one primary button',
     await page.locator('#rd-done .done-actions .done-primary').count() === 1);
+  // The two rules done-state.css is for, held here because the four flows
+  // tests/end-screen-calm.test.mjs walks cannot reach this page: the answer
+  // fits one phone screen with the fold shut, and it is not written in
+  // algorithm. Same measurement, same vocabulary.
+  const doneHeight = await page.evaluate(() => {
+    const root = document.getElementById('rd-done');
+    let h = root.getBoundingClientRect().height;
+    root.querySelectorAll('details').forEach((d) => { h -= d.getBoundingClientRect().height; });
+    return Math.round(h);
+  });
+  ok('the ending fits one phone screen with the fold shut', doneHeight > 0 && doneHeight <= 844, `${doneHeight}px`);
+  const face = await page.evaluate(() => {
+    const clone = document.getElementById('rd-done').cloneNode(true);
+    clone.querySelectorAll('details, script, style').forEach((n) => n.remove());
+    return (clone.textContent || '').replace(/\s+/g, ' ').trim();
+  });
+  const jargon = face.match(/\bML-KEM\b|\bML-DSA\b|\bFIPS\b|\bSHA-?3\b|\bfingerprint\b|\brelay\b/i);
+  ok('no algorithm name on the face of the ending', !jargon, jargon ? jargon[0] : '');
   ok('and the technical account starts folded away',
     await page.evaluate(() => [...document.querySelectorAll('#rd-done details')].every((d) => !d.open)));
   const left = await page.evaluate(() => { try { return window.localStorage.getItem('paramant.redeem.code'); } catch { return null; } });
