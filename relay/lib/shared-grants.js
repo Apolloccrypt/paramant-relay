@@ -33,14 +33,27 @@
 // account page all read the local record they already read, and it is now the
 // right one.
 //
-// WHAT IT DELIBERATELY DOES NOT DO. It never downgrades. Hydration goes through
+// A GRANT ONLY EVER RAISES. Hydration goes through
 // entitlements.mergeProductGrantInto, which copies a grant only when it beats
-// the one on file, tier and period together. A revocation therefore does NOT
-// travel this way; that stays the admin plane's job, where mutatePlanFleet
-// writes it to every sector and reports the sectors that refused. One-way is
-// the safe direction for a mechanism that heals in the background: the worst a
-// lost message can do is leave a customer on the tier he already had, never
-// take away one he paid for.
+// the one on file, tier and period together, so a stale row can never take away
+// a tier somebody paid for.
+//
+// A REVOCATION IS DIFFERENT, AND IT HAS TO TRAVEL. Making the row grant-only
+// meant deleting it when the last paid tier went away, and that turned a
+// chargeback into a plan the customer kept. Measured on 2026-09-05 with two
+// relays against one redis: relay-main revoked the tier and dropped the row, and
+// one second later relay-health -- which had never been told -- reseeded its own
+// still-paid record back into redis, and relay-main hydrated itself straight
+// back up to Pro. Money returned, plan kept, on every screen, permanently,
+// because the reseed runs again every minute.
+//
+// So the row is now the fleet's record of the paid state, not just of the good
+// news. An account whose grant is gone keeps a row carrying revoked_at, every
+// container applies that to its own record, and the outbound reseed only ever
+// fills in accounts that have NO row at all -- so a container holding a stale
+// paid record can no longer overwrite a fresher fact. Deliberate downgrades
+// made by an operator still go through admin mutatePlanFleet; this carries the
+// one downgrade nobody is present for.
 
 const entitlements = require('./entitlements');
 
@@ -75,22 +88,39 @@ const FIELDS = Object.freeze(grantFields());
 // Take the grant out of a full account record. Everything else on that record
 // (email, label, keys, usage) is the container's own business and has no place
 // in a shared row.
+//
+// A FLOOR TIER IS NOT A GRANT. free and community are what an account has when
+// nobody bought anything, so a record sitting at the floor yields null and the
+// row it produces is a revocation, not a grant of nothing. Reading it any other
+// way is what made a chargeback look like a term: the revoked record still said
+// plan_parasign 'free', that counted as a value, and the row went out marked as
+// a grant with revoked_at empty -- so the other containers had nothing to apply
+// and kept handing out Pro.
 function grantOf(rec) {
   if (!rec || typeof rec !== 'object') return null;
   const out = {};
   let any = false;
-  for (const f of FIELDS) {
-    if (rec[f] === undefined || rec[f] === null || rec[f] === '') continue;
-    out[f] = String(rec[f]);
+  for (const product of entitlements.PRODUCTS) {
+    const planField = entitlements.PRODUCT_PLAN_FIELD[product];
+    const tier = rec[planField];
+    if (tier === undefined || tier === null || tier === '') continue;
+    if (String(tier) === entitlements.floorTierOf(product)) continue;
+    out[planField] = String(tier);
     any = true;
+    for (const f of [entitlements.PRODUCT_PAID_UNTIL_FIELD[product], entitlements.PRODUCT_BUNDLE_FIELD[product]]) {
+      if (rec[f] === undefined || rec[f] === null || rec[f] === '') continue;
+      out[f] = String(rec[f]);
+    }
   }
   return any ? out : null;
 }
 
 // ── Write ────────────────────────────────────────────────────────────────────
 // Replace the row wholesale and then say so on the channel. An account whose
-// grant is empty -- everything back at the floor tier -- loses its row and
-// leaves the set, so the seed below never carries a grant that no longer exists.
+// grant is empty -- everything back at the floor tier -- keeps its row and its
+// place in the set, with revoked_at set and every grant field empty. That row
+// is the statement "this account has no paid term", and it is what stops
+// another container reinstating one.
 //
 // ONE HSET, EVERY FIELD, ALWAYS. Absent fields are written as empty strings and
 // read back as absent, rather than deleted in a second command. Redeeming a
@@ -110,15 +140,11 @@ async function publish(redis, accountId, rec) {
   const grant = grantOf(rec);
   const key = grantKey(accountId);
   try {
-    if (!grant) {
-      await redis.del(key);
-      await redis.sRem(ACCOUNT_SET, String(accountId));
-    } else {
-      const row = { updated_at: new Date().toISOString() };
-      for (const f of FIELDS) row[f] = grant[f] === undefined ? '' : grant[f];
-      await redis.hSet(key, row);
-      await redis.sAdd(ACCOUNT_SET, String(accountId));
-    }
+    const now = new Date().toISOString();
+    const row = { updated_at: now, revoked_at: grant ? '' : now };
+    for (const f of FIELDS) row[f] = (grant && grant[f] !== undefined) ? grant[f] : '';
+    await redis.hSet(key, row);
+    await redis.sAdd(ACCOUNT_SET, String(accountId));
     await redis.publish(CHANNEL, String(accountId));
     return { ok: true, grant };
   } catch (e) {
@@ -131,10 +157,20 @@ async function publish(redis, accountId, rec) {
 // straight to entitlements.mergeProductGrantInto, or null when there is nothing
 // on file.
 async function read(redis, accountId) {
+  const row = await readRow(redis, accountId);
+  return row ? row.grant : null;
+}
+
+// The whole row: the grant (or null) plus whether this account is on file as
+// having no paid term at all. `exists` is what the outbound reseed asks before
+// it publishes: an account redis already has an answer for is never overwritten
+// from a container's own disk.
+async function readRow(redis, accountId) {
   if (!redis || !accountId) return null;
   try {
     const h = await redis.hGetAll(grantKey(accountId));
-    return grantOf(h);
+    if (!h || Object.keys(h).length === 0) return null;
+    return { exists: true, grant: grantOf(h), revokedAt: h.revoked_at || null, updatedAt: h.updated_at || null };
   } catch {
     return null;
   }
@@ -151,8 +187,8 @@ async function readAll(redis) {
   try { ids = (await redis.sMembers(ACCOUNT_SET)) || []; } catch { return []; }
   const out = [];
   for (const accountId of ids) {
-    const grant = await read(redis, accountId);
-    if (grant) out.push({ accountId, grant });
+    const row = await readRow(redis, accountId);
+    if (row) out.push({ accountId, grant: row.grant, revokedAt: row.revokedAt });
   }
   return out;
 }
@@ -177,7 +213,31 @@ function applyTo(target, grant, now) {
   return moved;
 }
 
+// The other half of applyTo: bring a local record DOWN to the floor because the
+// fleet's row says this account has no paid term. Only ever called for a row
+// that actually carries revoked_at, and only the six grant fields are touched --
+// email, label, keys and usage are the container's own business.
+// Returns the products that moved.
+function applyRevocation(target) {
+  if (!target) return [];
+  const moved = [];
+  for (const product of entitlements.PRODUCTS) {
+    const planField = entitlements.PRODUCT_PLAN_FIELD[product];
+    const floor = entitlements.floorTierOf(product);
+    const paidField = entitlements.PRODUCT_PAID_UNTIL_FIELD[product];
+    const bundleField = entitlements.PRODUCT_BUNDLE_FIELD[product];
+    const had = target[planField] !== undefined && target[planField] !== floor;
+    const hadPeriod = target[paidField] !== undefined && target[paidField] !== null;
+    if (!had && !hadPeriod) continue;
+    entitlements.applyProductTier(target, product, floor);
+    delete target[paidField];
+    delete target[bundleField];
+    moved.push(product);
+  }
+  return moved;
+}
+
 module.exports = {
   GRANT_PREFIX, ACCOUNT_SET, CHANNEL, FIELDS,
-  grantKey, grantOf, publish, read, readAll, applyTo,
+  grantKey, grantOf, publish, read, readRow, readAll, applyTo, applyRevocation,
 };

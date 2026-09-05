@@ -444,8 +444,10 @@ async function createEnvelope(deps, apiKey, mode, rec) {
 // signing engine (deps.sigEngine: generateKeyPair/sign) and the envelope module's
 // pure recipe helpers to build the exact per-slot message the store verifies. For
 // email-bound slots it presents internalTrusted + the matching verifiedEmailHash
-// (sandbox stands in for the trusted admin proxy); open slots verify the v4
-// signer-bound recipe. Best-effort per slot; a slot that fails stays pending.
+// (sandbox stands in for the trusted admin proxy); open slots present the party's
+// invite token, which is the credential that binds an open slot to its party, on
+// top of the v4 signer-bound recipe. Best-effort per slot; a failing slot stays
+// pending.
 async function sandboxAutoSign(deps, out, signers, bindingMode, docHash) {
   const sig = deps.sigEngine;
   if (!sig || typeof sig.generateKeyPair !== 'function' || typeof sig.sign !== 'function') {
@@ -462,7 +464,9 @@ async function sandboxAutoSign(deps, out, signers, bindingMode, docHash) {
       const emailHash = partyEmailHash((signers[i] && signers[i].email) || '');
       const msg = signMessageBytes(out.id, docHash, i, emailHash, recipe, pubB64);
       const sigB64 = Buffer.from(sig.sign(msg, kp.secretKey)).toString('base64');
-      const r = await deps.envStore.sign(out.id, i, pubB64, sigB64, { internalTrusted: true, verifiedEmailHash: emailHash });
+      const link = (out.party_links || [])[i] || {};
+      const r = await deps.envStore.sign(out.id, i, pubB64, sigB64,
+        { internalTrusted: true, verifiedEmailHash: emailHash, inviteToken: link.invite_token || '' });
       if (r && r.ok && r.code === 'new') {
         signedIndices.push(i);
         lastSignedCount = r.signed_count;

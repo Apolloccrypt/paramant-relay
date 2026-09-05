@@ -159,13 +159,26 @@ fi
 # to the signer pubkey (recipe v4) — otherwise any caller who knows the envelope
 # id can fill any slot with a substituted key.
 echo ""
-echo "8. Open-mode envelope signer binding present..."
+echo "8. Open-mode envelope signer and party binding present..."
 ENV="$ROOT/relay/envelope.js"
 if [ -f "$ENV" ]; then
   if grep -q "effectiveRecipe" "$ENV" && grep -q "v >= 4" "$ENV"; then
     printf "   OK  envelope.js  (open-mode sign() binds signer pubkey via recipe v4)\n"
   else
     printf "   FAIL  envelope.js  — open-mode signature is not signer-bound (recipe v4 missing)\n"
+    FAIL=$((FAIL + 1))
+  fi
+  # Recipe v4 proves WHICH KEY signed. It says nothing about whose key it is, so
+  # on its own it let anyone holding the envelope id fill a named party's slot.
+  # The per-party invite token is what binds the slot to the party, in open mode
+  # as much as in email mode, and it must be required in BOTH places a slot is
+  # reached: the party view (getForParty, which also gates POST /view) and
+  # sign(). A mode-conditional token check in either is the door reopening.
+  if grep -q "invite_token_required" "$ENV" \
+     && ! grep -qE "mode === 'email' && !safeTokenEqual" "$ENV"; then
+    printf "   OK  envelope.js  (an open slot is party-bound by its invite token)\n"
+  else
+    printf "   FAIL  envelope.js  (open-mode slots are not party-bound: knowing the envelope id is enough to sign)\n"
     FAIL=$((FAIL + 1))
   fi
 fi

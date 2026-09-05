@@ -399,6 +399,20 @@ curl https://relay.paramant.app/v2/sth
 
 The relay signs `{relay_id, sha3_root, timestamp, tree_size, version}` (keys sorted, JSON-serialised) using ML-DSA-65. Verify the signature against the key returned by `GET /v2/pubkey`.
 
+`timestamp` is rounded down to the top of the hour **before it is signed**, so a head says
+when it was signed no more precisely than the log says when anything happened. A head is
+produced on every append, so a millisecond timestamp here would have given away the exact
+time of the leaf at `tree_size - 1`, and the leaf commits to that time. `tree_size` still
+orders the heads one per append. Heads signed before this changed keep the precise
+timestamp they were signed with and still verify: verification rebuilds the canonical
+payload from the fields a head carries and pins no resolution.
+
+The response may also carry a `forked` object. It appears only when the relay has REFUSED
+to sign a head that would contradict one it already signed, which is what happens when a
+relay comes back from a restart with its signing key and its head history but without its
+tree. The relay then stops issuing heads rather than publishing a second history, and this
+field is how an outside monitor tells that apart from a quiet week.
+
 ---
 
 ### GET /v2/sth/history — STH history
@@ -540,7 +554,7 @@ curl "https://relay.paramant.app/v2/sth/peers/a1b2…?limit=50&offset=0"
 | Path | Description |
 |------|-------------|
 | `GET /ct/` | Public web UI — live tree view, verify button, no auth |
-| `GET /ct/feed` | JSON feed for the UI (auto-refresh every 10s) |
+| `GET /ct/feed` | JSON feed for the UI (auto-refresh every 10s). `t` is rounded to the hour, as in `/v2/ct/log` |
 | `GET /ct/feed.xml` | RSS feed — last 20 STHs. Subscribe to independently archive roots. |
 
 The RSS feed is designed for external archiving: any subscriber retains an independent copy of each signed tree head, making log tampering detectable even if the relay is compromised later.

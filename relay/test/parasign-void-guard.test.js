@@ -32,10 +32,16 @@ const DOC = 'a'.repeat(64);
 const PUB = Buffer.from('dummy-signer-pubkey').toString('base64');
 const SIG = Buffer.from('dummy-signature').toString('base64');
 
+// The party's invite token. Open mode binds a slot to the party who holds this
+// (see envelope.js sign()), so every submission below carries it: what is under
+// test here is the void/complete guard, not the binding.
+const TOKEN = 'invite-token-for-the-void-guard-suite';
+const OPTS = { inviteToken: TOKEN };
+
 // open-mode envelope in a given status (open mode skips the email-binding gate).
 const openEnv = (status) => ({
   id: ID, doc_hash: DOC, status, binding_mode: 'open', recipe_version: '1',
-  party_count: '1', signed_count: '0', p0_status: 'pending',
+  party_count: '1', signed_count: '0', p0_status: 'pending', p0_invite_token: TOKEN,
 });
 
 async function main() {
@@ -45,7 +51,7 @@ async function main() {
     const redis = fakeRedis(openEnv('void'), ['new', '1', '1', 'void']);
     redis.evalSha = async () => { evalCalled = true; return ['new', '1', '1', 'void']; };
     const store = new EnvelopeStore(redis, { sigVerify: () => true });
-    const out = await store.sign(ID, 0, PUB, SIG);
+    const out = await store.sign(ID, 0, PUB, SIG, OPTS);
     assert.strictEqual(out.ok, false, 'voided envelope is not signable');
     assert.strictEqual(out.code, 'voided', 'fast-path returns code voided');
     assert.strictEqual(evalCalled, false, 'fast-path short-circuits before evalSha');
@@ -56,7 +62,7 @@ async function main() {
   {
     const store = new EnvelopeStore(fakeRedis(openEnv('complete'), ['idem','1','1','complete']),
                                     { sigVerify: () => true });
-    const out = await store.sign(ID, 0, PUB, SIG);
+    const out = await store.sign(ID, 0, PUB, SIG, OPTS);
     assert.strictEqual(out.ok, false);
     assert.strictEqual(out.code, 'closed', 'completed envelope -> closed');
     ok('sign() rejects completed envelope (code closed)');
@@ -67,7 +73,7 @@ async function main() {
   {
     const store = new EnvelopeStore(fakeRedis(openEnv('sent'), ['voided', '0', '1', 'void']),
                                     { sigVerify: () => true });
-    const out = await store.sign(ID, 0, PUB, SIG);
+    const out = await store.sign(ID, 0, PUB, SIG, OPTS);
     assert.strictEqual(out.ok, false, 'race: sign loses to concurrent void');
     assert.strictEqual(out.code, 'voided', 'atomic-script voided outcome mapped');
     ok('sign() maps atomic-script "voided" outcome (void wins the race)');
@@ -77,7 +83,7 @@ async function main() {
   {
     const store = new EnvelopeStore(fakeRedis(openEnv('sent'), ['closed', '1', '1', 'complete']),
                                     { sigVerify: () => true });
-    const out = await store.sign(ID, 0, PUB, SIG);
+    const out = await store.sign(ID, 0, PUB, SIG, OPTS);
     assert.strictEqual(out.code, 'closed', 'atomic-script closed outcome mapped');
     ok('sign() maps atomic-script "closed" outcome');
   }
@@ -86,7 +92,7 @@ async function main() {
   {
     const store = new EnvelopeStore(fakeRedis(openEnv('sent'), ['new', '1', '1', 'complete']),
                                     { sigVerify: () => true });
-    const out = await store.sign(ID, 0, PUB, SIG);
+    const out = await store.sign(ID, 0, PUB, SIG, OPTS);
     assert.strictEqual(out.ok, true, 'valid sign accepted');
     assert.strictEqual(out.code, 'new');
     assert.strictEqual(out.status, 'complete');
