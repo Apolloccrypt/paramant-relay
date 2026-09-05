@@ -2126,3 +2126,97 @@ console.log('ui-truthfulness: the appearance switch says only what theme.js and 
 })();
 
 console.log('ui-truthfulness: /parashare says the receiver has to be online, and the flow really waits for them');
+
+// ── /ct-log says whose traffic the log is made of ────────────────────────────
+//
+// The transparency page prints a live count of log entries and nothing else
+// about them. On 5 September 2026 that count was 891, of which 855 were
+// transfers, and those transfers were made by the hourly self-test in
+// .github/workflows/heartbeat.yml, not by customers: the last transfer by a
+// person was 18 August 2026. Every line is a real transfer through the real
+// relay, so the log itself is honest. What was not honest is the impression a
+// busy count leaves on a page that sells the product, and an impression is the
+// thing this file exists to hold.
+//
+// The public projection at /v2/ct/log deliberately gives no way to tell the two
+// apart: relay.js strips device_hash and coarsens the timestamp to the hour so
+// nobody can reconstruct who moved what and when. Labelling the self-test in
+// the log would undo exactly that, because every entry left unlabelled would
+// then be provably customer traffic. So the disclosure is on the page, where it
+// costs the log nothing, and this block is what keeps it there.
+(() => {
+  const ctLogHtml = read('frontend/ct-log.html');
+  const ctLogJs = read('frontend/js/ct-log.page.js');
+  // Comments are not read by visitors and this page's comment quotes the very
+  // sentence being required, so a gate that scanned the raw file would stay
+  // green on a page that had lost the sentence. Everything below reads what a
+  // person sees.
+  const ctLogSeen = ctLogHtml.replace(/<!--[\s\S]*?-->/g, '');
+
+  // The trigger: this page shows a count, so it owes the reader its composition.
+  assert.match(ctLogSeen, /id="stat-total"/,
+    'ct-log no longer shows a live entry count; if the count is gone, retire this block deliberately');
+  assert.match(ctLogSeen, /hourly self-test/i,
+    'ct-log prints a count of log entries, so it must name the hourly self-test that made most of them');
+  assert.match(ctLogSeen, /not a measure of how much the service is used/i,
+    'ct-log must say what the count is not, or the number sells activity the service does not have');
+
+  // The sentence has to stand before the number it explains, not below it.
+  const noticeAt = ctLogSeen.indexOf('id="composition-notice"');
+  const statsAt = ctLogSeen.indexOf('id="stat-total"');
+  assert.ok(noticeAt > 0 && noticeAt < statsAt,
+    'the composition notice must stand above the counters, which is where a visitor reads before the number');
+
+  // No page may sell the volume as demand. These are the shapes that would.
+  for (const shape of [
+    /(shows?|proves?|reflects?|measures?)[^.<]{0,30}(real |actual |live )?customer (use|usage|traffic|activity|demand)/i,
+    /see how (much|often)[^.<]{0,30}is used/i,
+    /live customer (activity|traffic)/i,
+    /growing (steadily|fast)/i,
+  ]) {
+    assert.doesNotMatch(ctLogSeen, shape,
+      'ct-log must not present the entry count as customer use; most of the entries are our own self-test');
+  }
+
+  // The count is fetched, never typed, so it cannot age into a lie. Read the
+  // notice as a whole rather than a window around the word "entries": the
+  // number sits in a span of its own, so any regex that steps over tags misses
+  // exactly the paste it is meant to catch. No figure belongs in this notice
+  // that /v2/ct/log did not just answer, so no literal number belongs here.
+  const ctLogNoticeEnd = ctLogSeen.indexOf('</div>\n</div>', noticeAt);
+  assert.ok(ctLogNoticeEnd > noticeAt, 'the composition notice no longer closes as a notice block');
+  const ctLogNotice = ctLogSeen.slice(noticeAt, ctLogNoticeEnd);
+  assert.match(ctLogNotice, /id="composition-count"/,
+    'the count in the sentence must be a slot the page fills, not text');
+  assert.doesNotMatch(ctLogNotice, /\d{2,}/,
+    'the entry count in the copy must come from /v2/ct/log, not be typed into the page');
+  assert.match(ctLogJs, /getElementById\('composition-count'\)/,
+    'ct-log.page.js must fill the count in the sentence; without it the page names no number at all');
+  assert.match(ctLogJs, /var logSize = d\.size != null \? d\.size : allEntries\.length;/,
+    'the sentence and the counter must name the same number, off the same read of /v2/ct/log');
+
+  // The self-test the page blames is real, hourly, and really does write to
+  // this log. A disclosure that named a check nobody runs would be its own lie.
+  const heartbeat = read('.github/workflows/heartbeat.yml');
+  assert.match(heartbeat, /- cron: '\d+ \* \* \* \*'/,
+    'ct-log calls the self-test hourly; heartbeat.yml no longer runs hourly');
+  assert.match(read('scripts/heartbeat/parasend.mjs'), /\$\{RELAY\}\/v2\/anon-inbound/,
+    'the self-test must still send a real transfer, or it makes no log entries to disclose');
+  const relaySrc = read('relay/relay.js');
+  const anonInbound = relaySrc.slice(
+    relaySrc.indexOf("path === '/v2/anon-inbound'"),
+    relaySrc.indexOf("path === '/v2/inbound'"));
+  assert.match(anonInbound, /ctAppendTransfer\(/,
+    'the route the self-test posts to no longer appends to the CT log, so the page blames it for nothing');
+
+  // Same rule as block 8 of site-claims.test.mjs, on the page next door: while
+  // HEARTBEAT_ENABLED gates the workflow, /sla says the check is switched off
+  // until its credentials are in place, and this page may not say otherwise.
+  // The entries are described in the past tense for that reason.
+  if (/vars\.HEARTBEAT_ENABLED\s*==\s*'true'/.test(heartbeat)) {
+    assert.doesNotMatch(ctLogSeen, /self-test (is )?(running|runs) (right )?now|every hour, (all day|around the clock)|around the clock/i,
+      'the self-test is gated off, so ct-log must not imply it is running; /sla carries the same caveat');
+  }
+})();
+
+console.log('ui-truthfulness: /ct-log says the count is mostly its own self-test, and the count is read not typed');

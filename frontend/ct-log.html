@@ -309,6 +309,34 @@ body { min-height:100vh; }
 </div>
 
 <div id="pane-log">
+<!--
+  What the count is made of. On 5 September 2026 this log held 891 entries, 855
+  of them transfers, and the transfers were made by the hourly self-test in
+  .github/workflows/heartbeat.yml rather than by customers: the last transfer by
+  a person was on 18 August 2026. Every one of those entries is a real transfer
+  through the real relay, so no line in the log is untrue, but a visitor reading
+  a busy log as busy customers would be, and that reading is the thing this
+  notice corrects.
+
+  Two things are deliberate in the wording. The entries are described in the
+  past tense, because the self-test is gated on HEARTBEAT_ENABLED and /sla says
+  so; this page may not imply a check that is not running. And the number is
+  filled in from /v2/ct/log by js/ct-log.page.js instead of being typed here, so
+  it cannot go stale. With no relay reachable the sentence keeps its own word
+  "entries" and still reads correctly.
+
+  tests/ui-truthfulness.test.mjs holds this notice in place: remove the sentence
+  and that gate goes red.
+-->
+<div class="notice" id="composition-notice">
+  <div class="body">
+    <strong>What is in this log</strong>
+    <span>This log records every transfer and every signature. Most of the
+    <span id="composition-count">entries</span> below were made by the hourly self-test with
+    which we check that the relay still works, not by customer traffic, so the number of
+    entries is not a measure of how much the service is used.</span>
+  </div>
+</div>
 <div class="notice" id="persistence-notice">
   <div class="body">
     <strong>Persistent log: survives relay restarts</strong>
@@ -401,7 +429,7 @@ body { min-height:100vh; }
 </div><!-- /pane-relays -->
 
 <script src="/js/delegate.js?v=1" defer></script>
-<script src="/js/ct-log.page.js?v=2" defer></script>
+<script src="/js/ct-log.page.js?v=3" defer></script>
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
