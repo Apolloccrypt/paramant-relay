@@ -36,12 +36,21 @@ const BASE_PATH   = (process.env.BASE_PATH || '').replace(/\/$/, '');
 // every Object.keys(SECTORS) iteration in this file; add a sector here and
 // the rest follows. findUserByEmail() stays health-only on purpose: health
 // is the canonical admin-UI source and the lookup is hot-path.
+// The fallback is the CONTAINER-INTERNAL listener, and that is :3000 for every
+// sector (docker-compose.yml sets PORT: "3000" once, for all five). The numbers
+// 3001-3005 are host-side published ports; on the compose network nothing
+// listens there. health/legal/finance/iot carried those host numbers as their
+// fallback, so a missing or misspelt RELAY_* env pointed the admin at a dead
+// port and every fan-out for that sector failed with ECONNREFUSED instead of
+// falling back. Only main was right. Kept in sync by
+// tests/sector-fallback-ports.test.mjs, which reads the port out of
+// docker-compose.yml rather than trusting a number typed here.
 const SECTORS = {
   main:    process.env.RELAY_MAIN    || 'http://relay-main:3000',
-  health:  process.env.RELAY_HEALTH  || 'http://relay-health:3005',
-  legal:   process.env.RELAY_LEGAL   || 'http://relay-legal:3002',
-  finance: process.env.RELAY_FINANCE || 'http://relay-finance:3003',
-  iot:     process.env.RELAY_IOT     || 'http://relay-iot:3004',
+  health:  process.env.RELAY_HEALTH  || 'http://relay-health:3000',
+  legal:   process.env.RELAY_LEGAL   || 'http://relay-legal:3000',
+  finance: process.env.RELAY_FINANCE || 'http://relay-finance:3000',
+  iot:     process.env.RELAY_IOT     || 'http://relay-iot:3000',
 };
 
 if (!ADMIN_TOKEN) { console.error('[PARAMANT-ADMIN] ADMIN_TOKEN is not set — refusing to start'); process.exit(1); }
