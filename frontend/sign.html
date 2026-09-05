@@ -549,7 +549,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
        honours on the way back; signup still finishes through the emailed
        verification link and does not carry it yet. -->
   <div class="ds-signedout" id="ds-signedout" role="status" hidden>
-    <p class="ds-signedout-text">You are not signed in. You can prepare a document here; sending it needs a free Community account.</p>
+    <p class="ds-signedout-text">You are not signed in. You can prepare a document here; signing or sending it needs a free Community account.</p>
     <p class="ds-signedout-actions">
       <a class="btn btn-secondary" href="/auth/login?next=/sign">Sign in</a>
       <a class="btn btn-primary" href="/signup?next=/sign">Create account</a>
@@ -858,6 +858,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       <label class="ds-seal-check"><input type="checkbox" id="ds-qes-optin"> Also add a qualified signature (sandbox)</label>
       <p class="ds-sub">A qualified trust service provider signs a hash of this document and returns a PAdES signature carrying its own certificate. The document itself never leaves this page. Sandbox only: this is a prototype against a test environment, not a production service.</p>
     </div>
+    <!-- No session. Said here as well as in the bar above, because this is the
+         step where it costs something: the file lives in this page and does not
+         survive the navigation to the sign-in. sign-flow.js reveals it together
+         with turning the button below into the sign-in. -->
+    <p class="ds-hint" id="ds-sign-signin-hint" hidden>Your document has not been uploaded and stays in this browser. Signing in reloads this page, so you pick the file again afterwards.</p>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-sign-back" type="button">Back</button>
       <button class="btn btn-primary" id="ds-sign-now" type="button">Sign this document</button>
@@ -1002,6 +1007,6 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 <script src="/js/parasign-pdf-ops.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=5" defer></script>
 <script src="/js/done-state.js?v=1" defer></script>
-<script type="module" src="/sign-flow.js?v=54"></script>
+<script type="module" src="/sign-flow.js?v=55"></script>
 </body>
 </html>
