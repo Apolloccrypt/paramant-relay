@@ -2,10 +2,10 @@
 
 Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. Nergens anders.
 
-- **97 omgevingsvariabelen** die de relay en de admin lezen staan in
+- **99 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **170 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **172 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -172,9 +172,11 @@ overschrijven zonder de code aan te raken.
 | `DOMAIN` | `deploy/docker-entrypoint.sh`, `install.sh` | `localhost` | domein in de nginx-entrypoint van een container die niet in compose staat |
 | `DRYRUN_OUT` | `deploy/ops/backup-full-state.sh` | `$WORK/out` | waar een proefback-up naartoe schrijft |
 | `EXPECT_PROD_COMMIT` | `deploy/deploy-3.1.sh` | `41501bb` | de vaste startcommit uit het draaiboek, gebruikt als er geen marker is |
+| `FLAKY_WATCH_REPEATS` | `scripts/flaky-watch.sh` | `3` | hoe vaak de bouwstraat de route-suites herhaalt om een wisselvallige test te laten zien |
 | `GITHUB_ACTIONS` | `scripts/check-test-declarations.sh` | leeg | omgevingsherkenning, geen Paramant-knop |
 | `HEALTH_URL` | `scripts/rollback-3.0.0.sh` | `http://127.0.0.1:3000/health` | welke URL het terugrolscript als gezond beschouwt |
 | `KEYFILE` | `deploy/ops/backup-full-state.sh`, `deploy/ops/restore-full-state.sh` | `/root/.config/paramant-backup/key.txt` | sleutelbestand waarmee de back-up versleuteld wordt |
+| `KNOWN_FLAKY_MAX_DAYS` | `scripts/check-flaky-register.sh` | `14` | hoeveel dagen een regel in `tests/known-flaky.tsv` mag blijven staan voor hij zelf een fout wordt |
 | `LATEST_ENV` | `scripts/rollback-3.0.0.sh` | leeg | welk env-bestand het terugrolscript terugzet |
 | `LC_ALL` | `scripts/check-commit-style.sh` | `C.UTF-8` | omgevingsherkenning, geen Paramant-knop |
 | `LE_EMAIL` | `install.sh` | `(n/a in localhost mode)` | adres voor Let's Encrypt |

@@ -1,0 +1,29 @@
+# KNOWN-FLAKY REGISTER
+#
+# A test that goes red at random is ignored within two weeks, and then there is
+# a guard that exists and does nothing. This file is what keeps that from
+# happening quietly: a test may only be KNOWN to be flaky on the record, with a
+# date, and the record expires.
+#
+# One tab-separated row per test:
+#
+#   suite<TAB>test name<TAB>first seen (YYYY-MM-DD)<TAB>who/where<TAB>why it is still here
+#
+# tests/static-sanity.sh check 13 reads this file and FAILS when a row is older
+# than KNOWN_FLAKY_MAX_DAYS (14). So an entry buys two weeks, and after that the
+# entry itself is the build error. Removing the row without fixing the test just
+# moves the failure back to where it belongs.
+#
+# Empty is the good state. The entry this file was going to carry -
+# route-ct-persistence "a relay that lost its tree refuses to sign a head
+# contradicting one it already signed" - was fixed instead: relay.js was losing
+# the last appends at shutdown. See relay/test/route-ct-exit-durability.test.js.
+#
+# A row here does NOT make anything green. check-flaky-register.sh fails on a
+# STALE row and on nothing else; a red suite stays red. What the row buys is
+# that the next person reading the red already knows it is known, since when,
+# and on which runs it was measured.
+#
+# suite	test	seen	source	why
+tests/handshake-meta.test.mjs	the two-file ParaShare handshake (scrollIntoViewIfNeeded op #btn-create-session)	2026-09-05	sign-e2e runs 33992956059, 33995309881, 33995562181, 33997515696	TimeoutError op "waiting for element to be stable" bij tests/handshake-meta.test.mjs:243, dat op main landde in 1622b527. Rood op vier runs vanavond, op drie verschillende takken, groen op andere runs van dezelfde takken. Niet van deze tak: deze PR raakt geen frontend en geen browser-suite.
+tests/end-screen-calm.test.mjs	de eindschermen blijven rustig	2026-09-05	sign-e2e runs 33995562181 (de-rest-van-de-review), 33998139643 (deze tak)	Rood op twee runs op twee verschillende takken, groen op main met dezelfde frontend (run 33995298677 op 1622b527) en groen op andere runs van dezelfde takken. Browser-suite, 47 s per keer. Niet van deze tak: deze PR raakt geen frontend.
