@@ -105,6 +105,8 @@ const SRC0 = {
   ext:        read('extensions/shared/paramant-core.js'),
   relay:      read('relay/relay.js'),
   signFlow:   read('frontend/sign-flow.js'),
+  v1Api:      read('relay/lib/parasign-open-api.js'),
+  v1Store:    read('relay/lib/parasign-store.js'),
 };
 const SRC = Object.fromEntries(Object.entries(SRC0).map(([k, v]) => [k, noComments(v)]));
 
@@ -167,6 +169,19 @@ const FACTS = {
     where: 'relay/crypto/bootstrap.js, frontend/sign-flow.js',
     algorithm: SIG,
     pure: !/ECDH|p256|RSA|Ed25519/i.test(SRC.sigImpl),
+  },
+  // The hosted signing ceremony on /v1. The one route where the relay is given
+  // the document itself, which is why every absolute "we never see plaintext"
+  // on the site has to carry an exception. Derived, not asserted: if this route
+  // is ever changed to take a capsule, these go false and block 9 stops
+  // demanding the exception.
+  hostedCeremony: {
+    where: 'relay/lib/parasign-open-api.js, relay/lib/parasign-store.js',
+    takesRawDocument: /Buffer\.from\(String\(doc\.content_base64\)/.test(SRC.v1Api)
+      && /pdf\.slice\(0, 5\)[\s\S]{0,40}'%PDF-'/.test(SRC.v1Api),
+    storesDocument: /await store\.putBlob\(out\.id, pdf,/.test(SRC.v1Api),
+    sealedUnderRelayKey: /PARASIGN_STORE_KEY/.test(SRC.relay),
+    routeIsReachable: /parasignOpenApi\.route\(/.test(SRC.relay),
   },
   // What the relay loads by default, against what it ships.
   suite: {
@@ -453,6 +468,66 @@ test('the vault page does not borrow the post-quantum story', () => {
     // post-quantum algorithms, is fine. Claiming it for this page is not.
     if (/\bnot\b|\bno\b|\bwithout\b|\belsewhere\b|\bsign(ing)?\b|\bsend(ing)?\b/i.test(s)) continue;
     problems.push(`vault: "${s.trim().slice(0, 180)}" claims a post-quantum property; ${FACTS.vault.where} uses ${FACTS.vault.kdf} into ${FACTS.vault.cipher} and nothing else`);
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// ── 9 ────────────────────────────────────────────────────────────────────────
+// The absolute that commit 06770e9b created. /architecture:755 used to read
+// "The relay never sees plaintext FOR SDK AND WEBAPP TRANSFERS"; the repair of
+// 5 September 2026 removed the qualifier and made a true limited sentence into
+// a false absolute one, on eight pages including the terms and the privacy
+// statement. relay/lib/parasign-store.js says of itself that the /v1 hosted
+// ceremony is "the ONE deliberate break of the 'relay never sees the PDF'
+// invariant", and relay/lib/parasign-open-api.js proves it: it takes a PDF as
+// content_base64, checks the %PDF- header (so, plaintext) and putBlob's the raw
+// bytes under a key the relay itself holds.
+//
+// The rule this block enforces is not "never say it". It is: a passage that
+// makes the claim about the relay AS SUCH has to name the exception. A passage
+// that scopes itself to a path the exception does not touch is honest and is
+// left alone, which is why the scope words below excuse a block rather than the
+// page excusing itself.
+test('no page makes the zero-knowledge claim about the relay as such without naming the /v1 exception', () => {
+  assert.ok(FACTS.hostedCeremony.takesRawDocument && FACTS.hostedCeremony.storesDocument,
+    `${FACTS.hostedCeremony.where}: /v1 no longer takes a raw PDF and stores it. If the ceremony became zero-knowledge, delete this block deliberately rather than letting it pass; the absolute sentences it guards would then be true.`);
+  assert.ok(FACTS.hostedCeremony.routeIsReachable,
+    'relay.js no longer mounts the /v1 route; if it is gone, the exception can go with it');
+
+  // What the claim sounds like, in every wording the site actually uses.
+  const CLAIM = [
+    /relay never sees (?:the )?plaintext/i,
+    /never (?:sees|holds|receives) (?:the )?plaintext/i,
+    /(?:holds?|stores?|hold) only ciphertext/i,
+    /never plaintext and never keys/i,
+    /no access to (?:keys or plaintext|plaintext or keys)/i,
+    /cannot access the content/i,
+    /does not receive the decryption key/i,
+  ];
+  // Naming the exception. Either form will do; both point a reader at it.
+  const EXCEPTION = /\/v1\b|hosted signing ceremony|hosted ceremony/i;
+  // Scoping the sentence to a path instead. A passage that says which route it
+  // is talking about is not making the absolute claim and needs no exception.
+  const SCOPED = /ParaSend|ParaShare|Ghost Pipe|web app|browser-encrypted|browser-created|created in a browser|SDK|extension|sensor|DICOM|on that path|this stand|on this page/i;
+
+  const problems = [];
+  for (const slug of allPages()) {
+    // The file's own prose pipeline, which is what makes this reliable: it puts
+    // a full stop at every block boundary before it strips tags, so a list item
+    // cannot run into the next one, and it includes the link-preview text,
+    // where four copies of the last untrue absolute were found. A hand-rolled
+    // block regex was tried first and swallowed a whole page inside one
+    // wrapping <div>, which hid the claim on /privacy entirely.
+    //
+    // Sentence by sentence, and the qualifier has to be in the sentence making
+    // the claim. Searching the paragraph would let "the SDKs and the web app"
+    // three sentences down excuse a bare absolute at the top: check 7's fault
+    // at paragraph scale, the right words in the wrong place.
+    for (const sentence of sentences(prose(page(slug)))) {
+      if (!CLAIM.some((re) => re.test(sentence))) continue;
+      if (EXCEPTION.test(sentence) || SCOPED.test(sentence)) continue;
+      problems.push(`${slug}: "${sentence.trim().slice(0, 150)}" states the zero-knowledge claim with no exception and no scope in the same sentence; ${FACTS.hostedCeremony.where} holds the document and its at-rest key for every live /v1 envelope`);
+    }
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });

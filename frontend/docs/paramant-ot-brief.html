@@ -300,7 +300,7 @@ Level 0  Physical process</div>
   → [client-side decrypt]
   → SCADA historian / cloud</div>
 
-<p>The relay holds only ciphertext, only in RAM, only until delivered. It has no knowledge of sensor values, device identifiers, or process state. A full relay compromise yields zero plaintext.</p>
+<p>On the Ghost Pipe and SDK paths in this brief the relay holds only ciphertext, only in RAM, only until delivered. It has no knowledge of sensor values, device identifiers, or process state. A full relay compromise yields zero plaintext.</p>
 
 <h2>Relay Properties</h2>
 <div class="two-col">
@@ -378,7 +378,7 @@ Level 0  Physical process</div>
   <tr>
     <td class="sr-ref">SR 4.1</td>
     <td>Information confidentiality</td>
-    <td>ML-KEM-768 client-side encryption. Relay never holds plaintext. Fixed-padding blobs — traffic analysis blind, SCADA message sizes not leaked.</td>
+    <td>ML-KEM-768 client-side encryption. Relay never holds plaintext on the SDK and Ghost Pipe paths this brief describes. Fixed-padding blobs, so traffic analysis is blind and SCADA message sizes are not leaked.</td>
     <td class="check-col">2–3</td>
   </tr>
   <tr>

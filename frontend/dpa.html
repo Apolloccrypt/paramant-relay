@@ -216,7 +216,7 @@ input:focus{border-color:var(--cobalt)}
   <h1>Data Processing Agreement</h1>
   <p class="sub">GDPR Article 28 compliant agreement between PARAMANT (processor) and your organisation (controller). Governs all personal data processed through the PARAMANT relay service.</p>
 
-  <div class="note-box"><strong>Zero-knowledge summary:</strong> PARAMANT operates a zero-knowledge relay. All file payloads are encrypted client-side before they reach our infrastructure — we hold only ciphertext and cannot access the content. We process only the minimum technical metadata required to route and expire transfers.</div>
+  <div class="note-box"><strong>Zero-knowledge summary:</strong> PARAMANT operates a zero-knowledge relay for transfers and for browser-created signing requests. Those payloads are encrypted client-side before they reach our infrastructure, so outside the hosted signing ceremony on the <code>/v1</code> API we hold only ciphertext and cannot access the content. The hosted signing ceremony on the <code>/v1</code> API is the exception the Controller should be aware of: there the document is supplied to PARAMANT in readable form so that PARAMANT can run the ceremony, and PARAMANT is a processor of that content for the life of the envelope. We process only the minimum technical metadata required to route and expire transfers.</div>
 
   <h2 id="parties">1. Parties</h2>
   <table>
@@ -275,8 +275,8 @@ input:focus{border-color:var(--cobalt)}
     <thead><tr><th>Measure</th><th>Implementation</th></tr></thead>
     <tbody>
       <tr><td>Encryption in transit</td><td>TLS 1.3 minimum on all relay endpoints</td></tr>
-      <tr><td>End-to-end encryption of content</td><td>File payloads are encrypted client-side and the relay holds only ciphertext. Authenticated web app and SDK transfers use the ML-KEM-768 + ECDH P-256 hybrid (NIST FIPS 203); browser-encrypted links and the two extensions use AES-256-GCM with the key in the URL fragment and no key exchange.</td></tr>
-      <tr><td>Encryption at rest</td><td>Ghost Pipe and ParaShare payloads remain RAM-only. ParaSign request documents are stored only as browser-encrypted AES-256-GCM capsules; the relay does not receive the decryption key.</td></tr>
+      <tr><td>End-to-end encryption of content</td><td>File payloads are encrypted client-side and, outside the hosted signing ceremony on the <code>/v1</code> API, the relay holds only ciphertext. Authenticated web app and SDK transfers use the ML-KEM-768 + ECDH P-256 hybrid (NIST FIPS 203); browser-encrypted links and the two extensions use AES-256-GCM with the key in the URL fragment and no key exchange.</td></tr>
+      <tr><td>Encryption at rest</td><td>Ghost Pipe and ParaShare payloads remain RAM-only. ParaSign request documents created in the browser are stored only as browser-encrypted AES-256-GCM capsules; the relay does not receive the decryption key. Documents submitted to the hosted signing ceremony on the <code>/v1</code> API are held by the relay and sealed at rest under a key the relay holds.</td></tr>
       <tr><td>Data minimisation</td><td>Filenames not stored in plaintext (enc_meta ciphertext only); device IDs hashed SHA3-256 in CT log; no logging of payload content</td></tr>
       <tr><td>Access control</td><td>API key authentication on all relay endpoints; admin panel protected with TOTP MFA and per-IP rate limiting (5 attempts per 15 minutes)</td></tr>
       <tr><td>Audit logging</td><td>Certificate Transparency log — transfer hashes and device key commitments, no payload content; tamper-evident Merkle tree</td></tr>
