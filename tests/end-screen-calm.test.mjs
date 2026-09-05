@@ -424,8 +424,12 @@ async function pickPdf(page, name) {
   await page.locator('.ds-pl-copy').first().waitFor({ timeout: 20000 });
   const text = await audit(page, '/sign invitations sent', '#step-done');
   ok('/sign invitations sent: the stage bar is gone', !(await page.locator('#ds-stepper').isVisible()));
+  // The screen may not stop at "sent": the email is a notice and the key is
+  // deliberately not in it, so the sender has one more thing to do and has to
+  // be told. See admin/lib/email-templates.js for why the key stays here.
   ok('/sign invitations sent: it says what is true now, in words',
-    /Invitations are on their way/.test(text), text.slice(0, 160));
+    /Notified\. Now send them the links\./.test(text) && /carries no key/.test(text),
+    text.slice(0, 200));
   await page.close();
 }
 
