@@ -78,6 +78,7 @@ const aliases = {
   '/docs': '/docs.html',
   '/help': '/help/index.html',
   '/download': '/download.html',
+  '/gereedschap': '/gereedschap.html',
 };
 
 const server = http.createServer((req, res) => {
@@ -168,6 +169,22 @@ const PAGES = [
       // the ownership claim, in the words he already publishes on LinkedIn.
       { name: 'the band tag, once, with the two frames that sell (5 September: a merge left it doubled and garbled)', css: '.hp-band-tag', text: 'Built in Harderwijk, hosted in Nuremberg, answerable to no one in Virginia' },
       { name: 'the heading of the five facts, which now come before the gift (panel of 4 September: facts convince, the letter can wait)', css: '#check-h', text: 'Five things you can check' },
+    ],
+  },
+  {
+    // The free half of the product, on one page. What has to be readable before
+    // a phone scrolls is the promise in the H1 and the name of the first tool:
+    // a visitor who came for "what can I use without signing up" has to see an
+    // answer, not a hero. The button under it sits at 907 by design, because
+    // each card carries two sentences (what it does, where the limit is) and
+    // cutting one to lift the button would cost the honest half.
+    slug: '/gereedschap',
+    claims: [
+      { name: 'the promise', css: 'h1.hero-h1', text: 'zonder account' },
+      { name: 'the line under it', css: 'p.lede', text: 'gewoon gereedschap' },
+      { name: 'the heading of the free tools', css: '.marker h2', text: 'Zonder account' },
+      { name: 'the first tool, by name', css: '.tool-card h3', text: 'Een bestand op slot zetten' },
+      { name: 'what that first tool does', css: '.tool-card p', text: 'Kies een bestand en een wachtwoord' },
     ],
   },
   {
