@@ -34,7 +34,8 @@ PRIVATE = {
 # its budget on a 60-page site: the product and the money pages first.
 PRIORITY = [
     (0.9, {"index", "pricing", "parasend", "parasign", "sign", "verify", "vault", "download"}),
-    (0.8, {"security", "trust", "architecture", "docs", "vs", "about"}),
+    (0.8, {"security", "trust", "architecture", "docs", "vs", "about",
+           "gereedschap"}),
 ]
 DEFAULT_PRIORITY = 0.6
 

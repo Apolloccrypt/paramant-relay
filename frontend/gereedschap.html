@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gereedschap &middot; wat zonder account werkt</title>
+<meta property="og:title" content="Gereedschap · wat zonder account werkt">
+<meta property="og:description" content="Wat van Paramant zonder account werkt: een bestand op slot zetten, een handtekening of ontvangstbewijs controleren, en het openbare logboek lezen.">
+<meta property="og:url" content="https://paramant.app/gereedschap">
+<meta property="og:type" content="website">
+<link rel="canonical" href="https://paramant.app/gereedschap">
+<meta name="description" content="Wat van Paramant zonder account werkt: een bestand op slot zetten, een handtekening of ontvangstbewijs controleren, en het openbare logboek lezen.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Gereedschap &middot; wat zonder account werkt">
+<meta name="twitter:description" content="Wat van Paramant zonder account werkt: een bestand op slot zetten, een handtekening of ontvangstbewijs controleren, en het openbare logboek lezen.">
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:site_name" content="Paramant">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/nav.css?v=24">
+<style>
+.tool-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--ink-hair);margin-top:var(--space-6)}
+.tool-grid,.tool-card{min-width:0}
+.tool-card{padding:var(--space-6);background:var(--bone);display:flex;flex-direction:column}
+.tool-card h3{font-size:var(--text-lg);color:var(--navy);margin-bottom:var(--space-3);line-height:1.3}
+.tool-card p{font-size:var(--text-base);color:var(--ink);line-height:1.7;margin-bottom:var(--space-3)}
+.tool-card p.edge{color:var(--ink-2)}
+.tool-card .btn{align-self:flex-start;white-space:normal;line-height:1.45}
+.tool-note{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)}
+.tool-tech{margin-top:auto;padding-top:var(--space-5);border-top:1px solid var(--ink-hair)}
+.tool-tech>summary{font-size:var(--text-sm);color:var(--ink-dim);cursor:pointer;list-style:none;padding:var(--space-2) 0}
+.tool-tech>summary::-webkit-details-marker{display:none}
+.tool-tech>summary::before{content:"+";display:inline-block;width:1.1em;font-family:var(--mono);color:var(--ink-dim)}
+.tool-tech[open]>summary::before{content:"\2212"}
+.tool-tech>summary:hover,.tool-tech>summary:focus-visible{color:var(--ink)}
+.tool-tech-body{font-size:var(--text-sm);line-height:1.7;color:var(--ink-dim);padding-bottom:var(--space-3)}
+.ladder{border-top:1px solid var(--invert-hair);max-width:70ch}
+.ladder-step{border-bottom:1px solid var(--invert-hair);padding:var(--space-5) 0}
+.ladder-name{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-2)}
+.ladder-step p{font-size:var(--text-base);color:var(--invert-ink);line-height:1.7;margin:0}
+.ladder-step p a{color:var(--cobalt)}
+@media(max-width:767px){
+.tool-grid{grid-template-columns:1fr;margin-top:var(--space-4)}
+.section-lg{padding-top:var(--space-6);padding-bottom:var(--space-5)}
+.section{padding-top:var(--space-6)}
+.tool-card{padding:var(--space-5)}
+}
+</style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/gereedschap#webpage",
+      "url": "https://paramant.app/gereedschap",
+      "name": "Gereedschap · wat zonder account werkt",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "nl",
+      "description": "Wat van Paramant zonder account werkt: een bestand op slot zetten, een handtekening of ontvangstbewijs controleren, en het openbare logboek lezen."
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+    <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/security" class="nav-link">Security</a></li>
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/docs" class="nav-link">Docs</a></li>
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/security" class="nav-mobile-standalone">Security</a>
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
+</div>
+
+<section class="section section-lg" id="main-content" tabindex="-1">
+  <div class="container">
+    <div class="eyebrow"><span class="bar"></span>gereedschap</div>
+    <h1 class="hero-h1">Los te gebruiken, <em>zonder account.</em></h1>
+    <p class="lede" style="max-width:720px">Een deel van Paramant is gewoon gereedschap: u opent een pagina, doet wat u kwam doen, en sluit hem weer.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">01</div>
+      <h2>Zonder account.</h2>
+      <div class="tag">geen aanmelding<br>geen betaling</div>
+    </div>
+
+    <div class="tool-grid">
+
+      <div class="tool-card">
+        <div class="tool-note">werkt meteen</div>
+        <h3>Een bestand op slot zetten</h3>
+        <p>Kies een bestand en een wachtwoord. Uw browser maakt er een gesloten bestand van dat alleen met dat wachtwoord weer opengaat.</p>
+        <p class="edge">Het bestand en het wachtwoord blijven op uw eigen apparaat. Wij krijgen ze niet, dus wij kunnen het wachtwoord ook niet voor u herstellen. Raakt u het kwijt, dan is het bestand weg.</p>
+        <a href="/vault" class="btn btn-primary">Een bestand op slot zetten</a>
+        <details class="tool-tech">
+          <summary>De techniek</summary>
+          <div class="tool-tech-body">AES-256-GCM. De sleutel komt uit uw wachtwoord met PBKDF2-SHA-256 over 600.000 rondes, met een willekeurige salt en nonce. Het aantal rondes staat in het bestand zelf, zodat oudere bestanden open blijven gaan. De pagina doet geen enkel netwerkverzoek.</div>
+        </details>
+      </div>
+
+      <div class="tool-card">
+        <div class="tool-note">werkt meteen</div>
+        <h3>Een handtekening of een ontvangstbewijs controleren</h3>
+        <p>Leg een ondertekend document naast zijn handtekeningbestand, of open het ontvangstbewijs van een verzending. De pagina rekent na of het klopt.</p>
+        <p class="edge">Het narekenen gebeurt in uw browser, ook zonder verbinding. Eén uitzondering: handtekeningen uit het oude formaat kunnen alleen door de server gecontroleerd worden, en daar is een sleutel voor nodig. De pagina zegt zelf wanneer dat zo is.</p>
+        <a href="/verify" class="btn btn-primary">Iets controleren</a>
+        <details class="tool-tech">
+          <summary>De techniek</summary>
+          <div class="tool-tech-body">Voor het huidige formaat wordt SHA3-256 over uw document berekend, daarna de ML-DSA-65-handtekening over die hash gecontroleerd, en daarna de geldigheidsduur. Een ontvangstbewijs wordt getoetst tegen sleutels die in de pagina zelf staan. In beide gevallen gaat er geen enkel verzoek de deur uit.</div>
+        </details>
+      </div>
+
+      <div class="tool-card">
+        <div class="tool-note">werkt meteen</div>
+        <h3>Het openbare logboek lezen</h3>
+        <p>Elke registratie van een publieke sleutel wordt toegevoegd aan een logboek dat alleen kan groeien, en dat iedereen mag inzien.</p>
+        <p class="edge">U ziet hashes en tijdstippen. Documenten, bestandsnamen en namen van mensen staan er niet in, en zijn er ook niet uit af te leiden.</p>
+        <a href="/ct-log" class="btn btn-primary">Het logboek openen</a>
+        <details class="tool-tech">
+          <summary>De techniek</summary>
+          <div class="tool-tech-body">Een Merkle-boom die op schijf staat en een herstart overleeft. De openbare weergave rondt tijdstippen af op het uur. Op 5 september 2026 stonden er 891 regels in.</div>
+        </details>
+      </div>
+
+      <div class="tool-card">
+        <div class="tool-note">u heeft een link nodig</div>
+        <h3>Een bestand ophalen dat iemand u stuurde</h3>
+        <p>Heeft iemand u een Paramant-link gestuurd, dan haalt u het bestand hier op en maakt uw browser het weer open.</p>
+        <p class="edge">Hier kunt u niets zelf beginnen. Zonder link van een afzender valt er niets op te halen. Een link uit de webapp gaat één keer open; daarna is onze kopie er niet meer.</p>
+        <a href="/get" class="btn btn-primary">Een link openen</a>
+        <details class="tool-tech">
+          <summary>De techniek</summary>
+          <div class="tool-tech-body">De sleutel staat achter het hekje in de link. Dat deel van een adres stuurt een browser nooit mee naar een server, dus wij hebben de sleutel niet en kunnen het bestand niet openen. De bestandsnaam zit versleuteld in het bestand zelf en staat er niet naast.</div>
+        </details>
+      </div>
+
+    </div>
+    <p class="dim mono" style="font-size:11px;margin-top:var(--space-5)">Nagekeken tegen de code en tegen paramant.app op 5 september 2026</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="marker">
+      <div class="num">02</div>
+      <h2>Hier is wel een account voor nodig.</h2>
+      <div class="tag">gratis account<br>eerlijk vooraf</div>
+    </div>
+
+    <p style="max-width:70ch;font-size:var(--text-base);color:var(--ink);line-height:1.75">Deze twee vragen een account. Een account kost niets: het Community-plan is gratis en blijft gratis. Het staat hier zodat u het weet voordat u een bestand kiest, in plaats van erna. Beide knoppen gaan daarom eerst naar het aanmeldscherm, en daarna vanzelf door naar het gereedschap.</p>
+
+    <div class="tool-grid">
+
+      <div class="tool-card">
+        <div class="tool-note">account nodig</div>
+        <h3>Een document laten ondertekenen</h3>
+        <p>Zet een PDF klaar, plaats uw handtekening en onderteken hem, of stuur het document naar de mensen die moeten tekenen.</p>
+        <p class="edge">Het klaarzetten en het plaatsen van de handtekening kan zonder aan te melden, het ondertekenen zelf niet. Het Community-plan geeft twee handtekeningen per maand.</p>
+        <a href="/auth/login?next=/sign" class="btn btn-secondary">Eerst aanmelden, dan ondertekenen</a>
+      </div>
+
+      <div class="tool-card">
+        <div class="tool-note">account nodig</div>
+        <h3>Een bestand veilig versturen</h3>
+        <p>Versleutel een bestand in uw browser en geef het live over aan de ontvanger, of laat het achter op een link die vanzelf vervalt.</p>
+        <p class="edge">Deze pagina vraagt eerst om aanmelden, dus zonder account komt u er niet in. Het Community-plan geeft tien verzendingen per maand, tot 5 MB per bestand.</p>
+        <a href="/auth/login?next=/parashare" class="btn btn-secondary">Eerst aanmelden, dan versturen</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section class="section section-dark">
+  <div class="container">
+    <div class="marker">
+      <div class="num">03</div>
+      <h2 style="color:var(--invert-ink)">Wat er daarna is.</h2>
+      <div class="tag">vier treden<br>geen haast</div>
+    </div>
+
+    <div class="ladder">
+      <div class="ladder-step">
+        <div class="ladder-name">Gereedschap</div>
+        <p>Het gereedschap hierboven kost niets, en wat vandaag zonder account werkt blijft zonder account werken.</p>
+      </div>
+      <div class="ladder-step">
+        <div class="ladder-name">Firm</div>
+        <p>29 euro per maand, excl. btw, voor een heel kantoor in plaats van per gebruiker: honderd handtekeningen en vijfhonderd verzendingen per maand, en toegang tot de API. <a href="/pricing">De hele prijslijst</a>.</p>
+      </div>
+      <div class="ladder-step">
+        <div class="ladder-name">De maandelijkse meting</div>
+        <p>Vanaf 250 euro per maand meet ik elke maand op dezelfde manier wat uw site of app naar buiten stuurt, en waarin dat verschilt met vorige maand. <a href="mailto:info@paramant.app?subject=De%20maandelijkse%20meting">Vraag ernaar</a>.</p>
+      </div>
+      <div class="ladder-step">
+        <div class="ladder-name">Onderzoek op maat</div>
+        <p>Eén vraag, één onderzoek, een vaste prijs die vooraf vastligt. <a href="mailto:info@paramant.app?subject=Onderzoek%20op%20maat">Vraag ernaar</a>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid footer-slim">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="/about">About</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Legal</div>
+        <div class="footer-links">
+          <a href="/privacy">Privacy Policy</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/terms">Terms of Service</a>
+          <a href="/sla">SLA</a>
+          <a href="/license">License</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+<script src="/nav.js?v=15" defer></script>
+<script src="/js/nav-auth.js?v=9" defer></script>
+</body>
+</html>
