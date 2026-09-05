@@ -1,4 +1,8 @@
-// /sign told the truth about two things it used to be quiet about.
+// /sign told the truth about two things it used to be quiet about. The bar's
+// sentence names both verbs now: 'sending' was true of the invite flow only,
+// and the visitor who picked 'Sign it myself' was told about a step his
+// workflow does not have. See tests/sign-signed-out-dead-end.test.mjs for the
+// gate on the other two workflows.
 //
 // 1. A visitor with no session. The page is public, and the notice that says
 //    so was a .ds-step, so setActive() hid it the moment a workflow was chosen.
@@ -87,7 +91,7 @@ async function pickJpeg(page) {
 const out = await openSign(false);
 await out.locator('#ds-signedout:not([hidden])').waitFor({ timeout: 15000 });
 ok('signed out, the flow carries a bar that says so',
-  /You are not signed in\. You can prepare a document here; sending it needs a free Community account\./.test(await out.locator('#ds-signedout').innerText()),
+  /You are not signed in\. You can prepare a document here; signing or sending it needs a free Community account\./.test(await out.locator('#ds-signedout').innerText()),
   await out.locator('#ds-signedout').innerText());
 const barLinks = await out.locator('#ds-signedout a').evaluateAll((nodes) => nodes.map((n) => [n.textContent.trim(), n.getAttribute('href')]));
 ok('the bar comes back to /sign afterwards',
