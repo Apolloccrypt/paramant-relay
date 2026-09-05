@@ -335,6 +335,31 @@ else
   fi
 fi
 
+# ── 13. The known-flaky register expires ─────────────────────────────────────
+# A test that goes red at random is ignored within two weeks, and then it is a
+# guard that exists and does nothing. That is the pattern this repo keeps
+# finding: a canary that skipped for weeks, four ParaSign suites that asserted
+# nothing, a static-sanity run that lived only on somebody's laptop.
+#
+# So a flaky test may be known, and knowing it has a date on it. Every row in
+# tests/known-flaky.tsv is good for KNOWN_FLAKY_MAX_DAYS (14); past that the row
+# itself is the failure, which is the only way a stale entry ever gets read
+# again. Empty is the good state.
+echo ""
+echo "13. Known-flaky register (dated, expiring)..."
+FLAKYREG="$ROOT/scripts/check-flaky-register.sh"
+if [ -x "$FLAKYREG" ]; then
+  if OUT13="$("$FLAKYREG" 2>&1)"; then
+    printf '%s\n' "$OUT13" | sed 's/^/  /'
+  else
+    printf '%s\n' "$OUT13" | sed 's/^/  /'
+    FAIL=$((FAIL + 1))
+  fi
+else
+  printf "   FAIL  scripts/check-flaky-register.sh is gone; nothing expires the register\n"
+  FAIL=$((FAIL + 1))
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
 echo "════════ RESULT ════════"

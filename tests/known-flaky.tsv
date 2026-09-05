@@ -1,0 +1,23 @@
+# KNOWN-FLAKY REGISTER
+#
+# A test that goes red at random is ignored within two weeks, and then there is
+# a guard that exists and does nothing. This file is what keeps that from
+# happening quietly: a test may only be KNOWN to be flaky on the record, with a
+# date, and the record expires.
+#
+# One tab-separated row per test:
+#
+#   suite<TAB>test name<TAB>first seen (YYYY-MM-DD)<TAB>who/where<TAB>why it is still here
+#
+# tests/static-sanity.sh check 13 reads this file and FAILS when a row is older
+# than KNOWN_FLAKY_MAX_DAYS (14). So an entry buys two weeks, and after that the
+# entry itself is the build error. Removing the row without fixing the test just
+# moves the failure back to where it belongs.
+#
+# Empty is the good state, and it is the state this file is in. The one entry it
+# was going to carry - route-ct-persistence "a relay that lost its tree refuses
+# to sign a head contradicting one it already signed" - was fixed instead:
+# relay.js was losing the last appends at shutdown. See
+# relay/test/route-ct-exit-durability.test.js.
+#
+# suite	test	seen	source	why
