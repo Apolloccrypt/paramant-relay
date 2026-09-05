@@ -371,7 +371,35 @@ const CT_MAX = 10000;
 // pruned index return null instead of the wrong entry.
 const { CtWindow, reindexEntries } = require('./lib/ct-window');
 const ctWindow = new CtWindow(CT_MAX);
-const CT_FILE     = process.env.CT_FILE     || null; // opt-in only — auto-derive disabled to preserve RAM-only default
+// Where the transparency log lives on disk.
+//
+// This used to be `process.env.CT_FILE || null`: opt-in, RAM-only unless a
+// deployment remembered to set it. docker-compose.yml does set it, so
+// production was fine and nobody looked again. Every other relay - a self-host,
+// a community node, a `node relay.js` on a laptop - kept its whole log in
+// memory and lost it on restart, and losing it is not the worst part.
+//
+// Measured on a booted relay: four entries, restart, and the log comes back at
+// size 0 while RELAY_IDENTITY_FILE brings the SAME signing key back, and
+// STH_FILE brings the old signed heads back with it. The relay then signs
+// tree_size 1 again over a different root, so /v2/sth/history ends up holding
+// two contradictory heads for the same tree size under one key. Not an empty
+// log: a forked one, published, signed, and indistinguishable from tampering.
+// Every receipt issued before the restart also stops resolving - /v2/ct/proof
+// answers 404 for an index that is now beyond the log's own size.
+//
+// So persistence is the default now, and it lands wherever the signed heads
+// already land: the head and the tree it attests to belong on the same volume,
+// and a deployment that sets STH_FILE to a writable path was already saying
+// where that is. An explicitly EMPTY CT_FILE still selects RAM-only, for the
+// caller who means it; unset no longer means it by accident.
+const _ctFileDefault = () => {
+  const sth = process.env.STH_FILE;
+  return sth ? path.join(path.dirname(sth), 'ct-log.json') : '/data/ct-log.json';
+};
+const CT_FILE = process.env.CT_FILE !== undefined
+  ? (process.env.CT_FILE || null)   // explicit, empty means RAM-only on purpose
+  : _ctFileDefault();
 const CT_MAX_SIZE = parseInt(process.env.CT_MAX_SIZE || String(100 * 1024 * 1024)); // 100 MB default
 
 // Fix 8: async CT write stream with queued writes and log rotation
@@ -381,8 +409,21 @@ let _ctDraining  = false;
 
 function _ctOpenStream() {
   if (!CT_FILE) return;
-  _ctStream = fs.createWriteStream(CT_FILE, { flags: 'a' });
-  _ctStream.on('error', e => log('warn', 'ct_stream_error', { err: e.message }));
+  // mkdir first, as _sthOpenStream already did. Without it a fresh volume that
+  // has no /data yet takes the CT log back to RAM-only silently, which is the
+  // state this default exists to end.
+  try {
+    fs.mkdirSync(path.dirname(CT_FILE), { recursive: true });
+    _ctStream = fs.createWriteStream(CT_FILE, { flags: 'a' });
+    _ctStream.on('error', e => log('warn', 'ct_stream_error', { err: e.message }));
+  } catch (e) {
+    log('error', 'ct_log_not_persisted', {
+      err: e.message, file: CT_FILE,
+      hint: 'The transparency log is RAM-only: it is lost on restart and the relay '
+          + 'will refuse to sign a tree head that contradicts one it already signed. '
+          + 'Point CT_FILE at a writable path.',
+    });
+  }
 }
 
 async function _ctRotate() {
@@ -524,6 +565,26 @@ try {
 }
 _sthOpenStream();
 
+// What this relay has already put its name to. Two things, because they catch
+// two different halves of the same break:
+//   _sthSignedRoots  tree_size -> sha3_root, for the heads still in sthLog. It
+//                    is pruned in step with sthLog, so it stays bounded by
+//                    STH_MAX and does not grow with the log.
+//   _sthMaxSignedSize the largest tree_size ever signed. One number, never
+//                    pruned, and the half that survives the window: a tree that
+//                    walked BACKWARDS is a contradiction even when the head it
+//                    contradicts has aged out of memory.
+const _sthSignedRoots = new Map();
+let _sthMaxSignedSize = -1;
+for (const s of sthLog) {
+  if (!s || typeof s.tree_size !== 'number' || !s.sha3_root) continue;
+  _sthSignedRoots.set(s.tree_size, s.sha3_root);
+  if (s.tree_size > _sthMaxSignedSize) _sthMaxSignedSize = s.tree_size;
+}
+// Set once the relay has caught a contradiction. It is not cleared: a log that
+// has forked stays forked until someone looks at it.
+let ctLogForked = null;
+
 // ── Relay identity — ML-DSA-65 keypair for relay authentication ───────────────
 let relayIdentity = null; // { sk: Buffer, pk: Buffer, pk_hash: string }
 
@@ -615,15 +676,86 @@ function ctLeafHash(deviceIdHash, pubKeyHex, ts) {
 // CT-log hash primitives live in ./lib/ct-hash (pure, unit-tested there).
 const { ctNodeHash, ctTreeHash, ctInclusionProof, blobLeafHash } = require('./lib/ct-hash');
 
-// Coarsen an ISO timestamp to the top of its hour for PUBLIC projections only.
-// The full-precision ts stays in the stored entry (and is committed in the leaf
-// hash); this just blunts millisecond traffic-analysis in the public CT log.
+// The field gate. Every name that reaches a log entry, a leaf preimage or an
+// entry type is declared in ./lib/ct-fields, and relay/test/ct-fields.test.js
+// holds that declaration against a hand-written copy AND against the literals
+// this file really passes. The log is the one place where a stray field is
+// permanent and public at once, so it is the one place worth this much
+// ceremony. See the header of ct-fields.js for what went wrong without it.
+const ctFields = require('./lib/ct-fields');
+
+// Strip anything undeclared off an entry before it is stored, written to
+// CT_FILE or projected onto a public route, and say loudly that it happened.
+// Stripping rather than throwing: an undeclared field is by construction one no
+// reader knows about, so dropping it breaks nothing that exists, while letting
+// it through publishes it forever.
+function ctGateEntry(family, entry) {
+  const { entry: gated, rejected } = ctFields.gateEntry(family, entry);
+  if (rejected.length) {
+    log('error', 'ct_entry_field_rejected', {
+      family, type: entry.type || 'key_reg', rejected,
+      hint: 'A field reached a CT log entry without being declared in relay/lib/ct-fields.js. '
+          + 'It was dropped. If the log should carry it, add it there and to '
+          + 'relay/test/ct-fields.test.js, which is where someone has to write down why.',
+    });
+  }
+  return gated;
+}
+
+// The same gate for a payload, applied BEFORE the leaf is hashed. Order is
+// load-bearing: the leaf commits to the payload, so gating after hashing would
+// commit to a field the stored entry no longer has, and every recomputation of
+// that leaf would then fail.
+function ctGatePayload(eventType, payload) {
+  const { payload: gated, rejected } = ctFields.gatePayload(eventType, payload);
+  if (rejected.length) {
+    log('error', 'ct_payload_field_rejected', {
+      type: eventType, rejected,
+      hint: 'Declare it in PAYLOAD_FIELDS in relay/lib/ct-fields.js, or leave it out of the log.',
+    });
+  }
+  return gated;
+}
+
+// An event type is a leaf format: it is concatenated into the entry type and,
+// for the signing-key and envelope families, hashed into the leaf preimage. An
+// undeclared one throws, and that is safe to do BECAUSE ct-fields.test.js scans
+// this file and envelope.js for the literals actually passed and fails if any
+// of them is missing from the list. Without that scan this is exactly the guard
+// that silently broke trust-on-first-use enrolment for months.
+function ctRequireEventType(family, eventType) {
+  if (!ctFields.isAllowedEventType(family, eventType)) {
+    throw new Error(`ct-fields: undeclared ${family} event type "${eventType}": `
+      + 'add it to EVENT_TYPES in relay/lib/ct-fields.js and say why in relay/test/ct-fields.test.js');
+  }
+}
+
+// ── The hour, defined once ───────────────────────────────────────────────────
+// Everything the CT log publishes about WHEN something happened is rounded to
+// the top of its hour, and every route that does that rounding goes through one
+// of these two functions. One definition, so a new public projection cannot
+// quietly pick a different resolution, and so relay/test/route-ct-public-time.test.js
+// has a single thing to hold every route to.
+//
+// The full-precision timestamp stays in the stored entry (it is committed in
+// the leaf hash, so a receipt must carry it back for /v2/verify-receipt) and in
+// the receipt the customer keeps. Precision belongs in the private receipt;
+// coarseness belongs in the public log.
+const CT_HOUR_MS = 3_600_000;
+
+// Epoch milliseconds -> the top of that hour, still epoch milliseconds.
+function ctCoarseMs(ms) {
+  const n = typeof ms === 'number' ? ms : Number(ms);
+  if (!Number.isFinite(n)) return ms;
+  return Math.floor(n / CT_HOUR_MS) * CT_HOUR_MS;
+}
+
+// ISO timestamp -> the top of its hour, as an ISO timestamp.
 function ctCoarseTs(ts) {
   if (!ts) return ts;
   const d = new Date(ts);
   if (isNaN(d.getTime())) return ts;
-  d.setUTCMinutes(0, 0, 0);
-  return d.toISOString();
+  return new Date(ctCoarseMs(d.getTime())).toISOString();
 }
 
 // Recursive canonical JSON (sorted keys, no whitespace) — used for signing receipts + STH.
@@ -647,7 +779,7 @@ function ctAppend(deviceId, pubKeyHex, apiKey) {
   const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
   const proof = ctInclusionProof(allEntries, allEntries.length - 1); // real audit path at the new leaf position
-  const entry = { index, leaf_hash, tree_hash, device_hash: deviceIdHash, ts, proof };
+  const entry = ctGateEntry('key_reg', { index, leaf_hash, tree_hash, device_hash: deviceIdHash, ts, proof });
   ctWindow.append(entry);
   // Fix 8: async write via stream queue instead of appendFileSync
   ctWrite(entry);
@@ -667,14 +799,14 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
   const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
   const proof = ctInclusionProof(allEntries, allEntries.length - 1);
-  const entry = {
+  const entry = ctGateEntry('relay_reg', {
     index, type: 'relay_reg', leaf_hash, tree_hash,
     device_hash: pkHash,          // reused field — relay public key hash
     relay_url: relayUrl, relay_sector: sector,
     relay_version: version, relay_edition: edition,
     relay_pk_hash: pkHash,
     ts, proof
-  };
+  });
   ctWindow.append(entry);
   // Fix 8: async write via stream queue
   ctWrite(entry);
@@ -693,10 +825,10 @@ function ctAppendTransfer(blobHash, sector) {
   const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
   const proof = ctInclusionProof(allEntries, allEntries.length - 1);
-  const entry = {
+  const entry = ctGateEntry('transfer', {
     index, type: 'transfer', leaf_hash, tree_hash,
     blob_hash: blobHash, sector, ts, proof
-  };
+  });
   ctWindow.append(entry);
   ctWrite(entry);
   const sth = produceSth(allEntries.length, entry.tree_hash);
@@ -714,10 +846,10 @@ function ctAppendParasign(documentHashHex, signerPkHash) {
   const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
   const proof = ctInclusionProof(allEntries, allEntries.length - 1);
-  const entry = {
+  const entry = ctGateEntry('parasign', {
     index, type: 'parasign', leaf_hash, tree_hash,
     document_hash: documentHashHex, signer_pk_hash: signerPkHash, ts, proof
-  };
+  });
   ctWindow.append(entry);
   ctWrite(entry);
   produceSth(allEntries.length, entry.tree_hash);
@@ -728,19 +860,37 @@ function ctAppendParasign(documentHashHex, signerPkHash) {
 // the CT log. The relay never sees the document - the leaf commits only to
 // the envelope id, event type, and a sha3-256 over the structured payload.
 function ctAppendEnvelope(eventType, envelopeId, payload) {
+  // `type` is the event name as given, not 'envelope_' + it. Every call site in
+  // envelope.js already passes the full name ('envelope_sign', 'envelope_void',
+  // ...), so the old concatenation published 'envelope_envelope_sign', and
+  // scripts/heartbeat/parasign.mjs has been filtering the public log for
+  // `type === 'envelope_sign'` against a value that never existed. That check
+  // is the strongest evidence the ParaSign heartbeat collects, and it could not
+  // fire. The declared list below is what would have caught it, which is why
+  // this repair rides along with the gate rather than as a separate errand.
+  //
+  // Nothing already signed moves: the leaf preimage is
+  // ctLeafHash(envelopeId, sha3(eventType|id|payload), ts) and takes the raw
+  // eventType, never this string. `type` lives on the entry and in the public
+  // projection only, so no inclusion proof and no receipt changes value.
+  const type = eventType;
+  ctRequireEventType('envelope', type);
+  // Gated first, then hashed: the leaf commits to this object, so it must be
+  // the same object the entry stores.
+  const gatedPayload = ctGatePayload(type, payload);
   const ts = new Date().toISOString();
   const valueHash = crypto.createHash('sha3-256')
     .update(eventType).update('|').update(envelopeId).update('|')
-    .update(JSON.stringify(payload || {})).digest('hex');
+    .update(JSON.stringify(gatedPayload)).digest('hex');
   const leaf_hash = ctLeafHash(envelopeId, valueHash, ts);
   const index = ctWindow.nextIndex();
   const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
   const proof = ctInclusionProof(allEntries, allEntries.length - 1);
-  const entry = {
-    index, type: 'envelope_' + eventType, leaf_hash, tree_hash,
-    envelope_id: envelopeId, payload: payload || {}, ts, proof
-  };
+  const entry = ctGateEntry('envelope', {
+    index, type, leaf_hash, tree_hash,
+    envelope_id: envelopeId, payload: gatedPayload, ts, proof
+  });
   ctWindow.append(entry);
   ctWrite(entry);
   produceSth(allEntries.length, entry.tree_hash);
@@ -750,11 +900,15 @@ function ctAppendEnvelope(eventType, envelopeId, payload) {
 // Appends a signing-pubkey lifecycle event (enroll / revoke) to the CT log so
 // identity changes are tamper-evident. user_id is hashed (SHA3-256) before
 // emission — verifiers see a stable identity-handle without the raw API key.
-// `eventType` must be 'signing_pk_enrolled' or 'signing_pk_revoked'.
+// `eventType` is one of EVENT_TYPES.signing_pk in relay/lib/ct-fields.js.
 function ctAppendSigningPkEvent(eventType, userId, signerPkHash) {
-  if (eventType !== 'signing_pk_enrolled' && eventType !== 'signing_pk_revoked') {
-    throw new Error('invalid eventType: ' + eventType);
-  }
+  // This guard used to name two of the four types its own call sites pass:
+  // 'signing_pk_enrolled_tofu' and 'signing_pk_enrolled_attested' threw here,
+  // the route's outer catch turned that into a 500 AFTER the key was stored,
+  // and neither enrolment path ever reached the transparency log. The list now
+  // lives in ct-fields.js with a test that scans the call sites, so a name can
+  // no longer be missing from it without the build saying so.
+  ctRequireEventType('signing_pk', eventType);
   const ts = new Date().toISOString();
   const userIdHash = crypto.createHash('sha3-256').update(String(userId)).digest('hex');
   const leaf_hash = ctLeafHash(userIdHash, signerPkHash, ts);
@@ -762,10 +916,10 @@ function ctAppendSigningPkEvent(eventType, userId, signerPkHash) {
   const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
   const proof = ctInclusionProof(allEntries, allEntries.length - 1);
-  const entry = {
+  const entry = ctGateEntry('signing_pk', {
     index, type: eventType, leaf_hash, tree_hash,
     user_id_hash: userIdHash, signer_pk_hash: signerPkHash, ts, proof
-  };
+  });
   ctWindow.append(entry);
   ctWrite(entry);
   produceSth(allEntries.length, entry.tree_hash);
@@ -778,7 +932,61 @@ function ctAppendSigningPkEvent(eventType, userId, signerPkHash) {
 function produceSth(tree_size, sha3_root) {
   if (!mlDsa || !relayIdentity) return null;
   const relay_id = RELAY_SELF_URL || (SECTOR + '.paramant.app');
-  const payload  = { relay_id, sha3_root, timestamp: Date.now(), tree_size, version: 1 };
+  // Append-only, enforced. A transparency log's whole claim is that tree_size
+  // only ever grows and that a size, once signed, keeps its root forever. Both
+  // break at once when the tree is lost but the key and the head history are
+  // not: the relay walks back to tree_size 1 and signs a second, different root
+  // for it. That signature is real, so no verifier can tell it from tampering,
+  // and the relay produced it without a single warning.
+  //
+  // So a head that contradicts one already signed is not produced at all. A
+  // missing head is visible and recoverable; a forged-looking one is neither.
+  // Re-signing the SAME root at the same size is allowed: that is idempotent,
+  // not a contradiction.
+  const priorRoot = _sthSignedRoots.get(tree_size);
+  const contradicts = priorRoot !== undefined && priorRoot !== sha3_root;
+  const wentBackwards = tree_size < _sthMaxSignedSize;
+  if (contradicts || wentBackwards) {
+    if (!ctLogForked) {
+      ctLogForked = {
+        tree_size, max_signed_size: _sthMaxSignedSize,
+        signed_root: priorRoot || null, refused_root: sha3_root,
+        reason: contradicts ? 'root_differs_at_same_size' : 'tree_size_went_backwards',
+        at: new Date().toISOString(),
+      };
+    }
+    log('error', 'sth_refused_would_fork', {
+      tree_size, max_signed_size: _sthMaxSignedSize,
+      reason: contradicts ? 'root_differs_at_same_size' : 'tree_size_went_backwards',
+      signed_root: priorRoot ? priorRoot.slice(0, 16) + '…' : null,
+      refused_root: String(sha3_root).slice(0, 16) + '…',
+      hint: 'This relay has already signed a larger or different tree. The usual cause is a '
+          + 'restart with a persisted STH log and a CT log that was not persisted. Restore CT_FILE '
+          + 'from backup, or start a new relay identity; do not delete the STH log.',
+    });
+    return null;
+  }
+  // The timestamp is coarsened to the hour BEFORE it is signed, because it is
+  // the sharpest of the three doors onto the exact time of a leaf, not the
+  // mildest. An STH is produced on every single append, so tree_size N is leaf
+  // N-1, and this timestamp used to be Date.now() taken microseconds after that
+  // leaf's own ts. Measured on a booted relay: given the leaf hash from
+  // /v2/ct/log and the STH at tree_size = index + 1 from /v2/sth/history, a
+  // candidate document was confirmed in ONE hash. That is worse than the feed
+  // was: the feed carried fifty entries, the history carries a thousand, the
+  // heads are mirrored to every peer, and the leak was inside a signature, so
+  // coarsening it in the projection would have been a lie rather than a fix.
+  // Hence at production. Old heads on disk keep the precise timestamp they were
+  // signed with and still verify: verification recomputes the canonical payload
+  // from whatever fields the head carries, both in receipt-verify.js and in
+  // /v2/sth/ingest, and neither pins a resolution.
+  //
+  // The cost is real and worth naming: an archiver can no longer tell from a
+  // head alone where in the hour it was signed. tree_size still orders the
+  // heads, monotonically and per append, so freshness monitoring and the
+  // consistency proofs are untouched. The log's own resolution has been an hour
+  // everywhere else all along; the head was the one place still saying more.
+  const payload  = { relay_id, sha3_root, timestamp: ctCoarseMs(Date.now()), tree_size, version: 1 };
   // Canonical JSON: keys sorted alphabetically
   const sortedKeys = Object.keys(payload).sort();
   const canonical  = JSON.stringify(Object.fromEntries(sortedKeys.map(k => [k, payload[k]])));
@@ -790,8 +998,12 @@ function produceSth(tree_size, sha3_root) {
     return null;
   }
   const sth = { ...payload, signature };
+  _sthSignedRoots.set(tree_size, sha3_root);
+  if (tree_size > _sthMaxSignedSize) _sthMaxSignedSize = tree_size;
   sthLog.push(sth);
-  if (sthLog.length > STH_MAX) sthLog.shift();
+  // Prune the root map in step with the head window so it stays bounded.
+  // _sthMaxSignedSize is what keeps the guard whole past this point.
+  if (sthLog.length > STH_MAX) { const dropped = sthLog.shift(); _sthSignedRoots.delete(dropped.tree_size); }
   sthWrite(sth);
   // Broadcast to peers asynchronously — non-blocking, best-effort
   setImmediate(() => broadcastSTH(sth).catch(() => {}));
@@ -990,7 +1202,12 @@ function renderPrometheus() {
     L.push(`# TYPE paramant_${k} counter`);
     L.push(`paramant_${k}{sector="${SECTOR}",v="${VERSION}"} ${v}`);
   }
-  for(const [k,v] of [['blobs_in_flight',blobStore.size],['pubkeys',pubkeys.size],['edition',EDITION==='licensed'?1:0],['did_registry',didRegistry.size],['ct_log',ctWindow.size],['uptime_s',Math.floor(process.uptime())],['heap_bytes',process.memoryUsage().heapUsed]]){
+  // ct_log_persisted and ct_log_forked are the two the transparency log is
+  // actually judged on. A relay whose log is RAM-only is one restart away from
+  // signing a second history, and a relay that has refused to sign has stopped
+  // producing heads entirely. Both were invisible before: the first showed as
+  // nothing at all, the second as a log that simply went quiet.
+  for(const [k,v] of [['blobs_in_flight',blobStore.size],['pubkeys',pubkeys.size],['edition',EDITION==='licensed'?1:0],['did_registry',didRegistry.size],['ct_log',ctWindow.size],['ct_log_persisted',CT_FILE?1:0],['ct_log_forked',ctLogForked?1:0],['uptime_s',Math.floor(process.uptime())],['heap_bytes',process.memoryUsage().heapUsed]]){
     L.push(`# TYPE paramant_${k} gauge`);
     L.push(`paramant_${k}{sector="${SECTOR}"} ${v}`);
   }
@@ -3025,16 +3242,20 @@ catch (e) { if (e.code !== 'ENOENT') log('warn', 'code_manifest_load_error', { e
 // this same function, so it outlives the product it was named after. `did`
 // is any opaque subject identifier, not necessarily a DID.
 function ctAppendEvent(eventType, did, payload) {
+  ctRequireEventType('did_event', eventType);
+  // Gated before it is hashed, as in ctAppendEnvelope: the leaf commits to this
+  // object, so the entry must store the same one.
+  const gatedPayload = ctGatePayload(eventType, payload);
   const ts = new Date().toISOString();
   const valueHash = crypto.createHash('sha3-256')
     .update(eventType).update('|').update(did).update('|')
-    .update(JSON.stringify(payload || {})).digest('hex');
+    .update(JSON.stringify(gatedPayload)).digest('hex');
   const leaf_hash = ctLeafHash(did, valueHash, ts);
   const index = ctWindow.nextIndex();
   const allEntries = [...ctWindow.entries, { leaf_hash }];
   const tree_hash = ctTreeHash(allEntries);
   const proof = ctInclusionProof(allEntries, allEntries.length - 1);
-  const entry = { index, type: eventType, leaf_hash, tree_hash, did, payload: payload || {}, ts, proof };
+  const entry = ctGateEntry('did_event', { index, type: eventType, leaf_hash, tree_hash, did, payload: gatedPayload, ts, proof });
   ctWindow.append(entry);
   ctWrite(entry);
   produceSth(allEntries.length, entry.tree_hash);
@@ -4826,6 +5047,19 @@ async function handleRelayRequest(req, res) {
   if (path === '/ct/feed' && req.method === 'GET') {
     // `i` comes from the window position (start_index + i), never from the
     // entry's stored index field. See /v2/ct/log below.
+    //
+    // `t` is coarsened by ctCoarseTs, exactly like /v2/ct/log and /v2/ct/proof.
+    // It used to be the stored full-precision ts, and that turned the hour
+    // rounding on the other two routes into decoration. A leaf commits to the
+    // millisecond timestamp, so anyone holding a candidate document could take
+    // the exact `t` from this feed, join it to the full leaf_hash that
+    // /v2/ct/log publishes at the same index, and confirm the document in ONE
+    // hash - no search at all - for the fifty most recent entries, which is
+    // precisely the traffic worth hiding. Coarsening here does not fix the
+    // underlying unsalted leaf (that needs a salted tree), but it puts the
+    // free path back behind the same hour of brute force as the rest of the
+    // log. Every projection that leaves this process goes through ctCoarseTs;
+    // the full ts stays in the stored entry and in the receipt.
     const last50 = ctWindow.recentPage(50);
     const root   = ctWindow.last() ? ctWindow.last().tree_hash : '0'.repeat(64);
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
@@ -4837,7 +5071,7 @@ async function handleRelayRequest(req, res) {
       root,
       entries: last50.entries.map((e, i) => ({
         i:    last50.start_index + i,
-        t:    e.ts,
+        t:    ctCoarseTs(e.ts),
         h:    e.leaf_hash ? e.leaf_hash.slice(0, 16) + '...' : null,
         type: e.type || 'key_reg',
         s:    e.relay_sector || SECTOR,
@@ -4886,7 +5120,11 @@ async function handleRelayRequest(req, res) {
     const latest = sthLog.length ? sthLog[sthLog.length - 1] : null;
     if (!latest) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'No STH yet — CT log is empty' })); }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, sth: latest }));
+    // `forked` is present only when this relay has refused to sign a head that
+    // would contradict one it already signed. It is on the PUBLIC endpoint on
+    // purpose: an outside monitor watching heads would otherwise see nothing but
+    // a log that stopped advancing, and could not tell that from a quiet week.
+    return res.end(J({ ok: true, sth: latest, ...(ctLogForked ? { forked: ctLogForked } : {}) }));
   }
   if (path === '/v2/sth/history' && req.method === 'GET') {
     const limit = Math.min(parseInt(query.limit || '100'), 100);
@@ -5371,6 +5609,32 @@ async function handleRelayRequest(req, res) {
       if (INVITE_RE.test(d.device_id)) {
         // Store without API key suffix — readable by any party who knows the session token
         const invFp = computeFingerprint(d.kyber_pub || '', d.ecdh_pub);
+        // FIRST REGISTRATION WINS, the same rule the keyed branch below enforces
+        // and the same rule the session manifest cites as "a property worth
+        // keeping". This branch did not have it: it did an unconditional set, so
+        // anyone who saw the ?s= token in the share link (an access log, browser
+        // history, an extension, the chat the link travelled through) could
+        // overwrite BOTH key slots with their own ECDH and ML-KEM keys after the
+        // honest parties had registered. Sender and receiver would then encrypt
+        // to the attacker, with only a manual fingerprint comparison in the way.
+        // A slot is a one-time capability; once filled it is filled.
+        //
+        // The one thing that must keep working is a refresh: the receiver stores
+        // its keypair in sessionStorage and re-registers the identical keys after
+        // a reload. Byte-identical content is therefore a replay and answers 200
+        // with the same fingerprint. Anything else is a takeover attempt: 409.
+        const heldInvite = pubkeys.get(d.device_id);
+        if (heldInvite && (!heldInvite.expires || Date.now() < heldInvite.expires)) {
+          const same = safeEqual(heldInvite.ecdh_pub || '', String(d.ecdh_pub || ''))
+                    && safeEqual(heldInvite.kyber_pub || '', String(d.kyber_pub || ''));
+          if (!same) {
+            log('warn', 'pubkey_invite_overwrite_refused', { device: d.device_id.slice(0, 12) });
+            res.writeHead(409, { 'Content-Type': 'application/json' });
+            return res.end(J({ error: 'Pubkey already registered for this session: first registration wins' }));
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          return res.end(J({ ok: true, fingerprint: heldInvite.fingerprint }));
+        }
         pubkeys.set(d.device_id, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', fingerprint: invFp, ts: new Date().toISOString(), registered_at: new Date().toISOString(), expires: Date.now() + INVITE_PUBKEY_TTL });
         log('info', 'pubkey_registered_invite', { device: d.device_id.slice(0, 12), fp: invFp });
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -5418,7 +5682,7 @@ async function handleRelayRequest(req, res) {
       const attestResult = verifyAttestation(d.ecdh_pub, d.device_id, d.attestation || null);
       const existingPubkey = pubkeys.get(_pkSlot);
       if (existingPubkey && (!existingPubkey.expires || Date.now() < existingPubkey.expires)) {
-        res.writeHead(409); return res.end(J({ error: 'Pubkey already registered for this session — first registration wins' }));
+        res.writeHead(409); return res.end(J({ error: 'Pubkey already registered for this session: first registration wins' }));
       }
       const fp = computeFingerprint(d.kyber_pub || '', d.ecdh_pub);
       const regAt = new Date().toISOString();
@@ -8042,10 +8306,10 @@ async function handleRelayRequest(req, res) {
             ? 'sha3_256(envelope.id || doc_hash || party_index_as_decimal || party_email_hash_bytes)'
             : 'sha3_256(envelope.id || doc_hash || party_index_as_decimal)');
     try {
-      // ?p=<i>&t=<invite_token> -> party-scoped view. For email-bound envelopes
-      // the token must match (getForParty returns null otherwise); for open
-      // envelopes the token is not required. This gives the co-signer exactly
-      // what it needs to recompute the (possibly v2) sign-message locally.
+      // ?p=<i>&t=<invite_token> -> party-scoped view. The token must match in
+      // every binding mode (getForParty returns null otherwise, as a plain 404).
+      // This gives the co-signer exactly what it needs to recompute the
+      // (possibly v2) sign-message locally, and gives a passer-by nothing.
       if (query.p !== undefined) {
         const pi = parseInt(Array.isArray(query.p) ? query.p[0] : query.p, 10);
         const token = (Array.isArray(query.t) ? query.t[0] : query.t || '').toString();
@@ -8075,9 +8339,11 @@ async function handleRelayRequest(req, res) {
       const d = JSON.parse((await readBody(req, 4096)).toString() || '{}');
       const pi = parseInt(d.party_index, 10);
       if (!Number.isInteger(pi) || pi < 0) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
-      // For email-bound envelopes the per-party invite token must match before
-      // we record a view; getForParty returns null on a bad/absent token (and
-      // does not require one for open envelopes).
+      // The per-party invite token must match before we record a view, in every
+      // binding mode; getForParty returns null on a bad or absent token. A view
+      // is written into the CT log as evidence of when a party opened the
+      // document, so an unauthenticated stamp on someone else's slot is a
+      // falsified record, not a cosmetic one.
       const gate = await store.getForParty(id, pi, (d.token || '').toString());
       if (!gate) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
       const ok = await store.markViewed(id, pi);
@@ -8102,20 +8368,66 @@ async function handleRelayRequest(req, res) {
       const pi = parseInt(d.party_index, 10);
       const signerPub = (d.signer_public_key || '').toString();
       const sig = (d.signature || '').toString();
-      const accountId = (d.account_id || '').toString();
+      // The per-party invite capability. Open-mode slots have no mailbox to bind
+      // to, so this token is what proves the submitter is the party whose slot
+      // this is; the store refuses an open slot without it.
+      const inviteToken = (d.token || d.invite_token || '').toString();
+      // Email-bound envelopes (R018): the store accepts the signature only when
+      // a trusted internal caller (the admin proxy, which verified the signer's
+      // authenticated session email) asserts a matching verified_email_hash.
+      // _internalOk() gates that trust on the X-Internal-Auth header; a public
+      // caller cannot set it, so it can never satisfy an email-bound slot. Read
+      // here rather than at the call, because it also decides whether the
+      // account_id in the body may be believed at all (see below).
+      const internalTrusted = _internalOk();
+      const verifiedEmailHash = (d.verified_email_hash || '').toString();
       if (!Number.isInteger(pi) || pi < 0 || !signerPub || !sig) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         return res.end(J({ error: 'party_index, signer_public_key, signature required' }));
       }
+
+      // ── WHOSE METER RUNS, and where that answer comes from ──────────────────
+      // It used to come straight out of the body (`d.account_id`), and every
+      // quota decision below sat inside `if (accountId)`. Leaving the field out
+      // therefore skipped the pre-gate AND the increment, while the signature was
+      // accepted all the same: unlimited signing on a plan that sells two a
+      // month. Absence was read as permission.
+      //
+      // The account is now resolved server-side, and absence is a refusal:
+      //   1. an internal-auth caller (the admin proxy) may name the SIGNER's
+      //      account -- that is the claim the enrolled-key pin below verifies;
+      //   2. otherwise the envelope's OWN stored account_id, written at create()
+      //      from the creating API key and not writable from any request;
+      //   3. neither -> 403. A signature that no account answers for is refused
+      //      rather than waved through.
+      // A public caller naming account_id is ignored outright, so the body can no
+      // longer steer whose meter runs, nor drain a stranger's quota.
+      const claimedAccountId = internalTrusted ? (d.account_id || '').toString() : '';
+      let ownerAccountId;
+      try { ownerAccountId = await store.ownerAccountId(id); }
+      catch (e) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
+      // No record at all stays a plain 404, exactly as before: the account rule
+      // must not turn into an oracle for which envelope ids exist.
+      if (ownerAccountId === null) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+      const accountId = claimedAccountId || ownerAccountId;
+      if (!accountId) {
+        log('warn', 'sign_no_account', { envelope: String(id).slice(0, 10) });
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'account_required' }));
+      }
+
       // Crypto M1: when the trusted admin proxy names the signer's account_id,
       // pin the submitted key to that account's ENROLLED active signing keys.
       // The email-binding check proves *which mailbox*; this proves the signature
       // was made by a key the account actually enrolled — so a leaked internal
       // token can't fill an email-bound slot with an attacker-substituted key.
       // Fail-closed (Redis is already a hard dependency of the envelope store).
-      if (accountId) {
+      // Only the CLAIMED account is pinned: the envelope owner is the party being
+      // billed, not the party holding the pen, and open-mode signers enrol no
+      // keys with us at all.
+      if (claimedAccountId) {
         try {
-          const active = await userSigning.getActiveSigningPks(redisClient, accountId);
+          const active = await userSigning.getActiveSigningPks(redisClient, claimedAccountId);
           const subj = Buffer.from(signerPub, 'base64');
           const enrolled = active.some(e => {
             try { return Buffer.from(e.pk_b64, 'base64').equals(subj); } catch { return false; }
@@ -8156,7 +8468,10 @@ async function handleRelayRequest(req, res) {
       const _signEnt = entitlements.getEntitlements(_signerRec).parasign;
       const _signIncluded = _signEnt.quotas.signs_month;
       let _signUsed = null; // best-effort count this month, feeds the 200 quota field
-      if (accountId && Number.isFinite(_signIncluded)) {
+      // No `accountId &&` here on purpose: the account is resolved above and an
+      // absent one already returned 403, so this gate can no longer be skipped by
+      // leaving a field out of the request.
+      if (Number.isFinite(_signIncluded)) {
         try {
           const _u = await quota.readUsage(redisClient, accountId);
           if (_u.available && Number.isFinite(_u.signs_this_month)) {
@@ -8173,23 +8488,18 @@ async function handleRelayRequest(req, res) {
         } catch (qe) { log('warn', 'quota_sign_pregate_failed', { err: qe.message }); }
       }
 
-      // Email-bound envelopes (R018): the store accepts the signature only when
-      // a trusted internal caller (the admin proxy, which verified the signer's
-      // authenticated session email) asserts a matching verified_email_hash.
-      // _internalOk() gates that trust on the X-Internal-Auth header; a public
-      // caller cannot set it, so it can never satisfy an email-bound slot.
-      const internalTrusted = _internalOk();
-      const verifiedEmailHash = (d.verified_email_hash || '').toString();
       const out = await store.sign(id, pi, signerPub, sig, {
         internalTrusted,
         verifiedEmailHash,
+        inviteToken,
         appearance: d.appearance,
       });
       if (!out.ok) {
         const code = out.code === 'not_found' ? 404
           : (out.code === 'bad_signature' || out.code === 'invalid_appearance') ? 400
           : (out.code === 'closed' || out.code === 'voided' || out.code === 'invite_expired') ? 410
-          : (out.code === 'email_binding_required' || out.code === 'email_mismatch') ? 403
+          : (out.code === 'email_binding_required' || out.code === 'email_mismatch'
+             || out.code === 'invite_token_required') ? 403
           : 409;
         res.writeHead(code, { 'Content-Type': 'application/json' });
         return res.end(J({ error: out.code }));
@@ -8200,7 +8510,7 @@ async function handleRelayRequest(req, res) {
       // 'idem' retry never reaches recordSign, so the counter cannot double-count
       // on retry. Awaited (single INCR) so the 200 below reports fresh numbers;
       // fail-open: a redis hiccup never blocks the signer's 200.
-      if (out.code === 'new' && accountId) {
+      if (out.code === 'new') {
         const _r = await quota.recordSign(redisClient, accountId, log);
         if (_r.counted) _signUsed = _r.used;
         else if (_signUsed != null) _signUsed += 1; // count failed: still reflect this sign best-effort
@@ -8228,9 +8538,10 @@ async function handleRelayRequest(req, res) {
       // API contract with the dashboard: every successful sign response carries
       // a `quota` field so the frontend can render usage without a second call.
       // Two numbers, because there are only two: what this account has signed
-      // this month and what its tier includes. Omitted entirely when there is
-      // no account or redis could not be read (fail-open, field is best-effort).
-      const _quotaField = (accountId && _signUsed != null && Number.isFinite(_signIncluded)) ? {
+      // this month and what its tier includes. Omitted entirely when redis could
+      // not be read (fail-open, the field is best-effort). There is always an
+      // account by this point; a request without one never got here.
+      const _quotaField = (_signUsed != null && Number.isFinite(_signIncluded)) ? {
         used: _signUsed,
         included: _signIncluded,
         reset_date: quota.nextResetDate(),
