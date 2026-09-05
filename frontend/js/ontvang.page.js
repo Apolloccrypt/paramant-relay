@@ -139,8 +139,13 @@ async function init() {
     showStep('step-fingerprint');
 
     // Registreer pubkey via HTTP — onafhankelijk van WS (ontvanger heeft geen API key)
+    // Het slot is eenmalig: de eerste registratie wint. Een refresh stuurt exact
+    // dezelfde sleutels (die staan in sessionStorage) en krijgt gewoon 200. Een
+    // 409 betekent dus dat iemand anders dit slot al gevuld heeft, en dan is
+    // doorgaan het gevaarlijke pad: de verzender zou naar die sleutel
+    // versleutelen. Zeg het en stop, in plaats van eeuwig te blijven wachten.
     try {
-      await fetch(`${RELAY_API}/v2/pubkey`, {
+      const reg = await fetch(`${RELAY_API}/v2/pubkey`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -150,6 +155,10 @@ async function init() {
         }),
         signal: AbortSignal.timeout(8000)
       });
+      if (reg.status === 409) {
+        $('fp-status').textContent = 'This link is already in use. Ask the sender for a new one.';
+        return;
+      }
       $('fp-status').textContent = 'Ready - waiting for sender to verify fingerprint';
     } catch(e) { console.warn('pubkey register failed', e); }
 
