@@ -180,7 +180,7 @@ section p+p{margin-top:14px}
   <section>
     <span class="sec-eyebrow">What Paramant adds</span>
     <h2>Burn-on-read delivery with a cryptographic receipt.</h2>
-    <p>Paramant encrypts the audit package with ML-KEM-768 + AES-256-GCM. After the investigator or auditor downloads, the relay wipes its copy from RAM. The ML-DSA-65 signed receipt records the file hash, the recipient, and the delivery timestamp. That receipt is the chain-of-custody record: this package, this hash, delivered once, to this recipient, at this time.</p>
+    <p>Paramant encrypts the audit package with ML-KEM-768 + AES-256-GCM. After the investigator or auditor downloads, the relay wipes its copy from RAM. The ML-DSA-65 signed receipt records the file hash, the relay that served it, the retrieval timestamp and the package's place in the transparency log. It names no recipient, and it cannot: the relay never learns who collected the package, which is the same design that stops it reading the contents. So the receipt proves this package, this hash, delivered once, at this time, not to whom.</p>
     <p>The relay holds only ciphertext. It cannot read what it carries. EU/DE hosting means no US CLOUD Act production orders apply. The transmission does not create a second data controller for the audit evidence.</p>
   </section>
 
