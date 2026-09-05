@@ -24,6 +24,14 @@ const crypto = require('crypto');
 const https  = require('https');
 const fs     = require('fs');
 const path   = require('path');
+// Same module, second name. The request handler declares `const path =
+// parsed.pathname`, which shadows the module for the whole body of that
+// function, so a path.join() below that line is a method call on a string and
+// throws. Inside a try/catch that is not a crash but a permanent wrong answer:
+// the storage probe of /v2/health/deep has reported "not writable: path.join
+// is not a function" on every request since it was written. Code inside the
+// request handler uses nodePath.
+const nodePath = path;
 const url_   = require('url');
 const { createClient } = require('redis');
 const userTotp      = require('./lib/user-totp');
@@ -3830,27 +3838,39 @@ async function handleRelayRequest(req, res) {
     add('crypto', mlDsa ? 'green' : 'yellow',
       mlDsa ? ('ML-DSA-65 loaded, mode=' + cmode) : ('ML-DSA-65 unavailable (build @paramant/core), mode=' + cmode));
 
+    // The directory the relay really writes to, which in the shipped compose is
+    // NOT the working directory. Every relay container runs with
+    // read_only: true and WORKDIR /app (docker-compose.yml x-relay-hardening,
+    // relay/Dockerfile), so a probe in process.cwd() throws EROFS on a
+    // perfectly healthy relay. The state lives on the /data volume named by
+    // USERS_FILE and CT_FILE, and that is the only directory whose
+    // writability this check has any reason to care about. cwd stays the
+    // fallback for a bare-metal install that sets neither.
+    const dataDir = process.env.SETUP_ENV_FILE ? nodePath.dirname(process.env.SETUP_ENV_FILE)
+      : (process.env.USERS_FILE ? nodePath.dirname(process.env.USERS_FILE) : process.cwd());
+
     try {
-      const dir = process.env.SETUP_ENV_FILE ? path.dirname(process.env.SETUP_ENV_FILE) : process.cwd();
-      const probe = path.join(dir, '.health-write-' + process.pid);
+      const probe = nodePath.join(dataDir, '.health-write-' + process.pid);
       fs.writeFileSync(probe, 'ok'); fs.unlinkSync(probe);
-      add('storage', 'green', 'data dir writable');
-    } catch (e) { add('storage', 'red', 'not writable: ' + (e.code || e.message)); }
+      add('storage', 'green', 'data dir writable (' + dataDir + ')');
+    } catch (e) { add('storage', 'red', 'not writable (' + dataDir + '): ' + (e.code || e.message)); }
 
     const rs = ramStatus();
     add('memory', rs.ram_ok ? 'green' : 'yellow', rs.rss_mb + 'MB rss / ' + rs.ram_limit_mb + 'MB limit');
 
     try {
       if (typeof fs.statfsSync === 'function') {
-        const st = fs.statfsSync(process.cwd());
+        // Same directory as the write probe: free space on the /app image
+        // layer says nothing about the volume the relay fills.
+        const st = fs.statfsSync(dataDir);
         const freeGb = (st.bsize * st.bavail) / 1e9;
-        add('disk', freeGb > 1 ? 'green' : 'yellow', freeGb.toFixed(1) + 'GB free');
+        add('disk', freeGb > 1 ? 'green' : 'yellow', freeGb.toFixed(1) + 'GB free on ' + dataDir);
       } else { add('disk', 'yellow', 'statfs unavailable on this Node'); }
     } catch (e) { add('disk', 'yellow', e.code || 'unknown'); }
 
     let tlsStatus = 'yellow', tlsDetail = 'TLS terminated at the edge (not on this relay)';
     try {
-      const certFile = process.env.TLS_CERT_FILE || path.join(process.cwd(), 'deploy/certs/cert.pem');
+      const certFile = process.env.TLS_CERT_FILE || nodePath.join(process.cwd(), 'deploy/certs/cert.pem');
       if (fs.existsSync(certFile) && typeof crypto.X509Certificate === 'function') {
         const cert = new crypto.X509Certificate(fs.readFileSync(certFile));
         const days = Math.floor((new Date(cert.validTo).getTime() - Date.now()) / 86400000);

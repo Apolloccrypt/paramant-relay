@@ -440,6 +440,59 @@ expect_count() {
   ok "$what ($field = $got)"
 }
 
+# expect_verdict: judge the verdict a check printed, not the transport that
+# carried it.
+#
+# Step 6c used to assert two HTTP status codes and nothing else: 401 without
+# the internal header, 200 with it. Both are statements about the gate in
+# FRONT of the route. The route's own answer, the overall field, was printed
+# and then dropped. Thirty-four consecutive runs printed "deep overall = red"
+# with two OK lines underneath, from 2026-09-03 02:59 to 2026-09-05 17:48.
+# A check that reads the envelope and not the letter is not a check.
+#
+# The rule:
+#   green            OK
+#   yellow           WARN, and the run continues
+#   red              STOP
+#   missing/other    STOP, an unreadable verdict is not a pass
+#
+# Yellow does not stop the run, and that is a deliberate line rather than a
+# soft one. Yellow is the permanent steady state of THIS deployment and always
+# will be: TLS terminates at nginx, so the relay has no certificate to read and
+# its tls check reports yellow "TLS terminated at the edge (not on this relay)"
+# on every healthy run (relay/relay.js, the tls check in /v2/health/deep). A
+# gate that stops on yellow stops every deploy forever, and a gate that stops
+# every deploy is a gate somebody switches off. There is deliberately no flag
+# to wave a red through: the whole failure being fixed here is a red that was
+# survivable.
+#
+# Whatever the verdict, the non-green components are printed first, by name and
+# state. Without that the verdict is a colour and nobody can act on it.
+expect_verdict() {   # verdict field, component-line prefix, what
+  local field="$1" prefix="$2" what="$3" got bad
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '  SKIP  assert (dry-run): %s   [%s must not be red]\n' "$what" "$field"
+    return 0
+  fi
+  got="$(remote_field "$field")"
+  bad="$(printf '%s\n' "$REMOTE_OUT" | grep -E "^$prefix " || true)"
+  if [ -n "$bad" ]; then
+    printf '%s\n' "$bad" | sed 's/^/    not green: /'
+  fi
+  case "$got" in
+    green)
+      ok "$what ($field = green)" ;;
+    yellow)
+      warn "$what -- $field is yellow; the components listed above are the reason" ;;
+    red)
+      die "$what -- $field is red. The components listed above name what is red. Fix them, then re-run the checks with --verify-only" ;;
+    "")
+      die "$what -- the server never printed '$field'" ;;
+    *)
+      die "$what -- $field is '$got', which is not green, yellow or red" ;;
+  esac
+}
+
 # expect_min: assert a printed measurement is at least N.
 expect_min() {
   local field="$1" min="$2" what="$3" got
@@ -2249,24 +2302,48 @@ phase_6() {
     ok "/health reports version $EXPECT_VERSION"
   fi
 
-  step "6c. /v2/health/deep, 401 without the token and 200 with it (server-local)"
+  # 6c reads three different things, and until now it judged only the first
+  # two. The route answers HTTP 200 whatever it thinks of the relay, so the
+  # status code is a statement about the auth gate in front of it and nothing
+  # else; the verdict is in the body, in "overall". Every run since
+  # 2026-09-03 02:59 printed "deep overall = red" and reported OK twice.
+  #
+  # So the block now also prints, per component that is not green, its name,
+  # its state and its detail. A verdict without its reasons is a colour.
+  step "6c. /v2/health/deep: the gate in front of it, and the verdict inside it"
   remote "deep health" "$COMPOSE_DIR" <<'EOF'
 set -euo pipefail
 cd "$1"
-# The token goes straight into a curl header. It is never echoed, and the only
-# things printed are status codes and the parsed overall field.
+# The token goes straight into a curl header. It is never echoed. What is
+# printed is status codes, the parsed overall field, and the components that
+# are not green. The details of a green component (free disk, cert age, key
+# count) stay unprinted.
 T="$(grep '^INTERNAL_AUTH_TOKEN=' .env | head -1 | cut -d= -f2-)"
 if [ -z "$T" ]; then echo "FATAL INTERNAL_AUTH_TOKEN empty in .env"; exit 1; fi
 echo "deep token length = ${#T}"
 echo "deep noauth code = $(curl -s -o /dev/null -w '%{http_code}' --max-time 15 http://127.0.0.1:3000/v2/health/deep)"
 echo "deep auth code = $(curl -s -o /dev/null -w '%{http_code}' --max-time 15 -H "X-Internal-Auth: $T" http://127.0.0.1:3000/v2/health/deep)"
 curl -s --max-time 15 -H "X-Internal-Auth: $T" http://127.0.0.1:3000/v2/health/deep \
-  | python3 -c 'import json,sys; d=json.load(sys.stdin); print("deep overall =", d.get("overall") or d.get("status") or "unknown")' 2>/dev/null \
+  | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+checks = d.get("checks") or []
+print("deep overall =", d.get("overall") or d.get("status") or "unknown")
+print("deep checks =", len(checks))
+bad = [c for c in checks if (c.get("status") or "unknown") != "green"]
+print("deep not-green =", len(bad))
+for c in bad:
+    print("deep component %s = %s -- %s" % (c.get("name", "?"), c.get("status", "?"), c.get("detail", "")))
+' 2>/dev/null \
   || echo "deep overall = unparseable"
 unset T
 EOF
   expect_count "deep noauth code" 401 "/v2/health/deep is 401 without X-Internal-Auth"
   expect_count "deep auth code" 200 "/v2/health/deep is 200 with X-Internal-Auth"
+  # And the answer itself. A body that could not be parsed prints
+  # "deep overall = unparseable", which is not green, yellow or red, so it
+  # stops the run too.
+  expect_verdict "deep overall" "deep component" "the relay's own deep-health verdict is not red"
 
   step "6d. /v1/paraid/issue-document is 404 on all six hosts (#319)"
   if [ "$DRY_RUN" -eq 1 ]; then
