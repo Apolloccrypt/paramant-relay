@@ -480,8 +480,17 @@ test('steps 1 and 2 are written for the sender, with the jargon moved into "How 
     'the heading says what the tool does for the reader, not what it is made of');
   assert.match(PS_HTML, /<details class="ps-how">[\s\S]*?<summary>How this works<\/summary>/,
     'the technical account must still be on the page, one click away');
-  assert.match(PS_HTML, /ML-KEM-768[\s\S]{0,400}ML-DSA-65/,
-    'the panel must keep the real names: moving the jargon may not mean losing it');
+  // Both names, inside the panel. This used to be a 400-character window
+  // between them, which is a proxy for "in the same panel" that breaks the
+  // moment the panel gains a sentence: on 5 September 2026 the panel grew a
+  // paragraph explaining that the two send stands do not share a key exchange,
+  // and the window failed on a panel that had lost nothing. Read the panel.
+  const howPanel = /<details class="ps-how">([\s\S]*?)<\/details>/.exec(PS_HTML);
+  assert.ok(howPanel, 'the "How this works" panel is gone');
+  for (const name of ['ML-KEM-768', 'ML-DSA-65', 'AES-256-GCM']) {
+    assert.ok(howPanel[1].includes(name),
+      `the panel must keep the real names: moving the jargon may not mean losing ${name}`);
+  }
   assert.match(PS_HTML, /Choose a file \(or several\)/,
     'the file label must ask for a file, not announce vault mode');
 

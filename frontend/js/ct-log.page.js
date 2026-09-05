@@ -1,5 +1,12 @@
 'use strict';
 
+// The relay whose log this page shows. It is health.paramant.app because that
+// is the relay the web app on this site actually sends through: parashare.page.js
+// starts at the health sector and discoverRelay() prefers it, and co-sign.js and
+// sign-flow.js name it outright. Every relay keeps its own log, so this page is
+// showing one of several and the copy in ct-log.html says which by name.
+// tests/ui-truthfulness.test.mjs reads the host out of this line and fails if the
+// page describes a different log than the one it fetches.
 const RELAY = 'https://health.paramant.app';
 const PAGE_SIZE = 20;
 let allEntries = [], page = 0, filtered = [], typeFilter = 'all';
@@ -25,6 +32,11 @@ async function load() {
 
     var keyRegCount   = allEntries.filter(function(e){ return !e.type || e.type === 'key_reg'; }).length;
     var transferCount = allEntries.filter(function(e){ return e.type === 'transfer' || e.type === 'pubkey'; }).length;
+    // The kind that dominates this log and had no counter of its own, so the
+    // three numbers under the table came nowhere near the total and nothing on
+    // the page said where the difference went. relay.js writes one of these
+    // every time one of our containers boots and announces itself.
+    var relayRegCount = allEntries.filter(function(e){ return e.type === 'relay_reg'; }).length;
     var logSize = d.size != null ? d.size : allEntries.length;
     document.getElementById('stat-total').textContent = logSize;
     // The composition sentence names the same number the counter shows. It is
@@ -35,6 +47,8 @@ async function load() {
     if (compEl && logSize) compEl.textContent = logSize + ' entries';
     document.getElementById('stat-count').textContent = keyRegCount;
     document.getElementById('stat-transfers').textContent = transferCount;
+    var relayRegEl = document.getElementById('stat-relayreg');
+    if (relayRegEl) relayRegEl.textContent = relayRegCount;
     const root = d.root || '';
     document.getElementById('stat-root').textContent =
       root && root !== '0'.repeat(64) ? root.slice(0,16)+'…' : 'n/a';

@@ -347,7 +347,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <p>Authenticated transfers from the ParaSend web app use ML-KEM-768 <em>and</em> ECDH P-256 simultaneously. The shared secret is the concatenation of both, so breaking one provides no advantage. This protects against store-now-decrypt-later attacks while maintaining compatibility with classical infrastructure.</p>
 
   <h3>Pre-shared secret (PSS)</h3>
-  <p>An optional out-of-band password added to HKDF input. Even a fully compromised relay cannot decrypt PSS-protected transfers: the relay would need to serve the correct ciphertext <em>and</em> know the PSS. Recommended for healthcare and legal workflows.</p>
+  <p>An optional password the sender and receiver agree out of band. The sender opens a session whose commitment is the SHA3-256 of that password; the receiver's client then sends the password itself to <code>/v2/session/join</code>, and the relay hashes it, compares it to the commitment and only then binds the receiver's public keys to the session, first join wins. What that buys is key binding: a third party who does not know the password cannot register their own keys as the receiver's.</p>
+  <p>What it does not buy is confidentiality against us. The password is not mixed into the key derivation: <code>hkdf_aes_key</code> in <code>crypto-wasm/src/lib.rs</code> takes the ML-KEM and ECDH shared secrets and nothing else. The receiver sends the password to the relay in plain text, so a relay running code we did not write reads it, and could bind its own keys whatever the commitment says. PSS raises the bar against key injection by an outsider; it is not a defence against the relay itself. It is a relay API feature, and the web app on this site does not use it.</p>
 
   <hr class="divider">
 
@@ -376,11 +377,11 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="card">
     <div style="display:flex;flex-direction:column;gap:10px">
       <div><span class="check">&#10003;</span><span>Read file contents: relay holds only ciphertext, never keys</span></div>
-      <div><span class="check">&#10003;</span><span>Substitute a registered public key (after TOFU or PSS is used)</span></div>
+      <div><span class="check">&#10003;</span><span>Substitute a registered public key once your own browser has pinned it (TOFU), or once you have compared the short code out of band</span></div>
       <div><span class="check">&#10003;</span><span>Decrypt any stored ciphertext: no key access</span></div>
       <div><span class="check">&#10003;</span><span>Read an exact file size: every web app block is a fixed 5 MB, and only the block count is visible</span></div>
       <div><span class="check">&#10003;</span><span>Recover burned blobs: memory is zeroed the moment the last read is spent</span></div>
-      <div><span class="check">&#10003;</span><span>Forge CT log entries: Merkle chain is append-only and tamper-evident</span></div>
+      <div><span class="check">&#10003;</span><span>Forge a CT log entry without it showing: the Merkle chain is append-only, so a rewrite contradicts any signed tree head kept from before it</span></div>
       <div><span class="check">&#10003;</span><span>Break ML-KEM-768: NIST FIPS 203, post-quantum secure</span></div>
     </div>
   </div>
@@ -443,12 +444,12 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       </tr>
       <tr>
         <td>3 · PSS</td>
-        <td>Pre-shared secret mixed into HKDF. Wrong key = undecryptable ciphertext.</td>
-        <td>Relay MITM at any time</td>
+        <td>The receiver proves a shared password before the relay will bind their keys to the session. It is not mixed into the encryption.</td>
+        <td>Key injection by an outsider. Not the relay itself, which reads the password on join</td>
       </tr>
       <tr>
         <td>4 · CT log + ML-DSA-65</td>
-        <td>Key registrations are signed and logged in Merkle chain. Retroactive injection is impossible.</td>
+        <td>Key registrations are signed and appended to a Merkle chain. Inserting one after the fact contradicts every signed tree head issued before it, so it shows up to anyone who kept one.</td>
         <td>Key injection, timestamp fraud</td>
       </tr>
     </tbody>

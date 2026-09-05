@@ -359,7 +359,7 @@ docker compose build   # build locally instead of pulling the published image</c
   <h3>Not possible, structurally <span class="badge badge-live">Live</span></h3>
   <ul>
     <li>Read your file content: we never hold decryption keys, anywhere</li>
-    <li>Rewrite your CT log after the fact: Merkle-tree integrity prevents it</li>
+    <li>Rewrite your CT log without it showing: a rewrite contradicts every signed tree head issued before it, and each receipt carries one</li>
     <li>Bypass your local TOTP or admin key: there is no backdoor in the source, and the source is public</li>
     <li>Reach your users' data or another deployment: relays are isolated by design</li>
     <li>Switch off your audit log: CT-log writes are not gated by any capability</li>

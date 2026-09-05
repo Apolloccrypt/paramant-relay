@@ -313,13 +313,13 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   .fingerprint{font-size:18px;letter-spacing:.08em}
 }
 </style>
-<meta name="description" content="Send a file with post-quantum encryption end to end. It lives in memory only and burns after one download.">
+<meta name="description" content="Hand a file over live with hybrid post-quantum encryption, or send a link whose key never reaches us. It lives in memory only and burns after one download.">
 <meta name="robots" content="noindex, nofollow">
 <!-- Gated by nginx (auth_request /api/user/check), so a crawler can only
      ever see the 302 to /auth/login, a path robots.txt disallows. Saying
      noindex here is the honest version of what the server already does. -->
 <meta property="og:title" content="Encrypted file transfer · Paramant">
-<meta property="og:description" content="Send a file with post-quantum encryption end to end. It lives in memory only and burns after one download. No account needed to receive.">
+<meta property="og:description" content="Hand a file over live with hybrid post-quantum encryption, or send a link whose key never reaches us. It lives in memory only and burns after one download. No account needed to receive.">
 <meta property="og:url" content="https://paramant.app/parashare">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
@@ -327,7 +327,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Encrypted file transfer · Paramant">
-<meta name="twitter:description" content="Send a file with post-quantum encryption end to end. It lives in memory only and burns after one download. No account needed to receive.">
+<meta name="twitter:description" content="Hand a file over live with hybrid post-quantum encryption, or send a link whose key never reaches us. It lives in memory only and burns after one download. No account needed to receive.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/parashare">
 <style>
@@ -408,7 +408,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "Send a file with post-quantum encryption end to end. It lives in memory only and burns after one download."
+      "description": "Hand a file over live with hybrid post-quantum encryption, or send a link whose key never reaches us. It lives in memory only and burns after one download."
     },
     {
       "@type": "SoftwareApplication",
@@ -523,7 +523,8 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <div class="ps-how-body">
       <p>Your receiver's browser makes a fresh pair of keys and sends us only the public half. Your browser locks the file for that public half and uploads the locked version. We hold no key, so what sits on our relay cannot be opened by us or by anyone who takes it from us.</p>
       <p>The short code you compare is built from the receiver's public keys, and both browsers work it out on their own. If anything had swapped those keys along the way, the two codes would not match. That is why you read the code to each other on a channel we do not run, such as a phone call.</p>
-      <p>For the reader who wants the names: ML-KEM-768 and ECDH for the key exchange, AES-256-GCM for the file, ML-DSA-65 signatures per chunk. The locked file is stored with an expiry and is destroyed when the link runs out or once the download link has been spent.</p>
+      <p>For the reader who wants the names: the two stands do not use the same ones. Handing over live is a <strong>hybrid</strong> key exchange: ML-KEM-768 and ECDH P-256 run side by side and both shared secrets go through HKDF-SHA256 into one AES-256-GCM key, so an attacker who breaks either one on its own still has nothing. Sending a link does no key exchange at all: your browser makes a fresh AES-256-GCM key, puts it after the <code>#</code> in the link, and a fragment is never sent to a server. That means the link <em>is</em> the key, so whoever can read the channel you send it over can read the file.</p>
+      <p>Neither stand signs the file. The signatures here are the relay's own, on the transparency log and on the receipt it issues. Signing a document with ML-DSA-65 is what ParaSign does, not what sending does. The locked file is stored with an expiry and is destroyed when the link runs out or once the download link has been spent.</p>
     </div>
   </details>
 
@@ -649,7 +650,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   <p class="sub">File is being encrypted with the receiver's ML-KEM-768 public key. The relay will never see the plaintext or the key.</p>
   <div class="ps-guide">
     <span class="ps-guide-kicker">Step 4 of 5 &middot; Encrypt &amp; send</span>
-    <strong>This all happens in your browser.</strong> ML-KEM-768 wraps a fresh AES-256-GCM key for the receiver, each chunk is signed with ML-DSA-65, then ciphertext-only flows to the relay. The receipt lands in the public CT log.
+    <strong>This all happens in your browser.</strong> ML-KEM-768 and ECDH P-256 together wrap a fresh AES-256-GCM key for the receiver, then ciphertext-only flows to the relay. The relay signs the entry it makes in the public log; the file itself carries no signature.
   </div>
 
   <div class="card">
@@ -753,7 +754,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <details class="done-details">
       <summary>What made this safe</summary>
       <div class="done-details-body">
-        <p>The lock was made in your browser, not on our server. Your file was sealed for the other person's own key before it left this device (<code>ML-KEM-768</code> with <code>ECDH</code> for the key exchange, <code>AES-256-GCM</code> for the file itself), and every block was signed on the way out (<code>ML-DSA-65</code>, the signature scheme in FIPS 204).</p>
+        <p>The lock was made in your browser, not on our server. Your file was sealed for the other person's own key before it left this device: a hybrid key exchange, <code>ML-KEM-768</code> alongside <code>ECDH P-256</code>, with both shared secrets derived into one <code>AES-256-GCM</code> key. Breaking one of the two on its own gets an attacker nowhere, which is why the classical half is still in there.</p>
         <p>The short code you read out to each other is worked out by both browsers from the other side's public keys. Two screens showing the same code means nobody swapped a key in between, and that is the whole reason we ask you to compare it somewhere we do not run.</p>
         <p>We are holding a sealed copy and never held the key, so it is not ours to open. It is wiped the moment the other side takes it, and destroyed on its own clock if that never happens.</p>
         <p><strong>Keep the receipt</strong> saves the entry this transfer made in our public log, which anyone can check at <a href="/ct-log">the log</a>: the entry, where it sits in the tree, and the signed tree head.</p>
@@ -800,7 +801,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <div class="hud-panel-row"><span>Location</span><span class="val" id="hud-loc">Locating...</span></div>
     <div class="hud-panel-row"><span>Relay</span><span class="val ok">EU/DE · Online</span></div>
     <div class="hud-panel-row"><span>Protocol</span><span class="val">Ghost Pipe v2</span></div>
-    <div class="hud-panel-row"><span>Encryption</span><span class="val">ML-KEM-768</span></div>
+    <div class="hud-panel-row"><span>Encryption</span><span class="val">ML-KEM-768 + ECDH P-256</span></div>
     <div class="hud-panel-row"><span>Blobs in flight</span><span class="val" id="hud-blobs">—</span></div>
   </div>
 
