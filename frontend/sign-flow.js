@@ -231,8 +231,12 @@ function enterRecipients() {
   const hint = $('ds-recipients-hint'); if (hint) hint.hidden = true;
   const delivery = $('ds-invite-delivery');
   if (delivery) delivery.hidden = state.signingMode !== 'invite';
+  // The default subject used to be 'Please sign: ' + the filename, which posted
+  // the filename to a mail provider outside the EU without the sender ever
+  // deciding to. A filename is content. The default says nothing about the file;
+  // the sender can still type whatever they like in a field they can see.
   if (state.signingMode === 'invite' && !state.inviteSubject && state.doc) {
-    state.inviteSubject = 'Please sign: ' + state.doc.name;
+    state.inviteSubject = 'Signature requested';
     const subject = $('ds-invite-subject'); if (subject) subject.value = state.inviteSubject;
   }
   renderRecipients();
@@ -248,6 +252,17 @@ function commitInviteDeliveryFromDom() {
   state.inviteMessage = ($('ds-invite-message')?.value || '').trim();
 }
 
+// The link that goes into an email is the notice, not the key. `sign_path`
+// carries the document key after the '#', and the mail leaves our infrastructure
+// through a US mail provider, so the fragment is cut off here, in the browser,
+// before the invitation is handed to our own server. The key stays on this
+// device and travels only over the channel the sender picks themselves; the
+// server refuses an invite_url that still carries a fragment, so a modified
+// client cannot put one back.
+function noticeUrl(signPath) {
+  return (location.origin + signPath).split('#')[0];
+}
+
 async function deliverInviteEmails(partyIndexes) {
   const mp = state.result?.envelope?.multiparty;
   if (!mp) throw new Error('The signing request is unavailable.');
@@ -258,7 +273,7 @@ async function deliverInviteEmails(partyIndexes) {
       party_index: p.party_index,
       email: state.recipients[p.party_index]?.email || '',
       label: state.recipients[p.party_index]?.label || '',
-      invite_url: location.origin + p.sign_path,
+      invite_url: noticeUrl(p.sign_path),
     }));
   const response = await fetch('/api/user/envelopes/' + encodeURIComponent(mp.envelope_id) + '/invitations', {
     method: 'POST',
@@ -3252,17 +3267,17 @@ function showDoneInvite(r) {
     sb.hidden = !emailPartial;
     sb.className = 'ds-banner err';
     sb.innerHTML = emailPartial
-      ? '<strong>Request created, but not every email was delivered.</strong> Use Retry or copy the failed personal links below.'
+      ? '<strong>Request created, but not every notice was delivered.</strong> Use Retry, or send the failed personal links below yourself.'
       : '';
   }
   paDone().fill('step-done', {
-    title: emailPartial ? 'Not every invitation went out.'
-         : emailOk      ? 'Invitations are on their way.'
+    title: emailPartial ? 'Not every notice went out.'
+         : emailOk      ? 'They have been notified. Now send the links.'
          :                'Ready for signature.',
     line: emailPartial
-      ? 'Some of the emails could not be delivered. Retry them below, or copy that person\'s own link and send it yourself.'
+      ? 'Some of the notices could not be delivered. Retry them below. Either way, each signer still needs their own link from you.'
       : emailOk
-        ? 'Everyone you named has a link of their own in their inbox. You can follow who has signed, and copy a link again, below.'
+        ? 'Everyone you named knows a document is waiting. The link that opens it is below, one per person, and it is yours to hand over: we keep it out of the email so no mail provider can open your document.'
         : 'Each signer has a link of their own below. Send it to them any way you like and follow progress here.',
   });
   const preview = $('ds-signed-preview'); if (preview) preview.hidden = true;
@@ -3313,14 +3328,14 @@ function renderPartyLinks(mp) {
   if (result) {
     if (state.deliveryMode === 'copy') {
       result.hidden = false; result.className = 'ds-banner';
-      result.textContent = 'Email delivery was not used. Copy each complete personal link below.';
+      result.textContent = 'No email was sent. Copy each complete personal link below and send it yourself.';
     } else if (state.inviteDelivery?.ok) {
       result.hidden = false; result.className = 'ds-banner ok';
-      result.textContent = 'All email invitations were delivered to the mail provider.';
+      result.textContent = 'All notices were delivered to the mail provider. The notices carry no key: send each person the link below as well.';
     } else if (state.inviteDelivery) {
       const failedCount = state.inviteDelivery.failed_party_indexes?.length || 0;
       result.hidden = false; result.className = 'ds-banner err';
-      result.textContent = failedCount + ' email invitation' + (failedCount === 1 ? '' : 's') + ' could not be delivered. Retry or copy the personal link.';
+      result.textContent = failedCount + ' notice' + (failedCount === 1 ? '' : 's') + ' could not be delivered. Retry, or just send that person the link below.';
     } else {
       result.hidden = true;
     }
