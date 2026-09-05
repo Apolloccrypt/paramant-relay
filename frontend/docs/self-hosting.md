@@ -45,7 +45,7 @@ No Linux expertise required. BIOS and UEFI supported.
 Whichever option you choose, the first boot lands on a web wizard at `/setup` that replaces the hand-run admin scripts (ADR R005). It is gated to a relay with no keys yet — or forced on with `SETUP_MODE=1` — and walks you through:
 
 1. **Domain & DNS** — `POST /v2/setup/check` validates the domain, DNS and TLS readiness without writing anything.
-2. **Deep health** — `GET /v2/health/deep` confirms storage, CT log, relay identity and peer reachability are all green.
+2. **Deep health**: `GET /v2/health/deep` aggregates nine checks (relay, crypto, storage, memory, disk, tls, users, audit, redis) into one verdict, green, yellow or red. There is no CT-log check, no relay-identity check and no peer-reachability check. This page claimed all three; none of them was ever written.
 3. **Apply** — `POST /v2/setup/apply` generates the admin token, enrolls TOTP and mints your first API key from the browser, ending on an all-systems-go summary.
 
 After setup the panel exposes day-to-day operation visually:

@@ -208,16 +208,16 @@ export async function surface(evidence) {
 
 // The deep readiness body, asserted rather than glanced at. The handler answers
 // HTTP 200 whatever the verdict, so `overall` is the only thing that carries it:
-// green, yellow or red, taken as the worst of eight component checks (relay,
-// crypto, storage, memory, disk, tls, users, audit). A 200 with overall red is a
-// relay that has told you it is broken.
+// green, yellow or red, taken as the worst of nine component checks (relay,
+// crypto, storage, memory, disk, tls, users, audit, redis). A 200 with overall
+// red is a relay that has told you it is broken.
 function assertDeepBody(evidence, res, how) {
   const d = res.json || {};
   assert(!!d.overall, 'deep readiness answered 200 without an overall verdict',
     `A readiness check with no verdict is the same lie in a different shape. Body: ${JSON.stringify(d).slice(0, 300)}`);
   const checks = Array.isArray(d.checks) ? d.checks : [];
   assert(checks.length > 0, 'deep readiness carries no component checks',
-    'The endpoint aggregates eight named checks. An empty list means it aggregated nothing.');
+    'The endpoint aggregates nine named checks. An empty list means it aggregated nothing.');
   const bad = checks.filter((c) => c.status === 'red');
   assert(d.overall !== 'red',
     `deep readiness reports overall red (${bad.map((c) => c.name).join(', ') || 'no component named'})`,
