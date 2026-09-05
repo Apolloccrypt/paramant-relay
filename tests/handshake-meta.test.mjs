@@ -164,56 +164,65 @@ let vaultBody = null;                 // the same record for a multi-file send
 let senderTtlMs = null;               // the ttl the sender had in hand
 
 {
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await page.addInitScript(() => {
+  // One context, two pages, one at a time. Two contexts doubled what the
+  // sign-e2e job runs in parallel and timed out two other suites; reusing a
+  // single page and reloading it hung on page.goto, because the first run
+  // leaves the sender polling and a route handler in flight when the navigation
+  // starts. A second page in the same context costs almost nothing and starts
+  // clean, and the routes below are installed on the context so both inherit
+  // them. The first page is closed before the second is opened.
+  const senderCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await senderCtx.addInitScript(() => {
     const stub = { initCrypto: async () => {}, encryptBlob: async (p) => new Uint8Array(p.length + 32),
       decryptBlob: async () => new Uint8Array() };
     Object.defineProperty(window, '_cryptoBridge', { get: () => stub, set: () => {}, configurable: true });
   });
-  await page.route('**/api/user/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
-  await page.route('**/api/user/parasend/token', (r) => r.fulfill({ status: 200, contentType: 'application/json',
+  await senderCtx.route('**/api/user/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+  await senderCtx.route('**/api/user/parasend/token', (r) => r.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify({ token: 'pst_' + 'b'.repeat(64), expires_in_s: 900 }) }));
-  for (const host of ['legal', 'finance', 'iot']) await page.route(`https://${host}.paramant.app/**`, (r) => r.abort());
-  await page.route('https://relay.paramant.app/**', (r) => r.abort());
-  await page.route('https://health.paramant.app/v2/check-key', (r) => r.fulfill({ status: 200, contentType: 'application/json',
+  for (const host of ['legal', 'finance', 'iot']) await senderCtx.route(`https://${host}.paramant.app/**`, (r) => r.abort());
+  await senderCtx.route('https://relay.paramant.app/**', (r) => r.abort());
+  await senderCtx.route('https://health.paramant.app/v2/check-key', (r) => r.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify({ valid: true, plan: 'pro', link_ttl_ms: 86400000,
       link_ttl_ms_by_plan: { community: 3600000, pro: 86400000, business: 604800000, enterprise: 604800000 } }) }));
-  await page.route('https://health.paramant.app/v2/inbound', (r) => r.fulfill({ status: 200, contentType: 'application/json',
+  await senderCtx.route('https://health.paramant.app/v2/inbound', (r) => r.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify({ ok: true, hash: 'a'.repeat(64), ttl_ms: 86400000, size: 0,
       download_token: 'a'.repeat(48), merkle_proof: null }) }));
-  await page.route('https://health.paramant.app/v2/dl/**', (r) => r.fulfill({ status: 200, contentType: 'application/json',
+  await senderCtx.route('https://health.paramant.app/v2/dl/**', (r) => r.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify({ ok: true, enc_meta: null, file_size: 0, ttl_left_s: 3600, used: false }) }));
   let receiverThere = false;
-  await page.route('https://health.paramant.app/v2/pubkey/**', (r) => receiverThere
+  await senderCtx.route('https://health.paramant.app/v2/pubkey/**', (r) => receiverThere
     ? r.fulfill({ status: 200, contentType: 'application/json',
         body: JSON.stringify({ kyber_pub: 'ab'.repeat(64), ecdh_pub: 'cd'.repeat(32) }) })
     : r.fulfill({ status: 404, body: '' }));
   // The record under test. Captured rather than asserted here: what it has to
   // agree with is the receiver, not a string in this file.
-  await page.route('https://health.paramant.app/v2/pubkey', (r) => {
+  await senderCtx.route('https://health.paramant.app/v2/pubkey', (r) => {
     const body = r.request().postDataJSON();
     if (body && typeof body.device_id === 'string' && body.device_id.endsWith('_ready')) {
       // First run is the single file, second is the vault; both go through the
-      // same route handler on the same page.
+      // same route handler on the context.
       if (postedBody === null) { posted = body.kyber_pub; postedBody = body; }
       else { vaultBody = body; }
     }
     return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
   });
 
-  await page.goto(`${ORIGIN}/parashare`, { waitUntil: 'domcontentloaded' });
-  await page.locator('#file-input').setInputFiles({ name: FILE_NAME, mimeType: 'image/jpeg',
+  const one = await senderCtx.newPage();
+  await one.goto(`${ORIGIN}/parashare`, { waitUntil: 'domcontentloaded' });
+  await one.locator('#file-input').setInputFiles({ name: FILE_NAME, mimeType: 'image/jpeg',
     buffer: Buffer.from(Array.from({ length: 2048 }, (_, i) => (i * 13 + 7) % 256)) });
-  await page.waitForFunction(() => !document.getElementById('btn-create-session').disabled, null, { timeout: 20000 });
-  await page.locator('#btn-create-session').click();
-  await page.waitForSelector('#step-waiting.active', { timeout: 20000 });
+  await one.waitForFunction(() => !document.getElementById('btn-create-session').disabled, null, { timeout: 20000 });
+  await one.locator('#btn-create-session').click();
+  await one.waitForSelector('#step-waiting.active', { timeout: 20000 });
   receiverThere = true;
-  await page.waitForFunction(() => /^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/.test((document.getElementById('fp-display')?.textContent || '').trim()),
+  await one.waitForFunction(() => /^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/.test((document.getElementById('fp-display')?.textContent || '').trim()),
     null, { timeout: 20000, polling: 250 });
-  senderTtlMs = parseInt(await page.locator('#ttl-select').inputValue(), 10);
-  await page.locator('#fp-confirm-check').check();
-  await page.locator('#fp-confirm-btn').click();
-  await page.waitForSelector('#step-done.active', { timeout: 40000 });
+  senderTtlMs = parseInt(await one.locator('#ttl-select').inputValue(), 10);
+  await one.locator('#fp-confirm-check').check();
+  await one.locator('#fp-confirm-btn').click();
+  await one.waitForSelector('#step-done.active', { timeout: 40000 });
+  await one.close();
 
   // ── the same sender again, with two files ─────────────────────────────────
   // A multi-file send put its whole manifest in the other free field: a JSON
@@ -221,29 +230,27 @@ let senderTtlMs = null;               // the ttl the sender had in hand
   // for an hour. That is wider than the single-file leak and the claims round
   // missed it. What goes now is one token array per file and nothing else.
   //
-  // On the same page, deliberately. As a second browser context this doubled
-  // what the sign-e2e job runs in parallel and made two suites time out on a
-  // loaded runner; the routes above are already installed here, so a reload
-  // costs a navigation instead of a whole context.
   receiverThere = false;
-  await page.goto(`${ORIGIN}/parashare`, { waitUntil: 'domcontentloaded' });
-  await page.locator('#file-input').setInputFiles(VAULT_NAMES.map((name, i) => ({
+  const many = await senderCtx.newPage();
+  await many.goto(`${ORIGIN}/parashare`, { waitUntil: 'domcontentloaded' });
+  await many.locator('#file-input').setInputFiles(VAULT_NAMES.map((name, i) => ({
     name, mimeType: 'application/pdf',
     buffer: Buffer.from(Array.from({ length: 1024 }, (_, j) => (j * 7 + i) % 256)) })));
-  await page.waitForFunction(() => !document.getElementById('btn-create-session').disabled, null, { timeout: 20000 });
+  await many.waitForFunction(() => !document.getElementById('btn-create-session').disabled, null, { timeout: 20000 });
   // Two files render a file list above the button, so scroll it into view
   // before clicking: on a 390px viewport it can otherwise sit under the fold
   // and never settle, which is a click that times out rather than fails.
-  await page.locator('#btn-create-session').scrollIntoViewIfNeeded();
-  await page.locator('#btn-create-session').click();
-  await page.waitForSelector('#step-waiting.active', { timeout: 20000 });
+  await many.locator('#btn-create-session').scrollIntoViewIfNeeded();
+  await many.locator('#btn-create-session').click();
+  await many.waitForSelector('#step-waiting.active', { timeout: 20000 });
   receiverThere = true;
-  await page.waitForFunction(() => /^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/.test((document.getElementById('fp-display')?.textContent || '').trim()),
+  await many.waitForFunction(() => /^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/.test((document.getElementById('fp-display')?.textContent || '').trim()),
     null, { timeout: 20000, polling: 250 });
-  await page.locator('#fp-confirm-check').check();
-  await page.locator('#fp-confirm-btn').click();
-  await page.waitForSelector('#step-done.active', { timeout: 40000 });
-  await page.close();
+  await many.locator('#fp-confirm-check').check();
+  await many.locator('#fp-confirm-btn').click();
+  await many.waitForSelector('#step-done.active', { timeout: 40000 });
+  await many.close();
+  await senderCtx.close();
 }
 
 ok('the sender page posts a handshake field at all', typeof posted === 'string' && posted.length > 0, String(posted));
