@@ -105,6 +105,11 @@ const SRC0 = {
   ext:        read('extensions/shared/paramant-core.js'),
   relay:      read('relay/relay.js'),
   signFlow:   read('frontend/sign-flow.js'),
+  v1Api:      read('relay/lib/parasign-open-api.js'),
+  v1Store:    read('relay/lib/parasign-store.js'),
+  bridge:     read('frontend/crypto-bridge.js'),
+  receive:    read('frontend/js/ontvang.page.js'),
+  signer:     read('frontend/js/parasign-signer.js'),
 };
 const SRC = Object.fromEntries(Object.entries(SRC0).map(([k, v]) => [k, noComments(v)]));
 
@@ -168,6 +173,19 @@ const FACTS = {
     algorithm: SIG,
     pure: !/ECDH|p256|RSA|Ed25519/i.test(SRC.sigImpl),
   },
+  // The hosted signing ceremony on /v1. The one route where the relay is given
+  // the document itself, which is why every absolute "we never see plaintext"
+  // on the site has to carry an exception. Derived, not asserted: if this route
+  // is ever changed to take a capsule, these go false and block 9 stops
+  // demanding the exception.
+  hostedCeremony: {
+    where: 'relay/lib/parasign-open-api.js, relay/lib/parasign-store.js',
+    takesRawDocument: /Buffer\.from\(String\(doc\.content_base64\)/.test(SRC.v1Api)
+      && /pdf\.slice\(0, 5\)[\s\S]{0,40}'%PDF-'/.test(SRC.v1Api),
+    storesDocument: /await store\.putBlob\(out\.id, pdf,/.test(SRC.v1Api),
+    sealedUnderRelayKey: /PARASIGN_STORE_KEY/.test(SRC.relay),
+    routeIsReachable: /parasignOpenApi\.route\(/.test(SRC.relay),
+  },
   // What the relay loads by default, against what it ships.
   suite: {
     where: 'relay/crypto/bootstrap.js',
@@ -175,6 +193,76 @@ const FACTS = {
     loaded: (SRC.bootstrap.slice(0, SRC.bootstrap.indexOf("resolved === 'extended'")).match(/register(?:KEM|Sig)\(/g) || []).length,
     shipped: (SRC.bootstrap.match(/register(?:KEM|Sig)\(/g) || []).length,
   },
+};
+
+// ── Which code backs which page ──────────────────────────────────────────────
+//
+// The blind spot check 7 had until 5 September 2026: it asked whether an
+// algorithm existed ANYWHERE in the codebase, not whether it ran on the path
+// the page was describing. So /audit-log-export could promise ML-KEM-768 for a
+// workflow that is a ParaSend link upload, where there is no key exchange at
+// all, and the gate stayed green because ML-KEM is in the repo. That is the
+// most expensive class of untrue sentence on this site, because it is the one a
+// compliance buyer copies into their own file as a fact.
+//
+// So: a corpus per path. Two things have to hold, and neither is assumed.
+//
+// 1. THE PAGE SAYS WHICH PATH IT IS ABOUT, in its own head:
+//
+//        <meta name="paramant:path" content="link">
+//
+//    An earlier version guessed the path from the prose instead, and the guess
+//    was confidently wrong: it read /license as the live hand-over, /changelog
+//    as the browser extensions and /auth/setup as an encrypted link, because
+//    each happened to contain a phrase. A gate that guesses is a gate whose
+//    green means nothing. A declaration is reviewable in the diff, and a page
+//    that does not carry one is judged by the product-wide rule exactly as
+//    before, so nothing regresses while the coverage grows.
+//
+// 2. THE SLICE REALLY IS THE PATH IT CLAIMS TO BE. parashare.page.js holds BOTH
+//    stands, so reading the whole file would hand the link path an ML-KEM it
+//    does not have. The file separates them with banner comments and the slices
+//    are cut on those; if a banner is renamed the cut fails loudly instead of
+//    quietly passing everything.
+//
+// Cut on the RAW file, because the banners are comments and SRC has had those
+// removed; then strip comments from the slice, for the reason noComments exists
+// at all. A comment in the link stand explains why it does NOT use the hybrid,
+// and reading that as evidence of ML-KEM would invert the whole check.
+const sliceBetween = (src, startRe, endRe, what) => {
+  const a = src.search(startRe);
+  const b = src.search(endRe);
+  assert.ok(a >= 0 && b > a,
+    `frontend/js/parashare.page.js no longer has the banner comments this file cuts ${what} on. Re-cut the slice deliberately: without it the link path inherits the live path's ML-KEM and the path check silently stops working.`);
+  return noComments(src.slice(a, b));
+};
+const LIVE_SRC = sliceBetween(SRC0.share, /^\/\/ .{1,3} Fingerprint confirmed/m, /^\/\/ .{1,3} Send a link/m, 'the live stand');
+const LINK_SRC = sliceBetween(SRC0.share, /^\/\/ .{1,3} Send a link/m, /$(?![\s\S])/, 'the link stand');
+
+// The slices have to be the two different things they are named after, or the
+// corpus is a lie in the other direction. This is the load-bearing assertion of
+// the whole idea.
+assert.match(LIVE_SRC, /encryptBlob\(/, 'the live slice lost its ML-KEM hybrid call; re-cut it');
+assert.doesNotMatch(LINK_SRC, /encryptBlob\(|kyber|ML-KEM/i,
+  'the link slice now contains the hybrid; either the link stand gained a key exchange (rewrite the paths table and the pages that describe it) or the slice is cut wrong');
+
+// The code that actually runs on each path, client side. Relay source is
+// deliberately absent: the relay serves every path, so folding it in would put
+// every algorithm on every path and give back the product-wide corpus this
+// block exists to replace.
+const PATHS = {
+  link:       { label: 'the browser-encrypted link',    src: [LINK_SRC, SRC.get].join('\n') },
+  live:       { label: 'the live hand-over',            src: [LIVE_SRC, SRC.wasm, SRC.bridge, SRC.receive].join('\n') },
+  extensions: { label: 'the browser extensions',        src: SRC.ext },
+  vault:      { label: 'the local vault',               src: SRC.vault },
+  signing:    { label: 'signing a document',            src: [SRC.signFlow, SRC.signer, SRC.sigImpl].join('\n') },
+  hosted:     { label: 'the hosted signing ceremony',   src: [SRC.v1Api, SRC.v1Store].join('\n') },
+};
+
+// Read the declaration out of a page's head.
+const declaredPath = (html) => {
+  const m = /<meta\s+name="paramant:path"\s+content="([a-z]+)"/i.exec(html);
+  return m ? m[1] : null;
 };
 
 // ── 1 ────────────────────────────────────────────────────────────────────────
@@ -401,8 +489,12 @@ test('no page dates a crypto algorithm earlier than the product exists', () => {
 // "AES" on its own is not on the list on purpose: on /pricing and /about it is
 // the eIDAS advanced signature, not the cipher. This block anchors on the
 // digit, the way the /download gate does.
-test('no page names a cryptographic primitive the code does not contain', () => {
+test('no page names a cryptographic primitive the code behind that page does not contain', () => {
   const codebase = [SRC.wasm, SRC.relay, SRC.share, SRC.get, SRC.vault, SRC.ext, SRC.signFlow, SRC.bootstrap].join('\n');
+  // Two lists, because there are two ways to name the wrong algorithm.
+  //
+  // FOREIGN: a primitive this product has never contained. Any page naming one
+  // is wrong wherever it says it, so the corpus is the whole codebase.
   const CANDIDATES = [
     ['AES-128', /\bAES-128\b/i, /Aes128|AES-128|aes-128/],
     ['AES-192', /\bAES-192\b/i, /Aes192|aes-192/],
@@ -419,20 +511,102 @@ test('no page names a cryptographic primitive the code does not contain', () => 
     ['Classic McEliece', /\bMcEliece\b/i, /mceliece/i],
   ];
 
+  // OURS: a primitive the product really does use, somewhere. Naming one is not
+  // wrong in itself, which is exactly why the old version of this block could
+  // not see the most expensive class of untrue sentence on the site: an
+  // algorithm attributed to a path that does not run it. /audit-log-export
+  // promised ML-KEM-768 for a workflow that is a ParaSend link upload, and the
+  // gate stayed green because ML-KEM is in the repo. For these the corpus is
+  // the path the page describes, not the product.
+  const OURS = [
+    ['ML-KEM-768',   /\bML-KEM-768\b/i,                /ML-KEM-768|MlKem768|mlkem768/i],
+    ['ML-DSA-65',    /\bML-DSA-65\b/i,                 /ML-DSA-65|MlDsa65|mldsa65|ml_dsa/i],
+    ['ECDH P-256',   /\bECDH\b|\bP-256\b/,             /ECDH|p256|P-256/i],
+    ['HKDF-SHA256',  /\bHKDF(-SHA-?256)?\b/i,          /HKDF|hkdf/i],
+    ['PBKDF2',       /\bPBKDF2\b/i,                    /PBKDF2/i],
+    ['SHA3-256',     /\bSHA-?3-256\b/i,                /sha3[_-]?256|SHA3-256/i],
+    ['a key exchange', /\bkey exchange\b|\bencapsulat/i, /ML-KEM|MlKem|mlkem|encryptBlob/i],
+  ];
+
+  // A sentence that names a primitive in order to say it is NOT used, or that
+  // it is what somebody else uses, is honest and stays.
+  const HONEST = /\bnot\b|\bno longer\b|\binstead of\b|\brather than\b|\bunlike\b|\bcompetitor|\bothers\b|\breplaced\b|\bwe do not\b|\bno key exchange\b|\bwithout\b/i;
+
   const problems = [];
   for (const [label, onPage, inCode] of CANDIDATES) {
     if (inCode.test(codebase)) continue; // the code has it, the pages may name it
     for (const slug of allPages()) {
       for (const s of sentences(prose(page(slug)))) {
         if (!onPage.test(s)) continue;
-        // A sentence that names a primitive in order to say it is NOT used, or
-        // that it is what someone else uses, is honest and stays.
-        if (/\bnot\b|\bno longer\b|\binstead of\b|\brather than\b|\bunlike\b|\bcompetitor|\bothers\b|\breplaced\b|\bwe do not\b/i.test(s)) continue;
+        if (HONEST.test(s)) continue;
         problems.push(`${slug}: "${s.trim().slice(0, 160)}" names ${label}; no source file in this repository contains it`);
       }
     }
   }
-  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+
+  // The path half. A page is judged against one path only when its prose names
+  // exactly one: a page covering the whole product (/privacy, /security, /docs,
+  // /crypto-agility) names several and is left to the product-wide half above,
+  // because "which path is this sentence about" has no answer there.
+  const pathProblems = [];
+  const judged = [];
+  for (const slug of allPages()) {
+    const html = page(slug);
+    const declared = declaredPath(html);
+    if (!declared) continue;
+    const only = PATHS[declared];
+    assert.ok(only, `${slug} declares paramant:path="${declared}", which is not a path in this file's table (${Object.keys(PATHS).join(', ')})`);
+    judged.push(slug);
+    for (const s of sentences(prose(html))) {
+      for (const [label, onPage, inCode] of OURS) {
+        if (!onPage.test(s) || HONEST.test(s)) continue;
+        if (inCode.test(only.src)) continue;
+        pathProblems.push(`${slug}: "${s.trim().slice(0, 160)}" names ${label}, and this page declares ${only.label}, where it does not run`);
+      }
+    }
+  }
+  // A coverage ratchet. Without it this block passes perfectly by judging
+  // nothing, and the cheapest way to silence a failure would be to delete the
+  // page's declaration. The number may only go up.
+  const COVERED = ['audit-log-export', 'co-sign', 'get', 'help/gmail-extension',
+    'help/outlook-extension', 'ontvang', 'parasign', 'sign', 'vault', 'verify'];
+  const dropped = COVERED.filter((slug) => !judged.includes(slug));
+  assert.deepEqual(dropped, [],
+    `these pages have lost their <meta name="paramant:path"> declaration, so nothing checks their algorithm names against the route they describe any more. Removing a declaration is not a way to fix a failure.\n  ${dropped.join('\n  ')}\n`);
+
+  // ── The register of claims waiting on a product decision ───────────────────
+  //
+  // /audit-log-export sells a chain of custody the workflow it describes does
+  // not produce. The page is not wrong about the algorithms existing; it is
+  // wrong about the route. Its own steps say the DPO uploads through the
+  // ParaSend web app and the regulator opens a one-time link, and that route is
+  // AES-256-GCM with the key in the fragment: no ML-KEM, and no signed
+  // receipt either, because relay.js signs one only on GET /v2/outbound/:hash
+  // and the browser download route signs nothing.
+  //
+  // Making the page true by editing it down is not this commit's call, and
+  // making the PRODUCT true means sending regulators down the hybrid route,
+  // which needs a public key from the regulator's own device. That is a design
+  // change that costs the thing the page is selling, so it is Mick's decision
+  // and not a gate's.
+  //
+  // Which leaves the question of what a gate should do with a known untruth it
+  // is not allowed to fix. Not stay silent, and not fail the build every night
+  // until somebody adds an ignore that never comes off. So: a register, and the
+  // assertion is that the violations are EXACTLY the register. A new untruth
+  // fails because it is not listed. A listed one that gets fixed also fails,
+  // and says to delete the line. The register can only shrink, and it cannot
+  // rot, because it is checked against the code on every run.
+  const AWAITING_DECISION = [
+    'audit-log-export: names ML-KEM-768 and ML-DSA-65 for a workflow its own steps describe as a ParaSend web app upload opened through a one-time link. Making it true needs the regulator to hold a device key, which is the convenience the page sells. Raised 5 September 2026.',
+  ];
+  const expected = new Set(AWAITING_DECISION.map((line) => line.split(':')[0]));
+  const unexpected = pathProblems.filter((line) => !expected.has(line.split(':')[0]));
+  const fixed = [...expected].filter((slug) => !pathProblems.some((line) => line.startsWith(`${slug}:`)));
+  assert.deepEqual(fixed, [],
+    `these pages are in the register of claims awaiting a decision but no longer break the path rule. Good news: delete their line from AWAITING_DECISION so the register keeps shrinking.\n  ${fixed.join('\n  ')}\n`);
+
+  assert.deepEqual([...problems, ...unexpected], [], `\n  ${[...problems, ...unexpected].join('\n  ')}\n`);
 });
 
 // ── 8 ────────────────────────────────────────────────────────────────────────
@@ -453,6 +627,66 @@ test('the vault page does not borrow the post-quantum story', () => {
     // post-quantum algorithms, is fine. Claiming it for this page is not.
     if (/\bnot\b|\bno\b|\bwithout\b|\belsewhere\b|\bsign(ing)?\b|\bsend(ing)?\b/i.test(s)) continue;
     problems.push(`vault: "${s.trim().slice(0, 180)}" claims a post-quantum property; ${FACTS.vault.where} uses ${FACTS.vault.kdf} into ${FACTS.vault.cipher} and nothing else`);
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+// ── 9 ────────────────────────────────────────────────────────────────────────
+// The absolute that commit 06770e9b created. /architecture:755 used to read
+// "The relay never sees plaintext FOR SDK AND WEBAPP TRANSFERS"; the repair of
+// 5 September 2026 removed the qualifier and made a true limited sentence into
+// a false absolute one, on eight pages including the terms and the privacy
+// statement. relay/lib/parasign-store.js says of itself that the /v1 hosted
+// ceremony is "the ONE deliberate break of the 'relay never sees the PDF'
+// invariant", and relay/lib/parasign-open-api.js proves it: it takes a PDF as
+// content_base64, checks the %PDF- header (so, plaintext) and putBlob's the raw
+// bytes under a key the relay itself holds.
+//
+// The rule this block enforces is not "never say it". It is: a passage that
+// makes the claim about the relay AS SUCH has to name the exception. A passage
+// that scopes itself to a path the exception does not touch is honest and is
+// left alone, which is why the scope words below excuse a block rather than the
+// page excusing itself.
+test('no page makes the zero-knowledge claim about the relay as such without naming the /v1 exception', () => {
+  assert.ok(FACTS.hostedCeremony.takesRawDocument && FACTS.hostedCeremony.storesDocument,
+    `${FACTS.hostedCeremony.where}: /v1 no longer takes a raw PDF and stores it. If the ceremony became zero-knowledge, delete this block deliberately rather than letting it pass; the absolute sentences it guards would then be true.`);
+  assert.ok(FACTS.hostedCeremony.routeIsReachable,
+    'relay.js no longer mounts the /v1 route; if it is gone, the exception can go with it');
+
+  // What the claim sounds like, in every wording the site actually uses.
+  const CLAIM = [
+    /relay never sees (?:the )?plaintext/i,
+    /never (?:sees|holds|receives) (?:the )?plaintext/i,
+    /(?:holds?|stores?|hold) only ciphertext/i,
+    /never plaintext and never keys/i,
+    /no access to (?:keys or plaintext|plaintext or keys)/i,
+    /cannot access the content/i,
+    /does not receive the decryption key/i,
+  ];
+  // Naming the exception. Either form will do; both point a reader at it.
+  const EXCEPTION = /\/v1\b|hosted signing ceremony|hosted ceremony/i;
+  // Scoping the sentence to a path instead. A passage that says which route it
+  // is talking about is not making the absolute claim and needs no exception.
+  const SCOPED = /ParaSend|ParaShare|Ghost Pipe|web app|browser-encrypted|browser-created|created in a browser|SDK|extension|sensor|DICOM|on that path|this stand|on this page/i;
+
+  const problems = [];
+  for (const slug of allPages()) {
+    // The file's own prose pipeline, which is what makes this reliable: it puts
+    // a full stop at every block boundary before it strips tags, so a list item
+    // cannot run into the next one, and it includes the link-preview text,
+    // where four copies of the last untrue absolute were found. A hand-rolled
+    // block regex was tried first and swallowed a whole page inside one
+    // wrapping <div>, which hid the claim on /privacy entirely.
+    //
+    // Sentence by sentence, and the qualifier has to be in the sentence making
+    // the claim. Searching the paragraph would let "the SDKs and the web app"
+    // three sentences down excuse a bare absolute at the top: check 7's fault
+    // at paragraph scale, the right words in the wrong place.
+    for (const sentence of sentences(prose(page(slug)))) {
+      if (!CLAIM.some((re) => re.test(sentence))) continue;
+      if (EXCEPTION.test(sentence) || SCOPED.test(sentence)) continue;
+      problems.push(`${slug}: "${sentence.trim().slice(0, 150)}" states the zero-knowledge claim with no exception and no scope in the same sentence; ${FACTS.hostedCeremony.where} holds the document and its at-rest key for every live /v1 envelope`);
+    }
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });

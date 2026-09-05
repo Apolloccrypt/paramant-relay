@@ -5765,6 +5765,13 @@ async function handleRelayRequest(req, res) {
   // Public keys are not sensitive; security comes from fingerprint verification.
   const INVITE_RE = /^inv_[a-zA-Z0-9]{32}(_ready)?$/;
 
+  // ── The `_ready` handshake slot holds no content ────────────────────────────
+  // The grammar, and why it is a refusal rather than a clean-up, is in
+  // relay/lib/handshake-record.js. Short version: /dpa promises customers that
+  // filenames are never stored in readable form, and this slot used to hold
+  // them in the clear for an hour, readable without an API key.
+  const { isCleanReadyRecord } = require('./lib/handshake-record');
+
   // ── GET /v2/pubkey — relay's ML-DSA-65 identity public key (for STH verification) ─
   if (path === '/v2/pubkey' && req.method === 'GET') {
     if (!relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'ML-DSA-65 not available on this relay' })); }
@@ -5780,6 +5787,12 @@ async function handleRelayRequest(req, res) {
       // M3: reject oversized device_id to prevent memory exhaustion / map-key attacks
       if (typeof d.device_id !== 'string' || d.device_id.length > 256) { res.writeHead(400); return res.end(J({ error: 'device_id must be a string of at most 256 characters' })); }
       if (INVITE_RE.test(d.device_id)) {
+        // The handshake slot carries no content. See lib/handshake-record.js.
+        if (d.device_id.endsWith('_ready') && !isCleanReadyRecord(d.kyber_pub || '', d.ecdh_pub)) {
+          log('warn', 'ready_handshake_rejected', { device: d.device_id.slice(0, 12) });
+          res.writeHead(400);
+          return res.end(J({ error: 'handshake record must carry only kind, counts and download tokens' }));
+        }
         // Store without API key suffix — readable by any party who knows the session token
         const invFp = computeFingerprint(d.kyber_pub || '', d.ecdh_pub);
         // FIRST REGISTRATION WINS, the same rule the keyed branch below enforces

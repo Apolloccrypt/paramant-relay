@@ -870,10 +870,17 @@ assert.match(homeGrid, /Generated on your device, never sent/,
   'index.html is the source of the promise that a key never reaches a server');
 assert.match(securityHtml, /relay holds only ciphertext, never keys/,
   'security.html is the source of the promise that the relay holds no keys');
-assert.match(docsHtml, /The relay never sees plaintext and never holds a private key\./,
+// The sentence carries its exception since 5 September 2026. relay/lib/
+// parasign-store.js calls the /v1 hosted ceremony "the ONE deliberate break of
+// the 'relay never sees the PDF' invariant", so the two pages must quote each
+// other complete with the break, not just the half that sells.
+// tests/crypto-claims.test.mjs block 9 is what stops the exception being
+// dropped again; this pins that both pages still say it in the same words.
+const KEYS_SENTENCE = /The relay never sees plaintext and never holds a private key,[^.]*hosted signing ceremony[^.]*\/v1/;
+assert.match(docsHtml, KEYS_SENTENCE,
   'docs.html is the source of the sentence /help quotes about plaintext and keys');
-assert.match(helpAnswers, /The relay never sees plaintext and never holds a private key\./,
-  'help/index.html must say where the keys are not, in the words docs.html uses');
+assert.match(helpAnswers, KEYS_SENTENCE,
+  'help/index.html must say where the keys are not, in the words docs.html uses, exception included');
 for (const sentence of helpBody.replace(/<[^>]+>/g, ' ').split(/(?<=[.!?])\s+/)) {
   if (!/\bkeys?\b/i.test(sentence)) continue;
   if (!/\b(server|servers|relay|Hetzner|Nuremberg|hosted|infrastructure|data centre|data center)\b/i.test(sentence)) continue;

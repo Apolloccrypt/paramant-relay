@@ -83,25 +83,50 @@ test('one resend per envelope per hour, on a bucket the caller cannot use agains
   assert.match(resendRoute[0], /res\.status\(429\)\.json\(\{ error: "rate_limited" \}\)/);
 });
 
-test('the resent mail says the document is not attached, because it cannot be', () => {
-  // The key to the sender's encrypted copy lives in the URL fragment, which no
-  // server ever received. A resend rebuilds the signing link and not that key,
-  // so the mail must not repeat the original's promise about the document.
-  assert.match(resendRoute[0], /documentIncluded: false/);
-  assert.match(templates, /function signingInviteEmail\(\{[^}]*documentIncluded = true/);
-  const resent = emailTemplates.signingInviteEmail({
-    inviteUrl: 'https://paramant.app/co-sign?env=EnvelopeIdPlaceholder00&p=0&t=t',
-    documentName: 'Engagement letter.pdf', senderLabel: 'demo@example.com',
-    envelopeId: 'EnvelopeIdPlaceholder00', partyIndex: 0, documentIncluded: false,
-  });
-  assert.match(resent.text, /does not carry\n?the sender's encrypted copy of the document/);
-  assert.doesNotMatch(resent.text, /The document is encrypted\./);
-  const original = emailTemplates.signingInviteEmail({
-    inviteUrl: 'https://paramant.app/co-sign?env=EnvelopeIdPlaceholder00&p=0&t=t#doc=v1.k',
-    documentName: 'Engagement letter.pdf', senderLabel: 'demo@example.com',
+test('neither invitation mail can carry the document key, and both say so', () => {
+  // There used to be two kinds of invitation mail: the first one, built in the
+  // sender's browser, put the document key in the link, and the resend could
+  // not because no server ever held that key. The first kind is gone: the key
+  // would have reached a mail provider outside the EU, which is the one thing
+  // six pages on the site promise never happens. So there is one mail now, and
+  // the flag that used to tell the two apart is gone with it.
+  assert.doesNotMatch(resendRoute[0], /documentIncluded/,
+    'the flag is gone: there is no invitation mail that carries a key');
+  assert.doesNotMatch(templates, /documentIncluded/,
+    'and the template no longer has a branch that promises one');
+  assert.doesNotMatch(resendRoute[0], /documentName/,
+    'a filename is content, and this mail leaves the EU');
+
+  const KEY = 'k'.repeat(43);
+  const both = ['https://paramant.app/co-sign?env=EnvelopeIdPlaceholder00&p=0&t=t',
+                `https://paramant.app/co-sign?env=EnvelopeIdPlaceholder00&p=0&t=t#doc=v1.${KEY}`];
+  const [resent, original] = both.map((inviteUrl) => emailTemplates.signingInviteEmail({
+    inviteUrl, documentName: 'Engagement letter.pdf', senderLabel: 'demo@example.com',
     envelopeId: 'EnvelopeIdPlaceholder00', partyIndex: 0,
-  });
-  assert.match(original.text, /The document is encrypted\./,
-    'the first invitation is unchanged');
+  }));
+  for (const [label, mail] of [['resend', resent], ['first invitation', original]]) {
+    const all = mail.text + mail.html + mail.subject;
+    assert.ok(!all.includes(KEY), `${label} carries no document key`);
+    assert.ok(!all.includes('Engagement letter'), `${label} carries no filename`);
+    assert.match(mail.text, /It does not open the document/,
+      `${label} says the link opens the request and not the document`);
+  }
   assert.equal(resent.subject, original.subject, 'both are the same mail about the same request');
+  assert.equal(resent.text, original.text,
+    'and they are now byte-identical: the key was the only thing that differed');
+});
+
+test('the invitations endpoint refuses a link that still carries a key', () => {
+  // The gate in front of the template. Trimming the fragment here instead of
+  // refusing would let a modified client post the key to this process and rely
+  // on us to drop it before Resend; refusing means nothing downstream has held
+  // one. The browser strips it, this refuses it, the template cuts it again.
+  const invitations = adminSource.match(/api\.post\("\/user\/envelopes\/:id\/invitations"[\s\S]*?\n\}\);/);
+  assert.ok(invitations, 'the invitations route exists');
+  assert.match(invitations[0], /if \(inviteUrl\.hash !== ""\) \{[\s\S]{0,120}?invite_url_carries_key/,
+    'a fragment is a refusal, not something to clean up quietly');
+  assert.doesNotMatch(invitations[0], /doc=v1/,
+    'the route no longer requires the key it must never forward');
+  assert.doesNotMatch(invitations[0], /documentName/,
+    'and it no longer hands the filename to the mail provider');
 });

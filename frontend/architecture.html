@@ -752,7 +752,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </table>
 
     <div class="arch-takeaway">
-      <p><strong>The relay never sees plaintext.</strong> Every client on this table encrypts before it uploads, the two extensions included. What differs is the key exchange: the SDKs and the web app bind the file to a recipient's public key, while the extensions and the browser-encrypted link put a symmetric key in the URL fragment and bind it to nobody. Anyone holding that link can open the file, so the channel you send it over is the security. See <a href="/crypto-agility#06">crypto-agility § 06</a> for the per-client wire format and migration table.</p>
+      <p><strong>The relay never sees plaintext, except in the hosted signing ceremony on the <code>/v1</code> API.</strong> Every client on this table encrypts before it uploads, the two extensions included. The ceremony is not a client on this table: there the relay is handed the PDF itself, because running the ceremony is what that request asked it to do. What differs is the key exchange: the SDKs and the web app bind the file to a recipient's public key, while the extensions and the browser-encrypted link put a symmetric key in the URL fragment and bind it to nobody. Anyone holding that link can open the file, so the channel you send it over is the security. See <a href="/crypto-agility#06">crypto-agility § 06</a> for the per-client wire format and migration table.</p>
     </div>
   </div>
 </section>
