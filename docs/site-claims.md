@@ -145,7 +145,7 @@ colour is measured in a browser by `tests/app-theme.test.mjs`.
 | A TOTP code is checked with a +/-1 slot window (so "more than 30 seconds off" is not exactly the tolerance) | help/session-issues | `relay/lib/totp.js` `window = 1` |
 | 10 single-use backup codes, hashed with Argon2id, each consumed once | help/backup-codes, help/authenticator-setup, help/lost-authenticator | `relay/lib/user-totp.js` (`argon2id`, `memoryCost: 65536`, `timeCost: 3`) |
 | API keys are 64 hex characters and do not expire | help/api-key-vs-totp, help/session-issues, help/iot-integration | `admin/server.js` `'pgp_' + crypto.randomBytes(32).toString('hex')` |
-| CT log persists to `/data/ct-log.json` and survives restarts | ct-log | `docker-compose.yml` sets `CT_FILE`; `relay.js` treats it as opt-in (default RAM-only) |
+| CT log persists to `/data/ct-log.json` and survives restarts | ct-log | `relay.js` persists by default (beside `STH_FILE`, else `/data/ct-log.json`); `docker-compose.yml` sets `CT_FILE` explicitly |
 | `verified_since` proves continuous relay identity | security, docs | `relay/relay.js` ~3831 to 3859 |
 | Filenames only as `enc_meta` ciphertext | dpa, privacy, docs | relay `enc_meta` handling. The hash algorithm half of this row is row 27 |
 | Webhooks signed with HMAC-SHA256 of the body, keyed on the API key | docs | the webhook signing path in `relay/relay.js` |
