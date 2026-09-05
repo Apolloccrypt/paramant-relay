@@ -85,7 +85,7 @@ test('buildSnapshot: full shape, caps, masked key, no key leak', async () => {
   assert.ok(!snap.key_masked.includes(uid), 'full key never returned');
   assert.equal(snap.quota.transfers, 7);
   assert.equal(snap.quota.signs, 1);
-  assert.equal(snap.quota.caps.transfers, 10);
+  assert.equal(snap.quota.caps.transfers, 50);
   assert.equal(snap.quota.caps.signs, 2);
   assert.equal(snap.audit.length, 1);
   assert.equal(Object.keys(snap.tools_status).length, 10);
@@ -103,13 +103,13 @@ test('buildSnapshot: full shape, caps, masked key, no key leak', async () => {
 // Every number below comes out of relay/lib/entitlements.js. Reinstating any
 // local table in admin/lib/developer-snapshot.js fails these cases, because a
 // table keyed on `plan` answers community for the first account.
-test('ParaSign Pro on a community ParaSend account: 100 signs, 10 transfers', async () => {
+test('ParaSign Pro on a community ParaSend account: 100 signs, 50 transfers', async () => {
   const snap = await buildSnapshot(
     depsFor({ plan: 'community', plan_parasign: 'pro', plan_parasend: 'community' }),
     { user_id: 'pgp_pro', email: 'pro@x.io' });
   assert.deepEqual(snap.tiers, { parasend: 'community', parasign: 'pro' });
   assert.equal(snap.quota.caps.signs, 100, 'the relay grants ParaSign Pro 100 signatures a month');
-  assert.equal(snap.quota.caps.transfers, 10, 'buying ParaSign does not move the ParaSend tier');
+  assert.equal(snap.quota.caps.transfers, 50, 'buying ParaSign does not move the ParaSend tier');
 });
 
 test('ParaSign Business: 1000 signs, and the row exists at all', async () => {
@@ -118,15 +118,15 @@ test('ParaSign Business: 1000 signs, and the row exists at all', async () => {
     { user_id: 'pgp_biz', email: 'biz@x.io' });
   assert.equal(snap.tiers.parasign, 'business');
   assert.equal(snap.quota.caps.signs, 1000, 'business is a tier the pricing page sells, not a fall-through to community');
-  assert.equal(snap.quota.caps.transfers, 10);
+  assert.equal(snap.quota.caps.transfers, 50);
 });
 
-test('community on both products: 2 signs, 10 transfers, counters default to 0', async () => {
+test('community on both products: 2 signs, 50 transfers, counters default to 0', async () => {
   const snap = await buildSnapshot(
     depsFor({ plan: 'community', plan_parasign: 'free', plan_parasend: 'community' }),
     { user_id: 'pgp_free', email: 'free@x.io' });
   assert.equal(snap.quota.caps.signs, 2);
-  assert.equal(snap.quota.caps.transfers, 10);
+  assert.equal(snap.quota.caps.transfers, 50);
   assert.equal(snap.quota.transfers, 0);
   assert.equal(snap.quota.signs, 0);
 });

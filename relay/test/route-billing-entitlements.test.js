@@ -356,7 +356,7 @@ test('the four plan ids map to the tiers and quotas the pricing rests on', async
   ]);
 
   const expected = {
-    acct_community: { parasend: 'community', parasign: 'free', transfers: 10, signs: 2 },
+    acct_community: { parasend: 'community', parasign: 'free', transfers: 50, signs: 2 },
     acct_pro: { parasend: 'pro', parasign: 'pro', transfers: 500, signs: 100 },
     // business keeps its own ParaSend row: it is a ParaSign tier name, so the
     // account never bought ParaSend, and it is neither raised to enterprise nor

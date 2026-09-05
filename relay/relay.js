@@ -1547,7 +1547,15 @@ function _reportLimit(v) {
 // enforced by counting them (FILE_MAX_BLOCKS below), so the number an operator
 // sees here is the tier's own, and MAX_BLOB does not enter into it.
 function _effectiveFileMb(ent) {
-  return ent.parasend.limits.file_mb;
+  // Through _reportLimit, so an uncapped row reports -1 and not null.
+  //
+  // This used to be Math.min(MAX_BLOB / 1048576, file_mb), which happened to
+  // launder Infinity into a finite 5 on the way out. Removing the min removed
+  // that accident too: the enterprise row is Infinity, JSON.stringify turns
+  // Infinity into null, and an operator reads null as "no data" rather than
+  // "no cap". The whole point of _reportLimit is that -1 is how this API says
+  // uncapped.
+  return _reportLimit(ent.parasend.limits.file_mb);
 }
 
 // How many padded blocks a file of `fileMb` may occupy.
