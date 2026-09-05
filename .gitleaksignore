@@ -112,3 +112,12 @@ d1fa18862dbbb9b90f7633cedae8e246f4b52120:tests/parasign-open-api.test.mjs:generi
 ffe1ee0ef045ed6be6a222d4797c92575bcc400a:tests/parasign-open-api.test.mjs:generic-api-key:760
 ffe1ee0ef045ed6be6a222d4797c92575bcc400a:tests/parasign-open-api.test.mjs:generic-api-key:795
 ffe1ee0ef045ed6be6a222d4797c92575bcc400a:tests/parasign-open-api.test.mjs:generic-api-key:797
+
+# Categorie 1, test-fixtures. Twee gemaskeerde voorbeeldsleutels in de
+# dashboardtest, in het veld dat de afgekapte weergave draagt die de UI toont.
+# De puntjes staan in de string zelf, het zijn geen sleutels. De literaltekst
+# staat hier bewust niet: dan gaat generic-api-key op dit bestand af.
+# Stonden al op main sinds 773c001c (2026-07-21) en lieten de secrets-poort daar
+# rood; zonder deze twee regels kan geen enkele PR groen worden.
+773c001c88a1023aa027b97112974b2464094a77:tests/developer-parasign-dashboard.test.mjs:generic-api-key:28
+773c001c88a1023aa027b97112974b2464094a77:tests/developer-parasign-dashboard.test.mjs:generic-api-key:41

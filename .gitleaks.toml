@@ -27,3 +27,8 @@ regexes = [
   '''X-Api-Key:\s*pgp_your_key''',
   '''X-Api-Key:\s*plk_your_key''',
 ]
+
+[[allowlists]]
+description = "The pinned relay identity keys in frontend/js/relay-trust-anchors.js. These are ML-DSA-65 PUBLIC keys, published by every relay at GET /v2/pubkey; pinning them is what lets /verify check a receipt with the network switched off. generic-api-key fires on two of the five, because a 2604-character base64 blob scores high on entropy, and which two it picks shifts with the key material, so a .gitleaksignore fingerprint would go stale at the next rotation. The regex is the whole condition and it is narrow by length: exactly the 2603 base64 characters plus padding of a 1952-byte ML-DSA-65 public key, right after a key field. An ML-DSA-65 SECRET key is 4032 bytes and does not fit it, nor does any ordinary credential. Do not add a paths entry to this block: this version of gitleaks accepts condition = \"AND\" and then ignores it, so a path here would allowlist the whole file instead of narrowing the regex, and a real secret dropped into that file would go unreported. Measured on this branch: with paths set, an injected stripe-access-token in that file was not reported; without it, it was. That the entries really are public keys is not taken on faith either: tests/verify-knows-the-fleet.test.mjs recomputes SHA3-256 over every one of them and holds it against the pinned fingerprint, and with FLEET_LIVE=1 against what each relay publishes."
+regexTarget = "match"
+regexes = ['''key:\s*'[A-Za-z0-9+/]{1000}[A-Za-z0-9+/]{1000}[A-Za-z0-9+/]{603}=''']

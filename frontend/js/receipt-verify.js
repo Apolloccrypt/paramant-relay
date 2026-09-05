@@ -10,7 +10,7 @@
 // The checks mirror relay.js POST /v2/verify-receipt and relay/lib/ct-hash.js
 // byte for byte. Keep them in sync.
 import { sha3_256, ml_dsa65 } from '/vendor/paramant-pqc.js';
-import { defaultAnchor, anchorByFingerprint, PUBKEY_URL } from '/js/relay-trust-anchors.js';
+import { anchorForReceipt, anchorByFingerprint, hostOfRelayId, PUBKEY_URL } from '/js/relay-trust-anchors.js';
 
 const LEAF_TRANSFER = 0x02; // domain separator for blob/transfer leaves
 const NODE = 0x01;          // domain separator for inner Merkle nodes
@@ -105,12 +105,14 @@ export function parseReceipt(input) {
 // ── The verification itself ─────────────────────────────────────────────────
 // Every check runs; nothing short-circuits, so a bad receipt says everything
 // that is wrong with it at once.
-export function verifyReceipt(receipt, relayKeyBytes) {
+export function verifyReceipt(receipt, relayKeyBytes, keySource) {
   // `ok` is true, false, or null for "could not be checked here". Only an
   // outright false makes the receipt untrustworthy; a null makes it unproven.
   const checks = [];
   const add = (id, ok, label, detail) => { checks.push({ id, ok, label, detail: detail || '' }); return ok; };
   const proof = receipt.inclusion_proof || {};
+  const source = (keySource && keySource.source) || (relayKeyBytes ? 'pasted' : 'none');
+  const relayHost = hostOfRelayId(receipt.relay_id);
 
   // 1. Does the receipt point at this exact transfer?
   let leafOk = false;
@@ -147,8 +149,18 @@ export function verifyReceipt(receipt, relayKeyBytes) {
   let keyKnown = null;
   let fingerprint = '';
   if (!relayKeyBytes) {
-    add('signature', null, 'The signature was not checked.',
-      'No server key was available to check it against. Everything else on this page was still checked.');
+    // Two different silences. "This page has never heard of that relay" is a
+    // statement about us; "no key at all" is a statement about the input. Only
+    // the second used to exist, and neither may read as "forged".
+    if (source === 'unknown-relay') {
+      add('signature', null, 'The signature was not checked, because this page does not know this relay.',
+        relayHost
+          ? 'The receipt says it was issued by ' + relayHost + ', which is not one of the relays this page ships with. Paste that relay\u2019s public key to finish the check.'
+          : 'The receipt does not say which relay issued it, so there is no key to check it against.');
+    } else {
+      add('signature', null, 'The signature was not checked.',
+        'No server key was available to check it against. Everything else on this page was still checked.');
+    }
   } else if (!signature) {
     add('signature', false, 'This receipt carries no signature at all.',
       'A genuine receipt is always signed by the server that handed the file over.');
@@ -186,6 +198,10 @@ export function verifyReceipt(receipt, relayKeyBytes) {
   return {
     valid: failed.length === 0,
     checkedSignature: !!relayKeyBytes,
+    signatureHeld: relayKeyBytes ? sigOk : null,
+    unknownRelay: source === 'unknown-relay',
+    relayHost,
+    keySource: source,
     checks,
     fingerprint,
     keyName: keyKnown ? keyKnown.name : null,
@@ -202,18 +218,28 @@ function formatMoment(value) {
   return date + ' at ' + time + ' UTC';
 }
 
-function shortHost(relayId) {
-  const raw = String(relayId || '').trim();
-  if (!raw) return '';
-  try { return new URL(raw).host; } catch { return raw; }
-}
-
 function keySentence(result) {
   const fp = result.fingerprint;
   if (!result.checkedSignature) {
+    if (result.unknownRelay) {
+      return result.relayHost
+        ? 'It says it was issued by <code class="mono">' + esc(result.relayHost)
+          + '</code>, a relay this page does not ship a key for, so the signer could not be identified here.'
+        : 'It does not say which relay issued it, so the signer could not be identified here.';
+    }
     return 'Nobody could be identified as the signer, because no key was available to compare against.';
   }
   const short = esc(fp.slice(0, 16));
+  // Past tense about the signer is only earned once the signature held. Before
+  // the fix this sentence named the pinned relay as signer even when the check
+  // had just failed against that very key, which asserted an identity nothing
+  // had shown.
+  if (result.signatureHeld !== true) {
+    const against = result.keyName
+      ? esc(result.keyName) + '\u2019s key <code class="mono">' + short + '</code>'
+      : 'the key you gave, fingerprint <code class="mono">' + short + '</code>';
+    return 'It does not match ' + against + ', so this page cannot say who signed it.';
+  }
   if (result.keyName) {
     return 'It was signed by ' + esc(result.keyName) + ', key <code class="mono">' + short + '</code>.';
   }
@@ -233,6 +259,14 @@ export function renderResult(result, target) {
     // Every check passed, but against a key this page has never seen. Saying
     // "genuine" there would launder an unknown signer into a Paramant promise.
     out.push('<div class="ps-banner ok"><strong>This receipt is unchanged.</strong> It all still matches the key you gave, and this page does not know that key.</div>');
+  } else if (result.valid && result.unknownRelay) {
+    // Every check this page could run passed; the one it could not run is the
+    // signature, because the receipt names a relay we ship no key for. An
+    // unknown sender and a forgery are different things and may never share a
+    // banner: this is the difference between "we cannot say" and "it is fake".
+    out.push('<div class="ps-banner info"><strong>This page does not know this relay.</strong> Everything it could check holds, but the receipt says it came from '
+      + (result.relayHost ? '<code class="mono">' + esc(result.relayHost) + '</code>' : 'a relay it does not name')
+      + ', and no key for it ships with this page. Paste that relay\u2019s public key to finish the check.</div>');
   } else if (result.valid) {
     out.push('<div class="ps-banner info"><strong>The receipt holds together.</strong> Its signature was not checked, because no server key was available.</div>');
   } else {
@@ -245,7 +279,7 @@ export function renderResult(result, target) {
   if (when) facts.push('The file was handed over on ' + esc(when) + '.');
   const issued = formatMoment(r.ts);
   if (issued && issued !== when) facts.push('It was accepted by the server on ' + esc(issued) + '.');
-  const host = shortHost(r.relay_id);
+  const host = result.relayHost;
   if (host) facts.push('The handover was done by <code class="mono">' + esc(host) + '</code>.');
   facts.push('The file it covers has fingerprint <code class="mono">' + esc(String(r.blob_hash)) + '</code>.');
   if (r.burn_confirmed === true) facts.push('The server destroyed its copy of the file as it was handed over.');
@@ -281,9 +315,18 @@ export function renderResult(result, target) {
 }
 
 // ── Page wiring ─────────────────────────────────────────────────────────────
-// A pasted key wins over the pinned one, so a receipt from another relay, or
-// from a relay that has rotated its key, stays checkable without a redeploy.
-function resolveKey(pastedKey) {
+// A pasted key wins over the pinned one, so a receipt from a relay this build
+// does not ship, or from a relay that has rotated its key, stays checkable
+// without a redeploy.
+//
+// With the field empty the key comes from the receipt's own `relay_id`, not
+// from whichever anchor happens to be first. Every relay in the fleet signs
+// with its own identity (relay/relay.js:5824-5829), so checking a health
+// receipt against the relay.paramant.app key could only ever fail, and the page
+// showed that failure as "Do not trust this receipt", calling Paramant's own
+// receipt a forgery. When the receipt names a relay this page does not ship,
+// the answer is "we do not know this relay", never a guess with the wrong key.
+export function resolveKey(pastedKey, receipt) {
   const raw = String(pastedKey || '').replace(/\s+/g, '');
   if (raw) {
     let bytes;
@@ -291,10 +334,11 @@ function resolveKey(pastedKey) {
     if (bytes.length !== ML_DSA65_PK_BYTES) {
       throw new Error('That is not a Paramant signing key: it is ' + bytes.length + ' bytes long instead of ' + ML_DSA65_PK_BYTES + '.');
     }
-    return bytes;
+    return { bytes, anchor: null, source: 'pasted' };
   }
-  const anchor = defaultAnchor();
-  return anchor ? fromB64(anchor.key) : null;
+  const anchor = anchorForReceipt(receipt);
+  if (anchor) return { bytes: fromB64(anchor.key), anchor, source: 'pinned' };
+  return { bytes: null, anchor: null, source: 'unknown-relay' };
 }
 
 export function initReceiptVerifier() {
@@ -317,9 +361,9 @@ export function initReceiptVerifier() {
     let receipt;
     try { receipt = parseReceipt(input.value); } catch (e) { return fail(e.message); }
     let key = null;
-    try { key = resolveKey(keyField ? keyField.value : ''); } catch (e) { return fail(e.message); }
+    try { key = resolveKey(keyField ? keyField.value : '', receipt); } catch (e) { return fail(e.message); }
     try {
-      renderResult(verifyReceipt(receipt, key), result);
+      renderResult(verifyReceipt(receipt, key.bytes, key), result);
     } catch (e) {
       fail('This receipt could not be checked: ' + e.message);
     }

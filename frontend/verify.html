@@ -194,11 +194,11 @@
 
     <details class="card ps-panel" id="rv-keyblock">
       <summary class="ps-panel-title">Checking a receipt from another server</summary>
-      <p class="ps-help">This page carries the signing key of the Paramant server, so the usual receipt is checked without asking anything of the network. A receipt from a server you run yourself is checked by pasting that server's key below.</p>
+      <p class="ps-help">This page carries the signing key of every Paramant relay, and picks the one the receipt names, so the usual receipt is checked without asking anything of the network. A receipt from a server you run yourself is checked by pasting that server's key below.</p>
       <div class="ps-field">
         <label class="ps-label" for="rv-key">Signing key of the server that issued the receipt</label>
         <textarea class="rv-paste" id="rv-key" spellcheck="false" placeholder="Leave this empty to use the key that came with this page."></textarea>
-        <p class="ps-help">Paramant publishes its own key at <code class="mono" id="rv-key-hint"></code>.</p>
+        <p class="ps-help">Every relay publishes its own key at <code class="mono">/v2/pubkey</code>, for example <code class="mono" id="rv-key-hint"></code>.</p>
       </div>
     </details>
 
