@@ -94,7 +94,11 @@ async function createEnvelope(parties = [{ label: 'Alice' }, { label: 'Bob' }], 
     body: { doc_hash: dh, parties, ...extra },
   });
   assert.strictEqual(r.status, 200, `create failed: ${r.status} ${r.text}`);
-  return { id: r.json.envelope.id, docHash: dh, envelope: r.json.envelope };
+  const env = r.json.envelope;
+  // The per-party invite tokens, handed back exactly once at create time. They
+  // are the capability that binds a slot to the party who may fill it, in open
+  // mode as much as in email mode, so every view/sign below carries one.
+  return { id: env.id, docHash: dh, envelope: env, tokens: env.party_links.map((p) => p.invite_token) };
 }
 
 // A real ML-DSA-65 signature over the exact message the relay will re-derive.
@@ -109,6 +113,8 @@ function signForParty(id, dh, partyIndex, keypair) {
 }
 
 const submit = (id, body) => srv.post(`/v2/envelopes/${id}/sign`, { headers: asParty(), body });
+// The party's own signing link, as the invite hands it over: token included.
+const submitAs = (id, token, body) => submit(id, { ...body, token });
 const statusOf = (id) => srv.get(`/v2/envelopes/${id}`, { headers: asParty() });
 const view = (id, body) => srv.post(`/v2/envelopes/${id}/view`, { headers: asParty(), body });
 const receipt = (id, key) => srv.get(`/v2/envelopes/${id}/receipt`,
@@ -127,7 +133,22 @@ test('create returns one signing link per party and an expiry derived from ttl_d
   assert.strictEqual(envelope.party_links.length, 2);
   assert.strictEqual(envelope.party_links[0].party_index, 0);
   assert.match(envelope.party_links[1].sign_path, /^\/co-sign\?env=/);
-  assert.strictEqual(envelope.party_links[0].invite_token, null, 'open mode issues no invite tokens');
+  // CHANGED 2026-09-05. This line used to read
+  //   assert.strictEqual(envelope.party_links[0].invite_token, null,
+  //                      'open mode issues no invite tokens')
+  // and that expectation was the open door itself: without a per-party token an
+  // open slot had no credential at all, so anyone who learned the envelope id
+  // could sign in a named party's name. create() has always MINTED a token per
+  // slot; it simply withheld it in open mode. It is handed over now, and the
+  // store requires it, so the assertion is inverted rather than deleted.
+  for (const link of envelope.party_links) {
+    assert.match(String(link.invite_token), /^[A-Za-z0-9_-]{40,}$/,
+      'every party gets an invite token, open mode included');
+    assert.ok(link.sign_path.includes('&t=' + link.invite_token),
+      'the signing link carries that party its own token');
+  }
+  assert.strictEqual(new Set(envelope.party_links.map((p) => p.invite_token)).size, 2,
+    'each slot gets its own token, so one party cannot sign for the other');
 
   const expires = Date.parse(envelope.expires_at);
   const expected = before + 3 * 86_400_000;
@@ -171,15 +192,23 @@ test('the relay never receives the document, only its hash', async () => {
 
 // ── 2. view ──────────────────────────────────────────────────────────────────
 
-test('a party marks itself viewed without any API key, and the status shows it', async () => {
+test('a party marks itself viewed with its invite token and no API key; a stranger cannot', async () => {
   if (!ready()) return;
   IP = nextIp();
-  const { id } = await createEnvelope();
+  const { id, tokens } = await createEnvelope();
   const before = await statusOf(id);
   assert.strictEqual(before.status, 200);
   assert.strictEqual(before.json.envelope.parties[0].status, 'pending');
 
-  const v = await view(id, { party_index: 0 });
+  // A passer-by who knows only the id cannot stamp a viewed-at onto a slot. That
+  // stamp goes into the CT log as evidence of when a party opened the document,
+  // so an unauthenticated one is a falsified record.
+  const nosy = await view(id, { party_index: 0 });
+  assert.strictEqual(nosy.status, 404, 'no invite token, no view');
+  assert.strictEqual((await statusOf(id)).json.envelope.parties[0].status, 'pending',
+    'the refused view changed nothing');
+
+  const v = await view(id, { party_index: 0, token: tokens[0] });
   assert.strictEqual(v.status, 200);
   assert.deepStrictEqual(v.json, { ok: true });
 
@@ -192,9 +221,9 @@ test('a party marks itself viewed without any API key, and the status shows it',
 test('the public status is redacted: no signatures, no raw keys, no account id', async () => {
   if (!ready()) return;
   IP = nextIp();
-  const { id, docHash: dh } = await createEnvelope([{ label: 'Solo' }]);
+  const { id, docHash: dh, tokens } = await createEnvelope([{ label: 'Solo' }]);
   const { pubB64, sigB64 } = signForParty(id, dh, 0);
-  assert.strictEqual((await submit(id, { party_index: 0, signer_public_key: pubB64, signature: sigB64 })).status, 200);
+  assert.strictEqual((await submitAs(id, tokens[0], { party_index: 0, signer_public_key: pubB64, signature: sigB64 })).status, 200);
 
   const r = await statusOf(id);
   assert.strictEqual(r.status, 200);
@@ -212,10 +241,10 @@ test('the public status is redacted: no signatures, no raw keys, no account id',
 test('a real ML-DSA-65 signature is accepted and completes the envelope when the last party signs', async () => {
   if (!ready()) return;
   IP = nextIp();
-  const { id, docHash: dh } = await createEnvelope();
+  const { id, docHash: dh, tokens } = await createEnvelope();
 
   const a = signForParty(id, dh, 0);
-  const first = await submit(id, { party_index: 0, signer_public_key: a.pubB64, signature: a.sigB64 });
+  const first = await submitAs(id, tokens[0], { party_index: 0, signer_public_key: a.pubB64, signature: a.sigB64 });
   assert.strictEqual(first.status, 200, first.text);
   assert.strictEqual(first.json.ok, true);
   assert.strictEqual(first.json.idempotent, false);
@@ -223,7 +252,7 @@ test('a real ML-DSA-65 signature is accepted and completes the envelope when the
   assert.strictEqual(first.json.status, 'sent', 'one of two parties is not a completed envelope');
 
   const b = signForParty(id, dh, 1);
-  const second = await submit(id, { party_index: 1, signer_public_key: b.pubB64, signature: b.sigB64 });
+  const second = await submitAs(id, tokens[1], { party_index: 1, signer_public_key: b.pubB64, signature: b.sigB64 });
   assert.strictEqual(second.status, 200, second.text);
   assert.strictEqual(second.json.signed_count, 2);
   assert.strictEqual(second.json.status, 'complete');
@@ -235,7 +264,7 @@ test('a signature over the WRONG message is refused, so the relay really verifie
   IP = nextIp();
   // The failure mode that would make every test above worthless is a relay that
   // stores whatever it is handed. Four forgeries, all rejected:
-  const { id, docHash: dh } = await createEnvelope([{ label: 'Solo' }]);
+  const { id, docHash: dh, tokens } = await createEnvelope([{ label: 'Solo' }]);
   const good = signForParty(id, dh, 0);
 
   // (a) a signature over a different document
@@ -252,13 +281,13 @@ test('a signature over the WRONG message is refused, so the relay really verifie
   const noise = Buffer.from(crypto.randomBytes(3309)).toString('base64');
 
   for (const [name, sig] of [['other document', wrongDoc], ['other party index', wrongIdx], ['other key', wrongKey], ['noise', noise]]) {
-    const r = await submit(id, { party_index: 0, signer_public_key: good.pubB64, signature: sig });
+    const r = await submitAs(id, tokens[0], { party_index: 0, signer_public_key: good.pubB64, signature: sig });
     assert.strictEqual(r.status, 400, `${name}: expected 400, got ${r.status} ${r.text}`);
     assert.deepStrictEqual(r.json, { error: 'bad_signature' }, name);
   }
 
   // The slot is still open after four refusals, and the good signature lands.
-  const ok = await submit(id, { party_index: 0, signer_public_key: good.pubB64, signature: good.sigB64 });
+  const ok = await submitAs(id, tokens[0], { party_index: 0, signer_public_key: good.pubB64, signature: good.sigB64 });
   assert.strictEqual(ok.status, 200, ok.text);
   did();
 });
@@ -266,22 +295,22 @@ test('a signature over the WRONG message is refused, so the relay really verifie
 test('DOUBLE SIGN: the same submission is idempotent, a different one is a conflict', async () => {
   if (!ready()) return;
   IP = nextIp();
-  const { id, docHash: dh } = await createEnvelope([{ label: 'Alice' }, { label: 'Bob' }]);
+  const { id, docHash: dh, tokens } = await createEnvelope([{ label: 'Alice' }, { label: 'Bob' }]);
   const a = signForParty(id, dh, 0);
-  const first = await submit(id, { party_index: 0, signer_public_key: a.pubB64, signature: a.sigB64 });
+  const first = await submitAs(id, tokens[0], { party_index: 0, signer_public_key: a.pubB64, signature: a.sigB64 });
   assert.strictEqual(first.status, 200);
   assert.strictEqual(first.json.idempotent, false);
 
   // Replaying the exact same signature is a retry, not a second signature: it
   // must not move the counter. (A network retry must be safe.)
-  const replay = await submit(id, { party_index: 0, signer_public_key: a.pubB64, signature: a.sigB64 });
+  const replay = await submitAs(id, tokens[0], { party_index: 0, signer_public_key: a.pubB64, signature: a.sigB64 });
   assert.strictEqual(replay.status, 200);
   assert.strictEqual(replay.json.idempotent, true, 'an identical resubmission is a replay');
   assert.strictEqual(replay.json.signed_count, 1, 'a replay must never increase signed_count');
 
   // A DIFFERENT signer trying to take an occupied slot is refused outright.
   const other = signForParty(id, dh, 0);
-  const conflict = await submit(id, { party_index: 0, signer_public_key: other.pubB64, signature: other.sigB64 });
+  const conflict = await submitAs(id, tokens[0], { party_index: 0, signer_public_key: other.pubB64, signature: other.sigB64 });
   assert.strictEqual(conflict.status, 409);
   assert.deepStrictEqual(conflict.json, { error: 'conflict' });
 
@@ -296,12 +325,12 @@ test('DOUBLE SIGN: the same submission is idempotent, a different one is a confl
 test('a completed envelope is closed: nobody signs it again', async () => {
   if (!ready()) return;
   IP = nextIp();
-  const { id, docHash: dh } = await createEnvelope([{ label: 'Solo' }]);
+  const { id, docHash: dh, tokens } = await createEnvelope([{ label: 'Solo' }]);
   const a = signForParty(id, dh, 0);
-  assert.strictEqual((await submit(id, { party_index: 0, signer_public_key: a.pubB64, signature: a.sigB64 })).status, 200);
+  assert.strictEqual((await submitAs(id, tokens[0], { party_index: 0, signer_public_key: a.pubB64, signature: a.sigB64 })).status, 200);
 
   const b = signForParty(id, dh, 0);
-  const closed = await submit(id, { party_index: 0, signer_public_key: b.pubB64, signature: b.sigB64 });
+  const closed = await submitAs(id, tokens[0], { party_index: 0, signer_public_key: b.pubB64, signature: b.sigB64 });
   assert.strictEqual(closed.status, 410);
   assert.deepStrictEqual(closed.json, { error: 'closed' });
   did();
@@ -310,14 +339,14 @@ test('a completed envelope is closed: nobody signs it again', async () => {
 test('a party index outside the envelope is a generic not_found, not an out-of-range hint', async () => {
   if (!ready()) return;
   IP = nextIp();
-  const { id, docHash: dh } = await createEnvelope([{ label: 'Solo' }]);
+  const { id, docHash: dh, tokens } = await createEnvelope([{ label: 'Solo' }]);
   const a = signForParty(id, dh, 3);
-  const r = await submit(id, { party_index: 3, signer_public_key: a.pubB64, signature: a.sigB64 });
+  const r = await submitAs(id, tokens[0], { party_index: 3, signer_public_key: a.pubB64, signature: a.sigB64 });
   assert.strictEqual(r.status, 404);
   assert.deepStrictEqual(r.json, { error: 'not_found' });
 
   // And an envelope id that never existed answers exactly the same way.
-  const ghost = await submit('Zm9vYmFyZm9vYmFyZm9vYmFyZm9v', { party_index: 0, signer_public_key: a.pubB64, signature: a.sigB64 });
+  const ghost = await submitAs('Zm9vYmFyZm9vYmFyZm9vYmFyZm9v', tokens[0], { party_index: 0, signer_public_key: a.pubB64, signature: a.sigB64 });
   assert.strictEqual(ghost.status, 404);
   assert.deepStrictEqual(ghost.json, { error: 'not_found' });
   did();
@@ -332,7 +361,7 @@ test('EXPIRED: once the retention window closes the envelope is gone and cannot 
   // relay does not compare expires_at on every read. So the honest way to test
   // expiry is to let the record actually expire. The suite shortens the TTL to
   // 50 ms on the store rather than waiting a day.
-  const { id, docHash: dh } = await createEnvelope([{ label: 'Alice' }], { ttl_days: 1 });
+  const { id, docHash: dh, tokens } = await createEnvelope([{ label: 'Alice' }], { ttl_days: 1 });
 
   const ttl = await rc.ttl(`env:${id}`);
   assert.ok(ttl > 86_000 && ttl <= 86_400, `a 1-day envelope should carry a ~1 day redis TTL, got ${ttl}`);
@@ -342,11 +371,11 @@ test('EXPIRED: once the retention window closes the envelope is gone and cannot 
   assert.strictEqual(await rc.exists(`env:${id}`), 0, 'the record really expired');
 
   const a = signForParty(id, dh, 0);
-  const signAfter = await submit(id, { party_index: 0, signer_public_key: a.pubB64, signature: a.sigB64 });
+  const signAfter = await submitAs(id, tokens[0], { party_index: 0, signer_public_key: a.pubB64, signature: a.sigB64 });
   assert.strictEqual(signAfter.status, 404, 'an expired envelope must not accept a signature');
   assert.deepStrictEqual(signAfter.json, { error: 'not_found' });
 
-  const viewAfter = await view(id, { party_index: 0 });
+  const viewAfter = await view(id, { party_index: 0, token: tokens[0] });
   assert.strictEqual(viewAfter.status, 404, 'and it can no longer be viewed');
   const status = await statusOf(id);
   assert.strictEqual(status.status, 404, 'and it no longer has a public status');
@@ -358,7 +387,7 @@ test('EXPIRED: once the retention window closes the envelope is gone and cannot 
 test('the receipt is owner-only and only issued once the envelope is complete', async () => {
   if (!ready()) return;
   IP = nextIp();
-  const { id, docHash: dh } = await createEnvelope([{ label: 'Alice' }, { label: 'Bob' }]);
+  const { id, docHash: dh, tokens } = await createEnvelope([{ label: 'Alice' }, { label: 'Bob' }]);
 
   const early = await receipt(id, OWNER);
   assert.strictEqual(early.status, 409, 'an unfinished envelope has no evidence to hand out');
@@ -366,7 +395,7 @@ test('the receipt is owner-only and only issued once the envelope is complete', 
 
   for (const i of [0, 1]) {
     const s = signForParty(id, dh, i);
-    assert.strictEqual((await submit(id, { party_index: i, signer_public_key: s.pubB64, signature: s.sigB64 })).status, 200);
+    assert.strictEqual((await submitAs(id, tokens[i], { party_index: i, signer_public_key: s.pubB64, signature: s.sigB64 })).status, 200);
   }
 
   const stranger = await receipt(id, STRANGER);
@@ -384,11 +413,11 @@ test('the receipt is owner-only and only issued once the envelope is complete', 
 test('OFFLINE VERIFICATION: the receipt checks out without asking the relay anything', async () => {
   if (!ready()) return;
   IP = nextIp();
-  const { id, docHash: dh } = await createEnvelope([{ label: 'Alice' }, { label: 'Bob' }]);
+  const { id, docHash: dh, tokens } = await createEnvelope([{ label: 'Alice' }, { label: 'Bob' }]);
   const signers = [];
   for (const i of [0, 1]) {
     const s = signForParty(id, dh, i);
-    assert.strictEqual((await submit(id, { party_index: i, signer_public_key: s.pubB64, signature: s.sigB64 })).status, 200);
+    assert.strictEqual((await submitAs(id, tokens[i], { party_index: i, signer_public_key: s.pubB64, signature: s.sigB64 })).status, 200);
     signers.push(s);
   }
   const psign = (await receipt(id, OWNER)).json;
@@ -458,10 +487,10 @@ test('OFFLINE VERIFICATION: the receipt checks out without asking the relay anyt
 test('OFFLINE VERIFICATION: every notary-signed field is covered, one sabotage at a time', async () => {
   if (!ready()) return;
   IP = nextIp();
-  const { id, docHash: dh } = await createEnvelope([{ label: 'Alice' }, { label: 'Bob' }]);
+  const { id, docHash: dh, tokens } = await createEnvelope([{ label: 'Alice' }, { label: 'Bob' }]);
   for (const i of [0, 1]) {
     const s = signForParty(id, dh, i);
-    assert.strictEqual((await submit(id, { party_index: i, signer_public_key: s.pubB64, signature: s.sigB64 })).status, 200);
+    assert.strictEqual((await submitAs(id, tokens[i], { party_index: i, signer_public_key: s.pubB64, signature: s.sigB64 })).status, 200);
   }
   const psign = (await receipt(id, OWNER)).json;
   const { notary_signature, ...unsigned } = psign;

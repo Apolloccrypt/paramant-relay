@@ -182,31 +182,53 @@ async function main() {
     ok('signed appearance survives status and receipt read-back');
   }
 
-  // 7. sign(): open envelope (no binding_mode) works via the public path but is
-  //    now SIGNER-BOUND (recipe v4): the verified message appends the signer's
-  //    public key, so the signature commits to the exact key that produced it.
+  // 7. sign(): an open envelope (no binding_mode) is PARTY-BOUND by its invite
+  //    token and SIGNER-BOUND by recipe v4. The token proves the submitter holds
+  //    this slot; v4 appends the signer's public key so the signature commits to
+  //    the exact key that produced it. Neither alone is enough: v4 says the key
+  //    signed, and says nothing about whose key it is.
+  //
+  //    CHANGED 2026-09-05. This case used to submit `store.sign(ID, 0, PUB,
+  //    'c2ln')` with no opts and assert `r.ok === true` under the name "open
+  //    envelope accepts public caller". That expectation was the hole itself:
+  //    open slots asked for no credential, so anyone who learned an envelope id
+  //    could sign in a named party's place. The assertion is inverted here, and
+  //    the case now also proves the two refusals it never made.
   {
     const SIGNER_PUB = 'cHViMQ==';   // base64('pub1')
+    const TOKEN = crypto.randomBytes(32).toString('base64url');
     const hash = {
       id: ID, doc_hash: DOC, status: 'sent',   // no binding_mode, no recipe_version
       party_count: '1', signed_count: '0', p0_email_hash: '', p0_status: 'pending',
+      p0_invite_token: TOKEN,
     };
     let seenMsg = null;
-    const store = new EnvelopeStore(fakeRedis(hash), {
+    const mk = () => new EnvelopeStore(fakeRedis({ ...hash }), {
       sigVerify: (_sig, msg) => { seenMsg = msg; return true; },
     });
-    const r = await store.sign(ID, 0, SIGNER_PUB, 'c2ln');   // public, no opts
-    assert.strictEqual(r.ok, true, 'open envelope accepts public caller');
+
+    // No token at all -> refused, and nothing was verified on the way out.
+    seenMsg = null;
+    assert.strictEqual((await mk().sign(ID, 0, SIGNER_PUB, 'c2ln')).code, 'invite_token_required',
+      'an open slot refuses a caller who holds only the envelope id');
+    assert.strictEqual(seenMsg, null, 'the refusal lands before any signature verification');
+    // A guessed token -> the same refusal.
+    assert.strictEqual((await mk().sign(ID, 0, SIGNER_PUB, 'c2ln', { inviteToken: 'nope' })).code,
+      'invite_token_required', 'a wrong invite token is refused too');
+
+    // The party who was handed the token signs.
+    const r = await mk().sign(ID, 0, SIGNER_PUB, 'c2ln', { inviteToken: TOKEN });
+    assert.strictEqual(r.ok, true, 'the invited party signs its own slot');
     // The verified message is the v4 recipe bound to THIS signer pubkey...
     assert.ok(seenMsg && seenMsg.equals(signMessageBytes(ID, DOC, 0, '', 4, SIGNER_PUB)),
       'open envelope verifies the signer-bound v4 message');
     // ...and is provably NOT the old (signer-agnostic) v1 message.
     assert.ok(!seenMsg.equals(signMessageBytes(ID, DOC, 0)),
       'open-mode message is no longer the unbound v1 recipe');
-    ok('sign() open envelope is signer-bound (v4, public)');
+    ok('sign() open envelope is party-bound (invite token) and signer-bound (v4)');
   }
 
-  // 8. getForParty: email mode is token-gated and never leaks the invite token
+  // 8. getForParty: token-gated in every mode, and never leaks the invite token
   {
     const TOKEN = crypto.randomBytes(32).toString('base64url');
     const hash = {
@@ -225,6 +247,27 @@ async function main() {
     assert.strictEqual(await store.checkInviteToken(ID, 0, TOKEN), true, 'checkInviteToken true on match');
     assert.strictEqual(await store.checkInviteToken(ID, 0, 'nope'), false, 'checkInviteToken false on miss');
     ok('getForParty token gating + no token leak');
+  }
+
+  // 8b. getForParty on an OPEN envelope is token-gated as well. It used to be
+  //     exempt, which made the party view (and POST /view behind it) readable by
+  //     anyone holding the envelope id.
+  {
+    const TOKEN = crypto.randomBytes(32).toString('base64url');
+    const hash = {
+      id: ID, doc_hash: DOC, status: 'sent',   // open: no binding_mode
+      party_count: '1', signed_count: '0',
+      p0_label: 'Demo', p0_email_hash: '', p0_status: 'pending', p0_invite_token: TOKEN,
+    };
+    const store = new EnvelopeStore(fakeRedis(hash), {});
+    assert.strictEqual(await store.getForParty(ID, 0, undefined), null, 'open + no token -> null');
+    assert.strictEqual(await store.getForParty(ID, 0, ''), null, 'open + empty token -> null');
+    assert.strictEqual(await store.getForParty(ID, 0, 'wrong-token'), null, 'open + wrong token -> null');
+    const view = await store.getForParty(ID, 0, TOKEN);
+    assert.ok(view, 'open + correct token returns the party view');
+    assert.strictEqual(view.binding_mode, 'open');
+    assert.ok(!JSON.stringify(view).includes(TOKEN), 'the open view never leaks the invite token either');
+    ok('getForParty is token-gated for open envelopes too');
   }
 
   // 9. sign(): the 7-day signing-invite window (email mode only). A fresh invite
@@ -248,9 +291,10 @@ async function main() {
     assert.strictEqual((await within.sign(ID, 0, 'cHVi', 'c2ln', opts)).ok, true, 'email invite within 7d still signs');
 
     // open/legacy envelope with an OLD created_at is NOT subject to the invite window
-    const openOld = { id: ID, doc_hash: DOC, status: 'sent', party_count: '1', signed_count: '0', p0_email_hash: '', p0_status: 'pending', created_at: old };
+    const openToken = crypto.randomBytes(32).toString('base64url');
+    const openOld = { id: ID, doc_hash: DOC, status: 'sent', party_count: '1', signed_count: '0', p0_email_hash: '', p0_status: 'pending', p0_invite_token: openToken, created_at: old };
     const open = new EnvelopeStore(fakeRedis(openOld), { sigVerify: () => true });
-    assert.strictEqual((await open.sign(ID, 0, 'cHVi', 'c2ln')).ok, true, 'open/legacy envelope ignores the 7d invite window');
+    assert.strictEqual((await open.sign(ID, 0, 'cHVi', 'c2ln', { inviteToken: openToken })).ok, true, 'open/legacy envelope ignores the 7d invite window');
 
     // getForParty exposes sign_expires_at for email mode (created_at + 7d), in the future for a fresh invite
     const TOKEN = crypto.randomBytes(32).toString('base64url');
@@ -267,10 +311,16 @@ async function main() {
   //     (signer-agnostic) message, or presents a signature minted for a
   //     different key, no longer validates against any other key/slot.
   {
+    const TOKEN10 = crypto.randomBytes(32).toString('base64url');
     const hash = {
       id: ID, doc_hash: DOC, status: 'sent',   // open envelope
       party_count: '1', signed_count: '0', p0_email_hash: '', p0_status: 'pending',
+      p0_invite_token: TOKEN10,
     };
+    // Every submission below holds the party's invite token, so what is under
+    // test here is purely the signer binding: the token got the caller to the
+    // slot, and v4 still has to prove which key filled it.
+    const OPTS10 = { inviteToken: TOKEN10 };
     // Honest verifier: bind sig<->(message, pubkey). Here a "signature" is just
     // the v4 message the signer committed to; it verifies only if it equals the
     // v4 message recomputed for the pubkey actually submitted to sign().
@@ -286,23 +336,23 @@ async function main() {
     // (a) Honest signer A: commits to v4 message for PUB_A, submits PUB_A -> ok.
     const msgA = signMessageBytes(ID, DOC, 0, '', 4, PUB_A).toString('base64');
     const okStore = new EnvelopeStore(fakeRedis(hash), { sigVerify: honest(msgA) });
-    assert.strictEqual((await okStore.sign(ID, 0, PUB_A, msgA)).ok, true, 'honest signer with matching v4 commitment accepted');
+    assert.strictEqual((await okStore.sign(ID, 0, PUB_A, msgA, OPTS10)).ok, true, 'honest signer with matching v4 commitment accepted');
 
     // (b) Attacker captured A's signature (committed to PUB_A) but submits PUB_B
     //     to claim the slot as a different identity -> rejected (message for
     //     PUB_B differs, so the captured commitment no longer verifies).
     const subStore = new EnvelopeStore(fakeRedis(hash), { sigVerify: honest(msgA) });
-    assert.strictEqual((await subStore.sign(ID, 0, PUB_B, msgA)).code, 'bad_signature', 'key-substituted signature rejected');
+    assert.strictEqual((await subStore.sign(ID, 0, PUB_B, msgA, OPTS10)).code, 'bad_signature', 'key-substituted signature rejected');
 
     // (c) Legacy attack: sign the OLD signer-agnostic v1 message -> rejected,
     //     because open mode now verifies the signer-bound v4 message only.
     const legacyMsg = signMessageBytes(ID, DOC, 0).toString('base64');
     const legacyStore = new EnvelopeStore(fakeRedis(hash), { sigVerify: honest(legacyMsg) });
-    assert.strictEqual((await legacyStore.sign(ID, 0, PUB_A, legacyMsg)).code, 'bad_signature', 'legacy signer-agnostic signature rejected');
+    assert.strictEqual((await legacyStore.sign(ID, 0, PUB_A, legacyMsg, OPTS10)).code, 'bad_signature', 'legacy signer-agnostic signature rejected');
 
     // (d) Empty signer key is rejected before verify (v4 mixes the pubkey).
     const emptyStore = new EnvelopeStore(fakeRedis(hash), { sigVerify: () => true });
-    assert.strictEqual((await emptyStore.sign(ID, 0, '', 'c2ln')).code, 'bad_signature', 'empty signer key rejected');
+    assert.strictEqual((await emptyStore.sign(ID, 0, '', 'c2ln', OPTS10)).code, 'bad_signature', 'empty signer key rejected');
 
     ok('sign() open-mode signer binding blocks key substitution + legacy replay');
   }

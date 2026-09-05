@@ -38,7 +38,9 @@ async function completeOpenEnvelope(store, eng, out, docHash) {
   const pubB64 = Buffer.from(kp.publicKey).toString('base64');
   const msg = envelopeMod.signMessageBytes(out.id, docHash, 0, '', 4, pubB64); // open -> recipe v4
   const sigB64 = Buffer.from(eng.sign(msg, kp.secretKey)).toString('base64');
-  return store.sign(out.id, 0, pubB64, sigB64, {});
+  // An open slot is bound to the party holding its invite token, exactly as an
+  // email slot is bound to its mailbox. create() hands the token back once.
+  return store.sign(out.id, 0, pubB64, sigB64, { inviteToken: out.party_links[0].invite_token });
 }
 
 async function main() {
