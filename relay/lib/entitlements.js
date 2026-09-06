@@ -207,6 +207,17 @@ function applyProductTier(rec, product, tier, paidUntil, bundle) {
   if (rec[field] !== norm) { rec[field] = norm; changed = true; }
   let parasignGranted = false;
   if (product === 'parasign' && norm !== 'free' && rec.parasign !== true) { rec.parasign = true; parasignGranted = true; }
+  // ...and the flag goes with the tier when the tier goes. The flag is what
+  // keys-table.accountHasParasignEntitlement reads to decide whether an account
+  // may mint /v1 API keys, and it used to be set on a grant and never cleared,
+  // so a chargeback or a lapsed term left the ParaSign API entitlement standing
+  // for good: the money went back and the key kept working. Only cleared when
+  // the tier ACTUALLY MOVED DOWN to free, so re-applying free to an account
+  // that already sits there leaves an operator's explicit grant alone.
+  let parasignRevoked = false;
+  if (product === 'parasign' && norm === 'free' && changed && rec.parasign === true) {
+    delete rec.parasign; parasignRevoked = true;
+  }
   // The paid period travels with the tier it paid for. Landing on the floor
   // clears it, so a revoked or lapsed account carries no stale date; passing
   // undefined leaves whatever is there alone, which keeps every existing caller
@@ -227,7 +238,7 @@ function applyProductTier(rec, product, tier, paidUntil, bundle) {
     if (!bundle) { if (rec[bundleField] !== undefined) delete rec[bundleField]; }
     else if (rec[bundleField] !== bundle) rec[bundleField] = bundle;
   }
-  return { field, tier: norm, changed, parasignGranted, paidUntil: rec[untilField] || null, bundle: rec[bundleField] || null };
+  return { field, tier: norm, changed, parasignGranted, parasignRevoked, paidUntil: rec[untilField] || null, bundle: rec[bundleField] || null };
 }
 
 // ── Migration: legacy single `plan` (+ parasign flag) -> per-product plan ─────
@@ -486,6 +497,7 @@ module.exports = {
   PRODUCT_PLAN_FIELD,
   PRODUCT_PAID_UNTIL_FIELD,
   PRODUCT_BUNDLE_FIELD,
+  floorTierOf,
   validateProductPlan,
   applyProductTier,
   effectiveProductTier,

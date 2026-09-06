@@ -36,12 +36,21 @@ const BASE_PATH   = (process.env.BASE_PATH || '').replace(/\/$/, '');
 // every Object.keys(SECTORS) iteration in this file; add a sector here and
 // the rest follows. findUserByEmail() stays health-only on purpose: health
 // is the canonical admin-UI source and the lookup is hot-path.
+// The fallback is the CONTAINER-INTERNAL listener, and that is :3000 for every
+// sector (docker-compose.yml sets PORT: "3000" once, for all five). The numbers
+// 3001-3005 are host-side published ports; on the compose network nothing
+// listens there. health/legal/finance/iot carried those host numbers as their
+// fallback, so a missing or misspelt RELAY_* env pointed the admin at a dead
+// port and every fan-out for that sector failed with ECONNREFUSED instead of
+// falling back. Only main was right. Kept in sync by
+// tests/sector-fallback-ports.test.mjs, which reads the port out of
+// docker-compose.yml rather than trusting a number typed here.
 const SECTORS = {
   main:    process.env.RELAY_MAIN    || 'http://relay-main:3000',
-  health:  process.env.RELAY_HEALTH  || 'http://relay-health:3005',
-  legal:   process.env.RELAY_LEGAL   || 'http://relay-legal:3002',
-  finance: process.env.RELAY_FINANCE || 'http://relay-finance:3003',
-  iot:     process.env.RELAY_IOT     || 'http://relay-iot:3004',
+  health:  process.env.RELAY_HEALTH  || 'http://relay-health:3000',
+  legal:   process.env.RELAY_LEGAL   || 'http://relay-legal:3000',
+  finance: process.env.RELAY_FINANCE || 'http://relay-finance:3000',
+  iot:     process.env.RELAY_IOT     || 'http://relay-iot:3000',
 };
 
 if (!ADMIN_TOKEN) { console.error('[PARAMANT-ADMIN] ADMIN_TOKEN is not set — refusing to start'); process.exit(1); }
@@ -1956,8 +1965,17 @@ api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
     try { inviteUrl = new URL(inviteUrlText); }
     catch { return res.status(400).json({ error: "invalid_invite_url" }); }
     const token = inviteUrl.searchParams.get("t") || "";
-    const fragment = inviteUrl.hash.slice(1);
-    if (inviteUrl.origin !== siteOrigin || inviteUrl.pathname !== "/co-sign" || inviteUrl.searchParams.get("env") !== id || Number(inviteUrl.searchParams.get("p")) !== partyIndex || !/^[A-Za-z0-9_-]{43}$/.test(token) || !/^doc=v1\.[A-Za-z0-9_-]{43}$/.test(fragment)) {
+    // The fragment of a signing link is the document's AES key. This endpoint
+    // hands the link to a mail provider outside the EU, so a link that still
+    // carries a fragment is refused rather than trimmed: trimming would invite
+    // a modified client to post the key here and trust us to drop it, and the
+    // key would still have passed through this process and any log on the way.
+    // The mail carries the notice, the sender passes the opening link on over a
+    // channel they choose. Nothing past this check has ever held a key.
+    if (inviteUrl.hash !== "") {
+      return res.status(400).json({ error: "invite_url_carries_key" });
+    }
+    if (inviteUrl.origin !== siteOrigin || inviteUrl.pathname !== "/co-sign" || inviteUrl.searchParams.get("env") !== id || Number(inviteUrl.searchParams.get("p")) !== partyIndex || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
       return res.status(400).json({ error: "invalid_invite_url" });
     }
     let env;
@@ -1981,7 +1999,9 @@ api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
         inviteUrl: item.inviteUrl,
         recipientLabel: item.label,
         senderLabel,
-        documentName: item.env.original_filename,
+        // No document name. A filename is content, it is often the whole point
+        // ("opzegging-huurcontract.pdf"), and this message leaves the EU. The
+        // recipient sees the name after the link opens the document.
         expiresAt: item.env.sign_expires_at,
         subject,
         message,
@@ -2264,6 +2284,28 @@ function productPlanFields(rec) {
   };
 }
 
+// The name of the plan this account is on, in the words the pricing page uses.
+// ONE function, because three places were naming the same plan differently: the
+// account page said FIRM PLAN, this API said "community", and the cancellation
+// mail said "your Paramant Pro plan" -- to one customer, about one purchase, on
+// the same afternoon. `pro` is Firm because Firm is what /pricing sells that
+// grants it (billing-catalog ON_SALE); a legacy ParaSign Pro buyer sees the
+// same word his own screens show him.
+const PLAN_NAMES = { pro: 'Firm', business: 'Business', enterprise: 'Enterprise' };
+function effectivePaidTier(fields) {
+  const live = (plan, until) => (plan && plan !== 'free' && plan !== 'community'
+    && (!until || Date.parse(until) > Date.now())) ? plan : null;
+  const order = ['enterprise', 'business', 'pro'];
+  const held = [live(fields.plan_parasign, fields.paid_until_parasign),
+    live(fields.plan_parasend, fields.paid_until_parasend)].filter(Boolean);
+  for (const tier of order) if (held.includes(tier)) return tier;
+  return null;
+}
+function planNameOf(fields) {
+  const tier = effectivePaidTier(fields);
+  return tier ? (PLAN_NAMES[tier] || tier) : 'Community';
+}
+
 // GET /api/user/me
 // JSON identity + account-summary endpoint backing the client-side /dashboard.
 // Same authUser cookie middleware as /api/user/account. Returns just what the
@@ -2336,6 +2378,51 @@ api.get("/user/check", authUser, (req, res) => {
 // to login. A valid session that is NOT on the developer allowlist gets 403,
 // which nginx remaps to 404 so the page's existence stays hidden. Allowlisted
 // session -> 200 and nginx serves /developer.html.
+// ── ParaSign /v1 API keys, for the customer who bought them ─────────────────
+// /pricing sells Firm with "a developer API with its own documentation and
+// webhooks, so signing can run inside your own software", and until now a buyer
+// had no way to get a key. The only route that mints one sat behind
+// developerGate, an operator EMAIL ALLOWLIST that answers 404, so the account
+// page's own "Developer settings" link was a dead end for every paying
+// customer. These three are the same relay route with the customer's session
+// instead of the allowlist; the entitlement check stays where it belongs, on
+// the relay (403 parasign_not_entitled for an account with no paid ParaSign
+// tier), so a free account still gets nothing.
+api.post("/user/parasign-keys", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const rr = await callRelay("/v2/user/parasign-keys", { user_id, label: req.body?.label, test: req.body?.test === true }, "POST");
+    const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(rr.status).json(body);
+  } catch (err) {
+    console.error("[user/parasign-keys POST]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+api.get("/user/parasign-keys", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const rr = await callRelay(`/v2/user/parasign-keys?user_id=${encodeURIComponent(user_id)}`, null, "GET");
+    const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(rr.status).json(body);
+  } catch (err) {
+    console.error("[user/parasign-keys GET]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+api.delete("/user/parasign-keys", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const rr = await callRelay("/v2/user/parasign-keys", { user_id, kid: req.body?.kid }, "DELETE");
+    const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(rr.status).json(body);
+  } catch (err) {
+    console.error("[user/parasign-keys DELETE]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
 api.get("/user/developer/check", authUser, (req, res) => {
   if (!isDeveloper(req.userSession.email)) return res.status(403).end();
   res.status(200).end();
@@ -2750,11 +2837,12 @@ api.get("/user/parasign/inbox", authUser, async (req, res) => {
 // created_at, so the resent link expires at the same moment as the first one and
 // the link already in the reader's mailbox keeps working.
 //
-// WHAT THE RESENT LINK CANNOT CARRY. The sender's encrypted copy of the document
-// is unlocked by a key that lives in the URL fragment. Browsers never send a
-// fragment, so no server ever held it: the first invitation was assembled in the
-// sender's browser. The resend therefore rebuilds the signing link and not that
-// key, and says so in the mail (documentIncluded: false).
+// WHAT NO INVITATION MAIL CARRIES. The document is unlocked by a key that lives
+// in the URL fragment. Browsers never transmit a fragment, so no server has ever
+// held it; the first invitation was assembled in the sender's browser. Since the
+// key would otherwise reach a mail provider outside the EU, the first invitation
+// does not carry it either: both mails are the same notice, and the sender hands
+// the opening link over themselves.
 //
 // One per envelope per hour, per account. The bucket is keyed on the session
 // account and the envelope together, never on the envelope alone: an id the
@@ -2796,11 +2884,9 @@ api.post("/user/parasign/inbox/:id/resend", authUser, async (req, res) => {
       inviteUrl,
       recipientLabel: invite.party_label || "",
       senderLabel: invite.sender || "",
-      documentName: invite.document,
       expiresAt: invite.signing_closes_at,
       envelopeId: id,
       partyIndex: invite.party_index,
-      documentIncluded: false,
     }));
   } catch (err) {
     console.error("[user/parasign/inbox resend mail]", err.message);
@@ -3297,10 +3383,36 @@ api.post("/user/billing/cancel", authUser, async (req, res) => {
     || billing?.next_billing_date
     || new Date(Date.now() + 30 * 86_400_000).toISOString();
   await redis().set(`paramant:user:plan_cancel_at:${user_id}`, cancelAt);
-  await logAuditEvent(user_id, 'plan_cancellation_scheduled', { cancel_at: cancelAt, plan: billing?.plan || 'pro', via: 'user_request' });
-  try { await sendCancellationScheduled(email, billing?.plan || 'pro', cancelAt); }
+  // STOP THE COLLECTION. This used to write the marker above, send the mail
+  // below and stop, so "Cancellation scheduled" was a note to ourselves. With
+  // BILLING_MODE set, checkout opens a Mollie mandate and a subscription, and
+  // nothing here ever told Mollie to stop: the customer read that his plan was
+  // cancelled and was charged again the following month. The relay owns the
+  // Mollie side (POST /v2/billing/cancel, which cancels the NEXT collection and
+  // leaves the paid term running), and it answers 'noop' when there is no
+  // subscription, which is what a one-off deployment gets.
+  let stopped = null;
+  try {
+    // SECTORS.main, niet health. De Mollie-aanwijzers (mollie_customer_id en
+    // mollie_subscription_*) worden door de webhook geschreven, en nginx stuurt
+    // publiek /v2 naar relay-main, dus daar staan ze. Een cancel naar health
+    // vindt geen abonnement, antwoordt 'noop' en zegt dat er niets te stoppen
+    // was terwijl de incasso doorloopt: exact dezelfde fout, één relay verderop.
+    const rr = await callRelay('/v2/billing/cancel', { user_id }, 'POST', 'main');
+    const rb = await rr.json().catch(() => null);
+    stopped = rb && rb.results ? rb.results : (rb || null);
+    if (!rr.ok) console.error('[billing] relay cancel returned', rr.status, JSON.stringify(rb));
+  } catch (err) {
+    // The marker and the mail have already been written; the customer's
+    // cancellation is not lost because Mollie was slow. Loud, because a
+    // subscription that survives a cancellation is money we may not take.
+    console.error('[billing] relay cancel failed:', err.message);
+  }
+  const planName = planNameOf(productPlanFields(cancelUser));
+  await logAuditEvent(user_id, 'plan_cancellation_scheduled', { cancel_at: cancelAt, plan: planName, via: 'user_request' });
+  try { await sendCancellationScheduled(email, planName, cancelAt); }
   catch (err) { console.error('[billing] cancel email failed:', err.message); }
-  res.json({ scheduled_downgrade_at: cancelAt });
+  res.json({ scheduled_downgrade_at: cancelAt, plan_name: planName, subscription: stopped });
 });
 
 api.get("/user/billing/status", authUser, async (req, res) => {
@@ -3310,6 +3422,18 @@ api.get("/user/billing/status", authUser, async (req, res) => {
   const cancelAt = await redis().get(`paramant:user:plan_cancel_at:${user_id}`);
   const keysRes = await relayFetch("health", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
   const currentKey = (keysRes.body?.keys || []).find(k => k.key === user_id);
+  // Whether a collection stands behind this plan is the ONE thing on this page
+  // that health cannot answer: the Mollie pointers are written by the webhook,
+  // and public /v2 goes to relay-main. Read from health, auto_renews was false
+  // for every customer who did have a subscription. Best effort: a main that
+  // cannot answer leaves the row at whatever health knows rather than failing
+  // the whole page.
+  let renews = !!currentKey?.auto_renews;
+  try {
+    const mainRes = await relayFetch("main", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
+    const mainKey = (mainRes.body?.keys || []).find(k => k.key === user_id);
+    if (mainKey) renews = !!mainKey.auto_renews;
+  } catch (err) { console.error("[billing status] main read failed:", err.message); }
   // What the account page shows about money has to be what actually happened.
   // Two things were wrong here. The record this used to read,
   // paramant:user:billing:<id>, is written by nothing in this codebase, so
@@ -3320,7 +3444,12 @@ api.get("/user/billing/status", authUser, async (req, res) => {
   const fields = productPlanFields(currentKey);
   const accessUntil = termEndOf(fields);
   res.json({
-    current_plan: currentKey?.plan || 'community',
+    // The plan the account is actually on, not the legacy unified `plan` field.
+    // A purchase writes plan_parasign / plan_parasend and deliberately never
+    // touches `plan`, so this said "community" to every paying customer since
+    // billing existed.
+    current_plan: effectivePaidTier(fields) || 'community',
+    plan_name: planNameOf(fields),
     ...fields,
     period: billing?.period || null,
     amount_eur: billing?.amount_eur ?? null,
@@ -3329,7 +3458,8 @@ api.get("/user/billing/status", authUser, async (req, res) => {
     // unless another payment is made, not the day a collection is attempted.
     access_until: accessUntil,
     next_billing_date: billing?.next_billing_date || null,
-    auto_renews: false,
+    // From the relay record, not a constant. See the projection in relay.js.
+    auto_renews: renews,
     cancellation_scheduled_at: cancelAt || null,
   });
 });

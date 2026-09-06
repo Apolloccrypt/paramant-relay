@@ -135,16 +135,24 @@ await page.locator('#step-done:not([hidden])').waitFor({ timeout: 15000 });
 const firstInvite = invitationCalls[0]?.invitations?.[0];
 const firstUrl = firstInvite ? new URL(firstInvite.invite_url) : null;
 ok('document is uploaded once as an encrypted capsule', documentUploads.length === 1 && documentUploads[0].body?.subarray(0, 4).toString() === 'PSDC', JSON.stringify({ count: documentUploads.length, magic: documentUploads[0]?.body?.subarray(0, 4).toString() }));
-ok('email invitation carries a personal fragment key', firstUrl?.hash.match(/^#doc=v1\.[A-Za-z0-9_-]{43}$/), firstUrl?.hash);
+// The email is the notice; the key is not in it. The browser cuts the fragment
+// off before the invitation is posted, so the document key never reaches our
+// own server and can never be forwarded to a mail provider outside the EU.
+// What the sender is given instead is the complete link, on the screen, to pass
+// on over a channel they choose.
+ok('the posted invitation carries no document key', firstUrl && firstUrl.hash === '' && !firstInvite.invite_url.includes('#'), firstInvite?.invite_url);
+ok('the posted invitation still names the request itself', firstUrl?.pathname === '/co-sign' && firstUrl?.searchParams.get('env') === ENV_ID && /^t{43}$/.test(firstUrl?.searchParams.get('t') || ''), firstUrl?.href);
+ok('the sender is shown the complete link, key and all', /#doc=v1\.[A-Za-z0-9_-]{43}$/.test((await page.locator('.ds-pl-url').first().getAttribute('title')) || ''), await page.locator('.ds-pl-url').first().getAttribute('title'));
+ok('the screen says the sender has to hand that link over', /now send them the links|send each person their link|needs their link from you|the key is in the link/i.test(await page.locator('#step-done').innerText()), await page.locator('#step-done').innerText().then((t) => t.slice(0, 220)));
 ok('email invitation is bound to the intended party and address', firstInvite?.party_index === 0 && firstInvite?.email === 'signer@example.com', JSON.stringify(firstInvite));
-ok('partial email failure is not shown as success', /not every email was delivered/i.test(await page.locator('#ds-success-banner').innerText()), await page.locator('#ds-success-banner').innerText());
+ok('partial email failure is not shown as success', /not every notice was delivered/i.test(await page.locator('#ds-success-banner').innerText()), await page.locator('#ds-success-banner').innerText());
 ok('failed email offers a retry', await page.locator('#ds-invite-retry').isVisible(), await page.locator('#ds-invite-retry').innerText());
 ok('sender still has a copy-link fallback', await page.locator('.ds-pl-copy').isVisible(), await page.locator('.ds-pl-copy').innerText());
 
 await page.locator('#ds-invite-retry').click();
-await page.waitForFunction(() => /all email invitations/i.test(document.querySelector('#ds-invite-delivery-result')?.textContent || ''));
+await page.waitForFunction(() => /all notices were delivered/i.test(document.querySelector('#ds-invite-delivery-result')?.textContent || ''));
 ok('retry sends only failed parties', invitationCalls.length === 2 && invitationCalls[1].invitations.length === 1 && invitationCalls[1].invitations[0].party_index === 0, JSON.stringify(invitationCalls[1]?.invitations));
-ok('successful retry clears the warning', /all email invitations/i.test(await page.locator('#ds-invite-delivery-result').innerText()) && !(await page.locator('#ds-invite-retry').isVisible()), await page.locator('#ds-invite-delivery-result').innerText());
+ok('successful retry clears the warning', /all notices were delivered/i.test(await page.locator('#ds-invite-delivery-result').innerText()) && !(await page.locator('#ds-invite-retry').isVisible()), await page.locator('#ds-invite-delivery-result').innerText());
 ok('phone viewport has no horizontal overflow', await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 1, await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
 
 // ── PDF variant: the requester points at the spot where the other party signs ──

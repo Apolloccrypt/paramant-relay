@@ -9,6 +9,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sign a PDF in your browser · Paramant</title>
 <meta property="og:site_name" content="Paramant">
+<!-- Which product path this page describes. tests/crypto-claims.test.mjs holds every
+     algorithm this page names against the code that runs on that path, instead of
+     against the codebase as a whole: naming an algorithm the product has, on a route
+     that does not run it, is the class of untrue sentence that reads as a fact. -->
+<meta name="paramant:path" content="signing">
 <meta name="description" content="Sign a PDF in your browser. The document text and your signing key never leave it, and anyone can check the finished document afterwards.">
 <meta property="og:title" content="Sign a PDF in your browser · Paramant">
 <meta property="og:description" content="Sign a PDF in your browser. The document text and your signing key never leave it, and anyone can check the finished document afterwards.">
@@ -723,7 +728,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 2.5: recipients (optional - if empty, this is a personal sign) -->
   <section class="ds-step" id="step-recipients" hidden>
     <h2>Add co-signers (optional)</h2>
-    <p class="ds-sub">Add each person who needs to sign. Their invitation is bound to the exact email address below. Paramant delivers the encrypted document with the request, so recipients do not need a separate copy.</p>
+    <p class="ds-sub">Add each person who needs to sign. Their invitation is bound to the exact email address below. The encrypted document travels with the request, so nobody needs a separate copy of the file. The key that opens it is the one thing we do not email: you pass that on yourself, on the next screen.</p>
 
     <div class="ds-recipients-list" id="ds-recipients-list"></div>
 
@@ -733,7 +738,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
     <fieldset class="ds-delivery-card" id="ds-invite-delivery" hidden>
       <legend>Email invitation</legend>
-      <p class="ds-usage-p">Paramant emails each recipient a personal link. They must sign in with the invited email address before the document opens.</p>
+      <p class="ds-usage-p">Paramant emails each recipient a notice with a link to the request. They must sign in with the invited email address. The notice does not carry the key to the document, because that email leaves our infrastructure through a mail provider abroad. You get each full link on the next screen to pass on yourself.</p>
       <div class="ds-delivery-fields" id="ds-delivery-fields">
         <label><span class="ds-label">Email subject</span><input class="ds-input" id="ds-invite-subject" maxlength="140"></label>
         <label><span class="ds-label">Message (optional)</span><textarea class="ds-input ds-textarea" id="ds-invite-message" maxlength="1000" placeholder="Add context, a reference or the requested deadline."></textarea></label>
@@ -742,11 +747,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         <summary>Security settings</summary>
         <label class="ds-delivery-option">
           <input type="radio" name="ds-delivery-mode" value="email" checked>
-          <span><strong>Send invitations by email</strong><span>Recommended. The link works only for the invited Paramant account.</span></span>
+          <span><strong>Email a notice, hand over the link yourself</strong><span>Recommended. The notice works only for the invited Paramant account, and the key never reaches our mail provider.</span></span>
         </label>
         <label class="ds-delivery-option">
           <input type="radio" name="ds-delivery-mode" value="copy">
-          <span><strong>Create links without sending email</strong><span>No email is sent. You share each personal link yourself.</span></span>
+          <span><strong>Create links without sending anything</strong><span>No email at all. You share each personal link yourself, exactly as above.</span></span>
         </label>
       </details>
     </fieldset>
@@ -921,7 +926,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
         <div class="ds-usage-card" id="ds-party-links-card" hidden>
           <h3 class="ds-proof-h">Their personal links</h3>
-          <p class="ds-usage-p" id="ds-party-links-copy">Each signer gets a link of their own, and it opens only for them.</p>
+          <p class="ds-usage-p" id="ds-party-links-copy">One link per signer. The key is in the link.</p>
           <div class="ds-banner" id="ds-invite-delivery-result" hidden role="status" aria-live="polite"></div>
           <div class="ds-party-links" id="ds-party-links"></div>
           <button class="btn btn-secondary" id="ds-invite-retry" type="button" hidden>Retry failed emails</button>
@@ -941,7 +946,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       <details class="done-details" id="ds-invite-details" hidden>
         <summary>What made this safe</summary>
         <div class="done-details-body">
-          <p>The document was sealed in your browser before any of it left this device, and each personal link carries that one person's key after the <code>#</code>, which is the part of a link a browser never sends to a server. What sits on our side is bytes we have no way to read.</p>
+          <p>The document was sealed in your browser before any of it left this device, and each personal link carries that one person's key after the <code>#</code>, which is the part of a link a browser never sends to a server. What sits on our side is bytes we have no way to read. The key stayed here too: the invitation email carries only a notice, so the mail provider that delivers it holds no way into the document and neither do we.</p>
           <p>A link is bound to the address you gave it, so it opens for that signer and not for whoever else it is forwarded to. When they sign, the signature is made on their own device with a key of their own (<code>ML-DSA-65</code>) and recorded on our relay and in the public <a href="/ct-log">CT log</a>, so you can show later that it happened and when.</p>
           <p>Nobody has signed anything yet. This screen is the moment the requests went out.</p>
         </div>

@@ -289,10 +289,12 @@ async function init() {
             if (vaultFiles) {
               await receiveVault(vaultFiles, meta.ttlMs, myPrivateKey_MLKEM, myPrivateKey_ECDH_RAW);
             } else {
-              // The name is a courtesy from the handshake and only used until
-              // chunk 0 arrives: the real name travels inside the sealed bytes,
-              // and receiveFile() overwrites this with it.
-              await receiveFile({ tokens: d.ecdh_pub, file_name: meta.name || 'download',
+              // No name comes off the wire. The handshake record carries the
+              // kind, the block count and the time to live, and nothing that
+              // would tell the relay what this file is. The real name arrives
+              // inside the sealed chunk 0 and receiveFile() picks it up there,
+              // before the save dialog opens or anything is painted.
+              await receiveFile({ tokens: d.ecdh_pub, file_name: 'download',
                 total_chunks: meta.chunks, ttl_ms: meta.ttlMs }, myPrivateKey_MLKEM, myPrivateKey_ECDH_RAW);
             }
           }

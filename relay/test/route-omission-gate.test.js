@@ -25,6 +25,19 @@
 //               request names none, and the plan cap still bites.
 //   FIRST WINS  a filled slot is not re-fillable with different content.
 //
+// One fixture in DOOR 3 changed on 5 September 2026 and the reason is worth
+// writing down, because the assertion looks weakened and is not. The `_ready`
+// half of a ParaShare session was being filled with two runs of hex, as though
+// it held keys like the slot above it. It does not: it holds the handshake
+// record, which used to carry the sender's file name in the clear for an hour,
+// readable by anyone with the session token, against what /dpa promises. That
+// field now has a grammar (relay/lib/handshake-record.js) and the arbitrary hex
+// is no longer a thing the slot accepts. The fixture is a real record now, the
+// FIRST WINS property is asserted exactly as before, and the refusal of a
+// malformed record is asserted alongside it: a passer-by must not be able to
+// fill the slot with rubbish either, since first-wins would then lock the
+// honest sender out.
+//
 // NEEDS a reachable redis (the envelope store and the quota counters are both
 // redis-only) and the ML-DSA-65 engine, both declared through test/_requires.js.
 // Run: REDIS_URL=redis://127.0.0.1:6399 node --test relay/test/route-omission-gate.test.js
@@ -328,12 +341,32 @@ test('DOOR 3: an invite pubkey slot is first-registration-wins, and a refresh st
   assert.strictEqual(read.json.fingerprint, fp, 'and the fingerprint the parties compared still matches');
 
   // The sender half of the same session is a separate slot with the same rule.
+  //
+  // It does NOT hold keys, whatever its two field names say: it holds the
+  // handshake record, and since 5 September 2026 that record has a grammar
+  // (relay/lib/handshake-record.js) because it used to carry the file name in
+  // the clear. So the fixture here is a real record and not two runs of hex.
+  // The property under test is unchanged: fill the slot, and it stays filled.
   const ready_ = session + '_ready';
+  const token = (c) => String(c).repeat(48);
+  const manifest = { device_id: ready_, ecdh_pub: token('a'), kyber_pub: 'file|1|3600000' };
+
+  // Before anything else: a record that is not a record does not get in at all,
+  // so the slot cannot be filled with a file name and cannot be filled with
+  // rubbish that would then block the honest sender by first-wins.
   assert.strictEqual((await srv.post('/v2/pubkey', {
-    headers: asParty(), body: { device_id: ready_, ecdh_pub: 'ee'.repeat(32), kyber_pub: 'ff'.repeat(32) },
-  })).status, 200);
+    headers: asParty(), body: { ...manifest, kyber_pub: 'opzegging-huurcontract.pdf|1|3600000' },
+  })).status, 400, 'a file name in the handshake field is refused, not stored');
   assert.strictEqual((await srv.post('/v2/pubkey', {
-    headers: asParty(), body: { device_id: ready_, ecdh_pub: '11'.repeat(32), kyber_pub: '22'.repeat(32) },
+    headers: asParty(),
+    body: { ...manifest, kyber_pub: 'vault|2|3600000', ecdh_pub: JSON.stringify([{ name: 'loonstrook.pdf', tokens: [token('a')] }]) },
+  })).status, 400, 'a vault manifest that names its files is refused too');
+
+  assert.strictEqual((await srv.post('/v2/pubkey', {
+    headers: asParty(), body: manifest,
+  })).status, 200, 'a well-formed handshake record fills the slot');
+  assert.strictEqual((await srv.post('/v2/pubkey', {
+    headers: asParty(), body: { ...manifest, ecdh_pub: token('b'), kyber_pub: 'file|2|3600000' },
   })).status, 409, 'the _ready slot is one-shot too, so a manifest cannot be swapped either');
   did();
 });
