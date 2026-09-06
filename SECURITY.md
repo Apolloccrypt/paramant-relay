@@ -884,11 +884,55 @@ Additional fixes applied 2026-04-13:
 | SSH | PermitRootLogin prohibit-password, MaxAuthTries 3 |
 | Spurious arm64 arch | Removed from apt |
 | HSTS | `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` on all 7 HTTPS server blocks (paramant.app + 5 relay subdomains). Applied directly in `/etc/nginx/sites-enabled/paramant-public` — the deploy-time nginx config (`deploy/nginx-paramant-live.conf`) also carries this header but the Cloudflare-facing config is gitignored. |
-| TLS | `ssl_protocols TLSv1.2 TLSv1.3` + forward-secret cipher suite (`ECDHE-*-GCM` + `CHACHA20-POLY1305`) explicit on all 443 vhosts; `ssl_prefer_server_ciphers off` (client chooses) |
+| TLS | `ssl_protocols TLSv1.3` explicit on all 443 vhosts (see "TLS 1.3 only" below) + forward-secret cipher suite (`ECDHE-*-GCM` + `CHACHA20-POLY1305`) for the TLS 1.2 that is no longer offered; `ssl_prefer_server_ciphers off` (client chooses) |
 | Google Fonts | Removed from CSP |
 | atd | Stopped and disabled |
 | NATS | Dedicated system user, systemd hardening |
 | Docker | admin + relay containers non-root (since e6f216d) |
+
+---
+
+## TLS 1.3 only (2026-09-05)
+
+`/dpa` promises, in the article 28 agreement customers sign electronically:
+"TLS 1.3 minimum on all relay endpoints". Every nginx config in this repository
+allowed TLS 1.2 as well, and `deploy/nginx/addin.paramant.app.conf` named no
+protocols at all and so inherited whatever the host default was. All nine
+TLS-terminating server blocks now carry `ssl_protocols TLSv1.3;`:
+
+| File | Server blocks |
+|------|---------------|
+| `deploy/nginx-paramant-public.conf` | 6 (paramant.app + the five sector relays) |
+| `deploy/nginx-selfhost.conf` | 1 |
+| `nginx-selfhost.conf` | 1 |
+| `deploy/nginx/addin.paramant.app.conf` | 1 (was inheriting the default) |
+
+`deploy/nginx-paramant-live.conf` is not in that list and does not terminate
+TLS: it listens on `127.0.0.1:8080` behind Caddy, and the Caddy configuration
+is not in this repository. **Production paramant.app is therefore not covered
+by this change**; it needs the same setting applied to Caddy
+(`protocols tls1.3 tls1.3`) before the `/dpa` line is true of the live edge.
+
+**This takes effect at the next nginx deploy, not at merge.**
+
+### Which clients this refuses
+
+TLS 1.3 is RFC 8446, August 2018. What loses access:
+
+| Client | Position |
+|--------|----------|
+| Chrome, Edge (Chromium) | 70+, October 2018. Fine. |
+| Firefox | 63+, October 2018. Fine. |
+| Safari, iOS | 12.1 / iOS 12.2, spring 2019. Fine. |
+| Windows Schannel | **TLS 1.3 only from Windows 11 and Server 2022.** Windows 10 does not negotiate it in Schannel, so .NET `HttpClient`, WinHTTP and PowerShell `Invoke-RestMethod` on Windows 10 stop reaching the API. Browsers on Windows 10 are unaffected, because Chrome and Firefox carry their own TLS. |
+| OpenSSL | 1.1.1+, September 2018. **`curl` and Python `requests` on RHEL/CentOS 7 (OpenSSL 1.0.2) stop working**, which is the platform most likely to be running an OT or DICOM integration. |
+| Java | 11+, or 8u261+. Java 8 before u261 stops working. |
+| Android | 10+ natively. Apps on Android 5 to 9 using `HttpsURLConnection` without Conscrypt stop working; Chrome on those devices is fine. |
+| Outlook add-in | Runs in Edge WebView2 (Chromium). Fine. |
+
+The two that matter commercially are Windows 10 API callers and RHEL 7 script
+callers. Neither can reach a browser-only workaround, so an SDK or IoT customer
+on either platform has to upgrade the platform, not the client library.
 
 ---
 

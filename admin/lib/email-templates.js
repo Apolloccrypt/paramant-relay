@@ -691,54 +691,60 @@ ${BASE_URL}`;
 
 // The invitation to sign, and the same mail sent a second time on request.
 //
-// documentIncluded: whether the link carries the key to the sender's encrypted
-// copy of the document. The sender's browser builds the first invitation, and
-// that key lives in the URL fragment, which browsers never transmit: the relay
-// has never held it and the admin only ever saw it in flight. So a resend the
-// SERVER builds can rebuild the signing link and cannot rebuild that fragment.
+// WHAT THIS MAIL MAY NOT CARRY, AND WHY THE RULE IS ABSOLUTE.
+// A signing link has two halves. Everything before the '#' names the request;
+// the fragment after it IS the AES key to the document. This message is posted
+// to a mail provider incorporated in the United States, so a fragment reaching
+// this function would put the decryption key, the address of the ciphertext and
+// the recipient in one American mailbox. Six sentences on paramant.app promise
+// that no US party ever holds a key. So the mail carries the notice and never
+// the key: the sender passes the opening link on over a channel they choose.
 //
-// The flag exists so the mail says which of the two it is. Promising an
-// encrypted copy that the link does not carry would be the kind of small lie
-// that costs a reader ten minutes and the product its credibility; the resent
-// mail says the document is not attached and what to do instead. Everything
-// else about the mail, the subject, the reference id, the sender line and the
-// closing date, is identical, so it threads with the original.
-function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, documentName, expiresAt, subject, message, envelopeId, partyIndex, documentIncluded = true }) {
-  const safeSubject = String(subject || '').trim().slice(0, 140) || `Signature requested for ${documentName || 'a document'}`;
+// The filename is out for the same reason. "opzegging-huurcontract.pdf" is the
+// content, not a label for it, and /dpa promises filenames are not stored or
+// handled in readable form. The recipient reads the name once the link has
+// opened the document in their own browser.
+//
+// This is why the function takes neither a documentName nor a flag for whether
+// the link carries a key: there is one kind of invitation mail now, and it is
+// the one that can be posted abroad without contradicting the site.
+function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt, subject, message, envelopeId, partyIndex }) {
+  // The last gate before the mail provider, and the one that holds even when
+  // the two in front of it are wrong. The browser cuts the fragment off before
+  // it posts the invitation, and the invitations endpoint refuses a link that
+  // still has one; this cuts it again. A key arriving here is a bug upstream,
+  // and an outgoing mail is the worst possible place to discover it.
+  const noticeUrl = String(inviteUrl || '').split('#')[0];
+  const safeSubject = String(subject || '').trim().slice(0, 140) || 'Signature requested';
   const greeting = recipientLabel ? `Hi ${recipientLabel},` : 'Hi,';
   const sender = senderLabel || 'A Paramant user';
   const expiry = expiresAt ? formatTS(expiresAt) : '7 days after creation';
   const note = String(message || '').trim().slice(0, 1000);
-  const carriesText = documentIncluded
-    ? `The document is encrypted. The complete personal link below opens it in your
-browser, verifies it against the signing request and enables signing.`
-    : `This link opens the signing request and enables signing. It does not carry
-the sender's encrypted copy of the document, so open the file you already have
-when the page asks for it, or ask the sender for the original link.`;
-  const carriesHtml = documentIncluded
-    ? 'The document is encrypted. The personal link opens it in your browser and verifies it against the signing request before signing is enabled.'
-    : 'This link opens the signing request and enables signing. It does not carry the sender\'s encrypted copy of the document, so open the file you already have when the page asks for it, or ask the sender for the original link.';
+  const carriesText = `This link opens the request. It does not open the document. The key that
+unlocks it is deliberately not in this email, so ask the sender for their
+complete link, or open the file if you already have a copy.`;
+  const carriesHtml = 'This link opens the request. It does not open the document. The key that unlocks it is deliberately not in this email, so ask the sender for their complete link, or open the file if you already have a copy.';
   const text = `${greeting}
 
-${sender} has asked you to review and sign ${documentName || 'a document'}.
+${sender} has asked you to review and sign a document.
 ${carriesText}
 
-Review and sign:
-${inviteUrl}
+Open the request:
+${noticeUrl}
 
-${note ? `Message from the sender:\n${note}\n\n` : ''}Sign in with this invited email address to open the document. Do not forward the link.
+${note ? `Message from the sender:\n${note}\n\n` : ''}Sign in with this invited email address. Do not forward the link.
 Signing closes at ${expiry}.
 
 Paramant
 ${BASE_URL}`;
-  const html = htmlShell(`Review and sign ${documentName || 'a document'} in Paramant.`, `
+  const html = htmlShell('A document is waiting for your signature in Paramant.', `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Signature requested</h1>
     <p style="margin:0 0 16px 0;line-height:1.6;">${escHtml(greeting)}</p>
-    <p style="margin:0 0 16px 0;line-height:1.6;"><strong>${escHtml(sender)}</strong> has asked you to review and sign <strong>${escHtml(documentName || 'a document')}</strong>.</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;"><strong>${escHtml(sender)}</strong> has asked you to review and sign a document.</p>
     <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">${escHtml(carriesHtml)}</p>
     ${note ? `<div style="margin:20px 0;padding:14px 16px;background:#F8FAFC;border:1px solid #E2E8F0;line-height:1.6;color:#334155;">${escHtml(note).replace(/\n/g, '<br>')}</div>` : ''}
-    ${btn(inviteUrl, 'Review and sign')}
-    <p style="margin:20px 0 8px 0;line-height:1.6;color:#92400E;font-size:13px;"><strong>Sign in with this invited email address to open the document. Do not forward the link.</strong></p>
+    ${btn(noticeUrl, 'Open the request')}
+    <p style="margin:20px 0 8px 0;line-height:1.6;color:#92400E;font-size:13px;"><strong>Sign in with this invited email address. Do not forward the link.</strong></p>
     <p style="margin:0;color:#64748b;font-size:12px;">Signing closes at ${escHtml(expiry)}.</p>
   `);
   return {

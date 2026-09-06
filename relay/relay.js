@@ -410,6 +410,12 @@ const CT_FILE = process.env.CT_FILE !== undefined
   : _ctFileDefault();
 const CT_MAX_SIZE = parseInt(process.env.CT_MAX_SIZE || String(100 * 1024 * 1024)); // 100 MB default
 
+// Set the moment a shutdown starts, and never cleared. Both append logs check
+// it before taking another line out of their queue, so from that point the exit
+// flush is the only writer left and no line can be shifted out of a queue into
+// a stream that has already been ended. See _flushAppendLogsOnExit.
+let _shuttingDown = false;
+
 // Fix 8: async CT write stream with queued writes and log rotation
 let _ctStream    = null;
 let _ctWriteQueue = [];
@@ -449,24 +455,27 @@ async function _ctRotate() {
 async function _ctDrain() {
   if (_ctDraining || !_ctStream) return;
   _ctDraining = true;
-  while (_ctWriteQueue.length > 0) {
+  while (_ctWriteQueue.length > 0 && !_shuttingDown) {
     const line = _ctWriteQueue.shift();
     await new Promise((resolve, reject) => {
       _ctStream.write(line, err => err ? reject(err) : resolve());
     }).catch(e => log('warn', 'ct_write_error', { err: e.message }));
   }
   _ctDraining = false;
-  // Check rotation after draining
-  _ctRotate().catch(() => {});
+  // Check rotation after draining. Not during a shutdown: rotation ends the
+  // stream and opens a new one, and the exit flush is already ending this one.
+  if (!_shuttingDown) _ctRotate().catch(() => {});
 }
 
 function ctWrite(entry) {
-  if (!CT_FILE || !_ctStream) return;
+  if (!CT_FILE || !_ctStream || _shuttingDown) return;
   _ctWriteQueue.push(JSON.stringify(entry) + '\n');
   setImmediate(_ctDrain);
 }
 
-// Flush CT queue on graceful shutdown
+// Hand whatever is still queued to the stream on a graceful shutdown. This only
+// gets the bytes as far as the stream; _flushAppendLogsOnExit is what waits for
+// them to reach the fd.
 function _flushCtOnExit() {
   if (!_ctStream || _ctWriteQueue.length === 0) return;
   for (const line of _ctWriteQueue) { try { _ctStream.write(line); } catch {} }
@@ -540,7 +549,7 @@ function _sthOpenStream() {
 async function _sthDrain() {
   if (_sthDraining || !_sthStream) return;
   _sthDraining = true;
-  while (_sthWriteQueue.length > 0) {
+  while (_sthWriteQueue.length > 0 && !_shuttingDown) {
     const line = _sthWriteQueue.shift();
     await new Promise((resolve, reject) => {
       _sthStream.write(line, err => err ? reject(err) : resolve());
@@ -550,6 +559,7 @@ async function _sthDrain() {
 }
 
 function sthWrite(entry) {
+  if (_shuttingDown) return;
   _sthWriteQueue.push(JSON.stringify(entry) + '\n');
   setImmediate(_sthDrain);
 }
@@ -1098,9 +1108,9 @@ function loadPeerSths() {
   }
 }
 
-function _flushPeerSthsOnExit() {
-  for (const stream of _peerSthStreams.values()) { try { stream.end(); } catch {} }
-}
+// The peer streams are ended by _flushAppendLogsOnExit along with the CT and STH
+// logs, and awaited there: a mirrored head is evidence too, and ending a stream
+// without waiting for it was the bug.
 
 // ── Gossip — broadcast our latest STH to all registered peers ─────────────────
 // Outbound HTTPS goes through safeHttpsRequest so the per-request DNS guard
@@ -3476,6 +3486,38 @@ async function handleRelayRequest(req, res) {
     }));
   }
 
+  // -- The scope of a v2 API key ----------------------------------------------
+  // Beside the session-token allowlist above, and for the same reason: one
+  // choke point above every route comparison, so no route has to remember it.
+  //
+  // A key is minted read-only / send-only / sign-only, the relay stores that
+  // scope and shows it back in the key list and on the dashboard, and until now
+  // it enforced none of it. Every key, whatever its label said, could write
+  // anywhere on the v2 plane. The route table and the scope matrix both live in
+  // lib/keys-table.js (pure, unit-tested); relay.js only asks the question.
+  //
+  // Only runs when a real key resolved. Keyless and public routes keep keyData
+  // null and are untouched, as does the inv_ receiver-session bypass. A legacy
+  // key without a scope, and any key minted 'full', is allowed every action by
+  // construction, so nothing that works today stops working.
+  //
+  // 403, not 401: the key is real and active, it just does not carry authority
+  // for this route, and a 401 would send the caller off to re-authenticate with
+  // the same key and be refused again.
+  if (keyData) {
+    const _scopeAction = keysTable.scopeActionFor(req.method, path);
+    if (!keysTable.requireScope(keyData, _scopeAction)) {
+      log('warn', 'insufficient_scope', { method: req.method, path, scope: keyData.scope || 'full', required: _scopeAction });
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({
+        error: 'insufficient_scope',
+        required_action: _scopeAction,
+        scope: keyData.scope || 'full',
+        hint: 'this API key was issued with a narrower scope than this route needs',
+      }));
+    }
+  }
+
   // ── Code-transparency manifest: publiek leesbaar, vóór de /v1-Bearer-gate ───
   // The SHA3-256 inventory of the deployed frontend, CT-anchored on publish.
   // Independent monitors fetch this and compare it against the live assets.
@@ -5619,6 +5661,13 @@ async function handleRelayRequest(req, res) {
   // Public keys are not sensitive; security comes from fingerprint verification.
   const INVITE_RE = /^inv_[a-zA-Z0-9]{32}(_ready)?$/;
 
+  // ── The `_ready` handshake slot holds no content ────────────────────────────
+  // The grammar, and why it is a refusal rather than a clean-up, is in
+  // relay/lib/handshake-record.js. Short version: /dpa promises customers that
+  // filenames are never stored in readable form, and this slot used to hold
+  // them in the clear for an hour, readable without an API key.
+  const { isCleanReadyRecord } = require('./lib/handshake-record');
+
   // ── GET /v2/pubkey — relay's ML-DSA-65 identity public key (for STH verification) ─
   if (path === '/v2/pubkey' && req.method === 'GET') {
     if (!relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'ML-DSA-65 not available on this relay' })); }
@@ -5634,6 +5683,12 @@ async function handleRelayRequest(req, res) {
       // M3: reject oversized device_id to prevent memory exhaustion / map-key attacks
       if (typeof d.device_id !== 'string' || d.device_id.length > 256) { res.writeHead(400); return res.end(J({ error: 'device_id must be a string of at most 256 characters' })); }
       if (INVITE_RE.test(d.device_id)) {
+        // The handshake slot carries no content. See lib/handshake-record.js.
+        if (d.device_id.endsWith('_ready') && !isCleanReadyRecord(d.kyber_pub || '', d.ecdh_pub)) {
+          log('warn', 'ready_handshake_rejected', { device: d.device_id.slice(0, 12) });
+          res.writeHead(400);
+          return res.end(J({ error: 'handshake record must carry only kind, counts and download tokens' }));
+        }
         // Store without API key suffix — readable by any party who knows the session token
         const invFp = computeFingerprint(d.kyber_pub || '', d.ecdh_pub);
         // FIRST REGISTRATION WINS, the same rule the keyed branch below enforces
@@ -9051,8 +9106,16 @@ if (redisClient && RELAY_REDIS_URL) {
 // around it (nothing in process memory, a SET NX lock so one of five containers
 // does the scan), with one difference: it is a migration and not a sweep, so a
 // finished run writes a redis marker and no later boot scans anything.
+// PARTY_INDEX_BOOT_DELAY_MS moves the one run, the same way
+// PLAN_EXPIRY_BOOT_DELAY_MS moves the sweep above. It exists for the same two
+// reasons: a test that wants to watch the migration should not wait 15 to 35
+// seconds for it, and a test that does NOT want it should not get an
+// estate-wide SCAN over the keyspace it is asserting on. Unset (production) the
+// delay and its jitter are unchanged.
+const _partyBackfillDelay = parseInt(process.env.PARTY_INDEX_BOOT_DELAY_MS || '', 10);
 partyBackfill.startPartyIndexBackfill({
   redis: redisClient,
+  ...(Number.isFinite(_partyBackfillDelay) ? { bootDelayMs: _partyBackfillDelay } : {}),
   // Its own store, not the request-scoped one. The migration reads envelope
   // hashes and writes index members: no signature is verified and no CT entry
   // is appended, so it needs neither engine, and a boot job that reached into a
@@ -9120,12 +9183,65 @@ server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   // Register to the relay registry after a short delay to let the server fully bind
   if (relayIdentity && RELAY_SELF_URL) setTimeout(registerSelf, 500);
 });
-function emergencyZeroAndExit(reason, code = 0) {
-  // Fix 8: flush CT write queue before exit
-  _flushCtOnExit();
+// How long the exit may wait for the append logs to reach the disk. A BACKSTOP
+// for a wedged volume, not the mechanism: the mechanism is the 'finish' event
+// below, and on a healthy disk this timer is never reached.
+const EXIT_FLUSH_MAX_MS = parseInt(process.env.EXIT_FLUSH_MAX_MS || '5000');
+
+// Resolves when this stream's queued writes have all reached the fd.
+function _endAppendStream(stream) {
+  return new Promise((resolve) => {
+    if (!stream || stream.destroyed || stream.writableEnded) return resolve();
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    stream.once('error', finish);
+    try { stream.end(finish); } catch (_) { finish(); }
+  });
+}
+
+// THE LAST APPEND IS NOT WRITTEN UNTIL THE BYTES ARE AT THE FD.
+//
+// fs.WriteStream.write() hands the buffer to libuv and returns; process.exit()
+// does not wait for it. The exit path used to write the queue and exit in the
+// same tick, so a head the relay had already SERVED could be missing from
+// sth-log.jsonl a millisecond later. Not a theory: route-ct-persistence uploads
+// four blobs, reads tree_size 4 off the live relay, restarts, and reads the
+// heads back. On an idle machine that passes 100 times out of 100. Under the
+// load of the other route suites on four cores it failed 3 times in 60, always
+// the same way - /v2/sth/history said [1,2,3,4] before the stop and
+// sth-log.jsonl held [1,2,3] after it. The relay then came back believing 3 was
+// the largest size it had ever signed, which is the exact state the fork guard
+// exists to refuse, so the suite read a lost write as a forked log.
+//
+// A relay stopped by systemctl lost the same head in production, silently.
+//
+// So the shutdown waits on the streams' own 'finish' events, which fire when
+// every queued write has completed. Waiting on an event, not on a duration.
+async function _flushAppendLogsOnExit() {
+  _shuttingDown = true;                 // the drains stop; this is now the only writer
+  _flushCtOnExit();                     // queue -> stream
   _flushSthOnExit();
-  _flushPeerSthsOnExit();
-  // Zeroize all in-memory blobs before exit
+  const streams = [_ctStream, _sthStream, ..._peerSthStreams.values()].filter(Boolean);
+  if (streams.length === 0) return;
+  let timer = null;
+  const guard = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      log('error', 'append_log_flush_timeout', {
+        ms: EXIT_FLUSH_MAX_MS, streams: streams.length,
+        hint: 'The transparency log did not reach the disk before the relay exited. '
+            + 'The last entries may be missing; check the volume behind CT_FILE and STH_FILE.',
+      });
+      resolve();
+    }, EXIT_FLUSH_MAX_MS);
+    if (timer.unref) timer.unref();
+  });
+  await Promise.race([Promise.all(streams.map(_endAppendStream)), guard]);
+  if (timer) clearTimeout(timer);
+}
+
+async function emergencyZeroAndExit(reason, code = 0) {
+  // Zeroize first: it is the part that must happen even if the disk is wedged,
+  // and the flush below may wait.
   try {
     for (const [, e] of blobStore.entries()) {
       if (e.blob) zeroBuffer(e.blob);
@@ -9134,14 +9250,21 @@ function emergencyZeroAndExit(reason, code = 0) {
     pubkeys.clear();
     // Clear download tokens (contain hashes, not plaintext, but scrub anyway)
     downloadTokens.clear();
-    log('info', 'shutdown_clean', { reason, burned: stats.burned });
   } catch (_) {}
+  try { await _flushAppendLogsOnExit(); } catch (_) {}
+  try { log('info', 'shutdown_clean', { reason, burned: stats.burned }); } catch (_) {}
   process.exit(code);
 }
 
-// Graceful shutdown on SIGTERM (systemctl stop) and SIGINT (Ctrl+C)
-process.on('SIGTERM', () => emergencyZeroAndExit('SIGTERM'));
-process.on('SIGINT',  () => emergencyZeroAndExit('SIGINT'));
+// Graceful shutdown on SIGTERM (systemctl stop) and SIGINT (Ctrl+C). A second
+// signal arriving while the first is still flushing means the caller wants out
+// now, so it exits without waiting rather than starting the flush over.
+function _onExitSignal(reason) {
+  if (_shuttingDown) { process.exit(0); return; }
+  emergencyZeroAndExit(reason);
+}
+process.on('SIGTERM', () => _onExitSignal('SIGTERM'));
+process.on('SIGINT',  () => _onExitSignal('SIGINT'));
 
 // Catch unhandled promise rejections — log and exit cleanly so blobs are zeroized
 process.on('unhandledRejection', (reason) => {

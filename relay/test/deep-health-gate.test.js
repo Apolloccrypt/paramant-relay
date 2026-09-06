@@ -128,7 +128,12 @@ test('storage: red, and the whole verdict goes red with it, when the data dir ca
   // A directory that does not exist. The relay boots anyway (a missing users
   // file is a warning, not a fatal), so this is a running relay whose state
   // directory is gone, which is exactly what the check is for.
-  const missing = path.join(os.tmpdir(), 'deep-health-absent-' + process.pid, 'users.json');
+  const absentDir = path.join(os.tmpdir(), 'deep-health-absent-' + process.pid);
+  // Made absent, not assumed absent. A pid is reused on a long-lived runner and
+  // a crashed earlier run leaves its directories behind, so a test that only
+  // hopes nothing is there passes for a reason it does not control.
+  fs.rmSync(absentDir, { recursive: true, force: true });
+  const missing = path.join(absentDir, 'users.json');
   const { port } = await bootHealthyRelay({ RELAY_MODE: 'full', USERS_FILE: missing });
   const r = await deep(port);
   assert.strictEqual(r.status, 200, 'the route answers 200 even when the verdict is red');

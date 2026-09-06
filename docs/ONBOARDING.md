@@ -49,7 +49,7 @@ What is in each directory, and which test or workflow fails when you break it.
 | `scripts/directie/` | `signalen.py`: a no-model status meter. Asks GitHub over `gh` and production over `curl`, turns each answer into red/orange/green with the command it measured with. | Nothing. Documented in `docs/directie.md`. |
 | `scripts/heartbeat/` | `run.mjs` and its lib: the four hourly production proofs (`surface`, `parasend`, `parasign-receipt`, `parasign-public-sign`). Every step runs even after one fails, on purpose: a dead page must never hide a dead signer. | Its logic by `tests/heartbeat-lib.test.mjs` (runs on every push); its execution by `heartbeat.yml` (hourly) |
 | `deploy/` | `DEPLOY-3.1.md` is the runbook; `deploy-3.1.sh` executes it phase by phase and refuses to continue when a measurement disagrees. `.env.example` is the canonical env inventory (81 variables, names and purposes, no values). Plus the three nginx configs and `ops/backup-*.sh`. | `tests/env-documented.test.mjs` (every `process.env` name must be documented there, and nothing documented that no code reads); `test.yml` job `shell-syntax` (`bash -n`); `test.yml` job `deploy-dryrun` runs `tests/deploy-3.1-dryrun.test.sh` on every push and pull request, with no server and no secrets. |
-| `tests/` | 27 `node:test` `.mjs` suites (16 node-only, 11 browser), plus `static-sanity.sh`, `auth-smoke.sh`, `e2e-auth-flow.sh` and the deploy dry-run self-test. | `test.yml` (node-only set), `sign-e2e.yml` (browser set), `product-heartbeat.yml`. Of the `.sh` files, `deploy-3.1-dryrun.test.sh` runs in CI (`test.yml` job `deploy-dryrun`) and `static-sanity.sh` does too (`test.yml` job `static-sanity`, twelve checks, no secrets and no server); `auth-smoke.sh` and `e2e-auth-flow.sh` need a live target and run at deploy time only. |
+| `tests/` | 27 `node:test` `.mjs` suites (16 node-only, 11 browser), plus `static-sanity.sh`, `auth-smoke.sh`, `e2e-auth-flow.sh` and the deploy dry-run self-test. | `test.yml` (node-only set), `sign-e2e.yml` (browser set), `product-heartbeat.yml`. Of the `.sh` files, `deploy-3.1-dryrun.test.sh` runs in CI (`test.yml` job `deploy-dryrun`) and `static-sanity.sh` does too (`test.yml` job `static-sanity`, thirteen checks, no secrets and no server); `auth-smoke.sh` and `e2e-auth-flow.sh` need a live target and run at deploy time only. |
 
 Selection of browser vs node-only suites is done **by what a file imports**, never
 by a hand-kept name list (`.github/workflows/test.yml:290-296`,
@@ -341,15 +341,16 @@ the commit message and the added `+` diff lines, and runs from both
 `tests/static-sanity.sh` and `.githooks/pre-push`. Default tooling adds these
 trailers for you; turn them off before your first commit.
 
-**static-sanity is twelve checks, and check 10 is the style guard.**
-`tests/static-sanity.sh` runs twelve numbered checks: syntax, redisClient
+**static-sanity is thirteen checks, and check 10 is the style guard.**
+`tests/static-sanity.sh` runs thirteen numbered checks: syntax, redisClient
 initialisation, TOTP helpers (warn), unsafe `req.body` access (warn), orphan code
 (warn), `/request-key` still returning 410, DID-auth replay protection, the
 open-mode envelope signer binding, installer release pinning, check 10, the
 commit and GitHub style guard delegating to `check-commit-style.sh`, check 11,
-the test-scope guard delegating to `check-test-declarations.sh`, and check 12,
-the opt-in on the tracked brand screenshots. Exit code is the number of hard
-failures.
+the test-scope guard delegating to `check-test-declarations.sh`, check 12,
+the opt-in on the tracked brand screenshots, and check 13, the known-flaky
+register delegating to `check-flaky-register.sh`. Exit code is the number of
+hard failures.
 
 It runs in CI as `test.yml` job `static-sanity`, on every push to main and every
 pull request. That is new. Until then it ran in **no** workflow at all: its only

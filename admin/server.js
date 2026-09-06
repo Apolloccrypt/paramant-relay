@@ -36,12 +36,21 @@ const BASE_PATH   = (process.env.BASE_PATH || '').replace(/\/$/, '');
 // every Object.keys(SECTORS) iteration in this file; add a sector here and
 // the rest follows. findUserByEmail() stays health-only on purpose: health
 // is the canonical admin-UI source and the lookup is hot-path.
+// The fallback is the CONTAINER-INTERNAL listener, and that is :3000 for every
+// sector (docker-compose.yml sets PORT: "3000" once, for all five). The numbers
+// 3001-3005 are host-side published ports; on the compose network nothing
+// listens there. health/legal/finance/iot carried those host numbers as their
+// fallback, so a missing or misspelt RELAY_* env pointed the admin at a dead
+// port and every fan-out for that sector failed with ECONNREFUSED instead of
+// falling back. Only main was right. Kept in sync by
+// tests/sector-fallback-ports.test.mjs, which reads the port out of
+// docker-compose.yml rather than trusting a number typed here.
 const SECTORS = {
   main:    process.env.RELAY_MAIN    || 'http://relay-main:3000',
-  health:  process.env.RELAY_HEALTH  || 'http://relay-health:3005',
-  legal:   process.env.RELAY_LEGAL   || 'http://relay-legal:3002',
-  finance: process.env.RELAY_FINANCE || 'http://relay-finance:3003',
-  iot:     process.env.RELAY_IOT     || 'http://relay-iot:3004',
+  health:  process.env.RELAY_HEALTH  || 'http://relay-health:3000',
+  legal:   process.env.RELAY_LEGAL   || 'http://relay-legal:3000',
+  finance: process.env.RELAY_FINANCE || 'http://relay-finance:3000',
+  iot:     process.env.RELAY_IOT     || 'http://relay-iot:3000',
 };
 
 if (!ADMIN_TOKEN) { console.error('[PARAMANT-ADMIN] ADMIN_TOKEN is not set — refusing to start'); process.exit(1); }
@@ -1956,8 +1965,17 @@ api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
     try { inviteUrl = new URL(inviteUrlText); }
     catch { return res.status(400).json({ error: "invalid_invite_url" }); }
     const token = inviteUrl.searchParams.get("t") || "";
-    const fragment = inviteUrl.hash.slice(1);
-    if (inviteUrl.origin !== siteOrigin || inviteUrl.pathname !== "/co-sign" || inviteUrl.searchParams.get("env") !== id || Number(inviteUrl.searchParams.get("p")) !== partyIndex || !/^[A-Za-z0-9_-]{43}$/.test(token) || !/^doc=v1\.[A-Za-z0-9_-]{43}$/.test(fragment)) {
+    // The fragment of a signing link is the document's AES key. This endpoint
+    // hands the link to a mail provider outside the EU, so a link that still
+    // carries a fragment is refused rather than trimmed: trimming would invite
+    // a modified client to post the key here and trust us to drop it, and the
+    // key would still have passed through this process and any log on the way.
+    // The mail carries the notice, the sender passes the opening link on over a
+    // channel they choose. Nothing past this check has ever held a key.
+    if (inviteUrl.hash !== "") {
+      return res.status(400).json({ error: "invite_url_carries_key" });
+    }
+    if (inviteUrl.origin !== siteOrigin || inviteUrl.pathname !== "/co-sign" || inviteUrl.searchParams.get("env") !== id || Number(inviteUrl.searchParams.get("p")) !== partyIndex || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
       return res.status(400).json({ error: "invalid_invite_url" });
     }
     let env;
@@ -1981,7 +1999,9 @@ api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
         inviteUrl: item.inviteUrl,
         recipientLabel: item.label,
         senderLabel,
-        documentName: item.env.original_filename,
+        // No document name. A filename is content, it is often the whole point
+        // ("opzegging-huurcontract.pdf"), and this message leaves the EU. The
+        // recipient sees the name after the link opens the document.
         expiresAt: item.env.sign_expires_at,
         subject,
         message,
@@ -2817,11 +2837,12 @@ api.get("/user/parasign/inbox", authUser, async (req, res) => {
 // created_at, so the resent link expires at the same moment as the first one and
 // the link already in the reader's mailbox keeps working.
 //
-// WHAT THE RESENT LINK CANNOT CARRY. The sender's encrypted copy of the document
-// is unlocked by a key that lives in the URL fragment. Browsers never send a
-// fragment, so no server ever held it: the first invitation was assembled in the
-// sender's browser. The resend therefore rebuilds the signing link and not that
-// key, and says so in the mail (documentIncluded: false).
+// WHAT NO INVITATION MAIL CARRIES. The document is unlocked by a key that lives
+// in the URL fragment. Browsers never transmit a fragment, so no server has ever
+// held it; the first invitation was assembled in the sender's browser. Since the
+// key would otherwise reach a mail provider outside the EU, the first invitation
+// does not carry it either: both mails are the same notice, and the sender hands
+// the opening link over themselves.
 //
 // One per envelope per hour, per account. The bucket is keyed on the session
 // account and the envelope together, never on the envelope alone: an id the
@@ -2863,11 +2884,9 @@ api.post("/user/parasign/inbox/:id/resend", authUser, async (req, res) => {
       inviteUrl,
       recipientLabel: invite.party_label || "",
       senderLabel: invite.sender || "",
-      documentName: invite.document,
       expiresAt: invite.signing_closes_at,
       envelopeId: id,
       partyIndex: invite.party_index,
-      documentIncluded: false,
     }));
   } catch (err) {
     console.error("[user/parasign/inbox resend mail]", err.message);
