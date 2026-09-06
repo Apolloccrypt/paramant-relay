@@ -833,6 +833,30 @@ async function authUser(req, res, next) {
     // showed the login time. Written at most once a minute (see
     // LAST_SEEN_REFRESH_MS) so an open dashboard does not add a write per poll.
     if (!(now - Number(sess.last_seen) < LAST_SEEN_REFRESH_MS)) { sess.last_seen = now; rewrite = true; }
+    // BOUND TO THE CLIENT THAT LOGGED IN. Finding 22i: the session record holds
+    // the account's raw pgp_ API key -- twice, since user_id IS that key -- and
+    // `ip` and `ua` were stored at login and then read only to be PRINTED on the
+    // account screen. Nothing compared them. A cookie lifted off one machine
+    // therefore worked from any other, and one hour of it bought a credential
+    // with no expiry at all.
+    //
+    // The user agent and not the IP. A phone moving from wifi to mobile data
+    // changes its IP mid-session and changes its user agent never; binding to
+    // the address would log people out for walking out of the door, and an
+    // attacker on the same NAT would pass it anyway. A UA change on a live
+    // session token is close to always theft, and in the rare honest case (a
+    // browser that updated itself between two requests) the cost is one login.
+    //
+    // A record from before this field was written has no `ua` to compare: it is
+    // stamped rather than refused, so a deploy does not log everybody out.
+    const ua = req.get('user-agent') || '';
+    if (typeof sess.ua !== 'string') { sess.ua = ua; rewrite = true; }
+    else if (sess.ua !== ua) {
+      await redis().del(key).catch(() => {});
+      try { await logAuditEvent(sess.user_id, 'session_client_changed', { via: sess.via || 'totp' }); } catch (_) { /* audit is best effort */ }
+      return res.status(401).json({ error: "session_expired" });
+    }
+
     // One command either way: SET with EX both stores and slides the window.
     if (rewrite) await redis().set(key, JSON.stringify(sess), { EX: 3600 });
     else await redis().expire(key, 3600);
@@ -2908,6 +2932,13 @@ api.get("/user/account/key", authUser, async (req, res) => {
   // stap 3: reveal the account's PRIMARY api-key (== user_id today), and only
   // when the account is legacy_revealable. The `revealable` field is additive;
   // existing callers read `.api_key`, unchanged while every account is 1:1.
+  //
+  // The one route that turns a session cookie into a credential with no expiry,
+  // so it leaves a mark. It used to leave none at all: an attacker who lifted a
+  // cookie, read the key here and never came back was invisible in the audit
+  // trail, and the key he walked off with outlives every session.
+  // session-credential-gate.test.js holds this to being the only such route.
+  try { await logAuditEvent(req.userSession.user_id, 'account_key_revealed', { via: req.userSession.via || 'totp' }); } catch (_) { /* audit is best effort */ }
   res.json(revealKey(req.userSession));
 });
 
@@ -4564,6 +4595,34 @@ api.post('/admin/cli/exec', authMiddleware, async (req, res) => {
     res.end();
   });
 });
+
+// ── CSRF: a cookie-authenticated write must come from our own page ──────────
+// Finding 19. SameSite=Lax is the whole defence today and it works on the
+// registrable domain, so every sector subdomain is same-site with paramant.app:
+// one HTML injection on one of them yields a page that may POST with the user's
+// session cookie, and twelve state-changing routes need no request body at all.
+// The decision table and the reasoning live in admin/lib/same-origin.js.
+//
+// Mounted here, in front of the whole /api router, so it cannot be forgotten on
+// the next route. Refusals are logged with the origin, because the first thing
+// anybody will ask when a client breaks is which origin it sent.
+const sameOrigin = require('./lib/same-origin');
+const CSRF_ALLOWED_ORIGINS = sameOrigin.buildAllowList(SITE_URL, process.env.CSRF_EXTRA_ORIGINS);
+const CSRF_ALLOW_LOCALHOST = process.env.NODE_ENV !== 'production';
+function requireSameOrigin(req, res, next) {
+  const v = sameOrigin.verdict({
+    method: req.method,
+    hasCookie: !!parseCookies(req).paramant_user_session,
+    origin: req.headers.origin,
+    secFetchSite: req.headers['sec-fetch-site'],
+    allow: CSRF_ALLOWED_ORIGINS,
+    allowLocalhost: CSRF_ALLOW_LOCALHOST,
+  });
+  if (v.ok) return next();
+  console.warn('[csrf] refused', req.method, req.originalUrl, v.reason);
+  return res.status(403).json({ error: 'csrf_origin', message: 'This request did not come from paramant.app.' });
+}
+app.use(`${BASE_PATH}/api`, requireSameOrigin);
 
 app.use(`${BASE_PATH}/api`, api);
 // /cli -- web debug terminal page (served before the SPA wildcard fallback).

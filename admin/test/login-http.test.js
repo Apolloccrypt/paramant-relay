@@ -453,8 +453,13 @@ test('a session record written before created_at existed is capped, not exempted
   await httpRedis.set(key, JSON.stringify(
     { user_id: HTTP_OWNER_KEY, email: HTTP_OWNER_EMAIL, ip: '203.0.113.9', ua: 'probe', via: 'totp' },
   ), { EX: 3600 });
+  // The User-Agent is sent to match the one on the fixture. Since 2026-09-06
+  // authUser binds a session to the client that opened it (finding 22i), so a
+  // request from a different agent is theft and gets a 401. That is a separate
+  // property, asserted in session-credential-gate.test.js; here it would just
+  // be noise standing between this test and the thing it measures.
   const r = await httpSrv.get('/api/user/account', {
-    headers: { Cookie: `paramant_user_session=${token}` },
+    headers: { Cookie: `paramant_user_session=${token}`, 'User-Agent': 'probe' },
   });
   assert.equal(r.status, 200, `a record without created_at must keep working: ${r.status} ${r.text}`);
   const stored = JSON.parse(await httpRedis.get(key));

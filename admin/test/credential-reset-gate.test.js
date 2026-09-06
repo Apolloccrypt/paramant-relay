@@ -77,7 +77,6 @@ test('the setup-token lifetime is one constant, never a literal', () => {
   // finding again under a different number.
   const decl = /const SETUP_TOKEN_TTL_S = ([^;]+);/.exec(SRC);
   assert.ok(decl, 'SETUP_TOKEN_TTL_S is no longer a simple declaration');
-  // eslint-disable-next-line no-new-func
   const value = Function(`"use strict"; const process = { env: {} }; return (${decl[1]});`)();
   assert.ok(value <= 7 * 86400, `the default setup-link lifetime is ${Math.round(value / 86400)} days`);
 });
