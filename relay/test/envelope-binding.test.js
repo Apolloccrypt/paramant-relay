@@ -175,11 +175,18 @@ async function main() {
       p0_appearance_hash: APPEARANCE_HASH,
     };
     const store = new EnvelopeStore(fakeRedis(hash), {});
-    const publicView = await store.getRedacted(ID);
+    // The owner's own view, and the receipt. Where a party signed on the page is
+    // a fact about that person, so it left the anonymous projection with the
+    // rest of the identifying fields (2026-09-05 review, findings 4 and 5); the
+    // read-back it is proving here is about the store, not about who may see it.
+    const ownerView = await store.getRedacted(ID, { authorized: true });
     const receipt = await store.getForReceipt(ID);
-    assert.deepStrictEqual(publicView.parties[0].appearance, APPEARANCE);
+    assert.deepStrictEqual(ownerView.parties[0].appearance, APPEARANCE);
     assert.strictEqual(receipt.parties[0].appearance_hash, APPEARANCE_HASH);
-    ok('signed appearance survives status and receipt read-back');
+    const strangerView = await store.getRedacted(ID);
+    assert.strictEqual(strangerView.parties[0].appearance, undefined,
+      'where a named party signed on the page is not for a passer-by');
+    ok('signed appearance survives status and receipt read-back, and stays out of the public one');
   }
 
   // 7. sign(): an open envelope (no binding_mode) is PARTY-BOUND by its invite
@@ -432,9 +439,9 @@ async function main() {
     const store = new EnvelopeStore(fakeRedis(hash), {
       sigVerify: () => true,
     });
-    const publicView = await store.getRedacted(ID);
-    assert.deepStrictEqual(publicView.requested_appearance, requested, 'public view carries the requested position');
-    assert.strictEqual(publicView.requested_appearance_hash, appearanceHash(requested));
+    const ownerView = await store.getRedacted(ID, { authorized: true });
+    assert.deepStrictEqual(ownerView.requested_appearance, requested, 'the owner view carries the requested position');
+    assert.strictEqual(ownerView.requested_appearance_hash, appearanceHash(requested));
     const partyView = await store.getForParty(ID, 0, 'invite-token-13');
     assert.deepStrictEqual(partyView.requested_appearance, requested, 'the invited party sees the same one position');
     assert.strictEqual(partyView.party.appearance, null, 'requested is not the party appearance');

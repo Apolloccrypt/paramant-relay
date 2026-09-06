@@ -118,8 +118,16 @@ test('sign paths in relay.js use zero tiers.tierLimitNum (R3)', () => {
   const r018 = src.slice(r018Start, src.indexOf('/v2/verify-receipt', r018Start));
   assert.ok(r018.length > 1000, 'found the R018 sign-path segment');
   assert.ok(!/tiers\.tierLimitNum/.test(r018), 'R018 sign path has no tiers.tierLimitNum');
-  assert.ok(r018.includes('signGateDecision'), 'R018 sign path decides via quota.signGateDecision');
-  assert.ok(r018.includes('quota.recordSign('), 'R018 sign path counts via quota.recordSign');
+  // Decides AND counts through lib/quota, in one call. It used to read with
+  // quota.readUsage, decide with quota.signGateDecision and count later with
+  // quota.recordSign; that gap is what let ten concurrent requests share one
+  // slot (2026-09-05 review, finding 8). The property this line has always been
+  // guarding is unchanged: the limit comes out of the quota module and never
+  // out of tiers.js. quota-gate.test.js holds gateSign and signGateDecision to
+  // the same answer at the boundary, so the /v1 create gate, which still reads
+  // the pure function, cannot drift from this path.
+  assert.ok(r018.includes('quota.gateSign('), 'R018 sign path decides and counts via quota.gateSign');
+  assert.ok(r018.includes('quota.releaseSign('), 'R018 sign path gives a reserved slot back when the signature does not land');
   assert.ok(r018.includes('monthly_sign_quota_reached'), 'R018 sign path emits the quota 402');
   assert.ok(!/hard_cap/.test(r018), 'R018 sign path has no second, higher stop');
   // /v1 create gate: the injected signQuotaGate closure.
@@ -253,10 +261,8 @@ test('the shared decision blocks a /v1 create the same way, on every tier', asyn
   assert.deepStrictEqual(quota.signGateDecision(1, free), { allowed: true, reason: null, limit: 2 });
 });
 
-test('transfer gating is untouched by the sign tiers', async () => {
-  const rc = fakeRedis();
-  const g = await quota.gateTransfer(rc, 'acct1', 'hashA', 10, null);
-  assert.strictEqual(g.allowed, true);
-  assert.strictEqual(g.counted, true);
-  assert.strictEqual(await rc.exists(quota.signsKey('acct1')), 0, 'a transfer is not a signature');
-});
+// 'transfer gating is untouched by the sign tiers' moved to quota-gate.test.js
+// on 2026-09-05. gateTransfer runs a Lua script now (review finding 8) and the
+// local fakeRedis has no EVAL, so here it was not testing the separation of the
+// two counters, it was testing quota's fail-open catch. It lives where the real
+// server is.

@@ -129,7 +129,13 @@ async function init() {
   $('loading-msg').textContent = 'Fetching envelope...';
 
   try {
-    const r = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(envId));
+    // Ask as this party, not as a passer-by. The public projection is
+    // deliberately thin since the 2026-09-05 review (findings 4 and 5): it no
+    // longer carries the document hash, the filename, or the other parties'
+    // names, and this page needs all three. The invite token is what entitles
+    // it to them, and this page has been holding it all along.
+    const partyQuery = '?p=' + encodeURIComponent(partyIndex) + '&t=' + encodeURIComponent(__inviteToken);
+    const r = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(envId) + partyQuery);
     if (r.status === 404) return showError('Envelope not found, expired, or already burned.');
     if (r.status === 429) return showError('Rate-limited - too many requests from this address. Try again in a minute.');
     if (!r.ok) return showError('Relay error: HTTP ' + r.status);
@@ -240,7 +246,8 @@ function renderQuotaNote(quota) {
 
 async function refreshEnvelopeStatus() {
   try {
-    const response = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(__envelope.id), { cache: 'no-store' });
+    const response = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(__envelope.id)
+      + '?p=' + encodeURIComponent(__partyIndex) + '&t=' + encodeURIComponent(__inviteToken), { cache: 'no-store' });
     if (response.ok) __envelope = (await response.json()).envelope || __envelope;
   } catch { /* the accepted sign result remains authoritative */ }
 }

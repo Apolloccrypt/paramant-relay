@@ -32,6 +32,7 @@ const crypto = require('crypto');
 const { boot, killAll } = require('./_relay-server');
 const { requireRedis, summary } = require('./_requires');
 const couponLib = require('../lib/coupon');
+const sessionTokens = require('../lib/session-token');
 const planExpiry = require('../lib/plan-expiry');
 const entitlements = require('../lib/entitlements');
 
@@ -81,6 +82,23 @@ const ACCOUNTS = ['acct_a', 'acct_b', 'acct_c', 'acct_over', 'acct_paying'];
 // granted one.
 async function clearAccounts() {
   if (!rc) return;
+  // The pst_ tokens this suite mints, and the per-owner index they live in.
+  // Every account is capped at twenty live tokens, and nothing here used to
+  // clean them up, so against a redis that outlives the run (a laptop, a
+  // container left up between runs) the cap was reached after a handful of
+  // runs. The mint then failed, the redeem call carried `Bearer undefined`, and
+  // the suite reported "expected 403, got 401 Invalid API key" as though the
+  // scope gate had broken. CI never saw it, because its redis service is new
+  // every time, which is exactly what makes a failure like this expensive: it
+  // only ever appears on the machine of whoever is trying to change something
+  // else. The tokens carry their own hour-long TTL; this is about the index.
+  for (const name of ['a', 'b', 'c', 'over', 'paying']) {
+    const idx = sessionTokens.ownerKey(`pgp_${name}`);
+    try {
+      for (const t of await rc.sMembers(idx)) { try { await rc.del(sessionTokens.tokenKey(t)); } catch (_) { /* best effort */ } }
+      await rc.del(idx);
+    } catch (_) { /* best effort */ }
+  }
   for (const accountId of ACCOUNTS) {
     try { await rc.del(`paramant:billing:gift:list:${accountId}`); } catch (_) { /* best effort */ }
     for (const product of entitlements.PRODUCTS) {

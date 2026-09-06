@@ -333,7 +333,16 @@ body { min-height:100vh; }
   itself at boot to RELAY_PRIMARY_URL, which docker-compose.yml points at
   relay-health for all five. In the last thousand entries, the ones this page
   renders, it was 963 out of 1000. So the count is dominated by our own
-  containers restarting, not by customers.
+  containers, not by customers.
+
+  Since the 2026-09-05 review (finding 21) a re-announcement that says nothing
+  new no longer appends. An announcement carries a url, a sector, a version and
+  an edition, and a restart that changes none of them now moves a timestamp
+  instead of writing a line. That was a growth problem before it was a copy
+  problem: the route is unauthenticated by design, the log is on disk, and every
+  append signs a new head that is gossiped to every peer. The historical count
+  above stands, and the sentence in the notice no longer promises a line per
+  restart, because there will not be one.
 
   The number is filled in from /v2/ct/log by js/ct-log.page.js instead of being
   typed here, so it cannot go stale. With no relay reachable the sentence keeps
@@ -345,9 +354,11 @@ body { min-height:100vh; }
     <span>You are looking at the log of one relay, <code>health.paramant.app</code>, the one
     the web app on this site sends through. Each of the relays we run keeps its own log, so
     this is not a total. Most of the <span id="composition-count">entries</span> below are not
-    transfers at all: every one of our relays writes a line here each time it restarts and
-    announces itself. The number of entries is therefore not a measure of how much the service
-    is used.</span>
+    transfers at all: they are our own relays announcing themselves. Every entry here is
+    something a relay said about itself, and for a long time each of them said it again on
+    every restart, which is why the number below is as large as it is. A relay that announces
+    itself and has nothing new to say no longer writes a line. Either way, the number of
+    entries is not a measure of how much the service is used.</span>
   </div>
 </div>
 <div class="notice" id="persistence-notice">

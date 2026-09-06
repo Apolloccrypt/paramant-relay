@@ -20,6 +20,15 @@ function _maskIp(ip) {
 }
 
 async function logAuditEvent(user_id, event_type, metadata = {}) {
+  // The first argument IS the redis key (AUDIT_KEY above), and every reader in
+  // this codebase asks for the account's full user_id. An empty or non-string
+  // key therefore writes an entry nobody can ever fetch. That is a programming
+  // error, not an outage, so it throws and is NOT swallowed below: the review of
+  // 2026-09-05 found six call sites that had slid the event name or a truncated
+  // id into this slot, and a silent fallback would have hidden all six.
+  if (!user_id || typeof user_id !== 'string') {
+    throw new TypeError(`logAuditEvent: user_id must be a non-empty string (event_type=${event_type})`);
+  }
   const ts = Date.now();
   // Mask any operator IP in the metadata before it is written.
   const meta = { ...metadata };
@@ -27,19 +36,32 @@ async function logAuditEvent(user_id, event_type, metadata = {}) {
   if (meta.ip) meta.ip = _maskIp(meta.ip);
   const entry = JSON.stringify({ user_id, event_type, metadata: meta, ts });
   const userKey = AUDIT_KEY(user_id);
-  const r = redis();
-  await Promise.all([
-    r.zAdd(userKey, { score: ts, value: entry }),
-    r.zAdd('paramant:audit:global', { score: ts, value: entry }),
-  ]);
-  // Bound retention by BOTH count (rank) and age (score).
-  const cutoff = ts - RETENTION_MS;
-  await Promise.all([
-    r.zRemRangeByRank(userKey, 0, -1001),
-    r.zRemRangeByRank('paramant:audit:global', 0, -10001),
-    r.zRemRangeByScore(userKey, 0, cutoff),
-    r.zRemRangeByScore('paramant:audit:global', 0, cutoff),
-  ]);
+  // Everything past this point is the store, and the store failing is an
+  // availability event. The trail is a witness, never a gate: a redis hiccup
+  // here may not turn a successful login into a 500, and (before the callers
+  // were awaited) an unhandled rejection here ended the admin process. So the
+  // infrastructure half is caught, logged loudly enough to be found in the
+  // journal, and swallowed.
+  try {
+    const r = redis();
+    await Promise.all([
+      r.zAdd(userKey, { score: ts, value: entry }),
+      r.zAdd('paramant:audit:global', { score: ts, value: entry }),
+    ]);
+    // Bound retention by BOTH count (rank) and age (score).
+    const cutoff = ts - RETENTION_MS;
+    await Promise.all([
+      r.zRemRangeByRank(userKey, 0, -1001),
+      r.zRemRangeByRank('paramant:audit:global', 0, -10001),
+      r.zRemRangeByScore(userKey, 0, cutoff),
+      r.zRemRangeByScore('paramant:audit:global', 0, cutoff),
+    ]);
+  } catch (err) {
+    // No user_id and no metadata in the line: the key carries the account id and
+    // the metadata carries the email. The event name and the reason are enough
+    // to tell an outage from a bug.
+    console.error(`[admin/audit] write failed, event lost: event_type=${event_type} reason=${err && err.message}`);
+  }
 }
 
 async function getAuditEvents(user_id, { limit = 50, event_types = null } = {}) {
