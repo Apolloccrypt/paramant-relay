@@ -226,6 +226,11 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 
 /* === Globe HUD (hidden by default; Ctrl+G to open) === */
 #globe-overlay{position:fixed;inset:0;z-index:0;background:#060c10;display:none}
+/* Ctrl+G hid main and showed nothing: toggleGlobe() adds .globe-fullscreen, and
+   until 6 September 2026 no rule turned the overlay itself back on, so the
+   shortcut left a blank page over a canvas of zero by zero. The scene was
+   built on every load and could not be reached from any of them. */
+#globe-overlay.globe-fullscreen{display:block;z-index:9000}
 #globe-overlay .hud-top,
 #globe-overlay .hud-bot,
 #globe-overlay .hc,
@@ -238,6 +243,13 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 #globe-overlay.globe-fullscreen #globe-loading{display:flex!important}
 #globe-overlay.globe-fullscreen .hud-panel{display:block!important}
 #globe-overlay.globe-fullscreen #globe-loading{display:flex!important}
+/* The ring is what you look at while the globe builds, so it has to be able to
+   leave. It could not: initGlobe() hid it with an inline display:none, and the
+   rule above is !important, which beats an inline declaration that is not. It
+   never showed because the globe was already built before anyone opened the
+   overlay. Now that it builds on the first open, the ring is on screen for
+   real, and this is how it goes away. */
+#globe-overlay.globe-fullscreen.globe-ready #globe-loading{display:none!important}
 
 #globe-overlay::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:20;
   background:repeating-linear-gradient(0deg,transparent,transparent 3px,
