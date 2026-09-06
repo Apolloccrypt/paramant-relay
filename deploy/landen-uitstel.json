@@ -1,0 +1,372 @@
+{
+  "_": "Zie deploy/landen.md. Elke post houdt een tak buiten de rode telling tot en met 'tot'. Daarna wordt hij weer rood. Bewaakt door tests/landen-poort.test.mjs.",
+  "gemeten": "2026-09-05",
+  "uitstel": [
+    {
+      "tak": "fix/sector-port-drift",
+      "stapel": "waarde",
+      "tot": "2026-09-12",
+      "reden": "admin/server.js:40-44 op main wijst health/legal/finance/iot nog naar 3005/3002/3003/3004, terwijl elke container intern op 3000 luistert. De nginx-helft van de tak is wel achterhaald."
+    },
+    {
+      "tak": "sec/relay-scope-enforcement",
+      "stapel": "waarde",
+      "tot": "2026-09-19",
+      "reden": "relay.js:6733 accepteert een scope op een v2-sleutel en nergens in 9080 regels staat een requireScope. Read-only heet read-only en schrijft alles, ook /v2/admin/*."
+    },
+    {
+      "tak": "feat/close-anon-inbound",
+      "stapel": "waarde",
+      "tot": "2026-09-19",
+      "reden": "relay.js:5767 draagt nog POST /v2/anon-inbound zonder sleutel, buiten entitlement en quotum om, en docs.html:471 adverteert hem met Auth n/a."
+    },
+    {
+      "tak": "fix/core-pin",
+      "stapel": "waarde",
+      "tot": "2026-09-12",
+      "reden": "relay/Dockerfile:31 en .github/workflows/test.yml:162 pinnen paramant-core allebei met de hand op dezelfde sha. Twee kopieen, geen bewaking; tests/core-pin.test.mjs bestaat niet op main."
+    },
+    {
+      "tak": "chore/eslint-guardrail",
+      "stapel": "waarde",
+      "tot": "2026-09-12",
+      "reden": "eslint.config.mjs op main draait op een regel, no-undef. no-sequences komt nergens in de repo voor, en dat is precies de komma-operator die de create-envelope auth-gate op elke POST liet matchen."
+    },
+    {
+      "tak": "feat/parasign-pdf-preview",
+      "stapel": "waarde",
+      "tot": "2026-09-26",
+      "reden": "sign-flow.js:2297 op main is nog Math.min(340, Math.floor(pane.clientWidth || 340)); de vangst redt alleen een exacte 0, en er is geen generatieteller. Dezelfde 65 regels als document-intelligence en privacy-statement-v2, land er een."
+    },
+    {
+      "tak": "feat/parasign-document-intelligence",
+      "stapel": "waarde",
+      "tot": "2026-09-26",
+      "reden": "Zelfde boom als feat/parasign-pdf-preview, geen enkel verschil in de diff. Land een van de drie en gooi de andere twee weg."
+    },
+    {
+      "tak": "feat/privacy-statement-v2",
+      "stapel": "waarde",
+      "tot": "2026-09-26",
+      "reden": "Dezelfde sign-flow.js-reparatie plus een privacyherschrijving die main langs een andere weg al heeft. Alleen de sign-flow-helft telt nog."
+    },
+    {
+      "tak": "feat/outlook-402",
+      "stapel": "waarde",
+      "tot": "2026-09-26",
+      "reden": "extensions/outlook-addin/manifest.xml:69 gebruikt resource= waar het schema resid= eist, dus het manifest zakt door validatie. En geen extensie-client herkent de 402 die de relay op vier plekken wel stuurt."
+    },
+    {
+      "tak": "test/sdk-relay-conformance",
+      "stapel": "waarde",
+      "tot": "2026-10-03",
+      "reden": "Geen enkele toets op main laat echte crypto van de ene implementatie door de andere lopen; wire-format.test.js draait op stub-crypto (sign: Buffer.alloc(3309), verify: true). 936 regels, nul conflicten."
+    },
+    {
+      "tak": "feat/parasign-ios-render",
+      "stapel": "waarde",
+      "tot": "2026-10-03",
+      "reden": "WebKit kapt een canvas boven ~4096px stil af en levert een blanco bitmap terwijl render() slaagt; main heeft geen cap en geen blanco-controle. Alleen de diagnose is overdraagbaar, de code moet opnieuw."
+    },
+    {
+      "tak": "feat/parasign-pdf-quality",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "CSP-externalisatie, csp-inline-check.yml en parasign-pdf-ops.js staan alle drie op main; de twee vertical-briefs die overbleven zijn geschrapt."
+    },
+    {
+      "tak": "feat/parasign-open-api",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "relay/lib/parasign-open-api.js op main is 765 regels tegen 409 op de tak en bevat elke functie ervan."
+    },
+    {
+      "tak": "feat/parasign-pricing",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "frontend/pricing.html:332 draagt het TIER CARDS: PARASIGN-blok met eigen kaarten, alleen met een andere tier-indeling."
+    },
+    {
+      "tak": "feat/parasign-key-issuance",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "relay/lib/keys-table.js:231-244 heeft de psk_live_/psk_test_-generator en tests/parasign-key-issuance.test.mjs staat op main."
+    },
+    {
+      "tak": "fix/parasign-verify-v3",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "ct-hash.js en ct-window.js zijn op main supersets, verifyDocEnvelopeV3 komt drie keer voor in relay/parasign.js."
+    },
+    {
+      "tak": "fase1-pricing",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "Btw-notice (pricing.html:415), jaarprijs in de kaart (:394) en relay/test/pricing-page.test.js staan alle drie op main."
+    },
+    {
+      "tak": "feat/auth-contract-tests",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "relay/test/route-auth-gate.test.js van 02-09 pint hetzelfde contract tegen een echt gebootte relay, plus authz- en route-omission-gates."
+    },
+    {
+      "tak": "feat/billing-paid-until",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "relay/test/entitlements-paid-until.test.js is byte-identiek op main en entitlements.js:123 kent paid_until_parasend en parasign."
+    },
+    {
+      "tak": "fix/prijspagina-eerlijk",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "Het commentaarblok van de tak staat woordelijk op main in pricing.html:312-330, en de toets in relay/test/pricing-page.test.js:427."
+    },
+    {
+      "tak": "fix/admin-mobile-header",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "admin/public/index.html:133-138 doet hetzelfde op 720px waar de tak 900px koos: hdr wrapt, tabs krijgen een eigen rij."
+    },
+    {
+      "tak": "fix/claims-truth-groupb",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "13 van de 21 bestanden zijn van main geschrapt; de rest is anders gerepareerd (crypto-agility.html:395, Nuremberg overal). Rest: README.md:263 eIDAS-regel, apart te doen."
+    },
+    {
+      "tak": "sec/infra-hardening",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "main noemt de tak zelf in deploy/nginx-paramant-live.conf:266; backup-umask, security-headers-snippet en de core-pin in test.yml staan er allemaal."
+    },
+    {
+      "tak": "fix/verify-chain-relay",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "ct-hash.js, ct-window.js met tests, CT_MAX plus CtWindow op relay.js:368 en de keyless v3-verificatie in parasign-verify.js staan op main."
+    },
+    {
+      "tak": "feat/parasign-admin-entitle",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "admin/server.js:3914 POST /admin/set-parasign, relay.js:7737 en parasignOnboardingEmail in admin/lib/email-templates.js:629."
+    },
+    {
+      "tak": "fix/busl-not-open-source",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "Zeven van de elf bestanden zijn van main geschrapt; op de rest staat de BUSL-1.1 source-available-formulering. De enige open-source-treffer over is vs.html:306, en die staat in de kolom van een concurrent."
+    },
+    {
+      "tak": "fix/parasign-v1-authz-wall",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "parasign-open-api.js op main heeft isEnvelopeOwner (:98), owner-only void met generieke 404 (:739) en de geredigeerde status-view (:489-521)."
+    },
+    {
+      "tak": "chore/commit-style-guard",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": ".githooks/pre-push, scripts/check-commit-style.sh, tests/static-sanity.sh en AGENTS.md:3-31 staan alle vier op main."
+    },
+    {
+      "tak": "feat/about-page",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "frontend/about.html staat op main en in sitemap.xml:5; de link-sweep van de tak ging over 38 pagina's waarvan de meeste geschrapt zijn."
+    },
+    {
+      "tak": "golf2-integratie",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "Elk onderdeel landde apart: about.html, de eslint-job in test.yml:97, route-auth-gate.test.js, post-deploy-verify.sh en sign-e2e.yml."
+    },
+    {
+      "tak": "fix/koop-pad-intentie",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "pricing-billing.js:100-163 heeft INTENT en rememberIntent, passkey.js:194-212 safeNext met de open-redirect-check, plus de toets op main."
+    },
+    {
+      "tak": "fix/account-wissen-avg",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "keys-table.js:339 heeft erasePersonalData met wipe en erased_at, geexporteerd op :370, met relay/test/account-wissen.test.js."
+    },
+    {
+      "tak": "feat/new-logo",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "Het logo landde via 3702bdad plus twee iteraties; alleen het nav-merk bleef liggen en dat raakte vooral geschrapte pagina's."
+    },
+    {
+      "tak": "deploy/pdf-suite",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "tests/pdf-ops.test.mjs is byte-identiek op main; supersampling, edit-laag en Ops.deletePage/rotatePage zitten in main's sign-flow.js."
+    },
+    {
+      "tak": "feat/parasign-api-docs2",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "frontend/docs.html:557 draagt de /v1-sectie met dezelfde vijf endpoints, curl-voorbeelden en tier-tabel."
+    },
+    {
+      "tak": "docs/readme-parasign",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "README.md:157 draagt de ParaSign-sectie met envelope-model, .psign-bewijs en psk_-auth, en is eerlijker over eIDAS dan de tak."
+    },
+    {
+      "tak": "fix/parasign-email-binding",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "admin/lib/recipient-binding.js is byte-identiek op main; de test staat er als admin/test/recipient-binding.test.js en is verder uitgebreid."
+    },
+    {
+      "tak": "feat/parasign-production",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "parasign-stamp.js, parasign-store.js en parasign-entitlement.test.js zijn byte-identiek op main; de rest is main die verder liep."
+    },
+    {
+      "tak": "feat/ui-simplify-sitewide",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "De smalle nav staat op main in index.html:466-471 en about.html bestaat; ruim twintig van de 73 aangeraakte bestanden zijn geschrapt."
+    },
+    {
+      "tak": "fix/honest-ui-labels",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "admin/public/index.html:392 en 415 zeggen Deactivate account; main loste de oneerlijkheid bij de wortel op met account-wissen. De ParaID-helft is dood."
+    },
+    {
+      "tak": "fix/ci-stille-tests",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "relay/test/_requires.js is byte-identiek op main en wordt er breder gebruikt (twintig-plus suites tegen acht), plus de workflow-helft in test.yml:188."
+    },
+    {
+      "tak": "chore/security-retire-leaked-admin-token",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "Commit 0f12e896 is voorouder van main en doet hetzelfde: deploy/prometheus-token weg, deploy/token en .env.bak* in .gitignore. Rest: het bredere patroon deploy/*token*, een regel."
+    },
+    {
+      "tak": "fix/did-auth-privilege-revocation",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "main verplaatste de fix naar relay/lib/auth-gate.js:57 didPrincipal, dat weigert als de registrerende sleutel weg of inactief is, en voegde ook replay-bescherming toe."
+    },
+    {
+      "tak": "fix/admin-redis6-scaniterator",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "admin/lib/redis.js:72 heeft scanKeys met dezelfde toelichting; admin/server.js roept hem twaalf keer aan en gebruikt nul rauwe scanIterator."
+    },
+    {
+      "tak": "feat/parasign-connect",
+      "stapel": "in-main-anders",
+      "tot": "2026-09-19",
+      "reden": "De hele /v1 Open API staat op main, inclusief de receipt-route met eigenaar-of-deelnemer-autorisatie en buildEnvelopePsign."
+    },
+    {
+      "tak": "harden/trial-email-normalize",
+      "stapel": "achterhaald",
+      "tot": "2026-09-19",
+      "reden": "De code die de tak hardde bestaat niet meer: geen trialRequests in relay/ en request-key.html is een doorstuurpagina naar /signup."
+    },
+    {
+      "tak": "feat/paramant-desktop",
+      "stapel": "achterhaald",
+      "tot": "2026-09-19",
+      "reden": "main voert de desktop-app expliciet af (download.html:7) en ui-truthfulness.test.mjs:1655 zet Tauri op de denylist; de .prmnt-container draait al als frontend/vault.js."
+    },
+    {
+      "tak": "feat/ui-homepage",
+      "stapel": "achterhaald",
+      "tot": "2026-09-19",
+      "reden": "De onware home-note die de tak verving staat niet meer op main, en index.html is van 214 naar 880 regels herschreven."
+    },
+    {
+      "tak": "review/dashboard-ingelogd-screenshots",
+      "stapel": "achterhaald",
+      "tot": "2026-09-19",
+      "reden": "Verweesde reviewtak zonder gemeenschappelijke voorouder: acht jpg's en een README, geen coderegel."
+    },
+    {
+      "tak": "cursor/nextlevel-https-pq-tls-8b5b",
+      "stapel": "achterhaald",
+      "tot": "2026-09-19",
+      "reden": "Raakt de verkeerde laag: de productie-edge is Caddy, de tak wijzigt alleen de self-host nginx-template, en X25519MLKEM768 komt nergens op main voor."
+    },
+    {
+      "tak": "feat/extension-zk-copy",
+      "stapel": "achterhaald",
+      "tot": "2026-09-19",
+      "reden": "Ongevraagde marketingcopy op docs.html en parashare.html, die daarna volledig herbouwd zijn; Outlook komt in beide nul keer voor."
+    },
+    {
+      "tak": "feat/droom-marketing",
+      "stapel": "achterhaald",
+      "tot": "2026-09-19",
+      "reden": "Reviewtak met screenshots, PR #384 gesloten. Precies die pagina's zijn in twee dagen 2987 regels doorgelopen, dus de afdrukken slaan nergens meer op."
+    },
+    {
+      "tak": "feat/homepage-sharp-sdk-cards",
+      "stapel": "achterhaald",
+      "tot": "2026-09-19",
+      "reden": "De sectie die de tak opmaakt bestaat niet meer: pcard en section-dark komen nul keer voor in main's herschreven index.html."
+    },
+    {
+      "tak": "docs/changelog-20260622",
+      "stapel": "achterhaald",
+      "tot": "2026-09-19",
+      "reden": "frontend/changelog.html springt van Unreleased naar v0.9.0-beta, en de tekst belooft een gratis-badge terwijl Mollie inmiddels live is. Landen zou een onwaar prijsverhaal publiceren."
+    },
+    {
+      "tak": "cursor/https-nextlevel-2940",
+      "stapel": "achterhaald",
+      "tot": "2026-09-19",
+      "reden": "deploy-3.1.sh installeert die conf niet, en de echte TLS-rand is Caddy; de security-headers zijn er al via het snippet en route-security-headers.test.js."
+    },
+    {
+      "tak": "review/fe-product-screenshots",
+      "stapel": "achterhaald",
+      "tot": "2026-09-19",
+      "reden": "Root-commit met vijf jpg's en een README die zelf zegt dat het reviewmateriaal is en niet bedoeld om te mergen."
+    },
+    {
+      "tak": "integ/parasign-editor",
+      "stapel": "achterhaald",
+      "tot": "2026-09-19",
+      "reden": "De fundering landde als parasign-pdf-ops.js en de edit-laag in sign-flow.js; wat overblijft zijn vormgereedschappen, uitbreiding waar niemand om vroeg, tegen een bestand dat 3790 regels is."
+    },
+    {
+      "tak": "feat/parasign-editor-shapes",
+      "stapel": "achterhaald",
+      "tot": "2026-09-19",
+      "reden": "integ/parasign-editor plus een commit met lijn- en pijlvormen, zelfde bestanden en zelfde oordeel."
+    },
+    {
+      "tak": "fix/paraid-honest-assurance",
+      "stapel": "achterhaald",
+      "tot": "2026-09-19",
+      "reden": "Alle vier de aangeraakte bestanden bestaan niet meer: er staat geen enkel paraid-bestand op main."
+    },
+    {
+      "tak": "fix/paraid-uit-de-etalage",
+      "stapel": "achterhaald",
+      "tot": "2026-09-19",
+      "reden": "Het doel is bereikt, radicaler dan de tak voorstelde: de ParaID-pagina's zijn geschrapt in plaats van op noindex gezet."
+    },
+    {
+      "tak": "review/homepage-koper-screenshots",
+      "stapel": "achterhaald",
+      "tot": "2026-09-19",
+      "reden": "Losse boom met vier jpg's; de bijbehorende PR #328 is op 02-09 gemergd."
+    }
+  ]
+}
