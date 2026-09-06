@@ -10,10 +10,43 @@
 //   3) Idempotent. A payment id that was already handled changes nothing
 //      (deps.isProcessed / deps.markProcessed), and setProductPlan is itself
 //      idempotent, so a double webhook is safe even without the marker.
-//   4) Only status 'paid' grants. failed/expired/canceled do nothing; chargeback
-//      revokes to the product floor.
+//   4) Only status 'paid' grants, and only when nothing has gone back.
+//      failed/expired/canceled do nothing; money returned in full, by chargeback
+//      OR by refund, revokes to the product floor.
 
 const catalog = require('./billing-catalog');
+const creditNote = require('./credit-note');
+const invoice = require('./invoice');
+
+// ── has any money gone back, and was it all of it ────────────────────────────
+// The document layer (credit-note.js) and this layer must agree about what
+// counts as money returned, or the customer gets a credit note for a plan he
+// keeps. Before 2026-09-06 they did not: credit-note.isReversal already read
+// both cumulative counters, while this file matched on the STATUS STRING alone
+// and only for 'chargeback'. Mollie reports a refund on the very same tr_ id
+// with the status still 'paid' and amountRefunded set, so a refund did not even
+// reach the fall-through the review pointed at -- it went down the PAID branch,
+// and only the idempotency marker stood between a refunded payment and a fresh
+// month granted on it.
+//
+// So the predicate is imported rather than restated. `full` decides revoke
+// versus leave-alone, and it is deliberately conservative in the one direction
+// that matters: a 'chargeback' status is whole no matter what the counters say,
+// which is exactly what this file did before. What is new is that a 'refunded'
+// status, and a still-'paid' payment whose counters reach the invoiced amount,
+// are whole too. A part-refund revokes nothing and grants nothing.
+function reversalOf(payment) {
+  const p = payment || {};
+  if (!creditNote.isReversal(p)) return null;
+  const cents = (v) => { const c = invoice.centsOf(v); return Number.isFinite(c) ? c : 0; };
+  const gross = cents(p.amount && p.amount.value);
+  const back = cents(p.amountRefunded && p.amountRefunded.value)
+             + cents(p.amountChargedBack && p.amountChargedBack.value);
+  const status = String(p.status || '');
+  const wholeByStatus = status === 'chargeback' || status === 'charged_back' || status === 'refunded';
+  const full = wholeByStatus || (back > 0 && gross > 0 && back >= gross);
+  return { full, kind: creditNote.reasonOf(p), back, gross };
+}
 
 // How far a paid interval carries the entitlement. Calendar months and years,
 // not 30 or 365 days: a customer who pays on the 31st should renew on a date
@@ -101,7 +134,8 @@ async function processPayment(payment, deps) {
   // payment it reverses, so a flat id check swallowed the revoke and left an
   // account that had taken its money back sitting on the paid tier. What the
   // marker records is the outcome, and only a repeat of that outcome is a no-op.
-  const revoking = status === 'chargeback' || status === 'charged_back';
+  const reversal = reversalOf(payment);
+  const revoking = !!(reversal && reversal.full);
   const wanted = revoking ? 'revoked' : 'granted';
   if (typeof d.isProcessed === 'function') {
     let done = false;
@@ -110,6 +144,39 @@ async function processPayment(payment, deps) {
     // 'granted', which is what every marker written before this meant.
     const seen = typeof done === 'string' ? done : (done ? 'granted' : null);
     if (seen === wanted) return { result: 'ignored', level: 'info', account: accountId, product, reason: 'already_processed' };
+  }
+
+  if (revoking) {
+    // Money reclaimed, in full, by chargeback or by refund. Revoke: drop this
+    // product to its floor tier.
+    // EVERY product the order bought goes back to its floor. A bundle that
+    // granted two entitlements and revoked one would leave the customer holding
+    // half a plan he has taken the money back for.
+    const revoked = [];
+    for (const g of order.grants) {
+      const floor = catalog.floorTier(g.product);
+      // null clears the period along with the tier: money reclaimed leaves no
+      // paid time on record.
+      try { await d.setProductPlan(accountId, g.product, floor, null, null); } catch { /* logged by caller via reason */ }
+      revoked.push({ product: g.product, tier: floor });
+    }
+    if (typeof d.markProcessed === 'function') { try { await d.markProcessed(payment.id, 'revoked'); } catch { /* best effort */ } }
+    return {
+      result: 'revoked', level: 'warn', account: accountId, product,
+      bundle: order.bundle || null, tier: revoked[0].tier, grants: revoked, reason: reversal.kind,
+    };
+  }
+
+  // Money went back, but not all of it. A part-refund is not a cancelled sale,
+  // so the entitlement stands -- but it must not be read as a fresh purchase
+  // either, which is what happened while a refund arrived as a still-'paid'
+  // payment and fell into the grant branch above. The credit note is issued by
+  // the webhook regardless (it is not gated on this outcome).
+  if (reversal) {
+    return {
+      result: 'ignored', level: 'info', account: accountId, product,
+      reason: `partial_${reversal.kind}:${reversal.back}_of_${reversal.gross}`,
+    };
   }
 
   if (status === 'paid') {
@@ -169,27 +236,10 @@ async function processPayment(payment, deps) {
     };
   }
 
-  if (status === 'chargeback' || status === 'charged_back') {
-    // Money reclaimed. Revoke: drop this product to its floor tier.
-    // EVERY product the order bought goes back to its floor. A bundle that
-    // granted two entitlements and revoked one would leave the customer holding
-    // half a plan he has taken the money back for.
-    const revoked = [];
-    for (const g of order.grants) {
-      const floor = catalog.floorTier(g.product);
-      // null clears the period along with the tier: money reclaimed leaves no
-      // paid time on record.
-      try { await d.setProductPlan(accountId, g.product, floor, null, null); } catch { /* logged by caller via reason */ }
-      revoked.push({ product: g.product, tier: floor });
-    }
-    if (typeof d.markProcessed === 'function') { try { await d.markProcessed(payment.id, 'revoked'); } catch { /* best effort */ } }
-    return {
-      result: 'revoked', level: 'warn', account: accountId, product,
-      bundle: order.bundle || null, tier: revoked[0].tier, grants: revoked, reason: 'chargeback',
-    };
-  }
 
-  // failed | expired | canceled | open | pending -> no entitlement change.
+  // authorized | failed | expired | canceled | open | pending -> no entitlement
+  // change. Money that went back no longer lands here: it is answered above,
+  // whatever status string it arrived under.
   return { result: 'ignored', level: 'info', account: accountId, product, reason: `status_${status}` };
 }
 
@@ -219,4 +269,4 @@ function classifyFetchError(err) {
   return { retry: true, level: 'warn', reason: status ? `mollie_${status}` : (msg || 'fetch_error') };
 }
 
-module.exports = { processPayment, classifyFetchError, periodEnd, extendFrom, bundleExtendFrom, keepLonger };
+module.exports = { processPayment, classifyFetchError, reversalOf, periodEnd, extendFrom, bundleExtendFrom, keepLonger };
