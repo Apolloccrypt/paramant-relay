@@ -81,7 +81,12 @@ function btn(url, label) {
 }
 
 // ── 1. SETUP EMAIL ────────────────────────────────────────────────────────────
-function setupEmail({ token, requestedAt, requestIP, isReset = false }) {
+// `validFor` is the human phrase for the link's lifetime. It is a parameter and
+// not a constant, because the number lives in admin/server.js
+// (SETUP_TOKEN_TTL_S) and a second copy here is how the mail came to promise
+// fourteen days after the link was shortened. setup-link-gate.test.js holds the
+// two together.
+function setupEmail({ token, requestedAt, requestIP, isReset = false, validFor = '2 days' }) {
   const url = `${BASE_URL}/auth/setup/${token}`;
   const preheader = isReset
     ? 'Your TOTP authenticator has been cleared. Scan the QR code to re-enroll.'
@@ -103,7 +108,7 @@ The link opens a page with a QR code. Scan it with your authenticator app
 (Google Authenticator, Authy, 1Password, or any TOTP app). You can also
 enter the secret manually if scanning does not work.
 
-This link is valid for 14 days.
+This link is valid for ${validFor}.
 
 Why an authenticator?
 
@@ -135,7 +140,7 @@ https://paramant.app`;
     <p style="margin:0 0 16px 0;line-height:1.6;">${isReset ? 'Your TOTP authenticator has been reset.' : 'Welcome to Paramant.'} To ${isReset ? 'reset your' : 'finish setting up your'} account, connect an authenticator app &mdash; this is what Paramant uses instead of a password.</p>
     ${btn(url, isReset ? 'Set up new authenticator' : 'Complete setup')}
     <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">The link opens a page with a QR code. Scan it with your authenticator app (Google Authenticator, Authy, 1Password, or any TOTP app). You can also enter the secret manually.</p>
-    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">This link is valid for <strong>14 days</strong>.</p>
+    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">This link is valid for <strong>${escHtml(validFor)}</strong>.</p>
     <hr style="border:none;border-top:1px solid rgba(11,58,106,0.08);margin:24px 0;">
     <h2 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">Why an authenticator?</h2>
     <p style="margin:0 0 12px 0;line-height:1.6;color:#475569;font-size:13px;">Passwords get reused, stolen, or phished. A TOTP code from your phone cannot be typed into a fake site or intercepted in a credential dump. It is the same mechanism your bank uses.</p>
