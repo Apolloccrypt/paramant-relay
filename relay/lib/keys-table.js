@@ -168,6 +168,23 @@ function parasignGrantLive(rec, now) {
   return !entitlements.effectiveProductTier(rec, 'parasign', now).expired;
 }
 
+// The ACCOUNT-level grant, which is narrower than the key-level one above and
+// has to stay narrower. A psk_ key carries scope 'parasign' for its whole life:
+// that is what the key IS, and it is a perfectly good reason to let the key
+// through the /v1 door at whatever tier it holds. It is not a reason to let the
+// ACCOUNT mint another one.
+//
+// Measured on 2026-09-06 by tests/koper-hele-weg.test.mjs, which is the only
+// test in the repo that walks the whole purchase and then charges it back: with
+// the scope shape included here, an account that had taken its money back could
+// still mint, because revoking clears the `parasign` flag on every member key
+// and cannot clear what a psk_ key is. The flag is the grant; the scope is a
+// capability the grant already handed out.
+function parasignAccountGrantLive(rec, now) {
+  if (!rec || rec.parasign !== true) return false;
+  return !entitlements.effectiveProductTier(rec, 'parasign', now).expired;
+}
+
 function hasParaSignScope(rec, now) {
   return parasignGrantLive(rec, now);
 }
@@ -456,7 +473,7 @@ const PARASIGN_ENTITLED_PLANS = new Set(['pro', 'business', 'enterprise', 'licen
 // makes it worth a gate rather than a shrug: a minted key carries parasign:true
 // itself, so it re-satisfies this very check for its own account.
 function accountHasParasignEntitlement(memberRecords, plan, now) {
-  for (const r of (memberRecords || [])) { if (parasignGrantLive(r, now)) return true; }
+  for (const r of (memberRecords || [])) { if (parasignAccountGrantLive(r, now)) return true; }
   return PARASIGN_ENTITLED_PLANS.has(plan);
 }
 
@@ -517,4 +534,4 @@ function erasePersonalData(data, accountOrKey) {
 
 module.exports = {
   PERSONAL_DATA_FIELDS,
-  erasePersonalData, VALID_SCOPES, SCOPE_ACTIONS, requireScope, scopeActionFor, hasParaSignScope, parasignGrantLive, computeKid, maskApiKey, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary, buildParasignKeyRecord, accountHasParasignEntitlement, PARASIGN_ENTITLED_PLANS };
+  erasePersonalData, VALID_SCOPES, SCOPE_ACTIONS, requireScope, scopeActionFor, hasParaSignScope, parasignGrantLive, parasignAccountGrantLive, computeKid, maskApiKey, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary, buildParasignKeyRecord, accountHasParasignEntitlement, PARASIGN_ENTITLED_PLANS };

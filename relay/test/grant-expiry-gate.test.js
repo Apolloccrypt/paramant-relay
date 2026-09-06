@@ -105,12 +105,16 @@ test('the two gates resolve the flag through the period, not raw', () => {
   assert.match(resolver, /effectiveProductTier\(rec, 'parasign'/, 'parasignGrantLive does not consult the period');
   assert.match(resolver, /\.expired/, 'parasignGrantLive reads the tier but not the expiry');
 
+  const account = src.slice(src.indexOf('function parasignAccountGrantLive('), src.indexOf('// ── Erasure'));
+  assert.match(account, /effectiveProductTier\(rec, 'parasign'/, 'the account grant does not consult the period');
+  assert.doesNotMatch(account.slice(0, account.indexOf('\n}')), /scope === 'parasign'/,
+    'the account grant reads the key capability again, so holding a psk_ key means permission to mint another');
+
   const scope = src.slice(src.indexOf('function hasParaSignScope('), src.indexOf('// Non-secret, stable key identifier'));
   assert.match(scope, /parasignGrantLive\(/, 'hasParaSignScope no longer goes through the resolver');
 
   const mintGate = src.slice(src.indexOf('function accountHasParasignEntitlement('));
-  assert.match(mintGate, /parasignGrantLive\(/, 'the mint gate no longer goes through the resolver');
-  assert.doesNotMatch(mintGate.slice(0, mintGate.indexOf('\n}')), /r\.parasign === true/, 'the mint gate reads the raw flag again');
+  assert.match(mintGate, /parasignAccountGrantLive\(/, 'the mint gate no longer goes through the account resolver');
 });
 
 test('no permission is decided on the raw flag anywhere', () => {
@@ -140,6 +144,15 @@ test('a lapsed grant is refused, a live one is not, an open one is not', () => {
   assert.strictEqual(keysTable.accountHasParasignEntitlement([lapsed], 'community'), false, 'a lapsed account still mints');
   assert.strictEqual(keysTable.accountHasParasignEntitlement([live], 'community'), true);
   assert.strictEqual(keysTable.accountHasParasignEntitlement([open], 'community'), true);
+  // The account grant is NARROWER than the key capability, and has to stay so.
+  // A psk_ key carries scope 'parasign' for life -- that is what the key is --
+  // and revoking an account clears the `parasign` flag on every member but
+  // cannot clear what a key IS. Reading the scope here let an account that had
+  // charged its payment back go on minting, which tests/koper-hele-weg.test.mjs
+  // caught on the first full run.
+  assert.strictEqual(keysTable.hasParaSignScope(scoped), true, 'a psk_ key lost the /v1 door');
+  assert.strictEqual(keysTable.accountHasParasignEntitlement([scoped], 'community'), false,
+    'holding a psk_ key is being read as permission to mint another');
   // The plan itself still carries the entitlement without any flag at all.
   assert.strictEqual(keysTable.accountHasParasignEntitlement([], 'pro'), true);
   assert.strictEqual(keysTable.accountHasParasignEntitlement([], 'community'), false);
