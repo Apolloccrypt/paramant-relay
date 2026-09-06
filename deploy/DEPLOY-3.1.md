@@ -948,12 +948,15 @@ passing on an empty search.
    relay, from the server, with the admin token:
    ```bash
    A=$(grep '^ADMIN_TOKEN=' /opt/paramant-relay/.env | cut -d= -f2-)
+   I=$(grep '^INTERNAL_AUTH_TOKEN=' /opt/paramant-relay/.env | cut -d= -f2-)
    curl -s -X POST http://127.0.0.1:3000/v2/admin/keys/mint-parasign \
-     -H "X-Admin-Token: $A" -H 'Content-Type: application/json' \
+     -H "X-Admin-Token: $A" -H "X-Internal-Auth: $I" -H 'Content-Type: application/json' \
      -d '{"account_id":"<the canary account>","test":true,"label":"parasign-canary"}'
-   unset A
+   unset A I
    ```
-   The key is shown once (`relay.js`, `/v2/admin/keys/mint-parasign`). Then
+   Both headers, since 2026-09-06: minting a key is a two-gate route, like
+   `set-product-plan`. Without `X-Internal-Auth` the answer is a 403, not a key.
+   The key itself is shown once (`relay.js`, `/v2/admin/keys/mint-parasign`). Then
    `gh secret set PARASIGN_CANARY_KEY` and trigger `product-heartbeat.yml` once
    with `workflow_dispatch`: expected 3 pass, 0 skip on the ParaSign canary.
    Every `/v2/admin` path is behind `X-Admin-Token` (`relay.js`, `isAdminPath`),

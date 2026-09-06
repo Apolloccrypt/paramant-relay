@@ -2951,6 +2951,33 @@ function mintParasignKey(accountId, opts = {}) {
   const anchorRec = apiKeys.get(accountId);
   const plan = opts.plan || (acct && acct.plan) || (anchorRec && anchorRec.plan) || 'community';
   const email = (acct && acct.email) || (anchorRec && anchorRec.email) || '';
+  // THE CAP, and it lives HERE rather than at the two routes on purpose. The
+  // 2026-09-05 review found the self-serve route minting without one: fourteen
+  // keys in a row on a Pro account, nine on a community account whose cap is
+  // five, and users.json growing by one entry per HTTP request. The admin route
+  // twenty lines away did it correctly, which is the whole story of how this
+  // happens. One generator, one cap, and a third mint route cannot drift.
+  //
+  // Checked with the insert below and nothing awaited in between, so it is
+  // atomic in the event loop, the same property the /v2/admin/keys mint relies
+  // on. Throws rather than answering, because the two callers own their own
+  // response shape; both map `code` to a 402.
+  const _capPlan = tiers.normalisePlan((acct && acct.plan) || plan);
+  const _cap = ACCOUNT_KEY_LIMIT[_capPlan] ?? ACCOUNT_KEY_LIMIT.community;
+  const _active = [...(accountKeys.get(accountId) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
+  if (_active >= _cap) {
+    const e = new Error(`Account key limit reached (${_cap} keys on the ${_capPlan} plan).`);
+    e.code = 'account_key_limit'; e.cap = _cap; e.current = _active; e.plan = _capPlan;
+    throw e;
+  }
+  if (EDITION !== 'licensed' && LICENSE_MAX_KEYS !== Infinity) {
+    const relayActive = [...apiKeys.values()].filter((v) => v.active !== false).length;
+    if (relayActive >= LICENSE_MAX_KEYS) {
+      const e = new Error(`License limit reached (${LICENSE_MAX_KEYS} keys).`);
+      e.code = 'relay_key_limit'; e.cap = LICENSE_MAX_KEYS; e.current = relayActive; e.plan = _capPlan;
+      throw e;
+    }
+  }
   // The new key inherits the account's EFFECTIVE per-product tiers, resolved
   // over every key the account holds. Minting used to pass the legacy `plan`
   // only, which silently issued a free-tier ParaSign key to a paying account.
@@ -2991,7 +3018,19 @@ function mintParasignKey(accountId, opts = {}) {
     ud.updated = new Date().toISOString();
   }).then(() => log('info', 'parasign_key_minted', { account: String(accountId).slice(0, 12), kid, mode: opts.test ? 'test' : 'live', plan: record.plan, persisted: true }))
     .catch(we => log('warn', 'parasign_key_persist_failed', { err: we.message }));
+  // The same pass the pgp_ mint runs. Without it a psk_ key was invisible to
+  // over_limit until the next reload-users, which is only ever manual.
+  applyKeyLimitEnforcement();
   return { key, kid, account_id: accountId, plan: record.plan, mode: opts.test ? 'test' : 'live', masked: maskKey(key), scope: 'parasign', created: record.created };
+}
+
+// A mint refused by a cap is a 402 with the numbers, not a 400 or a 500. Shared
+// by both mint routes so the answer cannot differ per door.
+function keyCapReject(err, res) {
+  if (!err || (err.code !== 'account_key_limit' && err.code !== 'relay_key_limit')) return false;
+  res.writeHead(402, { 'Content-Type': 'application/json' });
+  res.end(J({ error: err.message, current_keys: err.current, max_keys: err.cap === Infinity ? null : err.cap, upgrade_url: 'https://paramant.app/pricing' }));
+  return true;
 }
 
 function loadUsers() {
@@ -3667,10 +3706,44 @@ async function handleRelayRequest(req, res) {
   // shortcut we chose: the Cleverbase Signing API only offers authType
   // "oauth2code", so a natural person has to authorise in the Cleverbase app
   // for every batch of signatures. There is no machine-to-machine route.
+  //
+  // WHO MAY CALL IT. Finding 22c of the 2026-09-05 review: nothing but the flag
+  // check. The route sits above the API-key gate, read a 32 MB body from anyone,
+  // and two of the relay's own policy files already said otherwise --
+  // keys-table.js lists /v2/qes/sign in SIGN_PATHS, the scope class that needs a
+  // sign-capable key, and public-routes.js does NOT declare it, while promising
+  // that no keyless route joins the surface unannounced. The scope check is
+  // wrapped in `if (keyData)` and keyData is always null here, so the
+  // classification was dead policy.
+  //
+  // It is not moved below the gate, because the caller this route exists for is
+  // an external signing party who has no API key: the same person POST /sign
+  // serves. So it takes the same capability that route takes, the per-party
+  // invite token, checked against the store. A key-holding caller passes on the
+  // key instead. Either way there is now a named account or a named party behind
+  // every request, and 12 MB rather than 32.
+  //
+  // Not separately metered, and that is a decision rather than an omission: the
+  // qualified signature is a second signature over a document whose ParaSign
+  // signature the sign route already counted, and the QTSP call itself cannot be
+  // made without the signer's own service token and SAD.
   if (path === '/v2/qes/sign' && req.method === 'POST') {
     if (!qes.enabled()) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+    if (!envSignRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests' })); }
     try {
-      const d = JSON.parse((await readBody(req, 32 * 1024 * 1024)).toString());
+      const d = JSON.parse((await readBody(req, 12 * 1024 * 1024)).toString());
+      if (!keyData?.active) {
+        const _qStore = _envStore();
+        if (!_qStore) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
+        const _qEnv = String(d.envelope_id || '');
+        const _qPi = parseInt(d.party_index, 10);
+        const _qTok = String(d.invite_token || d.token || '');
+        const _qBad = () => { res.writeHead(403, { 'Content-Type': 'application/json' }); res.end(J({ error: 'qes_capability_required', message: 'A qualified signature needs the envelope and the party invite token it belongs to.' })); };
+        if (!/^[A-Za-z0-9_-]{20,64}$/.test(_qEnv) || !Number.isInteger(_qPi) || _qPi < 0 || !_qTok) return _qBad();
+        let _qParty = null;
+        try { _qParty = await _qStore.getForParty(_qEnv, _qPi, _qTok); } catch (qe) { if (redisOutage503(qe, res)) return; }
+        if (!_qParty) return _qBad();
+      }
       const pdf = Buffer.from(String(d.document || ''), 'base64');
       if (pdf.subarray(0, 5).toString('latin1') !== '%PDF-') {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -4866,6 +4939,7 @@ async function handleRelayRequest(req, res) {
         note: "Store this key now -- it is shown once and cannot be retrieved in full again." }));
     } catch (err) {
       if (redisOutage503(err, res)) return;
+      if (keyCapReject(err, res)) return;
       console.error("[user/parasign-keys POST]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -6864,8 +6938,32 @@ async function handleRelayRequest(req, res) {
       }
       const did = generateDid(d.device_id, d.ecdh_pub);
       const doc = createDidDocument(did, d.device_id, d.ecdh_pub, d.dsa_pub || '');
-      const _didIsNew = !didRegistry.has(did); // overwrite of same did must not double-count
-      didRegistry.set(did, { device_id: d.device_id, key: ownerKey, doc, ts: new Date().toISOString() });
+      // FIRST REGISTRATION WINS, the same rule POST /v2/pubkey has had on its
+      // slot. Finding 22b of the 2026-09-05 review: the set was unconditional
+      // and a DID is sha3-256(device_id + ecdh_pub), both of which GET
+      // /v2/did/:did hands out to anyone who asks -- a DID is a public
+      // identifier by design, so the holder's own counterparties know both
+      // halves of its preimage.
+      //
+      // What the rebind actually did is sharper than "the device moves". The
+      // signing material cannot be swapped (the ecdh key is inside the hash, so
+      // a different key is a different DID), but authByDid resolves the
+      // principal through didRegistry.key. Rebinding pointed the VICTIM'S OWN
+      // DID-authenticated traffic at the attacker's account: his plan, his
+      // account_id, his quota buckets, his device queues.
+      //
+      // A same-owner re-register stays 200 and keeps the stored document rather
+      // than rebuilding it, so `created` does not move under a verifier that
+      // pinned it. The counter is only touched for a genuinely new DID, and a
+      // rebind can no longer leave the previous owner's slot spent forever
+      // while the attacker's count never rises.
+      const held = didRegistry.get(did);
+      if (held && held.key !== ownerKey) {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'DID already registered: first registration wins' }));
+      }
+      const _didIsNew = !held;
+      didRegistry.set(did, { device_id: d.device_id, key: ownerKey, doc: held ? held.doc : doc, ts: new Date().toISOString() });
       if (_didIsNew && ownerKey) didKeyCounts.set(ownerKey, (didKeyCounts.get(ownerKey) || 0) + 1);
       // Pubkey TTL follows the authenticated ParaSend tier; an ANONYMOUS
       // (keyless inv_) registration gets the free-tier TTL, never the pro
@@ -6873,7 +6971,21 @@ async function handleRelayRequest(req, res) {
       // axis, and a key with no plan on file lands on community (7 days) rather
       // than being handed the pro 30 by the `|| 'pro'` default.
       const _didPlan = keyData ? parasendLimitsOf(keyData).tier : 'free';
-      pubkeys.set(`${d.device_id}:${acctOf(apiKey)}`, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', dsa_pub: d.dsa_pub || '', ts: new Date().toISOString(), expires: Date.now() + (_pubkeyTtl[_didPlan] ?? _pubkeyTtl.free) });
+      // The SAME slot POST /v2/pubkey guards with its 409, written here without
+      // one. Two things came with that. Under DID-auth apiKey is '' and acctOf('')
+      // returns '', so the slot collapses to `${device_id}:` -- one namespace
+      // shared by every DID-authenticated caller, readable through
+      // GET /v2/pubkey/:device. And a live slot could be overwritten from this
+      // route even though the front door refuses. Anonymous inv_ registrations
+      // keep their own slot as before; what is refused is writing over a slot
+      // that is still alive and does not belong to this account.
+      const _didSlot = `${d.device_id}:${acctOf(apiKey)}`;
+      const _heldPk = pubkeys.get(_didSlot);
+      if (_heldPk && (!_heldPk.expires || Date.now() < _heldPk.expires) && _heldPk.ecdh_pub !== d.ecdh_pub) {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'Pubkey already registered for this device: first registration wins' }));
+      }
+      pubkeys.set(_didSlot, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', dsa_pub: d.dsa_pub || '', ts: new Date().toISOString(), expires: Date.now() + (_pubkeyTtl[_didPlan] ?? _pubkeyTtl.free) });
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
       incMetric('did_registrations');
       auditAppend(apiKey, 'did_registered', { did, device: d.device_id });
@@ -7246,7 +7358,13 @@ async function handleRelayRequest(req, res) {
   // places the account lives, keeping what a payment must stay traceable by.
   // Idempotent: a retry after a sector was briefly unreachable finds nothing left
   // and reports zero, which is a success and not an error.
+  //
+  // Two gates since 2026-09-06: ADMIN_TOKEN by the admin-path fence, plus
+  // X-Internal-Auth here. Erasure is irreversible by design, so it belongs on
+  // the same footing as the routes that move an entitlement. Both admin call
+  // sites pass the header (admin/server.js, relayFetch withInternal).
   if (path === '/v2/admin/keys/erase' && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       const target = d.account_id || d.key;
@@ -8016,10 +8134,17 @@ async function handleRelayRequest(req, res) {
   // ── POST /v2/admin/keys/set-parasign - grant/revoke the ParaSign /v1 API ────
   // Admin override for the `parasign` entitlement, alongside the automatic grant
   // on payment. Sets the flag on the target key AND every sibling key of its
-  // account (account-level grant), then persists to users.json. ADMIN_TOKEN-gated
-  // by the admin-path guard above; the admin server fans this out to every sector
-  // so the grant is fleet-consistent. Additive: no current relay path gates on it.
+  // account (account-level grant), then persists to users.json. The admin server
+  // fans this out to every sector so the grant is fleet-consistent.
+  //
+  // TWO gates, not one. ADMIN_TOKEN by the admin-path guard above, and
+  // X-Internal-Auth here, the same pair update-plan and set-product-plan carry.
+  // Until 2026-09-06 this route had only the first, which made one leaked secret
+  // enough to hand out the /v1 API to any account. The neighbouring routes that
+  // move the same entitlement had two, and that asymmetry is what the 2026-09-05
+  // review found. admin/server.js sends the second header on this call.
   if (path === '/v2/admin/keys/set-parasign' && req.method === 'POST') {/*MARK:parasign_endpoint*/
+    if (!_internalOk()) return _internalReject();
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       const key = (d.key || '').toString();
@@ -8043,21 +8168,37 @@ async function handleRelayRequest(req, res) {
   }
 
   // ── POST /v2/admin/keys/mint-parasign - mint a psk_ ParaSign /v1 key ─────────
-  // Manual admin-setup path. ADMIN_TOKEN-gated (admin-path guard above). Runs the
-  // SAME mintParasignKey generator as the self-serve route, so both paths share
-  // one key format + one storage shape. Binds the key to {account_id} (or the
-  // account of {key}); returns the FULL key ONCE (never re-retrievable in full).
+  // Manual admin-setup path. Runs the SAME mintParasignKey generator as the
+  // self-serve route, so both paths share one key format + one storage shape.
+  // Binds the key to {account_id} (or the account of {key}); returns the FULL key
+  // ONCE (never re-retrievable in full).
+  //
+  // TWO gates: ADMIN_TOKEN by the admin-path guard above, plus X-Internal-Auth,
+  // matching the self-serve route at /v2/user/parasign-keys, which has required
+  // the internal header since it was written. A route that MINTS a credential
+  // standing behind fewer gates than the route that merely moves a tier was the
+  // asymmetry in the 2026-09-05 review.
+  //
+  // `plan` is NOT read from the body any more. It reached buildParasignKeyRecord
+  // as a bare string, and on an account with no per-product plan on record
+  // {"plan":"enterprise"} minted an enterprise key with no paid_until, which
+  // entitlements reads as never expiring. The account's own plan is already the
+  // fallback inside mintParasignKey, and there is no legitimate reason to mint a
+  // key at a tier the account does not hold. set-product-plan is the route for
+  // changing what an account holds, and it validates against the ladder.
   if (path === '/v2/admin/keys/mint-parasign' && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       let accountId = (d.account_id && String(d.account_id)) || '';
       if (!accountId && d.key) accountId = acctOf(String(d.key));
       if (!accountId) { res.writeHead(400); return res.end(J({ error: 'account_id or key required' })); }
-      const out = mintParasignKey(accountId, { test: d.test === true, label: d.label, plan: d.plan });
+      const out = mintParasignKey(accountId, { test: d.test === true, label: d.label });
+      try { auditAppend(out.key, 'admin_parasign_key_minted', { account: String(accountId).slice(0, 12), kid: out.kid, mode: out.mode, plan: out.plan }); } catch {}
       res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, mode: out.mode, scope: out.scope, key_masked: out.masked,
         note: 'Store this key now - it is shown once and cannot be retrieved in full again.' }));
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+    } catch(e) { if (keyCapReject(e, res)) return; res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
   // ── GET /v2/admin/keys/primary/:account_id — read an account's primary + members ──
@@ -8080,7 +8221,11 @@ async function handleRelayRequest(req, res) {
   // Promotes the chosen key, demotes the previous primary within the account
   // (keysTable.designatePrimary), then persists. Mismatched account_id => 400, so
   // a key can never be moved into an account it does not belong to.
+  // Two gates since 2026-09-06: it rewrites which key an account is billed and
+  // metered through, which is the same class of change as set-product-plan. No
+  // caller in the admin panel reaches it, so nothing had to move with it.
   if (path === '/v2/admin/keys/primary' && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       const accountId = (d.account_id || '').toString();
@@ -8161,6 +8306,28 @@ async function handleRelayRequest(req, res) {
   }
 
   // ── POST /v2/team/add-device ──────────────────────────────────────────────
+  // Finding 9 of the 2026-09-05 review lived here, and both the mechanism it
+  // named and the reach it assumed turned out to be wrong. Written down because
+  // the code reads as a working feature and is not one.
+  //
+  // What the review said: the minted key gets no account_id, so all three quota
+  // gates skip it. False. A backfill above all routing sets
+  // keyData.account_id = apiKey for any record that lacks one, so the gates
+  // never skip. The damage was real and different: the device became its OWN
+  // account, with its own fresh monthly bucket, uncorrelated with the seat that
+  // was paid for. Buy one Pro seat, mint devices, each one gets the whole plan.
+  //
+  // What the review did not check: `team_id` never reaches a runtime record.
+  // keysTable.parseAccountFields returns a fixed field set and drops it, and no
+  // other apiKeys.set site writes it. You need a record with team_id to mint one
+  // with team_id, so this route answers 403 to everyone and always has.
+  // deploy/paramant-admin.py team-create writes it to users.json, where it is
+  // dropped on load. The feature does not work end to end.
+  //
+  // So it is left unreachable, and the mint is fixed anyway: the day somebody
+  // teaches the loader about team_id, this must not be the shape that lands.
+  // Bound to the PARENT account, scope inherited, capped, persisted, and 32
+  // bytes like every other key in the file. key-mint-gate.test.js holds it here.
   if (path === '/v2/team/add-device' && req.method === 'POST') {
     const kd = apiKeys.get(apiKey);
     if (!kd?.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
@@ -8169,10 +8336,33 @@ async function handleRelayRequest(req, res) {
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.label) { res.writeHead(400); return res.end(J({ error: 'label verplicht' })); }
-      const newKey = 'pgp_' + require('crypto').randomBytes(16).toString('hex');
-      apiKeys.set(newKey, { label: d.label, plan: kd.plan, team_id: kd.team_id, active: true, created: new Date().toISOString() });
-      log('info', 'team_device_added', { label: d.label, team: kd.team_id });
-      res.writeHead(201); return res.end(J({ ok: true, key: newKey, label: d.label, team_id: kd.team_id }));
+      const label = String(d.label).slice(0, 128);
+      const account_id = kd.account_id || apiKey;
+      const scope = keysTable.VALID_SCOPES.has(kd.scope) ? kd.scope : 'full';
+      const email = kd.email || '';
+      const capPlan = tiers.normalisePlan(kd.plan);
+      const cap = ACCOUNT_KEY_LIMIT[capPlan] ?? ACCOUNT_KEY_LIMIT.community;
+      const active = [...(accountKeys.get(account_id) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
+      if (active >= cap) {
+        res.writeHead(402, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: `Account key limit reached (${cap} keys on the ${capPlan} plan).`, current_keys: active, max_keys: cap === Infinity ? null : cap, upgrade_url: 'https://paramant.app/pricing' }));
+      }
+      const created = new Date().toISOString();
+      const newKey = 'pgp_' + crypto.randomBytes(32).toString('hex');
+      apiKeys.set(newKey, { plan: kd.plan, label, email, active: true, account_id, is_primary: false, scope, team_id: kd.team_id, created });
+      if (!accounts.has(account_id)) accounts.set(account_id, { account_id, plan: kd.plan, email, primary_api_key: null, label });
+      if (!accountKeys.has(account_id)) accountKeys.set(account_id, new Set());
+      accountKeys.get(account_id).add(newKey);
+      const kid = keysTable.assignKid(kidIndex, newKey, log);
+      apiKeys.get(newKey).kid = kid;
+      kidIndex.set(kid, newKey);
+      _mutateUsersJson(ud => {
+        ud.api_keys.push({ key: newKey, plan: kd.plan, label, email, active: true, created, account_id, is_primary: false, scope, team_id: kd.team_id });
+        ud.updated = new Date().toISOString();
+      }).then(() => log('info', 'team_device_added', { label, team: kd.team_id, account: String(account_id).slice(0, 12), persisted: true }))
+        .catch(we => log('warn', 'key_persist_failed', { err: we.message, label }));
+      applyKeyLimitEnforcement();
+      res.writeHead(201); return res.end(J({ ok: true, key: newKey, kid, account_id, label, team_id: kd.team_id }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
@@ -9025,11 +9215,21 @@ let EDITION          = 'community';
 let LICENSE_MAX_KEYS = COMMUNITY_KEY_LIMIT; // effective limit — updated by checkLicense()
 // Per-account key cap (SaaS product dimension). Orthogonal to the BUSL-fixed
 // per-relay COMMUNITY_KEY_LIMIT: a key is over_limit if it busts EITHER (F).
-// Community is env-tunable within 3..5; pro/enterprise are uncapped.
+// Community is env-tunable within 3..5.
+//
+// pro and enterprise were Infinity until 2026-09-06, which read as "no product
+// limit" and worked out as "no limit at all": with a self-serve mint route and
+// no cap, a Pro account grew users.json by one entry per HTTP request, and on a
+// licensed relay the relay-total dimension is skipped so nothing ever noticed.
+// These two numbers are NOT a product limit and no page sells them. They are an
+// abuse ceiling, set far above what any real account holds, and env-tunable for
+// the one customer who ever argues with them. over_limit only flags, it never
+// deactivates, so a ceiling that turns out too low is a log line and not an
+// outage.
 const ACCOUNT_KEY_LIMIT = Object.freeze({
   community: Math.min(5, Math.max(3, parseInt(process.env.ACCOUNT_KEY_LIMIT_COMMUNITY || '5', 10) || 5)),
-  pro: Infinity,
-  enterprise: Infinity,
+  pro: Math.max(10, parseInt(process.env.ACCOUNT_KEY_LIMIT_PRO || '100', 10) || 100),
+  enterprise: Math.max(10, parseInt(process.env.ACCOUNT_KEY_LIMIT_ENTERPRISE || '1000', 10) || 1000),
 });
 let LICENSE_PAYLOAD  = null;                // { max_keys, expires_at, issued_to, issued_at }
 

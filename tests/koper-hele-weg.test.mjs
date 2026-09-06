@@ -306,6 +306,23 @@ test('7. geld terug levert een creditnota op die bij de factuur past', async () 
   assert.ok(gecrediteerd.reversed_at, 'de gecrediteerde factuur draagt geen stempel');
   assert.ok(S.resend.mails.some((m) => /CN-\d{4}-0001/.test(String(m.subject))),
     'de creditnota is niet gemaild');
+
+  // En het recht gaat mee terug. Tot 2026-09-06 stond hier alleen de nota: geld
+  // terug, plan behouden. Erger nog, de terugbetaling komt binnen als een
+  // betaling die 'paid' BLIJFT met amountRefunded erbij, dus hij liep door de
+  // toekenningstak en alleen de idempotentiemarkering hield een verse maand
+  // tegen. De vloer per product staat in relay/lib/billing-catalog.js.
+  const vloer = { parasign: 'free', parasend: 'community' };
+  const gekocht = eerste.metadata && eerste.metadata.product;
+  assert.ok(gekocht, 'de betaling draagt geen product in zijn metadata');
+  const producten = gekocht === 'firm' ? ['parasign', 'parasend'] : [gekocht];
+  for (const [naam, port] of [['main', S.relayPort], ['health', S.healthPort]]) {
+    const e = await rechtenOp(port, S.koper.key);
+    for (const prod of producten) {
+      assert.equal(e[prod].tier, vloer[prod],
+        `${naam} geeft na een volledige terugbetaling nog ${prod} op ${e[prod].tier}`);
+    }
+  }
 });
 
 test('8. na een terugboeking is het recht op BEIDE relays weg', async () => {

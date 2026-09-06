@@ -1147,8 +1147,11 @@ A refund or a chargeback arrives on the same `tr_` id as the payment. A
 returns **both** products to their floor, ParaSign to `free` and ParaSend to
 `community`, because the one payment is what held both up, and it clears the
 paid period with them. A charged-back single-product payment returns only that
-product. A **refund** moves no entitlement; the credit note is the record. The
-relay issues a **credit note** for either: its own sequential number in its own series
+product. A **full refund** does exactly the same, and it counts as full whether
+Mollie reports it as the status `refunded` or as an `amountRefunded` equal to the
+amount on a payment that is still `paid`. A **partial refund** moves no
+entitlement, and it does not renew one either. The relay issues a **credit note**
+for either: its own sequential number in its own series
 (`CN-2026-0001`, per calendar year), referring to the invoice it credits by
 number and date, with negative net, VAT and total. One per reversal, idempotent
 against a Mollie retry. A partial refund is credited for the amount that went

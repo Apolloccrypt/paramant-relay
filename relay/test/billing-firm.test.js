@@ -194,13 +194,44 @@ async function main() {
     ok("Mollie's other spelling, charged_back, revokes both as well");
   }
 
-  // ── a refund is money back, not an entitlement change ──────────────────────
+  // ── a refund is money back, and money back takes the bundle back ───────────
+  // Until 2026-09-06 this asserted the opposite: 'ignored', nothing moved. That
+  // was the policy the 2026-09-05 review filed as a revenue leak, and it did not
+  // survive being looked at. A refund reaches the webhook on the same tr_ id as
+  // the payment; whether it arrives as the status string or as a counter on a
+  // still-'paid' payment is a Mollie detail, not a decision about who keeps a
+  // plan. Both spellings are asserted, because the counter shape is the one the
+  // repo's own fake Mollie produces and it used to fall into the GRANT branch.
   {
     const set = spySetter();
     const r = await billing.processPayment(firmPayment({ status: 'refunded' }), { setProductPlan: set });
+    assert.strictEqual(r.result, 'revoked');
+    assert.strictEqual(r.reason, 'refund');
+    assert.strictEqual(set.calls.length, 2);
+    ok('a refunded Firm payment takes BOTH halves of the bundle back to their floor');
+  }
+  {
+    const set = spySetter();
+    const paid = firmPayment({ status: 'paid' });
+    const r = await billing.processPayment(
+      firmPayment({ status: 'paid', amountRefunded: { currency: 'EUR', value: paid.amount.value } }),
+      { setProductPlan: set },
+    );
+    assert.strictEqual(r.result, 'revoked');
+    assert.strictEqual(set.calls.length, 2);
+    ok('a full refund reported as a counter on a still-paid payment revokes just the same');
+  }
+  {
+    // The other side of the same rule: a part-refund is not a cancelled sale.
+    const set = spySetter();
+    const r = await billing.processPayment(
+      firmPayment({ status: 'paid', amountRefunded: { currency: 'EUR', value: '1.00' } }),
+      { setProductPlan: set },
+    );
     assert.strictEqual(r.result, 'ignored');
+    assert.match(r.reason, /^partial_refund:100_of_/);
     assert.strictEqual(set.calls.length, 0);
-    ok('a refunded Firm payment changes no entitlement (the credit note is the record)');
+    ok('a part-refund on a Firm bundle grants nothing and revokes nothing');
   }
 
   // ── 4. nobody who already pays loses anything ──────────────────────────────

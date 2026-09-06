@@ -16,6 +16,34 @@ const cliRate = require('./lib/cli-ratelimit');
 const configStore = require('./lib/config-store');
 const webauthn = require('./lib/webauthn');
 const { sessionKeyFields, proxyApiKey, revealKey } = require('./lib/account-keys');
+// One user's sessions, without reading everybody else's. See admin/lib/user-sessions.js.
+const userSessions = require('./lib/user-sessions');
+// The scan is now a FALLBACK, handed to user-sessions only for a user who has no
+// index yet: every session minted before this deploy. Nothing calls it per
+// request any more.
+const scanSessions = (r, match) => scanKeys(r, { MATCH: match, COUNT: 100 });
+
+// How long a setup link lives. It was fourteen days, hand-typed as `14 * 86400`
+// at seven separate sites, and finding 15 of the 2026-09-05 review is what that
+// buys: for an account whose TOTP is not yet active, the link is the account.
+// Whoever can read the mailbox at any point in those two weeks turns it into a
+// secret, a code and a session in two unauthenticated requests, and an
+// unauthenticated login attempt against such an account MINTS A FRESH ONE and
+// mails it, every time, without cleaning up the last.
+//
+// Two days is long enough for a link that arrives by mail to survive a weekend,
+// and /admin/resend-setup already exists as the operator's answer to an expired
+// one. It is one constant now, so the next copy-paste cannot pick a different
+// number, and setup-link-gate.test.js refuses a literal next to a setup token.
+const SETUP_TOKEN_TTL_S = Math.max(3600, parseInt(process.env.SETUP_TOKEN_TTL_S || '', 10) || 2 * 86400);
+// The same number in words, for the mail that carries the link. One source, so
+// the mail cannot promise a fortnight for a link that lasts two days.
+function setupTokenValidFor() {
+  const h = Math.round(SETUP_TOKEN_TTL_S / 3600);
+  if (h < 48) return h === 1 ? '1 hour' : `${h} hours`;
+  const d = Math.round(h / 24);
+  return d === 1 ? '1 day' : `${d} days`;
+}
 const { buildRecipientParties, RECIPIENT_EMAIL_RE } = require('./lib/recipient-binding');
 const { acquireSignupLock } = require('./lib/signup-lock');
 const loginRate = require('./lib/login-ratelimit');
@@ -207,7 +235,12 @@ async function authMiddleware(req, res, next) {
   }
 }
 
-function relayFetch(sector, relPath, method, body, rawResponse, tokenOverride) {
+// `withInternal` adds X-Internal-Auth, the SECOND relay gate. It is opt-in per
+// call rather than always on, because relayFetch also carries calls that must
+// stay first-gate only: the anonymous inbound proxy sends an empty token, and a
+// header the caller did not earn should not ride along behind it. Routes that
+// mutate an entitlement pass it; callRelay always sends it.
+function relayFetch(sector, relPath, method, body, rawResponse, tokenOverride, withInternal) {
   return new Promise((resolve, reject) => {
     const base = SECTORS[sector];
     if (!base) return reject(new Error(`Unknown sector: ${sector}`));
@@ -219,6 +252,7 @@ function relayFetch(sector, relPath, method, body, rawResponse, tokenOverride) {
       path: url.pathname + (url.search || ''), method: method || 'GET',
       headers: { 'Content-Type': 'application/json', 'X-Admin-Token': tok, 'Authorization': `Bearer ${tok}` },
     };
+    if (withInternal) opts.headers['X-Internal-Auth'] = INTERNAL_TOKEN;
     if (payload) opts.headers['Content-Length'] = Buffer.byteLength(payload);
     const req = http.request(opts, r => {
       const chunks = [];
@@ -458,18 +492,12 @@ api.post('/admin/resend-setup', async (req, res) => {
       redis().del(`paramant:user:backup_codes:${user_id}`),
       redis().del(`paramant:user:backup_codes_plaintext:${user_id}`),
     ]);
-    for await (const k of scanKeys(redis(), { MATCH: 'paramant:user:setup_token:*', COUNT: 100 })) {
-      const raw = await redis().get(k);
-      if (raw) { try { const d = JSON.parse(raw); if (d.user_id === user_id) await redis().del(k); } catch {} }
-    }
-    const setupToken = crypto.randomBytes(32).toString('hex');
-    await redis().set(
-      `paramant:user:setup_token:${setupToken}`,
-      JSON.stringify({ user_id, email }),
-      { EX: 14 * 86400 }
-    );
+    // issueSetupToken also revokes this account's sessions. This route deletes
+    // the TOTP state and the backup codes and used to leave every live session
+    // standing, which is the wrong way round.
+    const setupToken = await issueSetupToken(user_id, email);
     await sendSetupEmail(email, setupToken);
-    const expiresAt = Date.now() + 14 * 86400 * 1000;
+    const expiresAt = Date.now() + SETUP_TOKEN_TTL_S * 1000;
     const setupUrl = `${SITE_URL}/auth/setup/${setupToken}`;
     try { await logAuditEvent(user_id, 'admin_setup_resent', { email, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
     console.log(`[admin/resend-setup] sent to ${maskEmail(email)}`);
@@ -683,9 +711,42 @@ async function findUserById(userId) {
   return keys.find(k => k.key === userId && k.active !== false) || null;
 }
 
+// Mint the one outstanding setup link for an account, and clear what it replaces.
+//
+// Finding 15 of the 2026-09-05 review, in one place. Three things had to be true
+// and were not:
+//   - at most ONE link is live at a time. The login path minted a fresh one on
+//     every unauthenticated attempt against a not-yet-activated account and
+//     mailed it, leaving the previous ones alive for their full term. Two weeks
+//     of attempts, two weeks of working links in one mailbox.
+//   - the link is short-lived (SETUP_TOKEN_TTL_S).
+//   - the sessions it can replace do not outlive it. This function hands out the
+//     means to take the account over; a session that predates it has no claim.
+// One outstanding token per account is an invariant, so the account only needs a
+// POINTER to it, not a scan of every token in the product to find its own. The
+// pointer may go stale (the token was consumed, or expired); a stale one costs a
+// DEL of a key that is already gone.
+const setupTokenPointer = (userId) => `paramant:user:setup_token_for:${userId}`;
+
+async function dropSetupTokenFor(userId) {
+  if (!userId) return;
+  const prev = await redis().get(setupTokenPointer(userId)).catch(() => null);
+  if (prev) await redis().del(`paramant:user:setup_token:${prev}`).catch(() => {});
+  await redis().del(setupTokenPointer(userId)).catch(() => {});
+}
+
+async function issueSetupToken(userId, email, extra = {}) {
+  await dropSetupTokenFor(userId);
+  await userSessions.revokeAll(redis(), userId, { scan: scanSessions });
+  const token = crypto.randomBytes(32).toString('hex');
+  await redis().set(`paramant:user:setup_token:${token}`, JSON.stringify({ user_id: userId, email, ...extra }), { EX: SETUP_TOKEN_TTL_S });
+  await redis().set(setupTokenPointer(userId), token, { EX: SETUP_TOKEN_TTL_S }).catch(() => {});
+  return token;
+}
+
 // Send setup email via Resend
 async function sendSetupEmail(email, setupToken, isReset = false) {
-  const msg = emailTemplates.setupEmail({ token: setupToken, requestedAt: Date.now(), requestIP: '', isReset: !!isReset });
+  const msg = emailTemplates.setupEmail({ token: setupToken, requestedAt: Date.now(), requestIP: '', isReset: !!isReset, validFor: setupTokenValidFor() });
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error('RESEND_API_KEY not set');
   const res = await fetch('https://api.resend.com/emails', {
@@ -772,6 +833,30 @@ async function authUser(req, res, next) {
     // showed the login time. Written at most once a minute (see
     // LAST_SEEN_REFRESH_MS) so an open dashboard does not add a write per poll.
     if (!(now - Number(sess.last_seen) < LAST_SEEN_REFRESH_MS)) { sess.last_seen = now; rewrite = true; }
+    // BOUND TO THE CLIENT THAT LOGGED IN. Finding 22i: the session record holds
+    // the account's raw pgp_ API key -- twice, since user_id IS that key -- and
+    // `ip` and `ua` were stored at login and then read only to be PRINTED on the
+    // account screen. Nothing compared them. A cookie lifted off one machine
+    // therefore worked from any other, and one hour of it bought a credential
+    // with no expiry at all.
+    //
+    // The user agent and not the IP. A phone moving from wifi to mobile data
+    // changes its IP mid-session and changes its user agent never; binding to
+    // the address would log people out for walking out of the door, and an
+    // attacker on the same NAT would pass it anyway. A UA change on a live
+    // session token is close to always theft, and in the rare honest case (a
+    // browser that updated itself between two requests) the cost is one login.
+    //
+    // A record from before this field was written has no `ua` to compare: it is
+    // stamped rather than refused, so a deploy does not log everybody out.
+    const ua = req.get('user-agent') || '';
+    if (typeof sess.ua !== 'string') { sess.ua = ua; rewrite = true; }
+    else if (sess.ua !== ua) {
+      await redis().del(key).catch(() => {});
+      try { await logAuditEvent(sess.user_id, 'session_client_changed', { via: sess.via || 'totp' }); } catch (_) { /* audit is best effort */ }
+      return res.status(401).json({ error: "session_expired" });
+    }
+
     // One command either way: SET with EX both stores and slides the window.
     if (rewrite) await redis().set(key, JSON.stringify(sess), { EX: 3600 });
     else await redis().expire(key, 3600);
@@ -1038,12 +1123,7 @@ api.get("/user/signup/verify/:token", async (req, res) => {
       })
     ));
 
-    const setupToken = crypto.randomBytes(32).toString("hex");
-    await redis().set(
-      `paramant:user:setup_token:${setupToken}`,
-      JSON.stringify({ user_id: keyVal, email, label: label || null }),
-      { EX: 14 * 86400 }
-    );
+    const setupToken = await issueSetupToken(keyVal, email, { label: label || null });
     await redis().set(
       `paramant:user:meta:${keyVal}`,
       JSON.stringify({ email, created_at: createdAt })
@@ -1117,13 +1197,11 @@ api.post("/user/setup/:token/confirm", async (req, res) => {
   const activateRes = await callRelay("/v2/user/activate-totp", { user_id });
   const { backup_codes } = activateRes.ok ? await activateRes.json() : { backup_codes: [] };
   await redis().del(`paramant:user:setup_token:${token}`);
+  await redis().del(setupTokenPointer(user_id)).catch(() => {});
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id, email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", ...sessionKeyFields(user_id) }),
-    { EX: 3600 }
-  );
+  await userSessions.remember(redis(), user_id, sessionToken,
+    { user_id, email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", ...sessionKeyFields(user_id) }, 3600);
 
   setUserCookie(res, sessionToken);
 
@@ -1275,11 +1353,8 @@ api.post("/user/login", async (req, res) => {
     let um = {}; try { if (metaRaw) um = JSON.parse(metaRaw); } catch {}
     if (um.totp_required) {
       if (um.email || user.email) {
-        const setupToken = (await import('crypto')).randomBytes ? require('crypto').randomBytes(32).toString('hex') : '';
-        if (setupToken) {
-          await redis().set(`paramant:user:setup_token:${setupToken}`, JSON.stringify({ user_id: user.key, email: um.email || user.email }), { EX: 14 * 86400 });
-          sendSetupEmail(um.email || user.email, setupToken).catch(e => console.error('[login/totp_required] email:', e.message));
-        }
+        const setupToken = await issueSetupToken(user.key, um.email || user.email);
+        if (setupToken) sendSetupEmail(um.email || user.email, setupToken).catch(e => console.error('[login/totp_required] email:', e.message));
       }
       // Setup mail is dispatched fire-and-forget above. Respond identically
       // to "no such account" so the status code cannot be used as an
@@ -1324,11 +1399,8 @@ api.post("/user/login", async (req, res) => {
   await loginRate.clearEmailFailures(redis(), email);
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: user.key, email: user.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", ...sessionKeyFields(user.key) }),
-    { EX: 3600 }
-  );
+  await userSessions.remember(redis(), user.key, sessionToken,
+    { user_id: user.key, email: user.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", ...sessionKeyFields(user.key) }, 3600);
 
   setUserCookie(res, sessionToken);
 
@@ -1405,11 +1477,8 @@ api.post("/user/login-with-backup", async (req, res) => {
   if (!result || !result.valid) return backupAnswer(401, { error: "invalid_credentials" });
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: user.key, email: user.email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", via: "backup_code", ...sessionKeyFields(user.key) }),
-    { EX: 3600 }
-  );
+  await userSessions.remember(redis(), user.key, sessionToken,
+    { user_id: user.key, email: user.email, created_at: Date.now(), ip: req.headers["x-real-ip"] || "unknown", ua: req.get("user-agent") || "", via: "backup_code", ...sessionKeyFields(user.key) }, 3600);
 
   setUserCookie(res, sessionToken);
   return backupAnswer(200, { success: true, email: user.email });
@@ -1642,11 +1711,8 @@ api.post("/user/auth/webauthn/login/verify", async (req, res) => {
   // passkey was presented: 'webauthn' (email-first) or 'webauthn_xdev'
   // (usernameless / cross-device).
   const sessionToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: authedUserId, email: authedEmail, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: flow.discoverable ? "webauthn_xdev" : "webauthn", ...sessionKeyFields(authedUserId) }),
-    { EX: 3600 }
-  );
+  await userSessions.remember(redis(), authedUserId, sessionToken,
+    { user_id: authedUserId, email: authedEmail, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: flow.discoverable ? "webauthn_xdev" : "webauthn", ...sessionKeyFields(authedUserId) }, 3600);
   setUserCookie(res, sessionToken);
   try { await logAuditEvent(authedUserId, "webauthn_login", { via: flow.discoverable ? "webauthn_xdev" : "webauthn" }); } catch {}
   res.json({ success: true, email: authedEmail });
@@ -1802,6 +1868,7 @@ api.post("/user/auth/webauthn/register/verify", async (req, res) => {
   // One-shot: consume the setup_token so it cannot be reused for another
   // registration or for TOTP setup.
   await redis().del(`paramant:user:setup_token:${flow.setup_token}`).catch(() => {});
+  await redis().del(setupTokenPointer(flow.user_id)).catch(() => {});
 
   // Issue the session — TOFU onboarding. Passkey is now this account's factor
   // (R018); NO TOTP step. Lax cookie. via:'webauthn-register'.
@@ -1809,11 +1876,8 @@ api.post("/user/auth/webauthn/register/verify", async (req, res) => {
   // stays TOTP-gated until the passkey step-up (R018) is built, so signing is
   // blocked (not bypassed) for a passkey-only account.
   const sessionToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:user:session:${sessionToken}`,
-    JSON.stringify({ user_id: flow.user_id, email: flow.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: "webauthn-register", ...sessionKeyFields(flow.user_id) }),
-    { EX: 3600 }
-  );
+  await userSessions.remember(redis(), flow.user_id, sessionToken,
+    { user_id: flow.user_id, email: flow.email, created_at: Date.now(), ip, ua: req.get("user-agent") || "", via: "webauthn-register", ...sessionKeyFields(flow.user_id) }, 3600);
   setUserCookie(res, sessionToken);
   try { await logAuditEvent(flow.user_id, "webauthn_register", {}); } catch {}
   res.json({ success: true, email: flow.email, recovery_codes: recoveryCodes });
@@ -2351,17 +2415,10 @@ api.post("/user/auth/reset-confirm", async (req, res) => {
     redis().del(`paramant:user:backup_codes:${user_id}`),
     redis().del(`paramant:user:backup_codes_plaintext:${user_id}`),
   ]);
-  for await (const k of scanKeys(redis(), { MATCH: "paramant:user:setup_token:*", COUNT: 100 })) {
-    const r = await redis().get(k);
-    if (r) { try { const d = JSON.parse(r); if (d.user_id === user_id) await redis().del(k); } catch {} }
-  }
-
-  const setupToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:user:setup_token:${setupToken}`,
-    JSON.stringify({ user_id, email }),
-    { EX: 14 * 86400 }
-  );
+  // The public variant of the reset revoked nothing at all until 2026-09-06,
+  // while the logged-in one did. That inconsistency ran in the attacker's
+  // favour: the reset he drives is precisely the one without a session.
+  const setupToken = await issueSetupToken(user_id, email);
 
   try { await logAuditEvent(user_id, "totp_reset_confirmed", { age_sec: Math.floor((Date.now() - requested_at) / 1000), ip: req.headers["x-real-ip"] || "unknown" }); } catch {}
 
@@ -2379,7 +2436,14 @@ api.post("/user/auth/reset-confirm", async (req, res) => {
 // POST /api/user/logout
 api.post("/user/logout", async (req, res) => {
   const token = parseCookies(req).paramant_user_session;
-  if (token) await redis().del(`paramant:user:session:${token}`);
+  if (token) {
+    // Read the record first, so the index entry goes with the blob. Logging out
+    // used to delete only the blob, which left a dead token in nobody's way but
+    // also in the set for a week.
+    let uid = null;
+    try { uid = JSON.parse(await redis().get(`paramant:user:session:${token}`) || 'null')?.user_id || null; } catch { /* blob already gone */ }
+    await userSessions.forget(redis(), uid, token);
+  }
   clearUserCookie(res);
   res.json({ success: true });
 });
@@ -2729,17 +2793,14 @@ api.get("/user/account", authUser, async (req, res) => {
     const user = await findUserByEmail(email);
     const backupCount = await redis().sCard(`paramant:user:backup_codes:${user_id}`).catch(() => 0);
 
+    // The account screen's session list. It used to SCAN the whole keyspace and
+    // GET every session in the product to find this user's two, on every load,
+    // with no limiter. That was finding 14, and it was also a privacy shape
+    // nobody chose: to show you your own sessions the process read everybody
+    // else's IP and user agent and filtered afterwards. The index answers in one
+    // SMEMBERS plus one MGET, and it can only return this user's records.
     const sessions = [];
-    for await (const key of scanKeys(redis(), { MATCH: "paramant:user:session:*", COUNT: 100 })) {
-      const raw = await redis().get(key);
-      if (!raw) continue;
-      // One corrupt session blob (this user's OR any other user's, since the
-      // SCAN crosses the whole keyspace before the user_id filter below) must
-      // not 500 the whole account view: skip unparseable entries.
-      let s;
-      try { s = JSON.parse(raw); } catch { continue; }
-      if (!s || s.user_id !== user_id) continue;
-      const token = key.replace("paramant:user:session:", "");
+    for (const { token, session: s } of (await userSessions.list(redis(), user_id, scanSessions)).sessions) {
       sessions.push({
         ip_masked: maskIp(s.ip || ""),
         user_agent_short: (s.ua || "").split(" ")[0].slice(0, 40) || "—",
@@ -2871,6 +2932,13 @@ api.get("/user/account/key", authUser, async (req, res) => {
   // stap 3: reveal the account's PRIMARY api-key (== user_id today), and only
   // when the account is legacy_revealable. The `revealable` field is additive;
   // existing callers read `.api_key`, unchanged while every account is 1:1.
+  //
+  // The one route that turns a session cookie into a credential with no expiry,
+  // so it leaves a mark. It used to leave none at all: an attacker who lifted a
+  // cookie, read the key here and never came back was invisible in the audit
+  // trail, and the key he walked off with outlives every session.
+  // session-credential-gate.test.js holds this to being the only such route.
+  try { await logAuditEvent(req.userSession.user_id, 'account_key_revealed', { via: req.userSession.via || 'totp' }); } catch (_) { /* audit is best effort */ }
   res.json(revealKey(req.userSession));
 });
 
@@ -3259,12 +3327,7 @@ api.post("/user/account/totp/reset", authUser, async (req, res) => {
 
   await callRelay("/v2/user/delete-totp", { user_id });
 
-  const setupToken = crypto.randomBytes(32).toString("hex");
-  await redis().set(
-    `paramant:user:setup_token:${setupToken}`,
-    JSON.stringify({ user_id, email }),
-    { EX: 14 * 86400 }
-  );
+  const setupToken = await issueSetupToken(user_id, email);
 
   try {
     await sendSetupEmail(email, setupToken);
@@ -3274,10 +3337,7 @@ api.post("/user/account/totp/reset", authUser, async (req, res) => {
   }
 
   // Invalidate all sessions for this user
-  for await (const key of scanKeys(redis(), { MATCH: "paramant:user:session:*", COUNT: 100 })) {
-    const raw = await redis().get(key);
-    if (raw) { const s = JSON.parse(raw); if (s.user_id === user_id) await redis().del(key); }
-  }
+  await userSessions.revokeAll(redis(), user_id, { scan: scanSessions });
 
   clearUserCookie(res);
   res.json({ success: true });
@@ -3286,17 +3346,7 @@ api.post("/user/account/totp/reset", authUser, async (req, res) => {
 // POST /api/user/account/sessions/revoke-others
 api.post("/user/account/sessions/revoke-others", authUser, async (req, res) => {
   const { user_id } = req.userSession;
-  let revoked = 0;
-  for await (const key of scanKeys(redis(), { MATCH: "paramant:user:session:*", COUNT: 100 })) {
-    const raw = await redis().get(key);
-    if (!raw) continue;
-    const s = JSON.parse(raw);
-    const token = key.replace("paramant:user:session:", "");
-    if (s.user_id === user_id && token !== req.userSessionToken) {
-      await redis().del(key);
-      revoked++;
-    }
-  }
+  const revoked = await userSessions.revokeAll(redis(), user_id, { except: req.userSessionToken, scan: scanSessions });
   res.json({ success: true, revoked });
 });
 
@@ -3314,15 +3364,12 @@ api.delete("/user/account", authUser, async (req, res) => {
   // asking to be gone, and until now their email address stayed in users.json on
   // every sector. Article 17 GDPR, and audit finding 5 of 2026-07-21.
   await eachSector(Object.keys(SECTORS), async s => {
-    await relayFetch(s, "/v2/admin/keys/erase", "POST", { key: user_id }, false, ADMIN_TOKEN);
+    await relayFetch(s, "/v2/admin/keys/erase", "POST", { key: user_id }, false, ADMIN_TOKEN, true);
   });
 
   await callRelay("/v2/user/delete-totp", { user_id });
 
-  for await (const key of scanKeys(redis(), { MATCH: "paramant:user:session:*", COUNT: 100 })) {
-    const raw = await redis().get(key);
-    if (raw) { const s = JSON.parse(raw); if (s.user_id === user_id) await redis().del(key); }
-  }
+  await userSessions.revokeAll(redis(), user_id, { scan: scanSessions });
 
   clearUserCookie(res);
   res.json({ success: true });
@@ -4018,14 +4065,12 @@ api.post('/admin/force-totp', authMiddleware, async (req, res) => {
     if (required) {
       const totpActive = await redis().get(`paramant:user:totp_active:${key}`).catch(() => null);
       if (totpActive !== 'true') {
-        for await (const rkey of scanKeys(redis(), { MATCH: `paramant:user:session:*`, COUNT: 100 })) {
-          const raw = await redis().get(rkey).catch(() => null);
-          if (raw) { try { const ss = JSON.parse(raw); if (ss.user_id === key) { await redis().del(rkey); sessions_revoked++; } } catch {} }
-        }
+        // Counted before issueSetupToken revokes them, so the number reported
+        // back is the number that were actually cut.
+        sessions_revoked += (await userSessions.list(redis(), key, scanSessions)).sessions.length;
         if (userMeta.email) {
           try {
-            const setupToken = require('crypto').randomBytes(32).toString('hex');
-            await redis().set(`paramant:user:setup_token:${setupToken}`, JSON.stringify({ user_id: key, email: userMeta.email }), { EX: 14 * 86400 });
+            const setupToken = await issueSetupToken(key, userMeta.email);
             await sendSetupEmail(userMeta.email, setupToken);
             setup_email_sent = true;
           } catch (e) { console.error('[admin/force-totp] setup email:', e.message); }
@@ -4133,9 +4178,9 @@ api.post('/admin/reset-totp', authMiddleware, async (req, res) => {
     if (!await checkAdminRl('reset_totp', key, 5)) return res.status(429).json({ error: 'rate_limited' });
     if (mode === 'direct') {
       await callRelay('/v2/user/delete-totp', { user_id: key }).catch(() => {});
-      const setupToken = crypto.randomBytes(32).toString('hex');
-      await redis().set(`paramant:user:setup_token:${setupToken}`, JSON.stringify({ user_id: key, email: meta.email }), { EX: 14 * 86_400 });
-      await emailTemplates.sendEmail(meta.email, emailTemplates.setupEmail({ token: setupToken, requestedAt: Date.now(), requestIP: req.headers['x-real-ip'], isReset: true }));
+      // issueSetupToken revokes the sessions the old factor let through.
+      const setupToken = await issueSetupToken(key, meta.email);
+      await emailTemplates.sendEmail(meta.email, emailTemplates.setupEmail({ token: setupToken, requestedAt: Date.now(), requestIP: req.headers['x-real-ip'], isReset: true, validFor: setupTokenValidFor() }));
       try { await logAuditEvent(key, 'admin_totp_reset_initiated', { mode: 'direct', email: meta.email, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
       res.json({ ok: true, mode: 'direct', email: meta.email });
     } else {
@@ -4215,7 +4260,7 @@ api.post('/admin/set-parasign', authMiddleware, async (req, res) => {/*MARK:para
   if (!await checkAdminRl('set_parasign', 'admin', 30)) return res.status(429).json({ error: 'rate_limited' });
   try {
     const results = await eachSector(Object.keys(SECTORS), async s =>
-      relayFetch(s, '/v2/admin/keys/set-parasign', 'POST', { key, enabled }, false, ADMIN_TOKEN));
+      relayFetch(s, '/v2/admin/keys/set-parasign', 'POST', { key, enabled }, false, ADMIN_TOKEN, true));
     const anyOk = Object.values(results).some(r => r && r.status === 200);
     if (!anyOk) return res.status(502).json({ error: 'relay_error', results });
     await Promise.allSettled(Object.keys(SECTORS).map(s => relayFetch(s, '/v2/reload-users', 'POST', {}, false, ADMIN_TOKEN)));
@@ -4248,11 +4293,7 @@ api.post('/admin/revoke-sessions', authMiddleware, async (req, res) => {
   const { key } = req.body || {};
   if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
   try {
-    let count = 0;
-    for await (const rkey of scanKeys(redis(), { MATCH: 'paramant:user:session:*', COUNT: 100 })) {
-      const raw = await redis().get(rkey).catch(() => null);
-      if (raw) { try { const s = JSON.parse(raw); if (s.user_id === key) { await redis().del(rkey); count++; } } catch {} }
-    }
+    const count = await userSessions.revokeAll(redis(), key, { scan: scanSessions });
     try { await logAuditEvent(key, 'admin_sessions_revoked', { count, admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
     res.json({ ok: true, revoked: count });
   } catch (err) { console.error('[admin/revoke-sessions]', err.message); res.status(500).json({ error: 'internal' }); }
@@ -4289,12 +4330,9 @@ api.post('/admin/delete-account', authMiddleware, async (req, res) => {
     // 2026-07-21. Errors are swallowed like the revoke above: a sector that is
     // briefly unreachable must not leave the deletion half done and unretryable,
     // and the call is idempotent so a retry is free.
-    await eachSector(Object.keys(SECTORS), async s => relayFetch(s, '/v2/admin/keys/erase', 'POST', { key }, false, ADMIN_TOKEN).catch(() => {}));
+    await eachSector(Object.keys(SECTORS), async s => relayFetch(s, '/v2/admin/keys/erase', 'POST', { key }, false, ADMIN_TOKEN, true).catch(() => {}));
     await callRelay('/v2/user/delete-totp', { user_id: key }).catch(() => {});
-    for await (const rkey of scanKeys(redis(), { MATCH: `paramant:user:session:*`, COUNT: 100 })) {
-      const raw = await redis().get(rkey).catch(() => null);
-      if (raw) { try { const s = JSON.parse(raw); if (s.user_id === key) await redis().del(rkey); } catch {} }
-    }
+    await userSessions.revokeAll(redis(), key, { scan: scanSessions });
     for (const pattern of [`paramant:user:meta:${key}`, `paramant:user:totp:${key}`, `paramant:user:totp_active:${key}`, `paramant:user:billing:${key}`]) {
       await redis().del(pattern).catch(() => {});
     }
@@ -4323,11 +4361,7 @@ api.get('/admin/user-details/:key', authMiddleware, async (req, res) => {
     if (!k) return res.status(404).json({ error: 'not_found' });
     let meta = {}; try { if (metaRaw) meta = JSON.parse(metaRaw); } catch {}
     let billing = null; try { if (billingRaw) billing = JSON.parse(billingRaw); } catch {}
-    let sessionCount = 0;
-    for await (const rkey of scanKeys(redis(), { MATCH: 'paramant:user:session:*', COUNT: 100 })) {
-      const raw = await redis().get(rkey).catch(() => null);
-      if (raw) { try { const s = JSON.parse(raw); if (s.user_id === key) sessionCount++; } catch {} }
-    }
+    const sessionCount = (await userSessions.list(redis(), key, scanSessions)).sessions.length;
     const [totpActive, totpSecret] = await Promise.all([
       redis().get(`paramant:user:totp_active:${key}`).catch(() => null),
       redis().get(`paramant:user:totp:${key}`).catch(() => null),
@@ -4377,7 +4411,7 @@ api.post('/admin/preview-email', authMiddleware, async (req, res) => {
     let tpl;
     const fakeToken = 'preview' + crypto.randomBytes(8).toString('hex');
     if (type === 'welcome') tpl = emailTemplates.welcomeEmail({ apiKey: key || 'pgp_preview00000000', plan: meta.plan, label: meta.label, sectors: meta.sectors });
-    else if (type === 'setup') tpl = emailTemplates.setupEmail({ token: fakeToken, requestedAt: Date.now(), requestIP: '0.0.0.0', isReset: options.isReset || false });
+    else if (type === 'setup') tpl = emailTemplates.setupEmail({ token: fakeToken, requestedAt: Date.now(), requestIP: '0.0.0.0', isReset: options.isReset || false, validFor: setupTokenValidFor() });
     else if (type === 'reset-confirm') tpl = emailTemplates.resetConfirmationEmail({ confirmToken: fakeToken, requestedAt: Date.now(), requestIP: '0.0.0.0' });
     // Previewed as the admin-set plan, because that is the only shape this mail
     // is ever sent in: /admin/change-plan is its one live caller. A preview
@@ -4561,6 +4595,37 @@ api.post('/admin/cli/exec', authMiddleware, async (req, res) => {
     res.end();
   });
 });
+
+// ── CSRF: a cookie-authenticated write must come from our own page ──────────
+// Finding 19. SameSite=Lax is the whole defence today and it works on the
+// registrable domain, so every sector subdomain is same-site with paramant.app:
+// one HTML injection on one of them yields a page that may POST with the user's
+// session cookie, and twelve state-changing routes need no request body at all.
+// The decision table and the reasoning live in admin/lib/same-origin.js.
+//
+// Mounted here, in front of the whole /api router, so it cannot be forgotten on
+// the next route. Refusals are logged with the origin, because the first thing
+// anybody will ask when a client breaks is which origin it sent.
+const sameOrigin = require('./lib/same-origin');
+const CSRF_ALLOWED_ORIGINS = sameOrigin.buildAllowList(SITE_URL, process.env.CSRF_EXTRA_ORIGINS);
+const CSRF_ALLOW_LOCALHOST = process.env.NODE_ENV !== 'production';
+function requireSameOrigin(req, res, next) {
+  const v = sameOrigin.verdict({
+    method: req.method,
+    // req.path inside a mounted router is the path BELOW the mount, so this is
+    // '/user/logout' and not '/api/user/logout'. EXEMPT_PATHS is written that way.
+    path: req.path,
+    hasCookie: !!parseCookies(req).paramant_user_session,
+    origin: req.headers.origin,
+    secFetchSite: req.headers['sec-fetch-site'],
+    allow: CSRF_ALLOWED_ORIGINS,
+    allowLocalhost: CSRF_ALLOW_LOCALHOST,
+  });
+  if (v.ok) return next();
+  console.warn('[csrf] refused', req.method, req.originalUrl, v.reason);
+  return res.status(403).json({ error: 'csrf_origin', message: 'This request did not come from paramant.app.' });
+}
+app.use(`${BASE_PATH}/api`, requireSameOrigin);
 
 app.use(`${BASE_PATH}/api`, api);
 // /cli -- web debug terminal page (served before the SPA wildcard fallback).
