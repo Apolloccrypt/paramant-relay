@@ -228,6 +228,27 @@ jobs:
       # job below could only ever skip it, and a skipped suite is what this gate
       # exists to catch.
       #
+      # The three class gates from the 2026-09-05 repair round run here for the
+      # same reason as everything else in this job. counter-atomicity-gate fires
+      # concurrent requests at a cap and counts how many got through, which only
+      # means something against a real store: the bug it guards is invisible
+      # sequentially and cannot be staged at all in an in-memory stub.
+      # public-projection-gate and guess-budget-gate boot a real relay.js, which
+      # requires `redis` and @paramant/core at load, so the no-install job could
+      # only ever fail them. trusted-edge-gate is the exception and deliberately
+      # stays in that job: it reads the nginx configs off disk and calls one pure
+      # function, so it needs nothing, and the half of it that guards the edge
+      # config should run in the cheapest job there is.
+      # quota-gate, entitlements and did-principal all moved here on 2026-09-05,
+      # for one reason between them. The sign and transfer gates are Lua scripts
+      # since the review's finding 8 (read-decide-write in JavaScript let
+      # concurrent requests share one slot), and the in-memory redis stubs those
+      # three suites drove have no EVAL. Because quota fails open by design, a
+      # stub that cannot run the script does not turn a suite red: it turns every
+      # cap assertion into a pass over nothing, which is worse than the bug. That
+      # is the same shape as the four ParaSign suites above, so it gets the same
+      # answer: give the job the dependency rather than teach the stub to imitate
+      # the implementation.
       # parasign-signs-quota rides along here because it needs the same redis and
       # nothing else. It was the LAST suite in the repo that asserted nothing in
       # any CI job: it ran only in the no-install unit job, where it has no redis
@@ -243,7 +264,8 @@ jobs:
           # --test-reporter=tap: see the unit job below. This gate parses the
           # same TAP diagnostic lines, and its expected set is empty too, so
           # the spec reporter would leave it green over anything.
-          node --test --test-reporter=tap test/route-*.test.js test/parasign-signs-quota.test.js test/parasign-party-index.test.js 2>&1 | tee /tmp/relay-routes.log
+          node --test --test-reporter=tap test/route-*.test.js test/parasign-signs-quota.test.js test/parasign-party-index.test.js test/quota-gate.test.js test/entitlements.test.js test/did-principal.test.js \
+            test/counter-atomicity-gate.test.js test/public-projection-gate.test.js test/guess-budget-gate.test.js 2>&1 | tee /tmp/relay-routes.log
           # The same gate as the unit job below: a suite that runs and asserts
           # NOTHING still reports green, and that is how four ParaSign suites
           # came to mean nothing for weeks. This job has redis AND the engine,
@@ -402,7 +424,7 @@ jobs:
           # job exists to prevent, so the reporter is pinned rather than
           # inherited from whatever Node decides a default should be.
           node --test --test-reporter=tap $(ls test/*.test.js | grep -vE \
-            'inbound-hash-verify|deep-health-gate|billing-stance-boot|parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index|parasign-party-index|parasign-signs-quota|route-') \
+            'inbound-hash-verify|deep-health-gate|billing-stance-boot|parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index|parasign-party-index|parasign-signs-quota|quota-gate|entitlements.test|did-principal|counter-atomicity-gate|public-projection-gate|guess-budget-gate|route-') \
             2>&1 | tee /tmp/relay-units.log
           # Which suites ran and asserted nothing. The line comes from
           # summary() in test/_requires.js.

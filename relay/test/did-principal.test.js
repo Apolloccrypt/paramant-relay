@@ -10,35 +10,52 @@
 // T1.5  DID-request boven quota geeft 402 (zelfde gate als een API-key)
 // T1.6  DID-request van een ingetrokken enrollment wordt geweigerd
 
-const { test } = require('node:test');
+const { test, before, after } = require('node:test');
 const assert = require('assert');
 const { didPrincipal } = require('../lib/auth-gate');
 const entitlements = require('../lib/entitlements');
 const quota = require('../lib/quota');
+const crypto = require('crypto');
+const { requireRedis, summary } = require('./_requires');
 
-// Minimal in-memory Redis stub, same shape as quota-gate.test.js.
-function fakeRedis() {
-  const store = new Map();
-  return {
-    isReady: true,
-    async get(k) { return store.has(k) ? store.get(k) : null; },
-    async exists(k) { return store.has(k) ? 1 : 0; },
-    async incr(k) { const n = (parseInt(store.get(k) || '0', 10)) + 1; store.set(k, String(n)); return n; },
-    async expire() { return 1; },
-    async set(k, v, opts) {
-      if (opts && opts.NX && store.has(k)) return null;
-      store.set(k, v); return 'OK';
-    },
-    _store: store,
-  };
-}
+// The gates run Lua scripts since the 2026-09-05 review, finding 8: reading a
+// counter, deciding and writing were three round trips with awaits between them,
+// and concurrent requests all read the same number and all went through. An
+// in-memory stub cannot run EVAL, and because quota fails open by design a stub
+// that cannot run the script does not turn a cap test red, it turns it into a
+// pass over nothing. So the tests that drive a gate use a real server, and this
+// suite moved to the CI job that has one. See quota-gate.test.js for the longer
+// version of this note.
+
+// ── A real redis, and a fresh namespace per run ──────────────────────────────
+const DEFAULT_REDIS = 'redis://127.0.0.1:6399';
+const RUN = crypto.randomBytes(6).toString('hex');
+let rc = null;
+let quotaChecks = 0;
+const written = [];
+const track = (...keys) => { written.push(...keys); };
+// The monthly counters are shared and month-keyed, so a fixed account id would
+// make these cases depend on each other and on yesterday's run.
+const scoped = (name) => `${name}_${RUN}`;
+// The owner key doubles as the quota account id, and the counters live in a
+// shared redis, so it carries the run tag too.
+const OWNER_KEY = scoped('pgp_owner_key');
+
+before(async () => { rc = await requireRedis(DEFAULT_REDIS); });
+after(async () => {
+  if (rc) {
+    for (const k of written) { try { await rc.del(k); } catch (_) {} }
+    try { await rc.disconnect(); } catch (_) {}
+  }
+  summary('did-principal', quotaChecks);
+});
 
 // A community owner + the DID enrolled under that owner's key, exactly the
 // shapes relay.js keeps in apiKeys / didRegistry.
 function communityFixture() {
   const owner = { plan: 'community', active: true, label: 'Mick', email: 'm@example.org' };
-  const apiKeys = new Map([['pgp_owner_key', owner]]);
-  const didEntry = { device_id: 'phone-001', key: 'pgp_owner_key', doc: { id: 'did:paramant:abc' }, ts: '2026-07-01T00:00:00Z' };
+  const apiKeys = new Map([[OWNER_KEY, owner]]);
+  const didEntry = { device_id: 'phone-001', key: OWNER_KEY, doc: { id: 'did:paramant:abc' }, ts: '2026-07-01T00:00:00Z' };
   return { owner, apiKeys, didEntry };
 }
 
@@ -49,7 +66,7 @@ test('T1.4 DID-only principal carries the OWNER plan: community stays community,
   const p = didPrincipal(didEntry, (k) => apiKeys.get(k));
   assert.ok(p, 'valid enrollment under an active key yields a principal');
   assert.strictEqual(p.plan, 'community');
-  assert.strictEqual(p.account_id, 'pgp_owner_key', 'quota counters key on the owner key, not the device');
+  assert.strictEqual(p.account_id, OWNER_KEY, 'quota counters key on the owner key, not the device');
   assert.strictEqual(p.label, 'phone-001', 'label is the device, for attribution only');
 
   // Entitlements resolved for the DID principal are byte-identical to the
@@ -83,35 +100,46 @@ test('T1.5 DID-only request over the monthly transfer quota is declined like an 
   const limit = entitlements.getEntitlements(p).parasend.quotas.transfers_month;
   assert.strictEqual(limit, entitlements.transfersQuota(owner), 'limit equals the owner limit');
 
-  const r = fakeRedis();
-  r._store.set(quota.transfersKey(p.account_id), String(limit)); // owner account at cap
+  if (!rc) return;
+  const r = rc;
+  const ACCT = p.account_id;
+  track(quota.transfersKey(ACCT), quota.seenKey(ACCT, 'freshHashDid'), quota.seenKey(ACCT, 'freshHashKey'));
+  await r.set(quota.transfersKey(ACCT), String(limit)); // owner account at cap
 
   // The exact call relay.js makes in POST /v2/inbound before returning 402
   // monthly_transfer_quota_reached — same gate, same account, same limit.
-  const viaDid = await quota.gateTransfer(r, p.account_id, 'freshHashDid', limit, null);
-  assert.strictEqual(viaDid.allowed, false, 'DID request over quota is declined (402 path)');
-  assert.strictEqual(viaDid.over_limit, true);
+  const viaDid = await quota.gateTransfer(r, ACCT, 'freshHashDid', limit, null);
+  assert.strictEqual(viaDid.allowed, false, 'DID request over quota is declined (402 path)'); quotaChecks++;
+  assert.strictEqual(viaDid.over_limit, true); quotaChecks++;
 
-  const viaKey = await quota.gateTransfer(r, 'pgp_owner_key', 'freshHashKey', limit, null);
-  assert.strictEqual(viaKey.allowed, false, 'the API-key path declines identically');
+  // The owner's API key resolves to the same account, so the same counter is
+  // already at the cap and the answer has to match.
+  const viaKey = await quota.gateTransfer(r, ACCT, 'freshHashKey', limit, null);
+  assert.strictEqual(viaKey.allowed, false, 'the API-key path declines identically'); quotaChecks++;
 });
 
 test('T1.5b DID and API-key requests count on the SAME owner counter', async () => {
   const { apiKeys, didEntry } = communityFixture();
   const p = didPrincipal(didEntry, (k) => apiKeys.get(k));
-  const r = fakeRedis();
-  await quota.gateTransfer(r, p.account_id, 'hash1', 10, null);      // via DID
-  await quota.gateTransfer(r, 'pgp_owner_key', 'hash2', 10, null);   // via API key
-  assert.strictEqual(await r.get(quota.transfersKey('pgp_owner_key')), '2',
-    'both paths increment one shared owner counter');
+  if (!rc) return;
+  const r = rc;
+  const ACCT = p.account_id;
+  track(quota.transfersKey(ACCT), quota.seenKey(ACCT, 'hash1'), quota.seenKey(ACCT, 'hash2'));
+  await r.del(quota.transfersKey(ACCT));
+  await quota.gateTransfer(r, ACCT, 'hash1', 10, null);              // via DID
+  await quota.gateTransfer(r, OWNER_KEY, 'hash2', 10, null);   // via API key
+  assert.strictEqual(await r.get(quota.transfersKey(OWNER_KEY)), '2',
+    'both paths increment one shared owner counter'); quotaChecks++;
 });
 
 test('T1.5c DID-only request over the monthly sign quota is declined like an API-key request', async () => {
   const { apiKeys, didEntry } = communityFixture();
   const p = didPrincipal(didEntry, (k) => apiKeys.get(k));
   const limit = entitlements.getEntitlements(p).parasign.quotas.signs_month;
-  const r = fakeRedis();
-  r._store.set(quota.signsKey(p.account_id), String(limit));
+  if (!rc) return;
+  const r = rc;
+  track(quota.signsKey(p.account_id));
+  await r.set(quota.signsKey(p.account_id), String(limit));
   const g = await quota.gateSign(r, p.account_id, limit, null);
   assert.strictEqual(g.allowed, false, 'DID request over the signs cap is declined (402 path)');
 });
@@ -130,7 +158,7 @@ test('T1.6b an enrollment whose owner key is revoked or deleted grants no princi
   const { owner, apiKeys, didEntry } = communityFixture();
   owner.active = false; // key intrekking: admin revoke zet active=false
   assert.strictEqual(didPrincipal(didEntry, (k) => apiKeys.get(k)), null, 'owner key revoked => refused');
-  apiKeys.delete('pgp_owner_key'); // key rotated/deleted (loadKeys drops inactive keys)
+  apiKeys.delete(OWNER_KEY); // key rotated/deleted (loadKeys drops inactive keys)
   assert.strictEqual(didPrincipal(didEntry, (k) => apiKeys.get(k)), null, 'owner key gone => refused');
 });
 

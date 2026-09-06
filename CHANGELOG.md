@@ -31,6 +31,97 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   lying turns the gate red.
 
 ### Fixed
+- **An envelope number was enough to get the mail addresses of everyone who had
+  signed it.** `GET /v2/envelopes/:id` is public on purpose, because a recipient
+  is an outside party with no key, but it answered with the same object the
+  owner sees. Two of its fields did the damage. `signer_pk_hash` was the key
+  into `GET /v2/lookup-signer/:pk_hash`, which sits before the auth gate and
+  returned the signer's real address, so two unauthenticated GETs turned an
+  envelope id into a list of mailboxes. `doc_hash` was a confirmation oracle:
+  anyone holding a candidate file could prove offline that this exact document
+  was the one inside, which undoes the zero-knowledge claim at the metadata
+  layer. Alongside them the anonymous answer carried the original filename, the
+  name the sender typed for every party, and who signed when and where on the
+  page. The public projection now says how far along an envelope is and nothing
+  about who: status, counts, per-slot progress, expiry. Everything identifying
+  needs the party's invite token or the owner's key, and the address on
+  lookup-signer needs a live key. What a verifier checking a receipt actually
+  needs is still public, because it is in the receipt already: that a key is
+  enrolled, under what label, since when, and whether it was revoked. The relay's
+  own developer API had decided this the same way for the same object a year
+  earlier; two routes over one envelope with opposite answers is not a policy.
+- **Every per-IP limit in the relay could be switched off with one header.**
+  `getClientIp` read `X-Real-IP` and believed it, on the stated assumption that
+  nginx sets it authoritatively. nginx did that on the apex and on the relay
+  host. It did not on the four sector hostnames or in the `/rp/<sector>/` blocks
+  on the main site, and nginx forwards unknown client headers by default, so on
+  those hosts the caller chose their own address: the view limiter, the sign
+  limiter, the signer lookup, the claim, status and MFA limiters, the anonymous
+  upload window and the transparency ingest window all became optional at once.
+  The reverse case needed no attacker: where nobody set the header, everyone on
+  that hostname shared one bucket and one noisy visitor could lock out the rest.
+  Both sides are fixed. Every edge block that reaches a relay now sets the
+  address from the connection and clears the two headers a caller could
+  otherwise use to assert trust, and the relay believes a forwarded address only
+  from a peer inside its own trusted range and only when it is really an
+  address. A block someone forgets in future is now a lost address, not a
+  bypass.
+- **Monthly caps were a suggestion that held until two requests arrived
+  together.** Both quota gates read the counter, decided, and then wrote it, with
+  an `await` in between; on the live signing route the read and the increment sat
+  38 lines and a full ML-DSA-65 verification apart. Ten simultaneous requests all
+  read the same number, all found room, and all counted: eleven signatures on a
+  plan that sells two, with nothing logging a complaint. The gates now decide and
+  count in one Redis round trip, taking the same shape the coupon code has used
+  since it was written, and the sign route reserves its slot before storing and
+  gives it back when the signature is rejected or turns out to be a retry.
+- **Guessing a ParaShare secret cost nothing.** `POST /v2/session/join` answers
+  whether a caller-supplied pre-shared secret is correct. It carries no API key
+  by design, but it also had no limit, no attempt counter and no lockout, so
+  whoever had the session id could try passphrases at wire speed against a phrase
+  a person chose. Joining now costs a per-address window and a per-session budget
+  of five, and the fifth wrong answer destroys the session, so rotating source
+  addresses buys nothing. The comparison is constant-time like every other secret
+  comparison in the codebase. On the same route the error message and the
+  comments said the commitment was SHA-256 while the code computed SHA3-256; both
+  produce 64 hex characters, so an integrator following the message built a
+  session that could never be joined and only found out at a 403 blaming their
+  secret.
+- **A stranger could delete a transfer they could never read.** An anonymous blob
+  is stored without an owner, and the owner check was skipped entirely when there
+  was none. For reading that is the design and it is written down: the hash is
+  the capability, the payload is encrypted with a key the relay never sees, and
+  it burns after one read. Destroying is not reading. Anyone who glimpsed the
+  hash in an access log or a mail gateway's link scanner could end the transfer
+  without ever opening it. A blob with no owner now has no owner who can abort it
+  either; it goes when it burns or when its time runs out.
+- **Anyone could push every real relay out of the public federation list.**
+  `POST /v2/relays/register` verifies an ML-DSA-65 signature against the public
+  key in the same request, so registering is simply owning a keypair. That is the
+  design, but it had no rate limit while the transparency-ingest route next to it
+  does, for the reason spelled out in that route's own comment. Worse, the
+  eviction at capacity threw out the FIRST INSERTED entry, and a Map does not
+  reorder on update, so the relay that had been in the federation longest and was
+  still checking in every hour was the first to go. Every registration also wrote
+  an attacker-chosen url and sector into the transparency log, on disk, even when
+  it repeated an existing one, and each append gossips a signed head to every
+  peer. Registration is now budgeted per address, eviction takes the least
+  recently seen, and a registration that says nothing new moves a timestamp
+  instead of writing a log entry.
+- **Reading a device's public keys did not need the key that owns them.** Three
+  routes sit before the auth gate so the keyless share-link flow can work, and
+  that keylessness spilled onto the named slots: for an unknown API key the
+  account resolver returns the header value verbatim, so presenting an account id
+  as the key addressed that account's namespace. Account ids and API keys are the
+  same string today, so little was reachable that way; the moment accounts move
+  to non-secret ids it becomes a cross-account read. Named slots now need a live
+  key. The share-link branch stays keyless, which is why the routes are there.
+- **`GET /v2/lookup-signer/:pk_hash` returned a mail address to anyone.** The
+  comment defending that said the caller must already possess the envelope to
+  ask. That stopped being true when the public envelope view started publishing
+  the hash. The address now needs a live API key; everything a verifier needs is
+  still open.
+
 - **The public transparency log gave away the exact second, so anyone holding a
   copy of a document could prove it went through Paramant.** A leaf is
   `SHA3-256(0x02 || sha256(file) || SHA3-256(sector) || ts)`, with no salt and no

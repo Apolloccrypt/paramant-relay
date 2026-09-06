@@ -116,6 +116,12 @@ const submit = (id, body) => srv.post(`/v2/envelopes/${id}/sign`, { headers: asP
 // The party's own signing link, as the invite hands it over: token included.
 const submitAs = (id, token, body) => submit(id, { ...body, token });
 const statusOf = (id) => srv.get(`/v2/envelopes/${id}`, { headers: asParty() });
+// The same route as a party who holds their invite token. Since the 2026-09-05
+// review (findings 4 and 5) the two answers are deliberately different: a
+// passer-by gets progress, a participant gets the document hash, the filename
+// and the names.
+const statusAsParty = (id, i, token) =>
+  srv.get(`/v2/envelopes/${id}?p=${i}&t=${encodeURIComponent(token)}`, { headers: asParty() });
 const view = (id, body) => srv.post(`/v2/envelopes/${id}/view`, { headers: asParty(), body });
 const receipt = (id, key) => srv.get(`/v2/envelopes/${id}/receipt`,
   { headers: key ? asParty({ 'X-Api-Key': key }) : asParty() });
@@ -231,8 +237,34 @@ test('the public status is redacted: no signatures, no raw keys, no account id',
   assert.ok(!text.includes(sigB64), 'the raw signature must not be in the public status');
   assert.ok(!text.includes(pubB64), 'the raw public key must not be in the public status');
   assert.ok(!text.includes('acct_owner'), 'the owning account must not be in the public status');
-  assert.match(r.json.envelope.parties[0].signer_pk_hash, /^[0-9a-f]{64}$/, 'only a hash of the key is published');
   assert.ok(r.json.sign_message_recipe, 'the recipe is published so a verifier can re-derive the message');
+
+  // ── What "redacted" has to mean ────────────────────────────────────────────
+  // This used to assert that the public view publishes a hash of the signer's
+  // key "only". That hash was the join key: GET /v2/lookup-signer/:pk_hash sits
+  // before the auth gate and answered with the signer's real email address, so
+  // an envelope id turned into everyone's mailbox in two unauthenticated GETs.
+  // Alongside it the same anonymous answer carried the document's full SHA3-256
+  // (a confirmation oracle against any candidate file), the original filename,
+  // and the name the sender typed for every party. Redacted is a claim about
+  // what is NOT there, so the test now names those things.
+  const env = r.json.envelope;
+  assert.strictEqual(env.parties[0].signer_pk_hash, undefined, 'the pk hash is the key into lookup-signer and must not be public');
+  assert.strictEqual(env.doc_hash, undefined, 'the document hash is a confirmation oracle and must not be public');
+  assert.strictEqual(env.original_filename, undefined, 'the filename carries the subject and often a name');
+  assert.strictEqual(env.parties[0].label, undefined, 'the party labels are the signers names');
+  assert.strictEqual(env.parties[0].signed_at, undefined, 'when a named person signed is about that person');
+  // Still enough to be a status page.
+  assert.strictEqual(env.party_count, 1, 'how many parties is public');
+  assert.strictEqual(env.signed_count, 1, 'how far along it is, is public');
+  assert.strictEqual(env.parties[0].status, 'signed', 'per-slot progress is public');
+  did();
+
+  // The participant, who holds the token, still gets all of it.
+  const mine = await statusAsParty(id, 0, tokens[0]);
+  assert.strictEqual(mine.status, 200, mine.text);
+  assert.match(mine.json.envelope.doc_hash, /^[0-9a-f]{64}$/, 'a party can still verify against the document hash');
+  assert.strictEqual(mine.json.envelope.parties[0].label, 'Solo', 'a party still sees who the parties are');
   did();
 });
 
@@ -316,7 +348,10 @@ test('DOUBLE SIGN: the same submission is idempotent, a different one is a confl
 
   const status = await statusOf(id);
   assert.strictEqual(status.json.envelope.signed_count, 1, 'the conflict changed nothing');
-  assert.strictEqual(status.json.envelope.parties[0].signer_pk_hash,
+  // Who holds the slot is asked as the party, because the public view no longer
+  // says (findings 4 and 5); the property under test is the slot, not the leak.
+  const held = await statusAsParty(id, 0, tokens[0]);
+  assert.strictEqual(held.json.envelope.parties[0].signer_pk_hash,
     crypto.createHash('sha3-256').update(Buffer.from(a.pubB64, 'base64')).digest('hex'),
     'the first signer still holds the slot');
   did();

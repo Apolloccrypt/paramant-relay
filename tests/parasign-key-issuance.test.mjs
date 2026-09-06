@@ -83,7 +83,8 @@ function baseDeps(over = {}) {
   };
 }
 
-// A minimal in-memory redis good enough for quota.gateSign (get/incr/expire).
+// A minimal in-memory redis. The /v1 pre-gate only READS, so get() is all it
+// needs; the rest is here because the stub predates that and costs nothing.
 function fakeRedis() {
   const m = new Map();
   return {
@@ -95,11 +96,31 @@ function fakeRedis() {
     async exists(k) { return m.has(k) ? 1 : 0; },
   };
 }
-// Exactly the wiring relay.js injects into the /v1 deps: the gate receives the
-// key RECORD and meters against its ParaSign entitlement (plan_parasign, with a
-// legacy-plan fallback).
+// The wiring relay.js injects into the /v1 deps, copied from the closure there:
+// the gate receives the key RECORD and measures against its ParaSign entitlement
+// (plan_parasign, with a legacy-plan fallback).
+//
+// It READS and does not count, and that is the point of the /v1 path. A /v1
+// envelope's signers post back through the R018 sign route, and that route is
+// where a signature is counted; counting at create as well would charge twice
+// for one signature. This helper used to call quota.gateSign, which decides AND
+// counts, under a comment claiming it was "exactly the wiring relay.js
+// injects". It was not, and the difference mattered: the test then proved a
+// counting behaviour the create path does not have, and would have stayed green
+// if the real pre-gate had started counting by accident.
 function makeSignQuotaGate(redis) {
-  return async (accountId, rec) => quota.gateSign(redis, accountId, entitlements.signsQuota(rec), noop);
+  return async (accountId, rec) => {
+    const ent = entitlements.getEntitlements(rec || {}).parasign;
+    if (!accountId || !Number.isFinite(ent.quotas.signs_month)) return { allowed: true, over_limit: false };
+    const u = await quota.readUsage(redis, accountId);
+    if (!u.available || !Number.isFinite(u.signs_this_month)) return { allowed: true, over_limit: false };
+    const dec = quota.signGateDecision(u.signs_this_month, ent);
+    return {
+      allowed: dec.allowed, over_limit: !dec.allowed,
+      reason: dec.reason, plan: ent.tier, limit: dec.limit,
+      used: u.signs_this_month, reset_date: quota.nextResetDate(),
+    };
+  };
 }
 
 const RAND = () => crypto.randomBytes(32).toString('hex');
@@ -180,20 +201,35 @@ test('entitlement: a paid plan (pro/enterprise/licensed) entitles the account', 
 });
 
 // ---- 6) key → plan → quota → 402 -------------------------------------------
-test('quota: /v1 creates count against the plan ParaSign sign quota; past it → 402 monthly_sign_quota_reached', async () => {
+test('quota: /v1 creates are refused once the plan ParaSign sign quota is spent → 402 monthly_sign_quota_reached', async () => {
   // A minted key on the community plan. community.signs_month = 2 (tiers.js).
   const b = keysTable.buildParasignKeyRecord({ accountId: 'acct_q', plan: 'community', randomHex: RAND() });
   const apiKeys = new Map([[b.key, b.record]]);
-  const signQuotaGate = makeSignQuotaGate(fakeRedis());
+  const redis = fakeRedis();
+  const signQuotaGate = makeSignQuotaGate(redis);
   const body = J({ document: { content_base64: PDF_B64 }, signers: [{ name: 'A', email: 'a@b.nl' }] });
   const mkPost = () => baseDeps({ method: 'POST', path: '/v1/envelopes', authHeader: `Bearer ${b.key}`,
     apiKeys, envStore: fakeStore(), signQuotaGate, readBody: async () => Buffer.from(body) });
 
-  const r1 = mkPost(); await v1.route(r1); assert.equal(r1.res.statusCode, 201, 'sign 1 of 2 allowed');
-  const r2 = mkPost(); await v1.route(r2); assert.equal(r2.res.statusCode, 201, 'sign 2 of 2 allowed');
+  // The month's signatures are set here rather than produced by creating, because
+  // creating does not produce them: the counter moves on the sign route, where
+  // the signature actually lands. See makeSignQuotaGate above.
+  const key = quota.signsKey('acct_q');
+
+  const r1 = mkPost(); await v1.route(r1); assert.equal(r1.res.statusCode, 201, 'nothing signed yet, create allowed');
+  await redis.set(key, '1');
+  const r2 = mkPost(); await v1.route(r2); assert.equal(r2.res.statusCode, 201, '1 of 2 spent, create still allowed');
+  await redis.set(key, '2');
   const r3 = mkPost(); await v1.route(r3);
-  assert.equal(r3.res.statusCode, 402, 'sign 3 over the community cap');
+  assert.equal(r3.res.statusCode, 402, 'at the community cap of 2 the create path refuses');
   assert.equal(r3.res.json().error, 'monthly_sign_quota_reached');
+
+  // The boundary is AT the included quota, not past it, and it is the same rule
+  // the R018 sign route enforces in Lua. quota-gate.test.js holds those two to
+  // each other; this asserts the /v1 side of the same comparison.
+  await redis.set(key, '3');
+  const r4 = mkPost(); await v1.route(r4);
+  assert.equal(r4.res.statusCode, 402, 'and stays refused above the cap');
 });
 
 test('quota: an enterprise plan (unlimited signs) never hits the 402', async () => {
