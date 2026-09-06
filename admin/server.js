@@ -16,6 +16,8 @@ const cliRate = require('./lib/cli-ratelimit');
 const configStore = require('./lib/config-store');
 const webauthn = require('./lib/webauthn');
 const { sessionKeyFields, proxyApiKey, revealKey } = require('./lib/account-keys');
+const { meetDeStand } = require('./lib/stand');
+const standIo = require('./lib/stand-io');
 // One user's sessions, without reading everybody else's. See admin/lib/user-sessions.js.
 const userSessions = require('./lib/user-sessions');
 // The scan is now a FALLBACK, handed to user-sessions only for a user who has no
@@ -4037,6 +4039,61 @@ api.get("/admin/relay-detail", authMiddleware, async (req, res) => {
   } catch (err) { console.error("[admin/relay-detail]", err.message); res.status(500).json({ error: "internal" }); }
 });
 
+// ── De standpagina ──────────────────────────────────────────────────────────
+//
+// Eén pagina die de werkelijke stand toont, achter dezelfde inlog als de rest
+// van deze adminkant: token plus TOTP, sessie in redis, X-Session op elke
+// vraag. Er komt dus geen nieuwe openbare route bij, en er staat niets op deze
+// route dat een beheerder hier niet allang mocht zien.
+//
+// De metingen zelf staan in lib/stand.js, met de buitenwereld in lib/stand-io.js.
+
+function bouwStandIo() {
+  return standIo.maakIo({
+    redis,
+    relayFetch,
+    sectors: Object.keys(SECTORS),
+    adminToken: ADMIN_TOKEN,
+  });
+}
+
+api.get('/admin/stand', authMiddleware, async (req, res) => {
+  try {
+    res.json(await meetDeStand(bouwStandIo()));
+  } catch (err) {
+    // Geen halve pagina met een verzonnen kop: als het meten zelf omvalt zegt
+    // de pagina dat, en dat is iets anders dan "alles groen".
+    console.error('[admin/stand]', err.message);
+    res.status(503).json({ error: 'meten_mislukt', message: err.message });
+  }
+});
+
+// De echte proef, alleen op verzoek. Hij stuurt werkelijk een bestand door de
+// relay en laat het weer vernietigen, en dat schrijft een regel in het
+// openbare transparantielogboek. Vandaar de knop en niet elk paginabezoek: een
+// statuspagina die zichzelf meetelt maakt het gebruikscijfer onbruikbaar,
+// precies zoals in augustus gebeurde.
+//
+// De anonieme uploadroute laat tien pogingen per uur per IP toe, dus hier
+// staat een eigen rem van één proef per vijf minuten. Loopt die af, dan is dat
+// een 429 met een reden en niet een stilzwijgend mislukte proef.
+api.post('/admin/stand/proef', authMiddleware, async (req, res) => {
+  const rem = 'paramant:stand:proef:rem';
+  try {
+    const bezet = await redis().set(rem, '1', { NX: true, EX: 300 });
+    if (bezet === null) {
+      return res.status(429).json({ error: 'te_snel', message: 'Er is net een proef gedaan. Over vijf minuten kan er weer een.' });
+    }
+  } catch (err) {
+    if (isRedisOutage(err)) throw err;
+  }
+
+  const io = bouwStandIo();
+  const uitslag = await io.doeProef();
+  try { await io.bewaarProef(uitslag); } catch (err) { console.error('[admin/stand] proef niet bewaard:', err.message); }
+  res.json(uitslag);
+});
+
 
 // ── POST /admin/force-totp ───────────────────────────────────────────────────────
 api.post('/admin/force-totp', authMiddleware, async (req, res) => {
@@ -4630,6 +4687,11 @@ app.use(`${BASE_PATH}/api`, requireSameOrigin);
 app.use(`${BASE_PATH}/api`, api);
 // /cli -- web debug terminal page (served before the SPA wildcard fallback).
 app.get(`${BASE_PATH}/cli`, (req, res) => res.sendFile(path.join(__dirname, 'public', 'cli.html')));
+// /stand -- de standpagina, ook voor de SPA-wildcard langs. De pagina zelf is
+// een leeg geraamte: alles wat er te zien is komt van GET /api/admin/stand, en
+// dat zit achter authMiddleware. Er staat dus geen enkel gegeven in dit
+// bestand dat een buitenstaander niet mag zien.
+app.get(`${BASE_PATH}/stand`, (req, res) => res.sendFile(path.join(__dirname, 'public', 'stand.html')));
 // Express 5: named wildcard required (path-to-regexp v8 — bare /* not allowed)
 app.get(`${BASE_PATH}/*path`, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 

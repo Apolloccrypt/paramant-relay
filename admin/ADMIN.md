@@ -26,6 +26,40 @@ Sessions are stored in Redis under `paramant:admin:session:{sid}` with a 12-hour
 | **Billing** | Active subscriptions and MRR breakdown |
 | **Relay** | Live health + uptime + metrics for all 5 sector relays, auto-refreshes every 10s |
 
+## De standpagina (`/admin/stand`)
+
+Een aparte pagina naast de tabs, in het Nederlands, voor de vraag "hoe staat het
+ervoor" zonder eerst ergens in te loggen op een server. Zelfde inlog als de rest
+van deze adminkant: `X-Session` uit `sessionStorage`, dus er komt geen nieuwe
+openbare route bij. Het bestand `public/stand.html` is een leeg geraamte; alles
+wat erop komt haalt `public/stand.js` op bij `GET /api/admin/stand`, en die zit
+achter `authMiddleware`.
+
+Vier blokken, in deze volgorde: werkt het, wordt het gebruikt, staat er iets
+rood, en wat wacht er op de eigenaar. Gaat een blok goed, dan staat het dicht.
+
+Twee regels worden in `lib/stand.js` afgedwongen en niet alleen beschreven:
+
+- `punt()` zet elk punt zonder `meting` op "niet gemeten". Een getal dat er niet
+  is kan dus niet als groen eindigen.
+- In `RANG` staat "niet gemeten" boven "let op", zodat een weggevallen meting de
+  kop wegtrekt van groen in plaats van mee te liften op wat wel lukte.
+
+De metingen staan in `lib/stand.js`, de buitenwereld in `lib/stand-io.js`.
+GitHub wordt zonder sleutel bevraagd (openbare repo, 60 vragen per uur, vijf
+minuten cache in redis); lukt dat niet, dan staat er "niet gemeten".
+
+De knop "doe de echte proef" stuurt via `POST /api/admin/stand/proef` werkelijk
+een bestand door de relay, haalt het terug, vergelijkt de bytes en controleert
+dat een tweede ophaalpoging 410 geeft. Dat is een echte handeling die in het
+openbare transparantielogboek komt, dus hij draait op verzoek en niet bij elk
+paginabezoek, en hij telt op de pagina zelf als zelftest en nooit als gebruik.
+Eigen rem: een proef per vijf minuten.
+
+Instellingen: `PARAMANT_SITE_URL`, `PARAMANT_REPO`, `STAND_ZELFTEST_ACCOUNTS`
+(zie `deploy/.env.example`). De sabotagetoets is
+`admin/test/stand-gate.test.js`.
+
 ---
 
 ## User action menu
