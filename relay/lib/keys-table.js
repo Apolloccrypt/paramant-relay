@@ -148,12 +148,28 @@ function requireScope(keyData, action) {
 // when its record says so in any of three accepted shapes, so this survives the
 // single-string scope enum above without a schema migration:
 //   rec.scope === 'parasign'  |  rec.parasign === true  |  rec.scopes[] has it.
-function hasParaSignScope(rec) {
+//
+// AND the grant must still be running. The flag is written by
+// entitlements.applyProductTier on a purchase and cleared only by an explicit
+// write down to the floor tier; expiry is enforced on READ and never writes
+// back. So until 2026-09-06 the three shapes above were read raw, and one month
+// of ParaSign Pro bought the /v1 API forever: the term lapsed,
+// effectiveProductTier reported `free` to everyone who asked it, and this
+// function -- the actual gate -- never asked. A grant with no recorded period
+// (an admin set-parasign, and every account from before billing existed) has no
+// term to run out and stays true, which is exactly what effectiveProductTier
+// already means by expired:false.
+function parasignGrantLive(rec, now) {
   if (!rec) return false;
-  if (rec.scope === 'parasign') return true;
-  if (rec.parasign === true) return true;
-  if (Array.isArray(rec.scopes) && rec.scopes.includes('parasign')) return true;
-  return false;
+  const flagged = rec.scope === 'parasign'
+    || rec.parasign === true
+    || (Array.isArray(rec.scopes) && rec.scopes.includes('parasign'));
+  if (!flagged) return false;
+  return !entitlements.effectiveProductTier(rec, 'parasign', now).expired;
+}
+
+function hasParaSignScope(rec, now) {
+  return parasignGrantLive(rec, now);
 }
 
 // Non-secret, stable key identifier for URLs/listings (never the raw pgp_ key).
@@ -433,8 +449,14 @@ const PARASIGN_ENTITLED_PLANS = new Set(['pro', 'business', 'enterprise', 'licen
 // key already carries the parasign grant (admin set-parasign / billing auto-grant),
 // OR the account plan itself includes ParaSign (paid). Pure: takes the account's
 // member key-records and its plan; no I/O, no globals.
-function accountHasParasignEntitlement(memberRecords, plan) {
-  for (const r of (memberRecords || [])) { if (r && r.parasign === true) return true; }
+// The period is read here too, and for the sharper reason: this is the gate on
+// MINTING. A lapsed account that can still mint gets a fresh key on every call,
+// each one floored to `free` by mintParasignKey but each one a working /v1
+// credential and a new line in users.json. The self-perpetuating part is what
+// makes it worth a gate rather than a shrug: a minted key carries parasign:true
+// itself, so it re-satisfies this very check for its own account.
+function accountHasParasignEntitlement(memberRecords, plan, now) {
+  for (const r of (memberRecords || [])) { if (parasignGrantLive(r, now)) return true; }
   return PARASIGN_ENTITLED_PLANS.has(plan);
 }
 
@@ -495,4 +517,4 @@ function erasePersonalData(data, accountOrKey) {
 
 module.exports = {
   PERSONAL_DATA_FIELDS,
-  erasePersonalData, VALID_SCOPES, SCOPE_ACTIONS, requireScope, scopeActionFor, hasParaSignScope, computeKid, maskApiKey, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary, buildParasignKeyRecord, accountHasParasignEntitlement, PARASIGN_ENTITLED_PLANS };
+  erasePersonalData, VALID_SCOPES, SCOPE_ACTIONS, requireScope, scopeActionFor, hasParaSignScope, parasignGrantLive, computeKid, maskApiKey, parseAccountFields, assignKid, rebuildKeyIndexes, migrateUsersV2, computeOverLimit, designatePrimary, buildParasignKeyRecord, accountHasParasignEntitlement, PARASIGN_ENTITLED_PLANS };

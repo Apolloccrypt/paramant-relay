@@ -211,19 +211,84 @@ test('a key minted while the subscription is LIVE does not outlive it', async ()
   did();
 });
 
-test('a key minted for an ALREADY lapsed account is a plain floor key, with no stale date', async () => {
+test('an ALREADY lapsed account does not mint at all', async () => {
+  // Until 2026-09-06 this asserted a 201 and then checked that the minted key
+  // came out floored. It was half the fix, and it wrote the other half down as
+  // intended behaviour: the mint gate read `parasign: true` raw, so one month
+  // of ParaSign Pro bought an unlimited supply of working /v1 keys forever. The
+  // key is floored, yes, and it is also a credential, a users.json entry, and
+  // -- since a minted key carries parasign:true itself -- a fresh reason for
+  // the gate to say yes on the next call.
   let srv = await withUsers('mint-after-lapse', [{
     key: 'pgp_lapsed_mint', plan: 'community', active: true, parasign: true,
     account_id: 'acct_lapsed_mint', email: 'lapsed-mint@example.test',
     plan_parasign: 'business', paid_until_parasign: PAST,
   }]);
+  const before = srv.readUsersFile().api_keys.length;
   const minted = await srv.post('/v2/user/parasign-keys', { headers: BOTH, body: { user_id: 'acct_lapsed_mint' } });
-  assert.strictEqual(minted.status, 201, minted.text);
+  assert.strictEqual(minted.status, 403, minted.text);
+  assert.strictEqual(minted.json.error, 'parasign_not_entitled');
   await new Promise((r) => setTimeout(r, 300));
-  const onDisk = srv.readUsersFile().api_keys.find((k) => k.key === minted.json.key);
-  assert.strictEqual(onDisk.plan_parasign, 'free', 'a lapsed account mints what it is entitled to now, not what it paid for once');
-  assert.ok(!('paid_until_parasign' in onDisk),
-    'and carries no date, because a floor tier has no period to be bounded by');
+  assert.strictEqual(srv.readUsersFile().api_keys.length, before,
+    'a refused mint still grew users.json');
+  srv.stop();
+  did();
+});
+
+// ── the cap on minting ───────────────────────────────────────────────────────
+// The behavioural half of key-mint-gate.test.js. The static half can only see
+// that ACCOUNT_KEY_LIMIT is mentioned near the mint; it cannot see whether the
+// comparison still bites. Measured before the repair, on 2026-09-06: nine keys
+// on a community account whose cap is five, and fourteen in a row on Pro, where
+// the cap was Infinity. So the property is asserted over HTTP, as a property:
+// keep minting until it says no, and it must say no.
+test('the self-serve mint stops at the per-account cap, and says 402 with the numbers', async () => {
+  // ACCOUNT_KEY_LIMIT_COMMUNITY is turned down to its floor of 3 on purpose.
+  // At the default of 5 this test passed with the cap DELETED, because the
+  // relay-total community limit is also 5 and answered first with a different
+  // message. A gate satisfied by the wrong refusal is the failure this whole
+  // round is about, so the account cap has to be the only thing that can bite,
+  // and the assertion reads the message to prove which one did.
+  const srv = await boot({
+    tag: 'mint-cap', usersFile: true,
+    users: { api_keys: [{
+      key: 'pgp_cap_anchor', plan: 'community', active: true, parasign: true,
+      account_id: 'acct_cap', email: 'cap@example.test', is_primary: true,
+    }] },
+    env: { ...ADMIN_ENV, ACCOUNT_KEY_LIMIT_COMMUNITY: '3' },
+  });
+  const CAP = 3;
+  const codes = [];
+  let refusal = null;
+  for (let i = 0; i < CAP + 3; i++) {
+    const r = await srv.post('/v2/user/parasign-keys', { headers: BOTH, body: { user_id: 'acct_cap', label: `dev-${i}` } });
+    codes.push(r.status);
+    if (r.status === 402) { refusal = r.json; break; }
+  }
+  assert.ok(refusal, `minted ${codes.length} keys without ever being refused: ${codes.join(',')}`);
+  assert.match(refusal.error, /Account key limit reached \(3 keys on the community plan\)/,
+    `refused by the wrong cap: ${refusal.error}`);
+  assert.strictEqual(refusal.max_keys, CAP);
+  assert.strictEqual(refusal.current_keys, CAP);
+  assert.strictEqual(codes.filter((c) => c === 201).length, CAP - 1,
+    `expected ${CAP - 1} mints on top of the anchor key, got ${codes.filter((c) => c === 201).length}`);
+  await new Promise((r) => setTimeout(r, 300));
+  const onDisk = srv.readUsersFile().api_keys.length;
+  assert.strictEqual(onDisk, CAP, `users.json holds ${onDisk} keys, past a cap of ${CAP}`);
+  srv.stop();
+  did();
+});
+
+test('a grant with no recorded period still mints: absent is unbounded, not expired', async () => {
+  // The other direction of the same rule, and the one that would break every
+  // account predating the paid_until field. An admin set-parasign writes the
+  // flag and no date; that grant has no term to run out.
+  let srv = await withUsers('mint-open-grant', [{
+    key: 'pgp_open_grant', plan: 'community', active: true, parasign: true,
+    account_id: 'acct_open_grant', email: 'open-grant@example.test',
+  }]);
+  const minted = await srv.post('/v2/user/parasign-keys', { headers: BOTH, body: { user_id: 'acct_open_grant' } });
+  assert.strictEqual(minted.status, 201, minted.text);
   srv.stop();
   did();
 });

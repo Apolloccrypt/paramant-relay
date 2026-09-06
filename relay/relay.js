@@ -2951,6 +2951,33 @@ function mintParasignKey(accountId, opts = {}) {
   const anchorRec = apiKeys.get(accountId);
   const plan = opts.plan || (acct && acct.plan) || (anchorRec && anchorRec.plan) || 'community';
   const email = (acct && acct.email) || (anchorRec && anchorRec.email) || '';
+  // THE CAP, and it lives HERE rather than at the two routes on purpose. The
+  // 2026-09-05 review found the self-serve route minting without one: fourteen
+  // keys in a row on a Pro account, nine on a community account whose cap is
+  // five, and users.json growing by one entry per HTTP request. The admin route
+  // twenty lines away did it correctly, which is the whole story of how this
+  // happens. One generator, one cap, and a third mint route cannot drift.
+  //
+  // Checked with the insert below and nothing awaited in between, so it is
+  // atomic in the event loop, the same property the /v2/admin/keys mint relies
+  // on. Throws rather than answering, because the two callers own their own
+  // response shape; both map `code` to a 402.
+  const _capPlan = tiers.normalisePlan((acct && acct.plan) || plan);
+  const _cap = ACCOUNT_KEY_LIMIT[_capPlan] ?? ACCOUNT_KEY_LIMIT.community;
+  const _active = [...(accountKeys.get(accountId) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
+  if (_active >= _cap) {
+    const e = new Error(`Account key limit reached (${_cap} keys on the ${_capPlan} plan).`);
+    e.code = 'account_key_limit'; e.cap = _cap; e.current = _active; e.plan = _capPlan;
+    throw e;
+  }
+  if (EDITION !== 'licensed' && LICENSE_MAX_KEYS !== Infinity) {
+    const relayActive = [...apiKeys.values()].filter((v) => v.active !== false).length;
+    if (relayActive >= LICENSE_MAX_KEYS) {
+      const e = new Error(`License limit reached (${LICENSE_MAX_KEYS} keys).`);
+      e.code = 'relay_key_limit'; e.cap = LICENSE_MAX_KEYS; e.current = relayActive; e.plan = _capPlan;
+      throw e;
+    }
+  }
   // The new key inherits the account's EFFECTIVE per-product tiers, resolved
   // over every key the account holds. Minting used to pass the legacy `plan`
   // only, which silently issued a free-tier ParaSign key to a paying account.
@@ -2991,7 +3018,19 @@ function mintParasignKey(accountId, opts = {}) {
     ud.updated = new Date().toISOString();
   }).then(() => log('info', 'parasign_key_minted', { account: String(accountId).slice(0, 12), kid, mode: opts.test ? 'test' : 'live', plan: record.plan, persisted: true }))
     .catch(we => log('warn', 'parasign_key_persist_failed', { err: we.message }));
+  // The same pass the pgp_ mint runs. Without it a psk_ key was invisible to
+  // over_limit until the next reload-users, which is only ever manual.
+  applyKeyLimitEnforcement();
   return { key, kid, account_id: accountId, plan: record.plan, mode: opts.test ? 'test' : 'live', masked: maskKey(key), scope: 'parasign', created: record.created };
+}
+
+// A mint refused by a cap is a 402 with the numbers, not a 400 or a 500. Shared
+// by both mint routes so the answer cannot differ per door.
+function keyCapReject(err, res) {
+  if (!err || (err.code !== 'account_key_limit' && err.code !== 'relay_key_limit')) return false;
+  res.writeHead(402, { 'Content-Type': 'application/json' });
+  res.end(J({ error: err.message, current_keys: err.current, max_keys: err.cap === Infinity ? null : err.cap, upgrade_url: 'https://paramant.app/pricing' }));
+  return true;
 }
 
 function loadUsers() {
@@ -4866,6 +4905,7 @@ async function handleRelayRequest(req, res) {
         note: "Store this key now -- it is shown once and cannot be retrieved in full again." }));
     } catch (err) {
       if (redisOutage503(err, res)) return;
+      if (keyCapReject(err, res)) return;
       console.error("[user/parasign-keys POST]", err.message);
       res.writeHead(500); return res.end(J({ error: "internal" }));
     }
@@ -8086,7 +8126,7 @@ async function handleRelayRequest(req, res) {
       res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, mode: out.mode, scope: out.scope, key_masked: out.masked,
         note: 'Store this key now - it is shown once and cannot be retrieved in full again.' }));
-    } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+    } catch(e) { if (keyCapReject(e, res)) return; res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
   // ── GET /v2/admin/keys/primary/:account_id — read an account's primary + members ──
@@ -8194,6 +8234,28 @@ async function handleRelayRequest(req, res) {
   }
 
   // ── POST /v2/team/add-device ──────────────────────────────────────────────
+  // Finding 9 of the 2026-09-05 review lived here, and both the mechanism it
+  // named and the reach it assumed turned out to be wrong. Written down because
+  // the code reads as a working feature and is not one.
+  //
+  // What the review said: the minted key gets no account_id, so all three quota
+  // gates skip it. False. A backfill above all routing sets
+  // keyData.account_id = apiKey for any record that lacks one, so the gates
+  // never skip. The damage was real and different: the device became its OWN
+  // account, with its own fresh monthly bucket, uncorrelated with the seat that
+  // was paid for. Buy one Pro seat, mint devices, each one gets the whole plan.
+  //
+  // What the review did not check: `team_id` never reaches a runtime record.
+  // keysTable.parseAccountFields returns a fixed field set and drops it, and no
+  // other apiKeys.set site writes it. You need a record with team_id to mint one
+  // with team_id, so this route answers 403 to everyone and always has.
+  // deploy/paramant-admin.py team-create writes it to users.json, where it is
+  // dropped on load. The feature does not work end to end.
+  //
+  // So it is left unreachable, and the mint is fixed anyway: the day somebody
+  // teaches the loader about team_id, this must not be the shape that lands.
+  // Bound to the PARENT account, scope inherited, capped, persisted, and 32
+  // bytes like every other key in the file. key-mint-gate.test.js holds it here.
   if (path === '/v2/team/add-device' && req.method === 'POST') {
     const kd = apiKeys.get(apiKey);
     if (!kd?.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
@@ -8202,10 +8264,33 @@ async function handleRelayRequest(req, res) {
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.label) { res.writeHead(400); return res.end(J({ error: 'label verplicht' })); }
-      const newKey = 'pgp_' + require('crypto').randomBytes(16).toString('hex');
-      apiKeys.set(newKey, { label: d.label, plan: kd.plan, team_id: kd.team_id, active: true, created: new Date().toISOString() });
-      log('info', 'team_device_added', { label: d.label, team: kd.team_id });
-      res.writeHead(201); return res.end(J({ ok: true, key: newKey, label: d.label, team_id: kd.team_id }));
+      const label = String(d.label).slice(0, 128);
+      const account_id = kd.account_id || apiKey;
+      const scope = keysTable.VALID_SCOPES.has(kd.scope) ? kd.scope : 'full';
+      const email = kd.email || '';
+      const capPlan = tiers.normalisePlan(kd.plan);
+      const cap = ACCOUNT_KEY_LIMIT[capPlan] ?? ACCOUNT_KEY_LIMIT.community;
+      const active = [...(accountKeys.get(account_id) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
+      if (active >= cap) {
+        res.writeHead(402, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: `Account key limit reached (${cap} keys on the ${capPlan} plan).`, current_keys: active, max_keys: cap === Infinity ? null : cap, upgrade_url: 'https://paramant.app/pricing' }));
+      }
+      const created = new Date().toISOString();
+      const newKey = 'pgp_' + crypto.randomBytes(32).toString('hex');
+      apiKeys.set(newKey, { plan: kd.plan, label, email, active: true, account_id, is_primary: false, scope, team_id: kd.team_id, created });
+      if (!accounts.has(account_id)) accounts.set(account_id, { account_id, plan: kd.plan, email, primary_api_key: null, label });
+      if (!accountKeys.has(account_id)) accountKeys.set(account_id, new Set());
+      accountKeys.get(account_id).add(newKey);
+      const kid = keysTable.assignKid(kidIndex, newKey, log);
+      apiKeys.get(newKey).kid = kid;
+      kidIndex.set(kid, newKey);
+      _mutateUsersJson(ud => {
+        ud.api_keys.push({ key: newKey, plan: kd.plan, label, email, active: true, created, account_id, is_primary: false, scope, team_id: kd.team_id });
+        ud.updated = new Date().toISOString();
+      }).then(() => log('info', 'team_device_added', { label, team: kd.team_id, account: String(account_id).slice(0, 12), persisted: true }))
+        .catch(we => log('warn', 'key_persist_failed', { err: we.message, label }));
+      applyKeyLimitEnforcement();
+      res.writeHead(201); return res.end(J({ ok: true, key: newKey, kid, account_id, label, team_id: kd.team_id }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
@@ -9058,11 +9143,21 @@ let EDITION          = 'community';
 let LICENSE_MAX_KEYS = COMMUNITY_KEY_LIMIT; // effective limit — updated by checkLicense()
 // Per-account key cap (SaaS product dimension). Orthogonal to the BUSL-fixed
 // per-relay COMMUNITY_KEY_LIMIT: a key is over_limit if it busts EITHER (F).
-// Community is env-tunable within 3..5; pro/enterprise are uncapped.
+// Community is env-tunable within 3..5.
+//
+// pro and enterprise were Infinity until 2026-09-06, which read as "no product
+// limit" and worked out as "no limit at all": with a self-serve mint route and
+// no cap, a Pro account grew users.json by one entry per HTTP request, and on a
+// licensed relay the relay-total dimension is skipped so nothing ever noticed.
+// These two numbers are NOT a product limit and no page sells them. They are an
+// abuse ceiling, set far above what any real account holds, and env-tunable for
+// the one customer who ever argues with them. over_limit only flags, it never
+// deactivates, so a ceiling that turns out too low is a log line and not an
+// outage.
 const ACCOUNT_KEY_LIMIT = Object.freeze({
   community: Math.min(5, Math.max(3, parseInt(process.env.ACCOUNT_KEY_LIMIT_COMMUNITY || '5', 10) || 5)),
-  pro: Infinity,
-  enterprise: Infinity,
+  pro: Math.max(10, parseInt(process.env.ACCOUNT_KEY_LIMIT_PRO || '100', 10) || 100),
+  enterprise: Math.max(10, parseInt(process.env.ACCOUNT_KEY_LIMIT_ENTERPRISE || '1000', 10) || 1000),
 });
 let LICENSE_PAYLOAD  = null;                // { max_keys, expires_at, issued_to, issued_at }
 
