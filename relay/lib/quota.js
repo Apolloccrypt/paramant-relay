@@ -123,27 +123,97 @@ function signGateDecision(used, ent) {
 // gateTransfer also counts (it replaces recordTransfer on the upload path) so a
 // declined transfer is never counted and can't be bypassed by retrying — the
 // dedup `seen` key is only claimed once we've decided to count.
+//
+// ── Why these are Lua and not JavaScript ─────────────────────────────────────
+// The 2026-09-05 hostile review, finding 8. Both gates used to read the counter,
+// decide, and then write, with an `await` between the reading and the writing:
+//
+//     const cur = parseInt((await redisClient.get(signsKey(accountId))) || '0', 10);
+//     if (cur >= limit) return { allowed: false, ... };
+//     const n = await incrInWindow(redisClient, signsKey(accountId), MONTH_TTL_SECONDS);
+//
+// The counter stands at 1, the plan sells 2, ten requests arrive together. All
+// ten read 1, all ten find 1 < 2, all ten count. Eleven signatures on a plan
+// that sells two. The window is not theoretical: on the live sign route the
+// read and the increment sat 38 lines and a whole ML-DSA verification apart.
+//
+// The house already had the recipe. lib/coupon.js does cap, expiry, revocation,
+// double-use and the tally in ONE Lua script, and says why in as many words:
+// "A JavaScript version of this reads the count, decides, and writes, and two
+// requests that read the same 99 both write a hundredth seat." That is this bug,
+// written down a month earlier, in the one place that got it right. So these
+// gates take that pattern rather than invent a second one: same `redis.eval`
+// call shape, same array-of-strings decoding, same reservation semantics.
+//
+// The TTL is set with `if TTL < 0 then EXPIRE end` rather than `EXPIRE ... NX`
+// on purpose: inside a script the read-then-write is already atomic, so the
+// two-step form costs nothing here and it keeps the scripts working on the
+// Redis 6 that lib/redis-counter.js still carries a fallback for.
+
+// KEYS[1] the monthly counter.
+// ARGV[1] the cap, ARGV[2] the counter TTL in seconds.
+// Returns { status, used } with status one of: ok | over
+const GATE_SIGN_LUA = `
+local limit = tonumber(ARGV[1])
+local cur = tonumber(redis.call('GET', KEYS[1]) or '0')
+if cur >= limit then return {'over', tostring(cur)} end
+local n = redis.call('INCR', KEYS[1])
+if redis.call('TTL', KEYS[1]) < 0 then redis.call('EXPIRE', KEYS[1], ARGV[2]) end
+return {'ok', tostring(n)}
+`;
+
+// KEYS[1] the monthly counter, KEYS[2] the dedup `seen` key. When there is no
+// chunk hash the caller passes KEYS[1] again and sets ARGV[4] to '0'; nothing in
+// the script touches KEYS[2] in that case, so the duplicate key name is inert
+// and every key this script can touch is still declared in KEYS.
+// ARGV[1] the cap, ARGV[2] the counter TTL, ARGV[3] the seen TTL,
+// ARGV[4] '1' when the seen key is in play.
+// Returns { status, used } with status one of: ok | over | deduped
+const GATE_TRANSFER_LUA = `
+local limit = tonumber(ARGV[1])
+local hasSeen = ARGV[4] == '1'
+if hasSeen and redis.call('EXISTS', KEYS[2]) == 1 then return {'deduped', '0'} end
+local cur = tonumber(redis.call('GET', KEYS[1]) or '0')
+if cur >= limit then return {'over', tostring(cur)} end
+if hasSeen and not redis.call('SET', KEYS[2], '1', 'NX', 'EX', ARGV[3]) then
+  return {'deduped', '0'}
+end
+local n = redis.call('INCR', KEYS[1])
+if redis.call('TTL', KEYS[1]) < 0 then redis.call('EXPIRE', KEYS[1], ARGV[2]) end
+return {'ok', tostring(n)}
+`;
+
+// Give a counted unit back. Only ever called when the thing the count was taken
+// for did not happen, so the tally counts what was actually delivered. Never
+// goes below zero: a release without a matching reservation must not hand out a
+// free unit to the next caller.
+const RELEASE_LUA = `
+local cur = tonumber(redis.call('GET', KEYS[1]) or '0')
+if cur <= 0 then return '0' end
+return tostring(redis.call('DECR', KEYS[1]))
+`;
+
+// node-redis returns Lua's table as an array of strings, exactly as
+// lib/coupon.js documents at _claimResult.
+function _gateResult(raw) {
+  const arr = Array.isArray(raw) ? raw : [];
+  return { status: String(arr[0] || 'over'), used: parseInt(String(arr[1] || '0'), 10) || 0 };
+}
+
 async function gateTransfer(redisClient, accountId, chunkHash, limit, log) {
   if (!accountId || !redisClient || !redisClient.isReady || !Number.isFinite(limit)) {
     const r = await recordTransfer(redisClient, accountId, chunkHash, log);
     return { allowed: true, counted: r.counted, deduped: r.deduped, over_limit: false, error: r.error };
   }
   try {
-    if (chunkHash) {
-      const sk = seenKey(accountId, chunkHash);
-      // Continuing an already-counted (multi-chunk) upload is always allowed.
-      if (await redisClient.exists(sk)) return { allowed: true, counted: false, deduped: true, over_limit: false, error: null };
-      const cur = parseInt((await redisClient.get(transfersKey(accountId))) || '0', 10);
-      if (cur >= limit) return { allowed: false, counted: false, deduped: false, over_limit: true, error: null };
-      // Under cap: claim the seen key, then count.
-      const setRes = await redisClient.set(sk, '1', { NX: true, EX: SEEN_TTL_SECONDS });
-      if (setRes !== 'OK') return { allowed: true, counted: false, deduped: true, over_limit: false, error: null };
-    } else {
-      const cur = parseInt((await redisClient.get(transfersKey(accountId))) || '0', 10);
-      if (cur >= limit) return { allowed: false, counted: false, deduped: false, over_limit: true, error: null };
-    }
     const tk = transfersKey(accountId);
-    const n  = await incrInWindow(redisClient, tk, MONTH_TTL_SECONDS);
+    const sk = chunkHash ? seenKey(accountId, chunkHash) : tk;
+    const r = _gateResult(await redisClient.eval(GATE_TRANSFER_LUA, {
+      keys: [tk, sk],
+      arguments: [String(limit), String(MONTH_TTL_SECONDS), String(SEEN_TTL_SECONDS), chunkHash ? '1' : '0'],
+    }));
+    if (r.status === 'deduped') return { allowed: true, counted: false, deduped: true, over_limit: false, error: null };
+    if (r.status === 'over')    return { allowed: false, counted: false, deduped: false, over_limit: true, error: null };
     return { allowed: true, counted: true, deduped: false, over_limit: false, error: null };
   } catch (e) {
     if (log) log('warn', 'quota_gate_transfer_failed', { account: String(accountId).slice(0, 12), err: e.message });
@@ -154,17 +224,37 @@ async function gateTransfer(redisClient, accountId, chunkHash, limit, log) {
 async function gateSign(redisClient, accountId, limit, log) {
   if (!accountId || !redisClient || !redisClient.isReady || !Number.isFinite(limit)) {
     const r = await recordSign(redisClient, accountId, log);
-    return { allowed: true, counted: r.counted, over_limit: false, error: r.error };
+    return { allowed: true, counted: r.counted, used: r.used, over_limit: false, error: r.error };
   }
   try {
-    const cur = parseInt((await redisClient.get(signsKey(accountId))) || '0', 10);
-    if (cur >= limit) return { allowed: false, counted: false, over_limit: true, error: null };
-    const sk = signsKey(accountId);
-    const n  = await incrInWindow(redisClient, sk, MONTH_TTL_SECONDS);
-    return { allowed: true, counted: true, over_limit: false, error: null };
+    const r = _gateResult(await redisClient.eval(GATE_SIGN_LUA, {
+      keys: [signsKey(accountId)],
+      arguments: [String(limit), String(MONTH_TTL_SECONDS)],
+    }));
+    if (r.status === 'over') return { allowed: false, counted: false, used: r.used, over_limit: true, error: null };
+    return { allowed: true, counted: true, used: r.used, over_limit: false, error: null };
   } catch (e) {
     if (log) log('warn', 'quota_gate_sign_failed', { account: String(accountId).slice(0, 12), err: e.message });
-    return { allowed: true, counted: false, over_limit: false, error: e.message }; // fail open
+    return { allowed: true, counted: false, used: null, over_limit: false, error: e.message }; // fail open
+  }
+}
+
+// Hand a reserved signature back. gateSign counts BEFORE the signature is
+// stored, because counting after is what let ten concurrent requests share one
+// slot. The cost of counting first is that a signature the store then rejects
+// would be charged for, so the sign route releases it. This is the same
+// reservation shape lib/coupon.js uses for a seat: claim, and release when the
+// grant that followed the claim did not happen.
+async function releaseSign(redisClient, accountId, log) {
+  if (!accountId || !redisClient || !redisClient.isReady) return { released: false, used: null };
+  try {
+    const used = parseInt(String(await redisClient.eval(RELEASE_LUA, { keys: [signsKey(accountId)], arguments: [] })), 10);
+    return { released: true, used: Number.isFinite(used) ? used : null };
+  } catch (e) {
+    // A release that fails leaves the account one unit poorer for the month.
+    // That is the safe direction, so it logs and does not throw.
+    if (log) log('warn', 'quota_release_sign_failed', { account: String(accountId).slice(0, 12), err: e.message });
+    return { released: false, used: null };
   }
 }
 
@@ -199,6 +289,7 @@ module.exports = {
   signGateDecision,
   gateTransfer,
   gateSign,
+  releaseSign,
   readUsage,
   // exported for tests / admin tooling
   transfersKey,

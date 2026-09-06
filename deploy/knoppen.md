@@ -2,7 +2,7 @@
 
 Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. Nergens anders.
 
-- **99 omgevingsvariabelen** die de relay en de admin lezen staan in
+- **102 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
 - **172 knoppen** staan hieronder: alles wat die poort niet ziet.

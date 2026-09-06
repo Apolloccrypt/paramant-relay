@@ -5,25 +5,42 @@
 // overrun on one product returns 402-shaped decline without touching the other;
 // (3) the legacy->per-product migration never downgrades any existing account.
 
-const { test } = require('node:test');
+const { test, before, after } = require('node:test');
 const assert = require('assert');
 const ent = require('../lib/entitlements');
 const tiers = require('../lib/tiers');
 const quota = require('../lib/quota');
+const crypto = require('crypto');
+const { requireRedis, summary } = require('./_requires');
 
-// Minimal in-memory Redis stub (mirrors quota-gate.test.js).
-function fakeRedis() {
-  const store = new Map();
-  return {
-    isReady: true,
-    async get(k) { return store.has(k) ? store.get(k) : null; },
-    async exists(k) { return store.has(k) ? 1 : 0; },
-    async incr(k) { const n = (parseInt(store.get(k) || '0', 10)) + 1; store.set(k, String(n)); return n; },
-    async expire() { return 1; },
-    async set(k, v, opts) { if (opts && opts.NX && store.has(k)) return null; store.set(k, v); return 'OK'; },
-    _store: store,
-  };
-}
+// The gates run Lua scripts since the 2026-09-05 review, finding 8: reading a
+// counter, deciding and writing were three round trips with awaits between them,
+// and concurrent requests all read the same number and all went through. An
+// in-memory stub cannot run EVAL, and because quota fails open by design a stub
+// that cannot run the script does not turn a cap test red, it turns it into a
+// pass over nothing. So the tests that drive a gate use a real server, and this
+// suite moved to the CI job that has one. See quota-gate.test.js for the longer
+// version of this note.
+
+// ── A real redis, and a fresh namespace per run ──────────────────────────────
+const DEFAULT_REDIS = 'redis://127.0.0.1:6399';
+const RUN = crypto.randomBytes(6).toString('hex');
+let rc = null;
+let quotaChecks = 0;
+const written = [];
+const track = (...keys) => { written.push(...keys); };
+// The monthly counters are shared and month-keyed, so a fixed account id would
+// make these cases depend on each other and on yesterday's run.
+const scoped = (name) => `${name}_${RUN}`;
+
+before(async () => { rc = await requireRedis(DEFAULT_REDIS); });
+after(async () => {
+  if (rc) {
+    for (const k of written) { try { await rc.del(k); } catch (_) {} }
+    try { await rc.disconnect(); } catch (_) {}
+  }
+  summary('entitlements', quotaChecks);
+});
 
 // ── 1. Independent per-product entitlement ────────────────────────────────────
 test('account pro on parasign + community on parasend gets SEPARATE limits', () => {
@@ -54,34 +71,41 @@ test('no tier is unbounded: every metered monthly quota is finite', () => {
 
 // ── 2. Cross-product isolation of the quota gate ──────────────────────────────
 test('overrun on parasend transfers does NOT block parasign signs (402 isolation)', async () => {
-  const r = fakeRedis();
-  const acct = { account_id: 'acctZ', plan_parasend: 'community', plan_parasign: 'pro' };
+  if (!rc) return;
+  const r = rc;
+  const ACCT = scoped('acctZ');
+  track(quota.transfersKey(ACCT), quota.signsKey(ACCT), quota.seenKey(ACCT, 'freshChunk'));
+  const acct = { account_id: ACCT, plan_parasend: 'community', plan_parasign: 'pro' };
   const tLimit = ent.transfersQuota(acct); // 10
   const sLimit = ent.signsQuota(acct);     // 100
 
   // Drive parasend transfers to the cap.
-  r._store.set(quota.transfersKey('acctZ'), String(tLimit));
-  const tGate = await quota.gateTransfer(r, 'acctZ', 'freshChunk', tLimit, null);
-  assert.strictEqual(tGate.allowed, false, 'transfer over cap declined');
-  assert.strictEqual(tGate.over_limit, true);
+  await r.set(quota.transfersKey(ACCT), String(tLimit));
+  const tGate = await quota.gateTransfer(r, ACCT, 'freshChunk', tLimit, null);
+  assert.strictEqual(tGate.allowed, false, 'transfer over cap declined'); quotaChecks++;
+  assert.strictEqual(tGate.over_limit, true); quotaChecks++;
 
   // ParaSign signs are counted on a different Redis key and a different limit,
   // so the account can still sign.
-  const sGate = await quota.gateSign(r, 'acctZ', sLimit, null);
-  assert.strictEqual(sGate.allowed, true, 'sign unaffected by transfer overrun');
-  assert.strictEqual(sGate.counted, true);
+  const sGate = await quota.gateSign(r, ACCT, sLimit, null);
+  assert.strictEqual(sGate.allowed, true, 'sign unaffected by transfer overrun'); quotaChecks++;
+  assert.strictEqual(sGate.counted, true); quotaChecks++;
 });
 
 test('overrun on parasign signs does NOT block parasend transfers', async () => {
-  const r = fakeRedis();
-  const acct = { account_id: 'acctY', plan_parasend: 'pro', plan_parasign: 'free' };
+  if (!rc) return;
+  const r = rc;
+  const ACCT = scoped('acctY');
+  track(quota.transfersKey(ACCT), quota.signsKey(ACCT), quota.seenKey(ACCT, 'chunkY'));
+  const acct = { account_id: ACCT, plan_parasend: 'pro', plan_parasign: 'free' };
   const sLimit = ent.signsQuota(acct); // 2 (free)
-  r._store.set(quota.signsKey('acctY'), String(sLimit));
-  const sGate = await quota.gateSign(r, 'acctY', sLimit, null);
-  assert.strictEqual(sGate.allowed, false, 'sign over free cap declined');
+  await r.set(quota.signsKey(ACCT), String(sLimit));
+  const sGate = await quota.gateSign(r, ACCT, sLimit, null);
+  assert.strictEqual(sGate.allowed, false, 'sign over free cap declined'); quotaChecks++;
 
-  const tGate = await quota.gateTransfer(r, 'acctY', 'chunkA', ent.transfersQuota(acct), null);
-  assert.strictEqual(tGate.allowed, true, 'transfer unaffected by sign overrun');
+  track(quota.seenKey(ACCT, 'chunkA'));
+  const tGate = await quota.gateTransfer(r, ACCT, 'chunkA', ent.transfersQuota(acct), null);
+  assert.strictEqual(tGate.allowed, true, 'transfer unaffected by sign overrun'); quotaChecks++;
 });
 
 // ── 3. Migration never downgrades ─────────────────────────────────────────────

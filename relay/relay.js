@@ -34,6 +34,7 @@ const path   = require('path');
 const nodePath = path;
 const url_   = require('url');
 const { createClient } = require('redis');
+const clientIpLib = require('./lib/client-ip');
 const userTotp      = require('./lib/user-totp');
 const totpLib       = require('./lib/totp');
 const redisDeadlines = require('./lib/redis-deadline'); // one bound for every redis call
@@ -403,7 +404,7 @@ const ctWindow = new CtWindow(CT_MAX);
 // caller who means it; unset no longer means it by accident.
 const _ctFileDefault = () => {
   const sth = process.env.STH_FILE;
-  return sth ? path.join(path.dirname(sth), 'ct-log.json') : '/data/ct-log.json';
+  return sth ? nodePath.join(nodePath.dirname(sth), 'ct-log.json') : '/data/ct-log.json';
 };
 const CT_FILE = process.env.CT_FILE !== undefined
   ? (process.env.CT_FILE || null)   // explicit, empty means RAM-only on purpose
@@ -427,7 +428,7 @@ function _ctOpenStream() {
   // has no /data yet takes the CT log back to RAM-only silently, which is the
   // state this default exists to end.
   try {
-    fs.mkdirSync(path.dirname(CT_FILE), { recursive: true });
+    fs.mkdirSync(nodePath.dirname(CT_FILE), { recursive: true });
     _ctStream = fs.createWriteStream(CT_FILE, { flags: 'a' });
     _ctStream.on('error', e => log('warn', 'ct_stream_error', { err: e.message }));
   } catch (e) {
@@ -540,7 +541,7 @@ let _sthDraining  = false;
 
 function _sthOpenStream() {
   try {
-    fs.mkdirSync(path.dirname(STH_FILE), { recursive: true });
+    fs.mkdirSync(nodePath.dirname(STH_FILE), { recursive: true });
     _sthStream = fs.createWriteStream(STH_FILE, { flags: 'a' });
     _sthStream.on('error', e => log('warn', 'sth_stream_error', { err: e.message }));
   } catch (e) { log('warn', 'sth_stream_open_failed', { err: e.message }); }
@@ -628,7 +629,7 @@ function loadOrCreateRelayIdentity() {
       const pk_hash = crypto.createHash('sha3-256').update(pk).digest('hex');
       relayIdentity = { sk, pk, pk_hash };
       try {
-        fs.mkdirSync(path.dirname(RELAY_IDENTITY_FILE), { recursive: true });
+        fs.mkdirSync(nodePath.dirname(RELAY_IDENTITY_FILE), { recursive: true });
         fs.writeFileSync(RELAY_IDENTITY_FILE,
           JSON.stringify({ sk: sk.toString('base64'), pk: pk.toString('base64'), created_at: new Date().toISOString() }),
           { mode: 0o600 });
@@ -1047,7 +1048,7 @@ function _peerSthStreamFor(pkHash) {
   try {
     fs.mkdirSync(PEER_STH_DIR, { recursive: true });
     const safe = pkHash.replace(/[^a-f0-9]/g, '').slice(0, 64);
-    const stream = fs.createWriteStream(path.join(PEER_STH_DIR, safe + '.jsonl'), { flags: 'a' });
+    const stream = fs.createWriteStream(nodePath.join(PEER_STH_DIR, safe + '.jsonl'), { flags: 'a' });
     stream.on('error', e => log('warn', 'peer_sth_stream_error', { id: pkHash.slice(0, 16), err: e.message }));
     _peerSthStreams.set(pkHash, stream);
     return stream;
@@ -1074,7 +1075,7 @@ function _evictPeerSthsIfNeeded() {
     _peerSthStreamClose(pkHash);
     // Reclaim the evicted peer's on-disk .jsonl so the file set is actually
     // bounded (not just the fd table); a later re-ingest re-creates it fresh.
-    try { fs.unlinkSync(path.join(PEER_STH_DIR, pkHash.replace(/[^a-f0-9]/g, '').slice(0, 64) + '.jsonl')); } catch {}
+    try { fs.unlinkSync(nodePath.join(PEER_STH_DIR, pkHash.replace(/[^a-f0-9]/g, '').slice(0, 64) + '.jsonl')); } catch {}
     log('info', 'peer_sth_evicted', { id: pkHash.slice(0, 16), peers: peerSths.size });
   }
 }
@@ -1092,7 +1093,7 @@ function loadPeerSths() {
     for (const file of files) {
       const id = file.replace(/\.jsonl$/, '');
       try {
-        const lines = fs.readFileSync(path.join(PEER_STH_DIR, file), 'utf8').split('\n').filter(l => l.trim());
+        const lines = fs.readFileSync(nodePath.join(PEER_STH_DIR, file), 'utf8').split('\n').filter(l => l.trim());
         const sths = [];
         for (const line of lines) { try { sths.push(JSON.parse(line)); } catch {} }
         const recent = sths.slice(-PEER_STH_MAX);
@@ -1870,6 +1871,14 @@ function blobDrop(hash, wipe = true) {
 const anonInboundIpRequests = new Map(); // ip → [timestamps] for /v2/anon-inbound rate limit
 const invDidIpRequests = new Map(); // ip → [timestamps] for keyless inv_ DID registration
 const sthIngestIpRequests = new Map(); // ip → [timestamps] for /v2/sth/ingest (unauthenticated)
+// Same window, same reason, for POST /v2/relays/register. The STH ingest route
+// got one because it is "unauthenticated (ownership-signature only), so a flood
+// of attacker-minted relay keypairs is otherwise unbounded". Its neighbour
+// registers those very keypairs and had nothing: every registration appends to
+// the CT log (on disk since the persistence fix) and every append gossips a
+// fresh head to every peer in the registry, so one unauthenticated POST bought
+// an amplified fan-out and unbounded disk. The 2026-09-05 review, finding 21.
+const relayRegisterIpRequests = new Map(); // ip → [timestamps] for /v2/relays/register (unauthenticated)
 // Team rate limit tracking
 const teamRateLimits = new Map(); // team_id → { count, resetAt }
 
@@ -1882,6 +1891,7 @@ setInterval(() => {
   for (const [k, times] of anonInboundIpRequests){ const kept = times.filter(t => now - t < HOUR); if (kept.length) anonInboundIpRequests.set(k, kept); else anonInboundIpRequests.delete(k); }
   for (const [k, times] of invDidIpRequests)     { const kept = times.filter(t => now - t < HOUR); if (kept.length) invDidIpRequests.set(k, kept);     else invDidIpRequests.delete(k); }
   for (const [k, times] of sthIngestIpRequests)  { const kept = times.filter(t => now - t < HOUR); if (kept.length) sthIngestIpRequests.set(k, kept);  else sthIngestIpRequests.delete(k); }
+  for (const [k, times] of relayRegisterIpRequests) { const kept = times.filter(t => now - t < HOUR); if (kept.length) relayRegisterIpRequests.set(k, kept); else relayRegisterIpRequests.delete(k); }
   for (const [k, b]     of teamRateLimits)       { if (b && now > b.resetAt) teamRateLimits.delete(k); }
 }, 3_600_000);
 
@@ -1943,6 +1953,28 @@ function lookupSignerRateOk(ip) {
   return rateLimit.fixedWindowAllow(lookupSignerRateLimits, ip, 30, 60000);
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of lookupSignerRateLimits) if (now > v.resetAt + 60000) lookupSignerRateLimits.delete(k); }, 120_000);
+
+// ── Guessing budget for POST /v2/session/join ────────────────────────────────
+// The route takes a pre-shared secret and answers whether it was right. It has
+// no API key on purpose (the PSS is the authentication), and until the
+// 2026-09-05 review, finding 6, it had nothing else either: a wrong secret got a
+// 403 and left the session sitting there, so whoever had the session id could
+// try passphrases at wire speed. A PSS is a human-chosen phrase -- the docs
+// spell one out as an example -- so minutes of that is enough.
+//
+// Two budgets, because they stop different attackers. The per-IP window is the
+// same shape as every other limiter here and stops one host hammering. The
+// per-session budget is the one that matters: it survives a rotating source
+// address, and it is bounded by the thing being attacked rather than by who is
+// attacking it. Five wrong answers destroys the session, which is the correct
+// end state anyway -- a session whose secret has been guessed at five times is
+// not a session anyone should still be able to join.
+const sessionJoinLimits = new Map();      // ip -> { count, resetAt }
+const SESSION_JOIN_MAX_ATTEMPTS = 5;
+function sessionJoinRateOk(ip) {
+  return rateLimit.fixedWindowAllow(sessionJoinLimits, ip, 10, 60_000);
+}
+setInterval(() => { const now = Date.now(); for (const [k, v] of sessionJoinLimits) if (now > v.resetAt + 60_000) sessionJoinLimits.delete(k); }, 120_000);
 
 // Per-IP rate limits for /v2/envelopes/* (Model 2 multi-party signing).
 // Create is throttled per API key to prevent quota abuse; view/sign are
@@ -2033,15 +2065,18 @@ function log(level, msg, data = {}) {
 
 function J(o) { return JSON.stringify(o); }
 
-// ── Client IP — prefers CF-Connecting-IP (production), falls back to X-Real-IP set by nginx ──
-function getClientIp(req) {
-  // There is no Cloudflare in front of this deployment (Caddy edge -> nginx), so
-  // CF-Connecting-IP is never set legitimately — trusting it let a client spoof
-  // their IP and rotate past per-IP rate limits. nginx authoritatively sets
-  // X-Real-IP to the real client (via real_ip from Caddy's X-Forwarded-For) and
-  // clears CF-Connecting-IP, so use X-Real-IP only, then the socket as a fallback.
-  return req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
-}
+// ── Client IP: X-Real-IP, but only from a peer we put there ourselves ───────
+// Every per-IP limit in this file keys on this. It used to read the header
+// unconditionally, on the stated assumption that nginx sets it authoritatively.
+// nginx does that on the apex and on relay.paramant.app; it did not on the four
+// sector hostnames or in the /rp/<sector>/ blocks, and nginx forwards unknown
+// client headers by default. So on those hosts a caller chose their own address
+// and rotated past every limiter. See lib/client-ip.js for the whole story and
+// for why the trusted set has to include the docker bridge and not just
+// loopback. The edge configs now set the header everywhere, and
+// test/trusted-edge-gate.test.js keeps them that way; this is the lock on the
+// other side of that door, so a single missed nginx block is no longer a bypass.
+const getClientIp = clientIpLib.makeClientIp({ trusted: process.env.TRUSTED_PROXY_CIDRS });
 
 // ── HTML escaping for email templates (prevents HTML injection in Resend emails) ──
 function escHtml(s) {
@@ -3818,7 +3853,7 @@ async function handleRelayRequest(req, res) {
       }).catch(we => log('warn', 'setup_persist_failed', { err: we.message }));
 
       // -- write .env (atomic temp+rename, back up existing) --
-      const envPath = process.env.SETUP_ENV_FILE || path.join(process.cwd(), '.env');
+      const envPath = process.env.SETUP_ENV_FILE || nodePath.join(process.cwd(), '.env');
       const envLines = [
         '# Generated by Paramant /setup on ' + new Date().toISOString(),
         'SECTORS=' + sectors.join(','),
@@ -4939,10 +4974,23 @@ async function handleRelayRequest(req, res) {
     }));
   }
 
-  // ── GET /v2/lookup-signer/:pk_hash — public reverse-lookup for verifiers ──
+  // ── GET /v2/lookup-signer/:pk_hash, reverse-lookup for verifiers ─────────
   // Exact 64-hex-char SHA3-256 match only — no prefix scan, no enumeration.
-  // The caller must already possess the envelope (= the pk) to ask; we return
-  // label + email (if enrolled). Rate-limited 30/min/IP to blunt scraping.
+  // Rate-limited 30/min/IP to blunt scraping.
+  //
+  // THE EMAIL ADDRESS NEEDS A KEY NOW. The comment here used to defend handing
+  // it to anyone, on the grounds that "the caller must already possess the
+  // envelope (= the pk) to ask". That stopped being true. GET /v2/envelopes/:id
+  // is public, and it used to put signer_pk_hash in its answer, so the pk hash
+  // was free: envelope id -> hash -> the real mailbox of everyone who signed,
+  // in two unauthenticated GETs. The 2026-09-05 review, finding 4.
+  //
+  // Both halves are closed. The public envelope projection no longer carries
+  // the hash (envelope.js getRedacted), and the address here is now only for a
+  // caller that presented a live API key. What stays public is what a verifier
+  // checking a .psign file actually needs and already has in the file itself:
+  // that this key is enrolled, under what label, since when, and whether it was
+  // revoked. Verification does not need to know the person's mailbox.
   if (req.method === 'GET' && path.startsWith('/v2/lookup-signer/')) {
     if (!lookupSignerRateOk(clientIp)) {
       res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
@@ -4959,11 +5007,15 @@ async function handleRelayRequest(req, res) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         return res.end(J({ found: false }));
       }
+      // The identity half. keyData is resolved once, above the route table, and
+      // an inactive or absent key leaves it falsy: no key, no address.
       let email = null;
-      try {
-        const metaRaw = await redisClient.get(`paramant:user:meta:${found.userId}`);
-        if (metaRaw) { const m = JSON.parse(metaRaw); email = m.email || null; }
-      } catch {}
+      if (keyData && keyData.active) {
+        try {
+          const metaRaw = await redisClient.get(`paramant:user:meta:${found.userId}`);
+          if (metaRaw) { const m = JSON.parse(metaRaw); email = m.email || null; }
+        } catch {}
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({
         found: true,
@@ -5213,6 +5265,22 @@ async function handleRelayRequest(req, res) {
   // ── POST /v2/relays/register — relay self-registration, ML-DSA-65 verified ───
   // Public endpoint — no API key required. Requires valid ML-DSA-65 signature.
   if (path === '/v2/relays/register' && req.method === 'POST') {
+    // Before the body read and before the signature verify, exactly as the STH
+    // ingest route does it: an ML-DSA-65 verification is not something an
+    // unauthenticated caller gets to ask for at will.
+    {
+      const REGISTER_RPH = parseInt(process.env.RELAY_REGISTER_RATE_PER_HOUR || '10');
+      const HOUR_MS = 3_600_000;
+      const ip      = getClientIp(req);
+      const now     = Date.now();
+      const ipTimes = (relayRegisterIpRequests.get(ip) || []).filter(t => now - t < HOUR_MS);
+      if (ipTimes.length >= REGISTER_RPH) {
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '3600' });
+        return res.end(J({ error: 'Rate limit: too many relay registrations from this address. Try again later.' }));
+      }
+      ipTimes.push(now);
+      relayRegisterIpRequests.set(ip, ipTimes);
+    }
     if (!mlDsa) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'ML-DSA-65 not available on this relay — relay registry disabled' }));
@@ -5256,24 +5324,53 @@ async function handleRelayRequest(req, res) {
     }
     const pkHash = crypto.createHash('sha3-256').update(pkBytes).digest('hex');
     const existing = relayRegistry.get(pkHash);
+    const edition = rEdition || 'community';
     const verified_since = existing?.verified_since || new Date().toISOString();
-    const ctEntry = ctAppendRelayReg(rUrl, rSector, rVersion, rEdition || 'community', pkHash);
-    // Fix 7: evict oldest entry when registry is at capacity
+
+    // Append to the transparency log only when the registration SAYS something
+    // new. A relay that re-registers on its heartbeat used to write a fresh leaf
+    // every time, each one carrying an attacker-choosable url and sector, each
+    // one producing a signed head that gossips to every peer. The log is on disk
+    // now, so "unbounded appends" is unbounded disk. A repeat that changes
+    // nothing moves last_seen and stops there.
+    const changed = !existing
+      || existing.url !== rUrl
+      || existing.sector !== rSector
+      || existing.version !== rVersion
+      || existing.edition !== edition;
+    const ctEntry = changed ? ctAppendRelayReg(rUrl, rSector, rVersion, edition, pkHash) : null;
+    const nowIso = new Date().toISOString();
+
+    // Evict the LEAST RECENTLY SEEN, not the first inserted. A Map keeps
+    // insertion order and `set` on an existing key does not move it, so the old
+    // "oldest key wins" rule threw out the relay that had been in the federation
+    // longest and was still checking in every hour. Anyone able to register
+    // MAX_RELAY_REGISTRY fresh keypairs could push every real relay out of the
+    // public list; now the entries that keep proving they are alive are the last
+    // to go, and a flood evicts itself.
     if (!existing && relayRegistry.size >= MAX_RELAY_REGISTRY) {
-      const oldestKey = relayRegistry.keys().next().value;
-      relayRegistry.delete(oldestKey);
-      log('warn', 'relay_registry_evict', { evicted: oldestKey?.slice(0,16), size: relayRegistry.size });
+      let stalestKey = null;
+      let stalestAt = Infinity;
+      for (const [k, v] of relayRegistry) {
+        const seen = Date.parse(v.last_seen || v.verified_since || '') || 0;
+        if (seen < stalestAt) { stalestAt = seen; stalestKey = k; }
+      }
+      if (stalestKey) {
+        relayRegistry.delete(stalestKey);
+        log('warn', 'relay_registry_evict', { evicted: stalestKey.slice(0, 16), last_seen: new Date(stalestAt).toISOString(), size: relayRegistry.size });
+      }
     }
+    const ctIndex = ctEntry ? ctEntry.index : (existing?.last_ct_index ?? existing?.ct_index ?? null);
     relayRegistry.set(pkHash, {
-      url: rUrl, sector: rSector, version: rVersion, edition: rEdition || 'community',
+      url: rUrl, sector: rSector, version: rVersion, edition,
       pk_hash: pkHash, verified_since,
-      last_seen: ctEntry.ts,
-      ct_index: existing?.ct_index ?? ctEntry.index,
-      last_ct_index: ctEntry.index
+      last_seen: ctEntry ? ctEntry.ts : nowIso,
+      ct_index: existing?.ct_index ?? ctIndex,
+      last_ct_index: ctIndex
     });
-    log('info', 'relay_registered', { url: rUrl, sector: rSector, pk_hash: pkHash.slice(0,16)+'…', ct_index: ctEntry.index });
+    log('info', 'relay_registered', { url: rUrl, sector: rSector, pk_hash: pkHash.slice(0,16)+'…', ct_index: ctIndex, logged: !!ctEntry });
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, pk_hash: pkHash, ct_index: ctEntry.index, verified_since }));
+    return res.end(J({ ok: true, pk_hash: pkHash, ct_index: ctIndex, verified_since }));
   }
 
   // ── GET /v2/relays — public registry of verified relay nodes ─────────────────
@@ -5556,9 +5653,16 @@ async function handleRelayRequest(req, res) {
 
   // ── POST /v2/session/join — Receiver bewijst kennis van PSS + bindt pubkeys ─
   // Geen API key nodig — PSS is de authenticatie
-  // Relay verifieert: SHA-256(pss) == commitment  (relay kan dit NIET vervalsen)
+  // Relay verifieert: SHA3-256(pss) == commitment  (relay kan dit NIET vervalsen)
   // Na join: pubkeys gebonden aan sessie, niet overschrijfbaar
+  //
+  // Guessing is budgeted twice: per source address, and per session. See
+  // sessionJoinRateOk above for why both.
   if (path === '/v2/session/join' && req.method === 'POST') {
+    if (!sessionJoinRateOk(clientIp)) {
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+      return res.end(J({ error: 'Too many requests. Retry after 60 seconds.' }));
+    }
     try {
       const d = JSON.parse((await readBody(req, 65536)).toString());
       if (!d.session_id || !d.pss || !d.ecdh_pub) {
@@ -5573,11 +5677,21 @@ async function handleRelayRequest(req, res) {
       }
       if (sess.joined)              { res.writeHead(409); return res.end(J({ error: 'Session already joined — first join wins' })); }
 
-      // Verifieer PSS commitment: SHA-256(pss) moet overeenkomen
+      // Verifieer PSS commitment: SHA3-256(pss) moet overeenkomen.
+      // safeEqual and not !==: everything else in this codebase that compares a
+      // secret is constant-time (lib/auth-gate.js), and a comparison that leaks
+      // how far it got is an offline lever on a weak passphrase.
       const pssHash = crypto.createHash('sha3-256').update(d.pss).digest('hex');
-      if (pssHash !== sess.commitment) {
-        log('warn', 'session_join_bad_pss', { sid: d.session_id.slice(0, 12) });
-        res.writeHead(403); return res.end(J({ error: 'Pre-shared secret does not match commitment' }));
+      if (!authGate.safeEqual(pssHash, sess.commitment)) {
+        sess.bad_attempts = (sess.bad_attempts || 0) + 1;
+        const spent = sess.bad_attempts >= SESSION_JOIN_MAX_ATTEMPTS;
+        if (spent) sessions.delete(d.session_id);
+        log('warn', 'session_join_bad_pss', { sid: d.session_id.slice(0, 12), attempt: sess.bad_attempts, burned: spent });
+        res.writeHead(403);
+        return res.end(J({
+          error: 'Pre-shared secret does not match commitment',
+          attempts_left: Math.max(0, SESSION_JOIN_MAX_ATTEMPTS - sess.bad_attempts),
+        }));
       }
 
       // PSS verified — bind pubkeys (first-join-wins, onveranderbaar)
@@ -5787,6 +5901,20 @@ async function handleRelayRequest(req, res) {
     let deviceId;
     try { deviceId = decodeURIComponent(pkm[1]); }
     catch { res.writeHead(400); return res.end(J({ error: 'Invalid percent-encoding in path' })); }
+    // A named device slot belongs to an account, and reading one needs the key
+    // that owns it. These three routes sit before the auth gate so the keyless
+    // inv_ share-link flow can work, and until the 2026-09-05 review (finding
+    // 22l) they let that keylessness spill onto the named slots as well: acctOf
+    // returns the header value verbatim for a key it does not know, so
+    // `X-Api-Key: <account_id>` addressed any account's namespace. Today
+    // account_id and api_key are the same string, so that header is also the
+    // real key and little is lost; the moment accounts move to non-secret
+    // acct_ ids, it becomes a cross-account read oracle. The inv_ branch stays
+    // keyless, which is the whole reason these routes are here.
+    if (!INVITE_RE.test(deviceId) && !keyData?.active) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
+    }
     // Invite sessions: stored and retrieved without API key
     const _pkKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${acctOf(apiKey)}`;
     const entry = pubkeys.get(_pkKey);
@@ -5807,6 +5935,11 @@ async function handleRelayRequest(req, res) {
     let deviceId;
     try { deviceId = decodeURIComponent(fpm[1]); }
     catch { res.writeHead(400); return res.end(J({ error: 'Invalid percent-encoding in path' })); }
+    // Same rule as GET /v2/pubkey/:device above.
+    if (!INVITE_RE.test(deviceId) && !keyData?.active) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
+    }
     const _fKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${acctOf(apiKey)}`;
     const entry = pubkeys.get(_fKey);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'No pubkeys for this device.' })); }
@@ -5824,6 +5957,13 @@ async function handleRelayRequest(req, res) {
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.device_id || !d.fingerprint) { res.writeHead(400); return res.end(J({ error: 'device_id and fingerprint required' })); }
+      // Same rule as GET /v2/pubkey/:device above. A fingerprint check is a
+      // yes/no oracle over a stored key, so it needs the same entitlement as
+      // reading the key it is checking.
+      if (!INVITE_RE.test(d.device_id) && !keyData?.active) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
+      }
       const _vKey = INVITE_RE.test(d.device_id) ? d.device_id : `${d.device_id}:${acctOf(apiKey)}`;
       const entry = pubkeys.get(_vKey);
       if (!entry) { res.writeHead(404); return res.end(J({ error: 'No pubkeys for this device.' })); }
@@ -5954,7 +6094,11 @@ async function handleRelayRequest(req, res) {
   }
 
   // ── POST /v2/session/create — Sender maakt PSS-gebonden sessie ─────────────
-  // Vereist: geldige API key, commitment = SHA-256(pss) als hex
+  // Vereist: geldige API key, commitment = SHA3-256(pss) als hex.
+  // SHA3, niet SHA-256: /join rekent sha3-256 en deze kant zei jarenlang iets
+  // anders. Beide geven 64 hex, dus een SDK die de foutmelding volgde bouwde een
+  // sessie die nooit te joinen was en kreeg pas bij join een 403 die "verkeerde
+  // PSS" zei. docs/security.md had het als enige goed.
   // Geeft: session_id (pss_<32hex>), expires_ms
   // Relay ziet alleen de hash — kan PSS niet reconstrueren
   if (path === '/v2/session/create' && req.method === 'POST') {
@@ -5963,7 +6107,7 @@ async function handleRelayRequest(req, res) {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.commitment || !/^[a-f0-9]{64}$/.test(d.commitment)) {
         res.writeHead(400);
-        return res.end(J({ error: 'commitment must be SHA-256 hex (64 chars) of your pre-shared secret' }));
+        return res.end(J({ error: 'commitment must be SHA3-256 hex (64 chars) of your pre-shared secret' }));
       }
       const ttl  = Math.min(Math.max(parseInt(d.ttl_ms) || 600000, 60000), 3600000); // 1min–1h, default 10min
       const sid  = 'pss_' + crypto.randomBytes(24).toString('hex');
@@ -6345,7 +6489,17 @@ async function handleRelayRequest(req, res) {
   if (delm && req.method === 'DELETE') {
     const entry = blobStore.get(delm[1]);
     if (!entry) { res.writeHead(404); return res.end(J({ error: 'Not found' })); }
-    if (entry.apiKey && entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
+    // An anonymous blob is stored with apiKey: null, and `entry.apiKey && ...`
+    // skipped the owner check entirely for it. On the READ side that is the
+    // design and it is written down: the 64-hex hash is the capability, the
+    // payload is encrypted with a key in the URL fragment that the relay never
+    // sees, and it burns after one read. Destroying is not reading. Whoever
+    // glimpsed the hash in an access log, a browser history or a mail gateway's
+    // link scanner could end the transfer without ever being able to open it,
+    // and the sender would never learn why. So a blob with no owner has no
+    // owner who can abort it either: it goes when it burns or when its TTL
+    // runs out. The 2026-09-05 review, finding 22d.
+    if (!entry.apiKey || entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
     blobDrop(delm[1]);
     // Remove associated download token if present
     for (const [t, d] of downloadTokens.entries()) { if (d.hash === delm[1]) { downloadTokens.delete(t); break; } }
@@ -8592,25 +8746,38 @@ async function handleRelayRequest(req, res) {
       const _signerRec = entitlementRecordOf(accountId) || { plan: _signerPlan };
       const _signEnt = entitlements.getEntitlements(_signerRec).parasign;
       const _signIncluded = _signEnt.quotas.signs_month;
-      let _signUsed = null; // best-effort count this month, feeds the 200 quota field
+      let _signUsed = null;      // count this month, feeds the 200 quota field
+      let _signReserved = false; // this request took a slot and owes a release if the signature does not land
       // No `accountId &&` here on purpose: the account is resolved above and an
       // absent one already returned 403, so this gate can no longer be skipped by
       // leaving a field out of the request.
+      //
+      // The gate DECIDES AND COUNTS in one redis round trip (quota.gateSign, one
+      // Lua script). It used to read the count here, decide here, and increment
+      // 38 lines below, past a whole ML-DSA verification: ten requests that
+      // arrived together all read the same number, all found room, and all
+      // signed. See the 2026-09-05 review, finding 8.
+      //
+      // Counting first costs one thing, and it is paid back below: a signature
+      // the store then rejects, or an idempotent retry, has taken a slot it did
+      // not use, so both release it. That is the same reservation shape
+      // lib/coupon.js uses for a seat.
+      //
+      // The rule itself is still quota.signGateDecision's `used >= included`; the
+      // Lua enforces the same comparison, and quota-gate.test.js holds the two to
+      // each other at the boundary so the /v1 create gate cannot drift from this
+      // one.
       if (Number.isFinite(_signIncluded)) {
-        try {
-          const _u = await quota.readUsage(redisClient, accountId);
-          if (_u.available && Number.isFinite(_u.signs_this_month)) {
-            _signUsed = _u.signs_this_month;
-            const _dec = quota.signGateDecision(_signUsed, _signEnt);
-            if (!_dec.allowed) {
-              log('info', 'quota_sign_declined', { account: String(accountId).slice(0, 12), plan: _signEnt.tier, reason: _dec.reason, limit: _dec.limit, used: _signUsed });
-              res.writeHead(402, { 'Content-Type': 'application/json' });
-              return res.end(J({ error: 'monthly_sign_quota_reached', dimension: 'signs_month',
-                plan: _signEnt.tier, limit: _dec.limit, used: _signUsed,
-                reset_date: quota.nextResetDate() }));
-            }
-          }
-        } catch (qe) { log('warn', 'quota_sign_pregate_failed', { err: qe.message }); }
+        const _g = await quota.gateSign(redisClient, accountId, _signIncluded, log);
+        if (!_g.allowed) {
+          log('info', 'quota_sign_declined', { account: String(accountId).slice(0, 12), plan: _signEnt.tier, reason: 'quota', limit: _signIncluded, used: _g.used });
+          res.writeHead(402, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'monthly_sign_quota_reached', dimension: 'signs_month',
+            plan: _signEnt.tier, limit: _signIncluded, used: _g.used,
+            reset_date: quota.nextResetDate() }));
+        }
+        _signReserved = _g.counted;
+        if (Number.isFinite(_g.used)) _signUsed = _g.used;
       }
 
       const out = await store.sign(id, pi, signerPub, sig, {
@@ -8620,6 +8787,9 @@ async function handleRelayRequest(req, res) {
         appearance: d.appearance,
       });
       if (!out.ok) {
+        // The slot was taken before the store had its say. The signature did not
+        // land, so the month does not owe it.
+        if (_signReserved) await quota.releaseSign(redisClient, accountId, log);
         const code = out.code === 'not_found' ? 404
           : (out.code === 'bad_signature' || out.code === 'invalid_appearance') ? 400
           : (out.code === 'closed' || out.code === 'voided' || out.code === 'invite_expired') ? 410
@@ -8630,16 +8800,22 @@ async function handleRelayRequest(req, res) {
         return res.end(J({ error: out.code }));
       }
 
-      // Count exactly one signature per NEW accepted party-signature (signs_month
-      // is a signature counter, so multi-party envelopes count per party). An
-      // 'idem' retry never reaches recordSign, so the counter cannot double-count
-      // on retry. Awaited (single INCR) so the 200 below reports fresh numbers;
-      // fail-open: a redis hiccup never blocks the signer's 200.
-      if (out.code === 'new') {
-        const _r = await quota.recordSign(redisClient, accountId, log);
-        if (_r.counted) _signUsed = _r.used;
-        else if (_signUsed != null) _signUsed += 1; // count failed: still reflect this sign best-effort
+      // Exactly one signature is counted per NEW accepted party-signature
+      // (signs_month is a signature counter, so multi-party envelopes count per
+      // party). The count was already taken by the gate above, so all that is
+      // left here is the retry case: an 'idem' answer means this signature was
+      // already counted the first time round, and the slot this request reserved
+      // has to go back or a client that retries pays twice for one signature.
+      if (out.code !== 'new' && _signReserved) {
+        const _rel = await quota.releaseSign(redisClient, accountId, log);
+        if (Number.isFinite(_rel.used)) _signUsed = _rel.used;
+        _signReserved = false;
       }
+      // A path that reserved a slot and neither released it nor signed would
+      // leak a unit a month. There is no such path: every return between the
+      // gate and here releases first, and the only remaining exits are this
+      // 200 and the throw that the outer handler turns into a 500 (where a lost
+      // unit is the safe direction and the month self-heals on the 1st).
 
       // ── Completion webhooks (were never fired from the sign path) ───────────
       // envelope.sent/.voided already fire from the /v1 router; the sign path (in

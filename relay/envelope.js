@@ -484,9 +484,39 @@ class EnvelopeStore {
     };
   }
 
-  // Public view. Redacted: party labels are shown but email hashes are
-  // omitted, and signatures are returned only as length / pk-hash.
-  async getRedacted(id) {
+  // The envelope as a projection, in two strengths.
+  //
+  // WHY THERE ARE TWO. The 2026-09-05 hostile review, findings 4 and 5. GET
+  // /v2/envelopes/:id is public on purpose: a recipient is an outside party who
+  // has no API key. What that GET answered, though, was the same object the
+  // owner sees. With nothing but the id, a passer-by got the document's full
+  // SHA3-256, the original filename up to 200 characters, the name the sender
+  // typed for every party, who had signed and when, and where on the page.
+  //
+  // Two of those are worse than they look:
+  //
+  //   doc_hash is a confirmation oracle. Anyone holding a candidate PDF proves
+  //   offline that this exact file is the one in this envelope. That is the
+  //   zero-knowledge claim, undone at the metadata layer.
+  //
+  //   signer_pk_hash is a join key. GET /v2/lookup-signer/:pk_hash sits before
+  //   the auth gate, and it used to answer with the signer's real email
+  //   address. Two unauthenticated GETs turned an envelope id into the mailbox
+  //   of everyone who had signed it. That route now needs a key for the address
+  //   (relay.js), and this projection no longer hands out the hash to start
+  //   from.
+  //
+  // The relay's OWN developer API had already decided this the other way for
+  // the same object: docs/parasign-open-api-spec.md says GET /v1/envelopes/:id
+  // redacts signer names unless the caller is owner or participant, and
+  // lib/parasign-open-api.js implements it. Two routes over one envelope with
+  // opposite answers is not a policy, so the stricter one wins.
+  //
+  // `authorized` defaults to FALSE. That is the whole point: a new caller that
+  // forgets the flag gets the safe view, not the leaky one. The two callers
+  // that pass true have both already proved who they are (the account that owns
+  // the envelope, listing its own).
+  async getRedacted(id, { authorized = false } = {}) {
     if (!this.available()) throw new Error('redis unavailable');
     const key = 'env:' + id;
     const h = await this.redis.hGetAll(key);
@@ -495,36 +525,45 @@ class EnvelopeStore {
     const parties = [];
     for (let i = 0; i < partyCount; i++) {
       const sig = h['p' + i + '_sig'] || '';
-      parties.push({
+      const party = {
         index: i,
-        label: h['p' + i + '_label'] || null,
         status: sig ? 'signed' : (h['p' + i + '_status'] || 'pending'),
-        signed_at: h['p' + i + '_signed_at'] || null,
-        signer_pk_hash: sig ? crypto.createHash('sha3-256').update(Buffer.from(sig.split(':')[1] || '', 'base64')).digest('hex') : null,
-        appearance: sig && h['p' + i + '_appearance'] ? storedAppearance(h['p' + i + '_appearance']) : null,
-        appearance_hash: sig ? (h['p' + i + '_appearance_hash'] || null) : null,
-      });
+      };
+      if (authorized) {
+        // A name, a moment and a position are all about a person. The public
+        // view says how far along the envelope is, and nothing about who.
+        party.label = h['p' + i + '_label'] || null;
+        party.signed_at = h['p' + i + '_signed_at'] || null;
+        party.signer_pk_hash = sig ? crypto.createHash('sha3-256').update(Buffer.from(sig.split(':')[1] || '', 'base64')).digest('hex') : null;
+        party.appearance = sig && h['p' + i + '_appearance'] ? storedAppearance(h['p' + i + '_appearance']) : null;
+        party.appearance_hash = sig ? (h['p' + i + '_appearance_hash'] || null) : null;
+      }
+      parties.push(party);
     }
-    return {
+    const out = {
       id: h.id,
       status: h.status,
-      doc_hash: h.doc_hash,
       binding_mode: h.binding_mode || 'open',
       recipe_version: parseInt(h.recipe_version, 10) || 1,
-      original_filename: h.original_filename || null,
       created_at: h.created_at,
       expires_at: h.expires_at,
       completed_at: h.completed_at || null,
       voided_at: h.voided_at || null,
       party_count: partyCount,
       signed_count: parseInt(h.signed_count, 10) || 0,
-      // The position the creator asked every party to sign at. Public on
-      // purpose: /co-sign seeds its placement editor from it. A party may move
-      // it, and their signature binds where they actually signed, not this.
-      requested_appearance: h.requested_appearance ? storedAppearance(h.requested_appearance) : null,
-      requested_appearance_hash: h.requested_appearance_hash || null,
       parties,
     };
+    if (authorized) {
+      out.doc_hash = h.doc_hash;
+      out.original_filename = h.original_filename || null;
+      // The position the creator asked every party to sign at. /co-sign seeds
+      // its placement editor from it, and /co-sign now asks with its party
+      // token, so this no longer has to be public to do its job. A party may
+      // move it, and their signature binds where they actually signed.
+      out.requested_appearance = h.requested_appearance ? storedAppearance(h.requested_appearance) : null;
+      out.requested_appearance_hash = h.requested_appearance_hash || null;
+    }
+    return out;
   }
 
   async isOwner(id, accountId) {
@@ -674,7 +713,9 @@ class EnvelopeStore {
     const rows = await Promise.all(ids.map(async (id) => {
       const storedAccount = await this.redis.hGet('env:' + id, 'account_id');
       if (storedAccount && !safeTextEqual(storedAccount, accountId)) return null;
-      const env = await this.getRedacted(id);
+      // The account was matched against the record two lines up, so this is the
+      // owner reading their own envelope: the full projection.
+      const env = await this.getRedacted(id, { authorized: true });
       if (!env) return null;
       return {
         id: env.id,
@@ -955,6 +996,26 @@ class EnvelopeStore {
       // Same requested position as the public view: one box for every party.
       requested_appearance: h.requested_appearance ? storedAppearance(h.requested_appearance) : null,
       requested_appearance_hash: h.requested_appearance_hash || null,
+      // Everything the public projection used to hand to a passer-by, now for
+      // the one caller entitled to it: the holder of this party's invite token,
+      // whose token was checked against the record above. A co-signer has to
+      // see how many parties there are and which of them have signed, and
+      // /co-sign reads exactly these three fields; without them here, the fix
+      // for findings 4 and 5 would have to keep the leak to keep the page.
+      party_count: partyCount,
+      signed_count: parseInt(h.signed_count, 10) || 0,
+      parties: Array.from({ length: partyCount }, (_, i) => {
+        const s_ = h['p' + i + '_sig'] || '';
+        return {
+          index: i,
+          label: h['p' + i + '_label'] || null,
+          status: s_ ? 'signed' : (h['p' + i + '_status'] || 'pending'),
+          signed_at: h['p' + i + '_signed_at'] || null,
+          signer_pk_hash: s_ ? crypto.createHash('sha3-256').update(Buffer.from(s_.split(':')[1] || '', 'base64')).digest('hex') : null,
+          appearance: s_ && h['p' + i + '_appearance'] ? storedAppearance(h['p' + i + '_appearance']) : null,
+          appearance_hash: s_ ? (h['p' + i + '_appearance_hash'] || null) : null,
+        };
+      }),
       party: {
         index: pi,
         label: h['p' + pi + '_label'] || null,
