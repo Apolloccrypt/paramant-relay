@@ -1328,13 +1328,10 @@ document.addEventListener('DOMContentLoaded', () => {
         $('tb-dl-status').textContent = failureText('download', e);
         $('tb-dl-dot').className = 'dot red';
       });
-    setTimeout(() => initGlobe(), 400);
     return;
   }
 
   loadSessionCredential();
-  // Small delay so DOM is fully painted before Globe.gl reads dimensions
-  setTimeout(() => initGlobe(), 400);
 });
 
 // The session is the only source of the credential, and the credential is no
@@ -1368,6 +1365,25 @@ async function loadSessionCredential() {
   }
 }
 
+// Ctrl+G, and nothing else, opens this. Until 6 September 2026 the page booted
+// the globe 400 ms after every load anyway: 1.0 MB of globe.gl plus 1.9 MB of
+// textures, a WebGL context and a three.js render loop that autorotates for as
+// long as the tab is open, all of it behind an overlay on display:none that a
+// visitor reaches only by knowing the shortcut. On a phone that is the battery
+// and the data of a 3D scene nobody is looking at, and in a headless renderer
+// with no GPU it is a main thread that does not come back: the sweep in
+// scripts/ui-contrast-sweep.mjs had to stop scrolling because of it, the
+// comparison in tests/motion-safety.test.mjs had to be restructured around it,
+// and on 5 September it timed out tests/handshake-meta.test.mjs and
+// tests/end-screen-calm.test.mjs onto tests/known-flaky.tsv. Measured on one
+// core: one task of 26.3 s with no animation frame in it, against a Playwright
+// actionability budget of 30 s. Three workarounds and a flaky register, for a
+// decoration on a shortcut.
+//
+// So it boots on the first open, which is what the comment inside initGlobe()
+// has claimed all along. Opening it is also the moment the wrap finally has a
+// size to hand three.js, instead of the window fallback a display:none parent
+// forced. tests/parashare-boots-quiet.test.mjs is the gate.
 function toggleGlobe() {
   const overlay = document.getElementById('globe-overlay');
   const mainEl  = document.querySelector('main');
@@ -1376,6 +1392,11 @@ function toggleGlobe() {
   if (globeOpen) {
     // Fullscreen HUD mode: hide UI, show HUD panels
     overlay.classList.add('globe-fullscreen');
+    // First open builds it; every one after that only restarts the stats poll.
+    initGlobe().catch((e) => {
+      const loading = document.getElementById('globe-loading');
+      if (loading) loading.textContent = failureText('globe', e);
+    });
     if (mainEl) mainEl.style.display = 'none';
     const _gb = document.getElementById('globe-btn'); if (_gb) _gb.style.color = 'var(--ochre)';
     if (_gb) _gb.style.boxShadow = '0 0 12px rgba(217, 164, 65, .3)';
@@ -1520,8 +1541,9 @@ async function initGlobe() {
   wrap.addEventListener('mousedown', () => { globeInstance.controls().autoRotate = false; });
   wrap.addEventListener('touchstart', () => { globeInstance.controls().autoRotate = false; });
 
-  // Verberg loading
-  document.getElementById('globe-loading').style.display = 'none';
+  // Verberg loading. A class, not an inline style: the rule that shows the ring
+  // in fullscreen is !important and would win over the inline one.
+  document.getElementById('globe-overlay').classList.add('globe-ready');
 
   // Poll relay stats
   startGlobePoll();

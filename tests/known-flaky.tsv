@@ -19,11 +19,26 @@
 # contradicting one it already signed" - was fixed instead: relay.js was losing
 # the last appends at shutdown. See relay/test/route-ct-exit-durability.test.js.
 #
+# The two rows this file carried from 5 to 6 September 2026 -
+# tests/handshake-meta.test.mjs and tests/end-screen-calm.test.mjs, both timing
+# out inside a /parashare hand-over - were the same defect and it was in the
+# product, not in the tests. /parashare built a WebGL globe 400 ms after every
+# load, behind an overlay on display:none that no visitor could open at all
+# (Ctrl+G hid the page and showed nothing). On a runner with no GPU that is one
+# task of 26 seconds with no animation frame in it, against Playwright's 30. The
+# globe now builds on the first Ctrl+G, the shortcut works, and
+# tests/parashare-boots-quiet.test.mjs holds it there.
+#
+# The register also got the reading wrong, and that is worth writing down. Both
+# rows said "green on main". Main was not green: it went red with the same
+# stack at 2026-09-06T01:02Z, run 34002770950, an hour after the rows were
+# written. Over the same window branches failed 9 of 48 sign-e2e runs and main 1
+# of 12, which is one rate and not two. Branches get four times the runs, so
+# they show the failure four times as often. "Not on main" was sample size.
+#
 # A row here does NOT make anything green. check-flaky-register.sh fails on a
 # STALE row and on nothing else; a red suite stays red. What the row buys is
 # that the next person reading the red already knows it is known, since when,
 # and on which runs it was measured.
 #
 # suite	test	seen	source	why
-tests/handshake-meta.test.mjs	the two-file ParaShare handshake (scrollIntoViewIfNeeded op #btn-create-session)	2026-09-05	sign-e2e runs 33992956059, 33995309881, 33995562181, 33997515696	TimeoutError op "waiting for element to be stable" bij tests/handshake-meta.test.mjs:243, dat op main landde in 1622b527. Rood op vier runs vanavond, op drie verschillende takken, groen op andere runs van dezelfde takken. Niet van deze tak: deze PR raakt geen frontend en geen browser-suite.
-tests/end-screen-calm.test.mjs	de eindschermen blijven rustig	2026-09-05	sign-e2e runs 33995562181 (de-rest-van-de-review), 33998139643 (deze tak)	Rood op twee runs op twee verschillende takken, groen op main met dezelfde frontend (run 33995298677 op 1622b527) en groen op andere runs van dezelfde takken. Browser-suite, 47 s per keer. Niet van deze tak: deze PR raakt geen frontend.
