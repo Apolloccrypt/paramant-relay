@@ -48,7 +48,7 @@ const SITE = 'https://paramant.app';
 const allow = sameOrigin.buildAllowList(SITE, '');
 
 const ask = (over = {}) => sameOrigin.verdict({
-  method: 'POST', hasCookie: true, origin: '', secFetchSite: '', allow, ...over,
+  method: 'POST', path: '/user/account/totp/reset', hasCookie: true, origin: '', secFetchSite: '', allow, ...over,
 });
 
 test('the check is mounted in front of the whole router, before the routes', () => {
@@ -131,6 +131,21 @@ test('the allow list is built from SITE_URL, not from a hardcoded host', () => {
   assert.match(SRC, /CSRF_EXTRA_ORIGINS/, 'there is no way to add an origin without editing code');
 });
 
+test('exactly one write is exempt, and it is the one that only destroys the caller own session', () => {
+  // The Outlook task pane runs on addin.paramant.app and its logout is a simple
+  // cross-origin POST: no preflight, cookie attached, response hidden by CORS.
+  // It works today, the add-in ignores the answer, and an origin check would
+  // silently stop it revoking anything. Signing somebody out is the one write
+  // where refusing costs a shipped client more than it buys.
+  assert.deepStrictEqual([...sameOrigin.EXEMPT_PATHS], ['/user/logout'],
+    'the exempt set has changed. A write that GRANTS anything does not belong in it.');
+  assert.strictEqual(ask({ path: '/user/logout', origin: 'https://addin.paramant.app' }).ok, true);
+  assert.strictEqual(ask({ path: '/user/logout', origin: 'https://evil.example.test' }).reason, 'exempt_path');
+  // And the exemption is a PATH, not a prefix: nothing else under it rides along.
+  assert.strictEqual(ask({ path: '/user/logout/all', origin: 'https://legal.paramant.app' }).ok, false);
+  assert.strictEqual(ask({ path: '/user/account/key', origin: 'https://addin.paramant.app' }).ok, false);
+});
+
 test('self-test: the refusal reason names the origin, so a broken client is diagnosable', () => {
   const v = ask({ origin: 'https://legal.paramant.app' });
   assert.strictEqual(v.ok, false);
@@ -186,6 +201,17 @@ async function cookie() {
   }), { EX: 3600 });
   return `paramant_user_session=${token}`;
 }
+
+test('over HTTP: the add-in can still sign a user out from its own host', async () => {
+  if (!srv) return;
+  const Cookie = await cookie();
+  const r = await fetch(`${srv.base}/api/user/logout`, {
+    method: 'POST', headers: { Cookie, Origin: 'https://addin.paramant.app' },
+  });
+  assert.notStrictEqual(r.status, 403, 'the Outlook task pane can no longer log anybody out');
+  assert.strictEqual(await rc.get(`paramant:user:session:${Cookie.split('=')[1]}`), null,
+    'the logout was allowed through but revoked nothing');
+});
 
 test('over HTTP: a same-site sector origin cannot drive a cookie write', async () => {
   if (!srv) return;

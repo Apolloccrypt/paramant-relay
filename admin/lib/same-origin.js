@@ -61,11 +61,32 @@ const EXTENSION_SCHEME = /^(chrome-extension|moz-extension|safari-web-extension)
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+// Writes that are exempt, and there is exactly one.
+//
+// The Outlook task pane is served from https://addin.paramant.app
+// (deploy/nginx/addin.paramant.app.conf) and calls
+// POST https://paramant.app/api/user/logout with credentials: 'include' and no
+// body and no Content-Type. That is a SIMPLE request: no preflight, so the
+// browser sends it and the cookie rides along, and only the RESPONSE is hidden
+// from the caller by CORS. The add-in already ignores the answer. In other
+// words this call works today and an origin check would silently stop it
+// revoking the session, while `extensions/outlook-addin` keeps reporting
+// success. Its /login call is preflighted and already fails, so nothing else
+// there is at stake.
+//
+// Exempting a forced logout costs nothing an attacker wants. The worst a
+// cross-site page achieves is signing somebody out: no state is read, no state
+// is escalated, and the session it destroys is the victim's own. That is the
+// one place where breaking a shipped first-party client is the worse trade.
+// Widening this set to anything that GRANTS is not the same decision.
+const EXEMPT_PATHS = new Set(['/user/logout']);
+
 // Pure, so the whole decision table is testable without a server.
 // Returns { ok: true } or { ok: false, reason }.
-function verdict({ method, hasCookie, origin, secFetchSite, allow, allowLocalhost = false }) {
+function verdict({ method, path, hasCookie, origin, secFetchSite, allow, allowLocalhost = false }) {
   if (SAFE_METHODS.has(String(method || '').toUpperCase())) return { ok: true, reason: 'safe_method' };
   if (!hasCookie) return { ok: true, reason: 'no_session_cookie' };
+  if (EXEMPT_PATHS.has(String(path || ''))) return { ok: true, reason: 'exempt_path' };
 
   const o = String(origin || '').trim();
   if (o) {
@@ -84,4 +105,4 @@ function verdict({ method, hasCookie, origin, secFetchSite, allow, allowLocalhos
   return { ok: true, reason: 'no_browser_headers' };
 }
 
-module.exports = { buildAllowList, verdict, EXTENSION_SCHEME, SAFE_METHODS };
+module.exports = { buildAllowList, verdict, EXTENSION_SCHEME, SAFE_METHODS, EXEMPT_PATHS };

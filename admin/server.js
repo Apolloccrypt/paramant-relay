@@ -4612,6 +4612,9 @@ const CSRF_ALLOW_LOCALHOST = process.env.NODE_ENV !== 'production';
 function requireSameOrigin(req, res, next) {
   const v = sameOrigin.verdict({
     method: req.method,
+    // req.path inside a mounted router is the path BELOW the mount, so this is
+    // '/user/logout' and not '/api/user/logout'. EXEMPT_PATHS is written that way.
+    path: req.path,
     hasCookie: !!parseCookies(req).paramant_user_session,
     origin: req.headers.origin,
     secFetchSite: req.headers['sec-fetch-site'],
