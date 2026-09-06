@@ -207,7 +207,12 @@ async function authMiddleware(req, res, next) {
   }
 }
 
-function relayFetch(sector, relPath, method, body, rawResponse, tokenOverride) {
+// `withInternal` adds X-Internal-Auth, the SECOND relay gate. It is opt-in per
+// call rather than always on, because relayFetch also carries calls that must
+// stay first-gate only: the anonymous inbound proxy sends an empty token, and a
+// header the caller did not earn should not ride along behind it. Routes that
+// mutate an entitlement pass it; callRelay always sends it.
+function relayFetch(sector, relPath, method, body, rawResponse, tokenOverride, withInternal) {
   return new Promise((resolve, reject) => {
     const base = SECTORS[sector];
     if (!base) return reject(new Error(`Unknown sector: ${sector}`));
@@ -219,6 +224,7 @@ function relayFetch(sector, relPath, method, body, rawResponse, tokenOverride) {
       path: url.pathname + (url.search || ''), method: method || 'GET',
       headers: { 'Content-Type': 'application/json', 'X-Admin-Token': tok, 'Authorization': `Bearer ${tok}` },
     };
+    if (withInternal) opts.headers['X-Internal-Auth'] = INTERNAL_TOKEN;
     if (payload) opts.headers['Content-Length'] = Buffer.byteLength(payload);
     const req = http.request(opts, r => {
       const chunks = [];
@@ -3314,7 +3320,7 @@ api.delete("/user/account", authUser, async (req, res) => {
   // asking to be gone, and until now their email address stayed in users.json on
   // every sector. Article 17 GDPR, and audit finding 5 of 2026-07-21.
   await eachSector(Object.keys(SECTORS), async s => {
-    await relayFetch(s, "/v2/admin/keys/erase", "POST", { key: user_id }, false, ADMIN_TOKEN);
+    await relayFetch(s, "/v2/admin/keys/erase", "POST", { key: user_id }, false, ADMIN_TOKEN, true);
   });
 
   await callRelay("/v2/user/delete-totp", { user_id });
@@ -4215,7 +4221,7 @@ api.post('/admin/set-parasign', authMiddleware, async (req, res) => {/*MARK:para
   if (!await checkAdminRl('set_parasign', 'admin', 30)) return res.status(429).json({ error: 'rate_limited' });
   try {
     const results = await eachSector(Object.keys(SECTORS), async s =>
-      relayFetch(s, '/v2/admin/keys/set-parasign', 'POST', { key, enabled }, false, ADMIN_TOKEN));
+      relayFetch(s, '/v2/admin/keys/set-parasign', 'POST', { key, enabled }, false, ADMIN_TOKEN, true));
     const anyOk = Object.values(results).some(r => r && r.status === 200);
     if (!anyOk) return res.status(502).json({ error: 'relay_error', results });
     await Promise.allSettled(Object.keys(SECTORS).map(s => relayFetch(s, '/v2/reload-users', 'POST', {}, false, ADMIN_TOKEN)));
@@ -4289,7 +4295,7 @@ api.post('/admin/delete-account', authMiddleware, async (req, res) => {
     // 2026-07-21. Errors are swallowed like the revoke above: a sector that is
     // briefly unreachable must not leave the deletion half done and unretryable,
     // and the call is idempotent so a retry is free.
-    await eachSector(Object.keys(SECTORS), async s => relayFetch(s, '/v2/admin/keys/erase', 'POST', { key }, false, ADMIN_TOKEN).catch(() => {}));
+    await eachSector(Object.keys(SECTORS), async s => relayFetch(s, '/v2/admin/keys/erase', 'POST', { key }, false, ADMIN_TOKEN, true).catch(() => {}));
     await callRelay('/v2/user/delete-totp', { user_id: key }).catch(() => {});
     for await (const rkey of scanKeys(redis(), { MATCH: `paramant:user:session:*`, COUNT: 100 })) {
       const raw = await redis().get(rkey).catch(() => null);

@@ -237,8 +237,12 @@ test('the same token is accepted as a Bearer, and that is the only other form', 
 });
 
 test('the double-gated admin routes need X-Internal-Auth on top of the admin token', async () => {
-  // update-plan / set-product-plan / entitlements are reachable only with BOTH
-  // headers (relay.js:5246, 5286, 5307). The admin token alone must not do.
+  // update-plan / set-product-plan / entitlements were the first three. Since
+  // 2026-09-06 the set is everything under /v2/admin that moves an entitlement
+  // or mints a credential: set-parasign, mint-parasign, keys/erase and
+  // keys/primary joined them. Which routes belong is asserted as a class in
+  // admin-gate-parity.test.js; this is the behavioural half, on a booted relay.
+  // The admin token alone must not do.
   const onlyAdmin = await srv.get('/v2/admin/entitlements/acct_live', { headers: { 'X-Admin-Token': ADMIN } });
   assert.strictEqual(onlyAdmin.status, 401);
   assert.deepStrictEqual(onlyAdmin.json, { error: 'unauthorized' });
@@ -255,6 +259,14 @@ test('the double-gated admin routes need X-Internal-Auth on top of the admin tok
     headers: { 'X-Admin-Token': ADMIN, 'X-Internal-Auth': INTERNAL + 'x' },
   });
   assert.strictEqual(wrongInternal.status, 401);
+
+  // The route that MINTS. It used to stand behind the admin token alone, which
+  // made one leaked secret enough to walk out with a working ParaSign key.
+  const mintOne = await srv.post('/v2/admin/keys/mint-parasign', {
+    headers: { 'X-Admin-Token': ADMIN }, body: { account_id: 'acct_live', test: true },
+  });
+  assert.strictEqual(mintOne.status, 401, 'mint-parasign answered on the admin token alone');
+  assert.ok(!/psk_/.test(mintOne.text), 'a refused mint still leaked a key');
   did();
 });
 

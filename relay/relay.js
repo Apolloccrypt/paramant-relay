@@ -7246,7 +7246,13 @@ async function handleRelayRequest(req, res) {
   // places the account lives, keeping what a payment must stay traceable by.
   // Idempotent: a retry after a sector was briefly unreachable finds nothing left
   // and reports zero, which is a success and not an error.
+  //
+  // Two gates since 2026-09-06: ADMIN_TOKEN by the admin-path fence, plus
+  // X-Internal-Auth here. Erasure is irreversible by design, so it belongs on
+  // the same footing as the routes that move an entitlement. Both admin call
+  // sites pass the header (admin/server.js, relayFetch withInternal).
   if (path === '/v2/admin/keys/erase' && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       const target = d.account_id || d.key;
@@ -8016,10 +8022,17 @@ async function handleRelayRequest(req, res) {
   // ── POST /v2/admin/keys/set-parasign - grant/revoke the ParaSign /v1 API ────
   // Admin override for the `parasign` entitlement, alongside the automatic grant
   // on payment. Sets the flag on the target key AND every sibling key of its
-  // account (account-level grant), then persists to users.json. ADMIN_TOKEN-gated
-  // by the admin-path guard above; the admin server fans this out to every sector
-  // so the grant is fleet-consistent. Additive: no current relay path gates on it.
+  // account (account-level grant), then persists to users.json. The admin server
+  // fans this out to every sector so the grant is fleet-consistent.
+  //
+  // TWO gates, not one. ADMIN_TOKEN by the admin-path guard above, and
+  // X-Internal-Auth here, the same pair update-plan and set-product-plan carry.
+  // Until 2026-09-06 this route had only the first, which made one leaked secret
+  // enough to hand out the /v1 API to any account. The neighbouring routes that
+  // move the same entitlement had two, and that asymmetry is what the 2026-09-05
+  // review found. admin/server.js sends the second header on this call.
   if (path === '/v2/admin/keys/set-parasign' && req.method === 'POST') {/*MARK:parasign_endpoint*/
+    if (!_internalOk()) return _internalReject();
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       const key = (d.key || '').toString();
@@ -8043,17 +8056,33 @@ async function handleRelayRequest(req, res) {
   }
 
   // ── POST /v2/admin/keys/mint-parasign - mint a psk_ ParaSign /v1 key ─────────
-  // Manual admin-setup path. ADMIN_TOKEN-gated (admin-path guard above). Runs the
-  // SAME mintParasignKey generator as the self-serve route, so both paths share
-  // one key format + one storage shape. Binds the key to {account_id} (or the
-  // account of {key}); returns the FULL key ONCE (never re-retrievable in full).
+  // Manual admin-setup path. Runs the SAME mintParasignKey generator as the
+  // self-serve route, so both paths share one key format + one storage shape.
+  // Binds the key to {account_id} (or the account of {key}); returns the FULL key
+  // ONCE (never re-retrievable in full).
+  //
+  // TWO gates: ADMIN_TOKEN by the admin-path guard above, plus X-Internal-Auth,
+  // matching the self-serve route at /v2/user/parasign-keys, which has required
+  // the internal header since it was written. A route that MINTS a credential
+  // standing behind fewer gates than the route that merely moves a tier was the
+  // asymmetry in the 2026-09-05 review.
+  //
+  // `plan` is NOT read from the body any more. It reached buildParasignKeyRecord
+  // as a bare string, and on an account with no per-product plan on record
+  // {"plan":"enterprise"} minted an enterprise key with no paid_until, which
+  // entitlements reads as never expiring. The account's own plan is already the
+  // fallback inside mintParasignKey, and there is no legitimate reason to mint a
+  // key at a tier the account does not hold. set-product-plan is the route for
+  // changing what an account holds, and it validates against the ladder.
   if (path === '/v2/admin/keys/mint-parasign' && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       let accountId = (d.account_id && String(d.account_id)) || '';
       if (!accountId && d.key) accountId = acctOf(String(d.key));
       if (!accountId) { res.writeHead(400); return res.end(J({ error: 'account_id or key required' })); }
-      const out = mintParasignKey(accountId, { test: d.test === true, label: d.label, plan: d.plan });
+      const out = mintParasignKey(accountId, { test: d.test === true, label: d.label });
+      try { auditAppend(out.key, 'admin_parasign_key_minted', { account: String(accountId).slice(0, 12), kid: out.kid, mode: out.mode, plan: out.plan }); } catch {}
       res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       return res.end(J({ ok: true, key: out.key, kid: out.kid, account_id: out.account_id, plan: out.plan, mode: out.mode, scope: out.scope, key_masked: out.masked,
         note: 'Store this key now - it is shown once and cannot be retrieved in full again.' }));
@@ -8080,7 +8109,11 @@ async function handleRelayRequest(req, res) {
   // Promotes the chosen key, demotes the previous primary within the account
   // (keysTable.designatePrimary), then persists. Mismatched account_id => 400, so
   // a key can never be moved into an account it does not belong to.
+  // Two gates since 2026-09-06: it rewrites which key an account is billed and
+  // metered through, which is the same class of change as set-product-plan. No
+  // caller in the admin panel reaches it, so nothing had to move with it.
   if (path === '/v2/admin/keys/primary' && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
     try {
       const d = JSON.parse((await readBody(req, 1024)).toString());
       const accountId = (d.account_id || '').toString();
