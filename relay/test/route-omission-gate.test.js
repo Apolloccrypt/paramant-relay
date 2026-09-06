@@ -53,6 +53,7 @@ const quota = require('../lib/quota');
 const RUN = crypto.randomBytes(6).toString('hex');
 const OWNER = `pgp_owner_key_for_the_omission_gate_${RUN}`;
 const OWNER_ACCT = `acct_omission_${RUN}`;
+const OTHER = `pgp_other_${RUN}`;
 const DEFAULT_REDIS = 'redis://127.0.0.1:6399';
 
 let srv = null;
@@ -80,6 +81,10 @@ before(async () => {
       api_keys: [
         // community: signs_month is 2, which is what makes the cap observable.
         { key: OWNER, plan: 'community', active: true, parasign: true, email: 'owner@example.test', account_id: OWNER_ACCT },
+        // A second, unrelated account. DOOR 4 needs two callers who both hold a
+        // valid key, because the DID rebind was never an unauthenticated hole:
+        // it was one paying customer taking another one's device.
+        { key: OTHER, plan: 'community', active: true, email: 'other@example.test', account_id: `acct_other_${RUN}` },
       ],
     },
     env: { REDIS_URL: process.env.REDIS_URL || DEFAULT_REDIS },
@@ -368,5 +373,53 @@ test('DOOR 3: an invite pubkey slot is first-registration-wins, and a refresh st
   assert.strictEqual((await srv.post('/v2/pubkey', {
     headers: asParty(), body: { ...manifest, ecdh_pub: token('b'), kyber_pub: 'file|2|3600000' },
   })).status, 409, 'the _ready slot is one-shot too, so a manifest cannot be swapped either');
+  did();
+});
+
+// ── DOOR 4: an identity slot addressed by public inputs is not re-fillable ───
+//
+// Finding 22b. A DID is sha3-256(device_id + ecdh_pub) and both halves come
+// straight back out of GET /v2/did/:did, which is a declared public route
+// because a DID is a public identifier by design. The registration did an
+// unconditional set, so anyone holding a valid key of their own could take the
+// address over. The reason it matters is not the address: authByDid resolves
+// the principal through the registry entry's owner key, so the rebind pointed
+// the victim's own DID-authenticated traffic into the attacker's account.
+//
+// Asserted as the same property as DOOR 3, on a different registry: fill it,
+// and a different owner may not refill it. Same-owner re-registration must keep
+// working, because a device refreshes itself.
+test('DOOR 4: a DID belongs to whoever registered it first, and stays there', async () => {
+  if (!ready()) return;
+  const deviceId = `dev-door4-${RUN}`;
+  const ecdh = 'c'.repeat(64);
+  const body = { device_id: deviceId, ecdh_pub: ecdh };
+
+  const first = await srv.post('/v2/did/register', { headers: asParty({ 'X-Api-Key': OWNER }), body });
+  assert.strictEqual(first.status, 200, first.text);
+  const theDid = first.json.did;
+  assert.ok(theDid && theDid.startsWith('did:paramant:'), first.text);
+
+  // Both halves of the preimage are public, from a route with no credential.
+  const pub = await srv.get(`/v2/did/${encodeURIComponent(theDid)}`, { headers: asParty() });
+  assert.strictEqual(pub.status, 200, pub.text);
+  assert.strictEqual(pub.json.service[0].device, deviceId, 'the device id is not public after all');
+  assert.strictEqual(pub.json.verificationMethod[0].publicKeyHex, ecdh, 'the ecdh key is not public after all');
+
+  // So a stranger holding nothing but that document can rebuild the request.
+  const steal = await srv.post('/v2/did/register', { headers: asParty({ 'X-Api-Key': OTHER }), body });
+  assert.strictEqual(steal.status, 409, `a second owner took the DID: ${steal.status} ${steal.text}`);
+
+  // And the first owner still holds it.
+  const mine = await srv.get('/v2/did', { headers: asParty({ 'X-Api-Key': OWNER }) });
+  assert.strictEqual(mine.status, 200, mine.text);
+  assert.ok(mine.json.dids.some((e) => e.did === theDid), 'the honest owner lost the DID from his own list');
+  const theirs = await srv.get('/v2/did', { headers: asParty({ 'X-Api-Key': OTHER }) });
+  assert.ok(!theirs.json.dids.some((e) => e.did === theDid), 'the DID showed up in the attacker list');
+
+  // The owner refreshing his own device is not a takeover.
+  const refresh = await srv.post('/v2/did/register', { headers: asParty({ 'X-Api-Key': OWNER }), body });
+  assert.strictEqual(refresh.status, 200, `the owner could not refresh his own DID: ${refresh.text}`);
+  assert.strictEqual(refresh.json.did, theDid);
   did();
 });

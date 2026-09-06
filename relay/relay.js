@@ -3706,10 +3706,44 @@ async function handleRelayRequest(req, res) {
   // shortcut we chose: the Cleverbase Signing API only offers authType
   // "oauth2code", so a natural person has to authorise in the Cleverbase app
   // for every batch of signatures. There is no machine-to-machine route.
+  //
+  // WHO MAY CALL IT. Finding 22c of the 2026-09-05 review: nothing but the flag
+  // check. The route sits above the API-key gate, read a 32 MB body from anyone,
+  // and two of the relay's own policy files already said otherwise --
+  // keys-table.js lists /v2/qes/sign in SIGN_PATHS, the scope class that needs a
+  // sign-capable key, and public-routes.js does NOT declare it, while promising
+  // that no keyless route joins the surface unannounced. The scope check is
+  // wrapped in `if (keyData)` and keyData is always null here, so the
+  // classification was dead policy.
+  //
+  // It is not moved below the gate, because the caller this route exists for is
+  // an external signing party who has no API key: the same person POST /sign
+  // serves. So it takes the same capability that route takes, the per-party
+  // invite token, checked against the store. A key-holding caller passes on the
+  // key instead. Either way there is now a named account or a named party behind
+  // every request, and 12 MB rather than 32.
+  //
+  // Not separately metered, and that is a decision rather than an omission: the
+  // qualified signature is a second signature over a document whose ParaSign
+  // signature the sign route already counted, and the QTSP call itself cannot be
+  // made without the signer's own service token and SAD.
   if (path === '/v2/qes/sign' && req.method === 'POST') {
     if (!qes.enabled()) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+    if (!envSignRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests' })); }
     try {
-      const d = JSON.parse((await readBody(req, 32 * 1024 * 1024)).toString());
+      const d = JSON.parse((await readBody(req, 12 * 1024 * 1024)).toString());
+      if (!keyData?.active) {
+        const _qStore = _envStore();
+        if (!_qStore) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
+        const _qEnv = String(d.envelope_id || '');
+        const _qPi = parseInt(d.party_index, 10);
+        const _qTok = String(d.invite_token || d.token || '');
+        const _qBad = () => { res.writeHead(403, { 'Content-Type': 'application/json' }); res.end(J({ error: 'qes_capability_required', message: 'A qualified signature needs the envelope and the party invite token it belongs to.' })); };
+        if (!/^[A-Za-z0-9_-]{20,64}$/.test(_qEnv) || !Number.isInteger(_qPi) || _qPi < 0 || !_qTok) return _qBad();
+        let _qParty = null;
+        try { _qParty = await _qStore.getForParty(_qEnv, _qPi, _qTok); } catch (qe) { if (redisOutage503(qe, res)) return; }
+        if (!_qParty) return _qBad();
+      }
       const pdf = Buffer.from(String(d.document || ''), 'base64');
       if (pdf.subarray(0, 5).toString('latin1') !== '%PDF-') {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -6904,8 +6938,32 @@ async function handleRelayRequest(req, res) {
       }
       const did = generateDid(d.device_id, d.ecdh_pub);
       const doc = createDidDocument(did, d.device_id, d.ecdh_pub, d.dsa_pub || '');
-      const _didIsNew = !didRegistry.has(did); // overwrite of same did must not double-count
-      didRegistry.set(did, { device_id: d.device_id, key: ownerKey, doc, ts: new Date().toISOString() });
+      // FIRST REGISTRATION WINS, the same rule POST /v2/pubkey has had on its
+      // slot. Finding 22b of the 2026-09-05 review: the set was unconditional
+      // and a DID is sha3-256(device_id + ecdh_pub), both of which GET
+      // /v2/did/:did hands out to anyone who asks -- a DID is a public
+      // identifier by design, so the holder's own counterparties know both
+      // halves of its preimage.
+      //
+      // What the rebind actually did is sharper than "the device moves". The
+      // signing material cannot be swapped (the ecdh key is inside the hash, so
+      // a different key is a different DID), but authByDid resolves the
+      // principal through didRegistry.key. Rebinding pointed the VICTIM'S OWN
+      // DID-authenticated traffic at the attacker's account: his plan, his
+      // account_id, his quota buckets, his device queues.
+      //
+      // A same-owner re-register stays 200 and keeps the stored document rather
+      // than rebuilding it, so `created` does not move under a verifier that
+      // pinned it. The counter is only touched for a genuinely new DID, and a
+      // rebind can no longer leave the previous owner's slot spent forever
+      // while the attacker's count never rises.
+      const held = didRegistry.get(did);
+      if (held && held.key !== ownerKey) {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'DID already registered: first registration wins' }));
+      }
+      const _didIsNew = !held;
+      didRegistry.set(did, { device_id: d.device_id, key: ownerKey, doc: held ? held.doc : doc, ts: new Date().toISOString() });
       if (_didIsNew && ownerKey) didKeyCounts.set(ownerKey, (didKeyCounts.get(ownerKey) || 0) + 1);
       // Pubkey TTL follows the authenticated ParaSend tier; an ANONYMOUS
       // (keyless inv_) registration gets the free-tier TTL, never the pro
@@ -6913,7 +6971,21 @@ async function handleRelayRequest(req, res) {
       // axis, and a key with no plan on file lands on community (7 days) rather
       // than being handed the pro 30 by the `|| 'pro'` default.
       const _didPlan = keyData ? parasendLimitsOf(keyData).tier : 'free';
-      pubkeys.set(`${d.device_id}:${acctOf(apiKey)}`, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', dsa_pub: d.dsa_pub || '', ts: new Date().toISOString(), expires: Date.now() + (_pubkeyTtl[_didPlan] ?? _pubkeyTtl.free) });
+      // The SAME slot POST /v2/pubkey guards with its 409, written here without
+      // one. Two things came with that. Under DID-auth apiKey is '' and acctOf('')
+      // returns '', so the slot collapses to `${device_id}:` -- one namespace
+      // shared by every DID-authenticated caller, readable through
+      // GET /v2/pubkey/:device. And a live slot could be overwritten from this
+      // route even though the front door refuses. Anonymous inv_ registrations
+      // keep their own slot as before; what is refused is writing over a slot
+      // that is still alive and does not belong to this account.
+      const _didSlot = `${d.device_id}:${acctOf(apiKey)}`;
+      const _heldPk = pubkeys.get(_didSlot);
+      if (_heldPk && (!_heldPk.expires || Date.now() < _heldPk.expires) && _heldPk.ecdh_pub !== d.ecdh_pub) {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'Pubkey already registered for this device: first registration wins' }));
+      }
+      pubkeys.set(_didSlot, { ecdh_pub: d.ecdh_pub, kyber_pub: d.kyber_pub || '', dsa_pub: d.dsa_pub || '', ts: new Date().toISOString(), expires: Date.now() + (_pubkeyTtl[_didPlan] ?? _pubkeyTtl.free) });
       const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
       incMetric('did_registrations');
       auditAppend(apiKey, 'did_registered', { did, device: d.device_id });

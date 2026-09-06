@@ -18,6 +18,25 @@
 //   2. every declared public route is in the docs, marked "n/a"
 //   3. every declared route dispatches ABOVE the API-key gate in relay.js, and
 //      the set of exemptions inside that gate is the declared set
+//   4. THE CONVERSE. Checks 1-3 all walk from the declaration outward: they
+//      prove the six declared routes really are public. None of them walks the
+//      other way, and thirty-odd handlers dispatch above that gate. So the file
+//      promised that "no new keyless route joins it unannounced" while only
+//      checking the announced ones.
+//
+//      Finding 22c of the 2026-09-05 review walked in through that hole:
+//      POST /v2/qes/sign, no credential of any kind, a 32 MB body, and BOTH of
+//      the relay's own policy files disagreeing with the code. keys-table.js
+//      lists it in SIGN_PATHS, the scope class for a sign-capable key; the
+//      scope check runs inside `if (keyData)` and keyData is always null on a
+//      keyless route, so the classification was policy that could never fire.
+//      public-routes.js did not list it at all.
+//
+//      The converse check is narrow on purpose: a route the relay itself
+//      classifies as SIGN, SEND or ADMIN_WRITE may not be reachable by a caller
+//      carrying nothing. It does not try to judge the whole keyless surface,
+//      which is a bigger question than one review round; it holds the relay to
+//      its own written-down classification.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -127,4 +146,96 @@ test('the deprecated anonymous upload still carries its Sunset headers', () => {
   assert.match(handler, /res\.setHeader\('Sunset',/, 'the Sunset header is gone');
   assert.ok(declared.get('POST /v2/anon-inbound')?.deprecated,
     'the declaration no longer marks the anonymous upload deprecated');
+});
+
+// ── 4. the converse direction ────────────────────────────────────────────────
+
+const SCOPE_TABLES = ['SIGN_PATHS', 'SEND_PATHS', 'ADMIN_WRITE_PATHS'];
+
+// Reaching a handler above the key gate proves nothing on its own: several of
+// them authenticate by other means, in-route. These are the names that count as
+// asking the caller for something.
+const IN_ROUTE_CREDENTIAL = /keyData|apiKey|_internalOk\(|ADMIN_TOKEN|safeEqual\(|x-admin-token|getForParty\(|_setupModeOn\(|token|verify/i;
+
+// Routes the relay classifies but deliberately answers to anyone. Exact count:
+// a second one is a decision somebody has to write down here.
+const CLASSIFIED_BUT_PUBLIC = [
+  {
+    path: '/v2/sign-dpa',
+    reason: 'the self-service data-processing agreement. A prospective customer signs '
+          + 'the DPA before they have a key, so it cannot want one. It is in SIGN_PATHS '
+          + 'because the table keys on the path prefix and not on what is being signed, '
+          + 'which means a read-only KEY holder is refused a form an anonymous caller '
+          + 'may submit. That asymmetry is cosmetic today (nothing reads the answer) but '
+          + 'it is the misclassification, and the right repair is to move the route out '
+          + 'of SIGN_PATHS rather than to weaken this check.',
+  },
+];
+
+function scopePaths() {
+  const src = fs.readFileSync(path.join(ROOT, 'relay/lib/keys-table.js'), 'utf8');
+  const out = [];
+  for (const name of SCOPE_TABLES) {
+    const m = new RegExp(`${name}\\s*=\\s*new Set\\(\\[([\\s\\S]*?)\\]\\)`).exec(src);
+    assert.ok(m, `${name} is no longer a `+"`new Set([...])`"+` in keys-table.js`);
+    for (const p of m[1].matchAll(/'([^']+)'/g)) out.push({ table: name, path: p[1] });
+  }
+  assert.ok(out.length >= 8, `only ${out.length} classified paths found; the scanner has drifted`);
+  return out;
+}
+
+function handlerBlock(at) {
+  const lines = relaySrc.split('\n');
+  let i = relaySrc.slice(0, at).split('\n').length - 1;
+  while (i > 0 && !lines[i].includes('if (')) i--;
+  let d = 0;
+  let end = lines.length - 1;
+  for (let j = i; j < lines.length; j++) {
+    d += (lines[j].match(/\{/g) || []).length - (lines[j].match(/\}/g) || []).length;
+    if (j > i && d <= 0) { end = j; break; }
+  }
+  return lines.slice(i, end + 1).join('\n');
+}
+
+test('a route the relay classifies as sign, send or admin-write is never answered to nobody', () => {
+  const gate = keyGateAt();
+  const allowed = new Set(CLASSIFIED_BUT_PUBLIC.map((a) => a.path));
+  const offenders = [];
+  const hit = [];
+  for (const { table, path: p } of scopePaths()) {
+    const at = relaySrc.indexOf(`path === '${p}'`);
+    if (at === -1 || at > gate) continue;      // below the gate, or not a literal dispatch
+    hit.push(p);
+    if (IN_ROUTE_CREDENTIAL.test(handlerBlock(at))) continue;
+    if (allowed.has(p)) continue;
+    offenders.push(`${p} (${table}) dispatches above the API-key gate and asks the caller for nothing`);
+  }
+  assert.ok(hit.length >= 5, `only ${hit.length} classified routes found above the gate; the scanner has drifted`);
+  assert.deepEqual(offenders, [], 'dead policy: the relay classifies these and then answers anyone.\n  ' + offenders.join('\n  '));
+});
+
+test('the classified-but-public list is exact and reasoned', () => {
+  const gate = keyGateAt();
+  const stillPublic = [];
+  for (const { path: p } of scopePaths()) {
+    const at = relaySrc.indexOf(`path === '${p}'`);
+    if (at === -1 || at > gate) continue;
+    if (!IN_ROUTE_CREDENTIAL.test(handlerBlock(at))) stillPublic.push(p);
+  }
+  assert.deepEqual([...new Set(stillPublic)].sort(), CLASSIFIED_BUT_PUBLIC.map((a) => a.path).sort(),
+    'the set of classified-but-anonymous routes has changed. Add the new one with a\n'
+    + 'reason, or give it a credential check; remove one that has been closed.');
+  for (const a of CLASSIFIED_BUT_PUBLIC) assert.ok(a.reason.length > 80, `${a.path} has no usable reason`);
+});
+
+test('the qualified-signature route asks who is calling', () => {
+  // The finding itself, pinned as behaviour of the source rather than as a
+  // member of a list, so moving it between lists cannot make it pass.
+  const at = relaySrc.indexOf("path === '/v2/qes/sign'");
+  assert.notEqual(at, -1, 'the QES route is gone; update keys-table.js and this test');
+  const block = handlerBlock(at);
+  assert.match(block, /getForParty\(/, 'the QES route no longer checks the party invite token');
+  assert.match(block, /keyData\?\.active/, 'the QES route no longer accepts a key-holding caller either');
+  assert.match(block, /qes_capability_required/, 'the QES route has no refusal for a caller with no capability');
+  assert.doesNotMatch(block, /readBody\(req, 32 \* 1024 \* 1024\)/, 'the QES route still reads 32 MB from an unnamed caller');
 });

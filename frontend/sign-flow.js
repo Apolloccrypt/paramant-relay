@@ -3040,12 +3040,24 @@ async function addQualifiedSignature(pdfBytes) {
 
   let bin = '';
   for (let i = 0; i < pdfBytes.length; i++) bin += String.fromCharCode(pdfBytes[i]);
+  // The envelope and the party invite token go with the request. The relay used
+  // to take this document from anybody at all; since 2026-09-06 it wants to know
+  // which signing party is asking, and this page is that party. Same capability
+  // the signature submit already uses, so nothing new is handed to the browser.
+  const qesEnv = state.envelope || {};
+  const qesLink = (qesEnv.party_links || []).find((p) => p.party_index === 0) || {};
   let res;
   try {
     res = await fetch('/v2/qes/sign', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ document: btoa(bin), signer_name: state.signer.name || null }),
+      body: JSON.stringify({
+        document: btoa(bin),
+        signer_name: state.signer.name || null,
+        envelope_id: qesEnv.id || null,
+        party_index: 0,
+        invite_token: qesLink.invite_token || null,
+      }),
     });
   } catch {
     line.textContent = 'The qualified signature could not be requested. Your ParaSign signature is unaffected.';
