@@ -51,7 +51,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
-      # Twelve checks, no secrets, no server, no network. It was written as a
+      # Thirteen checks, no secrets, no server, no network. It was written as a
       # pre-commit hook and deploy/deploy-3.1.sh phase 0b runs it against the
       # commit being deployed, but until now it ran in NO workflow at all:
       # security-posture.yml only mentioned it in a comment. Every
@@ -60,7 +60,7 @@ jobs:
       # checks 10, 11 and 12 are precisely the ones a pull request can break for
       # everybody: the style guard, the merge-collision guard on the shared test
       # namespace, and the opt-in on the tracked brand screenshots.
-      - name: Static sanity (twelve checks)
+      - name: Static sanity (thirteen checks)
         run: bash tests/static-sanity.sh
 
   undefined-names:
@@ -284,6 +284,33 @@ jobs:
             echo "missing dependency. Fix the suite; do not add it to a list."
             exit 1
           fi
+
+      # THE SAME ROUTE SUITES, THREE MORE TIMES.
+      #
+      # The step above runs them once, and once is what a flaky test survives.
+      # On 2026-09-05 route-ct-persistence "a relay that lost its tree refuses
+      # to sign a head contradicting one it already signed" went red on two
+      # unrelated pull requests and stayed green on main. Measured on the branch
+      # that fixed it: 0 failures in 100 runs of the suite alone, 3 in 60 with
+      # the other route suites alongside it on four cores. A single pass has no
+      # opinion about that; four passes catch it roughly one time in five, and
+      # then it has a name and a repeat number instead of being read as "CI
+      # being CI" on somebody else's branch.
+      #
+      # It is not a retry: the step is red if ANY repeat is red, and the report
+      # separates a suite that always fails from one that failed in some
+      # repeats and passed in others. The route step above takes about twenty
+      # seconds, so three more passes cost a minute in a job that spends two
+      # building the engine.
+      #
+      # The way out of a red flaky-watch is a fix, or a dated row in
+      # tests/known-flaky.tsv that expires after fourteen days (static-sanity
+      # check 13). Not a re-run.
+      - name: Flaky watch - the route suites, repeated under the same load
+        env:
+          REDIS_URL: redis://127.0.0.1:6399
+          FLAKY_WATCH_REPEATS: '3'
+        run: bash scripts/flaky-watch.sh
 
       # The one admin suite that needs a REAL relay. Its backup-code case
       # measures the cost of ten argon2 verifications, which is the whole

@@ -150,6 +150,24 @@ async function boot(opts = {}) {
     RELAY_SELF_URL: '',
     RELAY_PRIMARY_URL: '',
     HOST: '127.0.0.1',
+    // THE BOOT-TIME BACKGROUND JOBS STAY OUT OF A TEST RUN unless a suite asks
+    // for them by name (opts.env wins over this).
+    //
+    // Both of these reach the SHARED redis, not this relay's scratch dir, and
+    // both work on keys with no account in them: the plan-expiry sweep
+    // zRem/hDels members of the one global paramant:billing:expiry zset
+    // (lib/plan-expiry.js), and the party-index migration takes a global lock
+    // and SCANs the whole `env:*` keyspace (lib/parasign-party-backfill.js).
+    // CI runs 21 route suites in parallel processes against ONE redis on db 0,
+    // so a relay that lives past its own suite's assertions starts sweeping and
+    // scanning another suite's rows. The delays are 30-60 s and 15-35 s, which
+    // is longer than most suites but not longer than all of them, so it shows
+    // up as one suite going red on somebody else's branch.
+    //
+    // An hour is not a magic number: it is "longer than any suite in this repo
+    // stays up". A suite that wants either job sets its own value.
+    PLAN_EXPIRY_BOOT_DELAY_MS: String(3600000),
+    PARTY_INDEX_BOOT_DELAY_MS: String(3600000),
   };
   for (const k of ['MOLLIE_API_KEY', 'MOLLIE_TEST_API_KEY', 'BILLING_MODE']) delete env[k];
 
