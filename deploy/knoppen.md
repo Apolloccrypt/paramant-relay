@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **102 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **172 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **175 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -112,6 +112,7 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `APP_SHOTS_ONLY` | `scripts/app-shots.mjs` | geen | beperkt de schermafdrukronde tot de app-paginas |
 | `CHECK_EXTERNAL_LINKS` | `tests/links.test.mjs` | geen | zet de externe-linkcontrole aan; staat alleen aan in heartbeat.yml, en die workflow is uit |
 | `CLEVERBASE_SANDBOX` | `tests/qes-cleverbase-live.test.mjs` | `test op '1'` | zet de live QES-suite aan; staat in geen enkele workflow, draait dus nergens |
+| `DE_SERVER_OFFLINE` | `tests/de-server-komt-uit-de-repo.test.mjs` | geen, test op `'1'` | zet de live helft van de repo-tegen-productie-poort uit; staat in geen enkele workflow en een test bewaakt dat dat zo blijft, want een live helft die je aan moet zetten draait nooit (zie `FLEET_LIVE`) |
 | `DEV_PORT` | `scripts/dev-local-proxy.js` | `'8080'` | poort van de dev-proxy |
 | `FAKE_MOLLIE_URL` | `tests/helpers/mollie-intercept.cjs` | geen | stuurt https-verkeer naar api.mollie.com door naar de nagebouwde Mollie van de koperspoort; leeg (productie) doet de preload niets |
 | `FAKE_RESEND_URL` | `tests/helpers/mollie-intercept.cjs` | geen | zelfde omleiding voor api.resend.com, zodat een test de facturen en waarschuwingsmails kan lezen die anders ongezien vertrekken |
@@ -130,6 +131,8 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `HEARTBEAT_SLOW_SIGN_MS` | `scripts/heartbeat/lib.mjs` | `15000` | zelfde drempel, maar voor het tekenpad |
 | `HEARTBEAT_TEST_SECRET` | `tests/heartbeat-lib.test.mjs` | geen | fixture, wordt door de test zelf gezet en weer weggehaald |
 | `KOPER_REDIS_DB` | `tests/helpers/koper-stack.cjs` | `11` | welke redisdatabase de koperspoort gebruikt en als enige leegt, zodat hij een server kan delen met de routesuites zonder hun sleutelruimte te raken |
+| `METING_TIMEOUT_MS` | `scripts/meet-de-server.mjs` | `8000` | hoe lang een meting op productie mag duren voor hij opgeeft |
+| `METING_WACHT_MS` | `scripts/meet-de-server.mjs` | `1500` | hoe lang de grensmeting op stilte wacht; onder de grens antwoordt nginx niet maar wacht hij op een body die nooit komt, en die stilte is het signaal |
 | `PARAMANT_BASE_URL` | `scripts/heartbeat/lib.mjs`, `tests/links.test.mjs` en 1 meer | `'https://paramant.app'` | welke site de heartbeat en de linkcontrole meten |
 | `PARAMANT_COSIGN_SCREENSHOT_PATH` | `tests/cosign-document-delivery.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
 | `PARAMANT_DASHBOARD_DETAIL_SCREENSHOT_PATH` | `tests/user-dashboard-documents.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
