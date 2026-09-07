@@ -6,7 +6,7 @@ const http    = require('http');
 const crypto  = require('crypto');
 const path    = require('path');
 const { initRedis, redis, redisHealthy, scanKeys } = require('./lib/redis');
-const { isRedisOutage } = require('./lib/redis-deadline');
+const { isRedisOutage, redisRefusal } = require('./lib/redis-deadline');
 const { incrInWindow } = require('./lib/redis-counter');
 const { logAuditEvent, getAuditEvents } = require('./lib/audit');
 const { spawn } = require('child_process');
@@ -4706,6 +4706,11 @@ app.get(`${BASE_PATH}/*path`, (req, res) => res.sendFile(path.join(__dirname, 'p
     // bounded (lib/redis-deadline) this one branch turns EVERY redis-backed
     // route in this file into an honest 503 inside the deadline, instead of a
     // request that waits for a store that is never going to answer.
+    // Name the refusal in the log. "redis_unavailable" alone leaves the operator
+    // guessing between a full disk (MISCONF), a hit ceiling (OOM) and a wrong
+    // ACL (NOPERM); the word Redis itself used points straight at the fix.
+    const refusal = redisRefusal(err);
+    if (refusal) console.error('[redis refused]', refusal, err.message);
     if (isRedisOutage(err)) {
       res.setHeader('Retry-After', '5');
       return res.status(503).json({ error: 'redis_unavailable' });
