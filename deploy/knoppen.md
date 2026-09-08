@@ -254,7 +254,7 @@ deze regels doorbreken.
 
 | bestand | richtlijn | waarde |
 |---|---|---|
-| `deploy/nginx-paramant-live.conf` | `client_max_body_size` | `4k / 64k / 16k / 16k / 50M / 30M / 12M / 35M / 12M / 12M / 12M` |
+| `deploy/nginx-paramant-live.conf` | `client_max_body_size` | `4k / 64k / 64k / 16k / 16k / 50M / 30M / 12M / 35M / 12M / 12M / 12M` |
 | `deploy/nginx-paramant-live.conf` | `limit_req_zone` | `afwezig` |
 | `deploy/nginx-paramant-live.conf` | `limit_conn` | `afwezig` |
 | `deploy/nginx-paramant-live.conf` | `proxy_read_timeout` | `3600s / 3600s / 3600s / 3600s / 3600s` |

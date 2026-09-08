@@ -39,6 +39,24 @@
     });
   }
 
+  // Carry the address the visitor already typed over to the recovery pages, so
+  // they do not have to type it again on a page they only reach when something
+  // has already gone wrong. sessionStorage, not a query parameter: the address
+  // stays out of the URL, the history and any copied link, and it dies with the
+  // tab. The recovery page treats a missing value as "no prefill", never as an
+  // error.
+  function rememberEmailForRecovery() {
+    const el = document.getElementById('email');
+    if (!el) return;
+    const v = el.value.trim();
+    try {
+      if (v) sessionStorage.setItem('paramant:recovery-email', v);
+      else sessionStorage.removeItem('paramant:recovery-email');
+    } catch (_) { /* private mode, or storage blocked: prefill is a nicety */ }
+  }
+  document.querySelectorAll('a[href^="/auth/backup"], a[href^="/auth/request-reset"]')
+    .forEach(function(a) { a.addEventListener('click', rememberEmailForRecovery); });
+
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
     errorDiv.classList.remove('visible');

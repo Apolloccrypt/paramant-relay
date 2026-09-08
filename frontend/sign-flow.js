@@ -2180,6 +2180,63 @@ function fillReview() {
   renderReviewPreviews().catch(err => console.warn('review preview failed', err));
   // Fill the passkey key fingerprint (async, public vault metadata only).
   fillReviewKeyFingerprint().catch(() => {});
+  // Say now whether this month's signatures are gone, not after the ceremony.
+  showRemainingSignatures().catch(() => {});
+}
+
+// The monthly signing allowance, read on the review step.
+//
+// The relay refuses over-quota signing with a 402 and the page renders the
+// upgrade notice from it, which is correct but arrives at the very end: the
+// signer has by then chosen a document, placed a seal, typed their name and
+// entered a six-digit code, and an envelope has already been created server
+// side. Nothing before that click said how many signatures were left. This
+// reads the counter the dashboard already publishes and puts the answer next
+// to the button, before the work.
+//
+// Signed out this stays silent: /sign is open to visitors on purpose, and a
+// visitor has no allowance to report. Any failure is silent too, because a
+// missing count must never stand in the way of a signature that is allowed.
+async function showRemainingSignatures() {
+  if (sessionState === 'out') return;
+  const host = $('ds-sign-status');
+  if (!host) return;
+
+  const res = await fetch('/api/user/dashboard/overview', {
+    credentials: 'include', headers: { Accept: 'application/json' }, cache: 'no-store',
+  });
+  if (!res.ok) return;
+  const data = await res.json();
+  const used = data && data.quota ? data.quota.signs : null;
+  const cap = data && data.quota && data.quota.caps ? data.quota.caps.signs : null;
+  if (typeof used !== 'number' || typeof cap !== 'number' || cap <= 0) return;
+
+  const left = Math.max(0, cap - used);
+  if (left > 0) {
+    // A quiet line, not a warning: this is capacity information, and on a plan
+    // with room to spare it should not look like a problem. The banner ships
+    // hidden, so anything written into it has to unhide it as well.
+    host.textContent = left === 1
+      ? 'One signature left this month on your plan.'
+      : left + ' signatures left this month on your plan.';
+    host.className = 'ds-banner';
+    host.hidden = false;
+    return;
+  }
+
+  // Nothing left. Show the same upgrade notice the 402 would have produced,
+  // only now it is here before the ceremony instead of after it.
+  //
+  // The button stays enabled on purpose, the way it does after a 402: someone
+  // who upgrades in another tab must be able to come back and sign without
+  // reloading, and this count is a snapshot that can be one purchase out of
+  // date. Informing is the fix; blocking would trade one dead end for another.
+  const q = window.paQuotaUpgrade;
+  const quotaShape = { dimension: 'signs_month', limit: cap, used: used, reset_date: null };
+  if (q && q.html) host.innerHTML = q.html(quotaShape);
+  else host.textContent = 'You have used all ' + cap + ' signatures included this month.';
+  host.className = 'ds-banner err';
+  host.hidden = false;
 }
 
 // Fill the signing-key fingerprint into the review card from PUBLIC vault

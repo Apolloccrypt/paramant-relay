@@ -813,7 +813,21 @@
         .catch(function () {});
     }
     pull();
-    if (!opsPollTimer) opsPollTimer = setInterval(pull, 5000);
+    // Poll only while the tab is actually being looked at, and at 30s rather
+    // than 5s. A dashboard left open in a background tab used to spend twelve
+    // requests a minute, for ever, on a rate-limited endpoint: it drained the
+    // bucket that every other signed-in call shares, so the account page came
+    // back 429 for a visitor who had done nothing but leave a tab open. Nothing
+    // on these cards changes second by second, and a tab that comes back to the
+    // front pulls once immediately, so the reading is fresh when it is read.
+    if (!opsPollTimer) {
+      opsPollTimer = setInterval(function () {
+        if (document.visibilityState === 'visible') pull();
+      }, 30000);
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') pull();
+      });
+    }
   }
 
   function start(tries) {

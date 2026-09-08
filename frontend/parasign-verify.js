@@ -162,7 +162,16 @@ function verifyV3Client(docHashHex) {
   const signedHash = env.stamped_hash || env.document_hash;
   if (!signedHash) errors.push('missing signed document hash (stamped_hash or document_hash)');
   if (docHashHex && signedHash && signedHash !== docHashHex) {
-    errors.push('document hash mismatch: this document does not match the one that was signed');
+    // The likeliest near-miss, named: the file from BEFORE the seal was added.
+    // The envelope carries both hashes, so we can tell that case apart from a
+    // genuinely unrelated file and say which copy to use instead of leaving
+    // the verifier to guess that "mismatch" means "you picked the wrong one".
+    if (env.original_hash && env.original_hash === docHashHex) {
+      errors.push('this is the document from before it was signed. Verify the signed copy instead: ' +
+        'the one with the seal on it, usually named ' + (env.stamped_filename || 'signed-<your file>'));
+    } else {
+      errors.push('document hash mismatch: this document does not match the one that was signed');
+    }
   }
   if (!env.signer_public_key) errors.push('missing signer_public_key');
   if (env.party_email_hash == null) {
@@ -293,9 +302,16 @@ async function lookupSignerHtml(envelope) {
     const d = await res.json();
     if (!d.found) return '';
     const label = d.label ? esc(d.label) : '<em>(no label)</em>';
-    const email = d.email ? esc(d.email) : '<em>(unverified)</em>';
     const algo  = esc(d.alg || '?');
-    let html = '<p class="ps-help"><strong>Signed by ' + label + ' (' + email + ')</strong> &middot; ' + algo + '</p>';
+    // The address is only shown when the lookup actually returns one. It used
+    // to fall back to the literal string "(unverified)", which the template
+    // then wrapped in brackets of its own and printed as "Name ((unverified))",
+    // and which read as a warning about the signature rather than as "no
+    // address is published for this key".
+    const who = d.email
+      ? label + ' (' + esc(d.email) + ')'
+      : label + ' <span class="dim">no address published for this key</span>';
+    let html = '<p class="ps-help"><strong>Signed by ' + who + '</strong> &middot; ' + algo + '</p>';
     if (d.revoked_at) {
       html += '<p class="ps-help">This key was revoked on ' + esc(d.revoked_at)
         + '. The signature is still cryptographically valid; treat as valid if signed before that date.</p>';
