@@ -204,6 +204,32 @@ test('the pages tell the truth about the verification link and who sends the mai
   }
 });
 
+test('the review card does not name a recipe version it cannot know', () => {
+  // The card printed "recipe_version 3" while the relay writes 5 into the
+  // envelope the signer downloads a minute later. The recipe is chosen server
+  // side, so before the envelope exists there is no number to print: the same
+  // preview already says "<set on sign>" for the fields in that position.
+  const js = read('frontend/sign-flow.js');
+  assert.doesNotMatch(js, /recipe_version 3\)/,
+    'the review card is back to promising recipe_version 3');
+  assert.doesNotMatch(js, /^\s*recipe_version: 3,\s*$/m,
+    'the envelope preview is back to a hardcoded recipe_version 3');
+  assert.match(js, /recipe_version: '<set on sign>'/,
+    'the envelope preview no longer marks the recipe as decided on signing');
+});
+
+test('a refused account deactivation says so', () => {
+  // `if (res.ok)` and nothing else: a refusal left the page sitting there while
+  // the account quietly still existed.
+  const js = read('frontend/js/account.inline1.js');
+  const block = /delete-account'\)\.addEventListener\([\s\S]*?\n  \}\);/.exec(js);
+  assert.ok(block, 'the deactivate handler is gone from the account page');
+  assert.match(block[0], /was NOT deactivated/,
+    'a failed deactivation is silent again');
+  assert.match(block[0], /res\.status === 401/,
+    'an expired session during deactivation is not named');
+});
+
 test('verify asks for the copy that actually validates', () => {
   const html = read('frontend/verify.html');
   assert.doesNotMatch(html, /Choose the original document/,

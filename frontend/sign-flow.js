@@ -2125,7 +2125,10 @@ function fillReview() {
   const docHashHex = toHex(sha3_256(state.doc.bytes));
   $('ds-proof-doc-hash').textContent = docHashHex;
   $('ds-proof-fp').textContent = '(your signing key fingerprint)';   // filled async below
-  $('ds-proof-version').textContent = 'parasign-doc-3 (recipe_version 3)';
+  // The recipe is chosen server side when the envelope is created, and has been
+  // 5 (signed visual placement) for a while. Printing a fixed 3 here made the
+  // review card disagree with the .psign the signer downloads a minute later.
+  $('ds-proof-version').textContent = 'parasign-doc-3 (recipe_version set when the envelope is created)';
 
   // Envelope-structure preview — the v3 .psign receipt (parasign-doc-3). The
   // signed_message line shows the EXACT v3 domain-prefixed message the passkey
@@ -2133,7 +2136,7 @@ function fillReview() {
   // the review reflects what is actually signed — not the old v2 message.
   const previewEnv = (state.mode === 'pdf' || state.mode === 'image') ? {
     version: 'parasign-doc-3',
-    recipe_version: 3,
+    recipe_version: '<set on sign>',
     sign_domain: 'paramant/parasign/doc/v1',
     algorithm: 'ML-DSA-65',
     hash_algorithm: 'SHA3-256',
@@ -2157,7 +2160,7 @@ function fillReview() {
     disclaimer: 'Post-quantum, zero-knowledge. Not eIDAS-qualified.',
   } : {
     version: 'parasign-doc-3',
-    recipe_version: 3,
+    recipe_version: '<set on sign>',
     sign_domain: 'paramant/parasign/doc/v1',
     algorithm: 'ML-DSA-65',
     hash_algorithm: 'SHA3-256',
