@@ -130,10 +130,36 @@ test('only the credential endpoints sit in the auth throttle', () => {
 
   // The narrow location has to exist, and it has to be the one carrying the
   // auth zone.
-  const authLoc = /location ~ \^\/api\/user\/\(login\|login-with-backup\|signup\|setup\|auth\)[^{]*\{([\s\S]*?)\n    \}/.exec(conf);
+  const authLocRe = /location ~ (\^\/api\/user\/\S+) \{([\s\S]*?)\n    \}/;
+  const authLoc = authLocRe.exec(conf);
   assert.ok(authLoc, 'the credential-only location is gone from the live nginx conf');
-  assert.match(authLoc[1], /limit_req\s+zone=relay_auth/,
+  assert.match(authLoc[2], /limit_req\s+zone=relay_auth/,
     'the credential endpoints are no longer in the auth throttle');
+
+  // Which paths that pattern actually catches, checked against the real ones.
+  // The near-miss that matters: /api/user/sign/* is an already-signed-in
+  // account signing a document, and it must NOT land in the credential bucket,
+  // or the signing flow throttles itself. "signup" and "sign" share a prefix,
+  // so this is a genuine trap rather than a hypothetical one.
+  const pattern = new RegExp(authLoc[1]);
+  const mustMatch = [
+    '/api/user/login', '/api/user/login-with-backup', '/api/user/signup',
+    '/api/user/signup/verify/abc123', '/api/user/setup/abc123',
+    '/api/user/setup/abc123/confirm', '/api/user/auth/webauthn/login/options',
+    '/api/user/auth/request-totp-reset',
+  ];
+  const mustNotMatch = [
+    '/api/user/sign/activation', '/api/user/sign/submit', '/api/user/session/verify',
+    '/api/user/account', '/api/user/account/signing-key', '/api/user/dashboard/overview',
+    '/api/user/parasign-keys', '/api/user/documents', '/api/user/envelopes',
+    '/api/user/billing/status', '/api/user/logout',
+  ];
+  for (const p of mustMatch) {
+    assert.ok(pattern.test(p), `${p} is a credential endpoint but falls outside the auth throttle`);
+  }
+  for (const p of mustNotMatch) {
+    assert.ok(!pattern.test(p), `${p} is not a credential endpoint but got swept into the auth throttle`);
+  }
 
   // And the broad prefix must NOT be, or every signed-in read shares the
   // credential bucket again and /account goes back to printing 429.
