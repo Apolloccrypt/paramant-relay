@@ -1867,6 +1867,46 @@ for f in $TARGETS; do
   awk "$ADMIN_AWK" "$f" "$f" > "/tmp/nginx-admin.$$"
   cat "/tmp/nginx-admin.$$" > "$f"
   rm -f "/tmp/nginx-admin.$$"
+  # 8. the document capsule may be 5 MB, and nginx allowed 64k.
+  #
+  #    location /api/user/ carries client_max_body_size 64k, which is right for
+  #    every JSON call under it. The one route that is not JSON is the capsule
+  #    upload, POST /api/user/envelopes/<id>/document, where express.raw accepts
+  #    6mb and the app tells the customer the limit is 5 MB.
+  #
+  #    So anything over 64k died at nginx with a 413 HTML page before node saw
+  #    it. Nothing was logged in any container, and the browser could not parse
+  #    that body, so sign-flow.js fell back to its generic sentence: "Could not
+  #    store the encrypted document." Measured against production on 08-09-2026:
+  #    30000 bytes answers 401 (the app, no session), 100000 bytes answers 413
+  #    (nginx, never reached the app). Every real document is over 64k, so
+  #    co-sign delivery was dead for anything but a toy file.
+  #
+  #    A regex location is matched before any prefix location, so this one wins
+  #    over /api/user/ without moving it. The capture is what lets proxy_pass
+  #    keep a URI here; a regex location may not carry a static one.
+  if ! grep -q 'envelopes/\[\^/\]+/document' "$f"; then
+    awk '
+      /^[[:space:]]*location \/api\/user\/ \{/ && !done {
+        print "    # the capsule upload is not JSON: 6m, matching express.raw in admin/server.js."
+        print "    location ~ ^/api/user/(envelopes/[^/]+/document)$ {"
+        print "        limit_req        zone=relay_auth burst=5 nodelay;"
+        print "        limit_req_status 429;"
+        print "        proxy_pass http://127.0.0.1:4200/admin/api/user/$1;"
+        print "        proxy_set_header Host $host;"
+        print "        proxy_set_header X-Real-IP $remote_addr;"
+        print "        proxy_set_header X-Forwarded-For $remote_addr;"
+        print "        proxy_set_header Cookie $http_cookie;"
+        print "        proxy_pass_header Set-Cookie;"
+        print "        client_max_body_size 6m;"
+        print "    }"
+        done = 1
+      }
+      { print }
+    ' "$f" > "/tmp/nginx-capsule.$$"
+    cat "/tmp/nginx-capsule.$$" > "$f"
+    rm -f "/tmp/nginx-capsule.$$"
+  fi
   if ! cmp -s "$f" "/tmp/nginx-pre-3.1-$(basename "$f").$TS"; then
     echo "edited $(basename "$f")"
     edited=$((edited + 1))
