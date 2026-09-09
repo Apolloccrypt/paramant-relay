@@ -394,3 +394,33 @@ test('the docs name the version the hosted relays actually answer', () => {
   assert.match(html, /What's new in 3\.0\.0/,
     'the release notes for 3.0.0 have been renumbered, which rewrites history');
 });
+
+test('the audits table does not report a finding as closed that SECURITY.md keeps open', () => {
+  const security = read('SECURITY.md');
+  const docs = read('frontend/docs.html');
+
+  // SECURITY.md keeps its own "Open findings" table. As long as it has rows,
+  // the audits table on /docs cannot report every audit as fully resolved.
+  // This is the one claim on that page a buyer's security officer reads first.
+  const openSection = /## Open findings\s*\n([\s\S]*?)\n---/.exec(security);
+  assert.ok(openSection, 'SECURITY.md no longer has an "Open findings" section; check the /docs table again');
+  const openRows = openSection[1].split('\n').filter((l) => /^\|\s*\d+\s*\|/.test(l));
+
+  const table = /<h2 id="audits">[\s\S]*?<\/table>/.exec(docs);
+  assert.ok(table, 'the audits table is gone from /docs');
+
+  if (openRows.length > 0) {
+    // Name the audit those rows belong to, so this fails loudly rather than
+    // quietly passing on a table that has been reworded.
+    assert.doesNotMatch(table[0], /Smart Cyber Solutions<\/td><td>[^<]*<\/td><td>All resolved/,
+      `SECURITY.md lists ${openRows.length} open finding(s) while /docs reports that audit as fully resolved`);
+    assert.match(docs, /One finding is still open/,
+      '/docs no longer tells the reader that a finding is open');
+  }
+
+  // The commit hash 0db3ef0 belongs to the Zwarts review in SECURITY.md. It was
+  // copied onto the Smart Cyber Solutions row as well, which credited a fix to
+  // an audit it did not close.
+  assert.doesNotMatch(table[0], /Smart Cyber Solutions[\s\S]*?0db3ef0/,
+    'the Smart Cyber Solutions row carries a commit hash that belongs to another audit');
+});

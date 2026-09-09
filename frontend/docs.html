@@ -951,8 +951,13 @@ python3 scripts/paramant-admin.py sync</pre>
       <tr><th>Date</th><th>Auditor</th><th>Findings</th><th>Status</th></tr>
       <tr><td>Apr 2026</td><td>R. Zwarts (verification)</td><td>14 total (1H · 8M · 5L)</td><td>All resolved: e6f216d</td></tr>
       <tr><td>Apr 2026</td><td>R. Zwarts (independent)</td><td>6 total (3H · 3M)</td><td>All resolved: 0db3ef0</td></tr>
-      <tr><td>Apr 2026</td><td>Ryan Williams · Smart Cyber Solutions</td><td>4C · 5H · 6M · 5L</td><td>All resolved: 0db3ef0</td></tr>
+      <tr><td>Apr 2026</td><td>Ryan Williams · Smart Cyber Solutions</td><td>4C · 5H · 6M · 5L</td><td>19 of 20 resolved; finding 4 open</td></tr>
     </table>
+    <p><strong>One finding is still open</strong>, and this table used to say otherwise. <code>SECURITY.md</code>
+    keeps its own "Open findings" section, and it lists finding 4 of the Smart Cyber Solutions
+    audit (Critical, a plaintext filename held in relay RAM) and finding 14 (Medium, the CT
+    Merkle tree not being RFC 6962 compliant). Read that section rather than this table before
+    you rely on a status here.</p>
     <p>All findings are publicly documented in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md" target="_blank" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)" rel="noopener">SECURITY.md</a>. To report a vulnerability: <a href="mailto:privacy@paramant.app" style="color:var(--cobalt)">privacy@paramant.app</a>.</p>
 
     <!-- ── Compliance ───────────────────────────────────────────── -->
