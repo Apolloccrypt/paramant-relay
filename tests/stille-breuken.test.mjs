@@ -303,3 +303,40 @@ test('the legal strip is a finger-sized target', () => {
   assert.match(rule[1], /min-height:\s*44px/,
     'the legal strip links are back under the 44px a thumb needs');
 });
+
+// ── Zinnen die zichzelf tegenspreken ─────────────────────────────────────────
+
+test('the SLA does not promise coverage its own section 5 withdraws', () => {
+  const html = read('frontend/sla.html');
+  // Section 1 said "All five sector relays are covered" while section 5 said
+  // the four sector relays are not measured and the monitor for the fifth is
+  // switched off. Both sentences were on the same page.
+  assert.doesNotMatch(html, /All five sector relays \([^)]*\) are covered/,
+    'the SLA promises coverage in section 1 that section 5 takes back');
+  assert.match(html, /their uptime is not measured/,
+    'section 5 no longer says which relays are not monitored; check section 1 again');
+  assert.match(html, /Read section 5 before you rely on a number here/,
+    'section 1 no longer points at the section that qualifies it');
+
+  // And the page describes itself as covering plans it does not list. Only
+  // Community and Enterprise have rows.
+  assert.doesNotMatch(html, /every Paramant plan, from Community to Enterprise/,
+    'the SLA describes itself as covering every plan while it lists two');
+});
+
+test('the status page does not call one look a day of uptime', () => {
+  const js = read('frontend/js/status.inline1.js');
+  // A first visit made one check, found it up, and printed "uptime 24h 100.0%".
+  assert.match(js, /function uptimeStat/,
+    'the uptime figure no longer carries its sample count');
+  assert.match(js, /stat\.n < 5/,
+    'a percentage is printed again before there are enough samples to mean one');
+
+  const html = read('frontend/status.html');
+  assert.doesNotMatch(html, /uptime % calculated from last 24h of checks/,
+    'the note under the page claims 24 hours of checks again');
+  assert.doesNotMatch(html, /Uptime is calculated from the last 24 hours of checks/,
+    'the page description still claims a 24-hour calculation');
+  assert.match(html, /checks this browser has made/,
+    'the note no longer says whose checks these are');
+});
