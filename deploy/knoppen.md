@@ -311,7 +311,7 @@ controle valt om.
 | `extensions/shared/paramant-core.js` | `PADDED_BLOCK` | `5 * 1024 * 1024` | hier is 5 MB wel een blokgrootte en geen grens; dit is de opvulling |
 | `relay/lib/qes/pades.js` | `DEFAULT_CONTENTS_BYTES` | `16384` | de echte reserveringsgrootte in het PDF-handtekeningveld; geen grens |
 | `relay/lib/parasign-open-api.js` | `PARASIGN_MAX_PDF_BYTES` | `20 * 1024 * 1024` | 20 MB voor de v1-PDF, boven de 10 MB die readBody doorlaat |
-| `relay/relay.js` | `CT_MAX` | `10000` | venster in het geheugen, geteld in regels; niet instelbaar |
+| `relay/relay.js` | `CT_MAX` | `10000` | venster in het geheugen, geteld in bladeren; instelbaar via `CT_MAX` sinds de STH-vensterfix, zodat een suite de omslag in een handvol appends haalt in plaats van tienduizend |
 | `relay/relay.js` | `CT_MAX_SIZE` | `100 * 1024 * 1024` | rotatiegrens op schijf, geteld in bytes; wel instelbaar, en dood zonder CT_FILE |
 | `relay/relay.js` | `TTL_MS` | `300000` | standaardlevensduur van een blob, 5 minuten |
 | `relay/relay.js` | `RAM_LIMIT_MB` | `512` | plafond van de RAM-bewaking; compose zet 1024 voor vier relays en 8192 hardgecodeerd voor health |

@@ -374,7 +374,11 @@ function createDidDocument(did, deviceId, ecdhPubHex, dsaPubHex) {
 }
 
 // ── Certificate Transparency Log ─────────────────────────────────────────────
-const CT_MAX = 10000;
+// How many leaves the Merkle tree keeps. Settable so a suite can reach the
+// wrap-around in a few appends instead of ten thousand: what happens at the
+// wrap is the interesting part, and a constant made it untestable. Production
+// leaves it alone.
+const CT_MAX = parseInt(process.env.CT_MAX || '10000', 10) || 10000;
 // Bounded, monotonically-indexed window (see lib/ct-window). Past CT_MAX the
 // logical index keeps advancing (no duplicates / frozen STH) and lookups for a
 // pruned index return null instead of the wrong entry.
@@ -586,19 +590,29 @@ _sthOpenStream();
 
 // What this relay has already put its name to. Two things, because they catch
 // two different halves of the same break:
-//   _sthSignedRoots  tree_size -> sha3_root, for the heads still in sthLog. It
-//                    is pruned in step with sthLog, so it stays bounded by
+//   _sthSignedRoots  "base:size" -> sha3_root, for the heads still in sthLog.
+//                    It is pruned in step with sthLog, so it stays bounded by
 //                    STH_MAX and does not grow with the log.
-//   _sthMaxSignedSize the largest tree_size ever signed. One number, never
-//                    pruned, and the half that survives the window: a tree that
-//                    walked BACKWARDS is a contradiction even when the head it
-//                    contradicts has aged out of memory.
+//   _sthMaxSignedSize the largest LOGICAL size ever signed (base + size). One
+//                    number, never pruned, and the half that survives the
+//                    window: a log that walked BACKWARDS is a contradiction
+//                    even when the head it contradicts has aged out of memory.
+//
+// The key is the pair, not the size. The tree covers a sliding window, so a
+// full window signs the same leaf count over and over with a different root
+// each time; keyed on size alone the relay refused every head from that point
+// on and flagged itself as forked. The pair identifies the tree, and the sum
+// is what has to keep growing.
 const _sthSignedRoots = new Map();
 let _sthMaxSignedSize = -1;
+// Heads signed before window_base existed describe a tree starting at leaf 0,
+// which is exactly what they were: at that point the window had not yet
+// wrapped. Reading them as base 0 keeps their guarantee intact.
+const { sthKey, sthLogicalSize, sthRefusal } = require('./lib/sth-guard');
 for (const s of sthLog) {
   if (!s || typeof s.tree_size !== 'number' || !s.sha3_root) continue;
-  _sthSignedRoots.set(s.tree_size, s.sha3_root);
-  if (s.tree_size > _sthMaxSignedSize) _sthMaxSignedSize = s.tree_size;
+  _sthSignedRoots.set(sthKey(s), s.sha3_root);
+  if (sthLogicalSize(s) > _sthMaxSignedSize) _sthMaxSignedSize = sthLogicalSize(s);
 }
 // Set once the relay has caught a contradiction. It is not cleared: a log that
 // has forked stays forked until someone looks at it.
@@ -802,7 +816,7 @@ function ctAppend(deviceId, pubKeyHex, apiKey) {
   ctWindow.append(entry);
   // Fix 8: async write via stream queue instead of appendFileSync
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  sthForTree(allEntries.length, entry.tree_hash);
   return entry;
 }
 
@@ -829,7 +843,7 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
   ctWindow.append(entry);
   // Fix 8: async write via stream queue
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  sthForTree(allEntries.length, entry.tree_hash);
   return entry;
 }
 
@@ -850,7 +864,7 @@ function ctAppendTransfer(blobHash, sector) {
   });
   ctWindow.append(entry);
   ctWrite(entry);
-  const sth = produceSth(allEntries.length, entry.tree_hash);
+  const sth = sthForTree(allEntries.length, entry.tree_hash);
   return { ...entry, sth };
 }
 
@@ -871,7 +885,7 @@ function ctAppendParasign(documentHashHex, signerPkHash) {
   });
   ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  sthForTree(allEntries.length, entry.tree_hash);
   return entry;
 }
 
@@ -912,7 +926,7 @@ function ctAppendEnvelope(eventType, envelopeId, payload) {
   });
   ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  sthForTree(allEntries.length, entry.tree_hash);
   return entry;
 }
 
@@ -941,14 +955,43 @@ function ctAppendSigningPkEvent(eventType, userId, signerPkHash) {
   });
   ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  sthForTree(allEntries.length, entry.tree_hash);
   return entry;
 }
 
 // ── Signed Tree Head — produce, sign, and persist an STH for every root change ─
 // Canonical JSON: sorted keys, no whitespace, UTF-8 (matches RFC 6962 § 3.5 spirit).
 // Signed with the relay's ML-DSA-65 identity key (NIST FIPS 204).
-function produceSth(tree_size, sha3_root) {
+// The head for the tree that was just hashed, with the window it covers.
+//
+// Call this AFTER ctWindow.append(), with the same leaf array that went into
+// ctTreeHash(). The base is derived rather than passed: the window may have
+// shifted during that append, and `size - leaves` is the logical index of the
+// first leaf in the tree either way.
+function sthForTree(leafCount, sha3_root) {
+  return produceSth(leafCount, sha3_root, ctWindow.size - leafCount);
+}
+
+// A signed head over the retained window, and the window it describes.
+//
+// window_base is not decoration. The Merkle tree here covers the CT_MAX most
+// recent leaves, so once the window is full the leaf count stops growing while
+// the root keeps changing on every append. tree_size alone therefore repeats,
+// with a different root each time, and the fork detector below is right to call
+// that a contradiction: for a whole-log head it would be one.
+//
+// Reproduced with a window of 4: appends 0 to 4 sign normally, and every append
+// from the fifth on is REFUSED with root_differs_at_same_size while the log
+// keeps growing. On production the window holds ten thousand leaves and the
+// log stood at 4814, so
+// this was a timer, not a fault anyone had seen yet: from entry 10002 the relay
+// would have signed no head at all and flagged itself as forked.
+//
+// So the pair (window_base, tree_size) identifies the tree, and monotonicity is
+// checked on window_base + tree_size, the logical size of the log, which only
+// ever grows. Old heads keep verifying: both verifiers rebuild the canonical
+// payload from whatever fields the head carries.
+function produceSth(tree_size, sha3_root, window_base) {
   if (!mlDsa || !relayIdentity) return null;
   const relay_id = RELAY_SELF_URL || (SECTOR + '.paramant.app');
   // Append-only, enforced. A transparency log's whole claim is that tree_size
@@ -962,21 +1005,27 @@ function produceSth(tree_size, sha3_root) {
   // missing head is visible and recoverable; a forged-looking one is neither.
   // Re-signing the SAME root at the same size is allowed: that is idempotent,
   // not a contradiction.
-  const priorRoot = _sthSignedRoots.get(tree_size);
-  const contradicts = priorRoot !== undefined && priorRoot !== sha3_root;
-  const wentBackwards = tree_size < _sthMaxSignedSize;
-  if (contradicts || wentBackwards) {
+  // The rule itself lives in lib/sth-guard.js, where it can be exercised
+  // without booting a relay.
+  const refusal = sthRefusal({
+    tree_size, window_base, sha3_root,
+    signedRoots: _sthSignedRoots, maxSignedSize: _sthMaxSignedSize,
+  });
+  const base = refusal ? refusal.base : (Number.isFinite(window_base) ? window_base : 0);
+  const logicalSize = base + tree_size;
+  const priorRoot = refusal ? refusal.priorRoot : undefined;
+  if (refusal) {
     if (!ctLogForked) {
       ctLogForked = {
-        tree_size, max_signed_size: _sthMaxSignedSize,
+        tree_size, window_base: base, logical_size: logicalSize, max_signed_size: _sthMaxSignedSize,
         signed_root: priorRoot || null, refused_root: sha3_root,
-        reason: contradicts ? 'root_differs_at_same_size' : 'tree_size_went_backwards',
+        reason: refusal.reason,
         at: new Date().toISOString(),
       };
     }
     log('error', 'sth_refused_would_fork', {
-      tree_size, max_signed_size: _sthMaxSignedSize,
-      reason: contradicts ? 'root_differs_at_same_size' : 'tree_size_went_backwards',
+      tree_size, window_base: base, logical_size: logicalSize, max_signed_size: _sthMaxSignedSize,
+      reason: refusal.reason,
       signed_root: priorRoot ? priorRoot.slice(0, 16) + '…' : null,
       refused_root: String(sha3_root).slice(0, 16) + '…',
       hint: 'This relay has already signed a larger or different tree. The usual cause is a '
@@ -1005,7 +1054,10 @@ function produceSth(tree_size, sha3_root) {
   // heads, monotonically and per append, so freshness monitoring and the
   // consistency proofs are untouched. The log's own resolution has been an hour
   // everywhere else all along; the head was the one place still saying more.
-  const payload  = { relay_id, sha3_root, timestamp: ctCoarseMs(Date.now()), tree_size, version: 1 };
+  // version 2 adds window_base. A head is only meaningful together with the
+  // window it covers, and until this field existed the head said "a tree of N
+  // leaves" without saying which N.
+  const payload  = { relay_id, sha3_root, timestamp: ctCoarseMs(Date.now()), tree_size, window_base: base, version: 2 };
   // Canonical JSON: keys sorted alphabetically
   const sortedKeys = Object.keys(payload).sort();
   const canonical  = JSON.stringify(Object.fromEntries(sortedKeys.map(k => [k, payload[k]])));
@@ -1017,12 +1069,12 @@ function produceSth(tree_size, sha3_root) {
     return null;
   }
   const sth = { ...payload, signature };
-  _sthSignedRoots.set(tree_size, sha3_root);
-  if (tree_size > _sthMaxSignedSize) _sthMaxSignedSize = tree_size;
+  _sthSignedRoots.set(`${base}:${tree_size}`, sha3_root);
+  if (logicalSize > _sthMaxSignedSize) _sthMaxSignedSize = logicalSize;
   sthLog.push(sth);
   // Prune the root map in step with the head window so it stays bounded.
   // _sthMaxSignedSize is what keeps the guard whole past this point.
-  if (sthLog.length > STH_MAX) { const dropped = sthLog.shift(); _sthSignedRoots.delete(dropped.tree_size); }
+  if (sthLog.length > STH_MAX) { const dropped = sthLog.shift(); _sthSignedRoots.delete(sthKey(dropped)); }
   sthWrite(sth);
   // Broadcast to peers asynchronously — non-blocking, best-effort
   setImmediate(() => broadcastSTH(sth).catch(() => {}));
@@ -3357,7 +3409,7 @@ function ctAppendEvent(eventType, did, payload) {
   const entry = ctGateEntry('did_event', { index, type: eventType, leaf_hash, tree_hash, did, payload: gatedPayload, ts, proof });
   ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  sthForTree(allEntries.length, entry.tree_hash);
   return entry;
 }
 
@@ -9389,7 +9441,7 @@ loadPeerSths();
 // new CT entries were written without a corresponding STH flush.
 if (ctWindow.windowLength > 0 && sthLog.length === 0) {
   const last = ctWindow.last();
-  produceSth(ctWindow.windowLength, last.tree_hash);
+  sthForTree(ctWindow.windowLength, last.tree_hash);
 }
 // Periodic STH gossip — re-broadcast latest STH every 10 min to catch newly registered peers
 setInterval(() => {

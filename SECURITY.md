@@ -101,9 +101,9 @@ Full report: [docs/security-audit-2026-04.md](docs/security-audit-2026-04.md)
 | # | Severity | Status |
 |---|----------|--------|
 | 1–3 | Critical | Fixed |
-| 4 | Critical | In progress: plaintext filename in relay RAM |
+| 4 | Critical | Fixed in v2.4.5 (2026-04-13): the relay stores `enc_meta`, ciphertext the client seals, and never the name |
 | 5–9 | High | Fixed |
-| 10–15 | Medium | Fixed (13: accepted — documented) |
+| 10-15 | Medium | Fixed, except 13 (accepted, documented) and 14 (open, see Open findings below) |
 | 16–20 | Low | Fixed |
 
 ---
@@ -112,8 +112,29 @@ Full report: [docs/security-audit-2026-04.md](docs/security-audit-2026-04.md)
 
 | # | Severity | Finding | ETA |
 |---|----------|---------|-----|
-| 4 | Critical | Plaintext filename stored in relay RAM | v2.4.6 |
-| 14 | Medium | CT Merkle tree non-RFC-6962 compliant | v2.5.0 |
+| 14 | Medium | CT Merkle tree is not RFC 6962: the tree is rebuilt from every leaf on each append, and it covers a sliding window rather than the whole log, so there is no consistency proof between two heads | none set |
+
+Finding 4 (plaintext filename in relay RAM) left this table on 2026-09-09. It
+was fixed on 2026-04-13 in v2.4.5 and this page had not caught up: the status
+above still said "in progress" and `/docs` reported the whole audit as
+resolved, which was the other half of the same drift. What the code does now:
+`POST /v2/inbound` accepts `enc_meta`, a base64 blob the client seals before it
+leaves the browser, and stores that on the download token
+(`relay/relay.js`, `downloadTokens.set(...)`). The download path sets
+`Content-Disposition: attachment; filename="paramant-encrypted-payload"` and the
+receiver's SDK decrypts `enc_meta` to recover the real name. Two comments in
+`relay.js` name finding #4 at those exact lines.
+
+Finding 14 is still open and its ETA was v2.5.0, which has long shipped, so the
+date is removed rather than left to age further. What HAS changed since April:
+the audit described "proofs that are just the last 8 leaf hashes", and there is
+now a real audit path (`relay/lib/ct-hash.js`, `ctInclusionProof`), with an odd
+leaf promoted rather than duplicated. What has not: the tree is still rebuilt
+from scratch on each append, it covers the CT_MAX most recent leaves rather
+than the log, and there is no consistency proof, so a verifier cannot check one
+head against an older one. That is the part that keeps this finding open, and
+it is why a signed head now carries `window_base` (see `relay/lib/sth-guard.js`):
+a head over a sliding window has to say which leaves it covers.
 
 ---
 
