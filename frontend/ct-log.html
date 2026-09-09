@@ -45,7 +45,9 @@ body { min-height:100vh; }
 .notice .body strong { color:var(--ink); display:block; margin-bottom:4px; }
 .notice code { font-size:var(--text-xs); }
 
-.stats { display:flex; gap:1px; background:var(--ink-ghost); margin:0 40px 32px; }
+.stats { display:flex; flex-wrap:wrap; gap:1px; background:var(--ink-ghost); margin:0 40px 12px; }
+.stat-scope { margin:0 40px 32px; font-family:var(--mono); font-size:11px; color:var(--ink-dim); line-height:1.6; }
+.stat-scope:empty { margin-bottom:0; }
 .stat { flex:1; padding:20px 24px; background:var(--bone); }
 .stat .val { font-size:22px; font-weight:700; color:var(--ink); margin-bottom:4px; }
 .stat .lbl { font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.1em; text-transform:uppercase; }
@@ -392,6 +394,10 @@ body { min-height:100vh; }
     <div class="lbl">Relay announcements</div>
   </div>
   <div class="stat">
+    <div class="val" id="stat-other">n/a</div>
+    <div class="lbl">Signing events</div>
+  </div>
+  <div class="stat">
     <div class="val dim" id="stat-root">n/a</div>
     <div class="lbl">Merkle Root</div>
   </div>
@@ -404,6 +410,11 @@ body { min-height:100vh; }
     <div class="lbl">Last Entry</div>
   </div>
 </div>
+
+<!-- Filled by ct-log.page.js. The counts above describe the window the relay returns
+     (1000 entries at most), the total above describes the whole log, and until
+     this line existed nothing on the page said so. -->
+<p class="stat-scope" id="stat-scope"></p>
 
 <!-- Hash Verification Tool -->
 <div class="verify-section">
@@ -462,7 +473,7 @@ body { min-height:100vh; }
 </main>
 
 <script src="/js/delegate.js?v=1" defer></script>
-<script src="/js/ct-log.page.js?v=3" defer></script>
+<script src="/js/ct-log.page.js?v=4" defer></script>
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">

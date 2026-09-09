@@ -340,3 +340,28 @@ test('the status page does not call one look a day of uptime', () => {
   assert.match(html, /checks this browser has made/,
     'the note no longer says whose checks these are');
 });
+
+test('the ct-log counters add up to the window they describe', () => {
+  const js = read('frontend/js/ct-log.page.js');
+  const html = read('frontend/ct-log.html');
+
+  // Three counts sat under a total that came from a different dataset: the
+  // total is the whole log, the counts covered the 1000 entries the relay
+  // returns in one request. Nothing said so, so 4798 sat above 0 + 37 + 957.
+  assert.match(js, /stat-scope/, 'the page no longer says which entries the counts cover');
+  assert.match(js, /allEntries\.length < logSize/,
+    'the scope line no longer distinguishes a window from the whole log');
+  assert.match(html, /id="stat-scope"/, 'the scope line has no place in the page');
+
+  // And signing work fell between the categories, counted by nobody. Any type
+  // added later lands in the same remainder.
+  assert.match(js, /var otherCount/, 'the remainder counter is gone');
+  assert.match(js, /countedTypes\.indexOf\(e\.type\) === -1/,
+    'the remainder no longer catches types the other counters do not claim');
+  assert.match(html, /id="stat-other"/, 'the remainder has no counter in the page');
+
+  // signing_pk_enrolled is what a key registration is actually called in the
+  // log; counting only 'key_reg' is what made that counter read 0.
+  assert.match(js, /e\.type === 'signing_pk_enrolled'/,
+    'key registrations are counted under a type name the log does not use');
+});
