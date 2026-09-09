@@ -347,7 +347,12 @@ const artOut = await artInsideTheClip(false);
 ok('signed out at 1440, the hero art is drawn and drawn whole', artOut.drawn > 0 && artOut.cut.length === 0, JSON.stringify(artOut));
 
 const appPage = await browser.newPage({ viewport:{ width:390, height:844 } });
-await appPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
+// developer:true, because this page is checked below for the developer entry in
+// the user menu. The flag is what session/verify answers for an account on the
+// operator allowlist; without it the menu correctly leaves that entry out,
+// since /developer answers 404 to everyone else. The signed-in-but-not-a-
+// developer case is measured separately, further down.
+await appPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com","developer":true}' }));
 await appPage.route('**/api/user/me', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"email":"demo@example.com","label":"Demo","plan":"pro","created_at":"2026-06-01T10:00:00.000Z","backup_codes_remaining":8,"session_expires_at":"2026-07-21T16:00:00.000Z","usage_purpose":"organisation"}' }));
 await appPage.route('**/api/user/documents', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"documents":[]}' }));
 await appPage.route('**/api/user/account/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
@@ -367,6 +372,26 @@ await appPage.locator('#nav-hamburger').click();
 const appMobile = await appPage.locator('#nav-mobile a').allInnerTexts();
 ok('signed-in mobile menu matches the workspace', appMobile.map((item) => item.toLowerCase()).join(',') === appDesktop.map((item) => item.toLowerCase()).join(','), appMobile.join(', '));
 ok('developer tools are settings, not a sixth product', await appPage.locator('.nav-user-menu a', { hasText:'Developer settings' }).count() === 1 && !appMobile.includes('Developer settings'), appMobile.join(', '));
+
+// And an ordinary signed-in account is not offered that entry at all. /developer
+// answers 404 to everyone off the operator allowlist, deliberately, so that the
+// surface stays hidden. The menu used to advertise it to every signed-in
+// visitor, which handed almost all of them a link that dead-ends. Measured on
+// its own page, because the assertion above needs the opposite session.
+const plainPage = await browser.newPage({ viewport:{ width:390, height:844 } });
+// Order matters: Playwright evaluates the LAST registered route first, so the
+// catch-all goes in before the specific one it must not swallow.
+await plainPage.route('**/api/user/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
+await plainPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"plain@example.com"}' }));
+await plainPage.goto(ORIGIN + '/dashboard', { waitUntil:'domcontentloaded' });
+await plainPage.waitForSelector('.nav-user-menu', { state:'attached' });
+const plainMenu = await plainPage.locator('.nav-user-menu a').allInnerTexts();
+ok('a signed-in non-developer is not offered the developer page', !plainMenu.includes('Developer settings') && plainMenu.includes('Account'), plainMenu.join(', '));
+// The in-page links ship hidden and are revealed by the same verdict, so a
+// non-developer must not see those either.
+const plainVisibleDev = await plainPage.locator('a[href="/developer"]:visible').count();
+ok('the in-page developer links stay hidden for a non-developer', plainVisibleDev === 0, String(plainVisibleDev));
+await plainPage.close();
 
 // Support survives signing in, and it is measured in TAPS.
 //
