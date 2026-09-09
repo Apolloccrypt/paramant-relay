@@ -1931,8 +1931,6 @@ const sthIngestIpRequests = new Map(); // ip → [timestamps] for /v2/sth/ingest
 // fresh head to every peer in the registry, so one unauthenticated POST bought
 // an amplified fan-out and unbounded disk. The 2026-09-05 review, finding 21.
 const relayRegisterIpRequests = new Map(); // ip → [timestamps] for /v2/relays/register (unauthenticated)
-// Team rate limit tracking
-const teamRateLimits = new Map(); // team_id → { count, resetAt }
 
 // Eviction sweep for the limiter maps that lacked one (the other limiters already
 // self-evict). Without this they grow unbounded — slow memory/audit creep,
@@ -1944,13 +1942,17 @@ setInterval(() => {
   for (const [k, times] of invDidIpRequests)     { const kept = times.filter(t => now - t < HOUR); if (kept.length) invDidIpRequests.set(k, kept);     else invDidIpRequests.delete(k); }
   for (const [k, times] of sthIngestIpRequests)  { const kept = times.filter(t => now - t < HOUR); if (kept.length) sthIngestIpRequests.set(k, kept);  else sthIngestIpRequests.delete(k); }
   for (const [k, times] of relayRegisterIpRequests) { const kept = times.filter(t => now - t < HOUR); if (kept.length) relayRegisterIpRequests.set(k, kept); else relayRegisterIpRequests.delete(k); }
-  for (const [k, b]     of teamRateLimits)       { if (b && now > b.resetAt) teamRateLimits.delete(k); }
 }, 3_600_000);
 
-function checkTeamRateLimit(teamId, limit) {
-  if (!teamId) return true;
-  return rateLimit.fixedWindowAllow(teamRateLimits, teamId, limit, 60000);
-}
+// checkTeamRateLimit() stood here, with its own Map and a line in the sweep
+// above. Nothing called it: not this file, not a route, not a test. It answered
+// `true` when handed no team id, which is a rate limiter that lets a caller
+// past by leaving a field out, and tests/authz-omission-gate.test.js is there
+// to catch exactly that shape. It only surfaced now because that scanner walks
+// the file with one sticky regex and an earlier match used to carry it over
+// this one; adding lines above moved the boundary. Dead code with a permissive
+// default is worth deleting rather than allowlisting: whoever wires team limits
+// up later should write the guard deliberately, refusing on a missing id.
 
 // M2: Per-IP rate limit for /v2/admin/verify-mfa (max 5 attempts per minute)
 const mfaRateLimits = new Map(); // ip → { count, resetAt }
