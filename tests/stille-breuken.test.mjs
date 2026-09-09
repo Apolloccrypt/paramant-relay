@@ -365,3 +365,32 @@ test('the ct-log counters add up to the window they describe', () => {
   assert.match(js, /e\.type === 'signing_pk_enrolled'/,
     'key registrations are counted under a type name the log does not use');
 });
+
+test('the docs do not offer an authentication form the relay refuses', () => {
+  const html = read('frontend/docs.html');
+  // ?k= was removed from the relay after the April 2026 review. The docs kept
+  // offering it, with a worked example, so anyone following them got
+  // "API key must be sent in the X-Api-Key header, not as a query parameter."
+  assert.doesNotMatch(html, /check-key\?k=pgp_your_key_here/,
+    'the docs demonstrate ?k= again, which the relay rejects');
+  assert.match(html, /There is no query-parameter\s*\n?\s*form/,
+    'the docs no longer say that the query-parameter form does not exist');
+});
+
+test('the docs name the version the hosted relays actually answer', () => {
+  const html = read('frontend/docs.html');
+  // Production answers 3.1.0; the self-host release the install script pins is
+  // v3.0.0. The page named 3.0.0 for both, including in the /health example.
+  assert.match(html, /"version": "3\.1\.0"/,
+    'the /health example is back on a version the hosted relay does not answer');
+  // As a JSON field, not as the word: the note under the example names it on
+  // purpose, to say it is gone.
+  assert.doesNotMatch(html, /"uptime_s"\s*:/,
+    'the /health example shows a field the relay does not return');
+  assert.doesNotMatch(html, /docs for Paramant v3\.0\.0/,
+    'the page describes itself as the docs for one version while it covers two');
+  // The history stays: "What's new in 3.0.0" is about 3.0.0 and must not be
+  // renumbered by a search and replace.
+  assert.match(html, /What's new in 3\.0\.0/,
+    'the release notes for 3.0.0 have been renumbered, which rewrites history');
+});

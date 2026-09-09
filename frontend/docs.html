@@ -9,15 +9,15 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0. Your IT can check everything here. The relay never holds a decryption key.">
+<meta name="description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant. Your IT can check everything here. The relay never holds a decryption key.">
 <meta property="og:title" content="Documentation · Paramant API and self-hosting">
-<meta property="og:description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0. Your IT can check everything here. The relay never holds a decryption key.">
+<meta property="og:description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant. Your IT can check everything here. The relay never holds a decryption key.">
 <meta property="og:url" content="https://paramant.app/docs">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Documentation · Paramant API and self-hosting">
-<meta name="twitter:description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0. Your IT can check everything here. The relay never holds a decryption key.">
+<meta name="twitter:description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant. Your IT can check everything here. The relay never holds a decryption key.">
 <link rel="canonical" href="https://paramant.app/docs">
 
 <link rel="stylesheet" href="/design-system.css?v=29">
@@ -176,7 +176,7 @@ tr:last-child td{border-bottom:none}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0. Your IT can check everything here. The relay never holds a decryption key."
+      "description": "API reference, SDK guide, self-hosting and compliance docs for Paramant. Your IT can check everything here. The relay never holds a decryption key."
     },
     {
       "@type": "Organization",
@@ -250,7 +250,12 @@ tr:last-child td{border-bottom:none}
     <span class="eyebrow">REFERENCE</span>
     <h1>Documentation</h1>
     <p class="docs-buyer">Evaluating Paramant? Your IT can check everything here. Plans and prices are on <a href="/pricing">Pricing</a>.</p>
-    <p class="lede">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT v3.0.0. The relay is untrusted by design: it never holds a decryption key. The ParaSign API is available from Firm; see <a href="/pricing">pricing</a>.</p>
+    <p class="lede">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT. The relay is untrusted by design: it never holds a decryption key. The ParaSign API is available from Firm; see <a href="/pricing">pricing</a>.</p>
+    <!-- Two version numbers, and they are meant to differ. Keeping it out of the
+         lede above on purpose: tests/ui-truthfulness.test.mjs requires the plan
+         boundary to sit in one unbroken run of text there. -->
+    <p class="small">The hosted relays answer <code>3.1.0</code>. The self-host release the install
+    script pins is <code>v3.0.0</code>, so the examples on this page differ where that matters.</p>
     <div class="docs-hero-actions">
       <a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">Quick start</a>
       <a href="/pricing" class="docs-hero-btn docs-hero-btn-secondary">See plans and prices</a>
@@ -380,10 +385,12 @@ curl https://health.paramant.app/v2/outbound/abc123... \
       <tr><td>pgp_</td><td><code>pgp_</code></td><td>End users</td><td>Send/receive files via the API</td></tr>
       <tr><td>plk_</td><td><code>plk_</code></td><td>Relay operators</td><td>License key: unlocks &gt;5 users on self-hosted relay</td></tr>
     </table>
-    <p>Pass the <code>pgp_</code> key in the <code>X-Api-Key</code> header or <code>?k=</code> query parameter:</p>
-    <pre>X-Api-Key: pgp_your_key_here
-<span class="cm"># or:</span>
-GET /v2/check-key?k=pgp_your_key_here</pre>
+    <p>Pass the <code>pgp_</code> key in the <code>X-Api-Key</code> header. There is no query-parameter
+    form: a key in a URL ends up in access logs, browser history and referrers, so the relay refuses it.</p>
+    <pre>X-Api-Key: pgp_your_key_here</pre>
+    <p class="small">These docs used to offer <code>?k=</code> as an alternative. It was removed from the
+    relay after the April 2026 review (see <code>SECURITY.md</code>), and sending it now answers
+    <code>API key must be sent in the X-Api-Key header, not as a query parameter.</code></p>
 
     <!-- ── SDK ──────────────────────────────────────────────────── -->
     <h2 id="sdk">SDK</h2>
@@ -545,12 +552,16 @@ ws.onmessage = e => {
     <h2 id="health">GET /health</h2>
     <pre><span class="cm">{
   "ok": true,
-  "version": "3.0.0",
+  "version": "3.1.0",
   "sector": "health",
   "edition": "licensed",
-  "uptime_s": 3600,
-  "license_expires": "2027-01-01"
+  "max_keys": null,
+  "license_expires": "2027-01-01T00:00:00.000Z",
+  "license_issued_to": "paramant.app"
 }</span></pre>
+    <p class="small">Copied from the live answer of <code>health.paramant.app/health</code>. There is no
+    <code>uptime_s</code> field: this example used to show one, along with a shortened
+    <code>license_expires</code> and a version the relay has not answered with for a while.</p>
 
     <!-- ── ParaSign API (/v1) ───────────────────────────────────── -->
     <span id="parasign-api" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
