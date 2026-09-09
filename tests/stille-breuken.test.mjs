@@ -249,3 +249,57 @@ test('verify asks for the copy that actually validates', () => {
   assert.match(code, /no address published for this key/,
     'the signer line no longer says why an address is missing');
 });
+
+// ── Doodlopende wegen ────────────────────────────────────────────────────────
+// Dezelfde familie, een verdieping lager: niet een melding die niet aankomt,
+// maar een uitgang die er niet is. Gemeten op 390x844.
+
+test('the vault page is not a dead end on a phone', () => {
+  const html = read('frontend/vault.html');
+  // Both links in the bar point at /dashboard and the page has no menu button
+  // and no drawer, so this was the one page you could not leave except by
+  // going back. It stays script-free on purpose: this page makes no network
+  // call at all, and the shared navigation would add one.
+  // Match the script tag, not the word: the comment in the page names
+  // nav-auth.js on purpose, to say why it is absent.
+  assert.doesNotMatch(html, /<script[^>]+nav-auth\.js/,
+    'the vault page now loads the shared navigation, which costs it its network silence');
+  assert.match(html, /class="vt-elsewhere"/,
+    'the vault page has no way out other than the dashboard again');
+  for (const href of ['/verify', '/gereedschap', '/']) {
+    assert.ok(html.includes(`<a href="${href}">`), `the vault page no longer links to ${href}`);
+  }
+  assert.match(html, /<footer class="legal-strip">/,
+    'the vault page dropped the legal strip, so privacy, DPA and terms are unreachable from it');
+});
+
+test('the ct-log skip link lands somewhere', () => {
+  const html = read('frontend/ct-log.html');
+  assert.match(html, /href="#main-content" class="skip-link"/,
+    'the skip link is gone from /ct-log');
+  // It pointed at an id that did not exist: pressing it set the hash and moved
+  // nothing. tabindex is what actually moves the focus.
+  assert.match(html, /<main id="main-content"[^>]*tabindex="-1"/,
+    'the skip link on /ct-log points at a target that cannot take focus');
+});
+
+test('both ct-log search fields have a name', () => {
+  const html = read('frontend/ct-log.html');
+  // A placeholder disappears the moment you type, so it is not a label. These
+  // two were the only unlabelled inputs on the site.
+  for (const id of ['verify-input', 'search']) {
+    const tag = new RegExp(`<input id="${id}"[^>]*>`).exec(html);
+    assert.ok(tag, `input #${id} is gone from /ct-log`);
+    assert.match(tag[0], /aria-label="/, `input #${id} has no accessible name, only a placeholder`);
+  }
+});
+
+test('the legal strip is a finger-sized target', () => {
+  const css = read('frontend/design-system.css');
+  // 17 to 19px tall, on every auth, account and download page: the smallest
+  // target on the site.
+  const rule = /\.legal-strip a \{([\s\S]*?)\}/.exec(css);
+  assert.ok(rule, '.legal-strip a is gone from the design system');
+  assert.match(rule[1], /min-height:\s*44px/,
+    'the legal strip links are back under the 44px a thumb needs');
+});

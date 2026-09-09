@@ -3037,6 +3037,13 @@ h1.paramant-h2 { font-size: var(--text-3xl); font-weight: inherit; letter-spacin
   text-decoration: none;
   border-bottom: 1px solid transparent;
   padding: 2px 0;
+  /* 44px of height for a thumb, without making the line look any taller: the
+     box grows, the text does not. Measured at 390px wide these links were 17
+     to 19px high, which is the smallest target on the site and sits on every
+     auth, account and download page. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
 }
 .legal-strip a:hover { color: var(--navy); border-bottom-color: var(--lime); }
 .legal-strip a:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }

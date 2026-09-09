@@ -17,7 +17,7 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#15191C">
 
-<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/design-system.css?v=29">
 <link rel="stylesheet" href="/nav.css?v=24">
 <link rel="stylesheet" href="/relay-pulse.css?v=4">
 <meta property="og:title" content="Certificate transparency log · Paramant">
@@ -297,6 +297,10 @@ body { min-height:100vh; }
   <a href="/help" class="nav-tail-link">Help</a>
 </div>
 
+<!-- The skip link at the top pointed at #main-content, which did not exist on
+     this page, and there was no <main> either. Pressing it set the hash and
+     moved nothing: a keyboard visitor was left where they started. -->
+<main id="main-content" role="main" tabindex="-1">
 <div class="hero">
   <div class="tag">Public Audit Log</div>
   <h1>Certificate <span>Transparency</span></h1>
@@ -405,7 +409,7 @@ body { min-height:100vh; }
 <div class="verify-section">
   <h2>Verify a hash</h2>
   <div class="verify-bar">
-    <input id="verify-input" placeholder="Paste leaf_hash, device_hash or tree_hash to verify inclusion..." data-input="clearVerify">
+    <input id="verify-input" aria-label="Hash to verify inclusion for" placeholder="Paste leaf_hash, device_hash or tree_hash to verify inclusion..." data-input="clearVerify">
     <button data-click="verifyHash">VERIFY</button>
   </div>
   <div class="verify-result" id="verify-result"></div>
@@ -418,7 +422,7 @@ body { min-height:100vh; }
 </div>
 
 <div class="search-bar">
-  <input id="search" placeholder="Filter entries by hash or index..." data-input="filterEntries">
+  <input id="search" aria-label="Filter log entries by hash or index" placeholder="Filter entries by hash or index..." data-input="filterEntries">
   <button data-click="filterEntries">FILTER</button>
 </div>
 
@@ -455,6 +459,7 @@ body { min-height:100vh; }
     <div id="relay-entries"><div class="loading">Loading relay registry…</div></div>
   </div>
 </div><!-- /pane-relays -->
+</main>
 
 <script src="/js/delegate.js?v=1" defer></script>
 <script src="/js/ct-log.page.js?v=3" defer></script>

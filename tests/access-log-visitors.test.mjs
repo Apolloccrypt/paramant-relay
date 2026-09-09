@@ -36,7 +36,7 @@ test('a client that renders is not excluded for lacking a referer', () => {
   // exclude every genuine visitor on this site.
   const r = analyse([
     line({ ip: '8.8.8.8', path: '/sign' }),
-    line({ ip: '8.8.8.8', path: '/design-system.css?v=28' }),
+    line({ ip: '8.8.8.8', path: '/design-system.css?v=29' }),
     line({ ip: '8.8.8.8', path: '/sign-flow.js?v=57' }),
   ]);
   assert.equal(r.atMostVisitors, 1);

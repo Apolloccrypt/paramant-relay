@@ -26,7 +26,7 @@
 <link rel="canonical" href="https://paramant.app/vault">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#15191C">
-<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/design-system.css?v=29">
 <style>
 .vt-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--ink-hair)}
 .vt-brand{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.04em;color:var(--navy);text-decoration:none}
@@ -56,6 +56,11 @@
 .vt-status.err{border-color:rgba(196, 96, 79, .5);background:rgba(196, 96, 79, .06);color:rgba(170,20,20,1)}
 .vt-note{margin-top:22px;font-size:12px;color:var(--ink-dim);line-height:1.6;text-align:center}
 .vt-warn{margin:20px 0;padding:14px 16px;border:1px solid #d4a017;background:var(--card);border-radius:10px;color:var(--warn-ink);font-size:13px}
+/* The way out, at the bottom. 44px tall because this is the size a thumb
+   needs, and this page is read on a phone as often as anywhere else. */
+.vt-elsewhere{margin:32px 0 8px;display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:center}
+.vt-elsewhere a{display:inline-flex;align-items:center;min-height:44px;padding:0 4px;font-size:13px;color:var(--ink-dim);text-decoration:underline;text-underline-offset:3px}
+.vt-elsewhere a:hover,.vt-elsewhere a:focus{color:var(--ink)}
 </style>
 <script type="application/ld+json" data-paramant-seo="1">
 {
@@ -175,7 +180,25 @@
 
   <p class="vt-note">Your file is encrypted here, in this browser, before anything is saved. Nothing leaves your browser, so we never receive your file or your passphrase and we cannot reset it for you. Lose the passphrase and the file is gone.</p>
   <p class="vt-tech">AES-256-GCM, key from your passphrase with PBKDF2-SHA-256, 600,000 rounds, random 16-byte salt, random 12-byte nonce.</p>
+
+  <!-- A way out that is not the dashboard.
+       Both links in the bar at the top point at /dashboard, and this page has
+       no menu button and no drawer: on a phone it was the one page in the site
+       you could not leave except by going back. It stays deliberately plain,
+       because this page makes no network call at all and adding the shared
+       navigation would add one (nav-auth.js asks session/verify who you are).
+       So: plain anchors, no script, and only the tools that also work with no
+       account, the same promise this page makes. -->
+  <nav class="vt-elsewhere" aria-label="Other tools that need no account">
+    <a href="/verify">Check a signature or receipt</a>
+    <a href="/gereedschap">All tools</a>
+    <a href="/">Home</a>
+  </nav>
 </main>
+
+<footer class="legal-strip">
+  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
+</footer>
 
 <script src="/vault.js?v=2" defer></script>
 </body>
