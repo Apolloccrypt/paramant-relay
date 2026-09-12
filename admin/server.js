@@ -2990,6 +2990,26 @@ api.get("/user/documents", authUser, async (req, res) => {
   }
 });
 
+// Heb ik dit document al aangeboden. Alleen over het eigen account, en alleen
+// op een hash die de vrager zelf al kent: de lijst hierboven laat de
+// documenthash bewust weg en dat blijft zo. Bedoeld voor een client die afbrak
+// tussen het aanmaken van de envelope en het opschrijven van het id, en die nu
+// niet kan vaststellen of hij er al een heeft.
+api.get("/user/documents/lookup", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  const docHash = String(req.query.doc_hash || "").trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(docHash)) return res.status(400).json({ error: "invalid_doc_hash" });
+  try {
+    const relayRes = await callRelay("/v2/user/envelopes/lookup", { user_id, doc_hash: docHash }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/documents lookup]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
 // Owner actions for the account-scoped document worklist. The browser supplies
 // only an envelope id; the relay receives the session account's own API key and
 // performs the durable account_id ownership check again.

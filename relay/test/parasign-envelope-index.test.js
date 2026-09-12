@@ -85,6 +85,25 @@ async function main() {
     assert.deepStrictEqual(await store.listAccountEnvelopes(OTHER, {}), [], 'stored account mismatch is rejected');
     ok('dashboard summary rejects a cross-account index entry');
 
+      // 1c) hervinden op documenthash --------------------------------------------
+      // Voor een client die afbrak tussen create() en het opschrijven van het id.
+      // De dashboardlijst laat de hash bewust weg (zie hierboven); dit is de
+      // gerichte vraag, alleen over het eigen account en alleen op een hash die
+      // de vrager al kent.
+      assert.deepStrictEqual(await store.findAccountEnvelopeIdsByDocHash(ACCT, docHash), [out.id],
+        'lookup by document hash finds the account own envelope');
+      assert.deepStrictEqual(await store.findAccountEnvelopeIdsByDocHash(ACCT, docHash.toUpperCase()), [out.id],
+        'lookup by document hash is case-insensitive');
+      assert.deepStrictEqual(await store.findAccountEnvelopeIdsByDocHash(OTHER, docHash), [],
+        'lookup by document hash rejects a cross-account index entry');
+      assert.deepStrictEqual(await store.findAccountEnvelopeIdsByDocHash(ACCT, 'f'.repeat(64)), [],
+        'lookup by document hash finds nothing for another document');
+      assert.deepStrictEqual(await store.findAccountEnvelopeIdsByDocHash(ACCT, 'niet-een-hash'), [],
+        'lookup by document hash refuses a malformed hash');
+      assert.deepStrictEqual(await store.findAccountEnvelopeIdsByDocHash('', docHash), [],
+        'lookup by document hash refuses an empty account');
+      ok('lookup by document hash is account-scoped and hash-exact');
+
     // 1b) the requested signing position ---------------------------------------
     // What the invite flow on /sign sends: one seal box, the same for every
     // party, normalized on the way in and durable across a read.
