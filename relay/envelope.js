@@ -738,6 +738,31 @@ class EnvelopeStore {
     return rows.filter(Boolean);
   }
 
+  // Welke envelopes van dit account gaan over DIT document.
+  //
+  // Waarom dit er is: een client die afbreekt tussen create() en het opschrijven
+  // van het envelope-id kan nu niet vaststellen of hij al een envelope voor dit
+  // document heeft. De dashboardlijst laat de documenthash bewust weg, en dat
+  // blijft zo; dit is een gerichte vraag waarop je alleen antwoord krijgt als je
+  // de hash al kent, en alleen over je eigen account. Het alternatief in de
+  // praktijk is bestandsnaam plus tijdstip als anker, en dat kan twee verzoeken
+  // voor hetzelfde bestand niet uit elkaar houden: dan is de veilige uitkomst
+  // een dubbele envelope of stilstand.
+  async findAccountEnvelopeIdsByDocHash(accountId, docHash, { limit = 100 } = {}) {
+    if (!this.available()) throw new Error('redis unavailable');
+    const hash = String(docHash || '').trim().toLowerCase();
+    if (!accountId || !/^[0-9a-f]{64}$/.test(hash)) return [];
+    const ids = await this.listAccountEnvelopeIds(accountId, { limit, prune: true });
+    const rijen = await Promise.all(ids.map(async (id) => {
+      const [storedAccount, storedHash] = await this.redis.hmGet(
+        'env:' + id, ['account_id', 'doc_hash']);
+      if (!storedAccount || !safeTextEqual(storedAccount, accountId)) return null;
+      if (!storedHash || !safeHexEqual(storedHash, hash)) return null;
+      return id;
+    }));
+    return rijen.filter(Boolean);
+  }
+
   // One-shot backfill of the per-account envelope index from existing env:* keys.
   // The index is only written at create() time, so envelopes made BEFORE it
   // existed are absent -- this SCANs every envelope hash and (re)builds the index.

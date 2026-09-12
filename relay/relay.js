@@ -4418,6 +4418,31 @@ async function handleRelayRequest(req, res) {
     }
   }
 
+  // ── POST /v2/user/envelopes/lookup: heb ik dit document al aangeboden ─────
+  // Voor een client die afbrak tussen het aanmaken van de envelope en het
+  // opschrijven van het id. Je krijgt alleen antwoord over je eigen account en
+  // alleen op een hash die je zelf al kent, dus dit legt niets bloot dat de
+  // vrager niet had. De dashboardlijst blijft de documenthash weglaten.
+  if (req.method === "POST" && path === "/v2/user/envelopes/lookup") {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const input = JSON.parse((await readBody(req, 4096)).toString());
+      const userId = (input.user_id || "").toString();
+      const docHash = (input.doc_hash || "").toString().trim().toLowerCase();
+      if (!userId || userId.length > 200) { res.writeHead(400); return res.end(J({ error: "invalid_user_id" })); }
+      if (!/^[0-9a-f]{64}$/.test(docHash)) { res.writeHead(400); return res.end(J({ error: "invalid_doc_hash" })); }
+      const store = _envStore();
+      if (!store) { res.writeHead(503); return res.end(J({ error: "envelope_store_unavailable" })); }
+      const ids = await store.findAccountEnvelopeIdsByDocHash(userId, docHash);
+      res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      return res.end(J({ ok: true, envelope_ids: ids, count: ids.length }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      console.error("[user/envelopes lookup]", err.message);
+      res.writeHead(500); return res.end(J({ error: "internal" }));
+    }
+  }
+
   // ── POST /v2/parasign/inbox/:id/resend: send me that invitation again ──────
   // Internal auth plus an asserted verified email hash, the same pair the
   // recipient-side document and participant-receipt reads take. It is NOT in
