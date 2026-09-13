@@ -148,5 +148,13 @@
   document.addEventListener('keydown', function (event) { if (event.key === 'Escape' && !modal.hidden) closeModal(); });
 
   Promise.all([loadSnapshot(), loadKeys()]);
-  setInterval(loadSnapshot, 10000);
+  // Same rule as the dashboard: a background tab must not keep spending the
+  // shared rate limit that every other signed-in call draws from. Poll while
+  // the page is visible, and pull once the moment it comes back to the front.
+  setInterval(function () {
+    if (document.visibilityState === 'visible') loadSnapshot();
+  }, 30000);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') loadSnapshot();
+  });
 }());

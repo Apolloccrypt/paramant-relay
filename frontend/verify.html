@@ -26,7 +26,7 @@
 <link rel="canonical" href="https://paramant.app/verify">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#15191C">
-<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/design-system.css?v=29">
 <link rel="stylesheet" href="/nav.css?v=24">
 <link rel="stylesheet" href="/relay-pulse.css?v=4">
 <link rel="stylesheet" href="/components-parasign.css?v=6">
@@ -144,8 +144,10 @@
   <div id="panel-doc" role="tabpanel" aria-labelledby="tab-doc">
 
   <section class="card ps-panel" aria-labelledby="v1">
-    <div class="ps-panel-head"><span class="ps-step">1</span><h2 id="v1" class="ps-panel-title">Original document</h2></div>
-    <label class="ps-file"><input type="file" id="vf-document"><span class="ps-file-cta">Choose the original document</span><span class="ps-file-meta" id="vf-document-info">No file selected</span></label>
+    <div class="ps-panel-head"><span class="ps-step">1</span><h2 id="v1" class="ps-panel-title">The signed document</h2></div>
+    <label class="ps-file"><input type="file" id="vf-document"><span class="ps-file-cta">Choose the signed document</span><span class="ps-file-meta" id="vf-document-info">No file selected</span></label>
+    <p class="small mt-2">The copy you were sent, with the seal on it. A PDF is signed after the seal
+    is drawn, so the file from before signing will not match.</p>
   </section>
 
   <section class="card ps-panel" aria-labelledby="v2">
@@ -249,8 +251,8 @@
   </div>
 </footer>
 <script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=9" defer></script>
-<script type="module" src="/parasign-verify.js?v=6"></script>
+<script src="/js/nav-auth.js?v=10" defer></script>
+<script type="module" src="/parasign-verify.js?v=7"></script>
 <script type="module" src="/js/receipt-verify.js?v=1"></script>
 </body>
 </html>

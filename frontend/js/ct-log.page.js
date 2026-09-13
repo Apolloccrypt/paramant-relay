@@ -30,13 +30,22 @@ async function load() {
     allEntries = (d.entries || []).slice().reverse();
     filtered   = allEntries;
 
-    var keyRegCount   = allEntries.filter(function(e){ return !e.type || e.type === 'key_reg'; }).length;
+    var keyRegCount   = allEntries.filter(function(e){ return !e.type || e.type === 'key_reg' || e.type === 'signing_pk_enrolled'; }).length;
     var transferCount = allEntries.filter(function(e){ return e.type === 'transfer' || e.type === 'pubkey'; }).length;
     // The kind that dominates this log and had no counter of its own, so the
     // three numbers under the table came nowhere near the total and nothing on
     // the page said where the difference went. relay.js writes one of these
     // every time one of our containers boots and announces itself.
     var relayRegCount = allEntries.filter(function(e){ return e.type === 'relay_reg'; }).length;
+    // Everything the three counters above do not claim. Signing work writes
+    // envelope_* and parasign entries, and those fell between the categories:
+    // counted by nobody, mentioned nowhere, so the numbers under the table
+    // still did not add up to the number of entries fetched. Whatever new type
+    // gets appended tomorrow lands here too, which is the point of a remainder.
+    var countedTypes = ['key_reg', 'signing_pk_enrolled', 'transfer', 'pubkey', 'relay_reg'];
+    var otherCount = allEntries.filter(function(e){
+      return e.type && countedTypes.indexOf(e.type) === -1;
+    }).length;
     var logSize = d.size != null ? d.size : allEntries.length;
     document.getElementById('stat-total').textContent = logSize;
     // The composition sentence names the same number the counter shows. It is
@@ -45,10 +54,24 @@ async function load() {
     // still reads correctly, which is why the fallback is not "n/a".
     var compEl = document.getElementById('composition-count');
     if (compEl && logSize) compEl.textContent = logSize + ' entries';
+
+    // What the four counters below actually cover. The relay hands out at most
+    // 1000 entries per request, so on a log of thousands the counts describe a
+    // window while the total above describes the whole log: three numbers that
+    // came nowhere near the fourth, with nothing saying why. Say the window.
+    var scopeEl = document.getElementById('stat-scope');
+    if (scopeEl) {
+      scopeEl.textContent = (allEntries.length < logSize)
+        ? 'The four counts above cover the ' + allEntries.length +
+          ' most recent entries of ' + logSize + ', the most the relay returns in one request.'
+        : 'The four counts above cover all ' + logSize + ' entries.';
+    }
     document.getElementById('stat-count').textContent = keyRegCount;
     document.getElementById('stat-transfers').textContent = transferCount;
     var relayRegEl = document.getElementById('stat-relayreg');
     if (relayRegEl) relayRegEl.textContent = relayRegCount;
+    var otherEl = document.getElementById('stat-other');
+    if (otherEl) otherEl.textContent = otherCount;
     const root = d.root || '';
     document.getElementById('stat-root').textContent =
       root && root !== '0'.repeat(64) ? root.slice(0,16)+'…' : 'n/a';

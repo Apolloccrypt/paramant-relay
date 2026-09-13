@@ -297,6 +297,18 @@
     if (res.ok) {
       alert('Account deactivated. Its key can no longer be used.');
       window.location = '/';
+      return;
+    }
+    // A refusal used to end here, silently: the page simply stayed put and the
+    // account was still there. Someone who has decided to close their account
+    // has to be told when that did not happen, and told what to do next.
+    if (res.status === 429) {
+      alert('Too many attempts right now. Wait a few minutes and try again.');
+    } else if (res.status === 401) {
+      alert('Your session has expired. Sign in again, then deactivate the account.');
+    } else {
+      alert('The account was NOT deactivated (server said ' + res.status + '). ' +
+            'Try again in a minute; if it keeps failing, mail privacy@paramant.app.');
     }
   });
 

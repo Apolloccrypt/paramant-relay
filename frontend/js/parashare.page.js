@@ -515,10 +515,38 @@ function setCreateStatus(msg, cls) {
   el.className = 'status-line' + (cls ? ' ' + cls : '');
 }
 
+// A file the link stand cannot take, named at the moment it is chosen. The
+// ceiling was checked only inside sealAndUpload, so an oversized file got a
+// green tick and a live button, and the refusal arrived after the click as the
+// page's generic "something went wrong on our side" while the real sentence
+// went to the console. It is not our side and nothing went wrong: it is a limit
+// the sender can act on, so it is said here, before the click.
+// Returns the sentence, or null when the file fits (or when the live stand,
+// which chunks and reaches 500 MB, is the one selected).
+function linkSizeRefusal(files) {
+  if (sendMode !== 'link' || !files || !files.length) return null;
+  const enc = new TextEncoder();
+  for (const f of files) {
+    if (f.size + enc.encode(f.name).length + LINK_OVERHEAD > LINK_MAX_BLOB) {
+      return f.name + ' is ' + (f.size / 1024 / 1024).toFixed(1) + ' MB, and a link stops at 5 MB. ' +
+        'One link is one sealed block, so it cannot be split. Choose "Hand over live" instead: ' +
+        'that way cuts the file into chunks and takes a file up to 500 MB, with the receiver online while you send.';
+    }
+  }
+  return null;
+}
+
 function onFileSelect() {
   const files = $('file-input').files;
   selectedFile = files[0] || null;
   if (!files.length) { setStatus('file-status', 'No file selected'); $('vault-list').style.display='none'; updateBtn(); return; }
+  const tooBig = linkSizeRefusal(files);
+  if (tooBig) {
+    setStatus('file-status', tooBig, 'err');
+    $('vault-list').style.display = 'none';
+    updateBtn();
+    return;
+  }
   if (files.length === 1) {
     setStatus('file-status', '✓ ' + files[0].name + ' (' + (files[0].size/1024/1024).toFixed(1) + ' MB)', 'ok');
     $('vault-list').style.display = 'none';
@@ -535,7 +563,8 @@ function onFileSelect() {
 
 function updateBtn() {
   selectedFiles = $('file-input') ? [...$('file-input').files] : [];
-  $('btn-create-session').disabled = !(keyValid && selectedFiles.length > 0);
+  $('btn-create-session').disabled =
+    !(keyValid && selectedFiles.length > 0) || linkSizeRefusal(selectedFiles) !== null;
 }
 
 // ── Session creation ──
@@ -1015,6 +1044,9 @@ function setSendMode(mode) {
   const btn = $('btn-create-session');
   if (btn) btn.textContent = (sendMode === 'link') ? 'Seal the file and make a link →' : 'Create secure session →';
   setCreateStatus('');
+  // The same file is fine on one stand and too big on the other, so the verdict
+  // on an already-chosen file is re-read whenever the stand changes.
+  if ($('file-input') && $('file-input').files.length) onFileSelect();
 }
 function chooseModeLive() { setSendMode('live'); }
 function chooseModeLink() { setSendMode('link'); }
@@ -1033,10 +1065,13 @@ async function startSend() {
 async function sealAndUpload(file, ttlMs) {
   const nameBytes = new TextEncoder().encode(file.name);
   if (file.size + nameBytes.length + LINK_OVERHEAD > LINK_MAX_BLOB) {
-    throw new Error(file.name + ' is too big for a link. A link is one sealed 5 MB block, ' +
-      'so 5 MB a file is the ceiling for this way of sending. Hand it over live instead: ' +
-      'that way cuts the file into chunks and takes a file up to 500 MB. ' +
-      'The receiver has to be online while you send.');
+    // The picker refuses this before the click; this is the backstop for a file
+    // that changed under us. `userFacing` keeps it out of the generic
+    // "something went wrong on our side" line, which is for OUR failures and
+    // sends the real sentence to the console where the sender never looks.
+    const err = new Error(linkSizeRefusal([file]) || (file.name + ' is too big for a link.'));
+    err.userFacing = true;
+    throw err;
   }
   const plain = concat(u32le(nameBytes.length), nameBytes, new Uint8Array(await file.arrayBuffer()));
   const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
@@ -1132,7 +1167,9 @@ async function createLink() {
       $('seal-status').className = 'status-line';
       $('seal-status').innerHTML = window.paQuotaUpgrade.html(e.quota);
     } else {
-      $('seal-status').textContent = failureText('seal and upload', e);
+      $('seal-status').textContent = (e && e.userFacing && e.message)
+        ? e.message
+        : failureText('seal and upload', e);
       $('seal-status').className = 'status-line err';
     }
   }

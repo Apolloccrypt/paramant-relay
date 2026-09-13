@@ -29,11 +29,18 @@
     h[id].push({ ts: Date.now(), ok: ok });
     return h;
   }
-  function uptimePct(h, id) {
+  // Uptime over whatever THIS browser has seen, and it says how much that is.
+  //
+  // The first visit ever made one check, found it up, and printed "uptime 24h
+  // 100.0%" under a note that said the figure came from 24 hours of checks. One
+  // sample is not a day, and a percentage without its sample count reads as a
+  // measurement when it is a single observation. So: return both, and let the
+  // caller print the count next to the number.
+  function uptimeStat(h, id) {
     var arr = h[id];
     if (!arr || arr.length === 0) return null;
     var good = arr.filter(function (r) { return r.ok; }).length;
-    return (good / arr.length * 100).toFixed(1);
+    return { pct: (good / arr.length * 100).toFixed(1), n: arr.length };
   }
 
   // Build cards once
@@ -73,9 +80,14 @@
     if (ms !== undefined) msEl.textContent = ms + 'ms';
   }
 
-  function setUptime(id, pct) {
+  function setUptime(id, stat) {
     var el = document.getElementById('up-' + id);
-    if (el && pct !== null) el.textContent = pct + '%';
+    if (!el || stat === null) return;
+    // Below a handful of samples the percentage says nothing, so show the
+    // sample count alone rather than a 100% that rests on one look.
+    el.textContent = stat.n < 5
+      ? stat.n + (stat.n === 1 ? ' check' : ' checks')
+      : stat.pct + '% of ' + stat.n + ' checks';
   }
 
   function setOverall(allOk, anyChecked) {
@@ -117,7 +129,7 @@
           addResult(h, s.id, false);
         })
         .finally(function () {
-          setUptime(s.id, uptimePct(h, s.id));
+          setUptime(s.id, uptimeStat(h, s.id));
           pending--;
           if (pending === 0) {
             saveHistory(h);

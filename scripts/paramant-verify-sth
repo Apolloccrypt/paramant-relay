@@ -46,8 +46,15 @@ function fetchJson(url) {
 }
 
 // Canonical JSON: sorted keys, no whitespace, UTF-8 — must match produceSth() in relay.js
+//
+// Every field the head carries EXCEPT the signature, rather than a fixed list.
+// A fixed list silently drops any field added later: window_base arrived in
+// version 2 and would have been left out of the payload here, so a perfectly
+// good head would have failed verification with no hint as to why. The relay
+// signs `{...payload}` and frontend/js/receipt-verify.js strips the signature
+// and canonicalises the rest; this now does the same thing.
 function canonicalJson(sth) {
-  const keys = ['relay_id', 'sha3_root', 'timestamp', 'tree_size', 'version'];
+  const keys = Object.keys(sth).filter(k => k !== 'signature').sort();
   return JSON.stringify(Object.fromEntries(keys.map(k => [k, sth[k]])));
 }
 
@@ -63,10 +70,18 @@ async function main() {
     process.exit(1);
   }
   const sth = sthResp.sth;
-  log(`STH: tree_size=${sth.tree_size} sha3_root=${(sth.sha3_root||'').slice(0,16)}… ts=${sth.timestamp}`);
+  log(`STH: tree_size=${sth.tree_size}${sth.window_base != null ? " window_base=" + sth.window_base : ""} sha3_root=${(sth.sha3_root||'').slice(0,16)}… ts=${sth.timestamp}`);
 
   // 2. Validate STH fields
-  if (sth.version !== 1) { console.error(`FAIL: unsupported STH version ${sth.version}`); process.exit(1); }
+  // 1 and 2 differ by one field: version 2 adds window_base, the logical index
+  // of the first leaf in the signed tree. The tree covers a sliding window, so
+  // a leaf count on its own does not say which leaves. Signature checking is
+  // untouched by this: the canonical payload is rebuilt from whatever fields
+  // the head carries, so a version 1 head still verifies exactly as before.
+  if (sth.version !== 1 && sth.version !== 2) { console.error(`FAIL: unsupported STH version ${sth.version}`); process.exit(1); }
+  if (sth.version === 2 && typeof sth.window_base !== 'number') {
+    console.error('FAIL: version 2 STH without window_base'); process.exit(1);
+  }
   for (const f of ['relay_id', 'sha3_root', 'timestamp', 'tree_size', 'signature']) {
     if (sth[f] === undefined || sth[f] === null) {
       console.error(`FAIL: STH missing required field '${f}'`); process.exit(1);
@@ -136,6 +151,9 @@ async function main() {
   console.log('OK: STH signature verified (ML-DSA-65 NIST FIPS 204)');
   console.log(`  relay_id   : ${sth.relay_id}`);
   console.log(`  tree_size  : ${sth.tree_size}`);
+  if (sth.window_base != null) {
+    console.log(`  window_base: ${sth.window_base}  (tree covers leaves ${sth.window_base}..${sth.window_base + sth.tree_size - 1})`);
+  }
   console.log(`  sha3_root  : ${sth.sha3_root}`);
   console.log(`  timestamp  : ${new Date(sth.timestamp).toISOString()}`);
   console.log(`  pk_hash    : ${pkResp.pk_hash}`);

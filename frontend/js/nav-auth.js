@@ -58,7 +58,7 @@
       '<a href="/signup" class="nav-cta">Create account</a>';
   }
 
-  function renderLoggedIn(email) {
+  function renderLoggedIn(email, isDeveloper) {
     setNavigation(APP_NAV, 'Workspace');
     // Support survives signing in. The tail used to be REMOVED here, on the
     // reasoning that the user menu carries Help from then on. On a phone that
@@ -90,7 +90,10 @@
         '<div class="nav-user-menu" hidden>' +
           '<a href="/dashboard" class="nav-menu-item">Documents</a>' +
           '<a href="/account" class="nav-menu-item">Account</a>' +
-          '<a href="/developer" class="nav-menu-item">Developer settings</a>' +
+          // Only for accounts that are actually on the developer allowlist.
+          // /developer answers 404 to everyone else, on purpose, so offering it
+          // to every signed-in visitor was offering a door that will not open.
+          (isDeveloper ? '<a href="/developer" class="nav-menu-item">Developer settings</a>' : '') +
           '<a href="/pricing" class="nav-menu-item">Plan &amp; billing</a>' +
           '<a href="/help" class="nav-menu-item">Help</a>' +
           '<div class="nav-menu-divider"></div>' +
@@ -143,7 +146,15 @@
       if (!res.ok) { renderLoggedOut(); return; }
       var data = await res.json();
       if (data.authenticated && data.email) {
-        renderLoggedIn(data.email);
+        renderLoggedIn(data.email, data.developer === true);
+        // The same verdict for the links that sit in the page itself (the
+        // settings tabs, the dashboard shortcuts). They ship hidden and are
+        // revealed here, so a non-developer is never shown a link that leads
+        // to a 404 and the page needs no second round-trip to find out.
+        if (data.developer === true) {
+          document.querySelectorAll('[data-developer-only]')
+            .forEach(function(el) { el.hidden = false; });
+        }
       } else {
         renderLoggedOut();
       }

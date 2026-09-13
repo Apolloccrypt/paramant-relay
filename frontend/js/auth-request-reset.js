@@ -36,7 +36,7 @@
       if (res.ok) {
         form.style.display = 'none';
         successDiv.style.display = 'block';
-        successDiv.innerHTML = '<p>If an account exists for <strong>' + email + '</strong>, a confirmation email is on its way. Look in your inbox, and in the spam folder. The sender is noreply@paramant.app.</p><p style="margin-top:8px">That first mail only confirms the request, and its link is valid for 60 minutes. Once you open it, we send the second mail with the link that links a new authenticator app; that one works for 14 days.</p><p style="margin-top:8px">We do not say whether the address is registered, so this message looks the same either way.</p>';
+        successDiv.innerHTML = '<p>If an account exists for <strong>' + email + '</strong>, a confirmation email is on its way. Look in your inbox, and in the spam folder. The sender is hello@paramant.app.</p><p style="margin-top:8px">That first mail only confirms the request, and its link is valid for 60 minutes. Once you open it, we send the second mail with the link that links a new authenticator app; that one works for 14 days.</p><p style="margin-top:8px">We do not say whether the address is registered, so this message looks the same either way.</p>';
       } else if (res.status === 429) {
         // server.js returns retry_after 86400 here: 5 requests per address per
         // 24 hours, 10 per connection per hour. Telling the reader to try again

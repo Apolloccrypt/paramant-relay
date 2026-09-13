@@ -1,8 +1,11 @@
 'use strict';
 // Pure fixed-window rate-limit decision, extracted from the ~dozen byte-identical
-// in-memory limiters in relay.js (checkTeamRateLimit, checkMfaRateLimit,
-// claimRateOk, checkKeyRateOk, lookupSignerRateOk, statusRateOk, envViewRateOk,
-// envSignRateOk, envCreateRateOk, ...). Each limiter keeps its own
+// in-memory limiters in relay.js (checkMfaRateLimit, claimRateOk,
+// checkKeyRateOk, lookupSignerRateOk, statusRateOk, envViewRateOk,
+// envSignRateOk, envCreateRateOk, ...). checkTeamRateLimit was in this list
+// until 2026-09-09, when it turned out nothing had ever called it and its
+// missing-id case answered "allowed"; it was deleted rather than kept as an
+// example. Each limiter keeps its own
 // Map<key,{count,resetAt}>; this centralises the decision so it is unit-tested
 // once. Behaviour-identical to the inline copies:
 //   - first hit in a window seeds resetAt = now + windowMs and count = 1,

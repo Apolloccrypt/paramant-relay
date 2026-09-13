@@ -2462,6 +2462,14 @@ api.get("/user/session/verify", async (req, res) => {
     authenticated: true,
     email: s.email,
     expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+    // Whether THIS session may open /developer. The navigation used to offer
+    // "Developer settings" to every signed-in visitor, and /developer answers
+    // 404 to anyone off the allowlist (deliberately, so the surface stays
+    // hidden), so the menu handed almost everyone a dead link. Telling a
+    // visitor about their own access is not a leak: a false here says nothing
+    // about what the route is or whether it exists, and it lets the menu stop
+    // advertising a door that will not open.
+    developer: isDeveloper(s.email),
   });
 });
 

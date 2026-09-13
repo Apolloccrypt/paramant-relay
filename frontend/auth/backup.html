@@ -9,7 +9,7 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/design-system.css?v=28">
+<link rel="stylesheet" href="/design-system.css?v=29">
 <link rel="stylesheet" href="/nav.css?v=24">
 <link rel="stylesheet" href="/relay-pulse.css?v=4">
 <style>
@@ -73,7 +73,12 @@
 </section>
 
 <section class="section">
-  <form id="backup-form" class="form-card">
+  <!-- novalidate, like the sign-in and sign-up forms. Without it the browser's
+       own `required` check runs first and cancels the submit event, so the
+       page's own handler never ran and never got to say what was missing: the
+       button simply did nothing. The fields keep `required` for assistive
+       technology; the sentences come from auth-backup.js. -->
+  <form id="backup-form" class="form-card" novalidate>
     <label for="email">Email address</label>
     <input type="email" id="email" name="email" required autocomplete="username"
            autofocus>
@@ -112,8 +117,8 @@
 </main>
 
 <script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=9" defer></script>
-<script src="/js/auth-backup.js?v=2"></script>
+<script src="/js/nav-auth.js?v=10" defer></script>
+<script src="/js/auth-backup.js?v=3"></script>
 
 <footer class="legal-strip">
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
