@@ -99,6 +99,14 @@ async function zetTeller(acct, n) {
   await rc.set(k, String(n), { EX: 3600 });
 }
 
+// Wat deze suite heeft getoetst, geteld in plaats van geraden. summary() kreeg
+// hier een hardgecodeerde nul, en dat is precies de toestand waar die functie
+// tegen bedacht is: vier tests die slagen en een slotregel die "SKIPPED - 0
+// checks ran" zegt. De CI-poort in de crypto-baan las die regel, terecht, als
+// een suite die niets toetste.
+let gedaan = 0;
+const geteld = (naam, fn) => test(naam, async (t) => { await fn(t); gedaan += 1; });
+
 before(async () => {
   rc = await requireRedis(DEFAULT_REDIS);
   usersFile = path.join(os.tmpdir(), `geldgaten-q-users-${process.pid}.json`);
@@ -127,12 +135,12 @@ after(async () => {
     }
     try { await rc.disconnect(); } catch (_) {}
   }
-  summary('geld-gaten-quota', 0);
+  summary('geld-gaten-quota', gedaan);
 });
 
 // ── GAT 4. De grens van transfers_month ─────────────────────────────────────
 
-test('gat 4a: de laatste transfer is OP voordat de verzending bestaat', async () => {
+geteld('gat 4a: de laatste transfer is OP voordat de verzending bestaat', async () => {
   if (!rc) return;
   // De teller loopt op /v2/inbound (relay.js:6937), NIET op /v2/sends. En er is
   // geen releaseTransfer: lib/quota.js kent alleen releaseSign (regel 268).
@@ -164,7 +172,7 @@ test('gat 4a: de laatste transfer is OP voordat de verzending bestaat', async ()
 
 // ── GAT 6. Wat een transfer werkelijk is ────────────────────────────────────
 
-test('gat 6a: een vaste meta.file_id zet de maandteller stil', async () => {
+geteld('gat 6a: een vaste meta.file_id zet de maandteller stil', async () => {
   if (!rc) return;
   // relay.js:6930 maakt de dedup-sleutel uit meta.file_id, en die komt UIT DE
   // CLIENT: frontend/js/parashare.page.js:824 maakt er acht willekeurige bytes
@@ -185,7 +193,7 @@ test('gat 6a: een vaste meta.file_id zet de maandteller stil', async () => {
     'acht losse bestanden, een transfer geteld');
 });
 
-test('gat 6b: zonder file_id kost EEN bestand een transfer PER BLOK', async () => {
+geteld('gat 6b: zonder file_id kost EEN bestand een transfer PER BLOK', async () => {
   if (!rc) return;
   // De verzendpagina (frontend/js/parashare.page.js:1221) stuurt GEEN file_id,
   // dus de dedup-sleutel valt terug op quota.firstChunkHash(blob) -- per blok
@@ -204,7 +212,7 @@ test('gat 6b: zonder file_id kost EEN bestand een transfer PER BLOK', async () =
 
 // ── GAT X. Twee verzendingen uit een upload (GEEN gat gevonden) ─────────────
 
-test('gat X (dicht): dezelfde blokken tegelijk twee keer versturen', async () => {
+geteld('gat X (dicht): dezelfde blokken tegelijk twee keer versturen', async () => {
   if (!rc) return;
   // relay.js:4652 laat `blobDrop` pas los NA `await _sendStore().create(...)`.
   // Met Redis is die create echte IO, dus het venster tussen de
