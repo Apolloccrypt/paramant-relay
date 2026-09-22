@@ -38,6 +38,16 @@ const PUBLIC_ROUTES = [
        + 'product heartbeat and the admin drop flow.',
     src: "path === '/v2/anon-inbound'",
     deprecated: true },
+  { method: 'GET',  docs: '/v2/pickup/:token',
+    src: "path.match(/^\\/v2\\/pickup\\/([A-Za-z0-9_-]{16,128})$/)",
+    why: 'the receiving end of a send to named recipients. A recipient is somebody who '
+       + 'was sent something, not somebody with a login, so there is no key to present. '
+       + 'The capability is the token, which arrives in one person\'s mail, and opening '
+       + 'the link only sends a code to that same mailbox: the file itself needs both.' },
+  { method: 'POST', docs: '/v2/pickup/:token',
+    src: "path.match(/^\\/v2\\/pickup\\/([A-Za-z0-9_-]{16,128})$/)",
+    why: 'the second half of the same pickup: the code from the mailbox, and then the '
+       + 'bytes. Same reason it carries no key, and three wrong codes close the door.' },
   { method: 'GET',  docs: '/v2/check-key',
     src: "path === '/v2/check-key'",
     why: 'a client must be able to discover which relay accepts its key before it has one.' },
@@ -68,6 +78,16 @@ const KEY_GATE_EXEMPTIONS = [
   'isEnvelopePublic',
   'isBillingWebhook',
   'isInternalBillingCancel',
+  // De ontvangerskant van een verzending naar genodigden. Een ontvanger draagt
+  // geen sleutel en hoort er geen te dragen: hij is iemand die iets gestuurd
+  // kreeg, niet iemand met een account. Zijn bevoegdheid is het token uit zijn
+  // eigen mail, en het openen van de link mailt alleen een code naar datzelfde
+  // postvak; de bytes vragen beide helften.
+  //
+  // De uitzondering is zo smal als hij kan: alleen GET en POST, alleen op een
+  // pad dat precies een token van de juiste vorm draagt. Alles daarbuiten valt
+  // gewoon door de poort.
+  'isPickupPublic',
 ];
 
 module.exports = { PUBLIC_ROUTES, KEY_GATE_EXEMPTIONS };

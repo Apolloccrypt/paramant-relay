@@ -27,6 +27,11 @@ const ORIGIN = 'https://paramant.app';
 const PRIVATE = new Set([
   '404', 'account', 'admin', 'all-systems-go', 'claim', 'co-sign', 'dashboard',
   'developer', 'get', 'ontvang', 'request-key', 'setup',
+  // ophalen.html is wat nginx op /ontvang/<token> serveert: een eenmalige
+  // flow, en de URL zelf IS het geheim. Indexeren zou een token in een
+  // zoekresultaat zetten, en een og:url zou hem in elke linkpreview zetten.
+  // Hoort dus bij de noindex-afspraak, niet bij de vindbaarheidsafspraak.
+  'ophalen',
   // /parashare sits behind the same nginx auth_request that /sign used to, so
   // by the rule at the top of this list it belongs here: gated pages are held
   // to the noindex contract, not the discoverability one. It was in the sitemap

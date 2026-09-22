@@ -231,12 +231,23 @@ test('the 5 MB block size on the site is the relay default', () => {
   for (const slug of ['privacy', 'security', 'vs']) {
     if (!visible(page(slug)).includes(`${mb} MB`)) problems.push(`${slug}: must state the ${mb} MB block size`);
   }
-  // A page may state either number, but only those two. Anything else is a
-  // figure the relay does not enforce.
+  // DRIE getallen, niet twee, en het derde is er sinds september 2026 bij.
+  //
+  // Een verzending naar genodigden heeft een eigen plafond: niemand staat aan
+  // de andere kant te wachten, dus het hele bestand blijft in de opslag tot de
+  // laatste ophaalt, verzegeld als base64 en daarmee een derde groter dan
+  // zichzelf. Dat getal komt uit SEND_MAX_MB in lib/send.js, net zoals de
+  // andere twee uit de code komen: de test leest ze, hij kent ze niet uit het
+  // hoofd.
+  const send = read('relay/lib/send.js');
+  const sendMb = Number(/SEND_MAX_MB \|\| '(\d+)'/.exec(send)[1]);
   for (const slug of publicPages()) {
     for (const hit of visible(page(slug)).matchAll(/(\d+) MB (file limit|per file|file size limit)/g)) {
       const n = Number(hit[1]);
-      if (n !== mb && n !== fileMb) problems.push(`${slug}: claims "${hit[0]}", and the relay enforces ${mb} MB per block and ${fileMb} MB per file`);
+      if (n !== mb && n !== fileMb && n !== sendMb) {
+        problems.push(`${slug}: claims "${hit[0]}", and the relay enforces ${mb} MB per block, `
+          + `${fileMb} MB per file and ${sendMb} MB for a send to named recipients`);
+      }
     }
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
@@ -1533,11 +1544,17 @@ test('every third party the server code calls is named on /privacy and /dpa', ()
     if (!re.test(subs)) problems.push(`privacy: the code calls ${v}, and the sub-processor list does not name it`);
     if (!re.test(table)) problems.push(`dpa: the code calls ${v}, and the sub-processor table does not name it`);
   }
-  // A US sub-processor is on the signed table, under Standard Contractual
-  // Clauses. /press said "No US entity in the chain" in the same breath as the
-  // Hetzner location, which is the opposite of what the controller signs.
-  // Verified by sabotage in both directions: putting the sentence back turns
-  // this red, and so does removing the US row from /dpa.
+  // ER IS GEEN AMERIKAANSE SUBVERWERKER MEER, en dat is het punt.
+  //
+  // Deze toets bestond omdat /press "No US entity in the chain" zei terwijl de
+  // getekende tabel Resend Inc. in de Verenigde Staten noemde, onder Standard
+  // Contractual Clauses. Dat was het tegenovergestelde van wat de
+  // verwerkingsverantwoordelijke tekende.
+  //
+  // Mail verhuisde in september 2026 naar Mailjet in Parijs, dus de rij is weg
+  // en de zin mag. De toets blijft staan en draait om: komt er ooit weer een
+  // Amerikaanse rij bij, dan moet geen enkele pagina meer beweren dat er geen
+  // Amerikaanse partij in de keten zit.
   const usRow = /<tr><td>([^<]+)<\/td><td>US[^<]*<\/td>/.exec(page('dpa'));
   if (usRow) {
     const denials = [];
@@ -1547,7 +1564,7 @@ test('every third party the server code calls is named on /privacy and /dpa', ()
     }
     assert.deepEqual(denials, [], `\n  ${denials.join('\n  ')}\n`);
   }
-  assert.ok(usRow, 'the /dpa table no longer names a US sub-processor; check /press and /privacy before deleting this assertion');
+  // Geen assertie dat de rij er MOET zijn: hem weghalen was de verbetering.
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });
 
@@ -2480,9 +2497,9 @@ test('the ParaSend credential /privacy describes is the credential the code impl
   const countRules = (from, to) => (scope.slice(scope.indexOf(from), scope.indexOf(to))
     .match(/\{ method:/g) || []).length;
   const rules = countRules('const SCOPE = [', 'const APP_SCOPE = [');
-  assert.equal(rules, 5,
+  assert.equal(rules, 6,
     `the relay's ParaSend allowlist now has ${rules} entries; /privacy says five, so change the page with the code`);
-  assert.ok(priv.includes('the relay accepts it on the five requests a transfer makes and refuses it on everything else'),
+  assert.ok(priv.includes('the relay accepts it on the six requests a transfer makes and refuses it on everything else'),
     'privacy: the storage section must state what the token can and cannot do');
   const appRules = countRules('const APP_SCOPE = [', 'const PURPOSE_PARASEND');
   assert.equal(appRules, 5,

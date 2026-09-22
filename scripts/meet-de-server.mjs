@@ -179,11 +179,23 @@ export async function meetGrens(host, verwacht) {
 // ongebreidelde zoektocht over zes hosts liep in de sabotagetoets van
 // 2026-09-05 buiten de tijd van de test, en een poort die bij een verschil
 // blijft hangen in plaats van rood te worden is geen poort.
+// De stappengrens moet het bereik AAN KUNNEN, anders is het antwoord een
+// benadering die zich voordoet als een getal. Met twintig stappen over 1 KiB
+// tot 64 MiB blijft er ongeveer 64 byte onzekerheid, en dan levert dezelfde
+// server per meting een ander getal: op 05-09 kwam er 10485760 uit en op 22-09
+// 10485728, tweeendertig byte lager. Dat las als drift op een server waar
+// niemand iets had veranderd, en het hield een hele CI-baan rood.
+//
+// Halveren kost log2(boven - onder) stappen om op de byte uit te komen. Die
+// som staat hieronder in plaats van een rond getal, met vijf stappen marge,
+// zodat een groter bereik de meting niet stilletjes weer vaag maakt. Het
+// verschil is een handvol extra verbindingen per host.
 export async function zoekGrens(host, onder = 1024, boven = 64 * 1024 * 1024) {
   if (await kopProbe(host, onder) === 413) return { grens: null, opmerking: 'weigert al op ' + onder };
   if (await kopProbe(host, boven) !== 413) return { grens: null, opmerking: 'accepteert nog op ' + boven };
+  const nodig = Math.ceil(Math.log2(Math.max(2, boven - onder))) + 5;
   let stappen = 0;
-  while (onder < boven - 1 && stappen < 20) {
+  while (onder < boven - 1 && stappen < nodig) {
     const mid = Math.floor((onder + boven) / 2);
     if (await kopProbe(host, mid) === 413) boven = mid; else onder = mid;
     stappen += 1;

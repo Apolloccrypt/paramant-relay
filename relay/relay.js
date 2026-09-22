@@ -40,6 +40,7 @@ const totpLib       = require('./lib/totp');
 const redisDeadlines = require('./lib/redis-deadline'); // one bound for every redis call
 const redisCounter  = require('./lib/redis-counter');   // INCR that always carries an expiry
 const rateLimit     = require('./lib/rate-limit');
+const mailer        = require('./lib/mail');            // one way out, carrier is a setting
 const authThrottle  = require('./lib/auth-throttle');
 const authGate      = require('./lib/auth-gate');
 const sessionTokens = require('./lib/session-token'); // pst_ ParaSend session tokens
@@ -157,6 +158,7 @@ const mollie          = require('./lib/mollie');            // Mollie Payments A
 const billing         = require('./lib/billing');           // Mollie webhook decision state machine
 const billingRecurring = require('./lib/billing-recurring'); // subscription + mandate layer
 const parasignStoreMod = require('./lib/parasign-store');    // durable encrypted /v1 side-store
+const sendMod       = require('./lib/send');            // sends to named recipients
 const parasignStamp = require('./lib/parasign-stamp');       // server-side PDF stamp-worker
 const qes           = require('./lib/qes');                   // qualified-signature layer, off unless flagged
 const tierGate         = require('./lib/tier-gate');         // per-tier feature gate (billing hardening)
@@ -241,7 +243,7 @@ try {
 } catch(e) { log('warn', 'ml_dsa_not_available', { hint: 'build/install @paramant/core', err: e.message }); }
 
 const ALLOWED = {
-  ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
+  ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/pickup','/v2/sends','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream',
                '/v2/ack','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
@@ -249,7 +251,7 @@ const ALLOWED = {
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
                '/v2/sth','/v2/verify-receipt','/v2/transfers','/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v2/qes','/v1'],
-  iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
+  iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/pickup','/v2/sends','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/ack','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
@@ -263,6 +265,58 @@ const ALLOWED = {
 function modeAllows(p) {
   const a = ALLOWED[RELAY_MODE];
   return !a || a.some(x => p === x || p.startsWith(x + '/'));
+}
+
+// The footer every mail to a non-customer carries.
+//
+// A stranger's first question is "why am I getting this", and the second is
+// "who are you". A transactional mail that answers neither is indistinguishable
+// from a phishing attempt, and a corporate spam filter will treat it as one.
+// Answering both costs three lines and is the difference between a document
+// that arrives and a ticket at somebody's IT desk.
+function VOET(wie, antwoordAdres) {
+  const wieHtml = escHtml(wie || '');
+  return '<hr style="border:0;border-top:1px solid #e3e7e9;margin:22px 0 12px">'
+       + '<p style="color:#8a949a;font-size:12px;line-height:1.6;margin:0">'
+       + 'You are getting this because ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
+                                                   : 'a Paramant customer')
+       + ' entered your address. Paramant carries the file in encrypted form and '
+       + 'cannot open it.'
+       + (antwoordAdres ? '<br>Reply to this mail to reach them directly.' : '')
+       + '<br>Paramantis Solutions B.V., Harderwijk, the Netherlands &middot; '
+       + '<a href="https://paramant.app/privacy" style="color:#8a949a">privacy</a>'
+       + '</p>';
+}
+
+// Which sector an account lives on, from its key label -- the same derivation
+// GET /v2/key-sector already answers the sender's page with.
+//
+// The invitation link has to carry it. An account is valid on exactly ONE
+// sector, and /ontvang/<token> is served by the apex, whose /v2/ goes to
+// health. Without `?r=`, every recipient of a legal or finance sender asks
+// health for a token health has never seen and is told the link cannot be
+// used. The one-link flow learned this already and puts `&r=` in its URL; this
+// is the same fix for the same reason.
+function sectorOfKey(kd) {
+  const label = ((kd && kd.label) || '').toLowerCase();
+  return label.includes('legal')   ? 'legal'
+       : label.includes('finance') ? 'finance'
+       : label.includes('iot')     ? 'iot'
+       : 'health';
+}
+
+// encodeURIComponent that cannot throw.
+//
+// It raises URIError on a lone surrogate, and every call site here is a
+// response header built after work that cannot be undone. Replacing the
+// unpaired half keeps the name readable and the response alive.
+function veiligCodeer(waarde) {
+  try { return encodeURIComponent(String(waarde == null ? '' : waarde)); }
+  catch (e) {
+    try {
+      return encodeURIComponent(String(waarde).replace(/[\uD800-\uDFFF]/g, ''));
+    } catch (e2) { return 'file'; }
+  }
 }
 
 // HTML-escape user-supplied strings before embedding in email templates.
@@ -1716,6 +1770,26 @@ function apiKeyFromHash(hash) {
 // keys built from acctOf(apiKey) are byte-identical to the old apiKey-scoped
 // ones — behaviour-neutral now, account-shared once a second key is added.
 function acctOf(apiKey) { const v = apiKeys.get(apiKey); return (v && v.account_id) || apiKey; }
+
+// WHO THE DASHBOARD MEANS when it says user_id, translated to who the send
+// store filed the send under. These are not the same string, and that cost the
+// whole feature.
+//
+// admin/server.js puts `user_id: user.key` in the session -- the API key. The
+// send is filed under acctOf(apiKey), which is `account_id` when the record has
+// one. Every account created through the admin has one. So a real customer's
+// dashboard asked for sends belonging to `pgp_...` while every send they had
+// ever made was filed under `acct_...`: an empty list, nothing to open, nothing
+// to withdraw. Measured, and it is exactly the tracking the product is sold on.
+//
+// Translating here rather than in the admin keeps it working from both sides:
+// an old account without account_id still resolves to itself, and a caller that
+// already sends the account id is untouched.
+function accountVan(userId) {
+  const v = String(userId || '');
+  if (!v) return v;
+  return apiKeys.has(v) ? acctOf(v) : v;
+}
 // How an account is named to somebody it sent a signing request to. The address
 // on the account, because that is exactly what the invitation mail already put
 // in front of this reader: admin/server.js sends signingInviteEmail with
@@ -2026,6 +2100,27 @@ async function envCreateRateOkShared(apiKey) {
 function _parasignStoreKey() {
   return process.env.PARASIGN_STORE_KEY || process.env.PARAMANT_TOTP_MASTER_KEY || null;
 }
+// ── ParaSend durable store for sends to named recipients ─────────────────────
+// Same machinery, its own namespace. Ordinary transfers keep living in the
+// in-memory Map: five minutes and one reader survive a process fine. A send to
+// thirty people can stand open for a week, and a restart would quietly destroy
+// something a customer is still waiting on, so those go through here.
+//
+// The prefix AND the AAD prefix differ from signing, so neither product can read
+// or unseal the other's documents.
+function _sendStore() {
+  if (!_sendStore._inst) {
+    const store = parasignStoreMod.createParaSignStore({
+      redis: redisClient, encKey: _parasignStoreKey(), log,
+      prefix: 'psend', aadPrefix: 'parasend',
+    });
+    _sendStore._inst = sendMod.createSendStore({ store, log });
+    _sendStore._backend = store.backend;
+    log('info', 'send_store_backend', { backend: store.backend });
+  }
+  return _sendStore._inst;
+}
+
 function _parasignStore() {
   if (!_parasignStore._inst) {
     _parasignStore._inst = parasignStoreMod.createParaSignStore({
@@ -2156,30 +2251,39 @@ function auditAppend(key, event, data = {}) {
 // the ParaSend Pro transfer notifications (upload/download) and by the invoice
 // mail, which is the one caller that passes an attachment; the DPA and
 // inbound-claim flows keep their own richly-templated inline sends.
-function sendResendEmail({ to, subject, text, html, from, cc, attachments } = {}) {
-  const RESEND_KEY = process.env.RESEND_API_KEY || '';
-  if (!RESEND_KEY || !to) return false;
-  const payload = {
-    from: from || 'PARAMANT <privacy@paramant.app>',
-    to: Array.isArray(to) ? to : [to],
-    subject: subject || '',
-  };
-  if (cc) payload.cc = Array.isArray(cc) ? cc : [cc];
-  if (html) payload.html = html;
-  if (text) payload.text = text;
-  // Resend takes attachments as { filename, content } with content base64.
-  // Used by the invoice mail; every other caller leaves it undefined and the
-  // request body is byte for byte what it was.
-  if (Array.isArray(attachments) && attachments.length) payload.attachments = attachments;
-  const body = JSON.stringify(payload);
-  try {
-    const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
-      headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-    }, r => { let data = ''; r.on('data', c => data += c); r.on('end', () => { try { const p = JSON.parse(data); log('info', 'resend_email_sent', { id: p.id, subject }); } catch (e) {} }); });
-    req2.on('error', e => log('warn', 'resend_email_failed', { err: e.message }));
-    req2.write(body); req2.end();
-    return true;
-  } catch (e) { log('warn', 'resend_email_failed', { err: e.message }); return false; }
+// Now a thin front for lib/mail.js, which decides who actually carries the
+// message. The name and the fire-and-forget contract are unchanged, so every
+// caller above stays as it was: returns immediately, never throws, never blocks
+// a request on a mail server.
+//
+// The point of the move: Paramant promises European handling in the footer of
+// this very mail, and the carrier is now a setting (MAIL_PROVIDER) instead of a
+// hostname compiled into this function.
+// Send and move on, logging whatever came back.
+//
+// Renamed from sendResendEmail, which stopped being true the day mail went
+// through one door: it has carried Mailjet, Scaleway or Resend depending on a
+// setting for a while now, and a function named after one carrier is how
+// somebody later assumes the switch does not apply here.
+//
+// Fire-and-forget is right ONLY where nobody is told the mail is on its way.
+// The invitation, the pickup code and the reminder all await instead, because
+// each one puts a sentence on somebody's screen claiming post has left.
+function mailLater({ to, subject, text, html, from, cc, attachments } = {}) {
+  if (!to) return false;
+  const cfg = mailer.config();
+  // Nothing configured is not a failure worth waking anyone for; it is how a
+  // relay without mail credentials has always behaved.
+  if (cfg.provider === 'resend' && !cfg.resendKey) return false;
+  mailer.stuur({ to, subject, text, html, cc, attachments,
+                 from: from || 'PARAMANT <privacy@paramant.app>' })
+    .then(r => {
+      if (r.ok) log('info', 'mail_sent', { provider: r.provider, count: r.count, subject });
+      else log('warn', 'mail_failed', { provider: r.provider, reason: r.reason,
+                                        detail: r.detail, subject });
+    })
+    .catch(e => log('warn', 'mail_failed', { reason: 'threw', err: e && e.message }));
+  return true;
 }
 
 // ── ML-DSA handtekening verificatie ──────────────────────────────────────────
@@ -2226,6 +2330,53 @@ function outboundRateOk(apiKey, rec) {
   return true;
 }
 setInterval(() => { const now = Date.now(); for (const [k,v] of outboundRateMap) if (now > v.resetAt) outboundRateMap.delete(k); }, 3_600_000);
+
+// ── The brake on invitations ────────────────────────────────────────────
+//
+// WHY THIS IS SEPARATE FROM outboundRateOk. That one counts DOWNLOADS: work a
+// recipient asks for, on a link they already hold. This counts MAIL WE SEND to
+// people who are not our customers, which is a different kind of thing to get
+// wrong. An account with thirty recipients per send and no brake is a way to
+// put unlimited mail into strangers' inboxes with paramant.app on the envelope,
+// and the cost of that is not a bill, it is the domain's reputation.
+//
+// It became urgent the moment Firm went from ten recipients to thirty.
+//
+// ALL OR NOTHING, and asked BEFORE the send is made. Counting per mail as the
+// loop runs would let a send half-happen: twelve people invited, eighteen not,
+// a send record that says thirty, and no way for the sender to tell which is
+// which. So the whole send asks for its seats up front and is refused as one.
+const inviteRateMap = new Map(); // account → { count, resetAt }
+const INVITE_RATE_WINDOW_MS = 3_600_000;
+
+function inviteRateOk(account, rec, aantal) {
+  const max = parasendLimitsOf(rec).limits.outbound_per_hour;
+  if (max === Infinity) return { ok: true };
+  const n = Math.max(1, Number(aantal) || 1);
+  const now = Date.now();
+  let c = inviteRateMap.get(account);
+  if (!c || now > c.resetAt) c = { count: 0, resetAt: now + INVITE_RATE_WINDOW_MS };
+  if (c.count + n > max) {
+    return { ok: false, limit: max, used: c.count, asked: n,
+             retry_after_s: Math.max(1, Math.ceil((c.resetAt - now) / 1000)) };
+  }
+  c.count += n;
+  inviteRateMap.set(account, c);
+  return { ok: true, used: c.count, limit: max };
+}
+
+// Give the seats back when a send never happened, so a refusal further down
+// does not quietly cost somebody an hour of their ceiling.
+function inviteRateGeef(account, aantal) {
+  const c = inviteRateMap.get(account);
+  if (!c) return;
+  c.count = Math.max(0, c.count - (Number(aantal) || 0));
+  inviteRateMap.set(account, c);
+}
+
+setInterval(() => { const now = Date.now();
+  for (const [k, v] of inviteRateMap) if (now > v.resetAt) inviteRateMap.delete(k);
+}, 3_600_000).unref?.();
 
 // ── Delivery receipt store (PR #341, finding 2) ─────────────────────────
 // The signed delivery receipt used to ride out on the download itself, in the
@@ -2828,7 +2979,7 @@ function _mailInvoice(record) {
     ``,
     record.seller.name,
   ].filter((l, i, a) => !(l === '' && a[i - 1] === ''));
-  return sendResendEmail({
+  return mailLater({
     to: record.buyer.email,
     from: 'PARAMANT <billing@paramant.app>',
     subject,
@@ -2903,7 +3054,7 @@ function _mailCreditNote(record) {
     ``,
     record.seller.name,
   ].filter((l, i, a) => !(l === '' && a[i - 1] === ''));
-  return sendResendEmail({
+  return mailLater({
     to: record.buyer.email,
     from: 'PARAMANT <billing@paramant.app>',
     subject,
@@ -3182,8 +3333,14 @@ async function pushWebhooks(apiKey, deviceId, event, data) {
   const hooks = webhooks.get(`${deviceId}:${acctOf(apiKey)}`) || [];
   for (const hook of hooks) {
     const payload = J({ event, device_id: deviceId, ts: new Date().toISOString(), ...data });
-    const sig = hook.secret ? crypto.createHmac('sha256', hook.secret).update(payload).digest('hex') : '';
     try {
+      // Inside the try, and that is the second lock. The registration above
+      // coerces, but a record written by an older build, or any future path
+      // into this map, must not be able to take the process down. A webhook
+      // that cannot be signed is a webhook that is not sent; it is not a
+      // reason to zero every customer's file.
+      const sig = hook.secret
+        ? crypto.createHmac('sha256', String(hook.secret)).update(payload).digest('hex') : '';
       await safeHttpsRequest(hook.url, {
         method:  'POST',
         timeout: 5000,
@@ -4418,6 +4575,371 @@ async function handleRelayRequest(req, res) {
     }
   }
 
+  // ── POST /v2/sends: van geuploade blokken naar een verzending ─────────────
+  //
+  // WHY THIS IS A SECOND STEP. A file goes up in blocks of a fixed size: a
+  // 50 MB document arrives as twelve separate /v2/inbound calls. Reading a
+  // recipient list off one of those would have made twelve sends out of one
+  // file, each with its own links, which is worse than not supporting it.
+  //
+  // So the upload is untouched and this comes after it: the caller hands back
+  // the hashes it just wrote, in order, and they become one file in the durable
+  // store. The loose blocks are dropped the moment they are joined, so nothing
+  // sits in memory twice.
+  if (req.method === 'POST' && path === '/v2/sends') {
+    const kd = apiKeys.get(apiKey);
+    if (!kd || !kd.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
+    try {
+      // Eigen try: een kapotte body is de fout van de beller, geen interne
+      // storing. Zes vormen gaven 500 send_failed -- geen JSON, leeg, null, te
+      // groot -- terwijl dezelfde file elders netjes 400 "Invalid JSON body"
+      // geeft. Een 500 stuurt iemand de verkeerde kant op en telt mee in elke
+      // storingsmeting.
+      let input;
+      try {
+        input = JSON.parse((await readBody(req, 65536)).toString());
+      } catch (e) {
+        const teGroot = /too large/i.test(String((e && e.message) || ''));
+        res.writeHead(teGroot ? 413 : 400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: teGroot ? 'body_too_large' : 'invalid_json',
+                           limit_bytes: teGroot ? 65536 : undefined }));
+      }
+      if (!input || typeof input !== 'object' || Array.isArray(input)) {
+        res.writeHead(400); return res.end(J({ error: 'invalid_json' }));
+      }
+      const hashes = Array.isArray(input.hashes) ? input.hashes : [];
+      if (!hashes.length || hashes.length > 512) {
+        res.writeHead(400); return res.end(J({ error: 'hashes_required' }));
+      }
+      // Every block has to exist AND belong to this key. Without the second
+      // half, knowing a hash would be enough to fold somebody else's upload
+      // into your own send.
+      // The same block twice would be joined twice: one 5 MiB upload repeated
+      // 512 times is a 2.5 GB buffer built from nothing.
+      if (new Set(hashes).size !== hashes.length) {
+        res.writeHead(400); return res.end(J({ error: 'duplicate_block' }));
+      }
+      // Off the ParaSend product axis, like every other ceiling in this file.
+      // Reading kd.plan was the fault parasendLimitsOf exists to end: the
+      // Mollie webhook writes plan_parasend and deliberately never touches the
+      // unified `plan`, so a paying Firm buyer was held to the community
+      // ceiling of one recipient while /pricing sold him ten.
+      const _psend = parasendLimitsOf(kd);
+      const _tier = _psend.tier;
+      const _fileMb = tiers.tierLimitNum(_tier, 'file_mb');
+      const _maxBytes = Number.isFinite(_fileMb) ? _fileMb * 1048576 : Infinity;
+      let _totaal = 0;
+      const delen = [];
+      for (const h of hashes) {
+        if (typeof h !== 'string' || !/^[a-f0-9]{64}$/.test(h)) {
+          res.writeHead(400); return res.end(J({ error: 'bad_hash' }));
+        }
+        const entry = blobStore.get(h);
+        if (!entry) { res.writeHead(404); return res.end(J({ error: 'block_missing' })); }
+        if (entry.apiKey !== apiKey) { res.writeHead(404); return res.end(J({ error: 'block_missing' })); }
+        _totaal += entry.blob.length;
+        if (_totaal > _maxBytes) {
+          res.writeHead(413);
+          return res.end(J({ error: 'too_large', dimension: 'file_mb', limit: _fileMb }));
+        }
+        delen.push(entry.blob);
+      }
+      const blob = Buffer.concat(delen);
+
+      // `sealed` is a map address -> { token, wrapped_key }, made in the
+      // sender's browser. The wrapping is the file key locked under that one
+      // recipient's token; we keep the wrapping and the hash of the token, and
+      // the token itself passes through once to be put in an email.
+      //
+      // So this relay holds a locked box and no key. Refusing a send without
+      // them is deliberate: a recipient who gets bytes they cannot open is
+      // worse off than one who never got them.
+      const sealed = (input.sealed && typeof input.sealed === 'object') ? input.sealed : null;
+
+      // Seats for the whole send, before anything is written. The count comes
+      // off `sealed`, which is the browser's own list and therefore the number
+      // of mails this is actually going to cause; the plan ceiling is checked
+      // again inside create, so a padded `sealed` buys nothing but a refusal.
+      const _wilMailen = sealed ? Object.keys(sealed).length
+                       : (Array.isArray(input.recipients) ? input.recipients.length : 0);
+      const _rem = inviteRateOk(acctOf(apiKey), kd, _wilMailen);
+      if (!_rem.ok) {
+        log('warn', 'invite_rate_limited', { limit: _rem.limit, used: _rem.used, asked: _rem.asked });
+        res.writeHead(429, { 'Content-Type': 'application/json',
+                             'Retry-After': String(_rem.retry_after_s) });
+        return res.end(J({ error: 'too_many_invitations', dimension: 'outbound_per_hour',
+                           limit: _rem.limit, used: _rem.used, asked: _rem.asked,
+                           retry_after_s: _rem.retry_after_s,
+                           hint: 'this ceiling is per hour and covers everyone you invite' }));
+      }
+
+      const made = await _sendStore().create({
+        plan: _tier, blob, addresses: input.recipients, sealed,
+        ttlMs: input.ttl_ms, filename: input.filename, accountId: acctOf(apiKey),
+        // From the key record, never from the request: a sender may not choose
+        // whose name appears above a mail thirty strangers receive.
+        sender: { naam: kd.label || '', email: kd.email || '' },
+      });
+      if (!made.ok) {
+        // No send, no mail, so the seats go back. Otherwise a sender who trips
+        // the recipient ceiling also loses an hour of their invitation budget,
+        // for a send that never left.
+        inviteRateGeef(acctOf(apiKey), _wilMailen);
+        // The dimension has to be the one that actually refused, not a
+        // constant. Every refusal from create used to come back as
+        // max_recipients, so a file over the size ceiling told the sender
+        // "your plan allows 25" while the 25 was megabytes and the number
+        // beside it was 27263003 bytes. A sender reading that would go and
+        // delete recipients from a list that was never the problem.
+        const _dim = made.dimension
+          || (made.reason === 'too_large' ? 'send_max_mb' : 'max_recipients');
+        const status = made.reason === 'over_limit' ? 403
+                     : made.reason === 'too_large' ? 413 : 400;
+        log('info', 'send_refused', { reason: made.reason, dimension: _dim, limit: made.limit });
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: made.reason, dimension: _dim,
+                           limit: made.limit, asked: made.asked,
+                           rejected: made.rejected || undefined }));
+      }
+
+      // Joined, so the loose blocks are no longer needed. Dropping them here
+      // rather than leaving them to their TTL keeps one file from occupying
+      // memory twice for the rest of its window.
+      for (const h of hashes) blobDrop(h);
+
+      const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
+      const tot = new Date(made.expires_at).toLocaleString('en-GB',
+        { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+      // Escaped: this name is chosen by the sender and lands in the HTML of up
+      // to thirty mails from paramant.app to people who are not our customers.
+      // An unescaped one could carry a link or a tracking pixel of its own.
+      // ONE LINE, and printable.
+      //
+      // The HTML half goes through escHtml, so markup was already dead. The
+      // TEXT half took the name raw, newlines included, and that is 120
+      // characters of free writing inside a mail from paramant.app to somebody
+      // who is not our customer. Measured: a filename carrying
+      // "PARAMANT SUPPORT: your account expires. Confirm here: <link>" arrived
+      // exactly like that, above our own link, thirty times over.
+      //
+      // Lone surrogates go too. encodeURIComponent throws URIError on one, and
+      // that throw happens in writeHead on the pickup route -- after the token
+      // is claimed. The recipient got a 500 and then already_collected on every
+      // retry: a file destroyed by its own name.
+      const naamRuw = (String((input.filename == null ? '' : input.filename))
+        .replace(/[\r\n\t]+/g, ' ')
+        .replace(/[\u0000-\u001f\u007f]/g, '')
+        .replace(/[\uD800-\uDFFF]/g, '')
+        .replace(/\s+/g, ' ')
+        // GEEN LINK. Regeleinden waren er al uit, maar honderdtwintig tekens
+        // vrije tekst met een URL erin is nog steeds een eigen regel in de mail
+        // van iemand die geen klant is, en elke mailclient maakt hem klikbaar.
+        // Gemeten met een bestandsnaam die "PARAMANT SUPPORT: uw account
+        // verloopt, bevestig hier: <link>" droeg: die kwam er zo uit, boven
+        // onze eigen link, dertig keer.
+        .replace(/\b(?:https?:\/\/|www\.)\S*/gi, '[link]')
+        .replace(/\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/gi, '[adres]')
+        .trim()
+        .slice(0, 120)) || 'a file';
+      const naam = escHtml(naamRuw);
+      // The human above the mail. Thirty people who are not our customers get
+      // this, and a message with no sender in it reads as phishing no matter
+      // how carefully the rest is worded.
+      const wieRuw = mailer.veiligeNaam(kd.label || '');
+      const wie = escHtml(wieRuw);
+      let gemaild = 0;
+      // One invitation per person, never a visible list of the others: who else
+      // receives a confidential document is not for the group to know.
+      const sector = sectorOfKey(kd);
+      for (const [adres, token] of Object.entries(made.tokens)) {
+        const link = base + '/ontvang/' + encodeURIComponent(token)
+                   + '?r=' + encodeURIComponent(sector);
+        // await, so `invited` counts what a provider accepted instead of how
+        // often we tried. A 201 saying "invited: 30" while nothing arrived is
+        // worse than an honest lower number.
+        const bezorgd = await mailer.stuur({
+          to: adres,
+          from: mailer.afzenderNamens(undefined, wieRuw),
+          replyTo: kd.email || undefined,
+          subject: wieRuw ? wieRuw + ' sent you a file' : 'A file is waiting for you',
+          // The plain-text half takes the unescaped name: HTML entities in a
+          // text mail read as noise, and there is nothing to inject into.
+          text: (wieRuw ? wieRuw + ' sent you a file through Paramant.' : 'A file is waiting for you.')
+              + '\n\n' + naamRuw + '\n\n' + link
+              + '\n\nThe link is yours alone and works once. Opening it sends a short code '
+              + 'to this address, so only somebody who can read this mailbox can collect the '
+              + 'file. Available until ' + tot + '.'
+              + '\n\nYou are getting this because ' + (wieRuw || 'a Paramant customer')
+              + ' entered your address. Paramant carries the file; we cannot open it.'
+              + (kd.email ? '\nReply to this mail to reach them directly.' : ''),
+          html: '<p>' + (wie ? '<strong>' + wie + '</strong> sent you a file through Paramant.'
+                             : 'A file is waiting for you.') + '</p>'
+              + '<p style="font-weight:600">' + naam + '</p>'
+              + '<p><a href="' + link + '" style="display:inline-block;padding:11px 18px;'
+              + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">'
+              + 'Open the file</a></p>'
+              + '<p style="color:#666;font-size:13px">This link is yours alone and works once. '
+              + 'Opening it sends a short code to this address, so only somebody who can read '
+              + 'this mailbox can collect the file.<br>Available until ' + tot + '.</p>'
+              + VOET(wieRuw, kd.email),
+        });
+        if (bezorgd && bezorgd.ok) gemaild += 1;
+        else log('warn', 'invitation_failed', { reason: bezorgd && bezorgd.reason });
+      }
+      log('info', 'send_invitations', { id: made.id, mailed: gemaild, of: made.count });
+
+      res.writeHead(201, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, send_id: made.id, recipients: made.count,
+                         invited: gemaild, size: blob.length,
+                         expires_at: new Date(made.expires_at).toISOString() }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      log('warn', 'send_create_failed', { err: err && err.message });
+      res.writeHead(500); return res.end(J({ error: 'send_failed' }));
+    }
+  }
+
+  // ── POST /v2/user/sends: wat dit account naar een groep stuurde ───────────
+  // The sending side of the dashboard, and the thing a customer actually buys:
+  // seeing who collected and who did not. Internal only, same as the signing
+  // worklist above, and the user_id comes from the authenticated session and
+  // never from the browser.
+  if (req.method === 'POST' && path === '/v2/user/sends') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const input = JSON.parse((await readBody(req, 4096)).toString());
+      const userId = accountVan(input.user_id);
+      if (!userId || userId.length > 200) { res.writeHead(400); return res.end(J({ error: 'invalid_user_id' })); }
+      const out = await _sendStore().list(userId, input.limit);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: true, sends: out.sends, count: out.sends.length }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      log('warn', 'user_sends_failed', { err: err && err.message });
+      res.writeHead(500); return res.end(J({ error: 'internal' }));
+    }
+  }
+
+  // ── POST /v2/user/sends/detail: one send, with its recipients ─────────────
+  if (req.method === 'POST' && path === '/v2/user/sends/detail') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const input = JSON.parse((await readBody(req, 4096)).toString());
+      const userId = accountVan(input.user_id);
+      const sendId = (input.send_id || '').toString();
+      // Ownership first, and the same answer for "not yours" as for "never
+      // existed": a sender must not be able to probe another account's ids.
+      if (!await _sendStore().ownedBy(sendId, userId)) {
+        res.writeHead(404); return res.end(J({ error: 'unknown_send' }));
+      }
+      const view = await _sendStore().overview(sendId);
+      if (!view.ok) { res.writeHead(404); return res.end(J({ error: 'unknown_send' })); }
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J(view));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      res.writeHead(500); return res.end(J({ error: 'internal' }));
+    }
+  }
+
+  // ── POST /v2/user/sends/revoke ────────────────────────────────────────────
+  // Withdraw one person without touching the rest of the group.
+  if (req.method === 'POST' && path === '/v2/user/sends/revoke') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const input = JSON.parse((await readBody(req, 4096)).toString());
+      const userId = accountVan(input.user_id);
+      const sendId = (input.send_id || '').toString();
+      if (!await _sendStore().ownedBy(sendId, userId)) {
+        res.writeHead(404); return res.end(J({ error: 'unknown_send' }));
+      }
+      const out = await _sendStore().revoke(sendId, (input.email || '').toString());
+      if (!out.ok) { res.writeHead(409); return res.end(J({ error: out.reason })); }
+      log('info', 'send_recipient_revoked', { id: sendId });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, settled: out.settled }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      res.writeHead(500); return res.end(J({ error: 'internal' }));
+    }
+  }
+
+  // ── POST /v2/user/sends/reinvite ──────────────────────────────────────────
+  // A REMINDER, and it carries no new link.
+  //
+  // It used to mint a fresh token and kill the old one, and that destroyed the
+  // file for the person it was meant to help: the file key is wrapped under the
+  // recipient's own token, and this relay cannot make a new wrapping because it
+  // never holds the key. They spent their one-time link on bytes that opened
+  // into nothing. Keeping the token instead is not an option either -- not
+  // writing it down is the whole reason the relay cannot open what it stores.
+  //
+  // So this points at the invitation they already have, which still works.
+  if (req.method === 'POST' && path === '/v2/user/sends/reinvite') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const input = JSON.parse((await readBody(req, 4096)).toString());
+      const userId = accountVan(input.user_id);
+      const sendId = (input.send_id || '').toString();
+      if (!await _sendStore().ownedBy(sendId, userId)) {
+        res.writeHead(404); return res.end(J({ error: 'unknown_send' }));
+      }
+      // Through the SAME hourly brake as an invitation. It was not, and that
+      // left ninety mails per send of thirty going out around the ceiling:
+      // three reminders per recipient, each a real mail to somebody who is not
+      // our customer. The brake exists to bound exactly that.
+      //
+      // The seat is taken before the send store is touched, and handed back
+      // below if the reminder turns out not to be allowed.
+      const _remH = inviteRateOk(accountVan(userId), apiKeys.get(userId) || null, 1);
+      if (!_remH.ok) {
+        log('warn', 'reminder_rate_limited', { limit: _remH.limit, used: _remH.used });
+        res.writeHead(429, { 'Content-Type': 'application/json',
+                             'Retry-After': String(_remH.retry_after_s) });
+        return res.end(J({ error: 'too_many_invitations', dimension: 'outbound_per_hour',
+                           limit: _remH.limit, retry_after_s: _remH.retry_after_s }));
+      }
+      const out = await _sendStore().reinvite(sendId, (input.email || '').toString());
+      if (!out.ok) {
+        inviteRateGeef(accountVan(userId), 1);
+        res.writeHead(out.reason === 'reminder_limit' ? 429 : 409);
+        return res.end(J({ error: out.reason, limit: out.limit }));
+      }
+      const tot = new Date(out.expires_at || Date.now()).toLocaleString('en-GB',
+        { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+          timeZone: 'Europe/Amsterdam', timeZoneName: 'short' });
+      // Awaited, so the dashboard's "reminder sent" is about what happened.
+      const wie3 = mailer.veiligeNaam(out.sender_name || '');
+      const bezorgd = await mailer.stuur({
+        to: out.email,
+        from: mailer.afzenderNamens(undefined, wie3),
+        replyTo: out.sender_email || undefined,
+        subject: wie3 ? 'A reminder from ' + wie3 + ': your file is still waiting'
+                      : 'A reminder: a file is still waiting for you',
+        text: 'A file is still waiting for you.\n\nUse the link in the earlier mail '
+            + 'from Paramant; it still works and it is still yours alone. '
+            + 'Available until ' + tot + '.',
+        html: '<p>A file is still waiting for you.</p>'
+            + '<p>Use the link in the earlier mail from Paramant. It still works, '
+            + 'and it is still yours alone.</p>'
+            + '<p style="color:#666;font-size:13px">Available until ' + escHtml(tot) + '. '
+            + 'Cannot find that mail? Ask the sender to send the file again.</p>'
+            + VOET(wie3, out.sender_email),
+      });
+      if (!bezorgd || !bezorgd.ok) {
+        log('warn', 'reminder_not_mailed', { id: sendId, reason: bezorgd && bezorgd.reason });
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'reminder_not_sent' }));
+      }
+      log('info', 'send_recipient_reminded', { id: sendId, reminders: out.reminders });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, reminders: out.reminders }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      res.writeHead(500); return res.end(J({ error: 'internal' }));
+    }
+  }
+
   // ── POST /v2/user/envelopes/lookup: heb ik dit document al aangeboden ─────
   // Voor een client die afbrak tussen het aanmaken van de envelope en het
   // opschrijven van het id. Je krijgt alleen antwoord over je eigen account en
@@ -5179,8 +5701,7 @@ async function handleRelayRequest(req, res) {
       fs.promises.appendFile(DPA_FILE, record + '\n').catch(e => log('warn', 'dpa_persist_failed', { err: e.message }));
 
       // Send countersigned DPA email
-      const RESEND_KEY = process.env.RESEND_API_KEY || '';
-      if (RESEND_KEY) {
+      if (mailer.gereed()) {
         const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:600px">
           <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
           <p style="color:#888;margin-bottom:16px">Dear ${escHtml(name)},</p>
@@ -5199,18 +5720,18 @@ async function handleRelayRequest(req, res) {
           <p style="color:#888;font-size:13px;margin-bottom:24px">The full agreement text is available at <a href="https://paramant.app/dpa" style="color:#888">paramant.app/dpa</a>. Keep this email and the reference number for your records.</p>
           <p style="color:#555;font-size:12px">Questions: privacy@paramant.app &nbsp;&middot;&nbsp; EU/DE jurisdiction &nbsp;&middot;&nbsp; GDPR Art. 28 compliant</p>
         </div>`;
-        const emailBody = JSON.stringify({
+        // Through the one door, like every other message. A DPA confirmation
+        // that talks about EU jurisdiction should not be carried out of it.
+        mailer.stuur({
           from: 'PARAMANT <privacy@paramant.app>',
-          to: [email],
-          cc: ['privacy@paramant.app'],
+          to: email,
+          cc: 'privacy@paramant.app',
           subject: `DPA signed — ${org} (${ref})`,
           html,
-        });
-        const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
-          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(emailBody) }
-        }, r => { let data = ''; r.on('data', c => data += c); r.on('end', () => { try { const p = JSON.parse(data); log('info', 'dpa_email_sent', { ref, email: maskEmail(email), id: p.id }); } catch(e) {} }); });
-        req2.on('error', e => log('warn', 'dpa_email_failed', { err: e.message }));
-        req2.write(emailBody); req2.end();
+        }).then(r => {
+          if (r.ok) log('info', 'dpa_email_sent', { ref, email: maskEmail(email), provider: r.provider });
+          else log('warn', 'dpa_email_failed', { reason: r.reason, detail: r.detail });
+        }).catch(e => log('warn', 'dpa_email_failed', { err: e && e.message }));
       }
 
       log('info', 'dpa_signed', { ref, org, email: maskEmail(email), version });
@@ -6171,6 +6692,210 @@ async function handleRelayRequest(req, res) {
     req.method === 'GET' ||
     (req.method === 'POST' && (path.endsWith('/view') || path.endsWith('/sign')))
   );
+  // ── De ontvangerskant, en hij staat BOVEN de sleutelpoort ────────────────
+  //
+  // Hier afgehandeld en niet lager, want dat is het verschil tussen een route
+  // die publiek IS en een route met een gat in de poort. Een ontvanger draagt
+  // geen sleutel: hij heeft een link uit zijn eigen mail en verder niets. Door
+  // hem hier te beantwoorden raakt hij de poort niet eens.
+
+  // ── GET /v2/pickup/:token ───────────────────────────────────────────────────
+  // The receiving end of a send to named recipients. The token is the whole
+  // capability: it arrives in one person's mail, it names the send, and it works
+  // exactly once. There is no account here and there must not be one, because a
+  // recipient is somebody who was sent something, not somebody with a login.
+  //
+  // Every refusal gives the same shape of answer whether the token never
+  // existed, was already used or was withdrawn, so a caller cannot map which
+  // sends exist by trying tokens. The reason is in the body for the person who
+  // legitimately holds the link and needs to know why it stopped working.
+  // One shape of refusal for every way a link can be unusable, so trying tokens
+  // tells a caller nothing about which sends exist. The reason sits in the body
+  // for the person who legitimately holds the link and needs to know why it
+  // stopped working.
+  function _pickupRefused(res, reason, limit) {
+    const status = reason === 'already_collected' ? 410
+                 : reason === 'revoked' ? 403
+                 : reason === 'expired' ? 410
+                 : reason === 'too_many_codes' ? 429
+                 : reason === 'too_many_tries' ? 429 : 404;
+    log('info', 'pickup_refused', { reason });
+    const kop = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
+    if (status === 429) kop['Retry-After'] = '3600';
+    res.writeHead(status, kop);
+    return res.end(J({ error: reason, limit: limit || undefined }));
+  }
+
+  const pickm = path.match(/^\/v2\/pickup\/([A-Za-z0-9_-]{16,128})$/);
+
+  // Both steps are POST, and that is not pedantry about verbs.
+  //
+  // Asking for a code SENDS A MAIL. As a GET, every Safe Links, Proofpoint or
+  // Barracuda scanner that opens the invitation fired it: the recipient got a
+  // code before they had clicked anything, and a second one when they did.
+  // A scanner does not POST, so this is the whole fix.
+  //
+  // Step one: prove the mailbox. It does not claim the link, so asking twice
+  // costs the recipient nothing but their own ceiling.
+  if (pickm && req.method === 'POST') {
+    let _body = {};
+    try { _body = JSON.parse((await readBody(req, 4096)).toString() || '{}') || {}; }
+    catch (_) { _body = {}; }
+
+    // De ontvanger meldt dat het bestand echt openging. Pas daarna is zijn
+    // link definitief op. Tot die tijd staat de claim "bezig" en valt hij na
+    // vijf minuten terug, want een server kan niet zien of bytes aankwamen.
+    if (_body.action === 'confirm') {
+      try {
+        const bev = await _sendStore().confirm(pickm[1]);
+        res.writeHead(bev.ok ? 200 : 409,
+                      { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        return res.end(J(bev.ok ? { ok: true } : { error: bev.reason }));
+      } catch (e) {
+        if (redisOutage503(e, res)) return;
+        res.writeHead(500); return res.end(J({ error: 'confirm_failed' }));
+      }
+    }
+
+    if (_body.action === 'code') {
+     try {
+      const vraag = await _sendStore().requestPickup(pickm[1]);
+      if (!vraag.ok) {
+        return _pickupRefused(res, vraag.reason, vraag.limit);
+      }
+      // The code leaves through the mailer, never through this response.
+      // Whoever holds the link must already be able to read that mailbox.
+      const minuten = Math.round(vraag.expires_in_s / 60);
+      // Awaited, so "we sent you a code" is a statement about what happened
+      // rather than about what was attempted. Fire-and-forget meant a recipient
+      // could sit waiting for a mail the provider had already refused, with
+      // their previous working code overwritten.
+      // Same address and same name as the invitation. It used to come from a
+      // DIFFERENT sender than the mail it belongs to, which is the single most
+      // reliable way to make a legitimate code look like a scam.
+      const wie2 = mailer.veiligeNaam(vraag.sender_name || '');
+      const bestand2 = escHtml(String(vraag.filename || '').slice(0, 120));
+      const bezorgd = await mailer.stuur({
+        to: vraag.email,
+        from: mailer.afzenderNamens(undefined, wie2),
+        replyTo: vraag.sender_email || undefined,
+        subject: 'Your code to open the file',
+        text: 'Your code is ' + vraag.code + '. It works for ' + minuten + ' minutes.'
+            + (vraag.filename ? '\n\nIt opens: ' + vraag.filename : '')
+            + (wie2 ? '\nSent to you by ' + wie2 + ' through Paramant.' : '')
+            + '\n\nIf you did not just ask for this code, somebody else has your link. '
+            + 'Do not pass the code on, and let the sender know.',
+        html: '<p>Your code to open the file:</p>'
+            + '<p style="font:600 28px/1.2 monospace;letter-spacing:.14em">' + vraag.code + '</p>'
+            + (bestand2 ? '<p style="color:#666;font-size:13px">It opens: <strong>'
+                          + bestand2 + '</strong></p>' : '')
+            + '<p style="color:#666;font-size:13px">It works for ' + minuten
+            + ' minutes.<br>If you did not just ask for this code, somebody else has your '
+            + 'link. Do not pass the code on, and let the sender know.</p>'
+            + VOET(wie2, vraag.sender_email),
+      });
+      if (!bezorgd || !bezorgd.ok) {
+        log('warn', 'pickup_code_not_mailed', { reason: bezorgd && bezorgd.reason });
+        res.writeHead(502, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        return res.end(J({ error: 'code_not_sent' }));
+      }
+      log('info', 'pickup_code_mailed', {});
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: true, step: 'code_sent', sent_to: vraag.masked,
+                         expires_in_s: vraag.expires_in_s }));
+     } catch (e) {
+      if (redisOutage503(e, res)) return;
+      log('warn', 'pickup_code_failed', { err: e && e.message });
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'pickup_failed' }));
+     }
+    }
+
+    // Step two: the code, and then the bytes.
+    try {
+      const code = String(_body.code || '');
+      const got = await _sendStore().collect(pickm[1], code);
+      if (!got.ok) {
+        // A wrong or stale code is a separate answer from a link that cannot be
+        // used at all: the holder needs to know whether to try again or stop.
+        if (got.reason === 'wrong_code' || got.reason === 'too_many_tries'
+            || got.reason === 'code_expired' || got.reason === 'no_code_requested') {
+          log('info', 'pickup_code_refused', { reason: got.reason });
+          res.writeHead(got.reason === 'too_many_tries' ? 429 : 401,
+                        { 'Content-Type': 'application/json' });
+          return res.end(J({ error: got.reason, tries_left: got.tries_left }));
+        }
+        return _pickupRefused(res, got.reason);
+      }
+      log('info', 'pickup_served', { bytes: got.blob.length, remaining: got.remaining,
+                                     settled: got.settled });
+      incMetric('bytes_out_total', got.blob.length);
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': got.blob.length,
+        'Cache-Control': 'no-store',
+        // What the receiver's client needs to show who it was for and how much
+        // of the group is still outstanding. Never an address of somebody else.
+        'X-Paramant-Recipient': veiligCodeer(got.email || ''),
+        'X-Paramant-Outstanding': String(got.remaining),
+        // The name the sender gave the file, so a browser saves something a
+        // person recognises instead of a string of random characters.
+        // veiligCodeer, never encodeURIComponent directly: a lone surrogate
+        // makes it throw, and a throw here lands after the claim. Older sends,
+        // filed before the name was cleaned on the way in, still pass through
+        // this route.
+        'X-Paramant-Filename': veiligCodeer(got.filename || 'file'),
+        // The file key, locked under this recipient's token. The page unwraps
+        // it with the token from its own URL; we never had the means to.
+        'X-Paramant-Key': got.wrapped_key || '',
+        'Access-Control-Expose-Headers':
+          'X-Paramant-Filename, X-Paramant-Outstanding, X-Paramant-Key',
+      });
+
+      // THE CLAIM IS ONLY REAL WHEN THE BYTES ARRIVED.
+      //
+      // 'finish' fires when the last byte has been handed to the socket;
+      // 'close' without it means the connection died first. On a phone that is
+      // an ordinary Tuesday, and it used to cost the recipient their one
+      // collection: fragments received, the retry answered already_collected,
+      // the file dropped, and the sender's dashboard reporting a delivery that
+      // never happened.
+      //
+      // So the file is drained here, after the fact, and a dead connection
+      // hands the turn back instead.
+      let _afgerond = false;
+      res.on('finish', () => {
+        _afgerond = true;
+        if (!got.settled) return;
+        _sendStore().drained(got.send_id)
+          .catch((e) => log('warn', 'send_drain_failed', { err: e && e.message }));
+      });
+      res.on('close', () => {
+        if (_afgerond) return;
+        log('warn', 'pickup_aborted', { bytes: got.blob.length });
+        _sendStore().releaseClaim(pickm[1])
+          .catch((e) => log('warn', 'pickup_release_failed', { err: e && e.message }));
+      });
+      return res.end(got.blob);
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      log('warn', 'pickup_failed', { err: e && e.message });
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'pickup_failed' }));
+    }
+  }
+
+
+  // The receiving end of a send to named recipients, and it carries no key on
+  // purpose: a recipient is somebody who was sent something, not somebody with
+  // a login. The capability is the token, which arrives in one person's mail.
+  //
+  // Opening the link only mails a code to that same mailbox; the bytes need
+  // both halves, and three wrong codes close the door. Without this line every
+  // recipient met a 401 and the whole feature reached nobody, which is what an
+  // audit on 22-09 found: the route was written, the gate was never opened.
+  const isPickupPublic = /^\/v2\/pickup\/[A-Za-z0-9_-]{16,128}$/.test(path)
+    && (req.method === 'GET' || req.method === 'POST');
   const isBillingWebhook = path === '/v2/billing/webhook' && req.method === 'POST';
   // The admin plane cancelling on behalf of a logged-in session. It carries
   // X-Internal-Auth, which no public caller can set, and the route itself
@@ -6187,7 +6912,7 @@ async function handleRelayRequest(req, res) {
       return res.end(J({ error: 'ADMIN_TOKEN required for admin endpoints' }));
     }
     // Fall through to admin endpoint handlers below
-  } else if (!keyData?.active && !isEnvelopePublic && !isBillingWebhook && !isInternalBillingCancel) {
+  } else if (!keyData?.active && !isEnvelopePublic && !isPickupPublic && !isBillingWebhook && !isInternalBillingCancel) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
   }
@@ -6546,7 +7271,7 @@ async function handleRelayRequest(req, res) {
       auditAppend(apiKey, 'inbound', { hash: hash.slice(0,16)+'...', bytes: blob.length, device: deviceId, sig: sigResult.valid ? 'ML-DSA-OK' : 'unsigned', ...(viaSessionToken ? { via: 'pst' } : {}) });
       log('info', 'blob_stored', { hash: hash.slice(0,16), size: blob.length, sig: sigResult.valid });
       // ParaSend Pro upload notification (no-op below Pro+ or without RESEND key).
-      transferNotify.maybeNotify({ keyData, event: 'upload', hashPrefix: hash, bytes: blob.length, sendEmail: sendResendEmail });
+      transferNotify.maybeNotify({ keyData, event: 'upload', hashPrefix: hash, bytes: blob.length, sendEmail: mailLater });
 
       // (Transfer already counted by the quota gate above, before storage.)
 
@@ -6664,7 +7389,7 @@ async function handleRelayRequest(req, res) {
     // whose key is on the blob entry — not the downloader. No-op below Pro+ / no key.
     {
       const _ownerKd = entry.apiKey ? apiKeys.get(entry.apiKey) : null;
-      transferNotify.maybeNotify({ keyData: _ownerKd, event: 'download', hashPrefix: outm[1], bytes: blob.length, sendEmail: sendResendEmail });
+      transferNotify.maybeNotify({ keyData: _ownerKd, event: 'download', hashPrefix: outm[1], bytes: blob.length, sendEmail: mailLater });
     }
 
     // ── Build signed delivery receipt ────────────────────────────────────────
@@ -6787,7 +7512,15 @@ async function handleRelayRequest(req, res) {
       if (!isSsrfSafeUrl(d.url)) { res.writeHead(400); return res.end(J({ error: 'url must be a valid public HTTPS URL (private/loopback addresses not allowed)' })); }
       const k = `${d.device_id}:${acctOf(apiKey)}`;
       if (!webhooks.has(k)) webhooks.set(k, []);
-      webhooks.get(k).push({ url: d.url, secret: d.secret || '' });
+      // String(), want `|| ''` vangt alleen falsy. Een number, object of array
+      // overleefde en kwam later in crypto.createHmac terecht, dat op een
+      // niet-string gooit. Die throw stond een regel BUITEN de try in
+      // pushWebhooks, in een async functie zonder await: een onafhankelijke
+      // rejected promise, en dit proces beantwoordt een onafgehandelde
+      // rejection met emergencyZeroAndExit -- alle blobs van ALLE klanten op
+      // nul en afsluiten. Een enkel JSON-veld van een betalende klant legde de
+      // relay om voor iedereen, telkens opnieuw, want de registratie bleef staan.
+      webhooks.get(k).push({ url: d.url, secret: String(d.secret == null ? '' : d.secret) });
       log('info', 'webhook_registered', { device: d.device_id });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true }));
@@ -7921,7 +8654,7 @@ async function handleRelayRequest(req, res) {
         siteUrl: process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL,
       });
       if (msg) {
-        Promise.resolve(sendResendEmail({ to, subject: msg.subject, text: msg.text, html: msg.html }))
+        Promise.resolve(mailLater({ to, subject: msg.subject, text: msg.text, html: msg.html }))
           .catch((e) => log('warn', 'coupon_mail_failed', { err: e.message }));
       }
     }
@@ -8276,8 +9009,7 @@ async function handleRelayRequest(req, res) {
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.email || !d.key) { res.writeHead(400); return res.end(J({ error: 'email and key required' })); }
-      const RESEND_KEY = process.env.RESEND_API_KEY || '';
-      if (!RESEND_KEY) { res.writeHead(503); return res.end(J({ error: 'RESEND_API_KEY not configured' })); }
+      if (!mailer.gereed()) { res.writeHead(503); return res.end(J({ error: 'mail not configured' })); }
       // H1: never put the raw API key in the email body (it would sit in the
       // mailbox and pass through Resend in plaintext). Mint a one-time claim
       // token and email a link instead. The token travels in the URL fragment
@@ -8298,21 +9030,20 @@ async function handleRelayRequest(req, res) {
         <p style="margin-top:24px;font-size:12px;color:#555"><a href="https://paramant.app/docs" style="color:#888">Docs</a> · <a href="https://paramant.app/ct-log" style="color:#555">CT log</a></p>
         <p style="margin-top:32px;font-size:11px;color:#333">ML-KEM-768 · Burn-on-read · EU/DE · BUSL-1.1</p>
       </div>`;
-      const body = JSON.stringify({ from: 'PARAMANT <privacy@paramant.app>', to: [d.email], subject: 'Claim your PARAMANT API key', html });
-      const resp = await new Promise((resolve, reject) => {
-        const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
-          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-        }, r => { let data = ''; r.on('data', c => data += c); r.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { resolve({raw:data}); } }); });
-        req2.on('error', reject);
-        req2.write(body); req2.end();
+      // Through the one door. This caller waits for the answer, because the
+      // person on the other end is standing in front of a page that has to say
+      // whether their key is on its way.
+      const resp = await mailer.stuur({
+        from: 'PARAMANT <privacy@paramant.app>', to: d.email,
+        subject: 'Claim your PARAMANT API key', html,
       });
-      if (resp.id) {
-        log('info', 'welcome_mail_sent', { email: maskEmail(d.email), id: resp.id, label: d.label });
+      if (resp.ok) {
+        log('info', 'welcome_mail_sent', { email: maskEmail(d.email), provider: resp.provider, label: d.label });
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(J({ ok: true, id: resp.id }));
+        return res.end(J({ ok: true }));
       } else {
-        log('warn', 'welcome_mail_failed', { email: maskEmail(d.email), resp });
-        res.writeHead(502); return res.end(J({ error: 'Resend error', detail: resp }));
+        log('warn', 'welcome_mail_failed', { email: maskEmail(d.email), reason: resp.reason, detail: resp.detail });
+        res.writeHead(502); return res.end(J({ error: 'mail_failed', detail: resp.reason }));
       }
     } catch (e) { if (redisOutage503(e, res)) return; res.writeHead(500); return res.end(J({ error: e.message })); }
   }
@@ -8598,7 +9329,11 @@ async function handleRelayRequest(req, res) {
         ? crypto.createHash('sha3-256').update(Buffer.from(d.creator_public_key, 'base64')).digest('hex')
         : '';
       const creatorApiHash = crypto.createHash('sha3-256').update(apiKey).digest('hex');
-      const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, accountId: acctOf(apiKey), docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays, bindingMode: d.binding_mode, recipeVersion: d.recipe_version, requestedAppearance: d.requested_appearance });
+      // The plan travels with the request now: it decides how many names may go
+      // on one document. Read here rather than passed down from the quota block
+      // above, whose const lives in its own scope.
+      const _planForParties = (apiKeys.get(apiKey) || {}).plan;
+      const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, accountId: acctOf(apiKey), docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays, bindingMode: d.binding_mode, recipeVersion: d.recipe_version, requestedAppearance: d.requested_appearance, plan: _planForParties });
       log('info', 'envelope_created', { id: out.id, parties: out.party_count, binding_mode: out.binding_mode });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, envelope: out }));
@@ -9264,6 +9999,32 @@ function _b64urlDecode(s) {
   return Buffer.from(p + '='.repeat((4 - p.length % 4) % 4), 'base64');
 }
 
+// Say at boot who carries the mail, and say it loudly when nobody does.
+//
+// The failure this exists for is silent by construction: a typo in
+// MAIL_PROVIDER falls back to dryrun, dryrun answers ok, the send route counts
+// thirty invitations, and the first anybody hears about it is a customer
+// asking why nothing arrived. One line at boot turns a week of quiet into a
+// question somebody can answer before the first send.
+function meldMailstand() {
+  const d = mailer.diagnose();
+  if (d.waarschuwing) {
+    log('error', 'mail_misconfigured', {
+      requested: d.gevraagd, using: d.provider, delivering: !d.stil,
+      hint: d.waarschuwing,
+    });
+    return;
+  }
+  log('info', 'mail_carrier', { provider: d.provider, from: d.from, delivering: !d.stil,
+                                fallback: d.reserve || 'none', fallback_ready: d.reserve_gereed });
+  if (!d.reserve) {
+    // Not an error: one carrier is a choice. But it is a choice worth seeing in
+    // the log, because the day it matters is the day nobody remembers making it.
+    log('info', 'mail_no_fallback', { hint: 'MAIL_FALLBACK_PROVIDER is unset, so a '
+      + 'suspended account stops every pickup code and signing link' });
+  }
+}
+
 function checkLicense() {
   // File integrity checksum (tamper detection)
   try {
@@ -9272,6 +10033,7 @@ function checkLicense() {
   } catch(e) {
     log('warn', 'relay_integrity_failed', { err: e.message });
   }
+  meldMailstand();
 
   // PLK_KEY is the canonical env var; PARAMANT_LICENSE accepted for backward compat
   const rawKey = process.env.PLK_KEY || process.env.PARAMANT_LICENSE || '';
@@ -9443,7 +10205,7 @@ setInterval(() => {
 const _expiryBootDelay = parseInt(process.env.PLAN_EXPIRY_BOOT_DELAY_MS || '', 10);
 planExpiry.startPlanExpiryPlanner({
   redis: redisClient,
-  sendEmail: ({ to, subject, text, html }) => sendResendEmail({ to, subject, text, html }),
+  sendEmail: ({ to, subject, text, html }) => mailLater({ to, subject, text, html }),
   log,
   siteUrl: process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL,
   seed: () => planExpiry.seedIndex(redisClient, accountsWithTerms()),

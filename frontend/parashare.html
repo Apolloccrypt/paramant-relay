@@ -54,6 +54,7 @@ h1{font-size:clamp(26px,5vw,38px);font-weight:600;letter-spacing:-.028em;line-he
 .ps-mode-card{display:flex;flex-direction:column;gap:6px;text-align:left;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-1);background:var(--surface);color:var(--ink-2);font:inherit;cursor:pointer;transition:border-color var(--d-2) var(--e-standard),background var(--d-2) var(--e-standard)}
 .ps-mode-card:hover{border-color:var(--line-2)}
 .ps-mode-card[aria-checked="true"]{border-color:var(--accent);background:var(--surface-sunk);box-shadow:inset 2px 0 0 var(--accent)}
+.ps-mode-alias{opacity:.62;font-weight:400}
 .ps-mode-title{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
 .ps-mode-card[aria-checked="true"] .ps-mode-title{color:var(--ink-1)}
 .ps-mode-body{font-size:13px;line-height:1.6;color:var(--ink-2)}
@@ -493,14 +494,23 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
      every plan. -->
 <div class="ps-mode" id="ps-mode" role="radiogroup" aria-label="How do you want to send this file">
   <button type="button" class="ps-mode-card" id="ps-mode-live" role="radio" aria-checked="true" data-click="chooseModeLive">
-    <span class="ps-mode-title">Hand over live</span>
-    <span class="ps-mode-body">Both of you are online, you compare a code, and nothing is ever stored. This way cuts the file into chunks and takes a file up to 500 MB.</span>
+    <span class="ps-mode-title">Together, now</span>
+    <span class="ps-mode-body">You are both at your screen. Up to 500 MB, and nothing is ever stored.</span>
   </button>
   <button type="button" class="ps-mode-card" id="ps-mode-link" role="radio" aria-checked="false" data-click="chooseModeLink">
-    <span class="ps-mode-title">Send a link</span>
-    <span class="ps-mode-body">The receiver opens it later. One link is one sealed block, so this way takes a file up to 5 MB. <span id="ps-mode-link-ttl">The sealed file waits on our server until its link expires, and a link from this web app is wiped after the first download.</span></span>
+    <!-- Twee namen, met opzet. "They open it later" is wat een mens leest;
+         "Send a link" is hoe /parasend, /pricing en /vs deze stand noemen, en
+         een koper die daarop afkomt moet hem hier terugvinden. -->
+    <span class="ps-mode-title">They open it later <span class="ps-mode-alias">&middot; Send a link</span></span>
+    <span class="ps-mode-body">They pick it up when it suits them. <span id="ps-mode-link-ttl">It waits until the link expires, then it is gone.</span></span>
   </button>
 </div>
+
+<!-- One line under the cards that says what the CHOSEN stand actually means.
+     It was removed as a duplicate of the card text, and that was wrong twice:
+     the cards never carried the promise that matters on the link stand (the
+     other person does not have to be online), and the size differs per stand
+     in a way a card subtitle cannot hold. -->
 
 <!-- Stepper -- visible above the active step, updates as you move through -->
 <ol class="ps-stepper" id="ps-stepper" aria-label="Sending progress">
@@ -528,22 +538,8 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 
 <!-- STEP 1: Setup -->
 <div class="step active" id="step-setup">
-  <p class="ps-live-note" id="ps-live-note">The person you send to has to be online while you send; you confirm a short code together.</p>
 
-  <details class="ps-how">
-    <summary>How this works</summary>
-    <div class="ps-how-body">
-      <p>Your receiver's browser makes a fresh pair of keys and sends us only the public half. Your browser locks the file for that public half and uploads the locked version. We hold no key, so what sits on our relay cannot be opened by us or by anyone who takes it from us.</p>
-      <p>The short code you compare is built from the receiver's public keys, and both browsers work it out on their own. If anything had swapped those keys along the way, the two codes would not match. That is why you read the code to each other on a channel we do not run, such as a phone call.</p>
-      <p>For the reader who wants the names: the two stands do not use the same ones. Handing over live is a <strong>hybrid</strong> key exchange: ML-KEM-768 and ECDH P-256 run side by side and both shared secrets go through HKDF-SHA256 into one AES-256-GCM key, so an attacker who breaks either one on its own still has nothing. Sending a link does no key exchange at all: your browser makes a fresh AES-256-GCM key, puts it after the <code>#</code> in the link, and a fragment is never sent to a server. That means the link <em>is</em> the key, so whoever can read the channel you send it over can read the file.</p>
-      <p>Neither stand signs the file. The signatures here are the relay's own, on the transparency log and on the receipt it issues. Signing a document with ML-DSA-65 is what ParaSign does, not what sending does. The locked file is stored with an expiry and is destroyed when the link runs out or once the download link has been spent.</p>
-    </div>
-  </details>
-
-  <div class="ps-guide">
-    <span class="ps-guide-kicker">Step 1 of 5 &middot; Setup</span>
-    <strong>Choose a file and say how long the link should live.</strong> The file stays on your own computer until step 4. We never hold it in a form we could open.
-  </div>
+<p class="ps-live-note" id="ps-live-note">The person you send to has to be online while you send; you confirm a short code together. Up to 500 MB, and nothing is ever stored.</p>
 
   <div class="ps-key-slim is-loading" id="ps-key-slim" aria-label="Account session">
     <span class="ps-key-status"><span id="ps-key-slim-label">Starting your account session</span> <span class="ps-key-mask" id="ps-key-mask" hidden></span></span>
@@ -581,6 +577,29 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     </div>
   </div>
 
+  <!-- Named recipients. Optional on purpose: leaving it empty keeps the old
+       behaviour, one link that burns on first read, which is right for handing
+       something to one person. Filling it in turns the send into one file with
+       a personal link per person and an overview of who collected.
+
+       Addresses are split here, in the browser, on newlines, commas and
+       semicolons, because the relay refuses a field with a comma in it. That
+       refusal is deliberate: a comma inside one address used to count as one
+       recipient and reach two mailboxes sharing a single link. So the splitting
+       happens where a person pastes, and what leaves is a real list. -->
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Who is it for</div></div>
+    <div class="card-body">
+      <label class="label" for="recipients-input">Email addresses (optional)</label>
+      <textarea id="recipients-input" rows="3" spellcheck="false" autocomplete="off"
+                placeholder="anna@example.org&#10;bob@example.org"
+                style="width:100%;padding:11px 12px;border:1px solid var(--line,#dfe4e7);border-radius:8px;background:transparent;color:inherit;font:400 14px/1.5 inherit;resize:vertical"
+                data-input="onRecipientsInput"></textarea>
+      <p class="ps-meta" id="recipients-status">Leave empty for one link that opens once.
+         Fill it in and everyone gets their own link, and you see who collected.</p>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Deletes itself</div></div>
     <div class="card-body">
@@ -596,6 +615,17 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   </div>
 
   <button class="btn" id="btn-create-session" disabled data-click="createSession">Create secure session &rarr;</button>
+
+  <details class="ps-how">
+    <summary>How this works</summary>
+    <div class="ps-how-body">
+      <p>Your receiver's browser makes a fresh pair of keys and sends us only the public half. Your browser locks the file for that public half and uploads the locked version. We hold no key, so what sits on our relay cannot be opened by us or by anyone who takes it from us.</p>
+      <p>The short code you compare is built from the receiver's public keys, and both browsers work it out on their own. If anything had swapped those keys along the way, the two codes would not match. That is why you read the code to each other on a channel we do not run, such as a phone call.</p>
+      <p>For the reader who wants the names: the two stands do not use the same ones. Handing over live is a <strong>hybrid</strong> key exchange: ML-KEM-768 and ECDH P-256 run side by side and both shared secrets go through HKDF-SHA256 into one AES-256-GCM key, so an attacker who breaks either one on its own still has nothing. Sending a link does no key exchange at all: your browser makes a fresh AES-256-GCM key, puts it after the <code>#</code> in the link, and a fragment is never sent to a server. That means the link <em>is</em> the key, so whoever can read the channel you send it over can read the file.</p>
+      <p>Neither stand signs the file. The signatures here are the relay's own, on the transparency log and on the receipt it issues. Signing a document with ML-DSA-65 is what ParaSign does, not what sending does. The locked file is stored with an expiry and is destroyed when the link runs out or once the download link has been spent.</p>
+    </div>
+  </details>
+
   <!-- A sector that will not answer used to leave this button quietly disabled
        with no reason given. It now reports itself here, at the moment of the
        press. -->
@@ -658,12 +688,19 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 
 <!-- STEP 3: Encrypting & uploading -->
 <div class="step" id="step-encrypting">
-  <h2 class="paramant-h1">Encrypting &amp; sending</h2>
-  <p class="sub">File is being encrypted with the receiver's ML-KEM-768 public key. The relay will never see the plaintext or the key.</p>
-  <div class="ps-guide">
-    <span class="ps-guide-kicker">Step 4 of 5 &middot; Encrypt &amp; send</span>
-    <strong>This all happens in your browser.</strong> ML-KEM-768 and ECDH P-256 together wrap a fresh AES-256-GCM key for the receiver, then ciphertext-only flows to the relay. The relay signs the entry it makes in the public log; the file itself carries no signature.
-  </div>
+  <h2 class="paramant-h1">Locking and sending</h2>
+  <!-- The waiting screen is the one place where a sender has nothing to do but
+       read, and it used to spend that attention on ML-KEM-768 and ECDH P-256.
+       Somebody sending a patient file wants one sentence, not a cipher suite.
+       The names are still here, one click down, for the reader who wants them. -->
+  <p class="sub">Your file is being locked on this device. We only ever receive the locked version, never the file itself and never the key.</p>
+  <details class="ps-how">
+    <summary>The names, for who wants them</summary>
+    <p>This all happens in your browser. ML-KEM-768 and ECDH P-256 together wrap a
+       fresh AES-256-GCM key for the receiver, then ciphertext-only flows to the
+       relay. The relay signs the entry it makes in the public log; the file
+       itself carries no signature.</p>
+  </details>
 
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Upload progress</div></div>
@@ -843,7 +880,8 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <script src="/js/format-date.js?v=1" defer></script>
 <script src="/js/done-state.js?v=1" defer></script>
 <script src="/js/handshake-meta.js?v=1" defer></script>
-<script src="/js/parashare.page.js?v=15" defer></script>
+<script src="/js/send-wrap.js?v=1" defer></script>
+<script src="/js/parashare.page.js?v=16" defer></script>
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=9" defer></script>
 <footer>

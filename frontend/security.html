@@ -250,7 +250,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="grid2" style="margin-top:20px">
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Your documents stay under EU law</div>
-      <p style="margin:0 0 10px">Server location: Hetzner Nuremberg, Germany. Legal jurisdiction: EU / Germany (GDPR). No US provider in the data path: your files and your keys stay in the EU and never reach a US company. Transactional email is the one exception in the chain and goes via Resend, a US provider, which receives the address, the message and the invite link but never the document. See the subprocessor list on <a href="/privacy">privacy</a>.</p>
+      <p style="margin:0 0 10px">Server location: Hetzner Nuremberg, Germany. Legal jurisdiction: EU / Germany (GDPR). No US provider in the data path: your files and your keys stay in the EU and never reach a US company. Transactional email goes via Mailjet SAS in Paris (parent Sinch AB, Sweden), which receives the address, the message and the invite link but never the document; that mail is stored in Frankfurt and Saint-Ghislain. Mailjet runs on Google Cloud, so Google is a sub-processor of theirs, and that is why we say no US provider touches a file or a key rather than claiming none exists at any depth. See the subprocessor list on <a href="/privacy">privacy</a>.</p>
       <p style="margin:0;font-size:var(--text-sm)"><a href="#jurisdiction">Check the jurisdiction table &rarr;</a></p>
     </div>
     <div class="card">
@@ -290,7 +290,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <tbody>
         <tr><td>Server location</td><td>Hetzner Nuremberg, Germany</td></tr>
         <tr><td>Legal jurisdiction</td><td>EU / Germany (GDPR)</td></tr>
-        <tr><td>US CLOUD Act</td><td>No US provider in the data path: files and keys stay in the EU. Transactional email goes via Resend, a US provider, which never receives the document. See <a href="/privacy">privacy</a>.</td></tr>
+        <tr><td>US CLOUD Act</td><td>No US provider in the data path: files and keys stay in the EU and never reach a US company. Transactional email goes via Mailjet SAS in Paris and is stored in the EU; Mailjet itself runs on Google Cloud, which never receives a file or a key. See <a href="/privacy">privacy</a>.</td></tr>
         <tr><td>Data retained</td><td>No plaintext, no keys. Only: transfer hash, creation timestamp, approximate encrypted size per block (up to 5 MB; exact 5 MB for the ParaSend web app), view count. Deleted after its last read.</td></tr>
         <tr><td>IP logging</td><td>Nginx access logging is switched off in the deploy configuration (<code>access_log off</code> on every server block that serves the site and the relays in <code>deploy/nginx-paramant-live.conf</code>). Not linked to transfer content. No separate retention period is promised. A relay you host yourself is the other way round: <code>deploy/nginx-selfhost.conf</code> writes an access log whose first field is the client address, so switch it off if you do not want it.</td></tr>
         <tr><td>Analytics</td><td>None. No third-party scripts on the relay or API.</td></tr>
@@ -475,7 +475,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <p style="margin-bottom:8px;font-size:var(--text-sm)">Do not publicly disclose before we have had a reasonable chance to fix. Do not access or modify data that does not belong to you. Do not run automated scans at volume that impacts service availability. Report to us first, not to third parties.</p>
     <h3 style="margin-top:20px">Scope</h3>
     <p style="margin-bottom:4px;font-size:var(--text-sm)"><strong>In scope:</strong> paramant.app, *.paramant.app, browser extensions published by us, API endpoints at <a href="/docs#api">docs/api</a>.</p>
-    <p style="margin-bottom:8px;font-size:var(--text-sm)"><strong>Out of scope:</strong> social engineering, physical attacks, denial of service, third-party services (Resend, Hetzner, Bunny, Mollie).</p>
+    <p style="margin-bottom:8px;font-size:var(--text-sm)"><strong>Out of scope:</strong> social engineering, physical attacks, denial of service, third-party services (Mailjet, Hetzner, Bunny, Mollie).</p>
     <h3 style="margin-top:20px">Rewards</h3>
     <p style="margin-bottom:0;font-size:var(--text-sm)">No monetary bounty at this time. Credit on our <a href="/security/acknowledgements">acknowledgements page</a>, and priority access to new features.</p>
   </div>

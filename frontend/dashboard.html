@@ -120,19 +120,86 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-filter:focus-visible { outline: none; box-shadow: var(--ring); position: relative; z-index: 1; }
 
 .dh-documents { border-top: 1px solid var(--line); }
-.dh-document { display: grid; grid-template-columns: minmax(0, 1fr) 132px 148px; gap: 22px; align-items: center; width: 100%; text-align: left; padding: 17px 26px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: inherit; cursor: pointer; transition: background var(--d-1) var(--e-standard); }
-.dh-document:hover { background: var(--accent-soft); }
-.dh-document:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-ring); }
+.dh-send-rows { border-top: 1px solid var(--line); }
+/* A row is a container now: the top half opens the detail, the strip under it
+   says what happens next and carries the control that closes the request. */
+.dh-document { border-bottom: 1px solid var(--line); transition: background var(--d-1) var(--e-standard); }
+.dh-send-row { border-bottom: 1px solid var(--line); transition: background var(--d-1) var(--e-standard); }
 .dh-document:last-child { border-bottom: 0; }
+.dh-send-row:last-child { border-bottom: 0; }
+.dh-document:hover { background: var(--accent-soft); }
+.dh-send-row:hover { background: var(--accent-soft); }
+.dh-document-open { display: grid; grid-template-columns: minmax(0, 1fr) 132px 148px; gap: 22px; align-items: center; width: 100%; text-align: left; padding: 17px 26px 13px; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.dh-send-open { display: grid; grid-template-columns: minmax(0, 1fr) 132px 148px; gap: 22px; align-items: center; width: 100%; text-align: left; padding: 17px 26px 13px; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.dh-document-open:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-ring); }
+.dh-send-open:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-ring); }
+/* The affordance the old row never had: a hint that there is more behind it. */
+.dh-document-open::after { content: 'Details'; position: absolute; opacity: 0; }
+.dh-send-open::after { content: 'Details'; position: absolute; opacity: 0; }
+.dh-document-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 0 26px 15px; }
+.dh-send-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 0 26px 15px; }
+.dh-document-next { flex: 1 1 220px; min-width: 0; font: 400 13px/1.45 var(--sans); color: var(--ink-2); }
+.dh-send-next { flex: 1 1 220px; min-width: 0; font: 400 13px/1.45 var(--sans); color: var(--ink-2); }
+.dh-document-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dh-send-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dh-rowbtn { padding: 7px 14px; border: 1px solid var(--line); border-radius: var(--r-pill); background: transparent; color: var(--ink-1); font: 600 12px/1.2 var(--sans); cursor: pointer; text-decoration: none; transition: border-color var(--d-1) var(--e-standard), background var(--d-1) var(--e-standard); }
+.dh-rowbtn:hover { border-color: var(--accent); background: var(--accent-soft); }
+.dh-rowbtn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-ring); }
+.dh-rowbtn.danger { color: var(--sig-stop, #d05b52); border-color: color-mix(in srgb, var(--sig-stop, #d05b52) 42%, transparent); }
+.dh-rowbtn.danger:hover { background: color-mix(in srgb, var(--sig-stop, #d05b52) 12%, transparent); border-color: var(--sig-stop, #d05b52); }
+.dh-rowask { flex: 1 1 100%; font: 400 13px/1.45 var(--sans); color: var(--ink-1); }
+.dh-rowask strong { font-weight: 600; }
+.dh-rowsay { font: 500 13px/1.45 var(--sans); color: var(--ink-2); }
+.dh-rowsay.done { color: var(--sig-ok, #4c9a72); }
+.dh-rowsay.fail { color: var(--sig-stop, #d05b52); }
+.dh-send-people { display: flex; flex-direction: column; gap: 2px; padding: 0 26px 14px; }
+.dh-send-person { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
+.dh-send-person:first-child { border-top: 0; }
+.dh-send-who { flex: 1 1 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 13px/1.4 var(--sans); color: var(--ink-1); }
+.dh-send-when { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-3); }
+.dh-dot { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1.3 var(--sans); white-space: nowrap; }
+.dh-dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.dh-dot.collected { color: var(--sig-ok, #4c9a72); }
+.dh-dot.waiting { color: var(--sig-wait, #b58a2b); }
+.dh-dot.revoked { color: var(--ink-3); }
+@media (max-width: 640px) {
+  .dh-send-people { padding: 0 18px 12px; }
+  .dh-send-person { gap: 6px; }
+}
+@media (max-width: 640px) {
+  .dh-document-open { grid-template-columns: 1fr; gap: 10px; padding: 15px 18px 11px; }
+  .dh-send-open { grid-template-columns: 1fr; gap: 10px; padding: 15px 18px 11px; }
+  .dh-document-foot { padding: 0 18px 14px; }
+  .dh-send-foot { padding: 0 18px 14px; }
+  /* On a phone the control is the point of the strip, so it gets its own line
+     and a full-width target rather than a pill squeezed next to the sentence. */
+  .dh-document-acts { width: 100%; }
+  .dh-send-acts { width: 100%; }
+  .dh-document-acts .dh-rowbtn { flex: 1 1 auto; text-align: center; padding: 11px 14px; }
+  .dh-send-acts .dh-rowbtn { flex: 1 1 auto; text-align: center; padding: 11px 14px; }
+  /* Dezelfde maat voor de knoppen PER PERSOON. Die stonden op 30px hoog naast
+     een lang e-mailadres: te klein om op een telefoon te raken, en Withdraw is
+     een knop die je niet per ongeluk wilt indrukken en ook niet drie keer wilt
+     missen. Elk op een eigen regel, want naast elkaar past het adres niet. */
+  .dh-send-person { flex-wrap: wrap; gap: 8px; }
+  .dh-send-person .dh-rowbtn { flex: 1 1 100%; text-align: center; padding: 11px 14px; min-height: 40px; }
+  .dh-send-who { flex: 1 1 100%; word-break: break-word; }
+}
 .dh-document-name { min-width: 0; }
+.dh-send-name { min-width: 0; }
 .dh-document-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.35 var(--sans); color: var(--ink-1); }
+.dh-send-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.35 var(--sans); color: var(--ink-1); }
 .dh-document-name span { display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-3); }
+.dh-send-name span { display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-3); }
 /* The reference is a whole value or an honestly shortened one. Cut without a
    sign that it was cut, "env_waiting_..." read as the complete id. */
 .dh-document-name .dh-doc-ref { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.dh-send-name .dh-doc-ref { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .dh-document-progress { min-width: 0; }
+.dh-send-progress { min-width: 0; }
 /* Never a bar without the number next to it. */
 .dh-document-progress span { display: block; margin-bottom: 7px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-2); }
+.dh-send-progress span { display: block; margin-bottom: 7px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-2); }
 /* The track has to be dark enough for the meter to read against it. On
    --line-2 the ochre fill measures 2.92:1, which is the wrong side of the
    3:1 WCAG 2.1 SC 1.4.11 asks of a control that shows a state. */
@@ -317,6 +384,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 
 @media (max-width: 980px) {
   .dh-document, .dh-skel-row { grid-template-columns: minmax(0, 1fr) 116px 132px; gap: 16px; }
+  .dh-send-row, .dh-skel-row { grid-template-columns: minmax(0, 1fr) 116px 132px; gap: 16px; }
 }
 @media (max-width: 760px) {
   main.pa-main { padding: var(--space-5) var(--space-3) var(--space-6); }
@@ -336,8 +404,11 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
   /* Under 760 the three columns stack in reading order: name, then progress,
      then state. */
   .dh-document, .dh-skel-row { grid-template-columns: minmax(0, 1fr) auto; gap: 12px 14px; padding: 16px 18px; }
+  .dh-send-row, .dh-skel-row { grid-template-columns: minmax(0, 1fr) auto; gap: 12px 14px; padding: 16px 18px; }
   .dh-document-progress, .dh-skel-row .s-progress { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
+  .dh-send-progress, .dh-skel-row .s-progress { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
   .dh-document-progress span { margin: 0; flex: 0 0 auto; }
+  .dh-send-progress span { margin: 0; flex: 0 0 auto; }
   .dh-progress { flex: 1 1 auto; }
   .dh-skel-row .s-num { flex: 0 0 auto; }
   .dh-skel-row .s-bar { margin-top: 0; flex: 1 1 auto; }
@@ -564,6 +635,22 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
       <div class="dh-inbox-list" id="dh-inbox-list" aria-live="polite"></div>
     </section>
 
+    <!-- The sending side. Deliberately ABOVE the signing worklist for an
+         account that sends to groups: the one question a sender has is who has
+         not collected yet, and that question should not need a scroll. Hidden
+         entirely when there is nothing, so a reader who only signs sees the
+         page they had yesterday. -->
+    <section class="dh-workspace" id="dh-sends-section" aria-labelledby="dh-sends-title" hidden>
+      <div class="dh-workspace-head">
+        <div>
+          <h2 id="dh-sends-title">Files you sent</h2>
+          <p>Who has collected, and who has not yet.</p>
+        </div>
+        <button class="dh-refresh" type="button" id="dh-sends-refresh">Refresh</button>
+      </div>
+      <div class="dh-documents" id="dh-sends" aria-live="polite"></div>
+    </section>
+
     <section class="dh-workspace" aria-labelledby="dh-documents-title">
       <div class="dh-workspace-head">
         <div>
@@ -709,6 +796,6 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=9" defer></script>
-<script src="/js/dashboard.js?v=15" defer></script>
+<script src="/js/dashboard.js?v=16" defer></script>
 </body>
 </html>

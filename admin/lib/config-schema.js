@@ -136,10 +136,39 @@ module.exports = {
     class: 'relay-restart', secret: true,
     description: 'Paramant license key (plk_...). Masked; replace-only.',
   },
+  MAIL_PROVIDER: {
+    type: 'string', ui: 'input', group: 'Secrets', default: 'mailjet',
+    class: 'relay-restart',
+    description: 'Who carries outbound mail: mailjet, scaleway, resend or dryrun. '
+      + 'A misspelled value delivers NOTHING; the relay logs mail_misconfigured at boot.',
+  },
+  MAIL_FALLBACK_PROVIDER: {
+    type: 'string', ui: 'input', group: 'Secrets', default: '',
+    class: 'relay-restart',
+    description: 'A second carrier, on a different company, used only when the first '
+      + 'refuses. Guards against an account suspension taking all mail down.',
+  },
+  MAILJET_API_KEY: {
+    type: 'string', ui: 'input', group: 'Secrets', default: '',
+    class: 'relay-restart', secret: true,
+    description: 'Mailjet public key (France, EU) for outbound mail. Masked; replace-only.',
+  },
+  MAILJET_SECRET_KEY: {
+    type: 'string', ui: 'input', group: 'Secrets', default: '',
+    class: 'relay-restart', secret: true,
+    description: 'Mailjet secret key. Masked; replace-only.',
+  },
+  RECIPIENT_HASH_KEY: {
+    type: 'string', ui: 'input', group: 'Secrets', default: '',
+    class: 'relay-restart', secret: true,
+    description: 'Pseudonymises recipient addresses in the send store. Generate once '
+      + 'with openssl rand -hex 32 and never change it. Masked; replace-only.',
+  },
   RESEND_API_KEY: {
     type: 'string', ui: 'input', group: 'Secrets', default: '',
     class: 'relay-restart', secret: true,
-    description: 'Resend API key for outbound mail. Masked; replace-only.',
+    description: 'Resend API key. Kept only as a way back; Resend is a US company '
+      + 'and mail moved to Mailjet in September 2026. Masked; replace-only.',
   },
   INTERNAL_AUTH_TOKEN: {
     type: 'string', ui: 'input', group: 'Secrets', default: '',

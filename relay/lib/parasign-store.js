@@ -70,7 +70,15 @@ function normalizeKey(raw) {
   return null;
 }
 
-function createParaSignStore({ redis, encKey, log } = {}) {
+// `prefix` and `aadPrefix` exist so a second product can use this store without
+// sharing a namespace with signing. They default to what ParaSign has always
+// used, so nothing about that path changes.
+//
+// The AAD prefix must move WITH the key prefix. If two namespaces shared it, a
+// sealed blob from one could be unsealed under the other's id, which is exactly
+// the confusion the AAD is there to prevent.
+function createParaSignStore({ redis, encKey, log,
+                               prefix = 'psign', aadPrefix = 'parasign' } = {}) {
   const key = normalizeKey(encKey);
   const useRedis = !!(redis && key);
   if (redis && !key && log) {
@@ -88,8 +96,8 @@ function createParaSignStore({ redis, encKey, log } = {}) {
   const memTimer = useRedis ? null : setInterval(memSweep, 300_000);
   if (memTimer && memTimer.unref) memTimer.unref();
 
-  const rkey = (kind, id) => `psign:${kind}:${id}`;
-  const aadOf = (kind, id) => `parasign:${kind}:${id}`;
+  const rkey = (kind, id) => `${prefix}:${kind}:${id}`;
+  const aadOf = (kind, id) => `${aadPrefix}:${kind}:${id}`;
 
   async function put(kind, id, plainBuf, ttlMs) {
     const n = Number(ttlMs);

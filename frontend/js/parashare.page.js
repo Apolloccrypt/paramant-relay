@@ -60,6 +60,11 @@ function $(id) { return document.getElementById(id); }
 // hangs its namespace off the global. The fallback string exists for the case
 // where that tag is missing; it is never the normal path.
 function failureText(where, e) {
+  // A sentence written for the sender passes straight through. Without this
+  // exception "Your plan allows 10 recipients per send. You listed 20." was
+  // replaced by "Something went wrong on our side", so the one person who could
+  // fix it was told it was not her problem.
+  if (e && e.voorDeGebruiker && e.message) return e.message;
   var errors = window.paramantErrors;
   if (errors) return errors.reportFailure(where, e).message;
   console.error('[paramant] ' + where, e);
@@ -685,6 +690,97 @@ async function waitForWindow(hash) {
 // on the `_ready` registration at the end of the send, so a receiver that never
 // saw the manifest still gets the file the way it always did. This only makes it
 // arrive sooner, and hold less while it does.
+
+// Count as somebody types, so a list of twenty is something you can see rather
+// than something you have to trust. The ceiling itself is not shown: this page
+// does not know the plan, and a wrong number here is worse than no number. The
+// server decides, and says so in plain words when it refuses.
+function onRecipientsInput() {
+  var status = document.getElementById('recipients-status');
+  if (!status) return;
+  var lijst = leesOntvangers();
+  if (!lijst.length) {
+    status.textContent = 'Leave empty for one link that opens once. Fill it in and '
+      + 'everyone gets their own link, and you see who collected.';
+    return;
+  }
+  var uniek = [];
+  var gezien = {};
+  for (var i = 0; i < lijst.length; i++) {
+    var a = lijst[i].toLowerCase();
+    if (!gezien[a]) { gezien[a] = 1; uniek.push(a); }
+  }
+  var dubbel = lijst.length - uniek.length;
+  status.textContent = uniek.length + (uniek.length === 1 ? ' recipient' : ' recipients')
+    + (dubbel ? ', ' + dubbel + ' duplicate' + (dubbel === 1 ? '' : 's') + ' ignored' : '')
+    + '. Each one gets their own link and a code to this address.';
+}
+
+// What she sees when it worked. Without this she was left on the progress bar
+// at 100 percent with one line of text: no confirmation, no way onward, and no
+// idea whether the invitations had gone out.
+function toonVerzending(verzending, naam) {
+  const aantal = verzending.invited + ' of ' + verzending.recipients;
+  if (window.paramantDone && paramantDone.fill) {
+    paramantDone.fill('step-done', {
+      title: 'Sent',
+      lead: aantal + ' invitations are on their way. Everyone got their own link.',
+      note: 'They each prove their mailbox with a short code before the file opens. '
+          + 'You can see who collected it in your dashboard.',
+      actions: [{ label: 'Open your dashboard', href: '/dashboard' },
+                { label: 'Send another file', href: '/parashare' }],
+    });
+  }
+  showStep('step-done');
+  const kop = $('done-title');
+  if (kop) kop.textContent = 'Sent to ' + aantal;
+  return { send: verzending, name: naam };
+}
+
+// ── Named recipients ─────────────────────────────────────────────────────────
+// Split here, in the browser, on newlines, commas and semicolons. The relay
+// refuses a field with a comma in it on purpose: a comma inside one address
+// used to count as one recipient and reach two mailboxes sharing a single
+// link. So whatever a person pastes gets taken apart where they pasted it, and
+// what leaves is a real list.
+function leesOntvangers() {
+  var veld = document.getElementById('recipients-input');
+  if (!veld) return [];
+  return String(veld.value || '')
+    .split(/[\n,;]+/)
+    .map(function (a) { return a.trim(); })
+    .filter(function (a) { return a.length > 0; });
+}
+
+// After every block has landed, turn them into one send with a link per person.
+// A separate call on purpose: a file arrives as many blocks, and reading a
+// recipient list off one of them would make many sends out of one file.
+async function maakVerzending(hashes, naam, ttlMs, ontvangers, sealed) {
+  const r = await relayFetch(RELAY_API + '/v2/sends', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hashes: hashes, recipients: ontvangers, sealed: sealed,
+                           filename: naam, ttl_ms: ttlMs }),
+    signal: AbortSignal.timeout(60000)
+  });
+  const body = await r.json().catch(function () { return {}; });
+  if (!r.ok) {
+    const uitleg = body.error === 'over_limit'
+      ? 'Your plan allows ' + body.limit + ' recipients per send. You listed ' + body.asked + '.'
+      : body.error === 'invalid_address'
+      ? 'That is not an address we can send to: ' + (body.rejected || '') 
+      : body.error === 'empty'
+      ? 'No usable address in that list.'
+      : 'The send could not be created.';
+    // Marked, so the catch that shows this to the sender knows it is a
+    // sentence written for her and not an internal failure to apologise for.
+    const fout = new Error(uitleg);
+    fout.voorDeGebruiker = true;
+    throw fout;
+  }
+  return body;
+}
+
 async function announceBlock(sessionId, index, token, totalChunks, meta) {
   try {
     await relayFetch(RELAY_API + '/v2/session/' + sessionId + '/manifest', {
@@ -825,7 +921,7 @@ async function confirmFingerprint() {
       // up in the handshake record on the relay, in the clear, for an hour.
       // Both already travel sealed inside chunk 0, so what left here was a
       // duplicate the receiver never read. See frontend/js/handshake-meta.js.
-      return { tokens };
+      return { tokens, chunkHashes };
     }
 
     // Upload all files
@@ -837,6 +933,25 @@ async function confirmFingerprint() {
 
     $('enc-progress').style.width = '100%';
     setEncProgress(100);
+
+    // ── a send to named recipients, if the sender named any ──────────────────
+    // A list of addresses does NOT belong on this path, and this is where that
+    // is held. The live hand-over encrypts to the receiver's public key, which
+    // means there is no file key to wrap under anybody's token: the branch that
+    // used to sit here called maakVerzending without `sealed`, so every one of
+    // the twenty got an invitation to a file their link could never open.
+    //
+    // Refusing is the honest answer. setSendMode hides the field on this path,
+    // so reaching this line means the sender typed the list first and switched
+    // afterwards; telling her beats sending twenty dead links.
+    if (leesOntvangers().length) {
+      const fout = new Error('A hand-over while you both watch goes to one person, '
+        + 'the one at the other screen. To send it to a list, pick "They open it '
+        + 'later" instead.');
+      fout.voorDeGebruiker = true;
+      throw fout;
+    }
+
     $('enc-status').textContent = 'Notifying receiver...';
 
     const isVault = files.length > 1;
@@ -1004,20 +1119,48 @@ function setSendMode(mode) {
   if (link) link.setAttribute('aria-checked', String(sendMode === 'link'));
   const stepper = $('ps-stepper');
   if (stepper) stepper.style.display = (sendMode === 'link') ? 'none' : '';
-  // "The person you send to has to be online while you send" is the one
-  // sentence on this page that the link stand makes false.
-  const note = $('ps-live-note');
+  // Named recipients belong to the link path: in a live hand-over the other
+  // person is already at their screen and you confirm a code together, so a
+  // list of twenty addresses has nothing to do there. Showing the field in both
+  // modes was how twenty addresses could be typed and silently ignored.
+  // De regel onder de kaarten zegt wat de GEKOZEN stand betekent. De maat
+  // verschilt per stand en per situatie: een enkele link is een verzegeld blok
+  // van 5 MB, een lijst gaat in blokken tot 25 MB, en live streamt tot 500 MB.
+  // Dat past niet in een ondertitel van een kaart, en het is precies wat een
+  // afzender moet weten voordat hij een bestand kiest.
+  const note = document.getElementById('ps-live-note');
   if (note) {
     note.textContent = (sendMode === 'link')
-      ? 'The person you send to does not have to be online. You get a link to pass on; it works once.'
-      : 'The person you send to has to be online while you send; you confirm a short code together.';
+      ? 'The other person does not have to be online: the file waits for them. A single link '
+        + 'carries up to 5 MB; fill in who it is for and it goes up in pieces, '
+        + 'up to 25 MB.'
+      : 'The person you send to has to be online while you send; you confirm a '
+        + 'short code together. Up to 500 MB, and nothing is ever stored.';
   }
+
+  const ontvangersKaart = document.getElementById('recipients-input');
+  const kaart = ontvangersKaart ? ontvangersKaart.closest('.card') : null;
+  if (kaart) kaart.hidden = (sendMode !== 'link');
+  // The sentence that used to sit here said the same thing as the card the
+  // sender just clicked, one block lower. Two blocks explaining one choice is
+  // how a page starts feeling like homework, so the card says it now and this
+  // is gone.
   const btn = $('btn-create-session');
   if (btn) btn.textContent = (sendMode === 'link') ? 'Seal the file and make a link →' : 'Create secure session →';
   setCreateStatus('');
 }
 function chooseModeLive() { setSendMode('live'); }
 function chooseModeLink() { setSendMode('link'); }
+
+// Apply the starting mode once at load. Without this the page opened with
+// sendMode 'live' while the recipients card was still visible, so a sender
+// could type twenty addresses, press the live button, and watch a screen that
+// waits for a receiver who was never told to come. Nobody got post.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function () { setSendMode(sendMode); });
+} else {
+  setSendMode(sendMode);
+}
 
 // The one button at the bottom of step 1, dispatched on the chosen stand. The
 // two flows share step 1 entirely -- same credential, same file picker, same
@@ -1030,13 +1173,33 @@ async function startSend() {
 // Returns { name, size, token, key, expires_ms }. Throws on refusal, with the
 // relay's quota JSON attached when that is what happened, so the caller can
 // render the upgrade notice the live stand already renders.
-async function sealAndUpload(file, ttlMs) {
+// How much a send to named recipients may carry. One link is one block of
+// 5 MB, and that stays: /get fetches a single token. A send to named people
+// goes up in as many blocks as it needs and POST /v2/sends joins them.
+//
+// 25 MB is measured, not chosen. Nobody is waiting at the other end of this
+// kind of send, so the file sits in the durable store until the last recipient
+// collects -- up to seven days -- sealed as base64 and therefore a third
+// larger than itself, in a Redis budget of 200 MB shared with sessions, rate
+// limits and every signature. That is six sends open at once. See SEND_MAX_MB
+// in relay/lib/send.js, which is the number that actually decides; this one is
+// here so the refusal arrives before the upload rather than after it.
+const GROEP_MAX = 25 * 1024 * 1024;
+
+async function sealAndUpload(file, ttlMs, meerdereBlokken) {
   const nameBytes = new TextEncoder().encode(file.name);
-  if (file.size + nameBytes.length + LINK_OVERHEAD > LINK_MAX_BLOB) {
-    throw new Error(file.name + ' is too big for a link. A link is one sealed 5 MB block, ' +
-      'so 5 MB a file is the ceiling for this way of sending. Hand it over live instead: ' +
-      'that way cuts the file into chunks and takes a file up to 500 MB. ' +
-      'The receiver has to be online while you send.');
+  const plafond = meerdereBlokken ? GROEP_MAX : LINK_MAX_BLOB;
+  if (file.size + nameBytes.length + LINK_OVERHEAD > plafond) {
+    const fout = new Error(meerdereBlokken
+      ? file.name + ' is ' + Math.round(file.size / 1048576) + ' MB, and sending to a '
+        + 'list tops out at ' + Math.round(GROEP_MAX / 1048576) + ' MB because your '
+        + 'browser locks the whole file at once. Put it in a zip, split it, or hand '
+        + 'it over live to one person.'
+      : file.name + ' is too big for a single link. A link is one sealed 5 MB block. '
+        + 'Fill in who it is for and it goes up in pieces instead, up to '
+        + Math.round(GROEP_MAX / 1048576) + ' MB.');
+    fout.voorDeGebruiker = true;
+    throw fout;
   }
   const plain = concat(u32le(nameBytes.length), nameBytes, new Uint8Array(await file.arrayBuffer()));
   const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
@@ -1044,32 +1207,63 @@ async function sealAndUpload(file, ttlMs) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain));
 
-  const hashBuf = await crypto.subtle.digest('SHA-256', ct);
-  const hash = u8toHex(new Uint8Array(hashBuf));
-  const ur = await relayFetch(RELAY_API + '/v2/inbound', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      hash, payload: toB64(ct), ttl_ms: ttlMs,
-      // No file name and no size on the relay side: the name lives only inside
-      // the sealed bytes, which is the same rule the live stand keeps.
-      meta: { device_id: 'transfer-web-link' }
-    }),
-    signal: AbortSignal.timeout(120000)
-  });
-  const ud = await ur.json();
-  if (window.paQuotaUpgrade && window.paQuotaUpgrade.isQuota402(ur.status, ud)) {
-    const qe = new Error(ud.error); qe.quota = ud; throw qe;
+  // ONE seal, cut into blocks that fit the wire. The relay stores blocks and
+  // /v2/sends concatenates them back into exactly these bytes, so the receiver
+  // decrypts one AES-GCM the way they always did: no second format, no second
+  // thing to get wrong, and the tag still covers the whole file.
+  const stukken = [];
+  for (let at = 0; at < ct.length; at += LINK_MAX_BLOB) {
+    stukken.push(ct.subarray(at, Math.min(at + LINK_MAX_BLOB, ct.length)));
   }
-  if (!ud.ok) throw new Error(ud.error || 'Upload failed: ' + file.name);
+  const hashes = [];
+  let eersteToken = null;
+  // Het antwoord van het EERSTE blok, want dat is wat de afzender te zien
+  // krijgt: de merkle-proof hangt eraan en de ttl is de gekapte waarde waar de
+  // relay zich echt aan houdt. Buiten de lus gedeclareerd, want hij wordt na
+  // afloop gelezen -- dat was hij niet, en `ud is not defined` liet de
+  // verzendpagina op het verzegelscherm staan zonder dat iemand zag waarom.
+  let eersteAntwoord = {};
+  for (let i = 0; i < stukken.length; i++) {
+    if (stukken.length > 1) {
+      $('seal-status').textContent = 'Sending ' + file.name + ', part '
+        + (i + 1) + ' of ' + stukken.length + '...';
+      setSealProgress(Math.round(((i + 1) / stukken.length) * 90));
+    }
+    const deel = stukken[i];
+    const hashBuf = await crypto.subtle.digest('SHA-256', deel);
+    const hash = u8toHex(new Uint8Array(hashBuf));
+    const ur = await relayFetch(RELAY_API + '/v2/inbound', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        hash, payload: toB64(deel), ttl_ms: ttlMs,
+        // No file name and no size on the relay side: the name lives only inside
+        // the sealed bytes, which is the same rule the live stand keeps.
+        meta: { device_id: 'transfer-web-link' }
+      }),
+      signal: AbortSignal.timeout(120000)
+    });
+    const ud = await ur.json();
+    if (window.paQuotaUpgrade && window.paQuotaUpgrade.isQuota402(ur.status, ud)) {
+      const qe = new Error(ud.error); qe.quota = ud; throw qe;
+    }
+    if (!ud.ok) throw new Error(ud.error || 'Upload failed: ' + file.name);
+    hashes.push(hash);
+    if (i === 0) { eersteToken = ud.download_token; eersteAntwoord = ud; }
+  }
+
   return {
-    name: file.name, size: file.size, token: ud.download_token,
+    name: file.name, size: file.size, token: eersteToken,
+    // Every block hash, in order, so POST /v2/sends can join them into the one
+    // file these bytes came from.
+    hashes,
+    hash: hashes[0],
     // The sender's one piece of real proof, see the note in js/done-state.js.
-    proof: ud.merkle_proof || null,
+    proof: eersteAntwoord.merkle_proof || null,
     // The relay's ttl_ms, not the one that was asked for: POST /v2/inbound
     // clamps to the tier, and the expiry the sender is shown has to be the one
     // the relay will actually act on.
-    expires_ms: Date.now() + Number(ud.ttl_ms || ttlMs),
+    expires_ms: Date.now() + Number(eersteAntwoord.ttl_ms || ttlMs),
     key: b64url(concat(rawKey, iv)),
     state: 'waiting',
   };
@@ -1107,7 +1301,7 @@ async function createLink() {
       $('seal-status').textContent = (files.length > 1 ? 'File ' + (i + 1) + '/' + files.length + ': ' : '') +
         'Sealing ' + files[i].name + ' in this browser...';
       setSealProgress(Math.round((i / files.length) * 90));
-      const row = await sealAndUpload(files[i], ttlMs);
+      const row = await sealAndUpload(files[i], ttlMs, leesOntvangers().length > 0);
       // The sector rides in the link because an account lives on exactly one of
       // them; without it /get asks health and a legal sender's receiver is told
       // the file is burned when it is sitting on another sector.
@@ -1115,6 +1309,37 @@ async function createLink() {
         '&r=' + encodeURIComponent(sector) + '#' + row.key;
       sentLinks.push(row);
     }
+    // ── a send to named recipients ───────────────────────────────────────
+    // This is the path a sender takes when the receiver is not sitting at their
+    // screen, so it is the path that has to carry the addresses. The live path
+    // reads them too, and used to be the ONLY one that did: filling in twenty
+    // addresses here produced one anonymous link and no mail at all.
+    const ontvangers = leesOntvangers();
+    if (ontvangers.length) {
+      if (files.length > 1) {
+        throw new Error('Sending to named people works with one file at a time. '
+                      + 'Put the documents in a zip, or send them one by one.');
+      }
+      $('seal-status').textContent = 'Locking the key for each person...';
+      const geheim = paramantSendWrap.fromB64url(sentLinks[0].key);
+      const sealed = {};
+      for (const adres of ontvangers) {
+        const token = paramantSendWrap.newToken();
+        // Wrapped here, in this browser. The relay receives the wrapping and
+        // the hash of the token, never the token and never the key.
+        sealed[adres.toLowerCase()] = {
+          token,
+          wrapped_key: await paramantSendWrap.wrap(token, geheim),
+        };
+      }
+      $('seal-status').textContent = 'Sending the invitations...';
+      const verzending = await maakVerzending(
+        sentLinks[0].hashes, files[0].name, ttlMs, ontvangers, sealed);
+      sentLinks.length = 0;
+      setSealProgress(100);
+      return toonVerzending(verzending, files[0].name);
+    }
+
     setSealProgress(100);
     renderSentLinks();
     window.paramantDone.proof('step-link', {
@@ -1680,6 +1905,7 @@ function updateGlobeTransfer(userLat, userLng) {
 
 act('change','fpConfirmToggle',(el)=>{const b=document.getElementById('fp-confirm-btn');if(b)b.disabled=!el.checked;});
 act('change','onFileSelect',()=>onFileSelect());
+act('input','onRecipientsInput',()=>onRecipientsInput());
 act('click','confirmFingerprint',()=>confirmFingerprint());act('click','copyLink',()=>copyLink());
 act('click','createSession',()=>startSend());act('click','expandApiKeyCard',()=>expandApiKeyCard());
 act('click','chooseModeLive',()=>chooseModeLive());act('click','chooseModeLink',()=>chooseModeLink());

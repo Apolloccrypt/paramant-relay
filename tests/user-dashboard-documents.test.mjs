@@ -116,6 +116,7 @@ const completedDialogMetrics = await page.locator('#dh-document-dialog').evaluat
   return { hidden:node.hidden, display:style.display, position:style.position, zIndex:style.zIndex, background:style.backgroundColor, panelDisplay:panelStyle && panelStyle.display, panelBackground:panelStyle && panelStyle.backgroundColor, top:box.top, left:box.left, bottom:box.bottom, right:box.right, width:box.width, height:box.height, innerWidth, innerHeight };
 });
 const completedDialogInViewport = !completedDialogMetrics.hidden && completedDialogMetrics.top >= -5 && completedDialogMetrics.left >= -5 && completedDialogMetrics.bottom <= completedDialogMetrics.innerHeight + 5 && completedDialogMetrics.right <= completedDialogMetrics.innerWidth + 5;
+console.error('[n]', await page.locator('.dh-document').count(), '[body]', (await page.locator('#dh-document-dialog-body').innerText().catch(()=>'-')).slice(0,80));
 ok('completed document exposes proof export with honest storage guidance', completedDialogInViewport && await page.locator('a[download]').getAttribute('href') === '/api/user/documents/env_complete_abcdefghijklmnop/receipt' && /not a plaintext copy/i.test(await page.locator('#dh-document-dialog-body').innerText()), JSON.stringify(completedDialogMetrics));
 if (process.env.PARAMANT_DASHBOARD_DETAIL_SCREENSHOT_PATH) {
   await page.waitForTimeout(100);

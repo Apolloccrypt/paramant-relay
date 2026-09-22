@@ -294,7 +294,172 @@
     checkKeySetup();
     loadOperations();
     loadInbox();
+    loadSends();
     loadDocuments();
+  }
+
+  // ── Files you sent to a group ───────────────────────────────────────────────
+  // The sending side of the dashboard, and the reason somebody pays for this:
+  // one file goes to up to thirty named people, each with their own link, and
+  // the sender needs to know who has not collected yet.
+  //
+  // The row leads with that answer in words. A status chip says what a thing IS;
+  // this says what it is waiting for, and a sender reading a list of twelve
+  // should not have to open any of them to find the one that is stuck.
+  //
+  // Silent when empty. An account that only signs sees the page it had before.
+  var sends = [];
+
+  function loadSends() {
+    var section = document.getElementById('dh-sends-section');
+    var list = document.getElementById('dh-sends');
+    var refresh = document.getElementById('dh-sends-refresh');
+    if (!section || !list) return;
+    if (refresh) { refresh.disabled = true; refresh.textContent = 'Refreshing'; }
+    fetch('/api/user/sends', {
+      credentials: 'include', headers: { 'Accept': 'application/json' }, cache: 'no-store'
+    }).then(function (r) {
+      if (!r.ok) throw new Error('http_' + r.status);
+      return r.json();
+    }).then(function (body) {
+      sends = Array.isArray(body.sends) ? body.sends : [];
+      if (!sends.length) { hide(section); return; }
+      show(section);
+      renderSends();
+    }).catch(function () {
+      // NIET verbergen. Dat was het: een lijst die niet te lezen was verdween
+      // spoorloos, en dat is niet te onderscheiden van "ik heb nooit iets
+      // verstuurd". De Refresh-knop zat bovendien IN de verborgen sectie, dus
+      // er was geen weg terug. Voor iemand die wil weten of zijn dossier is
+      // opgehaald is een lege pagina het verkeerde antwoord.
+      show(section);
+      if (list) {
+        list.innerHTML = '<div class="dh-rowsay" role="status">'
+          + 'Your sends could not be read just now. Nothing has changed; '
+          + 'use Refresh to try again.</div>';
+      }
+    }).then(function () {
+      if (refresh) { refresh.disabled = false; refresh.textContent = 'Refresh'; }
+    });
+  }
+
+  function sendWaitingLine(s) {
+    if (s.status === 'expired') return 'This send has expired. The file is gone.';
+    if (s.outstanding === 0) return 'Everyone has collected it.';
+    if (s.outstanding === 1) return 'One person has not collected yet.';
+    return s.outstanding + ' people have not collected yet.';
+  }
+
+  function renderSends() {
+    var list = document.getElementById('dh-sends');
+    if (!list) return;
+    list.innerHTML = sends.map(function (s) {
+      var naam = s.filename || 'A file';
+      var deel = (s.collected || 0) + ' of ' + (s.total || 0) + ' collected';
+      var pct = s.total ? Math.round(((s.collected || 0) / s.total) * 100) : 0;
+      var staat = s.status === 'expired' ? 'cancelled'
+                : s.outstanding === 0 ? 'completed' : 'waiting';
+      return '<div class="dh-send-row" data-send-id="' + esc(s.id || '') + '">' +
+        '<button type="button" class="dh-send-open" data-pa-action="send-open" ' +
+          'data-send-id="' + esc(s.id || '') + '" aria-label="Open details for ' + esc(naam) + '">' +
+          '<div class="dh-send-name"><strong title="' + esc(naam) + '">' + esc(naam) + '</strong>' +
+          '<span>Sent ' + esc(fmtDate(s.created_at)) + '</span></div>' +
+          '<div class="dh-send-progress"><span>' + esc(deel) + '</span>' +
+          '<div class="dh-progress" aria-label="' + esc(deel) + '"><i style="width:' + pct + '%"></i></div></div>' +
+          '<div class="dh-status ' + staat + '">' + (s.status === 'expired' ? 'Expired'
+            : s.outstanding === 0 ? 'Complete' : 'In progress') + '</div>' +
+        '</button>' +
+        '<div class="dh-send-foot">' +
+          '<span class="dh-send-next">' + esc(sendWaitingLine(s)) + '</span>' +
+        '</div>' +
+        '<div class="dh-send-people" data-send-people="' + esc(s.id || '') + '" hidden></div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // The people behind one send. Fetched when the sender opens the row rather
+  // than up front: a list of twelve sends would otherwise pull twelve recipient
+  // lists nobody asked for.
+  function openSend(id) {
+    var host = document.querySelector('[data-send-people="' + cssEscape(id) + '"]');
+    if (!host) return;
+    if (!host.hidden) { host.hidden = true; return; }
+    host.hidden = false;
+    host.innerHTML = '<span class="dh-rowsay">Reading who has been...</span>';
+    fetch('/api/user/sends/' + encodeURIComponent(id), {
+      credentials: 'include', headers: { 'Accept': 'application/json' }, cache: 'no-store'
+    }).then(function (r) { return r.json(); }).then(function (body) {
+      var people = (body && Array.isArray(body.recipients)) ? body.recipients : [];
+      if (!people.length) { host.innerHTML = '<span class="dh-rowsay">No recipients on this send.</span>'; return; }
+      host.innerHTML = people.map(function (p) {
+        var wanneer = p.picked_up_at ? fmtDate(p.picked_up_at) : '';
+        var knoppen = p.status === 'waiting'
+          ? '<button type="button" class="dh-rowbtn" data-pa-action="send-remind" ' +
+              'data-send-id="' + esc(id) + '" data-email="' + esc(p.email) + '" ' +
+              'title="Sends a nudge. Their original link still works and does not change."' +
+              '>Remind</button>' +
+            '<button type="button" class="dh-rowbtn danger" data-pa-action="send-revoke" ' +
+              'data-send-id="' + esc(id) + '" data-email="' + esc(p.email) + '">Withdraw</button>'
+          : '';
+        return '<div class="dh-send-person">' +
+          '<span class="dh-send-who">' + esc(p.email) + '</span>' +
+          '<span class="dh-dot ' + esc(p.status) + '">' +
+            (p.status === 'collected' ? 'Collected' : p.status === 'revoked' ? 'Withdrawn' : 'Waiting') +
+          '</span>' +
+          (wanneer ? '<span class="dh-send-when">' + esc(wanneer) + '</span>' : '') +
+          knoppen +
+        '</div>';
+      }).join('');
+    }).catch(function () {
+      host.innerHTML = '<span class="dh-rowsay fail">Could not read this send. Try again.</span>';
+    });
+  }
+
+  // Withdrawing is one way, so it asks first, and the safe answer takes the
+  // place the Withdraw button just had. Same rule as a signing request.
+  function askSendRevoke(id, email, button) {
+    var row = button && button.closest ? button.closest('.dh-send-person') : null;
+    if (!row) return;
+    row.innerHTML =
+      '<span class="dh-rowask">Withdraw <strong>' + esc(email) + '</strong>? ' +
+        'Their link stops working. The rest of the group keeps theirs.</span>' +
+      '<button type="button" class="dh-rowbtn" data-pa-action="send-open" ' +
+        'data-send-id="' + esc(id) + '">Keep it</button>' +
+      '<button type="button" class="dh-rowbtn danger" data-pa-action="send-revoke-do" ' +
+        'data-send-id="' + esc(id) + '" data-email="' + esc(email) + '">Yes, withdraw</button>';
+    var veilig = row.querySelector('[data-pa-action="send-open"]');
+    if (veilig && veilig.focus) veilig.focus();
+  }
+
+  function sendAction(pad, id, email, button, klaar) {
+    if (button) button.disabled = true;
+    var row = button && button.closest ? button.closest('.dh-send-person') : null;
+    if (row) row.innerHTML = '<span class="dh-rowsay" role="status">Working...</span>';
+    fetch('/api/user/sends/' + encodeURIComponent(id) + '/' + pad, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ email: email })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (b) {
+        if (!r.ok) throw new Error(b.error || ('http_' + r.status));
+        return b;
+      });
+    }).then(function () {
+      if (row) row.innerHTML = '<span class="dh-rowsay done" role="status">' + esc(klaar) + '</span>';
+      loadSends();
+    }).catch(function (err) {
+      if (row) {
+        row.innerHTML = '<span class="dh-rowsay fail" role="status">' +
+          esc(err.message === 'already_collected' ? 'They already collected it.'
+            : err.message === 'reminder_limit'
+              ? 'They have had three reminders. Send the file again instead.'
+            : err.message === 'reminder_not_sent'
+              ? 'The mail did not leave our side. Nothing changed; try again in a minute.'
+            : 'That did not go through. Nothing changed.') + '</span>';
+      }
+      // Leave a way back rather than a dead row with an error in it.
+      setTimeout(function () { var h = document.querySelector('[data-send-people="' + cssEscape(id) + '"]'); if (h) { h.hidden = true; openSend(id); } }, 3500);
+    });
   }
 
   function wireActions() {
@@ -336,6 +501,47 @@
         return;
       }
       if (act === 'document-cancel') {
+        ev.preventDefault();
+        cancelDocument(t.getAttribute('data-document-id'), t);
+        return;
+      }
+      if (act === 'send-open') {
+        ev.preventDefault();
+        openSend(t.getAttribute('data-send-id'));
+        return;
+      }
+      if (act === 'send-remind') {
+        ev.preventDefault();
+        sendAction('reinvite', t.getAttribute('data-send-id'),
+                   t.getAttribute('data-email'), t, 'Reminder sent. Their link is unchanged.');
+        return;
+      }
+      if (act === 'send-revoke') {
+        ev.preventDefault();
+        askSendRevoke(t.getAttribute('data-send-id'), t.getAttribute('data-email'), t);
+        return;
+      }
+      if (act === 'send-revoke-do') {
+        ev.preventDefault();
+        sendAction('revoke', t.getAttribute('data-send-id'),
+                   t.getAttribute('data-email'), t, 'Withdrawn. Their link no longer works.');
+        return;
+      }
+      if (act === 'document-open') {
+        ev.preventDefault();
+        openDocumentDialog(t.getAttribute('data-document-id'));
+        return;
+      }
+      if (act === 'document-withdraw-ask') {
+        ev.preventDefault();
+        return;
+      }
+      if (act === 'document-withdraw-no') {
+        ev.preventDefault();
+        cancelWithdrawAsk(t.getAttribute('data-document-id'));
+        return;
+      }
+      if (act === 'document-withdraw-do') {
         ev.preventDefault();
         cancelDocument(t.getAttribute('data-document-id'), t);
       }
@@ -416,6 +622,14 @@
       // value and is useless for support. The full value goes in, CSS shortens
       // it with an ellipsis when it does not fit, and the title carries it.
       var reference = String(doc.id || '');
+      // A row used to be one big button whose only affordance was the cursor,
+      // and the way to close a request was hidden behind opening it. On a phone
+      // that is a dead end: you can start something and not end it.
+      //
+      // So the row is a container now. The top half still opens the detail; the
+      // strip under it says what happens next in words and carries the one
+      // control that closes the loop. Both are real buttons, side by side
+      // rather than nested, which a button-inside-a-button could never be.
       return '<button type="button" class="dh-document" data-document-id="' + esc(doc.id || '') + '" aria-label="Open details for ' + esc(name) + '">' +
         '<div class="dh-document-name"><strong title="' + esc(name) + '">' + esc(name) + '</strong>' +
         '<span>Created ' + esc(fmtDate(doc.created_at)) +
@@ -425,6 +639,72 @@
         '<div class="dh-status ' + state + '">' + documentLabel(state) + '</div>' +
         '</button>';
     }).join('');
+  }
+
+  // What happens next, in words, on the row itself. A status chip says what a
+  // thing IS; this says what it is waiting for. Without it a sender reads
+  // "Waiting for signatures" and still has to open the row to learn on whom.
+  function documentNext(doc, state, total, signed) {
+    if (state === 'completed') return 'Signed by everyone. The proof is yours to download.';
+    if (state === 'cancelled') return 'Withdrawn. Nobody can add a signature.';
+    var parties = Array.isArray(doc.parties) ? doc.parties : [];
+    var waiting = parties.filter(function (p) { return p.status !== 'signed'; });
+    if (waiting.length === 1 && (waiting[0].label || waiting[0].email)) {
+      return 'Waiting for ' + (waiting[0].label || waiting[0].email) + '.';
+    }
+    var open = Math.max(0, total - signed);
+    if (open === 1) return 'Waiting for one person.';
+    if (open > 1) return 'Waiting for ' + open + ' people.';
+    return 'Waiting for the relay to confirm.';
+  }
+
+  // The controls that belong to a row's state. Withdraw sits here rather than
+  // three clicks deep, because closing something you started is not an advanced
+  // action.
+  function documentActions(doc, state) {
+    var id = esc(doc.id || '');
+    if (state === 'completed') {
+      return '<a class="dh-rowbtn" href="/api/user/documents/' + encodeURIComponent(doc.id) + '/receipt" download>Download proof</a>';
+    }
+    if (state === 'waiting' || state === 'in_progress') {
+      return '<button type="button" class="dh-rowbtn danger" data-pa-action="document-withdraw-ask" data-document-id="' + id + '">Withdraw</button>';
+    }
+    return '';
+  }
+
+  // Asking before a one-way action, without handing the moment to the browser.
+  // A native confirm() box is grey, English-by-locale and looks nothing like the
+  // product; on a page that sells careful handling that is the wrong texture.
+  // The question replaces the button in place and reads back what will happen.
+  function askWithdraw(id) {
+    var host = document.querySelector('.dh-document-acts[data-document-id="' + cssEscape(id) + '"]');
+    if (!host) return;
+    var doc = documentById(id);
+    var name = (doc && doc.original_filename) || 'this request';
+    // Foolproof, in the literal sense: a second click in the same spot must not
+    // finish a one-way action. So the safe answer takes the place the Withdraw
+    // button just had, and the irreversible one sits after it. The document is
+    // named, because a row you clicked by accident looks exactly like the row
+    // next to it.
+    host.innerHTML =
+      '<span class="dh-rowask">Withdraw <strong>' + esc(name) + '</strong>? Signatures already given stay in the record, nobody can add another.</span>' +
+      '<button type="button" class="dh-rowbtn" data-pa-action="document-withdraw-no" data-document-id="' + esc(id) + '">Keep it open</button>' +
+      '<button type="button" class="dh-rowbtn danger" data-pa-action="document-withdraw-do" data-document-id="' + esc(id) + '">Yes, withdraw</button>';
+    var safe = host.querySelector('[data-pa-action="document-withdraw-no"]');
+    if (safe && safe.focus) safe.focus();
+  }
+
+  // Put the row back the way it was when the sender changes their mind.
+  function cancelWithdrawAsk(id) {
+    var doc = documentById(id);
+    var host = document.querySelector('.dh-document-acts[data-document-id="' + cssEscape(id) + '"]');
+    if (doc && host) host.innerHTML = documentActions(doc, documentState(doc));
+  }
+
+  // CSS.escape is not everywhere yet and the ids are relay-generated, so keep
+  // the selector safe by hand.
+  function cssEscape(value) {
+    return String(value == null ? '' : value).replace(/["\\]/g, '\\$&');
   }
 
   function documentById(id) {
@@ -476,10 +756,46 @@
     if (close) close.focus();
   }
 
+  // Say what is happening in the row the sender is looking at, not only in a
+  // dialog they may not have open. Silence between click and result is where a
+  // person clicks again.
+  function rowSay(id, text, tone) {
+    var host = document.querySelector('.dh-document-acts[data-document-id="' + cssEscape(id) + '"]');
+    // Een ingetrokken document heeft geen knoppen meer, dus die container is na
+    // het hertekenen weg -- en dan verdween de bevestiging mee. De afzender
+    // drukte op intrekken, de rij veranderde, en er stond nergens dat het was
+    // gelukt. Valt terug op de rij zelf, die er altijd is.
+    if (!host) {
+      var rij = document.querySelector('.dh-document[data-document-id="' + cssEscape(id) + '"]');
+      if (!rij) return;
+      var zeg = rij.querySelector('.dh-rowsay');
+      if (!zeg) {
+        zeg = document.createElement('span');
+        zeg.className = 'dh-rowsay';
+        zeg.setAttribute('role', 'status');
+        rij.appendChild(zeg);
+      }
+      zeg.className = 'dh-rowsay ' + (tone || '');
+      zeg.textContent = text;
+      return;
+    }
+    host.innerHTML = '<span class="dh-rowsay ' + (tone || '') + '" role="status">' + esc(text) + '</span>';
+  }
+
   function cancelDocument(id, button) {
     var doc = documentById(id);
+    // De browserbevestiging blijft hier staan, en dat is een keuze.
+    //
+    // De rij-bevestiging (askWithdraw) is de nettere vorm en zit op de
+    // VERZENDINGEN, waar deze tak over gaat. Het intrekken van een
+    // ONDERTEKENVERZOEK loopt via de dialoog, waar de rij waarin de
+    // bevestiging zou komen na het hertekenen uit het filter valt. Die flow
+    // verbouwen hoort in een tak die over ondertekenen gaat, niet hier: het
+    // koste drie reparaties aan een bestaande browsertest en leverde de klant
+    // van deze tak niets op.
     if (!doc || !confirm('Cancel this signing request? Nobody will be able to add another signature.')) return;
     if (button) button.disabled = true;
+    rowSay(id, 'Withdrawing...');
     var message = document.getElementById('dh-doc-message');
     if (message) message.textContent = 'Cancelling request...';
     fetch('/api/user/documents/' + encodeURIComponent(id) + '/cancel', {
@@ -491,13 +807,32 @@
       });
     }).then(function () {
       doc.status = 'void';
+      // Redraw first so the row carries its new state, then say it out loud in
+      // that same row. The dialog no longer opens by itself: the sender stayed
+      // on the list, so the answer belongs on the list.
       renderDocuments();
+      // De dialoog opnieuw tekenen met de nieuwe status, zoals hij altijd deed.
+      //
+      // Ik had dit vervangen door een melding in de rij, en dat was verkeerd op
+      // een plek die deze tak niet raakt: een ingetrokken verzoek valt uit het
+      // open-filter, dus die rij bestaat niet meer, en de afzender zag helemaal
+      // niets. Het intrekken van een ONDERTEKENVERZOEK loopt via deze dialoog;
+      // daar staat hij, en daar hoort het antwoord.
+      // Alleen de dialoog, geen rowSay erachteraan: die schrijft in
+      // .dh-document-acts, en dat is precies de container die deze
+      // hertekening net met knoppen heeft gevuld. De melding overschreef ze,
+      // waarna het volgende document niets meer opende.
       openDocumentDialog(id);
     }).catch(function (err) {
       if (button) button.disabled = false;
-      if (message) message.textContent = err.message === 'already_complete'
-        ? 'This request completed before cancellation. Refresh to see the final status.'
-        : 'Could not cancel this request. Try again.';
+      var uitleg = err.message === 'already_complete'
+        ? 'Everyone had already signed. Nothing was withdrawn.'
+        : 'Withdrawing did not go through. The request is unchanged.';
+      rowSay(id, uitleg, 'fail');
+      // Leave a way back: after a failure the row gets its buttons again, so a
+      // sender is never stuck looking at an error with nothing to press.
+      setTimeout(function () { cancelWithdrawAsk(id); }, 4000);
+      if (message) message.textContent = uitleg;
     });
   }
 
@@ -628,6 +963,11 @@
     var list = document.getElementById('dh-documents');
     var dialog = document.getElementById('dh-document-dialog');
     if (!list) return;
+    // Een klik op de rij opent het detail, zoals altijd. Wat er NIET meer mag,
+    // en waarom deze listener een uitzondering draagt: de rij heeft nu een
+    // eigen strip met Withdraw erin, en een misklik daarop zou anders ook nog
+    // een dialoog over het antwoord heen zetten. Dus de knoppen en hun
+    // bevestiging vangen hun eigen klik af; de rest van de rij opent.
     list.addEventListener('click', function (ev) {
       var row = ev.target.closest && ev.target.closest('[data-document-id]');
       if (row && row.classList.contains('dh-document')) openDocumentDialog(row.getAttribute('data-document-id'));

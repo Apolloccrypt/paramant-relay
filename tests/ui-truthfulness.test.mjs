@@ -846,13 +846,13 @@ assert.doesNotMatch(helpBody, /Pay for volume, never for security/,
 // not repeated here.
 assert.match(securityHtml, /Hetzner Nuremberg, Germany/,
   'security.html must keep the server location row /help quotes');
-assert.match(homeGrid, /No US provider in the data path\. Email goes out via Resend, as <a href="\/privacy">\/privacy<\/a> sets out\./,
+assert.match(homeGrid, /No US provider in the data path\. Email goes out via Mailjet \(France\), as <a href="\/privacy">\/privacy<\/a> sets out\./,
   'index.html is the source of the data-path wording and its Resend exception');
 assert.match(helpAnswers, /Your documents live on servers at Hetzner Nuremberg, Germany, and they sit there as ciphertext\./,
   'help/index.html must answer where the documents live, and say they are ciphertext there');
 assert.match(helpAnswers, /no US provider is in the data path/,
   'help/index.html must scope the claim to the data path');
-assert.match(helpAnswers, /Email goes out via Resend, as <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a> sets out\./,
+assert.match(helpAnswers, /Email goes out via Mailjet \(France\), as <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a> sets out\./,
   'help/index.html must name the Resend exception in the same breath, with the /privacy link');
 assert.doesNotMatch(helpAnswers, /no US company/i,
   'help/index.html must not repeat the unqualified no-US-company row from /security');
@@ -951,7 +951,9 @@ const signVisibleText = visible('frontend/sign.html');
 // Resend exception travels with it. A page may shorten the long form on
 // /rules to this one; it may never drop the second half.
 const EU_CLAIM = 'Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path.';
-const EU_EXCEPTION = 'Email goes out via Resend';
+// Geen uitzondering meer, maar wel een feit dat op elke pagina hetzelfde moet
+// luiden: mail verhuisde in september 2026 van Resend (VS) naar Mailjet (FR).
+const EU_EXCEPTION = 'Email goes out via Mailjet';
 const homeVisible = visible('frontend/index.html');
 for (const [name, text] of [['index', homeVisible], ['parasign', parasign], ['parasend', parasend]]) {
   assert.ok(text.includes(EU_CLAIM), `${name}.html lost the data-path wording of the EU claim`);
@@ -1022,7 +1024,7 @@ for (const claim of [
   'Dutch law governs the terms you agree to, and a Dutch court hears the dispute.',
   // Proof 1, in this section\u2019s own words, with the exception in the same breath.
   'No US provider is in the data path.',
-  'The one exception is transactional email, which goes out through Resend, an American company: it receives the address and the invite link, never the document.',
+  'Transactional email goes out through Mailjet in Paris, whose parent is Swedish; the mail itself is stored on EU soil, in Frankfurt and Saint-Ghislain. It receives the address and the invite link, never the document.',
   // The sentence that carries the pride. It claims nothing a reader cannot check.
   'We are Dutch, and we would rather say so than hide behind a Delaware address.',
 ]) {
@@ -1286,8 +1288,8 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // its one exception in the same breath.
   assert.match(securityRaw, /No US provider in the data path/,
     'security.html must state the jurisdiction claim about the data path, not about the whole chain');
-  assert.doesNotMatch(securityRaw, /no US company\b(?![^<]*Resend)/,
-    'security.html must not claim "no US company" without naming the Resend exception beside it');
+  assert.doesNotMatch(securityRaw, /no US company\b(?![^<]*Mailjet)/,
+    'security.html must not claim "no US company" without naming the mail carrier beside it');
   // "In the same breath" is the whole point of the wording, so it is measured
   // as a window and not as "somewhere on the page": an earlier version of this
   // check let a card drop Resend entirely, because the jurisdiction table lower
@@ -1297,8 +1299,8 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
     let at = -1, seen = 0;
     while ((at = html.indexOf('No US provider in the data path', at + 1)) !== -1) {
       seen += 1;
-      assert.match(html.slice(at, at + WINDOW), /Resend/,
-        `${label} states the data-path claim without naming the Resend exception within ${WINDOW} characters of it`);
+      assert.match(html.slice(at, at + WINDOW), /Mailjet/,
+        `${label} states the data-path claim without naming the mail carrier within ${WINDOW} characters of it`);
     }
     assert.ok(seen >= 2,
       `${label} must carry the data-path wording in both the card and the jurisdiction row, found ${seen}`);
@@ -2129,8 +2131,13 @@ console.log('ui-truthfulness: the appearance switch says only what theme.js and 
   // sit before the step-1 guide inside #step-setup.
   const setupAt = parashare.indexOf('id="step-setup"');
   const noteAt = parashare.indexOf('The person you send to has to be online');
-  const guideAt = parashare.indexOf('Step 1 of 5');
-  assert.ok(setupAt > 0 && noteAt > setupAt && noteAt < guideAt,
+  // De bovengrens was "Step 1 of 5", en die tekst is weg: de stepper telde
+  // stappen mee die in de link-stand niet bestaan, en werd weggehaald toen dat
+  // scherm te vol bleek. De eis eronder is niet veranderd -- de zin moet boven
+  // de bestandskiezer staan, want daar leest een afzender voordat hij kiest --
+  // dus die is nu aan de bestandskiezer zelf gehangen.
+  const kiezerAt = parashare.indexOf('id="file-input"');
+  assert.ok(setupAt > 0 && noteAt > setupAt && kiezerAt > noteAt,
     'the sentence must stand inside #step-setup and above the step-1 guide, which is where a sender reads before choosing a file');
 
   // Claim 1: sending really does wait for the other person. createSession goes

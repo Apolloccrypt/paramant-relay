@@ -23,9 +23,15 @@
 'use strict';
 
 const crypto = require('crypto');
+const tiers = require('./lib/tiers');   // who may put how many names on a document
 
 const ID_BYTES = 24;             // 24 random bytes -> 32-char base64url
-const MAX_PARTIES = 20;          // sanity cap; CT-log/Redis can handle more
+// Absolute ceiling for one document, whatever a plan says. Thirty, matching the
+// ceiling on a send to a named group: above thirty people a document is no
+// longer signed by a room but circulated on a list, and a list wants an owner
+// and a different conversation. Was twenty, and nobody loses that: twenty is
+// the floor every plan keeps in lib/tiers.js, paid rows go to thirty.
+const MAX_PARTIES = 30;          // sanity cap; CT-log/Redis can handle more
 const MAX_LABEL_LEN = 80;
 const DEFAULT_TTL_DAYS = 30;
 const MAX_TTL_DAYS = 365;
@@ -356,11 +362,19 @@ class EnvelopeStore {
   // reader, the pruner and the backfill cannot drift apart.
   _partyMember(id, partyIndex) { return id + '#' + partyIndex; }
 
-  async create({ creatorPkHash, creatorApiKeyHash, accountId, docHash, parties, originalFilename, expiresInDays, bindingMode, recipeVersion: recipeVersionArg, requestedAppearance }) {
+  async create({ creatorPkHash, creatorApiKeyHash, accountId, docHash, parties, originalFilename, expiresInDays, bindingMode, recipeVersion: recipeVersionArg, requestedAppearance, plan }) {
     if (!this.available()) throw new Error('redis unavailable');
     if (!/^[0-9a-f]{64}$/.test(docHash)) throw new Error('doc_hash must be 64-char sha3-256 hex');
     if (!Array.isArray(parties) || parties.length === 0) throw new Error('parties required');
-    if (parties.length > MAX_PARTIES) throw new Error('too many parties (max ' + MAX_PARTIES + ')');
+    // Two ceilings, and the lower one wins. The plan says what this account
+    // bought; MAX_PARTIES says what one document can carry no matter what. An
+    // unknown or missing plan lands on community, which keeps the twenty every
+    // account already had.
+    const partyCap = Math.min(MAX_PARTIES, tiers.tierLimitNum(plan, 'max_parties') || MAX_PARTIES);
+    if (parties.length > partyCap) {
+      throw new Error('too many parties (max ' + partyCap + ' on the ' +
+                      tiers.normalisePlan(plan) + ' plan)');
+    }
     const ttlDays = Math.max(1, Math.min(MAX_TTL_DAYS,
       Number.isFinite(expiresInDays) ? expiresInDays : DEFAULT_TTL_DAYS));
     // ONE requested signing position for the whole envelope, the same for every

@@ -364,6 +364,10 @@ async function createEnvelope(deps, apiKey, mode, rec) {
       originalFilename: (d.original_filename || '').toString(),
       expiresInDays: ttlDays,
       bindingMode,
+      // The plan decides how many names may go on one document. Without this an
+      // API caller on a paid plan would silently land on the community ceiling,
+      // which is the floor rather than what they bought.
+      plan: rec && rec.plan,
     });
   } catch (e) {
     return errRes(res, 400, 'create_failed', e.message, J);

@@ -108,6 +108,12 @@ const SCOPE = [
   { method: 'GET', re: /^\/v2\/pubkey\/[^/]+$/ },
   // The upload itself.
   { method: 'POST', path: '/v2/inbound' },
+  // Turning the blocks that just landed into one send with a personal link per
+  // recipient. Same page, same session, the step straight after the upload --
+  // leaving it out meant the sender's browser got 403 session_token_out_of_scope
+  // with the blocks already written, so a send to a group could not be made at
+  // all and the blocks sat in memory until their TTL.
+  { method: 'POST', path: '/v2/sends' },
 ];
 
 // ── The second purpose: the signed-in app pages ──────────────────────────────

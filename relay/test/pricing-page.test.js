@@ -709,14 +709,25 @@ ok('the ParaSend limits on both product pages come from relay/lib/tiers.js (' +
    tiers.tierLimit('community', 'transfers_month') + '/' + tiers.tierLimit('pro', 'transfers_month') + ' transfers, ' +
    tiers.tierLimit('community', 'file_mb') + ' MB)');
 
-// A feature bullet quoted from /pricing has to stay a quote. This one names a
-// subprocessor, so dropping "via Resend" would quietly remove a disclosure the
-// EU claim depends on being made in the same breath.
-for (const line of ['Email notifications via Resend']) {
+// A feature bullet quoted from /pricing has to stay a quote, and the two pages
+// have to carry the same one. This bullet used to name Resend, because while
+// mail went to a US company the EU claim was only honest if the exception was
+// disclosed in the same breath. Mail moved to Mailjet (Paris) in September
+// 2026, so the exception is gone and the bullet says what is now true.
+for (const line of ['Email notifications, carried inside the EU']) {
   assert(html.includes(line), '/pricing lost the feature line: ' + line);
   assert(productHtml.parasend.includes(line), 'parasend.html lost the feature line /pricing carries: ' + line);
 }
 ok('the ParaSend Pro feature bullets quoted from /pricing are still quotes');
+
+// And the claim has to hold across the whole site: no page may still name a US
+// mail carrier as a current sub-processor. The one allowed mention is the
+// historical note in the DPA and on /press, which says the arrangement ENDED.
+for (const [naam, pagina] of [['pricing', html], ['parasend', productHtml.parasend]]) {
+  assert(!/via Resend|through Resend|Resend, a US|Resend Inc\. sends/.test(pagina),
+    naam + ' still presents Resend as the carrier; mail moved to Mailjet in September 2026');
+}
+ok('no page still names a US company as the mail carrier');
 
 // The signature quota lines stay pinned to the words /pricing uses: they are
 // billing copy, not a tiers.js row.
