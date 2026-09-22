@@ -301,6 +301,15 @@ function _parasendEntitlement(tier) {
       // here, so relay.js had to read the legacy `plan` for it while every
       // other ceiling came off this object. Mirrors tiers.js like the rest.
       outbound_per_hour: tiers.tierLimitNum(row, 'outbound_per_hour'),
+      // The capacity ceiling, and the one that was silently absent.
+      //
+      // relay.js reads `_psend.limits.concurrent_blobs` and refuses an upload
+      // when an account is holding more than its plan allows. That field was
+      // never put here, so the value was undefined, Number.isFinite(undefined)
+      // is false, and the whole guard was skipped on every request since it was
+      // written. Blobs live in RAM and only in RAM, so the one thing that
+      // bounds memory per tenant did nothing at all.
+      concurrent_blobs: tiers.tierLimitNum(row, 'concurrent_blobs'),
     }),
     features: Object.freeze({
       transfers: true,
