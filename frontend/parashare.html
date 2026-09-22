@@ -676,12 +676,19 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 
 <!-- STEP 3: Encrypting & uploading -->
 <div class="step" id="step-encrypting">
-  <h2 class="paramant-h1">Encrypting &amp; sending</h2>
-  <p class="sub">File is being encrypted with the receiver's ML-KEM-768 public key. The relay will never see the plaintext or the key.</p>
-  <div class="ps-guide">
-    <span class="ps-guide-kicker">Step 4 of 5 &middot; Encrypt &amp; send</span>
-    <strong>This all happens in your browser.</strong> ML-KEM-768 and ECDH P-256 together wrap a fresh AES-256-GCM key for the receiver, then ciphertext-only flows to the relay. The relay signs the entry it makes in the public log; the file itself carries no signature.
-  </div>
+  <h2 class="paramant-h1">Locking and sending</h2>
+  <!-- The waiting screen is the one place where a sender has nothing to do but
+       read, and it used to spend that attention on ML-KEM-768 and ECDH P-256.
+       Somebody sending a patient file wants one sentence, not a cipher suite.
+       The names are still here, one click down, for the reader who wants them. -->
+  <p class="sub">Your file is being locked on this device. We only ever receive the locked version, never the file itself and never the key.</p>
+  <details class="ps-how">
+    <summary>The names, for who wants them</summary>
+    <p>This all happens in your browser. ML-KEM-768 and ECDH P-256 together wrap a
+       fresh AES-256-GCM key for the receiver, then ciphertext-only flows to the
+       relay. The relay signs the entry it makes in the public log; the file
+       itself carries no signature.</p>
+  </details>
 
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Upload progress</div></div>
