@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const emailTemplates = require('./lib/email-templates');
+const mailer = require('../relay/lib/mail');   // one way out, carrier is a setting
 const pow = require('./lib/pow-captcha');
 const http    = require('http');
 const crypto  = require('crypto');
@@ -195,19 +196,15 @@ setInterval(() => {
   for (const [k, v] of trialEmailTrack) if (now - v.lastAt > 8 * 86_400_000) trialEmailTrack.delete(k);
 }, 3_600_000);
 async function sendTrialEmail(to, firstName, key) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) { console.warn('[trial] RESEND_API_KEY not set'); return false; }
-  const resp = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  // This mail ends with "Hetzner DE, GDPR, no US CLOUD Act". It now leaves the
+  // building through the same door as that promise describes.
+  const resp = await mailer.stuur({
       from: 'PARAMANT <noreply@paramant.app>',
-      to: [to],
+      to,
       subject: 'Your PARAMANT trial API key',
       html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#0c0c0c"><div style="max-width:580px;margin:40px auto;padding:40px;background:#0c0c0c;color:#ededed;font-family:monospace"><h2 style="color:#2d8a5c;margin:0 0 24px;font-size:18px;letter-spacing:.04em">PARAMANT TRIAL KEY</h2>${firstName ? `<p>Hi ${firstName},</p>` : ''}<p>Here's your 30-day trial API key:</p><pre style="background:#181818;border:1px solid #242424;border-radius:6px;padding:16px;font-size:13px;word-break:break-all;margin:16px 0">${key}</pre><h3 style="color:#2d8a5c;font-size:13px;letter-spacing:.06em;text-transform:uppercase;margin:24px 0 12px">Quick start</h3><pre style="background:#181818;border:1px solid #242424;border-radius:6px;padding:16px;font-size:12px;line-height:1.6"># Upload a file (burn-on-read)\ncurl -X POST https://health.paramant.app/v2/upload \\\n  -H "X-API-Key: ${key}" \\\n  -F "file=@document.pdf"\n\n# Returns a one-time URL\n# Recipient visits once — file is destroyed</pre><p style="color:#aaa;font-size:12px;margin-top:20px">Trial limits: 10 uploads/day &middot; 1h TTL &middot; 5 MB max &middot; ML-KEM-768</p><p style="font-size:12px;margin:8px 0"><a href="https://paramant.app/docs" style="color:#2d8a5c">paramant.app/docs</a></p><hr style="border:none;border-top:1px solid #242424;margin:24px 0"><p style="color:#6e6e6e;font-size:11px;margin:0">PARAMANT &middot; privacy@paramant.app &middot; Hetzner DE &middot; GDPR &middot; no US CLOUD Act</p></div></body></html>`,
-    }),
   });
-  if (!resp.ok) { const t = await resp.text().catch(() => ''); console.error('[trial] Resend', resp.status, t); return false; }
+  if (!resp.ok) { console.error('[trial] mail failed:', resp.provider, resp.reason, resp.detail || ''); return false; }
   return true;
 }
 
@@ -746,31 +743,28 @@ async function issueSetupToken(userId, email, extra = {}) {
   return token;
 }
 
-// Send setup email via Resend
+// Setup email, through the one door in relay/lib/mail.js so the carrier is a
+// setting rather than a hostname written here.
 async function sendSetupEmail(email, setupToken, isReset = false) {
   const msg = emailTemplates.setupEmail({ token: setupToken, requestedAt: Date.now(), requestIP: '', isReset: !!isReset, validFor: setupTokenValidFor() });
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error('RESEND_API_KEY not set');
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html, headers: msg.headers }),
+  // This one still throws on failure: somebody is waiting on a setup link and
+  // must not be told it was sent when it was not.
+  const r = await mailer.stuur({
+    to: email, from: msg.from, replyTo: msg.replyTo, subject: msg.subject,
+    text: msg.text, html: msg.html, headers: msg.headers,
   });
-  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => '')}`);
+  if (!r.ok) throw new Error(`mail ${r.provider}: ${r.reason}${r.detail ? ' ' + r.detail : ''}`);
 }
 
 
 // Send signup email-verification link
 async function sendVerificationEmail(email, token, requestIP) {
   const msg = emailTemplates.signupVerificationEmail({ email, token, requestedAt: Date.now(), requestIP });
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error('RESEND_API_KEY not set');
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html, headers: msg.headers }),
+  const r = await mailer.stuur({
+    to: email, from: msg.from, replyTo: msg.replyTo, subject: msg.subject,
+    text: msg.text, html: msg.html, headers: msg.headers,
   });
-  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => '')}`);
+  if (!r.ok) throw new Error(`mail ${r.provider}: ${r.reason}${r.detail ? ' ' + r.detail : ''}`);
 }
 
 // Send "someone tried to sign up with your email" notice to an existing
@@ -778,27 +772,21 @@ async function sendVerificationEmail(email, token, requestIP) {
 // both branches do the same kind of outbound work (no timing oracle).
 async function sendDuplicateSignupAttempt(email, requestIP) {
   const msg = emailTemplates.duplicateSignupAttemptEmail({ email, requestedAt: Date.now(), requestIP });
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error('RESEND_API_KEY not set');
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html, headers: msg.headers }),
+  const r = await mailer.stuur({
+    to: email, from: msg.from, replyTo: msg.replyTo, subject: msg.subject,
+    text: msg.text, html: msg.html, headers: msg.headers,
   });
-  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => '')}`);
+  if (!r.ok) throw new Error(`mail ${r.provider}: ${r.reason}${r.detail ? ' ' + r.detail : ''}`);
 }
 
 // Send TOTP reset confirmation email (step 1 of two-stage flow)
 async function sendResetConfirmEmail(email, confirmToken, maskedIp, requestedAt) {
   const msg = emailTemplates.resetConfirmationEmail({ confirmToken, requestedAt, requestIP: maskedIp });
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error('RESEND_API_KEY not set');
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html, headers: msg.headers }),
+  const r = await mailer.stuur({
+    to: email, from: msg.from, replyTo: msg.replyTo, subject: msg.subject,
+    text: msg.text, html: msg.html, headers: msg.headers,
   });
-  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text().catch(() => '')}`);
+  if (!r.ok) throw new Error(`mail ${r.provider}: ${r.reason}${r.detail ? ' ' + r.detail : ''}`);
 }
 
 // ── User session middleware ────────────────────────────────────────────────────
@@ -3562,12 +3550,11 @@ async function sendBillingConfirmation(email, plan, amount, period) {
   const planName = PLANS.find(p => p.id === plan)?.name || plan;
   const amountStr = amount === 0 ? 'Free' : `€${amount}/${period === 'yearly' ? 'yr' : 'mo'}`;
   const msg = emailTemplates.billingConfirmationEmail({ planName, period, amountStr, noPayment: period === 'admin' });
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html }),
+  const res = await mailer.stuur({
+    to: email, from: msg.from, replyTo: msg.replyTo,
+    subject: msg.subject, text: msg.text, html: msg.html,
   });
-  if (!res.ok) console.error('[billing] Resend error:', res.status, await res.text().catch(() => ''));
+  if (!res.ok) console.error('[billing] mail failed:', res.provider, res.reason, res.detail || '');
 }
 
 async function sendCancellationScheduled(email, plan, cancelAt) {
@@ -3576,12 +3563,11 @@ async function sendCancellationScheduled(email, plan, cancelAt) {
   const planName = PLANS.find(p => p.id === plan)?.name || plan;
   const cancelDate = new Date(cancelAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const msg = emailTemplates.billingCancellationEmail({ planName, cancelDate });
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: msg.from, replyTo: msg.replyTo, to: [email], subject: msg.subject, text: msg.text, html: msg.html }),
+  const res = await mailer.stuur({
+    to: email, from: msg.from, replyTo: msg.replyTo,
+    subject: msg.subject, text: msg.text, html: msg.html,
   });
-  if (!res.ok) console.error('[billing] Resend cancel error:', res.status, await res.text().catch(() => ''));
+  if (!res.ok) console.error('[billing] cancellation mail failed:', res.provider, res.reason, res.detail || '');
 }
 
 api.get("/user/billing/plans", (req, res) => {

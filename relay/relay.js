@@ -40,6 +40,7 @@ const totpLib       = require('./lib/totp');
 const redisDeadlines = require('./lib/redis-deadline'); // one bound for every redis call
 const redisCounter  = require('./lib/redis-counter');   // INCR that always carries an expiry
 const rateLimit     = require('./lib/rate-limit');
+const mailer        = require('./lib/mail');            // one way out, carrier is a setting
 const authThrottle  = require('./lib/auth-throttle');
 const authGate      = require('./lib/auth-gate');
 const sessionTokens = require('./lib/session-token'); // pst_ ParaSend session tokens
@@ -2156,30 +2157,29 @@ function auditAppend(key, event, data = {}) {
 // the ParaSend Pro transfer notifications (upload/download) and by the invoice
 // mail, which is the one caller that passes an attachment; the DPA and
 // inbound-claim flows keep their own richly-templated inline sends.
+// Now a thin front for lib/mail.js, which decides who actually carries the
+// message. The name and the fire-and-forget contract are unchanged, so every
+// caller above stays as it was: returns immediately, never throws, never blocks
+// a request on a mail server.
+//
+// The point of the move: Paramant promises European handling in the footer of
+// this very mail, and the carrier is now a setting (MAIL_PROVIDER) instead of a
+// hostname compiled into this function.
 function sendResendEmail({ to, subject, text, html, from, cc, attachments } = {}) {
-  const RESEND_KEY = process.env.RESEND_API_KEY || '';
-  if (!RESEND_KEY || !to) return false;
-  const payload = {
-    from: from || 'PARAMANT <privacy@paramant.app>',
-    to: Array.isArray(to) ? to : [to],
-    subject: subject || '',
-  };
-  if (cc) payload.cc = Array.isArray(cc) ? cc : [cc];
-  if (html) payload.html = html;
-  if (text) payload.text = text;
-  // Resend takes attachments as { filename, content } with content base64.
-  // Used by the invoice mail; every other caller leaves it undefined and the
-  // request body is byte for byte what it was.
-  if (Array.isArray(attachments) && attachments.length) payload.attachments = attachments;
-  const body = JSON.stringify(payload);
-  try {
-    const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
-      headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-    }, r => { let data = ''; r.on('data', c => data += c); r.on('end', () => { try { const p = JSON.parse(data); log('info', 'resend_email_sent', { id: p.id, subject }); } catch (e) {} }); });
-    req2.on('error', e => log('warn', 'resend_email_failed', { err: e.message }));
-    req2.write(body); req2.end();
-    return true;
-  } catch (e) { log('warn', 'resend_email_failed', { err: e.message }); return false; }
+  if (!to) return false;
+  const cfg = mailer.config();
+  // Nothing configured is not a failure worth waking anyone for; it is how a
+  // relay without mail credentials has always behaved.
+  if (cfg.provider === 'resend' && !cfg.resendKey) return false;
+  mailer.stuur({ to, subject, text, html, cc, attachments,
+                 from: from || 'PARAMANT <privacy@paramant.app>' })
+    .then(r => {
+      if (r.ok) log('info', 'mail_sent', { provider: r.provider, count: r.count, subject });
+      else log('warn', 'mail_failed', { provider: r.provider, reason: r.reason,
+                                        detail: r.detail, subject });
+    })
+    .catch(e => log('warn', 'mail_failed', { reason: 'threw', err: e && e.message }));
+  return true;
 }
 
 // ── ML-DSA handtekening verificatie ──────────────────────────────────────────
@@ -5179,8 +5179,7 @@ async function handleRelayRequest(req, res) {
       fs.promises.appendFile(DPA_FILE, record + '\n').catch(e => log('warn', 'dpa_persist_failed', { err: e.message }));
 
       // Send countersigned DPA email
-      const RESEND_KEY = process.env.RESEND_API_KEY || '';
-      if (RESEND_KEY) {
+      if (mailer.gereed()) {
         const html = `<div style="font-family:monospace;background:#0c0c0c;color:#ededed;padding:40px;max-width:600px">
           <div style="font-size:16px;font-weight:600;margin-bottom:24px;letter-spacing:.08em">PARAMANT</div>
           <p style="color:#888;margin-bottom:16px">Dear ${escHtml(name)},</p>
@@ -5199,18 +5198,18 @@ async function handleRelayRequest(req, res) {
           <p style="color:#888;font-size:13px;margin-bottom:24px">The full agreement text is available at <a href="https://paramant.app/dpa" style="color:#888">paramant.app/dpa</a>. Keep this email and the reference number for your records.</p>
           <p style="color:#555;font-size:12px">Questions: privacy@paramant.app &nbsp;&middot;&nbsp; EU/DE jurisdiction &nbsp;&middot;&nbsp; GDPR Art. 28 compliant</p>
         </div>`;
-        const emailBody = JSON.stringify({
+        // Through the one door, like every other message. A DPA confirmation
+        // that talks about EU jurisdiction should not be carried out of it.
+        mailer.stuur({
           from: 'PARAMANT <privacy@paramant.app>',
-          to: [email],
-          cc: ['privacy@paramant.app'],
+          to: email,
+          cc: 'privacy@paramant.app',
           subject: `DPA signed — ${org} (${ref})`,
           html,
-        });
-        const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
-          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(emailBody) }
-        }, r => { let data = ''; r.on('data', c => data += c); r.on('end', () => { try { const p = JSON.parse(data); log('info', 'dpa_email_sent', { ref, email: maskEmail(email), id: p.id }); } catch(e) {} }); });
-        req2.on('error', e => log('warn', 'dpa_email_failed', { err: e.message }));
-        req2.write(emailBody); req2.end();
+        }).then(r => {
+          if (r.ok) log('info', 'dpa_email_sent', { ref, email: maskEmail(email), provider: r.provider });
+          else log('warn', 'dpa_email_failed', { reason: r.reason, detail: r.detail });
+        }).catch(e => log('warn', 'dpa_email_failed', { err: e && e.message }));
       }
 
       log('info', 'dpa_signed', { ref, org, email: maskEmail(email), version });
@@ -8276,8 +8275,7 @@ async function handleRelayRequest(req, res) {
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.email || !d.key) { res.writeHead(400); return res.end(J({ error: 'email and key required' })); }
-      const RESEND_KEY = process.env.RESEND_API_KEY || '';
-      if (!RESEND_KEY) { res.writeHead(503); return res.end(J({ error: 'RESEND_API_KEY not configured' })); }
+      if (!mailer.gereed()) { res.writeHead(503); return res.end(J({ error: 'mail not configured' })); }
       // H1: never put the raw API key in the email body (it would sit in the
       // mailbox and pass through Resend in plaintext). Mint a one-time claim
       // token and email a link instead. The token travels in the URL fragment
@@ -8298,21 +8296,20 @@ async function handleRelayRequest(req, res) {
         <p style="margin-top:24px;font-size:12px;color:#555"><a href="https://paramant.app/docs" style="color:#888">Docs</a> · <a href="https://paramant.app/ct-log" style="color:#555">CT log</a></p>
         <p style="margin-top:32px;font-size:11px;color:#333">ML-KEM-768 · Burn-on-read · EU/DE · BUSL-1.1</p>
       </div>`;
-      const body = JSON.stringify({ from: 'PARAMANT <privacy@paramant.app>', to: [d.email], subject: 'Claim your PARAMANT API key', html });
-      const resp = await new Promise((resolve, reject) => {
-        const req2 = https.request({ hostname: 'api.resend.com', path: '/emails', method: 'POST',
-          headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-        }, r => { let data = ''; r.on('data', c => data += c); r.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { resolve({raw:data}); } }); });
-        req2.on('error', reject);
-        req2.write(body); req2.end();
+      // Through the one door. This caller waits for the answer, because the
+      // person on the other end is standing in front of a page that has to say
+      // whether their key is on its way.
+      const resp = await mailer.stuur({
+        from: 'PARAMANT <privacy@paramant.app>', to: d.email,
+        subject: 'Claim your PARAMANT API key', html,
       });
-      if (resp.id) {
-        log('info', 'welcome_mail_sent', { email: maskEmail(d.email), id: resp.id, label: d.label });
+      if (resp.ok) {
+        log('info', 'welcome_mail_sent', { email: maskEmail(d.email), provider: resp.provider, label: d.label });
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(J({ ok: true, id: resp.id }));
+        return res.end(J({ ok: true }));
       } else {
-        log('warn', 'welcome_mail_failed', { email: maskEmail(d.email), resp });
-        res.writeHead(502); return res.end(J({ error: 'Resend error', detail: resp }));
+        log('warn', 'welcome_mail_failed', { email: maskEmail(d.email), reason: resp.reason, detail: resp.detail });
+        res.writeHead(502); return res.end(J({ error: 'mail_failed', detail: resp.reason }));
       }
     } catch (e) { if (redisOutage503(e, res)) return; res.writeHead(500); return res.end(J({ error: e.message })); }
   }
