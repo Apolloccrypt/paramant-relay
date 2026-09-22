@@ -29,11 +29,17 @@ function nepFetch(antwoorden) {
 const bericht = { to: 'anna@example.org', subject: 'Your document', html: '<p>Hello <b>Anna</b></p>' };
 
 test('an unknown provider name falls back to dryrun, never to a live carrier', () => {
-  for (const naam of ['', 'postmark', 'sendgrid', 'nonsense']) {
+  for (const naam of ['postmark', 'sendgrid', 'nonsense']) {
     const cfg = mail.config({ MAIL_PROVIDER: naam });
-    assert.equal(cfg.provider, naam === '' ? 'mailjet' : 'dryrun',
-      'an empty setting means the default carrier, a wrong one sends nothing');
+    assert.equal(cfg.provider, 'dryrun', 'a wrong name sends nothing, ever');
   }
+  // An empty setting used to mean "mailjet", which read as a harmless default
+  // and was not: production runs without MAIL_PROVIDER and without Mailjet
+  // credentials, so the first deploy after that change would have dropped
+  // every mail. Empty now means "pick a carrier that can actually send", and
+  // with no credentials at all that is dryrun.
+  assert.equal(mail.config({ MAIL_PROVIDER: '' }).provider, 'dryrun');
+  assert.equal(mail.config({ MAIL_PROVIDER: '', RESEND_API_KEY: 're_x' }).provider, 'resend');
   assert.equal(mail.config({ MAIL_PROVIDER: ' Scaleway ' }).provider, 'scaleway',
     'case and spaces do not decide who carries the mail');
 });
@@ -341,4 +347,32 @@ test('en wel als er helemaal niets aankwam', async () => {
                        MAIL_FALLBACK_PROVIDER: 'resend', RESEND_API_KEY: 'r' } });
   assert.equal(tweedeGebruikt, true, 'nul bezorgd is precies waar de reserve voor is');
   assert.equal(r.ok, true);
+});
+
+// DE STANDAARDDRAGER MOET ER EEN ZIJN DIE KAN VERSTUREN.
+//
+// Toen Mailjet de eerste keus werd, ging de standaard mee naar 'mailjet'.
+// Productie draait zonder MAIL_PROVIDER en zonder Mailjet-sleutels, dus de
+// eerste uitrol daarna zou elke mail hebben laten vallen: geen uitnodiging,
+// geen ophaalcode, en pas zichtbaar als een klant belt. Dat is gevonden bij
+// het lezen van de productie-omgeving, niet door een test, en dat is precies
+// waarom deze er staat.
+test('zonder MAIL_PROVIDER kiest de relay een drager waarvan de sleutels er zijn', () => {
+  const alleenResend = mail.diagnose({ RESEND_API_KEY: 're_test' });
+  assert.equal(alleenResend.provider, 'resend');
+  assert.equal(alleenResend.stil, false,
+    'productie heeft vandaag alleen een Resend-sleutel; die mail moet weg kunnen');
+
+  const beide = mail.diagnose({
+    RESEND_API_KEY: 're_test', MAILJET_API_KEY: 'a', MAILJET_SECRET_KEY: 'b',
+  });
+  assert.equal(beide.provider, 'mailjet',
+    'staan de sleutels van de voorkeursdrager er, dan gaat het vanzelf over');
+
+  const gezet = mail.diagnose({ MAIL_PROVIDER: 'resend', RESEND_API_KEY: 're_test' });
+  assert.equal(gezet.provider, 'resend', 'een expliciete keuze wint altijd');
+
+  const leeg = mail.diagnose({});
+  assert.equal(leeg.provider, 'dryrun');
+  assert.equal(leeg.stil, true, 'geen enkele sleutel: stil, en diagnose zegt waarom');
 });

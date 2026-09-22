@@ -53,9 +53,38 @@
 
 const PROVIDERS = ['mailjet', 'scaleway', 'resend', 'dryrun'];
 
+// WELKE DRAGER, ALS NIEMAND HET ZEGT. Deze standaard stond op 'mailjet' vanaf
+// het moment dat Mailjet de eerste keus werd, en dat is een val: productie
+// draait zonder MAIL_PROVIDER in de omgeving en zonder Mailjet-sleutels, dus
+// de eerste uitrol na die wijziging had elke mail laten vallen. Geen
+// uitnodiging, geen ophaalcode, en pas zichtbaar als een klant belt.
+//
+// Een standaard hoort te kiezen wat er WERKT. De volgorde is de voorkeur
+// (Mailjet boven Scaleway boven Resend), maar alleen onder de dragers waarvan
+// de sleutels er ook echt zijn. Staat MAIL_PROVIDER wel gezet, dan wint die,
+// ook als zijn sleutels ontbreken: dan is de stilte een expliciete keuze en
+// zegt diagnose() waarom.
+const VOORKEUR = ['mailjet', 'scaleway', 'resend'];
+
+function kiesDrager(env, kandidaat) {
+  const gezet = String(env.MAIL_PROVIDER || '').trim().toLowerCase();
+  if (gezet) return gezet;
+  const eerste = VOORKEUR.find((naam) => gereedVoor(naam, kandidaat(naam)));
+  return eerste || 'dryrun';
+}
+
 function config(env) {
   env = env || process.env;
-  const naam = String(env.MAIL_PROVIDER || 'mailjet').trim().toLowerCase();
+  // gereedVoor() leest uit een cfg, en die maken we hier juist. Dus eerst de
+  // sleutels, dan de keuze, dan het geheel.
+  const sleutels = {
+    mailjetKey: env.MAILJET_API_KEY || '',
+    mailjetSecret: env.MAILJET_SECRET_KEY || '',
+    scalewayKey: env.SCALEWAY_SECRET_KEY || '',
+    scalewayProject: env.SCALEWAY_PROJECT_ID || '',
+    resendKey: env.RESEND_API_KEY || '',
+  };
+  const naam = kiesDrager(env, () => sleutels);
   return {
     provider: PROVIDERS.includes(naam) ? naam : 'dryrun',
     gevraagd: naam,
