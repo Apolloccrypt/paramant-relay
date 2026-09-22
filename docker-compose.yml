@@ -63,7 +63,7 @@ x-relay-env: &relay-env
   # substitutes ${VAR} into this file, there is no env_file, and a variable
   # that is not listed never reaches a container.
   MAIL_PROVIDER: "${MAIL_PROVIDER:-mailjet}"
-  MAIL_FROM: "${MAIL_FROM:-PARAMANT <post@paramant.app>}"
+  MAIL_FROM: "${MAIL_FROM:-PARAMANT <noreply@paramant.app>}"
   MAILJET_API_KEY: "${MAILJET_API_KEY:-}"
   MAILJET_SECRET_KEY: "${MAILJET_SECRET_KEY:-}"
   SCALEWAY_SECRET_KEY: "${SCALEWAY_SECRET_KEY:-}"
@@ -357,7 +357,7 @@ services:
       # the same lib/mail.js. Listing only RESEND_API_KEY here meant the admin
       # kept mailing through the US carrier after the relay had moved off it.
       MAIL_PROVIDER: "${MAIL_PROVIDER:-mailjet}"
-      MAIL_FROM: "${MAIL_FROM:-PARAMANT <post@paramant.app>}"
+      MAIL_FROM: "${MAIL_FROM:-PARAMANT <noreply@paramant.app>}"
       MAILJET_API_KEY: "${MAILJET_API_KEY:-}"
       MAILJET_SECRET_KEY: "${MAILJET_SECRET_KEY:-}"
       SCALEWAY_SECRET_KEY: "${SCALEWAY_SECRET_KEY:-}"
