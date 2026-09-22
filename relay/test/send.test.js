@@ -44,7 +44,14 @@ async function haalOp(sends, token) {
 
 function maakStore(extra) {
   const store = nepStore();
-  return { store, sends: createSendStore(Object.assign({ store }, extra || {})) };
+  const opties = Object.assign({}, extra || {});
+  // Een verzetbare klok, voor de tests die moeten kijken wat er gebeurt NADAT
+  // een ophaling niet meer kan lopen. De bescherming die het bestand vasthoudt
+  // zolang er bytes onderweg kunnen zijn, is per definitie tijdgebonden.
+  let nu = 1_000_000;
+  const klok = { vooruit: (ms) => { nu += ms; }, nu: () => nu };
+  if (opties.metKlok) { delete opties.metKlok; opties.now = klok.nu; }
+  return { store, klok, sends: createSendStore(Object.assign({ store }, opties)) };
 }
 
 test('one file for thirty people, not thirty files', async () => {
@@ -87,7 +94,7 @@ test('one person collecting leaves the file for the others', async () => {
 });
 
 test('the file goes when the last person is settled', async () => {
-  const { store, sends } = maakStore();
+  const { store, sends, klok } = maakStore({ metKlok: true });
   const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE) });
 
   await haalOp(sends, r.tokens['anna@example.org']);
@@ -96,11 +103,48 @@ test('the file goes when the last person is settled', async () => {
 
   const laatste = await haalOp(sends, r.tokens['carla@example.org']);
   assert.equal(laatste.settled, true);
-  assert.equal(store.blobs.size, 0, 'nobody is waiting, so the file is gone');
+
+  // NOT gone yet, and that is the fix. The file used to be dropped the moment
+  // the last recipient was marked collected, which is before a single byte has
+  // left. Measured on 3 MB with the connection cut after the first chunk: the
+  // recipient got fragments, the retry said already_collected, the file was
+  // gone, and the sender's dashboard reported a delivery that never happened.
+  assert.equal(store.blobs.size, 1,
+    'the file has to survive until the bytes are actually out the door');
+
+  // De route roept dit aan op de 'finish' van het antwoord zelf. Hier eerst de
+  // klok vooruit: zolang een claim vers is houdt drained() het bestand met
+  // opzet vast, want dan kunnen er nog bytes over de lijn gaan.
+  assert.equal((await sends.drained(r.id)).kept, true,
+    'vers geclaimd, dus nog even vasthouden');
+  klok.vooruit(120000);
+  const weg = await sends.drained(r.id);
+  assert.equal(weg.dropped, true);
+  assert.equal(store.blobs.size, 0, 'and then it goes');
 
   // The record survives: the sender must still be able to see who collected.
   const view = await sends.overview(r.id);
   assert.equal(view.collected, 3);
+});
+
+test('a connection that dies hands the collection back', async () => {
+  // Without this a dropped mobile connection costs somebody their only
+  // collection, and the sender is shown a delivery that never happened.
+  const { store, sends } = maakStore();
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE) });
+  const token = r.tokens['anna@example.org'];
+
+  const uit = await haalOp(sends, token);
+  assert.equal(uit.ok, true);
+  assert.equal((await sends.overview(r.id)).collected, 1);
+
+  await sends.releaseClaim(token);
+  assert.equal((await sends.overview(r.id)).collected, 0,
+    'de ophaling telde niet, want de bytes kwamen nooit aan');
+  assert.equal(store.blobs.size, 1, 'en het bestand staat er nog');
+
+  // En ze kan het gewoon opnieuw proberen.
+  assert.equal((await haalOp(sends, token)).ok, true);
 });
 
 test('withdrawing one person does not touch the rest', async () => {
@@ -119,11 +163,33 @@ test('withdrawing the last outstanding person drops the file', async () => {
   const { store, sends } = maakStore();
   const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE) });
 
-  await haalOp(sends, r.tokens['anna@example.org']);
-  await haalOp(sends, r.tokens['bob@example.org']);
-  const uit = await sends.revoke(r.id, 'carla@example.org');
+  // Klok ver genoeg vooruit dat de twee ophalingen hierboven niet meer als
+  // "in de lucht" tellen: anders houdt de nieuwe bescherming de blob vast,
+  // en dat is precies de bedoeling (zie de test hieronder).
+  const { store: st2, sends: s2, klok } = maakStore({ metKlok: true });
+  const r2 = await s2.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE) });
+  await haalOp(s2, r2.tokens['anna@example.org']);
+  await haalOp(s2, r2.tokens['bob@example.org']);
+  klok.vooruit(120000);
+  const uit = await s2.revoke(r2.id, 'carla@example.org');
   assert.equal(uit.settled, true);
-  assert.equal(store.blobs.size, 0, 'nobody can still collect, so nothing is kept');
+  assert.equal(st2.blobs.size, 0, 'nobody can still collect, so nothing is kept');
+});
+
+test('maar intrekken vernietigt niets onder een ophaling die nog loopt', async () => {
+  // De spiegel van de ophaalkant. Trek je de laatste wachtende in terwijl
+  // iemands bytes nog over de lijn gaan, dan werd het bestand daar weggegooid:
+  // die ophaler kreeg 'expired' met uren op de klok, en de afzender zag hem
+  // wachten op een bestand dat niet meer bestond.
+  const { store, sends } = maakStore();
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE) });
+
+  await haalOp(sends, r.tokens['anna@example.org']);
+  await haalOp(sends, r.tokens['bob@example.org']);   // net geclaimd, nog onderweg
+  const uit = await sends.revoke(r.id, 'carla@example.org');
+  assert.equal(uit.settled, true, 'iedereen is afgehandeld');
+  assert.equal(store.blobs.size, 1,
+    'maar het bestand blijft staan zolang er nog bytes kunnen lopen');
 });
 
 test('a reminder does not replace the link, and has a ceiling', async () => {

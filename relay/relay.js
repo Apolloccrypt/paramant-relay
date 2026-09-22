@@ -305,6 +305,20 @@ function sectorOfKey(kd) {
        : 'health';
 }
 
+// encodeURIComponent that cannot throw.
+//
+// It raises URIError on a lone surrogate, and every call site here is a
+// response header built after work that cannot be undone. Replacing the
+// unpaired half keeps the name readable and the response alive.
+function veiligCodeer(waarde) {
+  try { return encodeURIComponent(String(waarde == null ? '' : waarde)); }
+  catch (e) {
+    try {
+      return encodeURIComponent(String(waarde).replace(/[\uD800-\uDFFF]/g, ''));
+    } catch (e2) { return 'file'; }
+  }
+}
+
 // HTML-escape user-supplied strings before embedding in email templates.
 function escHtml(str) {
   return String(str || '')
@@ -1756,6 +1770,26 @@ function apiKeyFromHash(hash) {
 // keys built from acctOf(apiKey) are byte-identical to the old apiKey-scoped
 // ones — behaviour-neutral now, account-shared once a second key is added.
 function acctOf(apiKey) { const v = apiKeys.get(apiKey); return (v && v.account_id) || apiKey; }
+
+// WHO THE DASHBOARD MEANS when it says user_id, translated to who the send
+// store filed the send under. These are not the same string, and that cost the
+// whole feature.
+//
+// admin/server.js puts `user_id: user.key` in the session -- the API key. The
+// send is filed under acctOf(apiKey), which is `account_id` when the record has
+// one. Every account created through the admin has one. So a real customer's
+// dashboard asked for sends belonging to `pgp_...` while every send they had
+// ever made was filed under `acct_...`: an empty list, nothing to open, nothing
+// to withdraw. Measured, and it is exactly the tracking the product is sold on.
+//
+// Translating here rather than in the admin keeps it working from both sides:
+// an old account without account_id still resolves to itself, and a caller that
+// already sends the account id is untouched.
+function accountVan(userId) {
+  const v = String(userId || '');
+  if (!v) return v;
+  return apiKeys.has(v) ? acctOf(v) : v;
+}
 // How an account is named to somebody it sent a signing request to. The address
 // on the account, because that is exactly what the invitation mail already put
 // in front of this reader: admin/server.js sends signingInviteEmail with
@@ -3299,8 +3333,14 @@ async function pushWebhooks(apiKey, deviceId, event, data) {
   const hooks = webhooks.get(`${deviceId}:${acctOf(apiKey)}`) || [];
   for (const hook of hooks) {
     const payload = J({ event, device_id: deviceId, ts: new Date().toISOString(), ...data });
-    const sig = hook.secret ? crypto.createHmac('sha256', hook.secret).update(payload).digest('hex') : '';
     try {
+      // Inside the try, and that is the second lock. The registration above
+      // coerces, but a record written by an older build, or any future path
+      // into this map, must not be able to take the process down. A webhook
+      // that cannot be signed is a webhook that is not sent; it is not a
+      // reason to zero every customer's file.
+      const sig = hook.secret
+        ? crypto.createHmac('sha256', String(hook.secret)).update(payload).digest('hex') : '';
       await safeHttpsRequest(hook.url, {
         method:  'POST',
         timeout: 5000,
@@ -4550,7 +4590,23 @@ async function handleRelayRequest(req, res) {
     const kd = apiKeys.get(apiKey);
     if (!kd || !kd.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
     try {
-      const input = JSON.parse((await readBody(req, 65536)).toString());
+      // Eigen try: een kapotte body is de fout van de beller, geen interne
+      // storing. Zes vormen gaven 500 send_failed -- geen JSON, leeg, null, te
+      // groot -- terwijl dezelfde file elders netjes 400 "Invalid JSON body"
+      // geeft. Een 500 stuurt iemand de verkeerde kant op en telt mee in elke
+      // storingsmeting.
+      let input;
+      try {
+        input = JSON.parse((await readBody(req, 65536)).toString());
+      } catch (e) {
+        const teGroot = /too large/i.test(String((e && e.message) || ''));
+        res.writeHead(teGroot ? 413 : 400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: teGroot ? 'body_too_large' : 'invalid_json',
+                           limit_bytes: teGroot ? 65536 : undefined }));
+      }
+      if (!input || typeof input !== 'object' || Array.isArray(input)) {
+        res.writeHead(400); return res.end(J({ error: 'invalid_json' }));
+      }
       const hashes = Array.isArray(input.hashes) ? input.hashes : [];
       if (!hashes.length || hashes.length > 512) {
         res.writeHead(400); return res.end(J({ error: 'hashes_required' }));
@@ -4657,7 +4713,26 @@ async function handleRelayRequest(req, res) {
       // Escaped: this name is chosen by the sender and lands in the HTML of up
       // to thirty mails from paramant.app to people who are not our customers.
       // An unescaped one could carry a link or a tracking pixel of its own.
-      const naamRuw = (input.filename && String(input.filename).slice(0, 120)) || 'a file';
+      // ONE LINE, and printable.
+      //
+      // The HTML half goes through escHtml, so markup was already dead. The
+      // TEXT half took the name raw, newlines included, and that is 120
+      // characters of free writing inside a mail from paramant.app to somebody
+      // who is not our customer. Measured: a filename carrying
+      // "PARAMANT SUPPORT: your account expires. Confirm here: <link>" arrived
+      // exactly like that, above our own link, thirty times over.
+      //
+      // Lone surrogates go too. encodeURIComponent throws URIError on one, and
+      // that throw happens in writeHead on the pickup route -- after the token
+      // is claimed. The recipient got a 500 and then already_collected on every
+      // retry: a file destroyed by its own name.
+      const naamRuw = (String((input.filename == null ? '' : input.filename))
+        .replace(/[\r\n\t]+/g, ' ')
+        .replace(/[\u0000-\u001f\u007f]/g, '')
+        .replace(/[\uD800-\uDFFF]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 120)) || 'a file';
       const naam = escHtml(naamRuw);
       // The human above the mail. Thirty people who are not our customers get
       // this, and a message with no sender in it reads as phishing no matter
@@ -4725,7 +4800,7 @@ async function handleRelayRequest(req, res) {
     if (!_internalOk()) return _internalReject();
     try {
       const input = JSON.parse((await readBody(req, 4096)).toString());
-      const userId = (input.user_id || '').toString();
+      const userId = accountVan(input.user_id);
       if (!userId || userId.length > 200) { res.writeHead(400); return res.end(J({ error: 'invalid_user_id' })); }
       const out = await _sendStore().list(userId, input.limit);
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
@@ -4742,7 +4817,7 @@ async function handleRelayRequest(req, res) {
     if (!_internalOk()) return _internalReject();
     try {
       const input = JSON.parse((await readBody(req, 4096)).toString());
-      const userId = (input.user_id || '').toString();
+      const userId = accountVan(input.user_id);
       const sendId = (input.send_id || '').toString();
       // Ownership first, and the same answer for "not yours" as for "never
       // existed": a sender must not be able to probe another account's ids.
@@ -4765,7 +4840,7 @@ async function handleRelayRequest(req, res) {
     if (!_internalOk()) return _internalReject();
     try {
       const input = JSON.parse((await readBody(req, 4096)).toString());
-      const userId = (input.user_id || '').toString();
+      const userId = accountVan(input.user_id);
       const sendId = (input.send_id || '').toString();
       if (!await _sendStore().ownedBy(sendId, userId)) {
         res.writeHead(404); return res.end(J({ error: 'unknown_send' }));
@@ -4796,13 +4871,29 @@ async function handleRelayRequest(req, res) {
     if (!_internalOk()) return _internalReject();
     try {
       const input = JSON.parse((await readBody(req, 4096)).toString());
-      const userId = (input.user_id || '').toString();
+      const userId = accountVan(input.user_id);
       const sendId = (input.send_id || '').toString();
       if (!await _sendStore().ownedBy(sendId, userId)) {
         res.writeHead(404); return res.end(J({ error: 'unknown_send' }));
       }
+      // Through the SAME hourly brake as an invitation. It was not, and that
+      // left ninety mails per send of thirty going out around the ceiling:
+      // three reminders per recipient, each a real mail to somebody who is not
+      // our customer. The brake exists to bound exactly that.
+      //
+      // The seat is taken before the send store is touched, and handed back
+      // below if the reminder turns out not to be allowed.
+      const _remH = inviteRateOk(accountVan(userId), apiKeys.get(userId) || null, 1);
+      if (!_remH.ok) {
+        log('warn', 'reminder_rate_limited', { limit: _remH.limit, used: _remH.used });
+        res.writeHead(429, { 'Content-Type': 'application/json',
+                             'Retry-After': String(_remH.retry_after_s) });
+        return res.end(J({ error: 'too_many_invitations', dimension: 'outbound_per_hour',
+                           limit: _remH.limit, retry_after_s: _remH.retry_after_s }));
+      }
       const out = await _sendStore().reinvite(sendId, (input.email || '').toString());
       if (!out.ok) {
+        inviteRateGeef(accountVan(userId), 1);
         res.writeHead(out.reason === 'reminder_limit' ? 429 : 409);
         return res.end(J({ error: out.reason, limit: out.limit }));
       }
@@ -7163,16 +7254,45 @@ async function handleRelayRequest(req, res) {
         'Cache-Control': 'no-store',
         // What the receiver's client needs to show who it was for and how much
         // of the group is still outstanding. Never an address of somebody else.
-        'X-Paramant-Recipient': encodeURIComponent(got.email || ''),
+        'X-Paramant-Recipient': veiligCodeer(got.email || ''),
         'X-Paramant-Outstanding': String(got.remaining),
         // The name the sender gave the file, so a browser saves something a
         // person recognises instead of a string of random characters.
-        'X-Paramant-Filename': encodeURIComponent(got.filename || 'file'),
+        // veiligCodeer, never encodeURIComponent directly: a lone surrogate
+        // makes it throw, and a throw here lands after the claim. Older sends,
+        // filed before the name was cleaned on the way in, still pass through
+        // this route.
+        'X-Paramant-Filename': veiligCodeer(got.filename || 'file'),
         // The file key, locked under this recipient's token. The page unwraps
         // it with the token from its own URL; we never had the means to.
         'X-Paramant-Key': got.wrapped_key || '',
         'Access-Control-Expose-Headers':
           'X-Paramant-Filename, X-Paramant-Outstanding, X-Paramant-Key',
+      });
+
+      // THE CLAIM IS ONLY REAL WHEN THE BYTES ARRIVED.
+      //
+      // 'finish' fires when the last byte has been handed to the socket;
+      // 'close' without it means the connection died first. On a phone that is
+      // an ordinary Tuesday, and it used to cost the recipient their one
+      // collection: fragments received, the retry answered already_collected,
+      // the file dropped, and the sender's dashboard reporting a delivery that
+      // never happened.
+      //
+      // So the file is drained here, after the fact, and a dead connection
+      // hands the turn back instead.
+      let _afgerond = false;
+      res.on('finish', () => {
+        _afgerond = true;
+        if (!got.settled) return;
+        _sendStore().drained(got.send_id)
+          .catch((e) => log('warn', 'send_drain_failed', { err: e && e.message }));
+      });
+      res.on('close', () => {
+        if (_afgerond) return;
+        log('warn', 'pickup_aborted', { bytes: got.blob.length });
+        _sendStore().releaseClaim(pickm[1])
+          .catch((e) => log('warn', 'pickup_release_failed', { err: e && e.message }));
       });
       return res.end(got.blob);
     } catch (e) {
@@ -7361,7 +7481,15 @@ async function handleRelayRequest(req, res) {
       if (!isSsrfSafeUrl(d.url)) { res.writeHead(400); return res.end(J({ error: 'url must be a valid public HTTPS URL (private/loopback addresses not allowed)' })); }
       const k = `${d.device_id}:${acctOf(apiKey)}`;
       if (!webhooks.has(k)) webhooks.set(k, []);
-      webhooks.get(k).push({ url: d.url, secret: d.secret || '' });
+      // String(), want `|| ''` vangt alleen falsy. Een number, object of array
+      // overleefde en kwam later in crypto.createHmac terecht, dat op een
+      // niet-string gooit. Die throw stond een regel BUITEN de try in
+      // pushWebhooks, in een async functie zonder await: een onafhankelijke
+      // rejected promise, en dit proces beantwoordt een onafgehandelde
+      // rejection met emergencyZeroAndExit -- alle blobs van ALLE klanten op
+      // nul en afsluiten. Een enkel JSON-veld van een betalende klant legde de
+      // relay om voor iedereen, telkens opnieuw, want de registratie bleef staan.
+      webhooks.get(k).push({ url: d.url, secret: String(d.secret == null ? '' : d.secret) });
       log('info', 'webhook_registered', { device: d.device_id });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true }));

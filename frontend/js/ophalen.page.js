@@ -188,8 +188,17 @@
       stop(reden || 'pickup_failed');
     }).catch(function (err) {
       if (knop) knop.disabled = false;
-      var naam = err && err.message;
-      if (naam === 'no_key' || naam === 'bad_payload' || (err && err.name === 'OperationError')) {
+      // ELKE fout uit het uitpakken telt, niet drie met naam.
+      //
+      // send-wrap.js gooit ook 'wrapped key too short' en 'unexpected key
+      // material', en die stonden er niet bij. De ontvanger las dan "Could not
+      // reach Paramant. Try again" terwijl zijn eenmalige link net was
+      // verbrand: een zin die hem terugstuurt naar een deur die al dicht is.
+      var naam = (err && err.message) || '';
+      var uitpakfout = naam === 'no_key' || naam === 'bad_payload'
+        || /wrapped key|key material|base64|atob/i.test(naam)
+        || (err && (err.name === 'OperationError' || err.name === 'InvalidCharacterError'));
+      if (uitpakfout) {
         // The code was right and the bytes arrived, but this link cannot open
         // them. Telling somebody to try again would send them round forever.
         say('code-say', 'The file came through but this link cannot open it. '

@@ -31,8 +31,24 @@ function sha256hex(b) { return crypto.createHash('sha256').update(b).digest('hex
 
 // Boot een relay met dryrun-post en de interne poort open.
 // `post` vult zich met elke mail_dryrun-regel, in volgorde.
-async function bootSendRelay(extra = {}) {
+//
+// opties.traagMs > 0 zet er een opzettelijk trage nep-redis onder
+// (_traag-redis.js). Dat is geen luxe: zonder redis valt de verzendopslag terug
+// op een Map in het geheugen (lib/parasign-store.js:91) en lost elke get/put
+// SYNCHROON op. Er is dan geen opschortpunt tussen lezen en schrijven, dus de
+// race die opVolgorde moet dichthouden kan in die opstelling niet eens
+// optreden. Met de stub kost elke get en put echte milliseconden en staat het
+// venster wijd open -- zo meet de test iets.
+async function bootSendRelay(extra = {}, opties = {}) {
   const post = [];
+  let stub = null;
+  if (opties.traagMs) {
+    const { startTraagRedis } = require('./_traag-redis');
+    stub = await startTraagRedis({ vertragingMs: opties.traagMs });
+    extra = { REDIS_URL: stub.url,
+              PARASIGN_STORE_KEY: crypto.randomBytes(32).toString('base64'),
+              ...extra };
+  }
   const usersFile = path.join(os.tmpdir(),
     `send-race-users-${process.pid}-${crypto.randomBytes(4).toString('hex')}.json`);
   fs.writeFileSync(usersFile, '{}');
@@ -58,19 +74,31 @@ async function bootSendRelay(extra = {}) {
   });
   relay.post = post;
   relay.usersFile = usersFile;
+  relay.stub = stub;
+  relay.backend = stub ? 'redis' : 'memory';
   return relay;
 }
 
-async function uploadBlok(base, bytes) {
+// De uploadroute heeft toelatingsbeheer: boven een aantal gelijktijdige
+// uploads antwoordt hij 503 met inbound_rejected_ram. Dat is opzet en geen
+// fout, maar het staat een massatest in de weg, dus hier wordt er kort op
+// gewacht. Alleen op 503; elke andere status is wel een bevinding.
+async function uploadBlok(base, bytes, pogingen = 25) {
   const hash = sha256hex(bytes);
-  const r = await fetch(base + '/v2/inbound', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
-    body: JSON.stringify({ hash, payload: bytes.toString('base64'),
-                           meta: { device_id: 'transfer-web-link' } }),
-  });
-  if (r.status !== 200) throw new Error('blokupload faalde: ' + r.status);
-  return hash;
+  for (let i = 0; ; i++) {
+    const r = await fetch(base + '/v2/inbound', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
+      body: JSON.stringify({ hash, payload: bytes.toString('base64'),
+                             meta: { device_id: 'transfer-web-link' } }),
+    });
+    await r.text();
+    if (r.status === 200) return hash;
+    if (r.status !== 503 || i >= pogingen) {
+      throw new Error('blokupload faalde: ' + r.status + ' na ' + (i + 1) + ' pogingen');
+    }
+    await new Promise((res) => setTimeout(res, 40 + i * 20));
+  }
 }
 
 // Maak een verzending. Geeft { id, tokens, adressen, inhoud } terug.

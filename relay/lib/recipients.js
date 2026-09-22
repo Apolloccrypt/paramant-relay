@@ -200,7 +200,13 @@ const MAX_TOKEN_LEN = 128;
 // a bad one is a refusal the sender reads rather than a dead link a recipient
 // discovers.
 const TOKEN_SHAPE = /^[A-Za-z0-9_-]{32,128}$/;
-const WRAP_SHAPE  = /^[A-Za-z0-9_-]{16,4096}$/;
+// 60 tekens, niet 16. Een wikkeling is 12 bytes IV plus 44 bytes sleutel plus
+// een 16-byte tag = 72 bytes, en base64url daarvan is 96 tekens. Zestien tekens
+// is twaalf bytes: die haalt de ondergrens van unwrap niet eens, dus de
+// ontvanger liep de hele reis, verbrandde zijn eenmalige link, en kreeg pas
+// daarna te horen dat het niet ging. Weigeren hoort bij het aanmaken, waar de
+// AFZENDER het nog kan oplossen.
+const WRAP_SHAPE  = /^[A-Za-z0-9_-]{60,4096}$/;
 
 // Find the recipient a pickup token belongs to. Walks the whole table so a
 // caller cannot learn which addresses exist by timing the miss. Rows that are

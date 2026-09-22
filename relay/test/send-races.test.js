@@ -22,6 +22,8 @@ const { test, before, after } = require('node:test');
 const fs = require('fs');
 const { killSpawnedRelays } = require('./_boot-relay');
 const H = require('./_send-race');
+// De plafonds uit de bron lezen, niet overtikken.
+const { MAX_CODE_REQUESTS } = require('../lib/send');
 
 let R = null;
 const B = () => R.base;
@@ -141,7 +143,6 @@ test('herinneren en ophalen tegelijk: de herinnering mag de ophaling niet omduwe
     // nieuw terugschrijft is picked_up_at weg en werkt de link opnieuw.
     const nog = await H.pickup(B(), token, { action: 'code' });
     const nj = await nog.json().catch(() => ({}));
-    await nog.text?.call?.(null);
     assert.equal(nog.status, 410,
       `ronde ${i}: de link leefde weer op na een gelijktijdige herinnering ` +
       `(${nog.status} ${JSON.stringify(nj)})`);
@@ -226,7 +227,7 @@ test('200 gelijktijdige verzendingen op een account: geen enkele raakt zoek', as
   const na = await (await H.intern(B(), '/v2/user/sends', { limit: 200 })).json();
   const nu = new Set((na.sends || []).map(s => s.id));
 
-  // ACCOUNT_INDEX_MAX is 200 (lib/send.js:145). Er stonden er al wat, dus de
+  // ACCOUNT_INDEX_MAX is 200 (lib/send.js:166). Er stonden er al wat, dus de
   // oudste vallen er terecht af. Wat NIET mag: een van de laatste 200 mist.
   const verwacht = gemaakt.map(g => g.id).slice(-Math.min(200 - 0, N));
   const kwijt = verwacht.filter(id => !nu.has(id));
@@ -235,3 +236,129 @@ test('200 gelijktijdige verzendingen op een account: geen enkele raakt zoek', as
     `accountindex (lees-wijzig-schrijf); eerste vijf: ${kwijt.slice(0, 5).join(', ')} ` +
     `(index telde ${nu.size}, stond op ${hadden})`);
 }, { timeout: 180000 });
+
+// ── 7b. Dertig ontvangers die ALLEMAAL tegelijk ophalen ────────────────────
+// De scherpste toets op verloren schrijfacties: elke ophaling is een lees-
+// wijzig-schrijf op DEZELFDE sleutel (de verzending). Valt er een weg, dan
+// staat iemand die bytes kreeg in het overzicht nog op "waiting" -- en
+// allSettled wordt nooit waar, dus het bestand blijft zijn hele venster staan.
+test('dertig gelijktijdige ophalingen op een verzending: alle dertig geteld', async () => {
+  const adressen = Array.from({ length: 30 }, (_, i) => `g${i}@extern.test`);
+  const v = await H.maakVerzending(B(), adressen, { bytes: 1024 });
+
+  // Eerst alle codes, netjes een voor een: het gaat om de ophaling.
+  const codes = {};
+  for (const a of adressen) codes[a] = await H.haalCode(R, v.tokens[a], a);
+
+  const antwoorden = await Promise.all(adressen.map(
+    (a) => H.pickup(B(), v.tokens[a], { code: codes[a] })));
+  let metBytes = 0, nul = 0;
+  for (const r of antwoorden) {
+    if (r.status === 200) {
+      if ((await r.arrayBuffer()).byteLength > 0) metBytes++;
+      if (r.headers.get('X-Paramant-Outstanding') === '0') nul++;
+    } else { await r.text(); }
+  }
+  assert.equal(metBytes, 30, 'maar ' + metBytes + ' van de 30 kregen bytes');
+  assert.equal(nul, 1,
+    'precies een ophaling hoort de laatste te zijn (outstanding 0), er waren er ' + nul);
+
+  const dj = await (await H.intern(B(), '/v2/user/sends/detail', { send_id: v.id })).json();
+  assert.equal(dj.collected, 30,
+    'het overzicht telt ' + dj.collected + ' van de 30 ophalingen: verloren schrijfacties');
+  assert.equal(dj.outstanding, 0, 'er staat nog ' + dj.outstanding + ' open');
+  nogLevend('na dertig gelijktijdige ophalingen');
+});
+
+// ── 7c. De teller onder gelijktijdige codeverzoeken ────────────────────────
+// MAX_CODE_REQUESTS staat in lib/send.js en de teller is lees-wijzig-schrijf.
+// Meer verzoeken tegelijk dan het plafond: valt het slot, dan glippen er meer
+// door en is de rem op reset-en-probeer-opnieuw een advies.
+test('gelijktijdige codeverzoeken: er komen er precies MAX_CODE_REQUESTS door', async () => {
+  const adres = 'teller@extern.test';
+  const v = await H.maakVerzending(B(), [adres], { bytes: 128 });
+  const token = v.tokens[adres];
+
+  const N = MAX_CODE_REQUESTS + 5;
+  const rs = await Promise.all(Array.from({ length: N },
+    () => H.pickup(B(), token, { action: 'code' })));
+  const statussen = [];
+  for (const r of rs) { statussen.push(r.status); await r.text(); }
+  const ok = statussen.filter(s => s === 200).length;
+  const dicht = statussen.filter(s => s === 429).length;
+  assert.equal(ok, MAX_CODE_REQUESTS,
+    'er kwamen ' + ok + ' codeverzoeken door in plaats van ' + MAX_CODE_REQUESTS + ' (' +
+    JSON.stringify(statussen) + '): de teller verloor schrijfacties');
+  assert.equal(dicht, N - MAX_CODE_REQUESTS,
+    'de rest hoort 429 te krijgen, kreeg ' + JSON.stringify(statussen));
+  nogLevend('na gelijktijdige codeverzoeken');
+});
+
+// ── 5b. Zelfde botsing, andere volgorde ────────────────────────────────────
+test('codeverzoek eerst, ophaling erachteraan: de geldige code is dan dood', async () => {
+  let verloren = 0;
+  const details = [];
+  for (let i = 0; i < 20; i++) {
+    const adres = `d${i}@extern.test`;
+    const v = await H.maakVerzending(B(), [adres], { bytes: 128 });
+    const token = v.tokens[adres];
+    const code = await H.haalCode(R, token, adres);
+
+    // Omgekeerde volgorde: het codeverzoek gaat als eerste de deur uit.
+    const [nieuw, op] = await Promise.all([
+      H.pickup(B(), token, { action: 'code' }),
+      H.pickup(B(), token, { code }),
+    ]);
+    await nieuw.text();
+    if (op.status === 200) { await op.arrayBuffer(); }
+    else {
+      const j = await op.json().catch(() => ({}));
+      verloren++;
+      details.push(`${op.status} ${j.error} tries_left=${j.tries_left}`);
+    }
+  }
+  console.log(`      [bevinding] ${verloren}/20 ophalingen met een GELDIGE code ` +
+              `werden geweigerd doordat een gelijktijdig codeverzoek de code verving` +
+              (details.length ? `; eerste: ${details[0]}` : ''));
+  assert.ok(verloren >= 0);
+  nogLevend('na omgekeerde code-botsing');
+});
+
+// ── 5c. Wat het de ontvanger kost, en of hij eruit komt ────────────────────
+test('na een verdrongen code kan de ontvanger er nog uit, maar het kost hem pogingen', async () => {
+  const adres = 'kwijt@extern.test';
+  const v = await H.maakVerzending(B(), [adres], { bytes: 256 });
+  const token = v.tokens[adres];
+
+  // Eerste code, en dan de botsing: hij typt hem in terwijl een tweede tabblad
+  // (of hijzelf, ongeduldig) een nieuwe code aanvraagt.
+  const eerste = await H.haalCode(R, token, adres);
+  const voor = R.post.length;
+  const [nieuw, op] = await Promise.all([
+    H.pickup(B(), token, { action: 'code' }),
+    H.pickup(B(), token, { code: eerste }),
+  ]);
+  await nieuw.text();
+  const oj = await op.json().catch(() => ({}));
+  assert.equal(op.status, 401, 'de botsing trad niet op; deze test meet dan niets');
+  assert.equal(oj.error, 'wrong_code');
+
+  // De tweede codemail ligt in zijn bus. Daarmee moet hij er alsnog uit komen.
+  let tweede = null;
+  for (let i = 0; i < 60 && !tweede; i++) {
+    const mail = R.post.slice(voor).reverse().find(
+      (p) => /code to open the file/i.test(p.subject || '') && (p.to || []).includes(adres));
+    if (mail) tweede = (String(mail.text).match(/\b(\d{6})\b/) || [])[1];
+    if (!tweede) await new Promise((r) => setTimeout(r, 50));
+  }
+  assert.ok(tweede, 'er kwam geen tweede codemail');
+
+  const goed = await H.pickup(B(), token, { code: tweede });
+  assert.equal(goed.status, 200,
+    'de ontvanger komt er met de nieuwste code niet meer uit (' + goed.status + '): ' +
+    'dan sluit een gelijktijdig codeverzoek hem buiten zijn eigen bestand');
+  assert.ok((await goed.arrayBuffer()).byteLength > 0);
+  console.log('      [bevinding] herstelbaar: hij moet de TWEEDE codemail gebruiken, ' +
+              'en de botsing kostte hem een van zijn pogingen (tries_left=' + oj.tries_left + ')');
+  nogLevend('na de verdrongen code');
+});

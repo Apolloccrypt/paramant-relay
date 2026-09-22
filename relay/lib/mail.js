@@ -311,10 +311,22 @@ function veiligeNaam(waarde) {
 
 // Builds `"<name> via Paramant" <address>` from the configured MAIL_FROM and
 // whatever the customer is called. No name means the plain configured sender.
+//
+// THE FALLBACK IS THE POINT. Every call site passed `undefined` as the base,
+// which made ontleedAfzender('') return an empty email and produced
+// `"Zorggroep De Linde via Paramant" <>`. An empty angle bracket pair is not an
+// address: the whole string then falls into the address field at the provider,
+// and every mail server on earth rejects it. That is the invitation, the pickup
+// code and the reminder -- in other words, the entire feature delivering
+// nothing at all, with the fault invisible until a real send.
+//
+// Resolving the default HERE rather than at each call site means a future call
+// site cannot make that mistake again.
 function afzenderNamens(basis, naam) {
-  const b = ontleedAfzender(basis);
+  const grond = basis || config().from;
+  const b = ontleedAfzender(grond);
   const schoon = veiligeNaam(naam);
-  if (!schoon) return basis;
+  if (!schoon || !b.email) return grond;
   return '"' + schoon + ' via Paramant" <' + b.email + '>';
 }
 
@@ -380,6 +392,19 @@ async function stuur(msg, opts) {
   // just as invalid at the second carrier. Only a carrier-side failure is worth
   // a second attempt.
   if (uit && uit.reason === 'invalid') return uit;
+
+  // AND NEVER AFTER A PARTIAL DELIVERY. A carrier that took twenty-nine of
+  // thirty and refused one answers ok:false, and handing the whole message to
+  // the second carrier then sends those twenty-nine a SECOND copy of an
+  // invitation to a confidential file. Measured: 30 asked for, 59 delivered,
+  // and the result still said 30.
+  //
+  // The caller mails one recipient at a time today, so this cannot bite yet.
+  // It would the moment somebody batches that loop for speed, and that is
+  // exactly the kind of change nobody re-reads this file for.
+  if (uit && Number(uit.count) > 0) {
+    return Object.assign({}, uit, { fallback: 'skipped_partial_delivery' });
+  }
 
   const tweede = await viaProvider(reserve, m, cfg, fetchImpl, o.log);
   return Object.assign({}, tweede, {

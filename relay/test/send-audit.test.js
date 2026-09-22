@@ -355,7 +355,7 @@ test('POST /v2/sends toetst de omvang van het samengevoegde bestand', () => {
 // 10. De uitnodigingsmail
 // ═══════════════════════════════════════════════════════════════════════════
 test('de bestandsnaam in de uitnodigingsmail gaat door escHtml', () => {
-  const blok = blokUit(RELAY_SRC, "const naamRuw = (input.filename", 1800);
+  const blok = blokUit(RELAY_SRC, "const naamRuw = (String(", 2400);
   // Bewust ruim: deze toets gaat over de VRAAG of de naam ge-escaped wordt
   // voor hij de HTML in gaat, niet over hoe de variabele heet. De vorige
   // versie pinde de naam `naam` en brak op een hernoeming binnen dezelfde dag,

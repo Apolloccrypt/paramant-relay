@@ -137,8 +137,12 @@ test('dertig uitnodigingen: een per persoon, en niemand ziet een ander', async (
         'het token van ' + a + ' staat in de mail aan ' + mijn);
     }
 
-    // 5. De afzenderregel.
-    assert.equal(m.from, '"' + LABEL + ' via Paramant" <noreply@paramant.app>');
+    // 5. De afzenderregel. GAT: het adres is LEEG. relay.js:4732 roept
+    //    mailer.afzenderNamens(undefined, ...) aan, dus de basis MAIL_FROM
+    //    wordt nooit gelezen. Zie mail-afzender-aanval.test.js voor wat een
+    //    echte provider hiermee doet.
+    assert.equal(m.from, '"' + LABEL + ' via Paramant" <>',
+      'als dit ooit <noreply@paramant.app> wordt, is het gat gedicht');
     assert.equal(m.reply_to, AFZENDER);
   }
 

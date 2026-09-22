@@ -90,8 +90,29 @@ const SEND_MAX_BYTES = SEND_MAX_MB * 1048576;
 // paramant.app.
 //
 // These two count over the life of the link and nothing resets them.
-const MAX_CODE_REQUESTS = 5;
+// Drie, niet vijf. Elk codeverzoek is een echte mail van paramant.app aan
+// iemand die geen klant is, en de ontvanger trekt hem, niet de afzender: hij
+// valt dus buiten de uurrem op het account, want anders zou een ontvanger de
+// afzender kunnen blokkeren. Vijf per ontvanger maakte honderdvijftig mails per
+// verzending van dertig, naast de dertig uitnodigingen. Drie dekt wat een mens
+// nodig heeft -- klikken, niet aangekomen, nog een keer -- en een derde minder
+// ruimte voor wie een postvak wil volgooien met een gestolen link.
+const MAX_CODE_REQUESTS = 3;
 const MAX_WRONG_TOTAL = 9;
+
+// AND THEY EXPIRE, which is the difference between a brake and a lock.
+//
+// Without a window these two counters were permanent: nine wrong guesses and
+// that link was dead for good, with no way back. Reinvite does not mint a new
+// token (it cannot -- the wrapping belongs to the old one), so the dashboard
+// button restores nothing. Measured: thirteen requests from anybody holding the
+// link -- out of a proxy log, a forwarded mail, a shoulder -- locked the
+// rightful recipient out of their own file permanently.
+//
+// An hour keeps brute force pointless: nine guesses an hour against a million
+// codes is 216 attempts over a whole day's window, a 0.02% chance. And nobody
+// is shut out of a document they were sent.
+const COUNTER_WINDOW_MS = 3_600_000;
 const CODE_TTL_MS = 15 * 60 * 1000;
 const CODE_TRIES = 3;
 const CODE_DIGITS = 6;
@@ -180,6 +201,16 @@ function createSendStore({ store, log, now }) {
   // process; across processes it needs a revision field and a compare-and-set
   // in the store, and that is written down in the deploy notes rather than
   // pretended away here.
+  // Is er een ophaling die net begon en nog kan lopen? A response that has been
+  // handed its bytes finishes in seconds; a minute is generous and costs only
+  // that the file waits for its TTL in the rare case nobody was streaming.
+  const IN_DE_LUCHT_MS = 60_000;
+  function _verseClaim(records) {
+    const nu = clock();
+    return (Array.isArray(records) ? records : []).some(
+      (r) => r && r.picked_up_at && nu - r.picked_up_at < IN_DE_LUCHT_MS);
+  }
+
   const ketens = new Map();
   function opVolgorde(id, werk) {
     const vorige = ketens.get(id) || Promise.resolve();
@@ -369,6 +400,20 @@ function createSendStore({ store, log, now }) {
       return { ok: true, id: index.send };
     },
 
+    // Both ceilings age out together: one window, so a recipient who waited an
+    // hour finds the link exactly as it was before somebody else hammered it.
+    // Called before either counter is read, never after.
+    _verlooptellers(record) {
+      const nu = clock();
+      if (!record.counters_since || nu - record.counters_since > COUNTER_WINDOW_MS) {
+        record.counters_since = nu;
+        record.code_requests = 0;
+        record.wrong_total = 0;
+        return true;
+      }
+      return false;
+    },
+
     // Step one of collecting: prove the mailbox.
     //
     // Deliberately does NOT claim the token. A code request must not burn a
@@ -384,6 +429,8 @@ function createSendStore({ store, log, now }) {
 
       const refusal = recipients.pickupRefusal(record);
       if (refusal) return { ok: false, reason: refusal };
+
+      this._verlooptellers(record);
 
       // Counted before the code is minted, so the ceiling holds even when the
       // mail later fails. Both of these are what stops the reset-and-retry.
@@ -437,6 +484,7 @@ function createSendStore({ store, log, now }) {
       const refusal = recipients.pickupRefusal(record);
       if (refusal) return { ok: false, reason: refusal };
 
+      this._verlooptellers(record);
       if (!record.code_hash) return { ok: false, reason: 'no_code_requested' };
       if (clock() > (record.code_expires_at || 0)) {
         return { ok: false, reason: 'code_expired' };
@@ -480,19 +528,68 @@ function createSendStore({ store, log, now }) {
 
       const settled = recipients.allSettled(send.records);
       await writeSend(send.id, send, Math.max(1000, send.expires_at - clock()));
-      if (settled) {
-        // Everybody has been, so the file may go. The records stay until the
-        // window closes, so the sender can still see who collected and when.
-        await store.delBlob(send.id);
-        if (log) log('info', 'send_drained', { id: send.id });
-      }
+      // The file is NOT dropped here, and that is the whole point.
+      //
+      // It used to go the moment the last recipient was marked collected, which
+      // is before a single byte has left. Measured on a 3 MB file with the
+      // connection cut after the first chunk: the recipient got fragments, the
+      // retry answered already_collected, the file was gone, and the sender's
+      // dashboard said it had arrived. Nothing about that is recoverable, and
+      // the sender is told a lie on top of it.
+      //
+      // So the caller drains once the response has actually finished, through
+      // drained() below, and hands the turn back through releaseClaim() when
+      // the connection dies instead.
       const view = recipients.overview(send.records);
       return { ok: true, blob, filename: send.filename, email: record.email,
+               send_id: send.id,
                // The file key, locked under this recipient's own token. Useless
                // to us and to anyone who takes it from us; only the holder of
                // the token can open it, and that token was never written down.
                wrapped_key: record.wrapped_key || null,
                remaining: view.outstanding, settled };
+    },
+
+    // The file may go now: the bytes are out the door. Called from the route on
+    // the response's own 'finish', never before.
+    async drained(id) {
+      return opVolgorde(String(id || ''), async () => {
+        const send = await readSend(id);
+        if (!send) return { ok: false, reason: 'unknown_send' };
+        if (!recipients.allSettled(send.records)) return { ok: true, kept: true };
+        // A claim made moments ago may still be streaming. Dropping the file
+        // under it is the same destruction this whole path was rebuilt to
+        // avoid, just reached from the other side: the collector gets
+        // 'expired' with hours left on their window, and the sender sees them
+        // as waiting on a file that no longer exists.
+        if (_verseClaim(send.records)) {
+          if (log) log('info', 'send_drain_deferred', { id });
+          return { ok: true, kept: true, reason: 'collection_in_flight' };
+        }
+        await store.delBlob(id);
+        if (log) log('info', 'send_drained', { id });
+        return { ok: true, dropped: true };
+      });
+    },
+
+    // The connection died before the bytes arrived, so the recipient gets their
+    // turn back. Without this a dropped mobile connection costs somebody their
+    // only collection, and the sender is shown a delivery that never happened.
+    //
+    // Safe to call twice, and safe to call on a send that has since expired.
+    async releaseClaim(token) {
+      const found = await this._zoekSend(token);
+      if (!found.ok) return { ok: false, reason: found.reason };
+      return opVolgorde(found.id, async () => {
+        const send = await readSend(found.id);
+        if (!send) return { ok: false, reason: 'unknown_send' };
+        const record = recipients.findByToken(send.records, token);
+        if (!record || !record.picked_up_at) return { ok: true, nothing: true };
+        record.picked_up_at = null;
+        await writeSend(found.id, send, Math.max(1000, send.expires_at - clock()));
+        if (log) log('info', 'pickup_returned', { id: found.id });
+        return { ok: true, returned: true };
+      });
     },
 
     // Everything this account sent, newest first, for the sender's dashboard.
@@ -561,7 +658,12 @@ function createSendStore({ store, log, now }) {
       }
       const settled = recipients.allSettled(send.records);
       await writeSend(id, send, Math.max(1000, send.expires_at - clock()));
-      if (settled) await store.delBlob(id);
+      // Through the same gate as the collection path, not inline. Withdrawing
+      // the last outstanding person makes allSettled true, and dropping the
+      // file right there destroys it under a collector whose bytes are still
+      // on the wire: they get 'expired' with hours left on their window, and
+      // the sender sees them waiting on a file that no longer exists.
+      if (settled && !_verseClaim(send.records)) await store.delBlob(id);
       return { ok: true, settled };
     },
 
@@ -598,5 +700,5 @@ function createSendStore({ store, log, now }) {
 }
 
 module.exports = { createSendStore, newSendId, tokenIndexId, accountIndexId,
-                   maskEmail, CODE_TTL_MS, CODE_TRIES, CODE_DIGITS, MAX_REMINDERS, MAX_CODE_REQUESTS, MAX_WRONG_TOTAL,
+                   maskEmail, CODE_TTL_MS, CODE_TRIES, CODE_DIGITS, MAX_REMINDERS, MAX_CODE_REQUESTS, MAX_WRONG_TOTAL, COUNTER_WINDOW_MS,
                    SEND_MAX_MB, SEND_MAX_BYTES };

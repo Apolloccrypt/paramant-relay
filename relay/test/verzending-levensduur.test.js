@@ -119,7 +119,7 @@ test('niemand haalt op: na de TTL staat alles er nog, tot iets de opslag leest',
 });
 
 // ── 2. IEDEREEN HAALT OP ─────────────────────────────────────────────────────
-test('iedereen haalt op: de blob gaat meteen weg, de rest blijft tot de TTL', async () => {
+test('iedereen haalt op: de blob gaat pas weg als de bytes de deur uit zijn', async () => {
   const store = nieuweOpslag();
   const sends = createSendStore({ store });
   const adressen = ['a@extern.test', 'b@extern.test', 'c@extern.test'];
@@ -129,15 +129,23 @@ test('iedereen haalt op: de blob gaat meteen weg, de rest blijft tot de TTL', as
     const uit = await haalOp(sends, tokens[a]);
     assert.equal(uit.ok, true);
     assert.equal(uit.settled, false, 'zolang er iemand wacht is het niet klaar');
+    // drained() op een verzending die nog niet rond is laat de blob staan.
+    assert.deepEqual(await sends.drained(made.id), { ok: true, kept: true });
     assert.deepEqual(telling(store).blob, [made.id], 'de blob blijft voor de rest');
   }
 
   const laatste = await haalOp(sends, tokens[adressen[2]]);
   assert.equal(laatste.ok, true);
   assert.equal(laatste.settled, true);
-  // Gemeten, niet aangenomen: de blob is weg op hetzelfde moment, niet op de TTL.
-  assert.deepEqual(telling(store).blob, [],
-    'na de laatste ophaler hoort de blob direct weg te zijn (send.js _serve -> delBlob)');
+  // GEMETEN op de stand van 22-09 19:09. collect() laat de blob EXPRES staan:
+  // de route dropt hem pas op res 'finish' (relay.js, res.on('finish') ->
+  // _sendStore().drained(got.send_id)). Een afgebroken download geeft via
+  // releaseClaim() de beurt terug in plaats van het bestand te vernietigen.
+  assert.deepEqual(telling(store).blob, [made.id],
+    'na de laatste ophaler staat de blob er nog: collect() dropt niet meer zelf');
+
+  assert.deepEqual(await sends.drained(made.id), { ok: true, dropped: true });
+  assert.deepEqual(telling(store).blob, [], 'pas drained() ruimt op');
   const rest = telling(store);
   assert.equal(rest.send.length, 1, 'de records blijven, zodat de afzender ziet wie ophaalde');
   assert.equal(rest.tok.length, 3,
@@ -176,6 +184,7 @@ test('gemengd: een opgehaald, een ingetrokken, een wachtend -- de blob blijft te
   const { made, tokens } = await maakVerzending(sends, adressen, { bytes: 50_000 });
 
   assert.equal((await haalOp(sends, tokens[adressen[0]])).ok, true);
+  await sends.drained(made.id);
   assert.equal((await sends.revoke(made.id, adressen[1])).settled, false);
   assert.deepEqual(telling(store).blob, [made.id],
     'zolang er een wacht hoort de blob te blijven');
@@ -183,9 +192,11 @@ test('gemengd: een opgehaald, een ingetrokken, een wachtend -- de blob blijft te
   const beeld = await sends.overview(made.id);
   assert.deepEqual([beeld.collected, beeld.revoked, beeld.outstanding], [1, 1, 1]);
 
-  // En zodra de wachtende ophaalt is het alsnog klaar.
+  // En zodra de wachtende ophaalt EN zijn bytes binnen zijn, is het klaar.
   const laatste = await haalOp(sends, tokens[adressen[2]]);
   assert.equal(laatste.settled, true);
+  assert.deepEqual(telling(store).blob, [made.id], 'nog niet: de bytes zijn nog onderweg');
+  await sends.drained(made.id);
   assert.deepEqual(telling(store).blob, [], 'nu pas weg');
 });
 
@@ -248,4 +259,50 @@ test('verzending 201 duwt de eerste uit het overzicht terwijl blob en token blij
   const uit = await haalOp(sends, eerste.tokens['eerste@extern.test']);
   assert.equal(uit.ok, true, 'de link werkt nog: ' + JSON.stringify(uit));
   assert.equal(uit.blob.length, 1024, 'en levert het hele bestand');
+});
+
+// ── 7. DE INTREKKING DIE TE VROEG OPRUIMT ────────────────────────────────────
+test('intrekken vernietigt niets onder een ophaling die nog loopt', async () => {
+  // De ophaalkant is op 22-09 verbouwd: collect() laat de blob staan en de
+  // route dropt hem pas als de bytes echt zijn aangekomen (drained), zodat een
+  // dode verbinding de beurt teruggeeft (releaseClaim) in plaats van het
+  // bestand te vernietigen. _revoke() is NIET meegegaan: die dropt nog inline
+  // (lib/send.js:635, `if (settled) await store.delBlob(id)`).
+  //
+  // Dat is precies de volgorde die op een telefoon gewoon voorkomt.
+  const store = nieuweOpslag();
+  const sends = createSendStore({ store });
+  const adressen = ['ophaler@extern.test', 'tweede@extern.test'];
+  const { made, tokens } = await maakVerzending(sends, adressen, { bytes: 50_000 });
+
+  // 1. De ophaler klikt, krijgt zijn bytes toegewezen, maar de verbinding valt
+  //    weg voordat ze binnen zijn. De route dropt dus niets.
+  const uit = await haalOp(sends, tokens[adressen[0]]);
+  assert.equal(uit.ok, true);
+  assert.equal(uit.settled, false);
+
+  // 2. De afzender trekt de tweede in. Nu is alles 'settled' en de blob gaat
+  //    er direct af, terwijl de eerste zijn bestand nog nooit heeft gezien.
+  const ing = await sends.revoke(made.id, adressen[1]);
+  assert.equal(ing.settled, true);
+  assert.deepEqual(telling(store).blob, [],
+    'intrekken ruimt meteen op, zonder te kijken of de bytes al binnen waren');
+
+  // 3. De verbinding van de ophaler valt weg: de route geeft zijn beurt terug.
+  const terug = await sends.releaseClaim(tokens[adressen[0]]);
+  assert.deepEqual(terug, { ok: true, returned: true });
+
+  // 4. Hij probeert het opnieuw, binnen zijn venster van 24 uur.
+  const vraag = await sends.requestPickup(tokens[adressen[0]]);
+  assert.equal(vraag.ok, true, 'de link leeft nog: ' + JSON.stringify(vraag));
+  const weer = await sends.collect(tokens[adressen[0]], vraag.code);
+  assert.equal(weer.ok, false);
+  assert.equal(weer.reason, 'expired',
+    'het bestand is weg terwijl de verzending nog uren open staat');
+
+  // En wat de afzender ziet: iemand die nog altijd "wacht" op een bestand dat
+  // niet meer bestaat.
+  const beeld = await sends.overview(made.id);
+  assert.equal(beeld.outstanding, 1);
+  assert.equal(beeld.recipients.find(r => r.email === adressen[0]).status, 'waiting');
 });

@@ -101,7 +101,7 @@ async function verstuur(sleutel, adressen, opt) {
 
 const adres = (n, tag) => Array.from({ length: n }, (_, i) => `p${i}-${tag}@extern.test`);
 
-// VIJF sleutels, niet meer: relay.js:3640 zet elke sleutel boven de vijfde op
+// VIJF sleutels, niet meer: relay.js:3641 zet elke sleutel boven de vijfde op
 // over_limit en antwoordt 402 op alles. De Community Edition-grens van de relay
 // zelf, geen tier-grens.
 const K = {
@@ -153,7 +153,7 @@ after(() => {
 test('gat 1a: plus-adressering en gmail-punten tellen als APARTE ontvangers', async () => {
   // lib/tiers.js normaliseAddress doet NFC + trim + lowercase, meer niet: geen
   // plus-strip, geen punt-strip. Dus anna@ en anna+1@ zijn twee ontvangers en
-  // een community-account (max_recipients 1, lib/tiers.js:113) wordt geweigerd.
+  // een community-account (max_recipients 1, lib/tiers.js:73) wordt geweigerd.
   const plus = await verstuur(K.gratis, ['anna@gmail.test', 'anna+factuur@gmail.test']);
   assert.equal(plus.status, 403, JSON.stringify(plus.body));
   assert.equal(plus.body.error, 'over_limit');
@@ -170,7 +170,7 @@ test('gat 1a: plus-adressering en gmail-punten tellen als APARTE ontvangers', as
 });
 
 test('gat 1b: een gepadde `sealed` levert GEEN extra mail op', async () => {
-  // relay.js:4604 telt de zitplaatsen uit `sealed`, maar lib/recipients.js:146
+  // relay.js:4607 telt de zitplaatsen uit `sealed`, maar lib/recipients.js:146
   // loopt over `checked.recipients` (uit input.recipients). Dus dertig sealed
   // entries bij een ontvanger kost je dertig zitplaatsen en levert een mail.
   const voor = mails.length;
@@ -184,7 +184,7 @@ test('gat 1b: een gepadde `sealed` levert GEEN extra mail op', async () => {
 test('gat 1c: DE ECHTE: een gratis account bereikt 50 mensen per uur', async () => {
   // Er is GEEN grens op het aantal verzendingen per uur, alleen op ontvangers
   // per verzending (max_recipients 1) en op uitnodigingen per uur
-  // (outbound_per_hour 50, lib/tiers.js:120). Dus vijftig losse verzendingen
+  // (outbound_per_hour 50, lib/tiers.js:79). Dus vijftig losse verzendingen
   // van een persoon = vijftig bereikte mensen op het gratis plan, terwijl
   // frontend/pricing.html:469 zegt "one on Community".
   const voor = mails.length;
@@ -205,35 +205,15 @@ test('gat 1c: DE ECHTE: een gratis account bereikt 50 mensen per uur', async () 
 
 // ── GAT 2. Wat kost een verzending naar dertig mensen? ──────────────────────
 
-test('gat 2: dertig ontvangers = EEN verzending, zestig mails', async () => {
+test('gat 2: dertig ontvangers = EEN transfer, dertig uitnodigingen', async () => {
   const voor = mails.length;
   const r = await verstuur(K.firm, adres(30, 'kosten'));
   assert.equal(r.status, 201, JSON.stringify(r.body));
   assert.equal(r.body.recipients, 30);
   assert.equal(r.body.invited, 30);
   // De uitnodiging nu; de codemail volgt pas als iemand de link opent. De
-  // "x2" uit de lib/tiers.js:99 kostenberekening is dus een bovengrens.
+  // "x2" uit de lib/tiers.js:100 kostenberekening is dus een bovengrens.
   assert.equal(naarExtern(voor), 30, 'dertig uitnodigingen bij het versturen');
-});
-
-// ── GAT 3. Is de uurrem te omzeilen met gelijktijdigheid? ───────────────────
-
-test('gat 3: twintig gelijktijdige verzendingen breken de uurrem NIET', async () => {
-  // inviteRateOk (relay.js:2318) leest en schrijft de teller zonder await
-  // ertussen, dus binnen een Node-proces is het atomair. Twintig keer dertig is
-  // 600 gevraagde zitplaatsen op een plafond van 500: er mogen er precies
-  // zestien door (16 x 30 = 480; de zeventiende zou op 510 komen).
-  const u = [];
-  for (let i = 0; i < 20; i++) u.push(await upload(K.race));
-  const sealeds = [];
-  for (let i = 0; i < 20; i++) sealeds.push(await verzegel(u[i].geheim, adres(30, 'race' + i)));
-  const uit = await Promise.all(u.map((x, i) =>
-    sends(K.race, x.hashes, adres(30, 'race' + i), sealeds[i])));
-  const door = uit.filter(r => r.status === 201).length;
-  const geweigerd = uit.filter(r => r.status === 429).length;
-  assert.equal(door, 16, 'precies zestien passen in 500, kreeg ' + door);
-  assert.equal(geweigerd, 4);
-  assert.equal(door * 30, 480);
 });
 
 // ── GAT 5. Plannen die niet te koop zijn ────────────────────────────────────
@@ -265,39 +245,36 @@ test('gat 5b: betaalde plan_parasend pro met plan free KRIJGT zijn dertig', asyn
   assert.equal(r.body.recipients, 30);
 });
 
-// ── GAT: dezelfde blokken, twee verzendingen tegelijk ───────────────────────
+// ── GAT 3. Is de uurrem te omzeilen met gelijktijdigheid? ───────────────────
 
-test('gat X: een upload wordt twee verzendingen als je ze gelijk afvuurt', async () => {
-  // relay.js:4649 laat `blobDrop` pas los NA `await _sendStore().create(...)`.
-  // Twee gelijktijdige POST /v2/sends met dezelfde hashes passeren allebei de
-  // eigendomscontrole op relay.js:4583 voordat de eerste zijn blokken opruimt.
-  const u = await upload(K.firm);
-  const a = await verzegel(u.geheim, adres(5, 'dupA'));
-  const b = await verzegel(u.geheim, adres(5, 'dupB'));
-  const [r1, r2] = await Promise.all([
-    sends(K.firm, u.hashes, adres(5, 'dupA'), a),
-    sends(K.firm, u.hashes, adres(5, 'dupB'), b),
-  ]);
-  const gelukt = [r1, r2].filter(r => r.status === 201);
-  assert.equal(gelukt.length, 2,
-    'beide verzendingen kwamen door op een upload: ' + JSON.stringify([r1.body, r2.body]));
-  assert.notEqual(gelukt[0].body.send_id, gelukt[1].body.send_id);
-
-  // En serieel lukt het NIET: de blokken zijn dan al weg.
-  const u2 = await upload(K.firm);
-  const c = await verzegel(u2.geheim, adres(2, 'serA'));
-  const d = await verzegel(u2.geheim, adres(2, 'serB'));
-  const s1 = await sends(K.firm, u2.hashes, adres(2, 'serA'), c);
-  const s2 = await sends(K.firm, u2.hashes, adres(2, 'serB'), d);
-  assert.equal(s1.status, 201);
-  assert.equal(s2.status, 404, 'serieel hoort block_missing: ' + JSON.stringify(s2.body));
-  assert.equal(s2.body.error, 'block_missing');
+test('gat 3: twintig gelijktijdige verzendingen breken de uurrem NIET', async () => {
+  // inviteRateOk (relay.js:2318) leest en schrijft de teller zonder await
+  // ertussen, dus binnen een Node-proces is het atomair. Dit account gaf in
+  // gat 5b hierboven al dertig zitplaatsen uit, dus er is 470 van de 500 over:
+  // vijftien volle verzendingen passen (15 x 30 = 450, samen 480), de
+  // zestiende zou op 510 komen en hoort 429 te krijgen.
+  const u = [];
+  for (let i = 0; i < 20; i++) u.push(await upload(K.race));
+  const sealeds = [];
+  for (let i = 0; i < 20; i++) sealeds.push(await verzegel(u[i].geheim, adres(30, 'race' + i)));
+  const uit = await Promise.all(u.map((x, i) =>
+    sends(K.race, x.hashes, adres(30, 'race' + i), sealeds[i])));
+  const door = uit.filter(r => r.status === 201).length;
+  const geweigerd = uit.filter(r => r.status === 429).length;
+  assert.equal(door, 15, 'vijftien passen in de resterende 470, kreeg ' + door);
+  assert.equal(geweigerd, 5);
+  // De weigering vertelt eerlijk hoeveel er op staat, en dat is precies het
+  // getal dat de gelukte verzendingen verklaren. Geen enkele lekte erdoor.
+  const rem = uit.find(r => r.status === 429);
+  assert.equal(rem.body.limit, 500);
+  assert.equal(rem.body.used, 30 + door * 30);
+  assert.ok(rem.body.used + 30 > 500);
 });
 
 // ── GAT 7. De heruitnodiging als gratis mailkanaal ──────────────────────────
 
 test('gat 7: heruitnodigen kost GEEN zitplaats op de uurrem', async () => {
-  // relay.js:4795 roept inviteRateOk NIET aan. MAX_REMINDERS is 3
+  // relay.js:4795 (reinvite op regel 4804) roept inviteRateOk NIET aan. MAX_REMINDERS is 3
   // (lib/send.js:52), per ONTVANGER, dus een verzending naar dertig mensen is
   // negentig extra mails buiten outbound_per_hour om.
   const ontvangers = adres(3, 'rem');

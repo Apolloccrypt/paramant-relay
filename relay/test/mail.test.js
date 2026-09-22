@@ -285,3 +285,60 @@ test('gereed blijft waar zolang een van de twee kan versturen', () => {
     MAIL_FALLBACK_PROVIDER: 'resend', RESEND_API_KEY: 'r' }), true);
   assert.equal(mail.gereed({ MAIL_PROVIDER: 'mailjet' }), false);
 });
+
+test('een leeg afzenderadres is geen afzenderadres', async () => {
+  // Dit was een totale storing die pas bij een echte verzending zichtbaar zou
+  // zijn geweest: elke aanroeper gaf `undefined` als basis mee, wat
+  // `"Naam via Paramant" <>` opleverde. Een leeg haakjespaar is geen adres; de
+  // hele string valt dan in het adresveld van de provider en elke mailserver
+  // weigert hem. De uitnodiging, de code en de herinnering: alle drie.
+  let lichaam = null;
+  const f = async (url, opts) => {
+    lichaam = JSON.parse(opts.body);
+    return { ok: true, status: 200, json: async () => ({ Messages: [{ Status: 'success' }] }) };
+  };
+  await mail.stuur(
+    { to: ['partner@extern.test'], subject: 'A file', text: 'Hi',
+      from: mail.afzenderNamens(undefined, 'Zorggroep De Linde') },
+    { fetch: f, env: { MAIL_PROVIDER: 'mailjet', MAILJET_API_KEY: 'k', MAILJET_SECRET_KEY: 's' } });
+
+  const van = lichaam.Messages[0].From;
+  assert.match(van.Email, /@/, 'het adresveld moet een adres bevatten, kreeg: ' + van.Email);
+  assert.equal(van.Email, 'noreply@paramant.app');
+  assert.equal(van.Name, 'Zorggroep De Linde via Paramant',
+    'de naam hoort in het naamveld, niet in het adres');
+});
+
+test('de reserve stuurt nooit een tweede kopie na een halve bezorging', async () => {
+  // Een carrier die er negenentwintig van de dertig aannam en er een weigerde
+  // antwoordt ok:false. De hele partij doorgeven aan de tweede stuurt die
+  // negenentwintig een TWEEDE uitnodiging voor een vertrouwelijk bestand.
+  let tweedeGebruikt = false;
+  const f = async (url) => {
+    if (String(url).includes('resend')) { tweedeGebruikt = true; return { ok: true, status: 200, json: async () => ({}) }; }
+    return { ok: true, status: 200, json: async () => ({ Messages: [
+      { Status: 'success' }, { Status: 'error', Errors: [{ ErrorMessage: 'bad domain' }] }] }) };
+  };
+  const r = await mail.stuur(
+    { to: ['a@x.test', 'b@x.test'], subject: 'A file', text: 'Hi' },
+    { fetch: f, env: { MAIL_PROVIDER: 'mailjet', MAILJET_API_KEY: 'k', MAILJET_SECRET_KEY: 's',
+                       MAIL_FALLBACK_PROVIDER: 'resend', RESEND_API_KEY: 'r' } });
+
+  assert.equal(r.ok, false, 'een halve bezorging blijft een mislukking');
+  assert.equal(tweedeGebruikt, false, 'maar de reserve mag hem niet nog eens sturen');
+  assert.equal(r.fallback, 'skipped_partial_delivery');
+});
+
+test('en wel als er helemaal niets aankwam', async () => {
+  let tweedeGebruikt = false;
+  const f = async (url) => {
+    if (String(url).includes('resend')) { tweedeGebruikt = true; return { ok: true, status: 200, json: async () => ({}) }; }
+    return { ok: false, status: 403, text: async () => 'suspended' };
+  };
+  const r = await mail.stuur(
+    { to: ['a@x.test'], subject: 'A file', text: 'Hi' },
+    { fetch: f, env: { MAIL_PROVIDER: 'mailjet', MAILJET_API_KEY: 'k', MAILJET_SECRET_KEY: 's',
+                       MAIL_FALLBACK_PROVIDER: 'resend', RESEND_API_KEY: 'r' } });
+  assert.equal(tweedeGebruikt, true, 'nul bezorgd is precies waar de reserve voor is');
+  assert.equal(r.ok, true);
+});
