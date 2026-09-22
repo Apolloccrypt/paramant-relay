@@ -120,10 +120,36 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-filter:focus-visible { outline: none; box-shadow: var(--ring); position: relative; z-index: 1; }
 
 .dh-documents { border-top: 1px solid var(--line); }
-.dh-document { display: grid; grid-template-columns: minmax(0, 1fr) 132px 148px; gap: 22px; align-items: center; width: 100%; text-align: left; padding: 17px 26px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: inherit; cursor: pointer; transition: background var(--d-1) var(--e-standard); }
-.dh-document:hover { background: var(--accent-soft); }
-.dh-document:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-ring); }
+/* A row is a container now: the top half opens the detail, the strip under it
+   says what happens next and carries the control that closes the request. */
+.dh-document { border-bottom: 1px solid var(--line); transition: background var(--d-1) var(--e-standard); }
 .dh-document:last-child { border-bottom: 0; }
+.dh-document:hover { background: var(--accent-soft); }
+.dh-document-open { display: grid; grid-template-columns: minmax(0, 1fr) 132px 148px; gap: 22px; align-items: center; width: 100%; text-align: left; padding: 17px 26px 13px; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.dh-document-open:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-ring); }
+/* The affordance the old row never had: a hint that there is more behind it. */
+.dh-document-open::after { content: 'Details'; position: absolute; opacity: 0; }
+.dh-document-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 0 26px 15px; }
+.dh-document-next { flex: 1 1 220px; min-width: 0; font: 400 13px/1.45 var(--sans); color: var(--ink-2); }
+.dh-document-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dh-rowbtn { padding: 7px 14px; border: 1px solid var(--line); border-radius: var(--r-pill); background: transparent; color: var(--ink-1); font: 600 12px/1.2 var(--sans); cursor: pointer; text-decoration: none; transition: border-color var(--d-1) var(--e-standard), background var(--d-1) var(--e-standard); }
+.dh-rowbtn:hover { border-color: var(--accent); background: var(--accent-soft); }
+.dh-rowbtn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-ring); }
+.dh-rowbtn.danger { color: var(--sig-stop, #d05b52); border-color: color-mix(in srgb, var(--sig-stop, #d05b52) 42%, transparent); }
+.dh-rowbtn.danger:hover { background: color-mix(in srgb, var(--sig-stop, #d05b52) 12%, transparent); border-color: var(--sig-stop, #d05b52); }
+.dh-rowask { flex: 1 1 100%; font: 400 13px/1.45 var(--sans); color: var(--ink-1); }
+.dh-rowask strong { font-weight: 600; }
+.dh-rowsay { font: 500 13px/1.45 var(--sans); color: var(--ink-2); }
+.dh-rowsay.done { color: var(--sig-ok, #4c9a72); }
+.dh-rowsay.fail { color: var(--sig-stop, #d05b52); }
+@media (max-width: 640px) {
+  .dh-document-open { grid-template-columns: 1fr; gap: 10px; padding: 15px 18px 11px; }
+  .dh-document-foot { padding: 0 18px 14px; }
+  /* On a phone the control is the point of the strip, so it gets its own line
+     and a full-width target rather than a pill squeezed next to the sentence. */
+  .dh-document-acts { width: 100%; }
+  .dh-document-acts .dh-rowbtn { flex: 1 1 auto; text-align: center; padding: 11px 14px; }
+}
 .dh-document-name { min-width: 0; }
 .dh-document-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.35 var(--sans); color: var(--ink-1); }
 .dh-document-name span { display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-3); }

@@ -338,6 +338,26 @@
       if (act === 'document-cancel') {
         ev.preventDefault();
         cancelDocument(t.getAttribute('data-document-id'), t);
+        return;
+      }
+      if (act === 'document-open') {
+        ev.preventDefault();
+        openDocumentDialog(t.getAttribute('data-document-id'));
+        return;
+      }
+      if (act === 'document-withdraw-ask') {
+        ev.preventDefault();
+        askWithdraw(t.getAttribute('data-document-id'));
+        return;
+      }
+      if (act === 'document-withdraw-no') {
+        ev.preventDefault();
+        cancelWithdrawAsk(t.getAttribute('data-document-id'));
+        return;
+      }
+      if (act === 'document-withdraw-do') {
+        ev.preventDefault();
+        cancelDocument(t.getAttribute('data-document-id'), t);
       }
     });
   }
@@ -416,15 +436,97 @@
       // value and is useless for support. The full value goes in, CSS shortens
       // it with an ellipsis when it does not fit, and the title carries it.
       var reference = String(doc.id || '');
-      return '<button type="button" class="dh-document" data-document-id="' + esc(doc.id || '') + '" aria-label="Open details for ' + esc(name) + '">' +
-        '<div class="dh-document-name"><strong title="' + esc(name) + '">' + esc(name) + '</strong>' +
-        '<span>Created ' + esc(fmtDate(doc.created_at)) +
-        (reference ? ' <span class="dh-doc-ref" title="' + esc(reference) + '">· Ref ' + esc(reference) + '</span>' : '') +
-        '</span></div>' +
-        '<div class="dh-document-progress"><span>' + signed + ' of ' + total + ' signed</span><div class="dh-progress" aria-label="' + signed + ' of ' + total + ' signed"><i style="width:' + pct + '%"></i></div></div>' +
-        '<div class="dh-status ' + state + '">' + documentLabel(state) + '</div>' +
-        '</button>';
+      // A row used to be one big button whose only affordance was the cursor,
+      // and the way to close a request was hidden behind opening it. On a phone
+      // that is a dead end: you can start something and not end it.
+      //
+      // So the row is a container now. The top half still opens the detail; the
+      // strip under it says what happens next in words and carries the one
+      // control that closes the loop. Both are real buttons, side by side
+      // rather than nested, which a button-inside-a-button could never be.
+      return '<div class="dh-document" data-document-id="' + esc(doc.id || '') + '">' +
+        '<button type="button" class="dh-document-open" data-pa-action="document-open" data-document-id="' + esc(doc.id || '') + '" aria-label="Open details for ' + esc(name) + '">' +
+          '<div class="dh-document-name"><strong title="' + esc(name) + '">' + esc(name) + '</strong>' +
+          '<span>Created ' + esc(fmtDate(doc.created_at)) +
+          (reference ? ' <span class="dh-doc-ref" title="' + esc(reference) + '">· Ref ' + esc(reference) + '</span>' : '') +
+          '</span></div>' +
+          '<div class="dh-document-progress"><span>' + signed + ' of ' + total + ' signed</span><div class="dh-progress" aria-label="' + signed + ' of ' + total + ' signed"><i style="width:' + pct + '%"></i></div></div>' +
+          '<div class="dh-status ' + state + '">' + documentLabel(state) + '</div>' +
+        '</button>' +
+        '<div class="dh-document-foot">' +
+          '<span class="dh-document-next">' + esc(documentNext(doc, state, total, signed)) + '</span>' +
+          '<span class="dh-document-acts" data-document-id="' + esc(doc.id || '') + '">' +
+            documentActions(doc, state) +
+          '</span>' +
+        '</div>' +
+      '</div>';
     }).join('');
+  }
+
+  // What happens next, in words, on the row itself. A status chip says what a
+  // thing IS; this says what it is waiting for. Without it a sender reads
+  // "Waiting for signatures" and still has to open the row to learn on whom.
+  function documentNext(doc, state, total, signed) {
+    if (state === 'completed') return 'Signed by everyone. The proof is yours to download.';
+    if (state === 'cancelled') return 'Withdrawn. Nobody can add a signature.';
+    var parties = Array.isArray(doc.parties) ? doc.parties : [];
+    var waiting = parties.filter(function (p) { return p.status !== 'signed'; });
+    if (waiting.length === 1 && (waiting[0].label || waiting[0].email)) {
+      return 'Waiting for ' + (waiting[0].label || waiting[0].email) + '.';
+    }
+    var open = Math.max(0, total - signed);
+    if (open === 1) return 'Waiting for one person.';
+    if (open > 1) return 'Waiting for ' + open + ' people.';
+    return 'Waiting for the relay to confirm.';
+  }
+
+  // The controls that belong to a row's state. Withdraw sits here rather than
+  // three clicks deep, because closing something you started is not an advanced
+  // action.
+  function documentActions(doc, state) {
+    var id = esc(doc.id || '');
+    if (state === 'completed') {
+      return '<a class="dh-rowbtn" href="/api/user/documents/' + encodeURIComponent(doc.id) + '/receipt" download>Download proof</a>';
+    }
+    if (state === 'waiting' || state === 'in_progress') {
+      return '<button type="button" class="dh-rowbtn danger" data-pa-action="document-withdraw-ask" data-document-id="' + id + '">Withdraw</button>';
+    }
+    return '';
+  }
+
+  // Asking before a one-way action, without handing the moment to the browser.
+  // A native confirm() box is grey, English-by-locale and looks nothing like the
+  // product; on a page that sells careful handling that is the wrong texture.
+  // The question replaces the button in place and reads back what will happen.
+  function askWithdraw(id) {
+    var host = document.querySelector('.dh-document-acts[data-document-id="' + cssEscape(id) + '"]');
+    if (!host) return;
+    var doc = documentById(id);
+    var name = (doc && doc.original_filename) || 'this request';
+    // Foolproof, in the literal sense: a second click in the same spot must not
+    // finish a one-way action. So the safe answer takes the place the Withdraw
+    // button just had, and the irreversible one sits after it. The document is
+    // named, because a row you clicked by accident looks exactly like the row
+    // next to it.
+    host.innerHTML =
+      '<span class="dh-rowask">Withdraw <strong>' + esc(name) + '</strong>? Signatures already given stay in the record, nobody can add another.</span>' +
+      '<button type="button" class="dh-rowbtn" data-pa-action="document-withdraw-no" data-document-id="' + esc(id) + '">Keep it open</button>' +
+      '<button type="button" class="dh-rowbtn danger" data-pa-action="document-withdraw-do" data-document-id="' + esc(id) + '">Yes, withdraw</button>';
+    var safe = host.querySelector('[data-pa-action="document-withdraw-no"]');
+    if (safe && safe.focus) safe.focus();
+  }
+
+  // Put the row back the way it was when the sender changes their mind.
+  function cancelWithdrawAsk(id) {
+    var doc = documentById(id);
+    var host = document.querySelector('.dh-document-acts[data-document-id="' + cssEscape(id) + '"]');
+    if (doc && host) host.innerHTML = documentActions(doc, documentState(doc));
+  }
+
+  // CSS.escape is not everywhere yet and the ids are relay-generated, so keep
+  // the selector safe by hand.
+  function cssEscape(value) {
+    return String(value == null ? '' : value).replace(/["\\]/g, '\\$&');
   }
 
   function documentById(id) {
@@ -476,10 +578,23 @@
     if (close) close.focus();
   }
 
+  // Say what is happening in the row the sender is looking at, not only in a
+  // dialog they may not have open. Silence between click and result is where a
+  // person clicks again.
+  function rowSay(id, text, tone) {
+    var host = document.querySelector('.dh-document-acts[data-document-id="' + cssEscape(id) + '"]');
+    if (!host) return;
+    host.innerHTML = '<span class="dh-rowsay ' + (tone || '') + '" role="status">' + esc(text) + '</span>';
+  }
+
   function cancelDocument(id, button) {
     var doc = documentById(id);
-    if (!doc || !confirm('Cancel this signing request? Nobody will be able to add another signature.')) return;
+    // The confirmation now happens in the row (askWithdraw). A native confirm()
+    // here would ask a second time, in a grey box that looks like the browser
+    // rather than the product.
+    if (!doc) return;
     if (button) button.disabled = true;
+    rowSay(id, 'Withdrawing...');
     var message = document.getElementById('dh-doc-message');
     if (message) message.textContent = 'Cancelling request...';
     fetch('/api/user/documents/' + encodeURIComponent(id) + '/cancel', {
@@ -491,13 +606,21 @@
       });
     }).then(function () {
       doc.status = 'void';
+      // Redraw first so the row carries its new state, then say it out loud in
+      // that same row. The dialog no longer opens by itself: the sender stayed
+      // on the list, so the answer belongs on the list.
       renderDocuments();
-      openDocumentDialog(id);
+      rowSay(id, 'Withdrawn. Nobody can sign this any more.', 'done');
     }).catch(function (err) {
       if (button) button.disabled = false;
-      if (message) message.textContent = err.message === 'already_complete'
-        ? 'This request completed before cancellation. Refresh to see the final status.'
-        : 'Could not cancel this request. Try again.';
+      var uitleg = err.message === 'already_complete'
+        ? 'Everyone had already signed. Nothing was withdrawn.'
+        : 'Withdrawing did not go through. The request is unchanged.';
+      rowSay(id, uitleg, 'fail');
+      // Leave a way back: after a failure the row gets its buttons again, so a
+      // sender is never stuck looking at an error with nothing to press.
+      setTimeout(function () { cancelWithdrawAsk(id); }, 4000);
+      if (message) message.textContent = uitleg;
     });
   }
 
@@ -628,10 +751,10 @@
     var list = document.getElementById('dh-documents');
     var dialog = document.getElementById('dh-document-dialog');
     if (!list) return;
-    list.addEventListener('click', function (ev) {
-      var row = ev.target.closest && ev.target.closest('[data-document-id]');
-      if (row && row.classList.contains('dh-document')) openDocumentDialog(row.getAttribute('data-document-id'));
-    });
+    // The row used to be one big button and a click anywhere on it opened the
+    // detail. Now the row holds its own controls, so a stray click on the strip
+    // with Withdraw in it must NOT also open a dialog over the answer. Opening
+    // is an explicit action on its own button, handled in wireActions.
     if (dialog) dialog.addEventListener('click', function (ev) {
       if (ev.target === dialog) closeDocumentDialog();
     });
