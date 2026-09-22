@@ -70,6 +70,7 @@ const TIER_LIMITS = Object.freeze({
     devices: 5,            // mirrors legacy _pubkeyMax.free
     view_ttl_ms: 3_600_000, // mirrors legacy _planMaxTtl.dev (1 h)
     max_views: 1,          // mirrors legacy _planMaxViews.free (burn-on-read)
+    max_recipients: 1,     // named recipients per send; one is the free story
     concurrent_blobs: 8, // one live hand-over at a time, plus slack for its window
     outbound_per_hour: 50,  // mirrors legacy OUTBOUND_RATE.free
   }),
@@ -80,6 +81,7 @@ const TIER_LIMITS = Object.freeze({
     devices: 50,           // mirrors legacy _pubkeyMax.pro; brief says 10 once policy bump
     view_ttl_ms: 86_400_000, // 24 h
     max_views: 10,
+    max_recipients: 10,
     concurrent_blobs: 24, // about three at a time
     outbound_per_hour: 500,  // mirrors legacy OUTBOUND_RATE.pro
   }),
@@ -90,6 +92,7 @@ const TIER_LIMITS = Object.freeze({
     devices: 100,
     view_ttl_ms: 604_800_000, // 7 d
     max_views: 25,
+    max_recipients: 30,
     concurrent_blobs: 80, // about ten at a time
     outbound_per_hour: 2000, // its transfers_month; never below pro, which is
                              // what the old table did by leaving it out
@@ -101,6 +104,10 @@ const TIER_LIMITS = Object.freeze({
     devices: UNLIMITED,
     view_ttl_ms: 604_800_000, // 7 d  (legacy enterprise ceiling)
     max_views: 100,
+    // Deliberately not UNLIMITED. Above thirty named people a send stops being
+    // a send and becomes a distribution list, which needs list ownership and a
+    // different conversation. Thirty is the product ceiling, not a price step.
+    max_recipients: 30,
     concurrent_blobs: UNLIMITED,
     outbound_per_hour: UNLIMITED, // mirrors legacy OUTBOUND_RATE.enterprise
   }),
@@ -139,6 +146,41 @@ function tierLimitNum(plan, dim) {
   return isUnlimited(v) ? Infinity : v;
 }
 
+// Check a list of named recipients against the plan's ceiling.
+//
+// This is the ONLY place that decides who may address more than one person.
+// The browser may show the field to anyone; the answer is made here, server
+// side, from the plan on the key. A front end that forgets to hide the field
+// therefore cannot hand a community account a paid capability.
+//
+// Rejects rather than silently truncating. Quietly dropping addresses from a
+// send of a confidential document is the worst possible failure: the sender
+// believes twenty people were reached and nineteen never hear about it.
+//
+// Returns { ok, plan, limit, recipients, count, reason }.
+//   recipients  normalised (trimmed, lowercased) and de-duplicated
+//   reason      'empty' | 'over_limit' when ok is false
+function checkRecipients(plan, list) {
+  const named = normalisePlan(plan);
+  const limit = tierLimitNum(named, 'max_recipients');
+  const seen = new Set();
+  const recipients = [];
+  for (const raw of Array.isArray(list) ? list : []) {
+    const email = (raw == null ? '' : String(raw)).trim().toLowerCase();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    recipients.push(email);
+  }
+  if (recipients.length === 0) {
+    return { ok: false, plan: named, limit, recipients, count: 0, reason: 'empty' };
+  }
+  if (recipients.length > limit) {
+    return { ok: false, plan: named, limit, recipients, count: recipients.length,
+             reason: 'over_limit' };
+  }
+  return { ok: true, plan: named, limit, recipients, count: recipients.length, reason: null };
+}
+
 module.exports = {
   TIER_LIMITS,
   UNLIMITED,
@@ -146,4 +188,5 @@ module.exports = {
   tierLimit,
   tierLimitNum,
   isUnlimited,
+  checkRecipients,
 };
