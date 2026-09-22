@@ -387,7 +387,9 @@
         var wanneer = p.picked_up_at ? fmtDate(p.picked_up_at) : '';
         var knoppen = p.status === 'waiting'
           ? '<button type="button" class="dh-rowbtn" data-pa-action="send-remind" ' +
-              'data-send-id="' + esc(id) + '" data-email="' + esc(p.email) + '">Send again</button>' +
+              'data-send-id="' + esc(id) + '" data-email="' + esc(p.email) + '" ' +
+              'title="Sends a nudge. Their original link still works and does not change."' +
+              '>Remind</button>' +
             '<button type="button" class="dh-rowbtn danger" data-pa-action="send-revoke" ' +
               'data-send-id="' + esc(id) + '" data-email="' + esc(p.email) + '">Withdraw</button>'
           : '';
@@ -441,6 +443,10 @@
       if (row) {
         row.innerHTML = '<span class="dh-rowsay fail" role="status">' +
           esc(err.message === 'already_collected' ? 'They already collected it.'
+            : err.message === 'reminder_limit'
+              ? 'They have had three reminders. Send the file again instead.'
+            : err.message === 'reminder_not_sent'
+              ? 'The mail did not leave our side. Nothing changed; try again in a minute.'
             : 'That did not go through. Nothing changed.') + '</span>';
       }
       // Leave a way back rather than a dead row with an error in it.
@@ -499,7 +505,7 @@
       if (act === 'send-remind') {
         ev.preventDefault();
         sendAction('reinvite', t.getAttribute('data-send-id'),
-                   t.getAttribute('data-email'), t, 'A fresh link is on its way.');
+                   t.getAttribute('data-email'), t, 'Reminder sent. Their link is unchanged.');
         return;
       }
       if (act === 'send-revoke') {

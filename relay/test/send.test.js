@@ -13,7 +13,8 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { createSendStore } = require('../lib/send');
+const { createSendStore, MAX_REMINDERS } = require('../lib/send');
+const { sealedVoor } = require('./_sealed');
 
 // Stands in for parasign-store: same five calls, same shapes.
 function nepStore() {
@@ -25,6 +26,7 @@ function nepStore() {
     async getBlob(id) { const r = blobs.get(id); return r ? Buffer.from(r.buf) : null; },
     async delBlob(id) { blobs.delete(id); },
     async putMeta(id, obj, ttl) { meta.set(id, { obj: JSON.parse(JSON.stringify(obj)), ttl }); },
+    async delMeta(id) { meta.delete(id); },
     async getMeta(id) { const r = meta.get(id); return r ? JSON.parse(JSON.stringify(r.obj)) : null; },
   };
 }
@@ -49,7 +51,7 @@ test('one file for thirty people, not thirty files', async () => {
   const { store, sends } = maakStore();
   const dertig = Array.from({ length: 30 }, (_, i) => `p${i}@example.org`);
 
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: dertig,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: dertig, sealed: sealedVoor(dertig),
                                  filename: 'rapport.pdf' });
   assert.equal(r.ok, true);
   assert.equal(r.count, 30);
@@ -59,7 +61,7 @@ test('one file for thirty people, not thirty files', async () => {
 
 test('a token collects once, and the second attempt gets nothing', async () => {
   const { sends } = maakStore();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  filename: 'rapport.pdf' });
 
   const eerst = await haalOp(sends, r.tokens['bob@example.org']);
@@ -75,7 +77,7 @@ test('a token collects once, and the second attempt gets nothing', async () => {
 
 test('one person collecting leaves the file for the others', async () => {
   const { store, sends } = maakStore();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE });
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE) });
 
   await haalOp(sends, r.tokens['anna@example.org']);
   assert.equal(store.blobs.size, 1, 'the file is still there');
@@ -86,7 +88,7 @@ test('one person collecting leaves the file for the others', async () => {
 
 test('the file goes when the last person is settled', async () => {
   const { store, sends } = maakStore();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE });
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE) });
 
   await haalOp(sends, r.tokens['anna@example.org']);
   await haalOp(sends, r.tokens['bob@example.org']);
@@ -103,7 +105,7 @@ test('the file goes when the last person is settled', async () => {
 
 test('withdrawing one person does not touch the rest', async () => {
   const { sends } = maakStore();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE });
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE) });
 
   assert.equal((await sends.revoke(r.id, 'carla@example.org')).ok, true);
   const carla = await haalOp(sends, r.tokens['carla@example.org']);
@@ -115,7 +117,7 @@ test('withdrawing one person does not touch the rest', async () => {
 
 test('withdrawing the last outstanding person drops the file', async () => {
   const { store, sends } = maakStore();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE });
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE) });
 
   await haalOp(sends, r.tokens['anna@example.org']);
   await haalOp(sends, r.tokens['bob@example.org']);
@@ -124,36 +126,48 @@ test('withdrawing the last outstanding person drops the file', async () => {
   assert.equal(store.blobs.size, 0, 'nobody can still collect, so nothing is kept');
 });
 
-test('a fresh invitation kills the old link', async () => {
+test('a reminder does not replace the link, and has a ceiling', async () => {
   const { sends } = maakStore();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE });
-  const oud = r.tokens['bob@example.org'];
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE) });
+  const token = r.tokens['bob@example.org'];
 
-  const nieuw = await sends.reinvite(r.id, 'bob@example.org');
-  assert.equal(nieuw.ok, true);
-  assert.notEqual(nieuw.token, oud);
+  const eerste = await sends.reinvite(r.id, 'bob@example.org');
+  assert.equal(eerste.ok, true);
+  assert.equal(eerste.token, undefined, 'a reminder hands out no new token');
+  assert.equal(eerste.reminders, 1);
 
-  const metOud = await haalOp(sends, oud);
-  assert.equal(metOud.ok, false, 'the link the sender replaced must be dead');
-  assert.equal((await haalOp(sends, nieuw.token)).ok, true);
+  // The link they already have still collects. Minting a new one would have
+  // left them with bytes their token cannot open, because the wrapping in the
+  // store belongs to this token and the relay cannot make another.
+  assert.equal((await haalOp(sends, token)).ok, true,
+    'the invitation in their mailbox is still the one that works');
+
+  // And a sender cannot keep nudging a stranger for ever.
+  const tweede = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE) });
+  for (let i = 1; i <= MAX_REMINDERS; i++) {
+    assert.equal((await sends.reinvite(tweede.id, 'bob@example.org')).ok, true, 'reminder ' + i);
+  }
+  const over = await sends.reinvite(tweede.id, 'bob@example.org');
+  assert.equal(over.ok, false);
+  assert.equal(over.reason, 'reminder_limit');
 });
 
 test('the plan decides how many people may be addressed', async () => {
   const { sends } = maakStore();
   const twintig = Array.from({ length: 20 }, (_, i) => `p${i}@example.org`);
 
-  const gratis = await sends.create({ plan: 'community', blob: INHOUD, addresses: twintig });
+  const gratis = await sends.create({ plan: 'community', blob: INHOUD, addresses: twintig, sealed: sealedVoor(twintig) });
   assert.equal(gratis.ok, false);
   assert.equal(gratis.reason, 'over_limit');
   assert.equal(gratis.limit, 1);
 
-  assert.equal((await sends.create({ plan: 'business', blob: INHOUD, addresses: twintig })).ok, true);
+  assert.equal((await sends.create({ plan: 'business', blob: INHOUD, addresses: twintig, sealed: sealedVoor(twintig) })).ok, true);
 });
 
 test('a bad address is refused before anything is stored', async () => {
   const { store, sends } = maakStore();
   const r = await sends.create({ plan: 'business', blob: INHOUD,
-                                 addresses: ['ok@example.org', 'a@x.org\nBcc: derde@x.org'] });
+                                 addresses: ['ok@example.org', 'a@x.org\nBcc: derde@x.org'], sealed: sealedVoor(['ok@example.org', 'a@x.org\nBcc: derde@x.org']) });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'invalid_address');
   assert.equal(store.blobs.size, 0, 'no file is written for a send that cannot go out');
@@ -162,7 +176,7 @@ test('a bad address is refused before anything is stored', async () => {
 
 test('an unknown token says so without revealing whether the send exists', async () => {
   const { sends } = maakStore();
-  await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE });
+  await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE) });
   for (const bad of ['', 'x', 'a'.repeat(500), null, undefined]) {
     const r = await haalOp(sends, bad);
     assert.equal(r.ok, false);
@@ -172,7 +186,7 @@ test('an unknown token says so without revealing whether the send exists', async
 
 test('a file that is already gone does not count as collected', async () => {
   const { store, sends } = maakStore();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE });
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE) });
   store.blobs.clear();                       // the window closed, or a restart
 
   const p = await haalOp(sends, r.tokens['anna@example.org']);
@@ -189,17 +203,17 @@ test('the window is capped by the plan, not by what the sender asks', async () =
   const jaar = 365 * 24 * 3600 * 1000;
 
   const gratis = await sends.create({ plan: 'community', blob: INHOUD,
-                                      addresses: ['a@example.org'], ttlMs: jaar });
+                                      addresses: ['a@example.org'], sealed: sealedVoor(['a@example.org']), ttlMs: jaar });
   assert.ok(gratis.expires_at - Date.now() <= 3_600_000 + 1000, 'community is one hour');
 
   const zaak = await sends.create({ plan: 'business', blob: INHOUD,
-                                    addresses: DRIE, ttlMs: jaar });
+                                    addresses: DRIE, sealed: sealedVoor(DRIE), ttlMs: jaar });
   assert.ok(zaak.expires_at - Date.now() <= 604_800_000 + 1000, 'business is seven days');
 });
 
 test('the overview shows people, never a token or a hash', async () => {
   const { sends } = maakStore();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  filename: 'rapport.pdf' });
   const view = await sends.overview(r.id);
   const raw = JSON.stringify(view);
@@ -223,11 +237,11 @@ test('a send nobody knows gets a refusal, not a crash', async () => {
 
 test('a sender sees their own sends, newest first, and nobody else\'s', async () => {
   const { sends } = maakStore();
-  const een = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const een = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                    filename: 'een.pdf', accountId: 'acct-1' });
-  const twee = await sends.create({ plan: 'business', blob: INHOUD, addresses: ['x@example.org'],
+  const twee = await sends.create({ plan: 'business', blob: INHOUD, addresses: ['x@example.org'], sealed: sealedVoor(['x@example.org']),
                                     filename: 'twee.pdf', accountId: 'acct-1' });
-  await sends.create({ plan: 'business', blob: INHOUD, addresses: ['y@example.org'],
+  await sends.create({ plan: 'business', blob: INHOUD, addresses: ['y@example.org'], sealed: sealedVoor(['y@example.org']),
                        filename: 'anders.pdf', accountId: 'acct-2' });
 
   const lijst = await sends.list('acct-1');
@@ -243,7 +257,7 @@ test('a sender sees their own sends, newest first, and nobody else\'s', async ()
 
 test('the list answers the one question a sender has: who has not been yet', async () => {
   const { sends } = maakStore();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  filename: 'rapport.pdf', accountId: 'acct-1' });
   await haalOp(sends, r.tokens['anna@example.org']);
   await sends.revoke(r.id, 'bob@example.org');
@@ -258,7 +272,7 @@ test('the list answers the one question a sender has: who has not been yet', asy
 
 test('a send whose window closed stays in the list, marked expired', async () => {
   const { store, sends } = maakStore();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  filename: 'oud.pdf', accountId: 'acct-1' });
   store.meta.delete(r.id);                       // the window closed
 
@@ -270,7 +284,7 @@ test('a send whose window closed stays in the list, marked expired', async () =>
 
 test('a send belongs to one account, and a stranger gets the same answer as a wrong id', async () => {
   const { sends } = maakStore();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  accountId: 'acct-1' });
 
   assert.equal(await sends.ownedBy(r.id, 'acct-1'), true);
@@ -281,7 +295,7 @@ test('a send belongs to one account, and a stranger gets the same answer as a wr
 
 test('the owner is not part of what a sender looks at', async () => {
   const { sends } = maakStore();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  accountId: 'acct-geheim' });
   const raw = JSON.stringify(await sends.overview(r.id));
   assert.ok(!raw.includes('acct-geheim'),

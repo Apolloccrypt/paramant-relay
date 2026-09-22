@@ -45,11 +45,24 @@ test('the guard condition itself is true for a capped plan', () => {
   }
 });
 
-test('the numbers match the single source of truth', () => {
+test('the ceiling never refuses a file the plan sells', () => {
+  // NOT the raw table value, and that is the point. Waking the guard up with
+  // the numbers as written broke paying customers: the table says 8 blocks on
+  // community and 24 on pro, while file_mb says 500 MB on every row, and a
+  // 500 MB file is a hundred blocks that all sit there at once when nobody is
+  // collecting. Measured: pro failed at its 25th block, community at its 9th
+  // transfer. So the ceiling is the plan's own number OR what file_mb already
+  // promises, whichever is larger.
   for (const plan of ['community', 'pro', 'business', 'enterprise']) {
-    assert.equal(limitsFor(plan).concurrent_blobs,
-                 tiers.tierLimitNum(plan, 'concurrent_blobs'),
-                 plan + ' drifted away from tiers.js');
+    const nu = limitsFor(plan).concurrent_blobs;
+    const tabel = tiers.tierLimitNum(plan, 'concurrent_blobs');
+    const mb = tiers.tierLimitNum(plan, 'file_mb');
+    assert.ok(nu >= tabel, plan + ' fell below its own table value');
+    if (Number.isFinite(mb)) {
+      const nodig = Math.ceil((mb * 1048576) / (5 * 1048576));
+      assert.ok(nu >= nodig,
+        plan + ' would refuse a ' + mb + ' MB file it sells: ' + nu + ' blocks, needs ' + nodig);
+    }
   }
 });
 
@@ -63,7 +76,9 @@ test('enterprise is uncapped, and that is deliberate', () => {
 test('an unknown plan lands on community, never on unlimited', () => {
   for (const plan of [undefined, null, '', 'nonsense', 'gold']) {
     assert.equal(limitsFor(plan).concurrent_blobs,
-                 tiers.tierLimitNum('community', 'concurrent_blobs'),
-                 'a plan nobody recognises must get the smallest ceiling');
+                 limitsFor('community').concurrent_blobs,
+                 'a plan nobody recognises must get the community ceiling');
+    assert.equal(Number.isFinite(limitsFor(plan).concurrent_blobs), true,
+                 'and never unlimited');
   }
 });

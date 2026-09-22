@@ -19,11 +19,33 @@ test('community is capped at one named recipient', () => {
   const many = tiers.checkRecipients('community', twenty);
   assert.equal(many.ok, false, 'a free account cannot address twenty people');
   assert.equal(many.reason, 'over_limit');
-  // Counting stops one past the ceiling. Materialising all twenty before saying
-  // no was work an outsider could ask for by the hundred thousand.
-  assert.ok(many.count > many.limit && many.count <= many.limit + 1,
-    'the refusal knows it is over, without walking the whole list');
+  // The refusal names the REAL number. Stopping at limit+1 made the page say
+  // "your plan allows 1, you listed 2" to somebody who had pasted twenty
+  // names: wrong twice in one sentence, on the only screen where she could
+  // have fixed it.
+  assert.equal(many.count, twenty.length,
+    'the sender has to be told how many she actually listed');
   assert.deepEqual(many.recipients, [], 'and hands back no addresses');
+});
+
+test('an absurd list is refused without being walked', () => {
+  // The real worry behind the old limit+1 rule, and it survives: a refusal
+  // must not be free work anybody can ask for by the hundred thousand. The
+  // brake is on items SEEN, because counting only what survived deduplication
+  // left the counter at one while fifty thousand copies were normalised.
+  const vijftigduizend = Array.from({ length: 50000 }, (_, i) => 'p' + i + '@example.org');
+  const t0 = Date.now();
+  const uit = tiers.checkRecipients('community', vijftigduizend);
+  const duur = Date.now() - t0;
+  assert.equal(uit.ok, false);
+  assert.ok(uit.count < 1000, 'it stopped long before the end: counted ' + uit.count);
+  assert.ok(duur < 250, 'and it was cheap: ' + duur + 'ms');
+
+  const zelfde = Array.from({ length: 50000 }, () => 'een@example.org');
+  const t1 = Date.now();
+  tiers.checkRecipients('community', zelfde);
+  assert.ok(Date.now() - t1 < 250,
+    'fifty thousand duplicates must not be normalised either');
 });
 
 test('the paid rows climb: pro ten, business and enterprise thirty', () => {

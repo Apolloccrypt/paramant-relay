@@ -267,6 +267,23 @@ function modeAllows(p) {
   return !a || a.some(x => p === x || p.startsWith(x + '/'));
 }
 
+// Which sector an account lives on, from its key label -- the same derivation
+// GET /v2/key-sector already answers the sender's page with.
+//
+// The invitation link has to carry it. An account is valid on exactly ONE
+// sector, and /ontvang/<token> is served by the apex, whose /v2/ goes to
+// health. Without `?r=`, every recipient of a legal or finance sender asks
+// health for a token health has never seen and is told the link cannot be
+// used. The one-link flow learned this already and puts `&r=` in its URL; this
+// is the same fix for the same reason.
+function sectorOfKey(kd) {
+  const label = ((kd && kd.label) || '').toLowerCase();
+  return label.includes('legal')   ? 'legal'
+       : label.includes('finance') ? 'finance'
+       : label.includes('iot')     ? 'iot'
+       : 'health';
+}
+
 // HTML-escape user-supplied strings before embedding in email templates.
 function escHtml(str) {
   return String(str || '')
@@ -4468,7 +4485,14 @@ async function handleRelayRequest(req, res) {
       if (new Set(hashes).size !== hashes.length) {
         res.writeHead(400); return res.end(J({ error: 'duplicate_block' }));
       }
-      const _fileMb = tiers.tierLimitNum(kd.plan, 'file_mb');
+      // Off the ParaSend product axis, like every other ceiling in this file.
+      // Reading kd.plan was the fault parasendLimitsOf exists to end: the
+      // Mollie webhook writes plan_parasend and deliberately never touches the
+      // unified `plan`, so a paying Firm buyer was held to the community
+      // ceiling of one recipient while /pricing sold him ten.
+      const _psend = parasendLimitsOf(kd);
+      const _tier = _psend.tier;
+      const _fileMb = tiers.tierLimitNum(_tier, 'file_mb');
       const _maxBytes = Number.isFinite(_fileMb) ? _fileMb * 1048576 : Infinity;
       let _totaal = 0;
       const delen = [];
@@ -4488,8 +4512,17 @@ async function handleRelayRequest(req, res) {
       }
       const blob = Buffer.concat(delen);
 
+      // `sealed` is a map address -> { token, wrapped_key }, made in the
+      // sender's browser. The wrapping is the file key locked under that one
+      // recipient's token; we keep the wrapping and the hash of the token, and
+      // the token itself passes through once to be put in an email.
+      //
+      // So this relay holds a locked box and no key. Refusing a send without
+      // them is deliberate: a recipient who gets bytes they cannot open is
+      // worse off than one who never got them.
+      const sealed = (input.sealed && typeof input.sealed === 'object') ? input.sealed : null;
       const made = await _sendStore().create({
-        plan: kd.plan, blob, addresses: input.recipients,
+        plan: _tier, blob, addresses: input.recipients, sealed,
         ttlMs: input.ttl_ms, filename: input.filename, accountId: acctOf(apiKey),
       });
       if (!made.ok) {
@@ -4517,8 +4550,10 @@ async function handleRelayRequest(req, res) {
       let gemaild = 0;
       // One invitation per person, never a visible list of the others: who else
       // receives a confidential document is not for the group to know.
+      const sector = sectorOfKey(kd);
       for (const [adres, token] of Object.entries(made.tokens)) {
-        const link = base + '/ontvang/' + encodeURIComponent(token);
+        const link = base + '/ontvang/' + encodeURIComponent(token)
+                   + '?r=' + encodeURIComponent(sector);
         // await, so `invited` counts what a provider accepted instead of how
         // often we tried. A 201 saying "invited: 30" while nothing arrived is
         // worse than an honest lower number.
@@ -4621,10 +4656,16 @@ async function handleRelayRequest(req, res) {
   }
 
   // ── POST /v2/user/sends/reinvite ──────────────────────────────────────────
-  // A fresh link for one person; the old one dies at that moment. The new link
-  // leaves by mail and never through this response: the dashboard does not need
-  // it, and a link that passes through a browser is a link that can be copied
-  // out of one.
+  // A REMINDER, and it carries no new link.
+  //
+  // It used to mint a fresh token and kill the old one, and that destroyed the
+  // file for the person it was meant to help: the file key is wrapped under the
+  // recipient's own token, and this relay cannot make a new wrapping because it
+  // never holds the key. They spent their one-time link on bytes that opened
+  // into nothing. Keeping the token instead is not an option either -- not
+  // writing it down is the whole reason the relay cannot open what it stores.
+  //
+  // So this points at the invitation they already have, which still works.
   if (req.method === 'POST' && path === '/v2/user/sends/reinvite') {
     if (!_internalOk()) return _internalReject();
     try {
@@ -4635,24 +4676,34 @@ async function handleRelayRequest(req, res) {
         res.writeHead(404); return res.end(J({ error: 'unknown_send' }));
       }
       const out = await _sendStore().reinvite(sendId, (input.email || '').toString());
-      if (!out.ok) { res.writeHead(409); return res.end(J({ error: out.reason })); }
-      const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
-      const link = base + '/ontvang/' + encodeURIComponent(out.token);
-      sendResendEmail({
+      if (!out.ok) {
+        res.writeHead(out.reason === 'reminder_limit' ? 429 : 409);
+        return res.end(J({ error: out.reason, limit: out.limit }));
+      }
+      const tot = new Date(out.expires_at || Date.now()).toLocaleString('en-GB',
+        { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+          timeZone: 'Europe/Amsterdam', timeZoneName: 'short' });
+      // Awaited, so the dashboard's "reminder sent" is about what happened.
+      const bezorgd = await mailer.stuur({
         to: out.email,
-        subject: 'Your link to the file, again',
-        text: 'Here is your link again: ' + link
-            + '\n\nThe earlier link no longer works. This one is yours alone and works once.',
-        html: '<p>Here is your link again:</p>'
-            + '<p><a href="' + link + '" style="display:inline-block;padding:11px 18px;'
-            + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">'
-            + 'Open the file</a></p>'
-            + '<p style="color:#666;font-size:13px">The earlier link no longer works. '
-            + 'This one is yours alone and works once.</p>',
+        subject: 'A reminder: a file is still waiting for you',
+        text: 'A file is still waiting for you.\n\nUse the link in the earlier mail '
+            + 'from Paramant; it still works and it is still yours alone. '
+            + 'Available until ' + tot + '.',
+        html: '<p>A file is still waiting for you.</p>'
+            + '<p>Use the link in the earlier mail from Paramant. It still works, '
+            + 'and it is still yours alone.</p>'
+            + '<p style="color:#666;font-size:13px">Available until ' + escHtml(tot) + '. '
+            + 'Cannot find that mail? Ask the sender to send the file again.</p>',
       });
-      log('info', 'send_recipient_reinvited', { id: sendId });
+      if (!bezorgd || !bezorgd.ok) {
+        log('warn', 'reminder_not_mailed', { id: sendId, reason: bezorgd && bezorgd.reason });
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'reminder_not_sent' }));
+      }
+      log('info', 'send_recipient_reminded', { id: sendId, reminders: out.reminders });
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true }));
+      return res.end(J({ ok: true, reminders: out.reminders }));
     } catch (err) {
       if (redisOutage503(err, res)) return;
       res.writeHead(500); return res.end(J({ error: 'internal' }));
@@ -6873,28 +6924,49 @@ async function handleRelayRequest(req, res) {
   // tells a caller nothing about which sends exist. The reason sits in the body
   // for the person who legitimately holds the link and needs to know why it
   // stopped working.
-  function _pickupRefused(res, reason) {
+  function _pickupRefused(res, reason, limit) {
     const status = reason === 'already_collected' ? 410
                  : reason === 'revoked' ? 403
-                 : reason === 'expired' ? 410 : 404;
+                 : reason === 'expired' ? 410
+                 : reason === 'too_many_codes' ? 429
+                 : reason === 'too_many_tries' ? 429 : 404;
     log('info', 'pickup_refused', { reason });
-    res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-    return res.end(J({ error: reason }));
+    const kop = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
+    if (status === 429) kop['Retry-After'] = '3600';
+    res.writeHead(status, kop);
+    return res.end(J({ error: reason, limit: limit || undefined }));
   }
 
   const pickm = path.match(/^\/v2\/pickup\/([A-Za-z0-9_-]{16,128})$/);
-  // Step one, and what the link in the invitation points at. A GET with an
-  // effect, deliberately: the reader clicks, and a short code goes to the same
-  // mailbox the invitation went to. It does not claim the link, so clicking
-  // twice costs nothing.
-  if (pickm && req.method === 'GET') {
-    try {
+
+  // Both steps are POST, and that is not pedantry about verbs.
+  //
+  // Asking for a code SENDS A MAIL. As a GET, every Safe Links, Proofpoint or
+  // Barracuda scanner that opens the invitation fired it: the recipient got a
+  // code before they had clicked anything, and a second one when they did.
+  // A scanner does not POST, so this is the whole fix.
+  //
+  // Step one: prove the mailbox. It does not claim the link, so asking twice
+  // costs the recipient nothing but their own ceiling.
+  if (pickm && req.method === 'POST') {
+    let _body = {};
+    try { _body = JSON.parse((await readBody(req, 4096)).toString() || '{}') || {}; }
+    catch (_) { _body = {}; }
+
+    if (_body.action === 'code') {
+     try {
       const vraag = await _sendStore().requestPickup(pickm[1]);
-      if (!vraag.ok) return _pickupRefused(res, vraag.reason);
+      if (!vraag.ok) {
+        return _pickupRefused(res, vraag.reason, vraag.limit);
+      }
       // The code leaves through the mailer, never through this response.
       // Whoever holds the link must already be able to read that mailbox.
       const minuten = Math.round(vraag.expires_in_s / 60);
-      sendResendEmail({
+      // Awaited, so "we sent you a code" is a statement about what happened
+      // rather than about what was attempted. Fire-and-forget meant a recipient
+      // could sit waiting for a mail the provider had already refused, with
+      // their previous working code overwritten.
+      const bezorgd = await mailer.stuur({
         to: vraag.email,
         subject: 'Your code to open the file',
         text: 'Your code is ' + vraag.code + '. It works for ' + minuten + ' minutes.',
@@ -6903,26 +6975,26 @@ async function handleRelayRequest(req, res) {
             + '<p style="color:#666;font-size:13px">It works for ' + minuten
             + ' minutes. If you did not ask for this, you can ignore it.</p>',
       });
+      if (!bezorgd || !bezorgd.ok) {
+        log('warn', 'pickup_code_not_mailed', { reason: bezorgd && bezorgd.reason });
+        res.writeHead(502, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        return res.end(J({ error: 'code_not_sent' }));
+      }
       log('info', 'pickup_code_mailed', {});
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       return res.end(J({ ok: true, step: 'code_sent', sent_to: vraag.masked,
                          expires_in_s: vraag.expires_in_s }));
-    } catch (e) {
+     } catch (e) {
       if (redisOutage503(e, res)) return;
       log('warn', 'pickup_code_failed', { err: e && e.message });
       res.writeHead(500, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'pickup_failed' }));
+     }
     }
-  }
 
-  // Step two: the code, and then the bytes.
-  if (pickm && req.method === 'POST') {
+    // Step two: the code, and then the bytes.
     try {
-      let code = '';
-      try {
-        const body = await readBody(req, 4096);
-        code = String((JSON.parse(body.toString() || '{}') || {}).code || '');
-      } catch (_) { code = ''; }
+      const code = String(_body.code || '');
       const got = await _sendStore().collect(pickm[1], code);
       if (!got.ok) {
         // A wrong or stale code is a separate answer from a link that cannot be
@@ -6950,7 +7022,11 @@ async function handleRelayRequest(req, res) {
         // The name the sender gave the file, so a browser saves something a
         // person recognises instead of a string of random characters.
         'X-Paramant-Filename': encodeURIComponent(got.filename || 'file'),
-        'Access-Control-Expose-Headers': 'X-Paramant-Filename, X-Paramant-Outstanding',
+        // The file key, locked under this recipient's token. The page unwraps
+        // it with the token from its own URL; we never had the means to.
+        'X-Paramant-Key': got.wrapped_key || '',
+        'Access-Control-Expose-Headers':
+          'X-Paramant-Filename, X-Paramant-Outstanding, X-Paramant-Key',
       });
       return res.end(got.blob);
     } catch (e) {

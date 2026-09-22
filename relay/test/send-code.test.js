@@ -15,6 +15,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const { createSendStore, maskEmail, CODE_TRIES, CODE_DIGITS } = require('../lib/send');
+const { sealedVoor } = require('./_sealed');
 
 function nepStore() {
   const blobs = new Map(), meta = new Map();
@@ -24,6 +25,7 @@ function nepStore() {
     async getBlob(id) { const b = blobs.get(id); return b ? Buffer.from(b) : null; },
     async delBlob(id) { blobs.delete(id); },
     async putMeta(id, obj) { meta.set(id, JSON.parse(JSON.stringify(obj))); },
+    async delMeta(id) { meta.delete(id); },
     async getMeta(id) { const r = meta.get(id); return r ? JSON.parse(JSON.stringify(r)) : null; },
   };
 }
@@ -34,7 +36,7 @@ async function opgezet(klok) {
   const store = nepStore();
   const sends = createSendStore(klok ? { store, now: klok } : { store });
   const r = await sends.create({ plan: 'business', blob: INHOUD,
-                                 addresses: ['anna@example.org', 'bob@example.org'],
+                                 addresses: ['anna@example.org', 'bob@example.org'], sealed: sealedVoor(['anna@example.org', 'bob@example.org']),
                                  filename: 'rapport.pdf' });
   return { store, sends, r, token: r.tokens['anna@example.org'] };
 }

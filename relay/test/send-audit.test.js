@@ -25,9 +25,10 @@ const test = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { createSendStore } = require('../lib/send');
+const { createSendStore, MAX_REMINDERS } = require('../lib/send');
 const recipients = require('../lib/recipients');
 const tiers = require('../lib/tiers');
+const { sealedVoor } = require('./_sealed');
 
 const RELAY_SRC = fs.readFileSync(path.join(__dirname, '..', 'relay.js'), 'utf8');
 
@@ -86,7 +87,7 @@ function blokUit(bron, anker, lengte) {
 // ═══════════════════════════════════════════════════════════════════════════
 test('een token levert het bestand precies een keer, ook bij twee kliks tegelijk', async () => {
   const { sends } = maak();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  filename: 'rapport.pdf', accountId: 'acct-1' });
   const token = r.tokens['anna@example.org'];
   const vraag = await sends.requestPickup(token);
@@ -103,7 +104,7 @@ test('een token levert het bestand precies een keer, ook bij twee kliks tegelijk
 
 test('en het overzicht telt geen ophaling minder dan er bytes de deur uit gingen', async () => {
   const { sends } = maak();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  accountId: 'acct-1' });
   const token = r.tokens['anna@example.org'];
   const vraag = await sends.requestPickup(token);
@@ -123,7 +124,7 @@ test('en het overzicht telt geen ophaling minder dan er bytes de deur uit gingen
 // ═══════════════════════════════════════════════════════════════════════════
 test('de code van de ene ontvanger overleeft het codeverzoek van de andere', async () => {
   const { sends } = maak();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  accountId: 'acct-1' });
   const tA = r.tokens['anna@example.org'];
   const tB = r.tokens['bob@example.org'];
@@ -143,7 +144,7 @@ test('de code van de ene ontvanger overleeft het codeverzoek van de andere', asy
 // ═══════════════════════════════════════════════════════════════════════════
 test('veertig gelijktijdige foute codes verbruiken de drie pogingen', async () => {
   const { sends } = maak();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  accountId: 'acct-1' });
   const token = r.tokens['anna@example.org'];
   const vraag = await sends.requestPickup(token);
@@ -158,7 +159,7 @@ test('veertig gelijktijdige foute codes verbruiken de drie pogingen', async () =
 
 test('het aantal codeverzoeken per link heeft een plafond', async () => {
   const { sends } = maak(0);
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  accountId: 'acct-1' });
   const token = r.tokens['anna@example.org'];
 
@@ -177,7 +178,7 @@ test('het aantal codeverzoeken per link heeft een plafond', async () => {
 // ═══════════════════════════════════════════════════════════════════════════
 test('een intrekking overleeft een ophaling die op hetzelfde moment loopt', async () => {
   const { sends } = maak();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  accountId: 'acct-1' });
   const tAnna = r.tokens['anna@example.org'];
   const tBob = r.tokens['bob@example.org'];
@@ -204,7 +205,7 @@ test('een intrekking overleeft een ophaling die op hetzelfde moment loopt', asyn
 // ═══════════════════════════════════════════════════════════════════════════
 test('opnieuw uitnodigen wist geen ophaling uit die op dat moment loopt', async () => {
   const { store, sends } = maak();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  accountId: 'acct-1' });
   const token = r.tokens['anna@example.org'];
   const vraag = await sends.requestPickup(token);
@@ -230,22 +231,28 @@ test('opnieuw uitnodigen wist geen ophaling uit die op dat moment loopt', async 
 
 test('twee keer opnieuw uitnodigen laat precies een werkende link achter', async () => {
   const { sends } = maak();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  accountId: 'acct-1' });
 
+  const token = r.tokens['anna@example.org'];
   const [a, b] = await Promise.all([
     sends.reinvite(r.id, 'anna@example.org'),
     sends.reinvite(r.id, 'anna@example.org'),
   ]);
-  const gemaild = [a, b].filter(x => x.ok);
-  const werkend = [];
-  for (const x of gemaild) {
-    const v = await sends.requestPickup(x.token);
-    if (v.ok) werkend.push(x.token);
-  }
-  assert.equal(werkend.length, gemaild.length,
-    gemaild.length + ' verse links per mail de deur uit, waarvan er ' + werkend.length +
-    ' werken: de ontvanger krijgt een mail met een link die nooit iets doet');
+
+  // Het gat was: allebei gaven ok plus een vers token, maar maar een van de
+  // twee token_hashes overleefde, dus een van de twee mails droeg een link die
+  // nooit iets deed. Een herinnering deelt geen token meer uit, dus dat kan
+  // niet meer bestaan. Wat wel moet kloppen is de telling: twee herinneringen
+  // zijn er twee, ook als ze tegelijk komen.
+  assert.ok(a.ok && b.ok, 'beide herinneringen slagen');
+  assert.equal(a.token, undefined, 'en geen van beide deelt een nieuwe link uit');
+  assert.equal(b.token, undefined);
+  assert.equal(Math.max(a.reminders, b.reminders), 2,
+    'twee gelijktijdige herinneringen tellen als twee, niet als een');
+
+  const v = await sends.requestPickup(token);
+  assert.equal(v.ok, true, 'en de link die zij al had werkt nog steeds');
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -253,16 +260,23 @@ test('twee keer opnieuw uitnodigen laat precies een werkende link achter', async
 // ═══════════════════════════════════════════════════════════════════════════
 test('een dode token laat geen indexregel achter', async () => {
   const { store, sends } = maak(0);
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  accountId: 'acct-1' });
+  // Vijftig pogingen; het plafond hoort ze na drie te weigeren, en geen enkele
+  // mag een tokenregel achterlaten. Voorheen schreef elke heruitnodiging een
+  // nieuwe regel en verwijderde de oude nooit: 53 regels voor drie ontvangers,
+  // elk met de volle bewaartijd van de verzending.
+  let gelukt = 0;
   for (let i = 0; i < 50; i++) {
     const ri = await sends.reinvite(r.id, 'anna@example.org');
-    assert.equal(ri.ok, true, 'reinvite ' + i + ' moest slagen');
+    if (ri.ok) gelukt += 1;
+    else assert.equal(ri.reason, 'reminder_limit', 'weigeren mag alleen op het plafond');
   }
+  assert.equal(gelukt, MAX_REMINDERS, 'het plafond houdt');
+
   const tok = [...store.meta.keys()].filter(k => k.startsWith('tok-'));
   assert.equal(tok.length, DRIE.length,
-    'vijftig keer opnieuw uitnodigen liet ' + tok.length + ' tokenregels achter ' +
-    'voor drie ontvangers, elk met de volle bewaartijd van de verzending');
+    'vijftig pogingen lieten ' + tok.length + ' tokenregels achter voor drie ontvangers');
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -271,9 +285,9 @@ test('een dode token laat geen indexregel achter', async () => {
 test('twee verzendingen tegelijk staan allebei op het dashboard', async () => {
   const { sends } = maak();
   await Promise.all([
-    sends.create({ plan: 'business', blob: INHOUD, addresses: ['a@x.org'],
+    sends.create({ plan: 'business', blob: INHOUD, addresses: ['a@x.org'], sealed: sealedVoor(['a@x.org']),
                    filename: 'een.pdf', accountId: 'acct-1' }),
-    sends.create({ plan: 'business', blob: INHOUD, addresses: ['b@x.org'],
+    sends.create({ plan: 'business', blob: INHOUD, addresses: ['b@x.org'], sealed: sealedVoor(['b@x.org']),
                    filename: 'twee.pdf', accountId: 'acct-1' }),
   ]);
   const lijst = await sends.list('acct-1');
@@ -297,7 +311,7 @@ test('een half aangemaakte verzending laat het bestand niet achter', async () =>
     },
   };
   const sends = createSendStore({ store: kapot });
-  await assert.rejects(sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  await assert.rejects(sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                       accountId: 'acct-1' }));
   assert.equal(echt.blobs.size, 0,
     'de blob staat nog in de durende opslag terwijl de aanroeper een 500 kreeg: ' +
@@ -315,7 +329,7 @@ test('een verzending wordt getoetst aan de bestandsgrens van het plan', async ()
   // van 5 MiB samenvoegen tot 2,5 GB.
   const groot = Buffer.alloc(24 * 1024 * 1024, 1);
   const r = await sends.create({ plan: 'community', blob: groot,
-                                 addresses: ['a@x.org'], accountId: 'acct-1' });
+                                 addresses: ['a@x.org'], sealed: sealedVoor(['a@x.org']), accountId: 'acct-1' });
   assert.ok(Number.isFinite(grens));
   assert.equal(r.ok, true, 'voorwaarde van de test');
   // send.js kent geen enkele bovengrens op blob.length.
@@ -341,19 +355,35 @@ test('POST /v2/sends toetst de omvang van het samengevoegde bestand', () => {
 // 10. De uitnodigingsmail
 // ═══════════════════════════════════════════════════════════════════════════
 test('de bestandsnaam in de uitnodigingsmail gaat door escHtml', () => {
-  const blok = blokUit(RELAY_SRC, "const naam = (input.filename", 1800);
-  assert.match(blok, /escHtml\(\s*naam\s*\)|escHtml\(input\.filename/,
+  const blok = blokUit(RELAY_SRC, "const naamRuw = (input.filename", 1800);
+  // Bewust ruim: deze toets gaat over de VRAAG of de naam ge-escaped wordt
+  // voor hij de HTML in gaat, niet over hoe de variabele heet. De vorige
+  // versie pinde de naam `naam` en brak op een hernoeming binnen dezelfde dag,
+  // wat een uur uitzoekwerk kostte en nul defecten vond.
+  assert.match(blok, /escHtml\(\s*(naam\w*|input\.filename)\s*\)/,
     'de afzender bepaalt input.filename en die gaat onge-escaped in de HTML van ' +
     'maximaal dertig mails naar derden; relay.js heeft escHtml en gebruikt hem ' +
     'wel in de DPA- en factuurmails');
 });
 
 test('de afzender krijgt te horen dat de post niet aankwam', () => {
-  const blok = blokUit(RELAY_SRC, 'function sendResendEmail', 1200);
-  assert.match(blok, /await\s+mailer\.stuur|return\s+mailer\.stuur/,
-    'sendResendEmail vuurt mailer.stuur af en geeft meteen true terug; ' +
-    '"invited: 30" in het 201-antwoord telt pogingen, geen bezorgingen, ' +
-    'en een 4xx van de provider komt alleen in het log terecht');
+  // Drie mails verlaten deze functie richting mensen die geen klant zijn: de
+  // uitnodiging, de code en de herinnering. Alle drie moeten op de bezorging
+  // wachten, anders is wat de afzender of de ontvanger leest een bewering over
+  // een poging in plaats van over een feit. De oude toets keek naar
+  // sendResendEmail, dat fire-and-forget is en voor dit pad niet meer gebruikt
+  // wordt; deze kijkt naar de drie plekken zelf.
+  for (const anker of ['subject: \'A file is waiting for you\'',
+                       'subject: \'Your code to open the file\'',
+                       'subject: \'A reminder: a file is still waiting for you\'']) {
+    const i = RELAY_SRC.indexOf(anker);
+    assert.ok(i > 0, 'mail niet gevonden: ' + anker);
+    const voor = RELAY_SRC.slice(Math.max(0, i - 400), i);
+    assert.match(voor, /await\s+mailer\.stuur/,
+      anker + ' wordt verstuurd zonder op de bezorging te wachten, dus een 4xx ' +
+      'van de provider komt alleen in het log en de lezer krijgt te horen dat ' +
+      'het gelukt is');
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -365,7 +395,7 @@ test('GET /v2/pickup/:token is bereikbaar zonder API-sleutel', () => {
   assert.ok(poort > 0 && route > 0, 'poort of route niet gevonden');
 
   const uitzondering = RELAY_SRC.slice(poort, poort + 200);
-  const genoemd = /pickup/.test(uitzondering);
+  const genoemd = /pickup/i.test(uitzondering);
 
   assert.ok(route < poort || genoemd,
     'de sleutelpoort staat op regel ' + (RELAY_SRC.slice(0, poort).split('\n').length) +
@@ -390,7 +420,7 @@ test('een foute gok van de een wist de ophaling van de ander niet uit', async ()
   // foute code. Wie een token heeft en blijft gokken, rolt daarmee de staat van
   // iedereen terug, en een teruggerolde ophaling is een tweede levering.
   const { store, sends } = maak();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  accountId: 'acct-1' });
   const tAnna = r.tokens['anna@example.org'];
   const tBob = r.tokens['bob@example.org'];
@@ -424,7 +454,7 @@ test('checkRecipients stopt bij het plafond in plaats van de hele lijst te lopen
 
 test('overview lekt geen token of hash', async () => {
   const { sends } = maak(0);
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  accountId: 'acct-1' });
   const ov = await sends.overview(r.id);
   const tekst = JSON.stringify(ov);
@@ -436,7 +466,7 @@ test('recipients.claimPickup is atomair over een store heen', async () => {
   // De aanname die in recipients.js staat opgeschreven, getoetst op de laag
   // die hem gebruikt. Binnen een array klopt hij; door send.js heen niet.
   const { sends } = maak();
-  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE, sealed: sealedVoor(DRIE),
                                  accountId: 'acct-1' });
   const token = r.tokens['carla@example.org'];
   const vraag = await sends.requestPickup(token);

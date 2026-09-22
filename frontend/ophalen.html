@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+<!-- Belt and braces on top of the nginx header: the token IS the secret and it
+     sits in this page's URL, so nothing may carry it off in a Referer. -->
+<meta name="referrer" content="no-referrer">
 <title>A file is waiting for you &middot; Paramant</title>
 <!--
   The receiving end of a send to named recipients.
@@ -116,6 +119,7 @@
     </div>
   </div>
 </main>
+<script src="/js/send-wrap.js?v=1"></script>
 <script src="/js/ophalen.page.js"></script>
 </body>
 </html>

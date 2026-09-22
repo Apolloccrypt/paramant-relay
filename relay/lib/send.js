@@ -46,6 +46,23 @@ function newSendId() {
 // access to that mailbox collected it".
 //
 // The code is stored hashed, expires quickly, and survives three wrong guesses.
+// How often the sender may nudge one recipient. Each reminder is a mail to
+// somebody who never signed up with us, so this is a courtesy ceiling as much
+// as an abuse one.
+const MAX_REMINDERS = 3;
+
+// The two ceilings that survive a new code.
+//
+// code_tries is per code and resets with every fresh one, which is right for
+// the "2 tries left" line a recipient reads. On its own it was no lock at all:
+// asking for a new code put it back to zero, so three guesses per round times
+// as many rounds as you like. And every round mailed the recipient again, so
+// one link was also an unmetered way to fill a stranger's mailbox from
+// paramant.app.
+//
+// These two count over the life of the link and nothing resets them.
+const MAX_CODE_REQUESTS = 5;
+const MAX_WRONG_TOTAL = 9;
 const CODE_TTL_MS = 15 * 60 * 1000;
 const CODE_TRIES = 3;
 const CODE_DIGITS = 6;
@@ -138,10 +155,23 @@ function createSendStore({ store, log, now }) {
   function opVolgorde(id, werk) {
     const vorige = ketens.get(id) || Promise.resolve();
     const nu = vorige.then(werk, werk);
-    // Keep the chain alive but never let a rejection poison the next caller:
-    // one failed pickup must not break the send for everybody after it.
-    ketens.set(id, nu.then(() => {}, () => {}));
-    nu.finally(() => { if (ketens.get(id) && ketens.size > 500) ketens.delete(id); });
+    // `stil` is the chain the NEXT caller waits on, and it can never reject:
+    // one failed pickup must not break the send for everybody behind it.
+    //
+    // Everything that hangs off the queue hangs off `stil`, never off `nu`.
+    // A `.finally()` on `nu` returns a DERIVED promise that inherits the
+    // rejection and has no handler of its own, and this process turns an
+    // unhandled rejection into emergencyZeroAndExit: one Redis hiccup during
+    // one recipient's pickup would zero every other customer's blobs and stop
+    // the relay. The caller catching its own error does not save it, because
+    // the derived promise is a second, separate one.
+    const stil = nu.then(() => {}, () => {});
+    ketens.set(id, stil);
+    // Drop the entry only while it is still the tail. The old rule looked at
+    // the size of the whole map, so under the very load it was built for it
+    // deleted a chain that had work queued behind it, and two changes to one
+    // send ran side by side again.
+    stil.then(() => { if (ketens.get(id) === stil) ketens.delete(id); });
     return nu;
   }
 
@@ -170,11 +200,11 @@ function createSendStore({ store, log, now }) {
     //
     // `tokens` maps each address to its one-time token. The caller mails those
     // and then forgets them: they cannot be recovered from what is stored.
-    async create({ plan, blob, addresses, ttlMs, filename, accountId }) {
+    async create({ plan, blob, addresses, ttlMs, filename, accountId, sealed }) {
       if (!Buffer.isBuffer(blob) || blob.length === 0) {
         return { ok: false, reason: 'no_blob' };
       }
-      const built = recipients.buildRecipients(plan, addresses, clock());
+      const built = recipients.buildRecipients(plan, addresses, clock(), sealed);
       if (!built.ok) {
         return { ok: false, reason: built.reason, limit: built.limit,
                  asked: built.asked, rejected: built.rejected };
@@ -182,10 +212,20 @@ function createSendStore({ store, log, now }) {
       const id = newSendId();
       const ttl = windowFor(plan, ttlMs);
       const created = clock();
+      // The ceiling belongs to the layer that writes the bytes down, not only
+      // to the route that happens to call it today. A second caller, or a
+      // route that grows an extra branch, would otherwise bring the unbounded
+      // path straight back.
+      const _plan = tiers.normalisePlan(plan);
+      const _mb = tiers.tierLimitNum(_plan, 'file_mb');
+      if (Number.isFinite(_mb) && blob.length > _mb * 1048576) {
+        return { ok: false, reason: 'too_large', limit: _mb, asked: blob.length };
+      }
+
       const send = {
         id,
         account_id: accountId || null,
-        plan: tiers.normalisePlan(plan),
+        plan: _plan,
         filename: String(filename || '').slice(0, 200),
         salt: built.salt,
         created_at: created,
@@ -194,23 +234,59 @@ function createSendStore({ store, log, now }) {
         records: built.records,
       };
 
-      // Blob first: an index entry pointing at a send whose file never landed
-      // would be a link that 500s. If the blob write fails there is nothing to
-      // clean up, because nothing else exists yet.
-      await store.putBlob(id, blob, ttl);
-      await writeSend(id, send, ttl);
+      // The token index is ONE key space across every account, and the tokens
+      // come out of the sender's browser. Without this check a second account
+      // could put a token it had seen once -- a forwarded invitation, a line in
+      // a proxy log -- into its own `sealed` and take over the row, so the
+      // first sender's recipient is handed somebody else's send while the
+      // dashboard still says "waiting".
+      //
+      // Claimed BEFORE the blob, because a refusal here must leave nothing
+      // behind at all.
+      const geclaimd = [];
       for (const token of Object.values(built.tokens)) {
-        await store.putMeta(tokenIndexId(token), { send: id }, ttl);
+        const sleutel = tokenIndexId(token);
+        const bezet = await store.getMeta(sleutel);
+        if (bezet && bezet.send && bezet.send !== id) {
+          for (const k of geclaimd) { try { await store.delMeta(k); } catch (e) {} }
+          if (log) log('warn', 'send_token_taken', { id });
+          return { ok: false, reason: 'token_taken' };
+        }
+        await store.putMeta(sleutel, { send: id }, ttl);
+        geclaimd.push(sleutel);
       }
+
+      // From here on every failure has to undo what came before it. A half
+      // written send used to leave the file in the store under an id nobody
+      // knew, for as long as a week, and the sender got a 500 that said
+      // nothing about it.
+      try {
+        await store.putBlob(id, blob, ttl);
+        await writeSend(id, send, ttl);
+      } catch (err) {
+        try { await store.delBlob(id); } catch (e) {}
+        for (const k of geclaimd) { try { await store.delMeta(k); } catch (e) {} }
+        if (log) log('error', 'send_create_rolled_back', { id, err: err && err.message });
+        throw err;
+      }
+
       // The account index outlives the send itself, so a sender can still see
       // last week's delivery after the file is gone. Ids only: everything that
       // could identify a recipient stays in the send, which expires on time.
+      //
+      // Queued on the ACCOUNT, because this is read-modify-write on one key
+      // shared by every send that account makes. Two sends started together
+      // both read the old list and the second write dropped the first: that
+      // send then existed, held its file and its tokens, and was invisible on
+      // the dashboard and impossible to withdraw.
       if (accountId) {
         const key = accountIndexId(accountId);
-        const prev = (await store.getMeta(key)) || {};
-        const ids = [id].concat(Array.isArray(prev.sends) ? prev.sends : [])
-          .slice(0, ACCOUNT_INDEX_MAX);
-        await store.putMeta(key, { sends: ids }, ACCOUNT_INDEX_TTL_MS);
+        await opVolgorde('acct:' + accountId, async () => {
+          const prev = (await store.getMeta(key)) || {};
+          const ids = [id].concat(Array.isArray(prev.sends) ? prev.sends : [])
+            .slice(0, ACCOUNT_INDEX_MAX);
+          await store.putMeta(key, { sends: ids }, ACCOUNT_INDEX_TTL_MS);
+        });
       }
       if (log) log('info', 'send_created', { id, count: built.records.length, ttl_ms: ttl });
       return { ok: true, id, tokens: built.tokens, expires_at: send.expires_at,
@@ -267,6 +343,18 @@ function createSendStore({ store, log, now }) {
       const refusal = recipients.pickupRefusal(record);
       if (refusal) return { ok: false, reason: refusal };
 
+      // Counted before the code is minted, so the ceiling holds even when the
+      // mail later fails. Both of these are what stops the reset-and-retry.
+      if ((record.code_requests || 0) >= MAX_CODE_REQUESTS) {
+        if (log) log('warn', 'pickup_code_capped', { id: send.id, dimension: 'requests' });
+        return { ok: false, reason: 'too_many_codes', limit: MAX_CODE_REQUESTS };
+      }
+      if ((record.wrong_total || 0) >= MAX_WRONG_TOTAL) {
+        if (log) log('warn', 'pickup_code_capped', { id: send.id, dimension: 'wrong' });
+        return { ok: false, reason: 'too_many_tries' };
+      }
+      record.code_requests = (record.code_requests || 0) + 1;
+
       const code = newCode();
       record.code_hash = codeHash(send.id, token, code);
       record.code_expires_at = clock() + CODE_TTL_MS;
@@ -309,12 +397,15 @@ function createSendStore({ store, log, now }) {
       if (clock() > (record.code_expires_at || 0)) {
         return { ok: false, reason: 'code_expired' };
       }
-      if ((record.code_tries || 0) >= CODE_TRIES) {
+      if ((record.code_tries || 0) >= CODE_TRIES
+          || (record.wrong_total || 0) >= MAX_WRONG_TOTAL) {
         return { ok: false, reason: 'too_many_tries' };
       }
       if (!sameHash(record.code_hash, codeHash(send.id, token, code))) {
         record.code_tries = (record.code_tries || 0) + 1;
-        const left = CODE_TRIES - record.code_tries;
+        record.wrong_total = (record.wrong_total || 0) + 1;
+        const left = Math.min(CODE_TRIES - record.code_tries,
+                              MAX_WRONG_TOTAL - record.wrong_total);
         await writeSend(send.id, send, Math.max(1000, send.expires_at - clock()));
         if (log) log('info', 'pickup_code_wrong', { id: send.id, tries_left: left });
         return { ok: false, reason: 'wrong_code', tries_left: Math.max(0, left) };
@@ -353,6 +444,10 @@ function createSendStore({ store, log, now }) {
       }
       const view = recipients.overview(send.records);
       return { ok: true, blob, filename: send.filename, email: record.email,
+               // The file key, locked under this recipient's own token. Useless
+               // to us and to anyone who takes it from us; only the holder of
+               // the token can open it, and that token was never written down.
+               wrapped_key: record.wrapped_key || null,
                remaining: view.outstanding, settled };
     },
 
@@ -433,19 +528,28 @@ function createSendStore({ store, log, now }) {
       const want = String(email || '').trim().toLowerCase();
       const record = send.records.find(r => r && r.email === want);
       if (!record) return { ok: false, reason: 'unknown_recipient' };
-      const token = recipients.reinvite(record, clock(), send.records);
-      if (!token) {
+      const uit = recipients.reinvite(record, clock(), send.records);
+      if (!uit) {
         return { ok: false,
                  reason: record.picked_up_at ? 'already_collected'
                        : record.revoked_at ? 'revoked' : 'finished' };
       }
-      const left = Math.max(1000, send.expires_at - clock());
-      await writeSend(id, send, left);
-      await store.putMeta(tokenIndexId(token), { send: id }, left);
-      return { ok: true, token, email: record.email };
+      // A ceiling, because every reminder is a mail to somebody who is not our
+      // customer. Without one, the dashboard button is an unmetered way to
+      // mail a third party from paramant.app.
+      if (uit.reminders > MAX_REMINDERS) {
+        record.reminders = MAX_REMINDERS;
+        return { ok: false, reason: 'reminder_limit', limit: MAX_REMINDERS };
+      }
+      // No new token, so no new index row either: their link is unchanged and
+      // still the only one. That is what makes this a reminder instead of a
+      // replacement -- see the note on recipients.reinvite.
+      await writeSend(id, send, Math.max(1000, send.expires_at - clock()));
+      return { ok: true, email: record.email, reminders: uit.reminders,
+               invited_at: uit.invited_at, expires_at: send.expires_at };
     },
   };
 }
 
 module.exports = { createSendStore, newSendId, tokenIndexId, accountIndexId,
-                   maskEmail, CODE_TTL_MS, CODE_TRIES, CODE_DIGITS };
+                   maskEmail, CODE_TTL_MS, CODE_TRIES, CODE_DIGITS, MAX_REMINDERS, MAX_CODE_REQUESTS, MAX_WRONG_TOTAL };

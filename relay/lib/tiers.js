@@ -189,7 +189,7 @@ function tierLimitNum(plan, dim) {
 //
 // Hence: normalise first, then reject anything that is not a single ordinary
 // address. Better a sender who has to fix a typo than a leak nobody sees.
-const CONTROL_OR_SEPARATOR = /[ -,;<>"\\\s]/;
+const CONTROL_OR_SEPARATOR = /[\x00-\x1f\x7f,;<>"\\\s]/;
 
 function normaliseAddress(raw) {
   if (typeof raw !== 'string') return null;         // arrays, numbers, objects: no
@@ -223,18 +223,35 @@ function normaliseAddress(raw) {
   return email;
 }
 
+// How far past the plan we keep counting, so a refusal can name the real
+// number, and how many items we look at at all before we stop reading.
+const TEL_MARGE = 64;
+const SCAN_MAX = 2000;
+
 function checkRecipients(plan, list) {
   const named = normalisePlan(plan);
   const limit = tierLimitNum(named, 'max_recipients');
   const seen = new Set();
   const recipients = [];
   const items = Array.isArray(list) ? list : [];
+  let bekeken = 0;
   for (const raw of items) {
-    // Stop at the ceiling instead of building the whole list first. A refused
-    // send used to normalise a hundred thousand addresses before saying no,
-    // which is free work for whoever asked.
-    if (recipients.length > limit) break;
+    // TWO ceilings, because they stop two different things.
+    //
+    // The first is on unique addresses, and it deliberately runs a little past
+    // the plan: a sender who pastes twenty names on a plan that allows one has
+    // to be told she listed TWENTY. The old rule stopped at limit+1 and the
+    // page said "your plan allows 1, you listed 2", which is wrong twice in
+    // one sentence.
+    //
+    // The second is on items SEEN, and that one is the real brake. Counting
+    // only what survived deduplication meant fifty thousand copies of one
+    // address kept the counter at one, so the whole list was normalised before
+    // anything was refused: free work for whoever asked for it.
+    if (recipients.length > limit + TEL_MARGE) break;
+    if (bekeken > SCAN_MAX) break;
     if (raw == null || (typeof raw === 'string' && raw.trim() === '')) continue;
+    bekeken += 1;
     const email = normaliseAddress(raw);
     if (!email) {
       return { ok: false, plan: named, limit, recipients: [], count: 0,

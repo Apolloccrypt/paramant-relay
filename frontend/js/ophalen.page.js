@@ -20,6 +20,28 @@
     return parts.length ? decodeURIComponent(parts[parts.length - 1]) : '';
   })();
 
+  // WHICH RELAY HOLDS THIS FILE. An account lives on exactly one sector, and
+  // /ontvang/ is served by the apex, whose /v2/ goes to health. Asking health
+  // for a token that sits on legal gets "this link cannot be used", which is
+  // the most alarming thing we could tell somebody about a confidential file
+  // that is in fact perfectly fine. So the invitation carries `?r=`, exactly
+  // as the one-link flow already does.
+  var SECTOREN = {
+    health:  'https://health.paramant.app',
+    legal:   'https://legal.paramant.app',
+    finance: 'https://finance.paramant.app',
+    iot:     'https://iot.paramant.app',
+  };
+  var RELAY = (function () {
+    var r = '';
+    try { r = new URLSearchParams(location.search).get('r') || ''; } catch (e) { r = ''; }
+    // Same origin when it is one of ours already, so a self-hosted install and
+    // a local test do not get sent to paramant.app.
+    if (/(^|\.)paramant\.app$/.test(location.hostname) === false) return '';
+    return Object.prototype.hasOwnProperty.call(SECTOREN, r) ? SECTOREN[r] : '';
+  })();
+  function pickupUrl() { return RELAY + '/v2/pickup/' + encodeURIComponent(TOKEN); }
+
   var el = function (id) { return document.getElementById(id); };
   var show = function (id) { var n = el(id); if (n) n.hidden = false; };
   var hide = function (id) { var n = el(id); if (n) n.hidden = true; };
@@ -38,11 +60,18 @@
     unknown_token: ['This link cannot be used',
       'The link is not one we recognise. It may have been copied incompletely from the email.'],
     already_collected: ['You already collected this file',
-      'This link works once, and it has been used. If you need the file again, ask the sender for a new link.'],
+      'This link works once, and it has been used. If you still need the file, ask the sender to send it again.'],
     revoked: ['The sender withdrew this link',
-      'Whoever sent the file took this link back. The file itself is untouched; ask them for a new one.'],
+      'Whoever sent the file took this link back. Ask them if you should have had it.'],
     expired: ['This file is no longer available',
       'The window the sender set has closed and the file has been deleted. Ask them to send it again.'],
+    too_many_codes: ['Too many codes were requested for this link',
+      'For your own protection this link is now closed. Ask the sender to send the file again.'],
+    too_many_tries: ['Too many wrong codes',
+      'For your own protection this link is now closed. Ask the sender to send the file again.'],
+    code_not_sent: ['We could not send the code',
+      'The code did not leave our side, so there is nothing in your mailbox to look for. '
+      + 'Try again in a minute.'],
     pickup_failed: ['Something went wrong on our side',
       'That is not your doing. Try again in a minute.'],
   };
@@ -59,8 +88,14 @@
   function vraagCode(knop, zegId) {
     if (knop) knop.disabled = true;
     say(zegId, 'Sending the code...');
-    fetch('/v2/pickup/' + encodeURIComponent(TOKEN), {
-      headers: { 'Accept': 'application/json' }, cache: 'no-store'
+    // POST, not GET. Asking for a code sends a mail, and every Safe Links or
+    // antivirus scanner that opens the invitation would fire a GET: the
+    // recipient got a code before touching anything.
+    fetch(pickupUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ action: 'code' }),
+      cache: 'no-store'
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (b) {
         return { status: r.status, body: b };
@@ -77,6 +112,10 @@
       hide('step-start');
       show('step-code');
       say('code-say', '');
+      // A fresh code means fresh tries, so the button comes back. Leaving it
+      // grey was a dead end on a phone: the numeric keypad has no Enter.
+      var open = el('open');
+      if (open) open.disabled = false;
       var invoer = el('code');
       if (invoer) { invoer.value = ''; invoer.focus(); }
     }).catch(function () {
@@ -99,15 +138,22 @@
     if (knop) knop.disabled = true;
     say('code-say', 'Checking...');
 
-    fetch('/v2/pickup/' + encodeURIComponent(TOKEN), {
+    fetch(pickupUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ code: code }),
       cache: 'no-store'
     }).then(function (r) {
       if (r.status === 200) {
-        var naam = r.headers.get('X-Paramant-Filename') || 'file';
-        return r.blob().then(function (b) { return { ok: true, blob: b, naam: naam }; });
+        // The file key comes back wrapped under this link's own token. The
+        // relay could not open it and neither could the mail provider, which
+        // only ever saw the token and never this wrapping.
+        var wrapped = r.headers.get('X-Paramant-Key') || '';
+        return r.arrayBuffer().then(function (buf) {
+          return openMetToken(new Uint8Array(buf), wrapped);
+        }).then(function (uit) {
+          return { ok: true, blob: uit.blob, naam: uit.naam };
+        });
       }
       return r.json().catch(function () { return {}; })
         .then(function (b) { return { ok: false, status: r.status, body: b }; });
@@ -129,9 +175,10 @@
         return;
       }
       if (reden === 'too_many_tries') {
-        say('code-say', 'Too many wrong codes. Ask the sender for a new link.', 'fail');
-        if (knop) knop.disabled = true;
-        return;
+        return stop('too_many_tries');
+      }
+      if (reden === 'too_many_codes') {
+        return stop('too_many_codes');
       }
       if (reden === 'no_code_requested') {
         hide('step-code'); show('step-start');
@@ -139,10 +186,42 @@
         return;
       }
       stop(reden || 'pickup_failed');
-    }).catch(function () {
+    }).catch(function (err) {
       if (knop) knop.disabled = false;
+      var naam = err && err.message;
+      if (naam === 'no_key' || naam === 'bad_payload' || (err && err.name === 'OperationError')) {
+        // The code was right and the bytes arrived, but this link cannot open
+        // them. Telling somebody to try again would send them round forever.
+        say('code-say', 'The file came through but this link cannot open it. '
+          + 'Ask the sender for a new link.', 'fail');
+        return;
+      }
       say('code-say', 'Could not reach Paramant. Try again.', 'fail');
     });
+  }
+
+
+  // Unwrap the file key with the token from this page's own URL, then open the
+  // bytes. The sealed block is the same shape the one-link flow uses: a 32-byte
+  // key and a 12-byte IV together, and inside, the file name in front of the
+  // file itself.
+  //
+  // Everything here happens in this browser. The relay handed over a locked box
+  // and never had the key to it.
+  async function openMetToken(sealed, wrapped) {
+    if (!wrapped) throw new Error('no_key');
+    var sleutel = await paramantSendWrap.unwrap(TOKEN, wrapped);
+    var key = await crypto.subtle.importKey('raw', sleutel.rawKey,
+                                            { name: 'AES-GCM' }, false, ['decrypt']);
+    var plain = new Uint8Array(await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: sleutel.iv }, key, sealed));
+    // u32 little-endian name length, the name, then the file.
+    var dv = new DataView(plain.buffer, plain.byteOffset, 4);
+    var naamLen = dv.getUint32(0, true);
+    if (naamLen > plain.length - 4) throw new Error('bad_payload');
+    var naam = new TextDecoder().decode(plain.subarray(4, 4 + naamLen)) || 'file';
+    var body = plain.subarray(4 + naamLen);
+    return { naam: naam, blob: new Blob([body], { type: 'application/octet-stream' }) };
   }
 
   var laatste = null;

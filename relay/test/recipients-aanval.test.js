@@ -15,6 +15,7 @@ const test = require('node:test');
 
 const rec = require('../lib/recipients');
 const tiers = require('../lib/tiers');
+const { sealedVoor } = require('./_sealed');
 
 // Werkt zowel met de huidige plain-object tokens-map als met een Map, zodat de
 // test ook slaagt als het gat met een Map gedicht wordt.
@@ -44,7 +45,7 @@ function haalOp(records, token, now) {
 // wordt nooit waar en de blob blijft tot de TTL staan.
 // ---------------------------------------------------------------------------
 test('gat 1: een ontvanger die __proto__ heet laat zijn token verdwijnen', () => {
-  const built = rec.buildRecipients('community', ['__proto__']);
+  const built = rec.buildRecipients('community', ['__proto__'], undefined, sealedVoor(['__proto__']));
   if (!built.ok) return; // het adres weigeren dicht het gat ook
 
   const tokens = uitgedeeldeTokens(built.tokens);
@@ -58,7 +59,7 @@ test('gat 1: een ontvanger die __proto__ heet laat zijn token verdwijnen', () =>
 });
 
 test('gat 1b: een onbereikbaar record houdt de blob eeuwig in de lucht', () => {
-  const built = rec.buildRecipients('pro', ['__proto__', 'anna@example.org']);
+  const built = rec.buildRecipients('pro', ['__proto__', 'anna@example.org'], undefined, sealedVoor(['__proto__', 'anna@example.org']));
   if (!built.ok) return;
 
   for (const t of uitgedeeldeTokens(built.tokens)) haalOp(built.records, t, 1000);
@@ -79,13 +80,13 @@ test('gat 2: komma-smokkel geeft een gratis account meer dan een ontvanger', () 
   assert.equal(genest.ok, false,
     'een geneste array wordt een komma-string en telt als een ontvanger');
 
-  const komma = rec.buildRecipients('community', ['a@example.org, b@example.org']);
+  const komma = rec.buildRecipients('community', ['a@example.org, b@example.org'], undefined, sealedVoor(['a@example.org, b@example.org']));
   assert.equal(komma.ok, false,
     'twee adressen in een veld tellen als een, en delen dan ook nog een token');
 });
 
 test('gat 2b: een adres met een newline smokkelt mailheaders mee', () => {
-  const built = rec.buildRecipients('community', ['a@example.org\nBcc: evil@example.org']);
+  const built = rec.buildRecipients('community', ['a@example.org\nBcc: evil@example.org'], undefined, sealedVoor(['a@example.org\nBcc: evil@example.org']));
   if (!built.ok) return;
 
   for (const r of built.records) {
@@ -96,7 +97,7 @@ test('gat 2b: een adres met een newline smokkelt mailheaders mee', () => {
 
 test('gat 2c: willekeurige rommel wordt als adres geaccepteerd', () => {
   for (const rommel of [{}, 12345, true, ['x']]) {
-    const built = rec.buildRecipients('community', [rommel]);
+    const built = rec.buildRecipients('community', [rommel], undefined, sealedVoor([rommel]));
     assert.equal(built.ok, false,
       `${JSON.stringify(rommel)} is geen adres maar wordt wel een ontvanger ` +
       `(${JSON.stringify(built.records[0] && built.records[0].email)})`);
@@ -105,7 +106,7 @@ test('gat 2c: willekeurige rommel wordt als adres geaccepteerd', () => {
 
 test('gat 2d: er staat geen maximum op de lengte van een adres', () => {
   const lang = 'a'.repeat(1_000_000) + '@example.org';
-  const built = rec.buildRecipients('community', [lang]);
+  const built = rec.buildRecipients('community', [lang], undefined, sealedVoor([lang]));
   if (!built.ok) return;
 
   assert.ok(built.records[0].email.length <= 254,
@@ -136,7 +137,7 @@ test('gat 3: een afgewezen send bouwt eerst de hele lijst in het geheugen', () =
 // kost. Een echt token is 43 tekens.
 // ---------------------------------------------------------------------------
 test('gat 4: een token van 10 MB wordt gewoon gehasht (geen lengtecap)', () => {
-  const built = rec.buildRecipients('pro', ['a@example.org']);
+  const built = rec.buildRecipients('pro', ['a@example.org'], undefined, sealedVoor(['a@example.org']));
   const echt = rec.newPickupToken();
 
   const meet = (tok, n) => {
@@ -161,7 +162,7 @@ test('gat 4: een token van 10 MB wordt gewoon gehasht (geen lengtecap)', () => {
 // intrekking: de status staat weer op 'waiting'.
 // ---------------------------------------------------------------------------
 test('gat 5: een re-invite wekt een ingetrokken ontvanger weer tot leven', () => {
-  const built = rec.buildRecipients('pro', ['weg@example.org']);
+  const built = rec.buildRecipients('pro', ['weg@example.org'], undefined, sealedVoor(['weg@example.org']));
   const record = rec.findByToken(built.records, tokenVoor(built, 'weg@example.org'));
 
   assert.equal(rec.revoke(record, 100), true);
@@ -180,7 +181,7 @@ test('gat 5: een re-invite wekt een ingetrokken ontvanger weer tot leven', () =>
 // naar een blob die al weg is.
 // ---------------------------------------------------------------------------
 test('gat 6: re-invite draait allSettled terug nadat de blob al weg mocht', () => {
-  const built = rec.buildRecipients('pro', ['x@example.org', 'y@example.org']);
+  const built = rec.buildRecipients('pro', ['x@example.org', 'y@example.org'], undefined, sealedVoor(['x@example.org', 'y@example.org']));
   const x = rec.findByToken(built.records, tokenVoor(built, 'x@example.org'));
   const y = rec.findByToken(built.records, tokenVoor(built, 'y@example.org'));
 
@@ -200,16 +201,21 @@ test('gat 6: re-invite draait allSettled terug nadat de blob al weg mocht', () =
 // gevonden is. Een verzoek dat al binnen was met het oude token haalt daarna
 // alsnog op, terwijl regel 19 belooft dat het oude token op dat moment sterft.
 // ---------------------------------------------------------------------------
-test('gat 7: het oude token haalt alsnog op nadat de re-invite het doodde', () => {
-  const built = rec.buildRecipients('pro', ['bob@example.org']);
-  const oud = tokenVoor(built, 'bob@example.org');
+test('gat 7: een herinnering laat de link heel, want een nieuwe ging nooit open', () => {
+  // Dit gat werd gedicht door de oorzaak weg te nemen in plaats van het gevolg.
+  // Een nieuw token kon de wikkeling in de opslag niet openen en de relay kan
+  // niet opnieuw wikkelen, want hij heeft de bestandssleutel niet. De
+  // ontvanger verbrandde dus zijn eenmalige link op bytes die nergens mee
+  // opengingen. Een herinnering wijst nu naar de uitnodiging die hij al heeft.
+  const built = rec.buildRecipients('pro', ['bob@example.org'], undefined, sealedVoor(['bob@example.org']));
+  const token = tokenVoor(built, 'bob@example.org');
+  const record = rec.findByToken(built.records, token);
 
-  const record = rec.findByToken(built.records, oud); // verzoek met het oude token
-  rec.reinvite(record, 300);                          // afzender: "stuur opnieuw"
+  rec.reinvite(record, 300);
 
-  assert.equal(rec.findByToken(built.records, oud), null, 'het oude token vindt niemand meer');
-  assert.equal(rec.markPickedUp(record, 400), false,
-    'maar het opeisen kijkt alleen naar het record, dus het dode token haalt op');
+  assert.ok(rec.findByToken(built.records, token), 'zijn link blijft vindbaar');
+  assert.equal(rec.markPickedUp(record, 400, token), true, 'en haalt gewoon op');
+  assert.equal(rec.markPickedUp(record, 500, token), false, 'maar precies een keer');
 });
 
 // ---------------------------------------------------------------------------
@@ -219,7 +225,7 @@ test('gat 7: het oude token haalt alsnog op nadat de re-invite het doodde', () =
 // download het token), dus het venster tussen kijken en markeren is echt.
 // ---------------------------------------------------------------------------
 test('gat 8: twee gelijktijdige verzoeken krijgen allebei de blob', async () => {
-  const built = rec.buildRecipients('pro', ['race@example.org']);
+  const built = rec.buildRecipients('pro', ['race@example.org'], undefined, sealedVoor(['race@example.org']));
   const token = tokenVoor(built, 'race@example.org');
   let uitgeleverd = 0;
 
@@ -278,7 +284,7 @@ test('gat 9b: de hoofdletter I met punt vouwt niet terug op i', () => {
 // nette 404.
 // ---------------------------------------------------------------------------
 test('gat 10: een lege plek in de tabel laat de pickup-route crashen', () => {
-  const built = rec.buildRecipients('pro', ['anna@example.org']);
+  const built = rec.buildRecipients('pro', ['anna@example.org'], undefined, sealedVoor(['anna@example.org']));
   const kapot = [null, ...built.records];
   const token = tokenVoor(built, 'anna@example.org');
 
@@ -296,7 +302,7 @@ test('gat 10: een lege plek in de tabel laat de pickup-route crashen', () => {
 // met ParaSign, een half dump) is dat geen pseudoniem maar het adres zelf.
 // ---------------------------------------------------------------------------
 test('gat 11: email_hash is offline terug te rekenen door te raden', () => {
-  const built = rec.buildRecipients('pro', ['Anna@Example.org']);
+  const built = rec.buildRecipients('pro', ['Anna@Example.org'], undefined, sealedVoor(['Anna@Example.org']));
   const geraden = rec.recipientEmailHash('anna@example.org');
 
   assert.notEqual(built.records[0].email_hash, geraden,

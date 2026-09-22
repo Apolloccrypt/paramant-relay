@@ -9,11 +9,12 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const rec = require('../lib/recipients');
+const { sealedVoor } = require('./_sealed');
 
 const three = ['anna@example.org', 'bob@example.org', 'carla@example.org'];
 
 test('every recipient gets their own token, and tokens are not stored', () => {
-  const built = rec.buildRecipients('business', three);
+  const built = rec.buildRecipients('business', three, undefined, sealedVoor(three));
   assert.equal(built.ok, true);
   assert.equal(built.records.length, 3);
 
@@ -32,7 +33,7 @@ test('every recipient gets their own token, and tokens are not stored', () => {
 });
 
 test('a token collects once; the second attempt is refused', () => {
-  const built = rec.buildRecipients('business', three);
+  const built = rec.buildRecipients('business', three, undefined, sealedVoor(three));
   const token = built.tokens['bob@example.org'];
 
   // claimPickup is the only way in: looking up and claiming in one step is what
@@ -49,7 +50,7 @@ test('a token collects once; the second attempt is refused', () => {
 });
 
 test('one person collecting does not touch anybody else', () => {
-  const built = rec.buildRecipients('business', three);
+  const built = rec.buildRecipients('business', three, undefined, sealedVoor(three));
   rec.claimPickup(built.records, built.tokens['anna@example.org'], 1000);
 
   const view = rec.overview(built.records);
@@ -59,7 +60,7 @@ test('one person collecting does not touch anybody else', () => {
 });
 
 test('an unknown or empty token finds nobody', () => {
-  const built = rec.buildRecipients('pro', three);
+  const built = rec.buildRecipients('pro', three, undefined, sealedVoor(three));
   for (const bad of [rec.newPickupToken(), '', null, undefined, 'x']) {
     assert.equal(rec.findByToken(built.records, bad), null);
   }
@@ -67,7 +68,7 @@ test('an unknown or empty token finds nobody', () => {
 });
 
 test('revoking one person leaves the rest working', () => {
-  const built = rec.buildRecipients('business', three);
+  const built = rec.buildRecipients('business', three, undefined, sealedVoor(three));
   const carla = rec.findByToken(built.records, built.tokens['carla@example.org']);
   assert.equal(rec.revoke(carla, 500), true);
   assert.equal(rec.pickupRefusal(carla), 'revoked');
@@ -81,26 +82,41 @@ test('revoking one person leaves the rest working', () => {
   assert.equal(view.outstanding, 2);
 });
 
-test('re-inviting mints a new token and kills the old one', () => {
-  const built = rec.buildRecipients('business', three);
-  const oud = built.tokens['bob@example.org'];
-  const bob = rec.findByToken(built.records, oud);
+test('a reminder leaves the link alone, because a new one could not be opened', () => {
+  // This used to mint a fresh token, and that destroyed the file for the very
+  // person it was meant to help: the file key is wrapped under the OLD token,
+  // and the relay cannot re-wrap because it never holds the key. The recipient
+  // typed the right code, spent their one-time link, and got bytes nothing
+  // could open. So a reminder now points at the invitation they already have.
+  const built = rec.buildRecipients('business', three, undefined, sealedVoor(three));
+  const token = built.tokens['bob@example.org'];
+  const bob = rec.findByToken(built.records, token);
 
-  const nieuw = rec.reinvite(bob, 700);
-  assert.ok(nieuw && nieuw !== oud);
-  assert.equal(rec.findByToken(built.records, oud), null, 'the old link is dead');
-  assert.equal(rec.findByToken(built.records, nieuw).email, 'bob@example.org');
+  const uit = rec.reinvite(bob, 700);
+  assert.ok(uit && uit.ok, 'a reminder is allowed while they are still waiting');
   assert.equal(bob.reminders, 1);
-  // The killed link must not work even for a request that still holds the
-  // record: that was the hole, and it is why the token is now required here.
-  assert.equal(rec.markPickedUp(bob, 800, oud), false, 'the dead token cannot collect');
+  assert.equal(bob.reminded_at, 700);
 
-  rec.claimPickup(built.records, nieuw, 900);
-  assert.equal(rec.reinvite(bob, 1000), null, 'no re-invite after collection');
+  // The one thing that matters: their link still works, and still opens.
+  assert.equal(rec.findByToken(built.records, token).email, 'bob@example.org',
+    'the link in their mailbox is the only one there is, and it is untouched');
+  assert.equal(bob.wrapped_key, built.records.find(r => r.email === 'bob@example.org').wrapped_key,
+    'the wrapping still belongs to the token they hold');
+  assert.equal(rec.markPickedUp(bob, 800, token), true, 'and it can still collect');
+
+  assert.equal(rec.reinvite(bob, 1000), null, 'no reminder after collection');
+});
+
+test('a token that was never theirs still cannot collect', () => {
+  const built = rec.buildRecipients('business', three, undefined, sealedVoor(three));
+  const bob = rec.findByToken(built.records, built.tokens['bob@example.org']);
+  const anders = built.tokens['anna@example.org'];
+  assert.equal(rec.markPickedUp(bob, 800, anders), false,
+    'somebody else\'s token must never claim this record');
 });
 
 test('the blob may go once everyone has collected or been revoked', () => {
-  const built = rec.buildRecipients('business', three);
+  const built = rec.buildRecipients('business', three, undefined, sealedVoor(three));
   assert.equal(rec.allSettled([]), false, 'an empty table is not a finished send');
 
   rec.claimPickup(built.records, built.tokens['anna@example.org'], 100);
@@ -114,29 +130,31 @@ test('the blob may go once everyone has collected or been revoked', () => {
 
 test('the plan decides how many people a send may reach', () => {
   const twenty = Array.from({ length: 20 }, (_, i) => `p${i}@example.org`);
-  const free = rec.buildRecipients('community', twenty);
+  const free = rec.buildRecipients('community', twenty, undefined, sealedVoor(twenty));
   assert.equal(free.ok, false);
   assert.equal(free.reason, 'over_limit');
   assert.equal(free.limit, 1);
   assert.equal(free.records.length, 0, 'nothing is built for a refused send');
-  // It also stops counting at the ceiling instead of normalising the whole
-  // list first: a refused send must not be free work for whoever asked.
-  assert.ok(free.asked <= free.limit + 1,
-    'the refusal does not walk the entire list');
+  // And it names the number she actually listed. The old rule stopped at
+  // limit+1, so the page told a sender who had pasted twenty names that she
+  // had listed two.
+  assert.equal(free.asked, twenty.length,
+    'the refusal tells her how many she really listed');
 
-  assert.equal(rec.buildRecipients('business', twenty).ok, true);
+  assert.equal(rec.buildRecipients('business', twenty, undefined, sealedVoor(twenty)).ok, true);
 });
 
 test('the same address written three ways is one recipient', () => {
-  const built = rec.buildRecipients('pro',
-    [' Anna@Example.org', 'anna@example.org', 'ANNA@EXAMPLE.ORG ']);
+  const drie = [' Anna@Example.org', 'anna@example.org', 'ANNA@EXAMPLE.ORG '];
+  // One wrapping, because the sender's browser wraps per NORMALISED address.
+  const built = rec.buildRecipients('pro', drie, undefined, sealedVoor(drie));
   assert.equal(built.records.length, 1);
   assert.equal(built.records[0].email, 'anna@example.org');
   assert.equal(Object.keys(built.tokens).length, 1);
 });
 
 test('the overview shows people, never hashes or tokens', () => {
-  const built = rec.buildRecipients('business', three);
+  const built = rec.buildRecipients('business', three, undefined, sealedVoor(three));
   const view = rec.overview(built.records);
   const raw = JSON.stringify(view);
   assert.ok(!raw.includes('token_hash') && !raw.includes('email_hash'));

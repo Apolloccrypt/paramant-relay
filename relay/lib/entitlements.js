@@ -309,13 +309,38 @@ function _parasendEntitlement(tier) {
       // is false, and the whole guard was skipped on every request since it was
       // written. Blobs live in RAM and only in RAM, so the one thing that
       // bounds memory per tenant did nothing at all.
-      concurrent_blobs: tiers.tierLimitNum(row, 'concurrent_blobs'),
+      //
+      // NEVER BELOW WHAT THE PLAN SELLS. Waking the guard up with the numbers
+      // as written would have refused uploads the customer had paid for: the
+      // table says 8 blocks on community and 24 on pro, while file_mb says 500
+      // MB on every row. A 500 MB file is a hundred blocks, and in a send to
+      // named recipients nobody collects them for hours, so they all sit there
+      // at once. Measured: it broke a pro account at its 25th block and a
+      // community account at its 9th transfer.
+      //
+      // Two dimensions of one plan contradicting each other is a pricing
+      // question, not something to settle quietly inside a guard. So the floor
+      // here is whatever file_mb already promises, and the guard keeps doing
+      // the job it was written for: stopping the unbounded case.
+      concurrent_blobs: _blobCeiling(row),
     }),
     features: Object.freeze({
       transfers: true,
     }),
   });
 }
+// The blocks one account may hold at once: its own ceiling, but never fewer
+// than the largest file its plan allows. MAX_BLOB on the wire is 5 MiB, and a
+// little slack covers padding and the block that is still in flight.
+function _blobCeiling(row) {
+  const eigen = tiers.tierLimitNum(row, 'concurrent_blobs');
+  const mb = tiers.tierLimitNum(row, 'file_mb');
+  if (!Number.isFinite(eigen)) return eigen;          // unlimited stays unlimited
+  if (!Number.isFinite(mb)) return Infinity;          // an uncapped file needs uncapped room
+  const nodig = Math.ceil((mb * 1048576) / (5 * 1048576)) + 8;
+  return Math.max(eigen, nodig);
+}
+
 function _parasignEntitlement(tier) {
   const t = normaliseParasignTier(tier);
   const row = PARASIGN_TIER_TO_TIERS[t];

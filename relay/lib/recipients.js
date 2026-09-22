@@ -94,10 +94,29 @@ function safeHexEqual(a, b) {
 
 // Build the recipient table for a new send.
 //
-// Returns { ok, reason, limit, records, tokens } where `tokens` maps the plain
-// email to its one-time token. The caller mails those out and then forgets
-// them: they are not recoverable from `records`.
-function buildRecipients(plan, list, now) {
+// `sealed` is optional: a map of address -> { token, wrapped_key } prepared in
+// the sender's browser.
+//
+// WHY THE BROWSER MAKES THOSE. The file is sealed with a key this relay never
+// sees. In the ordinary one-link flow that key rides in the fragment of the URL,
+// which a browser does not send to servers. A send to a group cannot do that,
+// because we post the invitation and a fragment would travel through the mail
+// regardless.
+//
+// So the browser wraps the file key under a key derived from each recipient's
+// own token, and hands us only the wrapping. We keep the wrapping and the HASH
+// of the token. The token itself passes through once, to be put in an email,
+// and is never written down.
+//
+// The relay therefore holds a locked box and no key. The mail provider carries
+// a key and has never seen the box. Neither half is enough on its own, and that
+// is the whole point: it is why the token may not be stored here, not even for
+// the length of a send.
+//
+// Returns { ok, reason, limit, records, tokens }. `tokens` maps the address to
+// its one-time token, for the caller to mail and then forget: it cannot be
+// recovered from `records`.
+function buildRecipients(plan, list, now, sealed) {
   const checked = tiers.checkRecipients(plan, list);
   if (!checked.ok) {
     return { ok: false, reason: checked.reason, limit: checked.limit,
@@ -109,13 +128,60 @@ function buildRecipients(plan, list, now) {
   // Object.create(null): a key like __proto__ must be an ordinary entry, not a
   // setter that swallows the token and leaves a recipient who can never collect.
   const tokens = Object.create(null);
+  // No wrappings, no send. The fallback that used to sit here minted a relay
+  // token with wrapped_key null, so every recipient got an invitation, spent
+  // their one-time link, and read "this link cannot open it". Bytes nobody can
+  // read are worse than no bytes at all, and an older frontend or a hand-rolled
+  // API call is exactly how that happened.
+  const meegeleverd = (sealed && typeof sealed === 'object') ? sealed : null;
+  if (!meegeleverd) {
+    return { ok: false, reason: 'missing_wrapped_key', limit: checked.limit,
+             asked: checked.recipients.length, records: [], tokens: {} };
+  }
+  // One token may appear once. findByToken keeps the LAST match, so two
+  // recipients on one token means the first is mailed a code that lands in the
+  // second one's mailbox, is shown a stranger's masked address, and can never
+  // collect -- while allSettled never turns true and the file sits out its TTL.
+  const gezien = new Set();
   for (const email of checked.recipients) {
-    const token = newPickupToken();
+    let token, wrapped = null;
+    {
+      const paar = Object.prototype.hasOwnProperty.call(meegeleverd, email)
+        ? meegeleverd[email] : null;
+      // Every address must come with its own wrapping. One missing entry means
+      // one person who can never open the file, and silently giving them a
+      // relay-made token would hand them bytes they cannot read.
+      // TOKEN_SHAPE is the alphabet the pickup route matches on. A token with a
+      // dot or a percent passes a length check and then fails the route, so the
+      // recipient meets "Invalid API key" on their own link and the sender sees
+      // nothing wrong. The wrapping is base64url for the same reason: it rides
+      // back as an HTTP header, and a stray CR there costs the recipient their
+      // one collection with a 500.
+      if (!paar || typeof paar.token !== 'string' || typeof paar.wrapped_key !== 'string'
+          || !TOKEN_SHAPE.test(paar.token)
+          || paar.token.length > MAX_TOKEN_LEN
+          || !WRAP_SHAPE.test(paar.wrapped_key) || paar.wrapped_key.length > 4096) {
+        return { ok: false, reason: 'missing_wrapped_key', limit: checked.limit,
+                 asked: checked.recipients.length, records: [], tokens: {},
+                 rejected: email };
+      }
+      if (gezien.has(paar.token)) {
+        return { ok: false, reason: 'duplicate_token', limit: checked.limit,
+                 asked: checked.recipients.length, records: [], tokens: {},
+                 rejected: email };
+      }
+      gezien.add(paar.token);
+      token = paar.token;
+      wrapped = paar.wrapped_key;
+    }
     tokens[email] = token;
     records.push({
       email,                              // for the sender's own overview
       email_hash: recipientEmailHash(email, salt),
       token_hash: tokenHash(token),
+      // The file key, locked under this recipient's token. Useless here: we
+      // keep only the hash of the token that opens it.
+      wrapped_key: wrapped,
       invited_at: at,
       picked_up_at: null,
       revoked_at: null,
@@ -129,6 +195,12 @@ function buildRecipients(plan, list, now) {
 // A real token is 43 characters. Anything much longer is somebody making the
 // relay hash megabytes on an unauthenticated route; refuse before the work.
 const MAX_TOKEN_LEN = 128;
+// The alphabet /v2/pickup/:token matches on, and the shape of a wrapping that
+// can travel in a response header. Both are checked where the send is made, so
+// a bad one is a refusal the sender reads rather than a dead link a recipient
+// discovers.
+const TOKEN_SHAPE = /^[A-Za-z0-9_-]{32,128}$/;
+const WRAP_SHAPE  = /^[A-Za-z0-9_-]{16,4096}$/;
 
 // Find the recipient a pickup token belongs to. Walks the whole table so a
 // caller cannot learn which addresses exist by timing the miss. Rows that are
@@ -232,15 +304,32 @@ function revoke(record, now) {
 // then and a fresh token would point at nothing.
 // `records` is optional and last, so existing callers keep working; pass it and
 // the send-is-finished check comes along too.
+// A REMINDER, and deliberately not a new link.
+//
+// This used to mint a fresh token, and that quietly destroyed the file for the
+// person it was meant to help. The file key is wrapped under the recipient's
+// OWN token (frontend/js/send-wrap.js); a new token cannot open the wrapping
+// that is already in the store, and this relay has no way to make a new one,
+// because it never holds the file key. So the recipient typed the right code,
+// burned their one-time link, and read "this link cannot open it" -- with no
+// way back, since the record then counted as collected.
+//
+// It cannot be fixed by keeping the token either: not writing the token down
+// is the whole reason the relay cannot open what it stores. A relay that could
+// re-send the link is a relay that could open the file.
+//
+// So a reminder points at the invitation the recipient already has. Their link
+// is untouched and still works. If the mail is truly gone, the sender sends
+// the file again, which is one action and keeps every promise intact.
 function reinvite(record, now, records) {
   if (!record || typeof record !== 'object') return null;
   if (record.picked_up_at || record.revoked_at) return null;
   if (Array.isArray(records) && allSettled(records)) return null;
-  const token = newPickupToken();
-  record.token_hash = tokenHash(token);
   record.reminders = (record.reminders || 0) + 1;
-  record.invited_at = now || Date.now();
-  return token;
+  record.reminded_at = now || Date.now();
+  // invited_at stays: it is when the link they hold was sent, and the
+  // dashboard uses it to say how long somebody has been waiting.
+  return { ok: true, reminders: record.reminders, invited_at: record.invited_at };
 }
 
 // The blob may go when nobody can still collect it: everyone has either picked
