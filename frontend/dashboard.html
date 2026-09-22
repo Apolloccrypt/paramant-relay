@@ -142,6 +142,20 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-rowsay { font: 500 13px/1.45 var(--sans); color: var(--ink-2); }
 .dh-rowsay.done { color: var(--sig-ok, #4c9a72); }
 .dh-rowsay.fail { color: var(--sig-stop, #d05b52); }
+.dh-send-people { display: flex; flex-direction: column; gap: 2px; padding: 0 26px 14px; }
+.dh-send-person { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
+.dh-send-person:first-child { border-top: 0; }
+.dh-send-who { flex: 1 1 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 13px/1.4 var(--sans); color: var(--ink-1); }
+.dh-send-when { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-3); }
+.dh-dot { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1.3 var(--sans); white-space: nowrap; }
+.dh-dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.dh-dot.collected { color: var(--sig-ok, #4c9a72); }
+.dh-dot.waiting { color: var(--sig-wait, #b58a2b); }
+.dh-dot.revoked { color: var(--ink-3); }
+@media (max-width: 640px) {
+  .dh-send-people { padding: 0 18px 12px; }
+  .dh-send-person { gap: 6px; }
+}
 @media (max-width: 640px) {
   .dh-document-open { grid-template-columns: 1fr; gap: 10px; padding: 15px 18px 11px; }
   .dh-document-foot { padding: 0 18px 14px; }
@@ -588,6 +602,22 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
         <button class="dh-refresh" type="button" id="dh-inbox-refresh">Refresh</button>
       </div>
       <div class="dh-inbox-list" id="dh-inbox-list" aria-live="polite"></div>
+    </section>
+
+    <!-- The sending side. Deliberately ABOVE the signing worklist for an
+         account that sends to groups: the one question a sender has is who has
+         not collected yet, and that question should not need a scroll. Hidden
+         entirely when there is nothing, so a reader who only signs sees the
+         page they had yesterday. -->
+    <section class="dh-workspace" id="dh-sends-section" aria-labelledby="dh-sends-title" hidden>
+      <div class="dh-workspace-head">
+        <div>
+          <h2 id="dh-sends-title">Files you sent</h2>
+          <p>Who has collected, and who has not yet.</p>
+        </div>
+        <button class="dh-refresh" type="button" id="dh-sends-refresh">Refresh</button>
+      </div>
+      <div class="dh-documents" id="dh-sends" aria-live="polite"></div>
     </section>
 
     <section class="dh-workspace" aria-labelledby="dh-documents-title">

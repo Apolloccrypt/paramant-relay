@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>A file is waiting for you &middot; Paramant</title>
+<!--
+  The receiving end of a send to named recipients.
+
+  Whoever opens this has a link from their own mail and nothing else: no
+  account, no password, no session. That is deliberate. A recipient is somebody
+  who was sent something, not somebody who has to register first.
+
+  Two steps, and the page says so before it asks for anything:
+    1. opening this page sends a short code to the same mailbox the invitation
+       went to, so the link alone is not enough
+    2. the code opens the file, once
+
+  The page never shows the full address it mailed. Enough to recognise your own
+  mailbox, not enough to learn somebody else's from a link you found.
+-->
+<style>
+  :root {
+    color-scheme: light;
+    --ink-1: #14181b; --ink-2: #4a545b; --ink-3: #78848c;
+    --line: #dfe4e7; --paper: #f7f8f9; --card: #fff;
+    --accent: #0f5f6b; --accent-soft: #e8f1f2;
+    --ok: #2f7d57; --stop: #b4433a;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink-1: #eef1f2; --ink-2: #b3bcc2; --ink-3: #8a959c;
+      --line: #2a3237; --paper: #14181b; --card: #1b2125;
+      --accent: #6fc0cc; --accent-soft: #14343a;
+      --ok: #6cc194; --stop: #e08278;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink-1);
+         font: 400 16px/1.55 var(--sans); -webkit-font-smoothing: antialiased; }
+  main { max-width: 460px; margin: 0 auto; padding: 48px 20px 72px; }
+  .brand { font: 600 14px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase;
+           color: var(--ink-3); margin-bottom: 28px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          padding: 26px 24px; }
+  h1 { font: 600 21px/1.3 var(--sans); margin: 0 0 8px; }
+  p { margin: 0 0 14px; color: var(--ink-2); }
+  .file { font-weight: 600; color: var(--ink-1); word-break: break-word; }
+  label { display: block; font: 600 13px/1.4 var(--sans); color: var(--ink-1); margin: 18px 0 6px; }
+  input[type=text] { width: 100%; padding: 13px 14px; border: 1px solid var(--line);
+                     border-radius: 8px; background: var(--paper); color: var(--ink-1);
+                     font: 600 20px/1.2 var(--mono); letter-spacing: .28em; text-align: center; }
+  input[type=text]:focus-visible { outline: none; border-color: var(--accent);
+                                   box-shadow: 0 0 0 3px var(--accent-soft); }
+  button { width: 100%; margin-top: 14px; padding: 13px 18px; border: 0; border-radius: 8px;
+           background: var(--accent); color: #fff; font: 600 15px/1.2 var(--sans);
+           cursor: pointer; }
+  button[disabled] { opacity: .55; cursor: default; }
+  .muted { font-size: 13px; color: var(--ink-3); }
+  .note { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .say { margin-top: 14px; font: 500 14px/1.5 var(--sans); }
+  .say.ok { color: var(--ok); }
+  .say.fail { color: var(--stop); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">Paramant</div>
+
+  <div class="card">
+    <div id="step-start">
+      <h1>A file is waiting for you</h1>
+      <p>This link is yours alone and works once.</p>
+      <p>To make sure it is really you, we send a short code to the same mailbox
+         this link arrived in.</p>
+      <button type="button" id="ask">Send me the code</button>
+      <div class="say" id="start-say" role="status"></div>
+    </div>
+
+    <div id="step-code" hidden>
+      <h1>Enter the code</h1>
+      <p>We sent a six-digit code to <span class="file" id="sent-to"></span>.
+         It works for <span id="valid-for">15</span> minutes.</p>
+      <label for="code">Code</label>
+      <input type="text" id="code" inputmode="numeric" autocomplete="one-time-code"
+             maxlength="6" placeholder="000000" aria-describedby="code-say">
+      <button type="button" id="open">Open the file</button>
+      <div class="say" id="code-say" role="status"></div>
+      <div class="note muted">
+        Did not arrive? Check your spam folder, or
+        <a href="#" id="again">send a new code</a>. A new code replaces the old one.
+      </div>
+    </div>
+
+    <div id="step-done" hidden>
+      <h1>Your file is downloading</h1>
+      <p id="done-line">If nothing happened, your browser may have blocked it.</p>
+      <button type="button" id="again-download" hidden>Download again</button>
+      <div class="note muted">
+        This link has now been used. It will not open a second time, which is how
+        the sender knows the file reached you and nobody else.
+      </div>
+    </div>
+
+    <div id="step-stop" hidden>
+      <h1 id="stop-title">This link cannot be used</h1>
+      <p id="stop-line"></p>
+      <div class="note muted">
+        If you think this is a mistake, ask the person who sent it for a new
+        link. They can see whether you collected the file.
+      </div>
+    </div>
+  </div>
+</main>
+<script src="/js/ophalen.page.js"></script>
+</body>
+</html>

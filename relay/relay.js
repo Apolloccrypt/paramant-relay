@@ -4440,6 +4440,110 @@ async function handleRelayRequest(req, res) {
     }
   }
 
+  // ── POST /v2/user/sends: wat dit account naar een groep stuurde ───────────
+  // The sending side of the dashboard, and the thing a customer actually buys:
+  // seeing who collected and who did not. Internal only, same as the signing
+  // worklist above, and the user_id comes from the authenticated session and
+  // never from the browser.
+  if (req.method === 'POST' && path === '/v2/user/sends') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const input = JSON.parse((await readBody(req, 4096)).toString());
+      const userId = (input.user_id || '').toString();
+      if (!userId || userId.length > 200) { res.writeHead(400); return res.end(J({ error: 'invalid_user_id' })); }
+      const out = await _sendStore().list(userId, input.limit);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: true, sends: out.sends, count: out.sends.length }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      log('warn', 'user_sends_failed', { err: err && err.message });
+      res.writeHead(500); return res.end(J({ error: 'internal' }));
+    }
+  }
+
+  // ── POST /v2/user/sends/detail: one send, with its recipients ─────────────
+  if (req.method === 'POST' && path === '/v2/user/sends/detail') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const input = JSON.parse((await readBody(req, 4096)).toString());
+      const userId = (input.user_id || '').toString();
+      const sendId = (input.send_id || '').toString();
+      // Ownership first, and the same answer for "not yours" as for "never
+      // existed": a sender must not be able to probe another account's ids.
+      if (!await _sendStore().ownedBy(sendId, userId)) {
+        res.writeHead(404); return res.end(J({ error: 'unknown_send' }));
+      }
+      const view = await _sendStore().overview(sendId);
+      if (!view.ok) { res.writeHead(404); return res.end(J({ error: 'unknown_send' })); }
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J(view));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      res.writeHead(500); return res.end(J({ error: 'internal' }));
+    }
+  }
+
+  // ── POST /v2/user/sends/revoke ────────────────────────────────────────────
+  // Withdraw one person without touching the rest of the group.
+  if (req.method === 'POST' && path === '/v2/user/sends/revoke') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const input = JSON.parse((await readBody(req, 4096)).toString());
+      const userId = (input.user_id || '').toString();
+      const sendId = (input.send_id || '').toString();
+      if (!await _sendStore().ownedBy(sendId, userId)) {
+        res.writeHead(404); return res.end(J({ error: 'unknown_send' }));
+      }
+      const out = await _sendStore().revoke(sendId, (input.email || '').toString());
+      if (!out.ok) { res.writeHead(409); return res.end(J({ error: out.reason })); }
+      log('info', 'send_recipient_revoked', { id: sendId });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, settled: out.settled }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      res.writeHead(500); return res.end(J({ error: 'internal' }));
+    }
+  }
+
+  // ── POST /v2/user/sends/reinvite ──────────────────────────────────────────
+  // A fresh link for one person; the old one dies at that moment. The new link
+  // leaves by mail and never through this response: the dashboard does not need
+  // it, and a link that passes through a browser is a link that can be copied
+  // out of one.
+  if (req.method === 'POST' && path === '/v2/user/sends/reinvite') {
+    if (!_internalOk()) return _internalReject();
+    try {
+      const input = JSON.parse((await readBody(req, 4096)).toString());
+      const userId = (input.user_id || '').toString();
+      const sendId = (input.send_id || '').toString();
+      if (!await _sendStore().ownedBy(sendId, userId)) {
+        res.writeHead(404); return res.end(J({ error: 'unknown_send' }));
+      }
+      const out = await _sendStore().reinvite(sendId, (input.email || '').toString());
+      if (!out.ok) { res.writeHead(409); return res.end(J({ error: out.reason })); }
+      const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
+      const link = base + '/ontvang/' + encodeURIComponent(out.token);
+      sendResendEmail({
+        to: out.email,
+        subject: 'Your link to the file, again',
+        text: 'Here is your link again: ' + link
+            + '\n\nThe earlier link no longer works. This one is yours alone and works once.',
+        html: '<p>Here is your link again:</p>'
+            + '<p><a href="' + link + '" style="display:inline-block;padding:11px 18px;'
+            + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">'
+            + 'Open the file</a></p>'
+            + '<p style="color:#666;font-size:13px">The earlier link no longer works. '
+            + 'This one is yours alone and works once.</p>',
+      });
+      log('info', 'send_recipient_reinvited', { id: sendId });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      res.writeHead(500); return res.end(J({ error: 'internal' }));
+    }
+  }
+
   // ── POST /v2/user/envelopes/lookup: heb ik dit document al aangeboden ─────
   // Voor een client die afbrak tussen het aanmaken van de envelope en het
   // opschrijven van het id. Je krijgt alleen antwoord over je eigen account en
@@ -6783,6 +6887,10 @@ async function handleRelayRequest(req, res) {
         // of the group is still outstanding. Never an address of somebody else.
         'X-Paramant-Recipient': encodeURIComponent(got.email || ''),
         'X-Paramant-Outstanding': String(got.remaining),
+        // The name the sender gave the file, so a browser saves something a
+        // person recognises instead of a string of random characters.
+        'X-Paramant-Filename': encodeURIComponent(got.filename || 'file'),
+        'Access-Control-Expose-Headers': 'X-Paramant-Filename, X-Paramant-Outstanding',
       });
       return res.end(got.blob);
     } catch (e) {

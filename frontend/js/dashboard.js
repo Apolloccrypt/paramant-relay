@@ -294,7 +294,158 @@
     checkKeySetup();
     loadOperations();
     loadInbox();
+    loadSends();
     loadDocuments();
+  }
+
+  // ── Files you sent to a group ───────────────────────────────────────────────
+  // The sending side of the dashboard, and the reason somebody pays for this:
+  // one file goes to up to thirty named people, each with their own link, and
+  // the sender needs to know who has not collected yet.
+  //
+  // The row leads with that answer in words. A status chip says what a thing IS;
+  // this says what it is waiting for, and a sender reading a list of twelve
+  // should not have to open any of them to find the one that is stuck.
+  //
+  // Silent when empty. An account that only signs sees the page it had before.
+  var sends = [];
+
+  function loadSends() {
+    var section = document.getElementById('dh-sends-section');
+    var list = document.getElementById('dh-sends');
+    var refresh = document.getElementById('dh-sends-refresh');
+    if (!section || !list) return;
+    if (refresh) { refresh.disabled = true; refresh.textContent = 'Refreshing'; }
+    fetch('/api/user/sends', {
+      credentials: 'include', headers: { 'Accept': 'application/json' }, cache: 'no-store'
+    }).then(function (r) {
+      if (!r.ok) throw new Error('http_' + r.status);
+      return r.json();
+    }).then(function (body) {
+      sends = Array.isArray(body.sends) ? body.sends : [];
+      if (!sends.length) { hide(section); return; }
+      show(section);
+      renderSends();
+    }).catch(function () {
+      // A sending list that cannot be read is not worth an error box on a page
+      // that works otherwise; the refresh button is the way back.
+      hide(section);
+    }).then(function () {
+      if (refresh) { refresh.disabled = false; refresh.textContent = 'Refresh'; }
+    });
+  }
+
+  function sendWaitingLine(s) {
+    if (s.status === 'expired') return 'This send has expired. The file is gone.';
+    if (s.outstanding === 0) return 'Everyone has collected it.';
+    if (s.outstanding === 1) return 'One person has not collected yet.';
+    return s.outstanding + ' people have not collected yet.';
+  }
+
+  function renderSends() {
+    var list = document.getElementById('dh-sends');
+    if (!list) return;
+    list.innerHTML = sends.map(function (s) {
+      var naam = s.filename || 'A file';
+      var deel = (s.collected || 0) + ' of ' + (s.total || 0) + ' collected';
+      var pct = s.total ? Math.round(((s.collected || 0) / s.total) * 100) : 0;
+      var staat = s.status === 'expired' ? 'cancelled'
+                : s.outstanding === 0 ? 'completed' : 'waiting';
+      return '<div class="dh-document" data-send-id="' + esc(s.id || '') + '">' +
+        '<button type="button" class="dh-document-open" data-pa-action="send-open" ' +
+          'data-send-id="' + esc(s.id || '') + '" aria-label="Open details for ' + esc(naam) + '">' +
+          '<div class="dh-document-name"><strong title="' + esc(naam) + '">' + esc(naam) + '</strong>' +
+          '<span>Sent ' + esc(fmtDate(s.created_at)) + '</span></div>' +
+          '<div class="dh-document-progress"><span>' + esc(deel) + '</span>' +
+          '<div class="dh-progress" aria-label="' + esc(deel) + '"><i style="width:' + pct + '%"></i></div></div>' +
+          '<div class="dh-status ' + staat + '">' + (s.status === 'expired' ? 'Expired'
+            : s.outstanding === 0 ? 'Complete' : 'In progress') + '</div>' +
+        '</button>' +
+        '<div class="dh-document-foot">' +
+          '<span class="dh-document-next">' + esc(sendWaitingLine(s)) + '</span>' +
+        '</div>' +
+        '<div class="dh-send-people" data-send-people="' + esc(s.id || '') + '" hidden></div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // The people behind one send. Fetched when the sender opens the row rather
+  // than up front: a list of twelve sends would otherwise pull twelve recipient
+  // lists nobody asked for.
+  function openSend(id) {
+    var host = document.querySelector('[data-send-people="' + cssEscape(id) + '"]');
+    if (!host) return;
+    if (!host.hidden) { host.hidden = true; return; }
+    host.hidden = false;
+    host.innerHTML = '<span class="dh-rowsay">Reading who has been...</span>';
+    fetch('/api/user/sends/' + encodeURIComponent(id), {
+      credentials: 'include', headers: { 'Accept': 'application/json' }, cache: 'no-store'
+    }).then(function (r) { return r.json(); }).then(function (body) {
+      var people = (body && Array.isArray(body.recipients)) ? body.recipients : [];
+      if (!people.length) { host.innerHTML = '<span class="dh-rowsay">No recipients on this send.</span>'; return; }
+      host.innerHTML = people.map(function (p) {
+        var wanneer = p.picked_up_at ? fmtDate(p.picked_up_at) : '';
+        var knoppen = p.status === 'waiting'
+          ? '<button type="button" class="dh-rowbtn" data-pa-action="send-remind" ' +
+              'data-send-id="' + esc(id) + '" data-email="' + esc(p.email) + '">Send again</button>' +
+            '<button type="button" class="dh-rowbtn danger" data-pa-action="send-revoke" ' +
+              'data-send-id="' + esc(id) + '" data-email="' + esc(p.email) + '">Withdraw</button>'
+          : '';
+        return '<div class="dh-send-person">' +
+          '<span class="dh-send-who">' + esc(p.email) + '</span>' +
+          '<span class="dh-dot ' + esc(p.status) + '">' +
+            (p.status === 'collected' ? 'Collected' : p.status === 'revoked' ? 'Withdrawn' : 'Waiting') +
+          '</span>' +
+          (wanneer ? '<span class="dh-send-when">' + esc(wanneer) + '</span>' : '') +
+          knoppen +
+        '</div>';
+      }).join('');
+    }).catch(function () {
+      host.innerHTML = '<span class="dh-rowsay fail">Could not read this send. Try again.</span>';
+    });
+  }
+
+  // Withdrawing is one way, so it asks first, and the safe answer takes the
+  // place the Withdraw button just had. Same rule as a signing request.
+  function askSendRevoke(id, email, button) {
+    var row = button && button.closest ? button.closest('.dh-send-person') : null;
+    if (!row) return;
+    row.innerHTML =
+      '<span class="dh-rowask">Withdraw <strong>' + esc(email) + '</strong>? ' +
+        'Their link stops working. The rest of the group keeps theirs.</span>' +
+      '<button type="button" class="dh-rowbtn" data-pa-action="send-open" ' +
+        'data-send-id="' + esc(id) + '">Keep it</button>' +
+      '<button type="button" class="dh-rowbtn danger" data-pa-action="send-revoke-do" ' +
+        'data-send-id="' + esc(id) + '" data-email="' + esc(email) + '">Yes, withdraw</button>';
+    var veilig = row.querySelector('[data-pa-action="send-open"]');
+    if (veilig && veilig.focus) veilig.focus();
+  }
+
+  function sendAction(pad, id, email, button, klaar) {
+    if (button) button.disabled = true;
+    var row = button && button.closest ? button.closest('.dh-send-person') : null;
+    if (row) row.innerHTML = '<span class="dh-rowsay" role="status">Working...</span>';
+    fetch('/api/user/sends/' + encodeURIComponent(id) + '/' + pad, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ email: email })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (b) {
+        if (!r.ok) throw new Error(b.error || ('http_' + r.status));
+        return b;
+      });
+    }).then(function () {
+      if (row) row.innerHTML = '<span class="dh-rowsay done" role="status">' + esc(klaar) + '</span>';
+      loadSends();
+    }).catch(function (err) {
+      if (row) {
+        row.innerHTML = '<span class="dh-rowsay fail" role="status">' +
+          esc(err.message === 'already_collected' ? 'They already collected it.'
+            : 'That did not go through. Nothing changed.') + '</span>';
+      }
+      // Leave a way back rather than a dead row with an error in it.
+      setTimeout(function () { var h = document.querySelector('[data-send-people="' + cssEscape(id) + '"]'); if (h) { h.hidden = true; openSend(id); } }, 3500);
+    });
   }
 
   function wireActions() {
@@ -338,6 +489,28 @@
       if (act === 'document-cancel') {
         ev.preventDefault();
         cancelDocument(t.getAttribute('data-document-id'), t);
+        return;
+      }
+      if (act === 'send-open') {
+        ev.preventDefault();
+        openSend(t.getAttribute('data-send-id'));
+        return;
+      }
+      if (act === 'send-remind') {
+        ev.preventDefault();
+        sendAction('reinvite', t.getAttribute('data-send-id'),
+                   t.getAttribute('data-email'), t, 'A fresh link is on its way.');
+        return;
+      }
+      if (act === 'send-revoke') {
+        ev.preventDefault();
+        askSendRevoke(t.getAttribute('data-send-id'), t.getAttribute('data-email'), t);
+        return;
+      }
+      if (act === 'send-revoke-do') {
+        ev.preventDefault();
+        sendAction('revoke', t.getAttribute('data-send-id'),
+                   t.getAttribute('data-email'), t, 'Withdrawn. Their link no longer works.');
         return;
       }
       if (act === 'document-open') {

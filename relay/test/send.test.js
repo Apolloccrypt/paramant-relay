@@ -220,3 +220,70 @@ test('a send nobody knows gets a refusal, not a crash', async () => {
     assert.equal((await sends.reinvite(id, 'a@example.org')).ok, false);
   }
 });
+
+test('a sender sees their own sends, newest first, and nobody else\'s', async () => {
+  const { sends } = maakStore();
+  const een = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+                                   filename: 'een.pdf', accountId: 'acct-1' });
+  const twee = await sends.create({ plan: 'business', blob: INHOUD, addresses: ['x@example.org'],
+                                    filename: 'twee.pdf', accountId: 'acct-1' });
+  await sends.create({ plan: 'business', blob: INHOUD, addresses: ['y@example.org'],
+                       filename: 'anders.pdf', accountId: 'acct-2' });
+
+  const lijst = await sends.list('acct-1');
+  assert.deepEqual(lijst.sends.map(s => s.filename), ['twee.pdf', 'een.pdf'],
+    'newest first, because a dashboard is about what just happened');
+  assert.equal(lijst.sends.length, 2, 'and never another account\'s work');
+
+  const ander = await sends.list('acct-2');
+  assert.deepEqual(ander.sends.map(s => s.filename), ['anders.pdf']);
+  assert.equal((await sends.list(null)).sends.length, 0, 'no account, no list');
+  assert.ok(twee.id && een.id);
+});
+
+test('the list answers the one question a sender has: who has not been yet', async () => {
+  const { sends } = maakStore();
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+                                 filename: 'rapport.pdf', accountId: 'acct-1' });
+  await haalOp(sends, r.tokens['anna@example.org']);
+  await sends.revoke(r.id, 'bob@example.org');
+
+  const rij = (await sends.list('acct-1')).sends[0];
+  assert.equal(rij.total, 3);
+  assert.equal(rij.collected, 1);
+  assert.equal(rij.revoked, 1);
+  assert.equal(rij.outstanding, 1, 'one person is still expected');
+  assert.equal(rij.status, 'open');
+});
+
+test('a send whose window closed stays in the list, marked expired', async () => {
+  const { store, sends } = maakStore();
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+                                 filename: 'oud.pdf', accountId: 'acct-1' });
+  store.meta.delete(r.id);                       // the window closed
+
+  const lijst = await sends.list('acct-1');
+  assert.equal(lijst.sends.length, 1, 'a list that quietly shrinks looks like a loss');
+  assert.equal(lijst.sends[0].status, 'expired');
+  assert.equal(lijst.sends[0].id, r.id);
+});
+
+test('a send belongs to one account, and a stranger gets the same answer as a wrong id', async () => {
+  const { sends } = maakStore();
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+                                 accountId: 'acct-1' });
+
+  assert.equal(await sends.ownedBy(r.id, 'acct-1'), true);
+  assert.equal(await sends.ownedBy(r.id, 'acct-2'), false, 'not yours');
+  assert.equal(await sends.ownedBy(r.id, null), false);
+  assert.equal(await sends.ownedBy('nope', 'acct-1'), false, 'and never existed looks the same');
+});
+
+test('the owner is not part of what a sender looks at', async () => {
+  const { sends } = maakStore();
+  const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+                                 accountId: 'acct-geheim' });
+  const raw = JSON.stringify(await sends.overview(r.id));
+  assert.ok(!raw.includes('acct-geheim'),
+    'a field that travels to a browser is a field that can end up elsewhere');
+});

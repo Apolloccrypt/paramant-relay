@@ -92,6 +92,22 @@ function tokenIndexId(token) {
   return 'tok-' + recipients.tokenHash(token);
 }
 
+// The account index. A sender's dashboard has to list what they sent, and a
+// store that only answers by id cannot do that. Kept as a short list of ids per
+// account, newest first, capped: a dashboard shows recent work, and an index
+// that grows without end is a slow page and a memory leak in one.
+const ACCOUNT_INDEX_MAX = 200;
+// The index outlives the sends in it, so a sender can still see last week's
+// delivery after the file and its recipient list are gone. Thirty days.
+const ACCOUNT_INDEX_TTL_MS = 30 * 24 * 3600 * 1000;
+
+function accountIndexId(accountId) {
+  return 'acct-' + crypto.createHash('sha3-256')
+    .update('paramant/send-account/v1\x00', 'utf8')
+    .update(String(accountId || ''), 'utf8')
+    .digest('hex');
+}
+
 function createSendStore({ store, log, now }) {
   if (!store) throw new Error('send: a store is required');
   const clock = typeof now === 'function' ? now : () => Date.now();
@@ -152,6 +168,16 @@ function createSendStore({ store, log, now }) {
       await writeSend(id, send, ttl);
       for (const token of Object.values(built.tokens)) {
         await store.putMeta(tokenIndexId(token), { send: id }, ttl);
+      }
+      // The account index outlives the send itself, so a sender can still see
+      // last week's delivery after the file is gone. Ids only: everything that
+      // could identify a recipient stays in the send, which expires on time.
+      if (accountId) {
+        const key = accountIndexId(accountId);
+        const prev = (await store.getMeta(key)) || {};
+        const ids = [id].concat(Array.isArray(prev.sends) ? prev.sends : [])
+          .slice(0, ACCOUNT_INDEX_MAX);
+        await store.putMeta(key, { sends: ids }, ACCOUNT_INDEX_TTL_MS);
       }
       if (log) log('info', 'send_created', { id, count: built.records.length, ttl_ms: ttl });
       return { ok: true, id, tokens: built.tokens, expires_at: send.expires_at,
@@ -263,6 +289,50 @@ function createSendStore({ store, log, now }) {
                remaining: view.outstanding, settled };
     },
 
+    // Everything this account sent, newest first, for the sender's dashboard.
+    //
+    // A send whose window has closed is gone from the store but still in the
+    // index. It comes back as a row that says so rather than being dropped
+    // silently: "I sent that last week and it expired" is information, and a
+    // list that quietly shrinks looks like something went missing.
+    async list(accountId, limit) {
+      if (!accountId) return { ok: true, sends: [] };
+      const index = await store.getMeta(accountIndexId(accountId));
+      const ids = (index && Array.isArray(index.sends) ? index.sends : [])
+        .slice(0, Math.max(1, Math.min(Number(limit) || 50, 200)));
+      const sends = [];
+      for (const id of ids) {
+        const send = await readSend(id);
+        if (!send) { sends.push({ id, status: 'expired' }); continue; }
+        const view = recipients.overview(send.records);
+        sends.push({
+          id: send.id,
+          filename: send.filename,
+          created_at: send.created_at,
+          expires_at: send.expires_at,
+          size: send.size,
+          status: view.outstanding === 0 ? 'done' : 'open',
+          total: view.total,
+          collected: view.collected,
+          outstanding: view.outstanding,
+          revoked: view.revoked,
+        });
+      }
+      return { ok: true, sends };
+    },
+
+    // Does this send belong to this account?
+    //
+    // Kept out of overview() on purpose: the owner is not part of what a sender
+    // looks at, and a field that travels to a browser is a field that can end up
+    // somewhere else. Every route that touches a send by id asks this first, and
+    // answers a stranger the same way it answers an id that never existed.
+    async ownedBy(id, accountId) {
+      if (!accountId) return false;
+      const send = await readSend(id);
+      return Boolean(send && send.account_id && send.account_id === accountId);
+    },
+
     // What the sender sees. Never tokens, never hashes.
     async overview(id) {
       const send = await readSend(id);
@@ -310,5 +380,5 @@ function createSendStore({ store, log, now }) {
   };
 }
 
-module.exports = { createSendStore, newSendId, tokenIndexId,
+module.exports = { createSendStore, newSendId, tokenIndexId, accountIndexId,
                    maskEmail, CODE_TTL_MS, CODE_TRIES, CODE_DIGITS };

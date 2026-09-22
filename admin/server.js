@@ -2983,6 +2983,68 @@ api.get("/user/documents", authUser, async (req, res) => {
 // documenthash bewust weg en dat blijft zo. Bedoeld voor een client die afbrak
 // tussen het aanmaken van de envelope en het opschrijven van het id, en die nu
 // niet kan vaststellen of hij er al een heeft.
+// ── the sending side of the dashboard ────────────────────────────────────────
+// What this account sent to a group, and who collected it. Same shape as the
+// signing worklist above: the session supplies the user, never the browser.
+api.get("/user/sends", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const relayRes = await callRelay("/v2/user/sends", { user_id, limit: 50 }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/sends GET]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// One send, with its recipients and who has been.
+api.get("/user/sends/:id", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const relayRes = await callRelay("/v2/user/sends/detail",
+      { user_id, send_id: String(req.params.id || "") }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/sends detail]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// Withdraw one recipient. The rest of the group keeps its links.
+api.post("/user/sends/:id/revoke", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const relayRes = await callRelay("/v2/user/sends/revoke",
+      { user_id, send_id: String(req.params.id || ""),
+        email: String((req.body || {}).email || "") }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/sends revoke]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// Send one person a fresh link. The old one stops working at that moment, and
+// the new one goes out by mail, never through this response.
+api.post("/user/sends/:id/reinvite", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  try {
+    const relayRes = await callRelay("/v2/user/sends/reinvite",
+      { user_id, send_id: String(req.params.id || ""),
+        email: String((req.body || {}).email || "") }, "POST");
+    const body = await relayRes.json().catch(() => ({ error: "bad_relay_response" }));
+    return res.status(relayRes.status).json(body);
+  } catch (err) {
+    console.error("[user/sends reinvite]", err.message);
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
 api.get("/user/documents/lookup", authUser, async (req, res) => {
   const { user_id } = req.userSession;
   const docHash = String(req.query.doc_hash || "").trim().toLowerCase();
