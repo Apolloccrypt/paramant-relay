@@ -149,6 +149,31 @@ if (SITE !== BASE) {
     const html = await pagina.text();
     ok('en het is de ophaalpagina', /ophalen|ontvang/i.test(html), html.length + ' bytes');
   }
+
+  // EN DRAAIT DE PAGINA OOK. Een 200 zegt alleen dat nginx het bestand vond.
+  // Productie draagt een CSP die hier lokaal niet bestaat (script-src 'self',
+  // connect-src alleen de eigen sectorhosts), en als die de scripts tegenhoudt
+  // ziet de ontvanger een pagina die niets doet. Dat is met een fetch niet te
+  // zien en met een browser in tien seconden.
+  try {
+    const { chromium } = await import('playwright');
+    const browser = await chromium.launch();
+    const pg = await browser.newPage();
+    const fouten = [];
+    pg.on('pageerror', (e) => fouten.push(String(e.message).slice(0, 120)));
+    pg.on('console', (m) => { if (m.type() === 'error') fouten.push(m.text().slice(0, 120)); });
+    await pg.goto(paginaUrl, { waitUntil: 'networkidle', timeout: 30000 });
+    const zichtbaar = await pg.evaluate(() => document.body.innerText.slice(0, 2000));
+    ok('de pagina draait zijn javascript zonder fouten', fouten.length === 0,
+       fouten.slice(0, 2).join(' | '));
+    ok('en hij biedt de ontvanger een volgende stap',
+       /code|ophalen|open/i.test(zichtbaar), zichtbaar.replace(/\s+/g, ' ').slice(0, 90));
+    await browser.close();
+  } catch (e) {
+    // Geen playwright is geen reden om de rest af te keuren, maar het moet wel
+    // opvallen: zonder deze stap is de CSP niet nagemeten.
+    console.log('-    de browserstap is overgeslagen: ' + String(e.message).slice(0, 80));
+  }
 } else {
   console.log('-    de ontvangstpagina wordt overgeslagen: geen nginx voor ' + BASE);
 }
