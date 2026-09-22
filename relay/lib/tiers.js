@@ -71,6 +71,10 @@ const TIER_LIMITS = Object.freeze({
     view_ttl_ms: 3_600_000, // mirrors legacy _planMaxTtl.dev (1 h)
     max_views: 1,          // mirrors legacy _planMaxViews.free (burn-on-read)
     max_recipients: 1,     // named recipients per send; one is the free story
+    // Signers on one document. Twenty is what every account could already do,
+    // so it stays the floor: a paid ceiling must never be a quiet takeaway from
+    // people who have been using twenty since before it was a plan field.
+    max_parties: 20,
     concurrent_blobs: 8, // one live hand-over at a time, plus slack for its window
     outbound_per_hour: 50,  // mirrors legacy OUTBOUND_RATE.free
   }),
@@ -82,6 +86,7 @@ const TIER_LIMITS = Object.freeze({
     view_ttl_ms: 86_400_000, // 24 h
     max_views: 10,
     max_recipients: 10,
+    max_parties: 20,
     concurrent_blobs: 24, // about three at a time
     outbound_per_hour: 500,  // mirrors legacy OUTBOUND_RATE.pro
   }),
@@ -93,6 +98,7 @@ const TIER_LIMITS = Object.freeze({
     view_ttl_ms: 604_800_000, // 7 d
     max_views: 25,
     max_recipients: 30,
+    max_parties: 30,
     concurrent_blobs: 80, // about ten at a time
     outbound_per_hour: 2000, // its transfers_month; never below pro, which is
                              // what the old table did by leaving it out
@@ -108,6 +114,7 @@ const TIER_LIMITS = Object.freeze({
     // a send and becomes a distribution list, which needs list ownership and a
     // different conversation. Thirty is the product ceiling, not a price step.
     max_recipients: 30,
+    max_parties: 30,
     concurrent_blobs: UNLIMITED,
     outbound_per_hour: UNLIMITED, // mirrors legacy OUTBOUND_RATE.enterprise
   }),
