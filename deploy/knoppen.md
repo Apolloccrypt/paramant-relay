@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **102 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **179 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **181 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -137,6 +137,7 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `LANDEN_TERMIJN_DAGEN` | `scripts/check-landen.mjs` | `7` | hoeveel dagen een tak ongeland mag blijven voordat de poort rood wordt; verzet hem niet om groen te worden, daar is `deploy/landen-uitstel.json` voor |
 | `METING_TIMEOUT_MS` | `scripts/meet-de-server.mjs` | `8000` | hoe lang een meting op productie mag duren voor hij opgeeft |
 | `METING_WACHT_MS` | `scripts/meet-de-server.mjs` | `1500` | hoe lang de grensmeting op stilte wacht; onder de grens antwoordt nginx niet maar wacht hij op een body die nooit komt, en die stilte is het signaal |
+| `PARAMANT_API_KEY` | `scripts/prod-groep-proef.mjs` | geen | de API-sleutel waarmee de proef op de echte server een groepsverzending doet; zonder hem stopt het script meteen |
 | `PARAMANT_BASE_URL` | `scripts/heartbeat/lib.mjs`, `tests/links.test.mjs` en 1 meer | `'https://paramant.app'` | welke site de heartbeat en de linkcontrole meten |
 | `PARAMANT_COSIGN_SCREENSHOT_PATH` | `tests/cosign-document-delivery.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
 | `PARAMANT_DASHBOARD_DETAIL_SCREENSHOT_PATH` | `tests/user-dashboard-documents.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
@@ -213,6 +214,7 @@ overschrijven zonder de code aan te raken.
 | `PARAMANT_REPO` | `scripts/security/audit.sh` | `$HOME/paramant-relay` | welke repo dat script leest |
 | `PARAMANT_REQUIRED_WORKFLOWS` | `deploy/deploy-3.1.sh` | `test.yml csp-inline-check.yml sign-e2e.yml product-heartbeat` | welke CI-workflows groen moeten zijn voor de deploy start |
 | `PARAMANT_SENDER` | `scripts/paramant-cra.sh`, `scripts/paramant-firmware.sh` en 5 meer | `paramant-sender` | afzenderidentiteit in de sectorscripts |
+| `PARAMANT_SITE_CONF` | `deploy/ontvang-route.sh` | `/etc/nginx/sites-enabled/paramant.conf` | welke nginx-conf de /ontvang/-route krijgt; alleen anders op een server waar die conf anders heet |
 | `PARAMANT_SMOKE_API_KEY` | `deploy/deploy-3.1.sh` | leeg | sleutel voor de rooktest na de deploy |
 | `PARAMANT_TMPDIR` | `scripts/paramant-cra.sh`, `scripts/paramant-crypto-audit.sh` en 3 meer | `/run/paramant-tmp` | werkmap van de sectorscripts |
 | `PARAMANT_VERIFY_HEAD` | `deploy/deploy-3.1.sh` | leeg | welke commit --verify-only controleert |
