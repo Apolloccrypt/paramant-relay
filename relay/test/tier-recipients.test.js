@@ -19,7 +19,11 @@ test('community is capped at one named recipient', () => {
   const many = tiers.checkRecipients('community', twenty);
   assert.equal(many.ok, false, 'a free account cannot address twenty people');
   assert.equal(many.reason, 'over_limit');
-  assert.equal(many.count, 20, 'the rejection reports what was asked for');
+  // Counting stops one past the ceiling. Materialising all twenty before saying
+  // no was work an outsider could ask for by the hundred thousand.
+  assert.ok(many.count > many.limit && many.count <= many.limit + 1,
+    'the refusal knows it is over, without walking the whole list');
+  assert.deepEqual(many.recipients, [], 'and hands back no addresses');
 });
 
 test('the paid rows climb: pro ten, business and enterprise thirty', () => {
@@ -63,6 +67,8 @@ test('an empty list is refused, and never silently truncated', () => {
   // The important half: over the limit we reject instead of dropping addresses.
   // Quietly sending to fewer people than asked is the worst failure here.
   const over = tiers.checkRecipients('pro', twenty);
-  assert.equal(over.recipients.length, 20,
-    'the list comes back whole so the caller can report what was refused');
+  assert.equal(over.ok, false);
+  assert.equal(over.reason, 'over_limit');
+  assert.deepEqual(over.recipients, [],
+    'nothing is handed back: the caller tells the sender to trim, not who was cut');
 });

@@ -164,28 +164,99 @@ function tierLimitNum(plan, dim) {
 // send of a confidential document is the worst possible failure: the sender
 // believes twenty people were reached and nineteen never hear about it.
 //
-// Returns { ok, plan, limit, recipients, count, reason }.
-//   recipients  normalised (trimmed, lowercased) and de-duplicated
-//   reason      'empty' | 'over_limit' when ok is false
+// Returns { ok, plan, limit, recipients, count, reason, rejected }.
+//   recipients  validated, NFC-normalised, lowercased and de-duplicated
+//   reason      'empty' | 'over_limit' | 'invalid_address' when ok is false
+//   rejected    the first address that failed validation, for the error message
+
+// One address, or null when it is not one.
+//
+// WHY THIS IS STRICT. The old version did String(raw).trim().toLowerCase() and
+// called it a day, which let three things through that an adversarial pass
+// demonstrated on 22-09:
+//
+//   ['a@x.org','b@x.org'] as ONE entry became the single string
+//   "a@x.org,b@x.org". One recipient by the count, two mailboxes on the wire,
+//   sharing one pickup token. A community account with a ceiling of one reached
+//   two people.
+//
+//   "a@x.org\nBcc: someone@else" survived trim() whole, because trim only takes
+//   the ends. That line feeds the invitation mail: a blind copy of a pickup link
+//   to a third party.
+//
+//   Combining characters meant one mailbox could appear as two recipients with
+//   two live tokens, so revoking one revoked nothing.
+//
+// Hence: normalise first, then reject anything that is not a single ordinary
+// address. Better a sender who has to fix a typo than a leak nobody sees.
+const CONTROL_OR_SEPARATOR = /[ -,;<>"\\\s]/;
+
+function normaliseAddress(raw) {
+  if (typeof raw !== 'string') return null;         // arrays, numbers, objects: no
+  let email;
+  try {
+    // Fold twice: some capitals do not come back to their plain form in one
+    // pass (the Turkish dotted capital I becomes i plus a combining dot).
+    email = raw.normalize('NFC').trim().toLowerCase().normalize('NFC');
+  } catch (_) {
+    return null;
+  }
+  if (!email) return null;
+  if (email.length > 254) return null;               // RFC 5321 ceiling
+  if (CONTROL_OR_SEPARATOR.test(email)) return null; // CR, LF, comma, angle brackets
+  // ASCII only. Internationalised addresses (EAI) are rare in this market and
+  // they carry a whole class of trouble: the Turkish dotted capital I folds to
+  // an i with a separate combining dot, so one mailbox can enter the list twice
+  // as two recipients with two live tokens, and revoking one revokes nothing.
+  // Refusing them is a product choice, and a sender gets a clear error rather
+  // than a silent duplicate.
+  if (!/^[\x20-\x7e]+$/.test(email)) return null;
+  const at = email.indexOf('@');
+  if (at < 1 || at !== email.lastIndexOf('@')) return null;
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  if (!local || local.length > 64) return null;
+  if (!domain || domain.length > 253) return null;
+  if (!domain.includes('.')) return null;
+  if (domain.startsWith('.') || domain.endsWith('.') || domain.includes('..')) return null;
+  if (domain.startsWith('-') || domain.endsWith('-')) return null;
+  return email;
+}
+
 function checkRecipients(plan, list) {
   const named = normalisePlan(plan);
   const limit = tierLimitNum(named, 'max_recipients');
   const seen = new Set();
   const recipients = [];
-  for (const raw of Array.isArray(list) ? list : []) {
-    const email = (raw == null ? '' : String(raw)).trim().toLowerCase();
-    if (!email || seen.has(email)) continue;
+  const items = Array.isArray(list) ? list : [];
+  for (const raw of items) {
+    // Stop at the ceiling instead of building the whole list first. A refused
+    // send used to normalise a hundred thousand addresses before saying no,
+    // which is free work for whoever asked.
+    if (recipients.length > limit) break;
+    if (raw == null || (typeof raw === 'string' && raw.trim() === '')) continue;
+    const email = normaliseAddress(raw);
+    if (!email) {
+      return { ok: false, plan: named, limit, recipients: [], count: 0,
+               reason: 'invalid_address',
+               rejected: typeof raw === 'string' ? raw.slice(0, 80) : typeof raw };
+    }
+    if (seen.has(email)) continue;
     seen.add(email);
     recipients.push(email);
   }
   if (recipients.length === 0) {
-    return { ok: false, plan: named, limit, recipients, count: 0, reason: 'empty' };
+    return { ok: false, plan: named, limit, recipients, count: 0, reason: 'empty',
+             rejected: null };
   }
   if (recipients.length > limit) {
-    return { ok: false, plan: named, limit, recipients, count: recipients.length,
-             reason: 'over_limit' };
+    // Report the ceiling and how far over it went, without handing back the
+    // whole list: the caller only needs to tell the sender to trim it.
+    return { ok: false, plan: named, limit, recipients: [], count: recipients.length,
+             reason: 'over_limit', rejected: null };
   }
-  return { ok: true, plan: named, limit, recipients, count: recipients.length, reason: null };
+  return { ok: true, plan: named, limit, recipients, count: recipients.length,
+           reason: null, rejected: null };
 }
 
 module.exports = {
@@ -196,4 +267,5 @@ module.exports = {
   tierLimitNum,
   isUnlimited,
   checkRecipients,
+  normaliseAddress,
 };
