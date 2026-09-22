@@ -158,6 +158,7 @@ const mollie          = require('./lib/mollie');            // Mollie Payments A
 const billing         = require('./lib/billing');           // Mollie webhook decision state machine
 const billingRecurring = require('./lib/billing-recurring'); // subscription + mandate layer
 const parasignStoreMod = require('./lib/parasign-store');    // durable encrypted /v1 side-store
+const sendMod       = require('./lib/send');            // sends to named recipients
 const parasignStamp = require('./lib/parasign-stamp');       // server-side PDF stamp-worker
 const qes           = require('./lib/qes');                   // qualified-signature layer, off unless flagged
 const tierGate         = require('./lib/tier-gate');         // per-tier feature gate (billing hardening)
@@ -242,7 +243,7 @@ try {
 } catch(e) { log('warn', 'ml_dsa_not_available', { hint: 'build/install @paramant/core', err: e.message }); }
 
 const ALLOWED = {
-  ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
+  ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/pickup','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream',
                '/v2/ack','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
@@ -250,7 +251,7 @@ const ALLOWED = {
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
                '/v2/sth','/v2/verify-receipt','/v2/transfers','/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v2/qes','/v1'],
-  iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/status',
+  iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/pickup','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/ack','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
@@ -2027,6 +2028,27 @@ async function envCreateRateOkShared(apiKey) {
 function _parasignStoreKey() {
   return process.env.PARASIGN_STORE_KEY || process.env.PARAMANT_TOTP_MASTER_KEY || null;
 }
+// ── ParaSend durable store for sends to named recipients ─────────────────────
+// Same machinery, its own namespace. Ordinary transfers keep living in the
+// in-memory Map: five minutes and one reader survive a process fine. A send to
+// thirty people can stand open for a week, and a restart would quietly destroy
+// something a customer is still waiting on, so those go through here.
+//
+// The prefix AND the AAD prefix differ from signing, so neither product can read
+// or unseal the other's documents.
+function _sendStore() {
+  if (!_sendStore._inst) {
+    const store = parasignStoreMod.createParaSignStore({
+      redis: redisClient, encKey: _parasignStoreKey(), log,
+      prefix: 'psend', aadPrefix: 'parasend',
+    });
+    _sendStore._inst = sendMod.createSendStore({ store, log });
+    _sendStore._backend = store.backend;
+    log('info', 'send_store_backend', { backend: store.backend });
+  }
+  return _sendStore._inst;
+}
+
 function _parasignStore() {
   if (!_parasignStore._inst) {
     _parasignStore._inst = parasignStoreMod.createParaSignStore({
@@ -6339,7 +6361,8 @@ async function handleRelayRequest(req, res) {
     try {
       const body = await readBody(req);
       const d    = JSON.parse(body.toString());
-      const { hash, payload, ttl_ms, meta, dsa_signature, max_views: reqMaxViews, password, enc_meta } = d;
+      const { hash, payload, ttl_ms, meta, dsa_signature, max_views: reqMaxViews, password, enc_meta,
+              recipients: reqRecipients, filename: reqFilename } = d;
 
       if (!hash || !payload) { res.writeHead(400); return res.end(J({ error: 'hash and payload required' })); }
       if (!/^[a-f0-9]{64}$/.test(hash)) { res.writeHead(400); return res.end(J({ error: 'hash must be SHA-256 hex' })); }
@@ -6512,6 +6535,37 @@ async function handleRelayRequest(req, res) {
         }
       }
 
+      // ── a send to named recipients ──────────────────────────────────────────
+      // A recipient list turns this from one link that burns on first read into
+      // one file with a token per person. It leaves through the durable store,
+      // not the in-memory Map: this can stand open for a week and a restart must
+      // not destroy something a customer is still waiting on.
+      //
+      // The quota and ceiling checks above already ran, so a send obeys the same
+      // monthly limits as any other transfer.
+      if (reqRecipients !== undefined) {
+        const _plan = (apiKeys.get(apiKey) || {}).plan;
+        const made = await _sendStore().create({
+          plan: _plan, blob, addresses: reqRecipients, ttlMs: ttl,
+          filename: reqFilename, accountId: acctOf(apiKey),
+        });
+        if (!made.ok) {
+          // 403 for a plan ceiling, 400 for something the sender can fix.
+          const status = made.reason === 'over_limit' ? 403 : 400;
+          log('info', 'send_refused', { reason: made.reason, limit: made.limit });
+          res.writeHead(status, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: made.reason, dimension: 'max_recipients',
+                             limit: made.limit, asked: made.asked,
+                             rejected: made.rejected || undefined }));
+        }
+        // The tokens go back to the caller ONCE. They are not recoverable from
+        // anything stored, so whoever asked is the only one who can mail them.
+        res.writeHead(201, { 'Content-Type': 'application/json' });
+        return res.end(J({ ok: true, send_id: made.id, recipients: made.count,
+                           expires_at: new Date(made.expires_at).toISOString(),
+                           tokens: made.tokens }));
+      }
+
       // Append transfer to CT log before storing — so proof is available at outbound time
       const ctEntry = ctAppendTransfer(hash, SECTOR);
       blobPut(hash, { blob, ts: Date.now(), ttl, size: blob.length,
@@ -6608,6 +6662,49 @@ async function handleRelayRequest(req, res) {
   }
 
   // ── GET /v2/outbound/:hash — Burn-on-read ────────────────────────────────────
+  // ── GET /v2/pickup/:token ───────────────────────────────────────────────────
+  // The receiving end of a send to named recipients. The token is the whole
+  // capability: it arrives in one person's mail, it names the send, and it works
+  // exactly once. There is no account here and there must not be one, because a
+  // recipient is somebody who was sent something, not somebody with a login.
+  //
+  // Every refusal gives the same shape of answer whether the token never
+  // existed, was already used or was withdrawn, so a caller cannot map which
+  // sends exist by trying tokens. The reason is in the body for the person who
+  // legitimately holds the link and needs to know why it stopped working.
+  const pickm = path.match(/^\/v2\/pickup\/([A-Za-z0-9_-]{16,128})$/);
+  if (pickm && req.method === 'GET') {
+    try {
+      const got = await _sendStore().pickup(pickm[1]);
+      if (!got.ok) {
+        const status = got.reason === 'already_collected' ? 410
+                     : got.reason === 'revoked' ? 403
+                     : got.reason === 'expired' ? 410 : 404;
+        log('info', 'pickup_refused', { reason: got.reason });
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: got.reason }));
+      }
+      log('info', 'pickup_served', { bytes: got.blob.length, remaining: got.remaining,
+                                     settled: got.settled });
+      incMetric('bytes_out_total', got.blob.length);
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': got.blob.length,
+        'Cache-Control': 'no-store',
+        // What the receiver's client needs to show who it was for and how much
+        // of the group is still outstanding. Never an address of somebody else.
+        'X-Paramant-Recipient': encodeURIComponent(got.email || ''),
+        'X-Paramant-Outstanding': String(got.remaining),
+      });
+      return res.end(got.blob);
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      log('warn', 'pickup_failed', { err: e && e.message });
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'pickup_failed' }));
+    }
+  }
+
   const outm = path.match(/^\/v2\/outbound\/([a-f0-9]{64})$/);
   if (outm && req.method === 'GET') {
     const entry = blobStore.get(outm[1]);
