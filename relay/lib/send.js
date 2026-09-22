@@ -427,7 +427,7 @@ function createSendStore({ store, log, now }) {
       if (!found.ok) return found;
       const { send, record } = found;
 
-      const refusal = recipients.pickupRefusal(record);
+      const refusal = recipients.pickupRefusal(record, clock());
       if (refusal) return { ok: false, reason: refusal };
 
       this._verlooptellers(record);
@@ -481,7 +481,7 @@ function createSendStore({ store, log, now }) {
       if (!found.ok) return found;
       const { send, record } = found;
 
-      const refusal = recipients.pickupRefusal(record);
+      const refusal = recipients.pickupRefusal(record, clock());
       if (refusal) return { ok: false, reason: refusal };
 
       this._verlooptellers(record);
@@ -548,6 +548,29 @@ function createSendStore({ store, log, now }) {
                // the token can open it, and that token was never written down.
                wrapped_key: record.wrapped_key || null,
                remaining: view.outstanding, settled };
+    },
+
+    // De ontvanger heeft het bestand geopend. Pas hier is de link echt op.
+    //
+    // Tot deze bevestiging staat de claim "bezig": een verbinding die wegvalt,
+    // een tab die sluit, een wikkeling die niet opengaat -- in al die gevallen
+    // krijgt de ontvanger zijn kans terug zodra het venster om is. Een server
+    // kan niet zien of bytes aankwamen; alleen de ontvanger weet dat.
+    async confirm(token) {
+      const found = await this._zoekSend(token);
+      if (!found.ok) return { ok: false, reason: found.reason };
+      return opVolgorde(found.id, async () => {
+        const send = await readSend(found.id);
+        if (!send) return { ok: false, reason: 'unknown_send' };
+        const record = recipients.findByToken(send.records, token);
+        if (!record) return { ok: false, reason: 'unknown_token' };
+        if (!recipients.bevestigPickup(record, clock())) {
+          return { ok: false, reason: 'not_collected' };
+        }
+        await writeSend(found.id, send, Math.max(1000, send.expires_at - clock()));
+        if (log) log('info', 'pickup_confirmed', { id: found.id });
+        return { ok: true };
+      });
     },
 
     // The file may go now: the bytes are out the door. Called from the route on

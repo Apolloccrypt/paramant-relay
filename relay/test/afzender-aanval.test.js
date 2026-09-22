@@ -358,7 +358,7 @@ test('intrekken na ophalen kan niet, en herinneren na intrekken ook niet', async
 //
 // Voor een account MET account_id in users.json zijn dat twee verschillende
 // strings. Deze test legt vast wat daar dan gebeurt.
-test('het dashboard vraagt op de sleutel en ziet zijn verzending gewoon', async () => {
+test('het dashboard vraagt op de sleutel en ziet zijn verzending gewoon', { todo: 'GEDICHT: relay.js vertaalt de API-sleutel nu naar het account (accountVan). Bewaakt door test/dashboard-eigenaar.test.js, dat het juiste gedrag pint in plaats van het kapotte' }, async () => {
   const s = await verstuur(SLEUTEL_A, ['negen@extern.test']);
 
   const opAccount = await intern('/v2/user/sends', { user_id: ACCT_A });

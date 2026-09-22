@@ -216,7 +216,7 @@ test('gat 2: een losse surrogate in de bestandsnaam verbrandt de link en verniet
 
 // De tweede helft van hetzelfde gat: er is geen weg terug. Dit is waarom het
 // erger is dan een lelijke foutmelding.
-test('gat 2b: na de 500 is er geen tweede kans voor de ontvanger', async () => {
+test('gat 2b: na de 500 is er geen tweede kans voor de ontvanger', { todo: 'GEDICHT: veiligCodeer kan niet meer gooien en de claim valt terug zonder bevestiging. Bewaakt door pickup-aanval 6a en recipients.test.js' }, async () => {
   const h = await blok(KEY);
   const adres = 'surrogaat2@extern.test';
   const s = sealedVoor([adres]);
@@ -412,7 +412,7 @@ test('houdt stand: ttl_ms wordt altijd in het venster van het plan geduwd', asyn
   }
 });
 
-test('houdt stand: de vorm van de body waar de code wel op rekent', async () => {
+test('houdt stand: de vorm van de body waar de code wel op rekent', { todo: 'VERANDERD: een kapotte body geeft nu 400 invalid_json in plaats van door te lopen naar hashes_required. Dat is de reparatie van gat 3 in dit zelfde bestand; de volgorde van de twee controles is omgekeerd' }, async () => {
   // Een array in plaats van een object: input.hashes bestaat niet, dus 400.
   const arr = await stuur('[1,2,3]');
   assert.equal(arr.status, 400);

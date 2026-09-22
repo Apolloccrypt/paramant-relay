@@ -161,3 +161,47 @@ test('the overview shows people, never hashes or tokens', () => {
   assert.deepEqual(view.recipients.map(r => r.status), ['waiting', 'waiting', 'waiting']);
   assert.equal(view.total, 3);
 });
+
+// ── De onbevestigde ophaling ────────────────────────────────────────────────
+
+test('een ophaling telt pas als de ontvanger bevestigt dat het bestand openging', () => {
+  // Een server kan niet zien of bytes zijn aangekomen: een antwoord dat in de
+  // socketbuffer past laat 'finish' vuren ook als de client al weg is. Gemeten
+  // met 3 MB en een client die na 1 kB wegloopt: Node meldt exact hetzelfde
+  // als bij een geslaagde download. Dus telt alleen wat de ontvanger zegt.
+  const built = rec.buildRecipients('business', three, 1000, sealedVoor(three));
+  const token = built.tokens['bob@example.org'];
+  const bob = rec.findByToken(built.records, token);
+
+  assert.ok(rec.claimPickup(built.records, token, 2000), 'de ophaling begint');
+  assert.equal(rec.pickupRefusal(bob, 2000), 'already_collected',
+    'zolang hij loopt is de link op, anders kon iedereen twee keer');
+
+  // Vijf minuten later zonder bevestiging: de bytes zijn aantoonbaar nergens
+  // aangekomen, dus hij krijgt zijn kans terug.
+  const later = 2000 + rec.PICKUP_BEVESTIG_MS + 1;
+  assert.equal(rec.pickupRefusal(bob, later), null,
+    'een haperende verbinding mag niemand zijn enige ophaling kosten');
+  assert.ok(rec.claimPickup(built.records, token, later), 'en hij kan opnieuw');
+});
+
+test('maar een bevestigde ophaling is voorgoed op', () => {
+  const built = rec.buildRecipients('business', three, 1000, sealedVoor(three));
+  const token = built.tokens['bob@example.org'];
+  const bob = rec.findByToken(built.records, token);
+
+  rec.claimPickup(built.records, token, 2000);
+  assert.equal(rec.bevestigPickup(bob, 2100), true);
+
+  const veelLater = 2000 + rec.PICKUP_BEVESTIG_MS * 10;
+  assert.equal(rec.pickupRefusal(bob, veelLater), 'already_collected',
+    'wie het bestand had, krijgt geen tweede beurt door te wachten');
+  assert.equal(rec.claimPickup(built.records, token, veelLater), null);
+});
+
+test('bevestigen kan niet zonder ophalen', () => {
+  const built = rec.buildRecipients('business', three, 1000, sealedVoor(three));
+  const bob = rec.findByToken(built.records, built.tokens['bob@example.org']);
+  assert.equal(rec.bevestigPickup(bob, 2000), false,
+    'anders kon iemand een link doodverklaren die hij nooit gebruikte');
+});

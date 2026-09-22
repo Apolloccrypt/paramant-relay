@@ -248,7 +248,11 @@ function findByToken(records, token) {
 // and then marks leaves a window in which two requests both pass the check.
 function claimPickup(records, token, now) {
   const record = findByToken(records, token);
-  if (pickupRefusal(record)) return null;
+  if (pickupRefusal(record, now)) return null;
+  // Een verlopen, nooit bevestigde claim wordt opnieuw geclaimd: markPickedUp
+  // weigert een record dat al een picked_up_at draagt, en dat is hier juist
+  // het geval waarin de ontvanger zijn kans terugkrijgt.
+  if (record && record.picked_up_at) record.picked_up_at = null;
   return markPickedUp(record, now, token) ? record : null;
 }
 
@@ -256,8 +260,9 @@ function claimPickup(records, token, now) {
 // Returns { ok, record, reason }. Only ok:true may serve the file.
 function claim(records, token, now) {
   const record = findByToken(records, token);
-  const refusal = pickupRefusal(record);
+  const refusal = pickupRefusal(record, now);
   if (refusal) return { ok: false, record: record || null, reason: refusal };
+  if (record && record.picked_up_at) record.picked_up_at = null;   // verlopen claim
   // Re-verify against the presented token: the record may have been re-invited
   // between lookup and here in a future async version of this path.
   if (!safeHexEqual(record.token_hash || '', tokenHash(token))) {
@@ -270,11 +275,47 @@ function claim(records, token, now) {
 }
 
 // Why a token cannot be used right now, or null when it can.
-function pickupRefusal(record) {
+// Hoe lang een ophaling "bezig" mag heten voordat hij als mislukt telt.
+//
+// Een server kan NIET zien of de bytes zijn aangekomen. Een antwoord dat in de
+// socketbuffer past laat 'finish' vuren ook als de client al weg is, en
+// bytesWritten telt dan gewoon door: gemeten met 3 MB en een client die na
+// 1 kB wegloopt, meldt Node exact hetzelfde als bij een geslaagde download.
+// Dat is TCP, geen tekortkoming in deze code.
+//
+// Dus telt een claim pas definitief als de ontvanger het bestand heeft kunnen
+// OPENEN en dat bevestigt. Blijft die bevestiging uit -- verbinding weg, tab
+// dicht, telefoon in een tunnel -- dan valt de claim na dit venster vanzelf
+// terug en kan hij het opnieuw proberen. Zonder dat kostte een haperende
+// mobiele verbinding iemand zijn enige kans, terwijl het dashboard de levering
+// als geslaagd meldde.
+//
+// Vijf minuten: ruim genoeg voor een groot bestand over een trage lijn, kort
+// genoeg dat een verzending niet een uur op een dode ophaling blijft wachten.
+const PICKUP_BEVESTIG_MS = 5 * 60 * 1000;
+
+// Is deze ophaling nog onbevestigd en daarmee verlopen?
+function openstaandeClaimVerlopen(record, nu) {
+  if (!record || !record.picked_up_at) return false;
+  if (record.pickup_confirmed_at) return false;
+  return (nu || Date.now()) - record.picked_up_at > PICKUP_BEVESTIG_MS;
+}
+
+function pickupRefusal(record, nu) {
   if (!record) return 'unknown_token';
   if (record.revoked_at) return 'revoked';
-  if (record.picked_up_at) return 'already_collected';
+  // Een claim die nooit bevestigd is en waarvan het venster om is, telt niet
+  // als opgehaald: de bytes zijn aantoonbaar nergens aangekomen.
+  if (record.picked_up_at && !openstaandeClaimVerlopen(record, nu)) return 'already_collected';
   return null;
+}
+
+// De ontvanger heeft het bestand geopend. Nu pas is de link echt op.
+function bevestigPickup(record, nu) {
+  if (!record || !record.picked_up_at) return false;
+  if (record.pickup_confirmed_at) return true;
+  record.pickup_confirmed_at = nu || Date.now();
+  return true;
 }
 
 // Mark one recipient as collected. The token is REQUIRED and is verified
@@ -333,6 +374,17 @@ function reinvite(record, now, records) {
   if (Array.isArray(records) && allSettled(records)) return null;
   record.reminders = (record.reminders || 0) + 1;
   record.reminded_at = now || Date.now();
+  // En de tellers op nul. Dit is de enige knop die de afzender heeft, en zonder
+  // deze regel deed hij niets voor het geval waarin hij het hardst nodig is:
+  // wie de link onderschept vraagt drie codes aan, de teller zit vol, en de
+  // rechtmatige ontvanger komt er tot het uur om is niet meer in. De afzender
+  // die op "herinneren" drukt zegt juist: deze persoon mag het opnieuw
+  // proberen. Dat is een bewuste handeling van de eigenaar van het bestand,
+  // met een eigen plafond van drie, dus het is geen weg om de rem te omzeilen.
+  record.code_requests = 0;
+  record.wrong_total = 0;
+  record.code_tries = 0;
+  record.counters_since = now || Date.now();
   // invited_at stays: it is when the link they hold was sent, and the
   // dashboard uses it to say how long somebody has been waiting.
   return { ok: true, reminders: record.reminders, invited_at: record.invited_at };
@@ -366,6 +418,7 @@ function overview(records) {
 }
 
 module.exports = {
+  PICKUP_BEVESTIG_MS, openstaandeClaimVerlopen, bevestigPickup,
   TOKEN_BYTES,
   recipientEmailHash,
   normaliseForHash,

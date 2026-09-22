@@ -4731,6 +4731,14 @@ async function handleRelayRequest(req, res) {
         .replace(/[\u0000-\u001f\u007f]/g, '')
         .replace(/[\uD800-\uDFFF]/g, '')
         .replace(/\s+/g, ' ')
+        // GEEN LINK. Regeleinden waren er al uit, maar honderdtwintig tekens
+        // vrije tekst met een URL erin is nog steeds een eigen regel in de mail
+        // van iemand die geen klant is, en elke mailclient maakt hem klikbaar.
+        // Gemeten met een bestandsnaam die "PARAMANT SUPPORT: uw account
+        // verloopt, bevestig hier: <link>" droeg: die kwam er zo uit, boven
+        // onze eigen link, dertig keer.
+        .replace(/\b(?:https?:\/\/|www\.)\S*/gi, '[link]')
+        .replace(/\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/gi, '[adres]')
         .trim()
         .slice(0, 120)) || 'a file';
       const naam = escHtml(naamRuw);
@@ -7174,6 +7182,21 @@ async function handleRelayRequest(req, res) {
     let _body = {};
     try { _body = JSON.parse((await readBody(req, 4096)).toString() || '{}') || {}; }
     catch (_) { _body = {}; }
+
+    // De ontvanger meldt dat het bestand echt openging. Pas daarna is zijn
+    // link definitief op. Tot die tijd staat de claim "bezig" en valt hij na
+    // vijf minuten terug, want een server kan niet zien of bytes aankwamen.
+    if (_body.action === 'confirm') {
+      try {
+        const bev = await _sendStore().confirm(pickm[1]);
+        res.writeHead(bev.ok ? 200 : 409,
+                      { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        return res.end(J(bev.ok ? { ok: true } : { error: bev.reason }));
+      } catch (e) {
+        if (redisOutage503(e, res)) return;
+        res.writeHead(500); return res.end(J({ error: 'confirm_failed' }));
+      }
+    }
 
     if (_body.action === 'code') {
      try {

@@ -159,7 +159,19 @@
         .then(function (b) { return { ok: false, status: r.status, body: b }; });
     }).then(function (res) {
       if (knop) knop.disabled = false;
-      if (res.ok) return bewaar(res.blob, res.naam);
+      if (res.ok) {
+        // Bevestigen dat het bestand ECHT openging. Tot dat bericht staat de
+        // ophaling op "bezig" en krijgt de ontvanger zijn kans terug als er
+        // onderweg iets misgaat. Best effort: lukt de bevestiging niet, dan
+        // vervalt de claim vanzelf en kan hij het opnieuw proberen.
+        fetch(pickupUrl(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'confirm' }),
+          cache: 'no-store'
+        }).catch(function () { /* de claim vervalt vanzelf */ });
+        return bewaar(res.blob, res.naam);
+      }
 
       var reden = res.body.error;
       if (reden === 'wrong_code') {
