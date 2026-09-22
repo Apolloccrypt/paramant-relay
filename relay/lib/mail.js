@@ -61,6 +61,12 @@ function config(env) {
     gevraagd: naam,
     from: e.MAIL_FROM || 'PARAMANT <noreply@paramant.app>',
     resendKey: e.RESEND_API_KEY || '',
+    // A second carrier, on a different company, tried only when the first
+    // refuses. Empty means no fallback: one provider, and a refusal is final.
+    fallback: (() => {
+      const n = String(e.MAIL_FALLBACK_PROVIDER || '').trim().toLowerCase();
+      return PROVIDERS.includes(n) ? n : '';
+    })(),
     mailjetKey: e.MAILJET_API_KEY || '',
     mailjetSecret: e.MAILJET_SECRET_KEY || '',
     scalewayKey: e.SCALEWAY_SECRET_KEY || '',
@@ -334,15 +340,64 @@ async function stuur(msg, opts) {
   if (typeof fetchImpl !== 'function' && cfg.provider !== 'dryrun') {
     return { ok: false, provider: cfg.provider, reason: 'no_fetch' };
   }
+  const uit = await viaProvider(cfg.provider, m, cfg, fetchImpl, o.log);
+
+  // ── THE SECOND CARRIER ──────────────────────────────────────────────────
+  //
+  // Mail is a single point of failure, and the way it fails is not the way one
+  // expects. The common outage is not a network blip: it is an ACCOUNT. Both
+  // large providers we looked at have a documented pattern of suspending new
+  // senders on their own compliance signals, without warning, with domains
+  // verified and invoices paid. Twelve such reports in six months on each.
+  //
+  // For a product where the mail carries pickup codes and signing links, that
+  // is not an inconvenience. Nothing arrives, nobody can collect, and the only
+  // remedy is a support queue measured in days.
+  //
+  // So MAIL_FALLBACK_PROVIDER names a second carrier on a different company.
+  // It is tried ONLY when the first refuses, never in parallel, and the result
+  // names which one delivered so the logs do not quietly hide that the primary
+  // has been dead for a week.
+  if (uit && uit.ok) return uit;
+  const reserve = cfg.fallback;
+  if (!reserve || reserve === cfg.provider) return uit;
+  if (!gereedVoor(reserve, cfg)) {
+    return Object.assign({}, uit, { fallback: 'not_configured' });
+  }
+  // 'invalid' is the caller's own fault -- a message with no recipient will be
+  // just as invalid at the second carrier. Only a carrier-side failure is worth
+  // a second attempt.
+  if (uit && uit.reason === 'invalid') return uit;
+
+  const tweede = await viaProvider(reserve, m, cfg, fetchImpl, o.log);
+  return Object.assign({}, tweede, {
+    fallback_used: true,
+    primary: cfg.provider,
+    primary_reason: (uit && uit.reason) || 'unknown',
+  });
+}
+
+// One place that maps a name onto a carrier, so the fallback cannot drift away
+// from the primary path.
+async function viaProvider(naam, m, cfg, fetchImpl, logImpl) {
   try {
-    if (cfg.provider === 'mailjet') return await viaMailjet(m, cfg, fetchImpl);
-    if (cfg.provider === 'scaleway') return await viaScaleway(m, cfg, fetchImpl);
-    if (cfg.provider === 'resend') return await viaResend(m, cfg, fetchImpl);
-    return await viaDryrun(m, cfg, fetchImpl, o.log);
+    if (naam === 'mailjet') return await viaMailjet(m, cfg, fetchImpl);
+    if (naam === 'scaleway') return await viaScaleway(m, cfg, fetchImpl);
+    if (naam === 'resend') return await viaResend(m, cfg, fetchImpl);
+    return await viaDryrun(m, cfg, fetchImpl, logImpl);
   } catch (e) {
-    return { ok: false, provider: cfg.provider, reason: 'threw',
+    return { ok: false, provider: naam, reason: 'threw',
              detail: String((e && e.message) || e).slice(0, 200) };
   }
+}
+
+// Whether a named carrier has what it needs, against an already-built config.
+function gereedVoor(naam, cfg) {
+  if (naam === 'dryrun') return true;
+  if (naam === 'mailjet') return Boolean(cfg.mailjetKey && cfg.mailjetSecret);
+  if (naam === 'scaleway') return Boolean(cfg.scalewayKey && cfg.scalewayProject);
+  if (naam === 'resend') return Boolean(cfg.resendKey);
+  return false;
 }
 
 // Can this relay send mail at all? Callers used to ask "is RESEND_API_KEY set",
@@ -350,10 +405,10 @@ async function stuur(msg, opts) {
 // Mailjet account. Ask the question about mail, not about one carrier.
 function gereed(env) {
   const cfg = config(env);
-  if (cfg.provider === 'dryrun') return true;
-  if (cfg.provider === 'mailjet') return Boolean(cfg.mailjetKey && cfg.mailjetSecret);
-  if (cfg.provider === 'scaleway') return Boolean(cfg.scalewayKey && cfg.scalewayProject);
-  return Boolean(cfg.resendKey);
+  // Ready if EITHER carrier can send: a primary with a dead account and a
+  // working fallback is still a relay that delivers mail.
+  return gereedVoor(cfg.provider, cfg)
+      || (cfg.fallback ? gereedVoor(cfg.fallback, cfg) : false);
 }
 
 // Everything an operator needs to see at boot, in one object.
@@ -372,13 +427,24 @@ function diagnose(env) {
     gereed: gereed(env),
     stil: cfg.provider === 'dryrun',
     from: cfg.from,
+    // The second carrier, and whether it could actually take over. A fallback
+    // that is named but has no credentials is worse than none: it reads as
+    // covered on the day somebody checks, and is not on the day it is needed.
+    reserve: cfg.fallback || null,
+    reserve_gereed: cfg.fallback ? gereedVoor(cfg.fallback, cfg) : false,
     waarschuwing: terugval
       ? 'MAIL_PROVIDER is "' + cfg.gevraagd + '", which is not a provider. '
         + 'Falling back to dryrun: nothing will be delivered. Expected one of: '
         + PROVIDERS.join(', ')
-      : (!gereed(env)
+      : (!gereedVoor(cfg.provider, cfg)
           ? 'MAIL_PROVIDER is "' + cfg.provider + '" but its credentials are missing.'
-          : null),
+              + (cfg.fallback && gereedVoor(cfg.fallback, cfg)
+                  ? ' The fallback "' + cfg.fallback + '" will carry everything.'
+                  : '')
+          : (cfg.fallback && !gereedVoor(cfg.fallback, cfg)
+              ? 'MAIL_FALLBACK_PROVIDER is "' + cfg.fallback + '" but its credentials '
+                + 'are missing, so there is no second carrier despite one being named.'
+              : null)),
   };
 }
 

@@ -142,6 +142,12 @@ module.exports = {
     description: 'Who carries outbound mail: mailjet, scaleway, resend or dryrun. '
       + 'A misspelled value delivers NOTHING; the relay logs mail_misconfigured at boot.',
   },
+  MAIL_FALLBACK_PROVIDER: {
+    type: 'string', ui: 'input', group: 'Secrets', default: '',
+    class: 'relay-restart',
+    description: 'A second carrier, on a different company, used only when the first '
+      + 'refuses. Guards against an account suspension taking all mail down.',
+  },
   MAILJET_API_KEY: {
     type: 'string', ui: 'input', group: 'Secrets', default: '',
     class: 'relay-restart', secret: true,

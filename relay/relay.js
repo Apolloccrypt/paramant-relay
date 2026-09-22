@@ -9778,7 +9778,14 @@ function meldMailstand() {
     });
     return;
   }
-  log('info', 'mail_carrier', { provider: d.provider, from: d.from, delivering: !d.stil });
+  log('info', 'mail_carrier', { provider: d.provider, from: d.from, delivering: !d.stil,
+                                fallback: d.reserve || 'none', fallback_ready: d.reserve_gereed });
+  if (!d.reserve) {
+    // Not an error: one carrier is a choice. But it is a choice worth seeing in
+    // the log, because the day it matters is the day nobody remembers making it.
+    log('info', 'mail_no_fallback', { hint: 'MAIL_FALLBACK_PROVIDER is unset, so a '
+      + 'suspended account stops every pickup code and signing link' });
+  }
 }
 
 function checkLicense() {

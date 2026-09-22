@@ -204,3 +204,84 @@ test('the dryrun carrier writes the message where somebody can read it', () => {
       assert.equal(regels[0][2].subject, 'Rehearsal');
     });
 });
+
+// ── De tweede bezorger ──────────────────────────────────────────────────────
+//
+// Mail is een enkelvoudig faalpunt, en het faalt anders dan je verwacht. De
+// gewone storing is geen netwerkhapering maar een ACCOUNT: beide grote
+// providers hebben een gedocumenteerd patroon van nieuwe afzenders schorsen op
+// hun eigen compliance-signalen, zonder waarschuwing, met domein geverifieerd
+// en factuur betaald. Twaalf zulke meldingen in zes maanden bij allebei.
+//
+// Voor post die ophaalcodes en ondertekenlinks draagt is dat geen ongemak.
+
+test('een geweigerde verzending gaat naar de tweede bezorger', async () => {
+  const geraakt = [];
+  const f = async (url) => {
+    geraakt.push(url);
+    if (String(url).includes('mailjet')) return { ok: false, status: 403, text: async () => 'suspended' };
+    return { ok: true, status: 200, json: async () => ({ id: 'ok' }) };
+  };
+  const r = await mail.stuur({ to: ['anna@example.org'], subject: 'A file', text: 'Hi' },
+    { fetch: f, env: { MAIL_PROVIDER: 'mailjet', MAILJET_API_KEY: 'k', MAILJET_SECRET_KEY: 's',
+                       MAIL_FALLBACK_PROVIDER: 'resend', RESEND_API_KEY: 'r' } });
+
+  assert.equal(r.ok, true, 'de mail komt alsnog weg');
+  assert.equal(r.provider, 'resend');
+  assert.equal(r.fallback_used, true);
+  assert.equal(r.primary, 'mailjet');
+  assert.match(r.primary_reason, /http_403/,
+    'en het log moet zeggen waarom de eerste het liet afweten, anders ligt die stil dood');
+  assert.equal(geraakt.length, 2, 'eerst de een, dan pas de ander');
+});
+
+test('de tweede bezorger wordt niet gebruikt als de eerste het gewoon doet', async () => {
+  let aantal = 0;
+  const f = async () => { aantal += 1; return { ok: true, status: 200, json: async () => ({ Messages: [{ Status: 'success' }] }) }; };
+  const r = await mail.stuur({ to: ['anna@example.org'], subject: 'A file', text: 'Hi' },
+    { fetch: f, env: { MAIL_PROVIDER: 'mailjet', MAILJET_API_KEY: 'k', MAILJET_SECRET_KEY: 's',
+                       MAIL_FALLBACK_PROVIDER: 'resend', RESEND_API_KEY: 'r' } });
+  assert.equal(r.ok, true);
+  assert.equal(r.fallback_used, undefined, 'geen dubbele mail, nooit');
+  assert.equal(aantal, 1);
+});
+
+test('een bericht dat zelf fout is gaat niet twee keer de deur uit', async () => {
+  // Zonder ontvanger is het bij de tweede bezorger net zo ongeldig. Opnieuw
+  // proberen kost alleen een tweede afwijzing en verbergt de echte oorzaak.
+  let aantal = 0;
+  const f = async () => { aantal += 1; return { ok: true, status: 200, json: async () => ({}) }; };
+  const r = await mail.stuur({ to: [], subject: 'A file', text: 'Hi' },
+    { fetch: f, env: { MAIL_PROVIDER: 'mailjet', MAILJET_API_KEY: 'k', MAILJET_SECRET_KEY: 's',
+                       MAIL_FALLBACK_PROVIDER: 'resend', RESEND_API_KEY: 'r' } });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'invalid');
+  assert.equal(aantal, 0, 'er is niets verstuurd, ook niet naar de reserve');
+});
+
+test('een reserve zonder sleutels is geen reserve, en zegt dat', async () => {
+  const f = async () => ({ ok: false, status: 403, text: async () => 'suspended' });
+  const r = await mail.stuur({ to: ['anna@example.org'], subject: 'A file', text: 'Hi' },
+    { fetch: f, env: { MAIL_PROVIDER: 'mailjet', MAILJET_API_KEY: 'k', MAILJET_SECRET_KEY: 's',
+                       MAIL_FALLBACK_PROVIDER: 'resend' } });
+  assert.equal(r.ok, false);
+  assert.equal(r.fallback, 'not_configured',
+    'anders leest dit als gedekt op de dag dat iemand kijkt, en niet op de dag dat het nodig is');
+});
+
+test('dezelfde provider als reserve is geen reserve', async () => {
+  const f = async () => ({ ok: false, status: 403, text: async () => 'suspended' });
+  let r = await mail.stuur({ to: ['anna@example.org'], subject: 'A file', text: 'Hi' },
+    { fetch: f, env: { MAIL_PROVIDER: 'mailjet', MAILJET_API_KEY: 'k', MAILJET_SECRET_KEY: 's',
+                       MAIL_FALLBACK_PROVIDER: 'mailjet' } });
+  assert.equal(r.ok, false);
+  assert.equal(r.fallback_used, undefined, 'een geschorst account twee keer vragen helpt niet');
+});
+
+test('gereed blijft waar zolang een van de twee kan versturen', () => {
+  // Een hoofdprovider met een dood account en een werkende reserve is nog
+  // steeds een relay die post bezorgt.
+  assert.equal(mail.gereed({ MAIL_PROVIDER: 'mailjet',
+    MAIL_FALLBACK_PROVIDER: 'resend', RESEND_API_KEY: 'r' }), true);
+  assert.equal(mail.gereed({ MAIL_PROVIDER: 'mailjet' }), false);
+});

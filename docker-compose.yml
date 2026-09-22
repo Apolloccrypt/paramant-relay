@@ -63,6 +63,13 @@ x-relay-env: &relay-env
   # substitutes ${VAR} into this file, there is no env_file, and a variable
   # that is not listed never reaches a container.
   MAIL_PROVIDER: "${MAIL_PROVIDER:-mailjet}"
+  # A SECOND carrier, on a different company, tried only when the first refuses.
+  # The outage that actually happens to transactional mail is not a network
+  # blip, it is an account suspension: both large providers suspend new senders
+  # on their own compliance signals, without warning, and the remedy is a
+  # support queue measured in days. Our mail carries pickup codes and signing
+  # links, so that is not an inconvenience. Empty means no fallback.
+  MAIL_FALLBACK_PROVIDER: "${MAIL_FALLBACK_PROVIDER:-}"
   MAIL_FROM: "${MAIL_FROM:-PARAMANT <noreply@paramant.app>}"
   MAILJET_API_KEY: "${MAILJET_API_KEY:-}"
   MAILJET_SECRET_KEY: "${MAILJET_SECRET_KEY:-}"
@@ -357,6 +364,7 @@ services:
       # the same lib/mail.js. Listing only RESEND_API_KEY here meant the admin
       # kept mailing through the US carrier after the relay had moved off it.
       MAIL_PROVIDER: "${MAIL_PROVIDER:-mailjet}"
+      MAIL_FALLBACK_PROVIDER: "${MAIL_FALLBACK_PROVIDER:-}"
       MAIL_FROM: "${MAIL_FROM:-PARAMANT <noreply@paramant.app>}"
       MAILJET_API_KEY: "${MAILJET_API_KEY:-}"
       MAILJET_SECRET_KEY: "${MAILJET_SECRET_KEY:-}"
