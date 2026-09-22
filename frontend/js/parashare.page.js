@@ -1089,14 +1089,10 @@ function setSendMode(mode) {
   if (link) link.setAttribute('aria-checked', String(sendMode === 'link'));
   const stepper = $('ps-stepper');
   if (stepper) stepper.style.display = (sendMode === 'link') ? 'none' : '';
-  // "The person you send to has to be online while you send" is the one
-  // sentence on this page that the link stand makes false.
-  const note = $('ps-live-note');
-  if (note) {
-    note.textContent = (sendMode === 'link')
-      ? 'The person you send to does not have to be online. You get a link to pass on; it works once.'
-      : 'The person you send to has to be online while you send; you confirm a short code together.';
-  }
+  // The sentence that used to sit here said the same thing as the card the
+  // sender just clicked, one block lower. Two blocks explaining one choice is
+  // how a page starts feeling like homework, so the card says it now and this
+  // is gone.
   const btn = $('btn-create-session');
   if (btn) btn.textContent = (sendMode === 'link') ? 'Seal the file and make a link →' : 'Create secure session →';
   setCreateStatus('');

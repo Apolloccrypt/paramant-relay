@@ -112,6 +112,39 @@ function createSendStore({ store, log, now }) {
   if (!store) throw new Error('send: a store is required');
   const clock = typeof now === 'function' ? now : () => Date.now();
 
+  // ── one send, one queue ────────────────────────────────────────────────────
+  //
+  // WHY THIS EXISTS. The durable store serialises: putMeta stringifies and
+  // getMeta parses, so every read hands back a FRESH COPY. Every method here
+  // reads, changes and writes the whole send back, with an await in between.
+  //
+  // That makes read-modify-write the shape of all of it, and an audit on 22-09
+  // showed what that costs: two clicks on the same one-time link both got the
+  // file, a wrong code guess rolled back a collection that had already
+  // happened, and a withdrawal was quietly undone by a pickup that overlapped
+  // it -- while the sender had been told the person was locked out.
+  //
+  // The comment on claimPickup said Node "runs this without interleaving". True
+  // for an array in memory. Not true the moment the records travel through a
+  // store, because the await between read and write is exactly where the other
+  // request gets its turn.
+  //
+  // So every change to one send queues behind the previous change to that same
+  // send. Different sends still run side by side. This is correct for one relay
+  // process; across processes it needs a revision field and a compare-and-set
+  // in the store, and that is written down in the deploy notes rather than
+  // pretended away here.
+  const ketens = new Map();
+  function opVolgorde(id, werk) {
+    const vorige = ketens.get(id) || Promise.resolve();
+    const nu = vorige.then(werk, werk);
+    // Keep the chain alive but never let a rejection poison the next caller:
+    // one failed pickup must not break the send for everybody after it.
+    ketens.set(id, nu.then(() => {}, () => {}));
+    nu.finally(() => { if (ketens.get(id) && ketens.size > 500) ketens.delete(id); });
+    return nu;
+  }
+
   async function readSend(id) {
     if (typeof id !== 'string' || !id) return null;
     const meta = await store.getMeta(id);
@@ -184,6 +217,40 @@ function createSendStore({ store, log, now }) {
                count: built.records.length };
     },
 
+    // The public entry points. Each one queues behind the previous change to
+    // the same send, so a pickup cannot land between another request's read and
+    // its write. See opVolgorde above for why that matters.
+    async requestPickup(token) {
+      const g = await this._zoekSend(token);
+      if (!g.ok) return g;
+      return opVolgorde(g.id, () => this._requestPickup(token));
+    },
+
+    async collect(token, code) {
+      const g = await this._zoekSend(token);
+      if (!g.ok) return g;
+      return opVolgorde(g.id, () => this._collect(token, code));
+    },
+
+    async revoke(id, email) {
+      return opVolgorde(String(id || ''), () => this._revoke(id, email));
+    },
+
+    async reinvite(id, email) {
+      return opVolgorde(String(id || ''), () => this._reinvite(id, email));
+    },
+
+    // Which send a token belongs to, without touching it. Only used to pick the
+    // right queue; every real decision happens inside it.
+    async _zoekSend(token) {
+      if (typeof token !== 'string' || !token || token.length > MAX_TOKEN_LEN) {
+        return { ok: false, reason: 'unknown_token' };
+      }
+      const index = await store.getMeta(tokenIndexId(token));
+      if (!index || !index.send) return { ok: false, reason: 'unknown_token' };
+      return { ok: true, id: index.send };
+    },
+
     // Step one of collecting: prove the mailbox.
     //
     // Deliberately does NOT claim the token. A code request must not burn a
@@ -192,7 +259,7 @@ function createSendStore({ store, log, now }) {
     // Returns { ok, email, masked, code }. The code is for the caller to mail
     // and is never in an HTTP response: whoever asks for it must already be
     // able to read that mailbox.
-    async requestPickup(token) {
+    async _requestPickup(token) {
       const found = await this._locate(token);
       if (!found.ok) return found;
       const { send, record } = found;
@@ -230,7 +297,7 @@ function createSendStore({ store, log, now }) {
     // two simultaneous clicks from both being served.
     //
     // Returns { ok, blob, filename, email, remaining } or { ok:false, reason }.
-    async collect(token, code) {
+    async _collect(token, code) {
       const found = await this._locate(token);
       if (!found.ok) return found;
       const { send, record } = found;
@@ -344,7 +411,7 @@ function createSendStore({ store, log, now }) {
     },
 
     // Withdraw one person without touching the rest.
-    async revoke(id, email) {
+    async _revoke(id, email) {
       const send = await readSend(id);
       if (!send) return { ok: false, reason: 'unknown_send' };
       const want = String(email || '').trim().toLowerCase();
@@ -360,7 +427,7 @@ function createSendStore({ store, log, now }) {
     },
 
     // Send somebody a fresh link. The old one dies at that moment.
-    async reinvite(id, email) {
+    async _reinvite(id, email) {
       const send = await readSend(id);
       if (!send) return { ok: false, reason: 'unknown_send' };
       const want = String(email || '').trim().toLowerCase();

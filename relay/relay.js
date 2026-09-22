@@ -4463,6 +4463,14 @@ async function handleRelayRequest(req, res) {
       // Every block has to exist AND belong to this key. Without the second
       // half, knowing a hash would be enough to fold somebody else's upload
       // into your own send.
+      // The same block twice would be joined twice: one 5 MiB upload repeated
+      // 512 times is a 2.5 GB buffer built from nothing.
+      if (new Set(hashes).size !== hashes.length) {
+        res.writeHead(400); return res.end(J({ error: 'duplicate_block' }));
+      }
+      const _fileMb = tiers.tierLimitNum(kd.plan, 'file_mb');
+      const _maxBytes = Number.isFinite(_fileMb) ? _fileMb * 1048576 : Infinity;
+      let _totaal = 0;
       const delen = [];
       for (const h of hashes) {
         if (typeof h !== 'string' || !/^[a-f0-9]{64}$/.test(h)) {
@@ -4471,6 +4479,11 @@ async function handleRelayRequest(req, res) {
         const entry = blobStore.get(h);
         if (!entry) { res.writeHead(404); return res.end(J({ error: 'block_missing' })); }
         if (entry.apiKey !== apiKey) { res.writeHead(404); return res.end(J({ error: 'block_missing' })); }
+        _totaal += entry.blob.length;
+        if (_totaal > _maxBytes) {
+          res.writeHead(413);
+          return res.end(J({ error: 'too_large', dimension: 'file_mb', limit: _fileMb }));
+        }
         delen.push(entry.blob);
       }
       const blob = Buffer.concat(delen);
@@ -4496,16 +4509,25 @@ async function handleRelayRequest(req, res) {
       const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
       const tot = new Date(made.expires_at).toLocaleString('en-GB',
         { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
-      const naam = (input.filename && String(input.filename).slice(0, 120)) || 'a file';
+      // Escaped: this name is chosen by the sender and lands in the HTML of up
+      // to thirty mails from paramant.app to people who are not our customers.
+      // An unescaped one could carry a link or a tracking pixel of its own.
+      const naamRuw = (input.filename && String(input.filename).slice(0, 120)) || 'a file';
+      const naam = escHtml(naamRuw);
       let gemaild = 0;
       // One invitation per person, never a visible list of the others: who else
       // receives a confidential document is not for the group to know.
       for (const [adres, token] of Object.entries(made.tokens)) {
         const link = base + '/ontvang/' + encodeURIComponent(token);
-        if (sendResendEmail({
+        // await, so `invited` counts what a provider accepted instead of how
+        // often we tried. A 201 saying "invited: 30" while nothing arrived is
+        // worse than an honest lower number.
+        const bezorgd = await mailer.stuur({
           to: adres,
           subject: 'A file is waiting for you',
-          text: 'A file is waiting for you: ' + naam + '\n\n' + link
+          // The plain-text half takes the unescaped name: HTML entities in a
+          // text mail read as noise, and there is nothing to inject into.
+          text: 'A file is waiting for you: ' + naamRuw + '\n\n' + link
               + '\n\nThe link is yours alone and works once. Opening it sends a short code '
               + 'to this address. Available until ' + tot + '.',
           html: '<p>A file is waiting for you:</p>'
@@ -4516,7 +4538,9 @@ async function handleRelayRequest(req, res) {
               + '<p style="color:#666;font-size:13px">This link is yours alone and works once. '
               + 'Opening it sends a short code to this address, so only somebody who can read '
               + 'this mailbox can collect the file.<br>Available until ' + tot + '.</p>',
-        })) gemaild += 1;
+        });
+        if (bezorgd && bezorgd.ok) gemaild += 1;
+        else log('warn', 'invitation_failed', { reason: bezorgd && bezorgd.reason });
       }
       log('info', 'send_invitations', { id: made.id, mailed: gemaild, of: made.count });
 
@@ -6387,6 +6411,16 @@ async function handleRelayRequest(req, res) {
     req.method === 'GET' ||
     (req.method === 'POST' && (path.endsWith('/view') || path.endsWith('/sign')))
   );
+  // The receiving end of a send to named recipients, and it carries no key on
+  // purpose: a recipient is somebody who was sent something, not somebody with
+  // a login. The capability is the token, which arrives in one person's mail.
+  //
+  // Opening the link only mails a code to that same mailbox; the bytes need
+  // both halves, and three wrong codes close the door. Without this line every
+  // recipient met a 401 and the whole feature reached nobody, which is what an
+  // audit on 22-09 found: the route was written, the gate was never opened.
+  const isPickupPublic = /^\/v2\/pickup\/[A-Za-z0-9_-]{16,128}$/.test(path)
+    && (req.method === 'GET' || req.method === 'POST');
   const isBillingWebhook = path === '/v2/billing/webhook' && req.method === 'POST';
   // The admin plane cancelling on behalf of a logged-in session. It carries
   // X-Internal-Auth, which no public caller can set, and the route itself
@@ -6403,7 +6437,7 @@ async function handleRelayRequest(req, res) {
       return res.end(J({ error: 'ADMIN_TOKEN required for admin endpoints' }));
     }
     // Fall through to admin endpoint handlers below
-  } else if (!keyData?.active && !isEnvelopePublic && !isBillingWebhook && !isInternalBillingCancel) {
+  } else if (!keyData?.active && !isEnvelopePublic && !isPickupPublic && !isBillingWebhook && !isInternalBillingCancel) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
   }
