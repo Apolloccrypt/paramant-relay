@@ -69,7 +69,15 @@ x-relay-env: &relay-env
   # on their own compliance signals, without warning, and the remedy is a
   # support queue measured in days. Our mail carries pickup codes and signing
   # links, so that is not an inconvenience. Empty means no fallback.
-  MAIL_FALLBACK_PROVIDER: "${MAIL_FALLBACK_PROVIDER:-}"
+  #
+  # DEFAULT resend, and that is the safe order during the switch, not a
+  # preference. The day this branch rolls out, MAILJET_API_KEY may not exist
+  # yet: the account has to be opened by hand. Without a fallback the relay
+  # would then come up with mail_misconfigured and every invitation, pickup
+  # code and signing link would silently stop. With resend behind it, the old
+  # carrier keeps the product running until the Mailjet keys land, and the
+  # moment they do the primary takes over on its own.
+  MAIL_FALLBACK_PROVIDER: "${MAIL_FALLBACK_PROVIDER:-resend}"
   MAIL_FROM: "${MAIL_FROM:-PARAMANT <noreply@paramant.app>}"
   MAILJET_API_KEY: "${MAILJET_API_KEY:-}"
   MAILJET_SECRET_KEY: "${MAILJET_SECRET_KEY:-}"
@@ -364,7 +372,7 @@ services:
       # the same lib/mail.js. Listing only RESEND_API_KEY here meant the admin
       # kept mailing through the US carrier after the relay had moved off it.
       MAIL_PROVIDER: "${MAIL_PROVIDER:-mailjet}"
-      MAIL_FALLBACK_PROVIDER: "${MAIL_FALLBACK_PROVIDER:-}"
+      MAIL_FALLBACK_PROVIDER: "${MAIL_FALLBACK_PROVIDER:-resend}"
       MAIL_FROM: "${MAIL_FROM:-PARAMANT <noreply@paramant.app>}"
       MAILJET_API_KEY: "${MAILJET_API_KEY:-}"
       MAILJET_SECRET_KEY: "${MAILJET_SECRET_KEY:-}"

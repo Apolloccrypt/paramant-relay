@@ -249,6 +249,18 @@ function viaDryrun(m, cfg, fetchImpl, logImpl) {
     to: m.to, subject: m.subject, from: m.from || (cfg && cfg.from) || '',
     reply_to: m.replyTo || null, bytes: (m.html || m.text || '').length,
     attachments: m.attachments.length,
+    // THE TEXT ITSELF, and only on this carrier.
+    //
+    // dryrun exists to answer "what would have gone out", and metadata alone
+    // does not answer it: you cannot tell from a subject line whether the
+    // pickup code, the sector in the link or the sender's name came out right.
+    // Without this an end-to-end rehearsal is impossible, and the whole chain
+    // from sender to recipient stayed untested for exactly that reason.
+    //
+    // Safe because this provider delivers NOTHING. Anything it prints was never
+    // sent to anybody, and a relay that has dryrun selected in production is
+    // already shouting mail_misconfigured at boot. No other carrier gets this.
+    text: m.text || stripHtml(m.html),
   });
   return Promise.resolve({ ok: true, provider: 'dryrun', count: m.to.length, delivered: false });
 }

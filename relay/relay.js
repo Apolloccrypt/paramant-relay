@@ -4629,10 +4629,19 @@ async function handleRelayRequest(req, res) {
         // the recipient ceiling also loses an hour of their invitation budget,
         // for a send that never left.
         inviteRateGeef(acctOf(apiKey), _wilMailen);
-        const status = made.reason === 'over_limit' ? 403 : 400;
-        log('info', 'send_refused', { reason: made.reason, limit: made.limit });
+        // The dimension has to be the one that actually refused, not a
+        // constant. Every refusal from create used to come back as
+        // max_recipients, so a file over the size ceiling told the sender
+        // "your plan allows 25" while the 25 was megabytes and the number
+        // beside it was 27263003 bytes. A sender reading that would go and
+        // delete recipients from a list that was never the problem.
+        const _dim = made.dimension
+          || (made.reason === 'too_large' ? 'send_max_mb' : 'max_recipients');
+        const status = made.reason === 'over_limit' ? 403
+                     : made.reason === 'too_large' ? 413 : 400;
+        log('info', 'send_refused', { reason: made.reason, dimension: _dim, limit: made.limit });
         res.writeHead(status, { 'Content-Type': 'application/json' });
-        return res.end(J({ error: made.reason, dimension: 'max_recipients',
+        return res.end(J({ error: made.reason, dimension: _dim,
                            limit: made.limit, asked: made.asked,
                            rejected: made.rejected || undefined }));
       }
