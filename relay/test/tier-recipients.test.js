@@ -48,13 +48,25 @@ test('an absurd list is refused without being walked', () => {
     'fifty thousand duplicates must not be normalised either');
 });
 
-test('the paid rows climb: pro ten, business and enterprise thirty', () => {
-  assert.equal(tiers.tierLimitNum('pro', 'max_recipients'), 10);
-  assert.equal(tiers.tierLimitNum('business', 'max_recipients'), 30);
-  assert.equal(tiers.tierLimitNum('enterprise', 'max_recipients'), 30);
+test('free is one, paid is thirty, and there is no rung in between', () => {
+  // The ladder used to read 1 / 10 / 30 / 30, and that middle rung was not a
+  // decision anybody had made for Firm. `business` carries thirty but is not a
+  // tier anyone can buy: validateProductPlan('parasend','business') returns
+  // invalid_tier and the catalogue only ever grants 'pro'. So the only ceiling
+  // a paying customer could actually reach was ten, and the one question a real
+  // buyer asked -- can this reach about twenty people -- was answered no by a
+  // number nobody had chosen on purpose.
+  assert.equal(tiers.tierLimitNum('community', 'max_recipients'), 1,
+    'free stays one, or there is nothing to buy');
+  for (const betaald of ['pro', 'business', 'enterprise']) {
+    assert.equal(tiers.tierLimitNum(betaald, 'max_recipients'), 30,
+      betaald + ' must carry the number the product is sold on');
+  }
 
-  assert.equal(tiers.checkRecipients('pro', twenty).ok, false, 'twenty is over pro');
-  assert.equal(tiers.checkRecipients('business', twenty).ok, true, 'twenty fits business');
+  assert.equal(tiers.checkRecipients('pro', twenty).ok, true,
+    'twenty is the case this exists for, and Firm is the plan that can be bought');
+  assert.equal(tiers.checkRecipients('community', twenty).ok, false,
+    'and the free plan still says no, with a real number in the refusal');
 });
 
 test('thirty is the ceiling everywhere, enterprise included', () => {
@@ -88,7 +100,8 @@ test('an empty list is refused, and never silently truncated', () => {
 
   // The important half: over the limit we reject instead of dropping addresses.
   // Quietly sending to fewer people than asked is the worst failure here.
-  const over = tiers.checkRecipients('pro', twenty);
+  const eenendertig = Array.from({ length: 31 }, (_, i) => 'q' + i + '@example.org');
+  const over = tiers.checkRecipients('pro', eenendertig);
   assert.equal(over.ok, false);
   assert.equal(over.reason, 'over_limit');
   assert.deepEqual(over.recipients, [],

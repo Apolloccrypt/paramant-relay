@@ -2297,6 +2297,53 @@ function outboundRateOk(apiKey, rec) {
 }
 setInterval(() => { const now = Date.now(); for (const [k,v] of outboundRateMap) if (now > v.resetAt) outboundRateMap.delete(k); }, 3_600_000);
 
+// ── The brake on invitations ────────────────────────────────────────────
+//
+// WHY THIS IS SEPARATE FROM outboundRateOk. That one counts DOWNLOADS: work a
+// recipient asks for, on a link they already hold. This counts MAIL WE SEND to
+// people who are not our customers, which is a different kind of thing to get
+// wrong. An account with thirty recipients per send and no brake is a way to
+// put unlimited mail into strangers' inboxes with paramant.app on the envelope,
+// and the cost of that is not a bill, it is the domain's reputation.
+//
+// It became urgent the moment Firm went from ten recipients to thirty.
+//
+// ALL OR NOTHING, and asked BEFORE the send is made. Counting per mail as the
+// loop runs would let a send half-happen: twelve people invited, eighteen not,
+// a send record that says thirty, and no way for the sender to tell which is
+// which. So the whole send asks for its seats up front and is refused as one.
+const inviteRateMap = new Map(); // account → { count, resetAt }
+const INVITE_RATE_WINDOW_MS = 3_600_000;
+
+function inviteRateOk(account, rec, aantal) {
+  const max = parasendLimitsOf(rec).limits.outbound_per_hour;
+  if (max === Infinity) return { ok: true };
+  const n = Math.max(1, Number(aantal) || 1);
+  const now = Date.now();
+  let c = inviteRateMap.get(account);
+  if (!c || now > c.resetAt) c = { count: 0, resetAt: now + INVITE_RATE_WINDOW_MS };
+  if (c.count + n > max) {
+    return { ok: false, limit: max, used: c.count, asked: n,
+             retry_after_s: Math.max(1, Math.ceil((c.resetAt - now) / 1000)) };
+  }
+  c.count += n;
+  inviteRateMap.set(account, c);
+  return { ok: true, used: c.count, limit: max };
+}
+
+// Give the seats back when a send never happened, so a refusal further down
+// does not quietly cost somebody an hour of their ceiling.
+function inviteRateGeef(account, aantal) {
+  const c = inviteRateMap.get(account);
+  if (!c) return;
+  c.count = Math.max(0, c.count - (Number(aantal) || 0));
+  inviteRateMap.set(account, c);
+}
+
+setInterval(() => { const now = Date.now();
+  for (const [k, v] of inviteRateMap) if (now > v.resetAt) inviteRateMap.delete(k);
+}, 3_600_000).unref?.();
+
 // ── Delivery receipt store (PR #341, finding 2) ─────────────────────────
 // The signed delivery receipt used to ride out on the download itself, in the
 // X-Paramant-Receipt response header. It carries a full ML-DSA-65 signature and
@@ -4552,6 +4599,24 @@ async function handleRelayRequest(req, res) {
       // them is deliberate: a recipient who gets bytes they cannot open is
       // worse off than one who never got them.
       const sealed = (input.sealed && typeof input.sealed === 'object') ? input.sealed : null;
+
+      // Seats for the whole send, before anything is written. The count comes
+      // off `sealed`, which is the browser's own list and therefore the number
+      // of mails this is actually going to cause; the plan ceiling is checked
+      // again inside create, so a padded `sealed` buys nothing but a refusal.
+      const _wilMailen = sealed ? Object.keys(sealed).length
+                       : (Array.isArray(input.recipients) ? input.recipients.length : 0);
+      const _rem = inviteRateOk(acctOf(apiKey), kd, _wilMailen);
+      if (!_rem.ok) {
+        log('warn', 'invite_rate_limited', { limit: _rem.limit, used: _rem.used, asked: _rem.asked });
+        res.writeHead(429, { 'Content-Type': 'application/json',
+                             'Retry-After': String(_rem.retry_after_s) });
+        return res.end(J({ error: 'too_many_invitations', dimension: 'outbound_per_hour',
+                           limit: _rem.limit, used: _rem.used, asked: _rem.asked,
+                           retry_after_s: _rem.retry_after_s,
+                           hint: 'this ceiling is per hour and covers everyone you invite' }));
+      }
+
       const made = await _sendStore().create({
         plan: _tier, blob, addresses: input.recipients, sealed,
         ttlMs: input.ttl_ms, filename: input.filename, accountId: acctOf(apiKey),
@@ -4560,6 +4625,10 @@ async function handleRelayRequest(req, res) {
         sender: { naam: kd.label || '', email: kd.email || '' },
       });
       if (!made.ok) {
+        // No send, no mail, so the seats go back. Otherwise a sender who trips
+        // the recipient ceiling also loses an hour of their invitation budget,
+        // for a send that never left.
+        inviteRateGeef(acctOf(apiKey), _wilMailen);
         const status = made.reason === 'over_limit' ? 403 : 400;
         log('info', 'send_refused', { reason: made.reason, limit: made.limit });
         res.writeHead(status, { 'Content-Type': 'application/json' });

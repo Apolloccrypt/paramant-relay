@@ -85,7 +85,23 @@ const TIER_LIMITS = Object.freeze({
     devices: 50,           // mirrors legacy _pubkeyMax.pro; brief says 10 once policy bump
     view_ttl_ms: 86_400_000, // 24 h
     max_views: 10,
-    max_recipients: 10,
+    // Thirty, and it is the number the product is sold on.
+    //
+    // A care provider in Utrecht wrote in on 22-09 asking whether the paid
+    // bundles could send one file to about twenty people; their current tool
+    // stops at five. At ten this row answered "no" to the one question a buyer
+    // had actually asked, and `business` -- the row that does carry thirty --
+    // is not a tier anyone can buy: validateProductPlan('parasend','business')
+    // returns invalid_tier and the catalogue only ever grants 'pro'. So ten was
+    // not a ceiling somebody chose for Firm, it was a gap nobody had walked.
+    //
+    // The cost is bounded and was worked out: thirty recipients is sixty mails
+    // (invitation plus code), and 500 transfers a month puts the worst case at
+    // 30,000 -- 37 euro of Mailjet against 29 excl. btw of revenue, and that
+    // worst case is a customer sending twenty-five times every working day.
+    // What keeps it honest is the per-hour brake on invitations in relay.js,
+    // which did not exist when this number was ten.
+    max_recipients: 30,
     max_parties: 20,
     concurrent_blobs: 24, // about three at a time
     outbound_per_hour: 500,  // mirrors legacy OUTBOUND_RATE.pro
