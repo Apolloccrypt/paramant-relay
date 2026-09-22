@@ -44,8 +44,14 @@ fs.writeFileSync(usersFile, '{}');
 const mails = [];
 const relay = spawn(process.execPath, ['relay.js'], {
   cwd: RELAYDIR,
+  // Dezelfde omgeving die relay/test/_boot-relay.js meegeeft, inclusief het
+  // leegzetten van RELAY_REDIS_URL en NATS_URL. Zelf een env bij elkaar
+  // rommelen werkte hier wel en in CI niet: daar bleef de relay hangen op een
+  // Redis die er niet was, en de test faalde met ECONNREFUSED zonder te zeggen
+  // waarom.
   env: { ...process.env,
     PORT: String(RELAY_PORT), RELAY_MODE: 'full', LOG_LEVEL: 'info',
+    RELAY_REDIS_URL: '', NATS_URL: '',
     USERS_FILE: usersFile, MAIL_PROVIDER: 'dryrun',
     ADMIN_TOKEN: 'x'.repeat(40),
     PARAMANT_TOTP_MASTER_KEY: crypto.randomBytes(32).toString('base64'),
@@ -67,9 +73,23 @@ relay.stdout.on('data', (d) => {
 relay.stderr.on('data', () => {});
 
 const RELAY = `http://127.0.0.1:${RELAY_PORT}`;
-for (let i = 0; i < 100; i++) {
-  try { const r = await fetch(RELAY + '/health'); if (r.ok) break; } catch {}
+let uitvoer = '';
+relay.stdout.on('data', (d) => { uitvoer = (uitvoer + d).slice(-2000); });
+relay.stderr.on('data', (d) => { uitvoer = (uitvoer + d).slice(-2000); });
+let gezond = false;
+for (let i = 0; i < 150; i++) {
+  try { const r = await fetch(RELAY + '/health'); if (r.ok) { gezond = true; break; } } catch {}
+  if (relay.exitCode !== null) break;
   await new Promise((r) => setTimeout(r, 200));
+}
+if (!gezond) {
+  // Zeggen WAAROM, want een ECONNREFUSED verderop stuurt de lezer naar de
+  // verkeerde kant: dan lijkt het de test, terwijl het de relay is die niet
+  // startte.
+  console.error('de relay kwam niet omhoog (exit ' + relay.exitCode + '). Laatste uitvoer:\n' + uitvoer);
+  server.close(); try { relay.kill('SIGKILL'); } catch {}
+  try { fs.unlinkSync(usersFile); } catch {}
+  process.exit(1);
 }
 
 // ── de statische site, met /v2/ doorgestuurd naar de relay ──────────────────
