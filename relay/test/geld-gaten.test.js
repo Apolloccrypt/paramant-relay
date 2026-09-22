@@ -196,8 +196,20 @@ test('gat 1c: DE ECHTE: een gratis account bereikt 50 mensen per uur', async () 
     if (r.status === 201) { bereikt += 1; continue; }
     break;
   }
-  assert.equal(laatste.status, 429, 'pas de uurrem stopt dit: ' + JSON.stringify(laatste.body));
-  assert.equal(laatste.body.limit, 50);
+  // WELKE grens hem stopt hangt af van de opslag, en dat is voor dit gat niet
+  // de vraag. Zonder redis is er geen maandteller en loopt hij tegen de uurrem
+  // (429, outbound_per_hour). Met redis erachter telt ook transfers_month mee,
+  // en die staat op hetzelfde getal en slaat als eerste aan (403,
+  // monthly_transfer_quota_reached). Deze suite draaide eerst alleen zonder
+  // redis en pinde daarom een van de twee; sinds hij in de baan met een echte
+  // redis draait was dat een test die de opslag toetste in plaats van het gat.
+  //
+  // Het gat zelf verandert er niet door, en dat is wat hier wordt vastgelegd:
+  // vijftig verschillende mensen bereikt op een plan dat er een belooft.
+  assert.ok(laatste.status === 429 || laatste.status === 403,
+    'er moet een grens zijn, en die gaf ' + laatste.status + ': ' + JSON.stringify(laatste.body));
+  assert.equal(laatste.body.limit, 50,
+    'welke grens het ook is, hij hoort op vijftig te staan');
   assert.equal(bereikt, 50,
     'vijftig verschillende mensen op een plan dat er een belooft, kreeg ' + bereikt);
   assert.equal(naarExtern(voor), 50, 'en vijftig echte mails');

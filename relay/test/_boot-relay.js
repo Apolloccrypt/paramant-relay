@@ -71,6 +71,17 @@ function bootRelayBaseEnv(port) {
     ...process.env,
     PORT: String(port),
     USERS_JSON: '{"api_keys":[]}',
+    // relay.js:95 leest REDIS_URL, niet RELAY_REDIS_URL. Alleen die tweede
+    // leegzetten deed niets, en dat viel niet op zolang deze suites draaiden
+    // in een baan zonder redis in de omgeving. Sinds ze in de baan met een
+    // echte redis draaien deelden alle geboote relays een opslag: de
+    // maandteller van de ene test stond nog vol in de volgende, en drie suites
+    // die niets met redis te maken hebben vielen om op quota van een buurman.
+    //
+    // Een suite die zelf een relay start wil een eigen opslag. Wie wel redis
+    // wil geeft die expliciet mee in de env-parameter hieronder, zoals
+    // send-races-redis doet met zijn eigen stub.
+    REDIS_URL: '',
     RELAY_REDIS_URL: '',
     NATS_URL: '',
   };
