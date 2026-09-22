@@ -16,8 +16,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import net from 'node:net';
-import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { startRelay } from './_relay-stack.mjs';
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HIER, '..', 'frontend');
@@ -28,69 +28,29 @@ const MIME = { '.js':'text/javascript', '.css':'text/css', '.html':'text/html', 
 const checks = [];
 const ok = (naam, cond, detail='') => checks.push({ naam, pass: !!cond, detail: String(detail) });
 
-function vrijePoort() {
-  return new Promise((res) => {
-    const s = net.createServer();
-    s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); });
-  });
-}
-
-// ── de echte relay ──────────────────────────────────────────────────────────
+// ---- de echte relay, via de enige weg die er is -------------------------
+// startRelay() uit tests/_relay-stack.mjs is niet alleen gemak: die import is
+// wat scripts/browser-suites.mjs deze suite in de CI-baan met een echte
+// backend zet. Zelf spawnen werkte hier en faalde in CI op een ontbrekende
+// argon2, met een melding die naar de test wees in plaats van naar de baan.
 const API_KEY = 'pgp_browser_reis';
-const RELAY_PORT = await vrijePoort();
-const usersFile = path.join(RELAYDIR, `.browser-users-${process.pid}.json`);
-fs.writeFileSync(usersFile, '{}');
-
 const mails = [];
-const relay = spawn(process.execPath, ['relay.js'], {
-  cwd: RELAYDIR,
-  // Dezelfde omgeving die relay/test/_boot-relay.js meegeeft, inclusief het
-  // leegzetten van RELAY_REDIS_URL en NATS_URL. Zelf een env bij elkaar
-  // rommelen werkte hier wel en in CI niet: daar bleef de relay hangen op een
-  // Redis die er niet was, en de test faalde met ECONNREFUSED zonder te zeggen
-  // waarom.
-  env: { ...process.env,
-    PORT: String(RELAY_PORT), RELAY_MODE: 'full', LOG_LEVEL: 'info',
-    RELAY_REDIS_URL: '', NATS_URL: '',
-    USERS_FILE: usersFile, MAIL_PROVIDER: 'dryrun',
-    ADMIN_TOKEN: 'x'.repeat(40),
-    PARAMANT_TOTP_MASTER_KEY: crypto.randomBytes(32).toString('base64'),
+const stack = await startRelay({
+  onLine: (r) => {
+    if (!r.includes('mail_dryrun')) return;
+    try { mails.push(JSON.parse(r)); } catch { /* geen json, geen mail */ }
+  },
+  env: {
     USERS_JSON: JSON.stringify({ api_keys: [{ key: API_KEY, active: true, plan: 'pro',
       plan_parasend: 'pro', label: 'Zorggroep De Linde', email: 'anna@zorg.test',
       account_id: 'acct_browser' }] }),
   },
-  stdio: ['ignore', 'pipe', 'pipe'],
 });
-let buffer = '';
-relay.stdout.on('data', (d) => {
-  buffer += d.toString();
-  const regels = buffer.split('\n'); buffer = regels.pop();
-  for (const r of regels) {
-    if (!r.includes('mail_dryrun')) continue;
-    try { mails.push(JSON.parse(r)); } catch {}
-  }
-});
-relay.stderr.on('data', () => {});
+const RELAY = stack.basis;
+const RELAY_PORT = stack.poort;
+const relay = stack.proces;
+const usersFile = stack.usersFile;
 
-const RELAY = `http://127.0.0.1:${RELAY_PORT}`;
-let uitvoer = '';
-relay.stdout.on('data', (d) => { uitvoer = (uitvoer + d).slice(-2000); });
-relay.stderr.on('data', (d) => { uitvoer = (uitvoer + d).slice(-2000); });
-let gezond = false;
-for (let i = 0; i < 150; i++) {
-  try { const r = await fetch(RELAY + '/health'); if (r.ok) { gezond = true; break; } } catch {}
-  if (relay.exitCode !== null) break;
-  await new Promise((r) => setTimeout(r, 200));
-}
-if (!gezond) {
-  // Zeggen WAAROM, want een ECONNREFUSED verderop stuurt de lezer naar de
-  // verkeerde kant: dan lijkt het de test, terwijl het de relay is die niet
-  // startte.
-  console.error('de relay kwam niet omhoog (exit ' + relay.exitCode + '). Laatste uitvoer:\n' + uitvoer);
-  server.close(); try { relay.kill('SIGKILL'); } catch {}
-  try { fs.unlinkSync(usersFile); } catch {}
-  process.exit(1);
-}
 
 // ── de statische site, met /v2/ doorgestuurd naar de relay ──────────────────
 const server = http.createServer(async (req, res) => {
