@@ -267,6 +267,27 @@ function modeAllows(p) {
   return !a || a.some(x => p === x || p.startsWith(x + '/'));
 }
 
+// The footer every mail to a non-customer carries.
+//
+// A stranger's first question is "why am I getting this", and the second is
+// "who are you". A transactional mail that answers neither is indistinguishable
+// from a phishing attempt, and a corporate spam filter will treat it as one.
+// Answering both costs three lines and is the difference between a document
+// that arrives and a ticket at somebody's IT desk.
+function VOET(wie, antwoordAdres) {
+  const wieHtml = escHtml(wie || '');
+  return '<hr style="border:0;border-top:1px solid #e3e7e9;margin:22px 0 12px">'
+       + '<p style="color:#8a949a;font-size:12px;line-height:1.6;margin:0">'
+       + 'You are getting this because ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
+                                                   : 'a Paramant customer')
+       + ' entered your address. Paramant carries the file in encrypted form and '
+       + 'cannot open it.'
+       + (antwoordAdres ? '<br>Reply to this mail to reach them directly.' : '')
+       + '<br>Paramantis Solutions B.V., Harderwijk, the Netherlands &middot; '
+       + '<a href="https://paramant.app/privacy" style="color:#8a949a">privacy</a>'
+       + '</p>';
+}
+
 // Which sector an account lives on, from its key label -- the same derivation
 // GET /v2/key-sector already answers the sender's page with.
 //
@@ -2204,7 +2225,17 @@ function auditAppend(key, event, data = {}) {
 // The point of the move: Paramant promises European handling in the footer of
 // this very mail, and the carrier is now a setting (MAIL_PROVIDER) instead of a
 // hostname compiled into this function.
-function sendResendEmail({ to, subject, text, html, from, cc, attachments } = {}) {
+// Send and move on, logging whatever came back.
+//
+// Renamed from sendResendEmail, which stopped being true the day mail went
+// through one door: it has carried Mailjet, Scaleway or Resend depending on a
+// setting for a while now, and a function named after one carrier is how
+// somebody later assumes the switch does not apply here.
+//
+// Fire-and-forget is right ONLY where nobody is told the mail is on its way.
+// The invitation, the pickup code and the reminder all await instead, because
+// each one puts a sentence on somebody's screen claiming post has left.
+function mailLater({ to, subject, text, html, from, cc, attachments } = {}) {
   if (!to) return false;
   const cfg = mailer.config();
   // Nothing configured is not a failure worth waking anyone for; it is how a
@@ -2867,7 +2898,7 @@ function _mailInvoice(record) {
     ``,
     record.seller.name,
   ].filter((l, i, a) => !(l === '' && a[i - 1] === ''));
-  return sendResendEmail({
+  return mailLater({
     to: record.buyer.email,
     from: 'PARAMANT <billing@paramant.app>',
     subject,
@@ -2942,7 +2973,7 @@ function _mailCreditNote(record) {
     ``,
     record.seller.name,
   ].filter((l, i, a) => !(l === '' && a[i - 1] === ''));
-  return sendResendEmail({
+  return mailLater({
     to: record.buyer.email,
     from: 'PARAMANT <billing@paramant.app>',
     subject,
@@ -4524,6 +4555,9 @@ async function handleRelayRequest(req, res) {
       const made = await _sendStore().create({
         plan: _tier, blob, addresses: input.recipients, sealed,
         ttlMs: input.ttl_ms, filename: input.filename, accountId: acctOf(apiKey),
+        // From the key record, never from the request: a sender may not choose
+        // whose name appears above a mail thirty strangers receive.
+        sender: { naam: kd.label || '', email: kd.email || '' },
       });
       if (!made.ok) {
         const status = made.reason === 'over_limit' ? 403 : 400;
@@ -4547,6 +4581,11 @@ async function handleRelayRequest(req, res) {
       // An unescaped one could carry a link or a tracking pixel of its own.
       const naamRuw = (input.filename && String(input.filename).slice(0, 120)) || 'a file';
       const naam = escHtml(naamRuw);
+      // The human above the mail. Thirty people who are not our customers get
+      // this, and a message with no sender in it reads as phishing no matter
+      // how carefully the rest is worded.
+      const wieRuw = mailer.veiligeNaam(kd.label || '');
+      const wie = escHtml(wieRuw);
       let gemaild = 0;
       // One invitation per person, never a visible list of the others: who else
       // receives a confidential document is not for the group to know.
@@ -4559,20 +4598,29 @@ async function handleRelayRequest(req, res) {
         // worse than an honest lower number.
         const bezorgd = await mailer.stuur({
           to: adres,
-          subject: 'A file is waiting for you',
+          from: mailer.afzenderNamens(undefined, wieRuw),
+          replyTo: kd.email || undefined,
+          subject: wieRuw ? wieRuw + ' sent you a file' : 'A file is waiting for you',
           // The plain-text half takes the unescaped name: HTML entities in a
           // text mail read as noise, and there is nothing to inject into.
-          text: 'A file is waiting for you: ' + naamRuw + '\n\n' + link
+          text: (wieRuw ? wieRuw + ' sent you a file through Paramant.' : 'A file is waiting for you.')
+              + '\n\n' + naamRuw + '\n\n' + link
               + '\n\nThe link is yours alone and works once. Opening it sends a short code '
-              + 'to this address. Available until ' + tot + '.',
-          html: '<p>A file is waiting for you:</p>'
+              + 'to this address, so only somebody who can read this mailbox can collect the '
+              + 'file. Available until ' + tot + '.'
+              + '\n\nYou are getting this because ' + (wieRuw || 'a Paramant customer')
+              + ' entered your address. Paramant carries the file; we cannot open it.'
+              + (kd.email ? '\nReply to this mail to reach them directly.' : ''),
+          html: '<p>' + (wie ? '<strong>' + wie + '</strong> sent you a file through Paramant.'
+                             : 'A file is waiting for you.') + '</p>'
               + '<p style="font-weight:600">' + naam + '</p>'
               + '<p><a href="' + link + '" style="display:inline-block;padding:11px 18px;'
               + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">'
               + 'Open the file</a></p>'
               + '<p style="color:#666;font-size:13px">This link is yours alone and works once. '
               + 'Opening it sends a short code to this address, so only somebody who can read '
-              + 'this mailbox can collect the file.<br>Available until ' + tot + '.</p>',
+              + 'this mailbox can collect the file.<br>Available until ' + tot + '.</p>'
+              + VOET(wieRuw, kd.email),
         });
         if (bezorgd && bezorgd.ok) gemaild += 1;
         else log('warn', 'invitation_failed', { reason: bezorgd && bezorgd.reason });
@@ -4684,9 +4732,13 @@ async function handleRelayRequest(req, res) {
         { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
           timeZone: 'Europe/Amsterdam', timeZoneName: 'short' });
       // Awaited, so the dashboard's "reminder sent" is about what happened.
+      const wie3 = mailer.veiligeNaam(out.sender_name || '');
       const bezorgd = await mailer.stuur({
         to: out.email,
-        subject: 'A reminder: a file is still waiting for you',
+        from: mailer.afzenderNamens(undefined, wie3),
+        replyTo: out.sender_email || undefined,
+        subject: wie3 ? 'A reminder from ' + wie3 + ': your file is still waiting'
+                      : 'A reminder: a file is still waiting for you',
         text: 'A file is still waiting for you.\n\nUse the link in the earlier mail '
             + 'from Paramant; it still works and it is still yours alone. '
             + 'Available until ' + tot + '.',
@@ -4694,7 +4746,8 @@ async function handleRelayRequest(req, res) {
             + '<p>Use the link in the earlier mail from Paramant. It still works, '
             + 'and it is still yours alone.</p>'
             + '<p style="color:#666;font-size:13px">Available until ' + escHtml(tot) + '. '
-            + 'Cannot find that mail? Ask the sender to send the file again.</p>',
+            + 'Cannot find that mail? Ask the sender to send the file again.</p>'
+            + VOET(wie3, out.sender_email),
       });
       if (!bezorgd || !bezorgd.ok) {
         log('warn', 'reminder_not_mailed', { id: sendId, reason: bezorgd && bezorgd.reason });
@@ -6847,7 +6900,7 @@ async function handleRelayRequest(req, res) {
       auditAppend(apiKey, 'inbound', { hash: hash.slice(0,16)+'...', bytes: blob.length, device: deviceId, sig: sigResult.valid ? 'ML-DSA-OK' : 'unsigned', ...(viaSessionToken ? { via: 'pst' } : {}) });
       log('info', 'blob_stored', { hash: hash.slice(0,16), size: blob.length, sig: sigResult.valid });
       // ParaSend Pro upload notification (no-op below Pro+ or without RESEND key).
-      transferNotify.maybeNotify({ keyData, event: 'upload', hashPrefix: hash, bytes: blob.length, sendEmail: sendResendEmail });
+      transferNotify.maybeNotify({ keyData, event: 'upload', hashPrefix: hash, bytes: blob.length, sendEmail: mailLater });
 
       // (Transfer already counted by the quota gate above, before storage.)
 
@@ -6966,14 +7019,29 @@ async function handleRelayRequest(req, res) {
       // rather than about what was attempted. Fire-and-forget meant a recipient
       // could sit waiting for a mail the provider had already refused, with
       // their previous working code overwritten.
+      // Same address and same name as the invitation. It used to come from a
+      // DIFFERENT sender than the mail it belongs to, which is the single most
+      // reliable way to make a legitimate code look like a scam.
+      const wie2 = mailer.veiligeNaam(vraag.sender_name || '');
+      const bestand2 = escHtml(String(vraag.filename || '').slice(0, 120));
       const bezorgd = await mailer.stuur({
         to: vraag.email,
+        from: mailer.afzenderNamens(undefined, wie2),
+        replyTo: vraag.sender_email || undefined,
         subject: 'Your code to open the file',
-        text: 'Your code is ' + vraag.code + '. It works for ' + minuten + ' minutes.',
+        text: 'Your code is ' + vraag.code + '. It works for ' + minuten + ' minutes.'
+            + (vraag.filename ? '\n\nIt opens: ' + vraag.filename : '')
+            + (wie2 ? '\nSent to you by ' + wie2 + ' through Paramant.' : '')
+            + '\n\nIf you did not just ask for this code, somebody else has your link. '
+            + 'Do not pass the code on, and let the sender know.',
         html: '<p>Your code to open the file:</p>'
             + '<p style="font:600 28px/1.2 monospace;letter-spacing:.14em">' + vraag.code + '</p>'
+            + (bestand2 ? '<p style="color:#666;font-size:13px">It opens: <strong>'
+                          + bestand2 + '</strong></p>' : '')
             + '<p style="color:#666;font-size:13px">It works for ' + minuten
-            + ' minutes. If you did not ask for this, you can ignore it.</p>',
+            + ' minutes.<br>If you did not just ask for this code, somebody else has your '
+            + 'link. Do not pass the code on, and let the sender know.</p>'
+            + VOET(wie2, vraag.sender_email),
       });
       if (!bezorgd || !bezorgd.ok) {
         log('warn', 'pickup_code_not_mailed', { reason: bezorgd && bezorgd.reason });
@@ -7092,7 +7160,7 @@ async function handleRelayRequest(req, res) {
     // whose key is on the blob entry — not the downloader. No-op below Pro+ / no key.
     {
       const _ownerKd = entry.apiKey ? apiKeys.get(entry.apiKey) : null;
-      transferNotify.maybeNotify({ keyData: _ownerKd, event: 'download', hashPrefix: outm[1], bytes: blob.length, sendEmail: sendResendEmail });
+      transferNotify.maybeNotify({ keyData: _ownerKd, event: 'download', hashPrefix: outm[1], bytes: blob.length, sendEmail: mailLater });
     }
 
     // ── Build signed delivery receipt ────────────────────────────────────────
@@ -8349,7 +8417,7 @@ async function handleRelayRequest(req, res) {
         siteUrl: process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL,
       });
       if (msg) {
-        Promise.resolve(sendResendEmail({ to, subject: msg.subject, text: msg.text, html: msg.html }))
+        Promise.resolve(mailLater({ to, subject: msg.subject, text: msg.text, html: msg.html }))
           .catch((e) => log('warn', 'coupon_mail_failed', { err: e.message }));
       }
     }
@@ -9694,6 +9762,25 @@ function _b64urlDecode(s) {
   return Buffer.from(p + '='.repeat((4 - p.length % 4) % 4), 'base64');
 }
 
+// Say at boot who carries the mail, and say it loudly when nobody does.
+//
+// The failure this exists for is silent by construction: a typo in
+// MAIL_PROVIDER falls back to dryrun, dryrun answers ok, the send route counts
+// thirty invitations, and the first anybody hears about it is a customer
+// asking why nothing arrived. One line at boot turns a week of quiet into a
+// question somebody can answer before the first send.
+function meldMailstand() {
+  const d = mailer.diagnose();
+  if (d.waarschuwing) {
+    log('error', 'mail_misconfigured', {
+      requested: d.gevraagd, using: d.provider, delivering: !d.stil,
+      hint: d.waarschuwing,
+    });
+    return;
+  }
+  log('info', 'mail_carrier', { provider: d.provider, from: d.from, delivering: !d.stil });
+}
+
 function checkLicense() {
   // File integrity checksum (tamper detection)
   try {
@@ -9702,6 +9789,7 @@ function checkLicense() {
   } catch(e) {
     log('warn', 'relay_integrity_failed', { err: e.message });
   }
+  meldMailstand();
 
   // PLK_KEY is the canonical env var; PARAMANT_LICENSE accepted for backward compat
   const rawKey = process.env.PLK_KEY || process.env.PARAMANT_LICENSE || '';
@@ -9873,7 +9961,7 @@ setInterval(() => {
 const _expiryBootDelay = parseInt(process.env.PLAN_EXPIRY_BOOT_DELAY_MS || '', 10);
 planExpiry.startPlanExpiryPlanner({
   redis: redisClient,
-  sendEmail: ({ to, subject, text, html }) => sendResendEmail({ to, subject, text, html }),
+  sendEmail: ({ to, subject, text, html }) => mailLater({ to, subject, text, html }),
   log,
   siteUrl: process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL,
   seed: () => planExpiry.seedIndex(redisClient, accountsWithTerms()),

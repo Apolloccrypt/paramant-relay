@@ -367,22 +367,53 @@ test('de bestandsnaam in de uitnodigingsmail gaat door escHtml', () => {
 });
 
 test('de afzender krijgt te horen dat de post niet aankwam', () => {
-  // Drie mails verlaten deze functie richting mensen die geen klant zijn: de
-  // uitnodiging, de code en de herinnering. Alle drie moeten op de bezorging
-  // wachten, anders is wat de afzender of de ontvanger leest een bewering over
-  // een poging in plaats van over een feit. De oude toets keek naar
-  // sendResendEmail, dat fire-and-forget is en voor dit pad niet meer gebruikt
-  // wordt; deze kijkt naar de drie plekken zelf.
-  for (const anker of ['subject: \'A file is waiting for you\'',
-                       'subject: \'Your code to open the file\'',
-                       'subject: \'A reminder: a file is still waiting for you\'']) {
+  // Elke mail die deze relay verstuurt moet OF op de bezorging wachten, OF de
+  // uitkomst afhandelen in een .then. Wat niet mag is allebei niet: dan
+  // verdwijnt een 4xx van de provider spoorloos en leest iemand dat het gelukt
+  // is terwijl er niets vertrok.
+  //
+  // Het onderscheid is echt. Bij de ophaalcode krijgt de ONTVANGER te horen
+  // "we hebben je een code gestuurd", dus daar moet het antwoord op de
+  // bezorging wachten. Bij de DPA-bevestiging wordt niemand iets
+  // voorgespiegeld; daar volstaat loggen wat ervan kwam.
+  //
+  // Deze toets zoekt de AANROEPEN, niet de onderwerpregels. De vorige versie
+  // pinde de letterlijke tekst "A file is waiting for you" en brak zodra het
+  // onderwerp de naam van de afzender ging dragen: een uur uitzoekwerk, nul
+  // defecten gevonden.
+  const aanroepen = [...RELAY_SRC.matchAll(/mailer\.stuur\s*\(/g)];
+  assert.ok(aanroepen.length >= 3,
+    'verwacht minstens de uitnodiging, de code en de herinnering, gevonden: ' + aanroepen.length);
+
+  const stil = [];
+  for (const m of aanroepen) {
+    const voor = RELAY_SRC.slice(Math.max(0, m.index - 60), m.index);
+    const wacht = /\b(await|return)\s+$/.test(voor);
+    // Het blok erna: een .then binnen een paar honderd tekens telt als
+    // afhandeling. Verder kijken heeft geen zin, dan is het een andere mail.
+    const na = RELAY_SRC.slice(m.index, m.index + 2400);
+    const handeltAf = /\}\)\s*\.then\s*\(/.test(na);
+    if (!wacht && !handeltAf) stil.push(RELAY_SRC.slice(0, m.index).split('\n').length);
+  }
+  assert.deepEqual(stil, [],
+    'mailer.stuur op regel(s) ' + stil.join(', ') + ' wacht niet en handelt de ' +
+    'uitkomst niet af: een weigering van de provider verdwijnt dan zonder spoor');
+});
+
+test('wat de ontvanger te horen krijgt, wacht wel op de bezorging', () => {
+  // De drie mails die bij een niet-klant aankomen zijn de uitnodiging, de
+  // ophaalcode en de herinnering. Alle drie leiden tot een zin op het scherm
+  // of in een antwoord die beweert dat er post onderweg is, dus alle drie
+  // moeten op de provider wachten.
+  for (const anker of ['sent you a file', 'Your code to open the file',
+                       'a file is still waiting']) {
     const i = RELAY_SRC.indexOf(anker);
     assert.ok(i > 0, 'mail niet gevonden: ' + anker);
-    const voor = RELAY_SRC.slice(Math.max(0, i - 400), i);
-    assert.match(voor, /await\s+mailer\.stuur/,
-      anker + ' wordt verstuurd zonder op de bezorging te wachten, dus een 4xx ' +
-      'van de provider komt alleen in het log en de lezer krijgt te horen dat ' +
-      'het gelukt is');
+    const voor = RELAY_SRC.slice(Math.max(0, i - 900), i);
+    const laatste = voor.lastIndexOf('mailer.stuur');
+    assert.ok(laatste > 0, 'geen mailer.stuur boven "' + anker + '"');
+    assert.match(voor.slice(Math.max(0, laatste - 40), laatste), /\bawait\s+$/,
+      '"' + anker + '" wordt verstuurd zonder op de bezorging te wachten');
   }
 });
 

@@ -31,8 +31,8 @@ const bericht = { to: 'anna@example.org', subject: 'Your document', html: '<p>He
 test('an unknown provider name falls back to dryrun, never to a live carrier', () => {
   for (const naam of ['', 'postmark', 'sendgrid', 'nonsense']) {
     const cfg = mail.config({ MAIL_PROVIDER: naam });
-    assert.equal(cfg.provider, naam === '' ? 'resend' : 'dryrun',
-      'an empty setting keeps today\'s provider, a wrong one sends nothing');
+    assert.equal(cfg.provider, naam === '' ? 'mailjet' : 'dryrun',
+      'an empty setting means the default carrier, a wrong one sends nothing');
   }
   assert.equal(mail.config({ MAIL_PROVIDER: ' Scaleway ' }).provider, 'scaleway',
     'case and spaces do not decide who carries the mail');
@@ -126,4 +126,81 @@ test('the from line is split the way a carrier expects it', () => {
     { name: 'PARAMANT', email: 'noreply@paramant.app' });
   assert.deepEqual(mail.ontleedAfzender('noreply@paramant.app'),
     { name: undefined, email: 'noreply@paramant.app' });
+});
+
+
+test('a typo in MAIL_PROVIDER is a loud state, not a quiet one', () => {
+  // The trap: the fallback to dryrun answers ok, the route counts thirty
+  // invitations, and nothing anywhere says they never left. An operator found
+  // out a week later, from a customer.
+  const d = mail.diagnose({ MAIL_PROVIDER: 'mailjett', MAILJET_API_KEY: 'a', MAILJET_SECRET_KEY: 'b' });
+  assert.equal(d.provider, 'dryrun');
+  assert.equal(d.terugval, true, 'the fallback has to be visible as a fallback');
+  assert.equal(d.stil, true, 'and it has to say that nothing is delivered');
+  assert.match(d.waarschuwing, /not a provider/);
+  assert.match(d.waarschuwing, /mailjet, scaleway, resend, dryrun/,
+    'and name what the operator should have typed');
+});
+
+test('a configured provider without credentials does not pass as ready', () => {
+  const d = mail.diagnose({ MAIL_PROVIDER: 'mailjet' });
+  assert.equal(d.gereed, false);
+  assert.equal(d.terugval, false, 'this is not a typo, it is a missing key');
+  assert.match(d.waarschuwing, /credentials are missing/);
+});
+
+test('mailjet sends one message per address, so recipients never see each other', async () => {
+  // A list of thirty people collecting the same confidential document must not
+  // learn who else got it. Mailjet takes several addresses in one To array and
+  // would put them all in the header, so the split belongs here as well as
+  // upstream.
+  let lichaam = null;
+  const f = async (url, opts) => {
+    lichaam = JSON.parse(opts.body);
+    return { ok: true, status: 200, json: async () => ({ Messages: [{ Status: 'success' }, { Status: 'success' }] }) };
+  };
+  const r = await mail.stuur(
+    { to: ['anna@example.org', 'bob@example.org'], subject: 'A file', text: 'Hello',
+      from: '"Anna de Vries via Paramant" <post@paramant.app>', replyTo: 'anna@klant.nl' },
+    { fetch: f, env: { MAIL_PROVIDER: 'mailjet', MAILJET_API_KEY: 'k', MAILJET_SECRET_KEY: 's' } });
+
+  assert.equal(r.ok, true);
+  assert.equal(r.provider, 'mailjet');
+  assert.equal(lichaam.Messages.length, 2, 'one message per person');
+  for (const bericht of lichaam.Messages) {
+    assert.equal(bericht.To.length, 1, 'and exactly one address in each');
+  }
+  assert.equal(lichaam.Messages[0].From.Name, 'Anna de Vries via Paramant',
+    'the customer is named above the mail, or it reads as phishing');
+  assert.equal(lichaam.Messages[0].From.Email, 'post@paramant.app',
+    'while the envelope stays ours, so SPF and DKIM still pass');
+  assert.equal(lichaam.Messages[0].ReplyTo.Email, 'anna@klant.nl',
+    'and a reply reaches the one person who can explain it');
+});
+
+test('mailjet accepting the request is not the same as accepting the address', async () => {
+  // A 200 with one refused message used to count as a delivery, so the sender
+  // read "invited: 30" while one person got nothing.
+  const f = async () => ({ ok: true, status: 200, json: async () => ({
+    Messages: [{ Status: 'success' }, { Status: 'error', Errors: [{ ErrorMessage: 'invalid domain' }] }] }) });
+  const r = await mail.stuur(
+    { to: ['anna@example.org', 'bob@nietbestaand.invalid'], subject: 'A file', text: 'Hello' },
+    { fetch: f, env: { MAIL_PROVIDER: 'mailjet', MAILJET_API_KEY: 'k', MAILJET_SECRET_KEY: 's' } });
+  assert.equal(r.ok, false, 'a refused address must not read as delivered');
+  assert.equal(r.reason, 'rejected');
+  assert.match(r.detail, /invalid domain/, 'and the reason has to survive to the log');
+});
+
+test('the dryrun carrier writes the message where somebody can read it', () => {
+  const regels = [];
+  return mail.stuur({ to: ['anna@example.org'], subject: 'Rehearsal', text: 'Hi' },
+    { env: { MAIL_PROVIDER: 'dryrun' }, log: (n, g, v) => regels.push([n, g, v]) })
+    .then(r => {
+      assert.equal(r.ok, true);
+      assert.equal(r.delivered, false, 'ok is not delivered, and the field says so');
+      assert.equal(regels.length, 1, 'a rehearsal you cannot read is the same as mail that vanished');
+      assert.equal(regels[0][1], 'mail_dryrun');
+      assert.deepEqual(regels[0][2].to, ['anna@example.org']);
+      assert.equal(regels[0][2].subject, 'Rehearsal');
+    });
 });

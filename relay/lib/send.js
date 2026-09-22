@@ -51,6 +51,35 @@ function newSendId() {
 // as an abuse one.
 const MAX_REMINDERS = 3;
 
+// HOW BIG A SEND TO NAMED RECIPIENTS MAY BE, and this number is measured, not
+// chosen for how it sounds.
+//
+// The ordinary flows never hold a whole file anywhere: a live hand-over streams
+// through RAM three blocks at a time, and a one-link send is one sealed 5 MB
+// block. That is why /pricing can honestly sell "500 MB handed over live, 5 MB
+// over a link" while every tier stores transfers in RAM.
+//
+// A send to a group breaks that shape. Nobody is waiting at the other end, so
+// the whole file sits in the durable store until the last recipient collects or
+// the window closes -- up to seven days on Business. And parasign-store.js
+// seals with `.toString('base64')`, so it occupies a THIRD more than its own
+// size, in a Redis container limited to 256 MB that also carries sessions, rate
+// limits and every ParaSign envelope.
+//
+//   256 MB  the container
+//  - 56 MB  Redis itself, the AOF buffer, sessions, rate limits, ParaSign
+//  = 200 MB for sends, AFTER base64
+//  = 150 MB of real bytes, shared by every open send at once
+//
+// At 25 MB that is six sends open together. Bigger numbers are not generosity:
+// one 150 MB send would fill the store and the next customer's signature would
+// fail to write. Raise it only together with the Redis budget.
+const SEND_MAX_MB = (() => {
+  const n = parseInt(process.env.SEND_MAX_MB || '25', 10);
+  return Number.isFinite(n) && n > 0 ? n : 25;
+})();
+const SEND_MAX_BYTES = SEND_MAX_MB * 1048576;
+
 // The two ceilings that survive a new code.
 //
 // code_tries is per code and resets with every fresh one, which is right for
@@ -200,7 +229,7 @@ function createSendStore({ store, log, now }) {
     //
     // `tokens` maps each address to its one-time token. The caller mails those
     // and then forgets them: they cannot be recovered from what is stored.
-    async create({ plan, blob, addresses, ttlMs, filename, accountId, sealed }) {
+    async create({ plan, blob, addresses, ttlMs, filename, accountId, sealed, sender }) {
       if (!Buffer.isBuffer(blob) || blob.length === 0) {
         return { ok: false, reason: 'no_blob' };
       }
@@ -217,9 +246,14 @@ function createSendStore({ store, log, now }) {
       // route that grows an extra branch, would otherwise bring the unbounded
       // path straight back.
       const _plan = tiers.normalisePlan(plan);
-      const _mb = tiers.tierLimitNum(_plan, 'file_mb');
+      const _planMb = tiers.tierLimitNum(_plan, 'file_mb');
+      // The strictest of the two wins. file_mb is what the plan sells;
+      // SEND_MAX_MB is what the store can hold for days on end without taking
+      // somebody else's signature down with it.
+      const _mb = Math.min(Number.isFinite(_planMb) ? _planMb : Infinity, SEND_MAX_MB);
       if (Number.isFinite(_mb) && blob.length > _mb * 1048576) {
-        return { ok: false, reason: 'too_large', limit: _mb, asked: blob.length };
+        return { ok: false, reason: 'too_large', limit: _mb, asked: blob.length,
+                 dimension: _mb === SEND_MAX_MB ? 'send_max_mb' : 'file_mb' };
       }
 
       const send = {
@@ -227,6 +261,14 @@ function createSendStore({ store, log, now }) {
         account_id: accountId || null,
         plan: _plan,
         filename: String(filename || '').slice(0, 200),
+        // WHO IT IS FROM, and it has to live here rather than be looked up.
+        // The code mail and the reminder go out on a route that carries no API
+        // key: the recipient has a link and nothing else, so there is no key
+        // record to read a name off. Without this the second mail arrives from
+        // a faceless address while the first one had a name, which is exactly
+        // the shape that gets a message quarantined.
+        sender_name: String((sender && sender.naam) || '').slice(0, 60),
+        sender_email: String((sender && sender.email) || '').slice(0, 254),
         salt: built.salt,
         created_at: created,
         expires_at: created + ttl,
@@ -362,7 +404,9 @@ function createSendStore({ store, log, now }) {
       await writeSend(send.id, send, Math.max(1000, send.expires_at - clock()));
       if (log) log('info', 'pickup_code_issued', { id: send.id });
       return { ok: true, email: record.email, masked: maskEmail(record.email),
-               code, expires_in_s: Math.floor(CODE_TTL_MS / 1000) };
+               code, expires_in_s: Math.floor(CODE_TTL_MS / 1000),
+               sender_name: send.sender_name || '', sender_email: send.sender_email || '',
+               filename: send.filename || '' };
     },
 
     // Shared lookup for every token-bearing call.
@@ -546,10 +590,13 @@ function createSendStore({ store, log, now }) {
       // replacement -- see the note on recipients.reinvite.
       await writeSend(id, send, Math.max(1000, send.expires_at - clock()));
       return { ok: true, email: record.email, reminders: uit.reminders,
-               invited_at: uit.invited_at, expires_at: send.expires_at };
+               invited_at: uit.invited_at, expires_at: send.expires_at,
+               sender_name: send.sender_name || '', sender_email: send.sender_email || '',
+               filename: send.filename || '' };
     },
   };
 }
 
 module.exports = { createSendStore, newSendId, tokenIndexId, accountIndexId,
-                   maskEmail, CODE_TTL_MS, CODE_TRIES, CODE_DIGITS, MAX_REMINDERS, MAX_CODE_REQUESTS, MAX_WRONG_TOTAL };
+                   maskEmail, CODE_TTL_MS, CODE_TRIES, CODE_DIGITS, MAX_REMINDERS, MAX_CODE_REQUESTS, MAX_WRONG_TOTAL,
+                   SEND_MAX_MB, SEND_MAX_BYTES };

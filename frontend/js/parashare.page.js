@@ -1160,14 +1160,16 @@ async function startSend() {
 // render the upgrade notice the live stand already renders.
 // How much a send to named recipients may carry. One link is one block of
 // 5 MB, and that stays: /get fetches a single token. A send to named people
-// goes up in as many blocks as it needs and POST /v2/sends joins them, so the
-// ceiling there is what a browser can hold, not what fits in one block.
+// goes up in as many blocks as it needs and POST /v2/sends joins them.
 //
-// The number is honest rather than aspirational. The whole file is encrypted
-// in one pass, so it is in memory twice at the peak, plus a base64 copy per
-// block. A phone gives up long before a laptop does, and a sender who is told
-// no up front is better off than one whose tab dies at ninety percent.
-const GROEP_MAX = 150 * 1024 * 1024;
+// 25 MB is measured, not chosen. Nobody is waiting at the other end of this
+// kind of send, so the file sits in the durable store until the last recipient
+// collects -- up to seven days -- sealed as base64 and therefore a third
+// larger than itself, in a Redis budget of 200 MB shared with sessions, rate
+// limits and every signature. That is six sends open at once. See SEND_MAX_MB
+// in relay/lib/send.js, which is the number that actually decides; this one is
+// here so the refusal arrives before the upload rather than after it.
+const GROEP_MAX = 25 * 1024 * 1024;
 
 async function sealAndUpload(file, ttlMs, meerdereBlokken) {
   const nameBytes = new TextEncoder().encode(file.name);

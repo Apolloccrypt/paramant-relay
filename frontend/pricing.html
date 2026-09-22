@@ -466,7 +466,7 @@
       <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Product</span>
       <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-top:var(--space-2)">ParaSend · Send a file that disappears</h3>
       <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;max-width:760px;margin-top:var(--space-3)">
-        Send a file over a link that expires and wipes the file after the last read it allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Firm and 100 on Enterprise. Community covers 50 transfers a month, forever, and the file size is the same on every plan: up to 500 MB handed over live, and 5 MB for a one-time link. Organisations that send every week pay for longer links, more reads through the API and more registered devices. More reads is not a weaker promise: it is one link a whole team can open, or a counterparty reopening it after a misclick, instead of you sending the file a second time.
+        Send a file over a link that expires and wipes the file after the last read it allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Firm and 100 on Enterprise. Community covers 50 transfers a month, forever, and the file size is the same on every plan: up to 500 MB handed over live, 5 MB for a one-time link, and 25 MB when you send to a list of named recipients. How many people one send may reach does differ: one on Community, ten on Firm, thirty on Business and Enterprise, each getting their own link that works once. Organisations that send every week pay for longer links, more reads through the API and more registered devices. More reads is not a weaker promise: it is one link a whole team can open, or a counterparty reopening it after a misclick, instead of you sending the file a second time.
       </p>
       <!-- Which route a buyer actually has, before he picks a plan. The web app
            is a live handshake, and until 3 September 2026 that stood only on
@@ -487,8 +487,10 @@
           <li>1 hour link expiry</li>
           <li>Burn on first read</li>
           <li>50 transfers a month</li>
+          <li>One recipient per send</li>
           <li>500 MB per file over the live hand-over</li>
           <li>5 MB per file over a one-time link</li>
+          <li>25 MB per file when you send to a list of named recipients</li>
           <li>Up to 5 registered devices for the ParaSend web app</li>
         </ul>
         <a href="/signup" class="btn btn-primary" style="display:block;text-align:center">Create a free account &rarr;</a>
@@ -506,8 +508,9 @@
           <li>Up to 50 registered devices</li>
           <li>Send history and link management</li>
           <li>Webhooks on upload and download</li>
-          <li>Email notifications via Resend</li>
+          <li>Email notifications, carried inside the EU</li>
           <li>500 transfers a month</li>
+          <li>Up to 10 recipients per send, each with their own one-time link</li>
           <li>100 signatures a month on ParaSign, in the same payment</li>
         </ul>
 <!-- Prices live in relay/lib/billing-catalog.js, server side, and the button
@@ -554,7 +557,7 @@
 
     <div class="prose-section">
       <h3>Limits</h3>
-      <p>Every tier stores transfers in RAM. The file size does not differ by tier: 500 MB a file over the live hand-over, and 5 MB a file over a one-time link, because one link is one sealed block. What differs by tier is how long the link lives, how many times it can be read, and how many devices can register for verified transfers. Enterprise customers running a dedicated relay can configure limits within the RAM budget of their deployment.</p>
+      <p>Every tier stores transfers in RAM. The file size does not differ by tier: 500 MB a file over the live hand-over, 5 MB a file over a one-time link because one link is one sealed block, and 25 MB a file when you send to a list of named recipients. That last number is lower for a reason worth stating plainly: nobody is waiting at the other end of such a send, so the encrypted file has to be held until the last person collects it, and holding it is what costs. What differs by tier is how many people one send may reach, how long the link lives, how many times it can be read, and how many devices can register for verified transfers. Enterprise customers running a dedicated relay can configure limits within the RAM budget of their deployment.</p>
     </div>
 
     <div class="prose-section">

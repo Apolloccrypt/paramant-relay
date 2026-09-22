@@ -49,10 +49,34 @@ x-relay-env: &relay-env
   RAM_RESERVE_MB: "${RAM_RESERVE_MB:-256}"
   RAM_LIMIT_MB: "${RAM_LIMIT_MB:-1024}"
   LOG_LEVEL: "${LOG_LEVEL:-info}"
+  # ── Who carries the mail ────────────────────────────────────────────────
+  # MAIL_PROVIDER picks one of: mailjet, scaleway, resend, dryrun. Empty means
+  # mailjet. Anything MISSPELLED falls back to dryrun and delivers nothing, so
+  # the relay logs mail_misconfigured at boot rather than letting that run
+  # quietly; check that line after any change here.
+  #
+  # Mailjet SAS (Paris, owned by Sinch AB of Sweden) keeps every mail inside
+  # the EU, which is what this product sells. Resend is a US company and is
+  # kept only as a way back while the new sender reputation builds.
+  #
+  # The relay reads all of these by name, so they need a line here: .env only
+  # substitutes ${VAR} into this file, there is no env_file, and a variable
+  # that is not listed never reaches a container.
+  MAIL_PROVIDER: "${MAIL_PROVIDER:-mailjet}"
+  MAIL_FROM: "${MAIL_FROM:-PARAMANT <post@paramant.app>}"
+  MAILJET_API_KEY: "${MAILJET_API_KEY:-}"
+  MAILJET_SECRET_KEY: "${MAILJET_SECRET_KEY:-}"
+  SCALEWAY_SECRET_KEY: "${SCALEWAY_SECRET_KEY:-}"
+  SCALEWAY_PROJECT_ID: "${SCALEWAY_PROJECT_ID:-}"
+  SCALEWAY_REGION: "${SCALEWAY_REGION:-fr-par}"
   RESEND_API_KEY: "${RESEND_API_KEY:-}"
+  # Pseudonymises recipient addresses in the send store. Generate ONCE with
+  # `openssl rand -hex 32` and never change it: a fresh value per restart
+  # means the hashes no longer line up with the ones already written.
+  RECIPIENT_HASH_KEY: "${RECIPIENT_HASH_KEY:-}"
   # The public base the paid-term reminder mails link to (/pricing). Those
-  # mails are sent by the relay itself (lib/plan-expiry.js) and only when
-  # RESEND_API_KEY is set; without SITE_URL the link falls back to
+  # mails are sent by the relay itself (lib/plan-expiry.js) and only when a
+  # mail provider is configured; without SITE_URL the link falls back to
   # https://paramant.app.
   SITE_URL: "${SITE_URL:-https://paramant.app}"
   # Mollie billing (dormant until a key is set in .env)
@@ -266,6 +290,8 @@ services:
       redis-server
       --requirepass ${REDIS_PASSWORD}
       --appendonly yes
+      --maxmemory 200mb
+      --maxmemory-policy noeviction
     user: "redis"
     security_opt:
       - no-new-privileges:true
@@ -277,6 +303,17 @@ services:
     deploy:
       resources:
         limits:
+          # 200mb of maxmemory inside a 256m container, so Redis refuses a write
+          # itself instead of being shot by the kernel's OOM killer. A send to
+          # named recipients puts the whole file in here until the last person
+          # collects, sealed as base64 and therefore a third larger than the
+          # file, which is where lib/send.js gets its SEND_MAX_MB from.
+          #
+          # noeviction, NOT allkeys-lru: this Redis also holds sessions, rate
+          # limit counters and every ParaSign envelope. Evicting to make room
+          # for one big transfer would silently log people out and lose
+          # signatures. A refused write is a visible failure; an eviction is an
+          # invisible one.
           memory: 256m
           cpus: '0.5'
     volumes:
@@ -316,6 +353,16 @@ services:
       PORT: "4200"
       BASE_PATH: "/admin"
       ADMIN_TOKEN: "${ADMIN_TOKEN}"
+      # The admin server mails too (invoices, with a PDF attached), and it uses
+      # the same lib/mail.js. Listing only RESEND_API_KEY here meant the admin
+      # kept mailing through the US carrier after the relay had moved off it.
+      MAIL_PROVIDER: "${MAIL_PROVIDER:-mailjet}"
+      MAIL_FROM: "${MAIL_FROM:-PARAMANT <post@paramant.app>}"
+      MAILJET_API_KEY: "${MAILJET_API_KEY:-}"
+      MAILJET_SECRET_KEY: "${MAILJET_SECRET_KEY:-}"
+      SCALEWAY_SECRET_KEY: "${SCALEWAY_SECRET_KEY:-}"
+      SCALEWAY_PROJECT_ID: "${SCALEWAY_PROJECT_ID:-}"
+      SCALEWAY_REGION: "${SCALEWAY_REGION:-fr-par}"
       RESEND_API_KEY: "${RESEND_API_KEY:-}"
       RELAY_MAIN:    "http://relay-main:3000"
       RELAY_HEALTH:  "http://relay-health:3000"

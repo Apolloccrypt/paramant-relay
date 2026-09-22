@@ -3607,8 +3607,11 @@ const PLANS = [
 // arrived through a payment is already answered by the relay, which mails the
 // numbered invoice or receipt with the PDF attached (relay/lib/invoice.js).
 async function sendBillingConfirmation(email, plan, amount, period) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) { console.warn('[billing] RESEND_API_KEY not set'); return; }
+  // Ask about MAIL, not about one carrier. Gating on RESEND_API_KEY meant that
+  // after the move to a European provider this mail stayed silent on a
+  // perfectly configured account, and the warning in the log named a variable
+  // nobody was supposed to set any more.
+  if (!mailer.gereed()) { console.warn('[billing] no mail provider configured'); return; }
   const planName = PLANS.find(p => p.id === plan)?.name || plan;
   const amountStr = amount === 0 ? 'Free' : `€${amount}/${period === 'yearly' ? 'yr' : 'mo'}`;
   const msg = emailTemplates.billingConfirmationEmail({ planName, period, amountStr, noPayment: period === 'admin' });
@@ -3620,8 +3623,7 @@ async function sendBillingConfirmation(email, plan, amount, period) {
 }
 
 async function sendCancellationScheduled(email, plan, cancelAt) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) { console.warn('[billing] RESEND_API_KEY not set'); return; }
+  if (!mailer.gereed()) { console.warn('[billing] no mail provider configured'); return; }
   const planName = PLANS.find(p => p.id === plan)?.name || plan;
   const cancelDate = new Date(cancelAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const msg = emailTemplates.billingCancellationEmail({ planName, cancelDate });

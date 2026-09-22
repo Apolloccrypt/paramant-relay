@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const mailer = require('../../relay/lib/mail');
 
 const BASE_URL = process.env.SITE_URL || 'https://paramant.app';
 const FROM_ADDR = 'Paramant <hello@paramant.app>';
@@ -758,25 +759,32 @@ ${BASE_URL}`;
   };
 }
 
+// Every message this file sends goes through the one door in lib/mail.js.
+//
+// This used to POST straight to api.resend.com with RESEND_API_KEY, which meant
+// it was NOT part of "mail goes through one provider": the relay could be moved
+// to a European carrier while every account mail, signing invitation and
+// invoice from the admin kept flowing to a US company. Nothing would have
+// noticed, because it worked.
+//
+// Through the door, MAIL_PROVIDER decides, one setting for the whole product.
 async function sendEmail(to, templateResult) {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error('RESEND_API_KEY not set');
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: templateResult.from || FROM_ADDR,
-      to: [to],
-      subject: templateResult.subject,
-      html: templateResult.html,
-      text: templateResult.text,
-      headers: templateResult.headers || {},
-    }),
+  const r = await mailer.stuur({
+    to,
+    from: templateResult.from || FROM_ADDR,
+    subject: templateResult.subject,
+    html: templateResult.html,
+    text: templateResult.text,
+    headers: templateResult.headers || undefined,
+    attachments: templateResult.attachments || undefined,
   });
-  // Surface only the HTTP status, never the response body: Resend echoes the
-  // submitted payload (recipient address, subject, sometimes body) in its error
-  // JSON, which would otherwise land verbatim in our logs.
-  if (!res.ok) { res.text().catch(() => {}); throw new Error(`Resend ${res.status}`); }
+  // The reason, never the provider's response body: an error payload echoes
+  // the submitted message back, including the recipient address and sometimes
+  // the body, which would otherwise land verbatim in our logs.
+  if (!r || !r.ok) {
+    throw new Error('mail failed: ' + ((r && r.reason) || 'unknown')
+                    + ' via ' + ((r && r.provider) || '?'));
+  }
 }
 
 module.exports = {
