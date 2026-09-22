@@ -82,6 +82,14 @@ export async function startRelay(opts = {}) {
       PORT: String(poort),
       RELAY_MODE: 'full',
       LOG_LEVEL: 'info',
+      // relay.js:95 leest REDIS_URL, niet RELAY_REDIS_URL. Alleen die tweede
+      // leegzetten doet niets: in de CI-baan met een echte backend staat
+      // REDIS_URL gevuld, en dan deelt deze relay zijn opslag met elke andere
+      // suite in dezelfde runner. Dat liet tests/koper-hele-weg.test.mjs
+      // omvallen op factuurnummers die een vreemde relay had opgehoogd.
+      // Een suite die een eigen relay start wil een eigen opslag; wie wel een
+      // gedeelde redis wil geeft die hier expliciet mee via opts.env.
+      REDIS_URL: '',
       RELAY_REDIS_URL: '',
       NATS_URL: '',
       USERS_FILE: usersFile,

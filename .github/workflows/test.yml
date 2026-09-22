@@ -374,7 +374,11 @@ jobs:
             exit 1
           fi
           echo "full-stack browser suites: $suites"
-          node --test $suites
+          # One at a time. These suites each start real relay processes and a
+          # real browser; run in parallel they compete for the same backend and
+          # for the machine. Two of them was enough to make the billing numbers
+          # of one suite move under the other.
+          node --test --test-concurrency=1 $suites
 
   relay-unit-tests:
     name: relay - unit suite (no native deps)
