@@ -581,6 +581,29 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     </div>
   </div>
 
+  <!-- Named recipients. Optional on purpose: leaving it empty keeps the old
+       behaviour, one link that burns on first read, which is right for handing
+       something to one person. Filling it in turns the send into one file with
+       a personal link per person and an overview of who collected.
+
+       Addresses are split here, in the browser, on newlines, commas and
+       semicolons, because the relay refuses a field with a comma in it. That
+       refusal is deliberate: a comma inside one address used to count as one
+       recipient and reach two mailboxes sharing a single link. So the splitting
+       happens where a person pastes, and what leaves is a real list. -->
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Who is it for</div></div>
+    <div class="card-body">
+      <label class="label" for="recipients-input">Email addresses (optional)</label>
+      <textarea id="recipients-input" rows="3" spellcheck="false" autocomplete="off"
+                placeholder="anna@example.org&#10;bob@example.org"
+                style="width:100%;padding:11px 12px;border:1px solid var(--line,#dfe4e7);border-radius:8px;background:transparent;color:inherit;font:400 14px/1.5 inherit;resize:vertical"
+                data-input="onRecipientsInput"></textarea>
+      <p class="ps-meta" id="recipients-status">Leave empty for one link that opens once.
+         Fill it in and everyone gets their own link, and you see who collected.</p>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Deletes itself</div></div>
     <div class="card-body">

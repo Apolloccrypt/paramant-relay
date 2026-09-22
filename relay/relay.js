@@ -243,7 +243,7 @@ try {
 } catch(e) { log('warn', 'ml_dsa_not_available', { hint: 'build/install @paramant/core', err: e.message }); }
 
 const ALLOWED = {
-  ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/pickup','/v2/status',
+  ghost_pipe: ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/pickup','/v2/sends','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream',
                '/v2/ack','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
@@ -251,7 +251,7 @@ const ALLOWED = {
                '/v2/ws-ticket','/v2/fingerprint','/v2/relays','/v2/sign-dpa',
                '/v2/sth','/v2/verify-receipt','/v2/transfers','/v2/capabilities','/v2/health','/ct','/ct/feed','/v2/auth','/v2/user','/v2/setup',
                '/v2/sign','/v2/verify','/v2/lookup-signer','/v2/envelopes','/v2/billing','/v2/claim','/v2/parasign','/v2/qes','/v1'],
-  iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/pickup','/v2/status',
+  iot:        ['/health','/v2/pubkey','/v2/inbound','/v2/anon-inbound','/v2/outbound','/v2/pickup','/v2/sends','/v2/status',
                '/v2/webhook','/v2/audit','/v2/check-key','/v2/stream','/v2/stream-next',
                '/v2/ack','/v2/monitor',
                '/v2/did','/v2/ct','/v2/attest','/v2/admin','/metrics','/v2/dl',
@@ -4440,6 +4440,97 @@ async function handleRelayRequest(req, res) {
     }
   }
 
+  // ── POST /v2/sends: van geuploade blokken naar een verzending ─────────────
+  //
+  // WHY THIS IS A SECOND STEP. A file goes up in blocks of a fixed size: a
+  // 50 MB document arrives as twelve separate /v2/inbound calls. Reading a
+  // recipient list off one of those would have made twelve sends out of one
+  // file, each with its own links, which is worse than not supporting it.
+  //
+  // So the upload is untouched and this comes after it: the caller hands back
+  // the hashes it just wrote, in order, and they become one file in the durable
+  // store. The loose blocks are dropped the moment they are joined, so nothing
+  // sits in memory twice.
+  if (req.method === 'POST' && path === '/v2/sends') {
+    const kd = apiKeys.get(apiKey);
+    if (!kd || !kd.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
+    try {
+      const input = JSON.parse((await readBody(req, 65536)).toString());
+      const hashes = Array.isArray(input.hashes) ? input.hashes : [];
+      if (!hashes.length || hashes.length > 512) {
+        res.writeHead(400); return res.end(J({ error: 'hashes_required' }));
+      }
+      // Every block has to exist AND belong to this key. Without the second
+      // half, knowing a hash would be enough to fold somebody else's upload
+      // into your own send.
+      const delen = [];
+      for (const h of hashes) {
+        if (typeof h !== 'string' || !/^[a-f0-9]{64}$/.test(h)) {
+          res.writeHead(400); return res.end(J({ error: 'bad_hash' }));
+        }
+        const entry = blobStore.get(h);
+        if (!entry) { res.writeHead(404); return res.end(J({ error: 'block_missing' })); }
+        if (entry.apiKey !== apiKey) { res.writeHead(404); return res.end(J({ error: 'block_missing' })); }
+        delen.push(entry.blob);
+      }
+      const blob = Buffer.concat(delen);
+
+      const made = await _sendStore().create({
+        plan: kd.plan, blob, addresses: input.recipients,
+        ttlMs: input.ttl_ms, filename: input.filename, accountId: acctOf(apiKey),
+      });
+      if (!made.ok) {
+        const status = made.reason === 'over_limit' ? 403 : 400;
+        log('info', 'send_refused', { reason: made.reason, limit: made.limit });
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: made.reason, dimension: 'max_recipients',
+                           limit: made.limit, asked: made.asked,
+                           rejected: made.rejected || undefined }));
+      }
+
+      // Joined, so the loose blocks are no longer needed. Dropping them here
+      // rather than leaving them to their TTL keeps one file from occupying
+      // memory twice for the rest of its window.
+      for (const h of hashes) blobDrop(h);
+
+      const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
+      const tot = new Date(made.expires_at).toLocaleString('en-GB',
+        { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+      const naam = (input.filename && String(input.filename).slice(0, 120)) || 'a file';
+      let gemaild = 0;
+      // One invitation per person, never a visible list of the others: who else
+      // receives a confidential document is not for the group to know.
+      for (const [adres, token] of Object.entries(made.tokens)) {
+        const link = base + '/ontvang/' + encodeURIComponent(token);
+        if (sendResendEmail({
+          to: adres,
+          subject: 'A file is waiting for you',
+          text: 'A file is waiting for you: ' + naam + '\n\n' + link
+              + '\n\nThe link is yours alone and works once. Opening it sends a short code '
+              + 'to this address. Available until ' + tot + '.',
+          html: '<p>A file is waiting for you:</p>'
+              + '<p style="font-weight:600">' + naam + '</p>'
+              + '<p><a href="' + link + '" style="display:inline-block;padding:11px 18px;'
+              + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">'
+              + 'Open the file</a></p>'
+              + '<p style="color:#666;font-size:13px">This link is yours alone and works once. '
+              + 'Opening it sends a short code to this address, so only somebody who can read '
+              + 'this mailbox can collect the file.<br>Available until ' + tot + '.</p>',
+        })) gemaild += 1;
+      }
+      log('info', 'send_invitations', { id: made.id, mailed: gemaild, of: made.count });
+
+      res.writeHead(201, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, send_id: made.id, recipients: made.count,
+                         invited: gemaild, size: blob.length,
+                         expires_at: new Date(made.expires_at).toISOString() }));
+    } catch (err) {
+      if (redisOutage503(err, res)) return;
+      log('warn', 'send_create_failed', { err: err && err.message });
+      res.writeHead(500); return res.end(J({ error: 'send_failed' }));
+    }
+  }
+
   // ── POST /v2/user/sends: wat dit account naar een groep stuurde ───────────
   // The sending side of the dashboard, and the thing a customer actually buys:
   // seeing who collected and who did not. Internal only, same as the signing
@@ -6465,8 +6556,7 @@ async function handleRelayRequest(req, res) {
     try {
       const body = await readBody(req);
       const d    = JSON.parse(body.toString());
-      const { hash, payload, ttl_ms, meta, dsa_signature, max_views: reqMaxViews, password, enc_meta,
-              recipients: reqRecipients, filename: reqFilename } = d;
+      const { hash, payload, ttl_ms, meta, dsa_signature, max_views: reqMaxViews, password, enc_meta } = d;
 
       if (!hash || !payload) { res.writeHead(400); return res.end(J({ error: 'hash and payload required' })); }
       if (!/^[a-f0-9]{64}$/.test(hash)) { res.writeHead(400); return res.end(J({ error: 'hash must be SHA-256 hex' })); }
@@ -6637,70 +6727,6 @@ async function handleRelayRequest(req, res) {
           res.writeHead(402, { 'Content-Type': 'application/json' });
           return res.end(J({ error: 'monthly_transfer_quota_reached', dimension: 'transfers_month', plan: _psend.tier, limit: _tLimit }));
         }
-      }
-
-      // ── a send to named recipients ──────────────────────────────────────────
-      // A recipient list turns this from one link that burns on first read into
-      // one file with a token per person. It leaves through the durable store,
-      // not the in-memory Map: this can stand open for a week and a restart must
-      // not destroy something a customer is still waiting on.
-      //
-      // The quota and ceiling checks above already ran, so a send obeys the same
-      // monthly limits as any other transfer.
-      if (reqRecipients !== undefined) {
-        const _plan = (apiKeys.get(apiKey) || {}).plan;
-        const made = await _sendStore().create({
-          plan: _plan, blob, addresses: reqRecipients, ttlMs: ttl,
-          filename: reqFilename, accountId: acctOf(apiKey),
-        });
-        if (!made.ok) {
-          // 403 for a plan ceiling, 400 for something the sender can fix.
-          const status = made.reason === 'over_limit' ? 403 : 400;
-          log('info', 'send_refused', { reason: made.reason, limit: made.limit });
-          res.writeHead(status, { 'Content-Type': 'application/json' });
-          return res.end(J({ error: made.reason, dimension: 'max_recipients',
-                             limit: made.limit, asked: made.asked,
-                             rejected: made.rejected || undefined }));
-        }
-        // Every recipient gets their own invitation, with their own link. One
-        // mail per person and never a visible list of the others: who else is
-        // receiving a confidential document is not for the group to know.
-        const _base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL)
-          .replace(/\/+$/, '');
-        const _tot = new Date(made.expires_at).toLocaleString('en-GB',
-          { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
-        const _naam = (reqFilename && String(reqFilename).slice(0, 120)) || 'a file';
-        let _gemaild = 0;
-        for (const [adres, token] of Object.entries(made.tokens)) {
-          const link = _base + '/ontvang/' + encodeURIComponent(token);
-          const ok = sendResendEmail({
-            to: adres,
-            subject: 'A file is waiting for you',
-            text: 'A file is waiting for you: ' + _naam + '\n\n' + link
-                + '\n\nThe link is yours alone and works once. Opening it sends a short '
-                + 'code to this address. Available until ' + _tot + '.',
-            html: '<p>A file is waiting for you:</p>'
-                + '<p style="font-weight:600">' + _naam + '</p>'
-                + '<p><a href="' + link + '" style="display:inline-block;padding:11px 18px;'
-                + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">'
-                + 'Open the file</a></p>'
-                + '<p style="color:#666;font-size:13px">This link is yours alone and works '
-                + 'once. Opening it sends a short code to this address, so only somebody '
-                + 'who can read this mailbox can collect the file.<br>'
-                + 'Available until ' + _tot + '.</p>',
-          });
-          if (ok) _gemaild += 1;
-        }
-        log('info', 'send_invitations', { id: made.id, mailed: _gemaild,
-                                          of: made.count });
-        // The tokens still go back to the caller once, for a sender who wants to
-        // deliver the links another way. They are not recoverable from anything
-        // stored, so this response is the only copy.
-        res.writeHead(201, { 'Content-Type': 'application/json' });
-        return res.end(J({ ok: true, send_id: made.id, recipients: made.count,
-                           invited: _gemaild,
-                           expires_at: new Date(made.expires_at).toISOString(),
-                           tokens: made.tokens }));
       }
 
       // Append transfer to CT log before storing — so proof is available at outbound time

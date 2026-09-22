@@ -685,6 +685,72 @@ async function waitForWindow(hash) {
 // on the `_ready` registration at the end of the send, so a receiver that never
 // saw the manifest still gets the file the way it always did. This only makes it
 // arrive sooner, and hold less while it does.
+
+// Count as somebody types, so a list of twenty is something you can see rather
+// than something you have to trust. The ceiling itself is not shown: this page
+// does not know the plan, and a wrong number here is worse than no number. The
+// server decides, and says so in plain words when it refuses.
+function onRecipientsInput() {
+  var status = document.getElementById('recipients-status');
+  if (!status) return;
+  var lijst = leesOntvangers();
+  if (!lijst.length) {
+    status.textContent = 'Leave empty for one link that opens once. Fill it in and '
+      + 'everyone gets their own link, and you see who collected.';
+    return;
+  }
+  var uniek = [];
+  var gezien = {};
+  for (var i = 0; i < lijst.length; i++) {
+    var a = lijst[i].toLowerCase();
+    if (!gezien[a]) { gezien[a] = 1; uniek.push(a); }
+  }
+  var dubbel = lijst.length - uniek.length;
+  status.textContent = uniek.length + (uniek.length === 1 ? ' recipient' : ' recipients')
+    + (dubbel ? ', ' + dubbel + ' duplicate' + (dubbel === 1 ? '' : 's') + ' ignored' : '')
+    + '. Each one gets their own link and a code to this address.';
+}
+
+// ── Named recipients ─────────────────────────────────────────────────────────
+// Split here, in the browser, on newlines, commas and semicolons. The relay
+// refuses a field with a comma in it on purpose: a comma inside one address
+// used to count as one recipient and reach two mailboxes sharing a single
+// link. So whatever a person pastes gets taken apart where they pasted it, and
+// what leaves is a real list.
+function leesOntvangers() {
+  var veld = document.getElementById('recipients-input');
+  if (!veld) return [];
+  return String(veld.value || '')
+    .split(/[\n,;]+/)
+    .map(function (a) { return a.trim(); })
+    .filter(function (a) { return a.length > 0; });
+}
+
+// After every block has landed, turn them into one send with a link per person.
+// A separate call on purpose: a file arrives as many blocks, and reading a
+// recipient list off one of them would make many sends out of one file.
+async function maakVerzending(hashes, naam, ttlMs, ontvangers) {
+  const r = await relayFetch(RELAY_API + '/v2/sends', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hashes: hashes, recipients: ontvangers,
+                           filename: naam, ttl_ms: ttlMs }),
+    signal: AbortSignal.timeout(60000)
+  });
+  const body = await r.json().catch(function () { return {}; });
+  if (!r.ok) {
+    const uitleg = body.error === 'over_limit'
+      ? 'Your plan allows ' + body.limit + ' recipients per send. You listed ' + body.asked + '.'
+      : body.error === 'invalid_address'
+      ? 'That is not an address we can send to: ' + (body.rejected || '') 
+      : body.error === 'empty'
+      ? 'No usable address in that list.'
+      : 'The send could not be created.';
+    throw new Error(uitleg);
+  }
+  return body;
+}
+
 async function announceBlock(sessionId, index, token, totalChunks, meta) {
   try {
     await relayFetch(RELAY_API + '/v2/session/' + sessionId + '/manifest', {
@@ -825,7 +891,7 @@ async function confirmFingerprint() {
       // up in the handshake record on the relay, in the clear, for an hour.
       // Both already travel sealed inside chunk 0, so what left here was a
       // duplicate the receiver never read. See frontend/js/handshake-meta.js.
-      return { tokens };
+      return { tokens, chunkHashes };
     }
 
     // Upload all files
@@ -837,6 +903,25 @@ async function confirmFingerprint() {
 
     $('enc-progress').style.width = '100%';
     setEncProgress(100);
+
+    // ── a send to named recipients, if the sender named any ──────────────────
+    // Everything above is the ordinary upload, untouched. With addresses filled
+    // in, the blocks that just landed become one file with a personal link per
+    // person; without them nothing changes and the old one-link flow runs.
+    const ontvangers = leesOntvangers();
+    if (ontvangers.length) {
+      if (files.length > 1) {
+        throw new Error('Sending to named people works with one file at a time. '
+                      + 'Put the documents in a zip, or send them one by one.');
+      }
+      $('enc-status').textContent = 'Creating the links and sending invitations...';
+      const verzending = await maakVerzending(
+        vaultFiles[0].chunkHashes, files[0].name, ttlMs, ontvangers);
+      $('enc-status').textContent = verzending.invited + ' of ' + verzending.recipients
+        + ' invitations sent. Everyone got their own link.';
+      return { send: verzending };
+    }
+
     $('enc-status').textContent = 'Notifying receiver...';
 
     const isVault = files.length > 1;
@@ -1680,6 +1765,7 @@ function updateGlobeTransfer(userLat, userLng) {
 
 act('change','fpConfirmToggle',(el)=>{const b=document.getElementById('fp-confirm-btn');if(b)b.disabled=!el.checked;});
 act('change','onFileSelect',()=>onFileSelect());
+act('input','onRecipientsInput',()=>onRecipientsInput());
 act('click','confirmFingerprint',()=>confirmFingerprint());act('click','copyLink',()=>copyLink());
 act('click','createSession',()=>startSend());act('click','expandApiKeyCard',()=>expandApiKeyCard());
 act('click','chooseModeLive',()=>chooseModeLive());act('click','chooseModeLink',()=>chooseModeLink());
