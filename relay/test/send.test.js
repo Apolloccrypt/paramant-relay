@@ -32,6 +32,14 @@ function nepStore() {
 const DRIE = ['anna@example.org', 'bob@example.org', 'carla@example.org'];
 const INHOUD = Buffer.from('a confidential report');
 
+// Collecting is two steps now: prove the mailbox, then take the file. Tests
+// that only care about the outcome use this; the code itself has its own tests.
+async function haalOp(sends, token) {
+  const vraag = await sends.requestPickup(token);
+  if (!vraag.ok) return vraag;
+  return sends.collect(token, vraag.code);
+}
+
 function maakStore(extra) {
   const store = nepStore();
   return { store, sends: createSendStore(Object.assign({ store }, extra || {})) };
@@ -54,13 +62,13 @@ test('a token collects once, and the second attempt gets nothing', async () => {
   const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
                                  filename: 'rapport.pdf' });
 
-  const eerst = await sends.pickup(r.tokens['bob@example.org']);
+  const eerst = await haalOp(sends, r.tokens['bob@example.org']);
   assert.equal(eerst.ok, true);
   assert.equal(eerst.blob.toString(), 'a confidential report');
   assert.equal(eerst.email, 'bob@example.org');
   assert.equal(eerst.remaining, 2, 'two people still to come');
 
-  const tweede = await sends.pickup(r.tokens['bob@example.org']);
+  const tweede = await haalOp(sends, r.tokens['bob@example.org']);
   assert.equal(tweede.ok, false);
   assert.equal(tweede.reason, 'already_collected');
 });
@@ -69,10 +77,10 @@ test('one person collecting leaves the file for the others', async () => {
   const { store, sends } = maakStore();
   const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE });
 
-  await sends.pickup(r.tokens['anna@example.org']);
+  await haalOp(sends, r.tokens['anna@example.org']);
   assert.equal(store.blobs.size, 1, 'the file is still there');
 
-  const bob = await sends.pickup(r.tokens['bob@example.org']);
+  const bob = await haalOp(sends, r.tokens['bob@example.org']);
   assert.equal(bob.ok, true, 'and the next person still gets it');
 });
 
@@ -80,11 +88,11 @@ test('the file goes when the last person is settled', async () => {
   const { store, sends } = maakStore();
   const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE });
 
-  await sends.pickup(r.tokens['anna@example.org']);
-  await sends.pickup(r.tokens['bob@example.org']);
+  await haalOp(sends, r.tokens['anna@example.org']);
+  await haalOp(sends, r.tokens['bob@example.org']);
   assert.equal(store.blobs.size, 1);
 
-  const laatste = await sends.pickup(r.tokens['carla@example.org']);
+  const laatste = await haalOp(sends, r.tokens['carla@example.org']);
   assert.equal(laatste.settled, true);
   assert.equal(store.blobs.size, 0, 'nobody is waiting, so the file is gone');
 
@@ -98,19 +106,19 @@ test('withdrawing one person does not touch the rest', async () => {
   const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE });
 
   assert.equal((await sends.revoke(r.id, 'carla@example.org')).ok, true);
-  const carla = await sends.pickup(r.tokens['carla@example.org']);
+  const carla = await haalOp(sends, r.tokens['carla@example.org']);
   assert.equal(carla.ok, false);
   assert.equal(carla.reason, 'revoked');
 
-  assert.equal((await sends.pickup(r.tokens['anna@example.org'])).ok, true);
+  assert.equal((await haalOp(sends, r.tokens['anna@example.org'])).ok, true);
 });
 
 test('withdrawing the last outstanding person drops the file', async () => {
   const { store, sends } = maakStore();
   const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE });
 
-  await sends.pickup(r.tokens['anna@example.org']);
-  await sends.pickup(r.tokens['bob@example.org']);
+  await haalOp(sends, r.tokens['anna@example.org']);
+  await haalOp(sends, r.tokens['bob@example.org']);
   const uit = await sends.revoke(r.id, 'carla@example.org');
   assert.equal(uit.settled, true);
   assert.equal(store.blobs.size, 0, 'nobody can still collect, so nothing is kept');
@@ -125,9 +133,9 @@ test('a fresh invitation kills the old link', async () => {
   assert.equal(nieuw.ok, true);
   assert.notEqual(nieuw.token, oud);
 
-  const metOud = await sends.pickup(oud);
+  const metOud = await haalOp(sends, oud);
   assert.equal(metOud.ok, false, 'the link the sender replaced must be dead');
-  assert.equal((await sends.pickup(nieuw.token)).ok, true);
+  assert.equal((await haalOp(sends, nieuw.token)).ok, true);
 });
 
 test('the plan decides how many people may be addressed', async () => {
@@ -156,7 +164,7 @@ test('an unknown token says so without revealing whether the send exists', async
   const { sends } = maakStore();
   await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE });
   for (const bad of ['', 'x', 'a'.repeat(500), null, undefined]) {
-    const r = await sends.pickup(bad);
+    const r = await haalOp(sends, bad);
     assert.equal(r.ok, false);
     assert.equal(r.reason, 'unknown_token');
   }
@@ -167,7 +175,7 @@ test('a file that is already gone does not count as collected', async () => {
   const r = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE });
   store.blobs.clear();                       // the window closed, or a restart
 
-  const p = await sends.pickup(r.tokens['anna@example.org']);
+  const p = await haalOp(sends, r.tokens['anna@example.org']);
   assert.equal(p.ok, false);
   assert.equal(p.reason, 'expired');
 

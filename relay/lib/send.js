@@ -31,6 +31,60 @@ function newSendId() {
   return crypto.randomBytes(ID_BYTES).toString('base64url');
 }
 
+// ── proving the mailbox ──────────────────────────────────────────────────────
+// A token proves that a link was used. It does not prove WHO used it, and that
+// is the thing a sender is paying for: a forwarded mail or a mailbox somebody
+// else reads looks exactly like the right person collecting.
+//
+// A full account would prove it, and would also mean twenty external partners
+// registering before they can open one file. That is the friction that keeps
+// people on the free consumer services, so it is not the answer either.
+//
+// The middle road, and the one the signing path already takes: a short code to
+// the SAME address the invitation went to. No registration, one extra step of
+// about ten seconds, and it turns "the link was used" into "somebody with
+// access to that mailbox collected it".
+//
+// The code is stored hashed, expires quickly, and survives three wrong guesses.
+const CODE_TTL_MS = 15 * 60 * 1000;
+const CODE_TRIES = 3;
+const CODE_DIGITS = 6;
+
+function newCode() {
+  // Uniform over the whole range: a modulo of a random byte would lean on the
+  // low digits, and a six-digit space is small enough that it would show.
+  let out = '';
+  while (out.length < CODE_DIGITS) out += String(crypto.randomInt(0, 10));
+  return out;
+}
+
+function codeHash(sendId, token, code) {
+  return crypto.createHash('sha3-256')
+    .update('paramant/pickup-code/v1\x00', 'utf8')
+    .update(String(sendId), 'utf8').update('\x00', 'utf8')
+    .update(recipients.tokenHash(token), 'utf8').update('\x00', 'utf8')
+    .update(String(code || ''), 'utf8')
+    .digest('hex');
+}
+
+function sameHash(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  try { return crypto.timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex')); }
+  catch { return false; }
+}
+
+// anna@example.org -> a***a@example.org. Enough for the holder to recognise
+// their own address, not enough to learn somebody else's from a stray link.
+function maskEmail(email) {
+  const s = String(email || '');
+  const at = s.indexOf('@');
+  if (at < 1) return '***';
+  const local = s.slice(0, at);
+  const domain = s.slice(at);
+  if (local.length <= 2) return local[0] + '***' + domain;
+  return local[0] + '***' + local[local.length - 1] + domain;
+}
+
 // The token index. A pickup arrives with a token and nothing else, so something
 // has to map it to its send. Keyed on the HASH of the token: the index is as
 // unreadable as the records are.
@@ -104,11 +158,34 @@ function createSendStore({ store, log, now }) {
                count: built.records.length };
     },
 
-    // Collect with a token. One call: looking up and claiming in two steps is
-    // how two simultaneous clicks both got the file.
+    // Step one of collecting: prove the mailbox.
     //
-    // Returns { ok, blob, filename, email, remaining } or { ok:false, reason }.
-    async pickup(token) {
+    // Deliberately does NOT claim the token. A code request must not burn a
+    // link, or one stray click would cost somebody their only collection.
+    //
+    // Returns { ok, email, masked, code }. The code is for the caller to mail
+    // and is never in an HTTP response: whoever asks for it must already be
+    // able to read that mailbox.
+    async requestPickup(token) {
+      const found = await this._locate(token);
+      if (!found.ok) return found;
+      const { send, record } = found;
+
+      const refusal = recipients.pickupRefusal(record);
+      if (refusal) return { ok: false, reason: refusal };
+
+      const code = newCode();
+      record.code_hash = codeHash(send.id, token, code);
+      record.code_expires_at = clock() + CODE_TTL_MS;
+      record.code_tries = 0;
+      await writeSend(send.id, send, Math.max(1000, send.expires_at - clock()));
+      if (log) log('info', 'pickup_code_issued', { id: send.id });
+      return { ok: true, email: record.email, masked: maskEmail(record.email),
+               code, expires_in_s: Math.floor(CODE_TTL_MS / 1000) };
+    },
+
+    // Shared lookup for every token-bearing call.
+    async _locate(token) {
       if (typeof token !== 'string' || !token || token.length > MAX_TOKEN_LEN) {
         return { ok: false, reason: 'unknown_token' };
       }
@@ -116,14 +193,53 @@ function createSendStore({ store, log, now }) {
       if (!index || !index.send) return { ok: false, reason: 'unknown_token' };
       const send = await readSend(index.send);
       if (!send) return { ok: false, reason: 'expired' };
+      const record = recipients.findByToken(send.records, token);
+      if (!record) return { ok: false, reason: 'unknown_token' };
+      return { ok: true, send, record };
+    },
 
-      const record = recipients.claimPickup(send.records, token, clock());
-      if (!record) {
-        const why = recipients.pickupRefusal(
-          recipients.findByToken(send.records, token));
-        return { ok: false, reason: why || 'unknown_token' };
+    // Step two: the code, and then the file.
+    //
+    // Looking up and claiming stay one statement, because that is what keeps
+    // two simultaneous clicks from both being served.
+    //
+    // Returns { ok, blob, filename, email, remaining } or { ok:false, reason }.
+    async collect(token, code) {
+      const found = await this._locate(token);
+      if (!found.ok) return found;
+      const { send, record } = found;
+
+      const refusal = recipients.pickupRefusal(record);
+      if (refusal) return { ok: false, reason: refusal };
+
+      if (!record.code_hash) return { ok: false, reason: 'no_code_requested' };
+      if (clock() > (record.code_expires_at || 0)) {
+        return { ok: false, reason: 'code_expired' };
       }
+      if ((record.code_tries || 0) >= CODE_TRIES) {
+        return { ok: false, reason: 'too_many_tries' };
+      }
+      if (!sameHash(record.code_hash, codeHash(send.id, token, code))) {
+        record.code_tries = (record.code_tries || 0) + 1;
+        const left = CODE_TRIES - record.code_tries;
+        await writeSend(send.id, send, Math.max(1000, send.expires_at - clock()));
+        if (log) log('info', 'pickup_code_wrong', { id: send.id, tries_left: left });
+        return { ok: false, reason: 'wrong_code', tries_left: Math.max(0, left) };
+      }
+      // The code is spent the moment it works, so a mailbox somebody else reads
+      // later cannot replay it.
+      record.code_hash = null;
+      record.code_expires_at = null;
 
+      const claimed = recipients.claimPickup(send.records, token, clock());
+      if (!claimed) return { ok: false, reason: 'already_collected' };
+      return this._serve(send, claimed);
+    },
+
+    // Hand over the bytes for a claim that has already been made. Only called
+    // with a record that collect() just claimed, so there is nothing left to
+    // decide here except whether the file is still there.
+    async _serve(send, record) {
       const blob = await store.getBlob(send.id);
       if (!blob) {
         // The file is gone but the record says collected. Say so plainly rather
@@ -194,4 +310,5 @@ function createSendStore({ store, log, now }) {
   };
 }
 
-module.exports = { createSendStore, newSendId, tokenIndexId };
+module.exports = { createSendStore, newSendId, tokenIndexId,
+                   maskEmail, CODE_TTL_MS, CODE_TRIES, CODE_DIGITS };

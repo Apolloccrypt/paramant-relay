@@ -6558,10 +6558,43 @@ async function handleRelayRequest(req, res) {
                              limit: made.limit, asked: made.asked,
                              rejected: made.rejected || undefined }));
         }
-        // The tokens go back to the caller ONCE. They are not recoverable from
-        // anything stored, so whoever asked is the only one who can mail them.
+        // Every recipient gets their own invitation, with their own link. One
+        // mail per person and never a visible list of the others: who else is
+        // receiving a confidential document is not for the group to know.
+        const _base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL)
+          .replace(/\/+$/, '');
+        const _tot = new Date(made.expires_at).toLocaleString('en-GB',
+          { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+        const _naam = (reqFilename && String(reqFilename).slice(0, 120)) || 'a file';
+        let _gemaild = 0;
+        for (const [adres, token] of Object.entries(made.tokens)) {
+          const link = _base + '/ontvang/' + encodeURIComponent(token);
+          const ok = sendResendEmail({
+            to: adres,
+            subject: 'A file is waiting for you',
+            text: 'A file is waiting for you: ' + _naam + '\n\n' + link
+                + '\n\nThe link is yours alone and works once. Opening it sends a short '
+                + 'code to this address. Available until ' + _tot + '.',
+            html: '<p>A file is waiting for you:</p>'
+                + '<p style="font-weight:600">' + _naam + '</p>'
+                + '<p><a href="' + link + '" style="display:inline-block;padding:11px 18px;'
+                + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">'
+                + 'Open the file</a></p>'
+                + '<p style="color:#666;font-size:13px">This link is yours alone and works '
+                + 'once. Opening it sends a short code to this address, so only somebody '
+                + 'who can read this mailbox can collect the file.<br>'
+                + 'Available until ' + _tot + '.</p>',
+          });
+          if (ok) _gemaild += 1;
+        }
+        log('info', 'send_invitations', { id: made.id, mailed: _gemaild,
+                                          of: made.count });
+        // The tokens still go back to the caller once, for a sender who wants to
+        // deliver the links another way. They are not recoverable from anything
+        // stored, so this response is the only copy.
         res.writeHead(201, { 'Content-Type': 'application/json' });
         return res.end(J({ ok: true, send_id: made.id, recipients: made.count,
+                           invited: _gemaild,
                            expires_at: new Date(made.expires_at).toISOString(),
                            tokens: made.tokens }));
       }
@@ -6672,17 +6705,72 @@ async function handleRelayRequest(req, res) {
   // existed, was already used or was withdrawn, so a caller cannot map which
   // sends exist by trying tokens. The reason is in the body for the person who
   // legitimately holds the link and needs to know why it stopped working.
+  // One shape of refusal for every way a link can be unusable, so trying tokens
+  // tells a caller nothing about which sends exist. The reason sits in the body
+  // for the person who legitimately holds the link and needs to know why it
+  // stopped working.
+  function _pickupRefused(res, reason) {
+    const status = reason === 'already_collected' ? 410
+                 : reason === 'revoked' ? 403
+                 : reason === 'expired' ? 410 : 404;
+    log('info', 'pickup_refused', { reason });
+    res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(J({ error: reason }));
+  }
+
   const pickm = path.match(/^\/v2\/pickup\/([A-Za-z0-9_-]{16,128})$/);
+  // Step one, and what the link in the invitation points at. A GET with an
+  // effect, deliberately: the reader clicks, and a short code goes to the same
+  // mailbox the invitation went to. It does not claim the link, so clicking
+  // twice costs nothing.
   if (pickm && req.method === 'GET') {
     try {
-      const got = await _sendStore().pickup(pickm[1]);
+      const vraag = await _sendStore().requestPickup(pickm[1]);
+      if (!vraag.ok) return _pickupRefused(res, vraag.reason);
+      // The code leaves through the mailer, never through this response.
+      // Whoever holds the link must already be able to read that mailbox.
+      const minuten = Math.round(vraag.expires_in_s / 60);
+      sendResendEmail({
+        to: vraag.email,
+        subject: 'Your code to open the file',
+        text: 'Your code is ' + vraag.code + '. It works for ' + minuten + ' minutes.',
+        html: '<p>Your code to open the file:</p>'
+            + '<p style="font:600 28px/1.2 monospace;letter-spacing:.14em">' + vraag.code + '</p>'
+            + '<p style="color:#666;font-size:13px">It works for ' + minuten
+            + ' minutes. If you did not ask for this, you can ignore it.</p>',
+      });
+      log('info', 'pickup_code_mailed', {});
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: true, step: 'code_sent', sent_to: vraag.masked,
+                         expires_in_s: vraag.expires_in_s }));
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      log('warn', 'pickup_code_failed', { err: e && e.message });
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'pickup_failed' }));
+    }
+  }
+
+  // Step two: the code, and then the bytes.
+  if (pickm && req.method === 'POST') {
+    try {
+      let code = '';
+      try {
+        const body = await readBody(req, 4096);
+        code = String((JSON.parse(body.toString() || '{}') || {}).code || '');
+      } catch (_) { code = ''; }
+      const got = await _sendStore().collect(pickm[1], code);
       if (!got.ok) {
-        const status = got.reason === 'already_collected' ? 410
-                     : got.reason === 'revoked' ? 403
-                     : got.reason === 'expired' ? 410 : 404;
-        log('info', 'pickup_refused', { reason: got.reason });
-        res.writeHead(status, { 'Content-Type': 'application/json' });
-        return res.end(J({ error: got.reason }));
+        // A wrong or stale code is a separate answer from a link that cannot be
+        // used at all: the holder needs to know whether to try again or stop.
+        if (got.reason === 'wrong_code' || got.reason === 'too_many_tries'
+            || got.reason === 'code_expired' || got.reason === 'no_code_requested') {
+          log('info', 'pickup_code_refused', { reason: got.reason });
+          res.writeHead(got.reason === 'too_many_tries' ? 429 : 401,
+                        { 'Content-Type': 'application/json' });
+          return res.end(J({ error: got.reason, tries_left: got.tries_left }));
+        }
+        return _pickupRefused(res, got.reason);
       }
       log('info', 'pickup_served', { bytes: got.blob.length, remaining: got.remaining,
                                      settled: got.settled });
