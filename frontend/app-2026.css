@@ -658,8 +658,13 @@ a.plan-term-warn-cta:hover { background: var(--ink-1); }
    rule with its underline, not under the button rule. */
 @media (pointer: coarse) {
   .ax-btn, .ax-input, .dh-btn, .dh-filter, .dh-refresh, .acct-plan-cta,
-  .ds-edit-btn, .ds-tab, button.ax-copy { min-height: var(--tap); }
+  .ds-edit-btn, .ds-tab, button.ax-copy, .dh-rowbtn { min-height: var(--tap); }
   .dh-btn, .dh-filter, .dh-refresh { padding-top: 12px; padding-bottom: 12px; }
+  /* De knoppen in een rij stonden op 38px, en dat is precies waar ze het
+     meest toe doen: Withdraw naast een lang e-mailadres, op een telefoon.
+     Een misser daar is een intrekking die niet gebeurt, of erger, eentje die
+     wel gebeurt. */
+  .dh-rowbtn { padding-top: 11px; padding-bottom: 11px; }
 }
 
 /* Reduced motion is proved with a screenshot, not assumed. Everything that

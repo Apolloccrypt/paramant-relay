@@ -1123,6 +1123,21 @@ function setSendMode(mode) {
   // person is already at their screen and you confirm a code together, so a
   // list of twenty addresses has nothing to do there. Showing the field in both
   // modes was how twenty addresses could be typed and silently ignored.
+  // De regel onder de kaarten zegt wat de GEKOZEN stand betekent. De maat
+  // verschilt per stand en per situatie: een enkele link is een verzegeld blok
+  // van 5 MB, een lijst gaat in blokken tot 25 MB, en live streamt tot 500 MB.
+  // Dat past niet in een ondertitel van een kaart, en het is precies wat een
+  // afzender moet weten voordat hij een bestand kiest.
+  const note = document.getElementById('ps-live-note');
+  if (note) {
+    note.textContent = (sendMode === 'link')
+      ? 'The other person does not have to be online: the file waits for them. A single link '
+        + 'carries up to 5 MB; fill in who it is for and it goes up in pieces, '
+        + 'up to 25 MB.'
+      : 'The person you send to has to be online while you send; you confirm a '
+        + 'short code together. Up to 500 MB, and nothing is ever stored.';
+  }
+
   const ontvangersKaart = document.getElementById('recipients-input');
   const kaart = ontvangersKaart ? ontvangersKaart.closest('.card') : null;
   if (kaart) kaart.hidden = (sendMode !== 'link');
@@ -1202,6 +1217,12 @@ async function sealAndUpload(file, ttlMs, meerdereBlokken) {
   }
   const hashes = [];
   let eersteToken = null;
+  // Het antwoord van het EERSTE blok, want dat is wat de afzender te zien
+  // krijgt: de merkle-proof hangt eraan en de ttl is de gekapte waarde waar de
+  // relay zich echt aan houdt. Buiten de lus gedeclareerd, want hij wordt na
+  // afloop gelezen -- dat was hij niet, en `ud is not defined` liet de
+  // verzendpagina op het verzegelscherm staan zonder dat iemand zag waarom.
+  let eersteAntwoord = {};
   for (let i = 0; i < stukken.length; i++) {
     if (stukken.length > 1) {
       $('seal-status').textContent = 'Sending ' + file.name + ', part '
@@ -1228,7 +1249,7 @@ async function sealAndUpload(file, ttlMs, meerdereBlokken) {
     }
     if (!ud.ok) throw new Error(ud.error || 'Upload failed: ' + file.name);
     hashes.push(hash);
-    if (i === 0) eersteToken = ud.download_token;
+    if (i === 0) { eersteToken = ud.download_token; eersteAntwoord = ud; }
   }
 
   return {
@@ -1238,11 +1259,11 @@ async function sealAndUpload(file, ttlMs, meerdereBlokken) {
     hashes,
     hash: hashes[0],
     // The sender's one piece of real proof, see the note in js/done-state.js.
-    proof: ud.merkle_proof || null,
+    proof: eersteAntwoord.merkle_proof || null,
     // The relay's ttl_ms, not the one that was asked for: POST /v2/inbound
     // clamps to the tier, and the expiry the sender is shown has to be the one
     // the relay will actually act on.
-    expires_ms: Date.now() + Number(ud.ttl_ms || ttlMs),
+    expires_ms: Date.now() + Number(eersteAntwoord.ttl_ms || ttlMs),
     key: b64url(concat(rawKey, iv)),
     state: 'waiting',
   };

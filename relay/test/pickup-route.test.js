@@ -66,10 +66,19 @@ test('every sector that carries transfers also carries pickup', () => {
   }
 });
 
-test('the route is a GET, and reads nothing but the token', () => {
+test('vragen om een code is een POST, want een GET wordt door scanners afgevuurd', () => {
+  // Dit was een GET, en dat is precies verkeerd voor een verzoek met een
+  // bijwerking: een GET die MAIL VERSTUURT wordt afgevuurd door elke Safe
+  // Links-, Proofpoint- of Barracuda-scanner die de uitnodiging opent. De
+  // ontvanger kreeg dan een code voordat hij iets had aangeraakt, en nog een
+  // toen hij klikte. Een scanner doet geen POST, en dat is de hele reparatie.
+  //
+  // De GET blijft bestaan voor links die vóór de overstap zijn verstuurd.
   const idx = SOURCE.indexOf('/v2\\/pickup');
-  const blok = SOURCE.slice(idx, idx + 1400);
-  assert.match(blok, /req\.method === 'GET'/, 'pickup must be a GET');
+  const blok = SOURCE.slice(idx, idx + 2400);
+  assert.match(blok, /_body\.action === 'code'/,
+    'om een code vragen hoort een POST met {action:"code"} te zijn');
+  assert.match(blok, /req\.method === 'POST'/, 'en de route moet POST aannemen');
   assert.ok(!/apiKey/.test(blok.split('_sendStore()')[0]),
     'a recipient has no account, so the route must not reach for an api key');
 });

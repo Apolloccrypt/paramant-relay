@@ -6692,6 +6692,200 @@ async function handleRelayRequest(req, res) {
     req.method === 'GET' ||
     (req.method === 'POST' && (path.endsWith('/view') || path.endsWith('/sign')))
   );
+  // ── De ontvangerskant, en hij staat BOVEN de sleutelpoort ────────────────
+  //
+  // Hier afgehandeld en niet lager, want dat is het verschil tussen een route
+  // die publiek IS en een route met een gat in de poort. Een ontvanger draagt
+  // geen sleutel: hij heeft een link uit zijn eigen mail en verder niets. Door
+  // hem hier te beantwoorden raakt hij de poort niet eens.
+
+  // ── GET /v2/pickup/:token ───────────────────────────────────────────────────
+  // The receiving end of a send to named recipients. The token is the whole
+  // capability: it arrives in one person's mail, it names the send, and it works
+  // exactly once. There is no account here and there must not be one, because a
+  // recipient is somebody who was sent something, not somebody with a login.
+  //
+  // Every refusal gives the same shape of answer whether the token never
+  // existed, was already used or was withdrawn, so a caller cannot map which
+  // sends exist by trying tokens. The reason is in the body for the person who
+  // legitimately holds the link and needs to know why it stopped working.
+  // One shape of refusal for every way a link can be unusable, so trying tokens
+  // tells a caller nothing about which sends exist. The reason sits in the body
+  // for the person who legitimately holds the link and needs to know why it
+  // stopped working.
+  function _pickupRefused(res, reason, limit) {
+    const status = reason === 'already_collected' ? 410
+                 : reason === 'revoked' ? 403
+                 : reason === 'expired' ? 410
+                 : reason === 'too_many_codes' ? 429
+                 : reason === 'too_many_tries' ? 429 : 404;
+    log('info', 'pickup_refused', { reason });
+    const kop = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
+    if (status === 429) kop['Retry-After'] = '3600';
+    res.writeHead(status, kop);
+    return res.end(J({ error: reason, limit: limit || undefined }));
+  }
+
+  const pickm = path.match(/^\/v2\/pickup\/([A-Za-z0-9_-]{16,128})$/);
+
+  // Both steps are POST, and that is not pedantry about verbs.
+  //
+  // Asking for a code SENDS A MAIL. As a GET, every Safe Links, Proofpoint or
+  // Barracuda scanner that opens the invitation fired it: the recipient got a
+  // code before they had clicked anything, and a second one when they did.
+  // A scanner does not POST, so this is the whole fix.
+  //
+  // Step one: prove the mailbox. It does not claim the link, so asking twice
+  // costs the recipient nothing but their own ceiling.
+  if (pickm && req.method === 'POST') {
+    let _body = {};
+    try { _body = JSON.parse((await readBody(req, 4096)).toString() || '{}') || {}; }
+    catch (_) { _body = {}; }
+
+    // De ontvanger meldt dat het bestand echt openging. Pas daarna is zijn
+    // link definitief op. Tot die tijd staat de claim "bezig" en valt hij na
+    // vijf minuten terug, want een server kan niet zien of bytes aankwamen.
+    if (_body.action === 'confirm') {
+      try {
+        const bev = await _sendStore().confirm(pickm[1]);
+        res.writeHead(bev.ok ? 200 : 409,
+                      { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        return res.end(J(bev.ok ? { ok: true } : { error: bev.reason }));
+      } catch (e) {
+        if (redisOutage503(e, res)) return;
+        res.writeHead(500); return res.end(J({ error: 'confirm_failed' }));
+      }
+    }
+
+    if (_body.action === 'code') {
+     try {
+      const vraag = await _sendStore().requestPickup(pickm[1]);
+      if (!vraag.ok) {
+        return _pickupRefused(res, vraag.reason, vraag.limit);
+      }
+      // The code leaves through the mailer, never through this response.
+      // Whoever holds the link must already be able to read that mailbox.
+      const minuten = Math.round(vraag.expires_in_s / 60);
+      // Awaited, so "we sent you a code" is a statement about what happened
+      // rather than about what was attempted. Fire-and-forget meant a recipient
+      // could sit waiting for a mail the provider had already refused, with
+      // their previous working code overwritten.
+      // Same address and same name as the invitation. It used to come from a
+      // DIFFERENT sender than the mail it belongs to, which is the single most
+      // reliable way to make a legitimate code look like a scam.
+      const wie2 = mailer.veiligeNaam(vraag.sender_name || '');
+      const bestand2 = escHtml(String(vraag.filename || '').slice(0, 120));
+      const bezorgd = await mailer.stuur({
+        to: vraag.email,
+        from: mailer.afzenderNamens(undefined, wie2),
+        replyTo: vraag.sender_email || undefined,
+        subject: 'Your code to open the file',
+        text: 'Your code is ' + vraag.code + '. It works for ' + minuten + ' minutes.'
+            + (vraag.filename ? '\n\nIt opens: ' + vraag.filename : '')
+            + (wie2 ? '\nSent to you by ' + wie2 + ' through Paramant.' : '')
+            + '\n\nIf you did not just ask for this code, somebody else has your link. '
+            + 'Do not pass the code on, and let the sender know.',
+        html: '<p>Your code to open the file:</p>'
+            + '<p style="font:600 28px/1.2 monospace;letter-spacing:.14em">' + vraag.code + '</p>'
+            + (bestand2 ? '<p style="color:#666;font-size:13px">It opens: <strong>'
+                          + bestand2 + '</strong></p>' : '')
+            + '<p style="color:#666;font-size:13px">It works for ' + minuten
+            + ' minutes.<br>If you did not just ask for this code, somebody else has your '
+            + 'link. Do not pass the code on, and let the sender know.</p>'
+            + VOET(wie2, vraag.sender_email),
+      });
+      if (!bezorgd || !bezorgd.ok) {
+        log('warn', 'pickup_code_not_mailed', { reason: bezorgd && bezorgd.reason });
+        res.writeHead(502, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        return res.end(J({ error: 'code_not_sent' }));
+      }
+      log('info', 'pickup_code_mailed', {});
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: true, step: 'code_sent', sent_to: vraag.masked,
+                         expires_in_s: vraag.expires_in_s }));
+     } catch (e) {
+      if (redisOutage503(e, res)) return;
+      log('warn', 'pickup_code_failed', { err: e && e.message });
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'pickup_failed' }));
+     }
+    }
+
+    // Step two: the code, and then the bytes.
+    try {
+      const code = String(_body.code || '');
+      const got = await _sendStore().collect(pickm[1], code);
+      if (!got.ok) {
+        // A wrong or stale code is a separate answer from a link that cannot be
+        // used at all: the holder needs to know whether to try again or stop.
+        if (got.reason === 'wrong_code' || got.reason === 'too_many_tries'
+            || got.reason === 'code_expired' || got.reason === 'no_code_requested') {
+          log('info', 'pickup_code_refused', { reason: got.reason });
+          res.writeHead(got.reason === 'too_many_tries' ? 429 : 401,
+                        { 'Content-Type': 'application/json' });
+          return res.end(J({ error: got.reason, tries_left: got.tries_left }));
+        }
+        return _pickupRefused(res, got.reason);
+      }
+      log('info', 'pickup_served', { bytes: got.blob.length, remaining: got.remaining,
+                                     settled: got.settled });
+      incMetric('bytes_out_total', got.blob.length);
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': got.blob.length,
+        'Cache-Control': 'no-store',
+        // What the receiver's client needs to show who it was for and how much
+        // of the group is still outstanding. Never an address of somebody else.
+        'X-Paramant-Recipient': veiligCodeer(got.email || ''),
+        'X-Paramant-Outstanding': String(got.remaining),
+        // The name the sender gave the file, so a browser saves something a
+        // person recognises instead of a string of random characters.
+        // veiligCodeer, never encodeURIComponent directly: a lone surrogate
+        // makes it throw, and a throw here lands after the claim. Older sends,
+        // filed before the name was cleaned on the way in, still pass through
+        // this route.
+        'X-Paramant-Filename': veiligCodeer(got.filename || 'file'),
+        // The file key, locked under this recipient's token. The page unwraps
+        // it with the token from its own URL; we never had the means to.
+        'X-Paramant-Key': got.wrapped_key || '',
+        'Access-Control-Expose-Headers':
+          'X-Paramant-Filename, X-Paramant-Outstanding, X-Paramant-Key',
+      });
+
+      // THE CLAIM IS ONLY REAL WHEN THE BYTES ARRIVED.
+      //
+      // 'finish' fires when the last byte has been handed to the socket;
+      // 'close' without it means the connection died first. On a phone that is
+      // an ordinary Tuesday, and it used to cost the recipient their one
+      // collection: fragments received, the retry answered already_collected,
+      // the file dropped, and the sender's dashboard reporting a delivery that
+      // never happened.
+      //
+      // So the file is drained here, after the fact, and a dead connection
+      // hands the turn back instead.
+      let _afgerond = false;
+      res.on('finish', () => {
+        _afgerond = true;
+        if (!got.settled) return;
+        _sendStore().drained(got.send_id)
+          .catch((e) => log('warn', 'send_drain_failed', { err: e && e.message }));
+      });
+      res.on('close', () => {
+        if (_afgerond) return;
+        log('warn', 'pickup_aborted', { bytes: got.blob.length });
+        _sendStore().releaseClaim(pickm[1])
+          .catch((e) => log('warn', 'pickup_release_failed', { err: e && e.message }));
+      });
+      return res.end(got.blob);
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      log('warn', 'pickup_failed', { err: e && e.message });
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'pickup_failed' }));
+    }
+  }
+
+
   // The receiving end of a send to named recipients, and it carries no key on
   // purpose: a recipient is somebody who was sent something, not somebody with
   // a login. The capability is the token, which arrives in one person's mail.
@@ -7140,192 +7334,6 @@ async function handleRelayRequest(req, res) {
   }
 
   // ── GET /v2/outbound/:hash — Burn-on-read ────────────────────────────────────
-  // ── GET /v2/pickup/:token ───────────────────────────────────────────────────
-  // The receiving end of a send to named recipients. The token is the whole
-  // capability: it arrives in one person's mail, it names the send, and it works
-  // exactly once. There is no account here and there must not be one, because a
-  // recipient is somebody who was sent something, not somebody with a login.
-  //
-  // Every refusal gives the same shape of answer whether the token never
-  // existed, was already used or was withdrawn, so a caller cannot map which
-  // sends exist by trying tokens. The reason is in the body for the person who
-  // legitimately holds the link and needs to know why it stopped working.
-  // One shape of refusal for every way a link can be unusable, so trying tokens
-  // tells a caller nothing about which sends exist. The reason sits in the body
-  // for the person who legitimately holds the link and needs to know why it
-  // stopped working.
-  function _pickupRefused(res, reason, limit) {
-    const status = reason === 'already_collected' ? 410
-                 : reason === 'revoked' ? 403
-                 : reason === 'expired' ? 410
-                 : reason === 'too_many_codes' ? 429
-                 : reason === 'too_many_tries' ? 429 : 404;
-    log('info', 'pickup_refused', { reason });
-    const kop = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
-    if (status === 429) kop['Retry-After'] = '3600';
-    res.writeHead(status, kop);
-    return res.end(J({ error: reason, limit: limit || undefined }));
-  }
-
-  const pickm = path.match(/^\/v2\/pickup\/([A-Za-z0-9_-]{16,128})$/);
-
-  // Both steps are POST, and that is not pedantry about verbs.
-  //
-  // Asking for a code SENDS A MAIL. As a GET, every Safe Links, Proofpoint or
-  // Barracuda scanner that opens the invitation fired it: the recipient got a
-  // code before they had clicked anything, and a second one when they did.
-  // A scanner does not POST, so this is the whole fix.
-  //
-  // Step one: prove the mailbox. It does not claim the link, so asking twice
-  // costs the recipient nothing but their own ceiling.
-  if (pickm && req.method === 'POST') {
-    let _body = {};
-    try { _body = JSON.parse((await readBody(req, 4096)).toString() || '{}') || {}; }
-    catch (_) { _body = {}; }
-
-    // De ontvanger meldt dat het bestand echt openging. Pas daarna is zijn
-    // link definitief op. Tot die tijd staat de claim "bezig" en valt hij na
-    // vijf minuten terug, want een server kan niet zien of bytes aankwamen.
-    if (_body.action === 'confirm') {
-      try {
-        const bev = await _sendStore().confirm(pickm[1]);
-        res.writeHead(bev.ok ? 200 : 409,
-                      { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-        return res.end(J(bev.ok ? { ok: true } : { error: bev.reason }));
-      } catch (e) {
-        if (redisOutage503(e, res)) return;
-        res.writeHead(500); return res.end(J({ error: 'confirm_failed' }));
-      }
-    }
-
-    if (_body.action === 'code') {
-     try {
-      const vraag = await _sendStore().requestPickup(pickm[1]);
-      if (!vraag.ok) {
-        return _pickupRefused(res, vraag.reason, vraag.limit);
-      }
-      // The code leaves through the mailer, never through this response.
-      // Whoever holds the link must already be able to read that mailbox.
-      const minuten = Math.round(vraag.expires_in_s / 60);
-      // Awaited, so "we sent you a code" is a statement about what happened
-      // rather than about what was attempted. Fire-and-forget meant a recipient
-      // could sit waiting for a mail the provider had already refused, with
-      // their previous working code overwritten.
-      // Same address and same name as the invitation. It used to come from a
-      // DIFFERENT sender than the mail it belongs to, which is the single most
-      // reliable way to make a legitimate code look like a scam.
-      const wie2 = mailer.veiligeNaam(vraag.sender_name || '');
-      const bestand2 = escHtml(String(vraag.filename || '').slice(0, 120));
-      const bezorgd = await mailer.stuur({
-        to: vraag.email,
-        from: mailer.afzenderNamens(undefined, wie2),
-        replyTo: vraag.sender_email || undefined,
-        subject: 'Your code to open the file',
-        text: 'Your code is ' + vraag.code + '. It works for ' + minuten + ' minutes.'
-            + (vraag.filename ? '\n\nIt opens: ' + vraag.filename : '')
-            + (wie2 ? '\nSent to you by ' + wie2 + ' through Paramant.' : '')
-            + '\n\nIf you did not just ask for this code, somebody else has your link. '
-            + 'Do not pass the code on, and let the sender know.',
-        html: '<p>Your code to open the file:</p>'
-            + '<p style="font:600 28px/1.2 monospace;letter-spacing:.14em">' + vraag.code + '</p>'
-            + (bestand2 ? '<p style="color:#666;font-size:13px">It opens: <strong>'
-                          + bestand2 + '</strong></p>' : '')
-            + '<p style="color:#666;font-size:13px">It works for ' + minuten
-            + ' minutes.<br>If you did not just ask for this code, somebody else has your '
-            + 'link. Do not pass the code on, and let the sender know.</p>'
-            + VOET(wie2, vraag.sender_email),
-      });
-      if (!bezorgd || !bezorgd.ok) {
-        log('warn', 'pickup_code_not_mailed', { reason: bezorgd && bezorgd.reason });
-        res.writeHead(502, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-        return res.end(J({ error: 'code_not_sent' }));
-      }
-      log('info', 'pickup_code_mailed', {});
-      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-      return res.end(J({ ok: true, step: 'code_sent', sent_to: vraag.masked,
-                         expires_in_s: vraag.expires_in_s }));
-     } catch (e) {
-      if (redisOutage503(e, res)) return;
-      log('warn', 'pickup_code_failed', { err: e && e.message });
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'pickup_failed' }));
-     }
-    }
-
-    // Step two: the code, and then the bytes.
-    try {
-      const code = String(_body.code || '');
-      const got = await _sendStore().collect(pickm[1], code);
-      if (!got.ok) {
-        // A wrong or stale code is a separate answer from a link that cannot be
-        // used at all: the holder needs to know whether to try again or stop.
-        if (got.reason === 'wrong_code' || got.reason === 'too_many_tries'
-            || got.reason === 'code_expired' || got.reason === 'no_code_requested') {
-          log('info', 'pickup_code_refused', { reason: got.reason });
-          res.writeHead(got.reason === 'too_many_tries' ? 429 : 401,
-                        { 'Content-Type': 'application/json' });
-          return res.end(J({ error: got.reason, tries_left: got.tries_left }));
-        }
-        return _pickupRefused(res, got.reason);
-      }
-      log('info', 'pickup_served', { bytes: got.blob.length, remaining: got.remaining,
-                                     settled: got.settled });
-      incMetric('bytes_out_total', got.blob.length);
-      res.writeHead(200, {
-        'Content-Type': 'application/octet-stream',
-        'Content-Length': got.blob.length,
-        'Cache-Control': 'no-store',
-        // What the receiver's client needs to show who it was for and how much
-        // of the group is still outstanding. Never an address of somebody else.
-        'X-Paramant-Recipient': veiligCodeer(got.email || ''),
-        'X-Paramant-Outstanding': String(got.remaining),
-        // The name the sender gave the file, so a browser saves something a
-        // person recognises instead of a string of random characters.
-        // veiligCodeer, never encodeURIComponent directly: a lone surrogate
-        // makes it throw, and a throw here lands after the claim. Older sends,
-        // filed before the name was cleaned on the way in, still pass through
-        // this route.
-        'X-Paramant-Filename': veiligCodeer(got.filename || 'file'),
-        // The file key, locked under this recipient's token. The page unwraps
-        // it with the token from its own URL; we never had the means to.
-        'X-Paramant-Key': got.wrapped_key || '',
-        'Access-Control-Expose-Headers':
-          'X-Paramant-Filename, X-Paramant-Outstanding, X-Paramant-Key',
-      });
-
-      // THE CLAIM IS ONLY REAL WHEN THE BYTES ARRIVED.
-      //
-      // 'finish' fires when the last byte has been handed to the socket;
-      // 'close' without it means the connection died first. On a phone that is
-      // an ordinary Tuesday, and it used to cost the recipient their one
-      // collection: fragments received, the retry answered already_collected,
-      // the file dropped, and the sender's dashboard reporting a delivery that
-      // never happened.
-      //
-      // So the file is drained here, after the fact, and a dead connection
-      // hands the turn back instead.
-      let _afgerond = false;
-      res.on('finish', () => {
-        _afgerond = true;
-        if (!got.settled) return;
-        _sendStore().drained(got.send_id)
-          .catch((e) => log('warn', 'send_drain_failed', { err: e && e.message }));
-      });
-      res.on('close', () => {
-        if (_afgerond) return;
-        log('warn', 'pickup_aborted', { bytes: got.blob.length });
-        _sendStore().releaseClaim(pickm[1])
-          .catch((e) => log('warn', 'pickup_release_failed', { err: e && e.message }));
-      });
-      return res.end(got.blob);
-    } catch (e) {
-      if (redisOutage503(e, res)) return;
-      log('warn', 'pickup_failed', { err: e && e.message });
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'pickup_failed' }));
-    }
-  }
-
   const outm = path.match(/^\/v2\/outbound\/([a-f0-9]{64})$/);
   if (outm && req.method === 'GET') {
     const entry = blobStore.get(outm[1]);

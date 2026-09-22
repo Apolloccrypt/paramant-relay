@@ -78,6 +78,16 @@ const KEY_GATE_EXEMPTIONS = [
   'isEnvelopePublic',
   'isBillingWebhook',
   'isInternalBillingCancel',
+  // De ontvangerskant van een verzending naar genodigden. Een ontvanger draagt
+  // geen sleutel en hoort er geen te dragen: hij is iemand die iets gestuurd
+  // kreeg, niet iemand met een account. Zijn bevoegdheid is het token uit zijn
+  // eigen mail, en het openen van de link mailt alleen een code naar datzelfde
+  // postvak; de bytes vragen beide helften.
+  //
+  // De uitzondering is zo smal als hij kan: alleen GET en POST, alleen op een
+  // pad dat precies een token van de juiste vorm draagt. Alles daarbuiten valt
+  // gewoon door de poort.
+  'isPickupPublic',
 ];
 
 module.exports = { PUBLIC_ROUTES, KEY_GATE_EXEMPTIONS };

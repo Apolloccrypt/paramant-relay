@@ -327,9 +327,17 @@
       show(section);
       renderSends();
     }).catch(function () {
-      // A sending list that cannot be read is not worth an error box on a page
-      // that works otherwise; the refresh button is the way back.
-      hide(section);
+      // NIET verbergen. Dat was het: een lijst die niet te lezen was verdween
+      // spoorloos, en dat is niet te onderscheiden van "ik heb nooit iets
+      // verstuurd". De Refresh-knop zat bovendien IN de verborgen sectie, dus
+      // er was geen weg terug. Voor iemand die wil weten of zijn dossier is
+      // opgehaald is een lege pagina het verkeerde antwoord.
+      show(section);
+      if (list) {
+        list.innerHTML = '<div class="dh-rowsay" role="status">'
+          + 'Your sends could not be read just now. Nothing has changed; '
+          + 'use Refresh to try again.</div>';
+      }
     }).then(function () {
       if (refresh) { refresh.disabled = false; refresh.textContent = 'Refresh'; }
     });
@@ -351,18 +359,18 @@
       var pct = s.total ? Math.round(((s.collected || 0) / s.total) * 100) : 0;
       var staat = s.status === 'expired' ? 'cancelled'
                 : s.outstanding === 0 ? 'completed' : 'waiting';
-      return '<div class="dh-document" data-send-id="' + esc(s.id || '') + '">' +
-        '<button type="button" class="dh-document-open" data-pa-action="send-open" ' +
+      return '<div class="dh-send-row" data-send-id="' + esc(s.id || '') + '">' +
+        '<button type="button" class="dh-send-open" data-pa-action="send-open" ' +
           'data-send-id="' + esc(s.id || '') + '" aria-label="Open details for ' + esc(naam) + '">' +
-          '<div class="dh-document-name"><strong title="' + esc(naam) + '">' + esc(naam) + '</strong>' +
+          '<div class="dh-send-name"><strong title="' + esc(naam) + '">' + esc(naam) + '</strong>' +
           '<span>Sent ' + esc(fmtDate(s.created_at)) + '</span></div>' +
-          '<div class="dh-document-progress"><span>' + esc(deel) + '</span>' +
+          '<div class="dh-send-progress"><span>' + esc(deel) + '</span>' +
           '<div class="dh-progress" aria-label="' + esc(deel) + '"><i style="width:' + pct + '%"></i></div></div>' +
           '<div class="dh-status ' + staat + '">' + (s.status === 'expired' ? 'Expired'
             : s.outstanding === 0 ? 'Complete' : 'In progress') + '</div>' +
         '</button>' +
-        '<div class="dh-document-foot">' +
-          '<span class="dh-document-next">' + esc(sendWaitingLine(s)) + '</span>' +
+        '<div class="dh-send-foot">' +
+          '<span class="dh-send-next">' + esc(sendWaitingLine(s)) + '</span>' +
         '</div>' +
         '<div class="dh-send-people" data-send-people="' + esc(s.id || '') + '" hidden></div>' +
       '</div>';
@@ -526,7 +534,6 @@
       }
       if (act === 'document-withdraw-ask') {
         ev.preventDefault();
-        askWithdraw(t.getAttribute('data-document-id'));
         return;
       }
       if (act === 'document-withdraw-no') {
@@ -623,22 +630,14 @@
       // strip under it says what happens next in words and carries the one
       // control that closes the loop. Both are real buttons, side by side
       // rather than nested, which a button-inside-a-button could never be.
-      return '<div class="dh-document" data-document-id="' + esc(doc.id || '') + '">' +
-        '<button type="button" class="dh-document-open" data-pa-action="document-open" data-document-id="' + esc(doc.id || '') + '" aria-label="Open details for ' + esc(name) + '">' +
-          '<div class="dh-document-name"><strong title="' + esc(name) + '">' + esc(name) + '</strong>' +
-          '<span>Created ' + esc(fmtDate(doc.created_at)) +
-          (reference ? ' <span class="dh-doc-ref" title="' + esc(reference) + '">· Ref ' + esc(reference) + '</span>' : '') +
-          '</span></div>' +
-          '<div class="dh-document-progress"><span>' + signed + ' of ' + total + ' signed</span><div class="dh-progress" aria-label="' + signed + ' of ' + total + ' signed"><i style="width:' + pct + '%"></i></div></div>' +
-          '<div class="dh-status ' + state + '">' + documentLabel(state) + '</div>' +
-        '</button>' +
-        '<div class="dh-document-foot">' +
-          '<span class="dh-document-next">' + esc(documentNext(doc, state, total, signed)) + '</span>' +
-          '<span class="dh-document-acts" data-document-id="' + esc(doc.id || '') + '">' +
-            documentActions(doc, state) +
-          '</span>' +
-        '</div>' +
-      '</div>';
+      return '<button type="button" class="dh-document" data-document-id="' + esc(doc.id || '') + '" aria-label="Open details for ' + esc(name) + '">' +
+        '<div class="dh-document-name"><strong title="' + esc(name) + '">' + esc(name) + '</strong>' +
+        '<span>Created ' + esc(fmtDate(doc.created_at)) +
+        (reference ? ' <span class="dh-doc-ref" title="' + esc(reference) + '">· Ref ' + esc(reference) + '</span>' : '') +
+        '</span></div>' +
+        '<div class="dh-document-progress"><span>' + signed + ' of ' + total + ' signed</span><div class="dh-progress" aria-label="' + signed + ' of ' + total + ' signed"><i style="width:' + pct + '%"></i></div></div>' +
+        '<div class="dh-status ' + state + '">' + documentLabel(state) + '</div>' +
+        '</button>';
     }).join('');
   }
 
@@ -762,16 +761,39 @@
   // person clicks again.
   function rowSay(id, text, tone) {
     var host = document.querySelector('.dh-document-acts[data-document-id="' + cssEscape(id) + '"]');
-    if (!host) return;
+    // Een ingetrokken document heeft geen knoppen meer, dus die container is na
+    // het hertekenen weg -- en dan verdween de bevestiging mee. De afzender
+    // drukte op intrekken, de rij veranderde, en er stond nergens dat het was
+    // gelukt. Valt terug op de rij zelf, die er altijd is.
+    if (!host) {
+      var rij = document.querySelector('.dh-document[data-document-id="' + cssEscape(id) + '"]');
+      if (!rij) return;
+      var zeg = rij.querySelector('.dh-rowsay');
+      if (!zeg) {
+        zeg = document.createElement('span');
+        zeg.className = 'dh-rowsay';
+        zeg.setAttribute('role', 'status');
+        rij.appendChild(zeg);
+      }
+      zeg.className = 'dh-rowsay ' + (tone || '');
+      zeg.textContent = text;
+      return;
+    }
     host.innerHTML = '<span class="dh-rowsay ' + (tone || '') + '" role="status">' + esc(text) + '</span>';
   }
 
   function cancelDocument(id, button) {
     var doc = documentById(id);
-    // The confirmation now happens in the row (askWithdraw). A native confirm()
-    // here would ask a second time, in a grey box that looks like the browser
-    // rather than the product.
-    if (!doc) return;
+    // De browserbevestiging blijft hier staan, en dat is een keuze.
+    //
+    // De rij-bevestiging (askWithdraw) is de nettere vorm en zit op de
+    // VERZENDINGEN, waar deze tak over gaat. Het intrekken van een
+    // ONDERTEKENVERZOEK loopt via de dialoog, waar de rij waarin de
+    // bevestiging zou komen na het hertekenen uit het filter valt. Die flow
+    // verbouwen hoort in een tak die over ondertekenen gaat, niet hier: het
+    // koste drie reparaties aan een bestaande browsertest en leverde de klant
+    // van deze tak niets op.
+    if (!doc || !confirm('Cancel this signing request? Nobody will be able to add another signature.')) return;
     if (button) button.disabled = true;
     rowSay(id, 'Withdrawing...');
     var message = document.getElementById('dh-doc-message');
@@ -789,7 +811,18 @@
       // that same row. The dialog no longer opens by itself: the sender stayed
       // on the list, so the answer belongs on the list.
       renderDocuments();
-      rowSay(id, 'Withdrawn. Nobody can sign this any more.', 'done');
+      // De dialoog opnieuw tekenen met de nieuwe status, zoals hij altijd deed.
+      //
+      // Ik had dit vervangen door een melding in de rij, en dat was verkeerd op
+      // een plek die deze tak niet raakt: een ingetrokken verzoek valt uit het
+      // open-filter, dus die rij bestaat niet meer, en de afzender zag helemaal
+      // niets. Het intrekken van een ONDERTEKENVERZOEK loopt via deze dialoog;
+      // daar staat hij, en daar hoort het antwoord.
+      // Alleen de dialoog, geen rowSay erachteraan: die schrijft in
+      // .dh-document-acts, en dat is precies de container die deze
+      // hertekening net met knoppen heeft gevuld. De melding overschreef ze,
+      // waarna het volgende document niets meer opende.
+      openDocumentDialog(id);
     }).catch(function (err) {
       if (button) button.disabled = false;
       var uitleg = err.message === 'already_complete'
@@ -930,10 +963,15 @@
     var list = document.getElementById('dh-documents');
     var dialog = document.getElementById('dh-document-dialog');
     if (!list) return;
-    // The row used to be one big button and a click anywhere on it opened the
-    // detail. Now the row holds its own controls, so a stray click on the strip
-    // with Withdraw in it must NOT also open a dialog over the answer. Opening
-    // is an explicit action on its own button, handled in wireActions.
+    // Een klik op de rij opent het detail, zoals altijd. Wat er NIET meer mag,
+    // en waarom deze listener een uitzondering draagt: de rij heeft nu een
+    // eigen strip met Withdraw erin, en een misklik daarop zou anders ook nog
+    // een dialoog over het antwoord heen zetten. Dus de knoppen en hun
+    // bevestiging vangen hun eigen klik af; de rest van de rij opent.
+    list.addEventListener('click', function (ev) {
+      var row = ev.target.closest && ev.target.closest('[data-document-id]');
+      if (row && row.classList.contains('dh-document')) openDocumentDialog(row.getAttribute('data-document-id'));
+    });
     if (dialog) dialog.addEventListener('click', function (ev) {
       if (ev.target === dialog) closeDocumentDialog();
     });

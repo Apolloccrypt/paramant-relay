@@ -54,24 +54,24 @@
 const PROVIDERS = ['mailjet', 'scaleway', 'resend', 'dryrun'];
 
 function config(env) {
-  const e = env || process.env;
-  const naam = String(e.MAIL_PROVIDER || 'mailjet').trim().toLowerCase();
+  env = env || process.env;
+  const naam = String(env.MAIL_PROVIDER || 'mailjet').trim().toLowerCase();
   return {
     provider: PROVIDERS.includes(naam) ? naam : 'dryrun',
     gevraagd: naam,
-    from: e.MAIL_FROM || 'PARAMANT <noreply@paramant.app>',
-    resendKey: e.RESEND_API_KEY || '',
+    from: env.MAIL_FROM || 'PARAMANT <noreply@paramant.app>',
+    resendKey: env.RESEND_API_KEY || '',
     // A second carrier, on a different company, tried only when the first
     // refuses. Empty means no fallback: one provider, and a refusal is final.
     fallback: (() => {
-      const n = String(e.MAIL_FALLBACK_PROVIDER || '').trim().toLowerCase();
+      const n = String(env.MAIL_FALLBACK_PROVIDER || '').trim().toLowerCase();
       return PROVIDERS.includes(n) ? n : '';
     })(),
-    mailjetKey: e.MAILJET_API_KEY || '',
-    mailjetSecret: e.MAILJET_SECRET_KEY || '',
-    scalewayKey: e.SCALEWAY_SECRET_KEY || '',
-    scalewayProject: e.SCALEWAY_PROJECT_ID || '',
-    scalewayRegion: e.SCALEWAY_REGION || 'fr-par',
+    mailjetKey: env.MAILJET_API_KEY || '',
+    mailjetSecret: env.MAILJET_SECRET_KEY || '',
+    scalewayKey: env.SCALEWAY_SECRET_KEY || '',
+    scalewayProject: env.SCALEWAY_PROJECT_ID || '',
+    scalewayRegion: env.SCALEWAY_REGION || 'fr-par',
   };
 }
 

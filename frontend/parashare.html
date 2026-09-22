@@ -54,6 +54,7 @@ h1{font-size:clamp(26px,5vw,38px);font-weight:600;letter-spacing:-.028em;line-he
 .ps-mode-card{display:flex;flex-direction:column;gap:6px;text-align:left;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-1);background:var(--surface);color:var(--ink-2);font:inherit;cursor:pointer;transition:border-color var(--d-2) var(--e-standard),background var(--d-2) var(--e-standard)}
 .ps-mode-card:hover{border-color:var(--line-2)}
 .ps-mode-card[aria-checked="true"]{border-color:var(--accent);background:var(--surface-sunk);box-shadow:inset 2px 0 0 var(--accent)}
+.ps-mode-alias{opacity:.62;font-weight:400}
 .ps-mode-title{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
 .ps-mode-card[aria-checked="true"] .ps-mode-title{color:var(--ink-1)}
 .ps-mode-body{font-size:13px;line-height:1.6;color:var(--ink-2)}
@@ -497,10 +498,19 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <span class="ps-mode-body">You are both at your screen. Up to 500 MB, and nothing is ever stored.</span>
   </button>
   <button type="button" class="ps-mode-card" id="ps-mode-link" role="radio" aria-checked="false" data-click="chooseModeLink">
-    <span class="ps-mode-title">They open it later</span>
-    <span class="ps-mode-body">They pick it up when it suits them. Up to 5 MB. <span id="ps-mode-link-ttl">It waits until the link expires, then it is gone.</span></span>
+    <!-- Twee namen, met opzet. "They open it later" is wat een mens leest;
+         "Send a link" is hoe /parasend, /pricing en /vs deze stand noemen, en
+         een koper die daarop afkomt moet hem hier terugvinden. -->
+    <span class="ps-mode-title">They open it later <span class="ps-mode-alias">&middot; Send a link</span></span>
+    <span class="ps-mode-body">They pick it up when it suits them. <span id="ps-mode-link-ttl">It waits until the link expires, then it is gone.</span></span>
   </button>
 </div>
+
+<!-- One line under the cards that says what the CHOSEN stand actually means.
+     It was removed as a duplicate of the card text, and that was wrong twice:
+     the cards never carried the promise that matters on the link stand (the
+     other person does not have to be online), and the size differs per stand
+     in a way a card subtitle cannot hold. -->
 
 <!-- Stepper -- visible above the active step, updates as you move through -->
 <ol class="ps-stepper" id="ps-stepper" aria-label="Sending progress">
@@ -528,6 +538,8 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 
 <!-- STEP 1: Setup -->
 <div class="step active" id="step-setup">
+
+<p class="ps-live-note" id="ps-live-note">The person you send to has to be online while you send; you confirm a short code together. Up to 500 MB, and nothing is ever stored.</p>
 
   <div class="ps-key-slim is-loading" id="ps-key-slim" aria-label="Account session">
     <span class="ps-key-status"><span id="ps-key-slim-label">Starting your account session</span> <span class="ps-key-mask" id="ps-key-mask" hidden></span></span>

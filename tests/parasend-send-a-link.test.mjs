@@ -153,7 +153,19 @@ await sender.locator('#file-input').setInputFiles({
 });
 await sender.waitForFunction(() => !document.getElementById('btn-create-session').disabled, null, { timeout: 15000 });
 await sender.locator('#btn-create-session').click();
-await sender.waitForSelector('#step-link.active', { timeout: 30000 });
+sender.on('console', (m) => { if (m.type() === 'error') console.error('[console]', m.text()); });
+sender.on('pageerror', (e) => console.error('[pageerror]', String(e).slice(0, 200)));
+try {
+  await sender.waitForSelector('#step-link.active', { timeout: 20000 });
+} catch (e) {
+  const zichtbaar = await sender.evaluate(() => {
+    const st = [...document.querySelectorAll('.step')].filter(s => s.classList.contains('active')).map(s => s.id);
+    const f = document.getElementById('create-status') || document.getElementById('seal-status');
+    return { actief: st, melding: f ? f.textContent : '(geen)' };
+  });
+  console.error('[stand]', JSON.stringify(zichtbaar));
+  throw e;
+}
 
 // What the relay was handed. It is base64, it is not the file, and there is no
 // key anywhere in the request body.
