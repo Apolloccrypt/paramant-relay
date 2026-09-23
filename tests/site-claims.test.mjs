@@ -3227,4 +3227,54 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
     if (/\b(legally binding|juridisch bindend|onkraakbaar|100% veilig)\b/i.test(flat(slug))) problems.push(`${slug}: a promise no page may make`);
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+// 41 ── How many people one send reaches, per plan.
+//
+// relay.js refuses a send to more named recipients than max_recipients allows
+// (tiers.checkRecipients, 403 over_limit). Community is one; Firm reads the pro
+// row, Enterprise its own, and both are thirty. /pricing named the thirty on
+// Firm, but /parasend, the homepage and /docs said nothing about recipients and
+// the press kit sold a different product altogether. Every page that names the
+// number now names the one tiers.js sets, and no page may name another.
+//
+// Verified by sabotage: pro.max_recipients 30 -> 10 (red on every page below);
+// "up to 20 recipients" anywhere on the site (red in the sweep).
+test('the recipients per send on the site are the max_recipients tiers.js sets', () => {
+  const tiersSrc = read('relay/lib/tiers.js');
+  const recipientsOf = (tier) => {
+    const m = /max_recipients:\s*(\d+)/.exec(tiersSrc.slice(tiersSrc.indexOf(`  ${tier}: Object.freeze`)));
+    assert.ok(m, `tiers.js ${tier} must declare a literal max_recipients`);
+    return Number(m[1]);
+  };
+  const community = recipientsOf('community');
+  const firm = recipientsOf('pro');
+  const enterprise = recipientsOf('enterprise');
+  assert.equal(community, 1, 'community.max_recipients moved; "One recipient per send" on /pricing, /parasend and the homepage is now false');
+  assert.equal(firm, enterprise, 'Firm and Enterprise no longer share a recipient ceiling; /docs and /press name one number for both');
+
+  const flat = (slug) => visible(page(slug)).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  const must = {
+    'en/pricing': ['One recipient per send', `Up to ${firm} recipients per send, each with their own one-time link`],
+    parasend: ['One recipient per send', `Up to ${firm} recipients per send, each with their own one-time link`],
+    'en/index': ['one recipient per send', `up to ${firm} recipients per send`],
+    docs: [`One recipient per send on Community, up to ${firm} on Firm and Enterprise`],
+    press: [`up to ${firm} named recipients`, `One per send on Community · up to ${firm} per send on Firm and Enterprise`],
+  };
+  const missing = [];
+  for (const [slug, phrases] of Object.entries(must)) {
+    const text = flat(slug).replace(/&middot;/g, '·');
+    for (const p of phrases) if (!text.includes(p)) missing.push(`${slug}: must say "${p}"`);
+  }
+  assert.deepEqual(missing, [], `\n  ${missing.join('\n  ')}\n`);
+
+  // Any other count of recipients per send, anywhere on the site, is a number
+  // tiers.js does not grant.
+  const offenders = [];
+  for (const slug of publicPages()) {
+    const text = flat(slug);
+    for (const m of text.matchAll(/\bup to (\d+) (?:named )?recipients\b|\b(\d+) recipients per send\b/gi)) {
+      const n = Number(m[1] || m[2]);
+      if (n !== firm) offenders.push(`${slug}: "${m[0]}", and tiers.js grants ${firm} on the paid plans`);
+    }
+  }
+  assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}\n`);
 });

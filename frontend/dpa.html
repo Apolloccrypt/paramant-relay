@@ -215,22 +215,22 @@ input:focus{border-color:var(--cobalt)}
 <div class="wrap">
   <div class="eyebrow">Legal &mdash; effective 1 January 2025</div>
   <h1>Data Processing Agreement</h1>
-  <p class="sub">GDPR Article 28 compliant agreement between PARAMANT (processor) and your organisation (controller). Governs all personal data processed through the PARAMANT relay service.</p>
+  <p class="sub">GDPR Article 28 compliant agreement between Paramantis Solutions B.V. (processor) and your organisation (controller). Governs all personal data processed through the Paramant relay service.</p>
 
-  <div class="note-box"><strong>Zero-knowledge summary:</strong> PARAMANT operates a zero-knowledge relay for transfers and for browser-created signing requests. Those payloads are encrypted client-side before they reach our infrastructure, so outside the hosted signing ceremony on the <code>/v1</code> API we hold only ciphertext and cannot access the content. The hosted signing ceremony on the <code>/v1</code> API is the exception the Controller should be aware of: there the document is supplied to PARAMANT in readable form so that PARAMANT can run the ceremony, and PARAMANT is a processor of that content for the life of the envelope. We process only the minimum technical metadata required to route and expire transfers.</div>
+  <div class="note-box"><strong>Zero-knowledge summary:</strong> Paramantis operates a zero-knowledge relay for transfers and for browser-created signing requests. Those payloads are encrypted client-side before they reach our infrastructure, so outside the hosted signing ceremony on the <code>/v1</code> API we hold only ciphertext and cannot access the content. The hosted signing ceremony on the <code>/v1</code> API is the exception the Controller should be aware of: there the document is supplied to Paramantis in readable form so that Paramantis can run the ceremony, and Paramantis is a processor of that content for the life of the envelope. We process only the minimum technical metadata required to route and expire transfers.</div>
 
   <h2 id="parties">1. Parties</h2>
   <table>
     <tbody>
-      <tr><td>Processor</td><td>PARAMANT — operated on Hetzner Online GmbH, NBG1, Nuremberg, Germany. Contact: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a></td></tr>
+      <tr><td>Processor</td><td>Paramantis Solutions B.V. (&ldquo;Paramantis&rdquo;), Harderwijk, the Netherlands, KvK 42115132. The service is operated on Hetzner Online GmbH, NBG1, Nuremberg, Germany. Contact: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a></td></tr>
       <tr><td>Controller</td><td>The organisation identified in the signature form below</td></tr>
       <tr><td>Effective date</td><td>Date of electronic signature</td></tr>
     </tbody>
   </table>
 
   <h2 id="subject">2. Subject matter and scope</h2>
-  <p>This agreement governs the processing of personal data by PARAMANT on behalf of the Controller in connection with the PARAMANT relay and signing services, including all sector relays: healthcare, legal, finance, IoT, and general.</p>
-  <p>PARAMANT acts exclusively as a processor. The Controller determines the purposes and means of processing. The subject matter is secure relay of encrypted files, encrypted document delivery for signing requests and associated metadata between authenticated parties.</p>
+  <p>This agreement governs the processing of personal data by Paramantis on behalf of the Controller in connection with the Paramant relay and signing services, including all sector relays: healthcare, legal, finance, IoT, and general.</p>
+  <p>Paramantis acts exclusively as a processor. The Controller determines the purposes and means of processing. The subject matter is secure relay of encrypted files, encrypted document delivery for signing requests and associated metadata between authenticated parties.</p>
 
   <h2 id="nature">3. Nature, purpose, and duration of processing</h2>
   <table>
@@ -244,29 +244,29 @@ input:focus{border-color:var(--cobalt)}
   </table>
 
   <h2 id="obligations">4. Processor obligations</h2>
-  <p>PARAMANT shall:</p>
+  <p>Paramantis shall:</p>
   <ol>
-    <li>Process personal data only on documented instructions from the Controller, unless required to do so by Union or Member State law to which PARAMANT is subject</li>
+    <li>Process personal data only on documented instructions from the Controller, unless required to do so by Union or Member State law to which Paramantis is subject</li>
     <li>Ensure that persons authorised to process personal data have committed to confidentiality or are under an appropriate statutory obligation of confidentiality</li>
     <li>Implement appropriate technical and organisational measures in accordance with Article 32 GDPR — see Section 7</li>
-    <li>Assist the Controller with obligations under Articles 32&ndash;36 GDPR, taking into account the nature of processing and the information available to PARAMANT</li>
+    <li>Assist the Controller with obligations under Articles 32&ndash;36 GDPR, taking into account the nature of processing and the information available to Paramantis</li>
     <li>At the choice of the Controller, delete or return all personal data after the end of provision of processing services, and delete existing copies unless Union or Member State law requires storage of the personal data</li>
     <li>Make available to the Controller all information necessary to demonstrate compliance with obligations laid down in Article 28 GDPR, and allow for and contribute to audits and inspections</li>
     <li>Immediately inform the Controller if, in its opinion, an instruction infringes GDPR or other applicable data protection law</li>
   </ol>
 
   <h2 id="subprocessors">5. Sub-processors</h2>
-  <p>The Controller provides general authorisation for PARAMANT to use the following sub-processors:</p>
+  <p>The Controller provides general authorisation for Paramantis to use the following sub-processors:</p>
   <table>
     <thead><tr><th>Sub-processor</th><th>Location</th><th>Purpose</th><th>Data transferred</th></tr></thead>
     <tbody>
       <tr><td>Hetzner Online GmbH</td><td>Germany (NBG1)</td><td>Infrastructure hosting</td><td>Encrypted transfer payloads in RAM; encrypted ParaSign document capsules persist until the envelope expires: 30 days unless the request asks for another term, and never longer than 365 days</td></tr>
       <tr><td>Mailjet SAS</td><td>France (EU); parent Sinch AB, Sweden (EU). Mail is stored in Frankfurt (DE) and Saint-Ghislain (BE); Mailjet itself runs on Google Cloud, which is therefore a sub-processor of theirs</td><td>Transactional email: account and billing notices, signing invitations, and invitations to collect a file sent to named recipients</td><td>The recipient address and the message. For a signing invitation, the complete personal access link. For a send to named recipients, the recipient address, the file name chosen by the Controller, and a one-time link that does not by itself open the file. No document plaintext and no encryption key</td></tr>
-      <tr><td>Mollie B.V.</td><td>Netherlands (EU)</td><td>Payment processing for paid plans</td><td>The amount, a plan description, and the payment metadata the relay sets: accountId, product, plan, interval. No email address is sent while recurring billing is off, which is how production runs. Card details are entered on Mollie&rsquo;s own pages and never reach PARAMANT</td></tr>
+      <tr><td>Mollie B.V.</td><td>Netherlands (EU)</td><td>Payment processing for paid plans</td><td>The amount, a plan description, and the payment metadata the relay sets: accountId, product, plan, interval. No email address is sent while recurring billing is off, which is how production runs. Card details are entered on Mollie&rsquo;s own pages and never reach Paramantis</td></tr>
       <tr><td>Moneybird B.V.</td><td>Netherlands (EU)</td><td>Bookkeeping, only where the operator has connected an administration</td><td>The invoice or credit note: number, date, description, amounts and VAT, the billing details entered by the Controller (company name, invoice address, VAT number), the email address, and the PDF of the document. No transfer, file or signature data</td></tr>
     </tbody>
   </table>
-  <p>PARAMANT will notify the Controller at least 14 days in advance of any intended changes to sub-processors, giving the Controller the opportunity to object.</p>
+  <p>Paramantis will notify the Controller at least 14 days in advance of any intended changes to sub-processors, giving the Controller the opportunity to object.</p>
 
   <h2 id="transfers">6. International transfers</h2>
   <p><strong>No personal data is transferred outside the EEA.</strong> All relay infrastructure is in the EU (Hetzner DE, NBG1). Transactional email is carried by Mailjet SAS in France, whose parent Sinch AB is Swedish, and is stored in data centres in Frankfurt and Saint-Ghislain. Payments run through Mollie B.V. and bookkeeping through Moneybird B.V., both in the Netherlands.</p>
@@ -290,16 +290,16 @@ input:focus{border-color:var(--cobalt)}
   </table>
 
   <h2 id="incidents">8. Personal data breach notification</h2>
-  <p>PARAMANT will notify the Controller without undue delay, and in any case within 48 hours, after becoming aware of a personal data breach affecting data processed under this agreement. Notification will be sent to the email address provided in the signature form below and will include, to the extent available: the nature of the breach; categories and approximate number of data subjects and records affected; likely consequences; and measures taken or proposed to address the breach.</p>
+  <p>Paramantis will notify the Controller without undue delay, and in any case within 48 hours, after becoming aware of a personal data breach affecting data processed under this agreement. Notification will be sent to the email address provided in the signature form below and will include, to the extent available: the nature of the breach; categories and approximate number of data subjects and records affected; likely consequences; and measures taken or proposed to address the breach.</p>
 
   <h2 id="audit">9. Audit rights</h2>
-  <p>The Controller may request a compliance review, no more than once per calendar year, by providing at least 30 days&rsquo; written notice to <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>. PARAMANT will provide relevant documentation and, where applicable, access to system configurations. Physical on-site access requires prior agreement on scope, scheduling, and reasonable costs.</p>
+  <p>The Controller may request a compliance review, no more than once per calendar year, by providing at least 30 days&rsquo; written notice to <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>. Paramantis will provide relevant documentation and, where applicable, access to system configurations. Physical on-site access requires prior agreement on scope, scheduling, and reasonable costs.</p>
 
   <h2 id="liability">10. Liability</h2>
-  <p>Liability of each party for breach of this agreement is governed by Article 82 GDPR. PARAMANT&rsquo;s aggregate contractual liability is limited to the total fees paid by the Controller in the 12 months preceding the event giving rise to the claim, except in cases of wilful misconduct or gross negligence.</p>
+  <p>Liability of each party for breach of this agreement is governed by Article 82 GDPR. Paramantis&rsquo;s aggregate contractual liability is limited to the total fees paid by the Controller in the 12 months preceding the event giving rise to the claim, except in cases of wilful misconduct or gross negligence.</p>
 
   <h2 id="term">11. Term and termination</h2>
-  <p>This agreement is effective from the date of signature and remains in force for the duration of the Controller&rsquo;s service subscription. Upon termination, PARAMANT will delete all personal data within 30 days, except where retention is required by applicable law. The CT log (containing only hashed identifiers, no payload content) may be retained for audit and compliance purposes.</p>
+  <p>This agreement is effective from the date of signature and remains in force for the duration of the Controller&rsquo;s service subscription. Upon termination, Paramantis will delete all personal data within 30 days, except where retention is required by applicable law. The CT log (containing only hashed identifiers, no payload content) may be retained for audit and compliance purposes.</p>
 
   <h2 id="governing">12. Governing law and jurisdiction</h2>
   <p>This agreement is governed by the law of the Federal Republic of Germany. Any dispute arising under or in connection with this agreement shall be subject to the exclusive jurisdiction of the courts of Germany.</p>
