@@ -674,7 +674,20 @@ function loadOrCreateRelayIdentity() {
     relayIdentity = { sk, pk, pk_hash };
     log('info', 'relay_identity_loaded', { pk_hash: pk_hash.slice(0, 16) + '…', file: RELAY_IDENTITY_FILE });
   } catch (e) {
-    if (e.code !== 'ENOENT') log('warn', 'relay_identity_load_failed', { err: e.message, file: RELAY_IDENTITY_FILE });
+    // Only a file that does not exist yet earns a new identity. A file that is
+    // there but unreadable (EACCES, EISDIR) or not valid JSON is an identity
+    // this relay HAD: minting a fresh one over it would silently change the
+    // key every receipt and signed head was issued under, and overwrite the
+    // only copy of the old one. Stop instead and let the operator look.
+    if (e.code !== 'ENOENT') {
+      log('error', 'relay_identity_unreadable', {
+        err: e.message, code: e.code || e.name, file: RELAY_IDENTITY_FILE,
+        hint: 'refusing to generate a new identity over an existing file; restore it from backup or move it aside deliberately',
+      });
+      // 78 is EX_CONFIG. console.log is synchronous on files and pipes, so
+      // the line above is out before the exit.
+      process.exit(78);
+    }
     // Generate new keypair
     try {
       const kp = registry.getSig(0x0002).generateKeyPair();
