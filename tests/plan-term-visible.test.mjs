@@ -53,8 +53,10 @@ const json = (route, body, status = 200) =>
 function term(days) { return new Date(Date.now() + days * DAY).toISOString(); }
 // The one notation the site shows, mirrored from frontend/js/format-date.js:
 // day, month in full, year, in UTC, and never a slash.
-function readable(iso) {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+// The Dutch pages write the month in Dutch (format-date.js reads <html lang>),
+// the English copies under /en in English. Same shape either way.
+function readable(iso, lang = 'en') {
+  return new Date(iso).toLocaleDateString(lang === 'nl' ? 'nl-NL' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
 // ── /account ─────────────────────────────────────────────────────────────────
@@ -147,11 +149,13 @@ async function dashboard(paidUntil, prefix = '') {
 // on the same script. The same four states are held in both languages.
 const COPY = {
   nl: {
+    lang: 'nl',
     ends: (d) => `Loopt af op ${d}, er wordt niets automatisch verlengd.`,
     ended: (d) => `Afgelopen op ${d}, nu op Community.`,
     noCharge: /Er wordt niets automatisch afgeschreven\./, renew: 'Verlengen', pricing: '/pricing',
   },
   en: {
+    lang: 'en',
     ends: (d) => `Ends on ${d}, nothing renews automatically.`,
     ended: (d) => `Ended on ${d}, now on Community.`,
     noCharge: /Nothing is charged automatically\./, renew: 'Renew', pricing: /^\/(en\/)?pricing$/,
@@ -165,7 +169,7 @@ for (const [name, run, prefix, copy] of [['account', account, '', COPY.nl], ['da
   const far = term(40);
   const farState = await run(far, prefix);
   ok(`${name}: a term far out shows the date and says nothing renews`,
-    farState.line === copy.ends(readable(far)), JSON.stringify(farState));
+    farState.line === copy.ends(readable(far, copy.lang)), JSON.stringify(farState));
   ok(`${name}: a term far out carries no warning band`, farState.warn === null, JSON.stringify(farState));
 
   // Inside the last seven days: the same date, plus one calm amber line with the
@@ -173,9 +177,9 @@ for (const [name, run, prefix, copy] of [['account', account, '', COPY.nl], ['da
   const close = term(3);
   const closeState = await run(close, prefix);
   ok(`${name}: a term inside seven days still states the date`,
-    closeState.line === copy.ends(readable(close)), JSON.stringify(closeState));
+    closeState.line === copy.ends(readable(close, copy.lang)), JSON.stringify(closeState));
   ok(`${name}: a term inside seven days raises the warning`,
-    closeState.warnVisible && closeState.warn.includes(readable(close)), JSON.stringify(closeState));
+    closeState.warnVisible && closeState.warn.includes(readable(close, copy.lang)), JSON.stringify(closeState));
   ok(`${name}: the warning says nothing is charged automatically`,
     copy.noCharge.test(closeState.warn || ''), closeState.warn || '');
   ok(`${name}: the warning offers Renew, and it goes to /pricing`,
@@ -187,7 +191,7 @@ for (const [name, run, prefix, copy] of [['account', account, '', COPY.nl], ['da
   const gone = term(-2);
   const goneState = await run(gone, prefix);
   ok(`${name}: an ended term says so, and says where the account landed`,
-    goneState.line === copy.ended(readable(gone)), JSON.stringify(goneState));
+    goneState.line === copy.ended(readable(gone, copy.lang)), JSON.stringify(goneState));
   ok(`${name}: an ended term drops the warning band`, goneState.warn === null, JSON.stringify(goneState));
 
   // House style. An em-dash in customer copy is a style failure everywhere in

@@ -52,15 +52,27 @@
       "description": "Check a signed document, or the receipt that proves a file was delivered. Both happen in your browser, without an account and without uploading anything."
     },
     {
-      "@type": "SoftwareApplication",
-      "@id": "https://paramant.app/en/verify#software",
-      "name": "Paramant",
-      "applicationCategory": "SecurityApplication",
-      "operatingSystem": "Web browser",
-      "url": "https://paramant.app/en/verify",
-      "publisher": {
-        "@id": "https://paramant.app/#organization"
-      }
+      "@type": "BreadcrumbList",
+      "@id": "https://paramant.app/en/verify#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Paramant",
+          "item": "https://paramant.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "En",
+          "item": "https://paramant.app/en"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Check a signed document or a delivery receipt"
+        }
+      ]
     },
     {
       "@type": "Organization",

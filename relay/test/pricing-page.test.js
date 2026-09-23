@@ -835,9 +835,9 @@ ok('the compliance bullet on /parasend carries its own limit');
 (function oneMonthlyForm() {
   const MONTHLY_FORM = /([\d,]+) (signatures|transfers|ParaSend transfers) per month/;
   // /help, /parasend, /parasign and /signup are Dutch since 23 September 2026;
-  // their English copies live under /en. Both are held: the Dutch pages may not
-  // carry a stray English form either.
-  const PAGES = ['en/pricing.html', 'en/parasend.html', 'parasend.html', 'parasign.html', 'en/parasign.html', 'en/index.html', 'signup.html', 'en/signup.html', 'help/index.html', 'en/help/index.html'];
+  // their English copies live under /en and are held to the English form here.
+  // The Dutch pages are held to theirs below.
+  const PAGES = ['en/pricing.html', 'en/parasend.html', 'en/parasign.html', 'en/index.html', 'en/signup.html', 'en/help/index.html'];
   for (const rel of PAGES) {
     const pageHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', ...rel.split('/')), 'utf8');
     const stray = MONTHLY_FORM.exec(pageHtml);
@@ -846,9 +846,9 @@ ok('the compliance bullet on /parasend carries its own limit');
     assert(/(signatures|transfers) a month/.test(pageHtml),
       rel + ' no longer states a monthly allowance at all, so this gate is guarding nothing');
   }
-  // /parasign and /help are Dutch since 23 September 2026. Their one form is
-  // "per maand".
-  for (const rel of ['parasign.html', 'help/index.html']) {
+  // /parasign, /help, /parasend and /signup are Dutch since 23 September 2026.
+  // Their one form is "per maand".
+  for (const rel of ['parasign.html', 'help/index.html', 'parasend.html', 'signup.html']) {
     const pageNl = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', ...rel.split('/')), 'utf8');
     const strayNl = /([\d.]+) (handtekeningen|verzendingen) (in de|elke|een|iedere) maand|([\d,]+) (signatures|transfers) (per|a) month/.exec(pageNl);
     assert(!strayNl, rel + ' says "' + (strayNl ? strayNl[0] : '') + '"; the Dutch form is "N handtekeningen per maand"');
@@ -876,10 +876,13 @@ ok('the compliance bullet on /parasend carries its own limit');
 // is pinned here too, for the plan name the same sentence uses. Neither can move
 // without this going red.
 (function dashboardPriceAnswer() {
-  const dashHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'dashboard.html'), 'utf8');
+  // /dashboard is Dutch since 23 September 2026; the English answer lives on at
+  // /en/dashboard and is held here. The Dutch one is held to the same amount
+  // right after this block.
+  const dashHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'en', 'dashboard.html'), 'utf8');
   const visible = dashHtml.replace(/<!--[\s\S]*?-->/g, ' ');
   const answerMatch = /<dt>What does it cost\?<\/dt>\s*<dd>([\s\S]*?)<\/dd>/.exec(visible);
-  assert(answerMatch, 'dashboard.html must still answer "What does it cost?"');
+  assert(answerMatch, 'en/dashboard.html must still answer "What does it cost?"');
   const answer = answerMatch[1];
 
   // The plan by the name /pricing sells it under, and both products it covers,
@@ -921,6 +924,30 @@ ok('the compliance bullet on /parasend carries its own limit');
   assert(new RegExp('&euro;' + firmExcl + '(?![\\d.,])').test(helpHtml),
     '/help must still name the Firm price (&euro;' + firmExcl + ') the dashboard agrees with');
   assert(/\bFirm\b/.test(helpHtml), '/help must name the plan by the name /pricing sells it under');
+  // The Dutch /dashboard: the same question, the same plan, the same amount,
+  // both products by the names the Dutch bar uses, and an amount the Dutch
+  // /pricing carries.
+  const dashNl = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'dashboard.html'), 'utf8')
+    .replace(/<!--[\s\S]*?-->/g, ' ');
+  const answerNlMatch = /<dt>Wat kost het\?<\/dt>\s*<dd>([\s\S]*?)<\/dd>/.exec(dashNl);
+  assert(answerNlMatch, 'dashboard.html must still answer "Wat kost het?"');
+  const answerNl = answerNlMatch[1];
+  assert(/\bFirm\b/.test(answerNl), 'the Dutch dashboard price answer must name the Firm plan');
+  for (const productName of ['Ondertekenen', 'Versturen']) {
+    assert(answerNl.includes(productName),
+      'the Dutch dashboard price answer must name ' + productName + '; naming one product prices half the account');
+  }
+  const firmExclNl = String(firmExcl).replace('.', ',');
+  assert(new RegExp('&euro;' + firmExclNl + ' per maand excl\\. btw').test(answerNl),
+    'the Dutch dashboard must price Firm at the catalog amount (&euro;' + firmExclNl + '), got: ' + answerNl.trim());
+  for (const amount of new Set([...answerNl.matchAll(/&euro;([\d.,]+)/g)].map((m) => m[1]))) {
+    // The Dutch /pricing writes its amounts as "29 euro"; either notation counts.
+    const a = amount.replace(/[.]/g, '\\.');
+    assert(new RegExp('(?:&euro;|€)\\s?' + a + '(?![\\d.,])|(?<![\\d.,])' + a + ' euro\\b').test(htmlNl),
+      'the Dutch dashboard names &euro;' + amount + ', which is not on the Dutch /pricing');
+  }
+  assert(/\bCommunity is altijd gratis\b/.test(answerNl),
+    'the Dutch dashboard answer must still name the free plan Community');
   ok('the dashboard price answer names Firm, both products and the catalog amount');
 })();
 

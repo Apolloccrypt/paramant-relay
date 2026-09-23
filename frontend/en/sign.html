@@ -449,15 +449,27 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       "description": "Sign a PDF in your browser. The document text and your signing key never leave it, and anyone can check the finished document afterwards."
     },
     {
-      "@type": "SoftwareApplication",
-      "@id": "https://paramant.app/sign#software",
-      "name": "Paramant",
-      "applicationCategory": "SecurityApplication",
-      "operatingSystem": "Web browser",
-      "url": "https://paramant.app/sign",
-      "publisher": {
-        "@id": "https://paramant.app/#organization"
-      }
+      "@type": "BreadcrumbList",
+      "@id": "https://paramant.app/en/sign#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Paramant",
+          "item": "https://paramant.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "En",
+          "item": "https://paramant.app/en"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Sign a PDF in your browser"
+        }
+      ]
     },
     {
       "@type": "Organization",
@@ -1018,7 +1030,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 <script src="/nav.js?v=16" defer></script>
 <script src="/js/nav-auth.js?v=11" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
-<script src="/js/quota-upgrade.js?v=5" defer></script>
+<script src="/js/quota-upgrade.js?v=6" defer></script>
 <script src="/js/done-state.js?v=1" defer></script>
 <script type="module" src="/sign-flow.js?v=59"></script>
 </body>

@@ -25,9 +25,17 @@
 (function () {
   'use strict';
 
+  // The language of the page, from its own <html lang>: Dutch on the ordinary
+  // paths, English on the copies under /en. Without a document language (the
+  // vm sandbox of relay/test/quota-upgrade-render.test.js) it keeps English.
+  var LANG = (typeof document !== 'undefined' && document.documentElement &&
+    document.documentElement.lang) || '';
+  var EN = !LANG || LANG.slice(0, 2) === 'en';
+  function t(nl, en) { return EN ? en : nl; }
+
   var PRODUCTS = {
-    transfers_month: { unit: 'transfers'  },
-    signs_month:     { unit: 'signatures' }
+    transfers_month: { unit: t('verzendingen', 'transfers')  },
+    signs_month:     { unit: t('handtekeningen', 'signatures') }
   };
 
   // Every monthly ceiling this file prints, per dimension and per tier, copied
@@ -64,11 +72,11 @@
   // ceilings at once.
   var NEXT = {
     transfers_month: {
-      community: { name: 'Firm', price: 'EUR 29/month excl. VAT', limit: 500 }
+      community: { name: 'Firm', price: t('EUR 29/maand excl. btw', 'EUR 29/month excl. VAT'), limit: 500 }
     },
     signs_month: {
-      community: { name: 'Firm',              price: 'EUR 29/month excl. VAT', limit: 100 },
-      pro:       { name: 'ParaSign Business', price: 'EUR 299/month excl. VAT', limit: 1000 }
+      community: { name: 'Firm',              price: t('EUR 29/maand excl. btw', 'EUR 29/month excl. VAT'), limit: 100 },
+      pro:       { name: 'ParaSign Business', price: t('EUR 299/maand excl. btw', 'EUR 299/month excl. VAT'), limit: 1000 }
     }
   };
 
@@ -119,14 +127,17 @@
   // Community plan, third signature blocked: the purchase moment.
   function freeSignHtml(data) {
     return '<div class="pa-quota-upsell pa-quota-card" role="status">' +
-      '<strong>You\'ve used both signatures this month.</strong>' +
-      '<span>Community gives you 2 a month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.</span>' +
-      '<span><strong>Firm - EUR 29/month</strong><br>100 signatures a month. API access. 500 transfers a month on ParaSend, in the same payment.</span>' +
+      t('<strong>U heeft deze maand beide handtekeningen gebruikt.</strong>',
+        '<strong>You\'ve used both signatures this month.</strong>') +
+      t('<span>Community geeft u er 2 per maand, met dezelfde versleuteling, dezelfde post-quantumhandtekeningen en hetzelfde openbare bewijslogboek als elk betaald plan. Voor veiligheid betaalt u hier nooit. U betaalt voor volume.</span>',
+        '<span>Community gives you 2 a month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.</span>') +
+      t('<span><strong>Firm - EUR 29/maand</strong><br>100 handtekeningen per maand. API-toegang. 500 verzendingen per maand met Versturen, in dezelfde betaling.</span>',
+        '<span><strong>Firm - EUR 29/month</strong><br>100 signatures a month. API access. 500 transfers a month on ParaSend, in the same payment.</span>') +
       '<span class="pa-quota-actions">' +
-        '<a class="btn btn-primary" href="/pricing">Upgrade to Firm</a>' +
-        '<button type="button" class="btn btn-secondary" data-pa-quota-dismiss>Maybe later</button>' +
+        '<a class="btn btn-primary" href="/pricing">' + t('Overstappen op Firm', 'Upgrade to Firm') + '</a>' +
+        '<button type="button" class="btn btn-secondary" data-pa-quota-dismiss>' + t('Misschien later', 'Maybe later') + '</button>' +
       '</span>' +
-      '<span>Your limit resets on ' + resetDate(data) + '.</span>' +
+      '<span>' + t('Uw limiet begint opnieuw op ', 'Your limit resets on ') + resetDate(data) + '.</span>' +
       '</div>';
   }
 
@@ -140,20 +151,24 @@
     // #361, which sent no limit at all.
     var limit = data && isFinite(Number(data.limit)) ? Number(data.limit) : CEILINGS[dim][plan];
     var used = limit != null
-      ? 'You have used all ' + limit + ' ' + p.unit + ' included in your plan this month.'
-      : 'You have used all ' + p.unit + ' included in your plan this month.';
+      ? t('U heeft alle ' + limit + ' ' + p.unit + ' van uw plan voor deze maand gebruikt.',
+          'You have used all ' + limit + ' ' + p.unit + ' included in your plan this month.')
+      : t('U heeft alle ' + p.unit + ' van uw plan voor deze maand gebruikt.',
+          'You have used all ' + p.unit + ' included in your plan this month.');
     // Name the ceiling of the rung above. The card used to promise a vaguely
     // higher one while the number was sitting right here; every tier has a
     // finite plafond, so it can say which one it is.
     var next = NEXT[dim][plan];
     var offer = next
-      ? ' Upgrade to ' + next.name + ' (' + next.price + ') for ' + next.limit + ' ' +
-        p.unit + ' a month, or wait until your quota resets next month.'
-      : ' Your quota resets next month.';
+      ? t(' Stap over op ' + next.name + ' (' + next.price + ') voor ' + next.limit + ' ' +
+          p.unit + ' per maand, of wacht tot uw tegoed volgende maand opnieuw begint.',
+          ' Upgrade to ' + next.name + ' (' + next.price + ') for ' + next.limit + ' ' +
+          p.unit + ' a month, or wait until your quota resets next month.')
+      : t(' Uw tegoed begint volgende maand opnieuw.', ' Your quota resets next month.');
     return '<div class="pa-quota-upsell" role="status">' +
-      '<strong>' + PLAN_LABEL[plan] + ' monthly limit reached.</strong>' +
+      '<strong>' + t('Maandlimiet van ' + PLAN_LABEL[plan] + ' bereikt.', PLAN_LABEL[plan] + ' monthly limit reached.') + '</strong>' +
       '<span>' + used + offer + '</span>' +
-      '<a class="btn btn-primary" href="/pricing">View plans</a>' +
+      '<a class="btn btn-primary" href="/pricing">' + t('Plannen bekijken', 'View plans') + '</a>' +
       '</div>';
   }
 
@@ -174,7 +189,8 @@
     if (!isFinite(used) || !isFinite(included)) return '';
     if (included === 2 && used === 2) {
       return '<div class="pa-sign-note" role="status">' +
-        '<span>That\'s your second signature this month. One more and you\'ll need Firm (EUR 29/month, 100 signatures).</span>' +
+        t('<span>Dat was uw tweede handtekening deze maand. Voor de volgende heeft u Firm nodig (EUR 29/maand, 100 handtekeningen).</span>',
+          '<span>That\'s your second signature this month. One more and you\'ll need Firm (EUR 29/month, 100 signatures).</span>') +
         '</div>';
     }
     // The last signature Firm includes. Said once, when it happens, so nobody
@@ -184,7 +200,8 @@
     // the new month, or for a bigger plan.
     if (included === 100 && used === 100) {
       return '<div class="pa-sign-note" role="status">' +
-        '<span>That was the 100th signature your Firm plan includes this month. Signing starts again on ' + resetDate(quota) + '. Business (EUR 299/month) includes 1,000 a month. <a href="/pricing">Compare plans</a></span>' +
+        t('<span>Dat was de 100e handtekening die uw Firm-plan deze maand bevat. Ondertekenen kan weer vanaf ' + resetDate(quota) + '. Business (EUR 299/maand) bevat 1.000 per maand. <a href="/pricing">Plannen vergelijken</a></span>',
+          '<span>That was the 100th signature your Firm plan includes this month. Signing starts again on ' + resetDate(quota) + '. Business (EUR 299/month) includes 1,000 a month. <a href="/pricing">Compare plans</a></span>') +
         '</div>';
     }
     return '';

@@ -104,6 +104,7 @@ async function stubRelay(page) {
 // text they carried before lives on at /en/parashare and /en/get, and every
 // English pin below still holds there.
 const MONTH = '(January|February|March|April|May|June|July|August|September|October|November|December)';
+const MAAND = '(januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december)';
 const LANGS = [
   {
     tag: 'en', sendPath: '/en/parashare', getPrefix: '/en', markupFile: 'en/parashare.html',
@@ -123,7 +124,8 @@ const LANGS = [
     wiped: /na de eerste download gewist/,
     planInMarkup: /on Community|on Firm|on Pro|on Enterprise|bij Community|bij Firm|bij Pro|bij Enterprise/,
     notOnline: /hoeft niet online te zijn/,
-    until: new RegExp('tot \\d{1,2} ' + MONTH + ' \\d{4}, \\d{2}:\\d{2} UTC'),
+    // The Dutch page writes the month in Dutch: format-date.js reads <html lang>.
+    until: new RegExp('tot \\d{1,2} ' + MAAND + ' \\d{4}, \\d{2}:\\d{2} UTC'),
     worksOnce: /Werkt één keer/, waiting: /Wacht op de ontvanger/,
     noReceipt: /geen ondertekend ontvangstbewijs/i,
     gone: /voorgoed vernietigd/i,

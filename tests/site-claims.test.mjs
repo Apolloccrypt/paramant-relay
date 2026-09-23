@@ -2755,9 +2755,9 @@ test('every page that promises burn-on-read says which client and which plan it 
     assert.ok(flatten(bodyOf(page(slug))).includes(sentence),
       `${slug} (nl): must spell the per-plan read counts as "${sentence}", the numbers tiers.js sets`);
   }
-  const unifiedNl = `De webapp en de extensies verwijderen het bestand op elk plan na de eerste keer lezen. Via de API kan een betaalde link vaker gelezen worden: tot ${reads.pro} keer op Firm en ${reads.enterprise} keer op Enterprise.`;
-  assert.ok(flatten(bodyOf(page('security'))).includes(unifiedNl),
-    `security (nl): must carry the client-and-plan sentence in full: "${unifiedNl}"`);
+  const unifiedNlSecurity = `De webapp en de extensies verwijderen het bestand op elk plan na de eerste keer lezen. Via de API kan een betaalde link vaker gelezen worden: tot ${reads.pro} keer op Firm en ${reads.enterprise} keer op Enterprise.`;
+  assert.ok(flatten(bodyOf(page('security'))).includes(unifiedNlSecurity),
+    `security (nl): must carry the client-and-plan sentence in full: "${unifiedNlSecurity}"`);
   // Dutch /pricing sells one office plan, so it names that plan's read count.
   assert.ok(flatten(bodyOf(page('pricing'))).includes(`De webapp en de extensies wissen het na de eerste keer lezen, op elk plan. Via de API mag een betaalde link vaker gelezen worden: tot ${reads.pro} keer op het kantoorplan.`),
     'pricing (nl): must say the web app and extensions burn on the first read on every plan, and that more reads come through the API');
