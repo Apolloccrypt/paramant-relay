@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **102 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **181 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **182 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -215,6 +215,7 @@ overschrijven zonder de code aan te raken.
 | `PARAMANT_REQUIRED_WORKFLOWS` | `deploy/deploy-3.1.sh` | `test.yml csp-inline-check.yml sign-e2e.yml product-heartbeat` | welke CI-workflows groen moeten zijn voor de deploy start |
 | `PARAMANT_SENDER` | `scripts/paramant-cra.sh`, `scripts/paramant-firmware.sh` en 5 meer | `paramant-sender` | afzenderidentiteit in de sectorscripts |
 | `PARAMANT_SITE_CONF` | `deploy/ontvang-route.sh` | `/etc/nginx/sites-enabled/paramant.conf` | welke nginx-conf de /ontvang/-route krijgt; alleen anders op een server waar die conf anders heet |
+| `PARAMANT_SITE_NAAM` | `deploy/ontvang-route.sh` | `paramant.app` | welke server_name het blok draagt waar de /ontvang/-route in moet; de conf heeft er zes en de link wijst naar deze |
 | `PARAMANT_SMOKE_API_KEY` | `deploy/deploy-3.1.sh` | leeg | sleutel voor de rooktest na de deploy |
 | `PARAMANT_TMPDIR` | `scripts/paramant-cra.sh`, `scripts/paramant-crypto-audit.sh` en 3 meer | `/run/paramant-tmp` | werkmap van de sectorscripts |
 | `PARAMANT_VERIFY_HEAD` | `deploy/deploy-3.1.sh` | leeg | welke commit --verify-only controleert |

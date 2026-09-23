@@ -23,9 +23,9 @@ DRY=""
 [ "${1:-}" = "--dry-run" ] && DRY="ja"
 
 ssh -i "$KEY" -o BatchMode=yes -o IdentitiesOnly=yes "$HOST" \
-  "bash -s -- '$CONF' '${DRY}'" <<'REMOTE'
+  "bash -s -- '$CONF' '${DRY}' '${PARAMANT_SITE_NAAM:-paramant.app}'" <<'REMOTE'
 set -euo pipefail
-CONF="$1"; DRY="${2:-}"
+CONF="$1"; DRY="${2:-}"; SITE_NAAM="${3:-paramant.app}"
 
 if grep -q 'location \^~ /ontvang/' "$CONF"; then
   echo "de route staat er al; niets te doen"
@@ -56,9 +56,30 @@ BAK="/etc/nginx/backups/$(basename "$CONF").pre-ontvang-$TS"
 cp -a "$CONF" "$BAK"
 echo "reservekopie: $BAK"
 
-# Invoegen voor de laatste sluitende accolade van het server-blok.
-LAATSTE=$(grep -n '^}' "$CONF" | tail -1 | cut -d: -f1)
-if [ -z "$LAATSTE" ]; then echo "STOP: geen sluitende } gevonden in $CONF"; exit 1; fi
+# HET JUISTE SERVER-BLOK, NIET HET LAATSTE. paramant-public.conf draagt zes
+# server-blokken: paramant.app en daarna de vijf sectorhosts. Invoegen voor de
+# laatste sluitende accolade zette de route daardoor in relay.paramant.app,
+# terwijl de uitnodiging naar paramant.app linkt. nginx keurde dat goed, herlaadde
+# netjes, en elke ontvanger kreeg evengoed een 404.
+#
+# Dus: zoek het blok waarvan de server_name de site is waar de link heen wijst,
+# en voeg in voor de accolade die DAT blok sluit.
+LAATSTE=$(awk -v naam="$SITE_NAAM" '
+  /^[[:space:]]*server[[:space:]]*\{/ { diep = 1; blokstart = NR; raak = 0; next }
+  diep > 0 {
+    if ($0 ~ "server_name[[:space:]]+" naam "[[:space:]]*;") raak = 1
+    n = gsub(/\{/, "{"); m = gsub(/\}/, "}")
+    diep += n - m
+    if (diep <= 0) { if (raak) { print NR; exit } ; diep = 0 }
+  }' "$CONF")
+if [ -z "$LAATSTE" ]; then
+  echo "STOP: geen server-blok met server_name $SITE_NAAM gevonden in $CONF."
+  echo "Zet SITE_NAAM als de site anders heet, of PARAMANT_SITE_CONF als dit de"
+  echo "verkeerde conf is."
+  exit 1
+fi
+echo "server-blok van $SITE_NAAM sluit op regel $LAATSTE"
+
 
 BLOK=$(mktemp)
 cat > "$BLOK" <<'NGINX'
@@ -72,6 +93,11 @@ cat > "$BLOK" <<'NGINX'
     # ^~ zodat elk token eronder op dezelfde pagina uitkomt, en noindex omdat
     # een token in een zoekresultaat een token in andermans handen is.
     location ^~ /ontvang/ {
+        # De root hoort HIER en niet op serverniveau: dit blok heeft er geen,
+        # elke location in paramant.app zet zijn eigen. Zonder deze regel zoekt
+        # try_files in de standaardmap van nginx, vindt ophalen.html daar niet,
+        # en antwoordt 404 op een bestand dat gewoon in de docroot staat.
+        root /home/paramant/app;
         # De include is NIET optioneel. nginx erft add_header niet in een
         # location die zelf een add_header zet, dus zonder deze regel vielen
         # CSP, X-Frame-Options, nosniff, Referrer-Policy en Permissions-Policy

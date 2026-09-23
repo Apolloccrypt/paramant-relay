@@ -349,7 +349,11 @@ services:
 
   # ── Admin panel ──────────────────────────────────────────────────────────────
   admin:
-    build: ./admin
+    # Context is de repo-root, niet admin/: de admin deelt relay/lib/mail.js
+    # zodat er een mailprovider is voor het hele product. Zie admin/Dockerfile.
+    build:
+      context: .
+      dockerfile: admin/Dockerfile
     container_name: paramant-relay-admin
     restart: unless-stopped
     security_opt:
