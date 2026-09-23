@@ -49,9 +49,9 @@
       '</div>' +
       '<div class="card-status" id="status-' + s.id + '">Checking&hellip;</div>' +
       '<div class="meta-row">' +
-        '<div class="meta-item">version <span id="ver-' + s.id + '">&mdash;</span></div>' +
-        '<div class="meta-item">latency <span id="ms-' + s.id + '">&mdash;</span></div>' +
-        '<div class="meta-item">uptime 24h <span id="up-' + s.id + '">&mdash;</span></div>' +
+        '<div class="meta-item">version <span id="ver-' + s.id + '">-</span></div>' +
+        '<div class="meta-item">latency <span id="ms-' + s.id + '">-</span></div>' +
+        '<div class="meta-item">uptime 24h <span id="up-' + s.id + '">-</span></div>' +
       '</div>' +
       '<div class="sector-url"><a href="' + s.url + '/health" target="_blank" rel="noopener">' + s.host + '/health</a></div>';
     grid.appendChild(card);
