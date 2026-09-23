@@ -598,10 +598,10 @@ test('no page names a cryptographic primitive the code behind that page does not
   // and says to delete the line. The register can only shrink, and it cannot
   // rot, because it is checked against the code on every run.
   const AWAITING_DECISION = [
-    'audit-log-export: names ML-KEM-768 and ML-DSA-65 for a workflow its own steps describe as a ParaSend web app upload opened through a one-time link. Making it true needs the regulator to hold a device key, which is the convenience the page sells. Raised 5 September 2026.',
-
-    // The English text of the same page, under /en since 23 September 2026. Same claim, same decision.
-    'en/audit-log-export: the English copy of the page above, with the same two names for the same workflow. Raised 23 September 2026.',
+    // audit-log-export (NL) left this register on 23 September 2026: the page now
+    // names AES-256-GCM with the key in the link, and says this route makes no
+    // signed receipt. The English copy below still carries the old claim.
+    'en/audit-log-export: names ML-KEM-768 and ML-DSA-65 for a ParaSend web app upload opened through a one-time link, where neither runs (the Dutch page was fixed on the same day). Raised 23 September 2026.',
   ];
   const expected = new Set(AWAITING_DECISION.map((line) => line.split(':')[0]));
   const unexpected = pathProblems.filter((line) => !expected.has(line.split(':')[0]));
