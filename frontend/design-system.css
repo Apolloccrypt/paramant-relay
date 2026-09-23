@@ -42,8 +42,10 @@
   --cobalt:   #1D4ED8;
   --cobalt-2: #1A43BE;
 
-  /* punctuation */
-  --lime: #B2FF3F;
+  /* punctuation. Was lime #B2FF3F, 1.16:1 on the bone: under the 3:1 that
+     tests/ui-elements-contrast.test.mjs asks of a mark. It follows the cobalt,
+     as it followed the ochre in v5. */
+  --lime: var(--cobalt);
 
   /* inverted text */
   --bone-on-navy:      #F8FAFC;
@@ -147,6 +149,13 @@
   --invert-dim:  var(--bone-on-navy-dim);
   --invert-hair: var(--bone-on-navy-hair);
   --bone-blur:   rgba(248, 250, 252, .92);
+}
+
+/* On a navy slab the lime is the punctuation again: 9.7:1 on the navy, and the
+   ink that sits on it is the navy. */
+.section-dark, .section-navy, .section-cobalt, .page-hero--navy, .invert {
+  --lime: #B2FF3F;
+  --on-ochre: var(--navy);
 }
 
 

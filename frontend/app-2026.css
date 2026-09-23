@@ -47,10 +47,11 @@
   --line-2:     rgba(12,27,42,.20);
   --line-ghost: rgba(12,27,42,.05);
 
-  /* lime is a line, never a text background (one exception, see --mark-on) */
-  --mark:     #B2FF3F;
-  --mark-ink: #5C7A12;                 /* 4.90 on paper, readable lime */
-  --mark-on:  #0A1626;                 /* 14.94 on #B2FF3F */
+  /* the mark follows the accent: lime #B2FF3F was 1.1:1 on the paper, under
+     the 3:1 tests/ui-elements-contrast.test.mjs asks of a mark */
+  --mark:     #1D4ED8;
+  --mark-ink: #1D4ED8;
+  --mark-on:  #FFFFFF;
 
   /* signature states: the four words dashboard.js renders */
   --sig-wait: #79600F;
