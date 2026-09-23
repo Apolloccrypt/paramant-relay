@@ -38,6 +38,10 @@ ParaID-uitgifteroute staat open op productie*):
 | `/v1/paraid/issue-*` | 404 from nginx, all six server blocks (server-side edit of 01-09) | route removed in the relay (#319) |
 | `/v2/health/deep` | `{"error":"Not available in this relay mode"}` | 200 behind `X-Internal-Auth` (#322) |
 
+Which outside party each key belongs to, and whether that party is active, is
+in `deploy/partners.json` (see RUNBOOK.md, section 7). A key for a party that
+is not `actief` there is a dead leftover, and `tests/partners.test.mjs` says so.
+
 What main brings that touches the deploy, with the PR that did it:
 
 - **#314** release 3.1.0, ParaID auth, billing with an end date.

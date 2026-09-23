@@ -8,6 +8,7 @@ here; what is recorded is that the end state below has been reached. See also
 CHANGELOG "Cloudflare removed - relay now served directly from Hetzner DE".
 **Triggered by**: GitHub Issue #20 (sovereignty claim vs Cloudflare dependency)
 **Owner**: Mick Beer
+**Current status of every party**: `deploy/partners.json` (Bunny `actief`, Cloudflare `uitgefaseerd`).
 
 ## Rationale
 

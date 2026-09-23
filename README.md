@@ -564,6 +564,7 @@ The relay is **untrusted by design** — it never holds a decryption key.
 | Padding | 5 MB fixed — all transfers look identical (DPI masking) |
 | Audit log | SHA3-256 Merkle tree — tamper-evident, public |
 | Infrastructure | Hetzner Nuremberg DE (NBG1), EU jurisdiction only, no US CLOUD Act |
+| Outside parties | every one, with status: [deploy/partners.json](deploy/partners.json), public at [paramant.app/partners](https://paramant.app/partners). Mail goes through Resend in the US |
 | Docker | cap_drop ALL, no-new-privileges, read-only rootfs |
 
 **Security audits (April 2026):**

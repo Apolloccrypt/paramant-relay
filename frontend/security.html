@@ -266,7 +266,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="grid2" style="margin-top:20px">
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Uw documenten blijven onder Europees recht</div>
-      <p style="margin:0 0 10px">De servers staan bij Hetzner in Neurenberg, Duitsland, onder de AVG. Geen Amerikaanse partij in de weg die uw bestanden afleggen: uw bestanden en sleutels blijven in de EU en komen nooit bij een Amerikaans bedrijf. E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten. Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Daarom zeggen we dat geen Amerikaanse partij een bestand of een sleutel aanraakt, en niet dat er nergens een bestaat. De lijst met subverwerkers staat op <a href="/privacy">privacy</a>.</p>
+      <p style="margin:0 0 10px" data-partners-rollen>De servers staan bij Hetzner in Neurenberg, Duitsland, onder de AVG. Geen Amerikaanse partij in de weg die uw bestanden afleggen: uw bestanden en sleutels blijven in de EU en komen nooit bij een Amerikaans bedrijf. E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten. Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Daarom zeggen we dat geen Amerikaanse partij een bestand of een sleutel aanraakt, en niet dat er nergens een bestaat. De lijst met subverwerkers staat op <a href="/privacy">privacy</a>. Elke partij met haar status: <a href="/partners">/partners</a>.</p>
       <p style="margin:0;font-size:var(--text-sm)"><a href="#jurisdiction">De tabel met rechtsgebieden &rarr;</a></p>
     </div>
     <div class="card">
@@ -310,11 +310,11 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <p style="margin:0;line-height:1.8">Een Nederlands bedrijf is de eigenaar: Paramantis Solutions B.V. in Harderwijk, KvK 42115132. Een aantal bekendere Nederlandse namen in deze markt valt inmiddels onder een eigenaar in het buitenland; deze niet. De tabel hieronder toont elk punt dat het product raakt, ook de ene Amerikaanse uitzondering. Zo kunt u het zelf nagaan in plaats van ons op ons woord te geloven.</p>
   </div>
   <div class="card">
-    <table class="table">
+    <table class="table" data-partners-rollen>
       <tbody>
         <tr><td>Locatie van de servers</td><td>Hetzner Neurenberg, Duitsland</td></tr>
         <tr><td>Rechtsgebied</td><td>EU / Duitsland (AVG)</td></tr>
-        <tr><td>Amerikaanse CLOUD Act</td><td>Geen Amerikaanse partij op de route van uw gegevens: bestanden en sleutels blijven in de EU en komen nooit bij een Amerikaans bedrijf. E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten. Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Zie <a href="/privacy">privacy</a>.</td></tr>
+        <tr><td>Amerikaanse CLOUD Act</td><td>Geen Amerikaanse partij op de route van uw gegevens: bestanden en sleutels blijven in de EU en komen nooit bij een Amerikaans bedrijf. E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten. Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Zie <a href="/privacy">privacy</a>. Actuele status: <a href="/partners">/partners</a>.</td></tr>
         <tr><td>Wat bewaard wordt</td><td>Geen leesbare inhoud, geen sleutels. Alleen: de hash van de overdracht, het tijdstip van aanmaken, de geschatte versleutelde grootte per blok (tot 5 MB; precies 5 MB voor de webapp Versturen) en het aantal keer bekeken. Verwijderd na de laatste keer lezen.</td></tr>
         <tr><td>IP-logging</td><td>De toegangslog van Nginx staat uit in de deploy-configuratie (<code>access_log off</code> op elk serverblok dat de site en de relays bedient in <code>deploy/nginx-paramant-live.conf</code>). Niet gekoppeld aan de inhoud van een overdracht. Er wordt geen aparte bewaartermijn beloofd. Bij een relay die u zelf host is het andersom: <code>deploy/nginx-selfhost.conf</code> schrijft een toegangslog met als eerste veld het adres van de client. Zet die uit als u dat niet wilt.</td></tr>
         <tr><td>Analytics</td><td>Geen. Geen scripts van derden op de relay of de API.</td></tr>
@@ -530,6 +530,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
           <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
           <a href="/license">Licentie</a>
+          <a href="/partners">Partners</a>
         </div>
       </div>
     </div>

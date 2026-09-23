@@ -1093,7 +1093,7 @@ const signVisibleText = visible('frontend/sign.html');
 const EU_CLAIM = 'Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path.';
 // De uitzondering, op elke pagina met dezelfde woorden: mail gaat nog via
 // Resend in de VS. Mailjet stond hier tot 23 september 2026, maar is nooit
-// aangezet; zie deploy/mail-provider.json en tests/mail-provider-site.test.mjs.
+// aangezet; zie deploy/partners.json en tests/partners.test.mjs.
 const EU_EXCEPTION = 'Email (only the email address and the invite link, never the document or a key) still goes through Resend Inc. in the United States for now';
 const homeVisible = visible('frontend/en/index.html');
 for (const [name, text] of [['index', homeVisible], ['en/parasign', parasignEn], ['en/parasend', parasendEn]]) {
