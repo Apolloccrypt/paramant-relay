@@ -41,6 +41,16 @@ op drie plekken:
 backup and restore, and the merge rules. Read it before touching production;
 it says per command whether it runs on the admin machine or on the server.
 
+## Externe partijen
+
+`deploy/partners.json` is de enige bron voor elke externe partij (hosting, DNS,
+mail, betaling, boekhouding, code-hosting en de rest): status, sleutelnamen,
+juridische naam, land, moederbedrijf, met een bron per claim. Noem op de site
+of in de code geen partij als actief die daar niet actief staat.
+`tests/partners.test.mjs` toetst de site (NL en EN), de code en, met
+`PARTNERS_PROD_SSH`, de sleutelnamen op productie. Omschakelen: RUNBOOK.md,
+sectie 7.
+
 ## Cursor Cloud specific instructions
 
 PARAMANT is a post-quantum encrypted file relay. The components relevant to local

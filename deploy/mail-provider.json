@@ -1,8 +1,0 @@
-{
-  "_": "Welke maildrager productie echt gebruikt. De code kan er meer (relay/lib/mail.js, PROVIDERS), de site mag alleen deze noemen als huidige mailprovider. Omschakelen gaat in deze volgorde: sleutels in de prod-.env, dit bestand, dan /privacy, /dpa en de rest van de site in beide talen. tests/mail-provider-site.test.mjs houdt die drie gelijk.",
-  "actief": "resend",
-  "naam": "Resend Inc.",
-  "land": "Verenigde Staten",
-  "prod_sleutels": ["RESEND_API_KEY"],
-  "bron": "prod-.env heeft alleen RESEND-sleutels en geen MAIL_PROVIDER; de relay logt dat de Mailjet-sleutels ontbreken en dat resend alles draagt. Vastgesteld 2026-09-23."
-}

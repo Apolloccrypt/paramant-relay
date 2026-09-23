@@ -51,18 +51,22 @@ x-relay-env: &relay-env
   LOG_LEVEL: "${LOG_LEVEL:-info}"
   # ── Who carries the mail ────────────────────────────────────────────────
   # MAIL_PROVIDER picks one of: mailjet, scaleway, resend, dryrun. Empty means
-  # mailjet. Anything MISSPELLED falls back to dryrun and delivers nothing, so
-  # the relay logs mail_misconfigured at boot rather than letting that run
-  # quietly; check that line after any change here.
+  # the first carrier whose keys are present (relay/lib/mail.js, VOORKEUR).
+  # Anything MISSPELLED falls back to dryrun and delivers nothing, so the relay
+  # logs mail_misconfigured at boot rather than letting that run quietly; check
+  # that line after any change here.
   #
-  # Mailjet SAS (Paris, owned by Sinch AB of Sweden) keeps every mail inside
-  # the EU, which is what this product sells. Resend is a US company and is
-  # kept only as a way back while the new sender reputation builds.
+  # Which carrier production uses is not decided here but in
+  # deploy/partners.json (status actief), and tests/partners.test.mjs holds this
+  # file to it: with the production keys, the default and the fallback below
+  # must land on an active party. Until 23-09-2026 this said "mailjet" while
+  # Mailjet had no account and no keys; every mail first failed on Mailjet and
+  # then went out through Resend.
   #
   # The relay reads all of these by name, so they need a line here: .env only
   # substitutes ${VAR} into this file, there is no env_file, and a variable
   # that is not listed never reaches a container.
-  MAIL_PROVIDER: "${MAIL_PROVIDER:-mailjet}"
+  MAIL_PROVIDER: "${MAIL_PROVIDER:-}"
   # A SECOND carrier, on a different company, tried only when the first refuses.
   # The outage that actually happens to transactional mail is not a network
   # blip, it is an account suspension: both large providers suspend new senders
@@ -70,14 +74,10 @@ x-relay-env: &relay-env
   # support queue measured in days. Our mail carries pickup codes and signing
   # links, so that is not an inconvenience. Empty means no fallback.
   #
-  # DEFAULT resend, and that is the safe order during the switch, not a
-  # preference. The day this branch rolls out, MAILJET_API_KEY may not exist
-  # yet: the account has to be opened by hand. Without a fallback the relay
-  # would then come up with mail_misconfigured and every invitation, pickup
-  # code and signing link would silently stop. With resend behind it, the old
-  # carrier keeps the product running until the Mailjet keys land, and the
-  # moment they do the primary takes over on its own.
-  MAIL_FALLBACK_PROVIDER: "${MAIL_FALLBACK_PROVIDER:-resend}"
+  # DEFAULT empty. A fallback is only worth something on a carrier that is
+  # active in deploy/partners.json and has its keys in the production .env;
+  # set it there and here together.
+  MAIL_FALLBACK_PROVIDER: "${MAIL_FALLBACK_PROVIDER:-}"
   MAIL_FROM: "${MAIL_FROM:-PARAMANT <noreply@paramant.app>}"
   MAILJET_API_KEY: "${MAILJET_API_KEY:-}"
   MAILJET_SECRET_KEY: "${MAILJET_SECRET_KEY:-}"
@@ -375,8 +375,8 @@ services:
       # The admin server mails too (invoices, with a PDF attached), and it uses
       # the same lib/mail.js. Listing only RESEND_API_KEY here meant the admin
       # kept mailing through the US carrier after the relay had moved off it.
-      MAIL_PROVIDER: "${MAIL_PROVIDER:-mailjet}"
-      MAIL_FALLBACK_PROVIDER: "${MAIL_FALLBACK_PROVIDER:-resend}"
+      MAIL_PROVIDER: "${MAIL_PROVIDER:-}"
+      MAIL_FALLBACK_PROVIDER: "${MAIL_FALLBACK_PROVIDER:-}"
       MAIL_FROM: "${MAIL_FROM:-PARAMANT <noreply@paramant.app>}"
       MAILJET_API_KEY: "${MAILJET_API_KEY:-}"
       MAILJET_SECRET_KEY: "${MAILJET_SECRET_KEY:-}"

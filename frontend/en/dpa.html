@@ -291,15 +291,16 @@ input:focus{border-color:var(--cobalt)}
     <thead><tr><th>Sub-processor</th><th>Location</th><th>Purpose</th><th>Data transferred</th></tr></thead>
     <tbody>
       <tr><td>Hetzner Online GmbH</td><td>Germany (NBG1)</td><td>Infrastructure hosting</td><td>Encrypted transfer payloads in RAM; encrypted ParaSign document capsules persist until the envelope expires: 30 days unless the request asks for another term, and never longer than 365 days</td></tr>
-      <tr><td>Resend Inc.</td><td>US (Standard Contractual Clauses)</td><td>Transactional email: account and billing notices, signing invitations, and invitations to collect a file sent to named recipients</td><td>The recipient email address, the subject and the message. For a signing invitation, the complete personal access link. For a send to named recipients, the file name chosen by the Controller, and a one-time link that does not by itself open the file. No document plaintext and no encryption key</td></tr>
+      <tr><td>Resend (Plus Five Five, Inc.)</td><td>US (Standard Contractual Clauses)</td><td>Transactional email: account and billing notices, signing invitations, and invitations to collect a file sent to named recipients</td><td>The recipient email address, the subject and the message. For a signing invitation, the complete personal access link. For a send to named recipients, the file name chosen by the Controller, and a one-time link that does not by itself open the file. No document plaintext and no encryption key</td></tr>
       <tr><td>Mollie B.V.</td><td>Netherlands (EU)</td><td>Payment processing for paid plans</td><td>The amount, a plan description, and the payment metadata the relay sets: accountId, product, plan, interval. No email address is sent while recurring billing is off, which is how production runs. Card details are entered on Mollie&rsquo;s own pages and never reach Paramantis</td></tr>
-      <tr><td>Moneybird B.V.</td><td>Netherlands (EU)</td><td>Bookkeeping, only where the operator has connected an administration</td><td>The invoice or credit note: number, date, description, amounts and VAT, the billing details entered by the Controller (company name, invoice address, VAT number), the email address, and the PDF of the document. No transfer, file or signature data</td></tr>
+      <tr data-partner-context="moneybird voorwaardelijk"><td>Moneybird B.V.</td><td>Netherlands (EU)</td><td>Bookkeeping, only where the operator has connected an administration</td><td>The invoice or credit note: number, date, description, amounts and VAT, the billing details entered by the Controller (company name, invoice address, VAT number), the email address, and the PDF of the document. No transfer, file or signature data</td></tr>
     </tbody>
   </table>
+  <p>Current status of each sub-processor, with what it receives and never receives: <a href="/en/partners">/en/partners</a>.</p>
   <p>Paramantis will notify the Controller at least 14 days in advance of any intended changes to sub-processors, giving the Controller the opportunity to object.</p>
 
   <h2 id="transfers">6. International transfers</h2>
-  <p><strong>One transfer outside the EEA: transactional email.</strong> All relay infrastructure is in the EU (Hetzner DE, NBG1). Email (only the email address and the invite link, never the document or a key) still goes through Resend Inc. in the United States for now. The transfer is covered by Standard Contractual Clauses (Commission Implementing Decision (EU) 2021/914). Payments run through Mollie B.V. and bookkeeping through Moneybird B.V., both in the Netherlands. No other personal data is transferred outside the EEA.</p>
+  <p><strong>One transfer outside the EEA: transactional email.</strong> All relay infrastructure is in the EU (Hetzner DE, NBG1). Email (only the email address and the invite link, never the document or a key) still goes through Resend Inc. in the United States for now. The transfer is covered by Standard Contractual Clauses (Commission Implementing Decision (EU) 2021/914). Payments run through Mollie B.V. in the Netherlands.<span data-partner-context="moneybird voorwaardelijk"> Bookkeeping runs through Moneybird B.V., also in the Netherlands, only where the operator has connected an administration.</span> No other personal data is transferred outside the EEA.</p>
   <p>That is the one exception in the chain; we are moving to a Dutch provider. It joins the list in section 5 only once the contract is in place, and you hear about it at least 14 days in advance.</p>
 
   <h2 id="security">7. Technical and organisational measures (Article 32)</h2>
@@ -406,6 +407,7 @@ input:focus{border-color:var(--cobalt)}
           <a href="/en/terms">Terms of Service</a>
           <a href="/en/sla">SLA</a>
           <a href="/en/license">License</a>
+          <a href="/en/partners">Partners</a>
         </div>
       </div>
     </div>

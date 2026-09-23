@@ -50,9 +50,11 @@ NEW_MOBILE = '''\
 
 # Footer template - the site-map footer is gone. What stays is the company
 # behind the product plus the legal documents a visitor has a right to find.
-# Everything else (status, press, self-host, partners) is reachable from the
-# four nav links or from the pages they lead to; a footer is not a second
-# navigation.
+# Everything else (status, press, self-host) is reachable from the four nav
+# links or from the pages they lead to; a footer is not a second navigation.
+# /partners is the exception: every outside party the service depends on, with
+# its status, read from deploy/partners.json. It sits with the legal documents
+# because /privacy and /dpa point at it.
 NEW_FOOTER = '''\
 <footer>
   <div class="container-lg">
@@ -77,6 +79,7 @@ NEW_FOOTER = '''\
           <a href="/terms">Terms of Service</a>
           <a href="/sla">SLA</a>
           <a href="/license">License</a>
+          <a href="/partners">Partners</a>
         </div>
       </div>
     </div>
@@ -233,6 +236,7 @@ NEW_FOOTER_NL = '''\
           <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
           <a href="/license">Licentie</a>
+          <a href="/partners">Partners</a>
         </div>
       </div>
     </div>
@@ -244,12 +248,12 @@ NEW_FOOTER_NL = '''\
 # second navigation.
 LEGAL_STRIP = '''\
 <footer class="legal-strip">
-  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
+  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a><span class="legal-sep">&middot;</span><a href="/partners">Partners</a>
 </footer>'''
 
 LEGAL_STRIP_NL = '''\
 <footer class="legal-strip">
-  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a>
+  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a><span class="legal-sep">&middot;</span><a href="/partners">Partners</a>
 </footer>'''
 
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=31">'

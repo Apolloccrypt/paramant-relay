@@ -766,8 +766,7 @@ ok('the ParaSend limits on both product pages come from relay/lib/tiers.js (' +
 // A feature bullet quoted from /pricing has to stay a quote, and the two pages
 // have to carry the same one. It says what the mail carries, not where the
 // carrier sits: which company sends the mail is pinned in one place,
-// deploy/mail-provider.json, and tests/mail-provider-site.test.mjs holds every
-// page to it. On 2026-09-23 this bullet still said "carried inside the EU"
+// deploy/partners.json, and tests/partners.test.mjs holds every page to it. On 2026-09-23 this bullet still said "carried inside the EU"
 // while production mailed through Resend in the US; that may not recur.
 for (const line of ['Email notifications (only the address and the link, never the file)']) {
   assert(html.includes(line), '/pricing lost the feature line: ' + line);
@@ -776,10 +775,14 @@ for (const line of ['Email notifications (only the address and the link, never t
 ok('the ParaSend Pro feature bullets quoted from /pricing are still quotes');
 
 // No page may promise EU-only mail while the active carrier is outside the EU.
-const mailProvider = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'deploy', 'mail-provider.json'), 'utf8'));
-const actief = String(mailProvider.actief || mailProvider.active || '').toLowerCase();
-const EU_CARRIERS = new Set(['lettermint', 'mailjet', 'scaleway', 'brevo', 'flowmailer']);
-if (!EU_CARRIERS.has(actief)) {
+const partnersJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'deploy', 'partners.json'), 'utf8'));
+const mailActief = partnersJson.partijen.filter((p) => p.rol === 'mail' && p.status === 'actief');
+const actief = mailActief.map((p) => p.id).join(', ') || '(geen)';
+// EU/EER-landcodes; een drager zonder bekend land telt als buiten de EU.
+const EU_LANDEN = new Set(['AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT',
+  'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK']);
+assert(mailActief.length > 0, 'deploy/partners.json has no active mail carrier');
+if (!mailActief.every((p) => EU_LANDEN.has(p.land && p.land.code))) {
   for (const [naam, pagina] of [['pricing', html], ['pricing-nl', htmlNl], ['parasend', productHtml.parasend]]) {
     assert(!/carried inside the EU|verstuurd binnen de EU|mail (stays|blijft) (in|binnen) de EU/i.test(pagina),
       naam + ' promises EU-only mail while the active carrier (' + actief + ') is outside the EU');

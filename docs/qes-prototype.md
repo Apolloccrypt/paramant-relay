@@ -2,6 +2,8 @@
 
 This is a working prototype of a QES layer for ParaSign. It is off by default and
 it changes nothing about signing until `PARASIGN_QES_PROVIDER` names a provider.
+Cleverbase and the DigiCert timestamp service stand in `deploy/partners.json` as
+`in-code-niet-actief`; switching this on means moving them to `actief` there.
 It exists to answer one question without a contract: does a qualified signature
 fit next to what ParaSign already does, or does it need the product rebuilt?
 

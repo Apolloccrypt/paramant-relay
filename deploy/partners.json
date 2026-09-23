@@ -1,0 +1,827 @@
+{
+  "_": [
+    "Elke externe partij waar Paramant van afhangt, met wat productie echt gebruikt. Dit bestand is de enige bron: de site (/partners, /privacy, /dpa en elke pagina die een partij noemt), de code (relay/lib/mail.js, qes, moneybird) en de sleutels op productie worden ertegen getoetst door tests/partners.test.mjs.",
+    "status: actief = productie gebruikt hem nu; in-code-niet-actief = de code kent hem, maar productie heeft er geen sleutels voor (op de site: In voorbereiding); uitgefaseerd = niet meer in gebruik, met datum in 'tot'.",
+    "Omschakelen (voorbeeld: mail van Resend naar Lettermint): 1. sleutels van de nieuwe partij in de prod-.env en in docker-compose.yml; 2. hier de nieuwe partij op actief, de oude op uitgefaseerd met 'tot', en haar sleutels onder 'dode_resten' met een opruimdatum zolang ze nog op de server staan; 3. /privacy en /dpa in beide talen, en elke pagina die de oude noemt; 4. frontend/partners.json gelijk maken aan dit bestand (cp). De test wijst aan wat nog niet klopt. Volledige uitleg: RUNBOOK.md, sectie Partners.",
+    "Een naam van een niet-actieve partij mag op de site alleen binnen een element met data-partner-context=\"<id> <reden>\" (reden: voorwaardelijk, historie, gepland, geen-partij). Zo is elke uitzondering zichtbaar in de html en in de diff.",
+    "Geen waarden van sleutels, alleen namen. Juridische naam, land en moederbedrijf alleen met bron; anders null en 'onbekend' in bronnen."
+  ],
+  "gewijzigd": "2026-09-23",
+  "statussen": {
+    "actief": { "nl": "Actief", "en": "Active" },
+    "in-code-niet-actief": { "nl": "In voorbereiding", "en": "In preparation" },
+    "uitgefaseerd": { "nl": "Uitgefaseerd", "en": "Phased out" }
+  },
+  "rollen": {
+    "hosting": { "nl": "Hosting en infrastructuur", "en": "Hosting and infrastructure", "woorden": ["server", "hosting", "infrastructu"] },
+    "dns": { "nl": "DNS", "en": "DNS", "woorden": ["DNS"] },
+    "domeinregistratie": { "nl": "Domeinregistratie", "en": "Domain registration", "woorden": ["domein", "domain", "registrar"] },
+    "tls": { "nl": "TLS-certificaten", "en": "TLS certificates", "woorden": ["TLS", "certifica"] },
+    "mail": { "nl": "Transactionele e-mail", "en": "Transactional email", "woorden": ["e-mail", "email", "mail"] },
+    "mailbox": { "nl": "Mailbox voor inkomende mail", "en": "Mailbox for incoming mail", "woorden": ["mailbox", "e-mail", "email"] },
+    "betaling": { "nl": "Betalingen", "en": "Payments", "woorden": ["betaal", "betaling", "afrekenen", "payment", "checkout"] },
+    "boekhouding": { "nl": "Boekhouding", "en": "Bookkeeping", "woorden": ["boekhouding", "bookkeeping"] },
+    "gekwalificeerde-handtekening": { "nl": "Gekwalificeerde elektronische handtekening", "en": "Qualified electronic signature", "woorden": ["gekwalificeerd", "qualified", "QES"] },
+    "tijdstempel": { "nl": "Tijdstempel (TSA)", "en": "Timestamp authority (TSA)", "woorden": ["tijdstempel", "timestamp", "TSA"] },
+    "code-hosting": { "nl": "Broncode en CI", "en": "Source code and CI", "woorden": ["GitHub", "broncode", "source", "workflow", "CI"] },
+    "container-registry": { "nl": "Container-images", "en": "Container images", "woorden": ["image", "Docker"] },
+    "pakketregister": { "nl": "Pakketregister", "en": "Package registry", "woorden": ["npm", "pakket", "package"] },
+    "monitoring": { "nl": "Monitoring", "en": "Monitoring", "woorden": ["monitoring"] },
+    "automatisering": { "nl": "Automatisering", "en": "Automation", "woorden": ["automat", "workflow"] },
+    "ai": { "nl": "AI-dienst", "en": "AI service", "woorden": ["AI", "model"] },
+    "cdn": { "nl": "CDN en DNS", "en": "CDN and DNS", "woorden": ["CDN", "DNS"] },
+    "edge-hosting": { "nl": "Edge-hosting", "en": "Edge hosting", "woorden": ["edge", "hosting"] }
+  },
+  "partijen": [
+    {
+      "id": "hetzner",
+      "naam": "Hetzner Online GmbH",
+      "handelsnaam": "Hetzner",
+      "site_namen": ["\\bHetzner\\b"],
+      "rol": "hosting",
+      "land": { "nl": "Duitsland", "en": "Germany", "code": "DE" },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": {
+        "nl": "Alles wat op de server staat: versleutelde overdrachten in RAM, versleutelde documentcapsules van Ondertekenen, accountgegevens (e-mailadres, plan), logs en de configuratie van de server.",
+        "en": "Everything on the server: encrypted transfers in RAM, encrypted ParaSign document capsules, account data (email address, plan), logs and the server configuration."
+      },
+      "nooit": {
+        "nl": "Leesbare documenten of bestanden, en de sleutels van gebruikers: die worden in de browser gemaakt en komen niet op de server.",
+        "en": "Readable documents or files, and users' keys: they are made in the browser and never reach the server."
+      },
+      "subverwerker": true,
+      "status": "actief",
+      "sinds": null,
+      "tot": null,
+      "sleutels": [],
+      "sleutels_optioneel": [],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": [],
+      "code": [],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "frontend/dpa.html, artikel 5; hetzner.com/legal/legal-notice (Hetzner Online GmbH, Gunzenhausen), gezien 2026-09-23",
+        "land": "hetzner.com/legal/legal-notice: Industriestr. 25, 91710 Gunzenhausen, Duitsland; datacenter NBG1 volgens frontend/dpa.html",
+        "moederbedrijf": "onbekend",
+        "status": "deploy/de-server.json: productie-ip 116.203.86.81; audit 2026-09-23 (vault Rapporten/Paramant audit), externe accounts",
+        "sinds": "onbekend; al in gebruik bij de eerste commit (2026-04-01)",
+        "dpa_url": "onbekend; Hetzner biedt de verwerkersovereenkomst in het klantpaneel aan, geen openbare link gezien"
+      }
+    },
+    {
+      "id": "bunny",
+      "naam": "BunnyWay d.o.o.",
+      "handelsnaam": "Bunny.net",
+      "site_namen": ["\\bBunny\\b"],
+      "rol": "dns",
+      "land": { "nl": "Slovenië", "en": "Slovenia", "code": "SI" },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": {
+        "nl": "De DNS-records van paramant.app, en de opzoekingen van resolvers naar die naam.",
+        "en": "The DNS records of paramant.app, and resolvers' lookups of that name."
+      },
+      "nooit": {
+        "nl": "Pagina's, bestanden, documenten of sleutels: Bunny is hier geen CDN of proxy, er gaat geen verzoek doorheen.",
+        "en": "Pages, files, documents or keys: Bunny is not a CDN or proxy here, no request passes through it."
+      },
+      "subverwerker": false,
+      "subverwerker_toelichting": "Verwerkt geen persoonsgegevens namens klanten; staat voor de volledigheid wel in de lijst op /privacy. Oordeel: waarschijnlijk, juridisch niet getoetst.",
+      "status": "actief",
+      "sinds": "2026-06-24",
+      "tot": null,
+      "sleutels": [],
+      "sleutels_optioneel": [],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": [],
+      "code": [],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "bunny.net/tos: BunnyWay d.o.o., Dunajska cesta 165, 1000 Ljubljana, gezien 2026-09-23",
+        "land": "bunny.net/tos",
+        "moederbedrijf": "onbekend",
+        "status": "dig NS paramant.app: kiki.bunny.net, coco.bunny.net (2026-09-23); docs/migration-bunny.md",
+        "sinds": "commit 4733749a (2026-06-24): migratie van Cloudflare afgerond; exacte omzetdatum niet vastgelegd",
+        "dpa_url": "bunny.net/gdpr: de DPA staat in het bunny.net-paneel, geen openbare link"
+      }
+    },
+    {
+      "id": "key-systems",
+      "naam": "Key-Systems LLC",
+      "handelsnaam": "Key-Systems",
+      "site_namen": ["\\bKey-Systems\\b"],
+      "rol": "domeinregistratie",
+      "land": { "nl": "onbekend", "en": "unknown", "code": null },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": {
+        "nl": "De registratie van paramant.app en de gegevens van de houder.",
+        "en": "The registration of paramant.app and the registrant's details."
+      },
+      "nooit": {
+        "nl": "Klantgegevens, documenten of sleutels.",
+        "en": "Customer data, documents or keys."
+      },
+      "subverwerker": false,
+      "status": "actief",
+      "sinds": null,
+      "tot": null,
+      "sleutels": [],
+      "sleutels_optioneel": [],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": [],
+      "code": [],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "RDAP pubapi.registry.google/rdap/domain/paramant.app, rol registrar, 2026-09-23",
+        "land": "onbekend; RDAP geeft geen land",
+        "moederbedrijf": "onbekend",
+        "status": "RDAP 2026-09-23; domein geregistreerd 2026-03-25 (actor cloudflare), laatst gewijzigd 2026-07-04",
+        "sinds": "onbekend; tussen 2026-03-25 en 2026-07-04",
+        "dpa_url": "onbekend"
+      }
+    },
+    {
+      "id": "letsencrypt",
+      "naam": "Internet Security Research Group",
+      "handelsnaam": "Let's Encrypt",
+      "site_namen": ["Let.s Encrypt"],
+      "rol": "tls",
+      "land": { "nl": "Verenigde Staten", "en": "United States", "code": "US" },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": {
+        "nl": "De hostnamen van paramant.app, voor het certificaat. Die zijn openbaar via Certificate Transparency.",
+        "en": "The hostnames of paramant.app, for the certificate. They are public through Certificate Transparency."
+      },
+      "nooit": {
+        "nl": "Verkeer, bestanden, documenten, accountgegevens of de privésleutel van het certificaat.",
+        "en": "Traffic, files, documents, account data or the certificate's private key."
+      },
+      "subverwerker": false,
+      "status": "actief",
+      "sinds": null,
+      "tot": null,
+      "sleutels": [],
+      "sleutels_optioneel": [],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": [],
+      "code": ["deploy/caddy/Caddyfile", "scripts/paramant-tls-bootstrap.sh"],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "letsencrypt.org/about: Let's Encrypt wordt uitgegeven door de Internet Security Research Group (ISRG)",
+        "land": "letsencrypt.org/about (ISRG, Verenigde Staten)",
+        "moederbedrijf": "onbekend",
+        "status": "deploy/de-server.json cert.uitgever; deploy/caddy/Caddyfile regel tls /etc/letsencrypt/...",
+        "sinds": "onbekend",
+        "dpa_url": "geen: ISRG verwerkt geen persoonsgegevens voor Paramant"
+      }
+    },
+    {
+      "id": "resend",
+      "naam": "Plus Five Five, Inc.",
+      "handelsnaam": "Resend",
+      "site_namen": ["\\bResend\\b"],
+      "rol": "mail",
+      "land": { "nl": "Verenigde Staten", "en": "United States", "code": "US" },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": {
+        "nl": "Het e-mailadres van de ontvanger, het onderwerp en het bericht met de link. Bij een verzending naar genoemde ontvangers ook de bestandsnaam die de afzender koos.",
+        "en": "The recipient's email address, the subject and the message with the link. For a send to named recipients also the file name the sender chose."
+      },
+      "nooit": {
+        "nl": "Het document of bestand zelf, en geen sleutel: de sleutel die het bestand opent blijft ingepakt bij ons.",
+        "en": "The document or file itself, and no key: the key that opens the file stays wrapped with us."
+      },
+      "subverwerker": true,
+      "status": "actief",
+      "sinds": "2026-04-01",
+      "tot": null,
+      "sleutels": ["RESEND_API_KEY"],
+      "sleutels_optioneel": [],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": "https://resend.com/legal/dpa",
+      "hosts": ["api.resend.com"],
+      "code": ["relay/lib/mail.js"],
+      "code_keuze": { "module": "relay/lib/mail.js", "naam_in_code": "resend" },
+      "onderaannemers": [
+        { "naam": "Amazon Web Services (Amazon SES)", "zekerheid": "waarschijnlijk", "bron": "SPF van paramant.app bevat include:amazonses.com (dig TXT, 2026-09-23); deploy/.env.example noemt amazonses.com als Resend" }
+      ],
+      "bronnen": {
+        "naam": "resend.com/legal/dpa: \"Plus Five Five, Inc. ('Company' or 'Resend')\", San Francisco, gezien 2026-09-23. De site schreef 'Resend Inc.'; die entiteit bestaat niet onder die naam in de DPA.",
+        "land": "resend.com/legal/dpa (San Francisco, CA)",
+        "moederbedrijf": "onbekend",
+        "status": "prod-.env heeft RESEND_API_KEY en geen MAIL_PROVIDER (sleutelnamen gelezen 2026-09-23); PR #500",
+        "sinds": "eerste commit met RESEND_API_KEY: 6cb717bb (2026-04-01); mogelijk eerder",
+        "dpa_url": "resend.com/legal/dpa, gezien 2026-09-23"
+      }
+    },
+    {
+      "id": "proton",
+      "naam": "Proton AG",
+      "handelsnaam": "Proton",
+      "site_namen": ["\\bProton(?:mail| Mail)?\\b"],
+      "rol": "mailbox",
+      "land": { "nl": "Zwitserland", "en": "Switzerland", "code": "CH" },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": {
+        "nl": "Mail die mensen naar @paramant.app sturen, zoals privacy@paramant.app, met wat de afzender erin zet.",
+        "en": "Mail people send to @paramant.app, such as privacy@paramant.app, with whatever the sender puts in it."
+      },
+      "nooit": {
+        "nl": "Overdrachten, documenten of sleutels van de dienst: de relay praat niet met Proton.",
+        "en": "Transfers, documents or keys of the service: the relay does not talk to Proton."
+      },
+      "subverwerker": false,
+      "subverwerker_toelichting": "Mailbox voor de eigen correspondentie van Paramantis, geen verwerking namens klanten onder de DPA. Vermoeden, juridisch niet getoetst.",
+      "status": "actief",
+      "sinds": null,
+      "tot": null,
+      "sleutels": [],
+      "sleutels_optioneel": [],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": [],
+      "code": [],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "vermoeden: Proton AG is de uitgever van Proton Mail; niet in een contract gezien",
+        "land": "vermoeden: Genève, Zwitserland; niet nagekeken",
+        "moederbedrijf": "onbekend",
+        "status": "dig MX paramant.app: mail.protonmail.ch, mailsec.protonmail.ch; SPF include:_spf.protonmail.ch (2026-09-23)",
+        "sinds": "onbekend",
+        "dpa_url": "onbekend"
+      }
+    },
+    {
+      "id": "mollie",
+      "naam": "Mollie B.V.",
+      "handelsnaam": "Mollie",
+      "site_namen": ["\\bMollie\\b"],
+      "rol": "betaling",
+      "land": { "nl": "Nederland", "en": "Netherlands", "code": "NL" },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": {
+        "nl": "Het bedrag, een omschrijving van het plan en betaalmetadata (accountId, product, plan, interval). Kaartgegevens voert de klant in op de pagina's van Mollie.",
+        "en": "The amount, a plan description and payment metadata (accountId, product, plan, interval). Card details are entered on Mollie's own pages."
+      },
+      "nooit": {
+        "nl": "Documenten, bestanden of sleutels, en geen e-mailadres zolang terugkerende betaling uit staat.",
+        "en": "Documents, files or keys, and no email address while recurring billing is off."
+      },
+      "subverwerker": true,
+      "status": "actief",
+      "sinds": "2026-08-08",
+      "tot": null,
+      "sleutels": ["MOLLIE_API_KEY"],
+      "sleutels_optioneel": ["MOLLIE_TEST_API_KEY", "BILLING_MODE"],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": "https://www.mollie.com/legal/data-processing-agreement",
+      "hosts": ["api.mollie.com"],
+      "code": ["relay/lib/mollie.js"],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "mollie.com/legal/data-processing-agreement: Mollie B.V., Keizersgracht 126, Amsterdam, KvK 30204462, gezien 2026-09-23",
+        "land": "idem",
+        "moederbedrijf": "onbekend",
+        "status": "prod-.env heeft MOLLIE_API_KEY (2026-09-23); deploy/DEPLOY-3.1.md: live_-prefix",
+        "sinds": "waarschijnlijk: deploy/DEPLOY-3.1.md noemt de one-off checkout 'as since 08-08'; code sinds 04fc72d6 (2026-06-24)",
+        "dpa_url": "mollie.com/legal/data-processing-agreement, gezien 2026-09-23"
+      }
+    },
+    {
+      "id": "github",
+      "naam": "GitHub, Inc.",
+      "handelsnaam": "GitHub",
+      "site_namen": ["\\bGitHub\\b"],
+      "rol": "code-hosting",
+      "land": { "nl": "Verenigde Staten", "en": "United States", "code": "US" },
+      "moederbedrijf": "Microsoft Corporation",
+      "moederbedrijf_land": { "nl": "Verenigde Staten", "en": "United States", "code": "US" },
+      "gegevens": {
+        "nl": "De openbare broncode, de CI-runs, en de namen van CI-geheimen. De admin leest de openbare GitHub-API zonder sleutel voor de statuspagina.",
+        "en": "The public source code, the CI runs, and the names of CI secrets. The admin reads the public GitHub API without a key for the status page."
+      },
+      "nooit": {
+        "nl": "Klantgegevens, documenten, bestanden of productiesleutels.",
+        "en": "Customer data, documents, files or production keys."
+      },
+      "subverwerker": false,
+      "status": "actief",
+      "sinds": "2026-04-01",
+      "tot": null,
+      "sleutels": [],
+      "sleutels_optioneel": [],
+      "ci_geheimen": ["PARAMANT_CANARY_KEY", "PARASIGN_CANARY_KEY", "PARAMANT_INTERNAL_AUTH_TOKEN"],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": ["github.com", "api.github.com"],
+      "code": ["admin/lib/stand-io.js", ".github/workflows/test.yml"],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "github.com/Apolloccrypt/paramant-relay",
+        "land": "Verenigde Staten; algemeen bekend, niet in een contract gezien",
+        "moederbedrijf": "news.microsoft.com, 4 juni 2018: Microsoft to acquire GitHub",
+        "status": ".github/workflows; admin/lib/stand-io.js",
+        "sinds": "eerste commit 6cb717bb (2026-04-01)",
+        "dpa_url": "geen: GitHub verwerkt geen klantgegevens voor Paramant"
+      }
+    },
+    {
+      "id": "docker",
+      "naam": "Docker, Inc.",
+      "handelsnaam": "Docker Hub",
+      "site_namen": ["Docker Hub"],
+      "rol": "container-registry",
+      "land": { "nl": "Verenigde Staten", "en": "United States", "code": "US" },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": {
+        "nl": "De openbare images van de relay (gepubliceerd door CI). Productie haalt er het redis-image vandaan; de relay zelf wordt op de server gebouwd.",
+        "en": "The public relay images (published by CI). Production pulls the redis image from it; the relay itself is built on the server."
+      },
+      "nooit": {
+        "nl": "Klantgegevens, documenten, bestanden of productiesleutels.",
+        "en": "Customer data, documents, files or production keys."
+      },
+      "subverwerker": false,
+      "status": "actief",
+      "sinds": "2026-04-08",
+      "tot": null,
+      "sleutels": [],
+      "sleutels_optioneel": [],
+      "ci_geheimen": ["DOCKERHUB_USERNAME", "DOCKERHUB_TOKEN"],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": ["get.docker.com", "docs.docker.com"],
+      "code": [".github/workflows/docker-publish.yml", "docker-compose.yml"],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "vermoeden: Docker, Inc. is de uitgever van Docker Hub; niet in een contract gezien",
+        "land": "vermoeden: Verenigde Staten",
+        "moederbedrijf": "onbekend",
+        "status": ".github/workflows/docker-publish.yml (docker/login-action); docker-compose.yml redis:7.4.8-alpine",
+        "sinds": "commit 8c2f2dfc (2026-04-08): Docker Hub image",
+        "dpa_url": "geen: Docker verwerkt geen klantgegevens voor Paramant"
+      }
+    },
+    {
+      "id": "npm",
+      "naam": "npm, Inc.",
+      "handelsnaam": "npm",
+      "site_namen": [],
+      "rol": "pakketregister",
+      "land": { "nl": "Verenigde Staten", "en": "United States", "code": "US" },
+      "moederbedrijf": "GitHub, Inc.",
+      "moederbedrijf_land": { "nl": "Verenigde Staten", "en": "United States", "code": "US" },
+      "gegevens": {
+        "nl": "Verzoeken om pakketten bij elke build (npm ci), op de server en in CI.",
+        "en": "Package requests on every build (npm ci), on the server and in CI."
+      },
+      "nooit": {
+        "nl": "Klantgegevens, documenten, bestanden of productiesleutels.",
+        "en": "Customer data, documents, files or production keys."
+      },
+      "subverwerker": false,
+      "status": "actief",
+      "sinds": "2026-04-01",
+      "tot": null,
+      "sleutels": [],
+      "sleutels_optioneel": [],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": [],
+      "code": ["relay/package-lock.json", "package-lock.json"],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "vermoeden: npm, Inc. beheert registry.npmjs.org",
+        "land": "vermoeden: Verenigde Staten",
+        "moederbedrijf": "github.blog, maart 2020: npm is joining GitHub",
+        "status": "package-lock.json: resolved https://registry.npmjs.org/...; deploy-3.1.sh docker compose build",
+        "sinds": "eerste commit (2026-04-01)",
+        "dpa_url": "geen"
+      }
+    },
+    {
+      "id": "moneybird",
+      "naam": "Moneybird B.V.",
+      "handelsnaam": "Moneybird",
+      "site_namen": ["\\bMoneybird\\b"],
+      "rol": "boekhouding",
+      "land": { "nl": "Nederland", "en": "Netherlands", "code": "NL" },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": {
+        "nl": "Alleen als een administratie is gekoppeld: de factuur of creditnota (nummer, datum, bedragen, btw), de factuurgegevens van de klant, het e-mailadres en de pdf.",
+        "en": "Only once an administration is connected: the invoice or credit note (number, date, amounts, VAT), the customer's billing details, the email address and the PDF."
+      },
+      "nooit": {
+        "nl": "Overdrachten, bestanden, documenten, handtekeningen of sleutels.",
+        "en": "Transfers, files, documents, signatures or keys."
+      },
+      "subverwerker": true,
+      "status": "in-code-niet-actief",
+      "sinds": null,
+      "tot": null,
+      "sleutels": ["MONEYBIRD_TOKEN", "MONEYBIRD_ADMINISTRATION_ID"],
+      "sleutels_optioneel": [],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": ["moneybird.com"],
+      "code": ["relay/lib/moneybird.js"],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "frontend/dpa.html artikel 5 (Moneybird B.V.)",
+        "land": "frontend/dpa.html artikel 5",
+        "moederbedrijf": "onbekend",
+        "status": "prod-.env heeft geen MONEYBIRD-sleutels (2026-09-23); relay/lib/moneybird.js doet niets zonder beide",
+        "sinds": "code sinds e01dae1a (2026-09-03); nooit aangezet",
+        "dpa_url": "onbekend; moneybird.nl/verwerkersovereenkomst gaf 404 op 2026-09-23"
+      }
+    },
+    {
+      "id": "cleverbase",
+      "naam": null,
+      "handelsnaam": "Cleverbase",
+      "site_namen": ["\\bCleverbase\\b"],
+      "rol": "gekwalificeerde-handtekening",
+      "land": { "nl": "Nederland", "en": "Netherlands", "code": "NL" },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": {
+        "nl": "Alleen als het aanstaat: de hash van het document en de identiteit van de ondertekenaar voor een gekwalificeerde handtekening.",
+        "en": "Only when switched on: the document hash and the signer's identity for a qualified signature."
+      },
+      "nooit": {
+        "nl": "Het document zelf of de sleutels van Paramant.",
+        "en": "The document itself or Paramant's keys."
+      },
+      "subverwerker": true,
+      "status": "in-code-niet-actief",
+      "sinds": null,
+      "tot": null,
+      "sleutels": ["PARASIGN_QES_PROVIDER", "CLEVERBASE_CLIENT_ID", "CLEVERBASE_CLIENT_SECRET"],
+      "sleutels_optioneel": ["CLEVERBASE_BASE_URL", "CLEVERBASE_REDIRECT_URI"],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": ["connect.cleverbase.com", "connect.acc.cleverbase.com", "cleverbase.com"],
+      "code": ["relay/lib/qes/index.js", "relay/lib/qes/cleverbase.js"],
+      "code_keuze": { "module": "relay/lib/qes/index.js", "naam_in_code": "cleverbase" },
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "onbekend; cleverbase.com toont alleen '© Cleverbase' (2026-09-23)",
+        "land": "waarschijnlijk: Nederlandse gekwalificeerde vertrouwensdienst; niet nagekeken in het KvK-register",
+        "moederbedrijf": "onbekend",
+        "status": "prod-.env heeft geen PARASIGN_QES_PROVIDER (2026-09-23); relay/lib/qes/index.js: leeg is uit",
+        "sinds": "code sinds 4221d662 (2026-09-03), achter een vlag",
+        "dpa_url": "onbekend"
+      }
+    },
+    {
+      "id": "digicert",
+      "naam": "DigiCert, Inc.",
+      "handelsnaam": "DigiCert",
+      "site_namen": ["\\bDigiCert\\b"],
+      "rol": "tijdstempel",
+      "land": { "nl": "Verenigde Staten", "en": "United States", "code": "US" },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": {
+        "nl": "Alleen als gekwalificeerd ondertekenen aanstaat: een hash om een tijdstempel op te zetten.",
+        "en": "Only when qualified signing is switched on: a hash to timestamp."
+      },
+      "nooit": {
+        "nl": "Het document, de naam van de ondertekenaar of een sleutel.",
+        "en": "The document, the signer's name or a key."
+      },
+      "subverwerker": false,
+      "status": "in-code-niet-actief",
+      "sinds": null,
+      "tot": null,
+      "sleutels": [],
+      "sleutels_optioneel": ["QES_TSA_URL"],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": ["timestamp.digicert.com"],
+      "code": ["relay/lib/qes/tsa.js"],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "vermoeden: DigiCert, Inc. beheert timestamp.digicert.com",
+        "land": "vermoeden: Verenigde Staten",
+        "moederbedrijf": "onbekend",
+        "status": "relay/lib/qes/tsa.js DEFAULT_TSA_URL; alleen gebruikt als PARASIGN_QES_PROVIDER staat, en dat staat niet op productie",
+        "sinds": "code sinds 4221d662 (2026-09-03)",
+        "dpa_url": "geen: een hash is geen persoonsgegeven"
+      }
+    },
+    {
+      "id": "mailjet",
+      "naam": "Mailjet SAS",
+      "handelsnaam": "Mailjet",
+      "site_namen": ["\\bMailjet\\b"],
+      "rol": "mail",
+      "land": { "nl": "Frankrijk", "en": "France", "code": "FR" },
+      "moederbedrijf": "Sinch AB",
+      "moederbedrijf_land": { "nl": "Zweden", "en": "Sweden", "code": "SE" },
+      "gegevens": {
+        "nl": "Zou dezelfde gegevens krijgen als Resend nu: adres, onderwerp, bericht met link.",
+        "en": "Would receive what Resend receives now: address, subject, message with link."
+      },
+      "nooit": {
+        "nl": "Documenten, bestanden of sleutels.",
+        "en": "Documents, files or keys."
+      },
+      "subverwerker": true,
+      "status": "in-code-niet-actief",
+      "sinds": null,
+      "tot": null,
+      "sleutels": ["MAILJET_API_KEY", "MAILJET_SECRET_KEY"],
+      "sleutels_optioneel": [],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": ["api.mailjet.com", "app.mailjet.com"],
+      "code": ["relay/lib/mail.js"],
+      "code_keuze": { "module": "relay/lib/mail.js", "naam_in_code": "mailjet" },
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "deploy/.env.example (Mailjet SAS, Parijs)",
+        "land": "deploy/.env.example",
+        "moederbedrijf": "sinch.com/news/sinch-acquires-mailgun-and-mailjet (overname Pathwire, afgerond december 2021)",
+        "status": "geen MAILJET-sleutels in de prod-.env (2026-09-23); PR #500: nooit aangezet",
+        "sinds": "code sinds 6bfde5e1 (2026-09-22)",
+        "dpa_url": "onbekend"
+      }
+    },
+    {
+      "id": "scaleway",
+      "naam": "Scaleway SAS",
+      "handelsnaam": "Scaleway",
+      "site_namen": ["\\bScaleway\\b"],
+      "rol": "mail",
+      "land": { "nl": "Frankrijk", "en": "France", "code": "FR" },
+      "moederbedrijf": "iliad SA",
+      "moederbedrijf_land": { "nl": "Frankrijk", "en": "France", "code": "FR" },
+      "gegevens": {
+        "nl": "Zou dezelfde gegevens krijgen als Resend nu: adres, onderwerp, bericht met link.",
+        "en": "Would receive what Resend receives now: address, subject, message with link."
+      },
+      "nooit": {
+        "nl": "Documenten, bestanden of sleutels.",
+        "en": "Documents, files or keys."
+      },
+      "subverwerker": true,
+      "status": "in-code-niet-actief",
+      "sinds": null,
+      "tot": null,
+      "sleutels": ["SCALEWAY_SECRET_KEY", "SCALEWAY_PROJECT_ID"],
+      "sleutels_optioneel": ["SCALEWAY_REGION"],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": ["api.scaleway.com"],
+      "code": ["relay/lib/mail.js"],
+      "code_keuze": { "module": "relay/lib/mail.js", "naam_in_code": "scaleway" },
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "waarschijnlijk: Scaleway SAS; relay/lib/mail.js noemt Scaleway",
+        "land": "scaleway.com/en/about-us",
+        "moederbedrijf": "scaleway.com/en/news: 'Scaleway, part of the iliad Group'",
+        "status": "geen SCALEWAY-sleutels in de prod-.env (2026-09-23)",
+        "sinds": "code sinds 6bfde5e1 (2026-09-22)",
+        "dpa_url": "onbekend"
+      }
+    },
+    {
+      "id": "stripe",
+      "naam": null,
+      "handelsnaam": "Stripe",
+      "site_namen": ["\\bStripe\\b"],
+      "rol": "betaling",
+      "land": { "nl": "onbekend", "en": "unknown", "code": null },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": { "nl": "Niets meer.", "en": "Nothing any more." },
+      "nooit": { "nl": "Documenten, bestanden of sleutels.", "en": "Documents, files or keys." },
+      "subverwerker": false,
+      "status": "uitgefaseerd",
+      "sinds": null,
+      "tot": "2026-06-24",
+      "sleutels": ["STRIPE_SECRET_KEY", "STRIPE_DEVICE_PRICE_ID"],
+      "sleutels_optioneel": [],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": ["api.stripe.com"],
+      "code": ["deploy/paramant-admin.py"],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "onbekend welke Stripe-entiteit",
+        "land": "onbekend",
+        "moederbedrijf": "onbekend",
+        "status": "commit 04fc72d6 (2026-06-24): replace Stripe with Mollie everywhere. Code-rest: deploy/paramant-admin.py stripe_add_device",
+        "sinds": "onbekend",
+        "dpa_url": "n.v.t."
+      }
+    },
+    {
+      "id": "cloudflare",
+      "naam": "Cloudflare, Inc.",
+      "handelsnaam": "Cloudflare",
+      "site_namen": ["\\bCloudflare\\b"],
+      "rol": "cdn",
+      "land": { "nl": "Verenigde Staten", "en": "United States", "code": "US" },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": { "nl": "Niets meer.", "en": "Nothing any more." },
+      "nooit": { "nl": "Niets meer; DNS en verkeer lopen er niet meer langs.", "en": "Nothing any more; DNS and traffic no longer pass through it." },
+      "subverwerker": false,
+      "status": "uitgefaseerd",
+      "sinds": null,
+      "tot": "2026-06-24",
+      "sleutels": [],
+      "sleutels_optioneel": [],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": [],
+      "code": [],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "docs/migration-bunny.md",
+        "land": "docs/migration-bunny.md: 'Cloudflare is a US company'",
+        "moederbedrijf": "onbekend",
+        "status": "docs/migration-bunny.md: nameservers bunny.net, geen cf-ray (gemeten 2026-09-02)",
+        "sinds": "onbekend",
+        "dpa_url": "n.v.t."
+      }
+    },
+    {
+      "id": "fly",
+      "naam": null,
+      "handelsnaam": "Fly.io",
+      "site_namen": ["\\bFly\\.io\\b"],
+      "rol": "edge-hosting",
+      "land": { "nl": "onbekend", "en": "unknown", "code": null },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": { "nl": "Niets bekend; er draait niets meer.", "en": "Nothing known; nothing runs there any more." },
+      "nooit": { "nl": "Klantgegevens van de huidige dienst.", "en": "Customer data of the current service." },
+      "subverwerker": false,
+      "status": "uitgefaseerd",
+      "sinds": null,
+      "tot": null,
+      "sleutels": ["FLY_API_TOKEN"],
+      "sleutels_optioneel": [],
+      "ci_geheimen": [],
+      "dode_resten": [{ "sleutel": "FLY_API_TOKEN", "opruimen_voor": "2026-10-31" }],
+      "dpa_url": null,
+      "hosts": ["paramant-ghost-pipe.fly.dev"],
+      "code": ["scripts/paramant-sender.py"],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "onbekend",
+        "land": "onbekend",
+        "moederbedrijf": "onbekend",
+        "status": "FLY_API_TOKEN in de prod-.env, door geen code gelezen (audit 2026-09-23, dode rest); scripts/paramant-sender.py noemt nog paramant-ghost-pipe.fly.dev",
+        "sinds": "onbekend",
+        "dpa_url": "n.v.t."
+      }
+    },
+    {
+      "id": "anthropic",
+      "naam": "Anthropic, PBC",
+      "handelsnaam": "Anthropic",
+      "site_namen": ["\\bAnthropic\\b"],
+      "rol": "ai",
+      "land": { "nl": "Verenigde Staten", "en": "United States", "code": "US" },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": { "nl": "Niets: geen code roept het nog aan.", "en": "Nothing: no code calls it any more." },
+      "nooit": { "nl": "Klantgegevens, documenten of sleutels.", "en": "Customer data, documents or keys." },
+      "subverwerker": false,
+      "status": "uitgefaseerd",
+      "sinds": "2026-04-09",
+      "tot": null,
+      "sleutels": ["ANTHROPIC_API_KEY"],
+      "sleutels_optioneel": [],
+      "ci_geheimen": [],
+      "dode_resten": [{ "sleutel": "ANTHROPIC_API_KEY", "opruimen_voor": "2026-10-31" }],
+      "dpa_url": null,
+      "hosts": [],
+      "code": [],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "vermoeden: Anthropic, PBC",
+        "land": "vermoeden: Verenigde Staten",
+        "moederbedrijf": "onbekend",
+        "status": "ANTHROPIC_API_KEY in de prod-.env (2026-09-23); git grep in HEAD vindt geen lezer",
+        "sinds": "commit 496ec547 (2026-04-09): integrations stack met Claude AI",
+        "dpa_url": "n.v.t."
+      }
+    },
+    {
+      "id": "grafana",
+      "naam": null,
+      "handelsnaam": "Grafana",
+      "site_namen": ["\\bGrafana\\b"],
+      "rol": "monitoring",
+      "land": { "nl": "zelf gehost", "en": "self-hosted", "code": null },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": { "nl": "Niets: zelf gehoste software, draait niet.", "en": "Nothing: self-hosted software, not running." },
+      "nooit": { "nl": "Klantgegevens.", "en": "Customer data." },
+      "subverwerker": false,
+      "status": "uitgefaseerd",
+      "sinds": "2026-04-09",
+      "tot": null,
+      "sleutels": ["GRAFANA_USER", "GRAFANA_PASSWORD"],
+      "sleutels_optioneel": [],
+      "ci_geheimen": [],
+      "dode_resten": [
+        { "sleutel": "GRAFANA_USER", "opruimen_voor": "2026-10-31" },
+        { "sleutel": "GRAFANA_PASSWORD", "opruimen_voor": "2026-10-31" }
+      ],
+      "dpa_url": null,
+      "hosts": [],
+      "code": [],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "onbekend; n.v.t., zelf gehoste software en geen externe verwerker",
+        "land": "n.v.t.",
+        "moederbedrijf": "onbekend",
+        "status": "GRAFANA_* in de prod-.env (2026-09-23), door geen code gelezen; /changelog noemt Grafana als gepland",
+        "sinds": "commit 496ec547 (2026-04-09)",
+        "dpa_url": "n.v.t."
+      }
+    },
+    {
+      "id": "n8n",
+      "naam": null,
+      "handelsnaam": "n8n",
+      "site_namen": ["\\bn8n\\b"],
+      "rol": "automatisering",
+      "land": { "nl": "zelf gehost", "en": "self-hosted", "code": null },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": { "nl": "Niets: zelf gehoste software, draait niet.", "en": "Nothing: self-hosted software, not running." },
+      "nooit": { "nl": "Klantgegevens.", "en": "Customer data." },
+      "subverwerker": false,
+      "status": "uitgefaseerd",
+      "sinds": "2026-04-09",
+      "tot": null,
+      "sleutels": ["N8N_USER", "N8N_PASSWORD"],
+      "sleutels_optioneel": [],
+      "ci_geheimen": [],
+      "dode_resten": [
+        { "sleutel": "N8N_USER", "opruimen_voor": "2026-10-31" },
+        { "sleutel": "N8N_PASSWORD", "opruimen_voor": "2026-10-31" }
+      ],
+      "dpa_url": null,
+      "hosts": [],
+      "code": [],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "onbekend; n.v.t., zelf gehoste software en geen externe verwerker",
+        "land": "n.v.t.",
+        "moederbedrijf": "onbekend",
+        "status": "N8N_* in de prod-.env (2026-09-23), door geen code gelezen",
+        "sinds": "commit 496ec547 (2026-04-09)",
+        "dpa_url": "n.v.t."
+      }
+    }
+  ],
+  "overwogen": [
+    { "id": "lettermint", "naam": "Lettermint", "site_namen": ["\\bLettermint\\b"], "bron": "RUNBOOK.md, voorbeeld van omschakelen; nooit gecontracteerd" },
+    { "id": "brevo", "naam": "Brevo", "site_namen": ["\\bBrevo\\b"], "bron": "tests/mail-provider-site.test.mjs (PR #500) sloot hem uit; nooit gebruikt" },
+    { "id": "flowmailer", "naam": "Flowmailer", "site_namen": ["\\bFlowmailer\\b"], "bron": "idem" }
+  ],
+  "niet_opgenomen": [
+    { "hosts": ["api.ipify.org", "ifconfig.me"], "reden": "Hulpscripts voor wie zelf host (scripts/paramant-ip.sh, paramant-tls-bootstrap.sh) vragen het eigen publieke ip op. Draait niet op productie." },
+    { "hosts": ["api.osv.dev"], "reden": "CI-controle op kwetsbare pakketten (scripts/security/posture.sh). Krijgt alleen pakketnamen en versies." },
+    { "hosts": ["cdn.jsdelivr.net"], "reden": "Handmatig script om xterm naar frontend/vendor te kopiëren (scripts/paramant-update-vendor.sh). De site laadt niets van derden." },
+    { "hosts": ["cache.nixos.org"], "reden": "Bereikbaarheidsproef in het installatiescript voor wie zelf host." },
+    { "hosts": ["registry.company.nl"], "reden": "Voorbeeld-url in scripts/paramant-cra.sh." },
+    { "hosts": ["www.w3.org", "csrc.nist.gov", "english.ncsc.nl"], "reden": "Verwijzingen en xml-namespaces, geen verbinding." },
+    { "hosts": [], "reden": "Google Registry (.app) is de registry, geen partij waarmee Paramantis een contract heeft. Microsoft en Google als platform voor de Outlook- en Gmail-extensie: de gebruiker brengt die zelf mee." }
+  ]
+}

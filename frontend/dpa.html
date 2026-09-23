@@ -268,15 +268,16 @@ input:focus{border-color:var(--cobalt)}
     <thead><tr><th>Subverwerker</th><th>Locatie</th><th>Doel</th><th>Overgedragen gegevens</th></tr></thead>
     <tbody>
       <tr><td>Hetzner Online GmbH</td><td>Duitsland (NBG1)</td><td>Hosting van infrastructuur</td><td>Versleutelde inhoud van overdrachten in RAM; versleutelde documentcapsules van Ondertekenen blijven bewaard tot de envelop verloopt: 30 dagen, tenzij het verzoek een andere termijn vraagt, en nooit langer dan 365 dagen</td></tr>
-      <tr><td>Resend Inc.</td><td>Verenigde Staten (standaardcontractbepalingen)</td><td>Transactionele e-mail: berichten over account en facturatie, uitnodigingen om te ondertekenen, en uitnodigingen om een bestand op te halen dat naar genoemde ontvangers is verstuurd</td><td>Het e-mailadres van de ontvanger, het onderwerp en het bericht. Bij een uitnodiging om te ondertekenen: de volledige persoonlijke toegangslink. Bij een verzending naar genoemde ontvangers: de bestandsnaam die de verwerkingsverantwoordelijke koos, en een eenmalige link die het bestand niet zelf opent. Geen leesbare documenttekst en geen encryptiesleutel</td></tr>
+      <tr><td>Resend (Plus Five Five, Inc.)</td><td>Verenigde Staten (standaardcontractbepalingen)</td><td>Transactionele e-mail: berichten over account en facturatie, uitnodigingen om te ondertekenen, en uitnodigingen om een bestand op te halen dat naar genoemde ontvangers is verstuurd</td><td>Het e-mailadres van de ontvanger, het onderwerp en het bericht. Bij een uitnodiging om te ondertekenen: de volledige persoonlijke toegangslink. Bij een verzending naar genoemde ontvangers: de bestandsnaam die de verwerkingsverantwoordelijke koos, en een eenmalige link die het bestand niet zelf opent. Geen leesbare documenttekst en geen encryptiesleutel</td></tr>
       <tr><td>Mollie B.V.</td><td>Nederland (EU)</td><td>Betalingsverwerking voor betaalde abonnementen</td><td>Het bedrag, een omschrijving van het abonnement en de betalingsmetadata die de relay meegeeft: accountId, product, plan, interval. Er wordt geen e-mailadres verstuurd zolang terugkerende betaling uit staat, en zo draait productie. Kaartgegevens worden ingevoerd op de eigen pagina's van Mollie en bereiken Paramantis nooit</td></tr>
-      <tr><td>Moneybird B.V.</td><td>Nederland (EU)</td><td>Boekhouding, alleen als de exploitant een administratie heeft gekoppeld</td><td>De factuur of creditnota: nummer, datum, omschrijving, bedragen en btw, de factuurgegevens die de verwerkingsverantwoordelijke invoerde (bedrijfsnaam, factuuradres, btw-nummer), het e-mailadres en de pdf van het document. Geen gegevens over overdrachten, bestanden of handtekeningen</td></tr>
+      <tr data-partner-context="moneybird voorwaardelijk"><td>Moneybird B.V.</td><td>Nederland (EU)</td><td>Boekhouding, alleen als de exploitant een administratie heeft gekoppeld</td><td>De factuur of creditnota: nummer, datum, omschrijving, bedragen en btw, de factuurgegevens die de verwerkingsverantwoordelijke invoerde (bedrijfsnaam, factuuradres, btw-nummer), het e-mailadres en de pdf van het document. Geen gegevens over overdrachten, bestanden of handtekeningen</td></tr>
     </tbody>
   </table>
+  <p>Actuele status van elke subverwerker, met wat ze krijgen en wat nooit: <a href="/partners">/partners</a>.</p>
   <p>Paramantis meldt de verwerkingsverantwoordelijke beoogde wijzigingen in subverwerkers minstens 14 dagen vooraf, zodat de verwerkingsverantwoordelijke bezwaar kan maken.</p>
 
   <h2 id="transfers">6. Internationale doorgifte</h2>
-  <p><strong>Eén doorgifte buiten de EER: transactionele e-mail.</strong> Alle relay-infrastructuur staat in de EU (Hetzner DE, NBG1). E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten. De doorgifte is gedekt door de standaardcontractbepalingen (Uitvoeringsbesluit (EU) 2021/914 van de Europese Commissie). Betalingen lopen via Mollie B.V. en de boekhouding via Moneybird B.V., beide in Nederland. Er worden geen andere persoonsgegevens buiten de EER doorgegeven.</p>
+  <p><strong>Eén doorgifte buiten de EER: transactionele e-mail.</strong> Alle relay-infrastructuur staat in de EU (Hetzner DE, NBG1). E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten. De doorgifte is gedekt door de standaardcontractbepalingen (Uitvoeringsbesluit (EU) 2021/914 van de Europese Commissie). Betalingen lopen via Mollie B.V. in Nederland.<span data-partner-context="moneybird voorwaardelijk"> De boekhouding loopt alleen via Moneybird B.V., ook in Nederland, als de exploitant een administratie heeft gekoppeld.</span> Er worden geen andere persoonsgegevens buiten de EER doorgegeven.</p>
   <p>Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Die komt pas op de lijst in artikel 5 als het contract er is, en u hoort het minstens 14 dagen vooraf.</p>
 
   <h2 id="security">7. Technische en organisatorische maatregelen (artikel 32)</h2>
@@ -383,6 +384,7 @@ input:focus{border-color:var(--cobalt)}
           <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
           <a href="/license">Licentie</a>
+          <a href="/partners">Partners</a>
         </div>
       </div>
     </div>

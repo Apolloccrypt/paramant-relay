@@ -1741,7 +1741,7 @@ test('every third party the server code calls is named on /privacy and /dpa', ()
   // en haalde de rij weg. Mailjet is nooit aangezet: productie mailt via
   // Resend Inc. in de VS. Sinds 23 september staat de rij er weer, en zolang
   // hij er staat mag geen enkele pagina beweren dat er geen Amerikaanse partij
-  // in de keten zit. Welke drager actief is, staat in deploy/mail-provider.json.
+  // in de keten zit. Welke drager actief is, staat in deploy/partners.json.
   const usRow = /<tr><td>([^<]+)<\/td><td>US[^<]*<\/td>/.exec(page('en/dpa'))
     || /<tr><td>([^<]+)<\/td><td>(?:VS|Verenigde Staten)[^<]*<\/td>/.exec(page('dpa'));
   if (usRow) {

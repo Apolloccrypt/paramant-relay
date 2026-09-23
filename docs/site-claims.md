@@ -10,6 +10,9 @@ exists are gone; the pages that replaced them are read here.
 40 public pages under `frontend/` (44 since the English copies under `frontend/en/` of 23 September 2026). Every factual claim on them, with the test
 that pins it or the word UNCOVERED.
 
+Which outside party a page may name as current is not in this file: it is
+`deploy/partners.json`, pinned by `tests/partners.test.mjs`.
+
 Rows 23 to 36 came out of a pass over the legal pages (/privacy, /dpa, /terms,
 /license) and the retention and sub-processor claims on /security and /parasend,
 3 September 2026, plus the review round that followed it. What that pass could

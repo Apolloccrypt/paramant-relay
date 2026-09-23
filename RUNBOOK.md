@@ -31,10 +31,6 @@ the server, in files on the server, or in the accounts below.
 | `ADMIN_TOTP_SECRET` | second factor of the admin login |
 | `TOTP_SECRET` | relay-side TOTP |
 
-Switching mail carrier: put the new keys in the production `.env` first, then
-update `deploy/mail-provider.json` (`actief`, `naam`, `land`, `prod_sleutels`),
-then /privacy, /dpa and every page that names the carrier, in both languages.
-`tests/mail-provider-site.test.mjs` fails while those three disagree.
 | `PARAMANT_TOTP_MASTER_KEY` | encrypts the stored user TOTP secrets |
 | `RECIPIENT_HASH_KEY` | keyed hash of recipient addresses |
 | `REDIS_PASSWORD` | redis, read by `docker-compose.yml` |
@@ -57,9 +53,13 @@ file that reads it.
 
 ### External accounts
 
-Hetzner (the server), Bunny (DNS), the domain registrar, GitHub (code, CI,
-heartbeat secrets), Mollie (payments), Resend (mail). Who holds the logins and
-the second factors is kept outside this repo.
+Every outside party, with its status, the key names that belong to it and a
+source for each claim, is in [deploy/partners.json](deploy/partners.json)
+(section 7 below). The accounts with a login: Hetzner (the server), Bunny
+(DNS), the registrar (Key-Systems, per RDAP), Proton (the mailbox behind the
+MX), GitHub (code, CI, heartbeat secrets), Docker Hub (images), Mollie
+(payments), Resend (mail). Who holds the logins and the second factors is kept
+outside this repo.
 
 ### Escrow
 
@@ -250,3 +250,80 @@ write down what differs.
   summarise a diff or draft a text. It is a helper, never an operator: nothing
   it proposes is run on the server without a person reading the command
   first, and nothing it writes is merged without the checks above.
+
+## 7. Partners: adding, switching or retiring an outside party
+
+`deploy/partners.json` is the one source for every outside party Paramant
+depends on: hosting, DNS, registrar, TLS, mail, payments, bookkeeping, code
+hosting, images, and the ones the code knows but production does not use. The
+public page `/partners` reads a copy of it (`frontend/partners.json`), and
+`tests/partners.test.mjs` holds the site, the code and the production `.env`
+to it. Each party has a `status`: `actief` (production uses it now),
+`in-code-niet-actief` (the code knows it, production has no keys; shown as "In
+preparation") or `uitgefaseerd` (gone, with the date in `tot`).
+
+### The order, always
+
+1. **Keys on production.** Put the new party's keys in
+   `/opt/paramant-relay/.env` **[server]**, and make sure
+   `docker-compose.yml` passes each name to the container: `.env` only fills in
+   `${VAR}`, a name not listed never arrives.
+2. **partners.json.** Set the status, the key names (`sleutels`), `sinds` or
+   `tot`, the legal name, country, parent company and `dpa_url`, each with a
+   line under `bronnen`. Unknown stays `null` with `"onbekend"`. Then
+   `cp deploy/partners.json frontend/partners.json`.
+3. **The site.** `/privacy` and `/dpa` in both languages (the list under
+   Subverwerkers/Subprocessors and the table in article 5), then every page the
+   test names. A sub-processor change is announced to customers 14 days
+   ahead (DPA article 5); step 3 is when that clock starts.
+4. **Run** `node --test tests/partners.test.mjs`. It names what still
+   disagrees. For the production half, from the admin machine:
+
+   ```bash
+   # [admin]
+   PARTNERS_PROD_SSH=root@<server> PARTNERS_PROD_SSH_KEY=~/.ssh/<key> \
+     node --test tests/partners.test.mjs
+   ```
+
+   It reads key **names** only (`cut -d= -f1`), never values. Without those
+   variables that part is skipped with a message; CI has no key, so it skips
+   there too. A skip is not a pass.
+
+### Example: mail from Resend to Lettermint
+
+Lettermint is a Dutch transactional mail provider (lettermint.co). The code
+does not know it yet, so this switch starts in the code:
+
+1. Add a `lettermint` sender to `relay/lib/mail.js` (`PROVIDERS`, the key
+   names, the request), with its tests. Add its key to `docker-compose.yml`.
+   Add a party `lettermint` to `partners.json` with status
+   `in-code-niet-actief`, `code_keuze` pointing at `relay/lib/mail.js`, and
+   remove it from `overwogen`. The test now fails until that is consistent.
+2. After the contract: the key into the production `.env`, and `MAIL_PROVIDER`
+   stays empty so the code picks the carrier whose keys are present, or set it
+   to `lettermint` explicitly.
+3. `partners.json`: `lettermint` to `actief` with `sinds`; `resend` to
+   `uitgefaseerd` with `tot`, and while `RESEND_API_KEY` is still on the server
+   list it under `dode_resten` with an `opruimen_voor` date. The test goes red
+   on that date if the key is still there.
+4. The site: the Resend line out of `/privacy` and `/dpa` (both languages),
+   Lettermint in with its legal name and country, and every sentence the test
+   flags ("gaat nu nog via Resend Inc. in de Verenigde Staten" and its English
+   twin on home, /security, /press, /rules, /parasend, /parasign, /help).
+5. Remove `RESEND_API_KEY` from the server, then its `dode_resten` line.
+
+### Naming a non-active party on the site
+
+Only inside an element with `data-partner-context="<id> <reason>"`, reason one
+of `voorwaardelijk` (e.g. Moneybird: only when an administration is connected),
+`historie`, `gepland` or `geen-partij` (the name appears but not as our
+supplier, e.g. DigiCert in the ownership paragraph on home). The test rejects a
+marker on an element that no longer contains the name.
+
+### Dead keys on production today
+
+`ANTHROPIC_API_KEY`, `FLY_API_TOKEN`, `GRAFANA_USER`, `GRAFANA_PASSWORD`,
+`N8N_USER`, `N8N_PASSWORD`: read by no code, listed as `dode_resten` with
+`opruimen_voor` 2026-10-31. Remove them from `/opt/paramant-relay/.env`
+**[server]** (backup first), then their lines in `partners.json`.
+
