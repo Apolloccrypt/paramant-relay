@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Check a signed document or a delivery receipt · Paramant</title>
+<title>Check a signed document or a delivery receipt | Paramant</title>
 <meta property="og:site_name" content="Paramant">
 <!-- Which product path this page describes. tests/crypto-claims.test.mjs holds every
      algorithm this page names against the code that runs on that path, instead of
@@ -12,7 +12,7 @@
      that does not run it, is the class of untrue sentence that reads as a fact. -->
 <meta name="paramant:path" content="signing">
 <meta name="description" content="Check a signed document, or the receipt that proves a file was delivered. Both happen in your browser, without an account and without uploading anything.">
-<meta property="og:title" content="Check a signed document or a delivery receipt · Paramant">
+<meta property="og:title" content="Check a signed document or a delivery receipt | Paramant">
 <meta property="og:description" content="Check a signed document, or the receipt that proves a file was delivered. Both happen in your browser, without an account and without uploading anything.">
 <meta property="og:url" content="https://paramant.app/en/verify">
 <meta property="og:type" content="website">
@@ -20,7 +20,7 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Check a signed document or a delivery receipt · Paramant">
+<meta name="twitter:title" content="Check a signed document or a delivery receipt | Paramant">
 <meta name="twitter:description" content="Check a signed document, or the receipt that proves a file was delivered. Both happen in your browser, without an account and without uploading anything.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/en/verify">
@@ -41,7 +41,7 @@
       "@type": "WebPage",
       "@id": "https://paramant.app/en/verify#webpage",
       "url": "https://paramant.app/en/verify",
-      "name": "Check a signed document or a delivery receipt · Paramant",
+      "name": "Check a signed document or a delivery receipt | Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -191,7 +191,7 @@
       <li>The signer's ML-DSA-65 signature over that hash is valid</li>
       <li>The envelope has not expired</li>
     </ul>
-    <p class="ps-help">Signatures verify entirely in your browser &mdash; no account, no API key, works offline.</p>
+    <p class="ps-help">Signatures are checked entirely in your browser. No account, no API key, and it works offline.</p>
     <p><a href="/dashboard">Open your dashboard &rarr;</a></p>
   </aside>
   </div>
@@ -199,7 +199,7 @@
   <div id="panel-receipt" role="tabpanel" aria-labelledby="tab-receipt" hidden>
     <section class="card ps-panel" aria-labelledby="r1">
       <div class="ps-panel-head"><span class="ps-step">1</span><h2 id="r1" class="ps-panel-title">The receipt</h2></div>
-      <p class="ps-help">A delivery receipt is the small block of text you get when a file you sent is picked up. It says which file was handed over, at what moment, and whether the copy on the server was destroyed.</p>
+      <p class="ps-help">A delivery receipt is the small block of text you get when a file you sent is picked up. It says which file was handed over, when, and whether the copy on the server was destroyed.</p>
       <label class="rv-drop" id="rv-drop">
         <input type="file" id="rv-file" accept=".txt,.json,.receipt,application/json,text/plain">
         <span class="rv-drop-cta">Drop the receipt file here, or choose one</span>
@@ -233,9 +233,9 @@
         <li>The receipt is about the file it names and no other</li>
         <li>The entry it points to really sits in the public transparency log</li>
         <li>The signature over the whole receipt holds, so nothing was altered</li>
-        <li>The log snapshot the receipt leans on was signed too</li>
+        <li>The log snapshot the receipt relies on was signed too</li>
       </ul>
-      <p class="ps-help">All four run on this device. Once the page has loaded you can pull the plug and the answer is the same.</p>
+      <p class="ps-help">All four run on this device. Once the page has loaded, you can go offline and the answer stays the same.</p>
     </aside>
   </div>
 </main>

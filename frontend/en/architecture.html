@@ -4,20 +4,20 @@
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Architecture · How Paramant works</title>
+<title>Architecture: how encrypted file transfer works | Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="A plain-language walkthrough: how your file is encrypted in the browser, how it travels, why the relay cannot read it, and what happens when a link opens.">
-<meta property="og:title" content="Architecture · How Paramant works">
-<meta property="og:description" content="A plain-language walkthrough: how your file is encrypted in the browser, how it travels, why the relay cannot read it, and what happens when a link opens.">
+<meta name="description" content="A plain-language walkthrough of how your file is encrypted in the browser, how it travels, why the relay cannot read it, and what happens when a link opens.">
+<meta property="og:title" content="Architecture: how encrypted file transfer works | Paramant">
+<meta property="og:description" content="A plain-language walkthrough of how your file is encrypted in the browser, how it travels, why the relay cannot read it, and what happens when a link opens.">
 <meta property="og:url" content="https://paramant.app/en/architecture">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Architecture · How Paramant works">
-<meta name="twitter:description" content="A plain-language walkthrough: how your file is encrypted in the browser, how it travels, why the relay cannot read it, and what happens when a link opens.">
+<meta name="twitter:title" content="Architecture: how encrypted file transfer works | Paramant">
+<meta name="twitter:description" content="A plain-language walkthrough of how your file is encrypted in the browser, how it travels, why the relay cannot read it, and what happens when a link opens.">
 <link rel="canonical" href="https://paramant.app/en/architecture">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/architecture">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/architecture">
@@ -275,7 +275,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       "@type": "WebPage",
       "@id": "https://paramant.app/en/architecture#webpage",
       "url": "https://paramant.app/en/architecture",
-      "name": "Architecture · How Paramant works",
+      "name": "Architecture: how encrypted file transfer works | Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -283,7 +283,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "A plain-language walkthrough: how your file is encrypted in the browser, how it travels, why the relay cannot read it, and what happens when a link opens."
+      "description": "A plain-language walkthrough of how your file is encrypted in the browser, how it travels, why the relay cannot read it, and what happens when a link opens."
     },
     {
       "@type": "BreadcrumbList",
@@ -423,7 +423,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <rect x="250" y="76" width="140" height="52" rx="2" class="d-slot-bad"/>
         <text x="320" y="98" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-bad">████████████</text>
         <text x="320" y="114" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-bad">opaque ciphertext</text>
-        <text x="320" y="146" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">RAM only &mdash; no disk write</text>
+        <text x="320" y="146" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">RAM only, no disk write</text>
         <text x="320" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">no key, no plaintext</text>
 
         <!-- Arrow 2→3 -->
@@ -472,7 +472,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">02</div>
     <h2 class="section-title">What we see</h2>
-    <p class="section-desc">Most cloud services store your file, index it, preview it. Paramant's relay sits in the middle and sees almost nothing. Here is the difference.</p>
+    <p class="section-desc">Many cloud services store your file, index it and make previews of it. Paramant's relay sits in the middle and sees almost nothing. Here is the difference.</p>
 
     <div class="compare-grid">
       <div class="compare-col compare-col--bad">
@@ -481,7 +481,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
           <li>Readable file contents (stored in plaintext or decryptable by the provider)</li>
           <li>Filename and metadata logged</li>
           <li>Preview thumbnail generated server-side</li>
-          <li>Written to disk &mdash; survives restarts, subpoenas, breaches</li>
+          <li>Written to disk: survives restarts, subpoenas, breaches</li>
           <li>Access logs tied to content</li>
           <li>Subject to legal disclosure orders</li>
         </ul>
@@ -489,18 +489,18 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <div class="compare-col compare-col--good">
         <h3>Paramant relay</h3>
         <ul>
-          <li>Ciphertext only &mdash; we cannot read it</li>
+          <li>Ciphertext only: we cannot read it</li>
           <li>No filename, no metadata</li>
-          <li>No preview possible &mdash; opaque bytes</li>
-          <li>RAM only &mdash; relay restart destroys everything</li>
-          <li>Nothing to disclose &mdash; we hold no plaintext</li>
+          <li>No preview possible: opaque bytes</li>
+          <li>RAM only: a relay restart destroys everything</li>
+          <li>Nothing to disclose: we hold no plaintext</li>
           <li>GDPR jurisdiction, no US CLOUD Act</li>
         </ul>
       </div>
     </div>
 
     <div class="arch-takeaway--navy">
-      <p><strong>Legal disclosure is structurally impossible.</strong> We cannot hand over what we do not have. A court order served to the relay returns: encrypted bytes, no key, no plaintext, no filename.</p>
+      <p><strong>Legal disclosure is structurally impossible.</strong> We cannot hand over what we do not have. A court order served on the relay gets encrypted bytes, no key, no plaintext and no filename.</p>
     </div>
   </div>
 </section>
@@ -510,7 +510,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">03</div>
     <h2 class="section-title">The # in the link</h2>
-    <p class="section-desc">Every Paramant link is split in two. The left half goes to the relay. The right half &mdash; the part after <code style="font-family:'IBM Plex Mono',monospace;font-size:14px;background:var(--card);padding:2px 6px;color:var(--cobalt)">#</code> &mdash; never leaves your browser. This is not a Paramant policy. It is how browsers work.</p>
+    <p class="section-desc">Every Paramant link is split in two. The left half goes to the relay. The right half (the part after <code style="font-family:'IBM Plex Mono',monospace;font-size:14px;background:var(--card);padding:2px 6px;color:var(--cobalt)">#</code>) never leaves your browser. This is not a Paramant policy. It is how browsers work.</p>
 
     <div class="url-anatomy">
       <div class="url-display">
@@ -529,7 +529,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
             <span class="url-label-dot url-label-dot--lime"></span>
             <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ok-ink)">Never leaves the browser</strong>
           </div>
-          <p class="url-label-text" style="margin-top:6px;padding-left:16px">The fragment <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code> is the decryption key. Browsers strip the fragment before making any network request. It is never transmitted to any server &mdash; including ours.</p>
+          <p class="url-label-text" style="margin-top:6px;padding-left:16px">The fragment <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code> is the decryption key. Browsers strip the fragment before making any network request. It is never sent to any server, including ours.</p>
         </div>
       </div>
     </div>
@@ -554,16 +554,16 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <div class="lifecycle-body">Ciphertext is held in relay RAM. The decryption key lives only in the URL fragment on the sender's clipboard. The relay is waiting.</div>
       </div>
       <div class="lifecycle-state lifecycle-state--active">
-        <div class="lifecycle-num">State 02 &mdash; active</div>
+        <div class="lifecycle-num">State 02 · active</div>
         <div class="lifecycle-heading">Link opened</div>
-        <div class="lifecycle-body">Recipient's browser fetches the ciphertext. The relay flags the slot for immediate erasure. Decryption happens locally using the key from <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code>. File appears in the browser.</div>
+        <div class="lifecycle-body">The recipient's browser fetches the ciphertext. The relay flags the slot for immediate erasure. Decryption happens locally using the key from <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code>. The file appears in the browser.</div>
       </div>
       <div class="lifecycle-state lifecycle-state--gone">
         <svg class="lifecycle-gone-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
           <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
           <path d="M6.5 6.5L13.5 13.5M13.5 6.5L6.5 13.5" stroke="currentColor" stroke-width="1.75"/>
         </svg>
-        <div class="lifecycle-num">State 03 &mdash; gone</div>
+        <div class="lifecycle-num">State 03 · gone</div>
         <div class="lifecycle-heading">Erased</div>
         <div class="lifecycle-body">Memory slot zeroed. Any subsequent request for that ID returns HTTP 410 Gone. No recovery, no retry, no copy anywhere on disk.</div>
       </div>
@@ -580,7 +580,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">05</div>
     <h2 class="section-title">Verifiable history</h2>
-    <p class="section-desc">Every transfer event is appended to a Merkle tree. The root fingerprint is published. Changing any historical entry would change the root &mdash; which is publicly visible and tamper-evident.</p>
+    <p class="section-desc">Every transfer event is appended to a Merkle tree. The root fingerprint is published. Changing any historical entry would change the root, and that change is publicly visible.</p>
 
     <div class="arch-diagram" role="img" aria-label="Merkle tree diagram showing root hash derived from four leaf events">
       <svg viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">
@@ -632,7 +632,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </div>
 
     <div class="arch-takeaway">
-      <p><strong>The root fingerprints the whole tree.</strong> Edit any leaf event &mdash; even by one byte &mdash; and the root hash changes. Because the root is published in the CT log, any retroactive tampering is immediately detectable. This is the same principle used by certificate transparency in TLS.</p>
+      <p><strong>The root fingerprints the whole tree.</strong> Edit any leaf event, even by one byte, and the root hash changes. Because the root is published in the CT log, any retroactive tampering is immediately detectable. This is the same principle used by certificate transparency in TLS.</p>
     </div>
   </div>
 </section>
@@ -642,7 +642,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">06</div>
     <h2 class="section-title">Where it runs</h2>
-    <p class="section-desc">One jurisdiction. One data center. No CDN caching your files. No US entity holds ciphertext or a key; the one American sub-processor sends transactional email under Standard Contractual Clauses.</p>
+    <p class="section-desc">One jurisdiction. One data centre. No CDN caching your files. No US entity holds ciphertext or a key; the one American sub-processor sends transactional email under Standard Contractual Clauses.</p>
 
     <div style="text-align:center;margin:40px 0 32px">
       <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--lime);margin-bottom:24px">HETZNER · NUREMBERG · GERMANY · EU</div>
@@ -722,7 +722,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         </tr>
         <tr>
           <td>Post-quantum safe</td>
-          <td>Yes, ML-KEM-768 defeats HNDL attacks</td>
+          <td>Yes, ML-KEM-768 protects against harvest-now-decrypt-later (HNDL) attacks</td>
         </tr>
         <tr>
           <td>Good for</td>
@@ -738,7 +738,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">08</div>
     <h2 class="section-title">Components</h2>
-    <p class="section-desc">The relay is one piece. Around it sit official SDKs, two browser extensions, and the ParaSend web app. Each surface is at a different stage of the wire-format-v1 migration. Here is the honest state today.</p>
+    <p class="section-desc">The relay is one piece. Around it sit official SDKs, two browser extensions, and the ParaSend web app. Each surface is at a different stage of the wire-format-v1 migration. This is where each one stands today.</p>
 
     <table class="modes-table">
       <thead>
@@ -756,12 +756,12 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         </tr>
         <tr>
           <td><strong>sdk-py 3.0.0</strong></td>
-          <td>Python SDK. Default ML-KEM-768 + ML-DSA-65. Negotiates via the capabilities endpoint. Live on <a href="https://pypi.org/project/paramant-sdk/">PyPI</a> &mdash; <code>pip install paramant-sdk</code>.</td>
+          <td>Python SDK. Default ML-KEM-768 + ML-DSA-65. Negotiates via the capabilities endpoint. Live on <a href="https://pypi.org/project/paramant-sdk/">PyPI</a>: <code>pip install paramant-sdk</code>.</td>
           <td>Real post-quantum (pqcrypto). Produces v1 blobs.</td>
         </tr>
         <tr>
           <td><strong>sdk-js 3.0.0</strong></td>
-          <td>JavaScript / Node SDK. Same defaults and negotiation as the Python SDK. Live on <a href="https://www.npmjs.com/package/paramant-sdk">npm</a> &mdash; <code>npm install paramant-sdk</code>.</td>
+          <td>JavaScript / Node SDK. Same defaults and negotiation as the Python SDK. Live on <a href="https://www.npmjs.com/package/paramant-sdk">npm</a>: <code>npm install paramant-sdk</code>.</td>
           <td>Real post-quantum (@noble/post-quantum). Produces v1 blobs.</td>
         </tr>
         <tr>
@@ -792,7 +792,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 <section class="arch-section arch-section--tint">
   <div class="going-deeper">
     <span class="eyebrow" style="display:block;width:fit-content;margin:0 auto 20px;text-align:center">GOING DEEPER</span>
-    <h2>Want the cryptographic specification?</h2>
+    <h2>The full cryptographic specification</h2>
     <p>The security page covers every algorithm, the independent audit results, key verification layers, authentication model, and responsible disclosure. Written for cryptographers and security engineers.</p>
     <a href="/security" class="btn-arch">Read the security spec &rarr;</a>
   </div>

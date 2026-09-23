@@ -254,13 +254,13 @@ main.acct input::placeholder { color: var(--ink-3); }
       <h3>Authenticator app</h3>
       <p>Connected. Algorithm: SHA-256, 30 seconds, 6 digits.</p>
       <button type="button" class="btn btn-secondary btn-small" id="reset-totp">Set up a new authenticator</button>
-      <p class="small mt-2">Invalidates current TOTP. You will need to scan a new QR code.</p>
+      <p class="small mt-2">Your current authenticator codes stop working. You then scan a new QR code.</p>
     </div>
     <div class="acct-block">
       <h3>Backup codes</h3>
       <p><span id="backup-count">&mdash;</span> remaining of 10.</p>
       <button type="button" class="btn btn-secondary btn-small" id="regen-backup">Regenerate all codes</button>
-      <p class="small mt-2">Current codes become invalid. New codes shown once.</p>
+      <p class="small mt-2">Your current codes stop working. The new codes are shown once.</p>
     </div>
   </div>
 </section>
@@ -269,7 +269,7 @@ main.acct input::placeholder { color: var(--ink-3); }
   <div class="acct-kicker">Passkey sign-in &middot; WebAuthn, device-bound</div>
   <h2>Passkey sign-in.</h2>
   <p class="acct-lead">
-    Sign in with Face ID, Touch ID, Windows Hello, or a security key &mdash; no code to type.
+    Sign in with Face ID, Touch ID, Windows Hello or a security key. No code to type.
     Adding a passkey is a security change, so it needs your current 6-digit TOTP code.
   </p>
   <div class="acct-block">
@@ -309,7 +309,7 @@ main.acct input::placeholder { color: var(--ink-3); }
     <div class="acct-block">
       <h3>Browser vault</h3>
       <p style="margin:0 0 12px" id="vault-status" class="small">Checking this browser...</p>
-      <p class="small"><strong>Your signing key is encrypted in this browser and unlocked only by your passkey (Face ID / Touch ID / security key). We never see it. Lose this device? Set up signing again on a new one. Your account keeps every public key, so old signatures stay verifiable.</strong></p>
+      <p class="small"><strong>Your signing key is encrypted in this browser and opened only with your passkey (Face ID / Touch ID / security key). We never see it. If you lose this device, set up signing again on a new one. Your account keeps every public key, so old signatures stay verifiable.</strong></p>
     </div>
   </div>
   <hr class="acct-divider">
@@ -317,9 +317,9 @@ main.acct input::placeholder { color: var(--ink-3); }
     <h3>Set up your signing key</h3>
     <p class="small">
       Your signing key is created here, in this browser, with ML-DSA-65 (post-quantum), and
-      only you hold it. You set it up, and unlock it every time you sign, with the SAME
+      only you hold it. You set it up, and open it each time you sign, with the same
       passkey you sign in with (Face ID, Touch ID, or a security key). No passphrase, no extra
-      code: your sign-in passkey is your signing key. No passkey on this browser? You can still
+      code: your sign-in passkey is your signing key. If this browser has no passkey, you can still
       sign at <a href="/sign">/sign</a> with your authenticator code instead.
     </p>
     <div class="acct-field">
@@ -505,7 +505,7 @@ main.acct input::placeholder { color: var(--ink-3); }
   <div class="acct-kicker">Deactivate account &middot; blocks future access</div>
   <h2>Deactivate account.</h2>
   <p class="acct-lead">
-    Deactivates your account and makes its API key unusable. Your sessions and TOTP setup are removed. The account record is retained.
+    This deactivates your account and its API key stops working. We remove your sessions and your authenticator setup. The account record is retained.
   </p>
   <button type="button" class="btn btn-danger" id="delete-account">Deactivate account</button>
 </section>

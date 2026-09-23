@@ -933,7 +933,7 @@ assert.match(pricing, /charged &euro;35\.09\/mo incl\. 21% btw/,
   'pricing.html is the source of the incl. btw figure quoted on /help');
 assert.match(helpAnswers, /ParaSign Community is free, forever, and no card is required\. It covers 2 signatures a month\./,
   'help/index.html must name the free allowance, not just promise that free exists');
-assert.match(helpAnswers, /Firm at &euro;29 a month excl\. btw \(&euro;35\.09 incl\.\)/,
+assert.match(helpAnswers, /Firm at &euro;29 a month excl\. VAT \(&euro;35\.09 incl\. VAT\)/,
   'help/index.html must name the first paid price the way /pricing prints it');
 // Proof 3 of the messaging guide, quoted from /pricing. The slogan that follows
 // it there ("Pay for volume, never for security") stays on the page that sells;

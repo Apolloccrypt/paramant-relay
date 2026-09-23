@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Crypto agility · Paramant</title>
+<title>Crypto agility: swappable post-quantum algorithms | Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
-<meta property="og:title" content="Crypto agility · Paramant">
+<meta property="og:title" content="Crypto agility: swappable post-quantum algorithms | Paramant">
 <meta property="og:site_name" content="Paramant">
 <meta name="description" content="Algorithms you can swap without rebuilding. Identifiers travel in the header, not in the code path. NIST FIPS 203, 204, 205 and 206 loaded in production.">
 <meta property="og:description" content="Algorithms you can swap without rebuilding. Identifiers travel in the header, not in the code path. NIST FIPS 203, 204, 205 and 206 loaded in production.">
@@ -16,7 +16,7 @@
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Crypto agility · Paramant">
+<meta name="twitter:title" content="Crypto agility: swappable post-quantum algorithms | Paramant">
 <meta name="twitter:description" content="Algorithms you can swap without rebuilding. Identifiers travel in the header, not in the code path. NIST FIPS 203, 204, 205 and 206 loaded in production.">
 <link rel="canonical" href="https://paramant.app/en/crypto-agility">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/crypto-agility">
@@ -176,7 +176,7 @@ section h2{display:flex;align-items:baseline;gap:11px}
       "@type": "WebPage",
       "@id": "https://paramant.app/en/crypto-agility#webpage",
       "url": "https://paramant.app/en/crypto-agility",
-      "name": "Crypto agility · Paramant",
+      "name": "Crypto agility: swappable post-quantum algorithms | Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -289,7 +289,7 @@ section h2{display:flex;align-items:baseline;gap:11px}
     The history of cryptography is a history of algorithms being broken.
     Paramant is built so the next break does not break Paramant: the relay
     carries the NIST post-quantum suite and nothing about the choice is
-    hardcoded. What it loads by default is two of them, ML-KEM-768 and
+    hardcoded. By default it loads two of them, ML-KEM-768 and
     ML-DSA-65, and that is what <code>/v2/capabilities</code> answers today.
   </p>
   <ul class="hero-stats">
@@ -337,7 +337,7 @@ FLAGS    1 byte    reserved for future features</pre>
     <p style="font-size:14px;color:var(--ink-dim);line-height:1.75">
       A v1-capable client produces a blob with its chosen KEM and SIG IDs.
       The relay validates the header and rejects unsupported combinations
-      with HTTP 415. The relay stores verbatim, serves byte-for-byte. That
+      with HTTP 415. The relay stores the blob as it is and serves it back byte for byte. That
       is what preserves zero knowledge: the relay never touches the byte
       layout. The recipient client decodes using the algorithms declared in
       the header.
@@ -461,8 +461,8 @@ FLAGS    1 byte    reserved for future features</pre>
     <p class="section-sub">Per-client status. Verified from source, not assumed.</p>
     <p style="font-size:13px;color:var(--ink-dim);line-height:1.75;margin-top:6px">
       The relay accepts wire format v1 from any client that produces it.
-      The table below is the honest state of each official client surface
-      we ship today.
+      The table below shows where each official client surface we ship
+      stands today.
     </p>
     <table class="algo-table" style="margin-top:18px">
       <thead>
@@ -520,7 +520,7 @@ FLAGS    1 byte    reserved for future features</pre>
       </tbody>
     </table>
     <p style="font-size:12px;color:var(--ink-dim);margin-top:14px;line-height:1.7">
-      Pre-v1 hybrid: the WebApp WASM bridge already runs ML-KEM-768 + ECDH
+      Pre-v1 hybrid: the web app WASM bridge already runs ML-KEM-768 + ECDH
       P-256 + AES-256-GCM client-side, but its blob layout pre-dates the
       v1 header above. Migration to v1 lets the same WASM negotiate
       KEM / SIG IDs through <code>/v2/capabilities</code>.
@@ -543,7 +543,7 @@ FLAGS    1 byte    reserved for future features</pre>
     <div class="agility-row">
       <div class="ar-step">
         <div class="ar-num">Step 1</div>
-        <h4>Write the impl</h4>
+        <h4>Write the implementation</h4>
         <p>A small file that wraps the library. See <code>relay/crypto/impls/</code>
         in the repo for examples.</p>
       </div>
@@ -569,7 +569,7 @@ FLAGS    1 byte    reserved for future features</pre>
   <!-- ── 08 What is not yet built ── -->
   <section>
     <h2><span class="s-num">08</span>What is not yet built</h2>
-    <p class="section-sub">Honest delta between the header format and what ships.</p>
+    <p class="section-sub">The gap between what the header format allows and what ships.</p>
     <p style="font-size:14px;color:var(--ink-dim);line-height:1.75">
       The <code>FLAGS</code> byte reserves space for options not currently shipping:
     </p>
@@ -580,7 +580,7 @@ FLAGS    1 byte    reserved for future features</pre>
       <li>Forward secrecy via ephemeral per-session keys</li>
     </ul>
     <p style="font-size:13px;color:var(--ink-dim);line-height:1.75;margin-top:14px">
-      These are architected-for but not wired up. When they ship, the
+      The format has room for these, but they are not wired up yet. When they ship, the
       <code>FLAGS</code> bits get set and the wire format version stays at 1.
     </p>
   </section>

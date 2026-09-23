@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Authenticator apps · Paramant Help</title>
+<title>Which authenticator app to use for two-factor | Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:description" content="Every standard authenticator app works with Paramant, including Google Authenticator. For the strongest setup, use a SHA-256 app such as Authy or 1Password.">
-<meta name="twitter:title" content="Authenticator apps · Paramant Help">
+<meta name="twitter:title" content="Which authenticator app to use for two-factor | Paramant">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:image" content="https://paramant.app/og-image.png">
-<meta property="og:title" content="Authenticator apps · Paramant Help">
+<meta property="og:title" content="Which authenticator app to use for two-factor | Paramant">
 <meta property="og:description" content="Every standard authenticator app works with Paramant, including Google Authenticator. For the strongest setup, use a SHA-256 app such as Authy or 1Password.">
 <meta property="og:url" content="https://paramant.app/en/help/authenticator-apps">
 <meta property="og:type" content="website">
@@ -134,7 +134,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       "@type": "WebPage",
       "@id": "https://paramant.app/en/help/authenticator-apps#webpage",
       "url": "https://paramant.app/en/help/authenticator-apps",
-      "name": "Authenticator apps · Paramant Help",
+      "name": "Which authenticator app to use for two-factor | Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -253,34 +253,34 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     Authenticator apps
   </div>
 
-  <h1>Authenticator <em>apps</em></h1>
-  <p class="lead">Every standard authenticator app works with Paramant. A SHA-256 app gives you the strongest setup.</p>
+  <h1>Which <em>authenticator app</em> to use</h1>
+  <p class="lead">Every standard authenticator app works with Paramant. An app that supports SHA-256 gives you the strongest setup.</p>
 
   <h2>Why we recommend SHA-256</h2>
-  <p>Paramant's relay accepts both SHA-256 and SHA-1 TOTP codes, so every standard authenticator app works. We recommend SHA-256 because it keeps the MFA layer on the same cryptographic standard as the rest of the transport, which is built around post-quantum key exchange and FIPS 203 primitives. HMAC-SHA1 is not broken and RFC 6238 uses it as the default, so a SHA-1 app is perfectly safe to use. SHA-256 is simply the stronger, more consistent choice.</p>
+  <p>The Paramant relay (our server) accepts TOTP codes made with SHA-256 and with SHA-1, so every standard authenticator app works. We recommend SHA-256 because it keeps the sign-in step on the same cryptographic standard as the rest of the transfer, which is built around post-quantum key exchange and FIPS 203 primitives. HMAC-SHA1 is not broken and RFC 6238 uses it as the default, so a SHA-1 app is safe to use. SHA-256 is the stronger, more consistent choice.</p>
 
   <h2>Recommended apps (SHA-256)</h2>
-  <p>Authy, 1Password, Aegis (Android, open source), Raivo (iOS, open source), Bitwarden, Ente Auth (iOS and Android, open source), and 2FAS all support SHA-256 TOTP. Any of these will work with the QR code shown on the setup page and give you the strongest setup.</p>
+  <p>Authy, 1Password, Aegis (Android, open source), Raivo (iOS, open source), Bitwarden, Ente Auth (iOS and Android, open source), and 2FAS all support SHA-256 TOTP. Each of them reads the QR code on the setup page and gives you the strongest setup.</p>
   <div class="tip"><p>Not sure which to pick? Aegis on Android and Raivo on iOS are open source, store codes locally, and have no cloud dependency. 1Password and Bitwarden are good choices if you already use a password manager.</p></div>
 
   <h2>Also works (SHA-1)</h2>
   <p>Google Authenticator, Microsoft Authenticator, and the authenticator built into iCloud Keychain use SHA-1 TOTP. Paramant accepts SHA-1 codes, so these apps work fine. For the strongest setup we still recommend one of the SHA-256 apps above.</p>
   <div class="tip"><p>Already using Google Authenticator? It keeps working. Switching to a SHA-256 app such as Raivo or Aegis is a small upgrade, not a requirement.</p></div>
 
-  <h2>Upgrading to a SHA-256 app</h2>
-  <p>Google Authenticator works with Paramant. For the strongest setup you can keep it for your other services and add a SHA-256 app (Aegis on Android, Raivo on iOS) specifically for Paramant. Having multiple authenticator apps on one device is supported and common.</p>
+  <h2>Switching to a SHA-256 app</h2>
+  <p>Google Authenticator works with Paramant. For the strongest setup you can keep it for your other services and add a SHA-256 app (Aegis on Android, Raivo on iOS) specifically for Paramant. You can have more than one authenticator app on the same phone.</p>
 
   <hr class="divider">
 
   <h2 style="margin-top:0">Related</h2>
   <div class="next-steps">
     <a href="/auth/setup" class="next-step-card">
-      <h3>Set up authenticator</h3>
+      <h3>Set up your authenticator</h3>
       <p>Scan the QR code and confirm your first code.</p>
     </a>
     <a href="/security" class="next-step-card">
       <h3>Security overview</h3>
-      <p>Full cryptographic posture and protocol details.</p>
+      <p>How Paramant encrypts and protects your files.</p>
     </a>
   </div>
 

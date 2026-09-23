@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>IoT and embedded devices · Paramant Help</title>
+<title>Send files securely from IoT and embedded devices | Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<meta name="twitter:description" content="Using the Paramant API on constrained devices: Pi Zero, ESP32, OT gateways. Static API key, no TOTP required.">
-<meta name="twitter:title" content="IoT and embedded devices · Paramant Help">
+<meta name="twitter:description" content="Send files securely from IoT and embedded devices such as Raspberry Pi, ESP32 and OT gateways. It uses a static API key, with no authenticator code needed.">
+<meta name="twitter:title" content="Send files securely from IoT and embedded devices | Paramant">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:image" content="https://paramant.app/og-image.png">
-<meta property="og:title" content="IoT and embedded devices · Paramant Help">
-<meta property="og:description" content="Using the Paramant API on constrained devices: Pi Zero, ESP32, OT gateways. Static API key, no TOTP required.">
+<meta property="og:title" content="Send files securely from IoT and embedded devices | Paramant">
+<meta property="og:description" content="Send files securely from IoT and embedded devices such as Raspberry Pi, ESP32 and OT gateways. It uses a static API key, with no authenticator code needed.">
 <meta property="og:url" content="https://paramant.app/en/help/iot-integration">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Paramant">
@@ -20,7 +20,7 @@
 <link rel="alternate" hreflang="nl" href="https://paramant.app/help/iot-integration">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/help/iot-integration">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/help/iot-integration">
-<meta name="description" content="Using the Paramant API on constrained devices: Pi Zero, ESP32, OT gateways. Static API key, no TOTP required.">
+<meta name="description" content="Send files securely from IoT and embedded devices such as Raspberry Pi, ESP32 and OT gateways. It uses a static API key, with no authenticator code needed.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -147,7 +147,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       "@type": "WebPage",
       "@id": "https://paramant.app/en/help/iot-integration#webpage",
       "url": "https://paramant.app/en/help/iot-integration",
-      "name": "IoT and embedded devices · Paramant Help",
+      "name": "Send files securely from IoT and embedded devices | Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -155,7 +155,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "Using the Paramant API on constrained devices: Pi Zero, ESP32, OT gateways. Static API key, no TOTP required."
+      "description": "Send files securely from IoT and embedded devices such as Raspberry Pi, ESP32 and OT gateways. It uses a static API key, with no authenticator code needed."
     },
     {
       "@type": "BreadcrumbList",
@@ -259,13 +259,13 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     IoT &amp; embedded devices
   </div>
 
-  <h1>Paramant on <em>IoT</em> and embedded devices.</h1>
+  <h1>Send files securely from <em>IoT</em> and embedded devices</h1>
 
-  <p class="lead">IoT devices, PLCs, OT gateways, and single-board computers can send files through Paramant using only a static API key. No TOTP, no interactive login, no browser required.</p>
+  <p class="lead">IoT devices, PLCs, OT gateways, and single-board computers can send files through Paramant using only a static API key. They need no authenticator code (TOTP), no interactive login and no browser.</p>
 
   <h2>How machine authentication works</h2>
 
-  <p>Every API call to Paramant authenticates with an <code>Authorization</code> header containing your API key. The key is a 64-character hex string that identifies your account. For machine clients, this is sufficient, there is no TOTP prompt outside of the web dashboard login flow.</p>
+  <p>Every API call to Paramant authenticates with an <code>Authorization</code> header containing your API key. The key is a 64-character hex string that identifies your account. For machines that is enough. Paramant only asks for a TOTP code when you sign in to the web dashboard.</p>
 
   <div class="tip"><p>Generate a <strong>dedicated API key</strong> for each device or device class so you can revoke individual keys without affecting other integrations. Dashboard &rarr; API keys &rarr; <strong>Generate new key</strong>.</p></div>
 
@@ -282,13 +282,13 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </div>
     <div class="device-card">
       <h4>OT gateways</h4>
-      <p>Any gateway that can make outbound HTTPS calls, Tosibox, HMS Anybus, Ewon Flexy, can push files via the API.</p>
+      <p>Any gateway that can make outbound HTTPS calls (such as Tosibox, HMS Anybus or Ewon Flexy) can send files through the API.</p>
     </div>
   </div>
 
   <h2>Sending a file from a Linux device</h2>
 
-  <p>Using curl (available on all Pi and gateway images):</p>
+  <p>With curl, which is available on all Pi and gateway images:</p>
 
   <div class="code-block">curl -X POST https://api.paramant.app/v1/upload \
   -H "Authorization: Bearer YOUR_API_KEY" \
@@ -324,20 +324,20 @@ print(resp.json()["url"])</div>
 
   <h2>Key rotation on deployed devices</h2>
 
-  <p>Rotate keys on a schedule, or immediately after a device is decommissioned, repaired, or handled by a third party. The rotation process:</p>
+  <p>Rotate keys on a schedule, or immediately after a device is decommissioned, repaired, or handled by a third party. Here is how:</p>
 
   <ol style="margin:16px 0 16px 20px;display:flex;flex-direction:column;gap:10px">
     <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Generate a new key in the dashboard.</li>
     <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Push the new key to the device (OTA update, secure provisioning, or physical access).</li>
-    <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Verify the device is sending successfully with the new key.</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Check that the device sends successfully with the new key.</li>
     <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Revoke the old key in the dashboard.</li>
   </ol>
 
-  <div class="warn"><p>Revoke the old key only after confirming the new key works. A revoked key stops working immediately, there is no grace period.</p></div>
+  <div class="warn"><p>Revoke the old key only after confirming the new key works. A revoked key stops working immediately. There is no grace period.</p></div>
 
   <h2>Rate limits</h2>
 
-  <p>Request rate limits are per IP address, not per API key: the nginx configuration in this repository puts general API traffic in a <strong>60 requests a minute</strong> zone and uploads in a stricter one (<code>nginx-selfhost.conf</code>). The ceiling that is per key applies to retrieval, not upload: <strong>50 downloads an hour</strong> on Community and <strong>500 an hour</strong> on Firm (<code>outbound_per_hour</code> in <code>relay/lib/tiers.js</code>), answered with a 429. For high-frequency sensor data, batch readings into a single file before uploading rather than sending one file per measurement. A file is held to 500 MB on every plan (<code>file_mb</code> in <code>relay/lib/tiers.js</code>); it travels as blocks of a fixed 5 MB, so one upload call carries one block.</p>
+  <p>Request rate limits apply per IP address, not per API key. The nginx configuration in this repository puts general API traffic in a zone of <strong>60 requests a minute</strong>, and uploads in a stricter one (<code>nginx-selfhost.conf</code>). The limit that is per key applies to downloads, not uploads: <strong>50 downloads an hour</strong> on Community and <strong>500 an hour</strong> on Firm (<code>outbound_per_hour</code> in <code>relay/lib/tiers.js</code>). Above that you get a 429 response. For frequent sensor data, combine readings into one file before uploading, rather than sending one file per measurement. A file can be up to 500 MB on every plan (<code>file_mb</code> in <code>relay/lib/tiers.js</code>). It travels in fixed blocks of 5 MB, so one upload call carries one block.</p>
 
   <hr class="divider">
 
@@ -345,7 +345,7 @@ print(resp.json()["url"])</div>
 
   <div class="troubleshoot-item">
     <div class="q">My device gets a 401 on every request.</div>
-    <div class="a">Check that the Authorization header is exactly <code>Bearer YOUR_KEY</code> with a space after "Bearer". Also verify the key has not been revoked in the dashboard.</div>
+    <div class="a">Check that the Authorization header is exactly <code>Bearer YOUR_KEY</code> with a space after "Bearer". Also check in the dashboard that the key has not been revoked.</div>
   </div>
 
   <div class="troubleshoot-item">

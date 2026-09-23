@@ -4,19 +4,19 @@
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Privacy policy · Paramant</title>
+<title>Privacy policy: what we store and what we do not | Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
 <meta name="description" content="What Paramant stores and what it does not. An email address to run your account, no phone number, no IP logging for analytics. EU and German hosting.">
-<meta property="og:title" content="Privacy policy · Paramant">
+<meta property="og:title" content="Privacy policy: what we store and what we do not | Paramant">
 <meta property="og:description" content="What Paramant stores and what it does not. An email address to run your account, no phone number, no IP logging for analytics. EU and German hosting.">
 <meta property="og:url" content="https://paramant.app/en/privacy">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Privacy policy · Paramant">
+<meta name="twitter:title" content="Privacy policy: what we store and what we do not | Paramant">
 <meta name="twitter:description" content="What Paramant stores and what it does not. An email address to run your account, no phone number, no IP logging for analytics. EU and German hosting.">
 <link rel="canonical" href="https://paramant.app/en/privacy">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/privacy">
@@ -124,7 +124,7 @@ footer a{color:var(--ink);text-decoration:none}
       "@type": "WebPage",
       "@id": "https://paramant.app/en/privacy#webpage",
       "url": "https://paramant.app/en/privacy",
-      "name": "Privacy policy · Paramant",
+      "name": "Privacy policy: what we store and what we do not | Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -147,7 +147,7 @@ footer a{color:var(--ink);text-decoration:none}
         {
           "@type": "ListItem",
           "position": 2,
-          "name": "En",
+          "name": "English",
           "item": "https://paramant.app/en"
         },
         {
@@ -240,7 +240,7 @@ footer a{color:var(--ink);text-decoration:none}
 
 <h2>Core principle</h2>
 <p><strong>PARAMANT collects only what is strictly required to operate your account and run the service.</strong></p>
-<p>An email address is required to create an account and recover access; it is personal data, and it is stored. No phone number. We do not log IP addresses for analytics or profiling. An IP is processed for security and abuse-prevention only (rate limiting, the session record, an audit log, and the DPA signature record), the audit trail keeps a masked address for up to 400 days, and one log holds a full address for longer than any timer; both are named below. Only a strictly-necessary session cookie (no tracking cookies). No tracking pixels. No analytics. No advertisements. We never sell your data.</p>
+<p>An email address is required to create an account and recover access; it is personal data, and it is stored. No phone number. We do not log IP addresses for analytics or profiling. An IP is processed for security and abuse-prevention only (rate limiting, the session record, an audit log, and the DPA signature record). The audit trail keeps a masked address for up to 400 days, and one log holds a full address for longer than any timer; both are named below. Only a strictly-necessary session cookie (no tracking cookies). No tracking pixels. No analytics. No advertisements. We never sell your data.</p>
 
 <h2>How sending works (the ParaSend web app)</h2>
 <p>Files sent through the web app are encrypted <strong>client-side in your browser</strong> using post-quantum cryptography (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256) before they ever reach our servers. The relay never sees plaintext on that path. The one place it does is the hosted signing ceremony on the <code>/v1</code> API, where the document is sent to us so that we can run the ceremony; we hold it, sealed at rest under our own key, until that envelope ends.</p>
@@ -326,7 +326,7 @@ footer a{color:var(--ink);text-decoration:none}
 <ul>
 <li><strong>Edge access log.</strong> Our own edge writes a server access log with the client address, the timestamp, the path and the user agent. We read it to tell real visitors apart from scanners, never to build a profile of a person, and it is not exported to anyone. The nginx configuration in this repository logs nothing; the edge in front of it does.</li>
 <li><strong>Account audit log.</strong> Every audit entry keeps the network part of the address and drops the host part, so a full address is never written: 1.2.x.x for IPv4 and the first two groups for IPv6. Entries are bounded twice, by age and by count: nothing older than 400 days survives, and an account keeps at most its last 1000 entries. The 400 days is a default an operator can change.</li>
-<li><strong>Admin service log, for contrast.</strong> Three operational lines write about a signup attempt, a pending signup and a rate-limited request to reset a second factor. They used to carry the full address, and one of them the account email in plain text. They no longer do: an address is truncated to its network before it is written (203.0.113.x for IPv4, the first three groups for IPv6) and an email keeps one character and its domain (d***@example.com). What lands in the container log is what is left after that.</li>
+<li><strong>Admin service log, for contrast.</strong> Three operational log lines record a signup attempt, a pending signup and a rate-limited request to reset a second factor. They used to carry the full address, and one of them the account email in plain text. They no longer do: an address is truncated to its network before it is written (203.0.113.x for IPv4, the first three groups for IPv6) and an email keeps one character and its domain (d***@example.com). What lands in the container log is what is left after that.</li>
 </ul>
 <p>None of these is used for analytics, profiling or advertising, and none is shared with a third party.</p>
 

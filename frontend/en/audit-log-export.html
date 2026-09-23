@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Send audit logs to a regulator without a second leak · Paramant</title>
+<title>Send GDPR audit logs to a regulator safely | Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<meta name="twitter:description" content="Deliver GDPR Article 30 evidence to a supervisory authority or an auditor without a second exposure. The web app destroys the file after the first read.">
-<meta name="twitter:title" content="Send audit logs to a regulator without a second leak · Paramant">
+<meta name="twitter:description" content="Send GDPR Article 30 records to a supervisory authority or an auditor without creating a second exposure. The web app destroys the file after the first read.">
+<meta name="twitter:title" content="Send GDPR audit logs to a regulator safely | Paramant">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
@@ -16,9 +16,9 @@
      against the codebase as a whole: naming an algorithm the product has, on a route
      that does not run it, is the class of untrue sentence that reads as a fact. -->
 <meta name="paramant:path" content="link">
-<meta name="description" content="Deliver GDPR Article 30 evidence to a supervisory authority or an auditor without a second exposure. The web app destroys the file after the first read.">
-<meta property="og:title" content="Send audit logs to a regulator without a second leak · Paramant">
-<meta property="og:description" content="Deliver GDPR Article 30 evidence to a supervisory authority or an auditor without a second exposure. The web app destroys the file after the first read.">
+<meta name="description" content="Send GDPR Article 30 records to a supervisory authority or an auditor without creating a second exposure. The web app destroys the file after the first read.">
+<meta property="og:title" content="Send GDPR audit logs to a regulator safely | Paramant">
+<meta property="og:description" content="Send GDPR Article 30 records to a supervisory authority or an auditor without creating a second exposure. The web app destroys the file after the first read.">
 <meta property="og:url" content="https://paramant.app/en/audit-log-export">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
@@ -91,7 +91,7 @@ section p+p{margin-top:14px}
       "@type": "WebPage",
       "@id": "https://paramant.app/en/audit-log-export#webpage",
       "url": "https://paramant.app/en/audit-log-export",
-      "name": "Send audit logs to a regulator without a second leak · Paramant",
+      "name": "Send GDPR audit logs to a regulator safely | Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -99,7 +99,7 @@ section p+p{margin-top:14px}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "Deliver GDPR Article 30 evidence to a supervisory authority or an auditor without a second exposure. The web app destroys the file after the first read."
+      "description": "Send GDPR Article 30 records to a supervisory authority or an auditor without creating a second exposure. The web app destroys the file after the first read."
     },
     {
       "@type": "BreadcrumbList",
@@ -120,7 +120,7 @@ section p+p{margin-top:14px}
         {
           "@type": "ListItem",
           "position": 3,
-          "name": "Send audit logs to a regulator without a second leak"
+          "name": "Send GDPR audit logs to a regulator safely"
         }
       ]
     },
@@ -200,8 +200,8 @@ section p+p{margin-top:14px}
 
 <div class="hero">
   <div class="hero-label">ENTERPRISE &middot; GDPR &middot; CHAIN OF CUSTODY</div>
-  <h1>Audit log export, <em>GDPR chain of custody.</em></h1>
-  <p class="lead">Your GDPR Article 30 records document personal data processing. Sending them to a DPA investigator or external auditor by email creates a second exposure event. Paramant closes that loop.</p>
+  <h1>Audit log export with a <em>GDPR chain of custody.</em></h1>
+  <p class="lead">Your GDPR Article 30 records describe how you process personal data. Emailing them to an investigator at a data protection authority or to an external auditor creates a second exposure. Paramant closes that gap.</p>
 </div>
 
 <main id="main-content">
@@ -210,13 +210,13 @@ section p+p{margin-top:14px}
     <span class="sec-eyebrow">The problem</span>
     <h2>The channel is also a compliance event.</h2>
     <p>Article 30 processing records, Article 33 breach notifications, Article 35 DPIA supporting evidence: audit logs often contain the personal data they were created to document. When a Data Protection Authority opens an investigation, or when an external auditor requests evidence, those logs have to travel. Email is the default. Email is also a second data controller, a stored copy outside your retention schedule, and a new Article 32 risk surface.</p>
-    <p>The problem compounds when you need to demonstrate to the investigator that the evidence they received is the evidence you sent, and that it hasn't been tampered with in transit. Standard email provides no such assurance. A breach on the transmission channel would be both an evidentiary problem and a second notifiable incident.</p>
+    <p>It gets harder when you need to show the investigator that the evidence they received is the evidence you sent, and that nobody changed it on the way. Standard email gives no such assurance. A breach of the channel would be both an evidence problem and a second notifiable incident.</p>
   </section>
 
   <section>
     <span class="sec-eyebrow">What Paramant adds</span>
     <h2>Burn-on-read delivery with a cryptographic receipt.</h2>
-    <p>Paramant encrypts the audit package with ML-KEM-768 + AES-256-GCM. After the investigator or auditor downloads, the relay wipes its copy from RAM. The ML-DSA-65 signed receipt records the file hash, the relay that served it, the retrieval timestamp and the package's place in the transparency log. It names no recipient, and it cannot: the relay never learns who collected the package, which is the same design that stops it reading the contents. So the receipt proves this package, this hash, delivered once, at this time, not to whom.</p>
+    <p>Paramant encrypts the audit package with ML-KEM-768 + AES-256-GCM. After the investigator or auditor downloads, the relay wipes its copy from RAM. The ML-DSA-65 signed receipt records the file hash, the relay that served it, the retrieval timestamp and the package's place in the transparency log. It names no recipient, and it cannot: the relay never learns who collected the package, which is the same design that stops it reading the contents. So the receipt proves which package and hash were delivered, once, and when. It does not prove to whom.</p>
     <p>On this route, which is a ParaSend web app transfer, the relay holds only ciphertext and cannot read what it carries. EU/DE hosting means no US CLOUD Act production orders apply. The transmission does not create a second data controller for the audit evidence.</p>
   </section>
 
@@ -225,27 +225,27 @@ section p+p{margin-top:14px}
     <h2>From export to evidence.</h2>
     <div class="workflow-block">
       <div class="step-list">
-        <div class="step-row"><div class="step-num">01</div><div class="step-body"><strong>DPO or legal counsel</strong> exports the audit log package and uploads via the ParaSend web app</div></div>
-        <div class="step-row"><div class="step-num">02</div><div class="step-body"><strong>Paramant generates</strong> an encrypted one-time link; relay holds only ciphertext on this ParaSend route</div></div>
-        <div class="step-row"><div class="step-num">03</div><div class="step-body"><strong>Link is transmitted</strong> to the DPA investigator or auditor (the sensitive data does not travel by email)</div></div>
-        <div class="step-row"><div class="step-num">04</div><div class="step-body"><strong>Investigator downloads</strong>; relay RAM is cleared immediately after</div></div>
-        <div class="step-row"><div class="step-num">05</div><div class="step-body"><strong>Chain-of-custody receipt</strong> archived by both parties; CT log entry provides independent verification</div></div>
+        <div class="step-row"><div class="step-num">01</div><div class="step-body"><strong>DPO or legal counsel</strong> exports the audit log package and uploads it through the ParaSend web app</div></div>
+        <div class="step-row"><div class="step-num">02</div><div class="step-body"><strong>Paramant creates</strong> an encrypted one-time link; on this ParaSend route the relay holds only ciphertext</div></div>
+        <div class="step-row"><div class="step-num">03</div><div class="step-body"><strong>The link is sent</strong> to the investigator or auditor (the sensitive data itself does not travel by email)</div></div>
+        <div class="step-row"><div class="step-num">04</div><div class="step-body"><strong>The investigator downloads</strong>; the relay clears its copy from RAM straight after</div></div>
+        <div class="step-row"><div class="step-num">05</div><div class="step-body"><strong>Chain-of-custody receipt</strong> kept by both parties; its entry in the public transparency log (CT log) allows independent verification</div></div>
       </div>
     </div>
   </section>
 
   <section>
     <span class="sec-eyebrow">Compliance context</span>
-    <h2>GDPR requirements satisfied.</h2>
+    <h2>Which GDPR requirements this helps with.</h2>
     <table class="compliance-table">
       <thead>
         <tr><th>Requirement</th><th>Paramant control</th></tr>
       </thead>
       <tbody>
-        <tr><td>GDPR Art.&nbsp;32 &mdash; Appropriate technical measures</td><td>ML-KEM-768 + AES-256-GCM in transit; relay cannot decrypt; EU/DE hosting</td></tr>
-        <tr><td>GDPR Art.&nbsp;5(1)(e) &mdash; Storage limitation</td><td>Burn-on-read: a web app transfer is held only until the first download, then wiped; an API link is wiped after its last read</td></tr>
+        <tr><td>GDPR Art.&nbsp;32: appropriate technical measures</td><td>ML-KEM-768 + AES-256-GCM in transit; relay cannot decrypt; EU/DE hosting</td></tr>
+        <tr><td>GDPR Art.&nbsp;5(1)(e): storage limitation</td><td>Burn-on-read: a web app transfer is held only until the first download, then wiped; an API link is wiped after its last read</td></tr>
         <tr><td>Evidence integrity</td><td>ML-DSA-65 signed receipt with SHA-256 file hash; tamper-evident by construction</td></tr>
-        <tr><td>GDPR Art.&nbsp;28 &mdash; Processor agreement</td><td>Standard DPA at <a href="/dpa">/dpa</a>, signable electronically and applies to all plans. The relay does process personal data (account email, IP for rate limiting and abuse-prevention); what it never holds is document plaintext or keys.</td></tr>
+        <tr><td>GDPR Art.&nbsp;28: processor agreement</td><td>Standard DPA at <a href="/dpa">/dpa</a>, signable electronically and applies to all plans. The relay does process personal data (account email, IP for rate limiting and abuse-prevention); what it never holds is document plaintext or keys.</td></tr>
       </tbody>
     </table>
   </section>
@@ -254,8 +254,8 @@ section p+p{margin-top:14px}
 
 <div style="background:var(--bone-2);border:1px solid var(--ink-hair);padding:52px 48px;text-align:center">
   <h2 style="font-size:24px;font-weight:600;letter-spacing:-.02em;margin-bottom:10px;color:var(--bone-on-navy)">Deliver evidence without creating new exposure.</h2>
-  <p style="font-size:14px;color:var(--bone-on-navy-dim);margin-bottom:28px;max-width:520px;margin-left:auto;margin-right:auto">Community plan for individual DPOs. Business plan for teams with regular audit obligations.</p>
-  <a href="/signup" class="btn-primary">Create free account &rarr;</a>
+  <p style="font-size:14px;color:var(--bone-on-navy-dim);margin-bottom:28px;max-width:520px;margin-left:auto;margin-right:auto">The Community plan suits a DPO working alone. The Business plan suits teams with regular audit obligations.</p>
+  <a href="/signup" class="btn-primary">Create a free account &rarr;</a>
   <a href="/dpa" class="btn-sec">Download the DPA &rarr;</a>
   <p style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--bone-on-navy-dim);margin-top:24px">ML-KEM-768 &middot; ML-DSA-65 &middot; GDPR Art. 32 &middot; EU/DE</p>
 </div>
