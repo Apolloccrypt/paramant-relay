@@ -27,6 +27,8 @@ let OE_ORIGIN;
 function oeFile(p) {
   if (p === '/ontvang') return '/ontvang.html';
   if (p.startsWith('/ontvang/')) return '/ophalen.html';
+  if (p === '/en/ontvang') return '/en/ontvang.html';
+  if (p.startsWith('/en/ontvang/')) return '/en/ophalen.html';
   return p;
 }
 
@@ -57,42 +59,54 @@ async function visibleActions(page) {
     .map((e) => ({ tag: e.tagName, text: e.textContent.trim(), href: e.getAttribute('href') })));
 }
 
-for (const addr of ['/ontvang', '/ontvang/']) {
-  test(`${addr} without a token is a calm empty state with one button to /parasend`, async () => {
-    const page = await oeBrowser.newPage({ viewport: { width: 390, height: 844 } });
+// Both languages: /ontvang is Dutch, /en/ontvang keeps the original English words.
+const LANGS = [
+  { name: 'nl', pre: '', empty: /Er staat nog niets klaar/, opens: /Deze pagina opent vanzelf via de link die u kreeg\./,
+    alarm: /Ontvangen is mislukt|ongeldig of onvolledig|werkt niet|Opnieuw proberen/i, button: 'Zelf iets versturen',
+    invalid: /Deze link is ongeldig of onvolledig/, stop: /werkt niet/ },
+  { name: 'en', pre: '/en', empty: /Nothing to pick up yet/, opens: /This page opens by itself from the link you were sent\./,
+    alarm: /Transfer failed|Invalid or missing|cannot be used|Try again/i, button: 'Send something yourself',
+    invalid: /Invalid or missing session token/, stop: /cannot be used/ },
+];
+
+for (const L of LANGS) {
+  for (const addr of [L.pre + '/ontvang', L.pre + '/ontvang/']) {
+    test(`${addr} without a token is a calm empty state with one button to /parasend (${L.name})`, async () => {
+      const page = await oeBrowser.newPage({ viewport: { width: 390, height: 844 } });
+      await page.route('https://*.paramant.app/**', (r) => r.abort());
+      try {
+        await page.goto(OE_ORIGIN + addr);
+        await page.waitForFunction((src) => {
+          const h = [...document.querySelectorAll('h1')].find((e) => e.offsetParent !== null);
+          return h && new RegExp(src).test(h.textContent);
+        }, L.empty.source, { timeout: 5000 });
+        const text = await page.evaluate(() => document.querySelector('main').innerText);
+        assert.match(text, L.opens);
+        assert.doesNotMatch(text, L.alarm);
+        const actions = await visibleActions(page);
+        assert.equal(actions.length, 1, JSON.stringify(actions));
+        assert.equal(actions[0].text, L.button);
+        assert.equal(actions[0].href, '/parasend');
+      } finally { await page.close(); }
+    });
+  }
+
+  test(`/ontvang with a malformed session token still says the link is invalid (${L.name})`, async () => {
+    const page = await oeBrowser.newPage();
+    try {
+      await page.goto(OE_ORIGIN + L.pre + '/ontvang?s=inv_short');
+      await page.waitForFunction(() => document.querySelector('#step-error.active'), null, { timeout: 5000 });
+      assert.match(await page.textContent('#error-msg'), L.invalid);
+    } finally { await page.close(); }
+  });
+
+  test(`/ontvang/<short token> still says the link cannot be used (${L.name})`, async () => {
+    const page = await oeBrowser.newPage();
     await page.route('https://*.paramant.app/**', (r) => r.abort());
     try {
-      await page.goto(OE_ORIGIN + addr);
-      await page.waitForFunction(() => {
-        const h = [...document.querySelectorAll('h1')].find((e) => e.offsetParent !== null);
-        return h && /Nothing to pick up yet/.test(h.textContent);
-      }, null, { timeout: 5000 });
-      const text = await page.evaluate(() => document.querySelector('main').innerText);
-      assert.match(text, /This page opens by itself from the link you were sent\./);
-      assert.doesNotMatch(text, /Transfer failed|Invalid or missing|cannot be used|Try again/i);
-      const actions = await visibleActions(page);
-      assert.equal(actions.length, 1, JSON.stringify(actions));
-      assert.equal(actions[0].text, 'Send something yourself');
-      assert.equal(actions[0].href, '/parasend');
+      await page.goto(OE_ORIGIN + L.pre + '/ontvang/abc');
+      await page.waitForFunction(() => { const s = document.getElementById('step-stop'); return s && !s.hidden; }, null, { timeout: 5000 });
+      assert.match(await page.textContent('#stop-title'), L.stop);
     } finally { await page.close(); }
   });
 }
-
-test('/ontvang with a malformed session token still says the link is invalid', async () => {
-  const page = await oeBrowser.newPage();
-  try {
-    await page.goto(OE_ORIGIN + '/ontvang?s=inv_short');
-    await page.waitForFunction(() => document.querySelector('#step-error.active'), null, { timeout: 5000 });
-    assert.match(await page.textContent('#error-msg'), /Invalid or missing session token/);
-  } finally { await page.close(); }
-});
-
-test('/ontvang/<short token> still says the link cannot be used', async () => {
-  const page = await oeBrowser.newPage();
-  await page.route('https://*.paramant.app/**', (r) => r.abort());
-  try {
-    await page.goto(OE_ORIGIN + '/ontvang/abc');
-    await page.waitForFunction(() => { const s = document.getElementById('step-stop'); return s && !s.hidden; }, null, { timeout: 5000 });
-    assert.match(await page.textContent('#stop-title'), /cannot be used/);
-  } finally { await page.close(); }
-});

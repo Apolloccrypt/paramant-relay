@@ -1,29 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Check a signed document or a delivery receipt · Paramant</title>
+<title>Document of ontvangstbewijs controleren · Paramant</title>
 <meta property="og:site_name" content="Paramant">
 <!-- Which product path this page describes. tests/crypto-claims.test.mjs holds every
      algorithm this page names against the code that runs on that path, instead of
      against the codebase as a whole: naming an algorithm the product has, on a route
      that does not run it, is the class of untrue sentence that reads as a fact. -->
 <meta name="paramant:path" content="signing">
-<meta name="description" content="Check a signed document, or the receipt that proves a file was delivered. Both happen in your browser, without an account and without uploading anything.">
-<meta property="og:title" content="Check a signed document or a delivery receipt · Paramant">
-<meta property="og:description" content="Check a signed document, or the receipt that proves a file was delivered. Both happen in your browser, without an account and without uploading anything.">
+<meta name="description" content="Controleer een ondertekend document, of het bewijs dat een bestand is afgeleverd. Beide gebeuren in uw browser, zonder account en zonder iets te uploaden.">
+<meta property="og:title" content="Document of ontvangstbewijs controleren · Paramant">
+<meta property="og:description" content="Controleer een ondertekend document, of het bewijs dat een bestand is afgeleverd. Beide gebeuren in uw browser, zonder account en zonder iets te uploaden.">
 <meta property="og:url" content="https://paramant.app/verify">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Check a signed document or a delivery receipt · Paramant">
-<meta name="twitter:description" content="Check a signed document, or the receipt that proves a file was delivered. Both happen in your browser, without an account and without uploading anything.">
+<meta name="twitter:title" content="Document of ontvangstbewijs controleren · Paramant">
+<meta name="twitter:description" content="Controleer een ondertekend document, of het bewijs dat een bestand is afgeleverd. Beide gebeuren in uw browser, zonder account en zonder iets te uploaden.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/verify">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/verify">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/verify">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/verify">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#0B3A6A">
 <link rel="stylesheet" href="/design-system.css?v=31">
@@ -38,15 +41,15 @@
       "@type": "WebPage",
       "@id": "https://paramant.app/verify#webpage",
       "url": "https://paramant.app/verify",
-      "name": "Check a signed document or a delivery receipt · Paramant",
+      "name": "Document of ontvangstbewijs controleren · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "en",
-      "description": "Check a signed document, or the receipt that proves a file was delivered. Both happen in your browser, without an account and without uploading anything."
+      "inLanguage": "nl",
+      "description": "Controleer een ondertekend document, of het bewijs dat een bestand is afgeleverd. Beide gebeuren in uw browser, zonder account en zonder iets te uploaden."
     },
     {
       "@type": "SoftwareApplication",
@@ -93,156 +96,157 @@
 </script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
-    <li><a href="/security" class="nav-link">Security</a></li>
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/docs" class="nav-link">Docs</a></li>
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
-  <a href="/security" class="nav-mobile-standalone">Security</a>
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
 </div>
 
 <main id="main-content" role="main">
 <div class="ps-wrap">
   <header class="ps-head">
-    <p class="ps-kicker">Verify</p>
-    <h1 class="ps-title">Check a Paramant proof</h1>
-    <p class="ps-lede">Two kinds of proof come out of Paramant: a signed document, and a receipt that says a file was delivered and then destroyed. Both are checked here, on your own device. Nothing you drop in is uploaded, and neither check needs an account.</p>
+    <p class="ps-kicker">Controleren</p>
+    <h1 class="ps-title">Controleer een bewijs van Paramant</h1>
+    <p class="ps-lede">Paramant levert twee soorten bewijs: een ondertekend document, en een ontvangstbewijs dat zegt dat een bestand is afgeleverd en daarna vernietigd. Beide controleert u hier, op uw eigen apparaat. Niets wat u hier neerzet wordt geüpload, en voor geen van beide is een account nodig.</p>
   </header>
 
-  <div class="rv-tabs" role="tablist" aria-label="What do you want to check">
-    <button class="rv-tab" type="button" id="tab-doc" role="tab" aria-selected="true" aria-controls="panel-doc">Signed document</button>
-    <button class="rv-tab" type="button" id="tab-receipt" role="tab" aria-selected="false" aria-controls="panel-receipt">Delivery receipt</button>
+  <div class="rv-tabs" role="tablist" aria-label="Wat wilt u controleren">
+    <button class="rv-tab" type="button" id="tab-doc" role="tab" aria-selected="true" aria-controls="panel-doc">Ondertekend document</button>
+    <button class="rv-tab" type="button" id="tab-receipt" role="tab" aria-selected="false" aria-controls="panel-receipt">Ontvangstbewijs</button>
   </div>
 
   <div id="panel-doc" role="tabpanel" aria-labelledby="tab-doc">
 
   <section class="card ps-panel" aria-labelledby="v1">
-    <div class="ps-panel-head"><span class="ps-step">1</span><h2 id="v1" class="ps-panel-title">Original document</h2></div>
-    <label class="ps-file"><input type="file" id="vf-document"><span class="ps-file-cta">Choose the original document</span><span class="ps-file-meta" id="vf-document-info">No file selected</span></label>
+    <div class="ps-panel-head"><span class="ps-step">1</span><h2 id="v1" class="ps-panel-title">Origineel document</h2></div>
+    <label class="ps-file"><input type="file" id="vf-document"><span class="ps-file-cta">Kies het originele document</span><span class="ps-file-meta" id="vf-document-info">Geen bestand gekozen</span></label>
   </section>
 
   <section class="card ps-panel" aria-labelledby="v2">
-    <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="v2" class="ps-panel-title">.psign envelope</h2></div>
-    <label class="ps-file"><input type="file" id="vf-envelope" accept=".psign,application/json,.json"><span class="ps-file-cta">Choose the .psign file</span><span class="ps-file-meta" id="vf-envelope-info">No file selected</span></label>
+    <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="v2" class="ps-panel-title">.psign-envelop</h2></div>
+    <label class="ps-file"><input type="file" id="vf-envelope" accept=".psign,application/json,.json"><span class="ps-file-cta">Kies het .psign-bestand</span><span class="ps-file-meta" id="vf-envelope-info">Geen bestand gekozen</span></label>
     <div class="ps-field" id="vf-key-block" hidden>
-      <label class="ps-label" for="vf-api-key">API key (X-Api-Key)</label>
+      <label class="ps-label" for="vf-api-key">API-sleutel (X-Api-Key)</label>
       <input class="ps-input mono" type="password" id="vf-api-key" placeholder="pgp_..." autocomplete="off">
-      <p class="ps-warn">This is a legacy (v1/v2) envelope; its relay notary signature can only be checked by the relay, which requires an API key. Current signatures verify fully offline with no key.</p>
+      <p class="ps-warn">Dit is een oude envelop (v1/v2). De notarishandtekening van de relay kan alleen de relay zelf controleren, en daarvoor is een API-sleutel nodig. Huidige handtekeningen controleert u volledig offline, zonder sleutel.</p>
     </div>
   </section>
 
   <section class="card ps-panel" aria-labelledby="v3">
-    <div class="ps-panel-head"><span class="ps-step">3</span><h2 id="v3" class="ps-panel-title">Verify</h2></div>
-    <button class="btn btn-primary" id="vf-verify" type="button" disabled>Verify signature</button>
+    <div class="ps-panel-head"><span class="ps-step">3</span><h2 id="v3" class="ps-panel-title">Controleren</h2></div>
+    <button class="btn btn-primary" id="vf-verify" type="button" disabled>Handtekening controleren</button>
     <div class="ps-result" id="vf-result" hidden role="status" aria-live="polite"></div>
   </section>
 
   <aside class="ps-info">
-    <h2>What is checked</h2>
+    <h2>Wat er wordt gecontroleerd</h2>
     <ul>
-      <li>SHA3-256 of your document matches the hash inside the envelope</li>
-      <li>The signer's ML-DSA-65 signature over that hash is valid</li>
-      <li>The envelope has not expired</li>
+      <li>De SHA3-256 van uw document komt overeen met de hash in de envelop</li>
+      <li>De ML-DSA-65-handtekening van de ondertekenaar over die hash is geldig</li>
+      <li>De envelop is niet verlopen</li>
     </ul>
-    <p class="ps-help">Signatures verify entirely in your browser &mdash; no account, no API key, works offline.</p>
-    <p><a href="/dashboard">Open your dashboard &rarr;</a></p>
+    <p class="ps-help">Handtekeningen worden volledig in uw browser gecontroleerd: geen account, geen API-sleutel, en het werkt offline.</p>
+    <p><a href="/dashboard">Naar uw dashboard &rarr;</a></p>
   </aside>
   </div>
 
   <div id="panel-receipt" role="tabpanel" aria-labelledby="tab-receipt" hidden>
     <section class="card ps-panel" aria-labelledby="r1">
-      <div class="ps-panel-head"><span class="ps-step">1</span><h2 id="r1" class="ps-panel-title">The receipt</h2></div>
-      <p class="ps-help">A delivery receipt is the small block of text you get when a file you sent is picked up. It says which file was handed over, at what moment, and whether the copy on the server was destroyed.</p>
+      <div class="ps-panel-head"><span class="ps-step">1</span><h2 id="r1" class="ps-panel-title">Het ontvangstbewijs</h2></div>
+      <p class="ps-help">Een ontvangstbewijs is het korte blok tekst dat u krijgt als een bestand dat u verstuurde is opgehaald. Het zegt welk bestand is overgedragen, op welk moment, en of de kopie op de server is vernietigd.</p>
       <label class="rv-drop" id="rv-drop">
         <input type="file" id="rv-file" accept=".txt,.json,.receipt,application/json,text/plain">
-        <span class="rv-drop-cta">Drop the receipt file here, or choose one</span>
-        <span class="rv-drop-meta" id="rv-file-info">Nothing loaded yet</span>
+        <span class="rv-drop-cta">Sleep het ontvangstbewijs hierheen, of kies een bestand</span>
+        <span class="rv-drop-meta" id="rv-file-info">Nog niets geladen</span>
       </label>
       <div class="ps-field">
-        <label class="ps-label" for="rv-input">Or paste the receipt</label>
-        <textarea class="rv-paste" id="rv-input" spellcheck="false" placeholder="Paste the receipt text here. Both the long single-line form and the readable one work."></textarea>
+        <label class="ps-label" for="rv-input">Of plak het ontvangstbewijs</label>
+        <textarea class="rv-paste" id="rv-input" spellcheck="false" placeholder="Plak hier de tekst van het ontvangstbewijs. De lange vorm op één regel en de leesbare vorm werken allebei."></textarea>
       </div>
     </section>
 
     <section class="card ps-panel" aria-labelledby="r2">
-      <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="r2" class="ps-panel-title">Check it</h2></div>
-      <button class="btn btn-primary" id="rv-check" type="button">Check this receipt</button>
+      <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="r2" class="ps-panel-title">Controleren</h2></div>
+      <button class="btn btn-primary" id="rv-check" type="button">Dit ontvangstbewijs controleren</button>
       <div class="ps-result" id="rv-result" hidden role="status" aria-live="polite"></div>
     </section>
 
     <details class="card ps-panel" id="rv-keyblock">
-      <summary class="ps-panel-title">Checking a receipt from another server</summary>
-      <p class="ps-help">This page carries the signing key of every Paramant relay, and picks the one the receipt names, so the usual receipt is checked without asking anything of the network. A receipt from a server you run yourself is checked by pasting that server's key below.</p>
+      <summary class="ps-panel-title">Een ontvangstbewijs van een andere server controleren</summary>
+      <p class="ps-help">Deze pagina bevat de ondertekeningssleutel van elke Paramant-relay en kiest de sleutel die het ontvangstbewijs noemt. Een gewoon ontvangstbewijs wordt dus gecontroleerd zonder iets aan het netwerk te vragen. Een ontvangstbewijs van een server die u zelf draait, controleert u door de sleutel van die server hieronder te plakken.</p>
       <div class="ps-field">
-        <label class="ps-label" for="rv-key">Signing key of the server that issued the receipt</label>
-        <textarea class="rv-paste" id="rv-key" spellcheck="false" placeholder="Leave this empty to use the key that came with this page."></textarea>
-        <p class="ps-help">Every relay publishes its own key at <code class="mono">/v2/pubkey</code>, for example <code class="mono" id="rv-key-hint"></code>.</p>
+        <label class="ps-label" for="rv-key">Ondertekeningssleutel van de server die het ontvangstbewijs uitgaf</label>
+        <textarea class="rv-paste" id="rv-key" spellcheck="false" placeholder="Laat dit leeg om de sleutel te gebruiken die bij deze pagina hoort."></textarea>
+        <p class="ps-help">Elke relay publiceert zijn eigen sleutel op <code class="mono">/v2/pubkey</code>, bijvoorbeeld <code class="mono" id="rv-key-hint"></code>.</p>
       </div>
     </details>
 
     <aside class="ps-info">
-      <h2>What is checked</h2>
+      <h2>Wat er wordt gecontroleerd</h2>
       <ul>
-        <li>The receipt is about the file it names and no other</li>
-        <li>The entry it points to really sits in the public transparency log</li>
-        <li>The signature over the whole receipt holds, so nothing was altered</li>
-        <li>The log snapshot the receipt leans on was signed too</li>
+        <li>Het ontvangstbewijs gaat over het bestand dat het noemt, en geen ander</li>
+        <li>De regel waar het naar verwijst staat echt in het openbare transparantielogboek</li>
+        <li>De handtekening over het hele ontvangstbewijs klopt, dus er is niets veranderd</li>
+        <li>De momentopname van het logboek waar het ontvangstbewijs op steunt is ook ondertekend</li>
       </ul>
-      <p class="ps-help">All four run on this device. Once the page has loaded you can pull the plug and the answer is the same.</p>
+      <p class="ps-help">Alle vier gebeuren op dit apparaat. Zodra de pagina geladen is, kunt u de stekker eruit trekken en blijft het antwoord hetzelfde.</p>
     </aside>
   </div>
 </main>
+<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/verify" hreflang="en" lang="en">This page in English</a></p>
 
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Company</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/about">About</a>
-          <a href="/changelog">Changelog</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/privacy">Privacy Policy</a>
-          <a href="/dpa">Data Processing Agreement</a>
-          <a href="/terms">Terms of Service</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/license">License</a>
+          <a href="/license">Licentie</a>
         </div>
       </div>
     </div>
@@ -250,7 +254,7 @@
 </footer>
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=10" defer></script>
-<script type="module" src="/parasign-verify.js?v=6"></script>
-<script type="module" src="/js/receipt-verify.js?v=1"></script>
+<script type="module" src="/parasign-verify.js?v=7"></script>
+<script type="module" src="/js/receipt-verify.js?v=2"></script>
 </body>
 </html>

@@ -30,7 +30,7 @@ test('de rem wordt gevraagd voordat er iets wordt weggeschreven', () => {
   // een record dat dertig zegt.
   const remOp = BRON.indexOf('const _rem = inviteRateOk(');
   const create = BRON.indexOf('const made = await _sendStore().create(');
-  const mailen = BRON.indexOf("subject: wieRuw ? wieRuw + ' sent you a file'");
+  const mailen = BRON.indexOf("(wieRuw ? wieRuw + ' heeft u een bestand gestuurd'");
   assert.ok(remOp > 0 && create > 0 && mailen > 0, 'ankers niet gevonden');
   assert.ok(remOp < create, 'de rem moet voor create komen, niet erna');
   assert.ok(create < mailen, 'en create voor de mailronde');

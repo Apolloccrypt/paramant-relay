@@ -57,7 +57,7 @@ test('Mailjet krijgt een echt adres in From.Email', async () => {
   const r = await mail.stuur({
     to: ['partner0@extern.test'],
     from: mail.afzenderNamens(undefined, 'Zorggroep De Linde'),
-    subject: 'Zorggroep De Linde sent you a file',
+    subject: 'Zorggroep De Linde heeft u een bestand gestuurd',
     text: 'hoi',
   }, { fetch: f, env: MJ });
   assert.equal(r.ok, true, 'de neppe provider zegt ja; een echte niet');

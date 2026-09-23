@@ -105,7 +105,7 @@ test('twintig gelijktijdige verzendingen komen niet over het uurplafond', async 
   // 1. De route beweert:
   const beweerd = gelukt.reduce((n, a) => n + a.body.invited, 0);
   // 2. Wat er ECHT uit de maillaag kwam:
-  const echt = post.filter(p => /sent you a file/.test(p.subject || '')).length;
+  const echt = post.filter(p => /heeft u een bestand gestuurd/.test(p.subject || '')).length;
   assert.equal(echt, beweerd, 'invited moet kloppen met de post');
 
   // 3. En geen van beide mag over het plafond.

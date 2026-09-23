@@ -282,7 +282,7 @@ test('intrekken na ophalen kan niet, en herinneren na intrekken ook niet', async
   });
   assert.equal(cr.status, 200, 'code aanvragen faalde');
   await new Promise((r) => setTimeout(r, 250));
-  const mail = post.find((p) => /code to open the file/i.test(p.subject || ''));
+  const mail = post.find((p) => /controlecode om het bestand te openen/i.test(p.subject || ''));
   assert.ok(mail, 'geen codemail');
   const code = (String(mail.text).match(/\b(\d{6})\b/) || [])[1];
   const op = await fetch(BASE + '/v2/pickup/' + encodeURIComponent(s.tokens['zeven@extern.test']), {

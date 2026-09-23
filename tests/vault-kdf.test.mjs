@@ -76,7 +76,8 @@ async function forgeOldContainer(bytes, meta, passphrase) {
 
 const kdfServer = http.createServer((req, res) => {
   const pathname = new URL(req.url, 'http://localhost').pathname;
-  const wanted = pathname === '/vault' ? '/vault.html' : decodeURIComponent(pathname);
+  const wanted = pathname === '/vault' ? '/vault.html'
+    : pathname === '/en/vault' ? '/en/vault.html' : decodeURIComponent(pathname);
   const file = path.join(KDF_ROOT, wanted);
   if (!file.startsWith(KDF_ROOT)) { res.writeHead(403); return res.end(); }
   fs.readFile(file, (err, body) => {
@@ -104,8 +105,8 @@ try {
   await page.goto(`${KDF_ORIGIN}/vault`);
 
   const shown = (await page.locator('main').innerText()).replace(/\s+/g, ' ');
-  assert.ok(shown.includes(CURRENT_ITERATIONS.toLocaleString('en-US')),
-    `the page must print the iteration count the code uses (${CURRENT_ITERATIONS.toLocaleString('en-US')}); it says: ${shown}`);
+  assert.ok(shown.includes(CURRENT_ITERATIONS.toLocaleString('nl-NL')),
+    `the page must print the iteration count the code uses (${CURRENT_ITERATIONS.toLocaleString('nl-NL')}); it says: ${shown}`);
   assert.ok(shown.includes('PBKDF2-SHA-256') && shown.includes('AES-256-GCM'),
     `the page must name the KDF and the cipher it actually uses; it says: ${shown}`);
   // The claim the security review struck. AES-256 is not what makes this
@@ -115,7 +116,7 @@ try {
     `the vault page may not make a quantum claim; it says: ${shown}`);
   // And the honest sentence: no recovery, because there is nothing to recover
   // from.
-  assert.match(shown, /cannot reset it for you/i,
+  assert.match(shown, /niet voor u herstellen/i,
     `the page must say that a lost passphrase cannot be recovered; it says: ${shown}`);
 
   // ── A file locked TODAY carries the new count in its header ───────────────
@@ -168,7 +169,7 @@ try {
     'opening a container locked at the old iteration count must give the original file back');
   assert.equal(fs.readFileSync(await opened.path()).toString('utf8'), legacyBody.toString('utf8'),
     'the bytes that come back out of an old container must be the bytes that went in');
-  assert.match(await page.locator('#open-status').innerText(), /Opened/,
+  assert.match(await page.locator('#open-status').innerText(), /Geopend/,
     'the page must report success for a container written with the old parameters');
 
   // ── And a wrong passphrase is still refused, at either count ──────────────
@@ -178,8 +179,35 @@ try {
   await page.fill('#open-pw', 'not the passphrase');
   await page.click('#open-run');
   await page.locator('#open-status.err').waitFor();
-  assert.match(await page.locator('#open-status').innerText(), /Wrong passphrase/,
+  assert.match(await page.locator('#open-status').innerText(), /Verkeerde wachtwoordzin/,
     'a wrong passphrase must be refused, not silently accepted');
+
+  // ── The English page, /en/vault, runs the same file and says the same ────
+  //
+  // One vault.js serves both languages; the <html lang> picks the words. The
+  // English copy must still print the count, still refuse a wrong passphrase
+  // and still say it in English.
+  await page.goto(`${KDF_ORIGIN}/en/vault`);
+  const shownEn = (await page.locator('main').innerText()).replace(/\s+/g, ' ');
+  assert.ok(shownEn.includes(CURRENT_ITERATIONS.toLocaleString('en-US')),
+    `/en/vault must print the iteration count the code uses (${CURRENT_ITERATIONS.toLocaleString('en-US')}); it says: ${shownEn}`);
+  assert.ok(shownEn.includes('PBKDF2-SHA-256') && shownEn.includes('AES-256-GCM'),
+    `/en/vault must name the KDF and the cipher it actually uses; it says: ${shownEn}`);
+  assert.doesNotMatch(shownEn, /quantum/i, `/en/vault may not make a quantum claim; it says: ${shownEn}`);
+  assert.match(shownEn, /cannot reset it for you/i,
+    `/en/vault must say that a lost passphrase cannot be recovered; it says: ${shownEn}`);
+  await page.click('.vt-tab[data-mode="open"]');
+  await page.setInputFiles('#open-input', { name:'paramant-vault.prmnt', mimeType:'application/octet-stream', buffer:legacy });
+  await page.fill('#open-pw', 'not the passphrase');
+  await page.click('#open-run');
+  await page.locator('#open-status.err').waitFor();
+  assert.match(await page.locator('#open-status').innerText(), /Wrong passphrase/,
+    '/en/vault must refuse a wrong passphrase in English');
+  await page.fill('#open-pw', passphrase);
+  const [openedEn] = await Promise.all([page.waitForEvent('download'), page.click('#open-run')]);
+  assert.equal(openedEn.suggestedFilename(), legacyName, '/en/vault must open an old container too');
+  assert.match(await page.locator('#open-status').innerText(), /Opened/,
+    '/en/vault must report success in English');
 
   console.log('PASS: vault locks at 600,000 PBKDF2-SHA-256 rounds, still opens containers written at 210,000, and the page says so.');
 } finally {

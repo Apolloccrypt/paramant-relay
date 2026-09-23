@@ -31,7 +31,7 @@ const MIME = {
   '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png',
   '.woff2': 'font/woff2', '.json': 'application/json', '.ico': 'image/x-icon',
 };
-const aliases = { '/verify': '/verify.html' };
+const aliases = { '/verify': '/verify.html', '/en/verify': '/en/verify.html' };
 
 // Byte-identical to relay.js canonicalJSON.
 function canonicalJSON(value) {
@@ -103,10 +103,13 @@ function startServer() {
 
 // Load the page, then take the network away and keep a record of anything that
 // still tries to leave. Everything after this point is the offline promise.
-async function offlinePage(browser, origin) {
+// The English assertions below run against /en/verify, the English copy of the
+// page; the Dutch page at /verify gets its own tests further down. Both load
+// the same receipt-verify.js, which picks its words from <html lang>.
+async function offlinePage(browser, origin, route = '/en/verify') {
   const context = await browser.newContext({ viewport: { width: 1100, height: 900 } });
   const page = await context.newPage();
-  await page.goto(origin + '/verify', { waitUntil: 'load' });
+  await page.goto(origin + route, { waitUntil: 'load' });
   await page.waitForFunction(() => !!document.getElementById('rv-check'));
   await page.waitForLoadState('networkidle');
 
@@ -221,6 +224,66 @@ test('the receipt tab opens straight from /verify#receipt', async () => {
   await page.waitForFunction(() => !!document.getElementById('rv-check'));
   assert.equal(await page.isVisible('#panel-receipt'), true);
   assert.equal(await page.isVisible('#panel-doc'), false);
+  await context.close();
+});
+
+// ── The Dutch page, /verify ─────────────────────────────────────────────────
+// The same checks, the same offline promise, in Dutch. The English tests above
+// pin the English words on /en/verify; these pin the Dutch words on /verify.
+test('NL: een echt ontvangstbewijs wordt offline bevestigd, in het Nederlands', async () => {
+  const { context, page, attempted } = await offlinePage(browser, ORIGIN, '/verify');
+  const text = await checkReceipt(page, fixture.valid, fixture.key);
+  assert.match(text, /Dit ontvangstbewijs is ongewijzigd/);
+  assert.doesNotMatch(text, /Dit ontvangstbewijs is echt/,
+    'an unrecognised signer must never be presented as a Paramant receipt');
+  assert.match(text, /Het ontvangstbewijs gaat over dit bestand en geen ander/);
+  assert.match(text, /Het staat echt in het openbare transparantielogboek/);
+  assert.match(text, /De handtekening klopt, dus/);
+  assert.match(text, /Het logboek zelf is op dat moment ook ondertekend/);
+  assert.match(text, /Het is ondertekend met een sleutel die deze pagina niet kent/);
+  assert.match(text, /overgedragen op 1 september 2026 om 14:22 UTC/);
+  assert.ok(text.includes(fixture.blobHash), 'the fingerprint of the file must be on screen in full');
+  assert.match(text, /vernietigde zijn kopie van het bestand/);
+  assert.match(text, /regel 5 in een openbaar logboek dat op dat moment 5 regels telde/);
+  assert.doesNotMatch(text, /handtekening geldig|valid: true|blob_hash:/i);
+  assert.doesNotMatch(text, /This receipt|The signature|What was checked/,
+    'the Dutch page may not fall back to English sentences');
+  assert.deepEqual(attempted, [], 'checking a receipt must not touch the network: ' + attempted.join(', '));
+  await context.close();
+});
+
+test('NL: een ontvangstbewijs met een veranderd teken wordt geweigerd, met een reden', async () => {
+  const { context, page, attempted } = await offlinePage(browser, ORIGIN, '/verify');
+  const text = await checkReceipt(page, fixture.tampered, fixture.key);
+  assert.match(text, /Vertrouw dit ontvangstbewijs niet/);
+  assert.match(text, /Het ontvangstbewijs past niet bij het bestand dat het noemt/);
+  assert.match(text, /De handtekening klopt niet/);
+  assert.deepEqual(attempted, [], 'refusing a receipt must not touch the network either: ' + attempted.join(', '));
+  await context.close();
+});
+
+test('NL: onzin in het vak krijgt een zin, geen stacktrace', async () => {
+  const { context, page } = await offlinePage(browser, ORIGIN, '/verify');
+  await page.click('#tab-receipt');
+  await page.fill('#rv-input', 'this is just a note to myself');
+  await page.click('#rv-check');
+  await page.waitForSelector('#rv-result .ps-banner');
+  const text = await page.textContent('#rv-result');
+  assert.match(text, /Dit is geen ontvangstbewijs/);
+  assert.doesNotMatch(text, /undefined|TypeError|SyntaxError/);
+  await context.close();
+});
+
+test('the language switch keeps the receipt tab, both ways', async () => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto(ORIGIN + '/verify#receipt', { waitUntil: 'load' });
+  await page.waitForFunction(() => /#receipt$/.test(document.querySelector('.lang-switch a')?.getAttribute('href') || ''));
+  assert.equal(await page.getAttribute('.lang-switch a', 'href'), '/en/verify#receipt');
+  await page.goto(ORIGIN + '/en/verify#receipt', { waitUntil: 'load' });
+  await page.waitForFunction(() => /#receipt$/.test(document.querySelector('.lang-switch a')?.getAttribute('href') || ''));
+  assert.equal(await page.getAttribute('.lang-switch a', 'href'), '/verify#receipt');
+  assert.equal(await page.isVisible('#panel-receipt'), true);
   await context.close();
 });
 

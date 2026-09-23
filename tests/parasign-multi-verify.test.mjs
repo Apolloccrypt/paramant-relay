@@ -63,19 +63,33 @@ const fixture = await page.evaluate(async () => {
   return { source:Array.from(source), receipt };
 });
 
-await page.goto(origin + '/verify.html', { waitUntil:'domcontentloaded' });
-await page.locator('#vf-document').setInputFiles({ name:'source-demo.pdf', mimeType:'application/pdf', buffer:Buffer.from(fixture.source) });
-await page.locator('#vf-envelope').setInputFiles({ name:'source-demo.psign', mimeType:'application/json', buffer:Buffer.from(JSON.stringify(fixture.receipt)) });
-await page.locator('#vf-verify').click();
-await page.waitForFunction(() => /Signature valid|Signature INVALID/.test(document.querySelector('#vf-result')?.textContent || ''));
-const result = await page.locator('#vf-result').innerText();
-const keyHidden = await page.locator('#vf-key-block').isHidden();
-const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+// The same receipt through both copies of the page: the English words on
+// /en/verify, the Dutch words on /verify. One parasign-verify.js serves both.
+const runs = [
+  { url:'/en/verify.html', verdict:/Signature valid|Signature INVALID/, valid:/Signature valid/, offline:/verified offline/ },
+  { url:'/verify.html', verdict:/Handtekening geldig|Handtekening ONGELDIG/, valid:/Handtekening geldig/, offline:/offline gecontroleerd/ },
+];
+const outcomes = [];
+for (const run of runs) {
+  await page.goto(origin + run.url, { waitUntil:'domcontentloaded' });
+  await page.locator('#vf-document').setInputFiles({ name:'source-demo.pdf', mimeType:'application/pdf', buffer:Buffer.from(fixture.source) });
+  await page.locator('#vf-envelope').setInputFiles({ name:'source-demo.psign', mimeType:'application/json', buffer:Buffer.from(JSON.stringify(fixture.receipt)) });
+  await page.locator('#vf-verify').click();
+  await page.waitForFunction((src) => new RegExp(src).test(document.querySelector('#vf-result')?.textContent || ''), run.verdict.source);
+  outcomes.push({
+    run,
+    result: await page.locator('#vf-result').innerText(),
+    keyHidden: await page.locator('#vf-key-block').isHidden(),
+    overflow: await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+  });
+}
 
 await browser.close();
 server.close();
-if (!/Signature valid/.test(result)) throw new Error(result);
-if (!/verified offline/.test(result)) throw new Error('offline result missing');
-if (!keyHidden) throw new Error('API key field visible for self-contained proof');
-if (overflow > 1) throw new Error('phone overflow: ' + overflow);
+for (const { run, result, keyHidden, overflow } of outcomes) {
+  if (!run.valid.test(result)) throw new Error(run.url + ': ' + result);
+  if (!run.offline.test(result)) throw new Error(run.url + ': offline result missing');
+  if (!keyHidden) throw new Error(run.url + ': API key field visible for self-contained proof');
+  if (overflow > 1) throw new Error(run.url + ': phone overflow: ' + overflow);
+}
 console.log('parasign-multi-verify: recipe 5 receipt verifies offline in Chromium');

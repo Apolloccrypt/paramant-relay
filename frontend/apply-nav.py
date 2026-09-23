@@ -89,13 +89,15 @@ NEW_FOOTER = '''\
 # Versturen and Ondertekenen. js/nav-auth.js re-renders the same Dutch list
 # when <html lang="nl">, so the two may never drift apart.
 # Account and sign-in pages followed on the same day: one language from the
-# first screen to the dashboard.
+# first screen to the dashboard. Sending and receiving (get, ontvang, parasend,
+# parashare, verify) too.
 NL_PAGES = {
     'index.html', 'pricing.html', 'about.html', 'security.html',
     'auth/login.html', 'auth/setup.html', 'auth/backup.html',
     'auth/request-reset.html', 'auth/reset-confirm.html',
     'signup.html', 'signup/verified.html', 'request-key.html',
     'account.html', 'dashboard.html',
+    'get.html', 'ontvang.html', 'parasend.html', 'parashare.html', 'verify.html',
 }
 
 NEW_NAV_NL = '''\

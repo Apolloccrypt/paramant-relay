@@ -81,23 +81,23 @@ function nodeHash(leftHex, rightHex) {
 // and some tools wrap it as {"receipt": "..."}. All three are the same receipt.
 export function parseReceipt(input) {
   const text = String(input || '').trim();
-  if (!text) throw new Error('There is nothing here to check yet.');
+  if (!text) throw new Error(t('nothing'));
   let obj = null;
   if (text[0] === '{') {
-    try { obj = JSON.parse(text); } catch { throw new Error('This looks like JSON but it is damaged, so it cannot be read.'); }
+    try { obj = JSON.parse(text); } catch { throw new Error(t('damagedJson')); }
     if (obj && typeof obj.receipt === 'string') return parseReceipt(obj.receipt);
   } else {
     const compact = text.replace(/\s+/g, '');
     let decoded;
     try { decoded = new TextDecoder().decode(fromB64(compact)); }
-    catch { throw new Error('This is not a receipt. Paste the receipt text, or drop the receipt file.'); }
-    try { obj = JSON.parse(decoded); } catch { throw new Error('This is not a receipt. Paste the receipt text, or drop the receipt file.'); }
+    catch { throw new Error(t('notReceipt')); }
+    try { obj = JSON.parse(decoded); } catch { throw new Error(t('notReceipt')); }
   }
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
-    throw new Error('This is not a receipt. Paste the receipt text, or drop the receipt file.');
+    throw new Error(t('notReceipt'));
   }
   if (!obj.blob_hash || !obj.inclusion_proof) {
-    throw new Error('This file is not a ParaSend transfer receipt. A receipt names the file it covers and carries its place in the transparency log.');
+    throw new Error(t('notTransfer'));
   }
   return obj;
 }
@@ -120,11 +120,11 @@ export function verifyReceipt(receipt, relayKeyBytes, keySource) {
     const expected = blobLeafHash(receipt.blob_hash, receipt.sector, receipt.ts);
     leafOk = expected === proof.leaf_hash;
     add('leaf', leafOk,
-      leafOk ? 'The receipt is about this file and no other.'
-             : 'The receipt does not match the file it names.',
-      leafOk ? '' : 'The entry it points to in the transparency log belongs to a different file, or the fingerprint inside the receipt was changed afterwards.');
+      leafOk ? t('leafOk')
+             : t('leafBad'),
+      leafOk ? '' : t('leafBadWhy'));
   } catch (e) {
-    add('leaf', false, 'The receipt does not match the file it names.', 'The file fingerprint inside it could not be read (' + e.message + ').');
+    add('leaf', false, t('leafBad'), t('leafUnreadable', { err: e.message }));
   }
 
   // 2. Does the log entry really sit in the tree the receipt claims?
@@ -136,11 +136,11 @@ export function verifyReceipt(receipt, relayKeyBytes, keySource) {
     }
     rootOk = !!computed && computed === proof.root;
     add('tree', rootOk,
-      rootOk ? 'It really is in the public transparency log.'
-             : 'It is not in the transparency log it claims to be in.',
-      rootOk ? '' : 'Recomputing the log from the entry gives a different result, so the proof of inclusion does not hold.');
+      rootOk ? t('treeOk')
+             : t('treeBad'),
+      rootOk ? '' : t('treeBadWhy'));
   } catch (e) {
-    add('tree', false, 'It is not in the transparency log it claims to be in.', 'The proof of inclusion could not be recomputed (' + e.message + ').');
+    add('tree', false, t('treeBad'), t('treeErr', { err: e.message }));
   }
 
   // 3. The relay's signature over the whole receipt.
@@ -153,17 +153,17 @@ export function verifyReceipt(receipt, relayKeyBytes, keySource) {
     // statement about us; "no key at all" is a statement about the input. Only
     // the second used to exist, and neither may read as "forged".
     if (source === 'unknown-relay') {
-      add('signature', null, 'The signature was not checked, because this page does not know this relay.',
+      add('signature', null, t('sigUnknownRelay'),
         relayHost
-          ? 'The receipt says it was issued by ' + relayHost + ', which is not one of the relays this page ships with. Paste that relay\u2019s public key to finish the check.'
-          : 'The receipt does not say which relay issued it, so there is no key to check it against.');
+          ? t('sigUnknownRelayWhy', { host: relayHost })
+          : t('sigNoRelay'));
     } else {
-      add('signature', null, 'The signature was not checked.',
-        'No server key was available to check it against. Everything else on this page was still checked.');
+      add('signature', null, t('sigSkipped'),
+        t('sigSkippedWhy'));
     }
   } else if (!signature) {
-    add('signature', false, 'This receipt carries no signature at all.',
-      'A genuine receipt is always signed by the server that handed the file over.');
+    add('signature', false, t('sigNone'),
+      t('sigNoneWhy'));
   } else {
     try {
       fingerprint = toHex(sha3_256(relayKeyBytes));
@@ -171,26 +171,26 @@ export function verifyReceipt(receipt, relayKeyBytes, keySource) {
     } catch { sigOk = false; }
     keyKnown = anchorByFingerprint(fingerprint);
     add('signature', sigOk,
-      sigOk ? 'The signature holds, so not one character has been altered.'
-            : 'The signature does not hold.',
-      sigOk ? '' : 'Either the receipt was edited after it was signed, or it was signed by a different key than the one used to check it.');
+      sigOk ? t('sigOk')
+            : t('sigBad'),
+      sigOk ? '' : t('sigBadWhy'));
   }
 
   // 4. The relay's signature over the log snapshot the proof refers to.
   const sth = proof.sth || null;
   if (sth && sth.signature) {
     if (!relayKeyBytes) {
-      add('sth', null, 'The log snapshot was not checked.', 'No server key was available to check its signature against.');
+      add('sth', null, t('sthSkipped'), t('sthSkippedWhy'));
     } else {
       const { signature: sthSig, ...sthPayload } = sth;
       let sthOk = false;
       try { sthOk = ml_dsa65.verify(relayKeyBytes, enc.encode(canonicalJSON(sthPayload)), fromB64(sthSig)); } catch { sthOk = false; }
       const rootMatch = sth.sha3_root === proof.root;
       add('sth', sthOk && rootMatch,
-        (sthOk && rootMatch) ? 'The log itself was signed at that moment too.'
-                             : 'The log snapshot inside the receipt does not hold up.',
-        !sthOk ? 'The signature over the log snapshot does not check out.'
-               : (!rootMatch ? 'The snapshot describes a different state of the log than the proof does.' : ''));
+        (sthOk && rootMatch) ? t('sthOk')
+                             : t('sthBad'),
+        !sthOk ? t('sthBadSig')
+               : (!rootMatch ? t('sthBadRoot') : ''));
     }
   }
 
@@ -204,18 +204,158 @@ export function verifyReceipt(receipt, relayKeyBytes, keySource) {
     keySource: source,
     checks,
     fingerprint,
-    keyName: keyKnown ? keyKnown.name : null,
+    keyName: keyKnown ? ((LANG === 'nl' && keyKnown.name_nl) || keyKnown.name) : null,
     receipt,
   };
+}
+
+// Visible text in both languages. /verify is Dutch, /en/verify English; the page's <html lang> picks the set.
+const LANG = ((typeof document !== 'undefined' && document.documentElement.lang) || 'nl').slice(0, 2) === 'en' ? 'en' : 'nl';
+const T = {
+  nl: {
+    nothing: 'Er is hier nog niets om te controleren.',
+    damagedJson: 'Dit lijkt op JSON, maar het is beschadigd en daardoor niet te lezen.',
+    notReceipt: 'Dit is geen ontvangstbewijs. Plak de tekst van het ontvangstbewijs, of sleep het bestand hierheen.',
+    notTransfer: 'Dit bestand is geen ontvangstbewijs van ParaSend. Een ontvangstbewijs noemt het bestand waar het over gaat en bevat de plek in het transparantielogboek.',
+    leafOk: 'Het ontvangstbewijs gaat over dit bestand en geen ander.',
+    leafBad: 'Het ontvangstbewijs past niet bij het bestand dat het noemt.',
+    leafBadWhy: 'De regel in het transparantielogboek waar het naar verwijst hoort bij een ander bestand, of de vingerafdruk in het ontvangstbewijs is achteraf veranderd.',
+    leafUnreadable: 'De vingerafdruk van het bestand erin was niet te lezen ({err}).',
+    treeOk: 'Het staat echt in het openbare transparantielogboek.',
+    treeBad: 'Het staat niet in het transparantielogboek waar het volgens zichzelf in staat.',
+    treeBadWhy: 'Het logboek opnieuw berekenen vanuit de regel geeft een andere uitkomst, dus het bewijs van opname klopt niet.',
+    treeErr: 'Het bewijs van opname kon niet opnieuw worden berekend ({err}).',
+    sigUnknownRelay: 'De handtekening is niet gecontroleerd, omdat deze pagina deze relay niet kent.',
+    sigUnknownRelayWhy: 'Volgens het ontvangstbewijs is het uitgegeven door {host}, en dat is geen van de relays die deze pagina kent. Plak de publieke sleutel van die relay om de controle af te maken.',
+    sigNoRelay: 'Het ontvangstbewijs zegt niet welke relay het uitgaf, dus er is geen sleutel om het mee te vergelijken.',
+    sigSkipped: 'De handtekening is niet gecontroleerd.',
+    sigSkippedWhy: 'Er was geen sleutel van een server om hem mee te vergelijken. Al het andere op deze pagina is wel gecontroleerd.',
+    sigNone: 'Dit ontvangstbewijs heeft helemaal geen handtekening.',
+    sigNoneWhy: 'Een echt ontvangstbewijs is altijd ondertekend door de server die het bestand heeft overgedragen.',
+    sigOk: 'De handtekening klopt, dus er is geen enkel teken veranderd.',
+    sigBad: 'De handtekening klopt niet.',
+    sigBadWhy: 'Het ontvangstbewijs is na het ondertekenen bewerkt, of het is ondertekend met een andere sleutel dan die waarmee het is gecontroleerd.',
+    sthSkipped: 'De momentopname van het logboek is niet gecontroleerd.',
+    sthSkippedWhy: 'Er was geen sleutel van een server om de handtekening mee te vergelijken.',
+    sthOk: 'Het logboek zelf is op dat moment ook ondertekend.',
+    sthBad: 'De momentopname van het logboek in het ontvangstbewijs klopt niet.',
+    sthBadSig: 'De handtekening over de momentopname van het logboek klopt niet.',
+    sthBadRoot: 'De momentopname beschrijft een andere stand van het logboek dan het bewijs.',
+    moment: '{date} om {time} UTC',
+    keyUnknownRelay: 'Volgens het ontvangstbewijs is het uitgegeven door <code class="mono">{host}</code>, een relay waarvan deze pagina geen sleutel heeft. De ondertekenaar is hier dus niet vast te stellen.',
+    keyNoRelay: 'Het zegt niet welke relay het uitgaf. De ondertekenaar is hier dus niet vast te stellen.',
+    keyNone: 'Er is geen ondertekenaar vast te stellen, omdat er geen sleutel was om mee te vergelijken.',
+    againstNamed: 'de sleutel van {name} <code class="mono">{fp}</code>',
+    againstGiven: 'de sleutel die u gaf, vingerafdruk <code class="mono">{fp}</code>',
+    keyMismatch: 'Het past niet bij {against}, dus deze pagina kan niet zeggen wie het ondertekende.',
+    keyNamed: 'Het is ondertekend door {name}, sleutel <code class="mono">{fp}</code>.',
+    keyStranger: 'Het is ondertekend met een sleutel die deze pagina niet kent, vingerafdruk <code class="mono">{fp}</code>. Vergelijk die met de sleutel die Paramant publiceert voordat u erop vertrouwt.',
+    bannerGenuine: '<div class="ps-banner ok"><strong>Dit ontvangstbewijs is echt.</strong> Het is uitgegeven door {name} en er is sindsdien geen enkel teken veranderd.</div>',
+    bannerUnchanged: '<div class="ps-banner ok"><strong>Dit ontvangstbewijs is ongewijzigd.</strong> Alles past nog bij de sleutel die u gaf, en die sleutel kent deze pagina niet.</div>',
+    bannerUnknownRelay: '<div class="ps-banner info"><strong>Deze pagina kent deze relay niet.</strong> Alles wat te controleren was klopt, maar volgens het ontvangstbewijs komt het van {host}, en deze pagina heeft daar geen sleutel van. Plak de publieke sleutel van die relay om de controle af te maken.</div>',
+    bannerHolds: '<div class="ps-banner info"><strong>Het ontvangstbewijs is intern kloppend.</strong> De handtekening is niet gecontroleerd, omdat er geen sleutel van een server was.</div>',
+    bannerBad: '<div class="ps-banner err"><strong>Vertrouw dit ontvangstbewijs niet.</strong> Het zakte voor minstens een van de controles hieronder.</div>',
+    factHanded: 'Het bestand is overgedragen op {when}.',
+    factAccepted: 'De server nam het aan op {when}.',
+    factHost: 'De overdracht is gedaan door <code class="mono">{host}</code>.',
+    factFp: 'Het bestand waar het over gaat heeft vingerafdruk <code class="mono">{fp}</code>.',
+    factBurned: 'De server vernietigde zijn kopie van het bestand bij de overdracht.',
+    factKept: 'De server hield zijn kopie na deze download, omdat de verzending meer dan een download toestond.',
+    factEntry: 'Het is regel {n} in een openbaar logboek dat op dat moment {size} regels telde.',
+    says: 'Wat dit ontvangstbewijs zegt',
+    claims: 'Wat dit ontvangstbewijs beweert',
+    checkedHead: '<h3 class="rv-sub">Wat er is gecontroleerd</h3><ul class="rv-checks">',
+    passed: 'Geslaagd',
+    failed: 'Mislukt',
+    notChecked: 'Niet gecontroleerd',
+    showRaw: '<details class="rv-raw"><summary>Toon het ontvangstbewijs zoals het is geschreven</summary><pre class="mono">',
+    keyUnreadable: 'Die sleutel is niet leesbaar. Het is een doorlopend blok letters en cijfers.',
+    keyLength: 'Dat is geen ondertekeningssleutel van Paramant: hij is {n} bytes lang in plaats van {want}.',
+    checking: '<div class="ps-banner info">Bezig met controleren op dit apparaat…</div>',
+    couldNotCheck: 'Dit ontvangstbewijs kon niet worden gecontroleerd: {err}',
+    loaded: '{name} geladen',
+    unreadableFile: 'Dat bestand kon niet worden gelezen.',
+    unnamedRelay: 'een relay die het niet noemt',
+  },
+  en: {
+    nothing: 'There is nothing here to check yet.',
+    damagedJson: 'This looks like JSON but it is damaged, so it cannot be read.',
+    notReceipt: 'This is not a receipt. Paste the receipt text, or drop the receipt file.',
+    notTransfer: 'This file is not a ParaSend transfer receipt. A receipt names the file it covers and carries its place in the transparency log.',
+    leafOk: 'The receipt is about this file and no other.',
+    leafBad: 'The receipt does not match the file it names.',
+    leafBadWhy: 'The entry it points to in the transparency log belongs to a different file, or the fingerprint inside the receipt was changed afterwards.',
+    leafUnreadable: 'The file fingerprint inside it could not be read ({err}).',
+    treeOk: 'It really is in the public transparency log.',
+    treeBad: 'It is not in the transparency log it claims to be in.',
+    treeBadWhy: 'Recomputing the log from the entry gives a different result, so the proof of inclusion does not hold.',
+    treeErr: 'The proof of inclusion could not be recomputed ({err}).',
+    sigUnknownRelay: 'The signature was not checked, because this page does not know this relay.',
+    sigUnknownRelayWhy: 'The receipt says it was issued by {host}, which is not one of the relays this page ships with. Paste that relay’s public key to finish the check.',
+    sigNoRelay: 'The receipt does not say which relay issued it, so there is no key to check it against.',
+    sigSkipped: 'The signature was not checked.',
+    sigSkippedWhy: 'No server key was available to check it against. Everything else on this page was still checked.',
+    sigNone: 'This receipt carries no signature at all.',
+    sigNoneWhy: 'A genuine receipt is always signed by the server that handed the file over.',
+    sigOk: 'The signature holds, so not one character has been altered.',
+    sigBad: 'The signature does not hold.',
+    sigBadWhy: 'Either the receipt was edited after it was signed, or it was signed by a different key than the one used to check it.',
+    sthSkipped: 'The log snapshot was not checked.',
+    sthSkippedWhy: 'No server key was available to check its signature against.',
+    sthOk: 'The log itself was signed at that moment too.',
+    sthBad: 'The log snapshot inside the receipt does not hold up.',
+    sthBadSig: 'The signature over the log snapshot does not check out.',
+    sthBadRoot: 'The snapshot describes a different state of the log than the proof does.',
+    moment: '{date} at {time} UTC',
+    keyUnknownRelay: 'It says it was issued by <code class="mono">{host}</code>, a relay this page does not ship a key for, so the signer could not be identified here.',
+    keyNoRelay: 'It does not say which relay issued it, so the signer could not be identified here.',
+    keyNone: 'Nobody could be identified as the signer, because no key was available to compare against.',
+    againstNamed: '{name}’s key <code class="mono">{fp}</code>',
+    againstGiven: 'the key you gave, fingerprint <code class="mono">{fp}</code>',
+    keyMismatch: 'It does not match {against}, so this page cannot say who signed it.',
+    keyNamed: 'It was signed by {name}, key <code class="mono">{fp}</code>.',
+    keyStranger: 'It was signed by a key this page does not recognise, fingerprint <code class="mono">{fp}</code>. Compare that against the key Paramant publishes before you trust it.',
+    bannerGenuine: '<div class="ps-banner ok"><strong>This receipt is genuine.</strong> It was issued by {name} and not one character has changed since.</div>',
+    bannerUnchanged: '<div class="ps-banner ok"><strong>This receipt is unchanged.</strong> It all still matches the key you gave, and this page does not know that key.</div>',
+    bannerUnknownRelay: '<div class="ps-banner info"><strong>This page does not know this relay.</strong> Everything it could check holds, but the receipt says it came from {host}, and no key for it ships with this page. Paste that relay’s public key to finish the check.</div>',
+    bannerHolds: '<div class="ps-banner info"><strong>The receipt holds together.</strong> Its signature was not checked, because no server key was available.</div>',
+    bannerBad: '<div class="ps-banner err"><strong>Do not trust this receipt.</strong> It failed at least one check below.</div>',
+    factHanded: 'The file was handed over on {when}.',
+    factAccepted: 'It was accepted by the server on {when}.',
+    factHost: 'The handover was done by <code class="mono">{host}</code>.',
+    factFp: 'The file it covers has fingerprint <code class="mono">{fp}</code>.',
+    factBurned: 'The server destroyed its copy of the file as it was handed over.',
+    factKept: 'The server kept its copy after this download, because the transfer allowed more than one download.',
+    factEntry: 'It is entry {n} in a public log that held {size} entries at that moment.',
+    says: 'What this receipt says',
+    claims: 'What this receipt claims',
+    checkedHead: '<h3 class="rv-sub">What was checked</h3><ul class="rv-checks">',
+    passed: 'Passed',
+    failed: 'Failed',
+    notChecked: 'Not checked',
+    showRaw: '<details class="rv-raw"><summary>Show the receipt as it was written</summary><pre class="mono">',
+    keyUnreadable: 'That key is not readable. It is one unbroken block of letters and digits.',
+    keyLength: 'That is not a Paramant signing key: it is {n} bytes long instead of {want}.',
+    checking: '<div class="ps-banner info">Checking on this device…</div>',
+    couldNotCheck: 'This receipt could not be checked: {err}',
+    loaded: '{name} loaded',
+    unreadableFile: 'That file could not be read.',
+    unnamedRelay: 'a relay it does not name',
+  },
+};
+function t(k, v) {
+  let s = (T[LANG] && T[LANG][k]) || T.en[k] || k;
+  if (v) for (const n of Object.keys(v)) s = s.split('{' + n + '}').join(String(v[n]));
+  return s;
 }
 
 // ── Plain language ──────────────────────────────────────────────────────────
 function formatMoment(value) {
   const d = value == null ? null : new Date(typeof value === 'number' ? value : String(value));
   if (!d || isNaN(d.getTime())) return null;
-  const date = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(d);
-  const time = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' }).format(d);
-  return date + ' at ' + time + ' UTC';
+  const date = new Intl.DateTimeFormat(LANG === 'en' ? 'en-GB' : 'nl-NL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(d);
+  const time = new Intl.DateTimeFormat(LANG === 'en' ? 'en-GB' : 'nl-NL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' }).format(d);
+  return t('moment', { date, time });
 }
 
 function keySentence(result) {
@@ -223,11 +363,10 @@ function keySentence(result) {
   if (!result.checkedSignature) {
     if (result.unknownRelay) {
       return result.relayHost
-        ? 'It says it was issued by <code class="mono">' + esc(result.relayHost)
-          + '</code>, a relay this page does not ship a key for, so the signer could not be identified here.'
-        : 'It does not say which relay issued it, so the signer could not be identified here.';
+        ? t('keyUnknownRelay', { host: esc(result.relayHost) })
+        : t('keyNoRelay');
     }
-    return 'Nobody could be identified as the signer, because no key was available to compare against.';
+    return t('keyNone');
   }
   const short = esc(fp.slice(0, 16));
   // Past tense about the signer is only earned once the signature held. Before
@@ -236,15 +375,14 @@ function keySentence(result) {
   // had shown.
   if (result.signatureHeld !== true) {
     const against = result.keyName
-      ? esc(result.keyName) + '\u2019s key <code class="mono">' + short + '</code>'
-      : 'the key you gave, fingerprint <code class="mono">' + short + '</code>';
-    return 'It does not match ' + against + ', so this page cannot say who signed it.';
+      ? t('againstNamed', { name: esc(result.keyName), fp: short })
+      : t('againstGiven', { fp: short });
+    return t('keyMismatch', { against });
   }
   if (result.keyName) {
-    return 'It was signed by ' + esc(result.keyName) + ', key <code class="mono">' + short + '</code>.';
+    return t('keyNamed', { name: esc(result.keyName), fp: short });
   }
-  return 'It was signed by a key this page does not recognise, fingerprint <code class="mono">' + short
-    + '</code>. Compare that against the key Paramant publishes before you trust it.';
+  return t('keyStranger', { fp: short });
 }
 
 export function renderResult(result, target) {
@@ -253,62 +391,58 @@ export function renderResult(result, target) {
   const signedFully = result.valid && result.checkedSignature;
 
   if (signedFully && result.keyName) {
-    out.push('<div class="ps-banner ok"><strong>This receipt is genuine.</strong> It was issued by '
-      + esc(result.keyName) + ' and not one character has changed since.</div>');
+    out.push(t('bannerGenuine', { name: esc(result.keyName) }));
   } else if (signedFully) {
     // Every check passed, but against a key this page has never seen. Saying
     // "genuine" there would launder an unknown signer into a Paramant promise.
-    out.push('<div class="ps-banner ok"><strong>This receipt is unchanged.</strong> It all still matches the key you gave, and this page does not know that key.</div>');
+    out.push(t('bannerUnchanged'));
   } else if (result.valid && result.unknownRelay) {
     // Every check this page could run passed; the one it could not run is the
     // signature, because the receipt names a relay we ship no key for. An
     // unknown sender and a forgery are different things and may never share a
     // banner: this is the difference between "we cannot say" and "it is fake".
-    out.push('<div class="ps-banner info"><strong>This page does not know this relay.</strong> Everything it could check holds, but the receipt says it came from '
-      + (result.relayHost ? '<code class="mono">' + esc(result.relayHost) + '</code>' : 'a relay it does not name')
-      + ', and no key for it ships with this page. Paste that relay\u2019s public key to finish the check.</div>');
+    out.push(t('bannerUnknownRelay', { host: result.relayHost ? '<code class="mono">' + esc(result.relayHost) + '</code>' : t('unnamedRelay') }));
   } else if (result.valid) {
-    out.push('<div class="ps-banner info"><strong>The receipt holds together.</strong> Its signature was not checked, because no server key was available.</div>');
+    out.push(t('bannerHolds'));
   } else {
-    out.push('<div class="ps-banner err"><strong>Do not trust this receipt.</strong> It failed at least one check below.</div>');
+    out.push(t('bannerBad'));
   }
 
   const facts = [];
   facts.push(keySentence(result));
   const when = formatMoment(r.retrieved_at);
-  if (when) facts.push('The file was handed over on ' + esc(when) + '.');
+  if (when) facts.push(t('factHanded', { when: esc(when) }));
   const issued = formatMoment(r.ts);
-  if (issued && issued !== when) facts.push('It was accepted by the server on ' + esc(issued) + '.');
+  if (issued && issued !== when) facts.push(t('factAccepted', { when: esc(issued) }));
   const host = result.relayHost;
-  if (host) facts.push('The handover was done by <code class="mono">' + esc(host) + '</code>.');
-  facts.push('The file it covers has fingerprint <code class="mono">' + esc(String(r.blob_hash)) + '</code>.');
-  if (r.burn_confirmed === true) facts.push('The server destroyed its copy of the file as it was handed over.');
-  else if (r.burn_confirmed === false) facts.push('The server kept its copy after this download, because the transfer allowed more than one download.');
+  if (host) facts.push(t('factHost', { host: esc(host) }));
+  facts.push(t('factFp', { fp: esc(String(r.blob_hash)) }));
+  if (r.burn_confirmed === true) facts.push(t('factBurned'));
+  else if (r.burn_confirmed === false) facts.push(t('factKept'));
   const proof = r.inclusion_proof || {};
   if (proof.leaf_index != null && proof.tree_size != null) {
-    facts.push('It is entry ' + esc(String(proof.leaf_index + 1)) + ' in a public log that held '
-      + esc(String(proof.tree_size)) + ' entries at that moment.');
+    facts.push(t('factEntry', { n: esc(String(proof.leaf_index + 1)), size: esc(String(proof.tree_size)) }));
   }
 
   // A receipt that failed a check has not earned the word "says": from here on
   // its contents are a claim, and the heading has to read that way.
-  out.push('<h3 class="rv-sub">' + (result.valid ? 'What this receipt says' : 'What this receipt claims')
+  out.push('<h3 class="rv-sub">' + (result.valid ? t('says') : t('claims'))
     + '</h3><ul class="rv-facts">');
   for (const f of facts) out.push('<li>' + f + '</li>');
   out.push('</ul>');
 
-  out.push('<h3 class="rv-sub">What was checked</h3><ul class="rv-checks">');
+  out.push(t('checkedHead'));
   for (const c of result.checks) {
     const state = c.ok === true ? 'ok' : (c.ok === false ? 'bad' : 'skip');
     const mark = { ok: '\u2713', bad: '\u2715', skip: '\u2013' }[state];
-    const words = { ok: 'Passed', bad: 'Failed', skip: 'Not checked' }[state];
+    const words = { ok: t('passed'), bad: t('failed'), skip: t('notChecked') }[state];
     out.push('<li class="rv-' + state + '"><span class="rv-mark" aria-hidden="true">' + mark
       + '</span><span class="rv-body"><span class="rv-sr">' + words + ': </span>'
       + esc(c.label) + (c.detail ? '<span class="rv-detail">' + esc(c.detail) + '</span>' : '') + '</span></li>');
   }
   out.push('</ul>');
 
-  out.push('<details class="rv-raw"><summary>Show the receipt as it was written</summary><pre class="mono">'
+  out.push(t('showRaw')
     + esc(JSON.stringify(r, null, 2)) + '</pre></details>');
 
   target.innerHTML = out.join('');
@@ -330,9 +464,9 @@ export function resolveKey(pastedKey, receipt) {
   const raw = String(pastedKey || '').replace(/\s+/g, '');
   if (raw) {
     let bytes;
-    try { bytes = fromB64(raw); } catch { throw new Error('That key is not readable. It is one unbroken block of letters and digits.'); }
+    try { bytes = fromB64(raw); } catch { throw new Error(t('keyUnreadable')); }
     if (bytes.length !== ML_DSA65_PK_BYTES) {
-      throw new Error('That is not a Paramant signing key: it is ' + bytes.length + ' bytes long instead of ' + ML_DSA65_PK_BYTES + '.');
+      throw new Error(t('keyLength', { n: bytes.length, want: ML_DSA65_PK_BYTES }));
     }
     return { bytes, anchor: null, source: 'pasted' };
   }
@@ -357,7 +491,7 @@ export function initReceiptVerifier() {
 
   const run = () => {
     result.hidden = false;
-    result.innerHTML = '<div class="ps-banner info">Checking on this device…</div>';
+    result.innerHTML = t('checking');
     let receipt;
     try { receipt = parseReceipt(input.value); } catch (e) { return fail(e.message); }
     let key = null;
@@ -365,7 +499,7 @@ export function initReceiptVerifier() {
     try {
       renderResult(verifyReceipt(receipt, key.bytes, key), result);
     } catch (e) {
-      fail('This receipt could not be checked: ' + e.message);
+      fail(t('couldNotCheck', { err: e.message }));
     }
   };
 
@@ -375,9 +509,9 @@ export function initReceiptVerifier() {
     if (!f) return;
     try {
       input.value = await f.text();
-      if ($('rv-file-info')) $('rv-file-info').textContent = f.name + ' loaded';
+      if ($('rv-file-info')) $('rv-file-info').textContent = t('loaded', { name: f.name });
       run();
-    } catch { fail('That file could not be read.'); }
+    } catch { fail(t('unreadableFile')); }
   };
 
   if (file) file.addEventListener('change', (e) => loadFile(e.target.files && e.target.files[0]));
@@ -413,5 +547,17 @@ export function initTabs() {
   show(wanted || pairs[0]);
 }
 
+// The language switch keeps whatever the address carries (#receipt, a query),
+// so a reader who switches language lands on the same tab of the same proof.
+export function carryLangSwitch() {
+  const link = document.querySelector('.lang-switch a');
+  if (!link) return;
+  const base = link.getAttribute('href').split(/[?#]/)[0];
+  const sync = () => { link.setAttribute('href', base + location.search + location.hash); };
+  sync();
+  window.addEventListener('hashchange', sync);
+}
+
 initTabs();
 initReceiptVerifier();
+carryLangSwitch();

@@ -513,7 +513,11 @@ ok('every amount and discount sits on the card of the plan it belongs to (' + bo
 // Business is quoted on /parasign only, which is the only page that sells it.
 const PRODUCT_PAGES = [
   { product: 'parasign', file: 'parasign.html', sells: ['firm/firm', 'parasign/business'] },
-  { product: 'parasend', file: 'parasend.html', sells: ['firm/firm'] },
+  // Since the NL | EN switch (23-09-2026) /parasend is Dutch and the English
+  // text it had lives at /en/parasend unchanged. The checks below that read
+  // English hold the English copy; the Dutch page is held to the same numbers
+  // in Dutch further down.
+  { product: 'parasend', file: 'en/parasend.html', sells: ['firm/firm'] },
 ];
 const productHtml = {};
 for (const page of PRODUCT_PAGES) {
@@ -534,6 +538,44 @@ for (const page of PRODUCT_PAGES) {
 }
 ok('both product pages carry the btw convention and the catalog amounts');
 
+// The Dutch /parasend, held to the same catalog and tiers.js numbers in Dutch
+// notation: a comma for decimals, "Per jaar" for the annual price.
+{
+  const nlHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'parasend.html'), 'utf8');
+  for (const v of VARIANTS.filter(x => x.product + '/' + x.plan === 'firm/firm')) {
+    const order = catalog.resolveOrder({ product: v.product, plan: v.plan, interval: v.interval });
+    const excl = '&euro;' + v.excl.toLocaleString('nl-NL');
+    const opCard = v.interval === 'monthly'
+      ? new RegExp('<div class="tier-price">' + esc(excl) + '(?![\\d.,])')
+      : new RegExp('Per jaar:?\\s*' + esc(excl) + '(?![\\d.,])');
+    assert(opCard.test(nlHtml), 'parasend.html (nl) no longer shows ' + excl + ' on the firm card for ' + v.interval);
+    const incl = '&euro;' + Number(order.amount).toLocaleString('nl-NL', { minimumFractionDigits: 2 });
+    assert(showsAmount(nlHtml, incl), 'parasend.html (nl) no longer shows the catalog amount ' + incl + ' incl. btw for ' + v.interval);
+  }
+  assert(/excl\. btw/.test(nlHtml) && /incl\. 21% btw/.test(nlHtml),
+    'parasend.html (nl) must state excl. btw and the incl. 21% btw checkout amount');
+  const NL_LINES = [
+    [tiers.tierLimit('community', 'transfers_month') + ' verzendingen per maand', 'community transfers_month'],
+    [tiers.tierLimit('community', 'file_mb') + ' MB per bestand', 'community file_mb'],
+    ['Link verloopt na ' + hoursNl(tiers.tierLimit('community', 'view_ttl_ms')) + ' uur', 'community view_ttl_ms'],
+    ['Tot ' + tiers.tierLimit('community', 'outbound_per_hour') + ' keer ophalen per uur', 'community outbound_per_hour'],
+    ['Tot ' + tiers.tierLimit('community', 'devices') + ' geregistreerde apparaten', 'community devices'],
+    ['Gewist na de eerste keer lezen', 'community max_views'],
+    [tiers.tierLimit('pro', 'transfers_month') + ' verzendingen per maand', 'firm transfers_month'],
+    ['Link verloopt na ' + hoursNl(tiers.tierLimit('pro', 'view_ttl_ms')) + ' uur', 'firm view_ttl_ms'],
+    ['Tot ' + tiers.tierLimit('pro', 'max_views') + ' keer lezen per link', 'firm max_views'],
+    ['Tot ' + tiers.tierLimit('pro', 'outbound_per_hour') + ' keer ophalen per uur', 'firm outbound_per_hour'],
+    ['Tot ' + tiers.tierLimit('pro', 'devices') + ' geregistreerde apparaten', 'firm devices'],
+  ];
+  assert(tiers.tierLimit('community', 'max_views') === 1, 'Community has one view in tiers.js');
+  for (const [line, dim] of NL_LINES) {
+    assert(nlHtml.includes(line), 'parasend.html (nl) no longer states the ' + dim + ' that tiers.js enforces: "' + line + '"');
+  }
+  assert(!/uploads per uur|Onbeperkt verzenden|onbeperkt aantal verzendingen/i.test(nlHtml),
+    'parasend.html (nl) states an anon upload figure or unlimited transfers');
+  ok('the Dutch /parasend carries the same catalog amounts and tiers.js limits');
+}
+
 // ── The free number, pinned to the code that enforces it ─────────────────────
 //
 // /parasend said "10 uploads per hour per IP". That figure is real, but it is
@@ -549,6 +591,7 @@ ok('both product pages carry the btw convention and the catalog amounts');
 // being wrong together, which is exactly what happened here: /pricing and
 // index.html carry the same upload figure and are corrected in their own PRs.
 const hours = (ms) => ms / 3_600_000;
+function hoursNl(ms) { return ms / 3_600_000; }
 
 // The transfer lines are matched on the number and accept either spelling of
 // the period, so tiers.js drift fails here and wording drift fails in the
@@ -785,7 +828,7 @@ ok('the compliance bullet on /parasend carries its own limit');
 // the wording is pinned, so a page that reverts fails here and says so plainly.
 (function oneMonthlyForm() {
   const MONTHLY_FORM = /([\d,]+) (signatures|transfers|ParaSend transfers) per month/;
-  const PAGES = ['en/pricing.html', 'parasend.html', 'parasign.html', 'en/index.html', 'signup.html', 'help/index.html'];
+  const PAGES = ['en/pricing.html', 'en/parasend.html', 'parasign.html', 'en/index.html', 'signup.html', 'help/index.html'];
   for (const rel of PAGES) {
     const pageHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', ...rel.split('/')), 'utf8');
     const stray = MONTHLY_FORM.exec(pageHtml);

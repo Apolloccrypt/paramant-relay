@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Verzegel een bestand met een wachtwoordzin · Paramant</title>
-<meta name="twitter:description" content="Verzegel elk bestand met een wachtwoordzin voordat u het bewaart of deelt. Alles gebeurt op dit apparaat. Het bestand en de wachtwoordzin verlaten uw browser niet.">
-<meta name="twitter:title" content="Verzegel een bestand met een wachtwoordzin · Paramant">
+<title>Lock a file with a passphrase · Paramant</title>
+<meta name="twitter:description" content="Lock any file with a passphrase before you store or share it. Everything happens on this device; the file and the passphrase never leave your browser.">
+<meta name="twitter:title" content="Lock a file with a passphrase · Paramant">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
@@ -15,15 +15,15 @@
      against the codebase as a whole: naming an algorithm the product has, on a route
      that does not run it, is the class of untrue sentence that reads as a fact. -->
 <meta name="paramant:path" content="vault">
-<meta name="description" content="Verzegel elk bestand met een wachtwoordzin voordat u het bewaart of deelt. Alles gebeurt op dit apparaat. Het bestand en de wachtwoordzin verlaten uw browser niet.">
-<meta property="og:title" content="Verzegel een bestand met een wachtwoordzin · Paramant">
-<meta property="og:description" content="Verzegel elk bestand met een wachtwoordzin voordat u het bewaart of deelt. Alles gebeurt op dit apparaat. Het bestand en de wachtwoordzin verlaten uw browser niet.">
-<meta property="og:url" content="https://paramant.app/vault">
+<meta name="description" content="Lock any file with a passphrase before you store or share it. Everything happens on this device; the file and the passphrase never leave your browser.">
+<meta property="og:title" content="Lock a file with a passphrase · Paramant">
+<meta property="og:description" content="Lock any file with a passphrase before you store or share it. Everything happens on this device; the file and the passphrase never leave your browser.">
+<meta property="og:url" content="https://paramant.app/en/vault">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<link rel="canonical" href="https://paramant.app/vault">
+<link rel="canonical" href="https://paramant.app/en/vault">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/vault">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/vault">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/vault">
@@ -66,25 +66,25 @@
   "@graph": [
     {
       "@type": "WebPage",
-      "@id": "https://paramant.app/vault#webpage",
-      "url": "https://paramant.app/vault",
-      "name": "Verzegel een bestand met een wachtwoordzin · Paramant",
+      "@id": "https://paramant.app/en/vault#webpage",
+      "url": "https://paramant.app/en/vault",
+      "name": "Lock a file with a passphrase · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "nl",
-      "description": "Verzegel elk bestand met een wachtwoordzin voordat u het bewaart of deelt. Alles gebeurt op dit apparaat. Het bestand en de wachtwoordzin verlaten uw browser niet."
+      "inLanguage": "en",
+      "description": "Lock any file with a passphrase before you store or share it. Everything happens on this device; the file and the passphrase never leave your browser."
     },
     {
       "@type": "SoftwareApplication",
-      "@id": "https://paramant.app/vault#software",
+      "@id": "https://paramant.app/en/vault#software",
       "name": "Paramant",
       "applicationCategory": "SecurityApplication",
       "operatingSystem": "Web browser",
-      "url": "https://paramant.app/vault",
+      "url": "https://paramant.app/en/vault",
       "publisher": {
         "@id": "https://paramant.app/#organization"
       }
@@ -130,56 +130,56 @@
 
 <main class="vt-wrap">
   <div class="vt-kicker">Paramant Vault</div>
-  <h1 class="vt-title">Verzegel een bestand</h1>
-  <p class="vt-lede">Kies een bestand en een wachtwoordzin. Paramant maakt er een verzegeld <code>.prmnt</code>-bestand van dat alleen met uw wachtwoordzin opengaat. Alles gebeurt op dit apparaat. Het bestand en de wachtwoordzin verlaten uw browser niet.</p>
+  <h1 class="vt-title">Lock a file</h1>
+  <p class="vt-lede">Pick a file and a passphrase. Paramant turns it into a locked <code>.prmnt</code> file that only your passphrase can open. Everything happens on this device; the file and the passphrase never leave your browser.</p>
 
-  <div id="vt-unsupported" class="vt-warn" hidden>Uw browser ondersteunt de versleuteling niet die deze pagina nodig heeft. Probeer een recente versie van Chrome, Edge, Safari of Firefox.</div>
+  <div id="vt-unsupported" class="vt-warn" hidden>Your browser does not support the encryption this page needs. Try a recent Chrome, Edge, Safari or Firefox.</div>
 
   <div class="vt-tabs" role="tablist">
-    <button class="vt-tab on" data-mode="lock" role="tab" aria-selected="true">Bestand verzegelen</button>
-    <button class="vt-tab" data-mode="open" role="tab" aria-selected="false">Een .prmnt openen</button>
+    <button class="vt-tab on" data-mode="lock" role="tab" aria-selected="true">Lock a file</button>
+    <button class="vt-tab" data-mode="open" role="tab" aria-selected="false">Open a .prmnt</button>
   </div>
 
   <!-- Lock -->
   <section id="panel-lock" class="vt-card" role="tabpanel">
-    <div id="lock-drop" class="vt-drop" tabindex="0" role="button" aria-label="Kies een bestand om te verzegelen">
-      <p class="big">Sleep een bestand hierheen</p>
-      <p class="small">of klik om te kiezen · elk soort bestand</p>
+    <div id="lock-drop" class="vt-drop" tabindex="0" role="button" aria-label="Choose a file to lock">
+      <p class="big">Drop a file here</p>
+      <p class="small">or click to choose · any file type</p>
     </div>
     <input id="lock-input" type="file" hidden>
     <div id="lock-info" class="vt-info" hidden></div>
     <div class="vt-field">
-      <label class="vt-label" for="lock-pw">Wachtwoordzin</label>
-      <input id="lock-pw" class="vt-input" type="password" autocomplete="new-password" placeholder="Minstens 6 tekens">
+      <label class="vt-label" for="lock-pw">Passphrase</label>
+      <input id="lock-pw" class="vt-input" type="password" autocomplete="new-password" placeholder="At least 6 characters">
     </div>
     <div class="vt-field">
-      <label class="vt-label" for="lock-pw2">Herhaal de wachtwoordzin</label>
-      <input id="lock-pw2" class="vt-input" type="password" autocomplete="new-password" placeholder="Typ hem nog een keer">
+      <label class="vt-label" for="lock-pw2">Repeat passphrase</label>
+      <input id="lock-pw2" class="vt-input" type="password" autocomplete="new-password" placeholder="Type it again">
     </div>
-    <button id="lock-run" class="btn btn-primary vt-run" type="button" disabled>Bestand verzegelen</button>
+    <button id="lock-run" class="btn btn-primary vt-run" type="button" disabled>Lock file</button>
     <div id="lock-status" class="vt-status" hidden></div>
   </section>
 
   <!-- Open -->
   <section id="panel-open" class="vt-card" role="tabpanel" hidden>
-    <div id="open-drop" class="vt-drop" tabindex="0" role="button" aria-label="Kies een .prmnt-bestand om te openen">
-      <p class="big">Sleep een .prmnt-bestand hierheen</p>
-      <p class="small">of klik om te kiezen</p>
+    <div id="open-drop" class="vt-drop" tabindex="0" role="button" aria-label="Choose a .prmnt file to open">
+      <p class="big">Drop a .prmnt file here</p>
+      <p class="small">or click to choose</p>
     </div>
     <input id="open-input" type="file" accept=".prmnt" hidden>
     <div id="open-info" class="vt-info" hidden></div>
     <div class="vt-field">
-      <label class="vt-label" for="open-pw">Wachtwoordzin</label>
-      <input id="open-pw" class="vt-input" type="password" autocomplete="current-password" placeholder="De wachtwoordzin waarmee het verzegeld is">
+      <label class="vt-label" for="open-pw">Passphrase</label>
+      <input id="open-pw" class="vt-input" type="password" autocomplete="current-password" placeholder="The passphrase it was locked with">
     </div>
-    <button id="open-run" class="btn btn-primary vt-run" type="button" disabled>Bestand openen</button>
+    <button id="open-run" class="btn btn-primary vt-run" type="button" disabled>Open file</button>
     <div id="open-status" class="vt-status" hidden></div>
   </section>
 
-  <p class="vt-note">Uw bestand wordt hier versleuteld, in deze browser, voordat er iets wordt opgeslagen. Er gaat niets uit uw browser, dus wij krijgen uw bestand en uw wachtwoordzin nooit en kunnen die ook niet voor u herstellen. Kwijt is kwijt: zonder de wachtwoordzin is het bestand weg.</p>
-  <p class="vt-tech">AES-256-GCM, sleutel uit uw wachtwoordzin met PBKDF2-SHA-256, 600.000 rondes, willekeurige salt van 16 bytes, willekeurige nonce van 12 bytes.</p>
+  <p class="vt-note">Your file is encrypted here, in this browser, before anything is saved. Nothing leaves your browser, so we never receive your file or your passphrase and we cannot reset it for you. Lose the passphrase and the file is gone.</p>
+  <p class="vt-tech">AES-256-GCM, key from your passphrase with PBKDF2-SHA-256, 600,000 rounds, random 16-byte salt, random 12-byte nonce.</p>
 </main>
-<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/vault" hreflang="en" lang="en">This page in English</a></p>
+<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/vault" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
 
 <script src="/vault.js?v=3" defer></script>
 </body>

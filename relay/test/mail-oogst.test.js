@@ -101,7 +101,7 @@ test('dertig uitnodigingen: een per persoon, en niemand ziet een ander', { todo:
   assert.equal(vj.invited, 30);
 
   await wacht(400);
-  const uit = post.filter(p => /sent you a file/.test(p.subject || ''));
+  const uit = post.filter(p => /heeft u een bestand gestuurd/.test(p.subject || ''));
   assert.equal(uit.length, 30, 'dertig mails, geen enkele samengevoegd');
 
   // Dump voor het rapport.
@@ -161,7 +161,7 @@ test('de ophaalcode: wat een mailprovider te zien krijgt', async () => {
   assert.equal(cr.status, 200, await cr.text());
   await wacht(400);
 
-  const code = post.find(p => /code to open the file/i.test(p.subject || ''));
+  const code = post.find(p => /controlecode om het bestand te openen/i.test(p.subject || ''));
   assert.ok(code, 'geen codemail');
   fs.writeFileSync(path.join(os.tmpdir(), 'paramant-code.json'),
                    JSON.stringify(code, null, 2));
@@ -194,7 +194,7 @@ test('de herinnering: wat er in staat en wat er niet in staat', async () => {
   assert.equal(rr.status, 200, await rr.text());
   await wacht(400);
 
-  const her = post.find(p => /still waiting/i.test(p.subject || ''));
+  const her = post.find(p => /staat nog/i.test(p.subject || ''));
   assert.ok(her, 'geen herinnering');
   fs.writeFileSync(path.join(os.tmpdir(), 'paramant-herinnering.json'),
                    JSON.stringify(her, null, 2));
@@ -219,7 +219,7 @@ test('LOGS: geen token, geen code, geen wrapped_key, geen volledig adres', async
   // bestaan alleen op een carrier die niets bezorgt.
   const echt = alles.filter(l => !l.includes('mail_dryrun'));
   const codes = post
-    .filter(p => /code to open the file/i.test(p.subject || ''))
+    .filter(p => /controlecode om het bestand te openen/i.test(p.subject || ''))
     .map(p => (String(p.text).match(/\b(\d{6})\b/) || [])[1])
     .filter(Boolean);
 
