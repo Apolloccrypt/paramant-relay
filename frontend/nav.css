@@ -578,7 +578,7 @@ nav.nav .nav-link-btn:hover {
   top: -200px;
   left: 0;
   background: var(--navy);
-  color: var(--bone-on-navy, #F8FAFC);   /* --ink is the navy itself: text on its own ground */
+  color: var(--bone-on-navy, #FFFFFF);   /* --ink is the navy itself: text on its own ground */
   padding: 12px 20px;
   z-index: 10000;
   text-decoration: none;

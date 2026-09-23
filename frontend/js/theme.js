@@ -29,7 +29,7 @@
   // The two page grounds, kept in step with --paper in /app-2026.css. This is
   // the browser chrome, not the page: leaving it on a media query would tint
   // the address bar dark above a light page.
-  var CHROME = { light: '#FBFAF7', dark: '#15191C' };
+  var CHROME = { light: '#FFFFFF', dark: '#15191C' };
 
   function read() {
     try {
