@@ -3227,6 +3227,8 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
     if (/\b(legally binding|juridisch bindend|onkraakbaar|100% veilig)\b/i.test(flat(slug))) problems.push(`${slug}: a promise no page may make`);
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
 // 41 ── How many people one send reaches, per plan.
 //
 // relay.js refuses a send to more named recipients than max_recipients allows
