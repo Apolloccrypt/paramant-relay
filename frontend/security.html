@@ -266,7 +266,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="grid2" style="margin-top:20px">
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Uw documenten blijven onder Europees recht</div>
-      <p style="margin:0 0 10px">De servers staan bij Hetzner in Neurenberg, Duitsland, onder de AVG. Geen Amerikaanse partij in de weg die uw bestanden afleggen: uw bestanden en sleutels blijven in de EU en komen nooit bij een Amerikaans bedrijf. Mail gaat via Mailjet SAS in Parijs (moederbedrijf Sinch AB, Zweden). Mailjet krijgt het adres, het bericht en de uitnodigingslink, nooit het document, en bewaart die mail in Frankfurt en Saint-Ghislain. Mailjet draait zelf op Google Cloud; daarom zeggen we dat geen Amerikaanse partij een bestand of een sleutel aanraakt, en niet dat er nergens een bestaat. De lijst met subverwerkers staat op <a href="/privacy">privacy</a>.</p>
+      <p style="margin:0 0 10px">De servers staan bij Hetzner in Neurenberg, Duitsland, onder de AVG. Geen Amerikaanse partij in de weg die uw bestanden afleggen: uw bestanden en sleutels blijven in de EU en komen nooit bij een Amerikaans bedrijf. E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten. Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Daarom zeggen we dat geen Amerikaanse partij een bestand of een sleutel aanraakt, en niet dat er nergens een bestaat. De lijst met subverwerkers staat op <a href="/privacy">privacy</a>.</p>
       <p style="margin:0;font-size:var(--text-sm)"><a href="#jurisdiction">De tabel met rechtsgebieden &rarr;</a></p>
     </div>
     <div class="card">
@@ -314,7 +314,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <tbody>
         <tr><td>Locatie van de servers</td><td>Hetzner Neurenberg, Duitsland</td></tr>
         <tr><td>Rechtsgebied</td><td>EU / Duitsland (AVG)</td></tr>
-        <tr><td>Amerikaanse CLOUD Act</td><td>Geen Amerikaanse partij op de route van uw gegevens: bestanden en sleutels blijven in de EU en komen nooit bij een Amerikaans bedrijf. Transactionele mail gaat via Mailjet SAS in Parijs en wordt in de EU bewaard. Mailjet draait zelf op Google Cloud, dat nooit een bestand of een sleutel ontvangt. Zie <a href="/privacy">privacy</a>.</td></tr>
+        <tr><td>Amerikaanse CLOUD Act</td><td>Geen Amerikaanse partij op de route van uw gegevens: bestanden en sleutels blijven in de EU en komen nooit bij een Amerikaans bedrijf. E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten. Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Zie <a href="/privacy">privacy</a>.</td></tr>
         <tr><td>Wat bewaard wordt</td><td>Geen leesbare inhoud, geen sleutels. Alleen: de hash van de overdracht, het tijdstip van aanmaken, de geschatte versleutelde grootte per blok (tot 5 MB; precies 5 MB voor de webapp Versturen) en het aantal keer bekeken. Verwijderd na de laatste keer lezen.</td></tr>
         <tr><td>IP-logging</td><td>De toegangslog van Nginx staat uit in de deploy-configuratie (<code>access_log off</code> op elk serverblok dat de site en de relays bedient in <code>deploy/nginx-paramant-live.conf</code>). Niet gekoppeld aan de inhoud van een overdracht. Er wordt geen aparte bewaartermijn beloofd. Bij een relay die u zelf host is het andersom: <code>deploy/nginx-selfhost.conf</code> schrijft een toegangslog met als eerste veld het adres van de client. Zet die uit als u dat niet wilt.</td></tr>
         <tr><td>Analytics</td><td>Geen. Geen scripts van derden op de relay of de API.</td></tr>
@@ -489,7 +489,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <p style="margin-bottom:8px;font-size:var(--text-sm)">Maak niets openbaar voordat wij redelijkerwijs de kans hebben gehad het op te lossen. Bekijk of wijzig geen gegevens die niet van u zijn. Draai geen geautomatiseerde scans op een schaal die de dienst verstoort. Meld het eerst bij ons, niet bij derden.</p>
     <h3 style="margin-top:20px">Reikwijdte</h3>
     <p style="margin-bottom:4px;font-size:var(--text-sm)"><strong>Binnen de reikwijdte:</strong> paramant.app, *.paramant.app, browserextensies die wij publiceren, API-endpoints op <a href="/docs#api">docs/api</a>.</p>
-    <p style="margin-bottom:8px;font-size:var(--text-sm)"><strong>Buiten de reikwijdte:</strong> social engineering, fysieke aanvallen, denial of service, diensten van derden (Mailjet, Hetzner, Bunny, Mollie).</p>
+    <p style="margin-bottom:8px;font-size:var(--text-sm)"><strong>Buiten de reikwijdte:</strong> social engineering, fysieke aanvallen, denial of service, diensten van derden (Resend, Hetzner, Bunny, Mollie).</p>
     <h3 style="margin-top:20px">Beloning</h3>
     <p style="margin-bottom:0;font-size:var(--text-sm)">Op dit moment geen geldbeloning. Wel een vermelding op onze <a href="/security/acknowledgements">pagina met dankbetuigingen</a>, en voorrang bij nieuwe functies.</p>
   </div>

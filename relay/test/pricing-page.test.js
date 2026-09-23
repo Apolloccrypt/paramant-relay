@@ -764,24 +764,28 @@ ok('the ParaSend limits on both product pages come from relay/lib/tiers.js (' +
    tiers.tierLimit('community', 'file_mb') + ' MB)');
 
 // A feature bullet quoted from /pricing has to stay a quote, and the two pages
-// have to carry the same one. This bullet used to name Resend, because while
-// mail went to a US company the EU claim was only honest if the exception was
-// disclosed in the same breath. Mail moved to Mailjet (Paris) in September
-// 2026, so the exception is gone and the bullet says what is now true.
-for (const line of ['Email notifications, carried inside the EU']) {
+// have to carry the same one. It says what the mail carries, not where the
+// carrier sits: which company sends the mail is pinned in one place,
+// deploy/mail-provider.json, and tests/mail-provider-site.test.mjs holds every
+// page to it. On 2026-09-23 this bullet still said "carried inside the EU"
+// while production mailed through Resend in the US; that may not recur.
+for (const line of ['Email notifications (only the address and the link, never the file)']) {
   assert(html.includes(line), '/pricing lost the feature line: ' + line);
   assert(productHtml.parasend.includes(line), 'parasend.html lost the feature line /pricing carries: ' + line);
 }
 ok('the ParaSend Pro feature bullets quoted from /pricing are still quotes');
 
-// And the claim has to hold across the whole site: no page may still name a US
-// mail carrier as a current sub-processor. The one allowed mention is the
-// historical note in the DPA and on /press, which says the arrangement ENDED.
-for (const [naam, pagina] of [['pricing', html], ['parasend', productHtml.parasend]]) {
-  assert(!/via Resend|through Resend|Resend, a US|Resend Inc\. sends/.test(pagina),
-    naam + ' still presents Resend as the carrier; mail moved to Mailjet in September 2026');
+// No page may promise EU-only mail while the active carrier is outside the EU.
+const mailProvider = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'deploy', 'mail-provider.json'), 'utf8'));
+const actief = String(mailProvider.actief || mailProvider.active || '').toLowerCase();
+const EU_CARRIERS = new Set(['lettermint', 'mailjet', 'scaleway', 'brevo', 'flowmailer']);
+if (!EU_CARRIERS.has(actief)) {
+  for (const [naam, pagina] of [['pricing', html], ['pricing-nl', htmlNl], ['parasend', productHtml.parasend]]) {
+    assert(!/carried inside the EU|verstuurd binnen de EU|mail (stays|blijft) (in|binnen) de EU/i.test(pagina),
+      naam + ' promises EU-only mail while the active carrier (' + actief + ') is outside the EU');
+  }
 }
-ok('no page still names a US company as the mail carrier');
+ok('no page promises EU-only mail while the carrier (' + actief + ') is outside the EU');
 
 // The signature quota lines stay pinned to the words /pricing uses: they are
 // billing copy, not a tiers.js row.

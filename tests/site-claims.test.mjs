@@ -1730,17 +1730,18 @@ test('every third party the server code calls is named on /privacy and /dpa', ()
       if (!re.test(table)) problems.push(`${pre}dpa: the code calls ${v}, and the sub-processor table does not name it`);
     }
   }
-  // ER IS GEEN AMERIKAANSE SUBVERWERKER MEER, en dat is het punt.
+  // DE AMERIKAANSE RIJ IS TERUG, en deze toets draait daarom weer echt.
   //
   // Deze toets bestond omdat /press "No US entity in the chain" zei terwijl de
   // getekende tabel Resend Inc. in de Verenigde Staten noemde, onder Standard
   // Contractual Clauses. Dat was het tegenovergestelde van wat de
   // verwerkingsverantwoordelijke tekende.
   //
-  // Mail verhuisde in september 2026 naar Mailjet in Parijs, dus de rij is weg
-  // en de zin mag. De toets blijft staan en draait om: komt er ooit weer een
-  // Amerikaanse rij bij, dan moet geen enkele pagina meer beweren dat er geen
-  // Amerikaanse partij in de keten zit.
+  // Op 22 september 2026 zette de site Mailjet in Parijs als mailprovider neer
+  // en haalde de rij weg. Mailjet is nooit aangezet: productie mailt via
+  // Resend Inc. in de VS. Sinds 23 september staat de rij er weer, en zolang
+  // hij er staat mag geen enkele pagina beweren dat er geen Amerikaanse partij
+  // in de keten zit. Welke drager actief is, staat in deploy/mail-provider.json.
   const usRow = /<tr><td>([^<]+)<\/td><td>US[^<]*<\/td>/.exec(page('en/dpa'))
     || /<tr><td>([^<]+)<\/td><td>(?:VS|Verenigde Staten)[^<]*<\/td>/.exec(page('dpa'));
   if (usRow) {
