@@ -1361,10 +1361,23 @@ const downloadTokens = new Map(); // token -> { hash, key, expires_ms, used }
 // ── DPA rate limiting — prevents spam/storage churn on the public sign-dpa endpoint
 const dpaIpRequests    = new Map(); // ip    → [timestamps]
 const dpaEmailRequests = new Map(); // email → timestamp
+// Hard cap on distinct keys any IP/email tracking Map may hold. The cleanup
+// intervals below only trim stale timestamps; between sweeps a flood of
+// spoofed/distinct source IPs can still grow a Map unbounded (CWE-770). This
+// bounds worst-case memory regardless of sweep timing by evicting the oldest
+// entries once the cap is exceeded.
+const MAX_TRACKED_IPS = 50_000;
+function capMapSize(map, max) {
+  if (map.size <= max) return;
+  let excess = map.size - max;
+  for (const k of map.keys()) { if (excess-- <= 0) break; map.delete(k); }
+}
 setInterval(() => {
   const cutoff = Date.now() - 86_400_000;
   for (const [k, times] of dpaIpRequests) { const kept = times.filter(t => t > cutoff); if (kept.length) dpaIpRequests.set(k, kept); else dpaIpRequests.delete(k); }
   for (const [k, t]     of dpaEmailRequests) { if (t < cutoff) dpaEmailRequests.delete(k); }
+  capMapSize(dpaIpRequests, MAX_TRACKED_IPS);
+  capMapSize(dpaEmailRequests, MAX_TRACKED_IPS);
 }, 3_600_000);
 
 // Known link-preview bots — serve safe HTML placeholder, never trigger burn
@@ -2009,6 +2022,13 @@ setInterval(() => {
   for (const [k, times] of sthIngestIpRequests)  { const kept = times.filter(t => now - t < HOUR); if (kept.length) sthIngestIpRequests.set(k, kept);  else sthIngestIpRequests.delete(k); }
   for (const [k, times] of relayRegisterIpRequests) { const kept = times.filter(t => now - t < HOUR); if (kept.length) relayRegisterIpRequests.set(k, kept); else relayRegisterIpRequests.delete(k); }
   for (const [k, b]     of teamRateLimits)       { if (b && now > b.resetAt) teamRateLimits.delete(k); }
+  // Same unbounded-growth concern as the DPA maps above: cap distinct-IP
+  // tracking so a flood of spoofed source IPs cannot exhaust memory before
+  // the next sweep (CWE-770).
+  capMapSize(anonInboundIpRequests, MAX_TRACKED_IPS);
+  capMapSize(invDidIpRequests, MAX_TRACKED_IPS);
+  capMapSize(sthIngestIpRequests, MAX_TRACKED_IPS);
+  capMapSize(relayRegisterIpRequests, MAX_TRACKED_IPS);
 }, 3_600_000);
 
 function checkTeamRateLimit(teamId, limit) {
