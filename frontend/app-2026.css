@@ -25,9 +25,9 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
   /* surface */
-  --paper:        #FBFAF7;
+  --paper:        #FFFFFF;
   --surface:      #FFFFFF;
-  --surface-sunk: #F4F4F1;
+  --surface-sunk: #FFFFFF;
   --surface-ink:  #0C1622;
 
   /* ink */

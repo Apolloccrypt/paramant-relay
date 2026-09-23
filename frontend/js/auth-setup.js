@@ -29,7 +29,7 @@
         width: 240,
         height: 240,
         colorDark: '#0B3A6A',
-        colorLight: '#F8FAFC',
+        colorLight: '#FFFFFF',
         correctLevel: QRCode.CorrectLevel.M,
       });
 

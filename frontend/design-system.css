@@ -18,8 +18,8 @@
    ═══════════════════════════════════════════════════ */
 :root {
   /* surface */
-  --bone:   #F8FAFC;
-  --bone-2: #EEF2F6;
+  --bone:   #FFFFFF;
+  --bone-2: #F5F6F7;
 
   /* ink */
   --navy:      #0B3A6A;
@@ -48,9 +48,9 @@
   --lime: var(--cobalt);
 
   /* inverted text */
-  --bone-on-navy:      #F8FAFC;
-  --bone-on-navy-dim:  rgba(248,250,252,.72);
-  --bone-on-navy-hair: rgba(248,250,252,.18);
+  --bone-on-navy:      #FFFFFF;
+  --bone-on-navy-dim:  rgba(255, 255, 255,.72);
+  --bone-on-navy-hair: rgba(255, 255, 255,.18);
 
   /* typography */
   --sans: ui-sans-serif, system-ui, -apple-system, "Inter",
@@ -148,7 +148,7 @@
   --invert-ink:  var(--bone-on-navy);
   --invert-dim:  var(--bone-on-navy-dim);
   --invert-hair: var(--bone-on-navy-hair);
-  --bone-blur:   rgba(248, 250, 252, .92);
+  --bone-blur:   rgba(255, 255, 255, .92);
 }
 
 /* A link in running text is underlined, not only coloured: colour alone is
@@ -1361,7 +1361,7 @@ h1 em::after {
    v4: .foot-grid  |  v3 compat: .footer-grid
    ═══════════════════════════════════════════════════ */
 footer {
-  background: var(--bone-2);
+  background: #FFFFFF;
   padding: var(--space-9) 0;
   border-top: 1px solid var(--ink-hair);
 }
@@ -1948,7 +1948,7 @@ pre code { background: none; padding: 0; }
 .section-cobalt a,
 .section-dark a {
   color: var(--bone);
-  border-bottom: 1px solid rgba(248,250,252,0.3);
+  border-bottom: 1px solid rgba(255, 255, 255,0.3);
 }
 
 /* Marker z-index inside colored sections */
@@ -1961,7 +1961,7 @@ pre code { background: none; padding: 0; }
 /* Callout inside dark sections */
 .section-cobalt .callout,
 .section-dark .callout {
-  background: rgba(248, 250, 252, 0.08);
+  background: rgba(255, 255, 255, 0.08);
   border-left-color: var(--lime);
 }
 .section-cobalt .callout h4,
@@ -2033,7 +2033,7 @@ pre code { background: none; padding: 0; }
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1px;
-  background: rgba(248,250,252,0.15);
+  background: rgba(255, 255, 255,0.15);
   margin: 32px 0;
 }
 @media (max-width: 640px) {
@@ -2683,11 +2683,11 @@ a:not(.btn):not(.skip-link):not(.nav-link):not(.nav-logo):not(.footer-link):hove
 /* ─── DARK BAND — reusable navy section ──────────────────── */
 .dark-band {
   background: #0B3A6A;
-  color: #F8FAFC;
+  color: #FFFFFF;
   padding: 48px 24px;
   margin: 48px 0;
 }
-.dark-band h2, .dark-band h3 { color: #F8FAFC; }
+.dark-band h2, .dark-band h3 { color: #FFFFFF; }
 .dark-band a { color: #B2FF3F; }
 .dark-band code, .dark-band .tag {
   background: #B2FF3F;
@@ -2698,7 +2698,7 @@ a:not(.btn):not(.skip-link):not(.nav-link):not(.nav-logo):not(.footer-link):hove
 /* ── SECTION TINT — subtle off-white background for visual rhythm ── */
 /* visual-reset-v3 (sentinel) */
 .section-tint {
-  background: #F8FAFC;
+  background: #FFFFFF;
 }
 
 /* ── Skip to main content — WCAG 2.4.1 ─────────────────── */
@@ -2708,7 +2708,7 @@ a.skip-link,
   top: -200px !important;
   left: 0 !important;
   background: #0B3A6A;
-  color: #F8FAFC;
+  color: #FFFFFF;
   padding: 12px 20px;
   z-index: 10000;
   text-decoration: none;
@@ -2832,7 +2832,7 @@ a.skip-link:focus-visible,
   margin: 80px auto 0 auto;
   padding: 24px;
   background: #0B3A6A;
-  color: #F8FAFC;
+  color: #FFFFFF;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 24px;
@@ -2848,7 +2848,7 @@ a.skip-link:focus-visible,
 .trust-value {
   font-family: "IBM Plex Mono", monospace;
   font-size: 12px;
-  color: #F8FAFC;
+  color: #FFFFFF;
   line-height: 1.4;
 }
 @media (max-width: 900px) {

@@ -38,7 +38,7 @@ const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const THEME_KEY = 'paramant.theme.v1';
 
 // The two page grounds, from --paper in frontend/app-2026.css.
-const LIGHT = 'rgb(251, 250, 247)';
+const LIGHT = 'rgb(255, 255, 255)';
 const DARK = 'rgb(21, 25, 28)';   // the night of PR #417, now the dark choice
 
 const TYPES = { '.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.html':'text/html','.svg':'image/svg+xml','.png':'image/png','.json':'application/json','.woff2':'font/woff2' };
@@ -135,7 +135,7 @@ test('a dark system with no choice made leaves every app screen light', async ()
     const seen = await ground(browser, { url, system:'dark', choice:null });
     if (seen.body !== LIGHT) wrong.push(`${url}: body is ${seen.body}, expected ${LIGHT}`);
     if (seen.attribute !== null) wrong.push(`${url}: <html data-theme="${seen.attribute}"> without anyone choosing it`);
-    if (seen.chrome !== '#FBFAF7') wrong.push(`${url}: theme-color is ${seen.chrome}, expected #FBFAF7`);
+    if (seen.chrome !== '#FFFFFF') wrong.push(`${url}: theme-color is ${seen.chrome}, expected #FFFFFF`);
   }
   assert.deepEqual(wrong, [],
     '\n  A dark operating system must not darken the app on its own. That is the\n' +
