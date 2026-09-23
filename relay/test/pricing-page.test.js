@@ -93,7 +93,7 @@ const PARASIGN_COPY = [
   '>&euro;0<',
   '2 signatures a month',
   'No limit on receiving',
-  'Full post-quantum crypto - Public verification log',
+  'Full post-quantum cryptography, public verification log',
   'No card required',
   // FIRM - EUR 29/month, both products in one payment
   '&euro;29<',
@@ -112,8 +112,8 @@ const PARASIGN_COPY = [
   'Annual: &euro;2,990 excl. &middot; 16.7% off',
   // ENTERPRISE - Let's talk
   "Let's talk",
-  'Dedicated relay instance - Sector relay (health, legal, finance)',
-  'SLA with service credits - Self-hosting licence - Audit support',
+  'Dedicated relay instance, sector relay (health, legal, finance)',
+  'SLA with service credits, self-hosting licence, audit support',
 ];
 for (const s of PARASIGN_COPY) {
   assert(html.includes(s), 'missing ParaSign card copy: ' + s);
@@ -905,7 +905,7 @@ ok('the compliance bullet on /parasend carries its own limit');
   const order = catalog.resolveOrder({ product: 'firm', plan: 'firm', interval: 'monthly' });
   assert(!order.error, 'billing-catalog has no monthly Firm price: ' + order.error);
   const firmExcl = Math.round((parseFloat(order.amount) / 1.21) * 100) / 100;
-  assert(new RegExp('&euro;' + firmExcl + ' a month excl\\. btw').test(answer),
+  assert(new RegExp('&euro;' + firmExcl + ' a month excl\\. VAT').test(answer),
     'the dashboard must price Firm at the catalog amount (&euro;' + firmExcl + '), got: ' + answer.trim());
 
   // ui-truthfulness in one line: no amount here that a reader cannot find on

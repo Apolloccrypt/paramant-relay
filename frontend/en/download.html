@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>The Paramant desktop app is no longer maintained</title>
 <meta property="og:site_name" content="Paramant">
@@ -69,8 +69,8 @@ pre{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--ink);back
 @media(max-width:600px){h1{font-size:25px}.dl-sub{font-size:15px}main{padding:0 18px 60px}.dl-lead{padding:28px 0 30px}}
 </style>
 <style>.skip-link{position:absolute;top:-200px;left:0;background:var(--bone-2);color:var(--ink);padding:12px 20px;z-index:10000;text-decoration:none;font-size:13px;font-family:system-ui,sans-serif;border:2px solid var(--ochre);transition:top 120ms ease}.skip-link:focus,.skip-link:focus-visible{top:0;outline:none}.skip-link:focus:hover{background:var(--ochre)}</style>
-<link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <script type="application/ld+json" data-paramant-seo="1">
 {
@@ -145,6 +145,7 @@ pre{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--ink);back
   ]
 }
 </script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -167,6 +168,7 @@ pre{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--ink);back
   </div>
 
   <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/download" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/download" hreflang="en" lang="en" aria-current="true">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -182,7 +184,7 @@ pre{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--ink);back
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
   <a href="/help" class="nav-tail-link">Help</a>
-  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/download" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/download" hreflang="en" lang="en" aria-current="true">EN</a></span>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/download" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/download" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 
 <main id="main-content">
@@ -207,7 +209,7 @@ pre{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--ink);back
   <section>
     <h2>Free for everyone, paid for organisations</h2>
     <p class="quote">Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.</p>
-    <p>The Community plan is free, forever. It is not a trial and not a funnel. Organisations pay for the higher limits, not to unlock features. <a href="/pricing">See the plans</a>.</p>
+    <p>The Community plan is free, forever. It is not a trial and not a funnel. Organisations pay for the higher limits, not for extra features. <a href="/pricing">See the plans</a>.</p>
   </section>
 
   <section>
@@ -262,22 +264,22 @@ pre{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--ink);back
 
       <div class="file">
         <div class="file-name"><a href="/dl/paramant_0.2.1_amd64.deb">paramant_0.2.1_amd64.deb</a></div>
-        <div class="file-meta">Debian, Ubuntu. v0.2.1, 2,5 MB. Not signed.</div>
+        <div class="file-meta">Debian, Ubuntu. v0.2.1, 2.5 MB. Not signed.</div>
         <div class="file-sum">62360ad6959be6a9b333de65de67a24b4534f754043c3d88b85908d4703e32bb</div>
       </div>
       <div class="file">
         <div class="file-name"><a href="/dl/PARAMANT-0.2.0-1.x86_64.rpm">PARAMANT-0.2.0-1.x86_64.rpm</a></div>
-        <div class="file-meta">Fedora, RHEL, openSUSE. v0.2.0, 2,4 MB. Not signed.</div>
+        <div class="file-meta">Fedora, RHEL, openSUSE. v0.2.0, 2.4 MB. Not signed.</div>
         <div class="file-sum">b103dadcd081e886ead442e9128843d5a894b3ec05547b8a2a1ec208d7d541be</div>
       </div>
       <div class="file">
         <div class="file-name"><a href="/dl/PARAMANT_0.2.0_amd64.AppImage">PARAMANT_0.2.0_amd64.AppImage</a></div>
-        <div class="file-meta">Any Linux distribution, no installation. v0.2.0, 80,7 MB. Not signed.</div>
+        <div class="file-meta">Any Linux distribution, no installation. v0.2.0, 80.7 MB. Not signed.</div>
         <div class="file-sum">7e0962ace68feb6722a6ddcd60102513c8588c9ac4b3406f91b24721ee9aa728</div>
       </div>
       <div class="file">
         <div class="file-name"><a href="/dl/PARAMANT-0.2.0-windows-signed.exe">PARAMANT-0.2.0-windows-signed.exe</a></div>
-        <div class="file-meta">Windows 10 and 11, 64-bit. v0.2.0, 5,8 MB. Authenticode, self-signed.</div>
+        <div class="file-meta">Windows 10 and 11, 64-bit. v0.2.0, 5.8 MB. Authenticode, self-signed.</div>
         <div class="file-sum">fff0d10c1e0904c5b52cf7c15c1b0fce90e9ab9e48e54d6aab9747e73333f1bc</div>
       </div>
 
@@ -291,7 +293,7 @@ sha256sum -c SHA256SUMS --ignore-missing</pre>
 </main>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=11" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 
 <footer>
   <div class="container-lg">

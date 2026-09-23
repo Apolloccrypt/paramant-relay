@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Algemene voorwaarden · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -23,8 +23,8 @@
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/terms">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/terms">
 
-<link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
   <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -151,7 +151,7 @@ a:hover{opacity:.8}
       "name": "Paramant",
       "legalName": "Paramantis Solutions B.V.",
       "url": "https://paramant.app/",
-      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
       "founder": {
         "@type": "Person",
         "name": "Mick Beer",
@@ -177,6 +177,7 @@ a:hover{opacity:.8}
   ]
 }
 </script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Naar de inhoud</a>
@@ -198,6 +199,7 @@ a:hover{opacity:.8}
   </div>
 
   <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/terms" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/terms" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -213,7 +215,7 @@ a:hover{opacity:.8}
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
   <a href="/help" class="nav-tail-link">Hulp</a>
-  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/terms" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/terms" hreflang="en" lang="en">EN</a></span>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/terms" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/terms" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main id="main-content" tabindex="-1">
 
@@ -246,8 +248,8 @@ a:hover{opacity:.8}
   <div class="note-box">Deze voorwaarden gaan over de <strong>gehoste dienst</strong> op paramant.app. De <strong>software</strong> valt onder een aparte licentie, de <a href="/license">Business Source License 1.1</a>. Die staat gratis niet-productiegebruik toe en, op grond van de Additional Use Grant, gratis productiegebruik tot 5 actieve API-sleutels per relay-instantie en één zelf gehoste installatie, commercieel gebruik inbegrepen. Wie binnen die grenzen een eigen relay draait, valt onder die licentie, niet onder dit document.</div>
 
   <h2 id="scope">2. Wat de dienst is</h2>
-  <p>PARAMANT stuurt versleutelde gegevens door. Bestanden en documenten worden in uw eigen browser versleuteld voordat ze ons bereiken, en de relay heeft nooit de leesbare tekst of de sleutel, behalve bij de gehoste ondertekenprocedure op onze <code>/v1</code> API. Bij die procedure stuurt u ons het document zelf, zodat wij de procedure voor u kunnen uitvoeren, en zolang die envelop bestaat, bewaren wij het document en de sleutel waarmee het in opslag is verzegeld. De inhoud van een overdracht staat alleen in het werkgeheugen (RAM) en wordt vernietigd zodra de laatste keer dat de link gelezen mag worden is opgebruikt, of wanneer de bewaartijd verloopt, wat het eerst gebeurt. Een Community-link kan één keer gelezen worden. Daarom vervalt hij bij de eerste keer. De huidige bewaartijd is één uur op Community, vierentwintig uur op Firm en zeven dagen op Enterprise.</p>
-  <p>Uit dat ontwerp volgen twee gevolgen. Begrijp ze allebei voordat u op de dienst vertrouwt.</p>
+  <p>PARAMANT stuurt versleutelde gegevens door. Bestanden en documenten worden in uw eigen browser versleuteld voordat ze ons bereiken, en de relay heeft nooit de leesbare tekst of de sleutel, behalve bij de gehoste ondertekenprocedure op onze <code>/v1</code> API. Bij die procedure stuurt u ons het document zelf, zodat wij de procedure voor u kunnen uitvoeren, en zolang die envelop bestaat, bewaren wij het document en de sleutel waarmee het in opslag is verzegeld. De inhoud van een overdracht staat alleen in het werkgeheugen (RAM) en wordt vernietigd zodra de link zo vaak is gelezen als is toegestaan, of wanneer de bewaartijd verloopt, wat het eerst gebeurt. Een Community-link kan één keer gelezen worden. Daarom vervalt hij bij de eerste keer. De huidige bewaartijd is één uur op Community, vierentwintig uur op Firm en zeven dagen op Enterprise.</p>
+  <p>Dat ontwerp heeft twee gevolgen. Begrijp ze allebei voordat u op de dienst vertrouwt.</p>
   <p><strong>PARAMANT is geen opslag en geen back-up.</strong> Alles wat u verstuurt, is bedoeld om te verdwijnen. Bewaar zelf een kopie van alles wat belangrijk voor u is. Wij kunnen een overdracht niet herstellen nadat die is vervallen of verlopen, want er is niets meer over om te herstellen.</p>
   <p><strong>Wij kunnen uw gegevens niet lezen, en daarom kunnen wij ze ook niet terugzetten.</strong> Als u uw sleutel of uw link kwijtraakt, is de inhoud niet meer te herstellen. Dat is geen beperking van onze ondersteuning die wij met meer moeite zouden kunnen opheffen. Het is juist de eigenschap die de dienst de moeite waard maakt.</p>
 
@@ -257,7 +259,7 @@ a:hover{opacity:.8}
   <p>U moet minimaal 16 jaar oud zijn om een account aan te maken. PARAMANT is niet gericht op kinderen.</p>
 
   <h2 id="plans">4. Abonnementen, prijs en betaling</h2>
-  <p>Het Community-abonnement is gratis, vraagt geen betaalkaart en blijft gratis. Betaalde abonnementen geven ruimere grenzen: een langere geldigheid van links, meer keren lezen per link via de API, meer geregistreerde apparaten, toegang tot de API en een eigen relay. Ze ontgrendelen niet de versleuteling. Die is op elk niveau hetzelfde.</p>
+  <p>Het Community-abonnement is gratis, vraagt geen betaalkaart en blijft gratis. Betaalde abonnementen geven ruimere grenzen: een langere geldigheid van links, meer keren lezen per link via de API, meer geregistreerde apparaten, toegang tot de API en een eigen relay. Aan de versleuteling veranderen ze niets. Die is op elk niveau hetzelfde.</p>
   <p>Prijzen staan op de <a href="/pricing">prijspagina</a> exclusief btw. Bij het afrekenen wordt het bedrag inclusief 21% btw in rekening gebracht. De prijs die geldt, is de prijs die getoond wordt op het moment dat u het abonnement afneemt.</p>
   <div class="note-box"><strong>De stand van zaken, eerlijk gezegd:</strong> het afrekenen loopt via Mollie, een Nederlandse betaaldienstverlener. Kaartgegevens voert u in op de eigen pagina's van Mollie, en PARAMANT ziet of bewaart ze nooit. Elke betaling is een eenmalige betaling voor de periode die u koopt. Automatische verlenging staat niet aan, dus er wordt niets een tweede keer geïncasseerd zonder dat u opnieuw koopt.</div>
   <p>Een betaalde periode loopt voor de duur die u kiest, per maand of per jaar. Omdat verlenging niet automatisch gaat, eindigt de periode gewoon en valt het account terug naar Community, tenzij u een nieuwe periode koopt. Wij kunnen de prijzen voor een toekomstige periode wijzigen. Dat laten wij u minstens dertig dagen voordat de wijziging ingaat weten.</p>
@@ -291,7 +293,7 @@ a:hover{opacity:.8}
   <h2 id="liability">9. Aansprakelijkheid</h2>
   <p>De dienst wordt geleverd zoals hij is. Voor zover het Nederlandse recht dat toestaat, is onze totale aansprakelijkheid tegenover een zakelijke klant onder deze voorwaarden per gebeurtenis en per kalenderjaar beperkt tot het bedrag dat u ons betaalde in de twaalf maanden voor de gebeurtenis, en voor het Community-abonnement tot nul. Wij zijn niet aansprakelijk voor indirecte schade of gevolgschade, gederfde winst, verloren gegevens of gemiste besparingen.</p>
   <p>Deze beperkingen gelden niet voor schade door onze opzet of bewuste roekeloosheid, niet bij overlijden of letselschade, en niet waar dwingend recht de beperking verbiedt. Bent u consument, dan doet niets in dit artikel af aan uw wettelijke rechten.</p>
-  <p>Wij zijn uitdrukkelijk niet aansprakelijk voor gegevens die u kwijtraakt doordat een overdracht is vervallen of verlopen, of doordat u de sleutel bent kwijtgeraakt. Dat gedrag is de dienst die werkt zoals beschreven.</p>
+  <p>Wij zijn uitdrukkelijk niet aansprakelijk voor gegevens die u kwijtraakt doordat een overdracht is vervallen of verlopen, of doordat u de sleutel bent kwijtgeraakt. Dan werkt de dienst zoals beschreven.</p>
 
   <h2 id="suspension">10. Opschorting en beëindiging</h2>
   <p>Wij kunnen een account opschorten of beëindigen als het deze voorwaarden schendt, als het het platform of andere gebruikers in gevaar brengt, of als de wet dat vereist. Behalve in spoedeisende gevallen waarschuwen wij u eerst en geven wij u de kans het te herstellen. Schorten wij op zonder waarschuwing, dan leggen wij achteraf uit waarom.</p>
@@ -350,6 +352,6 @@ a:hover{opacity:.8}
   </div>
 </footer>
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=11" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 </body>
 </html>

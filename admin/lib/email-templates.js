@@ -760,7 +760,7 @@ function duplicateSignupAttemptEmail({ email, requestedAt, requestIP }) {
     'Wilde u zelf inloggen? Gebruik dan de inlogpagina:',
     loginUrl,
     '',
-    'Was u dit niet, negeer deze mail dan. De poging is afgeremd.',
+    'Was u dit niet, negeer deze mail dan. Er geldt een limiet op zulke pogingen.',
     '',
     `Poging op: ${dateStr}${requestIP ? ' . IP: ' + maskedIp : ''}`,
     '',
@@ -777,7 +777,7 @@ function duplicateSignupAttemptEmail({ email, requestedAt, requestIP }) {
       <a href="${loginUrl}" style="display:inline-block;background:#1D4ED8;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:6px;text-decoration:none;letter-spacing:0.01em;">Inloggen bij Paramant</a>
     </div>
     <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
-      Was u dit niet, negeer deze mail dan. De poging is afgeremd en er is geen account gemaakt.
+      Was u dit niet, negeer deze mail dan. Er geldt een limiet op zulke pogingen en er is geen account gemaakt.
       <br>Poging op ${dateStr}${requestIP ? ' . IP: ' + escHtml(maskedIp) : ''}.
     </p>
   `;
@@ -855,65 +855,65 @@ function backupCodesResetEmail({ email, requestedAt }) {
 // a MASKED key appears in the body -- the full key was issued separately -- so
 // no secret lands in the mailbox or the Resend logs. Content is Dutch (NL).
 function parasignOnboardingEmail({ apiKey, plan, label, enabled = true }) {/*MARK:parasign_tpl*/
-  const preheader = 'Je ParaSign-API is geactiveerd. Zo teken je je eerste document.';
+  const preheader = 'Uw ParaSign-API staat aan. Zo ondertekent u uw eerste document.';
   const masked = apiKey.slice(0, 12) + '...' + apiKey.slice(-4);
   const docsUrl = `${BASE_URL}/docs`;
 
-  const text = `Hoi,
+  const text = `Hallo,
 
-De ParaSign-handtekening-API (/v1) is voor je account geactiveerd.
+De ParaSign-API voor ondertekenen (/v1) staat nu aan voor uw account.
 
 Plan:        ${plan}
 Label:       ${label || '(geen label)'}
 API-sleutel: ${masked}
 
-De volledige sleutel is je apart bezorgd door de beheerder.
+De beheerder heeft u de volledige sleutel apart gegeven.
 
 Aan de slag:
 
-1. Zet je sleutel in de X-Api-Key header bij elke aanroep van de ParaSign-API
+1. Zet uw sleutel in de X-Api-Key-header bij elke aanroep van de ParaSign-API
 2. Documentatie: ${docsUrl}
-3. De ParaSign-endpoints leven onder /v1 op de Paramant-relay
+3. De ParaSign-endpoints staan onder /v1 op de Paramant-relay
 
-Je sleutel veilig bewaren:
+Uw sleutel veilig bewaren:
 
-- Gebruik een wachtwoordmanager, nooit platte tekst
+- Bewaar hem in een wachtwoordbeheerder, nooit als gewone tekst
 - Zet hem niet in versiebeheer (.env-bestanden lekken)
-- Vervang hem meteen bij een vermoeden van blootstelling
+- Vervang hem meteen als u denkt dat iemand anders hem kent
 
-Vragen? Beantwoord deze e-mail.
+Vragen? Antwoord gewoon op deze mail.
 
 Paramant
 ${BASE_URL}`;
 
   const html = htmlShell(preheader, `
-    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Je ParaSign-API is geactiveerd</h1>
-    <p style="margin:0 0 20px 0;line-height:1.6;">Een beheerder heeft de ParaSign-handtekening-API (<code style="background:#f1f5f9;padding:2px 5px;font-size:12px;">/v1</code>) voor je account aangezet.</p>
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Uw ParaSign-API staat aan</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Een beheerder heeft de ParaSign-API voor ondertekenen (<code style="background:#f1f5f9;padding:2px 5px;font-size:12px;">/v1</code>) voor uw account aangezet.</p>
     <table style="border-collapse:collapse;margin:0 0 24px 0;width:100%;">
       <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Plan</td><td style="padding:8px 0;"><span style="background:rgba(29,78,216,0.08);color:#1D4ED8;padding:2px 8px;font-size:12px;font-family:monospace;">${escHtml(plan)}</span></td></tr>
       <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Label</td><td style="padding:8px 0;">${label ? escHtml(label) : '<em style="color:#94a3b8;">geen label</em>'}</td></tr>
       <tr><td style="padding:8px 16px 8px 0;color:#64748b;font-family:monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">API-sleutel</td><td style="padding:8px 0;font-family:monospace;font-size:13px;color:#0B3A6A;">${masked}</td></tr>
     </table>
-    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">De volledige sleutel is je apart bezorgd door de beheerder die hem uitgaf.</p>
+    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">De beheerder die de sleutel uitgaf, heeft u de volledige sleutel apart gegeven.</p>
     <h2 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">Aan de slag</h2>
     <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
-      <li>Zet je sleutel in de <code style="background:#f1f5f9;padding:2px 5px;font-size:12px;">X-Api-Key</code> header bij elke aanroep</li>
-      <li>De ParaSign-endpoints leven onder <code style="background:#f1f5f9;padding:2px 5px;font-size:12px;">/v1</code> op de relay</li>
+      <li>Zet uw sleutel in de <code style="background:#f1f5f9;padding:2px 5px;font-size:12px;">X-Api-Key</code>-header bij elke aanroep</li>
+      <li>De ParaSign-endpoints staan onder <code style="background:#f1f5f9;padding:2px 5px;font-size:12px;">/v1</code> op de relay</li>
     </ul>
     ${btn(docsUrl, 'Bekijk de documentatie')}
     <hr style="border:none;border-top:1px solid rgba(11,58,106,0.08);margin:24px 0;">
-    <h2 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">Je sleutel veilig bewaren</h2>
+    <h2 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:#0B3A6A;">Uw sleutel veilig bewaren</h2>
     <ul style="margin:0 0 16px 0;padding-left:20px;line-height:1.7;color:#475569;font-size:13px;">
-      <li>Gebruik een wachtwoordmanager &mdash; nooit platte tekst</li>
+      <li>Bewaar hem in een wachtwoordbeheerder, nooit als gewone tekst</li>
       <li>Zet hem niet in versiebeheer (.env-bestanden lekken)</li>
-      <li>Vervang hem meteen bij een vermoeden van blootstelling</li>
+      <li>Vervang hem meteen als u denkt dat iemand anders hem kent</li>
     </ul>
-    <p style="margin:16px 0 0 0;color:#475569;font-size:14px;">Vragen? Beantwoord deze e-mail.</p>
+    <p style="margin:16px 0 0 0;color:#475569;font-size:14px;">Vragen? Antwoord gewoon op deze mail.</p>
   `);
 
   return {
     ...wrap(text, html, { refId: 'parasign-' + refIdHash(apiKey) }),
-    subject: 'Je ParaSign-API is geactiveerd',
+    subject: 'Uw ParaSign-API staat aan',
   };
 }
 

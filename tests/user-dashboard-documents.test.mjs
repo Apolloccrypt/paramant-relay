@@ -398,7 +398,7 @@ ok('an expired paid period falls back to Community on /account too',
   await nl.waitForFunction(() => document.querySelectorAll('.dh-document').length === 2);
   const nlMain = await nl.locator('main').innerText();
   const nlDocs = await nl.locator('#dh-documents').innerText();
-  ok('nl: the mission line is Dutch', /Belangrijke documenten, onder controle/.test(nlMain), nlMain.slice(0, 200));
+  ok('nl: the mission line is Dutch', /Uw documenten, overzichtelijk bij elkaar/.test(nlMain), nlMain.slice(0, 200));
   ok('nl: the same three actions lead', await nl.locator('.dh-start-card').count() === 3
     && await nl.locator('.dh-start-card').nth(0).getAttribute('href') === '/sign?mode=invite', await nl.locator('.dh-start').innerText());
   ok('nl: the open filter says in Dutch where each document stands',

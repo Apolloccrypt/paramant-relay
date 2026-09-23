@@ -125,10 +125,10 @@ key is for, because it is the one a page makes a promise about.
 
 | Key | What it holds | Written by | Set where |
 |---|---|---|---|
-| `paramant.theme.v1` | The appearance choice: `auto`, `light` or `dark`. Absent means light, which is the default on every page of the site and every app screen. Applied before the first paint by `frontend/js/theme.js`; the night tokens in `frontend/app-2026.css` are scoped to `[data-theme="dark"]` and `[data-theme="auto"]`, so a dark operating system alone never pulls the app into the night | `frontend/js/theme.js` | The Appearance switch on /account |
+| `paramant.theme.v1` | The appearance choice: `auto`, `light` or `dark`. Absent behaves as `auto`: light, unless the operating system asks for dark. Applied before the first paint by `frontend/js/theme.js`, which writes the resolved edition to `<html data-theme>`; the one dark token set lives in `frontend/design-system.css` under `:root[data-theme="dark"]` and every page follows it, public and app alike | `frontend/js/theme.js` | The Appearance switch on /account and the sun / moon switch beside NL / EN in the shared nav |
 
-/account tells the reader the choice is "kept in this browser only" and that the
-public pages stay light. `tests/ui-truthfulness.test.mjs` pins the key name, the
+/account tells the reader the choice is "kept in this browser only" and that it
+applies to every page. `tests/ui-truthfulness.test.mjs` pins the key name, the
 three values, that `theme.js` contains no `fetch`, `XMLHttpRequest` or
 `sendBeacon`, and that /privacy names the key. What the sentence promises about
 colour is measured in a browser by `tests/app-theme.test.mjs`.

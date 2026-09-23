@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#15191C;color:#EAE2CE}html[data-theme="dark"]{color-scheme:dark}@media (prefers-color-scheme:dark){html[data-theme="auto"],html[data-theme="auto"] body{background:#15191C;color:#EAE2CE}html[data-theme="auto"]{color-scheme:dark}}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Uw overzicht · Paramant</title>
 <meta name="robots" content="noindex, nofollow">
@@ -13,8 +13,8 @@
 <meta name="description" content="Log in op uw Paramant-overzicht.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://relay.paramant.app">
-<link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <link rel="stylesheet" href="/parapear.css?v=4">
 <noscript><meta http-equiv="refresh" content="0;url=/auth/login?next=/dashboard"></noscript>
@@ -443,8 +443,8 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 }
 </style>
 <meta name="theme-color" content="#FFFFFF">
-<link rel="stylesheet" href="/app-2026.css?v=9">
-<script src="/js/theme.js?v=5"></script>
+<link rel="stylesheet" href="/app-2026.css?v=10">
+<script src="/js/theme.js?v=6"></script>
 <!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
      Blocking and above every other script, so it exists before any renderer runs. -->
 <script src="/js/format-date.js?v=2"></script>
@@ -473,6 +473,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
   </div>
 
   <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/dashboard" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/dashboard" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -488,7 +489,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
   <a href="/help" class="nav-tail-link">Hulp</a>
-  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/dashboard" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/dashboard" hreflang="en" lang="en">EN</a></span>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/dashboard" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/dashboard" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 
 
@@ -530,7 +531,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
   <div id="dh-root" hidden>
     <header class="dh-hero" aria-labelledby="dh-h1">
       <div>
-        <h1 id="dh-h1">Belangrijke documenten, onder controle.</h1>
+        <h1 id="dh-h1">Uw documenten, overzichtelijk bij elkaar.</h1>
         <p class="dh-mission">Met Ondertekenen laat u een document tekenen. Met Versturen stuurt u een bestand dat zichzelf wist na het lezen. Beide draaien op servers in Duitsland.</p>
       </div>
       <span class="dh-plan"><strong data-dh="plan-strong">--</strong><span>plan</span></span>
@@ -541,7 +542,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
         <span class="dh-start-icon" aria-hidden="true">&#9993;</span>
         <span class="dh-start-kicker">Ondertekenen</span>
         <h2>Handtekeningen vragen</h2>
-        <p>Stuur een beveiligd document, nodig de juiste mensen uit en volg elke handtekening. Zij tekenen via de link in die e-mail, nadat ze zijn ingelogd op het account waaraan hij gericht is.</p>
+        <p>Stuur een beveiligd document naar de mensen die moeten tekenen en zie wie al getekend heeft. Zij krijgen een uitnodiging per e-mail en tekenen via de link daarin, nadat ze zijn ingelogd op het account waaraan de uitnodiging gericht is.</p>
         <span class="dh-start-link">Verzoek starten &rarr;</span>
       </a>
       <a class="dh-start-card" href="/parashare" aria-label="Een bestand veilig versturen">
@@ -567,8 +568,8 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     <aside class="dh-community" id="dh-community" aria-label="Uw plan" hidden>
       <div>
         <p class="dh-community-kicker">Community &middot; &euro;0</p>
-        <p class="dh-community-lede">U zit op het Community-plan en dat blijft gratis. De zakelijke plannen betalen de servers en houden het zo.</p>
-        <p class="dh-community-adds">Zij brengen 2 handtekeningen per maand naar 100 of 1.000, houden links langer open, bewaren een overzicht van wat u verstuurde, geven u ondersteuning van een vast persoon, en een audittrail die u kunt exporteren en overdragen.</p>
+        <p class="dh-community-lede">U zit op het Community-plan en dat blijft gratis. De zakelijke plannen betalen de servers, zodat dat zo blijft.</p>
+        <p class="dh-community-adds">Met een zakelijk plan krijgt u 100 of 1.000 handtekeningen per maand in plaats van 2. Links blijven langer open, u houdt een overzicht van wat u verstuurde, u krijgt ondersteuning van een vaste contactpersoon en een audittrail die u kunt exporteren en overdragen.</p>
       </div>
       <a class="dh-community-cta" href="/pricing">Zakelijke plannen bekijken &rarr;</a>
     </aside>
@@ -614,7 +615,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     <aside class="dh-purpose" id="dh-purpose" aria-label="Eén korte vraag" hidden>
       <span class="dh-purpose-kicker">Eén korte vraag</span>
       <h2>Waarvoor gebruikt u Paramant?</h2>
-      <p class="dh-purpose-sub">Eén tik, we vragen het één keer. Zo bouwen we eerst de goede dingen.</p>
+      <p class="dh-purpose-sub">Eén tik, en we vragen het maar één keer. Zo weten we wat we het eerst moeten bouwen.</p>
       <div class="dh-purpose-opts">
         <button type="button" class="dh-purpose-opt" data-pa-purpose="personal"><strong>Privégebruik</strong><span>Mijn eigen bestanden en documenten.</span></button>
         <button type="button" class="dh-purpose-opt" data-pa-purpose="organisation"><strong>Voor mijn organisatie</strong><span>Mijn bedrijf, praktijk of team.</span></button>
@@ -697,7 +698,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
          this. Each answer links to the page that carries the proof, so nothing
          here is a claim this file has to be trusted on. -->
     <section class="dh-ask" aria-labelledby="dh-ask-title">
-      <h2 id="dh-ask-title">Vragen die mensen stellen voordat ze dit vertrouwen</h2>
+      <h2 id="dh-ask-title">Wat mensen vragen voordat ze erop vertrouwen</h2>
       <dl class="dh-ask-list">
         <div class="dh-ask-item">
           <dt>Wat kost het?</dt>
@@ -721,7 +722,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
       <p class="dh-ask-foot">Andere vragen beantwoorden we in het <a href="/help">hulpcentrum</a>.</p>
     </section>
 
-    <nav class="dh-quiet-links" aria-label="Andere documentacties">
+    <nav class="dh-quiet-links" aria-label="Andere acties met documenten">
       <a href="/verify">Een ondertekend document controleren</a>
       <a href="/get">Een beveiligde zending openen</a>
       <a href="/vault">Een bestand beveiligen met een wachtzin</a>
@@ -803,7 +804,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=11" defer></script>
-<script src="/js/dashboard.js?v=17" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/dashboard.js?v=18" defer></script>
 </body>
 </html>

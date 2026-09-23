@@ -279,7 +279,7 @@ function VOET(wie, antwoordAdres, taal) {
   const wieHtml = escHtml(wie || '');
   const nl = 'U krijgt dit bericht omdat ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
                                                    : 'een klant van Paramant')
-       + ' uw adres heeft ingevuld. Paramant vervoert het bestand versleuteld en '
+       + ' uw adres heeft ingevuld. Paramant verstuurt het bestand versleuteld en '
        + 'kan het zelf niet openen.'
        + (antwoordAdres ? '<br>Beantwoord deze mail om de afzender direct te bereiken.' : '');
   const en = 'You are getting this because ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
@@ -4851,7 +4851,7 @@ async function handleRelayRequest(req, res) {
               + 'korte controlecode naar dit adres. Zo kan alleen wie deze mailbox leest het '
               + 'bestand ophalen. Beschikbaar tot ' + tot + '.'
               + '\n\nU krijgt dit bericht omdat ' + (wieRuw || 'een klant van Paramant')
-              + ' uw adres heeft ingevuld. Paramant vervoert het bestand, maar kan het niet openen.'
+              + ' uw adres heeft ingevuld. Paramant verstuurt het bestand, maar kan het niet openen.'
               + (kd.email ? '\nBeantwoord deze mail om de afzender direct te bereiken.' : ''),
                 (wieRuw ? wieRuw + ' sent you a file through Paramant.' : 'A file is waiting for you.')
               + (taal === 'en' ? '\n\n' + naamRuw + '\n\n' + link : '\n\nUse the link above.')
@@ -5593,7 +5593,7 @@ async function handleRelayRequest(req, res) {
       const plan = (acct && acct.plan) || (apiKeys.get(accountId) && apiKeys.get(accountId).plan) || "community";
       if (!keysTable.accountHasParasignEntitlement(memberRecords, plan)) {
         res.writeHead(403, { "Content-Type": "application/json" });
-        return res.end(J({ error: "parasign_not_entitled", message: "This account is not entitled to the ParaSign API. Upgrade to a paid plan or ask an admin to enable ParaSign. / Dit account heeft geen recht op de ParaSign-API; upgrade naar een betaald plan of laat een beheerder ParaSign inschakelen." }));
+        return res.end(J({ error: "parasign_not_entitled", message: "This account is not entitled to the ParaSign API. Upgrade to a paid plan or ask an admin to enable ParaSign. / Dit account heeft geen toegang tot de ParaSign-API. Kies een betaald plan of vraag een beheerder ParaSign aan te zetten." }));
       }
       const out = mintParasignKey(accountId, { test: d.test === true, label: d.label });
       log("info", "parasign_key_self_minted", { account: String(accountId).slice(0, 12), kid: out.kid, mode: out.mode });
@@ -6911,8 +6911,8 @@ async function handleRelayRequest(req, res) {
         subject: taal2 === 'en' ? 'Your code to open the file'
                                 : 'Uw controlecode om het bestand te openen',
         text: tweetaligTekst(taal2,
-              'Uw controlecode is ' + vraag.code + '. Hij werkt ' + minuten + ' minuten.'
-            + (vraag.filename ? '\n\nHij opent: ' + vraag.filename : '')
+              'Uw controlecode is ' + vraag.code + '. De code is ' + minuten + ' minuten geldig.'
+            + (vraag.filename ? '\n\nVoor het bestand: ' + vraag.filename : '')
             + (wie2 ? '\nGestuurd door ' + wie2 + ' via Paramant.' : '')
             + '\n\nHeeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders uw link. '
             + 'Geef de code niet door en laat het de afzender weten.',
@@ -6924,10 +6924,10 @@ async function handleRelayRequest(req, res) {
         html: tweetaligHtml(taal2,
               '<p>Uw controlecode om het bestand te openen:</p>'
             + '<p style="font:600 28px/1.2 monospace;letter-spacing:.14em">' + vraag.code + '</p>'
-            + (bestand2 ? '<p style="color:#666;font-size:13px">Hij opent: <strong>'
+            + (bestand2 ? '<p style="color:#666;font-size:13px">Voor het bestand: <strong>'
                           + bestand2 + '</strong></p>' : '')
-            + '<p style="color:#666;font-size:13px">Hij werkt ' + minuten
-            + ' minuten.<br>Heeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders '
+            + '<p style="color:#666;font-size:13px">De code is ' + minuten
+            + ' minuten geldig.<br>Heeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders '
             + 'uw link. Geef de code niet door en laat het de afzender weten.</p>',
               '<p>Your code to open the file' + (taal2 === 'en' ? ':' : ' is the one above.') + '</p>'
             + (taal2 === 'en'
@@ -9199,7 +9199,7 @@ async function handleRelayRequest(req, res) {
     const kd = apiKeys.get(apiKey);
     if (!kd?.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
     const teamId = kd.team_id;
-    if (!teamId) { res.writeHead(200); return res.end(J({ team_id: null, devices: [], message: 'Individuele key — geen team' })); }
+    if (!teamId) { res.writeHead(200); return res.end(J({ team_id: null, devices: [], message: 'Losse sleutel, geen team' })); }
     const devices = [];
     apiKeys.forEach((v, k) => {
       if (v.team_id === teamId) devices.push({ label: v.label, plan: v.plan, active: v.active, key_preview: k.slice(0,12)+'...' });
@@ -9233,7 +9233,7 @@ async function handleRelayRequest(req, res) {
   if (path === '/v2/team/add-device' && req.method === 'POST') {
     const kd = apiKeys.get(apiKey);
     if (!kd?.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
-    if (!kd.team_id) { res.writeHead(403); return res.end(J({ error: 'Geen team — upgrade naar Pro' })); }
+    if (!kd.team_id) { res.writeHead(403); return res.end(J({ error: 'Geen team. Daarvoor is Pro nodig.' })); }
     if (kd.plan === 'dev') { res.writeHead(403); return res.end(J({ error: 'Team keys vereisen Pro of Enterprise' })); }
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());

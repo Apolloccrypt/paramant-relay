@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Outlook add-in · Paramant Help</title>
+<title>Send encrypted attachments from Outlook | Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<meta name="twitter:description" content="Set up the Paramant Outlook add-in for Microsoft 365 and Exchange. Send encrypted attachments from within Outlook.">
-<meta name="twitter:title" content="Outlook add-in · Paramant Help">
+<meta name="twitter:description" content="Set up the Paramant add-in for Outlook, Microsoft 365 and Exchange 2019, and send encrypted attachments as a one-time download link, explained step by step.">
+<meta name="twitter:title" content="Send encrypted attachments from Outlook | Paramant">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:image" content="https://paramant.app/og-image.png">
-<meta property="og:title" content="Outlook add-in · Paramant Help">
-<meta property="og:description" content="Set up the Paramant Outlook add-in for Microsoft 365 and Exchange. Send encrypted attachments from within Outlook.">
+<meta property="og:title" content="Send encrypted attachments from Outlook | Paramant">
+<meta property="og:description" content="Set up the Paramant add-in for Outlook, Microsoft 365 and Exchange 2019, and send encrypted attachments as a one-time download link, explained step by step.">
 <meta property="og:url" content="https://paramant.app/en/help/outlook-extension">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Paramant">
@@ -25,7 +25,7 @@
      against the codebase as a whole: naming an algorithm the product has, on a route
      that does not run it, is the class of untrue sentence that reads as a fact. -->
 <meta name="paramant:path" content="extensions">
-<meta name="description" content="Set up the Paramant Outlook add-in for Microsoft 365 and Exchange. Send encrypted attachments from within Outlook.">
+<meta name="description" content="Set up the Paramant add-in for Outlook, Microsoft 365 and Exchange 2019, and send encrypted attachments as a one-time download link, explained step by step.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -84,8 +84,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   footer{padding:32px 20px;flex-direction:column}
 }
 </style>
-<link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 .nav-help {
@@ -157,7 +157,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       "@type": "WebPage",
       "@id": "https://paramant.app/en/help/outlook-extension#webpage",
       "url": "https://paramant.app/en/help/outlook-extension",
-      "name": "Outlook add-in · Paramant Help",
+      "name": "Send encrypted attachments from Outlook | Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -165,7 +165,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "Set up the Paramant Outlook add-in for Microsoft 365 and Exchange. Send encrypted attachments from within Outlook."
+      "description": "Set up the Paramant add-in for Outlook, Microsoft 365 and Exchange 2019, and send encrypted attachments as a one-time download link, explained step by step."
     },
     {
       "@type": "BreadcrumbList",
@@ -222,6 +222,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   ]
 }
 </script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
 
@@ -243,6 +244,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 
   <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/outlook-extension" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/outlook-extension" hreflang="en" lang="en" aria-current="true">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -258,7 +260,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
   <a href="/help" class="nav-tail-link">Help</a>
-  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/outlook-extension" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/outlook-extension" hreflang="en" lang="en" aria-current="true">EN</a></span>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/outlook-extension" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/outlook-extension" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div><main>
 
   <div class="breadcrumb">
@@ -267,9 +269,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     Outlook add-in
   </div>
 
-  <h1>Paramant for <em>Outlook</em>: encrypted attachments from within your inbox.</h1>
+  <h1>Paramant for <em>Outlook</em>: send encrypted attachments from your inbox</h1>
 
-  <p class="lead">The Paramant Outlook add-in lets you upload a file and insert a burn-on-read link directly from a compose or reply window in Outlook for Microsoft 365, Outlook on the web, and Exchange 2019. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Firm and 100 on Enterprise.</p>
+  <p class="lead">The Paramant Outlook add-in lets you upload a file and insert a burn-on-read link (a link that stops working after it has been read) straight from a compose or reply window in Outlook for Microsoft 365, Outlook on the web, and Exchange 2019. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Firm and 100 on Enterprise.</p>
 
   <h2>Compatibility</h2>
 
@@ -287,7 +289,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">1</div>
     <div class="step-body">
       <h2>Add from Microsoft AppSource</h2>
-      <p>In Outlook, open any compose or reply window. Click the <strong>Apps</strong> button in the ribbon (or the three-dot menu on web). Select <strong>Get Add-ins</strong>. Search for <strong>Paramant</strong> and click <strong>Add</strong>.</p>
+      <p>In Outlook, open any compose or reply window. Click the <strong>Apps</strong> button in the ribbon (or the three-dot menu in Outlook on the web). Select <strong>Get Add-ins</strong>. Search for <strong>Paramant</strong> and click <strong>Add</strong>.</p>
       <p>Alternatively, your Microsoft 365 administrator can deploy the add-in to your entire organisation from the Microsoft 365 admin center under <strong>Settings &rarr; Integrated apps</strong>.</p>
     </div>
   </div>
@@ -297,7 +299,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-body">
       <h2>Open the Paramant task pane</h2>
       <p>After installation, open a compose window. A <strong>Paramant</strong> button appears in the ribbon under the <strong>Message</strong> tab. Click it to open the task pane on the right side of the window.</p>
-      <div class="tip"><p>If you don't see the Paramant button, close and reopen Outlook. On Outlook for the web, hard-refresh the page (Ctrl+Shift+R).</p></div>
+      <div class="tip"><p>If you don't see the Paramant button, close and reopen Outlook. In Outlook on the web, hard-refresh the page (Ctrl+Shift+R).</p></div>
     </div>
   </div>
 
@@ -305,7 +307,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">3</div>
     <div class="step-body">
       <h2>Enter your API key</h2>
-      <p>The task pane shows an API key field on first run. Paste your Paramant API key and click <strong>Save</strong>. The key is stored in the add-in's local settings, it is not shared with Microsoft or stored on their servers.</p>
+      <p>The task pane shows an API key field on first run. Paste your Paramant API key and click <strong>Save</strong>. The key is kept in the add-in's local settings. It is not shared with Microsoft or stored on their servers.</p>
       <p>Your API key is in Paramant Dashboard &rarr; API keys. If you don't have one, generate one there.</p>
     </div>
   </div>
@@ -323,8 +325,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="step">
     <div class="step-num">2</div>
     <div class="step-body">
-      <h2>Set expiry and click Send</h2>
-      <p>Choose how long the link should remain active (1 hour to 7 days). Click <strong>Upload and insert link</strong>. The task pane inserts a formatted line into your email body with the secure download URL.</p>
+      <h2>Set the expiry and insert the link</h2>
+      <p>Choose how long the link stays active (1 hour to 7 days). Click <strong>Upload and insert link</strong>. The task pane inserts a formatted line into your email body with the secure download URL.</p>
     </div>
   </div>
 
@@ -332,17 +334,17 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">3</div>
     <div class="step-body">
       <h2>Send your email normally</h2>
-      <p>The Paramant link is now in the email body. Edit surrounding text if needed, then send. Your recipient clicks the link, downloads the file once, and the link and file are deleted.</p>
+      <p>The Paramant link is now in the email body. Edit the text around it if you want, then send. Your recipient clicks the link, downloads the file once, and the link and file are deleted.</p>
     </div>
   </div>
 
   <h2>Organisation-wide deployment</h2>
 
-  <p>Microsoft 365 administrators can push the add-in to all users without requiring individual installation. In the Microsoft 365 admin center: <strong>Settings &rarr; Integrated apps &rarr; Get apps</strong>, search for Paramant, and deploy to specific users, groups, or the entire organisation.</p>
+  <p>Microsoft 365 administrators can push the add-in to all users, so nobody has to install it themselves. In the Microsoft 365 admin center: <strong>Settings &rarr; Integrated apps &rarr; Get apps</strong>, search for Paramant, and deploy to specific users, groups, or the entire organisation.</p>
 
-  <p>Users receive the add-in on next Outlook restart. API keys must be configured individually by each user unless your organisation provides a shared key via a managed deployment.</p>
+  <p>Users get the add-in the next time they restart Outlook. Each user still enters their own API key, unless your organisation provides a shared key through a managed deployment.</p>
 
-  <div class="warn"><p>Do not use a single shared API key across all users in a large organisation, transfers from all users will appear under one account, and revoking the shared key will lock everyone out simultaneously. Use per-user or per-team keys.</p></div>
+  <div class="warn"><p>Do not use one shared API key for all users in a large organisation. Transfers from everyone would appear under one account, and revoking the shared key would lock everyone out at once. Use a key per user or per team.</p></div>
 
   <hr class="divider">
 
@@ -350,12 +352,12 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <div class="troubleshoot-item">
     <div class="q">The Paramant button does not appear in the ribbon.</div>
-    <div class="a">Close and reopen Outlook. If the button is still missing, go to File &rarr; Manage Add-ins and verify Paramant is listed and enabled. On Outlook for the web, check that pop-ups are not blocked for outlook.office.com.</div>
+    <div class="a">Close and reopen Outlook. If the button is still missing, go to File &rarr; Manage Add-ins and check that Paramant is listed and switched on. In Outlook on the web, check that pop-ups are not blocked for outlook.office.com.</div>
   </div>
 
   <div class="troubleshoot-item">
-    <div class="q">Task pane opens but shows a blank screen.</div>
-    <div class="a">This is usually a network issue. The add-in task pane loads from addin.paramant.app. Ensure your firewall or proxy allows outbound HTTPS connections to paramant.app and addin.paramant.app. Check <a href="/status">paramant.app/status</a> for any active incidents.</div>
+    <div class="q">The task pane opens but stays blank.</div>
+    <div class="a">This is usually a network issue. The add-in task pane loads from addin.paramant.app. Make sure your firewall or proxy allows outbound HTTPS connections to paramant.app and addin.paramant.app. Check <a href="/status">paramant.app/status</a> for any active incidents.</div>
   </div>
 
   <div class="troubleshoot-item">
@@ -365,7 +367,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <div class="troubleshoot-item">
     <div class="q">Our IT policy requires add-ins to be approved before installation.</div>
-    <div class="a">Ask your Microsoft 365 administrator to approve Paramant in the admin center under <strong>Settings &rarr; Integrated apps &rarr; Add-ins</strong>. Alternatively, request admin-deployed installation so the button appears automatically for all users.</div>
+    <div class="a">Ask your Microsoft 365 administrator to approve Paramant in the admin center under <strong>Settings &rarr; Integrated apps &rarr; Add-ins</strong>. Or ask them to deploy the add-in centrally, so the button appears for all users automatically.</div>
   </div>
 
   <hr class="divider">
@@ -374,11 +376,11 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="next-steps">
     <a href="/en/help/gmail-extension" class="next-step-card">
       <h3>Gmail extension</h3>
-      <p>Same workflow for Gmail in Chrome.</p>
+      <p>The same steps for Gmail in Chrome.</p>
     </a>
     <a href="/en/help/api-key-vs-totp" class="next-step-card">
       <h3>API key vs TOTP</h3>
-      <p>Understanding the credentials used by the add-in.</p>
+      <p>The credentials the add-in uses.</p>
     </a>
   </div>
 
@@ -417,6 +419,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=11" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 </body>
 </html>

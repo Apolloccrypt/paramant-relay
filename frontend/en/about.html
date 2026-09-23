@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>About Paramant · Founded by Mick Beer</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -29,8 +29,8 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 .about-band{padding:var(--space-8) 0;border-top:1px solid var(--ink-hair)}
@@ -151,6 +151,7 @@
   ]
 }
 </script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -173,6 +174,7 @@
   </div>
 
   <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/about" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/about" hreflang="en" lang="en" aria-current="true">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -188,7 +190,7 @@
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
   <a href="/help" class="nav-tail-link">Help</a>
-  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/about" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/about" hreflang="en" lang="en" aria-current="true">EN</a></span>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/about" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/about" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main>
 
@@ -200,7 +202,7 @@
       <h1 class="paramant-h2">About Paramant</h1>
       <span class="mono-eyebrow">Company, mission, and how to check us</span>
     </div>
-    <p class="about-lede">Sign and send documents so that only you and the person you send them to can read them, and so that anyone can check later that the document is genuine and unchanged. The servers stand in Germany, under EU law.</p>
+    <p class="about-lede">Sign and send documents so that only you and the person you send them to can read them, and so that anyone can check later that the document is genuine and unchanged. Our servers are in Germany, under EU law.</p>
     <p class="about-for">For small offices that sign and send confidential papers, and for the person who has to check a supplier before it goes near client files.</p>
     <div class="about-byline">
       <div class="n">Mick Beer</div>
@@ -219,7 +221,7 @@
     <span class="mono-eyebrow">01 / Mission</span>
     <h2 style="margin-top:var(--space-2)">What Paramant is</h2>
     <p>Two products on one post-quantum core. <strong>ParaSend</strong> encrypts files in your browser or SDK before they ever leave your device; the relay only holds fixed-size ciphertext in RAM and destroys it after its last read. <strong>ParaSign</strong> signs documents with ML-DSA-65 (FIPS 204) and records every signature in a public transparency log.</p>
-    <p>The design goals stay constant: privacy first, post-quantum by default, and EU-sovereign infrastructure with no US parent and no US CLOUD Act exposure. The aim is not to ask for your trust, but to remove the need for it.</p>
+    <p>The design goals stay constant: privacy first, post-quantum by default, and EU-sovereign infrastructure with no US parent and no US CLOUD Act exposure. We do not ask you to trust us. We aim to make that trust unnecessary.</p>
   </div>
 </section>
 
@@ -231,9 +233,9 @@
     <div class="person-card">
       <div class="person-name">Mick Beer</div>
       <div class="person-title">Privacy and security researcher, founder of Paramantis Solutions B.V.</div>
-      <p>Paramant is a product of <strong>Paramantis Solutions B.V.</strong> in Harderwijk, the Netherlands, founded by Mick Beer, privacy and security researcher. Paramantis Solutions B.V. is the contracting and responsible party; the founder is the origin of the work, not the service itself.</p>
+      <p>Paramant is a product of <strong>Paramantis Solutions B.V.</strong> in Harderwijk, the Netherlands, founded by Mick Beer, privacy and security researcher. Paramantis Solutions B.V. is the contracting and responsible party. The founder is where the work comes from, not the service itself.</p>
       <p>The Community plan is his way of giving something back to society; the business plans pay for it. That is the whole arrangement, and it is why the Community plan is not a trial and has no end date.</p>
-      <p>That background shapes the choices: post-quantum signatures (ML-DSA-65), a public transparency log, offline-verifiable documents, and source code you can inspect yourself. You do not have to take us at our word, you can verify it. The code is source-available and the transparency log is public: the product stands apart from the person and stays checkable.</p>
+      <p>That background shapes the choices: post-quantum signatures (ML-DSA-65), a public transparency log, offline-verifiable documents, and source code you can inspect yourself. You do not have to take our word for it: you can check it yourself. The code is source-available and the transparency log is public: the product stands apart from the person and stays checkable.</p>
     </div>
 
     <div class="split-head">Free for everyone, paid for organisations</div>
@@ -257,7 +259,7 @@
 <!-- HOW YOU CAN CHECK US -->
 <section class="about-band">
   <div class="container-md">
-    <span class="mono-eyebrow">03 / Technique &amp; transparency</span>
+    <span class="mono-eyebrow">03 / Technology &amp; transparency</span>
     <h2 style="margin-top:var(--space-2)">How you can check us</h2>
     <p>Every claim on this site is meant to be checkable, not taken on faith. Four things make that possible:</p>
     <div class="check-grid">
@@ -326,6 +328,6 @@
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=11" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 </body>
 </html>

@@ -223,7 +223,7 @@ function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle }) {
     const textNl = [
       `Uw ${planNl} is afgelopen op ${dateNl}. Uw account staat nu op ${FLOOR_NAME}.`,
       '',
-      'Er is niets afgeschreven. Elk plan is hier een eenmalige betaling voor de periode die u koopt. Er wordt dus niets vanzelf verlengd en niets geïncasseerd zonder u.',
+      'Er is niets afgeschreven. Elk plan is hier een eenmalige betaling voor de periode die u koopt. Er wordt dus niets vanzelf verlengd en niets geïncasseerd zonder dat u zelf betaalt.',
       '',
       `U kunt op elk moment een nieuwe maand of een nieuw jaar kopen: ${pricing}`,
       '',
@@ -251,7 +251,7 @@ function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle }) {
     '',
     `U kunt verlengen met een maand of een jaar. Doet u niets, dan gaat uw account terug naar ${FLOOR_NAME}. Er wordt niets automatisch afgeschreven.`,
     '',
-    `Uw plannen en prijzen vindt u hier: ${pricing}`,
+    `Plannen en prijzen vindt u hier: ${pricing}`,
     '',
     'Paramant',
   ].join('\n');

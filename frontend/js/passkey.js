@@ -60,7 +60,7 @@ function setStatus(el, text, isError, techCode) {
 // plus the one route that is known to still work, and the code kept small
 // underneath for support.
 const PASSKEY_START_FALLBACK =
-  nlEn('De passkey-vraag kon op dit apparaat niet starten. ', 'We could not start the passkey prompt on this device. ')
+  nlEn('Inloggen met een passkey kon op dit apparaat niet starten. ', 'We could not start the passkey prompt on this device. ')
   + nlEn('Kies “Mijn passkey staat op een ander apparaat”, of gebruik een code van 6 cijfers.', 'Try “My passkey is on another device”, or use a 6-digit code.');
 // Creating a passkey is a different screen with different exits: the
 // cross-device link and the 6-digit code are not on it, so the sign-in sentence
@@ -108,7 +108,7 @@ function passkeyAuthErrorMessage(e) {
     return nlEn('Inloggen met een passkey is afgebroken.', 'Passkey sign-in was cancelled.');
   }
   if (name === 'SecurityError') {
-    return nlEn('Inloggen met een passkey kon op deze site niet starten. Blijft dit gebeuren, neem dan contact op met support.', 'Passkey sign-in could not start on this site. If this keeps happening, contact support.');
+    return nlEn('Inloggen met een passkey kon op deze site niet starten. Blijft dit gebeuren, neem dan contact met ons op.', 'Passkey sign-in could not start on this site. If this keeps happening, contact support.');
   }
   // NotAllowedError and anything else: ambiguous. Give the actionable options.
   return nlEn('Er is op dit apparaat geen passkey gebruikt. Log hierboven in met uw e-mailadres en code, ', 'No passkey was used on this device. Sign in with your email and code above, ')
@@ -133,7 +133,7 @@ function wireSetupPasskey() {
 
   btn.addEventListener('click', async () => {
     btn.disabled = true;
-    setStatus(status, nlEn('Volg de vraag op uw apparaat om de passkey te maken…', 'Follow your device prompt to create the passkey…'), false);
+    setStatus(status, nlEn('Volg de stappen op uw apparaat om de passkey te maken…', 'Follow your device prompt to create the passkey…'), false);
     try {
       const opt = await postJSON('/api/user/auth/webauthn/register/options', { setup_token: setupToken });
       if (!opt.ok) throw passkeyStartFailure(opt.status, opt.data && opt.data.error, 'create');
@@ -234,7 +234,7 @@ function wireLoginPasskey() {
     const email = (emailEl && emailEl.value || '').trim();
     if (!email) { setStatus(status, nlEn('Vul eerst uw e-mailadres in.', 'Enter your email address first.'), true); if (emailEl) emailEl.focus(); return; }
     btn.disabled = true;
-    setStatus(status, nlEn('Volg de vraag op uw apparaat om in te loggen…', 'Follow your device prompt to sign in…'), false);
+    setStatus(status, nlEn('Volg de stappen op uw apparaat om in te loggen…', 'Follow your device prompt to sign in…'), false);
     try {
       const opt = await postJSON('/api/user/auth/webauthn/login/options', { email });
       if (!opt.ok) throw passkeyStartFailure(opt.status, opt.data && opt.data.error);
@@ -315,7 +315,7 @@ function wireAccountPasskey() {
       if (opt.status === 403) throw new Error(nlEn('Die code is niet geaccepteerd. Probeer de huidige code uit uw authenticator-app.', 'That TOTP code was not accepted. Try the current code from your authenticator.'));
       if (!opt.ok) throw passkeyStartFailure(opt.status, opt.data && opt.data.error, 'create');
 
-      setStatus(status, nlEn('Volg de vraag op uw apparaat om de passkey te maken…', 'Follow your device prompt to create the passkey…'), false);
+      setStatus(status, nlEn('Volg de stappen op uw apparaat om de passkey te maken…', 'Follow your device prompt to create the passkey…'), false);
       let attResp;
       try {
         attResp = await startRegistration({ optionsJSON: opt.data.options });

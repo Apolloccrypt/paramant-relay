@@ -2,29 +2,29 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Documentatie · Paramant-API en zelf hosten</title>
+<title>API-documentatie en zelf hosten · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="API-referentie, SDK-handleiding, zelf hosten en compliance-documentatie voor Paramant v3.0.0. Uw IT kan hier alles controleren.">
-<meta property="og:title" content="Documentatie · Paramant-API en zelf hosten">
-<meta property="og:description" content="API-referentie, SDK-handleiding, zelf hosten en compliance-documentatie voor Paramant v3.0.0. Uw IT kan hier alles controleren.">
+<meta name="description" content="Documentatie van Paramant v3.0.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
+<meta property="og:title" content="API-documentatie en zelf hosten · Paramant">
+<meta property="og:description" content="Documentatie van Paramant v3.0.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
 <meta property="og:url" content="https://paramant.app/docs">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Documentatie · Paramant-API en zelf hosten">
-<meta name="twitter:description" content="API-referentie, SDK-handleiding, zelf hosten en compliance-documentatie voor Paramant v3.0.0. Uw IT kan hier alles controleren.">
+<meta name="twitter:title" content="API-documentatie en zelf hosten · Paramant">
+<meta name="twitter:description" content="Documentatie van Paramant v3.0.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt.">
 <link rel="canonical" href="https://paramant.app/docs">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/docs">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/docs">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/docs">
 
-<link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
   <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -171,7 +171,7 @@ tr:last-child td{border-bottom:none}
       "@type": "WebPage",
       "@id": "https://paramant.app/docs#webpage",
       "url": "https://paramant.app/docs",
-      "name": "Documentatie · Paramant-API en zelf hosten",
+      "name": "API-documentatie en zelf hosten · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -179,7 +179,7 @@ tr:last-child td{border-bottom:none}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "nl",
-      "description": "API-referentie, SDK-handleiding, zelf hosten en compliance-documentatie voor Paramant v3.0.0. Uw IT kan hier alles controleren."
+      "description": "Documentatie van Paramant v3.0.0: API-referentie, SDK-handleiding, zelf hosten en uitleg over NEN 7510, NIS2 en DORA. Zo controleert uw IT hoe het werkt."
     },
     {
       "@type": "Organization",
@@ -187,7 +187,7 @@ tr:last-child td{border-bottom:none}
       "name": "Paramant",
       "legalName": "Paramantis Solutions B.V.",
       "url": "https://paramant.app/",
-      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
       "founder": {
         "@type": "Person",
         "name": "Mick Beer",
@@ -213,6 +213,7 @@ tr:last-child td{border-bottom:none}
   ]
 }
 </script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 
 <nav class="nav">
@@ -233,6 +234,7 @@ tr:last-child td{border-bottom:none}
   </div>
 
   <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/docs" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/docs" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -248,7 +250,7 @@ tr:last-child td{border-bottom:none}
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
   <a href="/help" class="nav-tail-link">Hulp</a>
-  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/docs" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/docs" hreflang="en" lang="en">EN</a></span>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/docs" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/docs" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main id="main-content" tabindex="-1">
 
@@ -257,7 +259,7 @@ tr:last-child td{border-bottom:none}
     <span class="eyebrow">NASLAG</span>
     <h1>Documentatie</h1>
     <p class="docs-buyer">Overweegt u Paramant? Uw IT kan hier alles controleren. Abonnementen en prijzen staan op <a href="/pricing">Prijzen</a>.</p>
-    <p class="lede">API-referentie, SDK-handleiding, zelf hosten en compliance-documentatie voor PARAMANT v3.0.0. De relay is bewust niet vertrouwd: hij heeft nooit een sleutel om te ontsleutelen. De API voor Ondertekenen is beschikbaar vanaf Firm; zie <a href="/pricing">prijzen</a>.</p>
+    <p class="lede">API-referentie, SDK-handleiding, zelf hosten en compliance-documentatie voor PARAMANT v3.0.0. U hoeft de relay niet te vertrouwen: hij heeft nooit een sleutel om te ontsleutelen. De API voor Ondertekenen is beschikbaar vanaf Firm; zie <a href="/pricing">prijzen</a>.</p>
     <div class="docs-hero-actions">
       <a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">Snel starten</a>
       <a href="/pricing" class="docs-hero-btn docs-hero-btn-secondary">Bekijk abonnementen en prijzen</a>
@@ -338,7 +340,7 @@ tr:last-child td{border-bottom:none}
 
     <!-- ── Quick start ──────────────────────────────────────────── -->
     <h2 id="quickstart">Snel starten</h2>
-    <p>Verstuur uw eerste versleutelde bestand in minder dan 5 minuten. <a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">Maak hier een gratis account aan</a> (beveiligd met TOTP, sleutel zichtbaar in het dashboard).</p>
+    <p>Verstuur uw eerste versleutelde bestand in minder dan 5 minuten. <a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">Maak een gratis account aan</a> (beveiligd met TOTP, sleutel zichtbaar in het dashboard).</p>
 
     <div class="step-row"><div class="step-num">1</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Installeer de SDK (Python 3.10+ of Node 18+; beide gebruiken dezelfde encoder voor wire format v1)</p></div></div>
     <div class="cb">
@@ -441,7 +443,7 @@ gp = GhostPipe(api_key="pgp_xxx", device="mri-001", sector="health")
 hash_, proof = gp.send(open("scan.dcm","rb").read(), ttl=3600)</pre></div>
 
     <h3><span class="sector-badge">legal</span>Juridisch en notariaat: eIDAS, KNB</h3>
-    <p>Verstuur ondertekende aktes en processtukken die na ontvangst cryptografisch verdwenen zijn. De CT-log geeft een manipulatiebestendig bewijs van aflevering, zonder de inhoud op te slaan.</p>
+    <p>Verstuur ondertekende aktes en processtukken die na ontvangst cryptografisch gewist zijn. De CT-log geeft een manipulatiebestendig bewijs van aflevering, zonder de inhoud op te slaan.</p>
     <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
     <pre><span class="cm"># Signed deed: burn-on-read, CT log entry as proof of delivery</span>
 from paramant_sdk import GhostPipe
@@ -479,7 +481,7 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
       <tr><td><span class="method post">POST</span></td><td>/v2/sends</td><td>Maakt van al geüploade blokken één verzending naar genoemde ontvangers: ieder krijgt een persoonlijke link die één keer werkt. Eén ontvanger per verzending op Community, tot 30 op Firm en Enterprise; meer wordt geweigerd met 403 <code>over_limit</code>. De body bevat de blokhashes, de adressen en per persoon één ingepakte bestandssleutel.</td><td>Sleutel</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/pickup/:token</td><td>De ontvangende kant. Die heeft geen inloggegevens nodig: het token uit de uitnodiging is zelf de toegang. <code>{"action":"code"}</code> mailt een korte code naar dezelfde mailbox; <code>{"code":"123456"}</code> geeft de bytes terug, één keer; <code>{"action":"confirm"}</code> meldt dat het bestand geopend is, en pas dan is het ophalen definitief.</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/pickup/:token</td><td>Dezelfde route, bewaard voor links die zijn gemaakt vóór de overstap naar POST. Een GET die mail verstuurt, wordt door elke linkscanner afgevuurd, dus nieuwe clients gebruiken POST.</td><td>n/a</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/outbound/:hash</td><td>Downloaden en wissen: gebruikt één lezing van de link</td><td>Sleutel</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/outbound/:hash</td><td>Downloaden en wissen: telt als één lezing van de link</td><td>Sleutel</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/status/:hash</td><td>Controleren of een blob beschikbaar is, zonder hem te verbruiken</td><td>Sleutel</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/ack</td><td>Aflevering bevestigen, vertraging vastleggen in de CT-log</td><td>Sleutel</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/monitor</td><td>Live statistieken: blobs onderweg, ACK-percentage</td><td>Sleutel</td></tr>
@@ -513,7 +515,7 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
     <p>TTL en <code>max_views</code> worden allebei begrensd op het maximum van het abonnement: Community krijgt 1 uur en 1 lezing, Firm 24 uur en tot 10 lezingen, Enterprise 7 dagen en 100 lezingen. Laat u <code>max_views</code> weg, dan wordt de link op elk abonnement bij de eerste lezing gewist. Zo werkt de webapp van Versturen. Het veld <code>hash</code> is de SHA-256 van de <em>opgevulde</em> inhoud, niet van het oorspronkelijke bestand. De SDK berekent dit zelf.</p>
 
     <h2 id="outbound">GET /v2/outbound/:hash</h2>
-    <p><strong>Gebruikt één lezing van de link.</strong> Een Community-link heeft één lezing, dus deze aanroep is de enige keer ophalen; een betaalde link kan er meer hebben, tot 10 op Firm. Bij de laatste lezing wordt de buffer van de blob overschreven met willekeurige bytes en uit het RAM verwijderd. Herstellen is niet mogelijk.</p>
+    <p><strong>Telt als één lezing van de link.</strong> Een Community-link heeft één lezing, dus deze aanroep is de enige keer ophalen; een betaalde link kan er meer hebben, tot 10 op Firm. Bij de laatste lezing wordt de buffer van de blob overschreven met willekeurige bytes en uit het RAM verwijderd. Herstellen is niet mogelijk.</p>
     <pre>GET /v2/outbound/abc123...
 X-Api-Key: pgp_xxx
 
@@ -618,7 +620,7 @@ X-Api-Key: pgp_xxx
   "message": "Send history and link management require a Firm plan or higher." }</pre>
 
     <h2 id="audit-export">GET /v2/parasign/audit-export</h2>
-    <p>Het compliance-deel van de betaalde abonnementen van Ondertekenen. Een auditor krijgt het manipulatiebestendige ondertekenspoor van het account, de ondertekende tree head (STH) uit de Certificate Transparency-log die het verankert, en de volledige <code>.psign</code>-bewijzen van elke voltooide envelope, als CSV of JSON. Er verlaat geen document de relay; de export bevat alleen hashes en handtekeningen.</p>
+    <p>Dit hoort bij de betaalde abonnementen van Ondertekenen en is bedoeld voor compliance. Een auditor krijgt het manipulatiebestendige ondertekenspoor van het account, de ondertekende tree head (STH) uit de Certificate Transparency-log die het verankert, en de volledige <code>.psign</code>-bewijzen van elke voltooide envelope, als CSV of JSON. Er verlaat geen document de relay; de export bevat alleen hashes en handtekeningen.</p>
     <table>
       <tr><th>Veld</th><th>Waarde</th></tr>
       <tr><td>Auth</td><td><code>X-Api-Key: pgp_...</code></td></tr>
@@ -648,7 +650,7 @@ curl "https://paramant.app/v2/parasign/audit-export?format=csv" \
     { "envelope_id": "env_9f2c...", "status": "completed", "psign": { "...": "full multi-signer .psign proof" } }
   ]
 }</pre>
-    <p>De CSV-export heeft één kopregel en één regel per auditregel: <code>time,event,doc_hash,bytes,device,chain_hash</code> (de <code>.psign</code>-bewijzen van envelopes staan alleen in de JSON-export). <code>chain_valid: false</code> wijst op manipulatie: een auditketen die de Merkle-hercontrole niet doorstond. Envelopestatussen zijn <code>completed</code> (volledig <code>.psign</code>), <code>in_progress</code>, <code>sent</code>, <code>void</code> of <code>expired_or_gone</code> (geen bewijs).</p>
+    <p>De CSV-export heeft één kopregel en één regel per auditgebeurtenis: <code>time,event,doc_hash,bytes,device,chain_hash</code> (de <code>.psign</code>-bewijzen van envelopes staan alleen in de JSON-export). <code>chain_valid: false</code> wijst op manipulatie: een auditketen die de Merkle-hercontrole niet doorstond. Envelopestatussen zijn <code>completed</code> (volledig <code>.psign</code>), <code>in_progress</code>, <code>sent</code>, <code>void</code> of <code>expired_or_gone</code> (geen bewijs).</p>
     <pre><span class="cm"># 403 plan too low</span>
 { "error": "tier_upgrade_required", "feature": "audit_export",
   "message": "The ParaSign audit export requires a Business plan or higher." }</pre>
@@ -698,7 +700,7 @@ id=tr_XXXX
     </div>
 
     <div class="callout"><span class="callout-label">Waar u begint</span>
-      <p>Deze links staan niet meer in de navigatie; alleen hier.
+      <p>Deze links staan niet meer in het menu, alleen nog hier.
       Installeren met één regel: <a href="/install.sh">install.sh</a> voor een server,
       <a href="/install-pi.sh">install-pi.sh</a> voor een Raspberry Pi.
       Images: <a href="https://hub.docker.com/r/mtty001/relay" target="_blank" rel="noopener">Docker Hub</a>.
@@ -858,7 +860,7 @@ paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/ap
       <tr><td>ML-DSA-65</td><td>Identiteitshandtekeningen van de relay (authenticatie tussen relays)</td><td>NIST FIPS 204</td></tr>
       <tr><td>Argon2id</td><td>Wachtwoord op een overdracht (hash, optionele module)</td><td>RFC 9106</td></tr>
     </table>
-    <p>Versleuteling in de browser draait als <strong>Rust/WASM</strong>, gecompileerd uit <code>crypto-wasm/</code>. De WASM-binary wordt voor het eerste gebruik tijdens het draaien met SHA-256 gecontroleerd. De JS-code van de relay kan op geen enkel moment bij sleutels om te ontsleutelen.</p>
+    <p>Versleuteling in de browser draait als <strong>Rust/WASM</strong>, gecompileerd uit <code>crypto-wasm/</code>. De WASM-binary wordt tijdens het draaien met SHA-256 gecontroleerd, vóór het eerste gebruik. De JS-code van de relay kan op geen enkel moment bij sleutels om te ontsleutelen.</p>
     <p>De twee helften draaien verschillende builds van dezelfde Rust-cryptografie. <strong>Sleutelinkapseling met ML-KEM-768 blijft aan de clientkant</strong> (WASM in de browser of de SDK): de relay wisselt nooit sleutels uit en heeft nooit een privésleutel. <strong>ML-DSA-65 draait aan de serverkant</strong>, voor het identiteitssleutelpaar van de relay, ondertekende ontvangstbewijzen en ondertekende tree heads (STH), en om handtekeningen van apparaten en ontvangstbewijzen te controleren. Sinds de M5b-migratie (27 mei 2026) komt die ML-DSA-65 aan de serverkant uit <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>: een losse Rust-cryptobibliotheek, klaar voor audit (BUSL-1.1), die de relay gebruikt via de NAPI-binding <code>@paramant/core</code>.</p>
 
     <h2 id="burn">Burn-on-read: wissen na ophalen</h2>
@@ -914,7 +916,7 @@ python3 scripts/paramant-admin.py sync</pre>
       <tr><td>Firm</td><td>1 uur</td><td>24 uur</td><td>500 MB</td></tr>
       <tr><td>Enterprise</td><td>1 uur</td><td>7 dagen</td><td>500 MB, of de limiet die voor uw eigen relay is ingesteld</td></tr>
     </table>
-    <p>De abonnementen verschillen niet in bestandsgrootte, dus het plafond is overal gelijk. Twee andere getallen worden vaak voor dit getal aangezien, maar zijn het niet. Een blob op <code>POST /v2/inbound</code> is een vast blok van 5 MB, de opvulgrootte onderweg, dus een bestand groter dan één blok gaat als meerdere blokken. En een eenmalige link uit de webapp van Versturen is één blok onder één token, dus die ene manier van versturen stopt bij 5 MB per bestand. De live overdracht in dezelfde webapp knipt het bestand in stukken en haalt wel de 500 MB uit deze tabel.</p>
+    <p>De abonnementen verschillen niet in bestandsgrootte, dus het plafond is overal gelijk. Twee andere getallen worden hier vaak mee verward. Een blob op <code>POST /v2/inbound</code> is een vast blok van 5 MB, de opvulgrootte onderweg, dus een bestand groter dan één blok gaat als meerdere blokken. En een eenmalige link uit de webapp van Versturen is één blok onder één token, dus die ene manier van versturen stopt bij 5 MB per bestand. De live overdracht in dezelfde webapp knipt het bestand in stukken en haalt wel de 500 MB uit deze tabel.</p>
 
     <h2 id="sectors">Relay-sectoren</h2>
     <p>Alle sectornodes draaien <strong>dezelfde Ghost Pipe-relaysoftware</strong>. Sectoren zijn routeringsdomeinen: ze houden verkeer gescheiden en hebben compliance-documentatie per sector. De cryptografie en de API zijn overal gelijk.</p>
@@ -928,7 +930,7 @@ python3 scripts/paramant-admin.py sync</pre>
 
     <!-- ── Security ─────────────────────────────────────────────── -->
     <h2 id="threat-model">Beveiliging: dreigingsmodel</h2>
-    <p>De relay is <strong>bewust niet vertrouwd</strong>. De beveiliging hangt niet af van vertrouwen in de beheerder.</p>
+    <p>Het ontwerp gaat ervan uit dat de relay <strong>niet te vertrouwen</strong> is. De beveiliging hangt niet af van vertrouwen in de beheerder.</p>
     <table>
       <tr><th>Wat een gecompromitteerde relay kan</th><th>Wat hij niet kan</th></tr>
       <tr><td>Dienst weigeren of vertragen</td><td>Bestandsinhoud lezen (geen sleutel om te ontsleutelen)</td></tr>
@@ -1055,7 +1057,7 @@ python3 scripts/paramant-admin.py sync</pre>
 
 <script src="/js/docs.inline1.js?v=1"></script>
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=11" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 </main>
 <footer>
   <div class="container-lg">

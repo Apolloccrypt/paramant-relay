@@ -529,6 +529,11 @@ jobs:
         # happens (scripts/ui-contrast-sweep.mjs), so a job without a browser
         # goes red in seconds instead of silent for hours.
         run: node --test $(node scripts/browser-suites.mjs --no-browser)
+      # Een verouderde e-mailblocklist is een waarschuwing, geen rode check: een
+      # vergeten update mag nooit een spoedfix tegenhouden. Rood wordt alleen de
+      # wekelijkse workflow email-blocklist (RUNBOOK.md, sectie 8).
+      - name: E-mailblocklist, leeftijd van de bron
+        run: node scripts/update-email-blocklist.mjs --leeftijd
 
   landen:
     name: landen, geen tak te lang buiten main

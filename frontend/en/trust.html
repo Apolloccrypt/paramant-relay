@@ -2,21 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Trust and verification · Paramant</title>
+<title>Trust and verification: check what we can see | Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
 <meta name="description" content="What Paramant can see on your own server, what it can do, and how you check both yourself. Every claim on the page is tagged live or planned.">
-<meta property="og:title" content="Trust and verification · Paramant">
+<meta property="og:title" content="Trust and verification: check what we can see | Paramant">
 <meta property="og:description" content="What Paramant can see on your own server, what it can do, and how you check both yourself. Every claim on the page is tagged live or planned.">
 <meta property="og:url" content="https://paramant.app/en/trust">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Trust and verification · Paramant">
+<meta name="twitter:title" content="Trust and verification: check what we can see | Paramant">
 <meta name="twitter:description" content="What Paramant can see on your own server, what it can do, and how you check both yourself. Every claim on the page is tagged live or planned.">
 <link rel="canonical" href="https://paramant.app/en/trust">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/trust">
@@ -29,8 +29,8 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -166,7 +166,7 @@ code{font-family:var(--mono);font-size:.92em;color:var(--cobalt)}
       "@type": "WebPage",
       "@id": "https://paramant.app/en/trust#webpage",
       "url": "https://paramant.app/en/trust",
-      "name": "Trust and verification · Paramant",
+      "name": "Trust and verification: check what we can see | Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -231,6 +231,7 @@ code{font-family:var(--mono);font-size:.92em;color:var(--cobalt)}
   ]
 }
 </script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -253,6 +254,7 @@ code{font-family:var(--mono);font-size:.92em;color:var(--cobalt)}
   </div>
 
   <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/trust" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/trust" hreflang="en" lang="en" aria-current="true">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -268,13 +270,13 @@ code{font-family:var(--mono);font-size:.92em;color:var(--cobalt)}
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
   <a href="/help" class="nav-tail-link">Help</a>
-  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/trust" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/trust" hreflang="en" lang="en" aria-current="true">EN</a></span>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/trust" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/trust" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <section class="page-hero page-hero--navy">
 <div class="page-hero-inner">
   <span class="eyebrow">TRANSPARENCY</span>
   <h1>Trust &amp; Verification</h1>
-  <p class="lede">For organisations that run Paramant on their own server, and for anyone who has to check a supplier before it goes near client documents. What we can see, what we can do, and how you verify both, without taking our word for it. If you use the hosted service at paramant.app, the <a href="/security">security page</a> is the shorter answer.</p>
+  <p class="lede">For organisations that run Paramant on their own server, and for anyone who has to check a supplier before it goes near client documents. This page sets out what we can see, what we can do, and how you can check both without taking our word for it. If you use the hosted service at paramant.app, the <a href="/security">security page</a> is the shorter answer.</p>
   <div class="hero-cta">
     <a href="/security" class="btn btn-primary">See the evidence &rarr;</a>
     <a href="/pricing" class="btn btn-secondary">See pricing &rarr;</a>
@@ -301,9 +303,9 @@ code{font-family:var(--mono);font-size:.92em;color:var(--cobalt)}
 
   <p><strong>Today <span class="badge badge-live">Live</span></strong> the relay's entitlement is an <em>offline</em> license. Your <code>PLK_KEY</code> is a license token signed by Paramant (Ed25519) that the relay verifies locally against an embedded public key. It carries a user cap, an expiry and who it was issued to. The relay does <strong>not</strong> phone home to validate it: with no key, or an expired one, the relay simply runs as Community Edition (5 users). Nothing leaves your server to check a license.</p>
 
-  <p><strong>Planned <span class="badge badge-planned">Planned</span></strong> to sell tiers with capabilities beyond a user-count, the design adds an <em>online</em> license-check. Under that model your relay calls a Paramant licensing endpoint at startup and every 6 hours. The request carries your license-key, a relay-identity (the fingerprint of the ML-DSA-65 public key your relay generates on first boot), the relay version, and a telemetry block that is off by default.</p>
+  <p><strong>Planned <span class="badge badge-planned">Planned</span></strong> to sell tiers with capabilities beyond a user cap, the design adds an <em>online</em> license-check. Under that model your relay calls a Paramant licensing endpoint at startup and every 6 hours. The request carries your license-key, a relay-identity (the fingerprint of the ML-DSA-65 public key your relay generates on first boot), the relay version, and a telemetry block that is off by default.</p>
 
-  <p>The response is a <strong>signed capability-set</strong> that says which features your tier unlocks, and it is valid for a few hours. Your relay verifies the ML-DSA-65 signature against an embedded Paramant licensing key; an unsigned or invalid response is rejected. If the licensing endpoint is unreachable, the relay keeps using its last cached capability-set for up to 7 days, then degrades to Community mode. There are no surprise lockouts: an outage on our side cannot instantly disable your relay.</p>
+  <p>The response is a <strong>signed capability-set</strong> that says which features your tier includes, and it is valid for a few hours. Your relay verifies the ML-DSA-65 signature against an embedded Paramant licensing key; an unsigned or invalid response is rejected. If the licensing endpoint is unreachable, the relay keeps using its last cached capability-set for up to 7 days, then falls back to Community mode. There are no surprise lockouts: an outage on our side cannot instantly disable your relay.</p>
 
   <p class="see-also">Full wire-protocol specification: ADR R013 (Draft) in the public <a href="https://github.com/Apolloccrypt/paramant-relay/tree/main/docs/adrs">ADR directory</a>.</p>
 
@@ -342,7 +344,7 @@ code{font-family:var(--mono);font-size:.92em;color:var(--cobalt)}
   <!-- ───────────────────── Verify ───────────────────── -->
   <h2 id="verify-deployment">How to verify your deployment</h2>
 
-  <p>You do not have to trust these statements. The public surface lets you check them.</p>
+  <p>You do not have to take these statements on trust. You can check them against what is public.</p>
 
   <h3>1. Source <span class="badge badge-live">Live</span></h3>
   <p>Everything that runs on your server is in the public <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub repository</a> under BUSL-1.1: the relay, the admin panel, the SDKs, and the license-<em>client</em> code that does the check-in. You can read exactly what your relay does, including every field it would send, and build it yourself:</p>
@@ -369,7 +371,7 @@ docker compose build   # build locally instead of pulling the published image</c
 
   <p>The remote-action model below is <span class="badge badge-planned">Planned</span>: specified, not yet implemented. The structural limits in "Not possible", however, hold <span class="badge badge-live">Live</span> today, because they follow from the architecture rather than from policy.</p>
 
-  <p>In the design, every remote action is recorded to <strong>your relay's own CT log</strong>, where you can verify it independently: you see what was done, when, and by which Paramant role (Owner or Support). Our internal audit-trail additionally records which individual acted, but that record is private to us.</p>
+  <p>In the design, every remote action is recorded to <strong>your relay's own CT log</strong>, where you can verify it independently: you see what was done, when, and by which Paramant role (Owner or Support). Our internal audit trail also records which individual acted, but that record is private to us.</p>
 
   <h3>Possible remote actions (planned)</h3>
   <dl>
@@ -472,6 +474,6 @@ docker compose build   # build locally instead of pulling the published image</c
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=11" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 </body>
 </html>

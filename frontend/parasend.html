@@ -2,19 +2,19 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ParaSend &middot; Versleuteld bestanden versturen met Paramant</title>
+<title>Veilig bestanden versturen met ParaSend · Paramant</title>
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Verstuur een bestand dat op uw apparaat wordt verzegeld en na de eerste keer lezen verdwijnt. Nooit op schijf, servers in Duitsland. Gratis voor iedereen.">
-<meta property="og:title" content="ParaSend &middot; Versleuteld bestanden versturen met Paramant">
-<meta property="og:description" content="Verstuur een bestand dat op uw apparaat wordt verzegeld en na de eerste keer lezen verdwijnt. Nooit op schijf, servers in Duitsland. Gratis voor iedereen.">
+<meta name="description" content="Verstuur bestanden veilig vanuit uw browser. Versleuteld op uw eigen apparaat, gewist na het lezen, nooit op schijf. Servers in Duitsland. Gratis te gebruiken.">
+<meta property="og:title" content="Veilig bestanden versturen met ParaSend &middot; Paramant">
+<meta property="og:description" content="Verstuur bestanden veilig vanuit uw browser. Versleuteld op uw eigen apparaat, gewist na het lezen, nooit op schijf. Servers in Duitsland. Gratis te gebruiken.">
 <meta property="og:url" content="https://paramant.app/parasend">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="ParaSend &middot; Versleuteld bestanden versturen met Paramant">
-<meta name="twitter:description" content="Verstuur een bestand dat op uw apparaat wordt verzegeld en na de eerste keer lezen verdwijnt. Nooit op schijf, servers in Duitsland. Gratis voor iedereen.">
+<meta name="twitter:title" content="Veilig bestanden versturen met ParaSend &middot; Paramant">
+<meta name="twitter:description" content="Verstuur bestanden veilig vanuit uw browser. Versleuteld op uw eigen apparaat, gewist na het lezen, nooit op schijf. Servers in Duitsland. Gratis te gebruiken.">
 <link rel="canonical" href="https://paramant.app/parasend">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/parasend">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/parasend">
@@ -26,8 +26,8 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 .ps-hero{padding:var(--space-10) 0 var(--space-6)}
@@ -118,7 +118,7 @@
       "@type": "WebPage",
       "@id": "https://paramant.app/parasend#webpage",
       "url": "https://paramant.app/parasend",
-      "name": "ParaSend · Versleuteld bestanden versturen met Paramant",
+      "name": "Veilig bestanden versturen met ParaSend · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -126,7 +126,7 @@
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "nl",
-      "description": "Verstuur een bestand dat op uw apparaat wordt verzegeld en na de eerste keer lezen verdwijnt. Nooit op schijf, servers in Duitsland. Gratis voor iedereen."
+      "description": "Verstuur bestanden veilig vanuit uw browser. Versleuteld op uw eigen apparaat, gewist na het lezen, nooit op schijf. Servers in Duitsland. Gratis te gebruiken."
     },
     {
       "@type": "SoftwareApplication",
@@ -145,7 +145,7 @@
       "name": "Paramant",
       "legalName": "Paramantis Solutions B.V.",
       "url": "https://paramant.app/",
-      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
       "founder": {
         "@type": "Person",
         "name": "Mick Beer",
@@ -171,6 +171,7 @@
   ]
 }
 </script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Naar de inhoud</a>
@@ -193,6 +194,7 @@
   </div>
 
   <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/parasend" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/parasend" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -208,7 +210,7 @@
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
   <a href="/help" class="nav-tail-link">Hulp</a>
-  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/parasend" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/parasend" hreflang="en" lang="en">EN</a></span>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/parasend" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/parasend" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main>
 
@@ -229,7 +231,7 @@
          and gets on with its work, and a receiver who has to be sitting there at
          the same moment is not a route that office can use. So it is said here,
          above the button, in the words the reviewer would have wanted. -->
-    <p class="ps-live">Met Samen, nu zijn u en de ontvanger allebei online en vergelijkt u een korte controlecode. Is de ontvanger niet online, kies dan Later ophalen in de web app, of de API of SDK.</p>
+    <p class="ps-live">Bij ‘Samen, nu’ zijn u en de ontvanger allebei online en vergelijkt u een korte controlecode. Is de ontvanger niet online, kies dan ‘Later ophalen’ in de webapp, of gebruik de API of SDK.</p>
     <div class="ps-actions">
       <a href="/parashare" class="btn btn-primary">Bestand versturen &rarr;</a>
       <a href="/pricing" class="btn btn-secondary">Prijzen bekijken &rarr;</a>
@@ -246,7 +248,7 @@
   <div class="container-md">
     <span class="mono-eyebrow">01 / Gratis voor iedereen</span>
     <h2 style="margin-top:var(--space-2)">Gratis voor iedereen. Betaald voor organisaties.</h2>
-    <p><strong>Het Community-plan is gratis, voor altijd.</strong> Het is geen proefperiode en geen lokkertje. Bedrijven betalen voor hogere limieten (langere links, vaker lezen via de API, meer apparaten, een eigen relay), niet om functies te ontgrendelen. Daardoor blijft het Community-plan gratis. Vaker lezen is geen zwakkere belofte: het is één link die een heel team kan openen, of een wederpartij die hem na een misklik nog eens opent, zonder dat u het bestand opnieuw verstuurt.</p>
+    <p><strong>Het Community-plan is gratis, voor altijd.</strong> Het is geen proefperiode en geen lokkertje. Bedrijven betalen voor hogere limieten (langere links, vaker lezen via de API, meer apparaten, een eigen relay), niet om functies vrij te spelen. Daardoor blijft het Community-plan gratis. Vaker lezen is geen zwakkere belofte: het is één link die een heel team kan openen, of een wederpartij die hem na een misklik nog eens opent, zonder dat u het bestand opnieuw verstuurt.</p>
     <p><strong>Elk plan krijgt dezelfde versleuteling, dezelfde post-quantumhandtekeningen en hetzelfde openbare logboek. U betaalt voor volume, nooit voor veiligheid. En u betaalt per organisatie, niet per gebruiker.</strong></p>
     <p class="ps-sub">De plannen en wat ze kosten staan <a href="#plans">verderop op deze pagina</a>. Afrekenen en de volledige vergelijking vindt u op de <a href="/pricing">prijzenpagina</a>.</p>
   </div>
@@ -256,7 +258,7 @@
 <section class="ps-band">
   <div class="container-md">
     <span class="mono-eyebrow">02 / Wat het doet</span>
-    <h2 style="margin-top:var(--space-2)">Hier verzegeld, onleesbaar onderweg, weg na de laatste keer lezen</h2>
+    <h2 style="margin-top:var(--space-2)">Versleuteld op uw apparaat, gewist na het lezen</h2>
     <p>ParaSend is het verzenddeel van Paramant. Het draait op dezelfde post-quantumkern als ParaSign. Uw bestand wordt versleuteld voordat het uw apparaat verlaat. Onze servers hebben dus niets dat ze kunnen afgeven of kwijtraken.</p>
     <div class="check-grid">
       <div class="check-card">
@@ -272,8 +274,8 @@
         <p>De ontvanger opent de link en krijgt het bestand. Meer is het niet. Geen account, niets te installeren.</p>
       </div>
       <div class="check-card">
-        <div class="k">Het opent op hun apparaat, of nergens</div>
-        <p>Het bestand is verzegeld voor een sleutel op het apparaat van de ontvanger. Het opent daar en nergens anders, en een bestand dat onderweg is veranderd, opent helemaal niet. Het verzendscherm hiervoor is de ParaSend web app.</p>
+        <div class="k">Het opent alleen bij de ontvanger</div>
+        <p>Het bestand is verzegeld voor een sleutel op het apparaat van de ontvanger. Het opent daar en nergens anders, en een bestand dat onderweg is veranderd, opent helemaal niet. Zo verstuurt de ParaSend-webapp.</p>
       </div>
       <div class="check-card">
         <div class="k">Een bestand voor uzelf verzegelen</div>
@@ -294,8 +296,8 @@
     <h2 style="margin-top:var(--space-2)">Drie stappen naar een bestand dat verdwijnt</h2>
     <p>Versturen vraagt een Paramant-account. Ontvangen vraagt helemaal niets.</p>
     <ol class="ps-steps">
-      <li><strong><a href="/signup">Maak een gratis account</a>.</strong> Geen betaalkaart, geen tijdslimiet. Het Community-plan verstuurt met een link van 1 uur, en de web app wist hem na de eerste keer lezen, voor altijd.</li>
-      <li><strong><a href="/parashare">Open de ParaSend web app</a> en kies uw bestand.</strong> Het wordt in uw browser verzegeld voordat er iets wordt geüpload. Wat onze servers ontvangen is dus onleesbaar, en ze bewaren het alleen in het geheugen.</li>
+      <li><strong><a href="/signup">Maak een gratis account</a>.</strong> Geen betaalkaart, geen tijdslimiet. Het Community-plan blijft gratis. Een link is 1 uur geldig, en de webapp wist het bestand na de eerste keer lezen.</li>
+      <li><strong><a href="/parashare">Open de ParaSend-webapp</a> en kies uw bestand.</strong> Het wordt in uw browser verzegeld voordat er iets wordt geüpload. Wat onze servers ontvangen is dus onleesbaar, en ze bewaren het alleen in het geheugen.</li>
       <li><strong>Deel de link.</strong> De ontvanger opent hem en het bestand wordt na de laatste keer lezen gewist. Bij het Community-plan verloopt de link na een uur, geopend of niet.</li>
     </ol>
   </div>
@@ -385,16 +387,16 @@
 <section class="ps-band">
   <div class="container-md">
     <span class="mono-eyebrow">06 / Het bewijs</span>
-    <h2 style="margin-top:var(--space-2)">Elke bewering kunt u ergens controleren</h2>
-    <p>U hoeft ons niet te vertrouwen. U moet het kunnen controleren. Elk punt hieronder linkt naar de plek waar dat kan.</p>
+    <h2 style="margin-top:var(--space-2)">Elke bewering kunt u zelf controleren</h2>
+    <p>U hoeft ons niet op ons woord te geloven. Bij elk punt hieronder staat een link naar de plek waar u het nagaat.</p>
     <div class="check-grid">
       <div class="check-card">
-        <div class="k">Wij hadden het nooit</div>
+        <div class="k">Wij zien de inhoud nooit</div>
         <p>AES-256-GCM met een sleutel die uw browser maakt. De relay heeft alleen versleutelde data, nooit de leesbare tekst en nooit de sleutel, en houdt die in het werkgeheugen tot de laatste keer lezen hem wist. Een verzending uit de web app wordt bewaard in blokken van vast 5 MB. Een blok zegt dus niets over de grootte van het bestand. De bewaarregel staat op de <a href="/security">beveiligingspagina</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">Het berichtformaat, volledig</div>
-        <p>De ParaSend web app gebruikt een hybride sleuteluitwisseling met ML-KEM-768 en ECDH P-256. Het register noemt de webapp op het pre-v1 hybrid-formaat, handtekening n.v.t., op weg naar v1. Met ML-DSA-65 ondertekende ontvangstbewijzen zijn live op het v1-formaat in sdk-py 3.0.0 en sdk-js 3.0.0. Lees het register op de <a href="/crypto-agility">pagina over crypto-wendbaarheid</a>.</p>
+        <p>De ParaSend web app gebruikt een hybride sleuteluitwisseling met ML-KEM-768 en ECDH P-256. In het register staat de webapp op het pre-v1 hybrid-formaat, handtekening n.v.t., op weg naar v1. Met ML-DSA-65 ondertekende ontvangstbewijzen zijn live op het v1-formaat in sdk-py 3.0.0 en sdk-js 3.0.0. Lees het register op de <a href="/crypto-agility">pagina over crypto-wendbaarheid</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">Uw sleutels zijn van u</div>
@@ -402,14 +404,14 @@
       </div>
       <div class="check-card">
         <div class="k">Europese grond, Europees recht</div>
-        <p>Hetzner in Duitsland, Bunny DNS (Slovenië). Geen Amerikaanse partij in de weg van de data. E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten, zoals <a href="/privacy">/privacy</a> uitlegt. Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Geen Amerikaanse partij komt aan een bestand of een sleutel. De subverwerkers staan daar, en regel 5 zegt hetzelfde volledig op <a href="/rules">onze regelspagina</a>.</p>
+        <p>Hetzner in Duitsland, Bunny DNS (Slovenië). Uw bestanden gaan niet langs een Amerikaanse partij. E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten, zoals <a href="/privacy">/privacy</a> uitlegt. Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Geen Amerikaanse partij komt aan een bestand of een sleutel. Op die pagina staan ook de subverwerkers. Regel 5 op <a href="/rules">onze regelspagina</a> zegt hetzelfde, volledig.</p>
       </div>
       <div class="check-card">
         <div class="k">Geen verzoeken aan derden</div>
         <p>Uw browser praat alleen met ons. Geen lettertypen, CDN's, analytics of pixels. Open de ontwikkelaarstools en kijk zelf.</p>
       </div>
       <div class="check-card">
-        <div class="k">Standaard klaar voor quantum</div>
+        <div class="k">Nu al bestand tegen quantumcomputers</div>
         <p>FIPS 203/204 vandaag, niet &ldquo;binnenkort&rdquo;. Het register van algoritmen staat op de <a href="/crypto-agility">pagina over crypto-wendbaarheid</a>.</p>
       </div>
       <div class="check-card">
@@ -474,6 +476,6 @@
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=11" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 </body>
 </html>

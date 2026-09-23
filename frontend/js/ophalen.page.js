@@ -128,7 +128,7 @@
     too_many_tries: ['Te vaak een verkeerde code',
       'Voor uw eigen veiligheid is deze link nu gesloten. Vraag de afzender om het bestand opnieuw te sturen.'],
     code_not_sent: ['We konden de code niet versturen',
-      'De code is bij ons niet vertrokken, dus in uw mailbox staat niets. '
+      'De code is niet verstuurd, dus er staat niets in uw mailbox. '
       + 'Probeer het over een minuut opnieuw.'],
     pickup_failed: ['Er ging bij ons iets mis',
       'Dat ligt niet aan u. Probeer het over een minuut opnieuw.'],

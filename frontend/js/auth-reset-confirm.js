@@ -14,7 +14,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
 
   if (!token || token === 'reset-confirm') {
     document.getElementById('initial-view').innerHTML =
-      nlEn('<p class="form-subtitle is-bad">Deze link is onvolledig, dus wij kunnen niet zien bij welk account hij hoort. Mailprogramma\'s breken een lange link soms over twee regels.</p>', '<p class="form-subtitle is-bad">This link is incomplete, so we cannot tell which account it belongs to. Mail clients sometimes break a long link across two lines.</p>') +
+      nlEn('<p class="form-subtitle is-bad">Deze link is onvolledig, dus wij kunnen niet zien bij welk account hij hoort. Mailprogramma\'s verdelen een lange link soms over twee regels.</p>', '<p class="form-subtitle is-bad">This link is incomplete, so we cannot tell which account it belongs to. Mail clients sometimes break a long link across two lines.</p>') +
       nlEn('<p class="footer-text mt-4"><a href="/auth/request-reset">Resetlink aanvragen</a></p>', '<p class="footer-text mt-4"><a href="/auth/request-reset">Request a reset link</a></p>');
     return;
   }

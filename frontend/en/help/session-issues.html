@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Session and login issues · Paramant Help</title>
+<title>Fix login problems and expired sessions | Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<meta name="twitter:description" content="Fix a sign-in code your account rejects, a session that expires too soon, and clock drift. The most common Paramant login problems, with the fix for each.">
-<meta name="twitter:title" content="Session and login issues · Paramant Help">
+<meta name="twitter:description" content="Fix the most common Paramant sign-in problems: a rejected 6-digit code, an invalid API key, an expired session, a redirect loop or too many login attempts.">
+<meta name="twitter:title" content="Fix login problems and expired sessions | Paramant">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:image" content="https://paramant.app/og-image.png">
-<meta property="og:title" content="Session and login issues · Paramant Help">
-<meta property="og:description" content="Fix a sign-in code your account rejects, a session that expires too soon, and clock drift. The most common Paramant login problems, with the fix for each.">
+<meta property="og:title" content="Fix login problems and expired sessions | Paramant">
+<meta property="og:description" content="Fix the most common Paramant sign-in problems: a rejected 6-digit code, an invalid API key, an expired session, a redirect loop or too many login attempts.">
 <meta property="og:url" content="https://paramant.app/en/help/session-issues">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Paramant">
@@ -20,7 +20,7 @@
 <link rel="alternate" hreflang="nl" href="https://paramant.app/help/session-issues">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/help/session-issues">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/help/session-issues">
-<meta name="description" content="Fix a sign-in code your account rejects, a session that expires too soon, and clock drift. The most common Paramant login problems, with the fix for each.">
+<meta name="description" content="Fix the most common Paramant sign-in problems: a rejected 6-digit code, an invalid API key, an expired session, a redirect loop or too many login attempts.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -73,8 +73,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   footer{padding:32px 20px;flex-direction:column}
 }
 </style>
-<link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 .nav-help {
@@ -146,7 +146,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       "@type": "WebPage",
       "@id": "https://paramant.app/en/help/session-issues#webpage",
       "url": "https://paramant.app/en/help/session-issues",
-      "name": "Session and login issues · Paramant Help",
+      "name": "Fix login problems and expired sessions | Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -154,7 +154,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "Fix a sign-in code your account rejects, a session that expires too soon, and clock drift. The most common Paramant login problems, with the fix for each."
+      "description": "Fix the most common Paramant sign-in problems: a rejected 6-digit code, an invalid API key, an expired session, a redirect loop or too many login attempts."
     },
     {
       "@type": "BreadcrumbList",
@@ -211,6 +211,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   ]
 }
 </script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
 
@@ -232,6 +233,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 
   <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/session-issues" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/session-issues" hreflang="en" lang="en" aria-current="true">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -247,7 +249,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
   <a href="/help" class="nav-tail-link">Help</a>
-  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/session-issues" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/session-issues" hreflang="en" lang="en" aria-current="true">EN</a></span>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/session-issues" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/session-issues" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div><main>
 
   <div class="breadcrumb">
@@ -256,26 +258,26 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     Session and login issues
   </div>
 
-  <h1>Session and <em>login</em> issues.</h1>
+  <h1>Fix <em>login</em> and session problems</h1>
 
-  <p class="lead">Most Paramant login failures have a small set of root causes. Find your error message below and follow the steps.</p>
+  <p class="lead">Most sign-in problems have one of a few causes. Find the message you see below and follow the steps.</p>
 
-  <h2>Common issues</h2>
+  <h2>Common sign-in problems and how to fix them</h2>
 
   <div class="issue-block">
     <div class="issue-header">"Invalid TOTP code", but the code looks correct</div>
     <div class="issue-body">
-      <p><strong>Most likely cause: clock drift.</strong> TOTP codes are time-based. If your phone clock is more than 30 seconds off from real time, every code will be rejected.</p>
+      <p><strong>Most likely cause: clock drift.</strong> TOTP codes are time-based. If your phone clock is more than 30 seconds off, every code is rejected.</p>
       <p>Fix on iPhone: Settings &rarr; General &rarr; Date &amp; Time &rarr; toggle <strong>Set Automatically</strong> off, then back on.<br>
       Fix on Android: Settings &rarr; General Management &rarr; Date and Time &rarr; enable <strong>Automatic date and time</strong>.</p>
-      <p><strong>Second possibility: the code was already used.</strong> Each 30-second code can only be accepted once. Wait for the next code to appear (watch the progress ring in your authenticator app) and enter the fresh one immediately.</p>
+      <p><strong>Second possible cause: the code was already used.</strong> Each 30-second code can only be accepted once. Wait for the next code to appear (watch the progress ring in your authenticator app) and enter the fresh one immediately.</p>
     </div>
   </div>
 
   <div class="issue-block">
     <div class="issue-header">"Invalid API key"</div>
     <div class="issue-body">
-      <p>Check that you copied the full 64-character key with no trailing spaces. In password managers, use the copy button rather than selecting manually. If you recently regenerated your key, make sure you saved the new one before closing the dashboard.</p>
+      <p>Check that you copied the full 64-character key with no trailing spaces. In password managers, use the copy button rather than selecting the text by hand. If you recently regenerated your key, make sure you saved the new one before closing the dashboard.</p>
       <p>If the key was revoked: generate a new one in Dashboard &rarr; API keys.</p>
     </div>
   </div>
@@ -283,8 +285,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="issue-block">
     <div class="issue-header">"Session expired, sign in again"</div>
     <div class="issue-body">
-      <p>Sessions last <strong>1 hour</strong> from the time of login. This is by design, Paramant handles sensitive files and does not support persistent sessions. Return to <a href="/auth/login">paramant.app/auth/login</a> and authenticate again.</p>
-      <p>If you are frequently logged out mid-task, consider using the API directly from a script rather than the web dashboard, so work is not interrupted by session expiry.</p>
+      <p>Sessions last <strong>1 hour</strong> from the time of login. This is deliberate. Paramant handles sensitive files and does not keep you signed in for longer. Go back to <a href="/auth/login">paramant.app/auth/login</a> and sign in again.</p>
+      <p>If you are often signed out halfway through a task, you could use the API from a script instead of the web dashboard, so an expiring session does not interrupt your work.</p>
     </div>
   </div>
 
@@ -304,15 +306,15 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="issue-block">
     <div class="issue-header">Stuck in a redirect loop after login</div>
     <div class="issue-body">
-      <p>Clear cookies for paramant.app entirely. The session cookie may be corrupt. After clearing, close and reopen the browser tab before attempting login again.</p>
+      <p>Clear cookies for paramant.app entirely. The session cookie may be damaged. After clearing, close and reopen the browser tab before you sign in again.</p>
     </div>
   </div>
 
   <div class="issue-block">
     <div class="issue-header">"Too many login attempts"</div>
     <div class="issue-body">
-      <p>There is no account lock, so there is nothing an administrator has to unlock. Sign-ins are rate limited per internet connection instead: more than <strong>5 attempts from one IP address</strong> inside <strong>15 minutes</strong> are answered with a 429, and that counter clears itself once the fifteen minutes are up. Somebody else on your network can set it off; using another connection gets you straight back in.</p>
-      <p>Your email address cannot be rate limited shut. Failed sign-ins are counted against the address, but only failures count, a successful sign-in clears them, and past ten inside fifteen minutes the next attempt asks your browser for a second or two of work rather than turning you away. So a stranger typing your address can make signing in slower for a moment and can never make it impossible. If you are still refused after the fifteen minutes are up, email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> with your account email.</p>
+      <p>Your account is never locked, so there is nothing an administrator has to unlock. Instead, sign-ins are limited per internet connection: more than <strong>5 attempts from one IP address</strong> within <strong>15 minutes</strong> get a 429 (too many requests) response. The counter resets itself once the fifteen minutes are up. Someone else on your network can trigger it; switching to another connection gets you straight back in.</p>
+      <p>Nobody can shut out your email address with failed attempts. We count failed sign-ins per address, and a successful sign-in clears them. After ten failures within fifteen minutes, the next attempt asks your browser for a second or two of extra work instead of turning you away. So a stranger typing your address can slow your sign-in down for a moment, but can never make it impossible. If you are still refused after the fifteen minutes are up, email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> with your account email.</p>
     </div>
   </div>
 
@@ -321,13 +323,13 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <h3>Still stuck?</h3>
 
   <div class="troubleshoot-item">
-    <div class="q">None of these apply and I still cannot log in.</div>
+    <div class="q">None of this applies and I still cannot sign in.</div>
     <div class="a">Check <a href="/status">paramant.app/status</a> for any active incidents. If status is green, email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> with your account email and a description of the exact error you see. Include a screenshot if possible.</div>
   </div>
 
   <div class="troubleshoot-item">
-    <div class="q">I am locked out entirely, no TOTP and no backup codes.</div>
-    <div class="a">See <a href="/en/help/lost-authenticator">Lost authenticator access</a> for the full account recovery process.</div>
+    <div class="q">I am completely locked out: no authenticator app and no backup codes.</div>
+    <div class="a">See <a href="/en/help/lost-authenticator">what to do if you lost your authenticator app</a> for the full recovery steps.</div>
   </div>
 
   <hr class="divider">
@@ -379,6 +381,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=11" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>De desktop-app van Paramant wordt niet meer onderhouden</title>
 <meta property="og:site_name" content="Paramant">
@@ -69,8 +69,8 @@ pre{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--ink);back
 @media(max-width:600px){h1{font-size:25px}.dl-sub{font-size:15px}main{padding:0 18px 60px}.dl-lead{padding:28px 0 30px}}
 </style>
 <style>.skip-link{position:absolute;top:-200px;left:0;background:var(--bone-2);color:var(--ink);padding:12px 20px;z-index:10000;text-decoration:none;font-size:13px;font-family:system-ui,sans-serif;border:2px solid var(--ochre);transition:top 120ms ease}.skip-link:focus,.skip-link:focus-visible{top:0;outline:none}.skip-link:focus:hover{background:var(--ochre)}</style>
-<link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <script type="application/ld+json" data-paramant-seo="1">
 {
@@ -107,7 +107,7 @@ pre{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--ink);back
       "name": "Paramant",
       "legalName": "Paramantis Solutions B.V.",
       "url": "https://paramant.app/",
-      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
       "founder": {
         "@type": "Person",
         "name": "Mick Beer",
@@ -133,6 +133,7 @@ pre{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--ink);back
   ]
 }
 </script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Naar de inhoud</a>
@@ -155,6 +156,7 @@ pre{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--ink);back
   </div>
 
   <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/download" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/download" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -170,7 +172,7 @@ pre{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--ink);back
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
   <a href="/help" class="nav-tail-link">Hulp</a>
-  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/download" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/download" hreflang="en" lang="en">EN</a></span>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/download" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/download" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 
 <main id="main-content">
@@ -194,13 +196,13 @@ pre{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--ink);back
 
   <section>
     <h2>Gratis voor iedereen, betaald voor organisaties</h2>
-    <p class="quote">Elk abonnement krijgt dezelfde versleuteling, dezelfde post-quantum handtekeningen en hetzelfde openbare bewijslog. U betaalt voor volume, nooit voor beveiliging. En u betaalt per organisatie, niet per gebruiker.</p>
-    <p>Het Community-abonnement is gratis, voor altijd. Het is geen proefperiode en geen lokkertje. Organisaties betalen voor hogere limieten, niet om functies vrij te spelen. <a href="/pricing">Bekijk de abonnementen</a>.</p>
+    <p class="quote">Elk plan krijgt dezelfde versleuteling, dezelfde post-quantumhandtekeningen en hetzelfde openbare bewijslogboek. U betaalt voor volume, nooit voor beveiliging. En u betaalt per organisatie, niet per gebruiker.</p>
+    <p>Het Community-plan is gratis, voor altijd. Het is geen proefperiode en geen lokkertje. Organisaties betalen voor hogere limieten, niet om functies vrij te spelen. <a href="/pricing">Bekijk de plannen en prijzen</a>.</p>
   </section>
 
   <section>
     <h2>Wie erachter zit</h2>
-    <p>Paramant wordt gebouwd door Paramantis Solutions B.V. in Harderwijk. Het Community-abonnement is gratis en blijft gratis. De zakelijke abonnementen betalen de servers en houden dat zo. <a href="/about">Over Paramant</a>.</p>
+    <p>Paramant wordt gebouwd door Paramantis Solutions B.V. in Harderwijk. Het Community-plan is gratis en blijft gratis. De zakelijke plannen betalen de servers, en zo blijft het gratis. <a href="/about">Over Paramant</a>.</p>
   </section>
 
   <details>
@@ -279,7 +281,7 @@ sha256sum -c SHA256SUMS --ignore-missing</pre>
 </main>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=11" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 
 <footer>
   <div class="container-lg">

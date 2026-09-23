@@ -2,6 +2,7 @@
 const express = require('express');
 const emailTemplates = require('./lib/email-templates');
 const mailer = require('../relay/lib/mail');   // one way out, carrier is a setting
+const emailPolicy = require('./lib/email-policy');
 const pow = require('./lib/pow-captcha');
 const http    = require('http');
 const crypto  = require('crypto');
@@ -420,6 +421,10 @@ function keyResults(results) {
 }
 
 api.post('/keys/all', authMiddleware, async (req, res) => {
+  if (req.body && req.body.email) {
+    const beleid = await emailPolicy.toets(req.body.email, 'aanmelden', { mx: false });
+    if (!beleid.ok) return res.status(422).json(emailPolicy.antwoord(beleid));
+  }
   const body = { ...req.body, key: 'pgp_' + crypto.randomBytes(32).toString('hex') };
   const results = await eachSector(Object.keys(SECTORS), async s => {
     const r = await relayFetch(s, '/v2/admin/keys', 'POST', body, false, req.sessionToken);
@@ -436,6 +441,10 @@ api.post('/keys/sectors', authMiddleware, async (req, res) => {
   if (!Array.isArray(sectors) || !sectors.length) return res.status(400).json({ error: 'sectors array required' });
   const invalid = sectors.filter(s => !SECTORS[s]);
   if (invalid.length) return res.status(400).json({ error: `Unknown sectors: ${invalid.join(', ')}` });
+  if (body.email) {
+    const beleid = await emailPolicy.toets(body.email, 'aanmelden', { mx: false });
+    if (!beleid.ok) return res.status(422).json(emailPolicy.antwoord(beleid));
+  }
   const sectorBody = { ...body, key: 'pgp_' + crypto.randomBytes(32).toString('hex') };
   const results = await eachSector(sectors, async s => {
     const r = await relayFetch(s, '/v2/admin/keys', 'POST', sectorBody, false, req.sessionToken);
@@ -919,36 +928,9 @@ api.get('/captcha/challenge', async (req, res) => {
   }
 });
 
-// Disposable / reserved domain denylist
-const BLOCKED_DOMAINS = new Set([
-  'localhost', 'example.com', 'example.org', 'example.net',
-  'test.com', 'test.local', 'test.invalid',
-  'mailinator.com', 'guerrillamail.com', 'guerrillamail.net',
-  'guerrillamail.org', 'guerrillamail.de', 'guerrillamail.info',
-  'sharklasers.com', 'guerrillamailblock.com', 'grr.la',
-  'spam4.me', 'yopmail.com', 'yopmail.fr', 'cool.fr.nf',
-  'jetable.fr.nf', 'nospam.ze.tc', 'nomail.xl.cx',
-  'mega.zik.dj', 'speed.1s.fr', 'courriel.fr.nf',
-  'moncourrier.fr.nf', 'monemail.fr.nf', 'monmail.fr.nf',
-  'trashmail.at', 'trashmail.com', 'trashmail.io',
-  'trashmail.me', 'trashmail.net', 'trashmail.org',
-  'dispostable.com', 'fakeinbox.com', 'maildrop.cc',
-  'discard.email', 'tempr.email', 'temp-mail.org',
-]);
-// Also block reserved TLDs
-const BLOCKED_TLDS = ['.local', '.test', '.invalid', '.example', '.localhost'];
-
-function isBlockedEmail(email) {
-  const lower = email.toLowerCase();
-  const atIdx = lower.lastIndexOf('@');
-  if (atIdx < 0) return true;
-  const domain = lower.slice(atIdx + 1);
-  if (BLOCKED_DOMAINS.has(domain)) return true;
-  for (const tld of BLOCKED_TLDS) {
-    if (domain.endsWith(tld)) return true;
-  }
-  return false;
-}
+// Welke adressen een account kunnen openen: admin/lib/email-policy.js, met de
+// lijst uit deploy/email-blocklist.json. Alleen voor aanmelden en verzenden;
+// een ontvanger wordt nooit getoetst (zie de uitleg bovenin die module).
 
 // POST /api/user/signup — stage 1: issue verification email, do NOT create account yet
 api.post("/user/signup", async (req, res) => {
@@ -962,7 +944,8 @@ api.post("/user/signup", async (req, res) => {
   // 2. Basic field validation
   if (!email || !dpa_accepted) return res.status(400).json({ error: "missing_fields" });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "invalid_email" });
-  if (isBlockedEmail(email)) return res.status(422).json({ error: "invalid_email", reason: "domain_not_allowed" });
+  const beleid = await emailPolicy.toets(email, 'aanmelden');
+  if (!beleid.ok) return res.status(422).json(emailPolicy.antwoord(beleid));
 
   const norm = email.toLowerCase().trim();
 
@@ -3550,6 +3533,10 @@ api.post("/drop/upload", async (req, res) => {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ error: "invalid_email" });
   }
+  // Wie zonder account verzendt, wordt getoetst als afzender. De ontvanger van
+  // de link niet: die komt nergens in deze route voor.
+  const beleid = await emailPolicy.toets(email, 'verzenden');
+  if (!beleid.ok) return res.status(422).json(emailPolicy.antwoord(beleid));
   // Per-IP bucket: the per-email limit below is keyed only on attacker-supplied
   // input, so rotating the email defeats it entirely. Cap per source IP too
   // (20/day is generous for a human, bounds anonymous-relay abuse from one host).

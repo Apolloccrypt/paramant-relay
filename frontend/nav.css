@@ -577,7 +577,7 @@ nav.nav .nav-link-btn:hover {
   position: absolute;
   top: -200px;
   left: 0;
-  background: var(--navy);
+  background: var(--invert);
   color: var(--bone-on-navy, #FFFFFF);   /* --ink is the navy itself: text on its own ground */
   padding: 12px 20px;
   z-index: 10000;
@@ -920,4 +920,62 @@ nav.nav .nav-menu-divider { height: 1px; background: var(--ink-hair); margin: va
 .nav-lang-sep { color: var(--ink-2); padding: 0 2px; }
 @media (max-width: 700px) {
   nav.nav .nav-lang { display: none; }
+}
+
+/* ════════════════════════════════════════
+   THEME SWITCH  (sun | moon, stamped by apply-nav.py beside NL | EN)
+   Same form and weight as the language switch: two halves and a bar, the
+   current edition drawn in the ink and underlined, the other in --ink-2.
+   One button; aria-pressed="true" means the dark edition is on. The marking
+   follows <html data-theme>, which /js/theme.js writes before the first
+   paint, so the switch never shows the wrong half, not even for a frame.
+   In the bar from 701px up; below that it sits with NL | EN in the strip
+   under the drawer.
+   ════════════════════════════════════════ */
+.nav-theme {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 4px;
+  background: none;
+  border: none;
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+.nav-theme-opt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 44px;
+  color: var(--ink-2);
+}
+.nav-theme-opt .nav-theme-icon {
+  padding-bottom: 3px;
+  border-bottom: 1.5px solid transparent;
+  box-sizing: content-box;
+}
+.nav-theme-sep { color: var(--ink-2); padding: 0 2px; }
+:root:not([data-theme="dark"]) .nav-theme-light,
+:root[data-theme="dark"] .nav-theme-dark { color: var(--ink); }
+:root:not([data-theme="dark"]) .nav-theme-light .nav-theme-icon,
+:root[data-theme="dark"] .nav-theme-dark .nav-theme-icon { border-bottom-color: currentColor; }
+.nav-theme:hover .nav-theme-opt { color: var(--cobalt); }
+.nav-theme:focus-visible {
+  outline: 3px solid var(--accent-ring, rgba(29, 78, 216, .35));
+  outline-offset: 2px;
+}
+/* In the strip the two switches share one row. */
+.nav-mobile-tail .nav-prefs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+}
+@media (max-width: 700px) {
+  nav.nav .nav-theme { display: none; }
 }

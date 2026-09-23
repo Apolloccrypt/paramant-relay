@@ -3064,7 +3064,7 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
   const SENTENCE = 'In the web app you and the receiver are both online and compare a short code, and the file is handed over live. Sending to someone who is not online right now needs the API, the SDK, or the Send a link mode in the web app.';
   // /parasend is Nederlands sinds 23 september 2026 en draagt dezelfde zin in
   // het Nederlands, met de standnamen die /parashare toont.
-  const SENTENCE_NL = 'Met Samen, nu zijn u en de ontvanger allebei online en vergelijkt u een korte controlecode. Is de ontvanger niet online, kies dan Later ophalen in de web app, of de API of SDK.';
+  const SENTENCE_NL = 'Bij ‘Samen, nu’ zijn u en de ontvanger allebei online en vergelijkt u een korte controlecode. Is de ontvanger niet online, kies dan ‘Later ophalen’ in de webapp, of gebruik de API of SDK.';
   const sentenceOf = (slug) => (slug === 'parasend' ? SENTENCE_NL : SENTENCE);
   const THREE = ['en/index', 'en/parasend', 'parasend', 'en/pricing'];
 
@@ -3524,7 +3524,7 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
   // the page: an account is one login today, and the roadmap still lists
   // "multiple users per account" as coming. What the page may say is that the
   // price is per account, and that more users are still to come.
-  says('pricing', 'Het kantoorplan kost per account, niet per gebruiker. Meerdere gebruikers binnen één account komt nog');
+  says('pricing', 'Het kantoorplan kost per account, niet per gebruiker. Een account met meerdere gebruikers komt nog');
   assert.match(visible(page('en/pricing')), /Coming to paid plans: multiple users per account/,
     'the Dutch page says more users per account is still coming; the roadmap line it rests on is on /en/pricing');
   for (const slug of ['index', 'pricing']) {

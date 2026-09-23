@@ -933,7 +933,7 @@ assert.match(pricing, /charged &euro;35\.09\/mo incl\. 21% btw/,
   'pricing.html is the source of the incl. btw figure quoted on /help');
 assert.match(helpAnswers, /ParaSign Community is free, forever, and no card is required\. It covers 2 signatures a month\./,
   'help/index.html must name the free allowance, not just promise that free exists');
-assert.match(helpAnswers, /Firm at &euro;29 a month excl\. btw \(&euro;35\.09 incl\.\)/,
+assert.match(helpAnswers, /Firm at &euro;29 a month excl\. VAT \(&euro;35\.09 incl\. VAT\)/,
   'help/index.html must name the first paid price the way /pricing prints it');
 // Proof 3 of the messaging guide, quoted from /pricing. The slogan that follows
 // it there ("Pay for volume, never for security") stays on the page that sells;
@@ -1102,13 +1102,13 @@ for (const [name, text] of [['index', homeVisible], ['en/parasign', parasignEn],
 }
 // /parasend is Nederlands sinds 23 september 2026: dezelfde claim, dezelfde
 // begrenzing tot de weg van de data, in de taal van de pagina.
-assert.ok(parasend.includes('Hetzner in Duitsland, Bunny DNS (Slovenië). Geen Amerikaanse partij in de weg van de data.'),
+assert.ok(parasend.includes('Hetzner in Duitsland, Bunny DNS (Slovenië). Uw bestanden gaan niet langs een Amerikaanse partij.'),
   'parasend.html lost the data-path wording of the EU claim');
 assert.ok(parasend.includes('E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten'),
   'parasend.html states the EU claim without naming the Resend exception');
 // /parasign is Dutch since 23 September 2026. The same two halves, in the
 // wording the Dutch homepage uses for proof 1.
-assert.ok(parasign.includes('Geen Amerikaanse partij in de weg die uw bestanden afleggen.'),
+assert.ok(parasign.includes('Uw bestanden gaan niet langs een Amerikaanse partij.'),
   'parasign.html lost the data-path wording of the EU claim');
 assert.ok(parasign.includes('E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten'),
   'parasign.html states the EU claim without naming the mail exception');
@@ -1246,7 +1246,7 @@ const FREE_FOREVER = 'not to unlock features, and that is what keeps the Communi
 for (const [name, text] of [['pricing', pricingText], ['en/parasign', parasignEn], ['en/parasend', parasendEn]]) {
   assert.ok(text.includes(FREE_FOREVER), `${name}.html lost the Community-plan promise`);
 }
-assert.ok(parasend.includes('niet om functies te ontgrendelen. Daardoor blijft het Community-plan gratis'),
+assert.ok(parasend.includes('niet om functies vrij te spelen. Daardoor blijft het Community-plan gratis'),
   'parasend.html lost the Community-plan promise');
 assert.ok(parasign.includes('niet om functies vrij te spelen, en dat houdt het Community-plan gratis'),
   'parasign.html lost the Community-plan promise');
@@ -2360,21 +2360,21 @@ console.log('ui-truthfulness: the rules page is Our rules on /rules, with /parar
     'theme.js must not send the choice anywhere; /account and /privacy both say it stays in the browser');
 
   const accountEn = read('frontend/en/account.html');
-  assert.match(accountEn, /Light is the default and it stays light until you change it here/,
-    '/en/account must say that light is the default, because app-2026.css makes it so');
-  assert.match(accountEn, /kept in this\s+browser only/,
+  assert.match(accountEn, /Without a choice the site follows your system/,
+    '/en/account must say that no choice follows the system, because theme.js makes it so');
+  assert.match(accountEn, /kept in this browser only/,
     '/en/account must say the choice never leaves the browser');
-  assert.match(accountEn, /The public pages stay light\./,
-    '/en/account promises the marketing pages stay light; tests/app-theme.test.mjs measures that');
-  assert.match(account, /Licht is de standaard en blijft zo tot u het hier wijzigt/,
-    '/account must say that light is the default, because app-2026.css makes it so');
+  assert.match(accountEn, /applies to every page/,
+    '/en/account promises the choice holds on every page; tests/app-theme.test.mjs measures that');
+  assert.match(account, /Zonder keuze volgt de site uw systeem/,
+    '/account must say that no choice follows the system, because theme.js makes it so');
   assert.match(account, /alleen in deze\s+browser bewaard/,
     '/account must say the choice never leaves the browser');
-  assert.match(account, /De openbare pagina's blijven licht\./,
-    '/account promises the marketing pages stay light; tests/app-theme.test.mjs measures that');
+  assert.match(account, /geldt voor elke pagina/,
+    '/account promises the choice holds on every page; tests/app-theme.test.mjs measures that');
 })();
 
-console.log('ui-truthfulness: the appearance switch says only what theme.js and app-2026.css do');
+console.log('ui-truthfulness: the appearance switch says only what theme.js and design-system.css do');
 
 // ── /parashare says up front that this is a live handshake ──────────────────
 // A buyer reached step 2 before finding out that the other person has to be at

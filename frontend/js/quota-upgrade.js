@@ -131,7 +131,7 @@
         '<strong>You\'ve used both signatures this month.</strong>') +
       t('<span>Community geeft u er 2 per maand, met dezelfde versleuteling, dezelfde post-quantumhandtekeningen en hetzelfde openbare bewijslogboek als elk betaald plan. Voor veiligheid betaalt u hier nooit. U betaalt voor volume.</span>',
         '<span>Community gives you 2 a month, with the same encryption, the same post-quantum signatures and the same public proof log as every paid plan. You never pay for security here. You pay for volume.</span>') +
-      t('<span><strong>Firm - EUR 29/maand</strong><br>100 handtekeningen per maand. API-toegang. 500 verzendingen per maand met Versturen, in dezelfde betaling.</span>',
+      t('<span><strong>Firm: EUR 29 per maand</strong><br>100 handtekeningen per maand. API-toegang. 500 verzendingen per maand met Versturen, in dezelfde betaling.</span>',
         '<span><strong>Firm - EUR 29/month</strong><br>100 signatures a month. API access. 500 transfers a month on ParaSend, in the same payment.</span>') +
       '<span class="pa-quota-actions">' +
         '<a class="btn btn-primary" href="/pricing">' + t('Overstappen op Firm', 'Upgrade to Firm') + '</a>' +

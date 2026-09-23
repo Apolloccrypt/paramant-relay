@@ -30,7 +30,8 @@
     "automatisering": { "nl": "Automatisering", "en": "Automation", "woorden": ["automat", "workflow"] },
     "ai": { "nl": "AI-dienst", "en": "AI service", "woorden": ["AI", "model"] },
     "cdn": { "nl": "CDN en DNS", "en": "CDN and DNS", "woorden": ["CDN", "DNS"] },
-    "edge-hosting": { "nl": "Edge-hosting", "en": "Edge hosting", "woorden": ["edge", "hosting"] }
+    "edge-hosting": { "nl": "Edge-hosting", "en": "Edge hosting", "woorden": ["edge", "hosting"] },
+    "blocklist-bron": { "nl": "Bron voor de e-mailblocklist", "en": "Email blocklist source", "woorden": ["blocklist", "wegwerp", "disposable"] }
   },
   "partijen": [
     {
@@ -416,6 +417,42 @@
         "status": "package-lock.json: resolved https://registry.npmjs.org/...; deploy-3.1.sh docker compose build",
         "sinds": "eerste commit (2026-04-01)",
         "dpa_url": "geen"
+      }
+    },
+    {
+      "id": "disposable-email-domains",
+      "naam": null,
+      "handelsnaam": "disposable-email-domains",
+      "site_namen": ["\\bdisposable-email-domains\\b"],
+      "rol": "blocklist-bron",
+      "land": { "nl": "Onbekend", "en": "Unknown" },
+      "moederbedrijf": null,
+      "gegevens": {
+        "nl": "Geen. Een wekelijkse CI-taak haalt de openbare lijst met wegwerpdomeinen op; er gaat niets naartoe.",
+        "en": "None. A weekly CI job downloads the public list of disposable domains; nothing is sent to it."
+      },
+      "nooit": {
+        "nl": "Klantgegevens, e-mailadressen, documenten, bestanden of sleutels.",
+        "en": "Customer data, email addresses, documents, files or keys."
+      },
+      "subverwerker": false,
+      "status": "actief",
+      "sinds": "2026-09-23",
+      "tot": null,
+      "sleutels": [],
+      "sleutels_optioneel": [],
+      "dode_resten": [],
+      "dpa_url": null,
+      "hosts": ["raw.githubusercontent.com"],
+      "code": ["scripts/update-email-blocklist.mjs", "deploy/email-blocklist.json"],
+      "onderaannemers": [],
+      "bronnen": {
+        "naam": "onbekend: een open project op github.com/disposable-email-domains, geen rechtspersoon gezien",
+        "land": "onbekend: het project noemt geen vestigingsplaats",
+        "moederbedrijf": "onbekend",
+        "status": "deploy/email-blocklist.json; scripts/update-email-blocklist.mjs; .github/workflows/email-blocklist.yml",
+        "sinds": "branch security/email-blocklist (2026-09-23)",
+        "dpa_url": "geen: er gaan geen gegevens naartoe. Licentie CC0-1.0 (LICENSE.txt in de repo, gelezen 2026-09-23)"
       }
     },
     {
