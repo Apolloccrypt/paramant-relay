@@ -27,7 +27,7 @@
 <style>
 /* The homepage on the paper it had before PR #404: warm paper #FAF8F3, ink
    #0C1B2A, one cobalt accent, and one dark object per screen (the Community
-   panel). The layout, the band and every word since #404 stay; only the
+   panel). The layout and every word since #404 stay; only the
    palette went back. The design-system names are re-pointed so the nav, the
    menu and the footer follow the page.
    Measured with WCAG 2.1 on #FAF8F3: ink 16.5, ink-2 #3F4D5C 8.6, ink-3
@@ -119,24 +119,6 @@ html[data-session="in"] .hp-art{display:none}
 html[data-session="in"] .home-hero .hp-wrap{grid-template-columns:minmax(0,1fr)}
 html[data-session="in"] .home-hero{padding-bottom:56px}
 
-/* ---------- the band: Harderwijk at first light, one sealed letter on the quay ---------- */
-.hp-band{position:relative;height:clamp(132px,34vw,230px);overflow:hidden;background:var(--paper-2);border-bottom:1px solid var(--line)}
-.hp-band svg{position:absolute;inset:0;width:100%;height:100%;display:block}
-/* Two lines instead of one: the tile is the eye-catcher, the fact under it is
-   the quiet half. The block is absolutely positioned, so a second line does not
-   push the band open; max-width keeps it off the left edge on a 320px phone. */
-.hp-band-tag{position:absolute;right:var(--pad);top:14px;font-family:var(--hp-mono);text-transform:uppercase;color:rgba(27,31,34,.82);text-align:right;max-width:min(26rem,calc(100% - var(--pad) * 2))}
-.hp-band-say{display:block;font-size:12px;font-weight:600;letter-spacing:.1em;line-height:1.4}
-/* The dot next to the strip line. Full ochre on the band's cream sky is
-   1.66:1; the ochre-as-ink token is the same hue at 4.7:1 on that paper. It
-   rides in the first line rather than beside the block, so on a 320px phone,
-   where the tile wraps onto two lines, it stays against the words. */
-.hp-band-say::before{content:"";display:inline-block;vertical-align:middle;width:9px;height:9px;border-radius:50%;background:var(--ochre-ink);margin:-2px 8px 0 0}
-/* 10px at .7 alpha is rgb(87,87,81) on the sky, 5.1:1, so the quieter half is
-   still readable rather than decorative. */
-.hp-band-sub{display:block;margin-top:4px;font-size:10px;letter-spacing:.12em;line-height:1.45;color:rgba(27,31,34,.7)}
-@media (min-width:900px){.hp-band-tag{right:max(var(--pad), calc((100% - var(--maxw)) / 2))}}
-
 /* ---------- hero ---------- */
 .home-hero{position:relative;padding:24px 0 28px}
 .home-hero .hp-wrap{position:relative;display:grid;gap:28px}
@@ -187,7 +169,7 @@ html[data-session="in"] .home-hero{padding-bottom:56px}
 .hw-cap{font-size:16px;line-height:1.35;font-weight:600;color:var(--fg);margin:12px 0 0;max-width:20ch}
 .hw-sub{font-size:14px;line-height:1.5;color:var(--fg-mid);margin:6px 0 0;max-width:34ch}
 
-/* the small drawn object: the band's own hand, one sheet with a seal. */
+/* the small drawn object: one sheet with a seal. */
 .hw-obj{flex:0 0 auto;width:88px;height:88px;display:block;margin-top:4px}
 @media (max-width:359px){.hw-obj{width:68px;height:68px}}
 
@@ -258,7 +240,7 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
   .hw-cols > .hw-card{margin-top:0}
 }
 
-/* the art: a document that gets signed, sealed, and then is gone. Desktop only; on a phone the band is the picture. */
+/* the art: a document that gets signed, sealed, and then is gone. Desktop only. */
 .hp-art{position:relative;z-index:1;height:150px;pointer-events:none;user-select:none}
 .hp-art-glow{position:absolute;inset:-40% -20%;background:
   radial-gradient(40% 50% at 70% 40%, rgba(29,78,216,.14), transparent 70%),
@@ -537,53 +519,6 @@ footer a{color:var(--fg)}
   <a href="/help" class="nav-tail-link">Help</a>
 </div>
 <main id="main-content" role="main">
-
-<div class="hp-band" aria-hidden="true">
-  <svg viewBox="0 0 1440 230" preserveAspectRatio="xMidYMax slice" role="presentation" focusable="false">
-    <defs>
-      <linearGradient id="hpSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E3D9BE"/><stop offset="1" stop-color="#EDE5CF"/></linearGradient>
-    </defs>
-    <rect width="1440" height="230" fill="url(#hpSky)"/>
-    <ellipse cx="300" cy="62" rx="110" ry="22" fill="#F4EEDC"/>
-    <ellipse cx="1060" cy="48" rx="90" ry="18" fill="#F4EEDC"/>
-    <ellipse cx="820" cy="96" rx="60" ry="12" fill="#F4EEDC" opacity=".8"/>
-    <circle cx="720" cy="104" r="46" fill="#D9A441" opacity=".85"/>
-    <!-- Harderwijk, back row -->
-    <g fill="#B8AD8E">
-      <path d="M0 200h60v-40h-60zM90 200v-58l22-14 22 14v58zM1250 200v-46l18-16 18 16v46zM1320 200h70v-38h-70z"/>
-      <path d="M220 200v-70l30-20 30 20v70zM1130 200v-64l26-18 26 18v64z"/>
-    </g>
-    <!-- Harderwijk, front row: the Grote Kerk, the Vischpoort, gabled houses, the mill -->
-    <g fill="#21262A">
-      <path d="M0 208h1440v22H0z"/>
-      <path d="M40 208v-88l16-10 16 10v88zM76 208v-64h44v64zM124 208v-92l14-9 14 9v92z"/>
-      <path d="M170 208v-70h50v70zM230 208v-96l12-6 12 6v96z"/>
-      <path d="M300 208v-150h8v-30l14-24 14 24v30h8v150z"/>
-      <path d="M356 208v-76h30v76zM392 208v-100l18-12 18 12v100zM434 208v-70h36v70z"/>
-      <path d="M520 208v-60a28 28 0 0 1 56 0v60zM540 208v-34a8 8 0 0 1 16 0v34z" fill-rule="evenodd"/>
-      <path d="M520 148h56v-8h-56zM548 118l-8 22h16z"/>
-      <path d="M600 208v-80l16-10 16 10v80zM640 208v-66h40v66zM688 208v-56h26v56z"/>
-      <path d="M840 208v-70h36v70zM884 208v-96l16-10 16 10v96zM924 208v-62h48v62zM980 208v-84l14-8 14 8v84z"/>
-      <path d="M1040 208v-58h40v58zM1088 208v-72l14-9 14 9v72z"/>
-      <path d="M1176 208v-88h44v88zM1198 120v-40h4v40z"/>
-      <path d="M1198 84l38-38 4 4-38 38zM1198 84l-38-38-4 4 38 38zM1198 84l38 38-4 4-38-38zM1198 84l-38 38 4 4 38-38z"/>
-      <path d="M1290 208v-52h30v52zM1330 208v-74l16-10 16 10v74zM1380 208v-44h60v44z"/>
-    </g>
-    <!-- the sealed letter on the quay -->
-    <g transform="translate(700 150) rotate(-6)">
-      <rect x="0" y="0" width="112" height="76" rx="3" fill="#F4EEDC" stroke="#21262A" stroke-width="2.5"/>
-      <path d="M0 4l56 40 56-40" fill="none" stroke="#21262A" stroke-width="2.5" stroke-linejoin="round"/>
-      <circle cx="56" cy="46" r="11" fill="#D9A441" stroke="#21262A" stroke-width="2.5"/>
-    </g>
-    <!-- the water of the Veluwemeer -->
-    <path d="M0 208h1440v22H0z" fill="#4E6E72"/>
-    <path d="M0 208h1440" stroke="#EAE2CE" stroke-opacity=".35"/>
-  </svg>
-  <span class="hp-band-tag">
-    <span class="hp-band-say">Beter een goede buur dan een verre vriend.</span>
-    <span class="hp-band-sub">Onze servers staan in Neurenberg.</span>
-  </span>
-</div>
 
 <section class="home-hero">
   <div class="hp-wrap">

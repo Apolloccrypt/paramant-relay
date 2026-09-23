@@ -1000,17 +1000,11 @@ assert.ok(security.includes('No US provider in the data path'),
 // data-path line is proof 1 in its own words with the Resend exception beside
 // it. The row in docs/site-claims.md records the external half as UNCOVERED,
 // which is the same footing the competitor facts on /vs stand on.
-// 5 September, Mick: the band now carries a Dutch tile instead of the English
-// ownership line. The proverb is the eye-catcher and claims nothing; the line
-// under it is the checkable half and is the same server location /privacy,
-// /security and the DPA name. One Dutch sentence on an English page is his
-// choice, not a slip, and this is not a translation round: no other page moved.
-const bandSay = (read('frontend/index.html').match(/<span class="hp-band-say">([\s\S]*?)<\/span>/) || [, ''])[1];
-const bandSub = (read('frontend/index.html').match(/<span class="hp-band-sub">([\s\S]*?)<\/span>/) || [, ''])[1];
-assert.equal(bandSay, 'Beter een goede buur dan een verre vriend.',
-  'index.html: the band tile is the one line above the fold that carries the tone; change it deliberately, and update tests/first-screen with it');
-assert.equal(bandSub, 'Onze servers staan in Neurenberg.',
-  'index.html: the line under the tile is the checkable half and must keep naming the city /privacy and the DPA name');
+// 23 September, Mick: the band at the top of the homepage is gone, the Dutch
+// tile and the Neurenberg line with it. The server location stays where it is
+// checkable: /privacy, /security and the DPA, pinned elsewhere in this file.
+assert.doesNotMatch(read('frontend/index.html'), /hp-band|goede buur/,
+  'index.html: the band was taken off the homepage on purpose; bring it back deliberately, not by accident');
 const whyNl = visible0((read('frontend/index.html').match(/<section class="hp-sec why-nl-sec"[\s\S]*?<\/section>/) || [''])[0]);
 assert.ok(whyNl, 'index.html must keep the "Why Dutch matters" section');
 for (const claim of [
