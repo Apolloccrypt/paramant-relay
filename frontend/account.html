@@ -270,7 +270,7 @@ main.acct input::placeholder { color: var(--ink-3); }
   <h2>Inloggen met een passkey.</h2>
   <p class="acct-lead">
     Log in met Face ID, Touch ID, Windows Hello of een beveiligingssleutel, zonder code te typen.
-    Een passkey toevoegen is een wijziging in uw beveiliging, dus daarvoor vragen we uw huidige code van 6 cijfers.
+    Een passkey verandert uw beveiliging. Daarom vragen we eerst uw huidige code van 6 cijfers.
   </p>
   <div class="acct-block">
     <h3>Uw passkeys</h3>
@@ -316,10 +316,10 @@ main.acct input::placeholder { color: var(--ink-3); }
   <div class="acct-block">
     <h3>Uw ondertekensleutel instellen</h3>
     <p class="small">
-      Uw ondertekensleutel wordt hier gemaakt, in deze browser, met ML-DSA-65 (post-quantum), en
-      alleen u hebt hem. U stelt hem in, en opent hem bij elke handtekening, met DEZELFDE
-      passkey waarmee u inlogt (Face ID, Touch ID of een beveiligingssleutel). Geen wachtwoordzin, geen extra
-      code: uw passkey is uw ondertekensleutel. Geen passkey in deze browser? U kunt nog steeds
+      Uw ondertekensleutel wordt hier in deze browser gemaakt, met ML-DSA-65 (post-quantum).
+      Alleen u hebt hem. U stelt hem in en opent hem bij elke handtekening met dezelfde
+      passkey waarmee u inlogt (Face ID, Touch ID of een beveiligingssleutel). U hebt dus geen
+      wachtwoordzin of extra code nodig. Geen passkey in deze browser? Dan kunt u nog steeds
       ondertekenen via <a href="/sign">/sign</a> met de code uit uw authenticator-app.
     </p>
     <div class="acct-field">
@@ -374,8 +374,8 @@ main.acct input::placeholder { color: var(--ink-3); }
          business plans pay for it, and one link is the whole upgrade path. -->
     <div class="acct-plan-band free" id="billing-community" hidden>
       <p class="acct-plan-kicker">Community &middot; &euro;0</p>
-      <p class="acct-plan-lede">U gebruikt het Community-plan en dat blijft gratis. De zakelijke plannen betalen de servers en houden het zo.</p>
-      <p class="acct-plan-adds">Ze verhogen 2 handtekeningen per maand naar 100 of 1.000, houden links langer open, bewaren een overzicht van wat u verstuurde, geven u ondersteuning met een naam erbij, en een audittrail die u kunt exporteren en overdragen.</p>
+      <p class="acct-plan-lede">U gebruikt het Community-plan en dat blijft gratis. De zakelijke plannen betalen de servers, zodat dat zo blijft.</p>
+      <p class="acct-plan-adds">Met een zakelijk plan krijgt u 100 of 1.000 handtekeningen per maand in plaats van 2. Links blijven langer open, u houdt een overzicht van wat u verstuurde, u krijgt ondersteuning van een vaste contactpersoon en een audittrail die u kunt exporteren en overdragen.</p>
       <a class="acct-plan-cta" href="/pricing">Bekijk de zakelijke plannen &rarr;</a>
     </div>
     <!-- Shown on a paid plan. No link to a higher tier: a customer who pays is
@@ -522,7 +522,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 <script src="/js/redeem-code.js?v=3" defer></script>
 
 <script type="module" src="/js/account.inline2.js?v=5"></script>
-<script type="module" src="/js/passkey.js?v=6"></script>
+<script type="module" src="/js/passkey.js?v=7"></script>
 <script type="module" src="/js/signing-enrol.js?v=16"></script>
 <script src="/js/account-theme.js?v=4" defer></script>
 

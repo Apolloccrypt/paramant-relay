@@ -4,20 +4,20 @@
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Privacybeleid · Paramant</title>
+<title>Privacybeleid · Wat we bewaren en wat niet · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Wat Paramant opslaat en wat niet. Een e-mailadres om uw account te beheren, geen telefoonnummer, geen IP-logging voor analyse. Hosting in de EU en Duitsland.">
-<meta property="og:title" content="Privacybeleid · Paramant">
-<meta property="og:description" content="Wat Paramant opslaat en wat niet. Een e-mailadres om uw account te beheren, geen telefoonnummer, geen IP-logging voor analyse. Hosting in de EU en Duitsland.">
+<meta name="description" content="Wat Paramant opslaat en wat niet. Een e-mailadres om uw account te beheren, geen telefoonnummer, geen IP-logging voor analyse. Hosting in Duitsland (EU).">
+<meta property="og:title" content="Privacybeleid · Wat we bewaren en wat niet · Paramant">
+<meta property="og:description" content="Wat Paramant opslaat en wat niet. Een e-mailadres om uw account te beheren, geen telefoonnummer, geen IP-logging voor analyse. Hosting in Duitsland (EU).">
 <meta property="og:url" content="https://paramant.app/privacy">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Privacybeleid · Paramant">
-<meta name="twitter:description" content="Wat Paramant opslaat en wat niet. Een e-mailadres om uw account te beheren, geen telefoonnummer, geen IP-logging voor analyse. Hosting in de EU en Duitsland.">
+<meta name="twitter:title" content="Privacybeleid · Wat we bewaren en wat niet · Paramant">
+<meta name="twitter:description" content="Wat Paramant opslaat en wat niet. Een e-mailadres om uw account te beheren, geen telefoonnummer, geen IP-logging voor analyse. Hosting in Duitsland (EU).">
 <link rel="canonical" href="https://paramant.app/privacy">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/privacy">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/privacy">
@@ -124,7 +124,7 @@ footer a{color:var(--ink);text-decoration:none}
       "@type": "WebPage",
       "@id": "https://paramant.app/privacy#webpage",
       "url": "https://paramant.app/privacy",
-      "name": "Privacybeleid · Paramant",
+      "name": "Privacybeleid · Wat we bewaren en wat niet · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -132,7 +132,7 @@ footer a{color:var(--ink);text-decoration:none}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "nl",
-      "description": "Wat Paramant opslaat en wat niet. Een e-mailadres om uw account te beheren, geen telefoonnummer, geen IP-logging voor analyse. Hosting in de EU en Duitsland."
+      "description": "Wat Paramant opslaat en wat niet. Een e-mailadres om uw account te beheren, geen telefoonnummer, geen IP-logging voor analyse. Hosting in Duitsland (EU)."
     },
     {
       "@type": "Organization",
@@ -140,7 +140,7 @@ footer a{color:var(--ink);text-decoration:none}
       "name": "Paramant",
       "legalName": "Paramantis Solutions B.V.",
       "url": "https://paramant.app/",
-      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
       "founder": {
         "@type": "Person",
         "name": "Mick Beer",
@@ -222,7 +222,7 @@ footer a{color:var(--ink);text-decoration:none}
 <h2>Hoe versturen werkt (de webapp Versturen)</h2>
 <p>Bestanden die u via de webapp verstuurt, worden <strong>aan de clientzijde in uw browser</strong> versleuteld met post-kwantumcryptografie (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256), voordat ze onze servers bereiken. Op die route ziet de relay nooit plaintext. De enige plek waar dat wel gebeurt, is de gehoste ondertekenprocedure via de <code>/v1</code>-API: daar wordt het document naar ons gestuurd, zodat wij de procedure kunnen uitvoeren. Wij bewaren het, in rust verzegeld onder onze eigen sleutel, tot die envelop afloopt.</p>
 <p>Bestanden worden opgesplitst in versleutelde blokken van 5 MB. Elk blok bestaat alleen in het RAM-geheugen van onze relayserver. Op het Community-plan wordt het na de eerste download permanent en onherroepelijk vernietigd (<strong>burn-on-read</strong>); een betaald plan geeft via de API meer leesbeurten per link vóór diezelfde vernietiging, tot 10 op Firm en 100 op Enterprise. Versleutelde payloaddata wordt nooit naar schijf geschreven. Van een <em>overdracht</em> wordt alleen dit op schijf bewaard: cryptografische hashes in het openbare Certificate Transparency-log. Geen bestandsinhoud, geen sleutels, geen plaintext. (Accountgegevens, hieronder vermeld, worden apart opgeslagen om uw account te beheren.)</p>
-<p>Blobs op het Community-plan verlopen na maximaal 1 uur. Firm-blobs na 24 uur. Enterprise-blobs na 7 dagen. Alle worden eerder vernietigd zodra de laatste leesbeurt van de link is gebruikt.</p>
+<p>Blobs op het Community-plan verlopen na maximaal 1 uur. Firm-blobs na 24 uur. Enterprise-blobs na 7 dagen. Alle blobs worden eerder vernietigd zodra de laatste leesbeurt van de link is gebruikt.</p>
 
 <h2>Hoe documenten bij Ondertekenen worden bezorgd</h2>
 <p>Als u om handtekeningen vraagt, versleutelt uw browser het document met AES-256-GCM voordat het wordt geüpload. De ondertekenrelay bewaart de versleutelde capsule bij de envelop tot die verloopt: 30 dagen, tenzij het verzoek om een andere termijn vraagt, en nooit langer dan 365 dagen. De relay ontvangt geen plaintext van het document en niet de documentsleutel. De persoonlijke ondertekenlink bevat de sleutel in het fragment van de URL; browsers sturen dat fragment niet naar de relay.</p>
@@ -299,7 +299,7 @@ footer a{color:var(--ink);text-decoration:none}
 <p>TLS wordt beëindigd door <strong>onze eigen edge (Caddy)</strong>, die draait op dezelfde Hetzner-infrastructuur in Duitsland, met post-kwantum sleuteluitwisseling. Er staat geen reverse proxy of CDN van een derde partij voor de site: uw verbinding bereikt onze server en verder niets. Kortlevende verbindingsmetadata (IP-adres, tijdstempel) wordt kortstondig verwerkt voor beveiliging en het voorkomen van misbruik, zoals hierboven beschreven, en nooit voor analyse.</p>
 
 <h2>Logs die een adres bevatten</h2>
-<p>Eén log bevat een volledig clientadres, en dat log wordt niet begrensd door een timer. Wij noemen het liever dan het woord &ldquo;kortstondig&rdquo; werk te laten doen dat het niet kan doen.</p>
+<p>Eén log bevat een volledig clientadres, en dat log wordt niet begrensd door een timer. Wij noemen het liever met name dan dat we ons verschuilen achter het woord &ldquo;kortstondig&rdquo;.</p>
 <ul>
 <li><strong>Toegangslog van de edge.</strong> Onze eigen edge schrijft een servertoegangslog met het clientadres, het tijdstip, het pad en de user-agent. Wij lezen het om echte bezoekers te onderscheiden van scanners, nooit om een profiel van een persoon op te bouwen, en het wordt aan niemand geëxporteerd. De nginx-configuratie in deze repository logt niets; de edge die ervoor staat wel.</li>
 <li><strong>Auditlog van het account.</strong> Elke auditregel bewaart het netwerkdeel van het adres en laat het hostdeel weg, zodat er nooit een volledig adres wordt geschreven: 1.2.x.x voor IPv4 en de eerste twee groepen voor IPv6. Regels worden op twee manieren begrensd, naar leeftijd en naar aantal: niets ouder dan 400 dagen blijft bestaan, en een account bewaart hooguit zijn laatste 1000 regels. De 400 dagen zijn een standaardwaarde die een beheerder kan wijzigen.</li>

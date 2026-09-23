@@ -29,7 +29,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     },
     busy: {
       t: nlEn('Uw account wordt nog aangemaakt', 'Your account is still being created'),
-      m: nlEn('Wij ontvingen uw bevestiging net en ronden die af. Wacht een paar seconden en klik dan nog een keer op de link in uw mail.', 'We received your verification a moment ago and are finishing it up. Wait a few seconds, then click the link in your email once more.')
+      m: nlEn('Wij hebben uw bevestiging net ontvangen en zijn die nog aan het verwerken. Wacht een paar seconden en klik dan nog een keer op de link in uw mail.', 'We received your verification a moment ago and are finishing it up. Wait a few seconds, then click the link in your email once more.')
     }
   };
   var e = map[err] || { t: nlEn('Onbekende fout', 'Unknown error'), m: nlEn('Meld u hieronder opnieuw aan.', 'Please try signing up again below.') };

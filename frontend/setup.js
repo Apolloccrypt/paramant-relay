@@ -264,7 +264,7 @@ function applyConfig() {
       if (applyBtn) { applyBtn.disabled = false; }
       if (status) {
         status.style.color = '#b00020';
-        status.textContent = 'De relay is niet bereikbaar. Uw instellingen staan hierboven, u kunt ze voorlopig met de hand toepassen.';
+        status.textContent = 'De relay is niet bereikbaar. Uw instellingen staan hierboven. U kunt ze voorlopig met de hand toepassen.';
       }
     });
 }

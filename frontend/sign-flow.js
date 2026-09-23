@@ -3339,10 +3339,10 @@ function showDoneInvite(r) {
          : emailOk      ? L('Bericht verstuurd. Stuur nu de links.', 'Notified. Now send them the links.')
          :                L('Klaar om te ondertekenen.', 'Ready for signature.'),
     line: emailPartial
-      ? L('Sommige berichten zijn niet bezorgd. Probeer het hieronder opnieuw. Hoe dan ook heeft elke ondertekenaar de link nog van u nodig.', 'Some notices were not delivered. Retry below. Either way each signer still needs their link from you.')
+      ? L('Sommige berichten zijn niet bezorgd. Probeer het hieronder opnieuw. Elke ondertekenaar heeft in elk geval de eigen link van u nodig.', 'Some notices were not delivered. Retry below. Either way each signer still needs their link from you.')
       : emailOk
         ? L('De e-mail is alleen een bericht en bevat geen sleutel. Stuur iedereen hieronder de eigen link.', 'The email is a notice and carries no key. Send each person their link below.')
-        : L('Elke ondertekenaar heeft hieronder een eigen link. Stuur die op een manier die u past en volg hier de voortgang.', 'Each signer has a link of their own below. Send it to them any way you like and follow progress here.'),
+        : L('Elke ondertekenaar heeft hieronder een eigen link. Stuur die zoals u wilt en volg hier de voortgang.', 'Each signer has a link of their own below. Send it to them any way you like and follow progress here.'),
   });
   const preview = $('ds-signed-preview'); if (preview) preview.hidden = true;
   ['ds-dl-pdf', 'ds-dl-psign'].forEach(id => { const el = $(id); if (el) el.hidden = true; });

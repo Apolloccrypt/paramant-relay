@@ -149,7 +149,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 <div class="step" id="step-loading">
   <h1>Verzoek openen</h1>
-  <p class="sub">De gegevens van het verzoek worden bij de relay opgehaald. De relay heeft het document zelf niet, alleen de SHA3-256-hash en uw plek om te tekenen.</p>
+  <p class="sub">De gegevens van het verzoek worden opgehaald bij de relay. Die heeft het document zelf niet, alleen de SHA3-256-hash ervan en de plek waar u tekent.</p>
   <div class="card"><div class="card-body"><div class="banner" id="loading-msg">Laden...</div></div></div>
 </div>
 
@@ -162,12 +162,12 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 <div class="step" id="step-cosign">
   <h1>Document medeondertekenen</h1>
-  <p class="sub">Bekijk het document dat u kreeg en zet uw handtekening. Ontsleutelen en ondertekenen met ML-DSA-65 gebeuren op uw apparaat. De relay krijgt versleutelde gegevens, uw publieke sleutel, de handtekening en de plek van uw velden. Nooit de leesbare inhoud van het document en nooit uw private sleutel.</p>
+  <p class="sub">Bekijk het document dat u is gestuurd en zet uw handtekening. Het ontsleutelen en ondertekenen met ML-DSA-65 gebeurt op uw eigen apparaat. De relay krijgt versleutelde gegevens, uw publieke sleutel, de handtekening en de plek van uw velden. De leesbare inhoud van het document en uw private sleutel krijgt hij nooit.</p>
 
   <div class="disclaimer">
     <strong>Post-quantum en zero-knowledge. Niet eIDAS-gekwalificeerd.</strong>
-    Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65, geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES).
-    Vergelijk de hash van het document hieronder met het bestand dat u los ontving.
+    Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65. Het is geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES).
+    Vergelijk de hash hieronder met die van het bestand dat u los ontving.
   </div>
 
   <div class="card">
@@ -192,7 +192,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   <div class="card">
     <div class="card-head"><div class="dot amber" id="review-dot"></div><div class="card-head-title">Bekijk wat u ondertekent</div></div>
     <div class="card-body">
-      <p class="sub" style="margin-bottom:12px">Het versleutelde document wordt pas opgehaald als u inlogt met het uitgenodigde e-mailadres, en daarna in deze browser ontsleuteld. De SHA3-256-hash moet kloppen met het verzoek voordat u kunt ondertekenen. De relay krijgt de sleutel van het document en de leesbare inhoud niet.</p>
+      <p class="sub" style="margin-bottom:12px">Het versleutelde document wordt pas opgehaald als u inlogt met het e-mailadres waarop u bent uitgenodigd. Daarna wordt het in deze browser ontsleuteld. U kunt pas ondertekenen als de SHA3-256-hash overeenkomt met het verzoek. De sleutel van het document en de leesbare inhoud krijgt de relay niet.</p>
       <div class="banner" id="document-delivery-status">Het versleutelde document wordt geladen...</div>
       <label class="file-cta" for="verify-file" id="verify-file-cta">Kies het document zelf als het niet vanzelf laadt</label>
       <input type="file" id="verify-file" hidden>
@@ -216,7 +216,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   <div class="card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Ondertekenen als <span id="me-label">ondertekenaar</span></div></div>
     <div class="card-body">
-      <p class="sub" style="margin-bottom:12px">U tekent met uw ondertekensleutel (ML-DSA-65). Die wordt ontgrendeld met Face ID, Touch ID of een beveiligingssleutel op het moment dat u tekent, en verlaat uw apparaat nooit. De handtekening is gekoppeld aan het e-mailadres waar deze uitnodiging naartoe ging.</p>
+      <p class="sub" style="margin-bottom:12px">U tekent met uw ondertekensleutel (ML-DSA-65). Op het moment dat u tekent, ontgrendelt u die met Face ID, Touch ID of een beveiligingssleutel. De sleutel verlaat uw apparaat nooit. De handtekening hoort bij het e-mailadres waarop u deze uitnodiging kreeg.</p>
       <div class="banner" id="sign-status" hidden></div>
       <div id="sign-cta" style="margin-bottom:12px" hidden></div>
       <button class="btn" id="sign-confirm" type="button" disabled>Dit document ondertekenen</button>
@@ -239,7 +239,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 </div>
 
 <div class="step" id="step-done">
-  <h1>Uw handtekening staat</h1>
+  <h1>Uw handtekening is gezet</h1>
   <p class="sub">Uw ML-DSA-65-handtekening is verstuurd. De relay heeft hem in het openbare CT-logboek gezet en de status van het verzoek bijgewerkt.</p>
   <div class="card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Resultaat</div></div>
@@ -255,10 +255,10 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
         <span class="tag green">ML-DSA-65</span>
         <span class="tag green">Zero-knowledge</span>
       </div>
-      <button class="btn" id="done-download-pdf" type="button" hidden style="margin-top:14px">PDF-kopie met zichtbare stempel downloaden</button>
+      <button class="btn" id="done-download-pdf" type="button" hidden style="margin-top:14px">Pdf-kopie met zichtbare stempel downloaden</button>
       <a class="btn btn-outline" id="done-download-proof" href="#" hidden style="margin-top:8px">Definitief .psign-bewijs downloaden</a>
-      <p class="review-gate" id="done-download-note" hidden>Dit is een leesbare werkkopie. Het definitieve .psign-bestand bewijst het oorspronkelijke PDF-document en elke ondertekende plek. Bewaar het origineel, deze kopie en het .psign-bestand samen.</p>
-      <p class="review-gate" id="done-proof-wait" hidden>Het definitieve .psign-bewijs komt beschikbaar zodra elke uitgenodigde ondertekenaar heeft getekend.</p>
+      <p class="review-gate" id="done-download-note" hidden>Dit is een leesbare werkkopie. Het definitieve .psign-bestand bewijst het oorspronkelijke pdf-document en elke ondertekende plek. Bewaar het origineel, deze kopie en het .psign-bestand samen.</p>
+      <p class="review-gate" id="done-proof-wait" hidden>Het definitieve .psign-bewijs is beschikbaar zodra iedere uitgenodigde ondertekenaar heeft getekend.</p>
     </div>
   </div>
   <a href="/" class="btn btn-outline">Terug naar de startpagina</a>
@@ -270,7 +270,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1"></script>
-<script src="/js/quota-upgrade.js?v=6" defer></script>
+<script src="/js/quota-upgrade.js?v=7" defer></script>
 <script type="module" src="/co-sign.js?v=23"></script>
 </body>
 </html>

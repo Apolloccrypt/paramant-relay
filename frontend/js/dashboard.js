@@ -690,7 +690,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     // named, because a row you clicked by accident looks exactly like the row
     // next to it.
     host.innerHTML =
-      nlEn('<span class="dh-rowask"><strong>', '<span class="dh-rowask">Withdraw <strong>') + esc(name) + nlEn('</strong> intrekken? Gezette handtekeningen blijven vastgelegd, niemand kan er nog een toevoegen.</span>', '</strong>? Signatures already given stay in the record, nobody can add another.</span>') +
+      nlEn('<span class="dh-rowask"><strong>', '<span class="dh-rowask">Withdraw <strong>') + esc(name) + nlEn('</strong> intrekken? Handtekeningen die al gezet zijn, blijven vastgelegd. Niemand kan er nog een toevoegen.</span>', '</strong>? Signatures already given stay in the record, nobody can add another.</span>') +
       '<button type="button" class="dh-rowbtn" data-pa-action="document-withdraw-no" data-document-id="' + esc(id) + nlEn('">Open laten</button>', '">Keep it open</button>') +
       '<button type="button" class="dh-rowbtn danger" data-pa-action="document-withdraw-do" data-document-id="' + esc(id) + nlEn('">Ja, intrekken</button>', '">Yes, withdraw</button>');
     var safe = host.querySelector('[data-pa-action="document-withdraw-no"]');

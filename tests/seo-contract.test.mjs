@@ -436,16 +436,16 @@ test('every public page names the company and the founder in its Organization no
 // founder and his title in Dutch.
 const PINNED = {
   index: {
-    title: 'Paramant · veilig versturen en laten tekenen',
-    desc: 'Patiëntdossiers en processtukken veilig versturen en laten tekenen, vanuit uw browser. Van Paramantis Solutions B.V. in Harderwijk.',
+    title: 'Veilig bestanden versturen en laten ondertekenen · Paramant',
+    desc: 'Patiëntdossiers en processtukken veilig versturen en digitaal laten ondertekenen, vanuit uw browser. Van Paramantis Solutions B.V. in Harderwijk.',
   },
   pricing: {
     title: 'Prijzen · Voor uw kantoor 29 euro per maand · Paramant',
     desc: 'Het Community-plan is gratis, voor altijd. Voor uw kantoor: versturen en ondertekenen samen, 29 euro per maand excl. btw. Van Paramantis Solutions B.V.',
   },
   about: {
-    title: 'Over Paramant · Opgericht door Mick Beer',
-    desc: 'Paramant is een product van Paramantis Solutions B.V. in Harderwijk, opgericht door Mick Beer, privacy- en securityonderzoeker.',
+    title: 'Over Paramant en oprichter Mick Beer · Paramant',
+    desc: 'Paramant is een product van Paramantis Solutions B.V. in Harderwijk, opgericht door Mick Beer, privacy- en securityonderzoeker. Wie we zijn en hoe u ons nakijkt.',
   },
   'en/index': {
     title: 'ParaSign by Paramant · sign and send documents in the EU',
@@ -460,8 +460,8 @@ const PINNED = {
     desc: 'Paramant is a product of Paramantis Solutions B.V. in Harderwijk, founded by Mick Beer, privacy and security researcher. Company, mission, and how to check us.',
   },
   sign: {
-    title: 'Een pdf ondertekenen in uw browser · Paramant',
-    desc: 'Onderteken een pdf in uw browser. Het document en uw ondertekensleutel blijven daar, en iedereen kan het getekende document achteraf controleren.',
+    title: 'Pdf digitaal ondertekenen in uw browser · Paramant',
+    desc: 'Onderteken een pdf in uw browser. De tekst van het document en uw ondertekensleutel blijven op uw apparaat. Iedereen kan de handtekening later controleren.',
   },
   'en/sign': {
     title: 'Sign a PDF in your browser · Paramant',
@@ -472,7 +472,7 @@ const PINNED = {
   // had to cover both proofs instead of only the signed document.
   verify: {
     title: 'Document of ontvangstbewijs controleren · Paramant',
-    desc: 'Controleer een ondertekend document, of het bewijs dat een bestand is afgeleverd. Beide gebeuren in uw browser, zonder account en zonder iets te uploaden.',
+    desc: 'Controleer of een ondertekend document klopt, of dat een verstuurd bestand is afgeleverd. Dat gebeurt in uw browser, zonder account en zonder iets te uploaden.',
   },
   // download, trust and rules: Dutch on the plain path since this branch, the
   // English pins moved with the English text to /en/.

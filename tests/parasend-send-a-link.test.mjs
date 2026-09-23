@@ -129,7 +129,7 @@ const LANGS = [
     worksOnce: /Werkt één keer/, waiting: /Wacht op de ontvanger/,
     noReceipt: /geen ondertekend ontvangstbewijs/i,
     gone: /voorgoed vernietigd/i,
-    burned: /al gedownload en daarna gewist/i, singleUse: /eenmalige link/i,
+    burned: /al gedownload en daarna gewist/i, singleUse: /werkt maar één keer/i,
   },
 ];
 for (const L of LANGS) {

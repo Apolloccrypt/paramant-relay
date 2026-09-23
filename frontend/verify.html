@@ -11,9 +11,9 @@
      against the codebase as a whole: naming an algorithm the product has, on a route
      that does not run it, is the class of untrue sentence that reads as a fact. -->
 <meta name="paramant:path" content="signing">
-<meta name="description" content="Controleer een ondertekend document, of het bewijs dat een bestand is afgeleverd. Beide gebeuren in uw browser, zonder account en zonder iets te uploaden.">
+<meta name="description" content="Controleer of een ondertekend document klopt, of dat een verstuurd bestand is afgeleverd. Dat gebeurt in uw browser, zonder account en zonder iets te uploaden.">
 <meta property="og:title" content="Document of ontvangstbewijs controleren · Paramant">
-<meta property="og:description" content="Controleer een ondertekend document, of het bewijs dat een bestand is afgeleverd. Beide gebeuren in uw browser, zonder account en zonder iets te uploaden.">
+<meta property="og:description" content="Controleer of een ondertekend document klopt, of dat een verstuurd bestand is afgeleverd. Dat gebeurt in uw browser, zonder account en zonder iets te uploaden.">
 <meta property="og:url" content="https://paramant.app/verify">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
@@ -21,7 +21,7 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Document of ontvangstbewijs controleren · Paramant">
-<meta name="twitter:description" content="Controleer een ondertekend document, of het bewijs dat een bestand is afgeleverd. Beide gebeuren in uw browser, zonder account en zonder iets te uploaden.">
+<meta name="twitter:description" content="Controleer of een ondertekend document klopt, of dat een verstuurd bestand is afgeleverd. Dat gebeurt in uw browser, zonder account en zonder iets te uploaden.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/verify">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/verify">
@@ -49,7 +49,7 @@
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "nl",
-      "description": "Controleer een ondertekend document, of het bewijs dat een bestand is afgeleverd. Beide gebeuren in uw browser, zonder account en zonder iets te uploaden."
+      "description": "Controleer of een ondertekend document klopt, of dat een verstuurd bestand is afgeleverd. Dat gebeurt in uw browser, zonder account en zonder iets te uploaden."
     },
     {
       "@type": "SoftwareApplication",
@@ -68,7 +68,7 @@
       "name": "Paramant",
       "legalName": "Paramantis Solutions B.V.",
       "url": "https://paramant.app/",
-      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
       "founder": {
         "@type": "Person",
         "name": "Mick Beer",
@@ -141,7 +141,7 @@
   <header class="ps-head">
     <p class="ps-kicker">Controleren</p>
     <h1 class="ps-title">Controleer een bewijs van Paramant</h1>
-    <p class="ps-lede">Paramant levert twee soorten bewijs: een ondertekend document, en een ontvangstbewijs dat zegt dat een bestand is afgeleverd en daarna vernietigd. Beide controleert u hier, op uw eigen apparaat. Niets wat u hier neerzet wordt geüpload, en voor geen van beide is een account nodig.</p>
+    <p class="ps-lede">Paramant levert twee soorten bewijs: een ondertekend document, en een ontvangstbewijs dat laat zien dat een bestand is afgeleverd en daarna vernietigd. U controleert ze allebei hier, op uw eigen apparaat. Wat u hier kiest of plakt, wordt niet geüpload. U heeft er geen account voor nodig.</p>
   </header>
 
   <div class="rv-tabs" role="tablist" aria-label="Wat wilt u controleren">
@@ -162,7 +162,7 @@
     <div class="ps-field" id="vf-key-block" hidden>
       <label class="ps-label" for="vf-api-key">API-sleutel (X-Api-Key)</label>
       <input class="ps-input mono" type="password" id="vf-api-key" placeholder="pgp_..." autocomplete="off">
-      <p class="ps-warn">Dit is een oude envelop (v1/v2). De notarishandtekening van de relay kan alleen de relay zelf controleren, en daarvoor is een API-sleutel nodig. Huidige handtekeningen controleert u volledig offline, zonder sleutel.</p>
+      <p class="ps-warn">Dit is een oude envelop (v1 of v2). De notarishandtekening van de relay kan alleen de relay zelf controleren, en daarvoor heeft u een API-sleutel nodig. Nieuwe handtekeningen controleert u volledig offline, zonder sleutel.</p>
     </div>
   </section>
 
@@ -175,11 +175,11 @@
   <aside class="ps-info">
     <h2>Wat er wordt gecontroleerd</h2>
     <ul>
-      <li>De SHA3-256 van uw document komt overeen met de hash in de envelop</li>
+      <li>De SHA3-256-hash van uw document is gelijk aan de hash in de envelop</li>
       <li>De ML-DSA-65-handtekening van de ondertekenaar over die hash is geldig</li>
       <li>De envelop is niet verlopen</li>
     </ul>
-    <p class="ps-help">Handtekeningen worden volledig in uw browser gecontroleerd: geen account, geen API-sleutel, en het werkt offline.</p>
+    <p class="ps-help">De controle gebeurt volledig in uw browser. U heeft geen account of API-sleutel nodig, en het werkt ook offline.</p>
     <p><a href="/dashboard">Naar uw dashboard &rarr;</a></p>
   </aside>
   </div>
@@ -187,7 +187,7 @@
   <div id="panel-receipt" role="tabpanel" aria-labelledby="tab-receipt" hidden>
     <section class="card ps-panel" aria-labelledby="r1">
       <div class="ps-panel-head"><span class="ps-step">1</span><h2 id="r1" class="ps-panel-title">Het ontvangstbewijs</h2></div>
-      <p class="ps-help">Een ontvangstbewijs is het korte blok tekst dat u krijgt als een bestand dat u verstuurde is opgehaald. Het zegt welk bestand is overgedragen, op welk moment, en of de kopie op de server is vernietigd.</p>
+      <p class="ps-help">Een ontvangstbewijs is een kort blok tekst. U krijgt het zodra een bestand dat u verstuurde is opgehaald. Het laat zien welk bestand is overgedragen, wanneer, en of de kopie op de server is vernietigd.</p>
       <label class="rv-drop" id="rv-drop">
         <input type="file" id="rv-file" accept=".txt,.json,.receipt,application/json,text/plain">
         <span class="rv-drop-cta">Sleep het ontvangstbewijs hierheen, of kies een bestand</span>
@@ -207,7 +207,7 @@
 
     <details class="card ps-panel" id="rv-keyblock">
       <summary class="ps-panel-title">Een ontvangstbewijs van een andere server controleren</summary>
-      <p class="ps-help">Deze pagina bevat de ondertekeningssleutel van elke Paramant-relay en kiest de sleutel die het ontvangstbewijs noemt. Een gewoon ontvangstbewijs wordt dus gecontroleerd zonder iets aan het netwerk te vragen. Een ontvangstbewijs van een server die u zelf draait, controleert u door de sleutel van die server hieronder te plakken.</p>
+      <p class="ps-help">Deze pagina kent de ondertekeningssleutel van elke Paramant-relay en kiest zelf de sleutel die in het ontvangstbewijs staat. Een gewoon ontvangstbewijs controleert u dus zonder dat er iets over het netwerk gaat. Draait u zelf een server? Plak dan hieronder de sleutel van die server.</p>
       <div class="ps-field">
         <label class="ps-label" for="rv-key">Ondertekeningssleutel van de server die het ontvangstbewijs uitgaf</label>
         <textarea class="rv-paste" id="rv-key" spellcheck="false" placeholder="Laat dit leeg om de sleutel te gebruiken die bij deze pagina hoort."></textarea>
@@ -223,7 +223,7 @@
         <li>De handtekening over het hele ontvangstbewijs klopt, dus er is niets veranderd</li>
         <li>De momentopname van het logboek waar het ontvangstbewijs op steunt is ook ondertekend</li>
       </ul>
-      <p class="ps-help">Alle vier gebeuren op dit apparaat. Zodra de pagina geladen is, kunt u de stekker eruit trekken en blijft het antwoord hetzelfde.</p>
+      <p class="ps-help">Alle vier de controles gebeuren op dit apparaat. Is de pagina eenmaal geladen, dan kunt u de internetverbinding verbreken. Het antwoord blijft hetzelfde.</p>
     </aside>
   </div>
 </main>
@@ -261,6 +261,6 @@
 <script src="/nav.js?v=16" defer></script>
 <script src="/js/nav-auth.js?v=12" defer></script>
 <script type="module" src="/parasign-verify.js?v=7"></script>
-<script type="module" src="/js/receipt-verify.js?v=2"></script>
+<script type="module" src="/js/receipt-verify.js?v=3"></script>
 </body>
 </html>

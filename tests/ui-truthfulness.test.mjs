@@ -1102,13 +1102,13 @@ for (const [name, text] of [['index', homeVisible], ['en/parasign', parasignEn],
 }
 // /parasend is Nederlands sinds 23 september 2026: dezelfde claim, dezelfde
 // begrenzing tot de weg van de data, in de taal van de pagina.
-assert.ok(parasend.includes('Hetzner in Duitsland, Bunny DNS (Slovenië). Geen Amerikaanse partij in de weg van de data.'),
+assert.ok(parasend.includes('Hetzner in Duitsland, Bunny DNS (Slovenië). Uw bestanden gaan niet langs een Amerikaanse partij.'),
   'parasend.html lost the data-path wording of the EU claim');
 assert.ok(parasend.includes('E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten'),
   'parasend.html states the EU claim without naming the Resend exception');
 // /parasign is Dutch since 23 September 2026. The same two halves, in the
 // wording the Dutch homepage uses for proof 1.
-assert.ok(parasign.includes('Geen Amerikaanse partij in de weg die uw bestanden afleggen.'),
+assert.ok(parasign.includes('Uw bestanden gaan niet langs een Amerikaanse partij.'),
   'parasign.html lost the data-path wording of the EU claim');
 assert.ok(parasign.includes('E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten'),
   'parasign.html states the EU claim without naming the mail exception');
@@ -1246,7 +1246,7 @@ const FREE_FOREVER = 'not to unlock features, and that is what keeps the Communi
 for (const [name, text] of [['pricing', pricingText], ['en/parasign', parasignEn], ['en/parasend', parasendEn]]) {
   assert.ok(text.includes(FREE_FOREVER), `${name}.html lost the Community-plan promise`);
 }
-assert.ok(parasend.includes('niet om functies te ontgrendelen. Daardoor blijft het Community-plan gratis'),
+assert.ok(parasend.includes('niet om functies vrij te spelen. Daardoor blijft het Community-plan gratis'),
   'parasend.html lost the Community-plan promise');
 assert.ok(parasign.includes('niet om functies vrij te spelen, en dat houdt het Community-plan gratis'),
   'parasign.html lost the Community-plan promise');

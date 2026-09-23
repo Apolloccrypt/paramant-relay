@@ -7,24 +7,24 @@
 <script src="/js/ready.js?v=1"></script>
 <style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Een pdf ondertekenen in uw browser · Paramant</title>
+<title>Pdf digitaal ondertekenen in uw browser · Paramant</title>
 <meta property="og:site_name" content="Paramant">
 <!-- Which product path this page describes. tests/crypto-claims.test.mjs holds every
      algorithm this page names against the code that runs on that path, instead of
      against the codebase as a whole: naming an algorithm the product has, on a route
      that does not run it, is the class of untrue sentence that reads as a fact. -->
 <meta name="paramant:path" content="signing">
-<meta name="description" content="Onderteken een pdf in uw browser. Het document en uw ondertekensleutel blijven daar, en iedereen kan het getekende document achteraf controleren.">
-<meta property="og:title" content="Een pdf ondertekenen in uw browser · Paramant">
-<meta property="og:description" content="Onderteken een pdf in uw browser. Het document en uw ondertekensleutel blijven daar, en iedereen kan het getekende document achteraf controleren.">
+<meta name="description" content="Onderteken een pdf in uw browser. De tekst van het document en uw ondertekensleutel blijven op uw apparaat. Iedereen kan de handtekening later controleren.">
+<meta property="og:title" content="Pdf digitaal ondertekenen in uw browser · Paramant">
+<meta property="og:description" content="Onderteken een pdf in uw browser. De tekst van het document en uw ondertekensleutel blijven op uw apparaat. Iedereen kan de handtekening later controleren.">
 <meta property="og:url" content="https://paramant.app/sign">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Een pdf ondertekenen in uw browser · Paramant">
-<meta name="twitter:description" content="Onderteken een pdf in uw browser. Het document en uw ondertekensleutel blijven daar, en iedereen kan het getekende document achteraf controleren.">
+<meta name="twitter:title" content="Pdf digitaal ondertekenen in uw browser · Paramant">
+<meta name="twitter:description" content="Onderteken een pdf in uw browser. De tekst van het document en uw ondertekensleutel blijven op uw apparaat. Iedereen kan de handtekening later controleren.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/sign">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/sign">
@@ -438,7 +438,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       "@type": "WebPage",
       "@id": "https://paramant.app/sign#webpage",
       "url": "https://paramant.app/sign",
-      "name": "Een pdf ondertekenen in uw browser · Paramant",
+      "name": "Pdf digitaal ondertekenen in uw browser · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -446,7 +446,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "nl",
-      "description": "Onderteken een pdf in uw browser. Het document en uw ondertekensleutel blijven daar, en iedereen kan het getekende document achteraf controleren."
+      "description": "Onderteken een pdf in uw browser. De tekst van het document en uw ondertekensleutel blijven op uw apparaat. Iedereen kan de handtekening later controleren."
     },
     {
       "@type": "SoftwareApplication",
@@ -465,7 +465,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       "name": "Paramant",
       "legalName": "Paramantis Solutions B.V.",
       "url": "https://paramant.app/",
-      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
       "founder": {
         "@type": "Person",
         "name": "Mick Beer",
@@ -597,16 +597,15 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <section class="ds-step ds-anon" id="step-anon" hidden>
     <h2>Voor ondertekenen is een account nodig</h2>
     <p class="ds-sub">
-      Niet omdat het document ergens heen gaat. Dat gebeurt niet: het bestand en uw privésleutel
-      blijven in deze browser, en de relay ziet alleen een hash. Het account is nodig omdat
-      een Paramant-handtekening wordt gezet met een sleutel die hoort bij een passkey op uw apparaat,
-      en die sleutel moet eerst ergens zijn vastgelegd voordat hij kan tekenen.
+      Uw document gaat nergens heen: het bestand en uw privésleutel blijven in deze browser,
+      en de relay ziet alleen een hash. U heeft een account nodig omdat u tekent met een sleutel
+      die hoort bij een passkey op uw apparaat. Die sleutel moet eerst zijn vastgelegd voordat
+      hij kan tekenen.
     </p>
     <p class="ds-sub">
       <strong>Wat zonder account kan:</strong> een verzoek openen dat iemand u stuurde
       en tekenen met de link uit die e-mail, en
-      <a href="/verify">elk getekend document controleren</a> tegen het openbare logboek. Daarvoor
-      is geen account nodig.
+      <a href="/verify">elk getekend document controleren</a> tegen het openbare logboek.
     </p>
     <!-- .ds-btn was never defined in any stylesheet, so the one CTA a
          session-less visitor gets rendered as two lines of plain blue text.
@@ -725,7 +724,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       </dl>
     </div>
     <p class="ds-doc-error" id="ds-hash-only-note" role="alert" hidden></p>
-    <p class="ds-edit-hint">Dit bestandstype wordt via de hash bevestigd: geen voorbeeld, geen zichtbare bewerking. De volledige pdf-editor (+ Tekst, + Datum, markeringen, notities en paginabeheer) verschijnt als u een pdf kiest.</p>
+    <p class="ds-edit-hint">Bij dit bestandstype ondertekent u alleen de hash. U ziet geen voorbeeld en kunt niets zichtbaar bewerken. De volledige pdf-editor (+ Tekst, + Datum, markeringen, notities en paginabeheer) verschijnt als u een pdf kiest.</p>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-hash-only-back" type="button">Terug</button>
       <button class="btn btn-primary" id="ds-hash-only-continue" type="button" disabled>Verder</button>
@@ -735,7 +734,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 2.5: recipients (optional - if empty, this is a personal sign) -->
   <section class="ds-step" id="step-recipients" hidden>
     <h2>Medeondertekenaars toevoegen (optioneel)</h2>
-    <p class="ds-sub">Voeg iedereen toe die moet tekenen. De uitnodiging is gebonden aan precies het e-mailadres hieronder. Het versleutelde document gaat met het verzoek mee, dus niemand heeft een aparte kopie nodig. Alleen de sleutel die het opent mailen wij niet: die geeft u zelf door, op het volgende scherm.</p>
+    <p class="ds-sub">Voeg iedereen toe die moet tekenen. De uitnodiging is gebonden aan precies het e-mailadres hieronder. Het versleutelde document gaat met het verzoek mee, dus niemand heeft een aparte kopie nodig. Alleen de sleutel die het document opent, mailen wij niet mee. Die geeft u zelf door, op het volgende scherm.</p>
 
     <div class="ds-recipients-list" id="ds-recipients-list"></div>
 
@@ -745,7 +744,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
     <fieldset class="ds-delivery-card" id="ds-invite-delivery" hidden>
       <legend>Uitnodiging per e-mail</legend>
-      <p class="ds-usage-p">Paramant stuurt elke ontvanger een bericht met een link naar het verzoek. De ontvanger logt in met het uitgenodigde e-mailadres. Het bericht bevat niet de sleutel tot het document, want die e-mail gaat via een mailprovider in het buitenland. Op het volgende scherm krijgt u elke volledige link om zelf door te geven.</p>
+      <p class="ds-usage-p">Paramant stuurt elke ontvanger een bericht met een link naar het verzoek. De ontvanger logt in met het uitgenodigde e-mailadres. De sleutel van het document staat niet in het bericht, want die e-mail gaat via een mailprovider in het buitenland. Op het volgende scherm krijgt u de volledige links, die u zelf doorgeeft.</p>
       <div class="ds-delivery-fields" id="ds-delivery-fields">
         <label><span class="ds-label">Onderwerp van de e-mail</span><input class="ds-input" id="ds-invite-subject" maxlength="140"></label>
         <label><span class="ds-label">Bericht (optioneel)</span><textarea class="ds-input ds-textarea" id="ds-invite-message" maxlength="1000" placeholder="Voeg uitleg, een kenmerk of de gewenste termijn toe."></textarea></label>
@@ -822,12 +821,12 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 4: review + sign -->
   <section class="ds-step" id="step-sign" hidden>
     <h2>Controleren en ondertekenen</h2>
-    <p class="ds-sub">Dit gaat u ondertekenen. Controleer het document, uw handtekening en de gegevens. Klikt u op <strong>Dit document ondertekenen</strong>, dan bevestigt u met Face ID, Touch ID of uw beveiligingssleutel. Dat ontgrendelt uw ondertekensleutel voor dit ene document en de handtekening wordt op uw apparaat gemaakt.</p>
+    <p class="ds-sub">Dit is wat u gaat ondertekenen. Controleer het document, uw handtekening en de gegevens. Klikt u op <strong>Dit document ondertekenen</strong>, dan bevestigt u met Face ID, Touch ID of uw beveiligingssleutel. Dat ontgrendelt uw ondertekensleutel voor dit ene document en de handtekening wordt op uw apparaat gemaakt.</p>
 
     <div class="ds-review-grid">
       <div class="ds-review-col">
         <h3 class="ds-review-h">Voorbeeld van het document: zichtbare stempel</h3>
-        <p class="ds-review-cap">De stempel op het document is het zichtbare Paramant-zegel. Tijdens het plaatsen kunt u hem verslepen; dit is wat lezers zien.</p>
+        <p class="ds-review-cap">De stempel is het zichtbare Paramant-zegel. Zo zien lezers het document. Tijdens het plaatsen kunt u de stempel verslepen.</p>
         <div id="ds-review-doc-preview" class="ds-review-pane"></div>
       </div>
       <div class="ds-review-col">
@@ -920,9 +919,9 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
            -> mrz-unverified). Shown by sign-flow.js only for binding_mode
            'open'. -->
       <p class="ds-proof-scope" id="ds-proof-scope" hidden>
-        <strong>Ondertekenaar niet geverifieerd.</strong> Dit document is in open modus ondertekend,
-        dus geen e-mailuitnodiging koppelde een persoon aan een plek. Het bewijs toont dat een bepaalde
-        sleutel precies dit document ondertekende, en dat het de sleutel is die in de envelop staat. Het
+        <strong>Ondertekenaar niet geverifieerd.</strong> Dit document is in open modus ondertekend.
+        Er was dus geen e-mailuitnodiging die een persoon aan een plek koppelde. Het bewijs toont dat een
+        bepaalde sleutel precies dit document ondertekende, en dat dit de sleutel uit de envelop is. Het
         toont niet wie die sleutel heeft. Wilt u een handtekening die aan een uitgenodigd e-mailadres
         gebonden is, gebruik dan <em>Handtekeningen vragen</em>.
       </p>
@@ -944,7 +943,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       <div class="done-actions">
         <button class="btn btn-primary done-primary" id="ds-dl-pdf" type="button" hidden>Getekende pdf downloaden</button>
         <button class="done-quiet" id="ds-dl-psign" type="button">Bewijsbestand bewaren</button>
-        <button class="done-quiet" id="ds-restart" type="button">Nog een ondertekenen</button>
+        <button class="done-quiet" id="ds-restart" type="button">Nog een document ondertekenen</button>
       </div>
 
       <!-- The invitations end screen has a different account to give: nothing
@@ -955,7 +954,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         <div class="done-details-body">
           <p>Het document werd in uw browser versleuteld voordat er iets van dit apparaat vertrok, en elke persoonlijke link bevat de sleutel van die ene persoon na de <code>#</code>, het deel van een link dat een browser nooit naar een server stuurt. Bij ons staan alleen bytes die wij niet kunnen lezen. Ook de sleutel bleef hier: de uitnodiging per e-mail bevat alleen een bericht, dus de mailprovider die hem bezorgt kan niet bij het document, en wij ook niet.</p>
           <p>Een link is gebonden aan het adres dat u opgaf, dus hij opent voor die ondertekenaar en niet voor iemand anders naar wie hij wordt doorgestuurd. Tekent de ontvanger, dan ontstaat de handtekening op diens eigen apparaat met een eigen sleutel (<code>ML-DSA-65</code>) en wordt die vastgelegd op onze relay en in het openbare <a href="/ct-log">CT-logboek</a>, zodat u later kunt aantonen dat het gebeurde en wanneer.</p>
-          <p>Er heeft nog niemand getekend. Dit scherm is het moment waarop de verzoeken zijn verstuurd.</p>
+          <p>Er heeft nog niemand getekend. Op dit moment zijn alleen de verzoeken verstuurd.</p>
         </div>
       </details>
 
@@ -1020,8 +1019,8 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 <script src="/nav.js?v=16" defer></script>
 <script src="/js/nav-auth.js?v=12" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
-<script src="/js/quota-upgrade.js?v=6" defer></script>
+<script src="/js/quota-upgrade.js?v=7" defer></script>
 <script src="/js/done-state.js?v=1" defer></script>
-<script type="module" src="/sign-flow.js?v=59"></script>
+<script type="module" src="/sign-flow.js?v=60"></script>
 </body>
 </html>

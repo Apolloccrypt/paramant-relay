@@ -22,7 +22,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     if (res.ok) {
       window.location = nlEn('/dashboard', '/en/dashboard');
     } else {
-      errorDiv.textContent = nlEn('Dit e-mailadres en deze back-upcode horen niet bij elkaar. Elke code werkt één keer, dus controleer of u er niet een gebruikt die al op is.', 'That email and backup code do not match. Each code works once, so check you are not reusing one you already used.');
+      errorDiv.textContent = nlEn('Dit e-mailadres en deze back-upcode horen niet bij elkaar. Elke code werkt één keer, dus controleer of u geen code gebruikt die al eerder is gebruikt.', 'That email and backup code do not match. Each code works once, so check you are not reusing one you already used.');
       errorDiv.classList.add('visible');
     }
   });

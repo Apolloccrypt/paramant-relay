@@ -232,10 +232,10 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
     <details class="done-details">
       <summary>Waarom dit veilig was</summary>
       <div class="done-details-body">
-        <p>Het openen gebeurde hier, in uw browser. Het bestand kwam verzegeld binnen en is geopend met de sleutel die in de link na de <code>#</code> stond. Dat deel van een link stuurt een browser nooit naar een server (<code>AES-256-GCM</code>).</p>
-        <p>Een link uit deze webapp opent één keer. Onze kopie is gewist zodra uw browser het bestand ophaalde, dus de link opent geen tweede keer.</p>
-        <p>De bestandsnaam reisde mee binnen het verzegelde bestand, niet ernaast. Ook die konden wij dus nooit lezen.</p>
-        <p id="done-pdf-note" hidden>De pagina's hierboven zijn door deze browser uit het bestand zelf getekend. Daarvoor is niets verstuurd, en er blijft niets van het document achter als u dit tabblad sluit.</p>
+        <p>Het openen gebeurde hier, in uw browser. Het bestand kwam verzegeld binnen (<code>AES-256-GCM</code>) en is geopend met de sleutel die in de link achter de <code>#</code> stond. Dat deel van een link stuurt een browser nooit naar een server.</p>
+        <p>Een link uit deze webapp werkt één keer. Onze kopie is gewist zodra uw browser het bestand ophaalde.</p>
+        <p>De bestandsnaam zat in het verzegelde bestand, niet ernaast. Ook die konden wij dus nooit lezen.</p>
+        <p id="done-pdf-note" hidden>Deze browser heeft de pagina's hierboven zelf uit het bestand opgebouwd. Daarvoor is niets verstuurd. Sluit u dit tabblad, dan blijft er niets van het document achter.</p>
       </div>
     </details>
   </div>
@@ -245,7 +245,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <div class="step" id="step-burned">
   <span class="burned-icon" style="margin-top:16px">&#x1F525;</span>
   <p class="burned-msg">Dit bestand is al gedownload en daarna gewist.</p>
-  <p class="burned-sub">Een link van Paramant is een eenmalige link. Na de download is het bestand voorgoed van onze server verwijderd.</p>
+  <p class="burned-sub">Een link van Paramant werkt maar één keer. Na de download is het bestand voorgoed van onze server verwijderd.</p>
   <a href="/dashboard" class="btn btn-outline" style="max-width:280px;margin:24px auto 0">Naar uw overzicht</a>
 </div>
 
