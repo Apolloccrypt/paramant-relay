@@ -30,6 +30,7 @@
 
 const crypto = require('crypto');
 const { isSsrfSafeUrl } = require('./ssrf-guard');
+const contentDisposition = require('./content-disposition');
 const { createParaSignStore } = require('./parasign-store');
 const envelopeMod = require('../envelope');   // pure helpers: signMessageBytes, partyEmailHash
 
@@ -557,7 +558,7 @@ async function getDocument(deps, id, token, rec) {
   const original = await store.getBlob(id);
   if (!original) return errRes(res, 404, 'document_gone', 'Document blob expired or unavailable.', J);
   const m = (await store.getMeta(id)) || {};
-  const fname = (m.original_filename || 'document.pdf').replace(/"/g, '') || 'document.pdf';
+  const fname = m.original_filename || 'document.pdf';
 
   // STAMP-WORKER. Bake a visible signature block + verification info into the
   // PDF server-side (lib/parasign-stamp.js via pdf-lib). The cryptographic
@@ -601,7 +602,7 @@ async function getDocument(deps, id, token, rec) {
   res.writeHead(200, {
     'Content-Type': 'application/pdf',
     'Content-Length': outPdf.length,
-    'Content-Disposition': `attachment; filename="${fname}"`,
+    'Content-Disposition': contentDisposition.attachment(fname, 'document.pdf'),
     'X-ParaSign-Stamped': stamped ? 'true' : 'false',
   });
   return res.end(outPdf);
@@ -717,10 +718,10 @@ async function getReceipt(deps, id, token, rec) {
   try { psign = buildEnvelopePsign({ env, meta: m, canonicalJSON, sigEngine, relayIdentity, publicOrigin: deps.publicOrigin }); }
   catch (e) { return errRes(res, 500, 'notary_sign_failed', e.message, J); }
 
-  const base = (m.original_filename || env.original_filename || 'document').replace(/\.pdf$/i, '').replace(/"/g, '');
+  const base = (m.original_filename || env.original_filename || 'document').replace(/\.pdf$/i, '') || 'document';
   res.writeHead(200, {
     'Content-Type': 'application/json',
-    'Content-Disposition': `attachment; filename="${base}.psign"`,
+    'Content-Disposition': contentDisposition.attachment(`${base}.psign`, 'document.psign'),
     'X-ParaSign-Receipt-Kind': 'full-psign',
   });
   return res.end(J(psign));
