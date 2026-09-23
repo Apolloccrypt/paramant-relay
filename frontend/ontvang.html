@@ -180,7 +180,7 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <!-- STEP 1: Generating keypair -->
 <div class="step active" id="step-keygen">
   <h1>Veilig ontvangen</h1>
-  <p class="sub">Uw browser maakt nu uw eigen sleutels. De geheime sleutel verlaat uw apparaat nooit. Lees daarna de controlecode voor aan de afzender, zo weet u allebei dat de verbinding klopt.</p>
+  <p class="sub">Uw browser maakt nu uw eigen sleutels. De geheime sleutel verlaat uw apparaat nooit. Daarna leest u de controlecode voor aan de afzender. Zo weet u allebei dat de verbinding klopt.</p>
 
   <div class="card">
     <div class="card-head"><div class="dot amber" id="keygen-dot"></div><div class="card-head-title" id="keygen-title">Sleutels worden gemaakt...</div></div>
@@ -194,7 +194,7 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <!-- STEP 2: Show fingerprint, wait for sender -->
 <div class="step" id="step-fingerprint">
   <h1>Uw controlecode</h1>
-  <p class="sub">Lees deze controlecode voor aan de afzender. Die bevestigt dat hij gelijk is aan de code op zijn scherm, pas dan wordt het bestand verzegeld. Zo kan niemand ertussen komen.</p>
+  <p class="sub">Lees deze code voor aan de afzender. Die controleert of het dezelfde code is als op zijn scherm. Pas daarna wordt het bestand verzegeld. Zo kan niemand ertussen komen.</p>
 
   <div class="card">
     <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title" id="fp-title">Wacht op bevestiging van de afzender...</div></div>
@@ -240,9 +240,9 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
     <details class="done-details">
       <summary>Waarom dit veilig was</summary>
       <div class="done-details-body">
-        <p>Uw browser maakte bij het openen van deze pagina een eigen sleutelpaar en hield de geheime helft hier, waar hij nog steeds is. De afzender verzegelde het bestand met de openbare helft voordat het zijn apparaat verliet. Wat onderweg was, kon dus alleen door u worden geopend (<code>ML-KEM-768</code> met <code>ECDH P-256</code> voor de sleuteluitwisseling, <code>AES-256-GCM</code> voor het bestand).</p>
-        <p>De controlecode die u samen voorlas, is ook aan deze kant berekend, uit uw eigen sleutels. Staat op beide schermen dezelfde code, dan heeft niemand onderweg een sleutel verwisseld.</p>
-        <p>Een verzending via deze webapp wordt één keer gelezen. Elk deel is bij ons gewist zodra uw browser het ophaalde, en komt niemand het ophalen, dan wordt onze kopie na afloop van de termijn ook vernietigd. Wat onze server onderweg meldde, staat hieronder.</p>
+        <p>Uw browser maakte bij het openen van deze pagina een eigen sleutelpaar. De geheime helft bleef op dit apparaat en staat er nog steeds. De afzender verzegelde het bestand met de openbare helft voordat het zijn apparaat verliet. Wat onderweg was, kon dus alleen u openen (<code>ML-KEM-768</code> met <code>ECDH P-256</code> voor de sleuteluitwisseling, <code>AES-256-GCM</code> voor het bestand).</p>
+        <p>De controlecode die u samen voorlas, is ook aan deze kant berekend uit uw eigen sleutels. Staat op beide schermen dezelfde code, dan heeft niemand onderweg een sleutel verwisseld.</p>
+        <p>Een verzending via deze webapp wordt één keer gelezen. Elk deel is bij ons gewist zodra uw browser het ophaalde. Haalt niemand het op, dan wordt onze kopie vernietigd als de termijn voorbij is. Wat onze server onderweg meldde, staat hieronder.</p>
         <pre id="burn-receipt" hidden></pre>
       </div>
     </details>

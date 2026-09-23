@@ -162,7 +162,7 @@ const T = {
     fileNofM: (i, n) => 'Bestand ' + i + '/' + n + ': ',
     encrypting: (done, total, i, n) => 'Verzegelen ' + done + '/' + total + ' MB (deel ' + i + '/' + n + ')...',
     uploading: (up, total) => 'Uploaden ' + up + '/' + total + ' MB...',
-    liveOnePerson: 'Samen, nu gaat naar één ontvanger, die achter het andere scherm. '
+    liveOnePerson: 'Bij ‘Samen, nu’ gaat het bestand naar één ontvanger: de persoon achter het andere scherm. '
       + 'Wilt u naar een lijst versturen, kies dan Later ophalen.',
     notifying: 'Ontvanger op de hoogte brengen...',
     filesOnWay: (n) => n + ' bestanden zijn onderweg',
@@ -178,9 +178,9 @@ const T = {
     linkTtl: (c, pr, ent) => 'Het verzegelde bestand wacht op onze server tot ' + c + ' bij Community, '
       + pr + ' bij Firm en ' + ent + ' bij Enterprise. Een link uit deze web app wordt na de eerste download gewist.',
     ttlNote: (d) => 'Als de link verloopt, vernietigen we het bestand, opgehaald of niet. '
-      + 'Uw abonnement houdt een link hooguit ' + d + ' vast. Een langere keuze wordt daartoe ingekort.',
+      + 'Met uw abonnement blijft een link hooguit ' + d + ' open. Kiest u langer, dan wordt dat ingekort.',
     noteLink: 'De ontvanger hoeft niet online te zijn: het bestand wacht. Eén link '
-      + 'draagt tot 5 MB. Vult u in voor wie het is, dan gaat het in delen, tot 25 MB.',
+      + 'kan tot 5 MB bevatten. Vult u in voor wie het is, dan gaat het in delen, tot 25 MB.',
     noteLive: 'De ontvanger moet online zijn terwijl u verstuurt. U controleert samen een '
       + 'korte controlecode. Tot 500 MB, en er wordt niets bewaard. '
       + 'Versturen naar een groep? Kies Later ophalen en vul in voor wie het is.',

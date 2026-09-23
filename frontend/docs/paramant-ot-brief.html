@@ -3,16 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Industriële OT-brief · Paramant</title>
+<title>OT-data veilig naar IT: brief voor de industrie · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<meta name="twitter:description" content="Gegevensoverdracht tussen OT en IT is een probleem van architectuur. Een relay die alleen in RAM werkt, in de DMZ. Geen VPN, geen blijvende opslag.">
-<meta name="twitter:title" content="Industriële OT-brief · Paramant">
+<meta name="twitter:description" content="Voor OT-beheerders: sensordata en firmware versleuteld van OT naar IT, via een doorgeefluik in uw DMZ. Geen VPN, geen blijvende opslag, met IEC 62443-matrix.">
+<meta name="twitter:title" content="OT-data veilig naar IT: brief voor de industrie · Paramant">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:image" content="https://paramant.app/og-image.png">
-<meta property="og:title" content="Industriële OT-brief · Paramant">
-<meta property="og:description" content="Gegevensoverdracht tussen OT en IT is een probleem van architectuur. Een relay die alleen in RAM werkt, in de DMZ. Geen VPN, geen blijvende opslag.">
+<meta property="og:title" content="OT-data veilig naar IT: brief voor de industrie · Paramant">
+<meta property="og:description" content="Voor OT-beheerders: sensordata en firmware versleuteld van OT naar IT, via een doorgeefluik in uw DMZ. Geen VPN, geen blijvende opslag, met IEC 62443-matrix.">
 <meta property="og:url" content="https://paramant.app/docs/paramant-ot-brief">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Paramant">
@@ -20,7 +20,7 @@
 <link rel="alternate" hreflang="nl" href="https://paramant.app/docs/paramant-ot-brief">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/docs/paramant-ot-brief">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/docs/paramant-ot-brief">
-<meta name="description" content="Gegevensoverdracht tussen OT en IT is een probleem van architectuur. Een relay die alleen in RAM werkt, in de DMZ. Geen VPN, geen blijvende opslag.">
+<meta name="description" content="Voor OT-beheerders: sensordata en firmware versleuteld van OT naar IT, via een doorgeefluik in uw DMZ. Geen VPN, geen blijvende opslag, met IEC 62443-matrix.">
 <style>
 :root {
   --doc-bg: #f4efe2; --doc-ink: #0a0a0a; --doc-ink-dim: #444; --doc-ink-ghost: #777;
@@ -154,7 +154,7 @@ footer {
       "@type": "WebPage",
       "@id": "https://paramant.app/docs/paramant-ot-brief#webpage",
       "url": "https://paramant.app/docs/paramant-ot-brief",
-      "name": "Industriële OT-brief · Paramant",
+      "name": "OT-data veilig naar IT: brief voor de industrie · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -162,7 +162,7 @@ footer {
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "nl",
-      "description": "Gegevensoverdracht tussen OT en IT is een probleem van architectuur. Een relay die alleen in RAM werkt, in de DMZ. Geen VPN, geen blijvende opslag."
+      "description": "Voor OT-beheerders: sensordata en firmware versleuteld van OT naar IT, via een doorgeefluik in uw DMZ. Geen VPN, geen blijvende opslag, met IEC 62443-matrix."
     },
     {
       "@type": "BreadcrumbList",
@@ -193,7 +193,7 @@ footer {
       "name": "Paramant",
       "legalName": "Paramantis Solutions B.V.",
       "url": "https://paramant.app/",
-      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
       "founder": {
         "@type": "Person",
         "name": "Mick Beer",
@@ -248,7 +248,7 @@ footer {
   <div>
     <h3>Wat de relay is</h3>
     <p>Een relay die alleen in RAM werkt, voor de zonegrens in de DMZ. Geen VPN. Geen aanpassing van het netwerk. Geen blijvende opslag. Sensordata komt versleuteld binnen en wordt na aflevering vernietigd. De relay is een doorgeefluik, geen server.</p>
-    <p>Te plaatsen op een Raspberry Pi 3B+ op veldniveau, of in uw bestaande DMZ op elke Linux-server.</p>
+    <p>U plaatst hem op een Raspberry Pi 3B+ op veldniveau, of op een Linux-server in uw bestaande DMZ.</p>
   </div>
   <div>
     <h3>Wat het niet is</h3>
@@ -400,7 +400,7 @@ Level 0  Physical process</div>
   <tr>
     <td class="sr-ref">SR 2.8</td>
     <td>Controleerbare gebeurtenissen</td>
-    <td>Openbaar Certificate Transparency-log op paramant.app/ct. Alleen aanvullen, knoeien wordt zichtbaar, door iedereen te controleren. Export naar SIEM wordt ondersteund (JSON + CSV). De hash van elke overdracht wordt gelogd.</td>
+    <td>Openbare Certificate Transparency-log op paramant.app/ct. Er kan alleen iets bij, knoeien valt op en iedereen kan het controleren. Export naar SIEM wordt ondersteund (JSON + CSV). De hash van elke overdracht wordt gelogd.</td>
     <td class="check-col">2–3</td>
   </tr>
   <tr>

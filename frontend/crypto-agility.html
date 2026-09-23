@@ -4,20 +4,20 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Crypto-agility · Paramant</title>
+<title>Crypto-agility: algoritmen wisselen zonder herbouw · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
-<meta property="og:title" content="Crypto-agility · Paramant">
+<meta property="og:title" content="Crypto-agility: algoritmen wisselen zonder herbouw · Paramant">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Algoritmen die u kunt wisselen zonder opnieuw te bouwen. De kenmerken staan in de header, niet in de code. NIST FIPS 203, 204, 205 en 206 meegeleverd.">
-<meta property="og:description" content="Algoritmen die u kunt wisselen zonder opnieuw te bouwen. De kenmerken staan in de header, niet in de code. NIST FIPS 203, 204, 205 en 206 meegeleverd.">
+<meta name="description" content="Algoritmen die u kunt wisselen zonder de software opnieuw te bouwen. Elk bestand noemt in zijn header welke algoritmen het gebruikt. NIST FIPS 203 tot en met 206.">
+<meta property="og:description" content="Algoritmen die u kunt wisselen zonder de software opnieuw te bouwen. Elk bestand noemt in zijn header welke algoritmen het gebruikt. NIST FIPS 203 tot en met 206.">
 <meta property="og:url" content="https://paramant.app/crypto-agility">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Crypto-agility · Paramant">
-<meta name="twitter:description" content="Algoritmen die u kunt wisselen zonder opnieuw te bouwen. De kenmerken staan in de header, niet in de code. NIST FIPS 203, 204, 205 en 206 meegeleverd.">
+<meta name="twitter:title" content="Crypto-agility: algoritmen wisselen zonder herbouw · Paramant">
+<meta name="twitter:description" content="Algoritmen die u kunt wisselen zonder de software opnieuw te bouwen. Elk bestand noemt in zijn header welke algoritmen het gebruikt. NIST FIPS 203 tot en met 206.">
 <link rel="canonical" href="https://paramant.app/crypto-agility">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/crypto-agility">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/crypto-agility">
@@ -176,7 +176,7 @@ section h2{display:flex;align-items:baseline;gap:11px}
       "@type": "WebPage",
       "@id": "https://paramant.app/crypto-agility#webpage",
       "url": "https://paramant.app/crypto-agility",
-      "name": "Crypto-agility · Paramant",
+      "name": "Crypto-agility: algoritmen wisselen zonder herbouw · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -184,7 +184,7 @@ section h2{display:flex;align-items:baseline;gap:11px}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "nl",
-      "description": "Algoritmen die u kunt wisselen zonder opnieuw te bouwen. De kenmerken staan in de header, niet in de code. NIST FIPS 203, 204, 205 en 206 meegeleverd."
+      "description": "Algoritmen die u kunt wisselen zonder de software opnieuw te bouwen. Elk bestand noemt in zijn header welke algoritmen het gebruikt. NIST FIPS 203 tot en met 206."
     },
     {
       "@type": "Organization",
@@ -192,7 +192,7 @@ section h2{display:flex;align-items:baseline;gap:11px}
       "name": "Paramant",
       "legalName": "Paramantis Solutions B.V.",
       "url": "https://paramant.app/",
-      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "description": "Documenten ondertekenen en bestanden versleuteld versturen, voor kantoren en praktijken in de EU. Nederlands bedrijf, servers in Duitsland.",
       "founder": {
         "@type": "Person",
         "name": "Mick Beer",
@@ -262,9 +262,9 @@ section h2{display:flex;align-items:baseline;gap:11px}
   <h1>Algoritmen die u kunt wisselen <em>zonder opnieuw te bouwen</em>.</h1>
   <p class="subtitle">
     De geschiedenis van de cryptografie is een geschiedenis van gebroken
-    algoritmen. Paramant is zo gebouwd dat de volgende doorbraak Paramant niet
-    breekt: de relay bevat de post-quantumalgoritmen van NIST en niets aan de
-    keuze staat vast in de code. Standaard laadt hij er twee, ML-KEM-768 en
+    algoritmen. Paramant is zo gebouwd dat een volgende doorbraak Paramant niet
+    breekt: de relay bevat de post-quantumalgoritmen van NIST, en de keuze
+    ligt niet vast in de code. Standaard laadt hij er twee, ML-KEM-768 en
     ML-DSA-65, en dat is wat <code>/v2/capabilities</code> vandaag teruggeeft.
   </p>
   <ul class="hero-stats">
@@ -296,8 +296,8 @@ section h2{display:flex;align-items:baseline;gap:11px}
     <pre style="background:var(--invert);color:var(--invert-ink);border:1px solid var(--ink-hair);padding:18px 22px;font-size:12px;overflow-x:auto;line-height:1.75;font-family:'IBM Plex Mono',ui-monospace,monospace">MAGIC    4 bytes   PQHB
 VERSION  1 byte    0x01
 KEM_ID   2 bytes   uint16 BE
-SIG_ID   2 bytes   uint16 BE (0x0000 = anonymous)
-FLAGS    1 byte    reserved for future features</pre>
+SIG_ID   2 bytes   uint16 BE (0x0000 = anoniem)
+FLAGS    1 byte    gereserveerd voor latere functies</pre>
     <p style="font-size:13px;color:var(--ink-dim);margin-top:14px;line-height:1.7">
       Daarna volgen velden van wisselende lengte met een lengteprefix:
       KEM-ciphertext, publieke sleutel van de afzender, optionele handtekening,
@@ -401,7 +401,7 @@ FLAGS    1 byte    reserved for future features</pre>
     </p>
 
     <div class="summary" style="margin-top:24px">
-      <p><strong>Totaal</strong>: 3 KEMs en 17 signature-algoritmen beschikbaar. De standaardmodus core laadt ML-KEM-768 en ML-DSA-65; de modus extended laadt ze allemaal.</p>
+      <p><strong>Totaal</strong>: 3 KEM's en 17 handtekeningalgoritmen beschikbaar. De standaardmodus core laadt ML-KEM-768 en ML-DSA-65; de modus extended laadt ze allemaal.</p>
     </div>
   </section>
 
