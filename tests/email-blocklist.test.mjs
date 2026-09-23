@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { normaliseer, parseLijst, pasToe, raaktUitzondering } from '../scripts/update-email-blocklist.mjs';
+import { normaliseer, parseLijst, pasToe, raaktUitzondering, verouderd } from '../scripts/update-email-blocklist.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const lijst = JSON.parse(fs.readFileSync(path.join(ROOT, 'deploy/email-blocklist.json'), 'utf8'));
@@ -137,17 +137,20 @@ test('elke externe bron staat in deploy/partners.json als actieve blocklist-bron
   assert.deepEqual(fout, [], `\n  ${fout.join('\n  ')}\n`);
 });
 
-// De wekelijkse workflow draait alleen op een schema. Stopt hij, dan merkt
-// niemand dat, behalve deze toets: na 30 dagen zonder verversing gaat elke
-// pull request rood (scripts/check-guards.mjs verwijst hiernaar).
-test('elke bron is in de laatste 30 dagen ververst', () => {
-  const grens = Date.now() - 30 * 86400000;
-  for (const c of Object.values(lijst.categorieen)) {
-    for (const b of c.bronnen || []) {
-      assert.ok(Date.parse(b.bijgewerkt_op) >= grens,
-        `${b.naam} is sinds ${b.bijgewerkt_op} niet ververst; draai de workflow email-blocklist of node scripts/update-email-blocklist.mjs --write`);
-    }
-  }
+// Een verouderde bron maakt een pull request NIET rood: een vergeten update mag
+// nooit een spoedfix of een deploy tegenhouden. Pull request-CI geeft een
+// ::warning::, alleen de wekelijkse workflow zelf gaat rood (--streng).
+test('een verouderde bron: waarschuwing in pull request-CI, rood alleen in de wekelijkse workflow', () => {
+  const data = structuredClone(lijst);
+  data.categorieen.wegwerp.bronnen[0].bijgewerkt_op = '2026-01-01';
+  const nu = Date.parse('2026-03-01');
+  assert.deepEqual(verouderd(data, 30, nu).map((o) => o.naam), ['disposable-email-domains']);
+  assert.deepEqual(verouderd(data, 90, nu), []);
+  const test_yml = fs.readFileSync(path.join(ROOT, '.github/workflows/test.yml'), 'utf8');
+  assert.match(test_yml, /update-email-blocklist\.mjs --leeftijd(?! --streng)/, 'test.yml waarschuwt niet over een verouderde lijst');
+  assert.ok(!/update-email-blocklist\.mjs --leeftijd --streng/.test(test_yml), 'test.yml mag niet rood gaan op de leeftijd van de lijst');
+  const wf = fs.readFileSync(path.join(ROOT, '.github/workflows/email-blocklist.yml'), 'utf8');
+  assert.match(wf, /--leeftijd --streng/, 'de wekelijkse workflow gaat niet rood op een verouderde lijst op main');
 });
 
 test('de wekelijkse update opent een pull request en merget niet', () => {

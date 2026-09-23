@@ -10,6 +10,11 @@
 //   node scripts/update-email-blocklist.mjs --write    schrijft het bestand
 //   node scripts/update-email-blocklist.mjs --check    exit 1 als het bestand achterloopt
 //   --bron <naam>=<bestand>                            lees een bron van schijf (tests, offline)
+//   --leeftijd [--streng] [--max-dagen 30]             hoe oud is elke bron? Zonder --streng
+//                                                      een ::warning:: en exit 0 (pull request-CI:
+//                                                      een vergeten update blokkeert nooit een
+//                                                      spoedfix); met --streng ::error:: en exit 1
+//                                                      (alleen de wekelijkse workflow)
 //
 // De wekelijkse workflow (.github/workflows/email-blocklist.yml) draait
 // --write en opent een pull request. Nooit automatisch mergen: een mens kijkt
@@ -74,6 +79,19 @@ export function pasToe(data, opgehaald, vandaag = new Date().toISOString().slice
   return verslag;
 }
 
+// Bronnen die langer dan maxDagen niet ververst zijn: [{ naam, bijgewerkt_op, dagen }].
+export function verouderd(data, maxDagen = 30, nu = Date.now()) {
+  const uit = [];
+  for (const c of Object.values(data.categorieen)) {
+    for (const b of c.bronnen || []) {
+      const t = Date.parse(b.bijgewerkt_op);
+      const dagen = Number.isNaN(t) ? Infinity : Math.floor((nu - t) / 86400000);
+      if (dagen > maxDagen) uit.push({ naam: b.naam, bijgewerkt_op: b.bijgewerkt_op, dagen });
+    }
+  }
+  return uit;
+}
+
 async function haalOp(bron) {
   const r = await fetch(bron.url, { signal: AbortSignal.timeout(30000) });
   if (!r.ok) throw new Error(`${bron.naam}: HTTP ${r.status} op ${bron.url}`);
@@ -114,6 +132,18 @@ async function main(argv) {
   });
   const ruw = fs.readFileSync(bestand, 'utf8');
   const data = JSON.parse(ruw);
+  if (argv.includes('--leeftijd')) {
+    const streng = argv.includes('--streng');
+    const mi = argv.indexOf('--max-dagen');
+    const max = mi >= 0 ? Number(argv[mi + 1]) : 30;
+    const oud = verouderd(data, max);
+    for (const o of oud) {
+      console.log(`::${streng ? 'error' : 'warning'}::deploy/email-blocklist.json: bron ${o.naam} is sinds ${o.bijgewerkt_op} niet ververst (${o.dagen} dagen). Draai de workflow email-blocklist of merge zijn pull request.`);
+    }
+    if (!oud.length) console.log(`email-blocklist: elke bron is jonger dan ${max} dagen`);
+    if (oud.length && streng) process.exit(1);
+    return;
+  }
   const opgehaald = {};
   for (const c of Object.values(data.categorieen)) {
     for (const bron of c.bronnen || []) {

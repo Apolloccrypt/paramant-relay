@@ -391,9 +391,18 @@ node --test tests/email-blocklist.test.mjs admin/test/email-policy.test.js
 
 The workflow `email-blocklist` does this every Monday and opens a pull request
 from `blocklist/update-<date>`. Never merge it without reading what came in.
-A pull request opened with `GITHUB_TOKEN` does not start the normal CI; close
-and reopen it to run the checks. If the weekly run stops, the test fails every
-pull request once the source is 30 days old.
+
+It pushes and opens the pull request with the repository secret
+`EMAIL_BLOCKLIST_PR_TOKEN` (a fine-grained token on this repository only, with
+write access to contents and pull requests), so the normal CI starts on it.
+Without that secret it falls back to `GITHUB_TOKEN`, says so as a warning, and
+GitHub does not start CI for that pull request: close and reopen it once.
+
+A stale list never blocks a pull request. When a source is older than 30 days,
+the CI of every pull request shows a warning (`node scripts/update-email-blocklist.mjs --leeftijd`),
+and only the weekly `email-blocklist` run goes red (`--leeftijd --streng` on
+the file in main). Red there means: an update pull request is waiting to be
+merged, or the fetch broke.
 
 To unblock one domain: add it to `uitzonderingen` with a reason. To block one:
 add it under `handmatig` in the right category with `reden`, `datum` and

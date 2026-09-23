@@ -324,7 +324,7 @@ export function findSilencers(workflows) {
 export const DECLARED = {
   'email-blocklist.yml#no-change-trigger': {
     why: 'the weekly update fetches an outside list and opens a pull request for a human to read. It is a schedule, not a gate; the gate on the list is tests/email-blocklist.test.mjs, which test.yml runs on every change.',
-    visible: 'tests/email-blocklist.test.mjs fails every pull request once a source has not been refreshed for 30 days, so a stopped weekly run turns the normal CI red',
+    visible: 'the weekly run itself goes red (--leeftijd --streng) when main still carries a source older than 30 days, and every pull request run of test.yml prints a ::warning:: annotation for it without blocking the merge',
   },
   'heartbeat.yml#no-change-trigger': {
     why: 'the hourly proof runs against production, so a pull request must not fire it. It is a schedule, not a gate.',

@@ -6,9 +6,17 @@ name: email-blocklist
 # rest) haalt het script eruit, en tests/email-blocklist.test.mjs faalt als er
 # toch een op de lijst komt; die toets draait hier voor de pull request er is.
 #
-# Een pull request die met GITHUB_TOKEN is geopend start zelf geen andere
-# workflows. Sluit en heropen hem, of push een lege commit, om de gewone CI te
-# laten draaien. Zie RUNBOOK.md, sectie E-mailbeleid.
+# Een pull request die met GITHUB_TOKEN is gepusht en geopend start zelf geen
+# andere workflows. Daarom pusht en opent deze workflow met het geheim
+# EMAIL_BLOCKLIST_PR_TOKEN (een fine-grained token op alleen deze repo:
+# contents en pull requests schrijven); dan draait de gewone CI vanzelf.
+# Ontbreekt dat geheim, dan valt hij terug op GITHUB_TOKEN, meldt dat als
+# ::warning::, en moet de pull request een keer gesloten en heropend worden.
+#
+# Rood gaat alleen deze workflow: als main een bron draagt die ouder is dan
+# 30 dagen (een update-PR die blijft liggen, of een run die stukgaat). In de
+# CI van een gewone pull request is dat alleen een waarschuwing, zodat een
+# vergeten update nooit een spoedfix blokkeert. Zie RUNBOOK.md, sectie 8.
 on:
   schedule:
     - cron: '23 4 * * 1'
@@ -29,6 +37,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ secrets.EMAIL_BLOCKLIST_PR_TOKEN || github.token }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
@@ -40,9 +50,13 @@ jobs:
         run: node --test tests/email-blocklist.test.mjs
       - name: Pull request openen als er iets veranderde
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.EMAIL_BLOCKLIST_PR_TOKEN || github.token }}
+          HEEFT_PR_TOKEN: ${{ secrets.EMAIL_BLOCKLIST_PR_TOKEN != '' }}
         run: |
           set -euo pipefail
+          if [ "$HEEFT_PR_TOKEN" != "true" ]; then
+            echo "::warning::EMAIL_BLOCKLIST_PR_TOKEN ontbreekt: de pull request start de CI niet vanzelf. Sluit en heropen hem (RUNBOOK.md, sectie 8)."
+          fi
           if git diff --quiet -- deploy/email-blocklist.json; then
             echo "Geen verandering."
             exit 0
@@ -67,3 +81,8 @@ jobs:
           else
             gh pr create --base main --head "$tak" --title "email-blocklist: bron bijgewerkt ($datum)" --body-file /tmp/pr-body.md
           fi
+      - name: Leeftijd van de lijst op main (rood als ouder dan 30 dagen)
+        run: |
+          set -euo pipefail
+          git show origin/main:deploy/email-blocklist.json > /tmp/blocklist-main.json
+          node scripts/update-email-blocklist.mjs --leeftijd --streng --bestand /tmp/blocklist-main.json
