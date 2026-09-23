@@ -66,6 +66,10 @@ Live production volumes (host paths, from `docker volume inspect`):
 
 ### Install on prod (not yet done — gated as a production action)
 
+Superseded: install the systemd timer from `deploy/systemd/` as described in
+`deploy/DEPLOY-3.1.md`, section "Daily backup (systemd timer)". The cron line
+below is kept for history; do not run both.
+
 ```
 # copy the script into place
 scp deploy/ops/backup-full-state.sh root@<prod>:/home/paramant/scripts/

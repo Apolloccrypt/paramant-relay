@@ -62,8 +62,10 @@ function runRestore(dir, args) {
   fs.mkdirSync(tmp);
   const key = path.join(dir, 'key.txt');
   fs.writeFileSync(key, '# public key: age1test\nAGE-SECRET-KEY-TEST\n');
+  const childEnv = { ...process.env, TMPDIR: tmp, KEYFILE: key, AGE_LOG: path.join(dir, 'age.log') };
+  childEnv.PATH = `${bin}${path.delimiter}${childEnv.PATH}`;
   const r = spawnSync('bash', [RESTORE, ...args], {
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, TMPDIR: tmp, KEYFILE: key, AGE_LOG: path.join(dir, 'age.log') },
+    env: childEnv,
     encoding: 'utf8',
   });
   return { ...r, tmp };
@@ -124,4 +126,94 @@ test('restore --extract-to refuses a directory that is not empty, and --confirm'
       assert.match(r2.stderr, /only goes with --inspect/);
     } finally { fs.rmSync(dir2, { recursive: true, force: true }); }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+// ── backup-full-state.sh ──────────────────────────────────────────────────────
+
+function runBackup(dir, args, env = {}) {
+  return spawnSync('bash', [BACKUP, ...args], {
+    env: { ...process.env, LOG: '/dev/null', ...env },
+    encoding: 'utf8',
+  });
+}
+
+test('backup --recipients: the server key plus every line of the recipients file', () => {
+  const dir = scratch('recip');
+  try {
+    const key = path.join(dir, 'key.txt');
+    fs.writeFileSync(key, '# created: 2026-09-23\n# public key: age1serverkey\nAGE-SECRET-KEY-X\n');
+    const rec = path.join(dir, 'recipients.txt');
+    fs.writeFileSync(rec, '# offline escrow key, on paper with the owner\nage1escrowkey\n\nage1secondoffline\n');
+    const r = runBackup(dir, ['--recipients'], { KEYFILE: key, RECIPIENTS_FILE: rec });
+    assert.equal(r.status, 0, r.stderr + r.stdout);
+    assert.match(r.stdout, /recipient: age1serverkey/);
+    assert.match(r.stdout, /recipient: age1escrowkey/);
+    assert.match(r.stdout, /recipient: age1secondoffline/);
+    assert.match(r.stdout, /recipients: 3/);
+    assert.doesNotMatch(r.stdout, /AGE-SECRET-KEY/);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('backup --recipients: one key only is allowed but warns about the missing escrow key', () => {
+  const dir = scratch('recip-one');
+  try {
+    const key = path.join(dir, 'key.txt');
+    fs.writeFileSync(key, '# public key: age1serverkey\nAGE-SECRET-KEY-X\n');
+    const r = runBackup(dir, ['--recipients'], { KEYFILE: key, RECIPIENTS_FILE: path.join(dir, 'none.txt') });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /recipients: 1/);
+    assert.match(r.stdout, /only one recipient/);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('backup --recipients: no key anywhere is a hard error', () => {
+  const dir = scratch('recip-none');
+  try {
+    const r = runBackup(dir, ['--recipients'], {
+      KEYFILE: path.join(dir, 'nokey.txt'), RECIPIENTS_FILE: path.join(dir, 'none.txt'),
+    });
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /no recipients/);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('backup --dry-run takes the host paths that exist and names the ones that do not', () => {
+  const dir = scratch('host');
+  try {
+    const relay = path.join(dir, 'relaydata');
+    fs.mkdirSync(relay);
+    fs.writeFileSync(path.join(relay, 'relay-identity.json'), '{}');
+    const envFile = path.join(dir, 'opt', '.env');
+    fs.mkdirSync(path.dirname(envFile), { recursive: true });
+    fs.writeFileSync(envFile, 'NAME=value\n');
+    const nginx = path.join(dir, 'etc', 'nginx');
+    fs.mkdirSync(path.join(nginx, 'sites-enabled'), { recursive: true });
+    fs.writeFileSync(path.join(nginx, 'sites-enabled', 'a.conf'), 'server {}\n');
+    const absent = path.join(dir, 'etc', 'caddy');
+    const out = path.join(dir, 'out');
+    const r = runBackup(dir, ['--dry-run'], {
+      PARAMANT_BACKUP_SOURCES: `main\t${relay}`,
+      REDIS_SRC_DIR: path.join(dir, 'noredis'),
+      PARAMANT_BACKUP_HOST_PATHS: `${envFile} ${nginx} ${absent}`,
+      DRYRUN_OUT: out,
+    });
+    assert.equal(r.status, 0, r.stderr + r.stdout);
+    assert.match(r.stdout, new RegExp(`host ${absent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: absent`));
+    const manifest = fs.readdirSync(out).find((f) => f.endsWith('MANIFEST.txt'));
+    const text = fs.readFileSync(path.join(out, manifest), 'utf8');
+    assert.match(text, new RegExp(`host${envFile.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'));
+    assert.match(text, /host\/.*etc\/nginx\/sites-enabled\/a\.conf$/m);
+    assert.match(text, /^relay\/main\/relay-identity\.json$|relay\/main\/relay-identity\.json$/m);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the systemd timer runs the backup daily at 03:30 UTC and catches up after downtime', () => {
+  const timer = fs.readFileSync(path.join(ROOT, 'deploy/systemd/paramant-backup.timer'), 'utf8');
+  const svc = fs.readFileSync(path.join(ROOT, 'deploy/systemd/paramant-backup.service'), 'utf8');
+  assert.match(timer, /^OnCalendar=\*-\*-\* 03:30:00 UTC$/m);
+  assert.match(timer, /^Persistent=true$/m);
+  assert.match(timer, /^Unit=paramant-backup\.service$/m);
+  assert.match(timer, /^WantedBy=timers\.target$/m);
+  assert.match(svc, /^Type=oneshot$/m);
+  assert.match(svc, /^ExecStart=.*\/opt\/paramant-relay\/deploy\/ops\/backup-full-state\.sh$/m);
 });

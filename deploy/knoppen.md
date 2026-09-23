@@ -2,10 +2,10 @@
 
 Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. Nergens anders.
 
-- **102 omgevingsvariabelen** die de relay en de admin lezen staan in
+- **119 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **182 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **184 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -196,6 +196,7 @@ overschrijven zonder de code aan te raken.
 | `PARAMANT_API_KEY` | `scripts/paramant-cra.sh`, `scripts/paramant-firmware.sh` en 5 meer | `$(python3 -c "import json; print(json.load(open('${CFG` | sleutel voor de losse sectorscripts |
 | `PARAMANT_APP` | `scripts/security/audit.sh` | `https://paramant.app` | welke site het beveiligingsauditscript meet |
 | `PARAMANT_BACKUP_DIR` | `deploy/deploy-3.1.sh` | `/home/paramant/backups` | waar de deploy zijn back-ups zet |
+| `PARAMANT_BACKUP_HOST_PATHS` | `deploy/ops/backup-full-state.sh` | `/opt/paramant-relay/.env /etc/nginx /etc/letsencrypt /etc/caddy /home/paramant/secrets` | welke hostpaden de volledige-staatback-up onder host/ meeneemt |
 | `PARAMANT_BACKUP_SOURCES` | `deploy/ops/backup-full-state.sh` | leeg | welke paden de volledige-staatback-up meeneemt |
 | `PARAMANT_CI_WAIT_SECONDS` | `deploy/deploy-3.1.sh` | `900` | hoe lang de deploy op een lopende CI wacht |
 | `PARAMANT_COMPOSE_DIR` | `deploy/deploy-3.1.sh` | `/opt/paramant-relay` | waar het compose-bestand op de server staat |
@@ -227,6 +228,7 @@ overschrijven zonder de code aan te raken.
 | `POSTURE_NPM` | `scripts/security/posture.sh` | `npm` | idem voor npm |
 | `POSTURE_OPENSSL` | `scripts/security/posture.sh` | `openssl` | idem voor openssl |
 | `PREV_HEAD` | `deploy/deploy-3.1.sh` | `$EXPECT_PROD_COMMIT` | de commit waar naar terug wordt gerold |
+| `RECIPIENTS_FILE` | `deploy/ops/backup-full-state.sh` | `/root/.config/paramant-backup/recipients.txt` | extra age-ontvangers (offline escrow-sleutel) naast de serversleutel |
 | `REDIS_CONTAINER` | `deploy/ops/backup-full-state.sh`, `deploy/ops/restore-full-state.sh` | `paramant-relay-redis` | welke container de back-up als Redis beschouwt |
 | `REDIS_SRC_DIR` | `deploy/ops/backup-full-state.sh` | leeg | waar de Redis-bestanden vandaan komen |
 | `REGISTRY` | `scripts/paramant-cra.sh` | `none` | containerregister in het CRA-script |

@@ -29,7 +29,8 @@ REDIS_CONTAINER="${REDIS_CONTAINER:-paramant-relay-redis}"
 
 FROM=""
 MODE="none"   # none | inspect | confirm
-EXTRACT_TO=
+EXTRACT_TO=""
+KEEP=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --from) FROM="$2"; shift 2 ;;
@@ -69,7 +70,7 @@ if [[ -n "$EXTRACT_TO" ]]; then
   chmod 700 "$EXTRACT_TO"
   WORK=$(cd "$EXTRACT_TO" && pwd)
   # On failure, do not leave a half-extracted secret tree behind either.
-  trap '[[ "${KEEP:-0}" == 1 ]] || rm -rf "$WORK"/paramant-full-*' EXIT
+  trap '[[ "$KEEP" == 1 ]] || rm -rf "$WORK"/paramant-full-*' EXIT
 else
   WORK=$(mktemp -d)
   trap 'rm -rf "$WORK"' EXIT

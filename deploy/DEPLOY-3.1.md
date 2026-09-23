@@ -997,6 +997,65 @@ line in `.env` and a recreate:
 Never set `BILLING_MODE=live` as the first step: that is exactly the deploy
 this brake exists to prevent.
 
+## Daily backup (systemd timer)
+
+`deploy/ops/backup-full-state.sh` used to run only inside a deploy (step 2).
+Between deploys nothing backed up the relay identities, the CT log or redis.
+`deploy/systemd/` has a oneshot service and a timer that run it every day at
+03:30 UTC. `Persistent=true` catches up a run the server missed while it was off.
+
+The bundle now also carries the host configuration, each only when present:
+`/opt/paramant-relay/.env`, `/etc/nginx`, `/etc/letsencrypt`, `/etc/caddy` and
+`/home/paramant/secrets`, under `host/` in the bundle. That makes the bundle
+the escrow of every production secret, so it is encrypted to more than one key.
+
+### Recipients: the server key and the offline escrow key
+
+The script encrypts to the public key in `/root/.config/paramant-backup/key.txt`
+(so a restore on this server works) plus every line of
+`/root/.config/paramant-backup/recipients.txt`, passed to `age -R`. The escrow
+key is made on an offline machine; only its public half goes to the server.
+
+```bash
+# offline machine, never networked while the key exists on it
+age-keygen -o escrow-key.txt          # prints "Public key: age1..."
+# print escrow-key.txt, store the paper with the owner, destroy the file
+
+# server, as root: add the PUBLIC key only
+install -d -m 700 /root/.config/paramant-backup
+echo 'age1...escrow-public-key...' >> /root/.config/paramant-backup/recipients.txt
+chmod 600 /root/.config/paramant-backup/recipients.txt
+
+# which keys will the next backup be encrypted to (writes nothing)
+bash /opt/paramant-relay/deploy/ops/backup-full-state.sh --recipients
+# expect: recipients: 2 (or more). "only one recipient" means no escrow key yet.
+```
+
+### Install the timer (server, as root)
+
+```bash
+cd /opt/paramant-relay
+install -m 644 deploy/systemd/paramant-backup.service /etc/systemd/system/
+install -m 644 deploy/systemd/paramant-backup.timer   /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now paramant-backup.timer
+systemctl list-timers paramant-backup.timer          # next run 03:30 UTC
+
+# first run by hand, then read what it wrote
+systemctl start paramant-backup.service
+journalctl -u paramant-backup.service -n 30 --no-pager
+# expect: "OK: N relay(s) + redis=1 + host=M, ... file(s), 2 recipient(s) -> ..."
+```
+
+If a cron line for the same script exists (`docs/ops/backup-restore-full.md`
+suggested one), remove it, or the backup runs twice a night. Whether the
+server has one is not known from the repo.
+
+The unit runs the script from the checkout, so a `git pull` in step 3 also
+updates what the timer runs. Restoring is `deploy/ops/restore-full-state.sh`;
+it restores relay data and redis, and lists the host configuration, which is
+put back by hand (see `RUNBOOK.md`, section Backup and restore).
+
 ## Step 8: rollback
 
 Trigger: any of the stop conditions in step 6, or clear breakage in the first
