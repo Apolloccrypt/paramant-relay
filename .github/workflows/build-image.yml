@@ -49,7 +49,7 @@ jobs:
       # paying for QEMU-emulated arm64. The multi-arch push stays in
       # docker-publish.yml. Build only, never push — this is a gate.
       - name: Build prod image (no push)
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ./relay
           file: ./relay/Dockerfile
@@ -93,7 +93,7 @@ jobs:
       # shares relay/lib/mail.js so one MAIL_PROVIDER decides for the whole
       # product. load: true because the next step runs what was built.
       - name: Build admin image (no push)
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: ./admin/Dockerfile
