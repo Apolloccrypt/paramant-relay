@@ -293,7 +293,7 @@ console.log('ui-truthfulness: the review findings on PR #337 stay fixed');
 // It states two things a page can be wrong about at real cost: what a signature
 // is worth, and what it costs. Both are pinned here, because the homepage is
 // the one page that repeats claims owned by another file.
-const home = read('frontend/index.html').replace(/<!--[\s\S]*?-->/g, '');
+const home = read('frontend/en/index.html').replace(/<!--[\s\S]*?-->/g, '');
 
 // 1. Same overclaim rule as sign.html. An open-mode signature commits to "key K
 // signed slot i of document D" and to nothing about who holds K, so the page
@@ -314,21 +314,40 @@ for (const m of home.matchAll(/[^.<>]*\bno account\b[^.<>]*/gi)) {
 // 3. Every price the homepage names must also stand on the pricing page. Two
 // pages quoting money is two places to be wrong; this makes the second one
 // follow the first instead of drifting away from it.
-const pricing = read('frontend/pricing.html');
+//
+// Since 23 September 2026 there are two pairs: the Dutch homepage and the Dutch
+// /pricing, which sell one offer (Community at 0, the kantoorplan at 29 euro),
+// and the English copies under /en/, which keep the full tier table. Each
+// homepage is held to its own pricing page. The Dutch pages write an amount as
+// "&euro;29" or as "29 euro", so both spellings count.
+const pricing = read('frontend/en/pricing.html');
+const pricingNl = read('frontend/pricing.html');
+const homeNl = read('frontend/index.html').replace(/<!--[\s\S]*?-->/g, '');
 // Matched on the WHOLE amount, not on a substring: an earlier version tested
 // pricing.includes('&euro;15'), which stayed green on a pricing page that only
 // ever said &euro;150. The digits must be followed by something that is not
 // another digit or a decimal separator.
-const homePrices = [...new Set([...home.matchAll(/&euro;([\d.,]+)/g)].map((m) => m[1]))];
-// Five: the three tier prices (0, 29, 299) and the two incl.-btw figures under
-// them. It was six while the Firm line also quoted a EUR 0.40 per-signature
-// rate; that rate was never charged and the line is gone, so the floor moved
-// down with it rather than the check being weakened for something else.
-assert.ok(homePrices.length >= 5, `expected the homepage to quote its tiers, found ${homePrices.length} prices`);
-const priceOnPricingPage = (amount) => new RegExp(`&euro;${amount.replace(/[.]/g, '\\.')}(?![\\d.,])`).test(pricing);
-const drifted = homePrices.filter((p) => !priceOnPricingPage(p));
+const pricesOf = (html) => [...new Set([
+  ...[...html.matchAll(/&euro;([\d.,]+)/g)].map((m) => m[1]),
+  ...[...html.matchAll(/(?<![\d.,])([\d]+(?:,\d\d)?) euro\b/g)].map((m) => m[1]),
+])];
+const onPage = (page) => (amount) => new RegExp(`(?:&euro;${amount.replace(/[.]/g, '\\.')}(?![\\d.,])|(?<![\\d.,])${amount} euro\\b)`).test(page);
+// English: five, the three tier prices (0, 29, 299) and the two incl.-btw
+// figures under them. It was six while the Firm line also quoted a EUR 0.40
+// per-signature rate; that rate was never charged and the line is gone, so the
+// floor moved down with it rather than the check being weakened for something
+// else. Dutch: the two amounts of the one offer, 0 and 29.
+const homePricesEn = pricesOf(home);
+assert.ok(homePricesEn.length >= 5, `expected the English homepage to quote its tiers, found ${homePricesEn.length} prices`);
+const homePrices = pricesOf(homeNl);
+assert.ok(homePrices.includes('0') && homePrices.includes('29'),
+  `expected the Dutch homepage to name Community at 0 and the kantoorplan at 29, found ${homePrices.join(', ')}`);
+const drifted = [
+  ...homePrices.filter((p) => !onPage(pricingNl)(p)).map((p) => `/ ${p} not on /pricing`),
+  ...homePricesEn.filter((p) => !onPage(pricing)(p)).map((p) => `/en ${p} not on /en/pricing`),
+];
 assert.deepEqual(drifted, [],
-  `these prices are on the homepage but not on /pricing: ${drifted.join(', ')}`);
+  `these prices are on a homepage but not on its pricing page: ${drifted.join(', ')}`);
 
 // ── The dashboard, which is the homepage for anyone who signed up ────────────
 // Mick's phone showed a badge reading "COMMUNITY PLAN" over a Start card, and
@@ -382,6 +401,10 @@ const wrongAlias = tierAliases.filter(([from, to]) => !new RegExp(`${from}:\\s*'
 assert.deepEqual(wrongAlias.map(([f, t]) => `${f}->${t}`), [],
   'dashboard.js must fold the same plan aliases normalisePlan does');
 
+// The dashboard is English and names every plan an account can hold, Business
+// and Enterprise included. The Dutch /pricing sells one offer and sends the rest
+// to Mick; the English /pricing still carries every card, so that is the page
+// the names are held to.
 const unsold = [...new Set(planNames)].filter((name) => !new RegExp(`>\\s*${name}\\s*<`).test(pricing));
 assert.deepEqual(unsold, [],
   `the dashboard shows these plan names, but /pricing does not sell them: ${unsold.join(', ')}`);
@@ -462,9 +485,11 @@ assert.doesNotMatch(hero, /data-dh="email"/,
 // because the pricing page disagreed, and the fix was to rename the tier rather
 // than to keep explaining it away.
 assert.ok(/<div class="tier-name">Community<\/div>/.test(pricing),
-  '/pricing must name its free tiers Community');
+  '/en/pricing must name its free tiers Community');
 assert.doesNotMatch(pricing, /<div class="tier-name">Free<\/div>/,
-  '/pricing must not have a tier named Free any more');
+  '/en/pricing must not have a tier named Free any more');
+assert.ok(/<p class="offer-kicker">Community<\/p>/.test(pricingNl),
+  '/pricing must name the free half Community, in its own block next to the offer');
 for (const [label, html] of [
   ['index.html', home],
   ['dashboard.html', read('frontend/dashboard.html')],
@@ -539,7 +564,7 @@ if (ruleNumbers.length) {
 // past: swapping "privacy and security researcher" for "award winning
 // cryptographer" deletes the very string the check looks for and it stays
 // green. Pinned in BOTH directions now.
-const about = read('frontend/about.html');
+const about = read('frontend/en/about.html');
 const flatten = (html) => html
   .replace(/<!--[\s\S]*?-->/g, ' ')
   .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
@@ -562,9 +587,9 @@ const ABOUT_WORDS = new Set(aboutText.toLowerCase().match(/[a-z]+/g) || []);
 // but /about; on the homepage exactly one place keeps them, the signature under
 // the letter, which is checked as a block further down. So index is the only
 // page still required to name him, and no other page may be forced to.
-const FOUNDER_REQUIRED = ['index'];
+const FOUNDER_REQUIRED = ['en/index'];
 // Pages that MAY name him. If they do, the same rules apply.
-const FOUNDER_OPTIONAL = ['pricing', 'parasign', 'dashboard', 'account'];
+const FOUNDER_OPTIONAL = ['en/pricing', 'parasign', 'dashboard', 'account'];
 for (const slug of [...FOUNDER_REQUIRED, ...FOUNDER_OPTIONAL]) {
   const text = flatten(read(`frontend/${slug}.html`));
   if (FOUNDER_REQUIRED.includes(slug)) {
@@ -766,9 +791,9 @@ console.log('ui-truthfulness: the account page resolves plans from the same sour
 // four meta tags. A pin that a meta description can satisfy pins nothing.
 const docsHtml = read('frontend/docs.html');
 const helpHtml = read('frontend/help/index.html');
-const securityHtml = read('frontend/security.html');
+const securityHtml = read('frontend/en/security.html');
 const developerHtml = read('frontend/developer.html');
-const homeGrid = read('frontend/index.html');
+const homeGrid = read('frontend/en/index.html');
 // Everything below </head>: the page a visitor reads, meta tags excluded. The
 // sales-voice and key-location gates below run against this, not against the
 // three answers alone, so a slogan cannot slip back in through the lede, an
@@ -941,10 +966,10 @@ const visible = (file) => visible0(read(file));
 const { default: tiers } = await import('../relay/lib/tiers.js');
 const parasign = visible('frontend/parasign.html');
 const parasend = visible('frontend/parasend.html');
-const aboutVisible = visible('frontend/about.html');
+const aboutVisible = visible('frontend/en/about.html');
 // pricingVisible above is the same page as markup; this is its plain text.
-const pricingText = visible('frontend/pricing.html');
-const security = visible('frontend/security.html');
+const pricingText = visible('frontend/en/pricing.html');
+const security = visible('frontend/en/security.html');
 const signVisibleText = visible('frontend/sign.html');
 
 // Proof 1. The EU claim is about the data path, not the whole chain, and the
@@ -954,7 +979,7 @@ const EU_CLAIM = 'Hetzner Germany, Bunny DNS (Slovenia). No US provider in the d
 // Geen uitzondering meer, maar wel een feit dat op elke pagina hetzelfde moet
 // luiden: mail verhuisde in september 2026 van Resend (VS) naar Mailjet (FR).
 const EU_EXCEPTION = 'Email goes out via Mailjet';
-const homeVisible = visible('frontend/index.html');
+const homeVisible = visible('frontend/en/index.html');
 for (const [name, text] of [['index', homeVisible], ['parasign', parasign], ['parasend', parasend]]) {
   assert.ok(text.includes(EU_CLAIM), `${name}.html lost the data-path wording of the EU claim`);
   assert.ok(text.includes(EU_EXCEPTION), `${name}.html states the EU claim without naming the Resend exception`);
@@ -964,7 +989,7 @@ for (const [name, text] of [['index', homeVisible], ['parasign', parasign], ['pa
 // jurisdiction, the CLOUD Act row, retention, IP logging and analytics. Bunny is
 // not in it, and DNS is not a row. A page that names Bunny and then sends the
 // reader to that table has offered a checkpoint that fails when checked.
-const securityJurisdiction = (read('frontend/security.html')
+const securityJurisdiction = (read('frontend/en/security.html')
   .match(/<h2[^>]*>Jurisdiction[\s\S]*?<\/table>/) || [''])[0];
 assert.ok(securityJurisdiction, 'security.html must keep its Jurisdiction and privacy table');
 assert.ok(!/Bunny/i.test(securityJurisdiction),
@@ -1000,18 +1025,12 @@ assert.ok(security.includes('No US provider in the data path'),
 // data-path line is proof 1 in its own words with the Resend exception beside
 // it. The row in docs/site-claims.md records the external half as UNCOVERED,
 // which is the same footing the competitor facts on /vs stand on.
-// 5 September, Mick: the band now carries a Dutch tile instead of the English
-// ownership line. The proverb is the eye-catcher and claims nothing; the line
-// under it is the checkable half and is the same server location /privacy,
-// /security and the DPA name. One Dutch sentence on an English page is his
-// choice, not a slip, and this is not a translation round: no other page moved.
-const bandSay = (read('frontend/index.html').match(/<span class="hp-band-say">([\s\S]*?)<\/span>/) || [, ''])[1];
-const bandSub = (read('frontend/index.html').match(/<span class="hp-band-sub">([\s\S]*?)<\/span>/) || [, ''])[1];
-assert.equal(bandSay, 'Beter een goede buur dan een verre vriend.',
-  'index.html: the band tile is the one line above the fold that carries the tone; change it deliberately, and update tests/first-screen with it');
-assert.equal(bandSub, 'Onze servers staan in Neurenberg.',
-  'index.html: the line under the tile is the checkable half and must keep naming the city /privacy and the DPA name');
-const whyNl = visible0((read('frontend/index.html').match(/<section class="hp-sec why-nl-sec"[\s\S]*?<\/section>/) || [''])[0]);
+// 23 September, Mick: the band at the top of the homepage is gone, the Dutch
+// tile and the Neurenberg line with it. The server location stays where it is
+// checkable: /privacy, /security and the DPA, pinned elsewhere in this file.
+assert.doesNotMatch(read('frontend/en/index.html'), /hp-band|goede buur/,
+  'index.html: the band was taken off the homepage on purpose; bring it back deliberately, not by accident');
+const whyNl = visible0((read('frontend/en/index.html').match(/<section class="hp-sec why-nl-sec"[\s\S]*?<\/section>/) || [''])[0]);
 assert.ok(whyNl, 'index.html must keep the "Why Dutch matters" section');
 for (const claim of [
   // The ownership facts. Sourced on the page, not in the code, so the wording is
@@ -1019,8 +1038,11 @@ for (const claim of [
   'The parent of WeTransfer has been Bending Spoons in Milan since July 2024.',
   'Zivver has been part of Kiteworks in California since June 2025.',
   'Signhost went to Entrust in 2022, SignRequest to Box in 2021, and QuoVadis is on the Dutch trust list today as DigiCert Europe Netherlands.',
-  // Who owns Paramant. The number is the one every other page carries.
-  'Paramantis Solutions B.V., Harderwijk, KvK 42115132, with no parent company anywhere else.',
+  // Who owns Paramant. The number is the one every other page carries. It said
+  // "with no parent company anywhere else" until 23 September 2026, which was
+  // a half truth: there is a parent, Paramantis Digital B.V., and it is Dutch.
+  // paramantis.nl names it as the holding of the group, with its KvK number.
+  'Paramantis Solutions B.V., Harderwijk, KvK 42115132. Its parent is Paramantis Digital B.V., also Dutch, KvK 42114664. There is no parent company abroad.',
   'Dutch law governs the terms you agree to, and a Dutch court hears the dispute.',
   // Proof 1, in this section\u2019s own words, with the exception in the same breath.
   'No US provider is in the data path.',
@@ -1030,6 +1052,8 @@ for (const claim of [
 ]) {
   assert.ok(whyNl.includes(claim), `index.html: "Why Dutch matters" lost the line: ${claim}`);
 }
+assert.ok(/The parent of Paramant is named on paramantis\.nl, checked 23 September 2026\./.test(whyNl),
+  'index.html: the parent company is an external fact too, so its source and check date travel with it');
 assert.ok(/Ownership sources: .*Checked 3 September 2026\./.test(whyNl),
   'index.html: the ownership facts are external, so the sources line and its check date must stay with them');
 // terms.html \u00a713 is what "Dutch law governs the terms" points at.
@@ -1040,11 +1064,11 @@ assert.match(read('frontend/terms.html'), /Dutch law applies\. Disputes go to th
 // /security carries the same claim once, above the table where it is checked.
 // It deliberately avoids the exact "No US provider in the data path" wording, so
 // the window check above still measures the two occurrences it was written for.
-assert.match(read('frontend/security.html'), /A Dutch company owns this: Paramantis Solutions B\.V\. in Harderwijk, KvK 42115132\./,
+assert.match(read('frontend/en/security.html'), /A Dutch company owns this: Paramantis Solutions B\.V\. in Harderwijk, KvK 42115132\./,
   'security.html must name the owner above the jurisdiction table');
 // /pricing: who takes the money is part of the same answer. Mollie B.V. is the
 // Netherlands row in the /dpa sub-processor table, so this is not a new claim.
-const pricingPay = read('frontend/pricing.html');
+const pricingPay = read('frontend/en/pricing.html');
 assert.match(pricingPay, /You pay a Dutch company, in euros, through a Dutch payment provider \(Mollie\)\./,
   'pricing.html must say who is paid and where they sit, in the payment paragraph');
 assert.match(read('frontend/dpa.html'), /<td>Mollie B\.V\.<\/td><td>Netherlands \(EU\)<\/td>/,
@@ -1231,7 +1255,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // the sentences the buyer-facing copy on /about and /security now rests on.
   // Every one of them was already on a page before this file pinned it; nothing
   // here was written for marketing.
-  const securityRaw = read('frontend/security.html');
+  const securityRaw = read('frontend/en/security.html');
   const trustRaw = read('frontend/trust.html');
 
   // The founder. Name and title are the only ones the site can support, so they
@@ -1890,7 +1914,7 @@ console.log('ui-truthfulness: no page bills for something billing-catalog.js can
     'a bare parasign=pro grant still moves nothing on ParaSend; that is what makes this gate necessary');
 
   const TRANSFER_FIGURE = /([\d][\d,]*)\s*(?:ParaSend\s+)?transfers/i;
-  const pricingHtml = read('frontend/pricing.html');
+  const pricingHtml = read('frontend/en/pricing.html');
   const between = (src, a, b) => src.slice(src.indexOf(a), b ? src.indexOf(b) : undefined);
   const dashJs = read('frontend/js/dashboard.js');
   const quotaJs = read('frontend/js/quota-upgrade.js');
@@ -2078,12 +2102,12 @@ console.log('ui-truthfulness: the rules page is Our rules on /rules, with /parar
   assert.doesNotMatch(themeJs, /fetch\(|XMLHttpRequest|navigator\.sendBeacon/,
     'theme.js must not send the choice anywhere; /account and /privacy both say it stays in the browser');
 
-  assert.match(account, /Dark is the default and it stays dark until you change it here/,
-    '/account must say that the night is the default, because app-2026.css makes it so');
+  assert.match(account, /Light is the default and it stays light until you change it here/,
+    '/account must say that light is the default, because app-2026.css makes it so');
   assert.match(account, /kept in this\s+browser only/,
     '/account must say the choice never leaves the browser');
-  assert.match(account, /The public pages stay dark\./,
-    '/account promises the marketing pages stay on the night; tests/app-theme.test.mjs measures that');
+  assert.match(account, /The public pages stay light\./,
+    '/account promises the marketing pages stay light; tests/app-theme.test.mjs measures that');
 })();
 
 console.log('ui-truthfulness: the appearance switch says only what theme.js and app-2026.css do');

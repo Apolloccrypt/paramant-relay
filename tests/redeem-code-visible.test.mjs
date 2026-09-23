@@ -128,7 +128,8 @@ for (const slug of ['/pricing', '/account']) {
     assert.ok(button, `${slug} has no submit button inside the redeem form`);
     // The claim that made this field allowed on a page about prices.
     const text = await page.textContent('[data-redeem-form]');
-    assert.match(text, /nothing is charged, now or later/i,
+    // /pricing is Dutch since 23 September 2026 and says it in Dutch.
+    assert.match(text, slug === '/pricing' ? /er wordt niets afgeschreven, nu niet en later niet/i : /nothing is charged, now or later/i,
       `${slug}: the field must say a code charges nothing, which is what the relay does`);
     await page.close();
   });

@@ -136,11 +136,14 @@
     return null;
   }
 
+  // /pricing is Dutch since 23 September 2026, /en/pricing is the English copy.
+  var NL = document.documentElement.lang === 'nl';
+
   Array.prototype.forEach.call(buttons, function (btn) {
     btn.addEventListener('click', function (ev) {
       ev.preventDefault();
       var orig = btn.textContent;
-      btn.textContent = 'One moment...';
+      btn.textContent = NL ? 'Even geduld...' : 'One moment...';
       btn.setAttribute('aria-busy', 'true');
       checkout(btn).then(function (url) {
         window.location.href = url;
@@ -164,8 +167,10 @@
           window.location.href = '/auth/login?next=' + encodeURIComponent(location.pathname + location.search);
           return;
         }
-        showError(btn, 'Could not start checkout. Nothing has been charged. ' +
-          'Please try again, or mail privacy@paramant.app and we will sort it out.');
+        showError(btn, NL
+          ? 'Afrekenen lukte niet. Er is niets afgeschreven. Probeer het opnieuw, of mail privacy@paramant.app, dan lossen we het op.'
+          : 'Could not start checkout. Nothing has been charged. ' +
+            'Please try again, or mail privacy@paramant.app and we will sort it out.');
       });
     });
   });
@@ -181,7 +186,7 @@
       var note = document.createElement('div');
       note.setAttribute('role', 'status');
       note.style.cssText = 'margin-top:.6rem;font-size:.85rem;color:#334155';
-      note.textContent = 'Picking up where you left off.';
+      note.textContent = NL ? 'We gaan verder waar u was.' : 'Picking up where you left off.';
       if (target.parentNode) target.parentNode.insertBefore(note, target.nextSibling);
       target.click();
     }

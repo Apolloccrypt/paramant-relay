@@ -1,8 +1,8 @@
 /* relay-pulse.css  ·  site-wide "relay signal"
  *
- * One ochre pulse glides across the very top edge of every page on a slow loop:
- * the signal passing through the relay, tying the whole site together. It is the
- * connective motif that echoes the lime beats in the homepage panel animations.
+ * One accent pulse glides once across the very top edge of a page when it
+ * loads: the signal passing through the relay. Once, not on a loop: motion
+ * that never stops is decoration a reader cannot switch off.
  *
  * Self-contained on purpose: nav.css and design-system.css are NOT touched. The
  * effect lives entirely on body::after, is fixed + 2px tall + pointer-events:none
@@ -13,7 +13,7 @@
 :root {
   --rp-lime: var(--ochre, #D9A441);   /* the one accent */
   --rp-width: 280px;    /* length of the travelling pulse */
-  --rp-period: 7s;      /* one pulse every N seconds */
+  --rp-period: 1.2s;    /* the one pass */
   --rp-thickness: 2px;
 }
 
@@ -27,21 +27,20 @@ body::after {
   z-index: 100;
   pointer-events: none;
   background: linear-gradient(90deg,
-    rgba(217, 164, 65, 0) 0%,
+    rgba(29, 78, 216, 0) 0%,
     var(--rp-lime) 50%,
-    rgba(217, 164, 65, 0) 100%);
+    rgba(29, 78, 216, 0) 100%);
   transform: translateX(-320px);
-  animation: relay-pulse var(--rp-period) ease-in-out 0.5s infinite;
-  will-change: transform, opacity;
+  opacity: 0;
+  animation: relay-pulse var(--rp-period) ease-in-out 0.5s 1 both;
 }
 
-/* travel left -> right across the viewport, then rest off-screen until the next
-   beat. translateX(100vw) clears the right edge on any width; the gap between
-   16% and 100% is the quiet interval. */
+/* travel left -> right across the viewport once and fade out at the right
+   edge. translateX(100vw) clears the right edge on any width. */
 @keyframes relay-pulse {
-  0%        { transform: translateX(-320px); opacity: 1; }
-  16%       { transform: translateX(100vw);  opacity: 1; }
-  17%, 100% { transform: translateX(100vw);  opacity: 0; }
+  0%   { transform: translateX(-320px); opacity: 1; }
+  95%  { transform: translateX(100vw);  opacity: 1; }
+  100% { transform: translateX(100vw);  opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

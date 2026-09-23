@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ParaSend &middot; Encrypted file transfer by Paramant</title>
 <meta property="og:site_name" content="Paramant">
@@ -21,11 +21,11 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#15191C">
+<meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=28">
-<link rel="stylesheet" href="/nav.css?v=24">
-<link rel="stylesheet" href="/relay-pulse.css?v=4">
+<link rel="stylesheet" href="/design-system.css?v=30">
+<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 .ps-hero{padding:var(--space-10) 0 var(--space-6)}
 .ps-band{padding:var(--space-8) 0;border-top:1px solid var(--ink-hair)}
@@ -204,6 +204,7 @@
   <a href="/auth/login" class="nav-tail-btn">Sign in</a>
   <a href="/help" class="nav-tail-link">Help</a>
 </div>
+<main>
 
 <!-- HERO: what you can do here, who it is for, and one action. The buyer meets
      a promise in plain words first; the algorithm names live in section 06. -->
@@ -325,6 +326,7 @@
           <li>5 MB per file over a one-time link, on every plan</li>
           <li>1 hour link expiry</li>
           <li>Burn on first read</li>
+          <li>One recipient per send</li>
           <li>Up to 50 retrievals an hour through the API</li>
           <li>Up to 5 registered devices for the ParaSend web app</li>
         </ul>
@@ -343,6 +345,7 @@
           <li>500 transfers a month</li>
           <li>24 hour link expiry</li>
           <li>Up to 10 reads per link through the API</li>
+          <li>Up to 30 recipients per send, each with their own one-time link</li>
           <li>Up to 500 retrievals an hour through the API</li>
           <li>Up to 50 registered devices</li>
           <li>Send history and link management</li>
@@ -432,6 +435,7 @@
   </div>
 </section>
 
+</main>
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
@@ -462,6 +466,6 @@
 </footer>
 
 <script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=9" defer></script>
+<script src="/js/nav-auth.js?v=10" defer></script>
 </body>
 </html>

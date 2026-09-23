@@ -152,10 +152,11 @@ ORG = {
     "knowsLanguage": ["nl", "en"]}
 
 
-# The one page written in Dutch. Everything else on the site is English, and
-# inLanguage was hardcoded to match; a Dutch page carrying inLanguage "en" is a
-# small lie in the one block that exists to be machine-read.
-DUTCH = {"gereedschap"}
+# The pages written in Dutch. /gereedschap was the first; since 23 September
+# 2026 the homepage, /pricing, /about and /security are Dutch as well, with the
+# English text under /en/. inLanguage follows the page; a Dutch page carrying
+# inLanguage "en" is a small lie in the one block that exists to be machine-read.
+DUTCH = {"gereedschap", "index", "pricing", "about", "security"}
 
 
 def graph_for(slug, title, desc):
@@ -215,7 +216,7 @@ def graph_for(slug, title, desc):
             "url": ORIGIN + "/",
             "name": "Paramant",
             "publisher": {"@id": f"{ORIGIN}/#organization"},
-            "inLanguage": "en"})
+            "inLanguage": ["nl", "en"]})
 
     return {"@context": "https://schema.org", "@graph": nodes}
 

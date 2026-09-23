@@ -413,16 +413,36 @@ test('every public page names the company and the founder in its Organization no
 // The title is pinned as well as the description. A title is the one sentence
 // that gets shared, and the gate above only pins the copies to each other: all
 // four saying the same false thing passed it.
+// Since 23 September 2026 /, /pricing, /about and /security are Dutch, and the
+// English text they carried before lives on under /en/ with its pins intact.
+// The Dutch sentences are pinned the same way: the homepage says the headline
+// Mick chose ("Patiëntdossiers en processtukken veilig versturen en laten
+// tekenen") and the company behind it; /pricing names the one offer, the
+// kantoorplan at 29 euro excl. btw, which is frontend/pricing.html and the
+// catalog behind it (tests/site-claims.test.mjs block 42); /about names the
+// founder and his title in Dutch.
 const PINNED = {
   index: {
+    title: 'Paramant · veilig versturen en laten tekenen',
+    desc: 'Patiëntdossiers en processtukken veilig versturen en laten tekenen, vanuit uw browser. Van Paramantis Solutions B.V. in Harderwijk.',
+  },
+  pricing: {
+    title: 'Prijzen · Voor uw kantoor 29 euro per maand · Paramant',
+    desc: 'Het Community-plan is gratis, voor altijd. Voor uw kantoor: versturen en ondertekenen samen, 29 euro per maand excl. btw. Van Paramantis Solutions B.V.',
+  },
+  about: {
+    title: 'Over Paramant · Opgericht door Mick Beer',
+    desc: 'Paramant is een product van Paramantis Solutions B.V. in Harderwijk, opgericht door Mick Beer, privacy- en securityonderzoeker.',
+  },
+  'en/index': {
     title: 'ParaSign by Paramant · sign and send documents in the EU',
     desc: 'Get documents signed and send files safely, straight from your browser. Built and hosted in the EU by Paramantis Solutions B.V. The Community plan is free, forever.',
   },
-  pricing: {
+  'en/pricing': {
     title: 'Pricing · What is free, and what businesses pay · Paramant',
     desc: 'The Community plan is free, forever. Organisations pay for higher limits: signing and sending on Firm, 29 euro a month excl. btw. From Paramantis Solutions B.V.',
   },
-  about: {
+  'en/about': {
     title: 'About Paramant · Founded by Mick Beer',
     desc: 'Paramant is a product of Paramantis Solutions B.V. in Harderwijk, founded by Mick Beer, privacy and security researcher. Company, mission, and how to check us.',
   },

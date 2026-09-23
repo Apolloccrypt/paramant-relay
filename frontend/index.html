@@ -1,37 +1,83 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}html{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#FAF8F3;color:#0C1B2A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#15191C">
-<title>ParaSign by Paramant &middot; sign and send documents in the EU</title>
+<meta name="theme-color" content="#0B3A6A">
+<title>Paramant &middot; veilig versturen en laten tekenen</title>
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Get documents signed and send files safely, straight from your browser. Built and hosted in the EU by Paramantis Solutions B.V. The Community plan is free, forever.">
-<meta property="og:title" content="ParaSign by Paramant &middot; sign and send documents in the EU">
-<meta property="og:description" content="Get documents signed and send files safely, straight from your browser. Built and hosted in the EU by Paramantis Solutions B.V. The Community plan is free, forever.">
+<meta name="description" content="Patiëntdossiers en processtukken veilig versturen en laten tekenen, vanuit uw browser. Van Paramantis Solutions B.V. in Harderwijk.">
+<meta property="og:title" content="Paramant &middot; veilig versturen en laten tekenen">
+<meta property="og:description" content="Patiëntdossiers en processtukken veilig versturen en laten tekenen, vanuit uw browser. Van Paramantis Solutions B.V. in Harderwijk.">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:url" content="https://paramant.app/">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="ParaSign by Paramant &middot; sign and send documents in the EU">
-<meta name="twitter:description" content="Get documents signed and send files safely, straight from your browser. Built and hosted in the EU by Paramantis Solutions B.V. The Community plan is free, forever.">
+<meta name="twitter:title" content="Paramant &middot; veilig versturen en laten tekenen">
+<meta name="twitter:description" content="Patiëntdossiers en processtukken veilig versturen en laten tekenen, vanuit uw browser. Van Paramantis Solutions B.V. in Harderwijk.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="/design-system.css?v=28">
-<link rel="stylesheet" href="/nav.css?v=24">
+<link rel="stylesheet" href="/design-system.css?v=30">
+<link rel="stylesheet" href="/nav.css?v=26">
 <style>
+/* The homepage on the paper it had before PR #404: warm paper #FAF8F3, ink
+   #0C1B2A, one cobalt accent, and one dark object per screen (the Community
+   panel). The layout and every word since #404 stay; only the
+   palette went back. The design-system names are re-pointed so the nav, the
+   menu and the footer follow the page.
+   Measured with WCAG 2.1 on #FAF8F3: ink 16.5, ink-2 #3F4D5C 8.6, ink-3
+   #5F6B78 5.1, cobalt 6.3, petrol 7.0. */
+:root{
+  --tint:12, 27, 42;
+  --night:#FAF8F3;
+  --night-2:#F3F0E8;
+  --cream:#0C1B2A;
+  --ochre:#1D4ED8;
+  --ochre-2:#173FB3;
+  --ochre-ink:#1D4ED8;
+  --on-ochre:#FFFFFF;
+  --petrol:#155E75;
+  --petrol-ink:#155E75;
+  --paper:#FFFFFF;
+  --paper-2:#F1EAD6;
+  --paper-ink:#0C1B2A;
+  --paper-ink-2:#3F4D5C;
+  --bone:var(--night);
+  --bone-2:var(--night-2);
+  --navy:var(--cream);
+  --ink:var(--cream);
+  --ink-2:#3F4D5C;
+  --ink-dim:#5F6B78;
+  --ink-hair:rgba(12, 27, 42, .12);
+  --ink-ghost:rgba(12, 27, 42, .05);
+  --line:rgba(12, 27, 42, .12);
+  --line-2:rgba(12, 27, 42, .22);
+  --card:#FFFFFF;
+  --card-line:rgba(12, 27, 42, .12);
+  --cobalt:var(--ochre);
+  --cobalt-2:var(--ochre-2);
+  --lime:var(--ochre);
+  --bone-blur:rgba(250, 248, 243, .92);
+  --r:16px;
+  color-scheme:light;
+}
+html{background:var(--night)}
+body{color:var(--ink)}
 /* Homepage 2026, night edition: the same hand as BeerWeer. The night itself is
    no longer here: frontend/design-system.css carries it for the whole site, so
    this block is only what the homepage owns on top of it. The band, the letter,
    the drawn document and the receipt live nowhere else. */
 :root{
   --fg:var(--ink); --fg-mid:var(--ink-2); --fg-dim:var(--ink-dim);
-  --teal:#8FB3C4;   /* the band at first light, and nowhere else */
+  --teal:#155E75;   /* the petrol as ink on the paper */
   --pad:clamp(16px,4vw,28px); --maxw:780px;
   --hp-paper:var(--night); --hp-paper-2:var(--night-2); --hp-ink:var(--cream); --hp-ink-2:var(--fg-mid); --hp-ink-3:var(--fg-dim);
   --hp-line:var(--line); --hp-line-2:var(--line-2); --hp-night:var(--paper); --hp-night-2:var(--paper-2);
@@ -54,13 +100,13 @@ main{display:block;overflow:hidden}
 
 /* buttons: one ochre, one hairline */
 .hp-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 18px;border-radius:12px;font-size:15px;font-weight:600;text-decoration:none;line-height:1;transition:background .15s,color .15s,border-color .15s,transform .15s;white-space:nowrap}
-.hp-btn-fill{background:var(--ochre);color:#141414;border:1px solid var(--ochre)}
+.hp-btn-fill{background:var(--ochre);color:var(--on-ochre);border:1px solid var(--ochre)}
 .hp-btn-fill:hover{background:var(--ochre-2);border-color:var(--ochre-2)}
 .hp-btn-line{background:var(--card);color:var(--fg);border:1px solid var(--line-2)}
 .hp-btn-line:hover{border-color:var(--fg);background:rgba(var(--tint),.09)}
-.hp-btn-paper{background:var(--paper-ink);color:var(--cream);border:1px solid var(--paper-ink)}
-.hp-btn-paper:hover{background:#000}
-.hp-btn:focus-visible{outline:3px solid rgba(217,164,65,.5);outline-offset:2px}
+.hp-btn-paper{background:var(--paper-ink);color:var(--paper);border:1px solid var(--paper-ink)}
+.hp-btn-paper:hover{background:#fff}
+.hp-btn:focus-visible{outline:3px solid rgba(29,78,216,.5);outline-offset:2px}
 .hp-btn:active{transform:translateY(1px)}
 
 /* ---------- signed in: the hero is the whole page ----------
@@ -75,24 +121,6 @@ html[data-session="in"] main > section:not(.home-hero){display:none}
 html[data-session="in"] .hp-art{display:none}
 html[data-session="in"] .home-hero .hp-wrap{grid-template-columns:minmax(0,1fr)}
 html[data-session="in"] .home-hero{padding-bottom:56px}
-
-/* ---------- the band: Harderwijk at first light, one sealed letter on the quay ---------- */
-.hp-band{position:relative;height:clamp(132px,34vw,230px);overflow:hidden;background:var(--paper-2);border-bottom:1px solid var(--line)}
-.hp-band svg{position:absolute;inset:0;width:100%;height:100%;display:block}
-/* Two lines instead of one: the tile is the eye-catcher, the fact under it is
-   the quiet half. The block is absolutely positioned, so a second line does not
-   push the band open; max-width keeps it off the left edge on a 320px phone. */
-.hp-band-tag{position:absolute;right:var(--pad);top:14px;font-family:var(--hp-mono);text-transform:uppercase;color:rgba(27,31,34,.82);text-align:right;max-width:min(26rem,calc(100% - var(--pad) * 2))}
-.hp-band-say{display:block;font-size:12px;font-weight:600;letter-spacing:.1em;line-height:1.4}
-/* The dot next to the strip line. Full ochre on the band's cream sky is
-   1.66:1; the ochre-as-ink token is the same hue at 4.7:1 on that paper. It
-   rides in the first line rather than beside the block, so on a 320px phone,
-   where the tile wraps onto two lines, it stays against the words. */
-.hp-band-say::before{content:"";display:inline-block;vertical-align:middle;width:9px;height:9px;border-radius:50%;background:var(--ochre-ink);margin:-2px 8px 0 0}
-/* 10px at .7 alpha is rgb(87,87,81) on the sky, 5.1:1, so the quieter half is
-   still readable rather than decorative. */
-.hp-band-sub{display:block;margin-top:4px;font-size:10px;letter-spacing:.12em;line-height:1.45;color:rgba(27,31,34,.7)}
-@media (min-width:900px){.hp-band-tag{right:max(var(--pad), calc((100% - var(--maxw)) / 2))}}
 
 /* ---------- hero ---------- */
 .home-hero{position:relative;padding:24px 0 28px}
@@ -144,7 +172,7 @@ html[data-session="in"] .home-hero{padding-bottom:56px}
 .hw-cap{font-size:16px;line-height:1.35;font-weight:600;color:var(--fg);margin:12px 0 0;max-width:20ch}
 .hw-sub{font-size:14px;line-height:1.5;color:var(--fg-mid);margin:6px 0 0;max-width:34ch}
 
-/* the small drawn object: the band's own hand, one sheet with a seal. */
+/* the small drawn object: one sheet with a seal. */
 .hw-obj{flex:0 0 auto;width:88px;height:88px;display:block;margin-top:4px}
 @media (max-width:359px){.hw-obj{width:68px;height:68px}}
 
@@ -215,32 +243,32 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
   .hw-cols > .hw-card{margin-top:0}
 }
 
-/* the art: a document that gets signed, sealed, and then is gone. Desktop only; on a phone the band is the picture. */
+/* the art: a document that gets signed and sealed, once, on arrival. It used to
+   burn and come back on a sixteen-second loop; motion that never stops is
+   decoration a reader cannot switch off. Desktop only. */
 .hp-art{position:relative;z-index:1;height:150px;pointer-events:none;user-select:none}
 .hp-art-glow{position:absolute;inset:-40% -20%;background:
-  radial-gradient(40% 50% at 70% 40%, rgba(217,164,65,.14), transparent 70%),
+  radial-gradient(40% 50% at 70% 40%, rgba(29,78,216,.14), transparent 70%),
   radial-gradient(30% 40% at 30% 70%, rgba(21,94,117,.35), transparent 70%);filter:blur(12px)}
 .hp-doc{position:absolute;left:50%;top:0;width:min(260px, 62vw);aspect-ratio:1/1.32;transform:translateX(-50%) rotate(-4deg);background:var(--paper);border:1px solid rgba(0,0,0,.2);border-radius:4px;box-shadow:0 30px 60px -30px rgba(0,0,0,.8);padding:9% 9% 12%;display:flex;flex-direction:column;gap:7%;
   -webkit-mask-image:linear-gradient(180deg,#000 0,#000 58%,rgba(0,0,0,.55) 74%,transparent 100%);mask-image:linear-gradient(180deg,#000 0,#000 58%,rgba(0,0,0,.55) 74%,transparent 100%);
   -webkit-mask-size:100% 300%;mask-size:100% 300%;-webkit-mask-position:0 0;mask-position:0 0;
-  animation:hp-burn 16s ease-in-out infinite}
+}
 .hp-doc i{display:block;height:5%;border-radius:2px;background:rgba(27,31,34,.12)}
 .hp-doc i.t{height:9%;width:62%;background:var(--paper-ink);opacity:.9}
 .hp-doc i.w1{width:92%} .hp-doc i.w2{width:78%} .hp-doc i.w3{width:86%} .hp-doc i.w4{width:54%}
 .hp-doc svg{width:56%;height:auto;margin-top:auto;overflow:visible}
-.hp-doc svg path{fill:none;stroke:var(--petrol);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:420;stroke-dashoffset:420;animation:hp-sign 16s ease-in-out infinite}
-.hp-seal{position:absolute;right:8%;top:7%;width:19%;aspect-ratio:1;border-radius:50%;border:1.5px solid var(--ochre-2);background:radial-gradient(circle at 50% 50%, rgba(217,164,65,.9), rgba(217,164,65,.5) 60%, transparent 62%);display:grid;place-items:center;font-family:var(--hp-mono);font-size:8px;color:#141414;letter-spacing:.08em;transform:scale(0);animation:hp-seal 16s ease-in-out infinite}
+.hp-doc svg path{fill:none;stroke:var(--petrol);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:420;stroke-dashoffset:420;animation:hp-sign 3s ease-in-out .3s 1 both}
+.hp-seal{position:absolute;right:8%;top:7%;width:19%;aspect-ratio:1;border-radius:50%;border:1.5px solid var(--ochre-2);background:radial-gradient(circle at 50% 50%, rgba(29,78,216,.9), rgba(29,78,216,.5) 60%, transparent 62%);display:grid;place-items:center;font-family:var(--hp-mono);font-size:8px;color:#141414;letter-spacing:.08em;transform:scale(0);animation:hp-seal 3s ease-in-out .3s 1 both}
 .hp-dust{position:absolute;left:50%;top:0;width:min(260px, 62vw);height:100%;transform:translateX(-50%);background-image:
   radial-gradient(circle, rgba(234,226,206,.6) 1px, transparent 1.6px),
-  radial-gradient(circle, rgba(217,164,65,.6) 1px, transparent 1.6px),
+  radial-gradient(circle, rgba(29,78,216,.6) 1px, transparent 1.6px),
   radial-gradient(circle, rgba(234,226,206,.35) .8px, transparent 1.4px);
   background-size:23px 29px, 37px 41px, 17px 19px;background-position:0 0, 9px 13px, 5px 3px;opacity:0;
   -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 40%,#000 70%,transparent 100%);mask-image:linear-gradient(180deg,transparent 0,#000 40%,#000 70%,transparent 100%);
-  animation:hp-dust 16s ease-in-out infinite}
+}
 @keyframes hp-sign{0%,6%{stroke-dashoffset:420}22%,100%{stroke-dashoffset:0}}
 @keyframes hp-seal{0%,24%{transform:scale(0)}29%{transform:scale(1.12)}33%,100%{transform:scale(1)}}
-@keyframes hp-burn{0%,74%{-webkit-mask-position:0 0;mask-position:0 0;opacity:1}90%{-webkit-mask-position:0 100%;mask-position:0 100%;opacity:1}91%,95%{opacity:0;-webkit-mask-position:0 100%;mask-position:0 100%}96%{opacity:0;-webkit-mask-position:0 0;mask-position:0 0}100%{opacity:1;-webkit-mask-position:0 0;mask-position:0 0}}
-@keyframes hp-dust{0%,74%{opacity:0;transform:translate(-50%,0)}84%{opacity:.9}94%,100%{opacity:0;transform:translate(-50%,-70px)}}
 @media (prefers-reduced-motion:reduce){
   .hp-doc,.hp-doc svg path,.hp-seal,.hp-dust{animation:none}
   .hp-doc{-webkit-mask-position:0 0;mask-position:0 0;opacity:1}
@@ -300,6 +328,7 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
 .gift-grid{display:grid;gap:16px;margin-top:28px}
 .panel{border-radius:var(--r);padding:28px 24px;position:relative;overflow:hidden;min-width:0}
 @media (min-width:900px){.panel{padding:40px 40px}}
+.panel-night{--paper:#0C1622;--paper-ink:#F4F7FA;--paper-ink-2:rgba(244,247,250,.80)}
 .panel-night{background:var(--paper);color:var(--paper-ink);box-shadow:0 30px 60px -40px rgba(0,0,0,.9)}
 .panel-night::after{content:none}
 .panel-paper{background:var(--card);border:1px solid var(--card-line)}
@@ -336,7 +365,7 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
 .prod-grid h3{font-size:clamp(1.25rem,1.1vw + .9rem,1.6rem);line-height:1.15;letter-spacing:-.02em;margin:0 0 14px;max-width:18ch;color:var(--fg)}
 .prod-lines{list-style:none;margin:0;padding:0;display:grid;gap:9px}
 .prod-lines li{font-size:15px;line-height:1.55;color:var(--fg-mid);padding:0 0 0 22px;margin:0;position:relative;border:0;background:none;box-shadow:none;border-radius:0}
-.prod-lines li::before{content:"";position:absolute;left:0;top:.55em;width:10px;height:10px;border-radius:50%;border:1.5px solid var(--ochre);background:rgba(217,164,65,.35)}
+.prod-lines li::before{content:"";position:absolute;left:0;top:.55em;width:10px;height:10px;border-radius:50%;border:1.5px solid var(--ochre);background:rgba(29,78,216,.35)}
 .prod-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
 
 /* ---------- three steps ---------- */
@@ -379,6 +408,20 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
 footer{background:var(--night-2);border-top:1px solid var(--line);color:var(--fg-mid)}
 footer a{color:var(--fg)}
 @media (min-width:760px){footer .footer-grid,footer .footer-grid.footer-slim{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);gap:32px;align-items:start}}
+
+/* De Nederlandse homepage (23-09-2026): een kop, een zin, een knop. Het
+   aanbod staat als een bedrag, de techniek staat ingeklapt. */
+.offer-line{font-size:15px;line-height:1.55;color:var(--fg-mid);margin:16px 0 0}
+.offer-line a{color:var(--fg);font-weight:600}
+.tech{margin:28px 0 0;border-top:1px solid var(--line);padding-top:8px}
+.tech summary{cursor:pointer;font-weight:600;color:var(--fg);font-size:15px;min-height:44px;display:flex;align-items:center}
+.tech p{font-size:14.5px;line-height:1.6;color:var(--fg-mid);margin:10px 0 0;max-width:60ch}
+.tech a{color:var(--fg)}
+.lang-switch{max-width:780px;margin:0 auto;padding:24px 16px;font-size:14px}
+.lang-switch a{color:var(--fg)}
+/* Signed in, the hero is the whole page and the workbench is English, like the
+   rest of the app; the language line would only sit in the gap above the footer. */
+html[data-session="in"] .lang-switch{display:none}
 </style>
 <script type="application/ld+json" data-paramant-seo="1">
 {
@@ -388,15 +431,15 @@ footer a{color:var(--fg)}
       "@type": "WebPage",
       "@id": "https://paramant.app/#webpage",
       "url": "https://paramant.app/",
-      "name": "ParaSign by Paramant · sign and send documents in the EU",
+      "name": "Paramant · veilig versturen en laten tekenen",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "en",
-      "description": "Get documents signed and send files safely, straight from your browser. Built and hosted in the EU by Paramantis Solutions B.V. The Community plan is free, forever."
+      "inLanguage": "nl",
+      "description": "Patiëntdossiers en processtukken veilig versturen en laten tekenen, vanuit uw browser. Van Paramantis Solutions B.V. in Harderwijk."
     },
     {
       "@type": "SoftwareApplication",
@@ -452,108 +495,63 @@ footer a{color:var(--fg)}
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "en"
+      "inLanguage": [
+        "nl",
+        "en"
+      ]
     }
   ]
 }
 </script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
-    <li><a href="/security" class="nav-link">Security</a></li>
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/docs" class="nav-link">Docs</a></li>
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
-  <a href="/security" class="nav-mobile-standalone">Security</a>
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
 </div>
 <main id="main-content" role="main">
-
-<div class="hp-band" aria-hidden="true">
-  <svg viewBox="0 0 1440 230" preserveAspectRatio="xMidYMax slice" role="presentation" focusable="false">
-    <defs>
-      <linearGradient id="hpSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E3D9BE"/><stop offset="1" stop-color="#EDE5CF"/></linearGradient>
-    </defs>
-    <rect width="1440" height="230" fill="url(#hpSky)"/>
-    <ellipse cx="300" cy="62" rx="110" ry="22" fill="#F4EEDC"/>
-    <ellipse cx="1060" cy="48" rx="90" ry="18" fill="#F4EEDC"/>
-    <ellipse cx="820" cy="96" rx="60" ry="12" fill="#F4EEDC" opacity=".8"/>
-    <circle cx="720" cy="104" r="46" fill="#D9A441" opacity=".85"/>
-    <!-- Harderwijk, back row -->
-    <g fill="#B8AD8E">
-      <path d="M0 200h60v-40h-60zM90 200v-58l22-14 22 14v58zM1250 200v-46l18-16 18 16v46zM1320 200h70v-38h-70z"/>
-      <path d="M220 200v-70l30-20 30 20v70zM1130 200v-64l26-18 26 18v64z"/>
-    </g>
-    <!-- Harderwijk, front row: the Grote Kerk, the Vischpoort, gabled houses, the mill -->
-    <g fill="#21262A">
-      <path d="M0 208h1440v22H0z"/>
-      <path d="M40 208v-88l16-10 16 10v88zM76 208v-64h44v64zM124 208v-92l14-9 14 9v92z"/>
-      <path d="M170 208v-70h50v70zM230 208v-96l12-6 12 6v96z"/>
-      <path d="M300 208v-150h8v-30l14-24 14 24v30h8v150z"/>
-      <path d="M356 208v-76h30v76zM392 208v-100l18-12 18 12v100zM434 208v-70h36v70z"/>
-      <path d="M520 208v-60a28 28 0 0 1 56 0v60zM540 208v-34a8 8 0 0 1 16 0v34z" fill-rule="evenodd"/>
-      <path d="M520 148h56v-8h-56zM548 118l-8 22h16z"/>
-      <path d="M600 208v-80l16-10 16 10v80zM640 208v-66h40v66zM688 208v-56h26v56z"/>
-      <path d="M840 208v-70h36v70zM884 208v-96l16-10 16 10v96zM924 208v-62h48v62zM980 208v-84l14-8 14 8v84z"/>
-      <path d="M1040 208v-58h40v58zM1088 208v-72l14-9 14 9v72z"/>
-      <path d="M1176 208v-88h44v88zM1198 120v-40h4v40z"/>
-      <path d="M1198 84l38-38 4 4-38 38zM1198 84l-38-38-4 4 38 38zM1198 84l38 38-4 4-38-38zM1198 84l-38 38 4 4 38-38z"/>
-      <path d="M1290 208v-52h30v52zM1330 208v-74l16-10 16 10v74zM1380 208v-44h60v44z"/>
-    </g>
-    <!-- the sealed letter on the quay -->
-    <g transform="translate(700 150) rotate(-6)">
-      <rect x="0" y="0" width="112" height="76" rx="3" fill="#F4EEDC" stroke="#21262A" stroke-width="2.5"/>
-      <path d="M0 4l56 40 56-40" fill="none" stroke="#21262A" stroke-width="2.5" stroke-linejoin="round"/>
-      <circle cx="56" cy="46" r="11" fill="#D9A441" stroke="#21262A" stroke-width="2.5"/>
-    </g>
-    <!-- the water of the Veluwemeer -->
-    <path d="M0 208h1440v22H0z" fill="#4E6E72"/>
-    <path d="M0 208h1440" stroke="#EAE2CE" stroke-opacity=".35"/>
-  </svg>
-  <span class="hp-band-tag">
-    <span class="hp-band-say">Beter een goede buur dan een verre vriend.</span>
-    <span class="hp-band-sub">Onze servers staan in Neurenberg.</span>
-  </span>
-</div>
-
 <section class="home-hero">
   <div class="hp-wrap">
     <div class="home-state" data-home="out">
-      <h1>Get documents signed and send files safely, from your browser.</h1>
-      <p class="lede">Made for <strong>small professional firms</strong> in the EU: legal, finance, health. A contract signed, or a file that deletes itself when the reading is done.</p>
+      <h1>Pati&euml;ntdossiers en processtukken veilig versturen en laten tekenen.</h1>
+      <p class="lede">Gemaakt in Nederland, voor <strong>praktijken en kantoren</strong>.</p>
       <div class="home-actions">
-        <a class="hp-btn hp-btn-fill" href="/sign">Sign a document</a>
-        <a class="hp-btn hp-btn-line" href="/pricing">Business plans</a>
+        <a class="hp-btn hp-btn-fill" href="/parashare">Veilig versturen</a>
+        <a class="hp-btn hp-btn-line" href="/sign">Laten tekenen</a>
       </div>
-      <p class="hero-note">Free on the <b>Community plan</b>, for good. Paid business plans from &euro;29 a month.</p>
-      <p class="hp-proof">When the file is gone, the proof stays. Anyone can check it without us.</p>
+      <p class="hero-note">Gratis met het <b>Community-plan</b>. Voor uw kantoor: 29 euro per maand, excl. btw.</p>
+      <p class="hp-proof">Is het bestand weg, dan blijft het bewijs. Iedereen kan het controleren zonder ons.</p>
     </div>
-    <div class="home-state" data-home="in" hidden>
+    <div class="home-state" data-home="in" lang="en" hidden>
       <h2 class="paramant-h1">Your documents<span class="home-hi-name" data-home-name></span>.</h2>
 
       <!-- The workbench. Every value in here is written by js/home-auth.js from
@@ -651,229 +649,149 @@ footer a{color:var(--fg)}
         <span class="hp-seal">EU</span>
       </div>
       <div class="hp-receipt">
-        <div class="rc-head"><span>Receipt</span><span>kept</span></div>
-        <div class="rc-row"><span>Fingerprint</span><i></i></div>
-        <div class="rc-row"><span>Signed at</span><i></i></div>
-        <div class="rc-row"><span>Receipt</span><i></i></div>
-        <div class="rc-foot">When the file is gone, the proof stays. Anyone can check it without us.</div>
+        <div class="rc-head"><span>Bewijs</span><span>bewaard</span></div>
+        <div class="rc-row"><span>Vingerafdruk</span><i></i></div>
+        <div class="rc-row"><span>Getekend op</span><i></i></div>
+        <div class="rc-row"><span>Ontvangstbewijs</span><i></i></div>
+        <div class="rc-foot">Is het bestand weg, dan blijft het bewijs. Iedereen kan het controleren zonder ons.</div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="hp-sec check-sec" aria-labelledby="check-h">
-  <div class="hp-wrap">
-    <p class="hp-kicker">Do not take our word for it</p>
-    <h2 id="check-h" class="hp-h2">Five things you can check yourself, today.</h2>
-    <p class="hp-lede">Trust is not something a website can claim. These five facts are on the record, outside this page, and each one has a place where you look it up.</p>
-    <ul class="check-grid">
-      <li><span class="ck-fact">A registered Dutch company</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk. The KvK register lists the company behind every promise on this page.</p><a href="https://www.kvk.nl/zoeken/?source=all&amp;q=42115132">KvK 42115132 &rarr;</a></li>
-      <li><span class="ck-fact">Servers in Germany</span><p class="ck-how">Hetzner in Nuremberg. Which company holds what, and the one exception for e-mail, is written out line by line on the security page.</p><a href="/security">Jurisdiction, line by line &rarr;</a></li>
-      <li><span class="ck-fact">A public log</span><p class="ck-how">Every registered key and every transfer leaves an entry in a tamper-evident log anyone can read. Not a claim about transparency: the log itself.</p><a href="/ct-log">Open the log &rarr;</a></li>
-      <li><span class="ck-fact">What happens when something goes wrong</span><p class="ck-how">A personal data breach is reported to you within 48 hours; that is in the signed Data Processing Agreement, not in a blog post. Your signature receipts verify without us, so they outlive us.</p><a href="/dpa#incidents">Breach notification, clause 8 &rarr;</a></li>
-      <li><span class="ck-fact">Code you can read</span><p class="ck-how">The core and the relay are published. Nine rules, each with a link to the proof, are written down in one place.</p><a href="/rules">The nine rules &rarr;</a></li>
-    </ul>
-  </div>
 </section>
-
 <section class="hp-sec why-nl-sec" aria-labelledby="why-nl-h">
   <div class="hp-wrap">
-    <p class="hp-kicker">Why Dutch matters</p>
-    <h2 id="why-nl-h" class="hp-h2">Dutch is a fact here, not a flag.</h2>
-    <p class="hp-lede">Where a supplier is owned decides which law reaches your client files and who can be ordered to hand them over. So it is a purchasing question, and here are the three answers.</p>
+    <p class="hp-kicker">Waarom Nederlands telt</p>
+    <h2 id="why-nl-h" class="hp-h2">Nederlands is hier een feit, geen vlag.</h2>
+    <p class="hp-lede">Waar een leverancier in handen is, bepaalt welk recht uw dossiers kan bereiken en wie gedwongen kan worden ze af te geven. Het is dus een inkoopvraag. Hier zijn de drie antwoorden.</p>
     <ul class="check-grid why-grid">
-      <li><span class="ck-fact">The Dutch names were sold</span><p class="ck-how">The parent of WeTransfer has been Bending Spoons in Milan since July 2024. Zivver has been part of Kiteworks in California since June 2025. Signhost went to Entrust in 2022, SignRequest to Box in 2021, and QuoVadis is on the Dutch trust list today as DigiCert Europe Netherlands. The names stayed Dutch. The owners did not.</p></li>
-      <li><span class="ck-fact">This one was not</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk, KvK 42115132, with no parent company anywhere else. Dutch law governs the terms you agree to, and a Dutch court hears the dispute.</p><a href="/terms#law">Governing law &rarr;</a></li>
-      <li><span class="ck-fact">And neither is the data path</span><p class="ck-how">Servers at Hetzner in Nuremberg, Germany. DNS at Bunny in Slovenia. No US provider is in the data path. Transactional email goes out through Mailjet in Paris, whose parent is Swedish; the mail itself is stored on EU soil, in Frankfurt and Saint-Ghislain. It receives the address and the invite link, never the document.</p><a href="/privacy">The sub-processors &rarr;</a></li>
+      <li><span class="ck-fact">De Nederlandse namen zijn verkocht</span><p class="ck-how">Zivver is sinds juni 2025 onderdeel van Kiteworks in Californi&euml;. WeTransfer valt sinds juli 2024 onder Bending Spoons in Milaan. Signhost ging in 2022 naar Entrust, SignRequest in 2021 naar Box, en QuoVadis staat op de Nederlandse vertrouwenslijst als DigiCert Europe Netherlands. De namen bleven Nederlands. De eigenaren niet.</p></li>
+      <li><span class="ck-fact">Deze niet</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk, KvK 42115132. Het moederbedrijf is Paramantis Digital B.V., ook Nederlands, KvK 42114664. Er is geen moederbedrijf in het buitenland. Op de voorwaarden is Nederlands recht van toepassing, en bij een geschil beslist een Nederlandse rechter.</p><a href="/terms#law">Toepasselijk recht &rarr;</a></li>
+      <li><span class="ck-fact">En de weg van uw bestanden ook niet</span><p class="ck-how">Servers bij Hetzner in Neurenberg, Duitsland. DNS bij Bunny in Sloveni&euml;. Geen Amerikaanse partij in de weg die uw bestanden afleggen. Mail gaat via Mailjet in Parijs, met een Zweeds moederbedrijf; de mail zelf staat in Frankfurt en Saint-Ghislain. Mailjet krijgt het adres en de uitnodigingslink, nooit het document.</p><a href="/privacy">De subverwerkers &rarr;</a></li>
     </ul>
-    <p class="why-proud">We are Dutch, and we would rather say so than hide behind a Delaware address.</p>
-    <p class="why-src">Ownership sources: the Kiteworks announcement of the Zivver acquisition (17 June 2025); the Bending Spoons announcement of the WeTransfer acquisition (31 July 2024); Entrust on Signhost (2022); Box on SignRequest (2021); the RDI trust service status list, which carries QuoVadis as DigiCert Europe Netherlands B.V. Checked 3 September 2026.</p>
+    <p class="why-src">Bronnen eigendom: de aankondiging van Kiteworks over de overname van Zivver (17 juni 2025); de aankondiging van Bending Spoons over de overname van WeTransfer (31 juli 2024); Entrust over Signhost (2022); Box over SignRequest (2021); de vertrouwenslijst van de RDI, met QuoVadis als DigiCert Europe Netherlands B.V. Gecontroleerd op 3 september 2026. Het moederbedrijf van Paramant staat op paramantis.nl, gecontroleerd op 23 september 2026.</p>
   </div>
 </section>
-
 <section class="hp-sec home-split-sec" aria-labelledby="split-h">
   <div class="hp-wrap">
-    <p class="hp-kicker">Why there are two kinds of plan</p>
-    <h2 id="split-h" class="hp-h2">One half is a gift. The other half pays for it.</h2>
-    <p class="hp-lede">That split is the whole idea, so it comes first. Everything further down this page is either the free half or the paid half.</p>
+    <p class="hp-kicker">Wat het kost</p>
+    <h2 id="split-h" class="hp-h2">Voor uw kantoor: 29 euro per maand.</h2>
+    <p class="hp-lede">Excl. btw, dus 35,09 euro per maand met 21% btw. E&eacute;n betaling voor versturen en ondertekenen samen. U betaalt per maand of per jaar, en er loopt geen abonnement vanzelf door.</p>
     <div class="gift-grid">
+      <article class="panel panel-paper">
+        <p class="panel-kicker">Voor uw kantoor</p>
+        <p class="panel-amt">&euro;29 <small>per maand, excl. btw</small></p>
+        <h3>Wat u krijgt.</h3>
+        <ul class="split-adds">
+          <li>100 handtekeningen per maand.</li>
+          <li>500 verzendingen per maand, tot 30 ontvangers per verzending, en links die 24 uur geldig blijven.</li>
+          <li>Dezelfde versleuteling als elk plan, de verwerkersovereenkomst en servers in Duitsland.</li>
+        </ul>
+        <div class="split-cta"><a class="hp-btn hp-btn-line" href="/pricing">Bekijk het kantoorplan</a></div>
+        <p class="offer-line">Meer nodig? Mail Mick: <a href="mailto:privacy@paramant.app?subject=Meer%20nodig">privacy@paramant.app</a></p>
+      </article>
       <article class="panel panel-night">
         <p class="panel-kicker">Community</p>
-        <p class="panel-amt">&euro;0 <small>for good</small></p>
-        <h3>Why half of this is free.</h3>
+        <p class="panel-amt">&euro;0 <small>voor altijd</small></p>
+        <h3>Waarom de helft gratis is.</h3>
         <div class="letter">
-          <p>I research how personal data leaks from the apps and clouds people trust. Paramant is what I would want a small firm to have: a way to get a document signed and to send a file that keeps client files in Europe, and that leaves proof you can check without us.</p>
-          <p>The <strong>Community</strong> plan is free, and stays free: 2 signatures a month, 50 transfers a month, and files up to 500 MB when you hand them over live, no card and no trial that runs out. That is my contribution back to the society these tools came from.</p>
-          <p>The business plans pay for the servers and for the work, and they keep the free half free.</p>
+          <p>Ik onderzoek hoe persoonsgegevens weglekken uit apps en clouds die mensen vertrouwen. Paramant is wat ik een klein kantoor gun: een document laten tekenen en een bestand versturen, met dossiers die in Europa blijven en bewijs dat u zonder ons kunt controleren.</p>
+          <p>Het <strong>Community</strong>-plan is gratis en blijft gratis: 2 handtekeningen per maand, 50 verzendingen per maand, &eacute;&eacute;n ontvanger per verzending, en bestanden tot 500 MB als u ze direct overdraagt. Geen betaalkaart en geen proefperiode die afloopt. Dat is mijn teruggave aan de samenleving.</p>
+          <p>Het kantoorplan betaalt de servers en het werk, en houdt de gratis helft gratis.</p>
         </div>
         <div class="letter-sign">
           <span class="by-mark" aria-hidden="true">MB</span>
-          <span><span class="who">Mick Beer, privacy and security researcher</span><span class="role">Founder of Paramantis Solutions B.V. &middot; Harderwijk, the Netherlands &middot; KvK 42115132</span></span>
+          <span><span class="who">Mick Beer, privacy- en securityonderzoeker</span><span class="role">Oprichter van Paramantis Solutions B.V. &middot; Harderwijk &middot; KvK 42115132</span></span>
         </div>
-        <div class="split-cta"><a class="hp-btn hp-btn-paper" href="/sign">Sign a document</a></div>
-      </article>
-      <article class="panel panel-paper">
-        <p class="panel-kicker">Business plans</p>
-        <p class="panel-amt">from &euro;29 <small>a month</small></p>
-        <h3>Organisations that need more, buy it.</h3>
-        <p>The paid plans are what keeps the free half free. The tiers are exactly the ones on the pricing page: <strong>Firm</strong> and <strong>Enterprise</strong> for ParaSend, <strong>Firm</strong>, <strong>Business</strong> and <strong>Enterprise</strong> for ParaSign. Firm is one payment that covers both products.</p>
-        <ul class="split-adds">
-          <li><b>Volume.</b> 100 or 1,000 signatures a month instead of 2, and links that live 24 hours or 7 days instead of 1.</li>
-          <li><b>Control.</b> Send history and link management, a notice to your own systems on upload and download, up to 50 registered devices, and up to 500 retrievals an hour through the API instead of 50.</li>
-          <li><b>Accountability.</b> Named support with a reply within one business day, an audit log you can export, and help answering your customers' security questionnaires.</li>
-          <li><b>Your own server.</b> Enterprise runs on a server of its own, with an SLA, and for ParaSign a sector server for health, legal or finance. The Data Processing Agreement applies to every plan.</li>
-        </ul>
-        <div class="split-cta"><a class="hp-btn hp-btn-fill" href="/pricing">See the business plans</a></div>
       </article>
     </div>
   </div>
 </section>
-
+<section class="hp-sec check-sec" aria-labelledby="check-h">
+  <div class="hp-wrap">
+    <p class="hp-kicker">Neem het niet van ons aan</p>
+    <h2 id="check-h" class="hp-h2">Vijf dingen die u vandaag zelf kunt nakijken.</h2>
+    <p class="hp-lede">Vertrouwen kan een website niet claimen. Deze vijf feiten staan buiten deze pagina vastgelegd, en bij elk staat waar u het nakijkt.</p>
+    <ul class="check-grid">
+      <li><span class="ck-fact">Een ingeschreven Nederlands bedrijf</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk. Het KvK-register noemt het bedrijf achter elke belofte op deze pagina.</p><a href="https://www.kvk.nl/zoeken/?source=all&amp;q=42115132">KvK 42115132 &rarr;</a></li>
+      <li><span class="ck-fact">Servers in Duitsland</span><p class="ck-how">Hetzner in Neurenberg. Welk bedrijf wat bewaart, en de ene uitzondering voor e-mail, staat regel voor regel op de beveiligingspagina.</p><a href="/security">Beveiliging &rarr;</a></li>
+      <li><span class="ck-fact">Een openbaar logboek</span><p class="ck-how">Elke geregistreerde sleutel en elke overdracht laat een regel achter in een logboek dat iedereen kan lezen en dat niet ongemerkt te wijzigen is.</p><a href="/ct-log">Open het logboek &rarr;</a></li>
+      <li><span class="ck-fact">Als er iets misgaat</span><p class="ck-how">Een datalek met persoonsgegevens melden we binnen 48 uur aan u. Dat staat in de verwerkersovereenkomst, niet in een blog. Uw ondertekeningsbewijzen zijn zonder ons te controleren, dus ze overleven ons.</p><a href="/dpa#incidents">Meldplicht, artikel 8 &rarr;</a></li>
+      <li><span class="ck-fact">Code die u kunt lezen</span><p class="ck-how">De kern en de server zijn gepubliceerd. Negen regels, elk met een link naar het bewijs, staan op &eacute;&eacute;n plek.</p><a href="/rules">De negen regels &rarr;</a></li>
+    </ul>
+  </div>
+</section>
 <section class="hp-sec" id="products" aria-labelledby="products-h">
   <div class="hp-wrap">
-    <p class="hp-kicker">Two products</p>
-    <h2 id="products-h" class="hp-h2">One for signing. One for sending.</h2>
-    <p class="hp-lede">Both run on the same core, and both work in a plain browser. Nothing to install for you, nothing to install for the other side.</p>
+    <p class="hp-kicker">Twee dingen</p>
+    <h2 id="products-h" class="hp-h2">Versturen en ondertekenen.</h2>
+    <p class="hp-lede">Allebei in een gewone browser. Niets te installeren, voor u niet en voor de ander niet.</p>
     <ul class="prod-grid">
       <li>
-        <span class="prod-name">ParaSign</span>
-        <h3>Get a document signed.</h3>
+        <span class="prod-name">Versturen &middot; ParaSend</span>
+        <h3>Een bestand dat verdwijnt.</h3>
         <ul class="prod-lines">
-          <li>Upload the PDF, place the fields, and mail it to whoever has to sign.</li>
-          <li>They sign with the link from that email, after signing in to the account it was addressed to.</li>
-          <li>You keep a receipt anyone can check offline, plus an entry in the public log.</li>
-          <li>A simple electronic signature under eIDAS. Not a qualified one, and we say so.</li>
+          <li>Het bestand wordt in uw browser versleuteld voordat het uw apparaat verlaat.</li>
+          <li>Onze server houdt alleen het verzegelde bestand vast, in het geheugen, nooit op een schijf.</li>
+          <li>Na de laatste keer lezen is het gewist. Er blijft niets over om later te lekken.</li>
+          <li>Dat geldt voor de webapp en de SDK's. De browserextensies versleutelen nog op onze server, tot dat is aangepast.</li>
+          <li>In de webapp zijn u en de ontvanger allebei online en vergelijkt u een korte code; dan gaat het bestand direct over. Is de ontvanger nu niet online, gebruik dan Send a link in de webapp, de API of de SDK.</li>
+          <li>&Eacute;&eacute;n ontvanger per verzending op Community, tot 30 ontvangers per verzending op het kantoorplan.</li>
         </ul>
-        <div class="prod-cta"><a class="hp-btn hp-btn-line" href="/parasign">What ParaSign is</a><a class="hp-btn hp-btn-fill" href="/sign">Sign a document</a></div>
+        <div class="prod-cta"><a class="hp-btn hp-btn-line" href="/parasend">Meer over versturen</a></div>
       </li>
       <li>
-        <span class="prod-name">ParaSend</span>
-        <h3>Send a file that disappears.</h3>
+        <span class="prod-name">Ondertekenen &middot; ParaSign</span>
+        <h3>Een document laten tekenen.</h3>
         <ul class="prod-lines">
-          <li>The file is encrypted in your browser before it leaves your device.</li>
-          <li>Our server only ever holds the sealed file in memory, never on a disk.</li>
-          <li>It is wiped after its last read, so there is nothing left to leak later.</li>
-          <li>That holds for the web app and the SDKs. The browser extensions still encrypt on our server, until that is changed.</li>
-          <!-- The handshake, on the card rather than on /parashare step 1. A
-               reviewer on 3 September 2026 bought ParaSign and refused ParaSend
-               over exactly this, and he only found it out after the button. -->
-          <li>In the web app you and the receiver are both online and compare a short code, and the file is handed over live. Sending to someone who is not online right now needs the API, the SDK, or the Send a link mode in the web app.</li>
+          <li>Upload de pdf, zet de velden neer en mail hem naar wie moet tekenen.</li>
+          <li>Zij tekenen via de link in die mail, na inloggen op het account waaraan hij gericht is.</li>
+          <li>U houdt een bewijs dat iedereen offline kan controleren, plus een regel in het openbare logboek.</li>
+          <li>Een gewone elektronische handtekening onder eIDAS. Geen gekwalificeerde, en dat zeggen we erbij.</li>
         </ul>
-        <div class="prod-cta"><a class="hp-btn hp-btn-line" href="/parasend">What ParaSend is</a><a class="hp-btn hp-btn-fill" href="/parashare">Send a file</a></div>
+        <div class="prod-cta"><a class="hp-btn hp-btn-line" href="/parasign">Meer over ondertekenen</a></div>
       </li>
     </ul>
+    <details class="tech">
+      <summary>De techniek, voor wie het wil weten</summary>
+      <p>De kern gebruikt ML-KEM-768 voor versleuteling en ML-DSA-65 voor handtekeningen, de twee standaarden die NIST in 2024 publiceerde. Versturen is hybride: ML-KEM-768 samen met ECDH P-256. <a href="/crypto-agility">Hoe we dat actueel houden</a></p>
+      <p>De code is source-available (BUSL 1.1). Bouwen op Paramant in plaats van klikken kan ook, met een SDK, een ondertekenings-API en een installer voor een eigen server: <a href="/docs">de documentatie voor ontwikkelaars</a>.</p>
+    </details>
   </div>
 </section>
-
-<section class="hp-sec" aria-labelledby="how-h">
-  <div class="hp-wrap">
-    <p class="hp-kicker">How it works</p>
-    <h2 id="how-h" class="hp-h2">Three steps, and you are done.</h2>
-    <p class="hp-lede">No plugin, no client software, no onboarding call. The whole thing happens in the tab you already have open.</p>
-    <ol class="step-grid">
-      <li>
-        <span class="step-n">01</span>
-        <h3>Pick the file</h3>
-        <p>Drop a PDF in your browser. It is encrypted on your own device, before anything is uploaded.</p>
-      </li>
-      <li>
-        <span class="step-n">02</span>
-        <h3>Send the link</h3>
-        <p>The other side opens the link from the email and signs or reads it there. They do not have to sign up for anything.</p>
-      </li>
-      <li>
-        <span class="step-n">03</span>
-        <h3>Keep the proof</h3>
-        <p>You get a receipt that can be checked without us, and a line in a public log that shows when it happened.</p>
-      </li>
-    </ol>
-  </div>
-</section>
-
-<section class="hp-sec" aria-labelledby="cost-h">
-  <div class="hp-wrap">
-    <p class="hp-kicker">What it costs</p>
-    <h2 id="cost-h" class="hp-h2">Free to start. Then a flat price a month.</h2>
-    <p class="hp-lede">Prices are a month excluding btw. You can stay on the Community plan as long as you like; there is no card and no time limit.</p>
-    <ul class="price-grid">
-      <li>
-        <h3>ParaSign</h3>
-        <p class="price-sub">Getting documents signed.</p>
-        <ul class="tiers">
-          <li><span class="tier-price">&euro;0</span><span class="tier-what"><b>Community</b> &middot; 2 signatures a month, no limit on receiving</span></li>
-          <li><span class="tier-price">&euro;29</span><span class="tier-what"><b>Firm</b> &middot; 100 signatures a month, and ParaSend in the same payment</span></li>
-          <li><span class="tier-price">&euro;299</span><span class="tier-what"><b>Business</b> &middot; 1,000 signatures a month, named support, exportable audit log</span></li>
-          <li><span class="tier-price">Talk</span><span class="tier-what"><b>Enterprise</b> &middot; your own server, SLA with service credits, licence to run it yourself</span></li>
-        </ul>
-        <p class="price-foot">&euro;35.09 and &euro;361.79 a month incl. 21% btw &middot; yearly is cheaper</p>
-      </li>
-      <li>
-        <h3>ParaSend</h3>
-        <p class="price-sub">Sending files that burn on read, one read on Community and up to ten on Firm.</p>
-        <ul class="tiers">
-          <li><span class="tier-price">&euro;0</span><span class="tier-what"><b>Community</b> &middot; 50 transfers a month, 500 MB per file handed over live, 5 MB per file over a one-time link, 1 hour link expiry, burn on first read</span></li>
-          <li><span class="tier-price">&euro;29</span><span class="tier-what"><b>Firm</b> &middot; 24 hour expiry, up to 10 reads per link through the API, send history, notices to your own systems, and ParaSign in the same payment</span></li>
-          <li><span class="tier-price">Custom</span><span class="tier-what"><b>Enterprise</b> &middot; your own server, SLA 99.95%, limits set for your organisation</span></li>
-        </ul>
-        <p class="price-foot">&euro;35.09 a month incl. 21% btw &middot; yearly is cheaper</p>
-      </li>
-    </ul>
-    <div class="sec-more">
-      <a class="sec-link" href="/pricing">See the full pricing page <span aria-hidden="true">&rarr;</span></a>
-    </div>
-  </div>
-</section>
-
-<section class="hp-sec" aria-labelledby="trust-h">
-  <div class="hp-wrap">
-    <p class="hp-kicker">Why you can trust it</p>
-    <h2 id="trust-h" class="hp-h2">Rules you can check. Every one has a proof.</h2>
-    <p class="hp-lede">Everyone has a privacy policy. Our rules come with a verify link each: a log, a header, a repo. Not a promise. Four of the nine are below.</p>
-    <ol class="rules-grid">
-      <li><h3>We never had it</h3><p>Encrypted in your browser before it leaves you, never written to a disk, gone after its last read.</p><a class="r-verify" href="/security">verify: architecture <span aria-hidden="true">&rarr;</span></a></li>
-      <li><h3>You own your keys</h3><p>Generated on your device, never sent. We see only the public half.</p><a class="r-verify" href="https://www.npmjs.com/package/paramant-sdk">verify: SDK source <span aria-hidden="true">&rarr;</span></a></li>
-      <li><h3>EU soil, EU law</h3><p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path. Email goes out via Mailjet (France), as <a href="/privacy">/privacy</a> sets out. No US provider touches a file or a key.</p><a class="r-verify" href="/security">verify: jurisdiction <span aria-hidden="true">&rarr;</span></a></li>
-      <li><h3>Verifiable, not trust-me</h3><p>The code is source-available (BUSL 1.1), every receipt can be checked without us, and a public log shows when it happened.</p><a class="r-verify" href="/ct-log">verify: CT log <span aria-hidden="true">&rarr;</span></a></li>
-    </ol>
-    <div class="sec-more">
-      <a class="sec-link" href="/rules">Read all nine rules <span aria-hidden="true">&rarr;</span></a>
-    </div>
-    <p class="pq-core">For the technically minded: the core uses ML-KEM-768 for encryption and ML-DSA-65 for signatures, the two standards NIST published in 2024. <a href="/crypto-agility">How we keep that current</a></p>
-    <p class="home-dev" style="margin-top:40px">Building on it instead of clicking? There is an SDK, a signing API and a self-host installer: <a href="/docs">read the developer docs &rarr;</a></p>
-  </div>
-</section>
-
 </main>
+<p class="lang-switch"><a href="/en" hreflang="en" lang="en">This page in English</a></p>
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Company</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/about">About</a>
-          <a href="/changelog">Changelog</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/privacy">Privacy Policy</a>
-          <a href="/dpa">Data Processing Agreement</a>
-          <a href="/terms">Terms of Service</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/license">License</a>
+          <a href="/license">Licentie</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 <script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=9" defer></script>
+<script src="/js/nav-auth.js?v=10" defer></script>
 <script src="/js/format-date.js?v=1" defer></script>
 <script src="/js/home-auth.js?v=5" defer></script>
 </body>

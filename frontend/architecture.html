@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Architecture · How Paramant works</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -24,11 +24,11 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#15191C">
+<meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=28">
-<link rel="stylesheet" href="/nav.css?v=24">
-<link rel="stylesheet" href="/relay-pulse.css?v=4">
+<link rel="stylesheet" href="/design-system.css?v=30">
+<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -87,7 +87,7 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif}
 .arch-diagram .d-slot-bad{fill:none;stroke:var(--brick);stroke-width:1}
 .arch-diagram .d-gone{fill:none;stroke:var(--brick);stroke-width:1.5}
 .arch-diagram .d-bar{fill:var(--paper-ink)}
-.arch-diagram .d-bar-ink{fill:var(--ochre)}
+.arch-diagram .d-bar-ink{fill:#B2FF3F}
 .arch-diagram .d-root{fill:var(--ochre-ink)}
 .arch-diagram .d-root-ink{fill:var(--paper)}
 .arch-diagram .d-h{fill:var(--paper-ink)}
@@ -106,15 +106,15 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif}
    strength. tests/ui-elements-contrast.test.mjs carries that reading as a
    named exception rather than as silence. */
 .loc-ring{fill:none;stroke:rgba(var(--tint), .10);stroke-width:1}
-.loc-ring-2{fill:none;stroke:rgba(217, 164, 65, .22);stroke-width:1}
-.loc-ring-3{fill:none;stroke:rgba(217, 164, 65, .38);stroke-width:1.5}
+.loc-ring-2{fill:none;stroke:rgba(29, 78, 216, .22);stroke-width:1}
+.loc-ring-3{fill:none;stroke:rgba(29, 78, 216, .38);stroke-width:1.5}
 .loc-dot{fill:var(--ochre)}
-.loc-cross{stroke:rgba(217, 164, 65, .55);stroke-width:1}
+.loc-cross{stroke:var(--cobalt);stroke-width:1}
 .loc-coord{fill:var(--ochre)}
 
 /* ── takeaway callout ── */
 .arch-takeaway{border-left:3px solid var(--ochre);padding:16px 20px;background:var(--card);margin-top:32px}
-.arch-takeaway--navy{border-left:3px solid var(--ochre);padding:16px 20px;background:rgba(217, 164, 65, .07);margin-top:32px}
+.arch-takeaway--navy{border-left:3px solid var(--ochre);padding:16px 20px;background:rgba(29, 78, 216, .07);margin-top:32px}
 .arch-takeaway p{font-size:14px;color:var(--ink-2);line-height:1.7;margin:0}
 .arch-takeaway--navy p{color:var(--ink-dim)}
 .arch-takeaway strong{color:var(--ink)}
@@ -124,7 +124,7 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif}
 .compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px}
 .compare-col{padding:28px 32px;border:1px solid rgba(var(--tint), .12)}
 .compare-col--bad{background:rgba(var(--tint), .04);border-color:rgba(var(--tint), .1)}
-.compare-col--good{background:rgba(217, 164, 65, .08);border-color:rgba(217, 164, 65, .3)}
+.compare-col--good{background:rgba(29, 78, 216, .08);border-color:rgba(29, 78, 216, .3)}
 .compare-col h3{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:20px}
 .compare-col--bad h3{color:var(--brick-ink)}
 .compare-col--good h3{color:var(--lime)}
@@ -235,7 +235,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 .nav-help:hover {
   color: var(--ink);
   border-color: var(--ochre);
-  background: rgba(217, 164, 65, 0.08);
+  background: rgba(29, 78, 216, 0.08);
 }
 .nav-help:hover::before {
   border-color: var(--line-2);
@@ -258,7 +258,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 }
 .nav-help-mobile:hover {
   color: var(--ink);
-  background: rgba(217, 164, 65, 0.08);
+  background: rgba(29, 78, 216, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -634,7 +634,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <text x="196" y="128" font-family="'IBM Plex Mono',monospace" font-size="8" class="loc-coord">49.45°N 11.08°E</text>
       </svg>
 
-      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;color:rgba(217, 164, 65, 0.8);letter-spacing:.08em;margin-top:8px">paramant-relay · 49.45N · 11.08E</div>
+      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;color:rgba(29, 78, 216, 0.8);letter-spacing:.08em;margin-top:8px">paramant-relay · 49.45N · 11.08E</div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:8px">
@@ -799,6 +799,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=9" defer></script>
+<script src="/js/nav-auth.js?v=10" defer></script>
 </body>
 </html>

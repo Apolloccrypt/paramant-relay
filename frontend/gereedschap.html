@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Gereedschap &middot; wat zonder account werkt</title>
 <meta property="og:title" content="Gereedschap · wat zonder account werkt">
@@ -20,8 +20,8 @@
 <meta property="og:image:height" content="630">
 <meta property="og:site_name" content="Paramant">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<link rel="stylesheet" href="/design-system.css?v=28">
-<link rel="stylesheet" href="/nav.css?v=24">
+<link rel="stylesheet" href="/design-system.css?v=30">
+<link rel="stylesheet" href="/nav.css?v=26">
 <style>
 .tool-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--ink-hair);margin-top:var(--space-6)}
 .tool-grid,.tool-card{min-width:0}
@@ -43,6 +43,8 @@
 .ladder-name{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-2)}
 .ladder-step p{font-size:var(--text-base);color:var(--invert-ink);line-height:1.7;margin:0}
 .ladder-step p a{color:var(--cobalt)}
+.section-dark .ladder-name,.section-dark .ladder-step p a,.section-dark .marker .num{color:var(--lime)}
+.section-dark .marker .tag{color:var(--bone-on-navy-dim)}
 @media(max-width:767px){
 .tool-grid{grid-template-columns:1fr;margin-top:var(--space-4)}
 .section-lg{padding-top:var(--space-6);padding-bottom:var(--space-5)}
@@ -135,6 +137,7 @@
   <a href="/auth/login" class="nav-tail-btn">Sign in</a>
   <a href="/help" class="nav-tail-link">Help</a>
 </div>
+<main>
 
 <section class="section section-lg" id="main-content" tabindex="-1">
   <div class="container">
@@ -268,6 +271,7 @@
   </div>
 </section>
 
+</main>
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
@@ -297,6 +301,6 @@
   </div>
 </footer>
 <script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=9" defer></script>
+<script src="/js/nav-auth.js?v=10" defer></script>
 </body>
 </html>

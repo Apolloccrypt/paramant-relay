@@ -79,6 +79,11 @@ const aliases = {
   '/help': '/help/index.html',
   '/download': '/download.html',
   '/gereedschap': '/gereedschap.html',
+  // The English copies of the four Dutch pages (23 September 2026).
+  // deploy/nginx-paramant-live.conf maps /en onto frontend/en/index.html.
+  '/en': '/en/index.html',
+  '/en/about': '/en/about.html',
+  '/en/security': '/en/security.html',
 };
 
 const server = http.createServer((req, res) => {
@@ -152,7 +157,19 @@ const measure = (page, claims) => page.evaluate((specs) => {
 // proof the right element was measured; the geometry is the assertion.
 const PAGES = [
   {
+    // The Dutch homepage (23 September 2026): the headline Mick chose, the line
+    // under it, the one offer beside the free plan, and the one button, which
+    // goes to versturen.
     slug: '/',
+    claims: [
+      { name: 'the H1', css: '[data-home="out"] h1', text: 'Patiëntdossiers en processtukken veilig versturen en laten tekenen' },
+      { name: 'the line under it', css: '[data-home="out"] p.lede', text: 'Gemaakt in Nederland, voor' },
+      { name: 'the Community plan and the one offer', css: '[data-home="out"] p.hero-note', text: 'Community-plan', also: ['Voor uw kantoor: 29 euro per maand'] },
+      { name: 'the one primary action', css: '[data-home="out"] .home-actions a.hp-btn-fill', href: '/parashare' },
+    ],
+  },
+  {
+    slug: '/en',
     claims: [
       { name: 'the H1', css: '[data-home="out"] h1', text: 'Get documents signed and send files safely' },
       { name: 'the line that says who it is for', css: '[data-home="out"] p.lede', text: 'small professional firms' },
@@ -164,11 +181,6 @@ const PAGES = [
       // Mick, 4 September: one note is enough. The founder line left both hero
       // states; the letter signature further down the page is the one place the
       // homepage still names him, and tests/ui-truthfulness pins that block.
-      // Mick, 5 September: the English ownership line became a Dutch tile with
-      // one quiet fact under it. Two lines where there was one, so this claim
-      // now also measures the bottom of the second: the block is absolutely
-      // positioned inside .hp-band, which is why it cannot push the hero down.
-      { name: 'the band tile and the fact under it', css: '.hp-band-tag', text: 'Beter een goede buur dan een verre vriend.', also: ['Onze servers staan in Neurenberg.'] },
       { name: 'the heading of the five facts, which now come before the gift (panel of 4 September: facts convince, the letter can wait)', css: '#check-h', text: 'Five things you can check' },
     ],
   },
@@ -212,7 +224,19 @@ const PAGES = [
     ],
   },
   {
+    // Mick visible (23 September 2026): the place for his photo, his name and
+    // title, and the first line about his research, before the buttons.
     slug: '/about',
+    claims: [
+      { name: 'the place for his photo', css: '.about-person .portrait' },
+      { name: 'the name of the person behind it', css: '.about-byline .n', text: 'Mick Beer' },
+      { name: 'his title', css: '.about-byline .t', text: 'Privacy- en securityonderzoeker' },
+      { name: 'the first line about his research', css: '.about-research li', text: 'persoonsgegevens weglekken' },
+      { name: 'the first action', css: '.hero-cta a.btn-primary', href: '/pricing' },
+    ],
+  },
+  {
+    slug: '/en/about',
     // The case this whole file exists for: two lines, no id of their own until
     // now, and the only place on the site that names the person behind it.
     claims: [
@@ -223,7 +247,18 @@ const PAGES = [
     ],
   },
   {
+    // The certification sentence is the first thing on the page, and what you
+    // do get follows in the same paragraph.
     slug: '/security',
+    claims: [
+      { name: 'the certification sentence', css: '.page-hero .cert-lede', text: 'Paramant is nog niet NEN 7510- of ISO 27001-gecertificeerd' },
+      { name: 'the bounded promise', css: '.page-hero .lede', nth: 1, text: 'Breekt iemand in op onze eigen server' },
+      { name: 'who is behind it', css: '.hero-by', text: 'Paramantis Solutions B.V.' },
+      { name: 'the first action', css: '.hero-cta a.btn-primary', href: '/pricing' },
+    ],
+  },
+  {
+    slug: '/en/security',
     claims: [
       // Bounded on purpose: what breaking in still does not get you. A promise
       // with its limit attached is worth nothing if the limit scrolls away.

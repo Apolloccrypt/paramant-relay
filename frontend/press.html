@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Press kit · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -24,11 +24,11 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#15191C">
+<meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=28">
-<link rel="stylesheet" href="/nav.css?v=24">
-<link rel="stylesheet" href="/relay-pulse.css?v=4">
+<link rel="stylesheet" href="/design-system.css?v=30">
+<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -47,7 +47,7 @@ p{color:var(--ink-dim);margin-bottom:12px;line-height:1.7}
 .blurb{background:var(--ink-ghost);border-left:3px solid var(--lime);padding:16px 20px;margin:0 0 16px}
 .blurb strong{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);display:block;margin-bottom:8px}
 .blurb p{margin:0;color:var(--ink);font-size:14px;line-height:1.75}
-.card{background:rgba(217, 164, 65, .06);border:1px solid var(--ink-hair);padding:20px 24px;margin-bottom:16px}
+.card{background:rgba(29, 78, 216, .06);border:1px solid var(--ink-hair);padding:20px 24px;margin-bottom:16px}
 .facts{display:grid;grid-template-columns:auto 1fr;gap:.4rem 1.5rem}
 .facts dt{color:var(--ink-dim);white-space:nowrap;font-family:var(--mono);font-size:12px}
 .facts dd{margin:0;color:var(--ink);font-size:13px}
@@ -58,12 +58,12 @@ p{color:var(--ink-dim);margin-bottom:12px;line-height:1.7}
 .download-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
 .dl-btn{background:var(--ink-ghost);border:1px solid var(--ink-hair);color:var(--ink);padding:.5rem 1rem;text-decoration:none;font-size:13px;font-family:var(--mono);transition:background .15s}
 .dl-btn:hover{background:var(--cobalt);color: var(--on-ochre);text-decoration:none}
-.contact{background:rgba(217, 164, 65, .06);border:1px solid var(--ink-hair);padding:20px 24px}
+.contact{background:rgba(29, 78, 216, .06);border:1px solid var(--ink-hair);padding:20px 24px}
 .contact p{margin-bottom:8px;color:var(--ink-dim);font-size:14px}
 .contact strong{color:var(--cobalt)}
 table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
 td,th{border:1px solid var(--ink-hair);padding:.55rem .9rem;text-align:left}
-th{background:rgba(217, 164, 65, .06);color:var(--ink-dim);font-family:var(--mono);font-size:11px;letter-spacing:.05em}
+th{background:rgba(29, 78, 216, .06);color:var(--ink-dim);font-family:var(--mono);font-size:11px;letter-spacing:.05em}
 td{color:var(--cobalt)}
 @media(max-width:600px){.grid{grid-template-columns:1fr}}
 </style>
@@ -100,7 +100,7 @@ td{color:var(--cobalt)}
 .nav-help:hover {
   color: var(--ink);
   border-color: var(--ochre);
-  background: rgba(217, 164, 65, 0.08);
+  background: rgba(29, 78, 216, 0.08);
 }
 .nav-help:hover::before {
   border-color: var(--line-2);
@@ -123,7 +123,7 @@ td{color:var(--cobalt)}
 }
 .nav-help-mobile:hover {
   color: var(--ink);
-  background: rgba(217, 164, 65, 0.08);
+  background: rgba(29, 78, 216, 0.08);
 }
 @media (max-width: 900px) {
   .nav-help { display: none; }
@@ -217,43 +217,46 @@ td{color:var(--cobalt)}
 
 <main id="main-content">
   <h1>PARAMANT</h1>
-  <p class="subtitle">Post-Quantum Ghost Pipe &middot; Press Kit</p>
+  <p class="subtitle">Document signing and encrypted file transfer &middot; Press Kit</p>
 
   <h2>About</h2>
 
   <div class="blurb">
     <strong>50 words</strong>
-    <p>PARAMANT is a post-quantum encrypted file relay built for regulated industries. Files are encrypted client-side before upload, on the authenticated paths with an ML-KEM-768 and ECDH P-256 hybrid, stored in RAM only, and destroyed after the link's last read, the first on Community. Nothing is written to disk. EU/DE jurisdiction. Self-hostable. NIS2, NEN7510, and IEC 62443 ready.</p>
+    <p>Paramant is document signing and encrypted file transfer for professional firms in the EU, from Paramantis Solutions B.V. in Harderwijk. ParaSign signs with ML-DSA-65. ParaSend encrypts files on your device, on the authenticated paths with an ML-KEM-768 and ECDH P-256 hybrid, and holds only ciphertext, in RAM. Servers at Hetzner in Nuremberg, Germany.</p>
   </div>
 
   <div class="blurb">
     <strong>150 words</strong>
-    <p>PARAMANT Ghost Pipe is a post-quantum encrypted relay that makes secure file transfer genuinely simple. Data is encrypted in the browser or SDK using ML-KEM-768 + AES-256-GCM — before it leaves the device. The relay only ever sees fixed-size (5 MB) ciphertext blobs, never the original file, never a decryption key. Blobs are held in RAM and destroyed immediately after the recipient downloads them. There is no storage, no inbox, no user account. Every transfer is recorded in a public SHA3-256 Merkle tree — proving delivery without storing content. Five live sector relays cover healthcare (NEN 7510), legal (eIDAS), finance (DORA), industrial IoT (IEC 62443), and general use. Community Edition is free forever for up to 5 API keys. The relay runs on a Raspberry Pi, a VPS, or as a bootable USB — no cloud dependency required.</p>
+    <p>Paramant has two products on one post-quantum core. ParaSign signs documents with ML-DSA-65 (FIPS 204) and enters every signature in a public, append-only log, so a signed document can be checked later without contacting us. ParaSend encrypts a file on the sender's device before it leaves: the ParaSend web app uses an ML-KEM-768 and ECDH P-256 hybrid, the one-time link path AES-256-GCM with a key made in the browser. For a ParaSend transfer the relay holds only ciphertext, in RAM, and wipes it after the last read the link allows, the first on Community. Sending needs a free account; receiving does not. The Community plan is free, forever: 2 signatures and 50 transfers a month. Organisations pay for higher limits on Firm, including one send to up to 30 named recipients, each with their own one-time link. The servers are at Hetzner in Nuremberg, Germany.</p>
   </div>
 
   <div class="blurb">
     <strong>300 words</strong>
-    <p>PARAMANT Ghost Pipe is a post-quantum secure file relay designed for healthcare providers, legal professionals, industrial operators, and financial institutions operating under strict data sovereignty requirements. It solves a specific problem: sending sensitive files between parties where neither party trusts the relay — and where the jurisdiction of storage matters.</p>
-    <p style="margin-top:10px">The system is built around three hard guarantees. First, encryption is purely client-side: files are encrypted using ML-KEM-768 key encapsulation and AES-256-GCM symmetric encryption inside a Rust/WASM module that runs in the browser, before any data leaves the device. Second, the relay is RAM-only: encrypted blobs are never written to disk, making forensic recovery impossible. Third, burn-on-read: each blob is destroyed after the last read its link allows, which on the Community plan is the first successful download. The relay cannot be compelled to hand over content it no longer holds.</p>
-    <p style="margin-top:10px">PARAMANT runs five sector relays, each tuned to its compliance domain: health (NEN 7510, HL7 FHIR, DICOM), legal (eIDAS, KNB), finance (NIS2, DORA, ISO 20022), industrial IoT (IEC 62443, EU CRA), and general. Each sector is a separate container — a breach in one does not expose another.</p>
-    <p style="margin-top:10px">Deployment takes two minutes: one docker compose command on any Ubuntu 22.04+ server. A Raspberry Pi installer and a bootable NixOS image (paramantOS) are available for dedicated hardware. The community edition is permanently free for up to 5 API keys per relay instance.</p>
-    <p style="margin-top:10px">PARAMANT was independently security-audited in April 2026 by Ryan Williams (Smart Cyber Solutions, AU) and R. Zwarts. Forty findings across three audits, including 4 critical. Every finding and its status is publicly documented.</p>
-    <p style="margin-top:10px">Incorporated in the Netherlands. Infrastructure on Hetzner Nuremberg, DE. EU/GDPR jurisdiction only, no US CLOUD Act exposure.</p>
+    <p>Paramant is a product of Paramantis Solutions B.V. in Harderwijk, the Netherlands, founded by Mick Beer, privacy and security researcher. It is built for professional firms in the EU that sign and send confidential documents.</p>
+    <p style="margin-top:10px">ParaSign signs documents with ML-DSA-65 (FIPS 204). Every signature is entered into a public, append-only log, and a signed document verifies without contacting us. A ParaSign signature is a Simple Electronic Signature, not a qualified signature under eIDAS.</p>
+    <p style="margin-top:10px">ParaSend encrypts a file on the sender's device before upload. The ParaSend web app uses an ML-KEM-768 and ECDH P-256 hybrid; the one-time link path uses AES-256-GCM with a key generated in the browser. For a ParaSend transfer the relay holds only ciphertext, in RAM, never on disk, and destroys it after the last read the link allows, which on Community is the first. Sending needs a free account; the person receiving the file needs none.</p>
+    <p style="margin-top:10px">The Community plan is free, forever, with no card: 2 signatures and 50 transfers a month, one recipient per send. Organisations pay for higher limits. Firm, at 29 euro a month excl. btw, covers both products: 100 signatures and 500 transfers a month, and one send to up to 30 named recipients, each with their own one-time link. Every plan gets the same encryption.</p>
+    <p style="margin-top:10px">Three external security audits reviewed the relay code in April 2026. Forty findings across three audits, including 4 critical. The Smart Cyber Solutions review is published finding by finding in the April 2026 audit report.</p>
+    <p style="margin-top:10px">Paramant is not certified under NIS2, NEN 7510 or IEC 62443. It publishes documentation mapped to those frameworks as input for a customer's own compliance process, and signs a data processing agreement under GDPR Article 28. The servers are at Hetzner in Nuremberg, Germany, under EU and German law. The relay is source-available under BUSL-1.1.</p>
   </div>
 
   <h2>Key facts</h2>
 
   <div class="card">
     <dl class="facts">
-      <dt>Founded</dt>        <dd>2025</dd>
-      <dt>HQ</dt>            <dd>Netherlands / EU</dd>
-      <dt>Infrastructure</dt><dd>Hetzner Nuremberg, DE — EU only</dd>
-      <dt>Jurisdiction</dt>  <dd>EU/DE &middot; GDPR &middot; no US CLOUD Act</dd>
-      <dt>Version</dt>       <dd>v3.0.0 (May 2026)</dd>
-      <dt>Live relays</dt>   <dd>5 (relay &middot; health &middot; finance &middot; legal &middot; iot)</dd>
-      <dt>Encryption</dt>    <dd>ML-KEM-768 + AES-256-GCM (NIST FIPS 203 / SP 800-38D)</dd>
-      <dt>Audit</dt>         <dd>April 2026 — findings and their status publicly documented</dd>
-      <dt>License</dt>       <dd>BUSL-1.1 — source available, free &le; 5 keys</dd>
+      <dt>Company</dt>       <dd>Paramantis Solutions B.V., Harderwijk, the Netherlands &middot; KvK 42115132</dd>
+      <dt>Founder</dt>       <dd>Mick Beer, privacy and security researcher</dd>
+      <dt>Products</dt>      <dd>ParaSign (document signing) &middot; ParaSend (encrypted file transfer)</dd>
+      <dt>Infrastructure</dt><dd>Hetzner, Nuremberg, Germany</dd>
+      <dt>Jurisdiction</dt>  <dd>EU / Germany &middot; GDPR &middot; <a href="/dpa">data processing agreement</a></dd>
+      <dt>Version</dt>       <dd>v3.1.0</dd>
+      <dt>Cryptography</dt>  <dd>ML-DSA-65 signatures (FIPS 204) &middot; ML-KEM-768 + ECDH P-256 hybrid with AES-256-GCM (FIPS 203)</dd>
+      <dt>Plans</dt>         <dd>Community, free forever &middot; Firm, 29 euro a month excl. btw &middot; Enterprise, on request. See <a href="/pricing">pricing</a></dd>
+      <dt>Recipients</dt>    <dd>One per send on Community &middot; up to 30 per send on Firm and Enterprise</dd>
+      <dt>Certification</dt> <dd>None. Framework documentation for NIS2, NEN 7510 and IEC 62443, not a certification</dd>
+      <dt>Audit</dt>         <dd>April 2026, three external audits; <a href="/docs/security-audit-2026-04.md">audit report</a></dd>
+      <dt>License</dt>       <dd>BUSL-1.1, source available; see <a href="/license">license</a></dd>
       <dt>Contact</dt>       <dd><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></dd>
     </dl>
   </div>
@@ -264,7 +267,7 @@ td{color:var(--cobalt)}
     <li><strong>No plaintext, ever.</strong> Encryption happens on your own machine before upload, in Rust compiled to WASM on the hybrid path and in Web Crypto on the link path. The relay cannot read your file, not even under court order, because it never had it.</li>
     <li><strong>Burn-on-read, and a ceiling.</strong> A blob is destroyed when the last read its link allows is spent, which on Community is the first one. It is destroyed on a timer too if that read never comes: one hour on Community, twenty-four hours on Firm, seven days on Enterprise. Whichever comes first, an attacker who compromises the relay afterwards finds nothing.</li>
     <li><strong>EU jurisdiction by design.</strong> Infrastructure is on Hetzner Nuremberg DE, and no US entity ever holds ciphertext or a key. Every direct sub-processor is European: transactional email moved from Resend Inc. in the United States to Mailjet SAS in Paris in September 2026, as the <a href="/dpa">DPA</a> states. Mailjet stores that mail in the EU and runs on Google Cloud, so a US company sits one layer below them; it never receives ciphertext or a key. No CLOUD Act exposure for transfer content. GDPR-compliant by architecture, not by policy.</li>
-    <li><strong>Sector compartmentalisation.</strong> Five separate relay containers — healthcare, legal, finance, IoT, general. A breach or subpoena targeting the finance relay cannot reach health data.</li>
+    <li><strong>One file to a group.</strong> On Firm one send reaches up to 30 named recipients, each with their own one-time link. On Community a send goes to one recipient.</li>
     <li><strong>Post-quantum now, not later.</strong> ML-KEM-768 (NIST FIPS 203) protects against store-now-decrypt-later attacks. Healthcare data sent today cannot be decrypted by a quantum computer in 2030.</li>
   </ul>
 
@@ -293,12 +296,12 @@ td{color:var(--cobalt)}
     </div>
     <div class="card">
       <h3>Relay status dashboard</h3>
-      <p style="font-size:13px">Five live sectors with real-time health indicators.</p>
+      <p style="font-size:13px">Live health of the relays, checked from your browser.</p>
       <a href="/status" class="dl-btn">Status page &rarr;</a>
     </div>
     <div class="card">
       <h3>Compliance</h3>
-      <p style="font-size:13px">NIS2, NEN7510, IEC 62443 — summarised in the docs.</p>
+      <p style="font-size:13px">Documentation mapped to NIS2, NEN 7510 and IEC 62443, as input for your own compliance process. Not a certification.</p>
       <a href="/docs#compliance-nis2" class="dl-btn">Compliance in docs &rarr;</a>
     </div>
   </div>
@@ -343,6 +346,6 @@ td{color:var(--cobalt)}
 </footer>
 
 <script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=9" defer></script>
+<script src="/js/nav-auth.js?v=10" defer></script>
 </body>
 </html>
