@@ -1453,6 +1453,35 @@ p{color:#666;font-size:.82rem}
 </body></html>`;
 }
 
+// A /v2/dl link whose token is not 48 hex characters: cut off when copied, or
+// never ours. Before this it fell through to the auth gate and the receiver
+// saw a 401 about API keys. Nothing was burned, so the burned page is wrong too.
+function _dlInvalidPage() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT - Link invalid</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0d0d;color:#e0e0e0;font-family:system-ui,sans-serif;display:flex;
+  align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.card{background:#161616;border:1px solid #2a2a2a;border-radius:12px;
+  max-width:440px;width:100%;padding:36px 32px;text-align:center}
+h1{font-size:1.05rem;font-weight:600;margin-bottom:8px}
+p{color:#999;font-size:.9rem;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>This link is invalid or incomplete.</h1>
+  <p>Part of it may have been cut off when it was copied. Open it again from the message you were sent.</p>
+</div>
+</body></html>`;
+}
+const DL_INVALID = { error: 'invalid_link', message: 'This link is invalid or incomplete.' };
+
 // ── CT Log public web UI ──────────────────────────────────────────────────────
 const CT_PAGE = (() => {
   const css = [
@@ -6282,6 +6311,18 @@ async function handleRelayRequest(req, res) {
     const ttl_left = Math.round((td.expires_ms - Date.now()) / 1000);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, enc_meta: td.enc_meta || null, file_size: td.file_size, ttl_left_s: ttl_left, used: false }));
+  }
+
+  // ── GET /v2/dl/<anything else>: a token that is not [a-f0-9]{48} ─────────
+  // The three routes above only match a well-formed token. Everything else
+  // under /v2/dl/ answers here, as a link problem, not as an auth problem.
+  if (path.startsWith('/v2/dl/') && req.method === 'GET') {
+    if (/\/(get|info)$/.test(path)) {
+      res.writeHead(400, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J(DL_INVALID));
+    }
+    res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(_dlInvalidPage());
   }
 
   // ── POST /v2/session/join — Receiver bewijst kennis van PSS + bindt pubkeys ─
