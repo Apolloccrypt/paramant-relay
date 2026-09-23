@@ -47,6 +47,8 @@ let sendMode = 'live';
 // /v2/check-key. Never written into the page by hand: see the comment on the
 // chooser in parashare.html.
 let planTtlByPlan = null, planTtlMs = 0;
+// True while a session runs (any step but step 1 and the end screens). See showStep.
+let sessionBusy = false;
 // The links this browser session has minted, newest last. Page-local on
 // purpose: the relay keeps no list of a sender's outstanding links, and
 // pretending otherwise would be a claim this build cannot keep.
@@ -87,6 +89,16 @@ function showStep(id) {
   var ENDED = (id === 'step-done' || id === 'step-link' || id === 'step-tb-download');
   var mode = $('ps-mode');
   if (mode) mode.style.display = ENDED ? 'none' : '';
+  // Once a session runs (waiting, encrypting, sealing, refused) the stand is
+  // decided. Switching it there used to flip the mode under a live session
+  // without going back to step 1, so the cards are locked until step 1 again.
+  sessionBusy = (id !== 'step-setup') && !ENDED;
+  ['ps-mode-live', 'ps-mode-link'].forEach(function (cid) {
+    var c = $(cid);
+    if (!c) return;
+    c.disabled = sessionBusy;
+    if (sessionBusy) c.setAttribute('aria-disabled', 'true'); else c.removeAttribute('aria-disabled');
+  });
   document.body.classList.toggle('ps-ended', ENDED);
   var stepper = $('ps-stepper');
   if (stepper) stepper.style.display = (ENDED || sendMode === 'link') ? 'none' : '';
@@ -752,6 +764,54 @@ function leesOntvangers() {
     .filter(function (a) { return a.length > 0; });
 }
 
+// "Your plan sends to 1 person at a time. You listed 2." One sentence for the
+// precheck and for the send itself, with the plural right.
+function teVeelZin(body) {
+  const n = Number(body.limit);
+  const wie = n === 1 ? '1 person' : n + ' people';
+  return 'Your plan sends to ' + wie + ' at a time. You listed ' + body.asked + '.';
+}
+
+// Ask the relay whether this list fits the plan BEFORE anything is sealed or
+// uploaded. Returns { ok: true } or the refusal body. A relay that does not
+// know the route (an older sector) or cannot be reached is not a refusal:
+// POST /v2/sends still checks, so the send goes on as before.
+async function precheckOntvangers(ontvangers) {
+  try {
+    const r = await relayFetch(RELAY_API + '/v2/sends/precheck', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipients: ontvangers }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (r.ok) return { ok: true };
+    if (r.status === 400 || r.status === 403) {
+      const body = await r.json().catch(function () { return {}; });
+      if (body && body.error) return Object.assign({ ok: false }, body);
+    }
+    return { ok: true, unchecked: true };
+  } catch (_) {
+    return { ok: true, unchecked: true };
+  }
+}
+
+// The refusal screen: one sentence, one button to /pricing, and a way back to
+// step 1 with the list still there to trim.
+function toonTeVeel(body) {
+  const line = $('over-limit-line');
+  if (line) line.textContent = teVeelZin(body) + ' Remove names from the list, or move to a plan that sends to more people.';
+  showStep('step-over-limit');
+}
+
+function backToSetup() {
+  const back = $('seal-back');
+  if (back) back.hidden = true;
+  const st = $('seal-status');
+  if (st) { st.textContent = 'Starting...'; st.className = 'status-line'; }
+  setSealProgress(0);
+  showStep('step-setup');
+}
+
 // After every block has landed, turn them into one send with a link per person.
 // A separate call on purpose: a file arrives as many blocks, and reading a
 // recipient list off one of them would make many sends out of one file.
@@ -766,7 +826,7 @@ async function maakVerzending(hashes, naam, ttlMs, ontvangers, sealed) {
   const body = await r.json().catch(function () { return {}; });
   if (!r.ok) {
     const uitleg = body.error === 'over_limit'
-      ? 'Your plan allows ' + body.limit + ' recipients per send. You listed ' + body.asked + '.'
+      ? teVeelZin(body)
       : body.error === 'invalid_address'
       ? 'That is not an address we can send to: ' + (body.rejected || '') 
       : body.error === 'empty'
@@ -1113,6 +1173,8 @@ function applyPlanTtls(found) {
 // nothing the link stand walks, so it goes away rather than lying about where
 // the sender is.
 function setSendMode(mode) {
+  // A session in progress keeps its stand; see showStep.
+  if (sessionBusy) return;
   sendMode = mode === 'link' ? 'link' : 'live';
   const live = $('ps-mode-live'), link = $('ps-mode-link');
   if (live) live.setAttribute('aria-checked', String(sendMode === 'live'));
@@ -1135,7 +1197,8 @@ function setSendMode(mode) {
         + 'carries up to 5 MB; fill in who it is for and it goes up in pieces, '
         + 'up to 25 MB.'
       : 'The person you send to has to be online while you send; you confirm a '
-        + 'short code together. Up to 500 MB, and nothing is ever stored.';
+        + 'short code together. Up to 500 MB, and nothing is ever stored. '
+        + 'Sending to a group? Choose Send a link and list who it is for.';
   }
 
   const ontvangersKaart = document.getElementById('recipients-input');
@@ -1294,6 +1357,29 @@ async function createLink() {
   const ttlMs = parseInt($('ttl-select').value);
   const sector = Object.entries(RELAY_SECTORS).find(([, u]) => u === RELAY_API)?.[0] || 'health';
 
+  // Everything that can refuse this send without the file is asked first.
+  // Before this, the file was sealed and uploaded (a transfer counted, blocks
+  // left in memory) and only then did POST /v2/sends say no.
+  const vooraf = leesOntvangers();
+  if (vooraf.length) {
+    if (files.length > 1) {
+      setCreateStatus('Sending to named people works with one file at a time. '
+                    + 'Put the documents in a zip, or send them one by one.', 'err');
+      return;
+    }
+    setCreateStatus('Checking the list...');
+    const pc = await precheckOntvangers(vooraf);
+    setCreateStatus('');
+    if (!pc.ok) {
+      if (pc.error === 'over_limit') return toonTeVeel(pc);
+      setCreateStatus(pc.error === 'invalid_address'
+        ? 'That is not an address we can send to: ' + (pc.rejected || '')
+        : pc.error === 'empty' ? 'No usable address in that list.'
+        : 'The send could not be created.', 'err');
+      return;
+    }
+  }
+
   showStep('step-sealing');
   setSealProgress(0);
   try {
@@ -1360,6 +1446,9 @@ async function createLink() {
       $('seal-status').textContent = failureText('seal and upload', e);
       $('seal-status').className = 'status-line err';
     }
+    // Never leave the sender on a progress bar that will not move again.
+    const back = $('seal-back');
+    if (back) back.hidden = false;
   }
 }
 
@@ -1909,6 +1998,7 @@ act('input','onRecipientsInput',()=>onRecipientsInput());
 act('click','confirmFingerprint',()=>confirmFingerprint());act('click','copyLink',()=>copyLink());
 act('click','createSession',()=>startSend());act('click','expandApiKeyCard',()=>expandApiKeyCard());
 act('click','chooseModeLive',()=>chooseModeLive());act('click','chooseModeLink',()=>chooseModeLink());
+act('click','backToSetup',()=>backToSetup());
 act('click','copySentLink',(el)=>copySentLink(el));act('click','refreshSentLinks',()=>refreshSentLinks());
 act('click','rejectFingerprint',()=>rejectFingerprint());act('input','onKeyInput',()=>onKeyInput());
 act('click','reload',()=>location.reload());
