@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const MIME = { '.js':'text/javascript', '.css':'text/css', '.html':'text/html', '.svg':'image/svg+xml', '.png':'image/png', '.woff2':'font/woff2' };
-const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/account':'/account.html', '/developer':'/developer.html', '/pricing':'/pricing.html', '/parashare':'/parashare.html', '/help':'/help/index.html' };
+const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/account':'/account.html', '/developer':'/developer.html', '/pricing':'/pricing.html', '/parashare':'/parashare.html', '/help':'/help/index.html', '/en':'/en/index.html' };
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   pathname = aliases[pathname] || pathname;
@@ -28,7 +28,10 @@ function ok(name, condition, detail='') { checks.push({ name, pass:!!condition, 
 
 const publicPage = await browser.newPage({ viewport:{ width:390, height:844 } });
 await publicPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
-await publicPage.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
+// The public checks below were written for the English homepage, which lives
+// at /en since 23 September 2026. The Dutch homepage at / has its own bar,
+// checked right after them.
+await publicPage.goto(ORIGIN + '/en', { waitUntil:'domcontentloaded' });
 await publicPage.waitForFunction(() => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === 'Product,Tools,Security,Pricing,Docs');
 const publicDesktop = await publicPage.locator('nav.nav .nav-links .nav-link').allInnerTexts();
 // The bar carries the free tools as their own destination. Everything a
@@ -55,6 +58,24 @@ await (async () => {
   const ctas = await publicPage.locator('#products .prod-cta a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')));
   ok('the homepage leads to both product pages, with the apps as the second action', JSON.stringify(ctas) === JSON.stringify(['/parasign','/sign','/parasend','/parashare']), await publicPage.locator('#products').innerText());
   ok('the homepage still routes to ParaSend from its own section', ctas.includes('/parashare'), await publicPage.locator('#products').innerText());
+})();
+// The Dutch homepage: the same bar in Dutch, with the two outward product
+// names, re-rendered identically by js/nav-auth.js after the session check; one
+// primary action (versturen) and one secondary (laten tekenen).
+await (async () => {
+  const nl = await browser.newPage({ viewport:{ width:390, height:844 } });
+  await nl.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
+  await nl.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
+  const want = 'Versturen,Ondertekenen,Gereedschap,Beveiliging,Prijzen';
+  const got = await nl.waitForFunction((w) => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((n) => n.textContent).join(',') === w, want, { timeout:10000 }).then(() => true, () => false);
+  ok('the Dutch homepage names its destinations in Dutch, with Versturen and Ondertekenen', got, (await nl.locator('nav.nav .nav-links .nav-link').allInnerTexts()).join(', '));
+  const authText = await nl.locator('#nav-auth').evaluate((n) => n.textContent);
+  ok('the Dutch bar says Hulp, Inloggen and Account maken after the session check', /Hulp/.test(authText) && /Inloggen/.test(authText) && /Account maken/.test(authText), authText);
+  const actions = await nl.locator('[data-home="out"] .home-actions a').evaluateAll((nodes) => nodes.map((n) => [n.getAttribute('href'), n.className]));
+  ok('the Dutch homepage leads with one primary action to versturen and one secondary', JSON.stringify(actions) === JSON.stringify([['/parashare','hp-btn hp-btn-fill'],['/sign','hp-btn hp-btn-line']]), JSON.stringify(actions));
+  const ctas = await nl.locator('#products .prod-cta a').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('href')));
+  ok('the Dutch homepage leads to both product pages', JSON.stringify(ctas) === JSON.stringify(['/parasend','/parasign']), JSON.stringify(ctas));
+  await nl.close();
 })();
 const publicMobilePaint = await publicPage.locator('nav.nav').evaluate((node) => ({
   background: getComputedStyle(node).backgroundColor,

@@ -210,7 +210,7 @@ footer a{color:var(--ink);text-decoration:none}
 <p><strong>PARAMANT collects only what is strictly required to operate your account and run the service.</strong></p>
 <p>An email address is required to create an account and recover access; it is personal data, and it is stored. No phone number. We do not log IP addresses for analytics or profiling. An IP is processed for security and abuse-prevention only (rate limiting, the session record, an audit log, and the DPA signature record), the audit trail keeps a masked address for up to 400 days, and one log holds a full address for longer than any timer; both are named below. Only a strictly-necessary session cookie (no tracking cookies). No tracking pixels. No analytics. No advertisements. We never sell your data.</p>
 
-<h2>How Ghost Pipe &amp; ParaShare (the ParaSend web app) work</h2>
+<h2>How sending works (the ParaSend web app)</h2>
 <p>Files sent through the web app are encrypted <strong>client-side in your browser</strong> using post-quantum cryptography (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256) before they ever reach our servers. The relay never sees plaintext on that path. The one place it does is the hosted signing ceremony on the <code>/v1</code> API, where the document is sent to us so that we can run the ceremony; we hold it, sealed at rest under our own key, until that envelope ends.</p>
 <p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server. On the Community plan it is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>); a paid plan buys more reads per link through the API before that same destruction, up to 10 on Firm and 100 on Enterprise. Encrypted payload data is never written to disk. From a <em>transfer</em>, the only thing persisted to disk is cryptographic hashes in the public Certificate Transparency log: no file content, no keys, no plaintext. (Account data, listed below, is stored separately to run your account.)</p>
 <p>Community plan blobs expire after 1 hour maximum. Firm blobs after 24 hours. Enterprise blobs after 7 days. All are destroyed earlier once the last read of the link is spent.</p>
@@ -249,7 +249,7 @@ footer a{color:var(--ink);text-decoration:none}
 <li>Use tracking cookies or browser fingerprinting (only a strictly-necessary session cookie is set after login)</li>
 <li>Run advertising or tracking scripts</li>
 <li>Share your data with third parties, except the operational subprocessors needed to run the service (hosting, transactional email, and payments, listed below)</li>
-<li>Write Ghost Pipe or ParaShare transfer payloads to disk. ParaSign request documents are different: their encrypted capsule may be persisted until the envelope expires.</li>
+<li>Write Ghost Pipe or ParaShare (the ParaSend web app) transfer payloads to disk. ParaSign request documents are different: their encrypted capsule may be persisted until the envelope expires.</li>
 <li>Load fonts, scripts, styles, or any other resource from a third party. Everything is self-hosted on paramant.app</li>
 </ul>
 
@@ -354,6 +354,6 @@ footer a{color:var(--ink);text-decoration:none}
 </footer>
 
 <script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=9" defer></script>
+<script src="/js/nav-auth.js?v=10" defer></script>
 </body>
 </html>

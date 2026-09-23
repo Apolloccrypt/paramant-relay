@@ -1,24 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>About Paramant · Founded by Mick Beer</title>
+<title>Over Paramant · Opgericht door Mick Beer</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Paramant is a product of Paramantis Solutions B.V. in Harderwijk, founded by Mick Beer, privacy and security researcher. Company, mission, and how to check us.">
-<meta property="og:title" content="About Paramant · Founded by Mick Beer">
-<meta property="og:description" content="Paramant is a product of Paramantis Solutions B.V. in Harderwijk, founded by Mick Beer, privacy and security researcher. Company, mission, and how to check us.">
+<meta name="description" content="Paramant is een product van Paramantis Solutions B.V. in Harderwijk, opgericht door Mick Beer, privacy- en securityonderzoeker.">
+<meta property="og:title" content="Over Paramant · Opgericht door Mick Beer">
+<meta property="og:description" content="Paramant is een product van Paramantis Solutions B.V. in Harderwijk, opgericht door Mick Beer, privacy- en securityonderzoeker.">
 <meta property="og:url" content="https://paramant.app/about">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="About Paramant · Founded by Mick Beer">
-<meta name="twitter:description" content="Paramant is a product of Paramantis Solutions B.V. in Harderwijk, founded by Mick Beer, privacy and security researcher. Company, mission, and how to check us.">
+<meta name="twitter:title" content="Over Paramant · Opgericht door Mick Beer">
+<meta name="twitter:description" content="Paramant is een product van Paramantis Solutions B.V. in Harderwijk, opgericht door Mick Beer, privacy- en securityonderzoeker.">
 <link rel="canonical" href="https://paramant.app/about">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/about">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/about">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/about">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -83,15 +86,15 @@
       "@type": "WebPage",
       "@id": "https://paramant.app/about#webpage",
       "url": "https://paramant.app/about",
-      "name": "About Paramant · Founded by Mick Beer",
+      "name": "Over Paramant · Opgericht door Mick Beer",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "en",
-      "description": "Paramant is a product of Paramantis Solutions B.V. in Harderwijk, founded by Mick Beer, privacy and security researcher. Company, mission, and how to check us."
+      "inLanguage": "nl",
+      "description": "Paramant is een product van Paramantis Solutions B.V. in Harderwijk, opgericht door Mick Beer, privacy- en securityonderzoeker."
     },
     {
       "@type": "Organization",
@@ -125,169 +128,192 @@
   ]
 }
 </script>
+<style>
+/* De Nederlandse over-pagina: Mick zichtbaar, met een plek voor zijn foto. */
+.about-person{display:flex;align-items:center;gap:var(--space-4);margin-top:var(--space-5);max-width:680px}
+.about-hero{padding:var(--space-10) 0 var(--space-6)}
+@media (max-width:640px){.about-hero{padding-top:var(--space-5)}}
+.about-person .about-byline{margin-top:0;border-left:0;padding-left:0}
+.about-person .about-byline .n{font-size:var(--text-lg, 1.25rem)}
+.about-person .about-byline .t{font-family:inherit;font-size:var(--text-sm, .95rem);letter-spacing:0;text-transform:none;color:var(--ink-dim);line-height:1.45;margin-top:2px}
+.portrait{flex:0 0 auto;width:112px;height:112px;border-radius:50%;overflow:hidden;background:var(--bone);box-shadow:0 0 0 1px var(--line, rgba(12,27,42,.12))}.portrait img{display:block;width:100%;height:100%;object-fit:cover}
+.about-research{list-style:none;padding:0;margin:var(--space-4) 0 0;max-width:680px}
+.about-research li{font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0 0 var(--space-2);padding-left:18px;position:relative}
+.about-research li::before{content:"";position:absolute;left:0;top:.75em;width:8px;height:2px;background:var(--cobalt)}
+.about-research a{color:var(--cobalt);text-decoration:underline}
+.about-tech{margin-top:var(--space-4);max-width:680px}
+.about-tech summary{cursor:pointer;font-weight:600;color:var(--ink);min-height:44px;display:flex;align-items:center}
+.lang-switch{max-width:780px;margin:0 auto;padding:24px 16px;font-size:14px}
+.lang-switch a{color:var(--ink)}
+</style>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
-    <li><a href="/security" class="nav-link">Security</a></li>
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/docs" class="nav-link">Docs</a></li>
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
-  <a href="/security" class="nav-mobile-standalone">Security</a>
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
 </div>
-<main>
-
-<!-- HERO -->
-<section style="padding:var(--space-10) 0 var(--space-6)" id="main-content" tabindex="-1">
+<main id="main-content" tabindex="-1">
+<section class="about-hero">
   <div class="container-md">
     <div class="sec-head">
       <span class="num">00</span>
-      <h1 class="paramant-h2">About Paramant</h1>
-      <span class="mono-eyebrow">Company, mission, and how to check us</span>
+      <h1 class="paramant-h2">Over Paramant</h1>
+      <span class="mono-eyebrow">Het bedrijf, de maker, en hoe u ons nakijkt</span>
     </div>
-    <p class="about-lede">Sign and send documents so that only you and the person you send them to can read them, and so that anyone can check later that the document is genuine and unchanged. The servers stand in Germany, under EU law.</p>
-    <p class="about-for">For small offices that sign and send confidential papers, and for the person who has to check a supplier before it goes near client files.</p>
-    <div class="about-byline">
-      <div class="n">Mick Beer</div>
-      <div class="t">Privacy and security researcher, founder of Paramantis Solutions B.V.</div>
+    <p class="about-lede">Documenten versturen en laten tekenen, zodat alleen u en de ontvanger ze kunnen lezen, en iedereen later kan nakijken dat het document echt en ongewijzigd is. De servers staan in Duitsland, onder Europees recht.</p>
+    <div class="about-person">
+      <picture class="portrait">
+        <source srcset="/assets/mick/mick-beer-240.webp" type="image/webp">
+        <img src="/assets/mick/mick-beer-240.jpg" width="112" height="112" alt="Mick Beer" loading="eager" decoding="async">
+      </picture>
+      <div class="about-byline">
+        <div class="n">Mick Beer</div>
+        <div class="t">Privacy- en securityonderzoeker, oprichter van Paramantis Solutions B.V.</div>
+      </div>
     </div>
+    <!-- Twee regels over zijn onderzoek, niet drie: alleen wat een bron heeft.
+         De eerste staat ook in de brief op de homepage, de tweede verwijst naar
+         zijn eigen site, waar het werk zelf staat. -->
+    <ul class="about-research">
+      <li>Mick onderzoekt hoe persoonsgegevens weglekken uit apps en clouds die mensen vertrouwen.</li>
+      <li>Zijn artikelen en tools staan op <a href="https://mickbeer.com" rel="noopener">mickbeer.com</a>.</li>
+    </ul>
     <div class="hero-cta">
-      <a href="/pricing" class="btn btn-primary">See pricing &rarr;</a>
-      <a href="/security" class="btn btn-secondary">See the evidence &rarr;</a>
+      <a href="/pricing" class="btn btn-primary">Bekijk de prijzen &rarr;</a>
+      <a href="/security" class="btn btn-secondary">Bekijk het bewijs &rarr;</a>
     </div>
   </div>
 </section>
 
-<!-- WHAT PARAMANT IS -->
 <section class="about-band">
   <div class="container-md">
-    <span class="mono-eyebrow">01 / Mission</span>
-    <h2 style="margin-top:var(--space-2)">What Paramant is</h2>
-    <p>Two products on one post-quantum core. <strong>ParaSend</strong> encrypts files in your browser or SDK before they ever leave your device; the relay only holds fixed-size ciphertext in RAM and destroys it after its last read. <strong>ParaSign</strong> signs documents with ML-DSA-65 (FIPS 204) and records every signature in a public transparency log.</p>
-    <p>The design goals stay constant: privacy first, post-quantum by default, and EU-sovereign infrastructure with no US parent and no US CLOUD Act exposure. The aim is not to ask for your trust, but to remove the need for it.</p>
+    <span class="mono-eyebrow">01 / Wat het is</span>
+    <h2 style="margin-top:var(--space-2)">Wat Paramant is</h2>
+    <p>Twee dingen: <strong>versturen</strong> en <strong>ondertekenen</strong>. Versturen versleutelt een bestand in uw browser voordat het uw apparaat verlaat; de server houdt alleen het verzegelde bestand vast, in het geheugen, en wist het na de laatste keer lezen. Ondertekenen zet een handtekening die iedereen later kan controleren, en zet elke handtekening in een openbaar logboek.</p>
+    <p>De uitgangspunten blijven gelijk: privacy eerst, bestand tegen toekomstige quantumcomputers, en servers in Europa zonder Amerikaans moederbedrijf. Het doel is niet om uw vertrouwen te vragen, maar om het overbodig te maken.</p>
+    <details class="about-tech">
+      <summary>De techniek, voor wie het wil weten</summary>
+      <p>Versturen heet in de code ParaSend, ondertekenen ParaSign. Handtekeningen gebruiken ML-DSA-65 (FIPS 204), in uw browser gemaakt; de private sleutel komt nooit op de server. Versturen uit de webapp is hybride: ML-KEM-768 samen met ECDH P-256. De code is source-available en staat op <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a>.</p>
+    </details>
   </div>
 </section>
 
-<!-- BEHIND PARAMANT -->
 <section class="about-band">
   <div class="container-md">
-    <span class="mono-eyebrow">02 / Who is behind Paramant</span>
-    <h2 style="margin-top:var(--space-2)">Behind Paramant</h2>
+    <span class="mono-eyebrow">02 / Wie erachter zit</span>
+    <h2 style="margin-top:var(--space-2)">Achter Paramant</h2>
     <div class="person-card">
       <div class="person-name">Mick Beer</div>
-      <div class="person-title">Privacy and security researcher, founder of Paramantis Solutions B.V.</div>
-      <p>Paramant is a product of <strong>Paramantis Solutions B.V.</strong> in Harderwijk, the Netherlands, founded by Mick Beer, privacy and security researcher. Paramantis Solutions B.V. is the contracting and responsible party; the founder is the origin of the work, not the service itself.</p>
-      <p>The Community plan is his way of giving something back to society; the business plans pay for it. That is the whole arrangement, and it is why the Community plan is not a trial and has no end date.</p>
-      <p>That background shapes the choices: post-quantum signatures (ML-DSA-65), a public transparency log, offline-verifiable documents, and source code you can inspect yourself. You do not have to take us at our word, you can verify it. The code is source-available and the transparency log is public: the product stands apart from the person and stays checkable.</p>
+      <div class="person-title">Privacy- en securityonderzoeker, oprichter van Paramantis Solutions B.V.</div>
+      <p>Paramant is een product van <strong>Paramantis Solutions B.V.</strong> in Harderwijk, opgericht door Mick Beer. Paramantis Solutions B.V. is de partij waarmee u een overeenkomst sluit en die verantwoordelijk is. Het moederbedrijf is Paramantis Digital B.V., ook een Nederlands bedrijf (KvK 42114664).</p>
+      <p>Het Community-plan is zijn teruggave aan de samenleving; het kantoorplan betaalt ervoor. Meer afspraak is er niet, en daarom is Community geen proefperiode en heeft het geen einddatum.</p>
     </div>
-
-    <div class="split-head">Free for everyone, paid for organisations</div>
     <div class="split-grid">
       <div class="split-card free">
-        <div class="k">Free for everyone</div>
-        <p><strong>ParaSign Community.</strong> &euro;0, forever. 2 signatures a month, unlimited receiving, full post-quantum crypto, public verification log. No card required.</p>
-        <p><strong>ParaSend Community.</strong> &euro;0, forever. AES-256-GCM with a browser-generated key, 1 hour link expiry, burn on first read. No card required.</p>
+        <div class="k">Gratis voor iedereen</div>
+        <p><strong>Community.</strong> &euro;0, voor altijd. 2 handtekeningen per maand, 50 verzendingen per maand, &eacute;&eacute;n ontvanger per verzending. Geen betaalkaart nodig.</p>
       </div>
       <div class="split-card paid">
-        <div class="k">For organisations</div>
-        <p><strong>Firm</strong> is one plan and one payment for both products: 100 signatures a month and API access on ParaSign, plus 500 transfers a month, 24 hour link expiry, up to 10 reads per link through the API, up to 50 registered devices, send history and webhooks on ParaSend.</p>
-        <p>Above Firm the plans stay per product. <strong>ParaSign Business</strong> adds named support and an exportable audit log. <strong>ParaSign Enterprise</strong> adds a dedicated relay instance, an SLA and a self-hosting licence. <strong>ParaSend Enterprise</strong> adds a dedicated relay and an SLA of 99.95%.</p>
+        <div class="k">Voor uw kantoor</div>
+        <p><strong>Voor uw kantoor: 29 euro per maand</strong>, excl. btw. E&eacute;n betaling voor versturen en ondertekenen: 100 handtekeningen per maand, 500 verzendingen per maand, tot 30 ontvangers per verzending.</p>
+        <p>Meer nodig? Mail Mick: <a href="mailto:privacy@paramant.app?subject=Meer%20nodig">privacy@paramant.app</a></p>
       </div>
     </div>
-    <p class="split-note">Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.</p>
-    <p class="about-cta"><a href="/pricing" class="btn btn-primary">See pricing &rarr;</a></p>
+    <p class="split-note">Elk plan krijgt dezelfde versleuteling en hetzelfde openbare logboek. U betaalt voor hogere grenzen, nooit voor veiligheid.</p>
   </div>
 </section>
 
-<!-- HOW YOU CAN CHECK US -->
 <section class="about-band">
   <div class="container-md">
-    <span class="mono-eyebrow">03 / Technique &amp; transparency</span>
-    <h2 style="margin-top:var(--space-2)">How you can check us</h2>
-    <p>Every claim on this site is meant to be checkable, not taken on faith. Four things make that possible:</p>
+    <span class="mono-eyebrow">03 / Nakijken</span>
+    <h2 style="margin-top:var(--space-2)">Hoe u ons kunt nakijken</h2>
+    <p>Elke bewering op deze site is bedoeld om na te kijken, niet om op te vertrouwen. Vier dingen maken dat mogelijk:</p>
     <div class="check-grid">
       <div class="check-card">
-        <div class="k">Post-quantum signatures</div>
-        <p>ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay.</p>
+        <div class="k">Handtekeningen op uw apparaat</div>
+        <p>De sleutel wordt in uw browser gemaakt en komt nooit op onze server.</p>
       </div>
       <div class="check-card">
-        <div class="k">Public transparency log</div>
-        <p>Every signature is entered into a public, append-only log. Inspect it on the <a href="/ct-log">CT Log</a>.</p>
+        <div class="k">Een openbaar logboek</div>
+        <p>Elke handtekening komt in een openbaar logboek waar alleen iets bij kan. Bekijk het in het <a href="/ct-log">logboek</a>.</p>
       </div>
       <div class="check-card">
-        <div class="k">Offline-verifiable documents</div>
-        <p>A signed document verifies without contacting us. Check one on the <a href="/verify">verify page</a>.</p>
+        <div class="k">Offline te controleren</div>
+        <p>Een getekend document is te controleren zonder contact met ons. Probeer het op de <a href="/verify">controlepagina</a>.</p>
       </div>
       <div class="check-card">
-        <div class="k">Source-available code</div>
-        <p>The relay is source-available. Read it on <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a> and run it yourself.</p>
+        <div class="k">Code die u kunt lezen</div>
+        <p>De server is source-available. Lees hem op <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a> en draai hem zelf.</p>
       </div>
     </div>
     <div class="scope-note">
-      <p><strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong> A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation produced in your browser. It is not a notarised legal signature under eIDAS or any qualified-trust regime (QES). We state exactly what it is and what it is not.</p>
+      <p><strong>Een gewone elektronische handtekening, geen gekwalificeerde.</strong> Een handtekening met Paramant is in eIDAS-termen een Simple Electronic Signature (SES). Het is geen gekwalificeerde elektronische handtekening (QES). We zeggen precies wat het wel en niet is.</p>
     </div>
   </div>
 </section>
 
-<!-- RESPONSIBLE DISCLOSURE -->
 <section class="about-band">
   <div class="container-md">
-    <span class="mono-eyebrow">04 / Responsible disclosure</span>
-    <h2 style="margin-top:var(--space-2)">Found a security issue?</h2>
-    <p>We publish a machine-readable <a href="/.well-known/security.txt">security.txt</a> (RFC 9116) and a full <a href="/security#responsible-disclosure">disclosure policy</a>. Reports reach us at <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>, in Dutch or English.</p>
+    <span class="mono-eyebrow">04 / Een lek gevonden?</span>
+    <h2 style="margin-top:var(--space-2)">Een beveiligingsprobleem gevonden?</h2>
+    <p>We publiceren een <a href="/.well-known/security.txt">security.txt</a> (RFC 9116) en een volledig <a href="/security#responsible-disclosure">meldbeleid</a>. Meldingen komen binnen op <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>, in het Nederlands of het Engels.</p>
   </div>
 </section>
-
 </main>
+<p class="lang-switch"><a href="/en/about" hreflang="en" lang="en">This page in English</a></p>
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Company</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/about">About</a>
-          <a href="/changelog">Changelog</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/privacy">Privacy Policy</a>
-          <a href="/dpa">Data Processing Agreement</a>
-          <a href="/terms">Terms of Service</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/license">License</a>
+          <a href="/license">Licentie</a>
         </div>
       </div>
     </div>
@@ -295,6 +321,6 @@
 </footer>
 
 <script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=9" defer></script>
+<script src="/js/nav-auth.js?v=10" defer></script>
 </body>
 </html>

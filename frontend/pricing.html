@@ -1,24 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pricing · What is free, and what businesses pay · Paramant</title>
+<title>Prijzen · Voor uw kantoor 29 euro per maand · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="The Community plan is free, forever. Organisations pay for higher limits: signing and sending on Firm, 29 euro a month excl. btw. From Paramantis Solutions B.V.">
-<meta property="og:title" content="Pricing · What is free, and what businesses pay · Paramant">
-<meta property="og:description" content="The Community plan is free, forever. Organisations pay for higher limits: signing and sending on Firm, 29 euro a month excl. btw. From Paramantis Solutions B.V.">
+<meta name="description" content="Het Community-plan is gratis, voor altijd. Voor uw kantoor: versturen en ondertekenen samen, 29 euro per maand excl. btw. Van Paramantis Solutions B.V.">
+<meta property="og:title" content="Prijzen · Voor uw kantoor 29 euro per maand · Paramant">
+<meta property="og:description" content="Het Community-plan is gratis, voor altijd. Voor uw kantoor: versturen en ondertekenen samen, 29 euro per maand excl. btw. Van Paramantis Solutions B.V.">
 <meta property="og:url" content="https://paramant.app/pricing">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Pricing · What is free, and what businesses pay · Paramant">
-<meta name="twitter:description" content="The Community plan is free, forever. Organisations pay for higher limits: signing and sending on Firm, 29 euro a month excl. btw. From Paramantis Solutions B.V.">
+<meta name="twitter:title" content="Prijzen · Voor uw kantoor 29 euro per maand · Paramant">
+<meta name="twitter:description" content="Het Community-plan is gratis, voor altijd. Voor uw kantoor: versturen en ondertekenen samen, 29 euro per maand excl. btw. Van Paramantis Solutions B.V.">
 <link rel="canonical" href="https://paramant.app/pricing">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/pricing">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/pricing">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/pricing">
 <link rel="stylesheet" href="/design-system.css?v=30">
 <link rel="stylesheet" href="/nav.css?v=26">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
@@ -145,15 +148,15 @@
       "@type": "WebPage",
       "@id": "https://paramant.app/pricing#webpage",
       "url": "https://paramant.app/pricing",
-      "name": "Pricing · What is free, and what businesses pay · Paramant",
+      "name": "Prijzen · Voor uw kantoor 29 euro per maand · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "en",
-      "description": "The Community plan is free, forever. Organisations pay for higher limits: signing and sending on Firm, 29 euro a month excl. btw. From Paramantis Solutions B.V."
+      "inLanguage": "nl",
+      "description": "Het Community-plan is gratis, voor altijd. Voor uw kantoor: versturen en ondertekenen samen, 29 euro per maand excl. btw. Van Paramantis Solutions B.V."
     },
     {
       "@type": "Organization",
@@ -187,492 +190,171 @@
   ]
 }
 </script>
+<style>
+/* De Nederlandse prijspagina: één aanbod, één knop. */
+.pr-what{font-size:var(--text-md);color:var(--ink);line-height:1.6;margin:0 0 var(--space-4)}
+.offer{border:1px solid var(--ink-hair);border-left:3px solid var(--cobalt);background:var(--bone);padding:var(--space-4) var(--space-5);margin:0 0 var(--space-3)}
+.offer-kicker{font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt);margin:0 0 var(--space-2)}
+.offer-h{font-size:clamp(1.4rem,2vw + .8rem,2rem);line-height:1.15;margin:0 0 var(--space-2);text-transform:none;letter-spacing:-.01em}
+.offer-btw{font-size:var(--text-base);color:var(--ink);margin:0 0 var(--space-3)}
+.offer-what{font-size:var(--text-base);color:var(--ink);line-height:1.6;margin:0 0 var(--space-4)}
+.offer-btn{display:inline-flex;max-width:100%;white-space:normal;text-align:center}
+.offer-year{margin:var(--space-3) 0 0;font-size:var(--text-sm)}
+.offer-year a,.offer-more a{color:var(--cobalt)}
+.offer-more{margin:var(--space-3) 0 0;font-size:var(--text-base);color:var(--ink)}
+.free{padding:var(--space-3) 0;margin:0 0 var(--space-3);border-bottom:1px solid var(--ink-hair)}
+.free-amt{font-size:var(--text-base);color:var(--ink);line-height:1.6;margin:0 0 var(--space-2)}
+.free-why{font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)}
+.pr-company{font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)}
+.pr-block{border-top:1px solid var(--ink-hair);padding:var(--space-6) 0 0;margin:var(--space-6) 0 0}
+.pr-block p{font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0 0 var(--space-3)}
+.pr-h{font-size:var(--text-xl);text-transform:none;margin:0 0 var(--space-3)}
+.pr-faq{border-bottom:1px solid var(--ink-hair);padding:var(--space-2) 0}
+.pr-faq summary{cursor:pointer;font-weight:600;color:var(--ink);min-height:44px;display:flex;align-items:center}
+.pr-faq p{margin:var(--space-2) 0 var(--space-3)}
+.lang-switch{max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px}
+.lang-switch a{color:var(--ink)}
+</style>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
-    <li><a href="/security" class="nav-link">Security</a></li>
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/docs" class="nav-link">Docs</a></li>
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
-  <a href="/security" class="nav-mobile-standalone">Security</a>
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
 </div>
-<main>
-
-<!-- HERO
-     Order is the message. The brief of 2026-09-02 makes the split (free for
-     everyone, paid for organisations) the one selling point, so it stands above
-     every table. What a phone sees first is measured, not assumed:
-     tests/pricing-fold.test.mjs pins the y of the first amount, the audience
-     line, the founder line and the first action inside a 390x844 screen.
-
-     Four things had to fit that were not there before. A visitor arriving from
-     a search engine has seen no other page, so the first line says what the
-     product does. The promise carries its own number: "free forever" without
-     "2 signatures a month" reads as generous until the table says otherwise,
-     and a buyer who finds that out one screen later feels sold to. The founder
-     stood at 1128px, which is a screen and a half of scrolling before anyone
-     says who holds the files. And the decorative "00" over the h1 cost the
-     first 60px of the fold while meaning nothing.
-
-     The two amounts are named separately because they buy different products.
-     "From &euro;15 a month" on its own was ParaSend Pro, and an office that came
-     here to sign anchors on it and then meets &euro;49 in the table.
-     tests/ui-truthfulness.test.mjs reads both figures off the Pro cards
-     themselves, and relay/test/pricing-page.test.js binds those cards to
-     relay/lib/billing-catalog.js, so the lead cannot drift from the catalog
-     without a red test in between.
-
-     The Community limits here are the ones the relay enforces on an account:
-     transfers_month 50 and file_mb 500 from relay/lib/tiers.js, refused with 402
-     and 413 respectively. The page used to say "10 uploads per hour per IP",
-     which is ANON_RATE_PER_HOUR on /v2/anon-inbound, an endpoint deprecated on
-     2026-05-28 with a Sunset of 2026-12-31. It described a rate limit on a
-     dying anonymous endpoint as if it were the account's allowance, and it was
-     the one number a visitor could plan around. relay/test/pricing-page.test.js
-     reads both figures out of tiers.js.
-
-     Jargon is out of this block on purpose. "A dedicated relay" and "a
-     connection to their own software" were the two phrases a lawyer cannot
-     read; the same facts stand under the tables in the words the docs use. -->
-<section style="padding:var(--space-6) 0 var(--space-7)" id="main-content" tabindex="-1">
+<!-- De Nederlandse prijspagina (23-09-2026). Eén aanbod: het kantoorplan
+     (in de code heet het Firm), met één knop. Community blijft zichtbaar als
+     de gratis helft. Business en Enterprise zijn niet weg, ze staan niet in de
+     etalage: wie meer nodig heeft mailt Mick, en /en/pricing toont de volledige
+     tabel. De bedragen komen uit relay/lib/billing-catalog.js en worden daar
+     door tests/site-claims.test.mjs en relay/test/pricing-page.test.js aan
+     vastgepind. -->
+<main id="main-content" tabindex="-1">
+<section style="padding:var(--space-6) 0 var(--space-7)">
   <div class="container-md">
-    <!-- .sec-head carries margin-bottom:var(--space-8) sitewide, which is right
-         under a section heading and wrong here: on a 390px screen it spends
-         60px of the one screen that has to carry the amount, the audience, the
-         founder and the button. Overridden on this hero only; the shared rule
-         in design-system.css is untouched. -->
-    <div class="sec-head" style="margin-bottom:var(--space-4)">
-      <h1 class="paramant-h2">Pricing</h1>
-      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Free for everyone, paid for organisations</span>
+    <h1 class="paramant-h2" style="margin-bottom:var(--space-3)">Prijzen</h1>
+    <p class="pr-what">Documenten laten tekenen en bestanden versturen die zichzelf wissen na het lezen.</p>
+    <div class="offer" id="kantoor">
+      <p class="offer-kicker">Voor uw kantoor</p>
+      <h2 class="offer-h">Voor uw kantoor: 29 euro per maand.</h2>
+      <p class="offer-btw">Excl. btw. U betaalt &euro;35,09 per maand, inclusief 21% btw.</p>
+      <p class="offer-what">E&eacute;n betaling voor versturen en ondertekenen samen: 100 handtekeningen per maand, 500 verzendingen per maand, tot 30 ontvangers per verzending, en links die 24 uur geldig blijven. Bij versturen vanuit de webapp zijn u en de ontvanger allebei online en vergelijkt u een korte code.</p>
+      <a href="/auth/login?next=/pricing" data-billing-product="firm" data-billing-plan="firm" data-billing-interval="monthly" class="btn btn-primary offer-btn">Kies het kantoorplan &rarr; <span style="font-weight:400;opacity:.85">&euro;35,09 per maand incl.</span></a>
+      <p class="offer-year"><a href="/auth/login?next=/pricing" data-billing-product="firm" data-billing-plan="firm" data-billing-interval="yearly" class="yearly-alt">Liever per jaar: &euro;350,90 incl. btw (&euro;290 excl.), twee maanden minder &rarr;</a></p>
+      <p class="offer-more">Meer nodig? Mail Mick: <a href="mailto:privacy@paramant.app?subject=Meer%20nodig">privacy@paramant.app</a></p>
     </div>
-    <p style="font-size:var(--text-md);color:var(--ink);line-height:1.6;margin:0 0 var(--space-3)">
-      Sign documents and send files that delete themselves after reading.
-    </p>
-    <p style="font-size:var(--text-md);color:var(--ink);line-height:1.6;margin:0 0 var(--space-3)">
-      <strong>Community is &euro;0 a month, forever:</strong> 2 signatures a month, 50 transfers a month, and files up to 500 MB when you hand them over live, no card.
-      Organisations that need higher limits, signing built into their own software, a named contact or a server of
-      their own pay for the business plans: <strong>&euro;29 a month</strong> for signing and sending together on Firm,
-      excl. btw.
-    </p>
-    <p style="font-size:var(--text-base);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-4)">
-      For a one-person practice, a volunteer board or a household, and for the offices that sign and send every week.
-    </p>
-    <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:center;margin-bottom:var(--space-4)">
-<!-- Besluit 22 (one filled accent per screen): the nav carries the filled
-           cobalt "Create account" on every page and it is sticky, so a filled
-           hero button put two of them on the first screen. This page has its own
-           primary action, the button in each plan card, so the two text CTAs on
-           it are outlined. The plan cards keep one filled button each. -->
-      <a href="/signup" class="btn btn-secondary">Create a free account &rarr;</a>
-      <a href="#plans" class="btn btn-tertiary">Compare plans</a>
+    <div class="free">
+      <p class="offer-kicker">Community</p>
+      <p class="free-amt"><strong>Community is &euro;0 per maand, voor altijd:</strong> 2 handtekeningen per maand, 50 verzendingen per maand, &eacute;&eacute;n ontvanger per verzending, en bestanden tot 500 MB als u ze direct overdraagt. Geen betaalkaart.</p>
+      <p class="free-why">Voor een eenmanspraktijk, een vrijwilligersbestuur of een huishouden. Het is geen proefperiode en geen lokkertje. Het is de teruggave van de oprichter aan de samenleving, en het kantoorplan houdt het gratis.</p>
+      <p><a href="/signup" class="btn btn-secondary">Maak een gratis account &rarr;</a></p>
     </div>
-    <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-6)">
-      Built in Harderwijk by <strong style="color:var(--navy)">Paramantis Solutions B.V.</strong> (KvK 42115132).
-      <a href="/about" style="color:var(--cobalt)">About Paramant &rarr;</a>
-    </p>
-    <div style="max-width:760px;margin:0 0 var(--space-4);padding:var(--space-4) var(--space-5);border:1px solid var(--ink-hair);border-left:3px solid var(--lime);background:var(--bone)">
-      <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0">
-        <strong>The Community plan is free, forever.</strong> It is not a trial and not a funnel. It is what
-        Paramant gives back: signing and sending that does not route through an American cloud, available to
-        whoever needs it. The Community plan is the founder's contribution back to the society the
-        tools came from. Businesses pay for the higher limits (longer links, more reads, more devices, a
-        server of their own), not to unlock features, and that is what keeps the Community plan free.
-      </p>
-    </div>
-    <p style="font-size:var(--text-sm);color:var(--ink-dim);margin:0">Already have an account? <a href="/dashboard" style="color:var(--cobalt)">Open your dashboard &rarr;</a></p>
+    <p class="pr-company">Gemaakt in Harderwijk door <strong style="color:var(--navy)">Paramantis Solutions B.V.</strong> (KvK 42115132). <a href="/about" style="color:var(--cobalt)">Over Paramant &rarr;</a></p>
+    <p style="font-size:var(--text-sm);color:var(--ink-dim);margin:0">Heeft u al een account? <a href="/dashboard" style="color:var(--cobalt)">Open uw documenten &rarr;</a></p>
   </div>
 </section>
-
-<!-- One basis for every listed price on this page: excl. btw. The rest of the
-     site quotes the same numbers that way (frontend/js/quota-upgrade.js), so
-     switching this page to incl. btw would only move the contradiction.
-
-     The amount actually taken off the card is incl. 21% btw and lives in
-     relay/lib/billing-catalog.js. It is always printed as "charged ... incl.
-     21% btw" beside the listed price, never on its own. Until 2026-08-30 the
-     monthly prices were listed excl. btw and the Business yearly price incl.
-     btw; read side by side that looks like paying yearly costs more.
-
-     Yearly discount is stated as a percentage, not as "two months free". Two
-     months free is 16.7%, which is what both plans on sale give: Firm (290
-     against 12 x 29) and ParaSign Business (2,990 against 12 x 299).
-
-     Number format is English throughout (dot decimal, comma thousands) and the
-     currency is always &euro;, never the string "EUR". The page mixed all four
-     variants, including EUR 3.617,90 and &euro;3,617.90 for the same amount.
-
-     relay/test/pricing-page.test.js recomputes every amount here from the
-     catalog, so a price edited on this page alone turns the suite red. -->
-<!-- TIER CARDS: PARASIGN -->
 <section style="padding:0 0 var(--space-9)" id="plans">
-  <div class="container">
-    <div style="margin-bottom:var(--space-6)">
-      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Product</span>
-      <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-top:var(--space-2)">ParaSign · Get a document signed</h3>
-      <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;max-width:760px;margin-top:var(--space-3)">
-        Sign a PDF yourself, or send it to the people who have to sign it. Community covers 2 signatures a month, forever. Organisations pay for volume: 100 a month on Firm, 1,000 a month on Business with a named contact. Firm is one payment for both products, ParaSign and ParaSend together, and it comes with a <strong>developer API</strong> with its own <a href="/docs#parasign-api" style="color:var(--cobalt)">documentation</a> and webhooks, so signing can run inside your own software.
-      </p>
+  <div class="container-md">
+    <div class="pr-block">
+      <h2 class="pr-h">Hoe betalen werkt</h2>
+      <p>U betaalt een Nederlands bedrijf, in euro, via een Nederlandse betaaldienst (Mollie). Elke betaling is eenmalig voor de periode die u koopt: een maand, of een jaar vooruit. Automatisch verlengen staat niet aan, dus er is geen incassomachtiging en geen abonnement dat vanzelf doorloopt. Loopt de periode af, dan valt uw account terug op het gratis Community-plan en wordt er niets meer afgeschreven, tenzij u zelf de volgende periode koopt.</p>
+      <p>Het kantoorplan kost per account, niet per gebruiker. Meerdere gebruikers binnen &eacute;&eacute;n account komt nog; tot die tijd is het &eacute;&eacute;n account per kantoor.</p>
     </div>
-    <div class="tier-grid tier-grid-4">
-
-      <div class="tier-card">
-        <div class="tier-name">Community</div>
-        <div class="tier-price">&euro;0</div>
-        <div class="tier-price-note">Forever</div>
-        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For a one-person practice, a volunteer board or a household. 2 signatures a month, forever.</p>
-        <ul class="tier-features">
-          <li>2 signatures a month</li>
-          <li>No limit on receiving</li>
-          <li>Full post-quantum crypto - Public verification log</li>
-          <li>No card required</li>
-        </ul>
-        <a href="/signup" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Create a free account &rarr;</a>
-      </div>
-
-      <!-- FIRM. One plan, one payment, both products. The two Pro plans it
-           replaces were sold apart at 49 and 15 a month excl. btw, which asked
-           an office that signs AND sends for 64 a month while a competitor
-           sells signing and sharing together from 14. The card is repeated in
-           the ParaSend grid below with the same price and the same buttons: it
-           is one purchase, and a visitor who came here to send must not have to
-           read the signing section to find it. -->
-      <div class="tier-card featured">
-        <div class="tier-name">Firm</div>
-        <div class="tier-price">&euro;29<span style="font-size:var(--text-sm);color:var(--ink-dim)">/month</span></div>
-        <div class="tier-price-note">excl. btw &middot; <span class="incl">charged &euro;35.09/mo incl. 21% btw</span></div>
-        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">One payment for both products, for an office that signs and sends every week, and for putting signing inside your own software through the API.</p>
-        <ul class="tier-features">
-          <li>100 signatures a month; after that signing waits for the new month</li>
-          <li>Need more than 100 a month? Business includes 1,000</li>
-          <li>500 transfers a month, 24 hour link expiry</li>
-          <li>API access</li>
-          <li>Annual: &euro;290 excl. &middot; 16.7% off</li>
-        </ul>
-        <a href="/auth/login?next=/pricing" data-billing-product="firm" data-billing-plan="firm" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Get Firm &rarr; <span style="font-weight:400;opacity:.85">&euro;35.09/mo incl.</span></a>
-        <div style="text-align:center"><a href="/auth/login?next=/pricing" data-billing-product="firm" data-billing-plan="firm" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; &euro;350.90/yr incl. &rarr;</a></div>
-      </div>
-
-      <div class="tier-card">
-        <div class="tier-name">Business</div>
-        <div class="tier-price">&euro;299<span style="font-size:var(--text-sm);color:var(--ink-dim)">/month</span></div>
-        <div class="tier-price-note">excl. btw &middot; <span class="incl">charged &euro;361.79/mo incl. 21% btw</span></div>
-        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For an organisation that has to answer for its process: a named contact and an audit log you can export.</p>
-        <ul class="tier-features">
-          <li>1,000 signatures a month</li>
-          <li>Named support, response within one business day</li>
-          <li>We help you answer your customers' security questionnaires</li>
-          <li>Exportable audit log with CT tree head (CSV or JSON)</li>
-          <li>Annual: &euro;2,990 excl. &middot; 16.7% off</li>
-        </ul>
-        <a href="/auth/login?next=/pricing" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center;margin-top:auto">Get ParaSign Business &rarr; <span style="font-weight:400;opacity:.85">&euro;361.79/mo incl.</span></a>
-        <div style="text-align:center"><a href="/auth/login?next=/pricing" data-billing-product="parasign" data-billing-plan="business" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; &euro;3,617.90/yr incl. &rarr;</a></div>
-      </div>
-
-      <div class="tier-card">
-        <div class="tier-name">Enterprise</div>
-        <div class="tier-price">Let's talk</div>
-        <div class="tier-price-note">Per organisation</div>
-        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For organisations that need a server of their own, an SLA with service credits or a self-hosting licence.</p>
-        <ul class="tier-features">
-          <li>Dedicated relay instance - Sector relay (health, legal, finance)</li>
-          <li>SLA with service credits - Self-hosting licence - Audit support</li>
-        </ul>
-        <a href="mailto:privacy@paramant.app?subject=ParaSign+Enterprise" class="btn btn-secondary" style="display:block;text-align:center;margin-top:auto">Contact &rarr;</a>
-      </div>
-
-    </div>
-    <div style="text-align:left;max-width:760px;margin:var(--space-6) auto 0;padding:var(--space-4) var(--space-5);border:1px solid var(--ink-hair);border-left:3px solid var(--lime);background:var(--bone)">
-      <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0">
-        Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.
-      </p>
-    </div>
-    <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4)">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Firm &euro;35.09/mo or &euro;350.90/yr, Business &euro;361.79/mo or &euro;3,617.90/yr.</p>
-    <!-- HOW PAYMENT WORKS. Every sentence here is what the code does today.
-         relay/lib/mollie.js: BILLING_MODE is unset in production, so
-         billingStance().recurring is false and relay/lib/billing-recurring.js
-         skips the customer, the mandate and the subscription; the checkout in
-         relay.js is a plain one-off Mollie payment. relay/lib/billing.js
-         periodEnd() turns the interval into one calendar month or twelve, and
-         relay/lib/entitlements.js effectiveProductTier() drops the product to
-         its floor tier (Community for ParaSend, the free tier for ParaSign) as
-         soon as that date passes, per product. /privacy and /terms carry the
-         same claim in the same words; tests/site-claims.test.mjs pins all three
-         against mollie.js. -->
-    <div style="text-align:left;max-width:760px;margin:var(--space-6) auto 0;padding:var(--space-4) var(--space-5);border:1px solid var(--ink-hair);border-left:3px solid var(--cobalt);background:var(--bone)">
-      <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt);margin:0 0 var(--space-3)">How payment works</p>
-      <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0">
-        You pay a Dutch company, in euros, through a Dutch payment provider (Mollie). Every payment is a one-off for the term you buy: one month, or one year paid up front. Automatic renewal is not switched on, so there is no direct debit mandate and no subscription that renews by itself. Firm is one payment for one term on both products. ParaSign Business is its own term. When a term ends, the products it paid for fall back to their free Community plan, and nothing is charged again unless you buy the next term yourself. A code is not a payment at all: it gives you a term as a gift, so nothing is ever charged for it.
-      </p>
-    </div>
-
-    <!-- HAVE A CODE. The redeem field, on the two pages that show a plan
-         (/pricing and /account). It runs on js/redeem-code.js, which mints the
-         same short-lived scoped token the price buttons use and posts it to
-         POST /v2/billing/redeem. Nothing is fetched when the page loads: the
-         token is minted on the submit, which is what tests/app-pages-no-api-key
-         .test.mjs pins for every script on these pages.
-
-         The sentence about nothing being charged is the same claim the payment
-         block above makes, and relay/lib/coupon.js is what keeps it true: the
-         redeem path never reaches lib/mollie.js and never draws an invoice
-         number. tests/site-claims.test.mjs pins both directions. -->
-    <form data-redeem-form style="text-align:left;max-width:760px;margin:var(--space-4) auto 0;padding:var(--space-4) var(--space-5);border:1px solid var(--ink-hair);border-left:3px solid var(--lime);background:var(--bone)">
-      <p style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cobalt);margin:0 0 var(--space-3)">Have a code?</p>
-      <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0 0 var(--space-3)">
-        A code gives you a term as a gift. It is not a discount and not a payment: nothing is charged, now or later, and there is nothing to cancel. Sign in first, then enter it here, or open <a href="/redeem">the code page</a>, which is this box on its own.
-      </p>
+    <form data-redeem-form class="pr-block pr-code">
+      <h2 class="pr-h">Heeft u een code?</h2>
+      <p>Een code geeft u een periode cadeau. Het is geen korting en geen betaling: er wordt niets afgeschreven, nu niet en later niet, en er is niets op te zeggen. Log eerst in en vul hem dan hier in, of open <a href="/redeem">de codepagina</a>.</p>
       <div style="display:flex;gap:var(--space-3);flex-wrap:wrap;align-items:flex-end">
         <label style="display:flex;flex-direction:column;gap:6px;flex:1 1 220px">
-          <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim)">Your code</span>
+          <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim)">Uw code</span>
           <input type="text" name="code" data-redeem-input maxlength="32" autocomplete="off" autocapitalize="characters" spellcheck="false" style="font-family:var(--mono);font-size:var(--text-base);padding:10px 12px;border:1px solid var(--ink-hair);background:var(--bone-2, #fff);color:var(--ink);width:100%">
         </label>
-        <button type="submit" class="btn btn-secondary" data-redeem-submit>Redeem code</button>
+        <button type="submit" class="btn btn-secondary" data-redeem-submit>Code verzilveren</button>
       </div>
       <p data-redeem-message role="status" hidden style="font-size:var(--text-sm);line-height:1.6;color:var(--ink);margin:var(--space-3) 0 0"></p>
     </form>
-  </div>
-</section>
-
-<!-- TIER CARDS: PARASEND -->
-<section style="padding:0 0 var(--space-9)">
-  <div class="container">
-    <div style="margin-bottom:var(--space-6)">
-      <span style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt)">Product</span>
-      <h3 style="font-size:var(--text-xl);text-transform:uppercase;margin-top:var(--space-2)">ParaSend · Send a file that disappears</h3>
-      <p style="font-size:var(--text-base);color:var(--ink);line-height:1.7;max-width:760px;margin-top:var(--space-3)">
-        Send a file over a link that expires and wipes the file after the last read it allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Firm and 100 on Enterprise. Community covers 50 transfers a month, forever, and the file size is the same on every plan: up to 500 MB handed over live, 5 MB for a one-time link, and 25 MB when you send to a list of named recipients. How many people one send may reach does differ: one on Community and thirty on every paid plan, each getting their own link that works once. Organisations that send every week pay for longer links, more reads through the API and more registered devices. More reads is not a weaker promise: it is one link a whole team can open, or a counterparty reopening it after a misclick, instead of you sending the file a second time.
-      </p>
-      <!-- Which route a buyer actually has, before he picks a plan. The web app
-           is a live handshake, and until 3 September 2026 that stood only on
-           /parashare, step 1, which is after the money. -->
-      <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.7;max-width:760px;margin-top:var(--space-3)">
-        In the web app you and the receiver are both online and compare a short code, and the file is handed over live. Sending to someone who is not online right now needs the API, the SDK, or the Send a link mode in the web app. The live hand-over takes a file up to 500 MB. A one-time link is a single sealed block, so that way stops at 5 MB a file.
-      </p>
-    </div>
-    <div class="tier-grid">
-
-      <div class="tier-card">
-        <div class="tier-name">Community</div>
-        <div class="tier-price">&euro;0</div>
-        <div class="tier-price-note">Forever &middot; no card required</div>
-        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">For one-off browser-encrypted sends. No tracking.</p>
-        <ul class="tier-features">
-          <li>AES-256-GCM, browser-generated key</li>
-          <li>1 hour link expiry</li>
-          <li>Burn on first read</li>
-          <li>50 transfers a month</li>
-          <li>One recipient per send</li>
-          <li>500 MB per file over the live hand-over</li>
-          <li>5 MB per file over a one-time link</li>
-          <li>25 MB per file when you send to a list of named recipients</li>
-          <li>Up to 5 registered devices for the ParaSend web app</li>
-        </ul>
-        <a href="/signup" class="btn btn-primary" style="display:block;text-align:center">Create a free account &rarr;</a>
-      </div>
-
-      <div class="tier-card featured">
-        <div class="tier-name">Firm</div>
-        <div class="tier-price">&euro;29<span style="font-size:var(--text-sm);color:var(--ink-dim)">/mo</span></div>
-        <div class="tier-price-note">excl. btw &middot; <span class="incl">charged &euro;35.09/mo incl. 21% btw</span><br>Annual &euro;290 excl. &middot; 16.7% off</div>
-        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">The same Firm plan as above: one payment covers sending and signing together. For professionals who send regularly. Features, not bigger files.</p>
-        <ul class="tier-features">
-          <li>Everything in Community</li>
-          <li>24 hour link expiry</li>
-          <li>Up to 10 reads per link through the API</li>
-          <li>Up to 50 registered devices</li>
-          <li>Send history and link management</li>
-          <li>Webhooks on upload and download</li>
-          <li>Email notifications, carried inside the EU</li>
-          <li>500 transfers a month</li>
-          <li>Up to 30 recipients per send, each with their own one-time link</li>
-          <li>100 signatures a month on ParaSign, in the same payment</li>
-        </ul>
-<!-- Prices live in relay/lib/billing-catalog.js, server side, and the button
-     only carries product/plan/interval. pricing-billing.js turns a click into
-     POST /v2/billing/checkout, which creates the Mollie payment WITH the
-     metadata the webhook needs to grant the tier.
-
-     The href is the no-JS fallback and points at sign-in, not at a payment.
-     It used to hold six static Mollie payment links; all six returned 404 on
-     2026-08-08, and even alive they carried no metadata, which is how the
-     first paying customer got nothing on 2026-07-21. -->
-        <a href="/auth/login?next=/pricing" data-billing-product="firm" data-billing-plan="firm" data-billing-interval="monthly" class="btn btn-primary" style="display:block;text-align:center">Get Firm &rarr; <span style="font-weight:400;opacity:.85">&euro;35.09/mo incl.</span></a>
-        <div style="text-align:center"><a href="/auth/login?next=/pricing" data-billing-product="firm" data-billing-plan="firm" data-billing-interval="yearly" class="yearly-alt">Or pay yearly &middot; &euro;350.90/yr incl. &rarr;</a></div>
-      </div>
-
-      <div class="tier-card">
-        <div class="tier-name">Enterprise</div>
-        <div class="tier-price">Custom</div>
-        <div class="tier-price-note">Dedicated relay &middot; SLA &middot; compliance</div>
-        <p style="font-size:var(--text-base);color:var(--ink);margin-bottom:var(--space-5);line-height:1.65">Dedicated infrastructure, compliance, and support.</p>
-        <ul class="tier-features">
-          <li>Everything in Firm</li>
-          <li>7 day link expiry</li>
-          <li>Up to 100 reads per link through the API</li>
-          <li>Unlimited registered devices</li>
-          <li>Dedicated relay on our infra or yours</li>
-          <li>Configurable limits per tenant</li>
-          <li>IEC 62443 / NIS2 / NEN 7510 documentation, public and free on every plan</li>
-          <li>Custom DPA terms negotiated in the contract</li>
-          <li>SLA 99.95%, priority incident response</li>
-          <li>On-premise and air-gapped deployment support</li>
-        </ul>
-        <a href="mailto:privacy@paramant.app?subject=Enterprise" class="btn btn-secondary" style="display:block;text-align:center">Contact &rarr;</a>
-      </div>
-
-    </div>
-    <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4)">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Firm &euro;35.09/mo or &euro;350.90/yr.</p>
-  </div>
-</section>
-
-<!-- PROSE SECTIONS -->
-<section style="padding:var(--space-9) 0;border-top:1px solid var(--ink-hair)">
-  <div class="container-md">
-
-    <div class="prose-section">
-      <h3>Limits</h3>
-      <p>Every tier stores transfers in RAM. The file size does not differ by tier: 500 MB a file over the live hand-over, 5 MB a file over a one-time link because one link is one sealed block, and 25 MB a file when you send to a list of named recipients. That last number is lower for a reason worth stating plainly: nobody is waiting at the other end of such a send, so the encrypted file has to be held until the last person collects it, and holding it is what costs. What differs by tier is how many people one send may reach, how long the link lives, how many times it can be read, and how many devices can register for verified transfers. Enterprise customers running a dedicated relay can configure limits within the RAM budget of their deployment.</p>
-    </div>
-
-    <div class="prose-section">
-      <h3>Encryption</h3>
-      <p>Every tier uses the same cryptography. Verified transfers from the ParaSend web app use ML-KEM-768 plus ECDH P-256 hybrid key exchange; the <a href="/crypto-agility" style="color:var(--cobalt)">crypto register</a> lists the web app with no default signature algorithm, on a pre-v1 hybrid wire format that is migrating to v1. There is no lesser encryption at lower tiers. Cryptography is not a paywalled feature at Paramant.</p>
-    </div>
-
-    <div class="prose-section">
-      <h3>Compliance</h3>
-      <p>The architecture is built to support your NIS2 and GDPR work. Paramant itself holds no third-party certification for those frameworks. Two mappings are written and published with the source, and neither sits behind a plan: an IEC 62443 requirement table in the OT guide, and a NEN 7510 table in the DICOM guide. A Community account can read both. There is no eIDAS mapping document. The standard Data Processing Agreement under GDPR Article 28 is published at <a href="/dpa" style="color:var(--cobalt)">/dpa</a> and applies to all plans; it can be signed electronically, with no account and no paid tier required.</p>
-    </div>
-
-    <div class="prose-section">
-      <h3>Support</h3>
-      <p>The Community plan is self-service via public documentation and the CT log. The Firm plan includes email support with published response targets. Enterprise customers get a named contact, a 99.95% SLA, priority incident handling, and deployment assistance for air-gapped and regulated environments.</p>
-    </div>
-
-    <div class="prose-section">
-      <h3>Roadmap</h3>
-      <p>Coming to paid plans: multiple users per account, and sending from your own domain. Tell us what you need first: <a href="mailto:privacy@paramant.app?subject=Roadmap" style="color:var(--cobalt)">privacy@paramant.app</a>.</p>
-    </div>
-
-  </div>
-</section>
-
-<!-- This block promised "30 days, no credit card, full relay access" until
-     2026-08-30, on a page whose Free cards say "Forever, no card required" and
-     whose FAQ says there is no separate trial. Three promises, one of them
-     invented. The Community plan is the trial; there is no 30-day clock. -->
-<!-- FREE-TIER CTA -->
-<section style="padding:var(--space-4) 0 var(--space-9)">
-  <div class="container-md">
-    <div class="trial-cta">
-      <div>
-        <p style="font-size:var(--text-base);font-weight:700;margin-bottom:var(--space-2)">Not sure which plan fits?</p>
-        <p style="font-size:var(--text-sm);color:var(--ink)">Start on the Community plan. No card, no time limit; upgrade when you outgrow the limits.</p>
-      </div>
-      <a href="/signup" class="btn btn-secondary">Create account →</a>
+    <div class="pr-block">
+      <h2 class="pr-h">Veelgestelde vragen</h2>
+      <details class="pr-faq">
+        <summary>Wat gebeurt er met mijn bestand nadat de ontvanger het heeft opgehaald?</summary>
+        <p>Het bestand staat alleen in het werkgeheugen van de server, nooit op een schijf, en wordt gewist na de laatste keer lezen die de link toestaat. De webapp en de extensies wissen het na de eerste keer lezen, op elk plan. Via de API mag een betaalde link vaker gelezen worden: tot 10 keer op het kantoorplan. Verloopt de link, dan is het bestand ook weg.</p>
+      </details>
+      <details class="pr-faq">
+        <summary>Is een gewone elektronische handtekening genoeg voor mijn documenten?</summary>
+        <p>Naar Nederlands recht heeft een gewone elektronische handtekening dezelfde rechtsgevolgen als een handgeschreven handtekening, als de methode voldoende betrouwbaar is gezien het doel en de omstandigheden (Burgerlijk Wetboek, art. 3:15a, <a href="https://wetten.overheid.nl/BWBR0005291/2025-07-01" target="_blank" rel="noopener">wetten.overheid.nl BWBR0005291</a>). Bij een gekwalificeerde handtekening hoeft die betrouwbaarheid niet te worden aangetoond. Een handtekening met Paramant is een gewone elektronische handtekening; elke handtekening levert een bewijs op en een regel in een openbaar logboek, zodat de betrouwbaarheid aan te tonen is. Dit is geen juridisch advies; vraag uw eigen adviseur wat uw zaak nodig heeft.</p>
+      </details>
+      <details class="pr-faq">
+        <summary>Krijg ik een verwerkersovereenkomst?</summary>
+        <p>Ja, op elk plan, ook op Community. De verwerkersovereenkomst staat openbaar op <a href="/dpa">/dpa</a> en is elektronisch te tekenen, zonder account.</p>
+      </details>
+      <details class="pr-faq">
+        <summary>Is Paramant gecertificeerd voor NEN 7510?</summary>
+        <p>Nee, nog niet. Paramant heeft geen certificering voor NEN 7510, ISO 27001 of NIS2. Er is wel documentatie die u kunt gebruiken voor uw eigen dossier, openbaar en gratis op elk plan. Wat u verder krijgt, staat bovenaan de <a href="/security">beveiligingspagina</a>.</p>
+      </details>
+      <details class="pr-faq">
+        <summary>Wat als Paramant stopt?</summary>
+        <p>De code staat openbaar op <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a> onder BUSL-1.1. Een server die u zelf draait, blijft werken. Uw ondertekeningsbewijzen zijn zonder ons te controleren.</p>
+      </details>
+      <details class="pr-faq">
+        <summary>De techniek, voor wie het wil weten</summary>
+        <p>Elk plan krijgt dezelfde versleuteling. Versturen uit de webapp gebruikt ML-KEM-768 samen met ECDH P-256; ondertekenen gebruikt ML-DSA-65. De bestandsgrootte verschilt niet per plan: 500 MB bij direct overdragen, 5 MB via een eenmalige link, en 25 MB als u naar een lijst van ontvangers verstuurt. Het kantoorplan geeft verder API-toegang, tot 50 geregistreerde apparaten, verzendgeschiedenis en webhooks. De volledige tabel met alle plannen staat op <a href="/en/pricing">de Engelse prijspagina</a>.</p>
+      </details>
     </div>
   </div>
 </section>
-
-<!-- FAQ -->
-<section style="padding:var(--space-4) 0 var(--space-9);border-top:1px solid var(--ink-hair)">
-  <div class="container-md">
-    <h2 style="font-size:var(--text-xl);text-transform:uppercase;margin-bottom:var(--space-7)">Frequently asked questions</h2>
-
-    <div class="faq-item">
-      <p class="faq-q">What happens to my file after the recipient downloads it?</p>
-      <div class="faq-a">All files are RAM-only. They exist only in server memory and are wiped after the last read the link allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Firm and 100 on Enterprise. TTL expiry wipes them too. Nothing persists after expiry on any tier. There is no disk storage.</div>
-    </div>
-
-    <div class="faq-item">
-      <p class="faq-q">Can I self-host Paramant for free?</p>
-      <div class="faq-a">Yes. The relay is available on <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a> under BUSL-1.1. Community self-hosting is free forever. The license prevents competitors from reselling the relay as a managed service without a commercial license. See the <a href="/license">license page</a> for full terms.</div>
-    </div>
-
-    <div class="faq-item">
-      <p class="faq-q">Is there a free trial for Firm?</p>
-      <div class="faq-a">There is no separate trial: every product has a Community tier forever, so you can try the core flow at no cost and upgrade to Firm or Business when you need higher limits. <a href="/signup">Create a free account</a> to start, no card required; the Firm and Business buttons above take you straight to checkout.</div>
-    </div>
-
-    <div class="faq-item">
-      <p class="faq-q">How does ParaSign pricing work?</p>
-      <div class="faq-a">ParaSign is priced by signature volume, not by feature. Community covers 2 signatures a month; Firm (&euro;29/mo or &euro;290/yr, excl. btw) includes 100 a month, with API access, and covers ParaSend in the same payment; Business (&euro;299/mo or &euro;2,990/yr, excl. btw) includes 1,000 a month with named support and an exportable audit log. A month&rsquo;s included signatures are the limit for that month: when they are used up, signing waits until the counter resets on the 1st, or you move to a plan that includes more. Every tier uses the same ML-DSA-65 post-quantum cryptography and public CT-log verification. A ParaSign signature is a Simple Electronic Signature (SES) under eIDAS, not an advanced (AES) or a qualified (QES) signature. QES is coming via an EU QTSP partner.</div>
-    </div>
-
-    <div class="faq-item">
-      <p class="faq-q">Is a Simple Electronic Signature enough for my documents?</p>
-      <div class="faq-a">Under Dutch law an ordinary electronic signature has the same legal effect as a handwritten one, provided the method used for signing is sufficiently reliable in the light of the purpose for which it was used and all the other circumstances of the case (Dutch Civil Code, art. 3:15a, <a href="https://wetten.overheid.nl/BWBR0005291/2025-07-01" target="_blank" rel="noopener">wetten.overheid.nl BWBR0005291</a>). A qualified signature (QES) shifts the burden of proof: with a QES that reliability does not have to be shown. With a simple signature it is an open standard, and ParaSign is built to make the reliability demonstrable: every signature produces a receipt and an entry in a public log that anyone can check. This is not legal advice; ask your own counsel what your matter needs.</div>
-    </div>
-
-    <div class="faq-item">
-      <p class="faq-q">Do all plans include a GDPR Data Processing Agreement?</p>
-      <div class="faq-a">The standard DPA is publicly available at <a href="/dpa">/dpa</a> and applies to all plans. Enterprise customers can negotiate custom DPA terms as part of their contract.</div>
-    </div>
-
-    <div class="faq-item">
-      <p class="faq-q">What does "IEC 62443 / NEN 7510 / NIS2 compliance documentation" mean?</p>
-      <div class="faq-a">Architecture documents, security controls mappings, and technical reference materials aligned to these frameworks. This is documentation you can use as input for your own compliance process. Paramant does not hold third-party certification for these frameworks.</div>
-    </div>
-
-    <div class="faq-item">
-      <p class="faq-q">What happens if Paramant shuts down?</p>
-      <div class="faq-a">Paramant is published under BUSL-1.1. If the managed service ever closes, every self-hosted relay keeps running indefinitely. The source code is permanently available on <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a>. No vendor lock-in by design.</div>
-    </div>
-
-  </div>
-</section>
-
 </main>
+<p class="lang-switch"><a href="/en/pricing" hreflang="en" lang="en">This page in English</a></p>
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Company</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/about">About</a>
-          <a href="/changelog">Changelog</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/privacy">Privacy Policy</a>
-          <a href="/dpa">Data Processing Agreement</a>
-          <a href="/terms">Terms of Service</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/license">License</a>
+          <a href="/license">Licentie</a>
         </div>
       </div>
     </div>
@@ -680,9 +362,9 @@
 </footer>
 
 <script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=9" defer></script>
+<script src="/js/nav-auth.js?v=10" defer></script>
 <script src="/js/app-session-token.js?v=1" defer></script>
-<script src="/js/pricing-billing.js?v=3" defer></script>
+<script src="/js/pricing-billing.js?v=4" defer></script>
 <script src="/js/redeem-code.js?v=2" defer></script>
 </body>
 </html>

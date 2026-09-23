@@ -1,24 +1,24 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Beveiliging · Wat u krijgt en wat u zelf kunt nakijken · Paramant</title>
+<title>Security · How to check Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Paramant is nog niet NEN 7510-gecertificeerd. Wel krijgt u een verwerkersovereenkomst, servers in Duitsland en een extern auditrapport. Van Paramantis Solutions B.V.">
-<meta property="og:title" content="Beveiliging · Wat u krijgt en wat u zelf kunt nakijken · Paramant">
-<meta property="og:description" content="Paramant is nog niet NEN 7510-gecertificeerd. Wel krijgt u een verwerkersovereenkomst, servers in Duitsland en een extern auditrapport. Van Paramantis Solutions B.V.">
-<meta property="og:url" content="https://paramant.app/security">
+<meta name="description" content="Servers at Hetzner in Nuremberg, Germany, under EU and German law. Post-quantum cryptography, nothing kept on disk, and a disclosure policy you can read.">
+<meta property="og:title" content="Security · How to check Paramant">
+<meta property="og:description" content="Servers at Hetzner in Nuremberg, Germany, under EU and German law. Post-quantum cryptography, nothing kept on disk, and a disclosure policy you can read.">
+<meta property="og:url" content="https://paramant.app/en/security">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Beveiliging · Wat u krijgt en wat u zelf kunt nakijken · Paramant">
-<meta name="twitter:description" content="Paramant is nog niet NEN 7510-gecertificeerd. Wel krijgt u een verwerkersovereenkomst, servers in Duitsland en een extern auditrapport. Van Paramantis Solutions B.V.">
-<link rel="canonical" href="https://paramant.app/security">
+<meta name="twitter:title" content="Security · How to check Paramant">
+<meta name="twitter:description" content="Servers at Hetzner in Nuremberg, Germany, under EU and German law. Post-quantum cryptography, nothing kept on disk, and a disclosure policy you can read.">
+<link rel="canonical" href="https://paramant.app/en/security">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/security">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/security">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/security">
@@ -150,17 +150,40 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   "@graph": [
     {
       "@type": "WebPage",
-      "@id": "https://paramant.app/security#webpage",
-      "url": "https://paramant.app/security",
-      "name": "Beveiliging · Wat u krijgt en wat u zelf kunt nakijken · Paramant",
+      "@id": "https://paramant.app/en/security#webpage",
+      "url": "https://paramant.app/en/security",
+      "name": "Security · How to check Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "nl",
-      "description": "Paramant is nog niet NEN 7510-gecertificeerd. Wel krijgt u een verwerkersovereenkomst, servers in Duitsland en een extern auditrapport. Van Paramantis Solutions B.V."
+      "inLanguage": "en",
+      "description": "Servers at Hetzner in Nuremberg, Germany, under EU and German law. Post-quantum cryptography, nothing kept on disk, and a disclosure policy you can read."
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://paramant.app/en/security#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Paramant",
+          "item": "https://paramant.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "En",
+          "item": "https://paramant.app/en"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Security"
+        }
+      ]
     },
     {
       "@type": "Organization",
@@ -194,114 +217,96 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   ]
 }
 </script>
-<style>
-/* De Nederlandse beveiligingspagina: de certificeringszin staat bovenaan en
-   leest als de rest van de hero, met onderstreepte links op het donkere vlak. */
-.page-hero--navy .cert-lede{color:var(--invert-ink)}
-.page-hero--navy .lede a{color:var(--invert-ink);text-decoration:underline;text-underline-offset:3px}
-.tech-ref-note{font-size:var(--text-sm);color:var(--ink-dim)}
-.lang-switch{max-width:780px;margin:0 auto;padding:24px 16px;font-size:14px}
-.lang-switch a{color:var(--ink);text-decoration:underline}
-</style>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Naar de inhoud</a>
+<a href="#main-content" class="skip-link">Skip to main content</a>
 
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/parasend" class="nav-link">Versturen</a></li>
-    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
-    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
-    <li><a href="/security" class="nav-link">Beveiliging</a></li>
-    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
+    <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/security" class="nav-link">Security</a></li>
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Hulp</a>
-    <a href="/auth/login" class="nav-signin">Inloggen</a>
-    <a href="/signup" class="nav-cta">Account maken</a>
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
-  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
-  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
-  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+  <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/security" class="nav-mobile-standalone">Security</a>
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
-  <a href="/help" class="nav-tail-link">Hulp</a>
+  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
 </div>
+
 <section class="page-hero page-hero--navy">
 <div class="page-hero-inner">
-  <span class="eyebrow">BEWIJS</span>
-  <h1>Beveiliging</h1>
-  <!-- Bovenaan, en eerlijk (besluit van 23-09-2026): wat Paramant niet heeft,
-       en direct daarna wat u wel krijgt. Elk van de drie dingen heeft een link
-       naar het stuk zelf, en tests/site-claims.test.mjs faalt als een van die
-       stukken verdwijnt. -->
-  <p class="lede cert-lede" id="certificering">Paramant is nog niet NEN 7510- of ISO 27001-gecertificeerd. Wel krijgt u: een <a href="/dpa">verwerkersovereenkomst</a>, servers in Duitsland (Hetzner, Neurenberg) en een <a href="/docs/security-audit-2026-04.md">extern auditrapport (april 2026)</a>. Voor uw eigen NEN 7510-dossier leveren wij de beheersmaatregelen aan.</p>
-  <p class="lede">Breekt iemand in op onze eigen server, dan kan hij de documenten daar nog steeds niet lezen: ze worden op uw apparaat versleuteld voordat ze het verlaten, en de sleutel komt nooit bij ons. Dat geldt voor de webapp om te versturen en voor de offici&euml;le SDK's. De browserextensies voor Chromium en Outlook versleutelen nog op onze server; wat u daarmee uploadt, kunnen wij lezen tot dat is aangepast.</p>
-  <p class="hero-by">Paramant is een product van Paramantis Solutions B.V. in Harderwijk, KvK 42115132. Elk plan krijgt dezelfde bescherming, ook het gratis Community-plan.</p>
+  <span class="eyebrow">EVIDENCE</span>
+  <h1>Security</h1>
+  <p class="lede">Break into our own server and you still cannot read the documents on it: they are encrypted on your device before they leave it, and the key never reaches us. That holds for the ParaSend web app and the official SDKs. The Chromium and Outlook extensions still encrypt on our server, which means we can read what you upload through them until that is changed; the detail is further down this page.</p>
+  <p class="lede">This is the evidence under everything the rest of the site promises, and it covers every plan: the Community tier gets exactly the same protection as the paid ones.</p>
+  <p class="hero-by">Paramant is a product of Paramantis Solutions B.V. in Harderwijk, the Netherlands, KvK 42115132.</p>
   <div class="hero-cta">
-    <a href="/pricing" class="btn btn-primary">Bekijk de prijzen &rarr;</a>
-    <a href="/verify" class="btn btn-secondary">Controleer een document &rarr;</a>
+    <a href="/pricing" class="btn btn-primary">See pricing &rarr;</a>
+    <a href="/verify" class="btn btn-secondary">Verify a document &rarr;</a>
   </div>
 </div>
 </section>
 
 <main id="main-content">
-  <h2 id="why-trust" style="margin-top:0">Waarom u ons kunt vertrouwen</h2>
-  <p>Vier dingen dragen dit product. Bij elk staat wat het voor u betekent en waar u het zelf nakijkt.</p>
+
+  <h2 id="why-trust" style="margin-top:0">Why you can trust us</h2>
+  <p>Four things carry this product. Each one says what it means for you, and where you check it yourself. The technical detail that makes them true starts below.</p>
+
   <div class="grid2" style="margin-top:20px">
     <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Uw documenten blijven onder Europees recht</div>
-      <p style="margin:0 0 10px">De servers staan bij Hetzner in Neurenberg, Duitsland, onder de AVG. Geen Amerikaanse partij in de weg die uw bestanden afleggen: uw bestanden en sleutels blijven in de EU en komen nooit bij een Amerikaans bedrijf. Mail gaat via Mailjet SAS in Parijs (moederbedrijf Sinch AB, Zweden). Mailjet krijgt het adres, het bericht en de uitnodigingslink, nooit het document, en bewaart die mail in Frankfurt en Saint-Ghislain. Mailjet draait zelf op Google Cloud; daarom zeggen we dat geen Amerikaanse partij een bestand of een sleutel aanraakt, en niet dat er nergens een bestaat. De lijst met subverwerkers staat op <a href="/privacy">privacy</a>.</p>
-      <p style="margin:0;font-size:var(--text-sm)"><a href="#jurisdiction">De tabel met rechtsgebieden &rarr;</a></p>
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Your documents stay under EU law</div>
+      <p style="margin:0 0 10px">Server location: Hetzner Nuremberg, Germany. Legal jurisdiction: EU / Germany (GDPR). No US provider in the data path: your files and your keys stay in the EU and never reach a US company. Transactional email goes via Mailjet SAS in Paris (parent Sinch AB, Sweden), which receives the address, the message and the invite link but never the document; that mail is stored in Frankfurt and Saint-Ghislain. Mailjet runs on Google Cloud, so Google is a sub-processor of theirs, and that is why we say no US provider touches a file or a key rather than claiming none exists at any depth. See the subprocessor list on <a href="/privacy">privacy</a>.</p>
+      <p style="margin:0;font-size:var(--text-sm)"><a href="#jurisdiction">Check the jurisdiction table &rarr;</a></p>
     </div>
     <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">De sleutel blijft op uw apparaat</div>
-      <p style="margin:0 0 10px">De ondertekeningssleutel wordt in uw browser gemaakt en komt nooit op onze server. Voor een verzoek dat u in de browser maakt, houdt de server alleen versleutelde gegevens vast.</p>
-      <p style="margin:0;font-size:var(--text-sm)"><a href="/crypto-agility">Het overzicht van algoritmen &rarr;</a></p>
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">The key stays on your device</div>
+      <p style="margin:0 0 10px">ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay. For a request you create in a browser the relay holds only ciphertext; for the hosted signing ceremony on the <code>/v1</code> API it holds the document, because that is what a hosted ceremony is.</p>
+      <p style="margin:0;font-size:var(--text-sm)"><a href="/crypto-agility">Check the algorithm registry &rarr;</a></p>
     </div>
     <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Het bewijs overleeft de leverancier</div>
-      <p style="margin:0 0 10px">Elke handtekening komt in een openbaar logboek waar alleen iets bij kan, niets uit. Een getekend document is te controleren zonder contact met ons.</p>
-      <p style="margin:0;font-size:var(--text-sm)"><a href="/ct-log">Het logboek &rarr;</a> &nbsp; <a href="/verify">Controleer een document &rarr;</a></p>
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">The proof outlives the supplier</div>
+      <p style="margin:0 0 10px">Every signature is entered into a public, append-only log. A signed document verifies without contacting us.</p>
+      <p style="margin:0;font-size:var(--text-sm)"><a href="/ct-log">Read the CT log &rarr;</a> &nbsp; <a href="/verify">Verify a document &rarr;</a></p>
     </div>
     <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">U kunt de code lezen</div>
-      <p style="margin:0 0 10px">De server is source-available onder BUSL-1.1. U kunt precies lezen wat hij met uw bestand doet, en hem op uw eigen server draaien.</p>
-      <p style="margin:0;font-size:var(--text-sm)"><a href="https://github.com/Apolloccrypt/paramant-relay">De code op GitHub &rarr;</a></p>
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">You can read the code</div>
+      <p style="margin:0 0 10px">The relay is source-available under BUSL-1.1. You can read exactly what it does with your file and run it on your own server.</p>
+      <p style="margin:0;font-size:var(--text-sm)"><a href="https://github.com/Apolloccrypt/paramant-relay">Open the repository &rarr;</a> &nbsp; <a href="/trust">How to verify a deployment &rarr;</a></p>
     </div>
   </div>
 
-  <div class="card" style="margin-top:14px;border-left:3px solid var(--cobalt)">
-    <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Waar uw documenten heen gaan, is een juridische vraag geworden</div>
-    <p style="margin:0;line-height:1.8">In een strafzaak bij de rechtbank Rotterdam had een cli&euml;nt vertrouwelijke informatie in ChatGPT gezet. Het was de cli&euml;nt, niet de advocaat. Op 12 juni 2026 oordeelde de rechter-commissaris dat het invoeren van zulke informatie in een externe AI-dienst als openbaarmaking kan gelden, waardoor de informatie haar vertrouwelijke karakter verliest (<a href="https://uitspraken.rechtspraak.nl/details?id=ECLI:NL:RBROT:2026:9319" target="_blank" rel="noopener">ECLI:NL:RBROT:2026:9319</a>, gepubliceerd op 30 juli 2026). Dat is &eacute;&eacute;n rechter-commissaris in &eacute;&eacute;n zaak, zonder hoger beroep. Het is geen vaste rechtspraak. Het laat wel zien dat een rechter nu vraagt waar een document terechtkomt. Het antwoord van Paramant zit in de bouw, niet in een contract: het bestand wordt in uw browser versleuteld en de server heeft nooit een leesbare kopie. Dit is geen juridisch advies; vraag uw eigen adviseur wat uw zaak nodig heeft.</p>
+  <div class="card" style="margin-top:16px;border-left:3px solid var(--lime)">
+    <p style="margin:0;line-height:1.8">Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user. The Community tier is not a weaker version of the product; it is the same product with lower limits. <a href="/pricing">See pricing &rarr;</a></p>
   </div>
 
-  <h3 id="audits">Wat er is geaudit</h3>
+  <h3>The limit, stated up front</h3>
   <div class="card">
-    <p style="margin:0 0 12px;line-height:1.8">Drie externe beveiligingsaudits in april 2026 hebben de code van de server bekeken: twee door R. Zwarts, een door Ryan Williams van Smart Cyber Solutions. Samen leverden ze 40 bevindingen op, waarvan 4 kritiek. Data, aantallen en de commit die elke reeks oploste, staan in de audittabel op de <a href="/docs#audits">docs-pagina</a>, en elke bevinding staat beschreven in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md">SECURITY.md</a> in de openbare code.</p>
-    <p style="margin:0;line-height:1.8">De review van Smart Cyber Solutions staat volledig online, bevinding voor bevinding, als het <a href="/docs/security-audit-2026-04.md">auditrapport van april 2026</a>. Wat niet gepubliceerd is, is de ruwe pentest-uitvoer erachter. Een volgende externe review van versie 3.0.0 is gepland.</p>
-  </div>
-
-  <h3 id="nen7510">Voor uw NEN 7510-dossier</h3>
-  <div class="card">
-    <p style="margin:0">Wat er nu ligt: een NEN 7510-tabel in de <a href="/docs/dicom-guide.md">DICOM-handleiding</a> en een IEC 62443-tabel in de <a href="/docs/ot-guide.md">OT-handleiding</a>, openbaar en gratis op elk plan. Dat is documentatie voor uw eigen dossier, geen certificaat. Mail <a href="mailto:privacy@paramant.app?subject=NEN%207510">privacy@paramant.app</a> voor de beheersmaatregelen die u nodig heeft.</p>
+    <p style="margin:0"><strong>Compliance documentation, not certification.</strong> The IEC 62443, NEN 7510 and NIS2 materials are architecture documents, security controls mappings and technical reference materials aligned to those frameworks. This is documentation you can use as input for your own compliance process. Paramant does not hold third-party certification for these frameworks.</p>
   </div>
 
   <hr class="divider">
-  <div lang="en" class="tech-ref">
-  <p class="tech-ref-note" lang="nl">Hieronder volgt de technische uitwerking, in het Engels, voor uw IT-leverancier of auditor.</p>
+
   <h2 id="jurisdiction">Jurisdiction &amp; privacy</h2>
   <div class="card" style="margin-bottom:14px;border-left:3px solid var(--cobalt)">
     <p style="margin:0;line-height:1.8">A Dutch company owns this: Paramantis Solutions B.V. in Harderwijk, KvK 42115132. Several of the better known Dutch names in this market now answer to an owner abroad; this one does not. The table below is every flag that touches the product, including the one American exception, so you can check that instead of taking our word for it.</p>
@@ -319,6 +324,10 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </table>
   </div>
 
+  <div class="card" style="margin-top:14px;border-left:3px solid var(--cobalt)">
+    <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Where your documents go has become a legal question</div>
+    <p style="margin:0;line-height:1.8">In a criminal case at the Rotterdam district court, a client had put privileged information into ChatGPT. It was the client who did so, not the lawyer. On 12 June 2026 the examining magistrate held that entering such information into an external AI service can count as disclosure, so the information loses its privileged character (<a href="https://uitspraken.rechtspraak.nl/details?id=ECLI:NL:RBROT:2026:9319" target="_blank" rel="noopener">ECLI:NL:RBROT:2026:9319</a>, published 30 July 2026). That is one examining magistrate in one case, with no appeal followed. It is not settled law. What it does show is that where a document ends up is a question a court will now ask. Paramant's answer to that question is architectural, not contractual: the file is encrypted in your browser and the server never holds a readable copy, as <a href="#core-principle">Core principle</a> sets out below. This is not legal advice; ask your own counsel what your matter needs.</p>
+  </div>
 
   <hr class="divider">
 
@@ -330,6 +339,12 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="card" style="margin-top:14px;border-left:3px solid var(--cobalt)">
     <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Where the zero-knowledge guarantee holds today</div>
     <p style="margin:0;line-height:1.75;font-size:var(--text-sm)">The guarantee above applies to transfers from the official SDKs (sdk-py 3.0.0, sdk-js 3.0.0) and the ParaSend web app, each of which encrypts in the client before bytes leave the device. The Chromium and Outlook extensions currently take a server-side encryption path while their client-side crypto is being finished; until that migration lands, treat extension uploads as relay-side, not zero-knowledge. Per-client status: <a href="/crypto-agility#06">crypto-agility § 06</a>.</p>
+  </div>
+
+  <h3 id="audits">What was audited</h3>
+  <div class="card">
+    <p style="margin:0 0 12px;line-height:1.8">Three external security audits in April 2026 reviewed the relay code: two by R. Zwarts, one by Ryan Williams of Smart Cyber Solutions. Together they produced 40 findings, 4 of them critical. Dates, finding counts and the commit that resolved each set are in the audit table on the <a href="/docs#audits">docs page</a>, and every finding is written up in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md">SECURITY.md</a> in the public repository.</p>
+    <p style="margin:0;line-height:1.8">The Smart Cyber Solutions review is published in full, finding by finding, as the <a href="/docs/security-audit-2026-04.md">April 2026 audit report</a>. What is not published is the raw pentest output behind it. A further external review of the v3.0.0 and open-core architecture is planned.</p>
   </div>
 
   <p style="font-size:var(--text-sm);color:var(--ink-dim)">For the cryptographic architecture in full, see the <a href="/architecture">architecture page</a>.</p>
@@ -491,42 +506,46 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <p style="margin-bottom:0;font-size:var(--text-sm)">No monetary bounty at this time. Credit on our <a href="/security/acknowledgements">acknowledgements page</a>, and priority access to new features.</p>
   </div>
 
-    <h2 id="customer-transparency">Customer transparency</h2>
+  <hr class="divider">
+
+  <h2 id="next">What to do next</h2>
+  <p>Every plan gets what this page describes. ParaSign Community and ParaSend Community cost &euro;0, forever, with no card required; the paid plans buy higher limits, API access, a dedicated relay and an SLA, never better cryptography.</p>
+  <div class="hero-cta">
+    <a href="/pricing" class="btn btn-primary">See pricing &rarr;</a>
+    <a href="/verify" class="btn btn-secondary">Verify a document &rarr;</a>
+  </div>
+
+  <hr class="divider">
+
+  <h2 id="customer-transparency">Customer transparency</h2>
   <p>Security is also about knowing what the vendor can and cannot do. The <a href="/trust">Trust &amp; Verification page</a> documents, in plain terms, how license-check works, what Paramant can see of your relay (and what it never can), how to verify your deployment, and which remote actions are possible versus structurally impossible. Each claim there is tagged as live today or planned, with links to the public protocol specifications.</p>
 
-  </div>
-  <hr class="divider">
-  <h2 id="next">Wat nu</h2>
-  <p>Elk plan krijgt wat deze pagina beschrijft. Community is gratis, voor altijd, zonder betaalkaart. Het kantoorplan koopt hogere grenzen, nooit betere versleuteling.</p>
-  <div class="hero-cta">
-    <a href="/pricing" class="btn btn-primary">Bekijk de prijzen &rarr;</a>
-    <a href="/verify" class="btn btn-secondary">Controleer een document &rarr;</a>
-  </div>
 </main>
-<p class="lang-switch"><a href="/en/security" hreflang="en" lang="en">This page in English</a></p>
+
+<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/security" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Bedrijf</div>
+        <div class="footer-col-label">Company</div>
         <div class="footer-links">
-          <a href="/about">Over Paramant</a>
-          <a href="/changelog">Wijzigingen</a>
+          <a href="/about">About</a>
+          <a href="/changelog">Changelog</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Juridisch</div>
+        <div class="footer-col-label">Legal</div>
         <div class="footer-links">
-          <a href="/privacy">Privacybeleid</a>
-          <a href="/dpa">Verwerkersovereenkomst</a>
-          <a href="/terms">Voorwaarden</a>
+          <a href="/privacy">Privacy Policy</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/terms">Terms of Service</a>
           <a href="/sla">SLA</a>
-          <a href="/license">Licentie</a>
+          <a href="/license">License</a>
         </div>
       </div>
     </div>

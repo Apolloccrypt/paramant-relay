@@ -30,7 +30,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.join(HERE, '..', 'frontend');
 const CHROME = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const TYPES = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.json': 'application/json' };
-const ROUTE_ALIAS = { '/pricing': '/pricing.html', '/signup': '/signup.html' };
+const ROUTE_ALIAS = { '/pricing': '/pricing.html', '/en/pricing': '/en/pricing.html', '/signup': '/signup.html' };
 
 const catalog = createRequire(import.meta.url)('../relay/lib/billing-catalog.js');
 
@@ -68,7 +68,10 @@ async function openPricing() {
   await page.route('**/v2/billing/**', (route) => route.fulfill({
     status: 500, contentType: 'application/json', body: '{"error":"not_expected_on_load"}',
   }));
-  await page.goto(`${BASE}/pricing`, { waitUntil: 'networkidle' });
+  // The full tier table is the English page since 23 September 2026; the Dutch
+  // /pricing sells Firm alone and is held by relay/test/pricing-page.test.js and
+  // tests/pricing-fold.test.mjs.
+  await page.goto(`${BASE}/en/pricing`, { waitUntil: 'networkidle' });
   return page;
 }
 
