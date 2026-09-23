@@ -131,8 +131,12 @@
 <style>
 /* De Nederlandse over-pagina: Mick zichtbaar, met een plek voor zijn foto. */
 .about-person{display:flex;align-items:center;gap:var(--space-4);margin-top:var(--space-5);max-width:680px}
-.about-person .about-byline{margin-top:0}
-.portrait{flex:0 0 auto;width:88px;height:88px;border-radius:50%;border:1px dashed var(--ink-dim);background:var(--bone);display:grid;place-items:center;font-family:var(--mono);font-size:var(--text-md);color:var(--ink-dim)}
+.about-hero{padding:var(--space-10) 0 var(--space-6)}
+@media (max-width:640px){.about-hero{padding-top:var(--space-5)}}
+.about-person .about-byline{margin-top:0;border-left:0;padding-left:0}
+.about-person .about-byline .n{font-size:var(--text-lg, 1.25rem)}
+.about-person .about-byline .t{font-family:inherit;font-size:var(--text-sm, .95rem);letter-spacing:0;text-transform:none;color:var(--ink-dim);line-height:1.45;margin-top:2px}
+.portrait{flex:0 0 auto;width:112px;height:112px;border-radius:50%;overflow:hidden;background:var(--bone);box-shadow:0 0 0 1px var(--line, rgba(12,27,42,.12))}.portrait img{display:block;width:100%;height:100%;object-fit:cover}
 .about-research{list-style:none;padding:0;margin:var(--space-4) 0 0;max-width:680px}
 .about-research li{font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0 0 var(--space-2);padding-left:18px;position:relative}
 .about-research li::before{content:"";position:absolute;left:0;top:.75em;width:8px;height:2px;background:var(--cobalt)}
@@ -179,7 +183,7 @@
   <a href="/help" class="nav-tail-link">Hulp</a>
 </div>
 <main id="main-content" tabindex="-1">
-<section style="padding:var(--space-10) 0 var(--space-6)">
+<section class="about-hero">
   <div class="container-md">
     <div class="sec-head">
       <span class="num">00</span>
@@ -187,12 +191,11 @@
       <span class="mono-eyebrow">Het bedrijf, de maker, en hoe u ons nakijkt</span>
     </div>
     <p class="about-lede">Documenten versturen en laten tekenen, zodat alleen u en de ontvanger ze kunnen lezen, en iedereen later kan nakijken dat het document echt en ongewijzigd is. De servers staan in Duitsland, onder Europees recht.</p>
-    <!-- Mick zichtbaar (besluit van 23-09-2026). De foto komt van Mick zelf;
-         tot die er is, staat hier een lege plek met zijn initialen en een
-         alt-tekst die zegt wat er komt. Geen stockfoto, geen gegenereerd
-         portret. -->
     <div class="about-person">
-      <div class="portrait" role="img" aria-label="Plek voor een foto van Mick Beer. De foto volgt.">MB</div>
+      <picture class="portrait">
+        <source srcset="/assets/mick/mick-beer-240.webp" type="image/webp">
+        <img src="/assets/mick/mick-beer-240.jpg" width="112" height="112" alt="Mick Beer" loading="eager" decoding="async">
+      </picture>
       <div class="about-byline">
         <div class="n">Mick Beer</div>
         <div class="t">Privacy- en securityonderzoeker, oprichter van Paramantis Solutions B.V.</div>

@@ -3172,13 +3172,15 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
   }
   if (!page('pricing').includes('wetten.overheid.nl/BWBR0005291')) problems.push('pricing: art. 3:15a must link to the statute');
 
-  // 6. /about: Mick visible. A place for a photo that is honest about being a
-  // place, his name and title, and only research lines with a source.
+  // 6. /about: Mick visible. His own portrait (the one on mickbeer.com), sized
+  // and named, and only research lines with a source.
   const about = page('about');
   const hero = about.slice(about.indexOf('<main'), about.indexOf('class="about-band"', about.indexOf('<main')));
-  assert.match(hero, /<div class="portrait" role="img" aria-label="Plek voor een foto van Mick Beer\. De foto volgt\.">/,
-    'about: the photo place says what it is, for a screen reader too');
-  assert.doesNotMatch(hero, /<img\b/, 'about: no photo until Mick supplies one; no stock or generated portrait');
+  assert.match(hero, /<picture class="portrait">[\s\S]*?<img src="\/assets\/mick\/mick-beer-240\.jpg" width="112" height="112" alt="Mick Beer"/,
+    'about: Mick\'s own portrait, with its size set so the page does not jump, and his name as alt text');
+  for (const f of ['frontend/assets/mick/mick-beer-240.jpg', 'frontend/assets/mick/mick-beer-240.webp']) {
+    assert.ok(fs.existsSync(path.join(ROOT, f)), `about: ${f} must exist`);
+  }
   says('about', 'Mick Beer Privacy- en securityonderzoeker, oprichter van Paramantis Solutions B.V.');
   const research = [...(hero.match(/<ul class="about-research">([\s\S]*?)<\/ul>/) || [, ''])[1].matchAll(/<li>([\s\S]*?)<\/li>/g)]
     .map((m) => m[1].replace(/<[^>]+>/g, '').trim());
