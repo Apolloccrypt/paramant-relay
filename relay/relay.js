@@ -4617,6 +4617,40 @@ async function handleRelayRequest(req, res) {
     }
   }
 
+  // ── POST /v2/sends/precheck: the recipient list, before any upload ────────
+  //
+  // The same check POST /v2/sends makes (tiers.checkRecipients on the ParaSend
+  // tier), without a single block. The page asks this first, so a Community
+  // sender with two addresses is told about the ceiling of one BEFORE the file
+  // is sealed and uploaded, instead of after: then a transfer was counted and
+  // the loose blocks sat in memory for a send that was refused. Nothing is
+  // counted, stored or mailed here, and the invitation budget is not touched.
+  if (req.method === 'POST' && path === '/v2/sends/precheck') {
+    const kd = apiKeys.get(apiKey);
+    if (!kd || !kd.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
+    let input;
+    try { input = JSON.parse((await readBody(req, 65536)).toString()); }
+    catch (e) {
+      const teGroot = /too large/i.test(String((e && e.message) || ''));
+      res.writeHead(teGroot ? 413 : 400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: teGroot ? 'body_too_large' : 'invalid_json' }));
+    }
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      res.writeHead(400); return res.end(J({ error: 'invalid_json' }));
+    }
+    const _tierP = parasendLimitsOf(kd).tier;
+    const chk = tiers.checkRecipients(_tierP, input.recipients);
+    if (!chk.ok) {
+      const status = chk.reason === 'over_limit' ? 403 : 400;
+      res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ error: chk.reason, dimension: 'max_recipients', plan: chk.plan,
+                         limit: chk.limit, asked: chk.count || undefined,
+                         rejected: chk.rejected || undefined }));
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(J({ ok: true, plan: chk.plan, limit: chk.limit, count: chk.count }));
+  }
+
   // ── POST /v2/sends: van geuploade blokken naar een verzending ─────────────
   //
   // WHY THIS IS A SECOND STEP. A file goes up in blocks of a fixed size: a
