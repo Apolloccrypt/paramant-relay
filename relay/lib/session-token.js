@@ -114,6 +114,10 @@ const SCOPE = [
   // with the blocks already written, so a send to a group could not be made at
   // all and the blocks sat in memory until their TTL.
   { method: 'POST', path: '/v2/sends' },
+  // Asking whether the recipient list fits the plan, before anything is sealed.
+  // Same page, the step before the upload; without it every signed-in sender
+  // got 403 session_token_out_of_scope and could not send to anyone by name.
+  { method: 'POST', path: '/v2/sends/precheck' },
 ];
 
 // ── The second purpose: the signed-in app pages ──────────────────────────────

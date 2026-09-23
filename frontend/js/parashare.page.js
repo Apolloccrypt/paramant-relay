@@ -776,6 +776,7 @@ function teVeelZin(body) {
 // uploaded. Returns { ok: true } or the refusal body. A relay that does not
 // know the route (an older sector) or cannot be reached is not a refusal:
 // POST /v2/sends still checks, so the send goes on as before.
+const LIJST_WEIGERINGEN = ['over_limit', 'invalid_address', 'empty'];
 async function precheckOntvangers(ontvangers) {
   try {
     const r = await relayFetch(RELAY_API + '/v2/sends/precheck', {
@@ -787,7 +788,12 @@ async function precheckOntvangers(ontvangers) {
     if (r.ok) return { ok: true };
     if (r.status === 400 || r.status === 403) {
       const body = await r.json().catch(function () { return {}; });
-      if (body && body.error) return Object.assign({ ok: false }, body);
+      // Only a refusal about the list itself stops the send. Anything else (a
+      // scope or auth answer from a relay that does not know the route yet) is
+      // not a verdict on the list, and POST /v2/sends still checks.
+      if (body && (LIJST_WEIGERINGEN.includes(body.error) || LIJST_WEIGERINGEN.includes(body.reason))) {
+        return Object.assign({ ok: false }, body);
+      }
     }
     return { ok: true, unchecked: true };
   } catch (_) {
