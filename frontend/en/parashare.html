@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#15191C;color:#EAE2CE}html[data-theme="dark"]{color-scheme:dark}@media (prefers-color-scheme:dark){html[data-theme="auto"],html[data-theme="auto"] body{background:#15191C;color:#EAE2CE}html[data-theme="auto"]{color-scheme:dark}}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Encrypted file transfer · Paramant</title>
+<title>Send a file securely | ParaSend | Paramant</title>
 <meta property="og:site_name" content="Paramant">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
@@ -325,21 +325,21 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   .fingerprint{font-size:18px;letter-spacing:.08em}
 }
 </style>
-<meta name="description" content="Hand a file over live with hybrid post-quantum encryption, or send a link whose key never reaches us. It lives in memory only and burns after one download.">
+<meta name="description" content="Send a file live with post-quantum encryption, or as a link whose key never reaches us. Held in memory, deleted after one download. No account needed to receive.">
 <meta name="robots" content="noindex, nofollow">
 <!-- Gated by nginx (auth_request /api/user/check), so a crawler can only
      ever see the 302 to /auth/login, a path robots.txt disallows. Saying
      noindex here is the honest version of what the server already does. -->
-<meta property="og:title" content="Encrypted file transfer · Paramant">
-<meta property="og:description" content="Hand a file over live with hybrid post-quantum encryption, or send a link whose key never reaches us. It lives in memory only and burns after one download. No account needed to receive.">
+<meta property="og:title" content="Send a file securely | ParaSend | Paramant">
+<meta property="og:description" content="Send a file live with post-quantum encryption, or as a link whose key never reaches us. Held in memory, deleted after one download. No account needed to receive.">
 <meta property="og:url" content="https://paramant.app/en/parashare">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Encrypted file transfer · Paramant">
-<meta name="twitter:description" content="Hand a file over live with hybrid post-quantum encryption, or send a link whose key never reaches us. It lives in memory only and burns after one download. No account needed to receive.">
+<meta name="twitter:title" content="Send a file securely | ParaSend | Paramant">
+<meta name="twitter:description" content="Send a file live with post-quantum encryption, or as a link whose key never reaches us. Held in memory, deleted after one download. No account needed to receive.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="canonical" href="https://paramant.app/en/parashare">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/parashare">
@@ -415,7 +415,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
       "@type": "WebPage",
       "@id": "https://paramant.app/en/parashare#webpage",
       "url": "https://paramant.app/en/parashare",
-      "name": "Encrypted file transfer · Paramant",
+      "name": "Send a file securely | ParaSend | Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -423,7 +423,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "Hand a file over live with hybrid post-quantum encryption, or send a link whose key never reaches us. It lives in memory only and burns after one download."
+      "description": "Send a file live with post-quantum encryption, or as a link whose key never reaches us. Held in memory, deleted after one download. No account needed to receive."
     },
     {
       "@type": "SoftwareApplication",
@@ -601,7 +601,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
                 style="width:100%;padding:11px 12px;border:1px solid var(--line,#dfe4e7);border-radius:8px;background:transparent;color:inherit;font:400 14px/1.5 inherit;resize:vertical"
                 data-input="onRecipientsInput"></textarea>
       <p class="ps-meta" id="recipients-status">Leave empty for one link that opens once.
-         Fill it in and everyone gets their own link, and you see who collected.</p>
+         Fill it in and everyone gets their own link, and you see who has picked it up.</p>
     </div>
   </div>
 
@@ -626,8 +626,8 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <div class="ps-how-body">
       <p>Your receiver's browser makes a fresh pair of keys and sends us only the public half. Your browser locks the file for that public half and uploads the locked version. We hold no key, so what sits on our relay cannot be opened by us or by anyone who takes it from us.</p>
       <p>The short code you compare is built from the receiver's public keys, and both browsers work it out on their own. If anything had swapped those keys along the way, the two codes would not match. That is why you read the code to each other on a channel we do not run, such as a phone call.</p>
-      <p>For the reader who wants the names: the two stands do not use the same ones. Handing over live is a <strong>hybrid</strong> key exchange: ML-KEM-768 and ECDH P-256 run side by side and both shared secrets go through HKDF-SHA256 into one AES-256-GCM key, so an attacker who breaks either one on its own still has nothing. Sending a link does no key exchange at all: your browser makes a fresh AES-256-GCM key, puts it after the <code>#</code> in the link, and a fragment is never sent to a server. That means the link <em>is</em> the key, so whoever can read the channel you send it over can read the file.</p>
-      <p>Neither stand signs the file. The signatures here are the relay's own, on the transparency log and on the receipt it issues. Signing a document with ML-DSA-65 is what ParaSign does, not what sending does. The locked file is stored with an expiry and is destroyed when the link runs out or once the download link has been spent.</p>
+      <p>For readers who want the technical names: the two modes use different ones. Handing over live is a <strong>hybrid</strong> key exchange: ML-KEM-768 and ECDH P-256 run side by side and both shared secrets go through HKDF-SHA256 into one AES-256-GCM key, so an attacker who breaks either one on its own still has nothing. Sending a link does no key exchange at all: your browser makes a fresh AES-256-GCM key, puts it after the <code>#</code> in the link, and a fragment is never sent to a server. That means the link <em>is</em> the key, so whoever can read the channel you send it over can read the file.</p>
+      <p>Neither mode signs the file. The signatures here are the relay's own, on the transparency log and on the receipt it issues. Signing a document with ML-DSA-65 is what ParaSign does, not what sending does. The locked file is stored with an expiry and is destroyed when the link runs out or once the download link has been spent.</p>
     </div>
   </details>
 
@@ -659,7 +659,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <div class="card-body">
       <span class="label">One-time session link</span>
       <div class="ps-linkrow">
-      <div class="share-box" id="session-link" data-click="copyLink">&mdash;</div>
+      <div class="share-box" id="session-link" data-click="copyLink">-</div>
       <button type="button" class="ps-copy" id="ps-copy-btn" data-click="copyLink">Copy link</button>
       </div>
       <p class="ps-meta" id="ps-link-meta">The link carries no key and no file name. It only says where to connect.</p>
@@ -700,7 +700,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
        The names are still here, one click down, for the reader who wants them. -->
   <p class="sub">Your file is being locked on this device. We only ever receive the locked version, never the file itself and never the key.</p>
   <details class="ps-how">
-    <summary>The names, for who wants them</summary>
+    <summary>The technical names, for those who want them</summary>
     <p>This all happens in your browser. ML-KEM-768 and ECDH P-256 together wrap a
        fresh AES-256-GCM key for the receiver, then ciphertext-only flows to the
        relay. The relay signs the entry it makes in the public log; the file
@@ -747,7 +747,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
      promise "the receiver has to be online" holds only while confirmFingerprint
      is the single door into it. This stand walks its own door. -->
 <div class="step" id="step-sealing">
-  <h2 class="paramant-h1">Sealing &amp; uploading</h2>
+  <h2 class="paramant-h1">Sealing and uploading</h2>
   <p class="sub">Your browser locks the file under a fresh AES-256-GCM key, then uploads the locked bytes. The key stays here and goes into the link, after the #, where no server ever sees it.</p>
 
   <div class="card">
@@ -867,15 +867,15 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <div class="hud-panel-row"><span>Relay</span><span class="val ok">EU/DE · Online</span></div>
     <div class="hud-panel-row"><span>Protocol</span><span class="val">Ghost Pipe v2</span></div>
     <div class="hud-panel-row"><span>Encryption</span><span class="val">ML-KEM-768 + ECDH P-256</span></div>
-    <div class="hud-panel-row"><span>Blobs in flight</span><span class="val" id="hud-blobs">&mdash;</span></div>
+    <div class="hud-panel-row"><span>Blobs in flight</span><span class="val" id="hud-blobs">-</span></div>
   </div>
 
   <!-- Bottom bar -->
   <div class="hud-bot">
     <div class="hud-stat"><span class="hud-stat-lbl">Relay</span><span class="hud-stat-val ok">EU/DE · Online</span></div>
     <div class="hud-stat"><span class="hud-stat-lbl">Jurisdiction</span><span class="hud-stat-val">GDPR · No US CLOUD Act</span></div>
-    <div class="hud-stat"><span class="hud-stat-lbl">Session</span><span class="hud-stat-val" id="hud-session-stat">&mdash;</span></div>
-    <div class="hud-stat"><span class="hud-stat-lbl">Uptime</span><span class="hud-stat-val" id="hud-uptime">&mdash;</span></div>
+    <div class="hud-stat"><span class="hud-stat-lbl">Session</span><span class="hud-stat-val" id="hud-session-stat">-</span></div>
+    <div class="hud-stat"><span class="hud-stat-lbl">Uptime</span><span class="hud-stat-val" id="hud-uptime">-</span></div>
   </div>
 </div>
 

@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Certificate transparency log · Paramant</title>
+<title>Certificate transparency log | Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered, without seeing the payload.">
+<meta name="description" content="Key registrations, transfers and relay announcements in one tamper-evident Merkle tree. Anyone can check that an entry is in the log without seeing its contents.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -20,14 +20,14 @@
 <link rel="stylesheet" href="/design-system.css?v=31">
 <link rel="stylesheet" href="/nav.css?v=27">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
-<meta property="og:title" content="Certificate transparency log · Paramant">
-<meta property="og:description" content="Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered, without seeing the payload.">
+<meta property="og:title" content="Certificate transparency log | Paramant">
+<meta property="og:description" content="Key registrations, transfers and relay announcements in one tamper-evident Merkle tree. Anyone can check that an entry is in the log without seeing its contents.">
 <meta property="og:url" content="https://paramant.app/en/ct-log">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Certificate transparency log · Paramant">
-<meta name="twitter:description" content="Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered, without seeing the payload.">
+<meta name="twitter:title" content="Certificate transparency log | Paramant">
+<meta name="twitter:description" content="Key registrations, transfers and relay announcements in one tamper-evident Merkle tree. Anyone can check that an entry is in the log without seeing its contents.">
 <link rel="canonical" href="https://paramant.app/en/ct-log">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/ct-log">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/ct-log">
@@ -221,7 +221,7 @@ body { min-height:100vh; }
       "@type": "WebPage",
       "@id": "https://paramant.app/en/ct-log#webpage",
       "url": "https://paramant.app/en/ct-log",
-      "name": "Certificate transparency log · Paramant",
+      "name": "Certificate transparency log | Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -229,7 +229,7 @@ body { min-height:100vh; }
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered, without seeing the payload."
+      "description": "Key registrations, transfers and relay announcements in one tamper-evident Merkle tree. Anyone can check that an entry is in the log without seeing its contents."
     },
     {
       "@type": "BreadcrumbList",
@@ -328,14 +328,14 @@ body { min-height:100vh; }
 <main id="main-content" tabindex="-1">
 
 <div class="hero">
-  <div class="tag">Public Audit Log</div>
-  <h1>Certificate <span>Transparency</span></h1>
+  <div class="tag">Public audit log</div>
+  <h1>Certificate <span>transparency</span></h1>
   <p>Key registrations, transfers and relay announcements are all appended to one tamper-evident Merkle tree. Anyone can check that an entry is in the tree without seeing the payload, the way HTTPS certificate transparency logs work.</p>
 </div>
 
 <div class="tabs">
   <button class="tab active" id="tab-log"    data-click="switchTab" data-tab="log">Log entries</button>
-  <button class="tab"        id="tab-relays" data-click="switchTab" data-tab="relays">Registered Relays</button>
+  <button class="tab"        id="tab-relays" data-click="switchTab" data-tab="relays">Registered relays</button>
 </div>
 
 <div id="pane-log">
@@ -419,7 +419,7 @@ body { min-height:100vh; }
   </div>
   <div class="stat">
     <div class="val dim" id="stat-root">n/a</div>
-    <div class="lbl">Merkle Root</div>
+    <div class="lbl">Merkle root</div>
   </div>
   <div class="stat">
     <div class="val green" id="stat-relay">n/a</div>
@@ -427,7 +427,7 @@ body { min-height:100vh; }
   </div>
   <div class="stat">
     <div class="val dim" id="stat-last">n/a</div>
-    <div class="lbl">Last Entry</div>
+    <div class="lbl">Last entry</div>
   </div>
 </div>
 
@@ -443,7 +443,7 @@ body { min-height:100vh; }
 
 <div class="type-filter">
   <button class="tf active" id="tf-all"      data-click="setTypeFilter" data-arg="all">All</button>
-  <button class="tf"        id="tf-relay_reg" data-click="setTypeFilter" data-arg="relay_reg">Relay reg</button>
+  <button class="tf"        id="tf-relay_reg" data-click="setTypeFilter" data-arg="relay_reg">Relay announcements</button>
   <button class="tf"        id="tf-transfer"  data-click="setTypeFilter" data-arg="transfer">Transfer proofs</button>
 </div>
 
@@ -455,9 +455,9 @@ body { min-height:100vh; }
 <div class="table-wrap">
   <div class="table-head">
     <span>#</span>
-    <span>Leaf Hash</span>
-    <span>Tree Hash</span>
-    <span>Device Hash</span>
+    <span>Leaf hash</span>
+    <span>Tree hash</span>
+    <span>Device hash</span>
     <span>Timestamp</span>
   </div>
   <div id="entries"><div class="loading">Loading log…</div></div>
@@ -473,14 +473,14 @@ body { min-height:100vh; }
 
 <div id="pane-relays" style="display:none">
   <div class="stats" id="relay-stats">
-    <div class="stat"><div class="val" id="rstat-count">n/a</div><div class="lbl">Registered Relays</div></div>
+    <div class="stat"><div class="val" id="rstat-count">n/a</div><div class="lbl">Registered relays</div></div>
     <div class="stat"><div class="val green" id="rstat-sectors">n/a</div><div class="lbl">Sectors</div></div>
-    <div class="stat"><div class="val dim" id="rstat-last">n/a</div><div class="lbl">Last Registration</div></div>
+    <div class="stat"><div class="val dim" id="rstat-last">n/a</div><div class="lbl">Last registration</div></div>
   </div>
   <div class="relay-table-wrap">
     <div class="relay-table-head">
       <span>URL</span><span>Sector</span><span>Version</span><span>Edition</span>
-      <span>Verified Since</span><span>Last Seen</span>
+      <span>Verified since</span><span>Last seen</span>
     </div>
     <div id="relay-entries"><div class="loading">Loading relay registry…</div></div>
   </div>

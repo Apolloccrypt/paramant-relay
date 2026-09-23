@@ -4,20 +4,20 @@
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Documentation · Paramant API and self-hosting</title>
+<title>API documentation and self-hosting guide | Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0. Your IT can check everything here. The relay never holds a decryption key.">
-<meta property="og:title" content="Documentation · Paramant API and self-hosting">
-<meta property="og:description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0. Your IT can check everything here. The relay never holds a decryption key.">
+<meta name="description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0, so your IT team can check how it works. Our servers never hold a decryption key.">
+<meta property="og:title" content="API documentation and self-hosting guide | Paramant">
+<meta property="og:description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0, so your IT team can check how it works. Our servers never hold a decryption key.">
 <meta property="og:url" content="https://paramant.app/en/docs">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Documentation · Paramant API and self-hosting">
-<meta name="twitter:description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0. Your IT can check everything here. The relay never holds a decryption key.">
+<meta name="twitter:title" content="API documentation and self-hosting guide | Paramant">
+<meta name="twitter:description" content="API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0, so your IT team can check how it works. Our servers never hold a decryption key.">
 <link rel="canonical" href="https://paramant.app/en/docs">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/docs">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/docs">
@@ -171,7 +171,7 @@ tr:last-child td{border-bottom:none}
       "@type": "WebPage",
       "@id": "https://paramant.app/en/docs#webpage",
       "url": "https://paramant.app/en/docs",
-      "name": "Documentation · Paramant API and self-hosting",
+      "name": "API documentation and self-hosting guide | Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -179,7 +179,7 @@ tr:last-child td{border-bottom:none}
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0. Your IT can check everything here. The relay never holds a decryption key."
+      "description": "API reference, SDK guide, self-hosting and compliance docs for Paramant v3.0.0, so your IT team can check how it works. Our servers never hold a decryption key."
     },
     {
       "@type": "BreadcrumbList",
@@ -280,7 +280,7 @@ tr:last-child td{border-bottom:none}
     <span class="eyebrow">REFERENCE</span>
     <h1>Documentation</h1>
     <p class="docs-buyer">Evaluating Paramant? Your IT can check everything here. Plans and prices are on <a href="/pricing">Pricing</a>.</p>
-    <p class="lede">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT v3.0.0. The relay is untrusted by design: it never holds a decryption key. The ParaSign API is available from Firm; see <a href="/pricing">pricing</a>.</p>
+    <p class="lede">API reference, SDK guide, self-hosting, and compliance docs for PARAMANT v3.0.0. The relay is untrusted by design: it never holds a decryption key. The ParaSign API is available from Firm upwards; see <a href="/pricing">pricing</a>.</p>
     <div class="docs-hero-actions">
       <a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">Quick start</a>
       <a href="/pricing" class="docs-hero-btn docs-hero-btn-secondary">See plans and prices</a>
@@ -297,7 +297,7 @@ tr:last-child td{border-bottom:none}
     <a href="#authentication">Authentication</a>
     <a href="#sdk">SDK &amp; scripts</a>
     <a href="#usecases">Use cases</a>
-    <h3>API Reference</h3>
+    <h3>API reference</h3>
     <a href="#endpoints">All endpoints</a>
     <a href="#inbound">POST /v2/inbound</a>
     <a href="#outbound">GET /v2/outbound</a>
@@ -322,7 +322,7 @@ tr:last-child td{border-bottom:none}
     <h3>Protocol</h3>
     <a href="#crypto">Crypto stack</a>
     <a href="#burn">Burn-on-read</a>
-    <a href="#padding">5MB padding</a>
+    <a href="#padding">5 MB padding</a>
     <a href="#ct-log">CT log</a>
     <h3>Identity &amp; Teams</h3>
     <a href="#did">W3C DID</a>
@@ -350,18 +350,18 @@ tr:last-child td{border-bottom:none}
       <li><strong>paramant-core crypto split (M5b).</strong> Server-side ML-DSA-65 signing is now provided by <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>: a standalone, audit-ready Rust library (BUSL-1.1) the relay consumes through its <code>@paramant/core</code> NAPI binding. Client-side ML-KEM-768 still runs in the browser/SDK; the relay never holds a key. See <a href="#crypto">Crypto stack</a>.</li>
       <li><strong>Document workspace.</strong> The user dashboard starts document flows, shows account-owned signing requests and exposes owner actions without adding a new trust surface.</li>
       <li><strong>Refreshed interactive UI.</strong> Dark mode (top-right toggle), real-time status updates and a mobile-friendly layout across the dashboard.</li>
-      <li><strong>First-run setup wizard.</strong> A web wizard at <code>/setup</code> replaces hand-run admin scripts for first-time operators: admin token, TOTP enrolment and the first key from the browser (ADR R005).</li>
+      <li><strong>First-run setup wizard.</strong> A web wizard at <code>/setup</code> replaces hand-run admin scripts for first-time operators: set the admin token, enrol TOTP and create the first key from the browser (ADR R005).</li>
       <li><strong>Visual admin config.</strong> <code>/admin/settings</code> exposes relay configuration in the panel, so common changes no longer require editing <code>.env</code> and restarting.</li>
       <li><strong>In-browser admin CLI.</strong> <code>/admin/cli</code> is a web terminal for admin debugging: inspect relay state without opening an SSH session.</li>
       <li><strong>Crypto-mode negotiation (ADR R006, accepted).</strong> <code>/v2/capabilities</code> advertises a compact <em>core</em> mode (2 algorithms) by default; extended algorithm sets are opt-in. See <a href="#crypto">Crypto stack</a>.</li>
-      <li><strong>Add-on architecture (ADR R007, draft).</strong> A specification for container-isolated integrations: storage mirrors, SIEM exporters, SSO: that work on ciphertext and metadata only, never plaintext or keys.</li>
+      <li><strong>Add-on architecture (ADR R007, draft).</strong> A specification for container-isolated integrations (storage mirrors, SIEM exporters, SSO) that work on ciphertext and metadata only, never plaintext or keys.</li>
       <li><strong>Static front-end serving (ADR R011).</strong> An opt-in <code>SERVE_FRONTEND</code> static handler lets a single relay serve its own UI for plug-and-play self-hosting. See <a href="#selfhost-docker">Self-hosting</a>.</li>
       <li><strong>Documented design decisions.</strong> Architecture Decision Records R001 to R011 capture the choices behind 3.0.0, from the hotfix flow to the crypto split. They live in the repository under <code>docs/adrs/</code>.</li>
     </ul>
 
     <!-- ── Quick start ──────────────────────────────────────────── -->
     <h2 id="quickstart">Quick start</h2>
-    <p>Send your first encrypted file in under 5 minutes. <a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">Create a free account here</a> (TOTP protected, key visible in dashboard).</p>
+    <p>Send your first encrypted file in under 5 minutes. <a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">Create a free account</a> (protected with TOTP; your key is shown in the dashboard).</p>
 
     <div class="step-row"><div class="step-num">1</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Install the SDK (Python 3.10+ or Node 18+; both ship the same wire-format-v1 encoder)</p></div></div>
     <div class="cb">
@@ -373,7 +373,7 @@ pip install paramant-sdk
 npm install paramant-sdk</pre>
     </div>
 
-    <div class="step-row"><div class="step-num">2</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Send a file: encrypted client-side before it leaves your device</p></div></div>
+    <div class="step-row"><div class="step-num">2</div><div class="step-body"><p style="color:var(--ink-dim);font-size:13px">Send a file. It is encrypted client-side, before it leaves your device.</p></div></div>
     <div class="cb">
       <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
       <pre>from paramant_sdk import GhostPipe
@@ -388,7 +388,7 @@ hash_, proof = gp.send(open("document.pdf", "rb").read(), ttl=3600)
 data, proof = gp.receive(hash_)</pre>
     </div>
 
-    <p>Or use the direct HTTP API: no SDK needed:</p>
+    <p>Or call the HTTP API directly, without the SDK:</p>
     <div class="cb">
       <div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">curl</span></div>
       <pre><span class="cm"># Upload encrypted blob</span>
@@ -404,11 +404,11 @@ curl https://health.paramant.app/v2/outbound/abc123... \
 
     <!-- ── Authentication ──────────────────────────────────────── -->
     <h2 id="authentication">Authentication</h2>
-    <p>Two key types exist: they serve different roles and are never interchangeable.</p>
+    <p>There are two key types. They serve different roles and are never interchangeable.</p>
     <table>
       <tr><th>Key</th><th>Prefix</th><th>Who</th><th>Purpose</th></tr>
       <tr><td>pgp_</td><td><code>pgp_</code></td><td>End users</td><td>Send/receive files via the API</td></tr>
-      <tr><td>plk_</td><td><code>plk_</code></td><td>Relay operators</td><td>License key: unlocks &gt;5 users on self-hosted relay</td></tr>
+      <tr><td>plk_</td><td><code>plk_</code></td><td>Relay operators</td><td>Licence key: allows more than 5 users on a self-hosted relay</td></tr>
     </table>
     <p>Pass the <code>pgp_</code> key in the <code>X-Api-Key</code> header or <code>?k=</code> query parameter:</p>
     <pre>X-Api-Key: pgp_your_key_here
@@ -417,7 +417,7 @@ GET /v2/check-key?k=pgp_your_key_here</pre>
 
     <!-- ── SDK ──────────────────────────────────────────────────── -->
     <h2 id="sdk">SDK</h2>
-    <p>Two official SDKs ship the same wire-format-v1 encoder, ML-KEM-768 + ML-DSA-65 by default, and capability negotiation against <code>/v2/capabilities</code>. Pick whichever matches your runtime: they are byte-compatible on the wire.</p>
+    <p>Two official SDKs ship the same wire-format-v1 encoder, ML-KEM-768 + ML-DSA-65 by default, and capability negotiation against <code>/v2/capabilities</code>. Pick the one that matches your runtime; they are byte-compatible on the wire.</p>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 22px">
       <a href="https://pypi.org/project/paramant-sdk/" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--ink);background:var(--black-hair);border:1px solid var(--ink-hair);padding:7px 14px;text-decoration:none">PyPI · paramant-sdk</a>
@@ -453,7 +453,7 @@ data = gp.receive(hash_)</pre>
 
     <!-- ── Use cases ──────────────────────────────────────────── -->
     <h2 id="usecases">Use cases</h2>
-    <p>PARAMANT has five sector relays: each tuned for its compliance domain. Pick the sector that matches your use case.</p>
+    <p>PARAMANT has five sector relays, each tuned to its compliance domain. Pick the sector that matches your use case.</p>
 
     <h3><span class="sector-badge">health</span>Healthcare: NEN 7510, DICOM, HL7 FHIR</h3>
     <p>Send MRI scans, referral letters, and lab results between care providers. <code>health.paramant.app</code> is designed for NEN 7510 compliance: encrypted in transit, RAM-only, EU jurisdiction, per-access CT log proof.</p>
@@ -473,7 +473,7 @@ hash_, receipt = gp.send(open("deed.pdf","rb").read())
 gp.verify_receipt(receipt)  <span class="cm"># ML-DSA-65 signed</span></pre></div>
 
     <h3><span class="sector-badge">iot</span>Industrial IoT: IEC 62443</h3>
-    <p>PLC and sensor data relay without VPN or direct OT internet exposure. Acts as a post-quantum data diode: OT side pushes outbound only, IT side receives. Every block is a fixed 5 MB, so payload size is hidden inside a block; the block count of a multi-block transfer is not.</p>
+    <p>Relay PLC and sensor data without a VPN and without exposing OT systems directly to the internet. The relay acts as a post-quantum data diode: the OT side only pushes outbound, the IT side receives. Every block is a fixed 5 MB, so payload size is hidden inside a block; the block count of a multi-block transfer is not.</p>
     <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
     <pre><span class="cm"># PLC telemetry: outbound only, no VPN, no inbound port</span>
 from paramant_sdk import GhostPipe
@@ -483,7 +483,7 @@ while True:
     time.sleep(15)</pre></div>
 
     <h3><span class="sector-badge">finance</span>Finance: NIS2, DORA, ISO 20022</h3>
-    <p>ISO 20022 payment file relay with per-transaction Merkle proof for DORA audit trails. <code>finance.paramant.app</code>: EU jurisdiction, no US Cloud Act, no metadata retention.</p>
+    <p>Relay ISO 20022 payment files with a per-transaction Merkle proof for DORA audit trails. <code>finance.paramant.app</code>: EU jurisdiction, no US Cloud Act, no metadata retention.</p>
     <div class="cb"><div class="cb-header"><div class="cb-dots"><span class="cb-dot"></span><span class="cb-dot"></span><span class="cb-dot"></span></div><span class="cb-lang">python</span></div>
     <pre><span class="cm"># Send ISO 20022 payment file with CT proof for DORA audit</span>
 from paramant_sdk import GhostPipe
@@ -499,29 +499,29 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
       <tr><td><span class="method get">GET</span></td><td>/health</td><td>Node status, version, uptime, edition</td><td>n/a</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/inbound</td><td>Upload encrypted blob from an authenticated client (RAM-only)</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/anon-inbound</td><td>Deprecated, sunset 31 December 2026 (the date the relay sends in the <code>Sunset</code> response header). Anonymous upload retained for sdk-js 3.x backward compatibility. New integrations must use <code>/v2/inbound</code>.</td><td>n/a</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/sends</td><td>Turn blocks already uploaded into one send to named recipients: each gets a personal link that works once. One recipient per send on Community, up to 30 on Firm and Enterprise; more is refused with 403 <code>over_limit</code>. Body carries the block hashes, the addresses, and one wrapped file key per person.</td><td>Key</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/pickup/:token</td><td>The receiving end, and it needs no credential: the token from the invitation IS the capability. <code>{"action":"code"}</code> mails a short code to the same mailbox; <code>{"code":"123456"}</code> returns the bytes, once; <code>{"action":"confirm"}</code> says the file opened, which is what makes the collection final.</td><td>n/a</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/pickup/:token</td><td>Same route, kept for links minted before the switch to POST. A GET that sends mail is fired by every link scanner, so new clients use POST.</td><td>n/a</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/outbound/:hash</td><td>Download + burn: spends one read of the link</td><td>Key</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/sends</td><td>Turns blocks you have already uploaded into one send to named recipients. Each recipient gets a personal link that works once. One recipient per send on Community, up to 30 on Firm and Enterprise; more is refused with 403 <code>over_limit</code>. Body carries the block hashes, the addresses, and one wrapped file key per person.</td><td>Key</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/pickup/:token</td><td>The receiving end. It needs no credential: the token from the invitation is the capability. <code>{"action":"code"}</code> mails a short code to the same mailbox; <code>{"code":"123456"}</code> returns the bytes, once; <code>{"action":"confirm"}</code> confirms the file opened, which makes the collection final.</td><td>n/a</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/pickup/:token</td><td>Same route, kept for links created before the switch to POST. Link scanners open every GET link, so a GET that sends mail would fire for each scan; new clients use POST.</td><td>n/a</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/outbound/:hash</td><td>Download and burn: uses one read of the link</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/status/:hash</td><td>Check blob availability without consuming</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/ack</td><td>Confirm delivery, log latency to CT</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/monitor</td><td>Live stats: blobs in flight, ACK rate</td><td>Key</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/ws-ticket</td><td>Get 30s one-time WebSocket ticket</td><td>Key</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/ws-ticket</td><td>Get a one-time WebSocket ticket, valid for 30s</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/stream</td><td>WebSocket push: blob_ready events</td><td>Ticket / Key</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/webhook</td><td>Register delivery webhook URL</td><td>Key</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/pubkey</td><td>Register ML-KEM + ECDH keypair</td><td>Key</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/webhook</td><td>Register a delivery webhook URL</td><td>Key</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/pubkey</td><td>Register an ML-KEM + ECDH keypair</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/check-key</td><td>Verify key validity and plan</td><td>n/a</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/did/register</td><td>Register W3C Decentralized Identity</td><td>Key</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/did/:did</td><td>Resolve DID document</td><td>n/a</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/did/register</td><td>Register a W3C decentralized identity (DID)</td><td>Key</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/did/:did</td><td>Resolve a DID document</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/ct/log</td><td>Certificate Transparency log (public)</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/relays</td><td>Registered relay nodes and status</td><td>n/a</td></tr>
-      <tr><td><span class="method get">GET</span></td><td>/v2/audit</td><td>Merkle audit chain: JSON + CSV export</td><td>Key</td></tr>
+      <tr><td><span class="method get">GET</span></td><td>/v2/audit</td><td>Merkle audit chain, exportable as JSON or CSV</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/team/devices</td><td>List team devices</td><td>Key</td></tr>
-      <tr><td><span class="method post">POST</span></td><td>/v2/team/add-device</td><td>Add device to team (Firm or higher)</td><td>Key</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/team/add-device</td><td>Add a device to a team (Firm or higher)</td><td>Key</td></tr>
     </table>
 
     <h2 id="inbound">POST /v2/inbound</h2>
-    <p>Upload an encrypted, padded blob. Stored in RAM only: never written to disk. Returns a hash used for retrieval.</p>
+    <p>Upload an encrypted, padded blob. It is stored in RAM only and never written to disk. Returns the hash you use to retrieve it.</p>
     <pre><span class="cm">Request body (JSON):</span>
 {
   "hash":    "sha256_of_padded_payload",
@@ -536,7 +536,7 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
     <p>TTL and <code>max_views</code> are both clamped to the plan maximum: Community gets 1 hour and 1 read, Firm 24 hours and up to 10 reads, Enterprise 7 days and 100 reads. Leave <code>max_views</code> out and the link burns on the first read on every plan, which is what the ParaSend web app does. The <code>hash</code> field is the SHA-256 of the <em>padded</em> payload (not the original file). The SDK computes this automatically.</p>
 
     <h2 id="outbound">GET /v2/outbound/:hash</h2>
-    <p><strong>Spends one read of the link.</strong> A Community link has one read, so this call is the only retrieval; a paid link can have more, up to 10 reads on Firm. On the last read the blob buffer is overwritten with random bytes and removed from RAM. There is no recovery.</p>
+    <p><strong>Uses one read of the link.</strong> A Community link has one read, so this call is the only retrieval; a paid link can have more, up to 10 reads on Firm. On the last read the blob buffer is overwritten with random bytes and removed from RAM. There is no recovery.</p>
     <pre>GET /v2/outbound/abc123...
 X-Api-Key: pgp_xxx
 
@@ -588,7 +588,7 @@ ws.onmessage = e => {
     <!-- ── ParaSign API (/v1) ───────────────────────────────────── -->
     <span id="parasign-api" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
     <h2 id="v1-envelopes">ParaSign API (/v1)</h2>
-    <p>Hosted signing ceremonies from your own stack: create an envelope from a PDF plus a signer list, route each signer to a hosted signing page, and pull the completed <code>.psign</code> proof. Authenticate with <code>Authorization: Bearer psk_live_...</code> (mint keys in the <a href="/developer">developer dashboard</a>; API access is part of Firm).</p>
+    <p>Run hosted signing ceremonies from your own stack: create an envelope from a PDF plus a signer list, route each signer to a hosted signing page, and pull the completed <code>.psign</code> proof. Authenticate with <code>Authorization: Bearer psk_live_...</code> (create keys in the <a href="/developer">developer dashboard</a>; API access is included in Firm).</p>
     <pre><span class="cm">Endpoints:</span>
 POST   /v1/envelopes                Create an envelope; returns id + one sign_url per signer
 GET    /v1/envelopes/:id            Envelope status and per-signer progress
@@ -613,7 +613,7 @@ curl https://paramant.app/v1/envelopes/env_.../receipt \
     <!-- ── Account & billing API ────────────────────────────────── -->
     <span id="account-api" style="display:block;scroll-margin-top:90px" aria-hidden="true"></span>
     <h2 id="user-history">GET /v2/user/history</h2>
-    <p>Your account's own send and envelope history: a read-only projection over the per-key Merkle audit chain. It returns identifiers, status and timing only, never a payload, download token or key. Authenticate with your <code>pgp_</code> key in the <code>X-Api-Key</code> header.</p>
+    <p>Your account's own send and envelope history, as a read-only view of the per-key Merkle audit chain. It returns identifiers, status and timing only, never a payload, download token or key. Authenticate with your <code>pgp_</code> key in the <code>X-Api-Key</code> header.</p>
     <table>
       <tr><th>Field</th><th>Value</th></tr>
       <tr><td>Auth</td><td><code>X-Api-Key: pgp_...</code></td></tr>
@@ -632,7 +632,7 @@ X-Api-Key: pgp_xxx
     { "id": "b7e0d4...", "status": "sent",               "time": "2026-07-19T14:05:41.882Z", "recipient_hash": "dev-2f10", "bytes": 5242880 }
   ]
 }</pre>
-    <p>Statuses map from the audit chain: <code>sent</code> (inbound), <code>aborted</code> (inbound aborted), <code>downloaded</code> (outbound view), <code>downloaded_burned</code> (outbound burn). Newest first, then capped to <code>limit</code>.</p>
+    <p>Statuses map from the audit chain: <code>sent</code> (inbound), <code>aborted</code> (inbound aborted), <code>downloaded</code> (outbound view), <code>downloaded_burned</code> (outbound burn). Entries are sorted newest first and capped at <code>limit</code>.</p>
     <pre><span class="cm"># 401 no / invalid key</span>
 { "error": "API key required" }
 
@@ -641,7 +641,7 @@ X-Api-Key: pgp_xxx
   "message": "Send history and link management require a Firm plan or higher." }</pre>
 
     <h2 id="audit-export">GET /v2/parasign/audit-export</h2>
-    <p>The compliance half of the ParaSign paid ladder: it hands an auditor the account's tamper-evident signing trail, the Certificate-Transparency signed tree head (STH) that anchors it, and the full per-envelope <code>.psign</code> proofs for every completed envelope, as CSV or JSON. No document bytes leave the relay; the export carries hashes and signatures only.</p>
+    <p>The compliance part of the paid ParaSign plans. It gives an auditor the account's tamper-evident signing trail, the Certificate Transparency signed tree head (STH) that anchors it, and the full per-envelope <code>.psign</code> proofs for every completed envelope, as CSV or JSON. No document bytes leave the relay; the export carries hashes and signatures only.</p>
     <table>
       <tr><th>Field</th><th>Value</th></tr>
       <tr><td>Auth</td><td><code>X-Api-Key: pgp_...</code></td></tr>
@@ -671,7 +671,7 @@ curl "https://paramant.app/v2/parasign/audit-export?format=csv" \
     { "envelope_id": "env_9f2c...", "status": "completed", "psign": { "...": "full multi-signer .psign proof" } }
   ]
 }</pre>
-    <p>The CSV export has one header row and one line per audit entry: <code>time,event,doc_hash,bytes,device,chain_hash</code> (the <code>.psign</code> envelope proofs are in the JSON export only). <code>chain_valid: false</code> is a tamper signal: an audit chain that failed its Merkle re-check. Envelope statuses are <code>completed</code> (full <code>.psign</code>), <code>in_progress</code>, <code>sent</code>, <code>void</code> or <code>expired_or_gone</code> (no proof).</p>
+    <p>The CSV export has one header row and one line per audit entry: <code>time,event,doc_hash,bytes,device,chain_hash</code> (the <code>.psign</code> envelope proofs are in the JSON export only). <code>chain_valid: false</code> signals possible tampering: the audit chain failed its Merkle re-check. Envelope statuses are <code>completed</code> (full <code>.psign</code>), <code>in_progress</code>, <code>sent</code>, <code>void</code> or <code>expired_or_gone</code> (no proof).</p>
     <pre><span class="cm"># 403 plan too low</span>
 { "error": "tier_upgrade_required", "feature": "audit_export",
   "message": "The ParaSign audit export requires a Business plan or higher." }</pre>
@@ -717,11 +717,11 @@ id=tr_XXXX
     <p>Community Edition is free forever for up to 5 users. One <code>docker compose up</code> starts 6 containers: five sector relays and an admin panel.</p>
 
     <div class="callout"><span class="callout-label">Requirements</span>
-      <p><strong style="color:var(--lime)">Requirements:</strong> Ubuntu 22.04+ / Debian 12+ · Docker 24+ · 1 GB RAM min · swap disabled · a domain with wildcard DNS</p>
+      <p><strong style="color:var(--lime)">Requirements:</strong> Ubuntu 22.04+ / Debian 12+ · Docker 24+ · 1 GB RAM minimum · swap disabled · a domain with wildcard DNS</p>
     </div>
 
     <div class="callout"><span class="callout-label">Where to start</span>
-      <p>The navigation no longer carries these; this is the one place that does.
+      <p>These links are no longer in the site navigation; this is the only place they appear.
       One-line install: <a href="/install.sh">install.sh</a> for a server,
       <a href="/install-pi.sh">install-pi.sh</a> for a Raspberry Pi.
       Images: <a href="https://hub.docker.com/r/mtty001/relay" target="_blank" rel="noopener">Docker Hub</a>.
@@ -766,7 +766,7 @@ curl http://localhost:3000/health
       <tr><th>Variable</th><th>Required</th><th>Description</th></tr>
       <tr><td>ADMIN_TOKEN</td><td>Yes</td><td>Admin panel password (min 32 chars, hex)</td></tr>
       <tr><td>TOTP_SECRET</td><td>Recommended</td><td>Base32 TOTP secret: enables MFA on admin login</td></tr>
-      <tr><td>PLK_KEY</td><td>No</td><td>License key: unlocks &gt;5 users (Community = free, max 5)</td></tr>
+      <tr><td>PLK_KEY</td><td>No</td><td>Licence key: allows more than 5 users (Community is free, max 5)</td></tr>
       <tr><td>RESEND_API_KEY</td><td>No</td><td>Email provider key (for key delivery notifications)</td></tr>
       <tr><td>LOG_LEVEL</td><td>No</td><td>info (default) · debug · warn · error</td></tr>
       <tr><td>RAM_LIMIT_MB</td><td>No</td><td>Blob storage memory cap per container (default 1024)</td></tr>
@@ -825,9 +825,9 @@ python3 deploy/paramant-admin.py sync
 <span class="cm"># Admin panel (requires ADMIN_TOKEN + TOTP if configured)</span>
 open https://your-domain.com/admin/</pre>
     </div>
-    <p>Community Edition enforces a hard cap of 5 users: the 6th <code>add</code> returns HTTP 402. Add a <code>PLK_KEY</code> to <code>.env</code> to unlock unlimited users.</p>
+    <p>Community Edition enforces a hard cap of 5 users: the 6th <code>add</code> returns HTTP 402. Add a <code>PLK_KEY</code> to <code>.env</code> to allow unlimited users.</p>
     <div class="callout"><span class="callout-label">New in 3.0.0</span>
-      <p><strong style="color:var(--lime)">Guided setup:</strong> a first-run web wizard at <code>/setup</code> replaces hand-run admin scripts for first-time operators: generating the admin token, enrolling TOTP and minting the first key from the browser. The wizard is gated to first boot (no keys yet) or an explicit <code>SETUP_MODE</code> flag, and runs deeper <code>/v2/health/deep</code> and DNS checks before declaring all-systems-go (design: ADR R005). Once running, <code>/admin/settings</code> exposes relay configuration visually: no more editing <code>.env</code> by hand: and <code>/admin/cli</code> gives admins a browser terminal for debugging without SSH.</p>
+      <p><strong style="color:var(--lime)">Guided setup:</strong> a first-run web wizard at <code>/setup</code> replaces hand-run admin scripts for first-time operators: generating the admin token, enrolling TOTP and minting the first key from the browser. The wizard is gated to first boot (no keys yet) or an explicit <code>SETUP_MODE</code> flag, and runs deeper <code>/v2/health/deep</code> and DNS checks before it reports that everything is ready (design: ADR R005). Once the relay is running, <code>/admin/settings</code> shows the relay configuration in the panel, so you no longer edit <code>.env</code> by hand, and <code>/admin/cli</code> gives admins a browser terminal for debugging without SSH.</p>
     </div>
     <div class="callout"><span class="callout-label">New in 3.0.0</span>
       <p><strong style="color:var(--lime)">Plug-and-play serving:</strong> set <code>SERVE_FRONTEND=1</code> to have a single relay serve its own UI from a read-only static handler, so a fresh self-host needs no separate web server (opt-in, default off; ADR R011). Set <code>CRYPTO_MODE</code> to choose the algorithm set the relay advertises on <code>/v2/capabilities</code>: <code>core</code> (the default: ML-KEM-768 + ML-DSA-65) or <code>extended</code> for the full opt-in set (ADR R006).</p>
@@ -842,14 +842,14 @@ docker compose up -d --build
 <span class="cm"># Named volumes (users.json, CT log, relay identity) are preserved</span></pre>
     </div>
     <div class="callout warn"><span class="callout-label">Important</span>
-      <p><strong style="color:var(--brick-ink)">Note:</strong> User data and the CT log persist in Docker named volumes across upgrades. The relay identity keypair (ML-DSA-65) is generated once on first boot and stored at <code>/data/relay-identity.json</code>: do not delete this volume or the relay will lose its registered identity. Since v3.0.0 the ML-DSA-65 signing that backs this identity comes from <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>, the relay's audit-ready Rust crypto dependency (consumed via the <code>@paramant/core</code> NAPI binding): it ships inside the Docker image, so no extra install step is needed.</p>
+      <p><strong style="color:var(--brick-ink)">Note:</strong> User data and the CT log persist in Docker named volumes across upgrades. The relay identity keypair (ML-DSA-65) is generated once on first boot and stored at <code>/data/relay-identity.json</code>: do not delete this volume or the relay will lose its registered identity. Since v3.0.0 the ML-DSA-65 signing that backs this identity comes from <a href="https://github.com/Apolloccrypt/paramant-core" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-core</a>, the relay's audit-ready Rust crypto dependency (consumed via the <code>@paramant/core</code> NAPI binding). It ships inside the Docker image, so no extra install step is needed.</p>
     </div>
 
     <!-- ── Admin scripts ─────────────────────────────────────────── -->
     <h2 id="client-deb">Admin scripts</h2>
-    <p>Admin scripts ship with the relay repository. After cloning <a href="https://github.com/Apolloccrypt/paramant-relay">paramant-relay</a>, the server-side admin tool lives under <code>deploy/</code>: run <code>python3 deploy/paramant-admin.py [command]</code> directly. Operator helpers (key add/revoke, first-boot setup) live under <code>scripts/</code>. No system-wide install package is currently provided: the SDK packages on PyPI (<code>paramant-sdk</code>) and npm (<code>paramant-sdk</code>) are the canonical client integrations.</p>
+    <p>Admin scripts ship with the relay repository. After cloning <a href="https://github.com/Apolloccrypt/paramant-relay">paramant-relay</a>, the server-side admin tool lives under <code>deploy/</code>: run <code>python3 deploy/paramant-admin.py [command]</code> directly. Operator helpers (key add/revoke, first-boot setup) live under <code>scripts/</code>. There is currently no system-wide install package; the SDK packages on PyPI (<code>paramant-sdk</code>) and npm (<code>paramant-sdk</code>) are the official client integrations.</p>
     <div class="callout"><span class="callout-label">Coming soon</span>
-      <p><strong style="color:var(--lime)">Add-ons:</strong> an add-on architecture is specified for integrations that live just beyond the relay core: storage mirrors, notification bridges, SIEM exporters, OIDC/SAML SSO. Container-isolated, manifest-declared capabilities, HomeAssistant-style, working on ciphertext and metadata only (never plaintext or keys). Specification: ADR R007, draft.</p>
+      <p><strong style="color:var(--lime)">Add-ons:</strong> an add-on architecture is specified for integrations that sit just outside the relay core, such as storage mirrors, notification bridges, SIEM exporters and OIDC/SAML SSO. Each add-on runs in its own container and declares its capabilities in a manifest (HomeAssistant-style). Add-ons work on ciphertext and metadata only, never plaintext or keys. Specification: ADR R007, draft.</p>
     </div>
 
     <h2 id="client-cli">CLI reference</h2>
@@ -870,7 +870,7 @@ paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/ap
 
     <!-- ── Crypto stack ─────────────────────────────────────────── -->
     <h2 id="crypto">Crypto stack</h2>
-    <p>Encryption happens client-side on every route on this page except one. The relay never sees plaintext and never holds a private key, apart from the hosted signing ceremony on the <code>/v1</code> API: the curl example above uploads a PDF as <code>content_base64</code>, and that is the relay reading a document because that request asked it to.</p>
+    <p>Encryption happens client-side on every route on this page except one. The relay never sees plaintext and never holds a private key, apart from the hosted signing ceremony on the <code>/v1</code> API. There, the curl example above uploads a PDF as <code>content_base64</code>, so the relay reads that document because the request asks it to.</p>
     <table>
       <tr><th>Algorithm</th><th>Role</th><th>Standard</th></tr>
       <tr><td>ML-KEM-768</td><td>Post-quantum key encapsulation</td><td>NIST FIPS 203</td></tr>
@@ -886,7 +886,7 @@ paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/ap
 
     <h2 id="burn">Burn-on-read</h2>
     <p>After <code>GET /v2/outbound/:hash</code> the relay immediately overwrites the blob buffer with cryptographically random bytes and removes the entry from memory. Encrypted payload data is <strong>never written to disk</strong> at any point during the transfer.</p>
-    <p>The CT log persists cryptographic hashes (Merkle leaf hashes, tree hashes, device hashes) to disk: never payload content. Even a complete disk image of the relay server reveals no file contents.</p>
+    <p>The CT log persists cryptographic hashes (Merkle leaf hashes, tree hashes, device hashes) to disk, never payload content. Even a complete disk image of the relay server reveals no file contents.</p>
     <p>Two-step burn: first the blob is zeroed in-place, then the Map entry is deleted. This prevents a brief window where a partial read could occur.</p>
 
     <h2 id="padding">5 MB fixed padding (ParaSend web app)</h2>
@@ -907,7 +907,7 @@ paramant-stream --key pgp_xxx --sector health --forward https://pacs.hospital/ap
 
     <!-- ── Identity & Teams ─────────────────────────────────────── -->
     <h2 id="did">W3C Decentralized Identity</h2>
-    <p>Devices can register a W3C DID backed by ML-DSA-65 and ECDH keys. Once registered, subsequent requests are signed: no API key in the header.</p>
+    <p>Devices can register a W3C DID backed by ML-DSA-65 and ECDH keys. Once registered, the device signs its requests instead of sending an API key in the header.</p>
     <pre>POST /v2/did/register
 { "device_id": "mri-001", "ecdh_pub": "base64...", "dsa_pub": "base64..." }
 
@@ -937,14 +937,14 @@ python3 scripts/paramant-admin.py sync</pre>
       <tr><td>Firm</td><td>1 hour</td><td>24 hours</td><td>500 MB</td></tr>
       <tr><td>Enterprise</td><td>1 hour</td><td>7 days</td><td>500 MB, or the limit set for your own relay</td></tr>
     </table>
-    <p>Size is not what the plans sell, so the file ceiling is the same on every one of them. Two other numbers are often read as this one and are not it. A blob on <code>POST /v2/inbound</code> is a fixed 5 MB block, which is the padding size on the wire, so a file larger than one block travels as several blocks. And a one-time link from the ParaSend web app is one block under one token, so that one way of sending stops at 5 MB a file; the live hand-over in the same web app cuts the file into chunks and reaches the 500 MB in this table.</p>
+    <p>The plans do not differ on file size, so the ceiling is the same on all of them. Two other numbers are often mistaken for it. A blob on <code>POST /v2/inbound</code> is a fixed 5 MB block, which is the padding size on the wire, so a file larger than one block travels as several blocks. A one-time link from the ParaSend web app is one block under one token, so that way of sending stops at 5 MB per file. The live hand-over in the same web app splits the file into chunks and reaches the 500 MB in this table.</p>
 
     <h2 id="sectors">Relay sectors</h2>
     <p>All sector nodes run <strong>identical Ghost Pipe relay software</strong>. Sectors are routing domains: they provide traffic isolation and sector-specific compliance documentation. The crypto stack and API surface are identical.</p>
     <table>
       <tr><th>Sector</th><th>URL</th><th>Primary use</th><th>Compliance</th></tr>
       <tr><td><span class="sector-badge">health</span></td><td>health.paramant.app</td><td>DICOM, patient records, vitals</td><td>NEN 7510, GDPR</td></tr>
-      <tr><td><span class="sector-badge">legal</span></td><td>legal.paramant.app</td><td>Contracts, notary, evidence</td><td>AVG, eIDAS</td></tr>
+      <tr><td><span class="sector-badge">legal</span></td><td>legal.paramant.app</td><td>Contracts, notary, evidence</td><td>GDPR, eIDAS</td></tr>
       <tr><td><span class="sector-badge">finance</span></td><td>finance.paramant.app</td><td>ISO 20022, compliance data</td><td>NIS2, DORA</td></tr>
       <tr><td><span class="sector-badge">iot</span></td><td>iot.paramant.app</td><td>SCADA, PLCs, sensor streams</td><td>IEC 62443</td></tr>
     </table>
@@ -959,14 +959,14 @@ python3 scripts/paramant-admin.py sync</pre>
       <tr><td>Observe that a web app blob arrived (all fixed 5 MB, content opaque)</td><td>Forge relay signatures (ML-DSA-65 key is per-relay, signed)</td></tr>
       <tr><td>Block a specific device hash</td><td>Decrypt any stored ciphertext</td></tr>
     </table>
-    <p>The threat model assumes network-level attackers, compromised relay operators, and post-quantum adversaries. Encryption uses a hybrid scheme (ML-KEM-768 + ECDH P-256) so that breaking <em>either</em> primitive is not sufficient: both must be broken simultaneously.</p>
+    <p>The threat model assumes network-level attackers, compromised relay operators, and post-quantum adversaries. Encryption uses a hybrid scheme (ML-KEM-768 + ECDH P-256) so that breaking <em>either</em> primitive is not enough; both must be broken at the same time.</p>
 
     <div class="callout"><span class="callout-label">Key insight</span>
-      <p><strong style="color:var(--lime)">Key insight:</strong> The relay stores encrypted blobs it cannot decrypt and Merkle hashes it cannot forge. A warrant served on the relay operator yields ciphertext and metadata: not plaintext.</p>
+      <p><strong style="color:var(--lime)">Key insight:</strong> The relay stores encrypted blobs it cannot decrypt and Merkle hashes it cannot forge. A warrant served on the relay operator yields ciphertext and metadata, not plaintext.</p>
     </div>
 
     <h3>Jurisdiction</h3>
-    <p>Managed relay infrastructure runs exclusively on <strong>Hetzner Nuremberg, Germany</strong>. EU/GDPR jurisdiction applies. No US Cloud Act jurisdiction: Hetzner is a German company with no US parent. Files, documents and keys do not leave the EU. The exception is email: the email address and the link go through Resend in the United States. Every party with its status: <a href="/en/partners">/en/partners</a>.</p>
+    <p>Managed relay infrastructure runs only at <strong>Hetzner in Nuremberg, Germany</strong>. EU/GDPR jurisdiction applies. No US Cloud Act jurisdiction: Hetzner is a German company with no US parent. Files, documents and keys do not leave the EU. The exception is email: the email address and the link go through Resend in the United States. See <a href="/en/partners">every party we use and its status</a>.</p>
 
     <h2 id="audits">Security audits</h2>
     <table>
@@ -975,24 +975,24 @@ python3 scripts/paramant-admin.py sync</pre>
       <tr><td>Apr 2026</td><td>R. Zwarts (independent)</td><td>6 total (3H · 3M)</td><td>All resolved: 0db3ef0</td></tr>
       <tr><td>Apr 2026</td><td>Ryan Williams · Smart Cyber Solutions</td><td>4C · 5H · 6M · 5L</td><td>All resolved: 0db3ef0</td></tr>
     </table>
-    <p>All findings are publicly documented in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md" target="_blank" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)" rel="noopener">SECURITY.md</a>. To report a vulnerability: <a href="mailto:privacy@paramant.app" style="color:var(--cobalt)">privacy@paramant.app</a>.</p>
+    <p>All findings are publicly documented in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md" target="_blank" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)" rel="noopener">SECURITY.md</a>. To report a vulnerability, email <a href="mailto:privacy@paramant.app" style="color:var(--cobalt)">privacy@paramant.app</a>.</p>
 
     <!-- ── Compliance ───────────────────────────────────────────── -->
     <h2 id="compliance-nis2">Compliance: NIS2 / DORA</h2>
     <p><strong>NIS2 (EU 2022/2555)</strong> applies to operators of essential services in the EU. PARAMANT supports NIS2 compliance through:</p>
     <ul>
-      <li>Post-quantum encryption (future-proof cryptographic resilience)</li>
+      <li>Post-quantum encryption (protection that also holds against future quantum computers)</li>
       <li>Merkle CT log: tamper-evident audit trail for every transfer</li>
       <li>EU-only infrastructure (Hetzner DE): files and keys never leave EU jurisdiction; only email goes through Resend in the US</li>
       <li>Burn-on-read: minimises data retention exposure</li>
-      <li>Zero-downtime key revocation: immediate incident response capability</li>
+      <li>Key revocation without downtime, so you can respond to an incident immediately</li>
     </ul>
     <p><strong>DORA (EU 2022/2554)</strong> applies to financial entities. The finance.paramant.app sector is designed with DORA in mind: per-transaction Merkle proof, no US Cloud Act jurisdiction, ISO 20022 compatible.</p>
 
     <h2 id="compliance-nen7510">NEN 7510 (Healthcare)</h2>
     <p>NEN 7510 is the Dutch standard for information security in healthcare. The health.paramant.app sector is designed for NEN 7510 compliance:</p>
     <ul>
-      <li>Encrypted in transit and at rest (technically: RAM only, never disk)</li>
+      <li>Encrypted in transit and at rest (in practice: held in RAM only, never written to disk)</li>
       <li>Access logging via CT log: cryptographic proof of every access event</li>
       <li>Device identity registration (DID): traceable per-device access</li>
       <li>Key-based access control: per-user API keys with revocation</li>
@@ -1003,7 +1003,7 @@ python3 scripts/paramant-admin.py sync</pre>
     <p>IEC 62443 is the international standard for operational technology security. The iot.paramant.app sector supports IEC 62443 deployments:</p>
     <ul>
       <li>Acts as a quantum-safe data diode: PLCs/sensors push data without opening inbound ports</li>
-      <li>No VPN, no certificates on OT side: works with Raspberry Pi and any Linux device</li>
+      <li>No VPN, no certificates on the OT side: works with Raspberry Pi and any Linux device</li>
       <li>Fixed 5 MB blocks: a single-block heartbeat and a single-block payload look identical on the wire; a multi-block transfer still shows its block count</li>
       <li>Network segmentation: OT side connects outbound only; IT side receives inbound only</li>
       <li>ML-DSA-65 device signatures: cryptographic device authentication</li>
@@ -1015,8 +1015,8 @@ python3 scripts/paramant-admin.py sync</pre>
     <p>Self-host operators get a set of command-line helpers under <code>scripts/</code> in the <a href="https://github.com/Apolloccrypt/paramant-relay" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant-relay</a> repo. SSH into your relay host and run them from the repo root. For most of these there is an in-browser equivalent at <a href="/admin/cli" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">/admin/cli</a> (admin login required).</p>
     <ul>
       <li><strong>Keys.</strong> <code>scripts/paramant-key-add.sh</code>: provision an API key.</li>
-      <li><strong>Signing.</strong> <code>scripts/paramant-sign</code>: ParaSign CLI: sign a document (ML-DSA-65, client-side) and notarise it into a <code>.psign</code> envelope, or verify one. See ADR R017.</li>
-      <li><strong>Deploy safety.</strong> <code>scripts/post-deploy-verify.sh</code>: post-deploy smoke test (exit 2 on critical failure); <code>scripts/rollback-3.0.0.sh</code>: roll back to the previously-built relay image.</li>
+      <li><strong>Signing.</strong> <code>scripts/paramant-sign</code>: the ParaSign CLI. It signs a document (ML-DSA-65, client-side) and notarises it into a <code>.psign</code> envelope, or verifies one. See ADR R017.</li>
+      <li><strong>Deploy safety.</strong> <code>scripts/post-deploy-verify.sh</code>: post-deploy smoke test (exit 2 on critical failure); <code>scripts/rollback-3.0.0.sh</code>: roll back to the previously built relay image.</li>
       <li><strong>Backups.</strong> <code>scripts/backup-users-json.sh</code>: age-encrypted backup of relay key metadata (already wired into cron, 03:15 daily; decrypt only in tmpfs).</li>
     </ul>
     <div class="cb">
@@ -1040,16 +1040,16 @@ python3 scripts/paramant-admin.py sync</pre>
 
     <div class="faq-item">
       <div class="faq-q">Is Community Edition really free forever?</div>
-      <div class="faq-a">Yes. Up to 5 users, no license key required, no time limit. The 6th user returns HTTP 402: add a <code>PLK_KEY</code> to .env to unlock unlimited users. Source is available under BUSL-1.1.</div>
+      <div class="faq-a">Yes. Up to 5 users, no licence key required, no time limit. Adding a 6th user returns HTTP 402; add a <code>PLK_KEY</code> to .env to allow unlimited users. The source is available under BUSL-1.1.</div>
     </div>
 
     <div class="faq-item">
       <div class="faq-q">What is the difference between pgp_ and plk_ keys?</div>
-      <div class="faq-a"><code>pgp_</code> keys are for end users: they authenticate API calls to send and receive files. <code>plk_</code> keys are relay license keys for operators: they go in .env, not in API calls, and unlock unlimited user capacity. They are never the same key and cannot be substituted for each other.</div>
+      <div class="faq-a"><code>pgp_</code> keys are for end users: they authenticate API calls to send and receive files. <code>plk_</code> keys are relay licence keys for operators: they go in .env, not in API calls, and allow an unlimited number of users. They are never the same key and cannot be substituted for each other.</div>
     </div>
 
     <div class="faq-item">
-      <div class="faq-q">How does 5MB padding protect me?</div>
+      <div class="faq-q">How does 5 MB padding protect me?</div>
       <div class="faq-a">Every block is padded to the same 5 MiB, so a passive observer cannot tell a 1 KB heartbeat from a 4.9 MB DICOM scan: both are one block. The block size tells an observer nothing about the file, but a transfer larger than one block is sent as several blocks and its <code>total_chunks</code> travels in the clear, so the number of blocks is visible and the file size can be placed within an order of magnitude. That is finding 5 of the April 2026 audit, an accepted trade-off.</div>
     </div>
 
@@ -1060,7 +1060,7 @@ python3 scripts/paramant-admin.py sync</pre>
 
     <div class="faq-item">
       <div class="faq-q">Is the source code auditable?</div>
-      <div class="faq-a">Yes. The full relay source is at <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" style="color:var(--cobalt)" rel="noopener">github.com/Apolloccrypt/paramant-relay</a> under BUSL-1.1. Three independent security audits were conducted in April 2026: all findings are publicly documented in SECURITY.md. The relay binary checksum is verified on startup and logged to the CT log.</div>
+      <div class="faq-a">Yes. The full relay source is at <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" style="color:var(--cobalt)" rel="noopener">github.com/Apolloccrypt/paramant-relay</a> under BUSL-1.1. Three independent security audits were conducted in April 2026; all findings are publicly documented in SECURITY.md. The relay binary checksum is verified on startup and logged to the CT log.</div>
     </div>
 
     <div class="faq-item">
@@ -1070,7 +1070,7 @@ python3 scripts/paramant-admin.py sync</pre>
 
     <div class="faq-item">
       <div class="faq-q">How do I get a pgp_ API key?</div>
-      <div class="faq-a"><a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">paramant.app/signup</a>: create a free account to receive your API key with TOTP protection. Community plan: 50 transfers a month, 500 MB per file sent as 5 MB blocks, 1-hour TTL, burn-on-first-read. A one-time link from the web app is a single block, so that way stops at 5 MB a file. See <a href="/pricing">/pricing</a> for tier details.</div>
+      <div class="faq-a"><a href="/signup" style="color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-dim)">Create a free account</a> to get your API key, protected with TOTP. Community plan: 50 transfers a month, 500 MB per file sent as 5 MB blocks, 1-hour TTL, burn-on-first-read. A one-time link from the web app is a single block, so that way stops at 5 MB a file. See <a href="/pricing">pricing</a> for plan details.</div>
     </div>
 
   </div>

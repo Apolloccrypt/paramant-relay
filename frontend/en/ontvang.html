@@ -179,7 +179,7 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 <!-- STEP 1: Generating keypair -->
 <div class="step active" id="step-keygen">
-  <h1>Secure receive</h1>
+  <h1>Receive a file securely</h1>
   <p class="sub">Your browser is generating a post-quantum keypair. The private key never leaves your device. Share your fingerprint with the sender to verify the connection.</p>
 
   <div class="card">
@@ -194,14 +194,14 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <!-- STEP 2: Show fingerprint, wait for sender -->
 <div class="step" id="step-fingerprint">
   <h1>Your fingerprint</h1>
-  <p class="sub">Tell the sender your fingerprint. They must confirm it matches on their screen before the file is encrypted. This prevents the relay from intercepting.</p>
+  <p class="sub">Tell the sender your fingerprint. They must confirm it matches on their screen before the file is encrypted. This stops the relay from intercepting the file.</p>
 
   <div class="card">
-    <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title" id="fp-title">Waiting for sender to verify...</div></div>
+    <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title" id="fp-title">Waiting for the sender to confirm...</div></div>
     <div class="card-body">
       <p class="fingerprint-label">Read this to the sender:</p>
       <div class="fingerprint" id="fp-display">-</div>
-      <div class="status-line" id="fp-status">Connected - sender is verifying your fingerprint</div>
+      <div class="status-line" id="fp-status">Connected. The sender is checking your fingerprint.</div>
     </div>
   </div>
 </div>

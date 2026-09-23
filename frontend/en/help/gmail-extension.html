@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Gmail extension · Paramant Help</title>
+<title>Send encrypted attachments from Gmail | Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<meta name="twitter:description" content="Install and configure the Paramant Chrome extension for sending encrypted attachments from Gmail.">
-<meta name="twitter:title" content="Gmail extension · Paramant Help">
+<meta name="twitter:description" content="Install the Paramant Chrome extension and send encrypted attachments from Gmail as a one-time download link. Files up to 500 MB, explained step by step.">
+<meta name="twitter:title" content="Send encrypted attachments from Gmail | Paramant">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:image" content="https://paramant.app/og-image.png">
-<meta property="og:title" content="Gmail extension · Paramant Help">
-<meta property="og:description" content="Install and configure the Paramant Chrome extension for sending encrypted attachments from Gmail.">
+<meta property="og:title" content="Send encrypted attachments from Gmail | Paramant">
+<meta property="og:description" content="Install the Paramant Chrome extension and send encrypted attachments from Gmail as a one-time download link. Files up to 500 MB, explained step by step.">
 <meta property="og:url" content="https://paramant.app/en/help/gmail-extension">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Paramant">
@@ -25,7 +25,7 @@
      against the codebase as a whole: naming an algorithm the product has, on a route
      that does not run it, is the class of untrue sentence that reads as a fact. -->
 <meta name="paramant:path" content="extensions">
-<meta name="description" content="Install and configure the Paramant Chrome extension for sending encrypted attachments from Gmail.">
+<meta name="description" content="Install the Paramant Chrome extension and send encrypted attachments from Gmail as a one-time download link. Files up to 500 MB, explained step by step.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -157,7 +157,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       "@type": "WebPage",
       "@id": "https://paramant.app/en/help/gmail-extension#webpage",
       "url": "https://paramant.app/en/help/gmail-extension",
-      "name": "Gmail extension · Paramant Help",
+      "name": "Send encrypted attachments from Gmail | Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
@@ -165,7 +165,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         "@id": "https://paramant.app/#organization"
       },
       "inLanguage": "en",
-      "description": "Install and configure the Paramant Chrome extension for sending encrypted attachments from Gmail."
+      "description": "Install the Paramant Chrome extension and send encrypted attachments from Gmail as a one-time download link. Files up to 500 MB, explained step by step."
     },
     {
       "@type": "BreadcrumbList",
@@ -269,7 +269,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h1>Paramant for <em>Gmail</em>: send encrypted attachments without leaving your inbox.</h1>
 
-  <p class="lead">The Paramant Chrome extension adds a button to Gmail's compose window. Select a file, the extension uploads it to Paramant, and inserts the burn-on-read link into your email. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Firm and 100 on Enterprise.</p>
+  <p class="lead">The Paramant Chrome extension adds a button to Gmail's compose window. Pick a file, and the extension uploads it to Paramant and puts a burn-on-read link (a link that stops working after it has been read) into your email. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Firm and 100 on Enterprise.</p>
 
   <h2>Before you start</h2>
 
@@ -288,7 +288,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-body">
       <h2>Install the extension</h2>
       <p>Open Chrome and go to the Chrome Web Store. Search for <strong>Paramant</strong> or find it under the developer name <strong>Apolloccrypt</strong>. Click <strong>Add to Chrome</strong>, then <strong>Add extension</strong> in the confirmation dialog.</p>
-      <p>The Paramant icon (a small shield) will appear in your Chrome toolbar. If it is hidden, click the puzzle icon in the toolbar and pin Paramant.</p>
+      <p>The Paramant icon (a small shield) appears in your Chrome toolbar. If it is hidden, click the puzzle icon in the toolbar and pin Paramant.</p>
     </div>
   </div>
 
@@ -297,7 +297,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-body">
       <h2>Enter your API key</h2>
       <p>Click the Paramant icon in the toolbar. A popup opens with a single field: <strong>API key</strong>. Paste your API key from your Paramant dashboard and click <strong>Save</strong>.</p>
-      <p>The extension stores the key locally in Chrome's extension storage, it is not transmitted anywhere except to paramant.app when you upload a file.</p>
+      <p>The extension keeps the key locally in Chrome's extension storage. It is sent nowhere except to paramant.app when you upload a file.</p>
       <div class="tip"><p>Your API key is in Dashboard &rarr; API keys. If you don't see one, click <strong>Generate new key</strong>.</p></div>
     </div>
   </div>
@@ -316,7 +316,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">1</div>
     <div class="step-body">
       <h2>Open a compose window</h2>
-      <p>In Gmail, click <strong>Compose</strong>. At the bottom of the compose window, you will see the Paramant shield icon alongside the standard Gmail toolbar icons.</p>
+      <p>In Gmail, click <strong>Compose</strong>. At the bottom of the compose window, you will see the Paramant shield icon next to the standard Gmail toolbar icons.</p>
     </div>
   </div>
 
@@ -324,8 +324,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">2</div>
     <div class="step-body">
       <h2>Click the Paramant icon and select a file</h2>
-      <p>Click the shield icon. A file picker opens. Select the file you want to send. The extension uploads it to Paramant in the background, you can see a progress indicator in the compose toolbar.</p>
-      <p>Files up to 500 MB are supported. That is the per-file ceiling on every plan (<code>file_mb</code> in <code>relay/lib/tiers.js</code>). The extension cuts the file into chunks and uploads one fixed 5 MB block per chunk, so the 5 MB block size is the wire format and not the size of the file you may send.</p>
+      <p>Click the shield icon. A file picker opens. Select the file you want to send. The extension uploads it to Paramant in the background. A progress indicator shows in the compose toolbar.</p>
+      <p>You can send files up to 500 MB. That is the limit per file on every plan (<code>file_mb</code> in <code>relay/lib/tiers.js</code>). The extension splits the file into fixed blocks of 5 MB for the upload. The 5 MB is only how the file travels, not a limit on the size of your file.</p>
     </div>
   </div>
 
@@ -334,26 +334,26 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-body">
       <h2>The link is inserted automatically</h2>
       <p>When the upload completes, the extension inserts a formatted line into your email body:</p>
-      <p style="font-family:var(--mono,ui-monospace);font-size:var(--text-sm);color:var(--ink-dim);border:1px solid var(--ink-hair);padding:10px 14px;line-height:1.6">Secure file: [filename] &mdash; download once at paramant.app/get/XXXXX<br>(link expires in 24 hours, file deleted after download)</p>
-      <p>Edit the text around the link as needed, then send your email normally.</p>
+      <p style="font-family:var(--mono,ui-monospace);font-size:var(--text-sm);color:var(--ink-dim);border:1px solid var(--ink-hair);padding:10px 14px;line-height:1.6">Secure file: [filename], download once at paramant.app/get/XXXXX<br>(link expires in 24 hours, file deleted after download)</p>
+      <p>Edit the text around the link if you want, then send your email as usual.</p>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">4</div>
     <div class="step-body">
-      <h2>Recipient downloads the file</h2>
-      <p>Your recipient clicks the link. They see the file name and size, click <strong>Download</strong>, and the file is delivered. The link and file are deleted immediately after that first download on every plan, because the extension never asks the relay for a second read, and a second try gets a 404.</p>
+      <h2>Your recipient downloads the file</h2>
+      <p>Your recipient clicks the link. They see the file name and size, click <strong>Download</strong>, and the file downloads. The link and file are deleted immediately after that first download on every plan. The extension never asks the relay for a second read, so a second try gets a 404 (not found).</p>
     </div>
   </div>
 
   <h2>Extension settings</h2>
 
-  <p>Click the Paramant toolbar icon at any time to access settings:</p>
+  <p>Click the Paramant toolbar icon at any time to open the settings:</p>
   <ul style="margin:12px 0 12px 20px;display:flex;flex-direction:column;gap:8px">
     <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Default TTL</strong>: how long the link stays active before expiring without a download. Default is 24 hours; options range from 1 hour to 7 days.</li>
     <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Link format</strong>: plain URL or formatted text block. Plain URL is better if the recipient's email client does not render HTML.</li>
-    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Transfer history</strong>: a list of recent uploads with their status (active, downloaded, expired). Only stored locally, not synced.</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Transfer history</strong>: a list of recent uploads with their status (active, downloaded, expired). Stored only in this browser, not synced.</li>
   </ul>
 
   <hr class="divider">
@@ -362,7 +362,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <div class="troubleshoot-item">
     <div class="q">The Paramant icon does not appear in the Gmail compose window.</div>
-    <div class="a">Reload the Gmail tab after installing the extension. If the icon still doesn't appear, check that the extension is enabled: Chrome menu &rarr; Extensions &rarr; Manage Extensions &rarr; Paramant should be toggled on.</div>
+    <div class="a">Reload the Gmail tab after installing the extension. If the icon still doesn't appear, check that the extension is switched on: Chrome menu &rarr; Extensions &rarr; Manage Extensions &rarr; Paramant.</div>
   </div>
 
   <div class="troubleshoot-item">
@@ -376,7 +376,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 
   <div class="troubleshoot-item">
-    <div class="q">My company's managed Chrome policy blocks extensions.</div>
+    <div class="q">My company's Chrome policy blocks extensions.</div>
     <div class="a">Ask your IT administrator to allowlist the Paramant extension by its ID (visible in Chrome &rarr; Extensions &rarr; Details). Alternatively, use the <a href="/parashare">web uploader</a> or the API directly.</div>
   </div>
 
@@ -386,11 +386,11 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="next-steps">
     <a href="/en/help/outlook-extension" class="next-step-card">
       <h3>Outlook add-in</h3>
-      <p>Same workflow for Microsoft Outlook and 365.</p>
+      <p>The same steps for Outlook and Microsoft 365.</p>
     </a>
     <a href="/en/help/api-key-vs-totp" class="next-step-card">
       <h3>API key vs TOTP</h3>
-      <p>Understanding the credentials used by the extension.</p>
+      <p>The credentials the extension uses.</p>
     </a>
   </div>
 

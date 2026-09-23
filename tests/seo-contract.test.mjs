@@ -448,12 +448,12 @@ const PINNED = {
     desc: 'Paramant is een product van Paramantis Solutions B.V. in Harderwijk, opgericht door Mick Beer, privacy- en securityonderzoeker.',
   },
   'en/index': {
-    title: 'ParaSign by Paramant · sign and send documents in the EU',
-    desc: 'Get documents signed and send files safely, straight from your browser. Built and hosted in the EU by Paramantis Solutions B.V. The Community plan is free, forever.',
+    title: 'E-signatures and secure file transfer in the EU | Paramant',
+    desc: 'Get documents signed and send files securely from your browser. Built and hosted in the EU by Paramantis Solutions B.V. The Community plan is free, forever.',
   },
   'en/pricing': {
-    title: 'Pricing · What is free, and what businesses pay · Paramant',
-    desc: 'The Community plan is free, forever. Organisations pay for higher limits: signing and sending on Firm, 29 euro a month excl. btw. From Paramantis Solutions B.V.',
+    title: 'Pricing for e-signatures and secure file transfer | Paramant',
+    desc: 'The Community plan is free, forever. Organisations pay for higher signing and sending limits on Firm: 29 euro a month excl. VAT. From Paramantis Solutions B.V.',
   },
   'en/about': {
     title: 'About Paramant · Founded by Mick Beer',
@@ -464,7 +464,7 @@ const PINNED = {
     desc: 'Onderteken een pdf in uw browser. Het document en uw ondertekensleutel blijven daar, en iedereen kan het getekende document achteraf controleren.',
   },
   'en/sign': {
-    title: 'Sign a PDF in your browser · Paramant',
+    title: 'Sign a PDF in your browser | ParaSign | Paramant',
     desc: 'Sign a PDF in your browser. The document text and your signing key never leave it, and anyone can check the finished document afterwards.',
   },
   // Updated when /verify grew a second tab: it now also checks the delivery
@@ -489,7 +489,7 @@ const PINNED = {
     desc: 'Wat Paramant op uw eigen server kan zien, wat het kan doen en hoe u beide zelf controleert. Elke bewering op deze pagina is gemarkeerd als live of gepland.',
   },
   'en/trust': {
-    title: 'Trust and verification · Paramant',
+    title: 'Trust and verification: check what we can see | Paramant',
     desc: 'What Paramant can see on your own server, what it can do, and how you check both yourself. Every claim on the page is tagged live or planned.',
   },
   signup: {

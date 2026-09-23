@@ -148,15 +148,15 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 <div class="step" id="step-loading">
   <h1>Opening envelope</h1>
-  <p class="sub">Fetching envelope metadata from the relay. The relay does not have the document itself - only the SHA3-256 hash and your signature slot.</p>
+  <p class="sub">Fetching the envelope details from the relay. The relay does not have the document itself, only its SHA3-256 hash and your signature slot.</p>
   <div class="card"><div class="card-body"><div class="banner" id="loading-msg">Loading...</div></div></div>
 </div>
 
 <div class="step" id="step-error">
   <h1>Could not open envelope</h1>
-  <p class="sub">The link is invalid, expired, or the relay refused to serve it.</p>
+  <p class="sub">The link is invalid or has expired, or the relay refused to serve it.</p>
   <div class="card"><div class="card-body"><div class="banner err" id="error-msg">Unknown error.</div></div></div>
-  <a href="/" class="btn btn-outline">Back to home</a>
+  <a href="/" class="btn btn-outline">Back to the homepage</a>
 </div>
 
 <div class="step" id="step-cosign">
@@ -215,7 +215,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   <div class="card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Sign as <span id="me-label">party</span></div></div>
     <div class="card-body">
-      <p class="sub" style="margin-bottom:12px">You sign with your signing key (ML-DSA-65), unlocked with Face ID / Touch ID / a security key the moment you sign, and never exported. The signature is bound to the email address this invite was sent to.</p>
+      <p class="sub" style="margin-bottom:12px">You sign with your signing key (ML-DSA-65). It opens with Face ID / Touch ID / a security key at the moment you sign, and it is never exported. The signature is bound to the email address this invite was sent to.</p>
       <div class="banner" id="sign-status" hidden></div>
       <div id="sign-cta" style="margin-bottom:12px" hidden></div>
       <button class="btn" id="sign-confirm" type="button" disabled>Sign this document</button>
@@ -260,7 +260,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
       <p class="review-gate" id="done-proof-wait" hidden>The final .psign proof becomes available after every invited signer has signed.</p>
     </div>
   </div>
-  <a href="/" class="btn btn-outline">Back to home</a>
+  <a href="/" class="btn btn-outline">Back to the homepage</a>
 </div>
 
 <p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a id="lang-switch-link" href="/co-sign" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
