@@ -1,0 +1,69 @@
+name: email-blocklist
+
+# Werkt deploy/email-blocklist.json wekelijks bij vanuit de bronnen die erin
+# staan, en opent een pull request. Nooit automatisch mergen: een mens kijkt
+# wat erbij komt en wat eraf gaat. De uitzonderingen (proton, tuta, gmail en de
+# rest) haalt het script eruit, en tests/email-blocklist.test.mjs faalt als er
+# toch een op de lijst komt; die toets draait hier voor de pull request er is.
+#
+# Een pull request die met GITHUB_TOKEN is geopend start zelf geen andere
+# workflows. Sluit en heropen hem, of push een lege commit, om de gewone CI te
+# laten draaien. Zie RUNBOOK.md, sectie E-mailbeleid.
+on:
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: email-blocklist
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: email-blocklist - weekly update
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Bron ophalen en uitzonderingen toepassen
+        run: |
+          set -euo pipefail
+          node scripts/update-email-blocklist.mjs --write | tee /tmp/blocklist-diff.txt
+      - name: Toets de nieuwe lijst
+        run: node --test tests/email-blocklist.test.mjs
+      - name: Pull request openen als er iets veranderde
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- deploy/email-blocklist.json; then
+            echo "Geen verandering."
+            exit 0
+          fi
+          datum=$(date -u +%Y-%m-%d)
+          tak="blocklist/update-$datum"
+          git config user.name "Mick"
+          git config user.email "103085050+Apolloccrypt@users.noreply.github.com"
+          git switch -c "$tak"
+          git add deploy/email-blocklist.json
+          git commit -m "email-blocklist: bron bijgewerkt ($datum)"
+          git push --force origin "$tak"
+          {
+            echo "Wekelijkse update van deploy/email-blocklist.json. Niet automatisch mergen: kijk wat erbij komt."
+            echo
+            echo '```'
+            head -c 60000 /tmp/blocklist-diff.txt
+            echo '```'
+          } > /tmp/pr-body.md
+          if gh pr view "$tak" --json state -q .state 2>/dev/null | grep -q OPEN; then
+            gh pr edit "$tak" --body-file /tmp/pr-body.md
+          else
+            gh pr create --base main --head "$tak" --title "email-blocklist: bron bijgewerkt ($datum)" --body-file /tmp/pr-body.md
+          fi
