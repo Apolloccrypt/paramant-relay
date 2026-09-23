@@ -30,6 +30,11 @@ the server, in files on the server, or in the accounts below.
 | `ADMIN_TOKEN` | the admin API and panel login |
 | `ADMIN_TOTP_SECRET` | second factor of the admin login |
 | `TOTP_SECRET` | relay-side TOTP |
+
+Switching mail carrier: put the new keys in the production `.env` first, then
+update `deploy/mail-provider.json` (`actief`, `naam`, `land`, `prod_sleutels`),
+then /privacy, /dpa and every page that names the carrier, in both languages.
+`tests/mail-provider-site.test.mjs` fails while those three disagree.
 | `PARAMANT_TOTP_MASTER_KEY` | encrypts the stored user TOTP secrets |
 | `RECIPIENT_HASH_KEY` | keyed hash of recipient addresses |
 | `REDIS_PASSWORD` | redis, read by `docker-compose.yml` |

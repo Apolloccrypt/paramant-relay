@@ -954,13 +954,13 @@ assert.doesNotMatch(helpBody, /Pay for volume, never for security/,
 // not repeated here.
 assert.match(securityHtml, /Hetzner Nuremberg, Germany/,
   'security.html must keep the server location row /help quotes');
-assert.match(homeGrid, /No US provider in the data path\. Email goes out via Mailjet \(France\), as <a href="\/privacy">\/privacy<\/a> sets out\./,
+assert.match(homeGrid, /No US provider in the data path\. Email \(only the email address and the invite link, never the document or a key\) still goes through Resend Inc\. in the United States for now, as <a href="\/privacy">\/privacy<\/a> sets out\. That is the one exception in the chain; we are moving to a Dutch provider\./,
   'index.html is the source of the data-path wording and its Resend exception');
 assert.match(helpAnswers, /Your documents live on servers at Hetzner Nuremberg, Germany, and they sit there as ciphertext\./,
   'help/index.html must answer where the documents live, and say they are ciphertext there');
 assert.match(helpAnswers, /no US provider is in the data path/,
   'help/index.html must scope the claim to the data path');
-assert.match(helpAnswers, /Email goes out via Mailjet \(France\), as <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a> sets out\./,
+assert.match(helpAnswers, /Email \(only the email address and the invite link, never the document or a key\) still goes through Resend Inc\. in the United States for now, as <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a> sets out\./,
   'help/index.html must name the Resend exception in the same breath, with the /privacy link');
 assert.doesNotMatch(helpAnswers, /no US company/i,
   'help/index.html must not repeat the unqualified no-US-company row from /security');
@@ -1020,7 +1020,7 @@ assert.match(helpNlAnswers, /Uw documenten staan versleuteld op servers van Hetz
   'help/index.html must answer where the documents live, and say they are ciphertext there');
 assert.match(helpNlAnswers, /bewaart nooit een privésleutel, behalve bij het gehoste ondertekenen op <code>\/v1<\/code>/,
   'help/index.html must say where the keys are not, exception included');
-assert.match(helpNlAnswers, /E-mail gaat via Mailjet \(Frankrijk\), zie <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a>\./,
+assert.match(helpNlAnswers, /Alleen e-mail \(adres en link, nooit het document of een sleutel\) gaat nog via Resend Inc\. in de VS, zie <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a>\./,
   'help/index.html must name the mail exception in the same breath, with the /privacy link');
 assert.doesNotMatch(helpNlHtml.slice(helpNlHtml.indexOf('</head>')), /Betaal voor volume|Pay for volume, never for security/i,
   'help/index.html must not carry the sales line anywhere in the body; it is a support page');
@@ -1091,9 +1091,10 @@ const signVisibleText = visible('frontend/sign.html');
 // Resend exception travels with it. A page may shorten the long form on
 // /rules to this one; it may never drop the second half.
 const EU_CLAIM = 'Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path.';
-// Geen uitzondering meer, maar wel een feit dat op elke pagina hetzelfde moet
-// luiden: mail verhuisde in september 2026 van Resend (VS) naar Mailjet (FR).
-const EU_EXCEPTION = 'Email goes out via Mailjet';
+// De uitzondering, op elke pagina met dezelfde woorden: mail gaat nog via
+// Resend in de VS. Mailjet stond hier tot 23 september 2026, maar is nooit
+// aangezet; zie deploy/mail-provider.json en tests/mail-provider-site.test.mjs.
+const EU_EXCEPTION = 'Email (only the email address and the invite link, never the document or a key) still goes through Resend Inc. in the United States for now';
 const homeVisible = visible('frontend/en/index.html');
 for (const [name, text] of [['index', homeVisible], ['en/parasign', parasignEn], ['en/parasend', parasendEn]]) {
   assert.ok(text.includes(EU_CLAIM), `${name}.html lost the data-path wording of the EU claim`);
@@ -1103,13 +1104,13 @@ for (const [name, text] of [['index', homeVisible], ['en/parasign', parasignEn],
 // begrenzing tot de weg van de data, in de taal van de pagina.
 assert.ok(parasend.includes('Hetzner in Duitsland, Bunny DNS (Slovenië). Geen Amerikaanse partij in de weg van de data.'),
   'parasend.html lost the data-path wording of the EU claim');
-assert.ok(parasend.includes('Mail gaat via Mailjet'),
+assert.ok(parasend.includes('E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten'),
   'parasend.html states the EU claim without naming the Resend exception');
 // /parasign is Dutch since 23 September 2026. The same two halves, in the
 // wording the Dutch homepage uses for proof 1.
 assert.ok(parasign.includes('Geen Amerikaanse partij in de weg die uw bestanden afleggen.'),
   'parasign.html lost the data-path wording of the EU claim');
-assert.ok(parasign.includes('Mail gaat via Mailjet'),
+assert.ok(parasign.includes('E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten'),
   'parasign.html states the EU claim without naming the mail exception');
 // And it may not be offered against a source that does not carry it. The
 // Jurisdiction and privacy table on /security lists Hetzner Nuremberg, the legal
@@ -1174,8 +1175,8 @@ for (const claim of [
   'Paramantis Solutions B.V., Harderwijk, KvK 42115132. Its parent is Paramantis Digital B.V., also Dutch, KvK 42114664. There is no parent company abroad.',
   'Dutch law governs the terms you agree to, and a Dutch court hears the dispute.',
   // Proof 1, in this section\u2019s own words, with the exception in the same breath.
-  'No US provider is in the data path.',
-  'Transactional email goes out through Mailjet in Paris, whose parent is Swedish; the mail itself is stored on EU soil, in Frankfurt and Saint-Ghislain. It receives the address and the invite link, never the document.',
+  'No US provider is in the data path of your files and keys.',
+  'Email (only the email address and the invite link, never the document or a key) still goes through Resend Inc. in the United States for now. That is the one exception in the chain; we are moving to a Dutch provider.',
   // The sentence that carries the pride. It claims nothing a reader cannot check.
   'We are Dutch, and we would rather say so than hide behind a Delaware address.',
 ]) {
@@ -1505,7 +1506,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // its one exception in the same breath.
   assert.match(securityRaw, /No US provider in the data path/,
     'security.html must state the jurisdiction claim about the data path, not about the whole chain');
-  assert.doesNotMatch(securityRaw, /no US company\b(?![^<]*Mailjet)/,
+  assert.doesNotMatch(securityRaw, /no US company\b(?![^<]*Resend)/,
     'security.html must not claim "no US company" without naming the mail carrier beside it');
   // "In the same breath" is the whole point of the wording, so it is measured
   // as a window and not as "somewhere on the page": an earlier version of this
@@ -1516,7 +1517,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
     let at = -1, seen = 0;
     while ((at = html.indexOf('No US provider in the data path', at + 1)) !== -1) {
       seen += 1;
-      assert.match(html.slice(at, at + WINDOW), /Mailjet/,
+      assert.match(html.slice(at, at + WINDOW), /Resend Inc\. in the United States/,
         `${label} states the data-path claim without naming the mail carrier within ${WINDOW} characters of it`);
     }
     assert.ok(seen >= 2,
