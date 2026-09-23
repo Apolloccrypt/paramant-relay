@@ -176,6 +176,54 @@ def lang_switch(rel, tag='div', english=None):
             '<span class="nav-lang-sep" aria-hidden="true">|</span>'
             f'<a href="{en}" hreflang="en" lang="en"{on if english else ""}>EN</a></{tag}>')
 
+# The theme switch. It sits beside NL | EN and has the same form: two halves
+# and a bar between them, the current one drawn solid. A sun and a moon as
+# inline SVG, one button, aria-pressed says whether the dark edition is on.
+# /js/theme.js handles the press (delegated, so nav-auth.js may re-render the
+# drawer around it) and keeps aria-pressed true to the page on load.
+SUN = ('<svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">'
+       '<circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/>'
+       '<path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" '
+       'fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>')
+MOON = ('<svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">'
+        '<path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" '
+        'stroke-width="1.5" stroke-linejoin="round"/></svg>')
+
+
+def theme_switch(english=False):
+    label, hint = ('Theme', 'Light or dark') if english else ('Thema', 'Licht of donker')
+    return (f'<button type="button" class="nav-theme" data-theme-toggle aria-label="{label}" aria-pressed="false" title="{hint}">'
+            f'<span class="nav-theme-opt nav-theme-light">{SUN}</span>'
+            '<span class="nav-theme-sep" aria-hidden="true">|</span>'
+            f'<span class="nav-theme-opt nav-theme-dark">{MOON}</span></button>')
+
+
+# The script that picks the edition before the first paint, in the <head> of
+# every page that links the design system, including the ones that keep their
+# own nav. And the dark ground in each page's critical <style>, so the very
+# first frame is already the right colour.
+THEME_JS = '<script src="/js/theme.js?v=6"></script>'
+CRITICAL_DARK = ('html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}'
+                 'html[data-theme="dark"]{color-scheme:dark}')
+
+
+def inject_theme(html):
+    if '/design-system.css' not in html and '/app-2026.css' not in html:
+        return html
+    html = re.sub(r'<script src="/js/theme\.js(?:\?v=\d+)?"></script>', THEME_JS, html)
+    if THEME_JS not in html:
+        head_close = html.find('</head>')
+        if head_close != -1:
+            html = html[:head_close] + THEME_JS + '\n' + html[head_close:]
+
+    def critical(m):
+        body = m.group(2)
+        body = re.sub(r'@media \(prefers-color-scheme:\s*dark\)\{html\[data-theme="auto"\].*?\}\}', '', body)
+        body = re.sub(r'html\[data-theme="dark"\][^{]*\{[^}]*\}', '', body)
+        return m.group(1) + body + CRITICAL_DARK + m.group(3)
+    return re.sub(r'(<style id="critical-css">)(.*?)(</style>)', critical, html, count=1, flags=re.DOTALL)
+
+
 NEW_NAV_NL = '''\
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
@@ -256,10 +304,10 @@ LEGAL_STRIP_NL = '''\
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a><span class="legal-sep">&middot;</span><a href="/partners">Partners</a>
 </footer>'''
 
-DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=31">'
-NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=27">'
+DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=32">'
+NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=28">'
 NAV_JS    = '<script src="/nav.js?v=16" defer></script>'
-NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=11" defer></script>'
+NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=12" defer></script>'
 
 # Pages that don't have <nav class="nav"> yet but should — inject the canonical
 # nav after <body> (or after a skip-link if present). App shells (admin,
@@ -444,6 +492,7 @@ def renumber_shared_assets(fpath, html):
     updated = re.sub(r'<link rel="stylesheet" href="/nav\.css(?:\?v=\d+)?">', NAV_LINK, updated)
     updated = re.sub(r'<script src="/nav\.js(?:\?v=\d+)?" defer></script>', NAV_JS, updated)
     updated = re.sub(r'<script src="/js/nav-auth\.js(?:\?v=\d+)?" defer></script>', NAV_AUTH_JS, updated)
+    updated = inject_theme(updated)
     if updated == html:
         return False
     with open(fpath, 'w', encoding='utf-8') as f:
@@ -474,9 +523,10 @@ def process(fpath):
     # under the drawer instead, next to Sign in and Help. A <span> there, not a
     # <div>: replace_mobile_div takes the strip out with a non-greedy match up to
     # its first </div>, which a nested div would cut short.
-    nav = nav.replace('  <button class="nav-hamburger"', '  ' + lang_switch(rel, english=english) + '\n\n  <button class="nav-hamburger"', 1)
+    nav = nav.replace('  <button class="nav-hamburger"', '  ' + lang_switch(rel, english=english) + '\n  ' + theme_switch(english) + '\n\n  <button class="nav-hamburger"', 1)
     assert mobile.endswith('</div>')
-    mobile = mobile[:-len('</div>')] + '  ' + lang_switch(rel, 'span', english) + '\n</div>'
+    mobile = (mobile[:-len('</div>')] + '  <span class="nav-prefs">' + lang_switch(rel, 'span', english)
+              + theme_switch(english) + '</span>\n</div>')
     updated = re.sub(r'<nav class="nav">.*?</nav>', lambda m: nav, content, flags=re.DOTALL)
     updated = replace_mobile_div(updated, mobile)
     updated = re.sub(r'<footer>.*?</footer>', lambda m: footer, updated, flags=re.DOTALL)
@@ -488,6 +538,7 @@ def process(fpath):
     updated = inject_design_system(updated)
     updated = inject_nav_js(updated)
     updated = inject_nav_auth_js(updated)
+    updated = inject_theme(updated)
     if updated == original:
         return False
     with open(fpath, 'w', encoding='utf-8') as f:

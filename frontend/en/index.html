@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0B3A6A">
 <title>ParaSign by Paramant &middot; sign and send documents in the EU</title>
@@ -25,8 +25,8 @@
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
 <style>
 /* The homepage on the paper it had before PR #404: warm paper #FFFFFF, ink
    #0C1B2A, one cobalt accent, and one dark object per screen (the Community
@@ -77,7 +77,7 @@ body{color:var(--ink)}
    the drawn document and the receipt live nowhere else. */
 :root{
   --fg:var(--ink); --fg-mid:var(--ink-2); --fg-dim:var(--ink-dim);
-  --teal:#155E75;   /* the petrol as ink on the paper */
+  --teal:var(--petrol-ink);   /* the petrol as ink on the paper; lifted in the dark set */
   --pad:clamp(16px,4vw,28px); --maxw:780px;
   --hp-paper:var(--night); --hp-paper-2:var(--night-2); --hp-ink:var(--cream); --hp-ink-2:var(--fg-mid); --hp-ink-3:var(--fg-dim);
   --hp-line:var(--line); --hp-line-2:var(--line-2); --hp-night:var(--paper); --hp-night-2:var(--paper-2);
@@ -331,6 +331,10 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
 .panel-night{--paper:#0C1622;--paper-ink:#F4F7FA;--paper-ink-2:rgba(244,247,250,.80)}
 .panel-night{background:var(--paper);color:var(--paper-ink);box-shadow:0 30px 60px -40px rgba(0,0,0,.9)}
 .panel-night::after{content:none}
+/* In the dark edition the one dark object lifts off the ground instead of sinking into it. */
+:root[data-theme="dark"] .panel-night{--paper:var(--invert);border:1px solid var(--line)}
+:root[data-theme="dark"] .panel-night .letter-sign{border-top-color:rgba(244,247,250,.45)}
+:root[data-theme="dark"] .panel-night .letter-sign .by-mark{border-color:rgba(244,247,250,.55)}
 .panel-paper{background:var(--card);border:1px solid var(--card-line)}
 .panel-kicker{font-family:var(--hp-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;margin:0 0 6px}
 .panel p.panel-amt{margin:0 0 18px;font-family:var(--hp-mono);font-size:clamp(1.9rem,3.2vw,2.6rem);font-weight:700;letter-spacing:-.02em;line-height:1;white-space:nowrap}
@@ -478,6 +482,7 @@ footer a{color:var(--fg)}
 }
 </script>
 <style>html[data-session="in"] .lang-switch{display:none}</style>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -499,6 +504,7 @@ footer a{color:var(--fg)}
   </div>
 
   <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en" hreflang="en" lang="en" aria-current="true">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -514,7 +520,7 @@ footer a{color:var(--fg)}
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
   <a href="/help" class="nav-tail-link">Help</a>
-  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en" hreflang="en" lang="en" aria-current="true">EN</a></span>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main id="main-content" role="main">
 
@@ -852,7 +858,7 @@ footer a{color:var(--fg)}
   </div>
 </footer>
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=11" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 <script src="/js/format-date.js?v=2" defer></script>
 <script src="/js/home-auth.js?v=7" defer></script>
 </body>

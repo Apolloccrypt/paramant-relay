@@ -17,7 +17,9 @@
    TOKENS
    ═══════════════════════════════════════════════════ */
 :root {
-  /* surface */
+  /* surface. --ground is the page ground by its own name, so /app-2026.css
+     can point its --paper at it without a loop through --bone. */
+  --ground: #FFFFFF;
   --bone:   #FFFFFF;
   --bone-2: #F5F6F7;
 
@@ -167,6 +169,168 @@ main li a:not([class]) {
   --lime: #B2FF3F;
   --on-ochre: var(--navy);
 }
+:root[data-theme="dark"] :is(.section-dark, .section-navy, .section-cobalt, .page-hero--navy, .invert) {
+  --on-ochre: #0B1220;
+}
+
+
+/* ═══════════════════════════════════════════════════
+   TOKENS, DARK  (v4.3)
+   The dark counterpart of the light theme above: the same shapes, type,
+   spacing and buttons, the same cobalt family, on a deep ink-navy ground
+   instead of white. It is the ONE dark set of the site: the marketing pages,
+   the /en copies and the app screens (/app-2026.css points its names here)
+   all follow it. /js/theme.js writes data-theme="dark" before the first paint
+   when the reader chose dark, or never chose and runs a dark system.
+
+   What stays paper in the dark. --paper and its family are the document
+   layer (the PDF preview on /sign, the paper mock on the homepage): a
+   document is white or cream in any room, so those names do not move.
+
+   Measured with the WCAG 2.1 relative-luminance formula. On the ground
+   #0E141B: ink 15.69, ink-2 9.48, ink-3 7.19, accent 6.87, accent-hov 8.80.
+   On a card #16202B: ink 13.95, ink-2 8.44, ink-3 6.39, accent 6.11. The
+   accent carries dark ink #0B1220 when it is a fill (6.95): a light cobalt
+   with white text on it would land at 2.69, so the fill turns the ink round,
+   the way the light theme's navy fill carries white.
+   tests/theme-contrast.test.mjs and tests/app-contrast.test.mjs walk every
+   text node in both editions.
+   ═══════════════════════════════════════════════════ */
+:root[data-theme="dark"] {
+  --tint: 230, 237, 245;
+
+  /* surface */
+  --ground:       #0E141B;
+  --bone:         #0E141B;
+  --bone-2:       #121A23;
+  --night:        #0E141B;
+  --night-2:      #121A23;
+  --card:         #16202B;
+  --card-2:       #1A2531;
+  --surface:      #16202B;
+  --surface-sunk: #0A0F15;
+  --surface-ink:  #070A0E;
+  --bone-blur:    rgba(14, 20, 27, .92);
+  --paper-blur:   rgba(14, 20, 27, .92);
+
+  /* ink */
+  --navy:    #E6EDF5;
+  --navy-2:  #E6EDF5;
+  --ink:     #E6EDF5;
+  --ink-1:   #E6EDF5;
+  --cream:   #E6EDF5;
+  --black:   #E6EDF5;
+  --ink-2:   #AEBBCA;
+  --ink-3:   #94A3B4;
+  --ink-dim:   var(--ink-2);
+  --lime-dim:  var(--ink-2);
+  --black-dim: var(--ink-2);
+
+  /* hairlines */
+  --ink-hair:    rgba(230, 237, 245, .14);
+  --ink-ghost:   rgba(230, 237, 245, .06);
+  --line:        rgba(230, 237, 245, .14);
+  --line-2:      rgba(230, 237, 245, .28);
+  --line-ghost:  rgba(230, 237, 245, .06);
+  --card-line:   rgba(230, 237, 245, .14);
+  --lime-hair:   rgba(230, 237, 245, .14);
+  --lime-ghost:  rgba(230, 237, 245, .06);
+  --black-hair:  rgba(230, 237, 245, .14);
+  --black-ghost: rgba(230, 237, 245, .06);
+
+  /* the one accent, the cobalt lifted for a dark ground */
+  --cobalt:      #6E9BFF;
+  --cobalt-2:    #8FB2FF;
+  --accent:      #6E9BFF;
+  --accent-hov:  #8FB2FF;
+  --accent-ink:  #0B1220;
+  --accent-soft: rgba(110, 155, 255, .12);
+  --accent-ring: rgba(110, 155, 255, .50);
+  --ochre:       #6E9BFF;
+  --ochre-2:     #8FB2FF;
+  --on-ochre:    #0B1220;
+  --ochre-ink:   #1D4ED8;   /* the accent as ink on paper (the cream diagrams): paper does not turn */
+  --lime:        #6E9BFF;
+  --mark:        #6E9BFF;
+  --mark-ink:    #6E9BFF;
+  --mark-on:     #0B1220;
+
+  /* the inverted slab: the light theme's navy block, lifted off the ground */
+  --invert:      #1A2431;
+  --invert-ink:  #F4F7FA;
+  --invert-dim:  rgba(244, 247, 250, .74);
+  --invert-hair: rgba(244, 247, 250, .18);
+  --bone-on-navy:      #F4F7FA;
+  --bone-on-navy-dim:  rgba(244, 247, 250, .74);
+  --bone-on-navy-hair: rgba(244, 247, 250, .18);
+  --on-ink:        #F4F7FA;
+  --on-ink-dim:    rgba(244, 247, 250, .74);
+  --on-ink-accent: #B2FF3F;
+
+  /* states, as ink on the dark ground */
+  --petrol-ink: #6CC4DC;
+  --brick:      #B04E40;   /* a fill: white on it 5.24; as a line 3.14 on a card */
+  --brick-ink:  #F0948A;
+  --ok-ink:     #7FCB9E;
+  --warn-ink:   #E3C169;
+  --sig-wait: #E3C169;
+  --sig-move: #6E9BFF;
+  --sig-done: #7FCB9E;
+  --sig-stop: #F0948A;
+  --sig-wait-bg: rgba(227, 193, 105, .12);
+  --sig-move-bg: rgba(110, 155, 255, .12);
+  --sig-done-bg: rgba(127, 203, 158, .12);
+  --sig-stop-bg: rgba(240, 148, 138, .12);
+  --sig-stop-line: rgba(240, 148, 138, .44);
+
+  /* shadow: depth still comes from hairlines; a shadow on dark is darker */
+  --sh-1: 0 1px 2px rgba(0, 0, 0, .40);
+  --sh-2: 0 1px 2px rgba(0, 0, 0, .44), 0 8px 24px -12px rgba(0, 0, 0, .66);
+  --sh-3: 0 24px 64px -24px rgba(0, 0, 0, .80);
+
+  color-scheme: dark;
+}
+
+/* A fill in the accent carries the dark ink; its hover lifts instead of
+   sinking to navy, which on this ground would be the text colour. */
+/* :where keeps this at the weight of :root[data-theme], so a page state that
+   repaints a button (a standby form, a disabled step) still wins over it. */
+:root[data-theme="dark"] :where(.btn-primary, .cta-stack .primary, .drop-btn, .section-cobalt, .invert, .plan-tier-active) {
+  color: var(--accent-ink);
+}
+:root[data-theme="dark"] :where(.btn-primary, .cta-stack .primary, .drop-btn):hover {
+  background: var(--accent-hov);
+  border-color: var(--accent-hov);
+  color: var(--accent-ink);
+}
+
+/* The reusable hero band: the light one is a pale wash over white; in the
+   dark it is the same wash, one step up from the ground. */
+:root[data-theme="dark"] .page-hero {
+  background: linear-gradient(180deg, var(--bone-2) 0%, rgba(230, 237, 245, .02) 100%);
+  border-top-color: var(--ink-ghost);
+  border-bottom-color: var(--ink-ghost);
+}
+
+/* The switch between the two: a short colour fade that shows what changed.
+   Only while /js/theme.js holds html.theme-fade (240ms after a press), never
+   on load, and not at all under prefers-reduced-motion. */
+html.theme-fade,
+html.theme-fade *,
+html.theme-fade *::before,
+html.theme-fade *::after {
+  transition: background-color 180ms var(--ease-sharp),
+              color 180ms var(--ease-sharp),
+              border-color 180ms var(--ease-sharp),
+              fill 180ms var(--ease-sharp),
+              stroke 180ms var(--ease-sharp) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.theme-fade,
+  html.theme-fade *,
+  html.theme-fade *::before,
+  html.theme-fade *::after { transition: none !important; }
+}
 
 
 /* ═══════════════════════════════════════════════════
@@ -289,7 +453,7 @@ h1 em::after {
   color: var(--bone-on-navy);
 }
 .section-navy {
-  background: var(--navy);
+  background: var(--invert);
   color: var(--bone-on-navy);
 }
 .section-cobalt ::selection,
@@ -580,7 +744,7 @@ h1 em::after {
 .cta-stack .primary:hover { background: var(--navy); border-top-color: var(--navy); }
 .cta-stack a:not(.primary):hover,
 .cta-stack button:not(.primary):hover {
-  background: var(--navy);
+  background: var(--invert);
   color: var(--bone-on-navy);
 }
 
@@ -1239,7 +1403,7 @@ h1 em::after {
   border-color: var(--navy);
 }
 .btn-secondary:hover {
-  background: var(--navy);
+  background: var(--invert);
   color: var(--bone-on-navy);
 }
 
@@ -1361,7 +1525,7 @@ h1 em::after {
    v4: .foot-grid  |  v3 compat: .footer-grid
    ═══════════════════════════════════════════════════ */
 footer {
-  background: #FFFFFF;
+  background: var(--bone);
   padding: var(--space-9) 0;
   border-top: 1px solid var(--ink-hair);
 }
@@ -1711,7 +1875,7 @@ pre code { background: none; padding: 0; }
   border-top: none;
 }
 .section-dark {
-  background: var(--navy);
+  background: var(--invert);
 }
 .section-dark h2 { color: var(--bone); }
 .section-dark p  { color: var(--bone-on-navy-dim); }
