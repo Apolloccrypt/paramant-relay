@@ -1,10 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Claim your API key · Paramant</title>
+<title>Uw API-sleutel ophalen · Paramant</title>
 <link rel="canonical" href="https://paramant.app/claim">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/claim">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/claim">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/claim">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -28,27 +31,27 @@
 <body>
   <main class="claim-wrap">
     <div class="claim-card">
-      <h1 style="font-size:20px;margin:0 0 8px">Claim your PARAMANT API key</h1>
-      <p class="claim-muted">This link reveals your key <strong>once</strong>. Save it in your password manager immediately — it is generated once and cannot be recovered.</p>
+      <h1 style="font-size:20px;margin:0 0 8px">Uw PARAMANT API-sleutel ophalen</h1>
+      <p class="claim-muted">Deze link toont uw sleutel <strong>één keer</strong>. Bewaar hem meteen in uw wachtwoordmanager. Hij wordt één keer gemaakt en is daarna niet terug te halen.</p>
 
       <div id="start">
-        <button id="revealBtn" class="claim-btn" type="button">Reveal my API key</button>
+        <button id="revealBtn" class="claim-btn" type="button">Toon mijn API-sleutel</button>
       </div>
 
       <div id="result" hidden>
-        <div class="claim-warn">Copy this key now. Refreshing or reopening the link will not show it again.</div>
+        <div class="claim-warn">Kopieer deze sleutel nu. Als u de pagina ververst of de link opnieuw opent, ziet u hem niet meer.</div>
         <div class="claim-key" id="keyOut" aria-live="polite"></div>
-        <button id="copyBtn" class="claim-btn" type="button">Copy key</button>
+        <button id="copyBtn" class="claim-btn" type="button">Sleutel kopiëren</button>
         <div class="claim-next">
-          <p class="claim-muted">Next steps</p>
-          <a class="claim-link" href="/docs#api">Read the API docs</a>
-          <a class="claim-link" href="/dashboard">Go to your dashboard</a>
+          <p class="claim-muted">Volgende stappen</p>
+          <a class="claim-link" href="/docs#api">Lees de API-documentatie</a>
+          <a class="claim-link" href="/dashboard">Naar uw dashboard</a>
         </div>
       </div>
 
       <p id="error" class="claim-err" hidden></p>
     </div>
   </main>
-  <script src="/claim.js?v=1"></script>
+  <script src="/claim.js?v=2"></script>
 </body>
 </html>

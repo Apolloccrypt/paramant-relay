@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Paramant desktop app is no longer maintained</title>
+<meta property="og:site_name" content="Paramant">
+<meta name="description" content="The Paramant desktop app was last built in March 2026 and is no longer maintained. Paramant runs in your browser instead, with nothing to install.">
+<meta property="og:title" content="The Paramant desktop app is no longer maintained">
+<meta property="og:description" content="The Paramant desktop app was last built in March 2026 and is no longer maintained. Paramant runs in your browser instead, with nothing to install.">
+<meta property="og:url" content="https://paramant.app/en/download">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="The Paramant desktop app is no longer maintained">
+<meta name="twitter:description" content="The Paramant desktop app was last built in March 2026 and is no longer maintained. Paramant runs in your browser instead, with nothing to install.">
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<link rel="canonical" href="https://paramant.app/en/download">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/download">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/download">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/download">
+<style>
+:root{--mono:ui-monospace,'Cascadia Code','Source Code Pro',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bone);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;min-height:100vh}
+a{color:var(--cobalt)}
+a:hover{text-decoration:underline}
+/* design-system.css loads after this block and flattens inline links to body
+   colour, so a reader cannot see them. Scoped back, buttons excluded. */
+main p a,.details-body a,main td a,.file-name a{color:var(--cobalt);text-decoration:underline;text-underline-offset:2px}
+main{max-width:720px;margin:0 auto;padding:0 24px 80px}
+
+.dl-lead{padding:44px 0 36px;border-bottom:1px solid var(--ink-hair)}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--ink-dim);margin-bottom:14px}
+h1{font-size:32px;line-height:1.2;font-weight:800;letter-spacing:-.02em;color:var(--ink)}
+.dl-sub{font-size:16px;line-height:1.65;color:var(--ink-dim);margin-top:16px;max-width:34em}
+.dl-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+
+section{padding:36px 0;border-bottom:1px solid var(--ink-hair)}
+h2{font-size:20px;font-weight:700;letter-spacing:-.01em;color:var(--ink);margin-bottom:14px}
+section p{font-size:15px;line-height:1.75;color:var(--ink-dim);margin-bottom:12px;max-width:36em}
+section p:last-child{margin-bottom:0}
+.quote{border-left:2px solid var(--cobalt);padding-left:16px;color:var(--ink)}
+
+details{margin-top:28px;border:1px solid var(--ink-hair);background:var(--bone-2)}
+summary{padding:16px 20px;font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--ink);cursor:pointer}
+summary:hover{color:var(--cobalt)}
+.details-body{padding:0 20px 20px}
+.details-body p{font-size:13px;line-height:1.75;color:var(--ink-dim);margin-bottom:12px;max-width:none}
+.dl-warn{border:1px solid var(--ink-hair);border-left:3px solid #b45309;padding:14px 16px;margin-bottom:18px;font-size:13px;line-height:1.7;color:var(--ink)}
+
+table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px}
+th,td{text-align:left;vertical-align:top;padding:10px 12px 10px 0;border-bottom:1px solid var(--ink-hair);line-height:1.6}
+th{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-dim);font-weight:400;white-space:nowrap}
+td{color:var(--ink-dim)}
+td strong{color:var(--ink);font-weight:700}
+code{font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--ink-ghost);padding:2px 6px;word-break:break-all}
+pre{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--ink);background:var(--bone);border:1px solid var(--ink-hair);padding:12px 14px;overflow-x:auto;margin-bottom:14px}
+
+.file{border-top:1px solid var(--ink-hair);padding:14px 0}
+.file:first-of-type{border-top:none}
+.file-name{font-family:var(--mono);font-size:13px;color:var(--ink);font-weight:700}
+.file-meta{font-size:12px;color:var(--ink-dim);line-height:1.7;margin-top:4px}
+.file-sum{font-family:var(--mono);font-size:11px;color:var(--ink-dim);word-break:break-all;margin-top:4px}
+
+@media(max-width:600px){h1{font-size:25px}.dl-sub{font-size:15px}main{padding:0 18px 60px}.dl-lead{padding:28px 0 30px}}
+</style>
+<style>.skip-link{position:absolute;top:-200px;left:0;background:var(--bone-2);color:var(--ink);padding:12px 20px;z-index:10000;text-decoration:none;font-size:13px;font-family:system-ui,sans-serif;border:2px solid var(--ochre);transition:top 120ms ease}.skip-link:focus,.skip-link:focus-visible{top:0;outline:none}.skip-link:focus:hover{background:var(--ochre)}</style>
+<link rel="stylesheet" href="/design-system.css?v=30">
+<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/en/download#webpage",
+      "url": "https://paramant.app/en/download",
+      "name": "The Paramant desktop app is no longer maintained",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "en",
+      "description": "The Paramant desktop app was last built in March 2026 and is no longer maintained. Paramant runs in your browser instead, with nothing to install."
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://paramant.app/en/download#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Paramant",
+          "item": "https://paramant.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "En",
+          "item": "https://paramant.app/en"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "The Paramant desktop app is no longer maintained"
+        }
+      ]
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+    <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/security" class="nav-link">Security</a></li>
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/docs" class="nav-link">Docs</a></li>
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/security" class="nav-mobile-standalone">Security</a>
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
+</div>
+
+<main id="main-content">
+
+  <header class="dl-lead">
+    <p class="kicker">DESKTOP APP</p>
+    <h1>The Paramant desktop app is no longer maintained</h1>
+    <p class="dl-sub">The last build is from March 2026. Paramant runs in your browser instead, with nothing to install and nothing to keep up to date.</p>
+    <div class="dl-actions">
+      <a class="btn btn-primary" href="/">Open the web app</a>
+      <a class="btn btn-outline" href="/pricing">See pricing</a>
+    </div>
+  </header>
+
+  <section>
+    <h2>What happened</h2>
+    <p>The desktop app was a native build of the Paramant messenger. It ran in its own window instead of a browser tab.</p>
+    <p>The last release is v0.2.1, published on 28 March 2026. Nothing has been released since, and there is no build pipeline that would produce a new one. Treat it as an archive, not as a product.</p>
+    <p>What Paramant does today is document signing and encrypted file transfer. Both run in your browser, on servers in Germany, and there is nothing to download.</p>
+  </section>
+
+  <section>
+    <h2>Free for everyone, paid for organisations</h2>
+    <p class="quote">Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.</p>
+    <p>The Community plan is free, forever. It is not a trial and not a funnel. Organisations pay for the higher limits, not to unlock features. <a href="/pricing">See the plans</a>.</p>
+  </section>
+
+  <section>
+    <h2>Who is behind it</h2>
+    <p>Paramant is built by Paramantis Solutions B.V. in Harderwijk. The Community plan is free and stays free; the business plans pay for the servers and keep it that way. <a href="/about">About Paramant</a>.</p>
+  </section>
+
+  <details>
+    <summary>What we checked, and when</summary>
+    <div class="details-body">
+      <p>Checked on 2 September 2026 against the files this site serves. The source repository is private, so there is no public commit log to link to. What you can check is the files themselves, with the commands in the right-hand column.</p>
+      <table>
+        <tr>
+          <th>Last release</th>
+          <td><strong>v0.2.1, 28 March 2026.</strong> It shipped two files: the Linux .deb and an Android .apk. No release has followed it.</td>
+        </tr>
+        <tr>
+          <th>Versions</th>
+          <td>The .deb is v0.2.1. The .rpm, the AppImage and the Windows .exe are still <strong>v0.2.0</strong>, from 26 March 2026. There is no single version number that covers all four.</td>
+        </tr>
+        <tr>
+          <th>.deb signature</th>
+          <td><strong>None, and it used to have one.</strong> The archive holds only <code>debian-binary</code>, <code>control.tar.gz</code> and <code>data.tar.gz</code>. A signed Debian package carries a fourth member: <code>_gpgbuilder</code> from dpkg-sig, or <code>_gpgorigin</code> from debsigs. Neither is there. Check it with <code>ar t paramant_0.2.1_amd64.deb</code>.</td>
+        </tr>
+        <tr>
+          <th>.rpm signature</th>
+          <td><strong>None.</strong> <code>rpm -qpi PARAMANT-0.2.0-1.x86_64.rpm</code> reports <code>Signature : (none)</code>. Only the digests are present.</td>
+        </tr>
+        <tr>
+          <th>AppImage signature</th>
+          <td><strong>None.</strong> The <code>.sha256_sig</code> and <code>.sig_key</code> sections exist but are filled with zeroes, which is what the build tool leaves behind when nothing signs the file.</td>
+        </tr>
+        <tr>
+          <th>.exe signature</th>
+          <td><strong>Authenticode, self-signed.</strong> One of the four carries a signature. Subject and issuer are both <code>CN=Mick Beer, O=PARAMANT, C=NL</code>, so it vouches for itself and proves nothing to someone who does not already have the certificate. Windows SmartScreen still warns.</td>
+        </tr>
+        <tr>
+          <th>Checksums</th>
+          <td>The four files served here match the published release artifacts byte for byte. The list is at <a href="/dl/SHA256SUMS">/dl/SHA256SUMS</a>.</td>
+        </tr>
+      </table>
+      <p>The signature was lost between the two releases, and that is worth stating plainly. The v0.2.0 package was signed with dpkg-sig: <code>ar t</code> lists a <code>_gpgbuilder</code> member holding a clearsigned manifest, signer <code>6EF8E5ACC444949E5A2EAA65CCE2378929A49B97</code>, which is exactly the key the v0.2.0 release notes name. Those notes were accurate. The v0.2.1 package, the one this page serves, has no such member. So this is a regression in the build, not a claim that was never true, and it went unnoticed because nothing checked it.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Archive: the March 2026 installers</summary>
+    <div class="details-body">
+      <div class="dl-warn">
+        These files are from March 2026 and receive no security updates. Three of the four carry no signature at all, and the fourth is self-signed, so a checksum is the only check you have. Install one only if you have a reason the web app cannot serve.
+      </div>
+
+      <div class="file">
+        <div class="file-name"><a href="/dl/paramant_0.2.1_amd64.deb">paramant_0.2.1_amd64.deb</a></div>
+        <div class="file-meta">Debian, Ubuntu. v0.2.1, 2,5 MB. Not signed.</div>
+        <div class="file-sum">62360ad6959be6a9b333de65de67a24b4534f754043c3d88b85908d4703e32bb</div>
+      </div>
+      <div class="file">
+        <div class="file-name"><a href="/dl/PARAMANT-0.2.0-1.x86_64.rpm">PARAMANT-0.2.0-1.x86_64.rpm</a></div>
+        <div class="file-meta">Fedora, RHEL, openSUSE. v0.2.0, 2,4 MB. Not signed.</div>
+        <div class="file-sum">b103dadcd081e886ead442e9128843d5a894b3ec05547b8a2a1ec208d7d541be</div>
+      </div>
+      <div class="file">
+        <div class="file-name"><a href="/dl/PARAMANT_0.2.0_amd64.AppImage">PARAMANT_0.2.0_amd64.AppImage</a></div>
+        <div class="file-meta">Any Linux distribution, no installation. v0.2.0, 80,7 MB. Not signed.</div>
+        <div class="file-sum">7e0962ace68feb6722a6ddcd60102513c8588c9ac4b3406f91b24721ee9aa728</div>
+      </div>
+      <div class="file">
+        <div class="file-name"><a href="/dl/PARAMANT-0.2.0-windows-signed.exe">PARAMANT-0.2.0-windows-signed.exe</a></div>
+        <div class="file-meta">Windows 10 and 11, 64-bit. v0.2.0, 5,8 MB. Authenticode, self-signed.</div>
+        <div class="file-sum">fff0d10c1e0904c5b52cf7c15c1b0fce90e9ab9e48e54d6aab9747e73333f1bc</div>
+      </div>
+
+      <p>Check a file before you open it:</p>
+      <pre>curl -sO https://paramant.app/dl/SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing</pre>
+      <p>On a phone there is nothing to install and nothing to check. Open <a href="/">paramant.app</a> and add it to your home screen. That is the current version, not a build from March.</p>
+    </div>
+  </details>
+
+</main>
+
+<script src="/nav.js?v=15" defer></script>
+<script src="/js/nav-auth.js?v=10" defer></script>
+
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid footer-slim">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="/about">About</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Legal</div>
+        <div class="footer-links">
+          <a href="/privacy">Privacy Policy</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/terms">Terms of Service</a>
+          <a href="/sla">SLA</a>
+          <a href="/license">License</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

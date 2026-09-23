@@ -41,10 +41,10 @@ async function load() {
     document.getElementById('stat-total').textContent = logSize;
     // The composition sentence names the same number the counter shows. It is
     // filled in here rather than typed into ct-log.html so it can never go
-    // stale; if this never runs the sentence keeps its own word "entries" and
+    // stale; if this never runs the sentence keeps its own word "vermeldingen" and
     // still reads correctly, which is why the fallback is not "n/a".
     var compEl = document.getElementById('composition-count');
-    if (compEl && logSize) compEl.textContent = logSize + ' entries';
+    if (compEl && logSize) compEl.textContent = logSize + ' vermeldingen';
     document.getElementById('stat-count').textContent = keyRegCount;
     document.getElementById('stat-transfers').textContent = transferCount;
     var relayRegEl = document.getElementById('stat-relayreg');
@@ -67,7 +67,7 @@ async function load() {
     if (allEntries.length > 0) {
       const ts = allEntries[0].ts;
       document.getElementById('stat-last').textContent = ts
-        ? new Date(ts).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit',day:'2-digit',month:'short'})
+        ? new Date(ts).toLocaleString('nl-NL', {hour:'2-digit',minute:'2-digit',second:'2-digit',day:'2-digit',month:'short'})
         : 'n/a';
     }
 
@@ -79,7 +79,7 @@ async function load() {
     render();
   } catch(e) {
     document.getElementById('entries').innerHTML =
-      '<div class="loading">Error loading log: ' + esc(e.message) + '</div>';
+      '<div class="loading">Het log kon niet worden geladen: ' + esc(e.message) + '</div>';
   }
 }
 
@@ -89,18 +89,17 @@ function render() {
   const total = filtered.length;
 
   document.getElementById('page-info').textContent =
-    total === 0 ? 'no results' : (start+1) + '–' + Math.min(start+PAGE_SIZE, total) + ' of ' + total;
+    total === 0 ? 'geen resultaten' : (start+1) + ' tot ' + Math.min(start+PAGE_SIZE, total) + ' van ' + total;
   document.getElementById('prev-btn').disabled = page === 0;
   document.getElementById('next-btn').disabled = start + PAGE_SIZE >= total;
 
   if (slice.length === 0) {
     document.getElementById('entries').innerHTML =
       '<div class="empty-state">'
-      + '<div class="big">📋</div>'
-      + '<h3>' + (allEntries.length === 0 ? 'Log is empty' : 'No results') + '</h3>'
+      + '<h3>' + (allEntries.length === 0 ? 'Het log is leeg' : 'Geen resultaten') + '</h3>'
       + '<p>' + (allEntries.length === 0
-          ? 'No public key registrations yet. The CT log records every device registration as an immutable entry. Entries appear here in real time.'
-          : 'No entries match your filter.')
+          ? 'Nog geen registraties van publieke sleutels. Het CT-log legt elke registratie van een apparaat vast als vermelding die niet meer te wijzigen is. Nieuwe vermeldingen verschijnen hier direct.'
+          : 'Geen vermeldingen die bij uw filter passen.')
       + '</p></div>';
     return;
   }
@@ -113,14 +112,14 @@ function render() {
     var idx = e.index !== undefined ? e.index : (filtered.length - 1 - gi);
     var ts  = e.ts;
     var time = ts
-      ? new Date(ts).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit',day:'2-digit',month:'short'})
+      ? new Date(ts).toLocaleString('nl-NL', {hour:'2-digit',minute:'2-digit',second:'2-digit',day:'2-digit',month:'short'})
       : 'n/a';
     var leaf   = trunc(e.leaf_hash   || e.hash || '');
     var tree   = trunc(e.tree_hash   || e.merkle_root || '');
     var device = trunc(e.device_hash || e.pubkey_hash  || '');
     var proofHtml = '';
     if (e.proof && e.proof.length) {
-      proofHtml = '<div class="drow"><span class="dkey">Merkle proof</span>'
+      proofHtml = '<div class="drow"><span class="dkey">Merkle-bewijs</span>'
         + '<span class="dval"><div class="proof-chain">'
         + e.proof.map(function(h){return '<span class="proof-hash">'+esc(h.slice(0,16))+'…</span>';}).join('')
         + '</div></span></div>';
@@ -134,11 +133,11 @@ function render() {
       + '</div>'
       + '<div class="entry-detail" id="d-'+gi+'">'
       + (e.type ? '<div class="drow"><span class="dkey">Type</span><span class="dval">'+esc(e.type)+'</span></div>' : '')
-      + '<div class="drow"><span class="dkey">Leaf hash</span><span class="dval">'+esc(e.leaf_hash||'n/a')+'</span></div>'
-      + '<div class="drow"><span class="dkey">Tree hash</span><span class="dval">'+esc(e.tree_hash||'n/a')+'</span></div>'
-      + '<div class="drow"><span class="dkey">Device hash</span><span class="dval">'+esc(e.device_hash||'n/a')+'</span></div>'
+      + '<div class="drow"><span class="dkey">Leaf-hash</span><span class="dval">'+esc(e.leaf_hash||'n/a')+'</span></div>'
+      + '<div class="drow"><span class="dkey">Tree-hash</span><span class="dval">'+esc(e.tree_hash||'n/a')+'</span></div>'
+      + '<div class="drow"><span class="dkey">Apparaat-hash</span><span class="dval">'+esc(e.device_hash||'n/a')+'</span></div>'
       + '<div class="drow"><span class="dkey">Index</span><span class="dval">'+esc(String(idx))+'</span></div>'
-      + '<div class="drow"><span class="dkey">Timestamp</span><span class="dval">'+(ts ? esc(new Date(ts).toISOString()) : 'n/a')+'</span></div>'
+      + '<div class="drow"><span class="dkey">Tijdstip</span><span class="dval">'+(ts ? esc(new Date(ts).toISOString()) : 'n/a')+'</span></div>'
       + proofHtml
       + '</div>';
   }).join('');
@@ -198,24 +197,24 @@ function verifyHash() {
   el.style.display = 'block';
   if (!match) {
     el.className = 'verify-result notfound';
-    el.innerHTML = '<strong>✗ Not found in log</strong><br>'
-      + '<span style="color:#999;font-size:11px">This hash has no matching entry in the current log window. '
-      + 'If the log was recently reset, older entries may no longer be present.</span>';
+    el.innerHTML = '<strong>✗ Niet gevonden in het log</strong><br>'
+      + '<span style="color:#999;font-size:11px">Deze hash komt niet voor in het deel van het log dat nu is geladen. '
+      + 'Is het log onlangs opnieuw begonnen, dan zijn oudere vermeldingen mogelijk niet meer aanwezig.</span>';
     return;
   }
 
   el.className = 'verify-result found';
   var field = (match.leaf_hash||'').startsWith(q) ? 'leaf_hash'
              : (match.device_hash||'').startsWith(q) ? 'device_hash' : 'tree_hash';
-  el.innerHTML = '<strong>✓ Verified: found at index ' + esc(String(match.index)) + '</strong>'
+  el.innerHTML = '<strong>✓ Geverifieerd: gevonden op index ' + esc(String(match.index)) + '</strong>'
     + '<pre>'
-    + 'Matched field : ' + esc(field) + '\n'
+    + 'Gevonden veld : ' + esc(field) + '\n'
     + 'Index         : ' + esc(String(match.index)) + '\n'
-    + 'Leaf hash     : ' + esc(match.leaf_hash||'n/a') + '\n'
-    + 'Tree hash     : ' + esc(match.tree_hash||'n/a') + '\n'
-    + 'Device hash   : ' + esc(match.device_hash||'n/a') + '\n'
-    + 'Timestamp     : ' + (match.ts ? esc(new Date(match.ts).toISOString()) : 'n/a') + '\n'
-    + (match.proof && match.proof.length ? 'Merkle proof  : ' + esc(match.proof.join(' → ')) : '')
+    + 'Leaf-hash     : ' + esc(match.leaf_hash||'n/a') + '\n'
+    + 'Tree-hash     : ' + esc(match.tree_hash||'n/a') + '\n'
+    + 'Apparaat-hash : ' + esc(match.device_hash||'n/a') + '\n'
+    + 'Tijdstip      : ' + (match.ts ? esc(new Date(match.ts).toISOString()) : 'n/a') + '\n'
+    + (match.proof && match.proof.length ? 'Merkle-bewijs : ' + esc(match.proof.join(' → ')) : '')
     + '</pre>';
 }
 
@@ -245,23 +244,23 @@ async function loadRelays() {
     document.getElementById('rstat-sectors').textContent = sectors.join(', ') || 'n/a';
     var latest = relays.reduce(function(a,b){ return (b.last_seen > a) ? b.last_seen : a; }, '');
     document.getElementById('rstat-last').textContent = latest
-      ? new Date(latest).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'})
+      ? new Date(latest).toLocaleString('nl-NL', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'})
       : 'n/a';
 
     if (relays.length === 0) {
-      el.innerHTML = '<div class="empty-state"><div class="big">📡</div>'
-        + '<h3>No relays registered yet</h3>'
-        + '<p>Relays register themselves at startup via <code>POST /v2/relays/register</code> using an ML-DSA-65 signed payload. '
-        + 'Set <code>RELAY_SELF_URL</code> and <code>RELAY_PRIMARY_URL</code> in the relay environment to enable auto-registration.</p></div>';
+      el.innerHTML = '<div class="empty-state">'
+        + '<h3>Nog geen relays geregistreerd</h3>'
+        + '<p>Relays registreren zichzelf bij het opstarten via <code>POST /v2/relays/register</code>, met een payload die is ondertekend met ML-DSA-65. '
+        + 'Stel <code>RELAY_SELF_URL</code> en <code>RELAY_PRIMARY_URL</code> in de omgeving van de relay in om automatische registratie aan te zetten.</p></div>';
       return;
     }
 
     el.innerHTML = relays.map(function(relay) {
       var since = relay.verified_since
-        ? new Date(relay.verified_since).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short',year:'2-digit'})
+        ? new Date(relay.verified_since).toLocaleString('nl-NL', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short',year:'2-digit'})
         : 'n/a';
       var last = relay.last_seen
-        ? new Date(relay.last_seen).toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short',year:'2-digit'})
+        ? new Date(relay.last_seen).toLocaleString('nl-NL', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short',year:'2-digit'})
         : 'n/a';
       var urlShort = esc(relay.url.replace(/^https?:\/\//, ''));
       return '<div class="relay-row">'
@@ -269,12 +268,12 @@ async function loadRelays() {
         + '<div class="cell green">' + esc(relay.sector || 'n/a') + '</div>'
         + '<div class="cell">v' + esc(relay.version || '?') + '</div>'
         + '<div class="cell">' + esc(relay.edition || 'community') + '</div>'
-        + '<div class="cell dim" title="CT log index ' + esc(String(relay.ct_index ?? '')) + '">' + since + '</div>'
+        + '<div class="cell dim" title="Index in het CT-log ' + esc(String(relay.ct_index ?? '')) + '">' + since + '</div>'
         + '<div class="cell dim">' + last + '</div>'
         + '</div>';
     }).join('');
   } catch (e) {
-    el.innerHTML = '<div class="loading">Error loading relay registry: ' + esc(e.message) + '</div>';
+    el.innerHTML = '<div class="loading">Het relayregister kon niet worden geladen: ' + esc(e.message) + '</div>';
   }
 }
 

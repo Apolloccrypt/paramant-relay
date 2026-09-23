@@ -62,7 +62,14 @@ const json = (route, body, status = 200) =>
 
 // The one shape: "8 September 2026". Anchored on both ends of the match so a
 // two-digit year or a trailing slash cannot slip through.
-const MONTH = '(?:January|February|March|April|May|June|July|August|September|October|November|December)';
+// The site's main language is Dutch since 23 September 2026 and
+// js/format-date.js writes the month in the page's language: "8 september
+// 2026" on a lang="nl" page, "8 September 2026" on a lang="en" page. Which one
+// a page must show follows from its own <html lang>, read below, so a page can
+// never pass with the other language's month.
+const MONTH = '(?:January|February|March|April|May|June|July|August|September|October|November|December|januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december)';
+const NL_MONTHS = { September: 'september', August: 'augustus' };
+const inLang = (lang, english) => (lang === 'en' ? english : english.replace(/[A-Z][a-z]+/g, (m) => NL_MONTHS[m] || m));
 const ONE_SHAPE = new RegExp(`^\\d{1,2} ${MONTH} \\d{4}$`);
 const ANY_DATE_LIKE = new RegExp(`\\b\\d{1,2} ${MONTH} \\d{4}\\b`);
 
@@ -135,6 +142,7 @@ const shown = await account.evaluate(() => {
   const invoiceRow = document.querySelector('#billing-invoices .info-row .info-label');
   const historyRow = document.querySelector('#billing-history .info-row .info-label');
   return {
+    lang: document.documentElement.lang,
     body: document.body.innerText,
     term: text(document.getElementById('billing-term-line')),
     accessUntil: text(document.getElementById('billing-next')),
@@ -158,9 +166,9 @@ for (const [where, value] of Object.entries(trio)) {
   ok(`${where} carries a date in the one shape, day month year`, ONE_SHAPE.test(value), `${where}: "${value}" from "${shown[Object.keys(trio).indexOf(where) === 0 ? 'term' : 'accessUntil']}"`);
 }
 ok('the three dates on one screen are the same date, written one way',
-  trio['the term line'] === '8 September 2026'
-  && trio['access until'] === '8 September 2026'
-  && trio['the invoice row'] === '8 September 2026',
+  trio['the term line'] === inLang(shown.lang, '8 September 2026')
+  && trio['access until'] === inLang(shown.lang, '8 September 2026')
+  && trio['the invoice row'] === inLang(shown.lang, '8 September 2026'),
   JSON.stringify(trio));
 
 // 3. Every other date the page renders is in the same shape.
@@ -188,6 +196,7 @@ const dashboard = await open('/dashboard', () => {
   return line && !line.hidden && /Created /.test(document.body.innerText);
 });
 const dash = await dashboard.evaluate(() => ({
+  lang: document.documentElement.lang,
   body: document.body.innerText,
   term: ((document.getElementById('dh-term-line') || {}).textContent || '').trim(),
 }));
@@ -196,11 +205,11 @@ await dashboard.close();
 const dashSlash = dash.body.split('\n').filter((line) => SLASHED.test(line));
 ok('/dashboard shows no slashed date anywhere on the page', dashSlash.length === 0, dashSlash.join(' | '));
 ok('/dashboard writes the term date exactly as /account does',
-  pick(dash.term) === '8 September 2026', dash.term);
+  pick(dash.term) === inLang(dash.lang, '8 September 2026'), dash.term);
 // The document row is where "Created Aug 31, 2026" stood, a third notation on a
 // screen that already had two.
 ok('a document row writes its date the same way the term line does',
-  /Created 31 August 2026/.test(dash.body), (dash.body.match(/Created [^\n]*/) || ['no document row'])[0]);
+  new RegExp(`Created ${inLang(dash.lang, '31 August 2026')}`).test(dash.body), (dash.body.match(/Created [^\n]*/) || ['no document row'])[0]);
 
 // ── report ───────────────────────────────────────────────────────────────────
 await browser.close();

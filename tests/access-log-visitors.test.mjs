@@ -37,7 +37,7 @@ test('a client that renders is not excluded for lacking a referer', () => {
   const r = analyse([
     line({ ip: '8.8.8.8', path: '/sign' }),
     line({ ip: '8.8.8.8', path: '/design-system.css?v=30' }),
-    line({ ip: '8.8.8.8', path: '/sign-flow.js?v=57' }),
+    line({ ip: '8.8.8.8', path: '/sign-flow.js?v=59' }),
   ]);
   assert.equal(r.atMostVisitors, 1);
   assert.equal(r.verdicts.possible_visitor, 1);
@@ -49,7 +49,7 @@ test('a crawler that really renders is reported apart, not as a person', () => {
   const ua = 'Mozilla/5.0 (compatible; heritrix/3.14.2-SNAPSHOT-20250101 +http://archive.org)';
   const r = analyse([
     line({ ip: '7.7.7.7', path: '/', ua }),
-    line({ ip: '7.7.7.7', path: '/nav.css?v=26', ua }),
+    line({ ip: '7.7.7.7', path: '/nav.css?v=27', ua }),
   ]);
   assert.equal(r.atMostVisitors, 0, 'a named crawler was counted as a possible visitor');
   assert.equal(r.verdicts.declared_automation, 1);

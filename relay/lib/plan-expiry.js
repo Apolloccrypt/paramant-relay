@@ -119,6 +119,18 @@ function formatDate(value) {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
+// The Dutch twin of formatDate: "3 oktober 2026". Same rule, same reason: UTC
+// and a hand-built month table, so the Dutch half of a mail reads the same from
+// every container whatever Intl data the image carries.
+const MONTHS_NL = Object.freeze(['januari', 'februari', 'maart', 'april', 'mei', 'juni',
+  'juli', 'augustus', 'september', 'oktober', 'november', 'december']);
+
+function formatDateNl(value) {
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getUTCDate()} ${MONTHS_NL[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
 function memberOf(accountId, product) {
   return `${accountId}|${product}`;
 }
@@ -149,6 +161,16 @@ function planLabel(product, tier) {
   return `${p} ${t}`;
 }
 
+// The Dutch site names the products by what they do: Versturen and
+// Ondertekenen. The tier names stay as they are on /pricing.
+const PRODUCT_NAME_NL = Object.freeze({ parasign: 'Ondertekenen', parasend: 'Versturen' });
+
+function planLabelNl(product, tier) {
+  const p = PRODUCT_NAME_NL[product] || product;
+  const t = TIER_NAME[tier] || tier;
+  return `${p} ${t}`;
+}
+
 // What a BUNDLE is called in a mail, and what it actually contains. A Firm
 // customer paid once for two products, so telling him "your ParaSend Pro ends"
 // names something he never bought under that name, and telling him twice is
@@ -162,6 +184,27 @@ function bundleLabel(bundle) {
   return BUNDLE_LABEL[bundle] || null;
 }
 
+const BUNDLE_LABEL_NL = Object.freeze({
+  firm: 'Paramant Firm-plan (Ondertekenen Pro en Versturen Pro)',
+});
+
+function bundleLabelNl(bundle) {
+  return BUNDLE_LABEL_NL[bundle] || null;
+}
+
+// Every customer mail about money, plans and codes is bilingual: the Dutch text
+// first, the English text below it, unchanged. The subject is "Dutch / English"
+// in the same order. One helper per half so all those mails share one shape.
+const MAIL_SEPARATOR = '----------------------------------------';
+
+function bilingualSubject(nl, en) {
+  return `${nl} / ${en}`;
+}
+
+function bilingualText(nl, en) {
+  return [nl, '', MAIL_SEPARATOR, '', en].join('\n');
+}
+
 // ── The two mails ────────────────────────────────────────────────────────────
 // Plain sentences, no urgency, no offer. The customer bought a term; he is
 // being told when it stops and that nothing happens to his card unless he says
@@ -170,10 +213,22 @@ function bundleLabel(bundle) {
 function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle }) {
   const date = formatDate(paidUntil);
   if (!date) return null;
+  const dateNl = formatDateNl(paidUntil);
   const plan = bundleLabel(bundle) || planLabel(product, tier);
+  const planNl = bundleLabelNl(bundle) || planLabelNl(product, tier);
   const pricing = `${String(siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, '')}/pricing`;
   if (kind === 'ended') {
-    const subject = `Your ${plan} has ended`;
+    const subjectNl = `Uw ${planNl} is afgelopen`;
+    const subjectEn = `Your ${plan} has ended`;
+    const textNl = [
+      `Uw ${planNl} is afgelopen op ${dateNl}. Uw account staat nu op ${FLOOR_NAME}.`,
+      '',
+      'Er is niets afgeschreven. Elk plan is hier een eenmalige betaling voor de periode die u koopt. Er wordt dus niets vanzelf verlengd en niets geïncasseerd zonder u.',
+      '',
+      `U kunt op elk moment een nieuwe maand of een nieuw jaar kopen: ${pricing}`,
+      '',
+      'Paramant',
+    ].join('\n');
     const text = [
       `Your ${plan} ended on ${date}, and your account is now on ${FLOOR_NAME}.`,
       '',
@@ -183,9 +238,23 @@ function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle }) {
       '',
       'Paramant',
     ].join('\n');
-    return { subject, text, html: htmlBody(subject, text, pricing) };
+    return {
+      subject: bilingualSubject(subjectNl, subjectEn),
+      text: bilingualText(textNl, text),
+      html: htmlBody([[subjectNl, textNl], [subjectEn, text]], pricing),
+    };
   }
-  const subject = `Your ${plan} ends on ${date}`;
+  const subjectNl = `Uw ${planNl} loopt af op ${dateNl}`;
+  const subjectEn = `Your ${plan} ends on ${date}`;
+  const textNl = [
+    `Uw ${planNl} loopt af op ${dateNl}.`,
+    '',
+    `U kunt verlengen met een maand of een jaar. Doet u niets, dan gaat uw account terug naar ${FLOOR_NAME}. Er wordt niets automatisch afgeschreven.`,
+    '',
+    `Uw plannen en prijzen vindt u hier: ${pricing}`,
+    '',
+    'Paramant',
+  ].join('\n');
   const text = [
     `Your ${plan} ends on ${date}.`,
     '',
@@ -195,23 +264,32 @@ function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle }) {
     '',
     'Paramant',
   ].join('\n');
-  return { subject, text, html: htmlBody(subject, text, pricing) };
+  return {
+    subject: bilingualSubject(subjectNl, subjectEn),
+    text: bilingualText(textNl, text),
+    html: htmlBody([[subjectNl, textNl], [subjectEn, text]], pricing),
+  };
 }
 
 const escHtml = (s) => String(s === null || s === undefined ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-function htmlBody(subject, text, pricing) {
-  const paragraphs = text.split('\n\n')
-    .filter((p) => p && p !== 'Paramant')
-    .map((p) => `<p style="margin:0 0 16px;line-height:1.6">${escHtml(p)}</p>`)
-    .join('\n');
+// sections: [[heading, text], ...], Dutch first. Each heading is that
+// language's subject; a thin rule separates the languages. The one link sits
+// at the bottom, since both halves point at the same page.
+function htmlBody(sections, link) {
+  const blocks = sections.map(([heading, text]) => {
+    const paragraphs = String(text || '').split('\n\n')
+      .filter((p) => p && p !== 'Paramant')
+      .map((p) => `<p style="margin:0 0 16px;line-height:1.6">${escHtml(p).replace(/\n/g, '<br>')}</p>`)
+      .join('\n');
+    return `<h1 style="font-size:18px;margin:0 0 16px">${escHtml(heading)}</h1>\n${paragraphs}`;
+  });
   return [
     '<div style="font-family:system-ui,-apple-system,\'Segoe UI\',sans-serif;color:#0B3A6A;max-width:520px">',
-    `<h1 style="font-size:18px;margin:0 0 16px">${escHtml(subject)}</h1>`,
-    paragraphs,
-    `<p style="margin:0"><a href="${escHtml(pricing)}" style="color:#0B3A6A">${escHtml(pricing)}</a></p>`,
+    blocks.join('\n<hr style="border:0;border-top:1px solid #d5dde6;margin:24px 0">\n'),
+    `<p style="margin:0"><a href="${escHtml(link)}" style="color:#0B3A6A">${escHtml(link)}</a></p>`,
     '</div>',
   ].join('\n');
 }
@@ -491,7 +569,8 @@ module.exports = {
   INDEX_ZSET, META_HASH, LOCK_KEY, NOTICE_PREFIX,
   WARN_DAYS, WARN_WINDOW_MS, ENDED_GRACE_MS, PRUNE_AFTER_MS,
   NOTICE_TTL_S, SWEEP_INTERVAL_MS, LOCK_TTL_MS, DEFAULT_SITE_URL,
-  formatDate, memberOf, parseMember, noticeKey, planLabel, bundleLabel, BUNDLE_LABEL, expiryMail,
+  formatDate, formatDateNl, memberOf, parseMember, noticeKey, planLabel, bundleLabel, BUNDLE_LABEL, expiryMail,
+  planLabelNl, bundleLabelNl, BUNDLE_LABEL_NL, bilingualSubject, bilingualText, htmlBody, MAIL_SEPARATOR,
   upsertExpiry, forgetAccount, seedIndex,
   acquireLock, releaseLock, runSweep, startPlanExpiryPlanner,
 };

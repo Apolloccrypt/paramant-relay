@@ -159,10 +159,11 @@ await page.fill('#code', '000000');
 await page.click('#open');
 await page.waitForFunction(() => {
   const n = document.getElementById('code-say');
-  return n && /wrong|try|tries/i.test(n.textContent || '');
+  // ophalen.html is Nederlands sinds 23 september 2026: "Die code klopt niet. Nog N pogingen over."
+  return n && /klopt niet.*poging/i.test(n.textContent || '');
 }, { timeout: 10000 }).catch(() => {});
 const naFout = await page.textContent('#code-say');
-ok('een foute code geeft een leesbare melding', /wrong|tr(y|ies)/i.test(naFout || ''), naFout);
+ok('een foute code geeft een leesbare melding', /Die code klopt niet\. Nog \d+ pogingen? over\./.test(naFout || ''), naFout);
 ok('en de knop blijft bruikbaar', !(await page.isDisabled('#open')));
 
 // En dan goed.

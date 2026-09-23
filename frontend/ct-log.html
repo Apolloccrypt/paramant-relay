@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Certificate transparency log · Paramant</title>
+<title>Certificate transparency-log · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered, without seeing the payload.">
+<meta name="description" content="Elke sleutelregistratie komt in een Merkle-boom die elke wijziging zichtbaar maakt. Iedereen kan nagaan dat een apparaat is geregistreerd, zonder de inhoud te zien.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -20,15 +20,18 @@
 <link rel="stylesheet" href="/design-system.css?v=30">
 <link rel="stylesheet" href="/nav.css?v=26">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
-<meta property="og:title" content="Certificate transparency log · Paramant">
-<meta property="og:description" content="Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered, without seeing the payload.">
+<meta property="og:title" content="Certificate transparency-log · Paramant">
+<meta property="og:description" content="Elke sleutelregistratie komt in een Merkle-boom die elke wijziging zichtbaar maakt. Iedereen kan nagaan dat een apparaat is geregistreerd, zonder de inhoud te zien.">
 <meta property="og:url" content="https://paramant.app/ct-log">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Certificate transparency log · Paramant">
-<meta name="twitter:description" content="Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered, without seeing the payload.">
+<meta name="twitter:title" content="Certificate transparency-log · Paramant">
+<meta name="twitter:description" content="Elke sleutelregistratie komt in een Merkle-boom die elke wijziging zichtbaar maakt. Iedereen kan nagaan dat een apparaat is geregistreerd, zonder de inhoud te zien.">
 <link rel="canonical" href="https://paramant.app/ct-log">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/ct-log">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/ct-log">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/ct-log">
   <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { min-height:100vh; }
@@ -218,15 +221,15 @@ body { min-height:100vh; }
       "@type": "WebPage",
       "@id": "https://paramant.app/ct-log#webpage",
       "url": "https://paramant.app/ct-log",
-      "name": "Certificate transparency log · Paramant",
+      "name": "Certificate transparency-log · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "en",
-      "description": "Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered, without seeing the payload."
+      "inLanguage": "nl",
+      "description": "Elke sleutelregistratie komt in een Merkle-boom die elke wijziging zichtbaar maakt. Iedereen kan nagaan dat een apparaat is geregistreerd, zonder de inhoud te zien."
     },
     {
       "@type": "Organization",
@@ -262,7 +265,7 @@ body { min-height:100vh; }
 </script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
@@ -299,14 +302,14 @@ body { min-height:100vh; }
 <main id="main-content" tabindex="-1">
 
 <div class="hero">
-  <div class="tag">Public Audit Log</div>
+  <div class="tag">Openbaar auditlog</div>
   <h1>Certificate <span>Transparency</span></h1>
-  <p>Key registrations, transfers and relay announcements are all appended to one tamper-evident Merkle tree. Anyone can check that an entry is in the tree without seeing the payload, the way HTTPS certificate transparency logs work.</p>
+  <p>Registraties van sleutels, overdrachten en aanmeldingen van relays komen allemaal in één Merkle-boom waarin elke wijziging zichtbaar is. Iedereen kan nagaan dat een vermelding in de boom staat, zonder de inhoud te zien. Zo werken ook de certificate transparency-logs van HTTPS.</p>
 </div>
 
 <div class="tabs">
-  <button class="tab active" id="tab-log"    data-click="switchTab" data-tab="log">Log entries</button>
-  <button class="tab"        id="tab-relays" data-click="switchTab" data-tab="relays">Registered Relays</button>
+  <button class="tab active" id="tab-log"    data-click="switchTab" data-tab="log">Vermeldingen</button>
+  <button class="tab"        id="tab-relays" data-click="switchTab" data-tab="relays">Geregistreerde relays</button>
 </div>
 
 <div id="pane-log">
@@ -351,46 +354,46 @@ body { min-height:100vh; }
 -->
 <div class="notice" id="composition-notice">
   <div class="body">
-    <strong>What is in this log, and whose it is</strong>
-    <span>You are looking at the log of one relay, <code>health.paramant.app</code>, the one
-    the web app on this site sends through. Each of the relays we run keeps its own log, so
-    this is not a total. Most of the <span id="composition-count">entries</span> below are not
-    transfers at all: they are our own relays announcing themselves. Every entry here is
-    something a relay said about itself, and for a long time each of them said it again on
-    every restart, which is why the number below is as large as it is. A relay that announces
-    itself and has nothing new to say no longer writes a line. Either way, the number of
-    entries is not a measure of how much the service is used.</span>
+    <strong>Wat er in dit log staat, en van wie het is</strong>
+    <span>U ziet het log van één relay, <code>health.paramant.app</code>, de relay waarlangs
+    de webapp op deze site verstuurt. Elke relay die we draaien houdt een eigen log bij, dus
+    dit is geen totaal. De meeste van de <span id="composition-count">vermeldingen</span> hieronder zijn
+    helemaal geen overdrachten: het zijn onze eigen relays die zich aanmelden. Elke vermelding
+    hier is iets wat een relay over zichzelf meldde, en lange tijd deed elke relay dat opnieuw bij
+    elke herstart. Daarom is het getal hieronder zo groot. Een relay die zich aanmeldt en niets
+    nieuws te melden heeft, schrijft nu geen regel meer. Hoe dan ook: het aantal vermeldingen
+    zegt niets over hoeveel de dienst wordt gebruikt.</span>
   </div>
 </div>
 <div class="notice" id="persistence-notice">
   <div class="body">
-    <strong>Persistent log: survives relay restarts</strong>
-    <span>Hashes are written to disk (<code>/data/ct-log.json</code>) on each registration
-    and reloaded on startup. No payload content is ever stored: only cryptographic hashes.
-    The log resets only when the relay volume is deleted.</span>
+    <strong>Blijvend log: overleeft een herstart van de relay</strong>
+    <span>Bij elke registratie worden hashes naar schijf geschreven (<code>/data/ct-log.json</code>)
+    en bij het opstarten opnieuw ingelezen. Er wordt nooit inhoud opgeslagen, alleen cryptografische hashes.
+    Het log begint alleen opnieuw als het volume van de relay wordt verwijderd.</span>
   </div>
 </div>
 
 <div class="stats">
   <div class="stat">
     <div class="val" id="stat-total">n/a</div>
-    <div class="lbl">Log entries</div>
+    <div class="lbl">Vermeldingen</div>
   </div>
   <div class="stat">
     <div class="val" id="stat-count">n/a</div>
-    <div class="lbl">Key registrations</div>
+    <div class="lbl">Sleutelregistraties</div>
   </div>
   <div class="stat">
     <div class="val" id="stat-transfers">n/a</div>
-    <div class="lbl">Transfer proofs</div>
+    <div class="lbl">Overdrachtsbewijzen</div>
   </div>
   <div class="stat">
     <div class="val" id="stat-relayreg">n/a</div>
-    <div class="lbl">Relay announcements</div>
+    <div class="lbl">Aanmeldingen van relays</div>
   </div>
   <div class="stat">
     <div class="val dim" id="stat-root">n/a</div>
-    <div class="lbl">Merkle Root</div>
+    <div class="lbl">Merkle-root</div>
   </div>
   <div class="stat">
     <div class="val green" id="stat-relay">n/a</div>
@@ -398,67 +401,67 @@ body { min-height:100vh; }
   </div>
   <div class="stat">
     <div class="val dim" id="stat-last">n/a</div>
-    <div class="lbl">Last Entry</div>
+    <div class="lbl">Laatste vermelding</div>
   </div>
 </div>
 
 <!-- Hash Verification Tool -->
 <div class="verify-section">
-  <h2>Verify a hash</h2>
+  <h2>Een hash controleren</h2>
   <div class="verify-bar">
-    <input id="verify-input" placeholder="Paste leaf_hash, device_hash or tree_hash to verify inclusion..." data-input="clearVerify">
-    <button data-click="verifyHash">VERIFY</button>
+    <input id="verify-input" placeholder="Plak een leaf_hash, device_hash of tree_hash om te controleren of die in het log staat" data-input="clearVerify">
+    <button data-click="verifyHash">CONTROLEREN</button>
   </div>
   <div class="verify-result" id="verify-result"></div>
 </div>
 
 <div class="type-filter">
-  <button class="tf active" id="tf-all"      data-click="setTypeFilter" data-arg="all">All</button>
-  <button class="tf"        id="tf-relay_reg" data-click="setTypeFilter" data-arg="relay_reg">Relay reg</button>
-  <button class="tf"        id="tf-transfer"  data-click="setTypeFilter" data-arg="transfer">Transfer proofs</button>
+  <button class="tf active" id="tf-all"      data-click="setTypeFilter" data-arg="all">Alles</button>
+  <button class="tf"        id="tf-relay_reg" data-click="setTypeFilter" data-arg="relay_reg">Aanmeldingen</button>
+  <button class="tf"        id="tf-transfer"  data-click="setTypeFilter" data-arg="transfer">Overdrachtsbewijzen</button>
 </div>
 
 <div class="search-bar">
-  <input id="search" placeholder="Filter entries by hash or index..." data-input="filterEntries">
-  <button data-click="filterEntries">FILTER</button>
+  <input id="search" placeholder="Filter vermeldingen op hash of index" data-input="filterEntries">
+  <button data-click="filterEntries">FILTEREN</button>
 </div>
 
 <div class="table-wrap">
   <div class="table-head">
     <span>#</span>
-    <span>Leaf Hash</span>
-    <span>Tree Hash</span>
-    <span>Device Hash</span>
-    <span>Timestamp</span>
+    <span>Leaf-hash</span>
+    <span>Tree-hash</span>
+    <span>Apparaat-hash</span>
+    <span>Tijdstip</span>
   </div>
-  <div id="entries"><div class="loading">Loading log…</div></div>
+  <div id="entries"><div class="loading">Log laden…</div></div>
 </div>
 
 <div class="pagination">
-  <button id="prev-btn" data-click="changePage" data-arg="-1" disabled>&#8592; Prev</button>
+  <button id="prev-btn" data-click="changePage" data-arg="-1" disabled>&#8592; Vorige</button>
   <span id="page-info">n/a</span>
-  <button id="next-btn" data-click="changePage" data-arg="1" disabled>Next &#8594;</button>
+  <button id="next-btn" data-click="changePage" data-arg="1" disabled>Volgende &#8594;</button>
 </div>
 
 </div><!-- /pane-log -->
 
 <div id="pane-relays" style="display:none">
   <div class="stats" id="relay-stats">
-    <div class="stat"><div class="val" id="rstat-count">n/a</div><div class="lbl">Registered Relays</div></div>
-    <div class="stat"><div class="val green" id="rstat-sectors">n/a</div><div class="lbl">Sectors</div></div>
-    <div class="stat"><div class="val dim" id="rstat-last">n/a</div><div class="lbl">Last Registration</div></div>
+    <div class="stat"><div class="val" id="rstat-count">n/a</div><div class="lbl">Geregistreerde relays</div></div>
+    <div class="stat"><div class="val green" id="rstat-sectors">n/a</div><div class="lbl">Sectoren</div></div>
+    <div class="stat"><div class="val dim" id="rstat-last">n/a</div><div class="lbl">Laatste registratie</div></div>
   </div>
   <div class="relay-table-wrap">
     <div class="relay-table-head">
-      <span>URL</span><span>Sector</span><span>Version</span><span>Edition</span>
-      <span>Verified Since</span><span>Last Seen</span>
+      <span>URL</span><span>Sector</span><span>Versie</span><span>Editie</span>
+      <span>Geverifieerd sinds</span><span>Laatst gezien</span>
     </div>
-    <div id="relay-entries"><div class="loading">Loading relay registry…</div></div>
+    <div id="relay-entries"><div class="loading">Relayregister laden…</div></div>
   </div>
 </div><!-- /pane-relays -->
 
 <script src="/js/delegate.js?v=1" defer></script>
-<script src="/js/ct-log.page.js?v=3" defer></script>
+<script src="/js/ct-log.page.js?v=4" defer></script>
 </main>
 <footer>
   <div class="container-lg">

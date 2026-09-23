@@ -57,23 +57,23 @@
   // than for a log. "Gone" and "already used" are different facts and a reader
   // needs to know which one applies to them.
   var WORDS = {
-    unknown_token: ['This link cannot be used',
-      'The link is not one we recognise. It may have been copied incompletely from the email.'],
-    already_collected: ['You already collected this file',
-      'This link works once, and it has been used. If you still need the file, ask the sender to send it again.'],
-    revoked: ['The sender withdrew this link',
-      'Whoever sent the file took this link back. Ask them if you should have had it.'],
-    expired: ['This file is no longer available',
-      'The window the sender set has closed and the file has been deleted. Ask them to send it again.'],
-    too_many_codes: ['Too many codes were requested for this link',
-      'For your own protection this link is now closed. Ask the sender to send the file again.'],
-    too_many_tries: ['Too many wrong codes',
-      'For your own protection this link is now closed. Ask the sender to send the file again.'],
-    code_not_sent: ['We could not send the code',
-      'The code did not leave our side, so there is nothing in your mailbox to look for. '
-      + 'Try again in a minute.'],
-    pickup_failed: ['Something went wrong on our side',
-      'That is not your doing. Try again in a minute.'],
+    unknown_token: ['Deze link werkt niet',
+      'We herkennen deze link niet. Misschien is hij niet helemaal uit de e-mail gekopieerd.'],
+    already_collected: ['U heeft dit bestand al opgehaald',
+      'Deze link werkt één keer, en hij is al gebruikt. Heeft u het bestand nog nodig, vraag de afzender dan om het opnieuw te sturen.'],
+    revoked: ['De afzender heeft deze link ingetrokken',
+      'Wie het bestand stuurde, heeft deze link teruggetrokken. Vraag de afzender of u het had moeten krijgen.'],
+    expired: ['Dit bestand is niet meer beschikbaar',
+      'De termijn die de afzender instelde is voorbij en het bestand is verwijderd. Vraag de afzender om het opnieuw te sturen.'],
+    too_many_codes: ['Er zijn te veel codes aangevraagd voor deze link',
+      'Voor uw eigen veiligheid is deze link nu gesloten. Vraag de afzender om het bestand opnieuw te sturen.'],
+    too_many_tries: ['Te vaak een verkeerde code',
+      'Voor uw eigen veiligheid is deze link nu gesloten. Vraag de afzender om het bestand opnieuw te sturen.'],
+    code_not_sent: ['We konden de code niet versturen',
+      'De code is bij ons niet verstuurd, dus u hoeft niet in uw mailbox te zoeken. '
+      + 'Probeer het over een minuut opnieuw.'],
+    pickup_failed: ['Er ging bij ons iets mis',
+      'Dat ligt niet aan u. Probeer het over een minuut opnieuw.'],
   };
 
   function stop(reason) {
@@ -87,7 +87,7 @@
 
   function vraagCode(knop, zegId) {
     if (knop) knop.disabled = true;
-    say(zegId, 'Sending the code...');
+    say(zegId, 'De code wordt verstuurd...');
     // POST, not GET. Asking for a code sends a mail, and every Safe Links or
     // antivirus scanner that opens the invitation would fire a GET: the
     // recipient got a code before touching anything.
@@ -104,7 +104,7 @@
       if (knop) knop.disabled = false;
       if (res.status !== 200) return stop(res.body.error || 'pickup_failed');
       var naar = el('sent-to');
-      if (naar) naar.textContent = res.body.sent_to || 'your mailbox';
+      if (naar) naar.textContent = res.body.sent_to || 'uw mailbox';
       var geldig = el('valid-for');
       if (geldig && res.body.expires_in_s) {
         geldig.textContent = String(Math.round(res.body.expires_in_s / 60));
@@ -120,7 +120,7 @@
       if (invoer) { invoer.value = ''; invoer.focus(); }
     }).catch(function () {
       if (knop) knop.disabled = false;
-      say(zegId, 'Could not reach Paramant. Check your connection and try again.', 'fail');
+      say(zegId, 'Paramant is niet bereikbaar. Controleer uw verbinding en probeer het opnieuw.', 'fail');
     });
   }
 
@@ -131,12 +131,12 @@
     var invoer = el('code');
     var code = invoer ? invoer.value.replace(/\D+/g, '') : '';
     if (code.length !== 6) {
-      say('code-say', 'The code is six digits.', 'fail');
+      say('code-say', 'De code bestaat uit zes cijfers.', 'fail');
       if (invoer) invoer.focus();
       return;
     }
     if (knop) knop.disabled = true;
-    say('code-say', 'Checking...');
+    say('code-say', 'Bezig met controleren...');
 
     fetch(pickupUrl(), {
       method: 'POST',
@@ -177,13 +177,13 @@
       if (reden === 'wrong_code') {
         var over = res.body.tries_left;
         say('code-say', over === 0
-          ? 'That code is wrong, and that was the last try.'
-          : 'That code is wrong. ' + over + (over === 1 ? ' try left.' : ' tries left.'), 'fail');
+          ? 'Die code klopt niet, en dat was de laatste poging.'
+          : 'Die code klopt niet. Nog ' + over + (over === 1 ? ' poging over.' : ' pogingen over.'), 'fail');
         if (invoer) { invoer.value = ''; invoer.focus(); }
         return;
       }
       if (reden === 'code_expired') {
-        say('code-say', 'That code has expired. Ask for a new one.', 'fail');
+        say('code-say', 'Die code is verlopen. Vraag een nieuwe aan.', 'fail');
         return;
       }
       if (reden === 'too_many_tries') {
@@ -194,7 +194,7 @@
       }
       if (reden === 'no_code_requested') {
         hide('step-code'); show('step-start');
-        say('start-say', 'Ask for a code first.', 'fail');
+        say('start-say', 'Vraag eerst een code aan.', 'fail');
         return;
       }
       stop(reden || 'pickup_failed');
@@ -213,11 +213,11 @@
       if (uitpakfout) {
         // The code was right and the bytes arrived, but this link cannot open
         // them. Telling somebody to try again would send them round forever.
-        say('code-say', 'The file came through but this link cannot open it. '
-          + 'Ask the sender for a new link.', 'fail');
+        say('code-say', 'Het bestand is binnengekomen, maar deze link kan het niet openen. '
+          + 'Vraag de afzender om een nieuwe link.', 'fail');
         return;
       }
-      say('code-say', 'Could not reach Paramant. Try again.', 'fail');
+      say('code-say', 'Paramant is niet bereikbaar. Probeer het opnieuw.', 'fail');
     });
   }
 
@@ -240,7 +240,7 @@
     var dv = new DataView(plain.buffer, plain.byteOffset, 4);
     var naamLen = dv.getUint32(0, true);
     if (naamLen > plain.length - 4) throw new Error('bad_payload');
-    var naam = new TextDecoder().decode(plain.subarray(4, 4 + naamLen)) || 'file';
+    var naam = new TextDecoder().decode(plain.subarray(4, 4 + naamLen)) || 'bestand';
     var body = plain.subarray(4 + naamLen);
     return { naam: naam, blob: new Blob([body], { type: 'application/octet-stream' }) };
   }
@@ -261,8 +261,8 @@
     hide('step-code');
     show('step-done');
     var lijn = el('done-line');
-    if (lijn) lijn.textContent = 'Saved as ' + naam + '. If nothing happened, '
-      + 'your browser may have blocked it.';
+    if (lijn) lijn.textContent = 'Opgeslagen als ' + naam + '. Gebeurt er niets, dan heeft '
+      + 'uw browser het misschien tegengehouden.';
     var opnieuw = el('again-download');
     if (opnieuw) opnieuw.hidden = false;
   }

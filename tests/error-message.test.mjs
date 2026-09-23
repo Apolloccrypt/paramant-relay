@@ -16,7 +16,7 @@
 // Sabotage that must turn this red (all four verified before commit):
 //   1. put `throw e` back in enrolEphemeralSigningKeyWithTotp
 //   2. return error.message from userFacingMessage instead of the constant
-//   3. drop 'privacy@paramant.app' or the "Try again in a minute" step
+//   3. drop 'privacy@paramant.app' or the "Probeer het over een minuut opnieuw" step
 //   4. let parashare.page.js print e.message again
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -43,10 +43,10 @@ test('a thrown TypeError comes out as the fixed sentence, not its own message', 
 
 test('the fixed sentence says it is not the customer\'s fault, what to do now, and who to reach', () => {
   const sentence = errors.SUPPORT_FAILURE_MESSAGE;
-  assert.match(sentence, /on our side/, 'it must not read as the customer having done something wrong');
-  assert.match(sentence, /Try again in a minute/, 'it must give the next step');
+  assert.match(sentence, /aan onze kant/, 'it must not read as the customer having done something wrong');
+  assert.match(sentence, /Probeer het over een minuut opnieuw/, 'it must give the next step');
   assert.match(sentence, /privacy@paramant\.app/, 'it must name a route to a human');
-  assert.match(sentence, /the time and what you did/, 'it must say what to put in that mail');
+  assert.match(sentence, /het tijdstip en wat u deed/, 'it must say what to put in that mail');
 });
 
 test('every shape that is not a planned failure lands on the same sentence', () => {
@@ -61,9 +61,9 @@ test('every shape that is not a planned failure lands on the same sentence', () 
 });
 
 test('the three planned failures keep their own instruction', () => {
-  assert.match(errors.userFacingMessage({ code: 'totp_invalid' }), /current 6-digit code/);
-  assert.match(errors.userFacingMessage({ code: 'totp_required' }), /Enter the 6-digit code/);
-  assert.match(errors.userFacingMessage({ code: 'totp_unavailable' }), /authenticator app on your account/);
+  assert.match(errors.userFacingMessage({ code: 'totp_invalid' }), /huidige 6-cijferige code/);
+  assert.match(errors.userFacingMessage({ code: 'totp_required' }), /Vul de 6-cijferige code/);
+  assert.match(errors.userFacingMessage({ code: 'totp_unavailable' }), /authenticator-app in op uw account/);
   assert.equal(errors.isKnownFailure({ code: 'nonesuch' }), false);
 });
 
@@ -95,7 +95,7 @@ test('a planned failure keeps its code and its words through reportFailure', () 
     console.error = original;
   }
   assert.equal(replacement.code, 'totp_invalid');
-  assert.match(replacement.message, /current 6-digit code/);
+  assert.match(replacement.message, /huidige 6-cijferige code/);
 });
 
 // ── the callers, so the translator cannot be right and unused ────────────────

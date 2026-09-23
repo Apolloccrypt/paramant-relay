@@ -62,7 +62,9 @@ function publicPages(dir = FRONTEND, prefix = '') {
     }
     if (!entry.isFile() || !entry.name.endsWith('.html')) return [];
     const slug = `${prefix}${entry.name.slice(0, -5)}`;
-    return PRIVATE.has(slug) || REDIRECTS.has(slug) ? [] : [slug];
+    // An English copy under en/ is held to the same contract as its Dutch page.
+    const base = slug.replace(/^en\//, '');
+    return PRIVATE.has(base) || REDIRECTS.has(base) ? [] : [slug];
   }).sort();
 }
 
@@ -163,7 +165,7 @@ test('every public page carries valid JSON-LD', () => {
 
 test('private pages are noindex and stay out of the sitemap', () => {
   const problems = [];
-  for (const slug of PRIVATE) {
+  for (const slug of [...PRIVATE].flatMap((s) => [s, `en/${s}`])) {
     const file = path.join(FRONTEND, `${slug}.html`);
     if (!fs.existsSync(file)) continue;
     const robots = (fs.readFileSync(file, 'utf8').match(rx.robots) || [, ''])[1];
@@ -457,11 +459,21 @@ const PINNED = {
     title: 'Check a signed document or a delivery receipt · Paramant',
     desc: 'Check a signed document, or the receipt that proves a file was delivered. Both happen in your browser, without an account and without uploading anything.',
   },
+  // download, trust and rules: Dutch on the plain path since this branch, the
+  // English pins moved with the English text to /en/.
   download: {
+    title: 'De desktop-app van Paramant wordt niet meer onderhouden',
+    desc: 'De desktop-app van Paramant is voor het laatst gebouwd in maart 2026 en wordt niet meer onderhouden. Paramant werkt nu in uw browser, zonder installatie.',
+  },
+  'en/download': {
     title: 'The Paramant desktop app is no longer maintained',
     desc: 'The Paramant desktop app was last built in March 2026 and is no longer maintained. Paramant runs in your browser instead, with nothing to install.',
   },
   trust: {
+    title: 'Vertrouwen en controle · Paramant',
+    desc: 'Wat Paramant op uw eigen server kan zien, wat het kan doen en hoe u beide zelf controleert. Elke bewering op deze pagina is gemarkeerd als live of gepland.',
+  },
+  'en/trust': {
     title: 'Trust and verification · Paramant',
     desc: 'What Paramant can see on your own server, what it can do, and how you check both yourself. Every claim on the page is tagged live or planned.',
   },
@@ -470,6 +482,10 @@ const PINNED = {
     desc: 'Create a Paramant account. ParaSign Community gives 2 signatures a month, unlimited receiving and full post-quantum crypto, forever. No card required.',
   },
   rules: {
+    title: 'Onze regels · Waar Paramant voor staat',
+    desc: 'De regels waar Paramant zich aan houdt: geen verzoeken naar derden, Europese soevereiniteit, standaard post-quantum, u beheert uw eigen sleutels, eerlijk van opzet.',
+  },
+  'en/rules': {
     title: 'Our rules · What Paramant stands for',
     desc: 'The rules Paramant holds itself to: zero third-party requests, EU sovereignty, post-quantum by default, you own your keys, honest by design.',
   },
@@ -533,7 +549,7 @@ const TECHNICAL = new Set(['architecture', 'crypto-agility', 'ct-log', 'docs/par
 test('the preview text a buyer reads first is free of internal vocabulary', () => {
   const problems = [];
   for (const slug of publicPages()) {
-    if (TECHNICAL.has(slug)) continue;
+    if (TECHNICAL.has(slug.replace(/^en\//, ''))) continue;
     const html = read(slug);
     const title = entities((html.match(rx.title) || [, ''])[1]);
     const desc = attr(html, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i);
@@ -543,6 +559,54 @@ test('the preview text a buyer reads first is free of internal vocabulary', () =
     for (const re of INTERNAL) {
       if (re.test(title)) problems.push(`${slug}: title carries ${re}, which is our vocabulary and not the reader's`);
       if (re.test(lead)) problems.push(`${slug}: the first sentence of the description carries ${re}`);
+    }
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+
+// Since 23 September 2026 every page that exists in both languages sits at two
+// addresses: Dutch on the plain path, English under /en/. Both copies say so to
+// a crawler in the same three links (nl, en, and the Dutch page as x-default),
+// each copy is canonical to itself, and the sitemap names the pair the same
+// way. A copy that points its canonical at the other language would tell a
+// search engine the English page does not exist.
+function languagePairs() {
+  return publicPages().filter((slug) => !slug.startsWith('en/') && fs.existsSync(path.join(FRONTEND, `en/${slug}.html`)));
+}
+
+test('every page in two languages names both, and each copy is canonical to itself', () => {
+  const pairs = languagePairs();
+  assert.ok(pairs.length >= 20, `expected the bilingual site, found ${pairs.length} pairs`);
+  const problems = [];
+  for (const nl of pairs) {
+    const en = `en/${nl}`;
+    for (const [slug, lang] of [[nl, 'nl'], [en, 'en']]) {
+      const html = read(slug);
+      if (!new RegExp(`<html[^>]*\\blang="${lang}"`).test(html)) problems.push(`${slug}: <html lang> is not "${lang}"`);
+      const canonical = (html.match(rx.canonical) || [, ''])[1];
+      if (canonical !== slugToUrl(slug)) problems.push(`${slug}: canonical is "${canonical}", want ${slugToUrl(slug)}`);
+      for (const [hl, target] of [['nl', nl], ['en', en], ['x-default', nl]]) {
+        const want = `<link rel="alternate" hreflang="${hl}" href="${slugToUrl(target)}">`;
+        if (!html.includes(want)) problems.push(`${slug}: missing ${want}`);
+      }
+    }
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+test('the sitemap names both languages of every pair', () => {
+  const xml = fs.readFileSync(SITEMAP, 'utf8');
+  const entries = new Map([...xml.matchAll(/<url>([\s\S]*?)<\/url>/g)].map((m) => [m[1].match(/<loc>([^<]+)<\/loc>/)[1].trim(), m[1]]));
+  const problems = [];
+  for (const nl of languagePairs()) {
+    for (const slug of [nl, `en/${nl}`]) {
+      const entry = entries.get(slugToUrl(slug));
+      if (!entry) { problems.push(`${slug}: not in the sitemap`); continue; }
+      for (const [hl, target] of [['nl', nl], ['en', `en/${nl}`], ['x-default', nl]]) {
+        const want = `<xhtml:link rel="alternate" hreflang="${hl}" href="${slugToUrl(target)}"/>`;
+        if (!entry.includes(want)) problems.push(`${slug}: sitemap entry lacks ${want}`);
+      }
     }
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);

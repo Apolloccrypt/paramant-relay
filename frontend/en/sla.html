@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Service level agreement · Paramant</title>
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:height" content="630">
+<meta property="og:image:width" content="1200">
+<meta property="og:site_name" content="Paramant">
+<meta name="description" content="Uptime commitments, downtime credits and support response times for every Paramant plan, from Community to Enterprise.">
+<meta property="og:title" content="Service level agreement · Paramant">
+<meta property="og:description" content="Uptime commitments, downtime credits and support response times for every Paramant plan, from Community to Enterprise.">
+<meta property="og:url" content="https://paramant.app/en/sla">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Service level agreement · Paramant">
+<meta name="twitter:description" content="Uptime commitments, downtime credits and support response times for every Paramant plan, from Community to Enterprise.">
+<link rel="canonical" href="https://paramant.app/en/sla">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/sla">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/sla">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/sla">
+
+<link rel="stylesheet" href="/design-system.css?v=30">
+<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+  <style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --black:var(--navy);;
+  --mono:ui-monospace,'Cascadia Code','SF Mono','Fira Code',monospace
+}
+html{scroll-behavior:smooth}
+body{background:var(--bone);color:var(--ink);font-family:var(--mono);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:720px;margin:0 auto;padding:80px 48px 120px}
+.eyebrow{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px;font-family:var(--mono)}
+h1{font-size:36px;font-weight:600;letter-spacing:-.025em;color:var(--ink);margin-bottom:10px}
+.sub{font-size:15px;color:var(--ink-dim);margin-bottom:56px;line-height:1.7}
+h2{font-size:18px;font-weight:600;letter-spacing:-.015em;color:var(--ink);margin-bottom:12px;margin-top:52px}
+h2:first-of-type{margin-top:0}
+p{color:var(--ink-dim);margin-bottom:16px;line-height:1.8}
+.sla-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--ink-hair);border:1px solid var(--ink-hair);overflow:hidden;margin-bottom:40px}
+.sla-cell{background:var(--bone);padding:24px 20px}
+.sla-cell.head{background:var(--ink-ghost)}
+.tier{font-size:11px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:6px}
+.uptime{font-size:24px;font-weight:600;letter-spacing:-.02em;color:var(--cobalt)}
+.uptime-sub{font-size:12px;color:var(--ink-dim);margin-top:4px}
+table{width:100%;border-collapse:collapse;margin-bottom:40px;font-size:13px}
+th{text-align:left;padding:10px 16px;font-size:11px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--ink-hair);font-weight:500}
+td{padding:12px 16px;color:var(--ink-dim);border-bottom:1px solid var(--ink-ghost)}
+tr:last-child td{border-bottom:none}
+td:first-child{color:var(--ink);font-weight:500}
+.badge{display:inline-block;padding:2px 8px;font-size:11px;font-family:var(--mono);letter-spacing:.04em}
+.badge-comm{background:var(--ink-ghost);color:var(--ink-dim)}
+.badge-pro{background:var(--ink-ghost);color:var(--ink-dim)}
+.badge-ent{background:var(--ink-ghost);color:var(--cobalt)}
+.note-box{background:var(--ink-ghost);border:1px solid var(--ink-hair);padding:20px 24px;margin-bottom:32px;font-size:13px;color:var(--ink-dim);line-height:1.7}
+.note-box strong{color:var(--cobalt)}
+a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-hair)}
+a:hover{opacity:.8}
+.toc{display:flex;flex-direction:column;gap:6px;margin-bottom:52px}
+.toc a{font-size:13px;text-decoration:none;color:var(--ink-dim)}
+.toc a:hover{color:var(--cobalt)}
+@media(max-width:640px){.wrap{padding:48px 24px 80px}.sla-grid{grid-template-columns:1fr}}
+</style>
+<style>
+.nav-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-family: IBM Plex Mono, monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+  text-decoration: none;
+  border: 1px solid var(--ink-hair);
+  transition: all 140ms ease;
+  margin-right: 12px;
+}
+.nav-help::before {
+  content: "?";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--ink-dim);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-dim);
+  font-family: Inter, sans-serif;
+  line-height: 1;
+}
+.nav-help:hover {
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(29, 78, 216, 0.08);
+}
+.nav-help:hover::before {
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
+}
+.nav-help:focus-visible {
+  outline: 2px solid var(--ochre);
+  outline-offset: 2px;
+}
+.nav-help-mobile {
+  display: block;
+  padding: 12px 20px;
+  font-family: IBM Plex Mono, monospace;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ink-hair);
+}
+.nav-help-mobile:hover {
+  color: var(--ink);
+  background: rgba(29, 78, 216, 0.08);
+}
+@media (max-width: 900px) {
+  .nav-help { display: none; }
+}
+</style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/en/sla#webpage",
+      "url": "https://paramant.app/en/sla",
+      "name": "Service level agreement · Paramant",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "en",
+      "description": "Uptime commitments, downtime credits and support response times for every Paramant plan, from Community to Enterprise."
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://paramant.app/en/sla#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Paramant",
+          "item": "https://paramant.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "En",
+          "item": "https://paramant.app/en"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Service level agreement"
+        }
+      ]
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+    <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/security" class="nav-link">Security</a></li>
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/docs" class="nav-link">Docs</a></li>
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/security" class="nav-mobile-standalone">Security</a>
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
+</div>
+<main id="main-content" tabindex="-1">
+
+<div class="wrap">
+  <div class="eyebrow">Legal &mdash; effective 1 January 2025</div>
+  <h1>Service Level Agreement</h1>
+  
+<!-- [BESLUIT MICK: welke taal geldt] -->
+<p class="lang-prevails">If the Dutch and the English text differ, the <mark>[...]</mark> version prevails. The Dutch text is at <a href="/sla" hreflang="nl" lang="nl">/sla</a>.</p><p class="sub">Uptime commitments, downtime credits, and support response times for all PARAMANT relay plans.</p>
+
+  <div class="toc">
+    <a href="#uptime">1. Uptime commitments</a>
+    <a href="#credits">2. Downtime credits</a>
+    <a href="#support">3. Support tiers</a>
+    <a href="#exclusions">4. Exclusions</a>
+    <a href="#measurement">5. Measurement methodology</a>
+    <a href="#changes">6. SLA changes</a>
+    <a href="#contact">7. Contact</a>
+  </div>
+
+  <!-- 1. Uptime -->
+  <h2 id="uptime">1. Uptime commitments</h2>
+  <p>Monthly uptime percentage is calculated as: <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">(total minutes &minus; downtime minutes) / total minutes &times; 100</code></p>
+
+  <div class="sla-grid">
+    <div class="sla-cell head">
+      <div class="tier">Community</div>
+      <div class="uptime">99.5%</div>
+      <div class="uptime-sub">~3.6 h/month max downtime</div>
+    </div>
+    <div class="sla-cell head">
+      <div class="tier">Enterprise</div>
+      <div class="uptime">99.95%</div>
+      <div class="uptime-sub">~22 min/month max downtime</div>
+    </div>
+  </div>
+
+  <p>Uptime is measured per calendar month across the primary relay endpoint assigned to your plan. All five sector relays (health, legal, finance, IoT, relay) are covered.</p>
+
+  <!-- 2. Credits -->
+  <h2 id="credits">2. Downtime credits</h2>
+  <p>If PARAMANT fails to meet the monthly uptime commitment, you may request a service credit. Credits are applied to the next billing cycle and are the sole remedy for downtime.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Monthly uptime</th>
+        <th>Community credit</th>
+        <th>Enterprise credit</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>99.5% &ndash; 99.9%</td>
+        <td>&mdash;</td>
+        <td>5%</td>
+      </tr>
+      <tr>
+        <td>99.0% &ndash; 99.5%</td>
+        <td>&mdash;</td>
+        <td>15%</td>
+      </tr>
+      <tr>
+        <td>95.0% &ndash; 99.0%</td>
+        <td>&mdash;</td>
+        <td>30%</td>
+      </tr>
+      <tr>
+        <td>Below 95.0%</td>
+        <td>&mdash;</td>
+        <td>50%</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note-box"><strong>How to claim:</strong> Email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> with subject "SLA credit request" within 30 days of the end of the affected calendar month. Include your API key label and a description of the outage. Credits are not automatically issued.</div>
+
+  <!-- 3. Support -->
+  <h2 id="support">3. Support tiers</h2>
+  <p>Initial response times are best-effort targets during business hours (09:00–17:00 CET, Mon–Fri).</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Tier</th>
+        <th>Channel</th>
+        <th>Initial response</th>
+        <th>Scope</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-comm">Community</span></td>
+        <td>GitHub Issues</td>
+        <td>Best effort</td>
+        <td>Bug reports, documentation questions</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-ent">Enterprise</span></td>
+        <td>Email + dedicated channel</td>
+        <td>4 business hours</td>
+        <td>Priority escalation, compliance docs, DPO contact, custom contracts</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 4. Exclusions -->
+  <h2 id="exclusions">4. Exclusions</h2>
+  <p>The following are not counted as downtime for SLA purposes:</p>
+  <ul style="color:var(--ink-dim);padding-left:20px;margin-bottom:16px;display:flex;flex-direction:column;gap:8px">
+    <li>Scheduled maintenance windows, announced at least 48 hours in advance via <a href="https://github.com/Apolloccrypt/paramant-relay/releases">GitHub Releases</a></li>
+    <li>Downtime caused by client-side network failures, DNS misconfiguration, or TLS certificate errors on the client</li>
+    <li>Force majeure events (natural disasters, acts of war, upstream provider outages outside our control)</li>
+    <li>Downtime caused by your own configuration errors, abuse, or violation of the BUSL-1.1 license terms</li>
+    <li>Degraded performance that does not result in complete unavailability of the relay API endpoints</li>
+    <li>Community plan: no credit entitlement regardless of downtime duration</li>
+  </ul>
+
+  <!-- 5. Measurement -->
+  <h2 id="measurement">5. Measurement methodology</h2>
+  <p>PARAMANT does not yet run an automated uptime monitor against every relay. What runs today: the <a href="/status">/status</a> page fetches GET <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">/health</code> on all five relays from your own browser and keeps the result for 24 hours. An hourly end-to-end check of the site and the main relay (<code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">relay.paramant.app</code>) is built and public in the open-source repository as the heartbeat workflow: a page load in a real browser, a transfer sent and read back, a document signed and its signature verified. It runs hourly once enabled, and it is switched off until its credentials are in place, so nothing on this page rests on it yet. A run that fails opens an issue in the repository. The four sector relays (health, legal, finance, IoT) are reached only to confirm that a retired route stays refused there, so their uptime is not measured.</p>
+  <p>Historical uptime data is not yet published; the <a href="/status">/status</a> page shows the last 24 hours as measured from your browser. Self-hosted operators can verify relay health independently via the <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">/v2/ct/log</code> API endpoint.</p>
+
+  <!-- 6. Changes -->
+  <h2 id="changes">6. SLA changes</h2>
+  <p>PARAMANT may update this SLA with 30 days' written notice. Continued use of the service after the effective date constitutes acceptance of the revised SLA. Material reductions to uptime commitments entitle existing paying customers to terminate their subscription and receive a pro-rated refund for the remaining term.</p>
+
+  <!-- 7. Contact -->
+  <h2 id="contact">7. Contact</h2>
+  <p>For SLA credits, support escalations, or enterprise contract inquiries:</p>
+  <p><a href="mailto:privacy@paramant.app">privacy@paramant.app</a><br>
+  PARAMANT &mdash; Hetzner DE (NBG1)<br>
+  EU/DE jurisdiction &middot; GDPR Art. 28 compliant &middot; No US CLOUD Act exposure</p>
+
+  <div class="note-box" style="margin-top:40px"><strong>Self-hosting:</strong> This SLA applies exclusively to the managed PARAMANT relay service at <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 5px">*.paramant.app</code>. Self-hosted deployments are governed by the BUSL-1.1 license and carry no uptime warranty. See <a href="https://github.com/Apolloccrypt/paramant-relay#self-hosting" target="_blank" rel="noopener">self-hosting documentation on GitHub</a> for HA configuration guidance.</div>
+</div>
+
+</main>
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid footer-slim">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="/about">About</a>
+          <a href="/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Legal</div>
+        <div class="footer-links">
+          <a href="/privacy">Privacy Policy</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/terms">Terms of Service</a>
+          <a href="/sla">SLA</a>
+          <a href="/license">License</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+<script src="/nav.js?v=15" defer></script>
+<script src="/js/nav-auth.js?v=10" defer></script>
+</body>
+</html>

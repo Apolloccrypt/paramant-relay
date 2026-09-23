@@ -19,13 +19,13 @@
 
   if (!/^[a-f0-9]{64}$/.test(token)) {
     revealBtn.disabled = true;
-    showError('This claim link is missing or malformed. Use the exact link from your email.');
+    showError('Deze link ontbreekt of is onvolledig. Gebruik precies de link uit uw e-mail.');
     return;
   }
 
   revealBtn.addEventListener('click', function () {
     revealBtn.disabled = true;
-    revealBtn.textContent = 'Revealing…';
+    revealBtn.textContent = 'Bezig met tonen…';
     errorEl.hidden = true;
     fetch('/v2/claim/reveal', {
       method: 'POST',
@@ -37,9 +37,9 @@
       if (!res.ok || !res.body || !res.body.key) {
         var code = res.body && res.body.error;
         showError(code === 'claim_not_found_or_used'
-          ? 'This key has already been claimed or the link has expired.'
-          : 'Could not reveal the key. Please try again or contact support via paramant.app.');
-        revealBtn.textContent = 'Reveal my API key';
+          ? 'Deze sleutel is al opgehaald of de link is verlopen.'
+          : 'De sleutel kon niet worden getoond. Probeer het opnieuw of neem contact op met support via paramant.app.');
+        revealBtn.textContent = 'Toon mijn API-sleutel';
         revealBtn.disabled = false;
         return;
       }
@@ -49,8 +49,8 @@
       startEl.hidden = true;
       resultEl.hidden = false;
     }).catch(function () {
-      showError('Network error. Please try again.');
-      revealBtn.textContent = 'Reveal my API key';
+      showError('Netwerkfout. Probeer het opnieuw.');
+      revealBtn.textContent = 'Toon mijn API-sleutel';
       revealBtn.disabled = false;
     });
   });
@@ -59,8 +59,8 @@
     var txt = keyOut.textContent || '';
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(txt).then(function () {
-        copyBtn.textContent = 'Copied';
-        setTimeout(function () { copyBtn.textContent = 'Copy key'; }, 1500);
+        copyBtn.textContent = 'Gekopieerd';
+        setTimeout(function () { copyBtn.textContent = 'Sleutel kopiëren'; }, 1500);
       });
     }
   });

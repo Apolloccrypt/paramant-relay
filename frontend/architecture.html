@@ -1,24 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Architecture · How Paramant works</title>
+<title>Architectuur · Zo werkt Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="A plain-language walkthrough: how your file is encrypted in the browser, how it travels, why the relay cannot read it, and what happens when a link opens.">
-<meta property="og:title" content="Architecture · How Paramant works">
-<meta property="og:description" content="A plain-language walkthrough: how your file is encrypted in the browser, how it travels, why the relay cannot read it, and what happens when a link opens.">
+<meta name="description" content="Stap voor stap in gewone taal: hoe uw bestand in de browser wordt versleuteld, hoe het reist en waarom de relay het niet kan lezen.">
+<meta property="og:title" content="Architectuur · Zo werkt Paramant">
+<meta property="og:description" content="Stap voor stap in gewone taal: hoe uw bestand in de browser wordt versleuteld, hoe het reist en waarom de relay het niet kan lezen.">
 <meta property="og:url" content="https://paramant.app/architecture">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Architecture · How Paramant works">
-<meta name="twitter:description" content="A plain-language walkthrough: how your file is encrypted in the browser, how it travels, why the relay cannot read it, and what happens when a link opens.">
+<meta name="twitter:title" content="Architectuur · Zo werkt Paramant">
+<meta name="twitter:description" content="Stap voor stap in gewone taal: hoe uw bestand in de browser wordt versleuteld, hoe het reist en waarom de relay het niet kan lezen.">
 <link rel="canonical" href="https://paramant.app/architecture">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/architecture">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/architecture">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/architecture">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -272,15 +275,15 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       "@type": "WebPage",
       "@id": "https://paramant.app/architecture#webpage",
       "url": "https://paramant.app/architecture",
-      "name": "Architecture · How Paramant works",
+      "name": "Architectuur · Zo werkt Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "en",
-      "description": "A plain-language walkthrough: how your file is encrypted in the browser, how it travels, why the relay cannot read it, and what happens when a link opens."
+      "inLanguage": "nl",
+      "description": "Stap voor stap in gewone taal: hoe uw bestand in de browser wordt versleuteld, hoe het reist en waarom de relay het niet kan lezen."
     },
     {
       "@type": "Organization",
@@ -316,7 +319,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
@@ -356,9 +359,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 <!-- ── HERO ── -->
 <section class="page-hero">
   <div class="page-hero-inner">
-    <span class="eyebrow">ARCHITECTURE</span>
-    <h1>How Paramant works.<br>Shown, not told.</h1>
-    <p class="lede">A plain-language walkthrough of every step: how your file is encrypted, how it travels, why the relay cannot read it, and what happens when the link is opened. For the cryptographic specification, see <a href="/security">the security page</a>.</p>
+    <span class="eyebrow">ARCHITECTUUR</span>
+    <h1>Zo werkt Paramant.<br>Laten zien, niet vertellen.</h1>
+    <p class="lede">Elke stap in gewone taal: hoe uw bestand wordt versleuteld, hoe het reist, waarom de relay het niet kan lezen en wat er gebeurt als de link wordt geopend. De cryptografische specificatie staat op <a href="/security">de beveiligingspagina</a>.</p>
   </div>
 </section>
 
@@ -366,60 +369,60 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 <section class="arch-section">
   <div class="arch-inner">
     <div class="section-num">01</div>
-    <h2 class="section-title">The flow</h2>
-    <p class="section-desc">Four stages. The key never leaves the browsers. The relay only ever sees ciphertext it cannot read.</p>
+    <h2 class="section-title">De route</h2>
+    <p class="section-desc">Vier stappen. De sleutel verlaat de browsers nooit. De relay ziet alleen versleutelde tekst die hij niet kan lezen.</p>
 
-    <div class="arch-diagram" role="img" aria-label="Four-stage transfer diagram: browser encrypts, relay stores ciphertext in RAM, recipient browser decrypts, then ciphertext is erased">
+    <div class="arch-diagram" role="img" aria-label="Schema in vier stappen: de browser versleutelt, de relay bewaart de versleutelde tekst in RAM, de browser van de ontvanger ontsleutelt, daarna wordt de versleutelde tekst gewist">
       <svg viewBox="0 0 860 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;min-width:480px">
         <!-- Stage boxes -->
         <!-- 1: YOUR BROWSER -->
         <rect x="0" y="40" width="180" height="140" rx="2" class="d-panel"/>
-        <text x="90" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-h">YOUR BROWSER</text>
+        <text x="90" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-h">UW BROWSER</text>
         <rect x="20" y="76" width="140" height="28" rx="2" class="d-slot"/>
         <text x="90" y="95" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="10" class="d-accent">file.pdf</text>
         <text x="90" y="118" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">AES-256-GCM</text>
-        <text x="90" y="132" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">encrypt in browser</text>
+        <text x="90" y="132" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">versleutelen in browser</text>
         <rect x="20" y="144" width="140" height="24" rx="2" class="d-bar"/>
-        <text x="90" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-bar-ink">&#x1F511; key generated</text>
+        <text x="90" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-bar-ink">&#x1F511; sleutel gemaakt</text>
 
         <!-- Arrow 1→2 -->
         <line x1="183" y1="110" x2="227" y2="110" class="d-line" marker-end="url(#arr)"/>
-        <text x="205" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">ciphertext</text>
+        <text x="205" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">versleuteld</text>
 
         <!-- 2: PARAMANT RELAY -->
         <rect x="230" y="40" width="180" height="140" rx="2" class="d-panel"/>
         <text x="320" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-h">PARAMANT RELAY</text>
         <rect x="250" y="76" width="140" height="52" rx="2" class="d-slot-bad"/>
         <text x="320" y="98" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-bad">████████████</text>
-        <text x="320" y="114" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-bad">opaque ciphertext</text>
-        <text x="320" y="146" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">RAM only &mdash; no disk write</text>
-        <text x="320" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">no key, no plaintext</text>
+        <text x="320" y="114" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-bad">onleesbare versleuteling</text>
+        <text x="320" y="146" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">alleen RAM, niets op schijf</text>
+        <text x="320" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">geen sleutel, geen leesbare tekst</text>
 
         <!-- Arrow 2→3 -->
         <line x1="413" y1="110" x2="457" y2="110" class="d-line" marker-end="url(#arr)"/>
-        <text x="435" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">ciphertext</text>
+        <text x="435" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">versleuteld</text>
 
         <!-- 3: RECIPIENT BROWSER -->
         <rect x="460" y="40" width="180" height="140" rx="2" class="d-panel"/>
-        <text x="550" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-h">RECIPIENT BROWSER</text>
+        <text x="550" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-h">BROWSER ONTVANGER</text>
         <rect x="480" y="76" width="140" height="28" rx="2" class="d-slot"/>
         <text x="550" y="95" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="10" class="d-accent">file.pdf ✓</text>
-        <text x="550" y="118" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">key from link #fragment</text>
-        <text x="550" y="132" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">decrypt locally</text>
+        <text x="550" y="118" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">sleutel uit #fragment van link</text>
+        <text x="550" y="132" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-t">lokaal ontsleutelen</text>
         <rect x="480" y="144" width="140" height="24" rx="2" class="d-bar"/>
-        <text x="550" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-bar-ink">flagged for erasure</text>
+        <text x="550" y="160" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-bar-ink">gemarkeerd voor wissen</text>
 
         <!-- Arrow 3→4 -->
         <line x1="643" y1="110" x2="687" y2="110" class="d-line" marker-end="url(#arr)"/>
-        <text x="665" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">burn</text>
+        <text x="665" y="102" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">wissen</text>
 
         <!-- 4: GONE -->
         <rect x="690" y="40" width="170" height="140" rx="2" class="d-gone" stroke-dasharray="4 3"/>
-        <text x="775" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-bad">GONE</text>
+        <text x="775" y="64" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.08em" class="d-bad">WEG</text>
         <text x="775" y="95" text-anchor="middle" font-size="28" class="d-bad">⌫</text>
-        <text x="775" y="126" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-bad">erased from RAM</text>
+        <text x="775" y="126" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-bad">gewist uit RAM</text>
         <text x="775" y="142" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-bad">410 Gone</text>
-        <text x="775" y="158" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-bad">no recovery</text>
+        <text x="775" y="158" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" class="d-bad">geen herstel</text>
 
         <!-- Arrowhead marker -->
         <defs>
@@ -431,7 +434,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </div>
 
     <div class="arch-takeaway">
-      <p><strong>The key only exists in browsers.</strong> The relay receives ciphertext, holds it in RAM, and forwards it. It has no key and cannot read the file. A fully compromised relay sees nothing useful.</p>
+      <p><strong>De sleutel bestaat alleen in browsers.</strong> De relay ontvangt versleutelde tekst, houdt die in RAM en geeft hem door. Hij heeft geen sleutel en kan het bestand niet lezen. Ook een volledig gekraakte relay ziet niets bruikbaars.</p>
     </div>
   </div>
 </section>
@@ -440,36 +443,36 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 <section class="arch-section arch-section--navy">
   <div class="arch-inner">
     <div class="section-num">02</div>
-    <h2 class="section-title">What we see</h2>
-    <p class="section-desc">Most cloud services store your file, index it, preview it. Paramant's relay sits in the middle and sees almost nothing. Here is the difference.</p>
+    <h2 class="section-title">Wat wij zien</h2>
+    <p class="section-desc">De meeste clouddiensten bewaren uw bestand, indexeren het en maken er een voorbeeld van. De relay van Paramant zit ertussen en ziet bijna niets. Dit is het verschil.</p>
 
     <div class="compare-grid">
       <div class="compare-col compare-col--bad">
-        <h3>Typical cloud storage</h3>
+        <h3>Gewone cloudopslag</h3>
         <ul>
-          <li>Readable file contents (stored in plaintext or decryptable by the provider)</li>
-          <li>Filename and metadata logged</li>
-          <li>Preview thumbnail generated server-side</li>
-          <li>Written to disk &mdash; survives restarts, subpoenas, breaches</li>
-          <li>Access logs tied to content</li>
-          <li>Subject to legal disclosure orders</li>
+          <li>Leesbare inhoud (onversleuteld opgeslagen of door de aanbieder te ontsleutelen)</li>
+          <li>Bestandsnaam en metadata gelogd</li>
+          <li>Voorbeeldafbeelding gemaakt op de server</li>
+          <li>Op schijf geschreven: overleeft herstarts, vorderingen en datalekken</li>
+          <li>Toegangslogs gekoppeld aan inhoud</li>
+          <li>Valt onder wettelijke bevelen tot afgifte</li>
         </ul>
       </div>
       <div class="compare-col compare-col--good">
-        <h3>Paramant relay</h3>
+        <h3>Relay van Paramant</h3>
         <ul>
-          <li>Ciphertext only &mdash; we cannot read it</li>
-          <li>No filename, no metadata</li>
-          <li>No preview possible &mdash; opaque bytes</li>
-          <li>RAM only &mdash; relay restart destroys everything</li>
-          <li>Nothing to disclose &mdash; we hold no plaintext</li>
-          <li>GDPR jurisdiction, no US CLOUD Act</li>
+          <li>Alleen versleutelde tekst: wij kunnen die niet lezen</li>
+          <li>Geen bestandsnaam, geen metadata</li>
+          <li>Geen voorbeeld mogelijk: onleesbare bytes</li>
+          <li>Alleen RAM: een herstart van de relay wist alles</li>
+          <li>Niets af te geven: wij hebben geen leesbare tekst</li>
+          <li>Valt onder de AVG, niet onder de Amerikaanse CLOUD Act</li>
         </ul>
       </div>
     </div>
 
     <div class="arch-takeaway--navy">
-      <p><strong>Legal disclosure is structurally impossible.</strong> We cannot hand over what we do not have. A court order served to the relay returns: encrypted bytes, no key, no plaintext, no filename.</p>
+      <p><strong>Wettelijke afgifte is door de opbouw onmogelijk.</strong> Wij kunnen niet afgeven wat wij niet hebben. Een gerechtelijk bevel aan de relay levert op: versleutelde bytes, geen sleutel, geen leesbare tekst, geen bestandsnaam.</p>
     </div>
   </div>
 </section>
@@ -478,8 +481,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 <section class="arch-section">
   <div class="arch-inner">
     <div class="section-num">03</div>
-    <h2 class="section-title">The # in the link</h2>
-    <p class="section-desc">Every Paramant link is split in two. The left half goes to the relay. The right half &mdash; the part after <code style="font-family:'IBM Plex Mono',monospace;font-size:14px;background:var(--card);padding:2px 6px;color:var(--cobalt)">#</code> &mdash; never leaves your browser. This is not a Paramant policy. It is how browsers work.</p>
+    <h2 class="section-title">De # in de link</h2>
+    <p class="section-desc">Elke Paramant-link bestaat uit twee delen. De linkerhelft gaat naar de relay. De rechterhelft, het deel na <code style="font-family:'IBM Plex Mono',monospace;font-size:14px;background:var(--card);padding:2px 6px;color:var(--cobalt)">#</code>, verlaat uw browser nooit. Dat is geen afspraak van Paramant. Zo werken browsers.</p>
 
     <div class="url-anatomy">
       <div class="url-display">
@@ -489,22 +492,22 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <div class="url-label-item">
           <div>
             <span class="url-label-dot url-label-dot--blue"></span>
-            <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cobalt)">Sent to relay</strong>
+            <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cobalt)">Naar de relay</strong>
           </div>
-          <p class="url-label-text" style="margin-top:6px;padding-left:16px">The path <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">/r/a8f3c92d</code> identifies which blob to retrieve. The relay sees this and serves the matching ciphertext.</p>
+          <p class="url-label-text" style="margin-top:6px;padding-left:16px">Het pad <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">/r/a8f3c92d</code> geeft aan welke blob moet worden opgehaald. De relay ziet dit en levert de bijbehorende versleutelde tekst.</p>
         </div>
         <div class="url-label-item">
           <div>
             <span class="url-label-dot url-label-dot--lime"></span>
-            <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ok-ink)">Never leaves the browser</strong>
+            <strong style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ok-ink)">Verlaat de browser nooit</strong>
           </div>
-          <p class="url-label-text" style="margin-top:6px;padding-left:16px">The fragment <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code> is the decryption key. Browsers strip the fragment before making any network request. It is never transmitted to any server &mdash; including ours.</p>
+          <p class="url-label-text" style="margin-top:6px;padding-left:16px">Het fragment <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code> is de sleutel om te ontsleutelen. Browsers halen het fragment weg voordat ze iets over het netwerk versturen. Het gaat nooit naar een server, ook niet naar de onze.</p>
         </div>
       </div>
     </div>
 
     <div class="arch-takeaway">
-      <p><strong>This is a browser standard, not a trust promise.</strong> RFC 3986 specifies that URL fragments are client-only. Even if Paramant wanted to log the key, the browser would never send it. The relay structurally cannot intercept it.</p>
+      <p><strong>Dit is een browserstandaard, geen belofte.</strong> RFC 3986 legt vast dat URL-fragmenten alleen bij de client blijven. Ook als Paramant de sleutel zou willen loggen, zou de browser hem nooit versturen. De relay kan hem door de opbouw niet onderscheppen.</p>
     </div>
   </div>
 </section>
@@ -513,33 +516,33 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 <section class="arch-section arch-section--tint">
   <div class="arch-inner">
     <div class="section-num">04</div>
-    <h2 class="section-title">Burn on read</h2>
-    <p class="section-desc">The ciphertext exists exactly once, and the relay zeroes the memory slot after the last read the link allows: one on Community, up to 10 on Firm and 100 on Enterprise. There is no second copy to retrieve.</p>
+    <h2 class="section-title">Weg na lezen</h2>
+    <p class="section-desc">De versleutelde tekst bestaat precies één keer. De relay maakt het geheugenvak leeg na de laatste keer lezen die de link toestaat: één keer bij Community, tot 10 keer bij Firm en 100 keer bij Enterprise. Er is geen tweede kopie om op te halen.</p>
 
     <div class="lifecycle-grid">
       <div class="lifecycle-state">
-        <div class="lifecycle-num">State 01</div>
-        <div class="lifecycle-heading">Link sent</div>
-        <div class="lifecycle-body">Ciphertext is held in relay RAM. The decryption key lives only in the URL fragment on the sender's clipboard. The relay is waiting.</div>
+        <div class="lifecycle-num">Stand 01</div>
+        <div class="lifecycle-heading">Link verstuurd</div>
+        <div class="lifecycle-body">De versleutelde tekst staat in het RAM van de relay. De sleutel staat alleen in het URL-fragment op het klembord van de afzender. De relay wacht.</div>
       </div>
       <div class="lifecycle-state lifecycle-state--active">
-        <div class="lifecycle-num">State 02 &mdash; active</div>
-        <div class="lifecycle-heading">Link opened</div>
-        <div class="lifecycle-body">Recipient's browser fetches the ciphertext. The relay flags the slot for immediate erasure. Decryption happens locally using the key from <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code>. File appears in the browser.</div>
+        <div class="lifecycle-num">Stand 02: actief</div>
+        <div class="lifecycle-heading">Link geopend</div>
+        <div class="lifecycle-body">De browser van de ontvanger haalt de versleutelde tekst op. De relay markeert het vak om direct te wissen. Het ontsleutelen gebeurt lokaal met de sleutel uit <code style="font-family:'IBM Plex Mono',monospace;font-size:12px">#key=…</code>. Het bestand verschijnt in de browser.</div>
       </div>
       <div class="lifecycle-state lifecycle-state--gone">
         <svg class="lifecycle-gone-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
           <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
           <path d="M6.5 6.5L13.5 13.5M13.5 6.5L6.5 13.5" stroke="currentColor" stroke-width="1.75"/>
         </svg>
-        <div class="lifecycle-num">State 03 &mdash; gone</div>
-        <div class="lifecycle-heading">Erased</div>
-        <div class="lifecycle-body">Memory slot zeroed. Any subsequent request for that ID returns HTTP 410 Gone. No recovery, no retry, no copy anywhere on disk.</div>
+        <div class="lifecycle-num">Stand 03: weg</div>
+        <div class="lifecycle-heading">Gewist</div>
+        <div class="lifecycle-body">Geheugenvak leeggemaakt. Elk later verzoek voor dat ID krijgt HTTP 410 Gone. Geen herstel, geen nieuwe poging, nergens een kopie op schijf.</div>
       </div>
     </div>
 
     <div class="arch-takeaway">
-      <p><strong>If you forward a link that still works, you forwarded the secret.</strong> On the Community plan burn-on-read is a single-use guarantee: once the link is opened it is gone, for the recipient and for anyone who intercepts a copy of the URL. A paid link is gone after the last read it allows, up to 10 reads on Firm.</p>
+      <p><strong>Stuurt u een link door die nog werkt, dan stuurt u het geheim door.</strong> Bij het Community-abonnement is weg-na-lezen een garantie voor eenmalig gebruik: zodra de link is geopend, is hij weg, voor de ontvanger en voor iedereen die een kopie van de URL onderschept. Een betaalde link is weg na de laatste keer lezen die hij toestaat, tot 10 keer bij Firm.</p>
     </div>
   </div>
 </section>
@@ -548,15 +551,15 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 <section class="arch-section">
   <div class="arch-inner">
     <div class="section-num">05</div>
-    <h2 class="section-title">Verifiable history</h2>
-    <p class="section-desc">Every transfer event is appended to a Merkle tree. The root fingerprint is published. Changing any historical entry would change the root &mdash; which is publicly visible and tamper-evident.</p>
+    <h2 class="section-title">Controleerbare geschiedenis</h2>
+    <p class="section-desc">Elke verzending wordt toegevoegd aan een Merkle-boom. De vingerafdruk van de wortel wordt gepubliceerd. Wie een oude regel wijzigt, verandert de wortel, en dat is openbaar zichtbaar en valt dus op.</p>
 
-    <div class="arch-diagram" role="img" aria-label="Merkle tree diagram showing root hash derived from four leaf events">
+    <div class="arch-diagram" role="img" aria-label="Schema van een Merkle-boom: de hash van de wortel volgt uit vier gebeurtenissen in de bladeren">
       <svg viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">
         <!-- ROOT -->
         <rect x="265" y="10" width="150" height="44" rx="2" class="d-root"/>
-        <text x="340" y="30" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.06em" class="d-root-ink">MERKLE ROOT</text>
-        <text x="340" y="46" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-root-ink">SHA3-256 fingerprint</text>
+        <text x="340" y="30" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" font-weight="700" letter-spacing="0.06em" class="d-root-ink">MERKLE-WORTEL</text>
+        <text x="340" y="46" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-root-ink">SHA3-256-vingerafdruk</text>
 
         <!-- Mid-level lines -->
         <line x1="290" y1="54" x2="175" y2="110" class="d-line"/>
@@ -565,11 +568,11 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <!-- Mid-level nodes -->
         <rect x="105" y="110" width="140" height="38" rx="2" class="d-panel"/>
         <text x="175" y="127" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-t">hash(A + B)</text>
-        <text x="175" y="141" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">transfers 1–2</text>
+        <text x="175" y="141" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">verzendingen 1 en 2</text>
 
         <rect x="435" y="110" width="140" height="38" rx="2" class="d-panel"/>
         <text x="505" y="127" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="9" class="d-t">hash(C + D)</text>
-        <text x="505" y="141" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">transfers 3–4</text>
+        <text x="505" y="141" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8" class="d-t">verzendingen 3 en 4</text>
 
         <!-- Leaf lines -->
         <line x1="145" y1="148" x2="75" y2="196" class="d-line"/>
@@ -579,29 +582,29 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
         <!-- Leaf nodes -->
         <rect x="25" y="196" width="100" height="48" rx="2" class="d-slot"/>
-        <text x="75" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" class="d-accent">EVENT A</text>
-        <text x="75" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" class="d-t">transfer 1</text>
-        <text x="75" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" class="d-t">timestamp + hash</text>
+        <text x="75" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" class="d-accent">GEBEURTENIS A</text>
+        <text x="75" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" class="d-t">verzending 1</text>
+        <text x="75" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" class="d-t">tijdstempel + hash</text>
 
         <rect x="215" y="196" width="100" height="48" rx="2" class="d-slot"/>
-        <text x="265" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" class="d-accent">EVENT B</text>
-        <text x="265" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" class="d-t">transfer 2</text>
-        <text x="265" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" class="d-t">timestamp + hash</text>
+        <text x="265" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" class="d-accent">GEBEURTENIS B</text>
+        <text x="265" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" class="d-t">verzending 2</text>
+        <text x="265" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" class="d-t">tijdstempel + hash</text>
 
         <rect x="365" y="196" width="100" height="48" rx="2" class="d-slot"/>
-        <text x="415" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" class="d-accent">EVENT C</text>
-        <text x="415" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" class="d-t">transfer 3</text>
-        <text x="415" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" class="d-t">timestamp + hash</text>
+        <text x="415" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" class="d-accent">GEBEURTENIS C</text>
+        <text x="415" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" class="d-t">verzending 3</text>
+        <text x="415" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" class="d-t">tijdstempel + hash</text>
 
         <rect x="555" y="196" width="100" height="48" rx="2" class="d-slot"/>
-        <text x="605" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" class="d-accent">EVENT D</text>
-        <text x="605" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" class="d-t">transfer 4</text>
-        <text x="605" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" class="d-t">timestamp + hash</text>
+        <text x="605" y="212" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="8.5" font-weight="700" class="d-accent">GEBEURTENIS D</text>
+        <text x="605" y="228" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7.5" class="d-t">verzending 4</text>
+        <text x="605" y="240" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="7" class="d-t">tijdstempel + hash</text>
       </svg>
     </div>
 
     <div class="arch-takeaway">
-      <p><strong>The root fingerprints the whole tree.</strong> Edit any leaf event &mdash; even by one byte &mdash; and the root hash changes. Because the root is published in the CT log, any retroactive tampering is immediately detectable. This is the same principle used by certificate transparency in TLS.</p>
+      <p><strong>De wortel is de vingerafdruk van de hele boom.</strong> Wijzig één gebeurtenis in een blad, al is het één byte, en de hash van de wortel verandert. Omdat de wortel in de CT-log wordt gepubliceerd, valt elke latere vervalsing direct op. Het is hetzelfde principe als certificate transparency bij TLS.</p>
     </div>
   </div>
 </section>
@@ -610,13 +613,13 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 <section class="arch-section arch-section--navy">
   <div class="arch-inner">
     <div class="section-num">06</div>
-    <h2 class="section-title">Where it runs</h2>
-    <p class="section-desc">One jurisdiction. One data center. No CDN caching your files. No US entity holds ciphertext or a key; the one American sub-processor sends transactional email under Standard Contractual Clauses.</p>
+    <h2 class="section-title">Waar het draait</h2>
+    <p class="section-desc">Eén rechtsgebied. Eén datacenter. Geen CDN dat uw bestanden opslaat. Geen Amerikaanse partij heeft versleutelde tekst of een sleutel. De enige Amerikaanse subverwerker verstuurt transactionele e-mail onder de standaardcontractbepalingen.</p>
 
     <div style="text-align:center;margin:40px 0 32px">
-      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--lime);margin-bottom:24px">HETZNER · NUREMBERG · GERMANY · EU</div>
+      <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--lime);margin-bottom:24px">HETZNER · NEURENBERG · DUITSLAND · EU</div>
 
-      <svg viewBox="0 0 360 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:360px;margin:0 auto;display:block" aria-label="Concentric circles showing relay location in Nuremberg, Germany">
+      <svg viewBox="0 0 360 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:360px;margin:0 auto;display:block" aria-label="Concentrische cirkels met de locatie van de relay in Neurenberg, Duitsland">
         <!-- Concentric circles -->
         <circle cx="180" cy="140" r="130" class="loc-ring"/>
         <circle cx="180" cy="140" r="100" class="loc-ring"/>
@@ -639,16 +642,16 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:8px">
       <div style="padding:20px;border:1px solid rgba(var(--tint), 0.1)">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);margin-bottom:8px">Jurisdiction</div>
-        <div style="font-size:14px;color:var(--ink-2);line-height:1.6">EU / Germany<br><span style="font-size:12px;color:var(--ink-dim)">GDPR · DSGVO</span></div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);margin-bottom:8px">Rechtsgebied</div>
+        <div style="font-size:14px;color:var(--ink-2);line-height:1.6">EU / Duitsland<br><span style="font-size:12px;color:var(--ink-dim)">AVG · DSGVO</span></div>
       </div>
       <div style="padding:20px;border:1px solid rgba(var(--tint), 0.1)">
         <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);margin-bottom:8px">US Cloud Act</div>
-        <div style="font-size:14px;color:var(--ink-2);line-height:1.6">Not applicable<br><span style="font-size:12px;color:var(--ink-dim)">no US entity</span></div>
+        <div style="font-size:14px;color:var(--ink-2);line-height:1.6">Niet van toepassing<br><span style="font-size:12px;color:var(--ink-dim)">geen Amerikaanse partij</span></div>
       </div>
       <div style="padding:20px;border:1px solid rgba(var(--tint), 0.1)">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);margin-bottom:8px">Storage</div>
-        <div style="font-size:14px;color:var(--ink-2);line-height:1.6">RAM only<br><span style="font-size:12px;color:var(--ink-dim)">no disk, no CDN</span></div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);margin-bottom:8px">Opslag</div>
+        <div style="font-size:14px;color:var(--ink-2);line-height:1.6">Alleen RAM<br><span style="font-size:12px;color:var(--ink-dim)">geen schijf, geen CDN</span></div>
       </div>
     </div>
   </div>
@@ -658,44 +661,44 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 <section class="arch-section">
   <div class="arch-inner">
     <div class="section-num">07</div>
-    <h2 class="section-title">Verified transfer</h2>
-    <p class="section-desc">Every Paramant transfer is account-bound and end-to-end encrypted in the browser. The ParaSend web app adds post-quantum key exchange, ML-DSA-65 sender signatures, and CT-log proof of origin. There is no anonymous or lower-assurance tier.</p>
+    <h2 class="section-title">Geverifieerd versturen</h2>
+    <p class="section-desc">Elke verzending met Paramant hoort bij een account en wordt in de browser end-to-end versleuteld. De webapp Versturen voegt daar post-quantum sleuteluitwisseling, ML-DSA-65-handtekeningen van de afzender en herkomstbewijs in de CT-log aan toe. Er is geen anonieme of minder zekere variant.</p>
 
     <table class="modes-table">
       <thead>
         <tr>
-          <th>Property</th>
-          <th><span class="mode-badge mode-badge--lime">Verified<br>web app</span></th>
+          <th>Eigenschap</th>
+          <th><span class="mode-badge mode-badge--lime">Geverifieerde<br>webapp</span></th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <td>Account needed</td>
-          <td>Yes</td>
+          <td>Account nodig</td>
+          <td>Ja</td>
         </tr>
         <tr>
-          <td>Encryption</td>
-          <td>Hybrid ML-KEM-768 + ECDH P-256, then AES-256-GCM</td>
+          <td>Versleuteling</td>
+          <td>Hybride ML-KEM-768 + ECDH P-256, daarna AES-256-GCM</td>
         </tr>
         <tr>
-          <td>Sender signature</td>
-          <td>ML-DSA-65, mathematically tied to sender identity</td>
+          <td>Handtekening afzender</td>
+          <td>ML-DSA-65, wiskundig gekoppeld aan de identiteit van de afzender</td>
         </tr>
         <tr>
-          <td>Reads allowed</td>
-          <td>One, burned on first open (the web app never asks for more)</td>
+          <td>Aantal keer lezen</td>
+          <td>Eén, gewist bij de eerste keer openen (de webapp vraagt nooit om meer)</td>
         </tr>
         <tr>
-          <td>Proof of origin</td>
-          <td>CT log entry, verifiable by recipient</td>
+          <td>Herkomstbewijs</td>
+          <td>Regel in de CT-log, te controleren door de ontvanger</td>
         </tr>
         <tr>
-          <td>Post-quantum safe</td>
-          <td>Yes, ML-KEM-768 defeats HNDL attacks</td>
+          <td>Bestand tegen quantumcomputers</td>
+          <td>Ja, ML-KEM-768 houdt HNDL-aanvallen (nu opslaan, later ontsleutelen) tegen</td>
         </tr>
         <tr>
-          <td>Good for</td>
-          <td>Legal, healthcare, financial, compliance workflows</td>
+          <td>Geschikt voor</td>
+          <td>Juridisch werk, zorg, financiën, compliance</td>
         </tr>
       </tbody>
     </table>
@@ -706,53 +709,53 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 <section class="arch-section">
   <div class="arch-inner">
     <div class="section-num">08</div>
-    <h2 class="section-title">Components</h2>
-    <p class="section-desc">The relay is one piece. Around it sit official SDKs, two browser extensions, and the ParaSend web app. Each surface is at a different stage of the wire-format-v1 migration. Here is the honest state today.</p>
+    <h2 class="section-title">Onderdelen</h2>
+    <p class="section-desc">De relay is één onderdeel. Daaromheen zitten officiële SDK's, twee browserextensies en de webapp Versturen. Elk onderdeel staat op een ander punt in de overstap naar wire format v1. Dit is de eerlijke stand van vandaag.</p>
 
     <table class="modes-table">
       <thead>
         <tr>
-          <th>Component</th>
-          <th>What it does</th>
-          <th>Crypto today</th>
+          <th>Onderdeel</th>
+          <th>Wat het doet</th>
+          <th>Cryptografie nu</th>
         </tr>
       </thead>
       <tbody>
         <tr>
           <td><strong>Relay</strong></td>
-          <td>Node.js, Hetzner Nuremberg. Validates inbound v1 blobs, advertises through <code>/v2/capabilities</code> the algorithms it has actually loaded, and rejects every other algorithm ID with HTTP 415.</td>
-          <td>Wire format v1. 3 KEMs and 17 signatures ship in the image; the default core mode loads two of them, ML-KEM-768 and ML-DSA-65, and those are the two the endpoint answers.</td>
+          <td>Node.js, Hetzner Neurenberg. Controleert binnenkomende v1-blobs, meldt via <code>/v2/capabilities</code> welke algoritmen echt geladen zijn en weigert elk ander algoritme-ID met HTTP 415.</td>
+          <td>Wire format v1. Het image bevat 3 KEM's en 17 handtekeningalgoritmen. De standaardmodus core laadt er twee, ML-KEM-768 en ML-DSA-65, en alleen die twee noemt het endpoint.</td>
         </tr>
         <tr>
           <td><strong>sdk-py 3.0.0</strong></td>
-          <td>Python SDK. Default ML-KEM-768 + ML-DSA-65. Negotiates via the capabilities endpoint. Live on <a href="https://pypi.org/project/paramant-sdk/">PyPI</a> &mdash; <code>pip install paramant-sdk</code>.</td>
-          <td>Real post-quantum (pqcrypto). Produces v1 blobs.</td>
+          <td>Python-SDK. Standaard ML-KEM-768 + ML-DSA-65. Stemt af via het capabilities-endpoint. Beschikbaar op <a href="https://pypi.org/project/paramant-sdk/">PyPI</a>: <code>pip install paramant-sdk</code>.</td>
+          <td>Echte post-quantum (pqcrypto). Maakt v1-blobs.</td>
         </tr>
         <tr>
           <td><strong>sdk-js 3.0.0</strong></td>
-          <td>JavaScript / Node SDK. Same defaults and negotiation as the Python SDK. Live on <a href="https://www.npmjs.com/package/paramant-sdk">npm</a> &mdash; <code>npm install paramant-sdk</code>.</td>
-          <td>Real post-quantum (@noble/post-quantum). Produces v1 blobs.</td>
+          <td>JavaScript/Node-SDK. Zelfde standaarden en afstemming als de Python-SDK. Beschikbaar op <a href="https://www.npmjs.com/package/paramant-sdk">npm</a>: <code>npm install paramant-sdk</code>.</td>
+          <td>Echte post-quantum (@noble/post-quantum). Maakt v1-blobs.</td>
         </tr>
         <tr>
-          <td><strong>ParaSend web app</strong></td>
-          <td>Verified, authenticated transfers from the browser.</td>
-          <td>Hybrid ML-KEM-768 + ECDH P-256 + AES-256-GCM via WASM, client-side. Pre-v1 blob layout. Migration to v1 in progress.</td>
+          <td><strong>Webapp Versturen</strong></td>
+          <td>Geverifieerde, geauthenticeerde verzendingen vanuit de browser.</td>
+          <td>Hybride ML-KEM-768 + ECDH P-256 + AES-256-GCM via WASM, bij de client. Blob-indeling van voor v1. Overstap naar v1 is bezig.</td>
         </tr>
         <tr>
-          <td><strong>Chromium extension</strong></td>
-          <td>Right-click upload from any tab.</td>
-          <td>Encrypts on your own machine, but with AES-256-GCM from Web Crypto and the key in the URL fragment, not with the ML-KEM hybrid. No key exchange, so no binding to a named recipient. A staged ML-KEM module sits in the codebase unused.</td>
+          <td><strong>Chromium-extensie</strong></td>
+          <td>Uploaden met de rechtermuisknop vanuit elk tabblad.</td>
+          <td>Versleutelt op uw eigen computer, maar met AES-256-GCM uit Web Crypto en de sleutel in het URL-fragment, niet met de ML-KEM-hybride. Geen sleuteluitwisseling, dus geen koppeling aan een bepaalde ontvanger. Een klaargezette ML-KEM-module staat ongebruikt in de code.</td>
         </tr>
         <tr>
-          <td><strong>Outlook add-in</strong></td>
-          <td>Encrypts attachments inside Outlook before send.</td>
-          <td>Same path as the Chromium extension: AES-256-GCM in the add-in, key in the URL fragment, no key exchange. Migration to the ML-KEM hybrid is not done.</td>
+          <td><strong>Outlook-invoegtoepassing</strong></td>
+          <td>Versleutelt bijlagen in Outlook voordat ze worden verstuurd.</td>
+          <td>Zelfde route als de Chromium-extensie: AES-256-GCM in de invoegtoepassing, sleutel in het URL-fragment, geen sleuteluitwisseling. De overstap naar de ML-KEM-hybride is nog niet gedaan.</td>
         </tr>
       </tbody>
     </table>
 
     <div class="arch-takeaway">
-      <p><strong>The relay never sees plaintext, except in the hosted signing ceremony on the <code>/v1</code> API.</strong> Every client on this table encrypts before it uploads, the two extensions included. The ceremony is not a client on this table: there the relay is handed the PDF itself, because running the ceremony is what that request asked it to do. What differs is the key exchange: the SDKs and the web app bind the file to a recipient's public key, while the extensions and the browser-encrypted link put a symmetric key in the URL fragment and bind it to nobody. Anyone holding that link can open the file, so the channel you send it over is the security. See <a href="/crypto-agility#06">crypto-agility § 06</a> for the per-client wire format and migration table.</p>
+      <p><strong>De relay ziet nooit leesbare tekst, behalve bij de gehoste ondertekenceremonie op de <code>/v1</code>-API.</strong> Elke client in deze tabel versleutelt voordat hij uploadt, ook de twee extensies. De ceremonie is geen client in deze tabel: daar krijgt de relay de pdf zelf, omdat dat verzoek hem vraagt de ceremonie uit te voeren. Het verschil zit in de sleuteluitwisseling. De SDK's en de webapp koppelen het bestand aan de publieke sleutel van een ontvanger. De extensies en de in de browser versleutelde link zetten een symmetrische sleutel in het URL-fragment en koppelen die aan niemand. Iedereen met die link kan het bestand openen, dus de beveiliging zit in het kanaal waarover u hem verstuurt. Zie <a href="/crypto-agility#06">crypto-agility § 06</a> voor het wire format per client en de overstaptabel.</p>
     </div>
   </div>
 </section>
@@ -760,10 +763,10 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 <!-- ── GOING DEEPER ── -->
 <section class="arch-section arch-section--tint">
   <div class="going-deeper">
-    <span class="eyebrow" style="display:block;width:fit-content;margin:0 auto 20px;text-align:center">GOING DEEPER</span>
-    <h2>Want the cryptographic specification?</h2>
-    <p>The security page covers every algorithm, the independent audit results, key verification layers, authentication model, and responsible disclosure. Written for cryptographers and security engineers.</p>
-    <a href="/security" class="btn-arch">Read the security spec &rarr;</a>
+    <span class="eyebrow" style="display:block;width:fit-content;margin:0 auto 20px;text-align:center">VERDER LEZEN</span>
+    <h2>De cryptografische specificatie lezen?</h2>
+    <p>De beveiligingspagina behandelt elk algoritme, de uitkomsten van de onafhankelijke audits, de lagen voor sleutelcontrole, het authenticatiemodel en het melden van kwetsbaarheden. Geschreven voor cryptografen en beveiligingsspecialisten.</p>
+    <a href="/security" class="btn-arch">Lees de beveiligingsspecificatie &rarr;</a>
   </div>
 </section>
 

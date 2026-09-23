@@ -70,8 +70,8 @@ function failureText(where, e) {
   var errors = window.paramantErrors;
   if (errors) return errors.reportFailure(where, e).message;
   console.error('[paramant] ' + where, e);
-  return 'Something went wrong on our side. Try again in a minute; if it keeps happening, ' +
-         'mail privacy@paramant.app with the time and what you did.';
+  return 'Er ging aan onze kant iets mis. Probeer het over een minuut opnieuw; blijft het gebeuren, ' +
+         'mail dan privacy@paramant.app met het tijdstip en wat u deed.';
 }
 function showStep(id) {
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));

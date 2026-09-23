@@ -106,19 +106,27 @@ test('one sweep warns the account inside the window, tells the lapsed one, and l
     'ten days out is not warned; five days out and expired yesterday are');
 
   const warn = send.sent.find((m) => m.to === 'five@example.com');
-  assert.equal(warn.subject, 'Your ParaSign Pro ends on 1 October 2026');
+  assert.equal(warn.subject, 'Uw Ondertekenen Pro loopt af op 1 oktober 2026 / Your ParaSign Pro ends on 1 October 2026');
+  // Dutch first, English below it.
+  assert.match(warn.text, /^Uw Ondertekenen Pro loopt af op 1 oktober 2026\./);
+  assert.match(warn.text, /Doet u niets, dan gaat uw account terug naar Community\. Er wordt niets automatisch afgeschreven\./);
+  assert.ok(warn.text.indexOf('Uw Ondertekenen Pro') < warn.text.indexOf('Your ParaSign Pro'), 'the Dutch text comes first');
+  assert.ok(warn.html.indexOf('loopt af op 1 oktober 2026') < warn.html.indexOf('ends on 1 October 2026'), 'the Dutch html comes first');
   assert.match(warn.text, /Your ParaSign Pro ends on 1 October 2026\./);
   assert.match(warn.text, /Renew for another month or year, or let it fall back to Community; nothing is charged automatically\./);
   assert.match(warn.text, /https:\/\/paramant\.app\/pricing/);
 
   const ended = send.sent.find((m) => m.to === 'gone@example.com');
-  assert.equal(ended.subject, 'Your ParaSend Pro has ended');
+  assert.equal(ended.subject, 'Uw Versturen Pro is afgelopen / Your ParaSend Pro has ended');
+  assert.match(ended.text, /Uw Versturen Pro is afgelopen op 25 september 2026\. Uw account staat nu op Community\./);
+  assert.match(ended.text, /Er is niets afgeschreven\./);
   assert.match(ended.text, /ended on 25 September 2026, and your account is now on Community\./);
   assert.match(ended.text, /Nothing was charged\./);
 
   // No em-dash anywhere in what a customer reads.
   const EM_DASH = '\u2014';
   for (const m of send.sent) assert.equal(m.text.includes(EM_DASH), false, 'no em-dash in the mail');
+  for (const m of send.sent) assert.equal(/!/.test(m.text), false, 'no exclamation mark in the mail');
 });
 
 test('a second sweep at the same clock sends nothing', async () => {
@@ -197,7 +205,7 @@ test('a renewal moves the date, and the new period gets its own warning', async 
   await planExpiry.runSweep({ redis, now: NOW + 30 * DAY, sendEmail: due, siteUrl: SITE });
   assert.equal(due.sent.length, 1);
   assert.equal(due.sent[0].to, 'five@example.com');
-  assert.equal(due.sent[0].subject, 'Your ParaSign Pro ends on 31 October 2026');
+  assert.equal(due.sent[0].subject, 'Uw Ondertekenen Pro loopt af op 31 oktober 2026 / Your ParaSign Pro ends on 31 October 2026');
 });
 
 test('without a mailer nothing is marked as sent, so the next sweep tries again', async () => {

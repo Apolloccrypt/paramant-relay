@@ -95,6 +95,15 @@ function humanDuration(days) {
   return `${d} ${d === 1 ? 'day' : 'days'}`;
 }
 
+// "3 maanden", the Dutch twin of humanDuration, for the Dutch half of the mail.
+function humanDurationNl(days) {
+  const d = Math.round(Number(days) || 0);
+  if (d <= 0) return '0 dagen';
+  if (d % 365 === 0) { const y = d / 365; return `${y} jaar`; }
+  if (d % 30 === 0) { const m = d / 30; return `${m} ${m === 1 ? 'maand' : 'maanden'}`; }
+  return `${d} ${d === 1 ? 'dag' : 'dagen'}`;
+}
+
 // "3 months of ParaSign Pro and ParaSend Pro". One sentence fragment that reads
 // the same in the mail, in the billing history and in the answer to the browser.
 function describeGrants(grants) {
@@ -107,6 +116,18 @@ function describeGrants(grants) {
   // Every grant on this coupon runs for the same number of days in every case
   // the admin route allows, so the duration is stated once.
   return `${humanDuration(list[0].days)} of ${names}`;
+}
+
+// "3 maanden Ondertekenen Pro en Versturen Pro". Only used in the mail; the
+// billing history and the browser answer keep the English fragment.
+function describeGrantsNl(grants) {
+  const list = Array.isArray(grants) ? grants : [];
+  if (list.length === 0) return 'niets';
+  const plans = list.map((g) => planExpiry.planLabelNl(g.product, g.tier));
+  const names = plans.length === 1
+    ? plans[0]
+    : `${plans.slice(0, -1).join(', ')} en ${plans[plans.length - 1]}`;
+  return `${humanDurationNl(list[0].days)} ${names}`;
 }
 
 // The line that goes in the billing history. It names the code on purpose: a
@@ -340,7 +361,22 @@ function redeemMail({ code, grants, ends, siteUrl } = {}) {
   const lines = list
     .map((g) => `${planExpiry.planLabel(g.product, g.tier)} until ${planExpiry.formatDate(g.ends || ends)}`)
     .join('\n');
-  const subject = `Your code ${code} is redeemed`;
+  const linesNl = list
+    .map((g) => `${planExpiry.planLabelNl(g.product, g.tier)} tot ${planExpiry.formatDateNl(g.ends || ends)}`)
+    .join('\n');
+  const subjectNl = `Uw code ${code} is ingewisseld`;
+  const subjectEn = `Your code ${code} is redeemed`;
+  const textNl = [
+    `Dank u. Uw code ${code} geeft u ${describeGrantsNl(list)}.`,
+    '',
+    linesNl,
+    '',
+    'Er is niets afgeschreven en dat gebeurt ook niet. Dit is een cadeauperiode, geen abonnement. Die stopt vanzelf op de datum hierboven en uw account gaat dan terug naar Community.',
+    '',
+    `Uw account vindt u hier: ${site}/account`,
+    '',
+    'Paramant',
+  ].join('\n');
   const text = [
     `Thank you. Your code ${code} gives you ${describeGrants(list)}.`,
     '',
@@ -352,25 +388,11 @@ function redeemMail({ code, grants, ends, siteUrl } = {}) {
     '',
     'Paramant',
   ].join('\n');
-  return { subject, text, html: _html(subject, text, `${site}/account`) };
-}
-
-const escHtml = (s) => String(s === null || s === undefined ? '' : s)
-  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-
-function _html(subject, text, link) {
-  const paragraphs = text.split('\n\n')
-    .filter((p) => p && p !== 'Paramant')
-    .map((p) => `<p style="margin:0 0 16px;line-height:1.6">${escHtml(p).replace(/\n/g, '<br>')}</p>`)
-    .join('\n');
-  return [
-    '<div style="font-family:system-ui,-apple-system,\'Segoe UI\',sans-serif;color:#0B3A6A;max-width:520px">',
-    `<h1 style="font-size:18px;margin:0 0 16px">${escHtml(subject)}</h1>`,
-    paragraphs,
-    `<p style="margin:0"><a href="${escHtml(link)}" style="color:#0B3A6A">${escHtml(link)}</a></p>`,
-    '</div>',
-  ].join('\n');
+  return {
+    subject: planExpiry.bilingualSubject(subjectNl, subjectEn),
+    text: planExpiry.bilingualText(textNl, text),
+    html: planExpiry.htmlBody([[subjectNl, textNl], [subjectEn, text]], `${site}/account`),
+  };
 }
 
 // ── What the browser is told ─────────────────────────────────────────────────
@@ -407,7 +429,7 @@ module.exports = {
   K, CODE_RE, CLAIM_LUA,
   DEFAULT_DAYS, DEFAULT_MAX_REDEMPTIONS, DEFAULT_GRANTS,
   MAX_REDEMPTIONS_CEILING, MAX_DAYS, MESSAGES,
-  normaliseCode, humanDuration, describeGrants, historyLabel,
+  normaliseCode, humanDuration, humanDurationNl, describeGrants, describeGrantsNl, historyLabel,
   validateGrants, validateMax, validateValidUntil,
   createCoupon, getCoupon, listCoupons, revokeCoupon, redemptionsOf,
   claim, release, grantEnd, redeemMail, messageFor, successMessage,

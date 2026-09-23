@@ -57,22 +57,34 @@ async function visibleActions(page) {
     .map((e) => ({ tag: e.tagName, text: e.textContent.trim(), href: e.getAttribute('href') })));
 }
 
+// The page speaks the language of its <html lang>: ophalen.html (/ontvang/) is
+// Dutch since 23 September 2026. Each language has its own exact sentences, and
+// the page is held to the ones of the language it declares.
+const EMPTY_COPY = {
+  en: { title: /Nothing to pick up yet/, lead: /This page opens by itself from the link you were sent\./, button: 'Send something yourself',
+    wrong: /Transfer failed|Invalid or missing|cannot be used|Try again/i },
+  nl: { title: /Nog niets op te halen/, lead: /Deze pagina opent vanzelf via de link die u kreeg\./, button: 'Zelf iets versturen',
+    wrong: /Transfer failed|Invalid or missing|cannot be used|Try again|werkt niet|mislukt|Probeer het opnieuw/i },
+};
 for (const addr of ['/ontvang', '/ontvang/']) {
   test(`${addr} without a token is a calm empty state with one button to /parasend`, async () => {
     const page = await oeBrowser.newPage({ viewport: { width: 390, height: 844 } });
     await page.route('https://*.paramant.app/**', (r) => r.abort());
     try {
       await page.goto(OE_ORIGIN + addr);
-      await page.waitForFunction(() => {
+      const lang = await page.evaluate(() => document.documentElement.lang);
+      const copy = EMPTY_COPY[lang];
+      assert.ok(copy, `unexpected <html lang="${lang}">`);
+      await page.waitForFunction((title) => {
         const h = [...document.querySelectorAll('h1')].find((e) => e.offsetParent !== null);
-        return h && /Nothing to pick up yet/.test(h.textContent);
-      }, null, { timeout: 5000 });
+        return h && new RegExp(title).test(h.textContent);
+      }, copy.title.source, { timeout: 5000 });
       const text = await page.evaluate(() => document.querySelector('main').innerText);
-      assert.match(text, /This page opens by itself from the link you were sent\./);
-      assert.doesNotMatch(text, /Transfer failed|Invalid or missing|cannot be used|Try again/i);
+      assert.match(text, copy.lead);
+      assert.doesNotMatch(text, copy.wrong);
       const actions = await visibleActions(page);
       assert.equal(actions.length, 1, JSON.stringify(actions));
-      assert.equal(actions[0].text, 'Send something yourself');
+      assert.equal(actions[0].text, copy.button);
       assert.equal(actions[0].href, '/parasend');
     } finally { await page.close(); }
   });
@@ -93,6 +105,7 @@ test('/ontvang/<short token> still says the link cannot be used', async () => {
   try {
     await page.goto(OE_ORIGIN + '/ontvang/abc');
     await page.waitForFunction(() => { const s = document.getElementById('step-stop'); return s && !s.hidden; }, null, { timeout: 5000 });
-    assert.match(await page.textContent('#stop-title'), /cannot be used/);
+    // ophalen.html is Dutch: "Deze link werkt niet" is its "this link cannot be used".
+    assert.match(await page.textContent('#stop-title'), /Deze link werkt niet/);
   } finally { await page.close(); }
 });
