@@ -50,7 +50,12 @@ const params = new URLSearchParams(location.search);
 const sessionToken = params.get('s');
 const RELAY_API = RELAY_SECTORS[params.get('r')] || RELAY_SECTORS.health;
 const tokenValid = !!sessionToken && /^inv_[a-zA-Z0-9]{32}$/.test(sessionToken);
-if (!tokenValid) {
+if (!sessionToken) {
+  // No link at all: somebody typed /ontvang or followed a menu. Nothing went
+  // wrong, so this is an empty state with one way forward, not an error with
+  // a "Try again" that would only reload the same empty page.
+  showStep('step-empty');
+} else if (!tokenValid) {
   // A bad link is a bad link whether or not the crypto library ever arrives, so
   // say so now instead of waiting on a signal that may never come.
   showError('Invalid or missing session token');

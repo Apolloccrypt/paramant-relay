@@ -62,6 +62,9 @@
            background: var(--accent); color: #fff; font: 600 15px/1.2 var(--sans);
            cursor: pointer; }
   button[disabled] { opacity: .55; cursor: default; }
+  a.button { display: block; box-sizing: border-box; width: 100%; margin-top: 14px; padding: 13px 18px;
+             border-radius: 8px; background: var(--accent); color: #fff; text-align: center;
+             text-decoration: none; font: 600 15px/1.2 var(--sans); }
   .muted { font-size: 13px; color: var(--ink-3); }
   .note { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
   .say { margin-top: 14px; font: 500 14px/1.5 var(--sans); }
@@ -75,6 +78,12 @@
   <div class="brand">Paramant</div>
 
   <div class="card">
+    <div id="step-empty" hidden>
+      <h1>Nothing to pick up yet</h1>
+      <p>This page opens by itself from the link you were sent.</p>
+      <a class="button" href="/parasend">Send something yourself</a>
+    </div>
+
     <div id="step-start">
       <h1>A file is waiting for you</h1>
       <p>This link is yours alone and works once.</p>
@@ -120,6 +129,6 @@
   </div>
 </main>
 <script src="/js/send-wrap.js?v=1"></script>
-<script src="/js/ophalen.page.js?v=1"></script>
+<script src="/js/ophalen.page.js?v=2"></script>
 </body>
 </html>
