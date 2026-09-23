@@ -367,6 +367,24 @@
       "stapel": "achterhaald",
       "tot": "2026-09-19",
       "reden": "Losse boom met vier jpg's; de bijbehorende PR #328 is op 02-09 gemergd."
+    },
+    {
+      "tak": "dependabot/docker/relay/node-50c8e8c",
+      "stapel": "waarde",
+      "tot": "2026-10-07",
+      "reden": "Open PR #477: node-basisimage in relay/Dockerfile van e67514e naar 50c8e8c. Mergen of sluiten, niet weggooien zolang de PR openstaat."
+    },
+    {
+      "tak": "fix/stille-breuken-usertest",
+      "stapel": "waarde",
+      "tot": "2026-10-07",
+      "reden": "Open PR #474, De storingen die niemand ziet. Blijft staan tot die PR gemerged of gesloten is."
+    },
+    {
+      "tak": "rookproef-vangt-elke-serverfout",
+      "stapel": "waarde",
+      "tot": "2026-10-07",
+      "reden": "Open PR #471, de rookproef vangt elke serverfout. Blijft staan tot die PR gemerged of gesloten is."
     }
   ]
 }
