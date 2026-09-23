@@ -6,7 +6,17 @@
   // frontend/apply-nav.py stamps into every page. The generator is the source
   // of truth; this array only re-renders the same links after the session
   // check, so a visitor never sees the navigation move under them.
-  var PUBLIC_NAV = [
+  // The four Dutch pages (<html lang="nl">) carry the Dutch bar that
+  // apply-nav.py stamps into them as NEW_NAV_NL, with the two outward product
+  // names. Same rule: this list only re-renders what the generator wrote.
+  var DUTCH = document.documentElement.lang === 'nl';
+  var PUBLIC_NAV = DUTCH ? [
+    ['Versturen', '/parasend'],
+    ['Ondertekenen', '/parasign'],
+    ['Gereedschap', '/gereedschap'],
+    ['Beveiliging', '/security'],
+    ['Prijzen', '/pricing']
+  ] : [
     ['Product', '/#products'],
     ['Tools', '/gereedschap'],
     ['Security', '/security'],
@@ -53,9 +63,13 @@
 
   function renderLoggedOut() {
     setNavigation(PUBLIC_NAV, 'Primary');
-    container.innerHTML = '<a href="/help" class="nav-help">Help</a>' +
-      '<a href="/auth/login" class="nav-signin">Sign in</a>' +
-      '<a href="/signup" class="nav-cta">Create account</a>';
+    container.innerHTML = DUTCH
+      ? '<a href="/help" class="nav-help">Hulp</a>' +
+        '<a href="/auth/login" class="nav-signin">Inloggen</a>' +
+        '<a href="/signup" class="nav-cta">Account maken</a>'
+      : '<a href="/help" class="nav-help">Help</a>' +
+        '<a href="/auth/login" class="nav-signin">Sign in</a>' +
+        '<a href="/signup" class="nav-cta">Create account</a>';
   }
 
   function renderLoggedIn(email) {
@@ -132,7 +146,7 @@
   }
 
   setNavigation(PUBLIC_NAV, 'Primary');
-  container.innerHTML = '<span class="nav-signin" aria-hidden="true">Checking session</span>';
+  container.innerHTML = '<span class="nav-signin" aria-hidden="true">' + (DUTCH ? 'Even kijken' : 'Checking session') + '</span>';
 
   (async function check() {
     try {

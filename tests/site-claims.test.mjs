@@ -263,7 +263,7 @@ test('link expiry per tier on pricing and privacy matches tiers.js', () => {
   const hours = (ms) => ms / 3_600_000;
   const free = hours(ttl('community')), pro = hours(ttl('pro')), ent = hours(ttl('enterprise'));
   assert.equal(free, 1); assert.equal(pro, 24); assert.equal(ent, 7 * 24);
-  const pricing = visible(page('pricing'));
+  const pricing = visible(page('en/pricing'));
   assert.ok(pricing.includes(`${free} hour link expiry`), `pricing: Community must say ${free} hour link expiry`);
   assert.ok(pricing.includes(`${pro} hour link expiry`), `pricing: Firm must say ${pro} hour link expiry`);
   assert.ok(pricing.includes(`${ent / 24} day link expiry`), `pricing: Enterprise must say ${ent / 24} day link expiry`);
@@ -400,7 +400,7 @@ test('the audit numbers on press, trust and the DPA match the audit table on /do
 test('the SLA figures are consistent across pages and the measurement described exists', () => {
   const sla = page('sla');
   const ent = /<div class="tier">Enterprise<\/div>\s*<div class="uptime">([\d.]+%)<\/div>/.exec(sla)[1];
-  const pricing = visible(page('pricing'));
+  const pricing = visible(page('en/pricing'));
   const quoted = [...pricing.matchAll(/(\d{2}\.\d{1,2}%) SLA|SLA (\d{2}\.\d{1,2}%)/g)].map((m) => m[1] || m[2]);
   assert.ok(quoted.length >= 2, 'pricing must quote the Enterprise SLA');
   for (const q of quoted) assert.equal(q, ent, `pricing quotes ${q}, the SLA page commits to ${ent}`);
@@ -677,8 +677,8 @@ test('the Community plan limits on the site are the ones tiers.js declares', () 
 
   const problems = [];
   const says = (where, text, phrase) => { if (!text.includes(phrase)) problems.push(`${where}: must state "${phrase}"`); };
-  says('index', visible(page('index')), `${transfers} transfers a month`);
-  says('index', visible(page('index')), `${mb} MB per file`);
+  says('index', visible(page('en/index')), `${transfers} transfers a month`);
+  says('index', visible(page('en/index')), `${mb} MB per file`);
   says('docs', visible(page('docs')), `${transfers} transfers a month`);
   says('docs', visible(page('docs')), `${mb} MB per file`);
   const apiMd = read('frontend/docs/api.md');
@@ -719,8 +719,8 @@ test('the Community plan limits on the site are the ones tiers.js declares', () 
 // test stayed green. This reads each number out of the /pricing tier card that
 // owns it and requires /about to say the same.
 test('the tier block on /about repeats the numbers /pricing charges for', () => {
-  const pricing = page('pricing');
-  const about = page('about');
+  const pricing = page('en/pricing');
+  const about = page('en/about');
 
   // The two product blocks, split on their own headings, then the tier cards
   // inside each one, keyed by the tier name /pricing prints. #336 renamed both
@@ -800,7 +800,7 @@ test('the tier block on /about repeats the numbers /pricing charges for', () => 
   // security.html kept "ParaSign Free and ParaSend Free cost &euro;0" through a
   // review. The three pages of this round are checked together; the sitewide
   // sweep lives in tests/ui-truthfulness.test.mjs.
-  for (const slug of ['about', 'security', 'trust']) {
+  for (const slug of ['en/about', 'security', 'trust']) {
     assert.doesNotMatch(page(slug), /Para(Sign|Send) Free/,
       `${slug}: the free plan is called Community, which is what /pricing prints on the card`);
   }
@@ -1262,7 +1262,7 @@ test('the hourly ceiling a paid plan buys is outbound_per_hour, and no page sell
   assert.doesNotMatch(relay, /ANON_RPH[^;]*plan/, 'the anonymous per-IP rate must not read a plan');
 
   const problems = [];
-  const idx = visible(page('index'));
+  const idx = visible(page('en/index'));
   if (!idx.includes(`up to ${pro} retrievals an hour through the API instead of ${community}`)) {
     problems.push(`index: the paid-plan line must say up to ${pro} retrievals an hour instead of ${community}`);
   }
@@ -1335,7 +1335,7 @@ test('no page a visitor can open loads anything from a third party, which is wha
   // And the two pages that make the promise still make it.
   assert.match(visible(page('parasend')), /No third-party requests/, 'parasend: the promise must still be on the page');
   assert.match(visible(page('parasend')), /No fonts, CDNs, analytics or pixels/, 'parasend: name what is not loaded');
-  assert.match(visible(page('pricing')), /No tracking\./, 'pricing: the free tier line must still say No tracking.');
+  assert.match(visible(page('en/pricing')), /No tracking\./, 'pricing: the free tier line must still say No tracking.');
 });
 
 // 23 ── The BUSL conversion. LICENSE is the operative grant; /license quotes it
@@ -1803,7 +1803,7 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
 
   // /pricing is where the money is asked for, so the same stance has to stand
   // next to the prices, not only in the legal pages a buyer never opens.
-  const pricingPage = visible(page('pricing'));
+  const pricingPage = visible(page('en/pricing'));
   assert.ok(pricingPage.includes('Every payment is a one-off for the term you buy'),
     'pricing: the payment block next to the prices must describe one-off payments, the stance mollie.js takes');
   assert.ok(pricingPage.includes('Automatic renewal is not switched on'),
@@ -1830,7 +1830,7 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
 // Sabotage runs both ways: making the redeem route issue an invoice or create a
 // Mollie payment turns this red, and so does dropping the sentence.
 test('a gift code charges nothing, on the page and in the code that answers it', () => {
-  const pricing = visible(page('pricing'));
+  const pricing = visible(page('en/pricing'));
 
   // 1. The page says it, next to the prices and in the field itself.
   assert.ok(pricing.includes('A code is not a payment at all: it gives you a term as a gift, so nothing is ever charged for it.'),
@@ -1894,7 +1894,7 @@ test('the DPA the pages offer is the public endpoint relay.js serves', () => {
   assert.match(handler, /Too many requests/, 'the handler must still rate limit; a public endpoint without one is a different claim');
 
   const SCOPE = 'applies to all plans';
-  for (const slug of ['pricing', 'privacy', 'audit-log-export']) {
+  for (const slug of ['en/pricing', 'privacy', 'audit-log-export']) {
     assert.ok(visible(page(slug)).toLowerCase().includes(SCOPE), `${slug}: must say the DPA ${SCOPE}, because the endpoint has no gate`);
   }
   // The homepage is the page a buyer reads first, and it listed a signed DPA as
@@ -1903,7 +1903,7 @@ test('the DPA the pages offer is the public endpoint relay.js serves', () => {
   // list. Scoped to list items that name a tier, because /index says "that is
   // in the signed Data Processing Agreement" in a breach-notification sentence
   // where the phrase is right.
-  assert.ok(visible(page('index')).includes('The Data Processing Agreement applies to every plan.'),
+  assert.ok(visible(page('en/index')).includes('The Data Processing Agreement applies to every plan.'),
     'index: the homepage must say the DPA applies to every plan, because the endpoint gates on nothing');
   // Two shapes carry a tier's feature list, and the sweep has to know both: the
   // one-line form on /index (<li> ... <b>Enterprise</b> ... </li>) and the card
@@ -2122,7 +2122,7 @@ test('the norm mappings the site claims are the ones written in the tree, and no
   assert.deepEqual(eidasMappings, [],
     `an eIDAS mapping now exists in ${eidasMappings.join(', ')}; /pricing says there is none`);
 
-  const pricing = visible(page('pricing'));
+  const pricing = visible(page('en/pricing'));
   assert.ok(pricing.includes('an IEC 62443 requirement table in the OT guide, and a NEN 7510 table in the DICOM guide'),
     'pricing: the compliance paragraph must name the two mappings that exist');
   assert.ok(pricing.includes('There is no eIDAS mapping document.'),
@@ -2412,13 +2412,13 @@ test('every page that promises burn-on-read says which client and which plan it 
   // named Pro and stopped there. The tiers.js row is still 'pro'; the plan it is
   // sold under has been Firm since 6 September 2026.
   const unified = `The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to ${reads.pro} reads on Firm and ${reads.enterprise} on Enterprise.`;
-  for (const slug of ['parasend', 'pricing', 'security', 'help/gmail-extension', 'help/outlook-extension']) {
+  for (const slug of ['parasend', 'en/pricing', 'security', 'help/gmail-extension', 'help/outlook-extension']) {
     assert.ok(flatten(bodyOf(page(slug))).includes(unified),
       `${slug}: must carry the client-and-plan sentence in full: "${unified}"`);
   }
   // And the buyer has to be told why more reads is worth paying for, or the
   // honest version reads as a downgrade next to "burns on the first read".
-  for (const slug of ['parasend', 'pricing']) {
+  for (const slug of ['parasend', 'en/pricing']) {
     assert.ok(flatten(bodyOf(page(slug))).includes('one link a whole team can open'),
       `${slug}: more reads has to be sold as a feature, not confessed as a weaker promise`);
   }
@@ -2426,7 +2426,7 @@ test('every page that promises burn-on-read says which client and which plan it 
   // The ParaSend tier cards, which are where a buyer reads the number before he
   // pays for it. Community's card is the one page element allowed to say "Burn
   // on first read" flat, because the card it sits in is the plan.
-  const pricingSrc = page('pricing');
+  const pricingSrc = page('en/pricing');
   assert.ok(pricingSrc.includes('<li>Burn on first read</li>'),
     'pricing: the ParaSend Community card must still say the link burns on the first read');
   assert.ok(pricingSrc.includes(`<li>Up to ${reads.pro} reads per link through the API</li>`),
@@ -2437,7 +2437,7 @@ test('every page that promises burn-on-read says which client and which plan it 
     `parasend: the Firm card must offer the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
   assert.ok(page('parasend').includes('<li>Burn on first read</li>'),
     'parasend: the Community card must still say the link burns on the first read');
-  assert.ok(flatten(bodyOf(page('index'))).includes(`up to ${reads.pro} reads per link through the API`),
+  assert.ok(flatten(bodyOf(page('en/index'))).includes(`up to ${reads.pro} reads per link through the API`),
     `index: the ParaSend Firm price line must name the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
 
   // The two pages that spell the ParaSend plans out on their own terms. The
@@ -2584,7 +2584,7 @@ test('the two legal facts are stated with their limits, and never as a promise',
   const DISCLAIMER = 'This is not legal advice; ask your own counsel what your matter needs.';
 
   // 1. Art. 3:15a, on the two pages where a buyer weighs SES against QES.
-  for (const slug of ['parasign', 'pricing']) {
+  for (const slug of ['parasign', 'en/pricing']) {
     const html = body(slug);
     assert.ok(html.includes('art. 3:15a'),
       `${slug}: must cite the article by number, as "art. 3:15a"`);
@@ -2597,8 +2597,10 @@ test('the two legal facts are stated with their limits, and never as a promise',
       `${slug}: the legal paragraph must carry the disclaimer: "${DISCLAIMER}"`);
   }
 
-  // 2. The Rotterdam decision, on /security, with all four limits.
-  const sec = body('security');
+  // 2. The Rotterdam decision, on /security, with all four limits. The English
+  // wording is held on /en/security; the Dutch page is held to the same four
+  // limits in Dutch by block 42.
+  const sec = body('en/security');
   assert.ok(sec.includes('ECLI:NL:RBROT:2026:9319'),
     'security: the decision must be cited by its ECLI, not paraphrased as "a court ruled"');
   assert.ok(sec.includes('uitspraken.rechtspraak.nl/details?id=ECLI:NL:RBROT:2026:9319'),
@@ -2736,7 +2738,7 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
 
   // The three pages. Same sentence on all three: the site says this one way, as
   // it does with the read counts above.
-  for (const slug of ['index', 'parasend', 'pricing']) {
+  for (const slug of ['en/index', 'parasend', 'en/pricing']) {
     const text = visible(page(slug)).replace(/\s+/g, ' ');
     assert.ok(text.includes(SENTENCE),
       `${slug}: must carry the live-handshake sentence in full, before the button: "${SENTENCE}"`);
@@ -2744,7 +2746,7 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
 
   // Both halves, phrase by phrase, so a rewrite that keeps the shape but drops
   // the plain words fails here rather than in a review a year from now.
-  for (const slug of ['index', 'parasend', 'pricing']) {
+  for (const slug of ['en/index', 'parasend', 'en/pricing']) {
     const text = visible(page(slug)).replace(/\s+/g, ' ');
     assert.ok(text.includes('both online'),
       `${slug}: the words "both online" are the whole point; a paraphrase is what hid this for months`);
@@ -2757,9 +2759,9 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
   // all three: the homepage card's list sits above its .prod-cta, the /parasend
   // hero line above .ps-actions, the /pricing paragraph above the tier grid.
   const before = {
-    index: /class="prod-cta"><a class="hp-btn hp-btn-line" href="\/parasend"/,
+    'en/index': /class="prod-cta"><a class="hp-btn hp-btn-line" href="\/parasend"/,
     parasend: /<div class="ps-actions">/,
-    pricing: /<div class="tier-grid">/,
+    'en/pricing': /<div class="tier-grid">/,
   };
   for (const [slug, cta] of Object.entries(before)) {
     const html = visible(page(slug));
@@ -2806,7 +2808,7 @@ test('the ParaSend read counts are the ones tiers.js grants to plans ParaSend se
   // The ParaSend grid is the one under the PARASEND marker. It used to be found
   // by its parasend checkout button; Firm is sold as one line over both
   // products, so that button now says firm and the marker is the stable anchor.
-  const pricingSrc = page('pricing');
+  const pricingSrc = page('en/pricing');
   const parasendHalf = pricingSrc.slice(pricingSrc.indexOf('<!-- TIER CARDS: PARASEND -->'));
   assert.ok(parasendHalf.length > 500, '/pricing no longer carries the PARASEND tier-card marker');
   const parasendGrid = /<div class="tier-grid">([\s\S]*?)<\/section>/.exec(parasendHalf)?.[1];
@@ -2824,7 +2826,7 @@ test('the ParaSend read counts are the ones tiers.js grants to plans ParaSend se
   // Firm reads the 'pro' row of tiers.js: it grants the ParaSend Pro tier, and
   // the entitlement tier names never moved, only the name the plan is sold under.
   const sentence = `Through the API a paid link can allow more reads: up to ${viewsOf('pro')} reads on Firm and ${viewsOf('enterprise')} on Enterprise.`;
-  for (const slug of ['pricing', 'parasend', 'security']) {
+  for (const slug of ['en/pricing', 'parasend', 'security']) {
     assert.ok(visible(page(slug)).replace(/\s+/g, ' ').includes(sentence),
       `${slug}: must name the API read counts as "${sentence}", the max_views tiers.js grants to the plans ParaSend sells`);
   }
@@ -2887,7 +2889,7 @@ test('every ParaSend link lifetime on the site names a plan ParaSend sells, with
 
   // Which plans a duration may be hung on, read off the price table itself --
   // the same grid block 39 reads, so the two cannot drift apart.
-  const pricingSrc = page('pricing');
+  const pricingSrc = page('en/pricing');
   const parasendHalf = pricingSrc.slice(pricingSrc.indexOf('<!-- TIER CARDS: PARASEND -->'));
   assert.ok(parasendHalf.length > 500, '/pricing no longer carries the PARASEND tier-card marker');
   const parasendGrid = /<div class="tier-grid">([\s\S]*?)<\/section>/.exec(parasendHalf)?.[1];
@@ -3014,10 +3016,213 @@ test('the tools page only calls a tool account-free while the code keeps it that
   assert.ok(tools.includes('vijftig verzendingen per maand'), 'gereedschap: must state the Community sending limit');
 
   // The ladder quotes Firm at the price the pricing page charges.
-  assert.ok(/&euro;29</.test(page('pricing')), 'pricing: Firm is no longer 29');
+  assert.ok(/&euro;29</.test(page('en/pricing')), 'pricing: Firm is no longer 29');
   assert.ok(tools.includes('29 euro per maand'), 'gereedschap: the ladder must quote the Firm price the pricing page charges');
 
   // The page promises no gratis limit it cannot show. It may name Community,
   // never "Free", and it may not invent a free allowance of its own.
   assert.doesNotMatch(tools, /\bgratis\b[^.]{0,40}\bonbeperkt\b/i, 'gereedschap: no unlimited free allowance');
+});
+
+// 42 ── The Dutch pages, 23 September 2026.
+//
+// Mick decided six things that day: Dutch as the main language on /, /pricing,
+// /about and /security, with the English text kept under /en/; one offer, "Voor
+// uw kantoor: 29 euro per maand", with Community beside it and Business and
+// Enterprise only through "Meer nodig?"; the headline on /; two product names
+// outward, Versturen and Ondertekenen; the certification sentence at the top of
+// /security; and Mick visible on /about. Every sentence below is read against
+// the source that makes it true, the same way the English pages are held above.
+// The English copies under /en/ carry the old pins; this block is what holds
+// the Dutch text.
+//
+// Verified by sabotage: pro.max_recipients 30 -> 10, the Firm monthly price in
+// billing-catalog.js 35.09 -> 36.30, the audit report renamed, and "nog niet"
+// taken out of the certification sentence each turn this block red.
+test('the Dutch pages say what the code, the catalog and the files on disk say', async () => {
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  const catalog = require('../relay/lib/billing-catalog.js');
+  const tiers = require('../relay/lib/tiers.js');
+  const flat = (slug) => visible(page(slug)).replace(/<[^>]+>/g, ' ')
+    .replace(/&euml;/g, 'ë').replace(/&eacute;/g, 'é').replace(/&Eacute;/g, 'É').replace(/&euro;/g, '€')
+    .replace(/&rarr;/g, '→').replace(/&amp;/g, '&').replace(/\s+/g, ' ').replace(/ ([.,;:])/g, '$1');
+  const body = (slug) => { const h = visible(page(slug)); return h.slice(h.indexOf('<body')); };
+  const problems = [];
+  const says = (slug, phrase) => { if (!flat(slug).includes(phrase)) problems.push(`${slug}: must say "${phrase}"`); };
+
+  // 1. The language, both ways, and the way back.
+  const ORIGIN = 'https://paramant.app';
+  for (const slug of ['index', 'pricing', 'about', 'security']) {
+    const nl = slug === 'index' ? '/' : `/${slug}`;
+    const en = slug === 'index' ? '/en' : `/en/${slug}`;
+    const nlHtml = page(slug); const enHtml = page(`en/${slug}`);
+    if (!/^<!DOCTYPE html>\s*<html lang="nl">/i.test(nlHtml)) problems.push(`${slug}: <html lang="nl"> is the decision`);
+    if (!/^<!DOCTYPE html>\s*<html lang="en">/i.test(enHtml)) problems.push(`en/${slug}: the English copy must say lang="en"`);
+    for (const [name, html, canonical] of [[slug, nlHtml, nl], [`en/${slug}`, enHtml, en]]) {
+      if (!html.includes(`<link rel="canonical" href="${ORIGIN}${canonical}">`)) problems.push(`${name}: canonical must be ${canonical}`);
+      for (const [lang, href] of [['nl', nl], ['en', en], ['x-default', nl]]) {
+        if (!html.includes(`<link rel="alternate" hreflang="${lang}" href="${ORIGIN}${href}">`)) problems.push(`${name}: hreflang ${lang} must point at ${href}`);
+      }
+    }
+    if (!body(slug).includes(`href="${en}" hreflang="en"`)) problems.push(`${slug}: no visible way to the English page`);
+    if (!body(`en/${slug}`).includes(`href="${nl}" hreflang="nl"`)) problems.push(`en/${slug}: no visible way back to the Dutch page`);
+  }
+  // /en is served the way /help is, or the English homepage is a 404.
+  assert.match(read('deploy/nginx-paramant-live.conf'), /location = \/en \{ try_files \/en\/index\.html =404; \}/,
+    'nginx must serve /en from frontend/en/index.html');
+
+  // 2. The one offer. The amounts are the catalog's, the limits are tiers.js's.
+  const monthlyIncl = Number(catalog.priceOf('firm', 'firm', 'monthly'));
+  const excl = Math.round(monthlyIncl / 1.21 * 100) / 100;
+  const inclNl = monthlyIncl.toFixed(2).replace('.', ',');
+  says('index', `Voor uw kantoor: ${excl} euro per maand.`);
+  says('index', `Excl. btw, dus ${inclNl} euro per maand met 21% btw.`);
+  says('index', `Voor uw kantoor: ${excl} euro per maand, excl. btw.`);
+  says('pricing', `Voor uw kantoor: ${excl} euro per maand.`);
+  says('about', `Voor uw kantoor: ${excl} euro per maand`);
+  for (const slug of ['index', 'pricing', 'about']) says(slug, 'Meer nodig? Mail Mick: privacy@paramant.app');
+  const lim = (tier, dim) => tiers.tierLimit(tier, dim);
+  for (const slug of ['index', 'pricing', 'about']) {
+    says(slug, `${lim('community', 'signs_month')} handtekeningen per maand`);
+    says(slug, `${lim('community', 'transfers_month')} verzendingen per maand`);
+    says(slug, `${lim('pro', 'signs_month')} handtekeningen per maand`);
+    says(slug, `${lim('pro', 'transfers_month')} verzendingen per maand`);
+    says(slug, `tot ${lim('pro', 'max_recipients')} ontvangers per verzending`);
+  }
+  assert.equal(lim('community', 'max_recipients'), 1, 'community.max_recipients moved; three Dutch pages say one recipient');
+  for (const slug of ['index', 'pricing', 'about']) says(slug, 'één ontvanger per verzending');
+  // "Het hele kantoor, niet per gebruiker" was part of the brief and is NOT on
+  // the page: an account is one login today, and the roadmap still lists
+  // "multiple users per account" as coming. What the page may say is that the
+  // price is per account, and that more users are still to come.
+  says('pricing', 'Het kantoorplan kost per account, niet per gebruiker. Meerdere gebruikers binnen één account komt nog');
+  assert.match(visible(page('en/pricing')), /Coming to paid plans: multiple users per account/,
+    'the Dutch page says more users per account is still coming; the roadmap line it rests on is on /en/pricing');
+  for (const slug of ['index', 'pricing']) {
+    if (/het hele kantoor/i.test(flat(slug))) problems.push(`${slug}: "het hele kantoor" promises seats an account does not have yet`);
+  }
+  // One primary button on the signed-out homepage and on /pricing.
+  const homeOut = (page('index').match(/<div class="home-state" data-home="out">[\s\S]*?<\/section>/) || [''])[0];
+  const homeMain = visible(page('index')).slice(visible(page('index')).indexOf('<main'), visible(page('index')).indexOf('</main>'));
+  const signedIn = (homeMain.match(/<div class="home-state" data-home="in"[\s\S]*?<div class="hp-art"/) || [''])[0];
+  const fills = (homeMain.replace(signedIn, '').match(/class="hp-btn hp-btn-fill"/g) || []).length;
+  if (fills !== 1) problems.push(`index: ${fills} primary buttons signed out, the decision is one`);
+  if (!/<a class="hp-btn hp-btn-fill" href="\/parashare">/.test(homeOut)) problems.push('index: the one primary button goes to versturen (/parashare)');
+  const pricingMain = visible(page('pricing')).slice(visible(page('pricing')).indexOf('<main'));
+  if ((pricingMain.match(/class="btn btn-primary/g) || []).length !== 1) problems.push('pricing: exactly one primary button');
+
+  // 3. The headline, word for word.
+  assert.match(page('index'), /<h1>Pati&euml;ntdossiers en processtukken veilig versturen en laten tekenen\.<\/h1>/,
+    'index: the headline Mick chose');
+  says('index', 'Gemaakt in Nederland, voor praktijken en kantoren.');
+
+  // 4. Two product names outward. The Dutch bar names Versturen and
+  // Ondertekenen, apply-nav.py and nav-auth.js carry the same list, and no nav
+  // or heading on a public page presents a retired name as a product.
+  const nav = (html) => (html.match(/<nav class="nav">[\s\S]*?<\/nav>/) || [''])[0];
+  for (const slug of ['index', 'pricing', 'about', 'security']) {
+    const labels = [...nav(page(slug)).matchAll(/class="nav-link">([^<]+)</g)].map((m) => m[1]);
+    if (labels.join(',') !== 'Versturen,Ondertekenen,Gereedschap,Beveiliging,Prijzen') problems.push(`${slug}: the Dutch bar reads ${labels.join(',')}`);
+  }
+  const navAuth = read('frontend/js/nav-auth.js');
+  for (const label of ['Versturen', 'Ondertekenen', 'Gereedschap', 'Beveiliging', 'Prijzen']) {
+    if (!navAuth.includes(`['${label}', `)) problems.push(`nav-auth.js: the Dutch list lost ${label}, the bar would change under the reader`);
+  }
+  const RETIRED = /ghost ?pipe|parashare|parapear|\bvault\b/i;
+  for (const slug of publicPages()) {
+    const html = visible(page(slug));
+    const spots = [nav(html), ...[...html.matchAll(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi)].map((m) => m[1])];
+    for (const spot of spots) {
+      const text = spot.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (RETIRED.test(text)) problems.push(`${slug}: a nav or heading presents a retired name: "${text.slice(0, 80)}"`);
+    }
+  }
+
+  // 5. /security, at the top: what Paramant is not, then what you get, and
+  // each of the three things exists.
+  const CERT = 'Paramant is nog niet NEN 7510- of ISO 27001-gecertificeerd. Wel krijgt u: een verwerkersovereenkomst, servers in Duitsland (Hetzner, Neurenberg) en een extern auditrapport (april 2026). Voor uw eigen NEN 7510-dossier leveren wij de beheersmaatregelen aan.';
+  const firstLede = (body('security').match(/<p class="lede[^"]*"[^>]*>([\s\S]*?)<\/p>/) || [, ''])[1]
+    .replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  if (firstLede !== CERT) problems.push(`security: the first paragraph must be the certification sentence, it reads "${firstLede}"`);
+  assert.ok(fs.existsSync(path.join(ROOT, 'frontend/dpa.html')), 'the verwerkersovereenkomst the sentence offers is /dpa');
+  assert.match(page('security'), /href="\/docs\/security-audit-2026-04\.md">extern auditrapport \(april 2026\)</,
+    'security: the audit report link sits on the words that promise it');
+  assert.match(read('frontend/docs/security-audit-2026-04.md'), /April 2026/,
+    'the audit report the sentence names must be the April 2026 one');
+  assert.match(read('frontend/docs/dicom-guide.md'), /NEN 7510/,
+    'the NEN 7510 table /security points a dossier at must still be in the DICOM guide');
+  // No Dutch sentence may turn "nog niet" into a certificate.
+  for (const slug of publicPages()) {
+    const t = flat(slug);
+    for (const m of t.matchAll(/[^.]*\b(?:NEN ?7510|ISO ?27001)[^.]*gecertificeerd[^.]*\./gi)) {
+      if (!/\bnog niet\b|\bgeen\b|\bniet\b/i.test(m[0])) problems.push(`${slug}: "${m[0].trim()}" reads as a certificate Paramant does not hold`);
+    }
+  }
+  // The Rotterdam decision in Dutch, with its four limits.
+  const sec = flat('security');
+  for (const phrase of ['ECLI:NL:RBROT:2026:9319', 'rechter-commissaris', 'Het was de cliënt, niet de advocaat.',
+    'als openbaarmaking kan gelden', 'Het is geen vaste rechtspraak.', 'Dit is geen juridisch advies; vraag uw eigen adviseur wat uw zaak nodig heeft.']) {
+    if (!sec.includes(phrase)) problems.push(`security: the decision must be stated with its limits: "${phrase}"`);
+  }
+  // Art. 3:15a with its condition, on the Dutch /pricing.
+  const pr = flat('pricing');
+  for (const phrase of ['art. 3:15a', 'voldoende betrouwbaar', 'Dit is geen juridisch advies; vraag uw eigen adviseur wat uw zaak nodig heeft.']) {
+    if (!pr.includes(phrase)) problems.push(`pricing: the legal paragraph must carry "${phrase}"`);
+  }
+  if (!page('pricing').includes('wetten.overheid.nl/BWBR0005291')) problems.push('pricing: art. 3:15a must link to the statute');
+
+  // 6. /about: Mick visible. A place for a photo that is honest about being a
+  // place, his name and title, and only research lines with a source.
+  const about = page('about');
+  const hero = about.slice(about.indexOf('<main'), about.indexOf('class="about-band"', about.indexOf('<main')));
+  assert.match(hero, /<div class="portrait" role="img" aria-label="Plek voor een foto van Mick Beer\. De foto volgt\.">/,
+    'about: the photo place says what it is, for a screen reader too');
+  assert.doesNotMatch(hero, /<img\b/, 'about: no photo until Mick supplies one; no stock or generated portrait');
+  says('about', 'Mick Beer Privacy- en securityonderzoeker, oprichter van Paramantis Solutions B.V.');
+  const research = [...(hero.match(/<ul class="about-research">([\s\S]*?)<\/ul>/) || [, ''])[1].matchAll(/<li>([\s\S]*?)<\/li>/g)]
+    .map((m) => m[1].replace(/<[^>]+>/g, '').trim());
+  assert.deepEqual(research, [
+    'Mick onderzoekt hoe persoonsgegevens weglekken uit apps en clouds die mensen vertrouwen.',
+    'Zijn artikelen en tools staan op mickbeer.com.',
+  ], 'about: the research lines are the two with a source, and no more');
+  assert.ok(flat('index').includes('Ik onderzoek hoe persoonsgegevens weglekken uit apps en clouds die mensen vertrouwen.'),
+    'about: the first research line is sourced from the letter on the homepage; the letter must still say it');
+  assert.match(hero, /<a href="https:\/\/mickbeer\.com"/, 'about: the second line links the site it names');
+  // Jargon folded away on /about: the algorithm names only inside <details>.
+  const aboutOpen = visible(about).replace(/<details[\s\S]*?<\/details>/g, '');
+  for (const rx of [/ML-DSA/, /ML-KEM/, /\bFIPS\b/]) {
+    if (rx.test(aboutOpen.slice(aboutOpen.indexOf('<body')))) problems.push(`about: ${rx.source} outside the folded technical block`);
+  }
+
+  // 7. The Dutch argument, high on the page and sourced, and the parent company
+  // named so "no parent abroad" is the whole truth.
+  const home = page('index');
+  const why = home.indexOf('id="why-nl-h"'); const cost = home.indexOf('id="split-h"'); const check = home.indexOf('id="check-h"');
+  if (!(why > 0 && why < cost && why < check)) problems.push('index: "Waarom Nederlands telt" must stand directly under the hero, above the price and the checks');
+  says('index', 'Zivver is sinds juni 2025 onderdeel van Kiteworks in Californië.');
+  says('index', 'de aankondiging van Kiteworks over de overname van Zivver (17 juni 2025)');
+  for (const slug of ['index', 'en/index', 'about']) says(slug, 'Paramantis Digital B.V.');
+  says('index', 'Het moederbedrijf is Paramantis Digital B.V., ook Nederlands, KvK 42114664. Er is geen moederbedrijf in het buitenland.');
+  says('index', 'Het moederbedrijf van Paramant staat op paramantis.nl, gecontroleerd op 23 september 2026.');
+  for (const slug of publicPages()) {
+    if (/no parent company anywhere/i.test(flat(slug))) problems.push(`${slug}: "no parent company" is half the truth; the parent is Paramantis Digital B.V.`);
+  }
+
+  // 8. The same facts the English pages are held to, in Dutch.
+  says('index', 'In de webapp zijn u en de ontvanger allebei online en vergelijkt u een korte code');
+  const prodCta = home.indexOf('<div class="prod-cta"><a class="hp-btn hp-btn-line" href="/parasend">');
+  if (!(home.indexOf('vergelijkt u een korte code') > 0 && home.indexOf('vergelijkt u een korte code') < prodCta)) problems.push('index: the handshake sentence stands above the versturen card button');
+  const buy = page('pricing').indexOf('data-billing-interval="monthly"');
+  const hs = page('pricing').indexOf('allebei online en vergelijkt u een korte code');
+  if (!(hs > 0 && hs < buy)) problems.push('pricing: the handshake stands above the button that buys it');
+  says('pricing', 'Elke betaling is eenmalig voor de periode die u koopt');
+  says('pricing', 'Automatisch verlengen staat niet aan');
+  says('pricing', 'er wordt niets afgeschreven, nu niet en later niet');
+  says('pricing', 'Ja, op elk plan, ook op Community.');
+  says('index', 'Dezelfde versleuteling als elk plan, de verwerkersovereenkomst en servers in Duitsland.');
+  for (const slug of ['index', 'pricing', 'about', 'security']) {
+    if (/\b(legally binding|juridisch bindend|onkraakbaar|100% veilig)\b/i.test(flat(slug))) problems.push(`${slug}: a promise no page may make`);
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });

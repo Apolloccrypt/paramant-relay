@@ -83,6 +83,79 @@ NEW_FOOTER = '''\
   </div>
 </footer>'''
 
+# The four pages whose main language is Dutch since 23 September 2026 (/,
+# /pricing, /about, /security; the English text moved to /en/...). They carry
+# the same bar in Dutch, with the two outward product names Mick settled on:
+# Versturen and Ondertekenen. js/nav-auth.js re-renders the same Dutch list
+# when <html lang="nl">, so the two may never drift apart.
+NL_PAGES = {'index.html', 'pricing.html', 'about.html', 'security.html'}
+
+NEW_NAV_NL = '''\
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
+  </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>'''
+
+NEW_MOBILE_NL = '''\
+<div class="nav-mobile" id="nav-mobile">
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+</div>'''
+
+NEW_FOOTER_NL = '''\
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid footer-slim">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Bedrijf</div>
+        <div class="footer-links">
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Juridisch</div>
+        <div class="footer-links">
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
+          <a href="/sla">SLA</a>
+          <a href="/license">Licentie</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>'''
+
 # Pages with the shared nav but no footer (auth, account, download, signup)
 # still owe the visitor the three legal documents. One line, three links, no
 # second navigation.
@@ -94,7 +167,7 @@ LEGAL_STRIP = '''\
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=30">'
 NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=26">'
 NAV_JS    = '<script src="/nav.js?v=15" defer></script>'
-NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=9" defer></script>'
+NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=10" defer></script>'
 
 # Pages that don't have <nav class="nav"> yet but should — inject the canonical
 # nav after <body> (or after a skip-link if present). App shells (admin,
@@ -226,7 +299,7 @@ def inject_nav_block(html):
     return html[:i] + '\n' + NEW_NAV + '\n' + NEW_MOBILE + html[i:]
 
 
-def replace_mobile_div(html):
+def replace_mobile_div(html, mobile=None):
     """Replace <div class="nav-mobile"...>...</div>, counting nested divs.
 
     NEW_MOBILE stamps two siblings: the drawer and its tail. An earlier run
@@ -234,12 +307,13 @@ def replace_mobile_div(html):
     </div>, so without this the second run would leave the old tail sitting
     after the new one and the idempotency gate would go red. The tail holds
     anchors and no nested divs, so one non-greedy match takes it out."""
+    mobile = mobile or NEW_MOBILE
     html = re.sub(r'\n?<div class="nav-mobile-tail".*?</div>', '',
                   html, flags=re.DOTALL)
     start = html.find('<div class="nav-mobile"')
     if start == -1:
         nav_end = html.find('</nav>') + len('</nav>')
-        return html[:nav_end] + '\n' + NEW_MOBILE + html[nav_end:]
+        return html[:nav_end] + '\n' + mobile + html[nav_end:]
     depth, i = 0, start
     while i < len(html):
         if html[i:i+4] == '<div':
@@ -248,7 +322,7 @@ def replace_mobile_div(html):
         elif html[i:i+6] == '</div>':
             depth -= 1
             if depth == 0:
-                return html[:start] + NEW_MOBILE + html[i + 6:]
+                return html[:start] + mobile + html[i + 6:]
             i += 6
         else:
             i += 1
@@ -294,9 +368,11 @@ def process(fpath):
         content = inject_nav_block(content)
         if '<nav class="nav">' not in content:
             return False
-    updated = re.sub(r'<nav class="nav">.*?</nav>', NEW_NAV, content, flags=re.DOTALL)
-    updated = replace_mobile_div(updated)
-    updated = re.sub(r'<footer>.*?</footer>', NEW_FOOTER, updated, flags=re.DOTALL)
+    dutch = rel in NL_PAGES
+    nav, mobile, footer = (NEW_NAV_NL, NEW_MOBILE_NL, NEW_FOOTER_NL) if dutch else (NEW_NAV, NEW_MOBILE, NEW_FOOTER)
+    updated = re.sub(r'<nav class="nav">.*?</nav>', lambda m: nav, content, flags=re.DOTALL)
+    updated = replace_mobile_div(updated, mobile)
+    updated = re.sub(r'<footer>.*?</footer>', lambda m: footer, updated, flags=re.DOTALL)
     updated = inject_legal_strip(updated)
     updated = inject_main(updated)
     updated = inject_design_system(updated)

@@ -41,7 +41,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const MIME = { '.js':'text/javascript', '.css':'text/css', '.html':'text/html', '.svg':'image/svg+xml', '.png':'image/png', '.woff2':'font/woff2', '.json':'application/json' };
-const aliases = { '/pricing':'/pricing.html', '/signup':'/signup.html' };
+const aliases = { '/pricing':'/pricing.html', '/en/pricing':'/en/pricing.html', '/signup':'/signup.html' };
 const FOLD = { width: 390, height: 844 };
 
 const server = http.createServer((req, res) => {
@@ -59,7 +59,10 @@ await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const ORIGIN = `http://localhost:${server.address().port}`;
 const browser = await chromium.launch({ headless: true, ...(EXE ? { executablePath: EXE } : {}) });
 
-async function open(width, height, slug = 'pricing') {
+// Since 23 September 2026 /pricing is Dutch and sells one offer; the English
+// page with the full tier table is /en/pricing. The English tests below keep
+// measuring that page; the Dutch first screen has its own test at the end.
+async function open(width, height, slug = 'en/pricing') {
   const page = await browser.newPage({ viewport: { width, height } });
   await page.route('**/api/user/session/verify', (route) => route.fulfill({ status: 401, contentType: 'application/json', body: '{"authenticated":false}' }));
   await page.goto(`${ORIGIN}/${slug}`, { waitUntil: 'networkidle' });
@@ -146,7 +149,7 @@ test('the first screen at 390px carries the amount, the audience, the company an
   const required = { ...seen, cta };
   delete required.foldText;
   for (const [name, hit] of Object.entries(required)) {
-    assert.ok(hit, `/pricing must carry the ${name} line; it is missing entirely`);
+    assert.ok(hit, `/en/pricing must carry the ${name} line; it is missing entirely`);
     assert.ok(hit.bottom <= FOLD.height,
       `the ${name} line ends at y=${hit.bottom}, past the ${FOLD.height}px first screen: a buyer has to scroll for it`);
   }
@@ -217,6 +220,43 @@ test('no tier card is wider than the grid that holds it', async () => {
     }
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
+});
+
+
+// The Dutch /pricing, 23 September 2026: one offer. On a phone the first screen
+// has to carry what the product does, the one amount, what it costs with btw,
+// the one button, and the free plan beside it, in that order.
+test('the Dutch first screen at 390px carries the one offer, its button and Community', async () => {
+  const page = await open(FOLD.width, FOLD.height, 'pricing');
+  const seen = await measure(page, [
+    ['h1', '^Prijzen$'],
+    ['what', 'Documenten laten tekenen en bestanden versturen die zichzelf wissen na het lezen'],
+    ['offer', '^Voor uw kantoor: 29 euro per maand\\.$'],
+    ['btw', 'Excl\\. btw\\. U betaalt €35,09 per maand, inclusief 21% btw\\.'],
+    ['community', 'Community is €0 per maand, voor altijd:'],
+  ]);
+  const cta = await page.evaluate(() => {
+    const links = [...document.querySelectorAll('#main-content a.btn-primary')];
+    if (links.length !== 1) return { count: links.length };
+    const rect = links[0].getBoundingClientRect();
+    return { count: 1, top: Math.round(rect.top + window.scrollY), bottom: Math.round(rect.bottom + window.scrollY), plan: links[0].getAttribute('data-billing-plan') };
+  });
+  const width = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+  await page.close();
+  assert.equal(cta.count, 1, `the Dutch /pricing carries ${cta.count} primary buttons; the decision is one`);
+  assert.equal(cta.plan, 'firm', 'the one primary button buys the kantoorplan (Firm)');
+  const required = { ...seen, cta };
+  delete required.foldText;
+  for (const [name, hit] of Object.entries(required)) {
+    assert.ok(hit, `/pricing must carry the ${name} line; it is missing entirely`);
+    assert.ok(hit.bottom <= FOLD.height, `the ${name} line ends at y=${hit.bottom}, past the ${FOLD.height}px first screen`);
+  }
+  assert.ok(seen.what.top < seen.offer.top && seen.offer.top < seen.btw.top && seen.btw.top < cta.top,
+    'what it does, then the amount, then the amount with btw, then the button');
+  assert.equal(width.scroll, width.client, 'the Dutch /pricing scrolls sideways on a phone');
+  for (const rx of [/\bML-DSA\b/i, /\bML-KEM\b/i, /\bAPI\b/, /\brelay\b/i, /\bFirm\b/]) {
+    assert.doesNotMatch(seen.foldText, rx, `the Dutch first screen reads "${seen.foldText}" and carries ${rx}`);
+  }
 });
 
 test.after(async () => { await browser.close(); server.close(); });
