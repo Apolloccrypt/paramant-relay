@@ -91,8 +91,8 @@ LEGAL_STRIP = '''\
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
 </footer>'''
 
-DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=29">'
-NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=25">'
+DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=30">'
+NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=26">'
 NAV_JS    = '<script src="/nav.js?v=15" defer></script>'
 NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=9" defer></script>'
 
@@ -138,6 +138,29 @@ def inject_legal_strip(html):
         # page, so append it rather than skip the page.
         return html.rstrip() + '\n' + LEGAL_STRIP + '\n'
     return html[:body_close] + LEGAL_STRIP + '\n' + html[body_close:]
+
+
+def inject_main(html):
+    """Give a page without a <main> landmark one, from under the nav to the
+    footer. A screen reader jumps by landmarks, and 19 pages had none.
+
+    Most of these pages already put id="main-content" on their first section,
+    which is where the skip-link lands and what their own CSS styles, so that
+    id stays where it is and the landmark goes around it. A page without the id
+    gets it on the <main>. A page that already has a <main> is left alone,
+    which keeps the stamp idempotent."""
+    if re.search(r'<main\b', html):
+        return html
+    tail = re.search(r'<div class="nav-mobile-tail" id="nav-mobile-tail">.*?</div>\n', html, flags=re.DOTALL)
+    if not tail:
+        return html
+    start = tail.end()
+    foot = re.search(r'<footer\b', html[start:])
+    if not foot:
+        return html
+    end = start + foot.start()
+    opener = '<main>' if 'id="main-content"' in html else '<main id="main-content" tabindex="-1">'
+    return html[:start] + opener + '\n' + html[start:end] + '</main>\n' + html[end:]
 
 
 def inject_design_system(html):
@@ -275,6 +298,7 @@ def process(fpath):
     updated = replace_mobile_div(updated)
     updated = re.sub(r'<footer>.*?</footer>', NEW_FOOTER, updated, flags=re.DOTALL)
     updated = inject_legal_strip(updated)
+    updated = inject_main(updated)
     updated = inject_design_system(updated)
     updated = inject_nav_js(updated)
     updated = inject_nav_auth_js(updated)

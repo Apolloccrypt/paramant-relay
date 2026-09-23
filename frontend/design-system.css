@@ -151,6 +151,16 @@
   --bone-blur:   rgba(248, 250, 252, .92);
 }
 
+/* A link in running text is underlined, not only coloured: colour alone is
+   not enough to tell a link from its sentence (WCAG 1.4.1). A link with a
+   class is a component (a button, a card, a nav item) and keeps its own
+   styling. */
+main p a:not([class]),
+main li a:not([class]) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* On a navy slab the lime is the punctuation again: 9.7:1 on the navy, and the
    ink that sits on it is the navy. */
 .section-dark, .section-navy, .section-cobalt, .page-hero--navy, .invert {
@@ -589,16 +599,6 @@ h1 em::after {
   transition: background var(--duration-base) var(--ease-sharp),
               border-color var(--duration-base) var(--ease-sharp),
               box-shadow var(--duration-base) var(--ease-out);
-}
-/* Idle "breathe" — subtle lime ring that invites interaction without
-   shouting. Pauses on hover/focus/drag so feedback states are clean. */
-.drop:not(:hover):not(:focus-within):not(.drag-over),
-.dropzone:not(:hover):not(:focus-within):not(.drag-over) {
-  animation: drop-breathe 3.6s var(--ease-soft) infinite;
-}
-@keyframes drop-breathe {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(178,255,63,0); }
-  50%      { box-shadow: 0 0 0 4px rgba(178,255,63,.18); }
 }
 .drop:hover, .drop:focus-within,
 .dropzone:hover, .dropzone:focus-within {
@@ -2724,6 +2724,11 @@ a.skip-link:focus-visible,
 .skip-link:focus-visible {
   top: 0 !important;
   outline: none;
+}
+a.skip-link:focus-visible,
+.skip-link:focus-visible {
+  outline: 3px solid var(--cobalt);
+  outline-offset: 2px;
 }
 
 

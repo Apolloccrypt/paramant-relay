@@ -22,8 +22,8 @@
 <link rel="canonical" href="https://paramant.app/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="/design-system.css?v=29">
-<link rel="stylesheet" href="/nav.css?v=25">
+<link rel="stylesheet" href="/design-system.css?v=30">
+<link rel="stylesheet" href="/nav.css?v=26">
 <style>
 /* The homepage on the paper it had before PR #404: warm paper #FAF8F3, ink
    #0C1B2A, one cobalt accent, and one dark object per screen (the Community
@@ -240,7 +240,9 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
   .hw-cols > .hw-card{margin-top:0}
 }
 
-/* the art: a document that gets signed, sealed, and then is gone. Desktop only. */
+/* the art: a document that gets signed and sealed, once, on arrival. It used to
+   burn and come back on a sixteen-second loop; motion that never stops is
+   decoration a reader cannot switch off. Desktop only. */
 .hp-art{position:relative;z-index:1;height:150px;pointer-events:none;user-select:none}
 .hp-art-glow{position:absolute;inset:-40% -20%;background:
   radial-gradient(40% 50% at 70% 40%, rgba(29,78,216,.14), transparent 70%),
@@ -248,24 +250,22 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
 .hp-doc{position:absolute;left:50%;top:0;width:min(260px, 62vw);aspect-ratio:1/1.32;transform:translateX(-50%) rotate(-4deg);background:var(--paper);border:1px solid rgba(0,0,0,.2);border-radius:4px;box-shadow:0 30px 60px -30px rgba(0,0,0,.8);padding:9% 9% 12%;display:flex;flex-direction:column;gap:7%;
   -webkit-mask-image:linear-gradient(180deg,#000 0,#000 58%,rgba(0,0,0,.55) 74%,transparent 100%);mask-image:linear-gradient(180deg,#000 0,#000 58%,rgba(0,0,0,.55) 74%,transparent 100%);
   -webkit-mask-size:100% 300%;mask-size:100% 300%;-webkit-mask-position:0 0;mask-position:0 0;
-  animation:hp-burn 16s ease-in-out infinite}
+}
 .hp-doc i{display:block;height:5%;border-radius:2px;background:rgba(27,31,34,.12)}
 .hp-doc i.t{height:9%;width:62%;background:var(--paper-ink);opacity:.9}
 .hp-doc i.w1{width:92%} .hp-doc i.w2{width:78%} .hp-doc i.w3{width:86%} .hp-doc i.w4{width:54%}
 .hp-doc svg{width:56%;height:auto;margin-top:auto;overflow:visible}
-.hp-doc svg path{fill:none;stroke:var(--petrol);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:420;stroke-dashoffset:420;animation:hp-sign 16s ease-in-out infinite}
-.hp-seal{position:absolute;right:8%;top:7%;width:19%;aspect-ratio:1;border-radius:50%;border:1.5px solid var(--ochre-2);background:radial-gradient(circle at 50% 50%, rgba(29,78,216,.9), rgba(29,78,216,.5) 60%, transparent 62%);display:grid;place-items:center;font-family:var(--hp-mono);font-size:8px;color:#141414;letter-spacing:.08em;transform:scale(0);animation:hp-seal 16s ease-in-out infinite}
+.hp-doc svg path{fill:none;stroke:var(--petrol);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:420;stroke-dashoffset:420;animation:hp-sign 3s ease-in-out .3s 1 both}
+.hp-seal{position:absolute;right:8%;top:7%;width:19%;aspect-ratio:1;border-radius:50%;border:1.5px solid var(--ochre-2);background:radial-gradient(circle at 50% 50%, rgba(29,78,216,.9), rgba(29,78,216,.5) 60%, transparent 62%);display:grid;place-items:center;font-family:var(--hp-mono);font-size:8px;color:#141414;letter-spacing:.08em;transform:scale(0);animation:hp-seal 3s ease-in-out .3s 1 both}
 .hp-dust{position:absolute;left:50%;top:0;width:min(260px, 62vw);height:100%;transform:translateX(-50%);background-image:
   radial-gradient(circle, rgba(234,226,206,.6) 1px, transparent 1.6px),
   radial-gradient(circle, rgba(29,78,216,.6) 1px, transparent 1.6px),
   radial-gradient(circle, rgba(234,226,206,.35) .8px, transparent 1.4px);
   background-size:23px 29px, 37px 41px, 17px 19px;background-position:0 0, 9px 13px, 5px 3px;opacity:0;
   -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 40%,#000 70%,transparent 100%);mask-image:linear-gradient(180deg,transparent 0,#000 40%,#000 70%,transparent 100%);
-  animation:hp-dust 16s ease-in-out infinite}
+}
 @keyframes hp-sign{0%,6%{stroke-dashoffset:420}22%,100%{stroke-dashoffset:0}}
 @keyframes hp-seal{0%,24%{transform:scale(0)}29%{transform:scale(1.12)}33%,100%{transform:scale(1)}}
-@keyframes hp-burn{0%,74%{-webkit-mask-position:0 0;mask-position:0 0;opacity:1}90%{-webkit-mask-position:0 100%;mask-position:0 100%;opacity:1}91%,95%{opacity:0;-webkit-mask-position:0 100%;mask-position:0 100%}96%{opacity:0;-webkit-mask-position:0 0;mask-position:0 0}100%{opacity:1;-webkit-mask-position:0 0;mask-position:0 0}}
-@keyframes hp-dust{0%,74%{opacity:0;transform:translate(-50%,0)}84%{opacity:.9}94%,100%{opacity:0;transform:translate(-50%,-70px)}}
 @media (prefers-reduced-motion:reduce){
   .hp-doc,.hp-doc svg path,.hp-seal,.hp-dust{animation:none}
   .hp-doc{-webkit-mask-position:0 0;mask-position:0 0;opacity:1}

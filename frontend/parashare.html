@@ -11,9 +11,9 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="/design-system.css?v=29">
-<link rel="stylesheet" href="/nav.css?v=25">
-<link rel="stylesheet" href="/relay-pulse.css?v=4">
+<link rel="stylesheet" href="/design-system.css?v=30">
+<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
 <link rel="stylesheet" href="/parapear.css?v=4">
 <style>
 /* Page: parashare — transfer UI */
@@ -54,7 +54,7 @@ h1{font-size:clamp(26px,5vw,38px);font-weight:600;letter-spacing:-.028em;line-he
 .ps-mode-card{display:flex;flex-direction:column;gap:6px;text-align:left;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-1);background:var(--surface);color:var(--ink-2);font:inherit;cursor:pointer;transition:border-color var(--d-2) var(--e-standard),background var(--d-2) var(--e-standard)}
 .ps-mode-card:hover{border-color:var(--line-2)}
 .ps-mode-card[aria-checked="true"]{border-color:var(--accent);background:var(--surface-sunk);box-shadow:inset 2px 0 0 var(--accent)}
-.ps-mode-alias{opacity:.62;font-weight:400}
+.ps-mode-alias{color:var(--ink-3);font-weight:400}
 .ps-mode-title{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
 .ps-mode-card[aria-checked="true"] .ps-mode-title{color:var(--ink-1)}
 .ps-mode-body{font-size:13px;line-height:1.6;color:var(--ink-2)}
@@ -262,13 +262,12 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 #globe-canvas-wrap canvas{display:block;width:100%!important;height:100%!important}
 
 .hc{position:absolute;width:56px;height:56px;border-color:var(--lime);border-style:solid;
-  opacity:.55;z-index:25;transition:opacity .3s;animation:hcPulse 3s ease-in-out infinite}
+  opacity:.55;z-index:25;transition:opacity .3s}
 .hc:hover{opacity:.9}
 .hc-tl{top:16px;left:16px;border-width:2px 0 0 2px}
 .hc-tr{top:16px;right:16px;border-width:2px 2px 0 0}
 .hc-bl{bottom:16px;left:16px;border-width:0 0 2px 2px}
 .hc-br{bottom:16px;right:16px;border-width:0 2px 2px 0}
-@keyframes hcPulse{0%,100%{opacity:.4}50%{opacity:.7}}
 
 .hud-top{position:absolute;top:0;left:0;right:0;height:52px;z-index:30;
   display:flex;align-items:center;justify-content:space-between;padding:0 24px;

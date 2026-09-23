@@ -175,14 +175,39 @@ function bytesToDataUrl(bytes, mime) {
 // Async libraries
 // ====================================================================
 
+// Both PDF libraries are loaded on demand, the first time a document is
+// picked, and not with the page: together with the PDF.js worker they are
+// about 2.2 MB that a visitor who only reads /sign never needs. Asking twice
+// is harmless: the tag is added once and the sticky signal (js/ready.js)
+// answers everyone who waits on it.
+const PDFJS_LOADER = '/vendor/pdfjs/pdfjs-loader.js?v=3';
+const PDFLIB_SRC = '/vendor/pdf-lib/pdf-lib.min.js?v=1';
+
+function loadScriptOnce(src, isModule) {
+  if (document.querySelector('script[src="' + src + '"]')) return;
+  const el = document.createElement('script');
+  if (isModule) el.type = 'module';
+  el.src = src;
+  document.head.appendChild(el);
+}
+
+// Called when a file is chosen, so the libraries are on their way while the
+// bytes are still being read.
+function preloadPdfLibs() {
+  loadScriptOnce(PDFJS_LOADER, true);
+  loadScriptOnce(PDFLIB_SRC, false);
+}
+
 async function waitForPdfjs() {
   // Sticky signal, so it does not matter whether the loader module ran before
   // or after this file. See js/ready.js.
+  loadScriptOnce(PDFJS_LOADER, true);
   return window.ready.within('pdfjs', 10000, 'PDF.js');
 }
 
 async function waitForPdfLib() {
   if (window.PDFLib) return window.PDFLib;
+  loadScriptOnce(PDFLIB_SRC, false);
   return new Promise((resolve, reject) => {
     const start = Date.now();
     const tick = () => {
@@ -476,6 +501,7 @@ function describeFileType(bytes, name) {
 }
 
 async function onDocChosen(file) {
+  preloadPdfLibs();
   clearDocError();
   const bytes = new Uint8Array(await file.arrayBuffer());
   // Empty file: nothing to sign or attest. Reject with a clear message instead
