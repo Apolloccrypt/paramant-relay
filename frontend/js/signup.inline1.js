@@ -30,7 +30,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       if (e.status === 400 && e.err && e.err.error === 'invalid_email') errorDiv.textContent = nlEn('Dit e-mailadres lijkt niet te kloppen. Controleer het en probeer het opnieuw.', 'This email address does not look right. Check it and try again.');
       else if (e.status === 403) errorDiv.textContent = nlEn('De controle lukte niet. Vernieuw de pagina en probeer het opnieuw.', 'Verification failed. Please refresh and try again.');
       else if (e.status === 409) errorDiv.innerHTML = nlEn('Er is al een account met dit e-mailadres. <a href="/auth/login">Inloggen</a>.', 'An account with this email already exists. <a href="/auth/login">Sign in</a>.');
-      else if (e.status === 422) errorDiv.textContent = nlEn('Dit e-maildomein wordt niet geaccepteerd. Gebruik een echt e-mailadres.', 'This email domain is not accepted. Please use a real email address.');
+      else if (e.status === 422) errorDiv.textContent = nlEn('Dit e-mailadres kunnen we niet gebruiken voor een account. Gebruik een adres dat u blijvend leest.', 'We cannot use this email address for an account. Please use an address you will keep reading.');
       else if (e.status === 429) errorDiv.textContent = nlEn('Te veel pogingen. Probeer het later opnieuw.', 'Too many attempts. Please try again later.');
       else errorDiv.textContent = (e.err && e.err.message) || nlEn('Er ging iets mis. Probeer het opnieuw.', 'Something went wrong. Please try again.');
     } else { errorDiv.textContent = nlEn('Geen verbinding. Controleer uw internetverbinding.', 'Network error. Please check your connection.'); }

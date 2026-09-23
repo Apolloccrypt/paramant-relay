@@ -37,6 +37,8 @@ COPY admin/server.js .
 COPY admin/lib/ lib/
 COPY admin/public/ public/
 COPY relay/lib/mail.js /app/relay/lib/mail.js
+# De e-mailblocklist die admin/lib/email-policy.js leest (../../deploy vanaf lib/).
+COPY deploy/email-blocklist.json /app/deploy/email-blocklist.json
 
 # Non-root user — admin server never needs root
 RUN addgroup -S admin && adduser -S admin -G admin

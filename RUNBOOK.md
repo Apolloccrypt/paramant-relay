@@ -327,3 +327,87 @@ marker on an element that no longer contains the name.
 `opruimen_voor` 2026-10-31. Remove them from `/opt/paramant-relay/.env`
 **[server]** (backup first), then their lines in `partners.json`.
 
+
+## 8. E-mailbeleid: which addresses can open an account
+
+`deploy/email-blocklist.json` lists the email domains that cannot open an
+account. `admin/lib/email-policy.js` reads it; nothing else does.
+
+### Where it applies, and where it never does
+
+| Route | Checked as | Blocklist | MX check |
+| --- | --- | --- | --- |
+| `POST /api/user/signup` | `aanmelden` | yes | yes (unless `EMAIL_MX_CHECK=0`) |
+| `POST /api/keys/all`, `/api/keys/sectors` (admin creates a key on an address) | `aanmelden` | yes | no |
+| `POST /api/drop/upload` (sending without an account) | `verzenden` | yes | no |
+| recipients: group sends, `/ontvang`, pickup codes, signing invitations | `ontvanger` | **never** | **never** |
+| the client of a future "Veilig gesprek" | `gesprek-client` | **never** | **never** |
+
+Recipients are never checked on purpose: someone looking for help may use a
+throwaway address because their own inbox is read by someone else. Refusing
+that person is the wrong way round. `/request-key` is retired (410) and
+`/v2/claim/reveal` takes no address; the account behind a claim was checked
+when it was created. `admin/test/email-policy.test.js` fails if the check
+appears on a recipient route or anywhere in `relay/`.
+
+The refusal is a 422 with `error: invalid_email`, `reason: domain_not_allowed`
+and the message in both languages: "Dit e-mailadres kunnen we niet gebruiken
+voor een account. Gebruik een adres dat u blijvend leest." The log line has
+the purpose, the category and the domain, never the address:
+`[email-policy] geweigerd doel=aanmelden categorie=wegwerp domein=mailinator.com`.
+
+### What is in the file
+
+- `wegwerp`: disposable and temporary mail, from
+  [disposable-email-domains](https://github.com/disposable-email-domains/disposable-email-domains)
+  (CC0-1.0, checked in its LICENSE.txt), plus a few manual entries carried over
+  from the old list in `admin/server.js`.
+- `misbruik`: known abuse domains. **Empty on purpose.** No source with a
+  licence that allows commercial reuse was found (StopForumSpam is
+  non-commercial only; see `overwogen`). Add a domain only by hand, under
+  `handmatig`, with a reason, a date and a source you can point at.
+- `gereserveerd`: `example.*`, `localhost` and the `.test`, `.example`,
+  `.invalid`, `.localhost` and `.local` TLDs (RFC 2606, RFC 6762).
+- `uitzonderingen`: the allowlist. Privacy-friendly providers (Proton, Tuta,
+  mailbox.org, Posteo, Disroot, Riseup, StartMail, Mailfence, Runbox,
+  Fastmail) and the large ordinary ones. It always wins, and
+  `tests/email-blocklist.test.mjs` fails if one of them, or a domain above or
+  below it, ends up on any list.
+
+A listed domain also blocks its subdomains. Addresses are lowercased and IDN
+domains are converted to punycode before the lookup.
+
+The MX check refuses a domain with no MX and no A/AAAA record, or with a null
+MX (RFC 7505). A DNS error or a timeout (1.5 s) never refuses anyone.
+
+### Updating
+
+```bash
+# [admin] or any checkout
+node scripts/update-email-blocklist.mjs            # show the diff, write nothing
+node scripts/update-email-blocklist.mjs --write    # write deploy/email-blocklist.json
+node --test tests/email-blocklist.test.mjs admin/test/email-policy.test.js
+```
+
+The workflow `email-blocklist` does this every Monday and opens a pull request
+from `blocklist/update-<date>`. Never merge it without reading what came in.
+
+It pushes and opens the pull request with the repository secret
+`EMAIL_BLOCKLIST_PR_TOKEN` (a fine-grained token on this repository only, with
+write access to contents and pull requests), so the normal CI starts on it.
+Without that secret it falls back to `GITHUB_TOKEN`, says so as a warning, and
+GitHub does not start CI for that pull request: close and reopen it once.
+
+A stale list never blocks a pull request. When a source is older than 30 days,
+the CI of every pull request shows a warning (`node scripts/update-email-blocklist.mjs --leeftijd`),
+and only the weekly `email-blocklist` run goes red (`--leeftijd --streng` on
+the file in main). Red there means: an update pull request is waiting to be
+merged, or the fetch broke.
+
+To unblock one domain: add it to `uitzonderingen` with a reason. To block one:
+add it under `handmatig` in the right category with `reden`, `datum` and
+`bron`. The change reaches production with the next admin image
+(`admin/Dockerfile` copies the file).
+
+A new outside source also goes into `deploy/partners.json` as a party with
+role `blocklist-bron` (section 7); the test checks that.
