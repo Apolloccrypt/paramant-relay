@@ -874,3 +874,50 @@ nav.nav .nav-menu-divider { height: 1px; background: var(--ink-hair); margin: va
 @media (min-width: 701px) {
   .nav-mobile-tail { display: none !important; }
 }
+
+/* ════════════════════════════════════════
+   LANGUAGE SWITCH  (NL | EN, stamped by apply-nav.py)
+   The current language is marked with aria-current and drawn solid; the
+   other is a plain link to the same page in that language. In the bar from
+   701px up. Below that the phone bar keeps one action beside the menu button,
+   and the same switch sits in the strip under the drawer, where Sign in and
+   Help already went.
+   ════════════════════════════════════════ */
+.nav-lang {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: .04em;
+}
+.nav-lang a,
+.nav-mobile-tail .nav-lang a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 44px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+  text-decoration: none;
+  border: none;
+}
+.nav-lang a:hover { color: var(--cobalt); }
+.nav-lang a[aria-current] {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.nav-lang a:focus-visible {
+  outline: 3px solid rgba(29, 78, 216, .35);
+  outline-offset: 2px;
+}
+.nav-lang-sep { color: var(--ink-2); padding: 0 2px; }
+@media (max-width: 700px) {
+  nav.nav .nav-lang { display: none; }
+}

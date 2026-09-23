@@ -6,10 +6,12 @@
   // frontend/apply-nav.py stamps into every page. The generator is the source
   // of truth; this array only re-renders the same links after the session
   // check, so a visitor never sees the navigation move under them.
-  // The four Dutch pages (<html lang="nl">) carry the Dutch bar that
-  // apply-nav.py stamps into them as NEW_NAV_NL, with the two outward product
-  // names. Same rule: this list only re-renders what the generator wrote.
-  var DUTCH = document.documentElement.lang === 'nl';
+  // Every page carries the Dutch bar that apply-nav.py stamps as NEW_NAV_NL,
+  // with the two outward product names, except a page that declares
+  // <html lang="en">. The rule is the page's own lang, as it is in the
+  // generator, so a page is never re-rendered in the other language than the
+  // one it was stamped with.
+  var DUTCH = !/^en\b/i.test(document.documentElement.lang || '');
   var PUBLIC_NAV = DUTCH ? [
     ['Versturen', '/parasend'],
     ['Ondertekenen', '/parasign'],
@@ -17,18 +19,27 @@
     ['Beveiliging', '/security'],
     ['Prijzen', '/pricing']
   ] : [
-    ['Product', '/#products'],
+    // The English bar points at the English pages (apply-nav.py
+    // to_english_links); /gereedschap has no English page and keeps its route.
+    ['Product', '/en#products'],
     ['Tools', '/gereedschap'],
-    ['Security', '/security'],
-    ['Pricing', '/pricing'],
-    ['Docs', '/docs']
+    ['Security', '/en/security'],
+    ['Pricing', '/en/pricing'],
+    ['Docs', '/en/docs']
   ];
   // The workspace bar is verbs: what you came here to do, in the order you do
   // it. Send and Sign were the two; locking a file with a passphrase is the
   // third, so it sits beside them under the same kind of name. /vault is the
   // route, "Lock a file" is what it does; the page keeps no product name of its
   // own because there is not one to give it yet.
-  var APP_NAV = [
+  var APP_NAV = DUTCH ? [
+    ['Documenten', '/dashboard'],
+    ['Versturen', '/parashare'],
+    ['Ondertekenen', '/sign'],
+    ['Bestand vergrendelen', '/vault'],
+    ['Controleren', '/verify'],
+    ['Instellingen', '/account']
+  ] : [
     ['Documents', '/dashboard'],
     ['Send', '/parashare'],
     ['Sign', '/sign'],
@@ -44,7 +55,7 @@
       primary.className = 'nav-links';
       primary.setAttribute('aria-label', label);
       primary.innerHTML = items.map(function(item) {
-        var active = location.pathname === item[1] || (item[1] === '/#products' && location.pathname === '/');
+        var active = location.pathname === item[1] || (item[1] === '/#products' && location.pathname === '/') || (item[1] === '/en#products' && location.pathname === '/en');
         return '<li><a href="' + item[1] + '" class="nav-link' + (active ? ' active' : '') + '">' + item[0] + '</a></li>';
       }).join('');
       for (var i = 1; i < lists.length; i++) lists[i].remove();
@@ -53,7 +64,7 @@
     var mobile = document.getElementById('nav-mobile');
     if (mobile) {
       mobile.innerHTML = items.map(function(item) {
-        var current = location.pathname === item[1] || (item[1] === '/#products' && location.pathname === '/');
+        var current = location.pathname === item[1] || (item[1] === '/#products' && location.pathname === '/') || (item[1] === '/en#products' && location.pathname === '/en');
         return '<a href="' + item[1] + '" class="nav-mobile-standalone"' + (current ? ' aria-current="page"' : '') + '>' + item[0] + '</a>';
       }).join('');
     }
@@ -62,7 +73,7 @@
   }
 
   function renderLoggedOut() {
-    setNavigation(PUBLIC_NAV, 'Primary');
+    setNavigation(PUBLIC_NAV, DUTCH ? 'Hoofdmenu' : 'Primary');
     container.innerHTML = DUTCH
       ? '<a href="/help" class="nav-help">Hulp</a>' +
         '<a href="/auth/login" class="nav-signin">Inloggen</a>' +
@@ -73,7 +84,7 @@
   }
 
   function renderLoggedIn(email) {
-    setNavigation(APP_NAV, 'Workspace');
+    setNavigation(APP_NAV, DUTCH ? 'Werkruimte' : 'Workspace');
     // Support survives signing in. The tail used to be REMOVED here, on the
     // reasoning that the user menu carries Help from then on. On a phone that
     // left no Help at all: the bar sheds .nav-help below 700px, the drawer is
@@ -85,7 +96,12 @@
     // does go: it is not an action you still need. Help lands in the same place
     // as it does signed out, one tap under the drawer, 48px tall.
     var tail = document.getElementById('nav-mobile-tail');
-    if (tail) tail.innerHTML = '<a href="/help" class="nav-tail-link">Help</a>';
+    // The language switch apply-nav.py stamps into the strip stays with it.
+    if (tail) {
+      var langSwitch = tail.querySelector('.nav-lang');
+      tail.innerHTML = '<a href="/help" class="nav-tail-link">' + (DUTCH ? 'Hulp' : 'Help') + '</a>';
+      if (langSwitch) tail.appendChild(langSwitch);
+    }
     var shortEmail = email.length > 24 ? email.slice(0, 18) + '...' : email;
     // Help sits where it sits signed out: a text link left of the account
     // control. nav.css hides it below 700px, where the drawer tail above takes
@@ -94,21 +110,28 @@
     // Never interpolate the email into innerHTML (stored/self DOM XSS): the
     // signup regex permits HTML metacharacters. Build static markup, then set
     // the email via textContent (mirrors home-auth.js / dashboard.js).
+    var T = DUTCH ? {
+      help: 'Hulp', docs: 'Documenten', account: 'Account', dev: 'Ontwikkelaarsinstellingen',
+      plan: 'Abonnement en betaling', out: 'Uitloggen'
+    } : {
+      help: 'Help', docs: 'Documents', account: 'Account', dev: 'Developer settings',
+      plan: 'Plan &amp; billing', out: 'Sign out'
+    };
     container.innerHTML =
-      '<a href="/help" class="nav-help">Help</a>' +
+      '<a href="/help" class="nav-help">' + T.help + '</a>' +
       '<div class="nav-user">' +
         '<button type="button" class="nav-user-trigger" aria-expanded="false">' +
           '<span class="nav-user-email"></span>' +
           '<span class="nav-user-chevron">\u25be</span>' +
         '</button>' +
         '<div class="nav-user-menu" hidden>' +
-          '<a href="/dashboard" class="nav-menu-item">Documents</a>' +
-          '<a href="/account" class="nav-menu-item">Account</a>' +
-          '<a href="/developer" class="nav-menu-item">Developer settings</a>' +
-          '<a href="/pricing" class="nav-menu-item">Plan &amp; billing</a>' +
-          '<a href="/help" class="nav-menu-item">Help</a>' +
+          '<a href="/dashboard" class="nav-menu-item">' + T.docs + '</a>' +
+          '<a href="/account" class="nav-menu-item">' + T.account + '</a>' +
+          '<a href="/developer" class="nav-menu-item">' + T.dev + '</a>' +
+          '<a href="/pricing" class="nav-menu-item">' + T.plan + '</a>' +
+          '<a href="/help" class="nav-menu-item">' + T.help + '</a>' +
           '<div class="nav-menu-divider"></div>' +
-          '<button type="button" class="nav-menu-item nav-menu-signout" id="nav-signout">Sign out</button>' +
+          '<button type="button" class="nav-menu-item nav-menu-signout" id="nav-signout">' + T.out + '</button>' +
         '</div>' +
       '</div>';
 
@@ -145,7 +168,7 @@
     });
   }
 
-  setNavigation(PUBLIC_NAV, 'Primary');
+  setNavigation(PUBLIC_NAV, DUTCH ? 'Hoofdmenu' : 'Primary');
   container.innerHTML = '<span class="nav-signin" aria-hidden="true">' + (DUTCH ? 'Even kijken' : 'Checking session') + '</span>';
 
   (async function check() {

@@ -26,7 +26,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="/design-system.css?v=30">
-<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/nav.css?v=27">
 <style>
 /* The homepage on the paper it had before PR #404: warm paper #FAF8F3, ink
    #0C1B2A, one cobalt accent, and one dark object per screen (the Community
@@ -523,6 +523,8 @@ html[data-session="in"] .lang-switch{display:none}
     <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en" hreflang="en" lang="en">EN</a></div>
+
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
@@ -537,6 +539,7 @@ html[data-session="in"] .lang-switch{display:none}
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
   <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en" hreflang="en" lang="en">EN</a></span>
 </div>
 <main id="main-content" role="main">
 <section class="home-hero">
@@ -790,8 +793,8 @@ html[data-session="in"] .lang-switch{display:none}
     </div>
   </div>
 </footer>
-<script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=10" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
 <script src="/js/format-date.js?v=2" defer></script>
 <script src="/js/home-auth.js?v=7" defer></script>
 </body>
