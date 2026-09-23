@@ -23,6 +23,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadPdfLibs } from './helpers/sign-pdf-libs.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
@@ -64,6 +65,7 @@ async function openSign(authenticated, url = '/sign') {
 // A real PDF, built in the page with the pdf-lib the page already loads, so the
 // bytes that reach the picker are the bytes a browser would hand it.
 async function pickPdf(page) {
+  await loadPdfLibs(page);
   await page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     for (let i = 0; i < 400 && !(window.PDFLib && window.pdfjsLib); i++) await sleep(20);

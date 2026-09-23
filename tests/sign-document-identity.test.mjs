@@ -23,6 +23,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadPdfLibs } from './helpers/sign-pdf-libs.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
@@ -53,6 +54,7 @@ async function uploadIn(mode, filename) {
   // Signed in: the account notice must not be what fills the screen.
   await page.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"authenticated":true}' }));
   await page.goto(`${ORIGIN}/sign?mode=${mode}`, { waitUntil: 'networkidle' });
+  await loadPdfLibs(page);
   await page.evaluate(async (name) => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     while (!window.PDFLib || !window.pdfjsLib) await sleep(20);

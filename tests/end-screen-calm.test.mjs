@@ -36,6 +36,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { webcrypto as wc } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { loadPdfLibs } from './helpers/sign-pdf-libs.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
@@ -392,6 +393,7 @@ async function stubSign(page, { partyCount = 1, bindingMode = 'email' } = {}) {
 }
 
 async function pickPdf(page, name) {
+  await loadPdfLibs(page);
   await page.evaluate(async (n) => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     for (let i = 0; i < 600 && !(window.PDFLib && window.pdfjsLib); i++) await sleep(20);

@@ -7,6 +7,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadPdfLibs } from './helpers/sign-pdf-libs.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
@@ -107,6 +108,7 @@ await page.locator('.ds-mode-card[data-mode="invite"]').click();
 // A .txt used to go straight to the recipients through the hash-only path.
 // /sign refuses anything that is not a PDF now (tests/sign-signed-out.test.mjs
 // covers the refusal), so the delivery run takes the road a customer takes.
+await loadPdfLibs(page);
 await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   while (!window.PDFLib) await sleep(20);
@@ -183,6 +185,7 @@ await pdfPage.route(`**/api/user/envelopes/${ENV_ID}/invitations`, async (route)
 await pdfPage.goto(ORIGIN + '/sign', { waitUntil: 'domcontentloaded' });
 await pdfPage.locator('.ds-mode-card[data-mode="invite"]').click();
 ok('the invite stepper shows the Place step', await pdfPage.locator('.ds-stepper li[data-step="place"]').isVisible(), await pdfPage.locator('.ds-stepper').innerText());
+await loadPdfLibs(pdfPage);
 await pdfPage.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   while (!window.PDFLib) await sleep(20);
