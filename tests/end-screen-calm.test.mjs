@@ -430,7 +430,7 @@ async function pickPdf(page, name) {
   // deliberately not in it, so the sender has one more thing to do and has to
   // be told. See admin/lib/email-templates.js for why the key stays here.
   ok('/sign invitations sent: it says what is true now, in words',
-    /Notified\. Now send them the links\./.test(text) && /carries no key/.test(text),
+    /Bericht verstuurd\. Stuur nu de links\./.test(text) && /bevat geen sleutel/.test(text),
     text.slice(0, 200));
   await page.close();
 }
@@ -456,7 +456,7 @@ async function pickPdf(page, name) {
   const text = await audit(page, '/sign signed yourself', '#step-done');
   ok('/sign signed yourself: the stage bar is gone', !(await page.locator('#ds-stepper').isVisible()));
   ok('/sign signed yourself: it says to keep both files, without naming a scheme',
-    /Save both files now/.test(text), text.slice(0, 200));
+    /Bewaar nu beide bestanden/.test(text), text.slice(0, 200));
   await page.close();
 }
 

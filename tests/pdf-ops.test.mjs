@@ -31,7 +31,7 @@ test('deletePage removes exactly the indexed page', async () => {
 
 test('deletePage refuses to delete the last page', async () => {
   const one = await makePdf(1);
-  await assert.rejects(() => Ops.deletePage(PDFLib, one, 0), /last page/);
+  await assert.rejects(() => Ops.deletePage(PDFLib, one, 0), /laatste pagina/);
 });
 
 test('movePage up and down', async () => {
@@ -43,9 +43,9 @@ test('movePage up and down', async () => {
 
 test('reorderPages validates the permutation', async () => {
   const base = await makePdf(3);
-  await assert.rejects(() => Ops.reorderPages(PDFLib, base, [0, 1]), /every page/);
-  await assert.rejects(() => Ops.reorderPages(PDFLib, base, [0, 1, 1]), /permutation/);
-  await assert.rejects(() => Ops.reorderPages(PDFLib, base, [0, 1, 3]), /permutation/);
+  await assert.rejects(() => Ops.reorderPages(PDFLib, base, [0, 1]), /elke pagina/);
+  await assert.rejects(() => Ops.reorderPages(PDFLib, base, [0, 1, 1]), /permutatie/);
+  await assert.rejects(() => Ops.reorderPages(PDFLib, base, [0, 1, 3]), /permutatie/);
   assert.deepEqual(await widths(await Ops.reorderPages(PDFLib, base, [2, 0, 1])), [102, 100, 101]);
 });
 
@@ -74,7 +74,7 @@ test('extractRange copies an inclusive range and leaves the source alone', async
   const out = await Ops.extractRange(PDFLib, base, 1, 3);
   assert.deepEqual(await widths(out), [101, 102, 103]);
   assert.deepEqual(await widths(base), [100, 101, 102, 103, 104]);
-  await assert.rejects(() => Ops.extractRange(PDFLib, base, 3, 9), /invalid page range/);
+  await assert.rejects(() => Ops.extractRange(PDFLib, base, 3, 9), /ongeldig paginabereik/);
 });
 
 test('parsePageRange accepts "3" and "2-5", rejects junk', () => {

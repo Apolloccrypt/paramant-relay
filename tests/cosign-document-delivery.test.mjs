@@ -36,7 +36,7 @@ await page.goto(ORIGIN + '/__proof');
 await page.addScriptTag({ url: ORIGIN + '/vendor/pdf-lib/pdf-lib.min.js' });
 const fixture = await page.evaluate(async ({ envelopeId }) => {
   const pqc = await import('/vendor/paramant-pqc.js');
-  const delivery = await import('/js/parasign-document-capsule.js?v=1');
+  const delivery = await import('/js/parasign-document-capsule.js?v=2');
   const pdf = await window.PDFLib.PDFDocument.create();
   const pdfPage = pdf.addPage([595, 842]);
   pdfPage.drawText('Generic agreement for recipient placement test', { x: 50, y: 780, size: 16 });
@@ -81,7 +81,7 @@ async function waitForDeliveryResult(target = page) {
   await target.waitForFunction(() => {
     const step = document.querySelector('.step.active')?.id;
     const text = document.querySelector('#document-delivery-status')?.textContent || '';
-    return step === 'step-cosign' && text && !/^(Loading|Downloading)/i.test(text);
+    return step === 'step-cosign' && text && !/wordt (geladen|gedownload)/i.test(text);
   }, null, { timeout: 15000 });
 }
 
@@ -95,8 +95,8 @@ let state = await page.evaluate(() => ({
   overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
 }));
 ok('automatic delivery opens the co-sign step', state.step === 'step-cosign', state.step);
-ok('automatic delivery reports decrypted + matched', /loaded, decrypted and matched/i.test(state.delivery), state.delivery);
-ok('automatic delivery verifies the document hash', /Hash matches/i.test(state.result), state.result);
+ok('automatic delivery reports decrypted + matched', /geladen, ontsleuteld en klopt/i.test(state.delivery), state.delivery);
+ok('automatic delivery verifies the document hash', /hash klopt\./i.test(state.result), state.result);
 ok('verified delivered document enables signing', state.signDisabled === false, state.signDisabled);
 ok('phone viewport has no horizontal overflow', state.overflow <= 1, state.overflow);
 ok('document endpoint read once', documentReads === 1, documentReads);
@@ -109,7 +109,7 @@ let appearanceState = await page.evaluate(() => ({
   fields: Array.from(document.querySelectorAll('.appearance-field:not(.prior)')).map((node) => ({ text: node.textContent, left: node.style.left, top: node.style.top })),
   draft: Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.getItem(sessionStorage.key(i))).find((value) => value && value.includes('"fields"')) || '',
 }));
-ok('recipient places a visible signature and date on the PDF', appearanceState.fields.length === 2 && appearanceState.fields.some((field) => /Paramant signed/i.test(field.text)) && appearanceState.fields.some((field) => /2026|2027/i.test(field.text)), JSON.stringify(appearanceState));
+ok('recipient places a visible signature and date on the PDF', appearanceState.fields.length === 2 && appearanceState.fields.some((field) => /Paramant ondertekend/i.test(field.text)) && appearanceState.fields.some((field) => /2026|2027/i.test(field.text)), JSON.stringify(appearanceState));
 ok('placement draft stores coordinates only for refresh recovery', /"type":"seal"/.test(appearanceState.draft) && !/example\.com|agreement/i.test(appearanceState.draft), appearanceState.draft);
 if (process.env.PARAMANT_COSIGN_SCREENSHOT_PATH) await stableScreenshot(page, { path:process.env.PARAMANT_COSIGN_SCREENSHOT_PATH, fullPage:true });
 const renderedPdf = await page.evaluate(async () => {
@@ -128,7 +128,7 @@ await page.reload({ waitUntil: 'domcontentloaded' });
 await waitForDeliveryResult();
 await page.waitForFunction(() => document.querySelectorAll('.appearance-field:not(.prior)').length === 2);
 state = await page.evaluate(() => ({ delivery: document.querySelector('#document-delivery-status')?.textContent, signDisabled: document.querySelector('#sign-confirm')?.disabled, fields: document.querySelectorAll('.appearance-field:not(.prior)').length }));
-ok('refresh retrieves the document and restores placed fields', documentReads === 2 && /matched/i.test(state.delivery) && state.signDisabled === false && state.fields === 2, JSON.stringify({ documentReads, ...state }));
+ok('refresh retrieves the document and restores placed fields', documentReads === 2 && /klopt met dit verzoek/i.test(state.delivery) && state.signDisabled === false && state.fields === 2, JSON.stringify({ documentReads, ...state }));
 
 const keyStart = '#doc=v1.'.length;
 const badFragment = fixture.fragment.slice(0, keyStart) +
@@ -136,13 +136,13 @@ const badFragment = fixture.fragment.slice(0, keyStart) +
 await page.goto(base + '&case=bad-key' + badFragment, { waitUntil: 'domcontentloaded' });
 await waitForDeliveryResult();
 state = await page.evaluate(() => ({ delivery: document.querySelector('#document-delivery-status')?.textContent, signDisabled: document.querySelector('#sign-confirm')?.disabled }));
-ok('altered document key fails closed', /could not be decrypted|incomplete or altered/i.test(state.delivery) && state.signDisabled === true, JSON.stringify(state));
+ok('altered document key fails closed', /kon niet worden geopend|onvolledig of gewijzigd/i.test(state.delivery) && state.signDisabled === true, JSON.stringify(state));
 
 const readsBeforeNoKey = documentReads;
 await page.goto(base, { waitUntil: 'domcontentloaded' });
 await waitForDeliveryResult();
 state = await page.evaluate(() => ({ delivery: document.querySelector('#document-delivery-status')?.textContent, manual: document.querySelector('#verify-file-cta')?.textContent }));
-ok('older link without key gives an actionable manual fallback', /does not contain/i.test(state.delivery) && /manually/i.test(state.manual), JSON.stringify(state));
+ok('older link without key gives an actionable manual fallback', /zit geen sleutel/i.test(state.delivery) && /zelf/i.test(state.manual), JSON.stringify(state));
 ok('missing fragment does not fetch undecryptable ciphertext', documentReads === readsBeforeNoKey, documentReads);
 
 const anonPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -232,11 +232,11 @@ const seededLook = await seedPage.evaluate(() => {
 });
 ok('the seeded box wears the requested style, not the signed style',
   /\brequested\b/.test(seededLook.className) && seededLook.borderStyle === 'dashed'
-  && /Requested spot/i.test(seededLook.text) && !/Signer Demo/.test(seededLook.text) && !seededLook.hasRemove,
+  && /Gevraagde plek/i.test(seededLook.text) && !/Signer Demo/.test(seededLook.text) && !seededLook.hasRemove,
   JSON.stringify(seededLook));
 ok('the marked spot is brought into view when the document opens', seededLook.inView === true, JSON.stringify(seededLook));
 ok('a line above the document points at the spot',
-  seededLook.noteVisible && /sender marked where you sign/i.test(seededLook.noteText) && /Go to the spot/i.test(seededLook.goLabel),
+  seededLook.noteVisible && /afzender heeft aangegeven waar u tekent/i.test(seededLook.noteText) && /Naar die plek/i.test(seededLook.goLabel),
   JSON.stringify(seededLook));
 
 // Scroll away, then use the button: it has to bring the spot back.
@@ -273,7 +273,7 @@ const touchTargets = await seedPage.evaluate(() => Array.from(
 ).map((b) => ({ id: b.id, h: Math.round(b.getBoundingClientRect().height) })));
 ok('every control on the signing screen is a 44px touch target',
   touchTargets.length >= 5 && touchTargets.every((b) => b.h >= 44), JSON.stringify(touchTargets));
-ok('the recipient is told it is a request they may move', /sender asked/i.test(seeded.help) && /move it/i.test(seeded.help) && /where you actually sign/i.test(seeded.help), seeded.help);
+ok('the recipient is told it is a request they may move', /afzender vraagt/i.test(seeded.help) && /verplaatsen/i.test(seeded.help) && /waar u echt tekent/i.test(seeded.help), seeded.help);
 ok('a requested position is not silently adopted as the signer draft', seeded.draft === '', seeded.draft);
 
 await seedPage.locator('#appearance-seal').click();
@@ -288,7 +288,7 @@ const afterMove = await seedPage.evaluate(() => {
   return { className: node.className, text: node.textContent, hasRemove: !!node.querySelector('.appearance-remove'), noteHidden: document.getElementById('requested-note').hidden };
 });
 ok('once the signer places it, it is their signature and not a request',
-  !/requested/.test(afterMove.className) && /Paramant signed/.test(afterMove.text) && afterMove.hasRemove && afterMove.noteHidden === true,
+  !/requested/.test(afterMove.className) && /Paramant ondertekend/.test(afterMove.text) && afterMove.hasRemove && afterMove.noteHidden === true,
   JSON.stringify(afterMove));
 
 // Fit-to-width changed how wide the render is, so the click-to-fraction maths

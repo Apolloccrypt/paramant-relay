@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <!-- Sticky readiness signals. Plain script in <head> on purpose: it must run
@@ -7,26 +7,26 @@
 <script src="/js/ready.js?v=1"></script>
 <style id="critical-css">html,body{background:#FBFAF7;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#15191C;color:#EAE2CE}html[data-theme="dark"]{color-scheme:dark}@media (prefers-color-scheme:dark){html[data-theme="auto"],html[data-theme="auto"] body{background:#15191C;color:#EAE2CE}html[data-theme="auto"]{color-scheme:dark}}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Een pdf ondertekenen in uw browser · Paramant</title>
+<title>Sign a PDF in your browser · Paramant</title>
 <meta property="og:site_name" content="Paramant">
 <!-- Which product path this page describes. tests/crypto-claims.test.mjs holds every
      algorithm this page names against the code that runs on that path, instead of
      against the codebase as a whole: naming an algorithm the product has, on a route
      that does not run it, is the class of untrue sentence that reads as a fact. -->
 <meta name="paramant:path" content="signing">
-<meta name="description" content="Onderteken een pdf in uw browser. Het document en uw ondertekensleutel blijven daar, en iedereen kan het getekende document achteraf controleren.">
-<meta property="og:title" content="Een pdf ondertekenen in uw browser · Paramant">
-<meta property="og:description" content="Onderteken een pdf in uw browser. Het document en uw ondertekensleutel blijven daar, en iedereen kan het getekende document achteraf controleren.">
-<meta property="og:url" content="https://paramant.app/sign">
+<meta name="description" content="Sign a PDF in your browser. The document text and your signing key never leave it, and anyone can check the finished document afterwards.">
+<meta property="og:title" content="Sign a PDF in your browser · Paramant">
+<meta property="og:description" content="Sign a PDF in your browser. The document text and your signing key never leave it, and anyone can check the finished document afterwards.">
+<meta property="og:url" content="https://paramant.app/en/sign">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Een pdf ondertekenen in uw browser · Paramant">
-<meta name="twitter:description" content="Onderteken een pdf in uw browser. Het document en uw ondertekensleutel blijven daar, en iedereen kan het getekende document achteraf controleren.">
+<meta name="twitter:title" content="Sign a PDF in your browser · Paramant">
+<meta name="twitter:description" content="Sign a PDF in your browser. The document text and your signing key never leave it, and anyone can check the finished document afterwards.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<link rel="canonical" href="https://paramant.app/sign">
+<link rel="canonical" href="https://paramant.app/en/sign">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/sign">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/sign">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/sign">
@@ -436,17 +436,17 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   "@graph": [
     {
       "@type": "WebPage",
-      "@id": "https://paramant.app/sign#webpage",
-      "url": "https://paramant.app/sign",
-      "name": "Een pdf ondertekenen in uw browser · Paramant",
+      "@id": "https://paramant.app/en/sign#webpage",
+      "url": "https://paramant.app/en/sign",
+      "name": "Sign a PDF in your browser · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "nl",
-      "description": "Onderteken een pdf in uw browser. Het document en uw ondertekensleutel blijven daar, en iedereen kan het getekende document achteraf controleren."
+      "inLanguage": "en",
+      "description": "Sign a PDF in your browser. The document text and your signing key never leave it, and anyone can check the finished document afterwards."
     },
     {
       "@type": "SoftwareApplication",
@@ -497,52 +497,52 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 <script src="/js/theme.js?v=5"></script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Naar de inhoud</a>
+<a href="#main-content" class="skip-link">Skip to main content</a>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/parasend" class="nav-link">Versturen</a></li>
-    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
-    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
-    <li><a href="/security" class="nav-link">Beveiliging</a></li>
-    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
+    <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/security" class="nav-link">Security</a></li>
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Hulp</a>
-    <a href="/auth/login" class="nav-signin">Inloggen</a>
-    <a href="/signup" class="nav-cta">Account maken</a>
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
-  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
-  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
-  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+  <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/security" class="nav-mobile-standalone">Security</a>
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
-  <a href="/help" class="nav-tail-link">Hulp</a>
+  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
 </div>
 
 <main id="main-content" role="main">
 <div class="ds-wrap">
   <header class="ds-head">
-    <p class="ds-kicker">ParaSign · documenten veilig laten tekenen</p>
-    <h1 class="ds-title">Laat een belangrijk document ondertekenen.</h1>
-    <p class="ds-lede">Onderteken zelf, teken samen of stuur het naar anderen. Uw document blijft privé en bij elke handtekening hoort bewijs dat iedereen zelf kan controleren.</p>
+    <p class="ds-kicker">ParaSign · secure document workflow</p>
+    <h1 class="ds-title">Get an important document signed.</h1>
+    <p class="ds-lede">Sign it yourself, work together or send it to others. Your document stays private and every completed signature comes with independently verifiable proof.</p>
     <ul class="ds-facts">
-      <li><b>Altijd gratis</b> &middot; 2 handtekeningen per maand, geen betaalkaart</li>
-      <li><b>Uw ondertekensleutel blijft hier</b> &middot; hij wordt op uw apparaat gemaakt en komt nooit op onze servers</li>
-      <li><b>Europees recht</b> &middot; servers in Duitsland, onder EU-recht</li>
+      <li><b>Free forever</b> &middot; 2 signatures a month, no card</li>
+      <li><b>Your signing key stays here</b> &middot; it is made on your device and never reaches our servers</li>
+      <li><b>EU jurisdiction</b> &middot; servers in Germany, under EU law</li>
     </ul>
-    <p class="ds-headlink"><a href="/parasign">Wat ParaSign is, en wat organisaties betalen &rarr;</a></p>
+    <p class="ds-headlink"><a href="/parasign">What ParaSign is, and what organisations pay &rarr;</a></p>
   </header>
 
   <!-- The session probe could not answer. NOT the same event as "you are not
@@ -559,19 +559,19 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
        honours on the way back; signup still finishes through the emailed
        verification link and does not carry it yet. -->
   <div class="ds-signedout" id="ds-signedout" role="status" hidden>
-    <p class="ds-signedout-text">U bent niet ingelogd. U kunt hier een document klaarzetten; voor ondertekenen of versturen is een gratis Community-account nodig.</p>
+    <p class="ds-signedout-text">You are not signed in. You can prepare a document here; signing or sending it needs a free Community account.</p>
     <p class="ds-signedout-actions">
-      <a class="btn btn-secondary" href="/auth/login?next=/sign">Inloggen</a>
-      <a class="btn btn-primary" href="/signup?next=/sign">Account maken</a>
+      <a class="btn btn-secondary" href="/auth/login?next=/en/sign">Sign in</a>
+      <a class="btn btn-primary" href="/signup?next=/en/sign">Create account</a>
     </p>
   </div>
 
-  <ol class="ds-stepper" id="ds-stepper" aria-label="Voortgang ondertekenen" hidden>
+  <ol class="ds-stepper" id="ds-stepper" aria-label="Sign progress" hidden>
     <li data-step="doc" class="active">Document</li>
-    <li data-step="place">Plaatsen</li>
-    <li data-step="recipients">Medeondertekenaars</li>
-    <li data-step="identity">Identiteit</li>
-    <li data-step="sign">Ondertekenen</li>
+    <li data-step="place">Place</li>
+    <li data-step="recipients">Co-signers</li>
+    <li data-step="identity">Identity</li>
+    <li data-step="sign">Sign</li>
   </ol>
 
   <!-- The document under the whole flow, named once and shown on every step
@@ -580,7 +580,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
        file picker to the co-signers, so the file was named nowhere and the
        last thing before "Send for signature" was a screen that did not say
        what was being sent. -->
-  <p class="ds-doc-meta" id="ds-doc-meta" hidden><span class="ds-doc-meta-label">Bestand</span><span class="ds-doc-meta-name" id="ds-doc-meta-name"></span><span class="ds-doc-meta-size" id="ds-doc-meta-size"></span></p>
+  <p class="ds-doc-meta" id="ds-doc-meta" hidden><span class="ds-doc-meta-label">File</span><span class="ds-doc-meta-name" id="ds-doc-meta-name"></span><span class="ds-doc-meta-size" id="ds-doc-meta-size"></span></p>
 
   <!-- No session: say what this needs BEFORE a document is picked.
        The page used to be behind an nginx auth_request, so a visitor never got
@@ -591,18 +591,18 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
        actually does. Hidden by default and revealed by sign-flow.js only when
        /api/user/check answers 401, so a signed-in user never sees it. -->
   <section class="ds-step ds-anon" id="step-anon" hidden>
-    <h2>Voor ondertekenen is een account nodig</h2>
+    <h2>Signing a document needs an account</h2>
     <p class="ds-sub">
-      Niet omdat het document ergens heen gaat. Dat gebeurt niet: het bestand en uw privésleutel
-      blijven in deze browser, en de relay ziet alleen een hash. Het account is nodig omdat
-      een Paramant-handtekening wordt gezet met een sleutel die hoort bij een passkey op uw apparaat,
-      en die sleutel moet eerst ergens zijn vastgelegd voordat hij kan tekenen.
+      Not because the document goes anywhere. It does not: the file and your private key
+      stay in this browser, and the relay only ever sees a hash. The account exists because
+      a Paramant signature is made with a key that belongs to a passkey on your device, and
+      that key has to be enrolled somewhere before it can sign.
     </p>
     <p class="ds-sub">
-      <strong>Wat zonder account kan:</strong> een verzoek openen dat iemand u stuurde
-      en tekenen met de link uit die e-mail, en
-      <a href="/verify">elk getekend document controleren</a> tegen het openbare logboek. Daarvoor
-      is geen account nodig.
+      <strong>What you can do without one:</strong> open a signing request someone sent you
+      and sign it with the link from that email, and
+      <a href="/verify">verify any signed document</a> against the public log. Neither needs
+      an account.
     </p>
     <!-- .ds-btn was never defined in any stylesheet, so the one CTA a
          session-less visitor gets rendered as two lines of plain blue text.
@@ -610,31 +610,31 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
          uses, and sign-flow.js selects neither class, so nothing behavioural
          changes. -->
     <p class="ds-anon-actions">
-      <a class="btn btn-primary" href="/signup?next=/sign">Account maken</a>
-      <a class="btn btn-secondary" href="/auth/login?next=/sign">Inloggen</a>
+      <a class="btn btn-primary" href="/signup?next=/en/sign">Create an account</a>
+      <a class="btn btn-secondary" href="/auth/login?next=/en/sign">Sign in</a>
     </p>
     <p class="ds-sub ds-anon-foot">
-      Met een Community-account ondertekent u 2 documenten per maand. <a href="/pricing">Bekijk wat de betaalde abonnementen toevoegen</a>.
+      Community accounts sign 2 documents a month. <a href="/pricing">See what the paid tiers add</a>.
     </p>
   </section>
 
   <!-- Step 0: choose a signing setup -->
   <section class="ds-step" id="step-mode">
-    <div class="ds-mode-intro"><div><h2>Hoe wilt u ondertekenen?</h2><p class="ds-sub">Kies een werkwijze. U kunt die voor het versturen nog wijzigen.</p></div><span class="ds-mode-safe">Uw ondertekensleutel blijft op uw apparaat</span></div>
+    <div class="ds-mode-intro"><div><h2>How should it be signed?</h2><p class="ds-sub">Choose a workflow. You can change it before sending.</p></div><span class="ds-mode-safe">Your signing key stays on your device</span></div>
     <div class="ds-modes">
       <button type="button" class="ds-mode-card primary" data-mode="invite">
         <span class="ds-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg></span>
-        <span class="ds-mode-copy"><span class="ds-mode-badge">Aanbevolen voor organisaties</span><span class="ds-mode-t">Handtekeningen vragen</span><span class="ds-mode-d">Stuur een beveiligd document naar een of meer mensen en volg wie al getekend heeft.</span></span>
+        <span class="ds-mode-copy"><span class="ds-mode-badge">Recommended for business</span><span class="ds-mode-t">Request signatures</span><span class="ds-mode-d">Email a secure document to one or more people and follow their progress.</span></span>
         <span class="ds-mode-go" aria-hidden="true">&rarr;</span>
       </button>
       <button type="button" class="ds-mode-card" data-mode="alone">
         <span class="ds-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19h5"/><path d="m6 16 9-9 3 3-9 9H6z"/></svg></span>
-        <span class="ds-mode-copy"><span class="ds-mode-t">Zelf ondertekenen</span><span class="ds-mode-d">Zet uw handtekening en download het resultaat meteen.</span></span>
+        <span class="ds-mode-copy"><span class="ds-mode-t">Sign it myself</span><span class="ds-mode-d">Add your signature and download the result immediately.</span></span>
         <span class="ds-mode-go" aria-hidden="true">&rarr;</span>
       </button>
       <button type="button" class="ds-mode-card" data-mode="cosign">
         <span class="ds-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2"/><path d="M3 19c.5-4 2-6 5-6s4.5 2 5 6"/><path d="M14 14c3-1 5 1 6 4"/></svg></span>
-        <span class="ds-mode-copy"><span class="ds-mode-t">Samen ondertekenen</span><span class="ds-mode-d">Teken eerst zelf en nodig daarna anderen uit om mee te tekenen.</span></span>
+        <span class="ds-mode-copy"><span class="ds-mode-t">Sign together</span><span class="ds-mode-d">Sign first, then invite others to add their signatures.</span></span>
         <span class="ds-mode-go" aria-hidden="true">&rarr;</span>
       </button>
     </div>
@@ -642,11 +642,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
   <!-- Step 1: pick document -->
   <section class="ds-step" id="step-doc" hidden>
-    <h2>Kies het document dat u wilt ondertekenen</h2>
-    <p class="ds-sub">ParaSign ondertekent pdf-bestanden. Kies een pdf en zet uw stempel op een pagina naar keuze. Het bestand blijft in deze browser.</p>
-    <div class="ds-dropzone" id="ds-dropzone" role="button" tabindex="0" aria-label="Kies of sleep een bestand">
-      <p class="big">Sleep een bestand hierheen, of klik om te kiezen</p>
-      <p class="small">Blijft in uw browser. Er wordt nog niets geüpload.</p>
+    <h2>Pick the document you want to sign</h2>
+    <p class="ds-sub">ParaSign signs PDF files. Pick a PDF and place your signature stamp on any page. The file stays in this browser.</p>
+    <div class="ds-dropzone" id="ds-dropzone" role="button" tabindex="0" aria-label="Pick or drop a file">
+      <p class="big">Drop a file here, or click to choose</p>
+      <p class="small">Stays in your browser. Nothing is uploaded yet.</p>
       <input type="file" id="ds-doc-input" accept="application/pdf,.pdf" hidden>
     </div>
     <p class="ds-doc-error" id="ds-doc-error" role="alert" hidden></p>
@@ -654,47 +654,47 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
   <!-- Step 2 (PDF): place stamp -->
   <section class="ds-step" id="step-place" hidden>
-    <h2>Plaats uw handtekening</h2>
-    <p class="ds-sub">Klik ergens op een pagina om de stempel te plaatsen. Klik op een andere plek om hem te verplaatsen. <span id="ds-place-page-count" style="font-family:var(--mono);font-size:11px;color:var(--ink-dim)"></span></p>
-    <p class="ds-hint" id="ds-place-hint">Klik op een pagina om de stempel te plaatsen.</p>
+    <h2>Place your signature</h2>
+    <p class="ds-sub">Click anywhere on a page to drop the stamp. Click another spot to move it. <span id="ds-place-page-count" style="font-family:var(--mono);font-size:11px;color:var(--ink-dim)"></span></p>
+    <p class="ds-hint" id="ds-place-hint">Click a page to drop the signature stamp.</p>
     <div class="ds-zoom" id="ds-zoom" hidden>
-      <button id="ds-zoom-out" type="button" aria-label="Uitzoomen">&minus;</button>
+      <button id="ds-zoom-out" type="button" aria-label="Zoom out">&minus;</button>
       <span id="ds-zoom-pct">100%</span>
-      <button id="ds-zoom-in" type="button" aria-label="Inzoomen">+</button>
-      <button id="ds-zoom-fit" type="button">Passend</button>
+      <button id="ds-zoom-in" type="button" aria-label="Zoom in">+</button>
+      <button id="ds-zoom-fit" type="button">Fit</button>
     </div>
     <div class="ds-invite-tools" id="ds-invite-tools" hidden>
-      <button class="ds-edit-btn" id="ds-invite-place" type="button">Plaats het handtekeningvak</button>
+      <button class="ds-edit-btn" id="ds-invite-place" type="button">Place the signature box</button>
     </div>
-    <p class="ds-edit-hint" id="ds-edit-tools-hint" hidden>Dit bestand is een afbeelding, dus u kunt alleen uw stempel plaatsen. De volledige editor (+ Tekst, + Datum, markeringen, notities en paginabeheer) werkt op pdf-bestanden: kies een pdf om die te gebruiken.</p>
+    <p class="ds-edit-hint" id="ds-edit-tools-hint" hidden>This file is an image, so you can place your signature stamp only. The full editor (+ Text, + Date, highlights, notes and page management) works on PDF files: pick a PDF to use it.</p>
     <div class="ds-edit-tools" id="ds-edit-tools" hidden>
-      <span class="ds-edit-label">Toevoegen aan het document:</span>
-      <button class="ds-edit-btn" id="ds-add-text" type="button">+ Tekst</button>
-      <button class="ds-edit-btn" id="ds-add-date" type="button">+ Datum</button>
-      <button class="ds-edit-btn" id="ds-add-highlight" type="button">+ Markering</button>
-      <button class="ds-edit-btn" id="ds-add-note" type="button">+ Notitie</button>
-      <button class="ds-edit-btn" id="ds-tool-pen" type="button" aria-pressed="false">&#9998; Tekenen</button>
+      <span class="ds-edit-label">Add to the document:</span>
+      <button class="ds-edit-btn" id="ds-add-text" type="button">+ Text</button>
+      <button class="ds-edit-btn" id="ds-add-date" type="button">+ Date</button>
+      <button class="ds-edit-btn" id="ds-add-highlight" type="button">+ Highlight</button>
+      <button class="ds-edit-btn" id="ds-add-note" type="button">+ Note</button>
+      <button class="ds-edit-btn" id="ds-tool-pen" type="button" aria-pressed="false">&#9998; Draw</button>
       <span class="ds-edit-sep" aria-hidden="true"></span>
-      <button class="ds-edit-btn" id="ds-page-merge" type="button">+ Pagina's&hellip;</button>
-      <button class="ds-edit-btn" id="ds-page-split" type="button">Pagina's exporteren&hellip;</button>
+      <button class="ds-edit-btn" id="ds-page-merge" type="button">+ Pages&hellip;</button>
+      <button class="ds-edit-btn" id="ds-page-split" type="button">Export pages&hellip;</button>
       <input id="ds-page-merge-file" type="file" accept="application/pdf,.pdf" hidden>
-      <span class="ds-edit-tip">Dubbelklik op een tekstvak om te bewerken, sleep om te verplaatsen, gebruik de hoek om het formaat te wijzigen. De paginaknoppen staan op elke pagina.</span>
+      <span class="ds-edit-tip">Double-click a text box to edit, drag to move, corner to resize. Page buttons sit on each page.</span>
     </div>
     <div class="ds-seal-tools" id="ds-seal-tools" hidden>
-      <div class="ds-seal-choice" role="radiogroup" aria-label="Plaats van de handtekening">
-        <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-inline" value="inline" checked> Zet de stempel in het document</label>
-        <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-sheet" value="sheet"> Voeg een apart handtekeningblad toe</label>
-        <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-both" value="both"> Zet de stempel en voeg het blad toe</label>
+      <div class="ds-seal-choice" role="radiogroup" aria-label="Signature placement">
+        <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-inline" value="inline" checked> Place the seal in the document</label>
+        <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-sheet" value="sheet"> Add a separate signature sheet</label>
+        <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-both" value="both"> Place the seal and add the sheet</label>
       </div>
-      <label class="ds-seal-check" id="ds-allpages-label"><input type="checkbox" id="ds-allpages"> Onderteken elke pagina met deze handtekening</label>
-      <button class="ds-edit-btn" id="ds-apply-tpl" type="button" hidden>Opgeslagen positie gebruiken</button>
-      <span class="ds-edit-tip" id="ds-seal-tip">Herhaalt uw stempel op dezelfde plek op elke pagina. Positie en grootte worden onthouden voor de volgende keer (nooit uw naam of handtekening).</span>
+      <label class="ds-seal-check" id="ds-allpages-label"><input type="checkbox" id="ds-allpages"> Sign every page with this signature</label>
+      <button class="ds-edit-btn" id="ds-apply-tpl" type="button" hidden>Use saved position</button>
+      <span class="ds-edit-tip" id="ds-seal-tip">Repeats your seal at the same spot on every page. Position and scale are remembered for next time (never your name or signature image).</span>
     </div>
     <div class="ds-page-nav" id="ds-page-nav" hidden>
-      <button id="ds-page-nav-prev" type="button" aria-label="Vorige pagina">&#8593;</button>
+      <button id="ds-page-nav-prev" type="button" aria-label="Previous page">&#8593;</button>
       <span id="ds-page-nav-label"></span>
-      <input id="ds-page-nav-jump" type="number" min="1" aria-label="Ga naar pagina">
-      <button id="ds-page-nav-next" type="button" aria-label="Volgende pagina">&#8595;</button>
+      <input id="ds-page-nav-jump" type="number" min="1" aria-label="Go to page">
+      <button id="ds-page-nav-next" type="button" aria-label="Next page">&#8595;</button>
     </div>
     <!-- The sticky action bar belongs to the document, not to the whole step:
          it is wrapped together with the page list so it can never float up
@@ -703,58 +703,58 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <div class="ds-place-doc">
       <div id="ds-pdf-canvas-list"></div>
       <div class="ds-actions ds-place-actions">
-        <button class="btn btn-tertiary" id="ds-place-back" type="button">Terug</button>
-        <button class="btn btn-primary" id="ds-place-continue" type="button" disabled>Verder</button>
+        <button class="btn btn-tertiary" id="ds-place-back" type="button">Back</button>
+        <button class="btn btn-primary" id="ds-place-continue" type="button" disabled>Continue</button>
       </div>
     </div>
   </section>
 
   <!-- Step 2-alt (non-PDF): hash-only mode -->
   <section class="ds-step" id="step-hash-only" hidden>
-    <h2>Handtekening op de hash</h2>
-    <p class="ds-sub">Dit bestandstype kan geen zichtbare stempel krijgen. U ondertekent de SHA3-256-hash van het bestand; ontvangers controleren door hetzelfde bestand opnieuw te hashen.</p>
+    <h2>Hash-only signature</h2>
+    <p class="ds-sub">This file type cannot be visually stamped. You will sign the SHA3-256 of the bytes; recipients verify by re-hashing the same file.</p>
     <div class="ds-info-card">
       <dl>
-        <dt>Bestand</dt>          <dd id="ds-hash-only-name">-</dd>
-        <dt>Grootte</dt>          <dd id="ds-hash-only-size">-</dd>
+        <dt>File</dt>          <dd id="ds-hash-only-name">-</dd>
+        <dt>Size</dt>          <dd id="ds-hash-only-size">-</dd>
         <dt>SHA3-256</dt>      <dd id="ds-hash-only-hash">-</dd>
       </dl>
     </div>
     <p class="ds-doc-error" id="ds-hash-only-note" role="alert" hidden></p>
-    <p class="ds-edit-hint">Dit bestandstype wordt via de hash bevestigd: geen voorbeeld, geen zichtbare bewerking. De volledige pdf-editor (+ Tekst, + Datum, markeringen, notities en paginabeheer) verschijnt als u een pdf kiest.</p>
+    <p class="ds-edit-hint">This file type is attested by hash: no preview, no visual editing. The full PDF editor (+ Text, + Date, highlights, notes and page management) appears when you pick a PDF file.</p>
     <div class="ds-actions">
-      <button class="btn btn-tertiary" id="ds-hash-only-back" type="button">Terug</button>
-      <button class="btn btn-primary" id="ds-hash-only-continue" type="button" disabled>Verder</button>
+      <button class="btn btn-tertiary" id="ds-hash-only-back" type="button">Back</button>
+      <button class="btn btn-primary" id="ds-hash-only-continue" type="button" disabled>Continue</button>
     </div>
   </section>
 
   <!-- Step 2.5: recipients (optional - if empty, this is a personal sign) -->
   <section class="ds-step" id="step-recipients" hidden>
-    <h2>Medeondertekenaars toevoegen (optioneel)</h2>
-    <p class="ds-sub">Voeg iedereen toe die moet tekenen. De uitnodiging is gebonden aan precies het e-mailadres hieronder. Het versleutelde document gaat met het verzoek mee, dus niemand heeft een aparte kopie nodig. Alleen de sleutel die het opent mailen wij niet: die geeft u zelf door, op het volgende scherm.</p>
+    <h2>Add co-signers (optional)</h2>
+    <p class="ds-sub">Add each person who needs to sign. Their invitation is bound to the exact email address below. The encrypted document travels with the request, so nobody needs a separate copy of the file. The key that opens it is the one thing we do not email: you pass that on yourself, on the next screen.</p>
 
     <div class="ds-recipients-list" id="ds-recipients-list"></div>
 
     <div class="ds-actions" style="margin-top:8px">
-      <button class="btn btn-tertiary" id="ds-add-recipient" type="button">+ Ontvanger toevoegen</button>
+      <button class="btn btn-tertiary" id="ds-add-recipient" type="button">+ Add recipient</button>
     </div>
 
     <fieldset class="ds-delivery-card" id="ds-invite-delivery" hidden>
-      <legend>Uitnodiging per e-mail</legend>
-      <p class="ds-usage-p">Paramant stuurt elke ontvanger een bericht met een link naar het verzoek. De ontvanger logt in met het uitgenodigde e-mailadres. Het bericht bevat niet de sleutel tot het document, want die e-mail gaat via een mailprovider in het buitenland. Op het volgende scherm krijgt u elke volledige link om zelf door te geven.</p>
+      <legend>Email invitation</legend>
+      <p class="ds-usage-p">Paramant emails each recipient a notice with a link to the request. They must sign in with the invited email address. The notice does not carry the key to the document, because that email leaves our infrastructure through a mail provider abroad. You get each full link on the next screen to pass on yourself.</p>
       <div class="ds-delivery-fields" id="ds-delivery-fields">
-        <label><span class="ds-label">Onderwerp van de e-mail</span><input class="ds-input" id="ds-invite-subject" maxlength="140"></label>
-        <label><span class="ds-label">Bericht (optioneel)</span><textarea class="ds-input ds-textarea" id="ds-invite-message" maxlength="1000" placeholder="Voeg uitleg, een kenmerk of de gewenste termijn toe."></textarea></label>
+        <label><span class="ds-label">Email subject</span><input class="ds-input" id="ds-invite-subject" maxlength="140"></label>
+        <label><span class="ds-label">Message (optional)</span><textarea class="ds-input ds-textarea" id="ds-invite-message" maxlength="1000" placeholder="Add context, a reference or the requested deadline."></textarea></label>
       </div>
       <details class="ds-security-details">
-        <summary>Beveiligingsinstellingen</summary>
+        <summary>Security settings</summary>
         <label class="ds-delivery-option">
           <input type="radio" name="ds-delivery-mode" value="email" checked>
-          <span><strong>Stuur een bericht, geef de link zelf door</strong><span>Aanbevolen. Het bericht werkt alleen voor het uitgenodigde Paramant-account, en de sleutel komt nooit bij onze mailprovider.</span></span>
+          <span><strong>Email a notice, hand over the link yourself</strong><span>Recommended. The notice works only for the invited Paramant account, and the key never reaches our mail provider.</span></span>
         </label>
         <label class="ds-delivery-option">
           <input type="radio" name="ds-delivery-mode" value="copy">
-          <span><strong>Maak links zonder iets te versturen</strong><span>Helemaal geen e-mail. U deelt elke persoonlijke link zelf, net als hierboven.</span></span>
+          <span><strong>Create links without sending anything</strong><span>No email at all. You share each personal link yourself, exactly as above.</span></span>
         </label>
       </details>
     </fieldset>
@@ -762,89 +762,89 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <div class="ds-banner" id="ds-recipients-hint" hidden></div>
 
     <div class="ds-actions" style="margin-top:18px">
-      <button class="btn btn-tertiary" id="ds-recipients-back" type="button">Terug</button>
-      <button class="btn btn-primary" id="ds-recipients-continue" type="button">Verder</button>
+      <button class="btn btn-tertiary" id="ds-recipients-back" type="button">Back</button>
+      <button class="btn btn-primary" id="ds-recipients-continue" type="button">Continue</button>
     </div>
   </section>
 
   <!-- Step 3: identity -->
   <section class="ds-step" id="step-identity" hidden>
-    <h2>Wie ondertekent?</h2>
-    <p class="ds-sub">Uw naam komt in de zichtbare stempel (bij pdf-bestanden) en in de .psign-envelop.</p>
+    <h2>Who is signing?</h2>
+    <p class="ds-sub">Your name is baked into the visible stamp (for PDFs) and into the .psign envelope.</p>
     <div class="ds-field">
-      <label class="ds-label" for="ds-signer-name">Uw naam</label>
-      <input class="ds-input" type="text" id="ds-signer-name" maxlength="80" placeholder="bijv. Jan de Vries" autocomplete="name">
+      <label class="ds-label" for="ds-signer-name">Your name</label>
+      <input class="ds-input" type="text" id="ds-signer-name" maxlength="80" placeholder="e.g. Mick Beer" autocomplete="name">
     </div>
 
     <div class="ds-field">
-      <label class="ds-label" id="ds-sig-style-label">Soort handtekening</label>
+      <label class="ds-label" id="ds-sig-style-label">Signature style</label>
       <div class="ds-sig-tabs" role="tablist" aria-labelledby="ds-sig-style-label">
-        <button class="ds-tab active" id="ds-tab-typed" data-sig="typed" type="button" role="tab" aria-selected="true" aria-controls="ds-sig-panel-typed" tabindex="0">Getypte naam</button>
-        <button class="ds-tab" id="ds-tab-drawn" data-sig="drawn" type="button" role="tab" aria-selected="false" aria-controls="ds-sig-panel-drawn" tabindex="-1">Handtekening tekenen</button>
-        <button class="ds-tab" id="ds-tab-image" data-sig="image" type="button" role="tab" aria-selected="false" aria-controls="ds-sig-panel-image" tabindex="-1">Afbeelding uploaden</button>
+        <button class="ds-tab active" id="ds-tab-typed" data-sig="typed" type="button" role="tab" aria-selected="true" aria-controls="ds-sig-panel-typed" tabindex="0">Typed name</button>
+        <button class="ds-tab" id="ds-tab-drawn" data-sig="drawn" type="button" role="tab" aria-selected="false" aria-controls="ds-sig-panel-drawn" tabindex="-1">Draw signature</button>
+        <button class="ds-tab" id="ds-tab-image" data-sig="image" type="button" role="tab" aria-selected="false" aria-controls="ds-sig-panel-image" tabindex="-1">Upload image</button>
       </div>
       <div class="ds-sig-panel" id="ds-sig-panel-typed" role="tabpanel" aria-labelledby="ds-tab-typed" tabindex="0">
-        <p class="ds-hint">Uw naam verschijnt als tekst in de stempel. Kies 'Handtekening tekenen' voor een handgeschreven handtekening.</p>
+        <p class="ds-hint">Your name will appear as text inside the stamp. Choose 'Draw' if you want a handwritten signature.</p>
       </div>
       <div class="ds-sig-panel" id="ds-sig-panel-drawn" role="tabpanel" aria-labelledby="ds-tab-drawn" tabindex="0" hidden>
-        <p class="ds-hint">Teken met muis of vinger. Gebruik een rustige lijn; het resultaat wordt als PNG in de pdf gezet.</p>
-        <canvas id="ds-sig-canvas" width="500" height="160" role="img" aria-label="Tekenvlak voor de handtekening: teken uw handtekening met muis of vinger"></canvas>
-        <p class="ds-hint" id="ds-sig-draw-status" aria-live="polite">Uw lijn verschijnt hier terwijl u tekent.</p>
+        <p class="ds-hint">Draw with mouse or finger. Use a steady stroke - the result is rendered as PNG and embedded in the PDF.</p>
+        <canvas id="ds-sig-canvas" width="500" height="160" role="img" aria-label="Signature drawing area - draw your signature with mouse or finger"></canvas>
+        <p class="ds-hint" id="ds-sig-draw-status" aria-live="polite">Your line appears here while you draw.</p>
         <div class="ds-actions" style="margin-top:8px">
-          <button class="btn btn-tertiary" id="ds-sig-clear" type="button">Wissen</button>
+          <button class="btn btn-tertiary" id="ds-sig-clear" type="button">Clear</button>
         </div>
       </div>
       <div class="ds-sig-panel" id="ds-sig-panel-image" role="tabpanel" aria-labelledby="ds-tab-image" tabindex="0" hidden>
-        <p class="ds-hint">Upload een PNG of JPG van uw handtekening. Een transparante PNG werkt het best.</p>
+        <p class="ds-hint">Upload a PNG or JPG of your signature. A transparent PNG works best.</p>
         <label class="ds-dropzone" id="ds-sig-image-drop" style="padding:20px;text-align:center;display:block">
           <input type="file" id="ds-sig-image-input" accept="image/png,image/jpeg" hidden>
-          <p class="big" style="font-size:13px">Klik om een PNG/JPG te kiezen (max. 1 MB)</p>
+          <p class="big" style="font-size:13px">Click to choose a PNG/JPG (max 1 MB)</p>
           <img id="ds-sig-image-preview" alt="" style="max-height:80px;display:none;margin:10px auto 0;background:var(--card);padding:4px;border:1px solid var(--ink-hair)">
         </label>
       </div>
     </div>
 
     <div class="ds-field">
-      <label class="ds-label">Cryptografische sleutel (ML-DSA-65)</label>
-      <p class="ds-hint" id="ds-signing-identity">Uw ondertekensleutel wordt gecontroleerd...</p>
-      <p class="ds-hint" style="margin-top:6px">De soort handtekening is wat mensen zien. Wat de handtekening cryptografisch vastlegt, is uw ondertekensleutel (ML-DSA-65). Die ontgrendelt u met Face ID, Touch ID of een beveiligingssleutel op het moment dat u tekent, en hij wordt nooit geëxporteerd. Ontvangers die u toevoegt, tekenen op <code>/co-sign</code> met hun eigen ondertekensleutel.</p>
+      <label class="ds-label">Cryptographic key (ML-DSA-65)</label>
+      <p class="ds-hint" id="ds-signing-identity">Checking your signing key...</p>
+      <p class="ds-hint" style="margin-top:6px">Your signature style is what people see. What cryptographically binds the signature is your signing key (ML-DSA-65), unlocked with Face ID / Touch ID / a security key the moment you sign, and never exported. Recipients you add sign at <code>/co-sign</code> with their own signing key.</p>
     </div>
     <div class="ds-actions">
-      <button class="btn btn-tertiary" id="ds-identity-back" type="button">Terug</button>
-      <button class="btn btn-primary" id="ds-identity-continue" type="button" disabled>Verder</button>
+      <button class="btn btn-tertiary" id="ds-identity-back" type="button">Back</button>
+      <button class="btn btn-primary" id="ds-identity-continue" type="button" disabled>Continue</button>
     </div>
   </section>
 
   <!-- Step 4: review + sign -->
   <section class="ds-step" id="step-sign" hidden>
-    <h2>Controleren en ondertekenen</h2>
-    <p class="ds-sub">Dit gaat u ondertekenen. Controleer het document, uw handtekening en de gegevens. Klikt u op <strong>Dit document ondertekenen</strong>, dan bevestigt u met Face ID, Touch ID of uw beveiligingssleutel. Dat ontgrendelt uw ondertekensleutel voor dit ene document en de handtekening wordt op uw apparaat gemaakt.</p>
+    <h2>Review and sign</h2>
+    <p class="ds-sub">This is what you are about to sign. Check the document, your signature, and the metadata. When you click <strong>Sign this document</strong>, you confirm with Face ID / Touch ID / your security key, that unlocks your signing key for this one document and the signature is created locally.</p>
 
     <div class="ds-review-grid">
       <div class="ds-review-col">
-        <h3 class="ds-review-h">Voorbeeld van het document: zichtbare stempel</h3>
-        <p class="ds-review-cap">De stempel op het document is het zichtbare Paramant-zegel. Tijdens het plaatsen kunt u hem verslepen; dit is wat lezers zien.</p>
+        <h3 class="ds-review-h">Document preview - visual seal</h3>
+        <p class="ds-review-cap">The stamp on the document is the visible Paramant seal. Drag it during placement; this is what readers see.</p>
         <div id="ds-review-doc-preview" class="ds-review-pane"></div>
       </div>
       <div class="ds-review-col">
-        <h3 class="ds-review-h">Uw handtekening</h3>
-        <p class="ds-review-cap">Getypte naam, getekende lijn of geüploade afbeelding: dit staat in de stempel.</p>
+        <h3 class="ds-review-h">Your signature mark</h3>
+        <p class="ds-review-cap">Typed name, drawn line, or uploaded image - this is what sits inside the seal.</p>
         <div id="ds-review-sig-preview" class="ds-review-pane"></div>
       </div>
     </div>
 
     <div class="ds-proof-card">
-      <h3 class="ds-proof-h">Cryptografisch bewijs (.psign-envelop)</h3>
-      <p class="ds-review-cap">De zichtbare stempel is ondersteunend bewijs. Deze envelop is het wiskundige bewijs dat iedereen offline kan controleren met alleen uw publieke sleutel. De handtekening zelf ontstaat als u op Dit document ondertekenen klikt.</p>
+      <h3 class="ds-proof-h">Cryptographic proof (.psign envelope)</h3>
+      <p class="ds-review-cap">The visual seal is supporting evidence. This envelope is the mathematical proof anyone can verify offline using only your public key. The signature itself is produced when you click Sign this document.</p>
       <dl class="ds-proof-dl">
-        <dt>Algoritme</dt>          <dd>ML-DSA-65 (FIPS 204, post-quantum)</dd>
-        <dt>Hash-algoritme</dt>     <dd>SHA3-256</dd>
-        <dt>SHA3-256 van het document</dt>  <dd id="ds-proof-doc-hash">-</dd>
-        <dt>Vingerafdruk sleutel ondertekenaar</dt><dd id="ds-proof-fp">-</dd>
-        <dt>Versie envelop</dt>   <dd id="ds-proof-version">-</dd>
+        <dt>Algorithm</dt>          <dd>ML-DSA-65 (FIPS 204, post-quantum)</dd>
+        <dt>Hash algorithm</dt>     <dd>SHA3-256</dd>
+        <dt>Document SHA3-256</dt>  <dd id="ds-proof-doc-hash">-</dd>
+        <dt>Signer key fingerprint</dt><dd id="ds-proof-fp">-</dd>
+        <dt>Envelope version</dt>   <dd id="ds-proof-version">-</dd>
       </dl>
       <details>
-        <summary>Opbouw van de envelop tonen</summary>
+        <summary>Show envelope structure</summary>
         <pre id="ds-proof-json" class="ds-proof-json"></pre>
       </details>
     </div>
@@ -852,44 +852,44 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <div class="ds-info-card">
       <dl>
         <dt>Document</dt>      <dd id="ds-review-doc">-</dd>
-        <dt>Werkwijze</dt>          <dd id="ds-review-mode">-</dd>
-        <dt>Ondertekenaar</dt>        <dd id="ds-review-name">-</dd>
-        <dt>Soort handtekening</dt><dd id="ds-review-sig">-</dd>
-        <dt>Ondertekensleutel</dt>   <dd id="ds-review-key-src">-</dd>
-        <dt>Ontvangers</dt>    <dd id="ds-review-recipients">-</dd>
+        <dt>Mode</dt>          <dd id="ds-review-mode">-</dd>
+        <dt>Signer</dt>        <dd id="ds-review-name">-</dd>
+        <dt>Signature style</dt><dd id="ds-review-sig">-</dd>
+        <dt>Signing key</dt>   <dd id="ds-review-key-src">-</dd>
+        <dt>Recipients</dt>    <dd id="ds-review-recipients">-</dd>
       </dl>
     </div>
 
     <div class="ds-disclaimer">
-      <strong>Post-quantum en zonder inzage. Niet eIDAS-gekwalificeerd.</strong>
-      Een ParaSign-handtekening is een gewone elektronische handtekening, in eIDAS-termen een Simple Electronic Signature (SES): een cryptografische bevestiging met ML-DSA-65 (FIPS 204), gemaakt in uw browser. Het is geen gekwalificeerde handtekening onder eIDAS of een ander gekwalificeerd vertrouwensstelsel (QES).
+      <strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong>
+      A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 (FIPS 204) cryptographic attestation, produced in your browser. It is not a notarised legal signature under eIDAS or any qualified-trust regime (QES).
     </div>
     <div class="ds-info-card" id="ds-qes-option" hidden>
-      <label class="ds-seal-check"><input type="checkbox" id="ds-qes-optin"> Voeg ook een gekwalificeerde handtekening toe (sandbox)</label>
-      <p class="ds-sub">Een gekwalificeerde vertrouwensdienst ondertekent een hash van dit document en stuurt een PAdES-handtekening met een eigen certificaat terug. Het document zelf verlaat deze pagina niet. Alleen sandbox: dit is een prototype tegen een testomgeving, geen productiedienst.</p>
+      <label class="ds-seal-check"><input type="checkbox" id="ds-qes-optin"> Also add a qualified signature (sandbox)</label>
+      <p class="ds-sub">A qualified trust service provider signs a hash of this document and returns a PAdES signature carrying its own certificate. The document itself never leaves this page. Sandbox only: this is a prototype against a test environment, not a production service.</p>
     </div>
     <!-- No session. Said here as well as in the bar above, because this is the
          step where it costs something: the file lives in this page and does not
          survive the navigation to the sign-in. sign-flow.js reveals it together
          with turning the button below into the sign-in. -->
-    <p class="ds-hint" id="ds-sign-signin-hint" hidden>Uw document is niet geüpload en blijft in deze browser. Inloggen laadt deze pagina opnieuw, dus daarna kiest u het bestand nog een keer.</p>
+    <p class="ds-hint" id="ds-sign-signin-hint" hidden>Your document has not been uploaded and stays in this browser. Signing in reloads this page, so you pick the file again afterwards.</p>
     <div class="ds-actions">
-      <button class="btn btn-tertiary" id="ds-sign-back" type="button">Terug</button>
-      <button class="btn btn-primary" id="ds-sign-now" type="button">Dit document ondertekenen</button>
+      <button class="btn btn-tertiary" id="ds-sign-back" type="button">Back</button>
+      <button class="btn btn-primary" id="ds-sign-now" type="button">Sign this document</button>
     </div>
     <div class="ds-banner" id="ds-sign-status" hidden role="status" aria-live="polite"></div>
 
     <!-- Authenticator-code (TOTP) fallback: shown only when one-tap passkey
          signing isn't available (provider can't do WebAuthn-PRF, e.g. Proton Pass,
          or there's no passkey). The 6-digit code authorises a fresh signing key for
-         this session — signing "like logging in again". -->
+         this session, signing "like logging in again". -->
     <div class="ds-banner" id="ds-pass-panel" hidden>
       <p id="ds-pass-prompt" style="margin-bottom:10px"></p>
-      <input class="ds-input" type="text" id="ds-pass-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" style="margin-bottom:8px" aria-label="Code uit de authenticator-app">
+      <input class="ds-input" type="text" id="ds-pass-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" style="margin-bottom:8px" aria-label="Authenticator code">
       <p id="ds-pass-err" class="ds-hint" hidden style="color:var(--danger);margin-bottom:8px"></p>
       <div class="ds-actions">
-        <button class="btn btn-tertiary" id="ds-pass-cancel" type="button">Annuleren</button>
-        <button class="btn btn-primary" id="ds-pass-confirm" type="button">Verder</button>
+        <button class="btn btn-tertiary" id="ds-pass-cancel" type="button">Cancel</button>
+        <button class="btn btn-primary" id="ds-pass-confirm" type="button">Continue</button>
       </div>
     </div>
   </section>
@@ -903,8 +903,8 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <section class="ds-step" id="step-done" hidden>
     <div class="done-state">
       <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
-      <h2 class="done-title">Ondertekend.</h2>
-      <p class="ds-sub done-line" id="ds-done-line">Uw handtekening staat op het document.</p>
+      <h2 class="done-title">Signed.</h2>
+      <p class="ds-sub done-line" id="ds-done-line">Your signature is on the document.</p>
 
       <!-- Kept on the face of the screen and never folded away: it is the one
            thing here that takes something back. What the proof says, and what it
@@ -916,11 +916,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
            -> mrz-unverified). Shown by sign-flow.js only for binding_mode
            'open'. -->
       <p class="ds-proof-scope" id="ds-proof-scope" hidden>
-        <strong>Ondertekenaar niet geverifieerd.</strong> Dit document is in open modus ondertekend,
-        dus geen e-mailuitnodiging koppelde een persoon aan een plek. Het bewijs toont dat een bepaalde
-        sleutel precies dit document ondertekende, en dat het de sleutel is die in de envelop staat. Het
-        toont niet wie die sleutel heeft. Wilt u een handtekening die aan een uitgenodigd e-mailadres
-        gebonden is, gebruik dan <em>Handtekeningen vragen</em>.
+        <strong>Signer not verified.</strong> This document was signed in open mode, so no
+        email invitation tied a person to a slot. The proof shows that a specific key signed
+        this exact document, and that the key is the one recorded in the envelope. It does not
+        show who holds that key. For a signature bound to an invited email address, use
+        <em>Request signatures</em> instead.
       </p>
 
       <div class="done-payload">
@@ -928,51 +928,51 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         <div id="ds-signed-preview"></div>
 
         <div class="ds-usage-card" id="ds-party-links-card" hidden>
-          <h3 class="ds-proof-h">Hun persoonlijke links</h3>
-          <p class="ds-usage-p" id="ds-party-links-copy">Eén link per ondertekenaar. De sleutel zit in de link.</p>
+          <h3 class="ds-proof-h">Their personal links</h3>
+          <p class="ds-usage-p" id="ds-party-links-copy">One link per signer. The key is in the link.</p>
           <div class="ds-banner" id="ds-invite-delivery-result" hidden role="status" aria-live="polite"></div>
           <div class="ds-party-links" id="ds-party-links"></div>
-          <button class="btn btn-secondary" id="ds-invite-retry" type="button" hidden>Mislukte e-mails opnieuw sturen</button>
-          <p class="ds-usage-p" style="font-size:11px;color:var(--ink-dim)">Zie hoe iedereen ervoor staat op <a id="ds-envelope-status-link" href="#">de statuspagina van dit verzoek</a>.</p>
+          <button class="btn btn-secondary" id="ds-invite-retry" type="button" hidden>Retry failed emails</button>
+          <p class="ds-usage-p" style="font-size:11px;color:var(--ink-dim)">See where everyone stands on <a id="ds-envelope-status-link" href="#">the status page for this request</a>.</p>
         </div>
       </div>
 
       <div class="done-actions">
-        <button class="btn btn-primary done-primary" id="ds-dl-pdf" type="button" hidden>Getekende pdf downloaden</button>
-        <button class="done-quiet" id="ds-dl-psign" type="button">Bewijsbestand bewaren</button>
-        <button class="done-quiet" id="ds-restart" type="button">Nog een ondertekenen</button>
+        <button class="btn btn-primary done-primary" id="ds-dl-pdf" type="button" hidden>Download signed PDF</button>
+        <button class="done-quiet" id="ds-dl-psign" type="button">Keep the proof file</button>
+        <button class="done-quiet" id="ds-restart" type="button">Sign another</button>
       </div>
 
       <!-- The invitations end screen has a different account to give: nothing
            has been signed yet, so the self-signed text below would be untrue on
            it. Swapped in by sign-flow.js. -->
       <details class="done-details" id="ds-invite-details" hidden>
-        <summary>Waarom dit veilig was</summary>
+        <summary>What made this safe</summary>
         <div class="done-details-body">
-          <p>Het document werd in uw browser versleuteld voordat er iets van dit apparaat vertrok, en elke persoonlijke link bevat de sleutel van die ene persoon na de <code>#</code>, het deel van een link dat een browser nooit naar een server stuurt. Bij ons staan alleen bytes die wij niet kunnen lezen. Ook de sleutel bleef hier: de uitnodiging per e-mail bevat alleen een bericht, dus de mailprovider die hem bezorgt kan niet bij het document, en wij ook niet.</p>
-          <p>Een link is gebonden aan het adres dat u opgaf, dus hij opent voor die ondertekenaar en niet voor iemand anders naar wie hij wordt doorgestuurd. Tekent de ontvanger, dan ontstaat de handtekening op diens eigen apparaat met een eigen sleutel (<code>ML-DSA-65</code>) en wordt die vastgelegd op onze relay en in het openbare <a href="/ct-log">CT-logboek</a>, zodat u later kunt aantonen dat het gebeurde en wanneer.</p>
-          <p>Er heeft nog niemand getekend. Dit scherm is het moment waarop de verzoeken zijn verstuurd.</p>
+          <p>The document was sealed in your browser before any of it left this device, and each personal link carries that one person's key after the <code>#</code>, which is the part of a link a browser never sends to a server. What sits on our side is bytes we have no way to read. The key stayed here too: the invitation email carries only a notice, so the mail provider that delivers it holds no way into the document and neither do we.</p>
+          <p>A link is bound to the address you gave it, so it opens for that signer and not for whoever else it is forwarded to. When they sign, the signature is made on their own device with a key of their own (<code>ML-DSA-65</code>) and recorded on our relay and in the public <a href="/ct-log">CT log</a>, so you can show later that it happened and when.</p>
+          <p>Nobody has signed anything yet. This screen is the moment the requests went out.</p>
         </div>
       </details>
 
       <details class="done-details" id="ds-signed-details">
-        <summary>Waarom dit veilig was</summary>
+        <summary>What made this safe</summary>
         <div class="done-details-body">
-          <p>De handtekening is hier gemaakt, op dit apparaat, met een sleutel die de browser nooit verliet en die u op het moment van tekenen ontgrendelde met uw gezicht, uw vingerafdruk of uw beveiligingssleutel (<code>ML-DSA-65</code>, het handtekeningschema uit FIPS 204). Wij bewaren de publieke helft en de vastlegging daarvan. De helft die tekent hebben wij nooit gehad.</p>
-          <p>Het bewijsbestand hoort bij het document en staat op zichzelf. Iedereen kan het tweetal controleren, zonder account en zonder ons: op <a href="/verify">paramant.app/verify</a>, dat de eigen hash van het document opnieuw berekent (<code>SHA3-256</code>), de handtekening toetst aan de publieke sleutel in de envelop en, als de envelop is medeondertekend, onze handtekening toetst aan het openbare <a href="/ct-log">CT-logboek</a>. Of offline, met <code>paramant-sign verify &lt;file&gt; &lt;envelope.psign&gt;</code> uit <a href="/docs#operator-scripts">paramant-sign</a>.</p>
-          <p>Een groene uitslag daar betekent drie dingen tegelijk: de bytes zijn niet veranderd sinds u tekende, de handtekening komt van de houder van die sleutel, en <span id="ds-usage-notary-line"></span></p>
+          <p>The signature was made here, on this device, by a key that never left the browser and was unlocked by your face, your fingerprint or your security key at the moment you signed (<code>ML-DSA-65</code>, the signature scheme in FIPS 204). We hold the public half and the record of it. We never held the half that signs.</p>
+          <p>The proof file travels with the document and stands on its own. Anyone can check the pair without an account and without us: at <a href="/verify">paramant.app/verify</a>, which recomputes the document's own digest (<code>SHA3-256</code>), checks the signature against the public key inside the envelope and, when the envelope was counter-signed, checks our signature against the public <a href="/ct-log">CT log</a>. Or offline, with <code>paramant-sign verify &lt;file&gt; &lt;envelope.psign&gt;</code> from <a href="/docs#operator-scripts">paramant-sign</a>.</p>
+          <p>A green result there means three things at once: the bytes have not changed since you signed, the signature came from the holder of that key, and <span id="ds-usage-notary-line"></span></p>
 
           <div class="ds-info-card">
             <dl>
               <dt>Document</dt>       <dd id="ds-done-name">-</dd>
-              <dt>Werkwijze</dt>           <dd id="ds-done-mode">-</dd>
-              <dt>Vingerafdruk sleutel</dt><dd id="ds-done-fingerprint">-</dd>
-              <dt>Vastlegging op de relay</dt>   <dd id="ds-done-notary">-</dd>
+              <dt>Mode</dt>           <dd id="ds-done-mode">-</dd>
+              <dt>Key fingerprint</dt><dd id="ds-done-fingerprint">-</dd>
+              <dt>Relay record</dt>   <dd id="ds-done-notary">-</dd>
             </dl>
           </div>
 
           <div class="ds-usage-card">
-            <h3 class="ds-proof-h">De bestanden, en wat elk bestand is</h3>
+            <h3 class="ds-proof-h">The files, and what each one is</h3>
             <ol class="ds-usage-list" id="ds-usage-files"></ol>
           </div>
         </div>
@@ -982,31 +982,31 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 </div>
 </main>
 
-<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/sign" hreflang="en" lang="en">This page in English</a></p>
+<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/sign" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
 
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Bedrijf</div>
+        <div class="footer-col-label">Company</div>
         <div class="footer-links">
-          <a href="/about">Over Paramant</a>
-          <a href="/changelog">Wijzigingen</a>
+          <a href="/about">About</a>
+          <a href="/changelog">Changelog</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Juridisch</div>
+        <div class="footer-col-label">Legal</div>
         <div class="footer-links">
-          <a href="/privacy">Privacybeleid</a>
-          <a href="/dpa">Verwerkersovereenkomst</a>
-          <a href="/terms">Voorwaarden</a>
+          <a href="/privacy">Privacy Policy</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/terms">Terms of Service</a>
           <a href="/sla">SLA</a>
-          <a href="/license">Licentie</a>
+          <a href="/license">License</a>
         </div>
       </div>
     </div>

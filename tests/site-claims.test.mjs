@@ -128,6 +128,10 @@ const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'e
 const TENS = { 30: 'thirty', 40: 'forty', 50: 'fifty', 60: 'sixty' };
 const word = (n) => (n <= 20 ? WORDS[n] : `${TENS[n - (n % 10)]}${n % 10 ? '-' + WORDS[n % 10] : ''}`);
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
+// Dutch number words, for the pages that are Dutch now. Only 0-20 is needed.
+const WOORDEN = ['nul', 'een', 'twee', 'drie', 'vier', 'vijf', 'zes', 'zeven', 'acht', 'negen', 'tien',
+  'elf', 'twaalf', 'dertien', 'veertien', 'vijftien', 'zestien', 'zeventien', 'achttien', 'negentien', 'twintig'];
+const woord = (n) => { assert.ok(n <= 20, `woord(${n}): extend WOORDEN`); return WOORDEN[n]; };
 
 // 1 ── The parameter sets. Site says ML-KEM-768 (FIPS 203) and ML-DSA-65
 // (FIPS 204). The core registers exactly those two unconditionally.
@@ -964,11 +968,12 @@ test('the rate limits the IoT page quotes are the ones the configuration sets', 
   const iot = visible(page('help/iot-integration'));
   const problems = [];
   const says = (phrase, why) => { if (!iot.includes(phrase)) problems.push(`help/iot-integration: must say "${phrase}" (${why})`); };
-  says(`${api.rate} requests a minute`, 'the general API zone rate');
-  says('per IP address, not per API key', 'the zone is keyed on the client address');
-  says(`${community} downloads an hour`, 'the Community outbound_per_hour');
-  says(`${pro} an hour`, 'the Pro outbound_per_hour');
-  if (/\d+\s*uploads? per minute/i.test(iot)) problems.push('help/iot-integration: the per-minute figure is a request rate per IP, not an upload rate per key');
+  // The page is Dutch since 2026-09-23; the numbers are pinned in its words.
+  says(`${api.rate} verzoeken per minuut`, 'the general API zone rate');
+  says('per IP-adres, niet per API-sleutel', 'the zone is keyed on the client address');
+  says(`${community} downloads per uur`, 'the Community outbound_per_hour');
+  says(`${pro} per uur`, 'the Pro outbound_per_hour');
+  if (/\d+\s*uploads? per (?:minute|minuut)/i.test(iot)) problems.push('help/iot-integration: the per-minute figure is a request rate per IP, not an upload rate per key');
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });
 
@@ -1007,17 +1012,18 @@ test('no page promises an account lockout, and the login limits are the enforced
   }
   // And the page that used to promise it now states what the code does.
   const help = visible(page('help/session-issues'));
-  if (!help.includes('There is no account lock')) problems.push('help/session-issues: must say there is no account lock');
-  for (const phrase of [`${perIp} attempts from one IP address`, `${winMin} minutes`]) {
+  // help/session-issues is Dutch since 2026-09-23, so its sentences are pinned in Dutch.
+  if (!help.includes('Er is geen accountblokkade')) problems.push('help/session-issues: must say there is no account lock');
+  for (const phrase of [`${perIp} pogingen vanaf één IP-adres`, `${winMin} minuten`]) {
     if (!help.includes(phrase)) problems.push(`help/session-issues: must state "${phrase}"`);
   }
   // The per-email number is no longer a refusal, so the page states it as the
   // point where an attempt starts costing work. Naming it as a second limit
   // would put the lockout back in the reader's head.
-  if (!help.includes(`past ${word(perEmail)} inside ${word(winMin)} minutes`)) {
+  if (!help.includes(`na ${woord(perEmail)} binnen ${woord(winMin)} minuten`)) {
     problems.push(`help/session-issues: must state the ${perEmail}-failure threshold as a cost, not a limit`);
   }
-  if (/for one email address/.test(help)) {
+  if (/for one email address|voor één e-mailadres/.test(help)) {
     problems.push('help/session-issues: there is no per-email refusal to state any more');
   }
 
@@ -1047,7 +1053,7 @@ test('no page promises an account lockout, and the login limits are the enforced
   const neverCleared = !/clearEmailFailures|del\(\s*emailKey/.test(body);
   const shared = emailKeyed && beforeAuth && neverCleared;
 
-  const CAVEAT = 'attempts someone else makes on your address count against you too';
+  const CAVEAT = 'pogingen die iemand anders op uw adres doet, tellen ook voor u mee';
   if (shared) {
     if (!help.includes(CAVEAT)) {
       problems.push(`help/session-issues: the ${perEmail}-per-address counter is spent by anyone who knows the address, and the page must say so`);
@@ -2412,9 +2418,16 @@ test('every page that promises burn-on-read says which client and which plan it 
   // named Pro and stopped there. The tiers.js row is still 'pro'; the plan it is
   // sold under has been Firm since 6 September 2026.
   const unified = `The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to ${reads.pro} reads on Firm and ${reads.enterprise} on Enterprise.`;
-  for (const slug of ['parasend', 'en/pricing', 'security', 'help/gmail-extension', 'help/outlook-extension']) {
+  for (const slug of ['parasend', 'en/pricing', 'security']) {
     assert.ok(flatten(bodyOf(page(slug))).includes(unified),
       `${slug}: must carry the client-and-plan sentence in full: "${unified}"`);
+  }
+  // The two extension help pages are Dutch since 2026-09-23 and carry the same
+  // sentence in Dutch, with the same numbers off tiers.js.
+  const unifiedNl = `De webapp en de extensies wissen het bestand na de eerste keer lezen, op elk plan. Via de API mag een betaalde link vaker gelezen worden: tot ${reads.pro} keer op Firm en ${reads.enterprise} keer op Enterprise.`;
+  for (const slug of ['help/gmail-extension', 'help/outlook-extension']) {
+    assert.ok(flatten(bodyOf(page(slug))).includes(unifiedNl),
+      `${slug}: must carry the client-and-plan sentence in full: "${unifiedNl}"`);
   }
   // And the buyer has to be told why more reads is worth paying for, or the
   // honest version reads as a downgrade next to "burns on the first read".
@@ -2584,7 +2597,15 @@ test('the two legal facts are stated with their limits, and never as a promise',
   const DISCLAIMER = 'This is not legal advice; ask your own counsel what your matter needs.';
 
   // 1. Art. 3:15a, on the two pages where a buyer weighs SES against QES.
-  for (const slug of ['parasign', 'en/pricing']) {
+  // /parasign is Dutch since 23 September 2026: the same four checks in the
+  // words the Dutch /pricing is held to further down this file.
+  {
+    const html = body('parasign');
+    for (const phrase of ['art. 3:15a', 'wetten.overheid.nl/BWBR0005291', 'voldoende betrouwbaar', 'Dit is geen juridisch advies; vraag uw eigen adviseur wat uw zaak nodig heeft.']) {
+      assert.ok(html.includes(phrase), `parasign: the legal paragraph lost "${phrase}"`);
+    }
+  }
+  for (const slug of ['en/pricing']) {
     const html = body(slug);
     assert.ok(html.includes('art. 3:15a'),
       `${slug}: must cite the article by number, as "art. 3:15a"`);

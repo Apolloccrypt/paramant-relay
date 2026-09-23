@@ -93,11 +93,11 @@ async function pickJpeg(page) {
 const out = await openSign(false);
 await out.locator('#ds-signedout:not([hidden])').waitFor({ timeout: 15000 });
 ok('signed out, the flow carries a bar that says so',
-  /You are not signed in\. You can prepare a document here; signing or sending it needs a free Community account\./.test(await out.locator('#ds-signedout').innerText()),
+  /U bent niet ingelogd\. U kunt hier een document klaarzetten; voor ondertekenen of versturen is een gratis Community-account nodig\./.test(await out.locator('#ds-signedout').innerText()),
   await out.locator('#ds-signedout').innerText());
 const barLinks = await out.locator('#ds-signedout a').evaluateAll((nodes) => nodes.map((n) => [n.textContent.trim(), n.getAttribute('href')]));
 ok('the bar comes back to /sign afterwards',
-  JSON.stringify(barLinks) === JSON.stringify([['Sign in', '/auth/login?next=/sign'], ['Create account', '/signup?next=/sign']]),
+  JSON.stringify(barLinks) === JSON.stringify([['Inloggen', '/auth/login?next=/sign'], ['Account maken', '/signup?next=/sign']]),
   JSON.stringify(barLinks));
 ok('the bar cannot be dismissed', await out.locator('#ds-signedout button').count() === 0, String(await out.locator('#ds-signedout button').count()));
 
@@ -114,10 +114,10 @@ await out.locator('#ds-place-continue').click();
 await out.locator('#step-recipients:not([hidden])').waitFor({ timeout: 15000 });
 ok('the bar is still there on Co-signers, where it was missing', await out.locator('#ds-signedout').isVisible(), 'step-recipients');
 ok('the send button asks for the session instead of promising to send',
-  (await out.locator('#ds-recipients-continue').innerText()).trim() === 'Sign in to send',
+  (await out.locator('#ds-recipients-continue').innerText()).trim() === 'Inloggen om te versturen',
   await out.locator('#ds-recipients-continue').innerText());
 ok('and it says the prepared document does not survive signing in',
-  /has not been uploaded/i.test(await out.locator('#ds-recipients-hint').innerText()),
+  /is niet geüpload/i.test(await out.locator('#ds-recipients-hint').innerText()),
   await out.locator('#ds-recipients-hint').innerText());
 await out.locator('#ds-recipients-continue').click();
 await out.waitForURL(/\/auth\/login\?next=%2Fsign|\/auth\/login\?next=\/sign/, { timeout: 15000 }).catch(() => {});
@@ -136,7 +136,7 @@ await inn.locator('#ds-pdf-canvas-list .ds-page-wrap[data-page-index="0"]').clic
 await inn.locator('#ds-place-continue').click();
 await inn.locator('#step-recipients:not([hidden])').waitFor({ timeout: 15000 });
 ok('signed in, the send button is the send button',
-  (await inn.locator('#ds-recipients-continue').innerText()).trim() === 'Send for signature',
+  (await inn.locator('#ds-recipients-continue').innerText()).trim() === 'Versturen om te laten tekenen',
   await inn.locator('#ds-recipients-continue').innerText());
 await inn.close();
 
@@ -147,7 +147,7 @@ await pickJpeg(jpeg);
 await jpeg.locator('#ds-doc-error:not([hidden])').waitFor({ timeout: 15000 });
 ok('a JPEG is refused, and named',
   (await jpeg.locator('#ds-doc-error').innerText()).trim()
-    === 'This is a JPEG image, not a PDF. ParaSign signs PDF documents. Export or print your file to PDF first.',
+    === 'Dit is een JPEG-afbeelding, geen pdf. ParaSign ondertekent pdf-documenten. Exporteer of print uw bestand eerst naar pdf.',
   await jpeg.locator('#ds-doc-error').innerText());
 ok('a refused file does not move the flow on',
   await jpeg.locator('#step-doc').isVisible()
