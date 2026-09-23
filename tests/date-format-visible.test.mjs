@@ -37,7 +37,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const MIME = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
-const aliases = { '/': '/index.html', '/dashboard': '/dashboard.html', '/account': '/account.html', '/pricing': '/pricing.html' };
+const aliases = { '/': '/index.html', '/dashboard': '/dashboard.html', '/account': '/account.html', '/pricing': '/pricing.html', '/en/dashboard': '/en/dashboard.html' };
 
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
@@ -185,7 +185,7 @@ ok('a session says the day and names the clock it is on',
 // 3268d4a9). Wait for both before reading the page.
 const dashboard = await open('/dashboard', () => {
   const line = document.getElementById('dh-term-line');
-  return line && !line.hidden && /Created /.test(document.body.innerText);
+  return line && !line.hidden && /Gemaakt /.test(document.body.innerText);
 });
 const dash = await dashboard.evaluate(() => ({
   body: document.body.innerText,
@@ -199,8 +199,19 @@ ok('/dashboard writes the term date exactly as /account does',
   pick(dash.term) === '8 September 2026', dash.term);
 // The document row is where "Created Aug 31, 2026" stood, a third notation on a
 // screen that already had two.
+// /dashboard is Dutch since 23 September 2026; the month name comes from the
+// shared js/format-date.js, so either spelling of the month is the one shape.
 ok('a document row writes its date the same way the term line does',
-  /Created 31 August 2026/.test(dash.body), (dash.body.match(/Created [^\n]*/) || ['no document row'])[0]);
+  /Gemaakt 31 (August|augustus) 2026/.test(dash.body), (dash.body.match(/Gemaakt [^\n]*/) || ['no document row'])[0]);
+// The English copy loads the same script and must say it in English.
+const dashboardEn = await open('/en/dashboard', () => {
+  const line = document.getElementById('dh-term-line');
+  return line && !line.hidden && /Created /.test(document.body.innerText);
+});
+const dashEn = await dashboardEn.evaluate(() => document.body.innerText);
+await dashboardEn.close();
+ok('/en/dashboard writes the document row date the same way',
+  /Created 31 August 2026/.test(dashEn), (dashEn.match(/Created [^\n]*/) || ['no document row'])[0]);
 
 // ── report ───────────────────────────────────────────────────────────────────
 await browser.close();

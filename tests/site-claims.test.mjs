@@ -114,6 +114,9 @@ const PRIVATE = new Set([
   'developer', 'get', 'ontvang', 'request-key', 'setup', 'parashare', 'iot',
   'auth/backup', 'auth/login', 'auth/request-reset', 'auth/reset-confirm',
   'auth/setup', 'billing/checkout', 'signup/verified',
+  'en/account', 'en/claim', 'en/dashboard', 'en/request-key',
+  'en/auth/backup', 'en/auth/login', 'en/auth/request-reset', 'en/auth/reset-confirm',
+  'en/auth/setup', 'en/billing/checkout', 'en/signup/verified',
 ]);
 function publicPages(dir = path.join(ROOT, 'frontend'), prefix = '') {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -3279,4 +3282,45 @@ test('the recipients per send on the site are the max_recipients tiers.js sets',
     }
   }
   assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}\n`);
+});
+
+// The sign-in and account pages are Dutch on their own path and English under
+// /en/ since 23 September 2026, the way /, /pricing, /about and /security went
+// first. Each pair has to say its language, point search engines at both, and
+// give the reader a visible way across and back. The token pages carry the
+// token across in their script, so their switch names the page and the script
+// adds the rest.
+test('the sign-in and account pages exist in both languages and link each other', () => {
+  const ORIGIN = 'https://paramant.app';
+  const PAIRS = ['auth/login', 'auth/backup', 'auth/request-reset', 'auth/reset-confirm', 'auth/setup',
+    'signup', 'signup/verified', 'account', 'dashboard', 'claim'];
+  const problems = [];
+  for (const slug of PAIRS) {
+    const nlHtml = read(`frontend/${slug}.html`);
+    const enHtml = read(`frontend/en/${slug}.html`);
+    const nl = `/${slug}`; const en = `/en/${slug}`;
+    if (!/^<!DOCTYPE html>\s*<html lang="nl">/i.test(nlHtml)) problems.push(`${slug}: <html lang="nl">`);
+    if (!/^<!DOCTYPE html>\s*<html lang="en">/i.test(enHtml)) problems.push(`en/${slug}: <html lang="en">`);
+    for (const [name, html, canonical] of [[slug, nlHtml, nl], [`en/${slug}`, enHtml, en]]) {
+      if (!html.includes(`<link rel="canonical" href="${ORIGIN}${canonical}">`)) problems.push(`${name}: canonical must be ${canonical}`);
+      for (const [lang, href] of [['nl', nl], ['en', en], ['x-default', nl]]) {
+        if (!html.includes(`<link rel="alternate" hreflang="${lang}" href="${ORIGIN}${href}">`)) problems.push(`${name}: hreflang ${lang} must point at ${href}`);
+      }
+    }
+    if (!nlHtml.includes(`<a href="${en}" hreflang="en" lang="en">This page in English</a>`)) problems.push(`${slug}: no visible way to the English page`);
+    if (!enHtml.includes(`<a href="${nl}" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a>`)) problems.push(`en/${slug}: no visible way back to the Dutch page`);
+  }
+  // The pages that load one script for both copies must tell it the language:
+  // every script that holds both texts reads <html lang>, and nothing else.
+  for (const file of ['frontend/js/auth-login.js', 'frontend/js/auth-setup.js', 'frontend/js/passkey.js',
+    'frontend/js/account.inline1.js', 'frontend/js/dashboard.js', 'frontend/js/signup.inline1.js']) {
+    const js = read(file);
+    if (!/function nlEn\(nl, en\) \{ return \/\^en\\b\/i\.test\(document\.documentElement\.lang \|\| ''\) \? en : nl; \}/.test(js)) problems.push(`${file}: no nlEn switch on <html lang>`);
+  }
+  // Two paths carry a token after the page name, so nginx needs them spelled out.
+  const conf = read('deploy/nginx-paramant-live.conf');
+  for (const p of ['/en/auth/setup/', '/en/auth/reset-confirm/']) {
+    if (!conf.includes(`location ${p} { try_files ${p.replace(/\/$/, '')}.html =404; }`)) problems.push(`nginx: ${p} is not served`);
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });

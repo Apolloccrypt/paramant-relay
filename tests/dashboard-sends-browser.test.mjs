@@ -45,6 +45,7 @@ const server = http.createServer((req, res) => {
     return stuur(200, {});
   }
   const bestand = path.join(ROOT, u.pathname === '/dashboard' ? 'dashboard.html'
+    : u.pathname === '/en/dashboard' ? 'en/dashboard.html'
     : u.pathname === '/' ? 'index.html' : u.pathname);
   if (!bestand.startsWith(ROOT)) { res.writeHead(403); return res.end(); }
   fs.readFile(bestand, (e, body) => {
@@ -59,10 +60,10 @@ const ORIGIN = `http://localhost:${server.address().port}`;
 const browser = await chromium.launch({ headless: true, ...(EXE ? { executablePath: EXE } : {}) });
 const fouten = [];
 
-async function open() {
+async function open(pad = '/dashboard') {
   const page = await browser.newPage();
   page.on('pageerror', (e) => fouten.push(String(e).slice(0, 160)));
-  await page.goto(`${ORIGIN}/dashboard`);
+  await page.goto(`${ORIGIN}${pad}`);
   await page.waitForTimeout(800);
   return page;
 }
@@ -87,8 +88,16 @@ let page = await open();
 ok('de verzending staat op het dashboard',
    ((await page.textContent('body')) || '').includes('jaarrekening-2025.pdf'));
 const lijf = (await page.textContent('body')) || '';
-ok('en het zegt hoeveel mensen er nog niet ophaalden', /8 people have not collected/.test(lijf),
-   (lijf.match(/[^.]*collected[^.]*/) || [''])[0].slice(0, 80));
+ok('en het zegt hoeveel mensen er nog niet ophaalden', /8 mensen hebben het nog niet opgehaald/.test(lijf),
+   (lijf.match(/[^.]*opgehaald[^.]*/) || [''])[0].slice(0, 80));
+// Dezelfde zin op de Engelse kopie, die hetzelfde script laadt.
+{
+  const en = await open('/en/dashboard');
+  const lijfEn = (await en.textContent('body')) || '';
+  ok('en op /en/dashboard in het Engels', /8 people have not collected/.test(lijfEn),
+     (lijfEn.match(/[^.]*collected[^.]*/) || [''])[0].slice(0, 80));
+  await en.close();
+}
 
 // ── 2. Wie het heeft opgehaald, per persoon ────────────────────────────────
 const rij = await page.$('[data-pa-action="send-open"], .dh-document-open, #dh-sends .dh-row');

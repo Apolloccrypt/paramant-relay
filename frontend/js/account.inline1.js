@@ -1,3 +1,6 @@
+// One file, two languages: the Dutch page and its English copy under /en/ load
+// this same script, and <html lang> says which of the two strings to show.
+function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || '') ? en : nl; }
 
 (function() {
   // Plan resolution, the same shape js/dashboard.js uses, because a customer
@@ -103,7 +106,7 @@
       var planChip = document.getElementById('plan-chip');
       if (planChip) planChip.textContent = planName(data, data.plan);
       document.getElementById('label').textContent = data.label || '—';
-      document.getElementById('created').textContent = paramantDate.day(data.created_at, 'Unknown');
+      document.getElementById('created').textContent = paramantDate.day(data.created_at, nlEn('Onbekend', 'Unknown'));
       document.getElementById('backup-count').textContent = data.backup_codes_remaining;
 
       const sessionsList = document.getElementById('sessions-list');
@@ -116,10 +119,10 @@
         // self/stored DOM XSS.
         const labelEl = document.createElement('div');
         labelEl.className = 'info-label';
-        labelEl.textContent = (s.ip_masked || '') + (s.current ? ' (this session)' : '');
+        labelEl.textContent = (s.ip_masked || '') + (s.current ? nlEn(' (deze sessie)', ' (this session)') : '');
         const valueEl = document.createElement('div');
         valueEl.className = 'info-value';
-        valueEl.textContent = (s.user_agent_short || '') + ' · last seen ' + paramantDate.moment(s.last_seen);
+        valueEl.textContent = (s.user_agent_short || '') + nlEn(' · laatst gezien ', ' · last seen ') + paramantDate.moment(s.last_seen);
         el.appendChild(labelEl);
         el.appendChild(valueEl);
         sessionsList.appendChild(el);
@@ -130,7 +133,7 @@
         const ms = expiresAt - new Date();
         const min = Math.max(0, Math.ceil(ms / 60000));
         document.getElementById('session-timer').textContent =
-          min > 60 ? Math.round(min / 60) + 'h' : min + 'm';
+          min > 60 ? Math.round(min / 60) + nlEn(' uur', 'h') : min + nlEn(' min', 'm');
       }
       updateTimer();
       setInterval(updateTimer, 30000);
@@ -218,7 +221,7 @@
         keyRowFilled = true;
         el.textContent = maskKey(key);
       }).catch(function() {
-        el.textContent = 'Unavailable';
+        el.textContent = nlEn('Niet beschikbaar', 'Unavailable');
       });
     });
   }
@@ -228,15 +231,15 @@
     const original = btn.textContent;
     let key;
     try { key = await accountKey(); }
-    catch (e) { btn.textContent = 'Failed'; setTimeout(function(){ btn.textContent = original; }, 2000); return; }
+    catch (e) { btn.textContent = nlEn('Mislukt', 'Failed'); setTimeout(function(){ btn.textContent = original; }, 2000); return; }
     const ok = await Promise.resolve(_copyText(key));
     if (ok) {
-      btn.textContent = 'Copied!';
+      btn.textContent = nlEn('Gekopieerd', 'Copied');
     } else {
       // Last-resort path for Safari/WebKit with VPN extensions that block writes entirely.
       // Show the key so the user can select + ⌘-C manually.
       document.getElementById('api-key').textContent = key;
-      btn.textContent = 'Shown — ⌘-C';
+      btn.textContent = nlEn('Getoond, kopieer met ⌘-C', 'Shown, ⌘-C');
     }
     setTimeout(function(){ btn.textContent = original; }, 2500);
   });
@@ -245,30 +248,30 @@
     try {
       document.getElementById('api-key').textContent = await accountKey();
     } catch (e) {
-      document.getElementById('api-key').textContent = 'Unavailable';
+      document.getElementById('api-key').textContent = nlEn('Niet beschikbaar', 'Unavailable');
     }
   });
 
   document.getElementById('regen-backup').addEventListener('click', async function() {
-    if (!confirm('Regenerate backup codes? Current codes will be invalid.')) return;
+    if (!confirm(nlEn('Back-upcodes vernieuwen? De huidige codes vervallen dan.', 'Regenerate backup codes? Current codes will be invalid.'))) return;
     const res = await fetch('/api/user/account/backup-codes/regenerate', {
       method: 'POST',
       credentials: 'include',
     });
     if (res.ok) {
       const data = await res.json();
-      alert('New codes:\n\n' + data.backup_codes.join('\n') + '\n\nSave these now. They will not be shown again.');
+      alert(nlEn('Nieuwe codes:\n\n', 'New codes:\n\n') + data.backup_codes.join('\n') + nlEn('\n\nBewaar ze nu. U ziet ze hierna niet meer.', '\n\nSave these now. They will not be shown again.'));
     }
   });
 
   document.getElementById('reset-totp').addEventListener('click', async function() {
-    if (!confirm('This will send a new setup email. Your current authenticator will be invalidated.')) return;
+    if (!confirm(nlEn('We sturen u een nieuwe instelmail. Uw huidige authenticator-app werkt dan niet meer.', 'This will send a new setup email. Your current authenticator will be invalidated.'))) return;
     const res = await fetch('/api/user/account/totp/reset', {
       method: 'POST',
       credentials: 'include',
     });
     if (res.ok) {
-      alert('Setup email sent. Check your inbox.');
+      alert(nlEn('De instelmail is verstuurd. Kijk in uw inbox.', 'Setup email sent. Check your inbox.'));
       window.location = '/auth/login';
     }
   });
@@ -283,19 +286,19 @@
       method: 'POST',
       credentials: 'include',
     });
-    alert('Other sessions signed out.');
+    alert(nlEn('De andere sessies zijn uitgelogd.', 'Other sessions signed out.'));
     loadAccount();
   });
 
   document.getElementById('delete-account').addEventListener('click', async function() {
-    const answer = prompt('Type DEACTIVATE to confirm account deactivation:');
-    if (answer !== 'DEACTIVATE') return;
+    const answer = prompt(nlEn('Typ DEACTIVEREN om het deactiveren van uw account te bevestigen:', 'Type DEACTIVATE to confirm account deactivation:'));
+    if (answer !== nlEn('DEACTIVEREN', 'DEACTIVATE')) return;
     const res = await fetch('/api/user/account', {
       method: 'DELETE',
       credentials: 'include',
     });
     if (res.ok) {
-      alert('Account deactivated. Its key can no longer be used.');
+      alert(nlEn('Account gedeactiveerd. De sleutel werkt niet meer.', 'Account deactivated. Its key can no longer be used.'));
       window.location = '/';
     }
   });
@@ -342,13 +345,13 @@
     var when = termDate(term.at);
     if (line) {
       line.textContent = term.ended
-        ? 'Ended on ' + when + ', now on Community.'
-        : 'Ends on ' + when + ', nothing renews automatically.';
+        ? nlEn('Afgelopen op ', 'Ended on ') + when + nlEn(', nu op Community.', ', now on Community.')
+        : nlEn('Loopt af op ', 'Ends on ') + when + nlEn(', er wordt niets automatisch verlengd.', ', nothing renews automatically.');
       line.hidden = false;
     }
     if (warn && term.warn) {
       var text = warn.querySelector('[data-term="text"]');
-      if (text) text.textContent = 'Your plan ends on ' + when + '. Renew for another month or year, or let it fall back to Community. Nothing is charged automatically.';
+      if (text) text.textContent = nlEn('Uw plan loopt af op ', 'Your plan ends on ') + when + nlEn('. Verleng met een maand of een jaar, of laat het terugvallen op Community. Er wordt niets automatisch afgeschreven.', '. Renew for another month or year, or let it fall back to Community. Nothing is charged automatically.');
       warn.hidden = false;
     }
   }
@@ -356,7 +359,7 @@
   async function loadBilling() {
     try {
       const res = await fetch('/api/user/billing/status', { credentials: 'include' });
-      if (!res.ok) { document.getElementById('billing-loading').textContent = 'Billing unavailable.'; return; }
+      if (!res.ok) { document.getElementById('billing-loading').textContent = nlEn('Betaalstatus niet beschikbaar.', 'Billing unavailable.'); return; }
       const d = await res.json();
       document.getElementById('billing-loading').style.display = 'none';
       document.getElementById('billing-content').classList.remove('hidden');
@@ -400,11 +403,11 @@
       renderTerm(d);
       if (d.cancellation_scheduled_at) {
         document.getElementById('billing-cancel-row').style.display = 'flex';
-        document.getElementById('billing-cancel-date').textContent = 'Downgrade scheduled ' + paramantDate.day(d.cancellation_scheduled_at);
+        document.getElementById('billing-cancel-date').textContent = nlEn('Terug naar een lager plan op ', 'Downgrade scheduled ') + paramantDate.day(d.cancellation_scheduled_at);
         document.getElementById('billing-cancel-btn').classList.add('hidden');
       }
     } catch(err) {
-      document.getElementById('billing-loading').textContent = 'Could not load billing.';
+      document.getElementById('billing-loading').textContent = nlEn('Betaalstatus kon niet worden geladen.', 'Could not load billing.');
     }
   }
 
@@ -423,10 +426,10 @@
     // event name is not pretty, and it is at least true.
     if (e.event_type === 'plan_changed') {
       var m = e.metadata || {};
-      return 'Plan changed from ' + (m.from || 'unknown') + ' to ' + (m.to || 'unknown');
+      return nlEn('Plan gewijzigd van ', 'Plan changed from ') + (m.from || nlEn('onbekend', 'unknown')) + nlEn(' naar ', ' to ') + (m.to || nlEn('onbekend', 'unknown'));
     }
-    if (e.event_type === 'plan_cancellation_scheduled') return 'Cancellation scheduled';
-    return e.event_type || 'Billing event';
+    if (e.event_type === 'plan_cancellation_scheduled') return nlEn('Opzegging gepland', 'Cancellation scheduled');
+    return e.event_type || nlEn('Betaalgebeurtenis', 'Billing event');
   }
 
   function historyRow(e) {
@@ -458,7 +461,7 @@
       right.appendChild(document.createTextNode(' '));
       const link = document.createElement('a');
       link.href = '/api/user/billing/invoices/' + encodeURIComponent(e.document) + '.pdf';
-      link.textContent = 'Download PDF';
+      link.textContent = nlEn('PDF downloaden', 'Download PDF');
       right.appendChild(link);
     }
     row.appendChild(left);
@@ -471,23 +474,23 @@
     if (!histEl) return;
     try {
       const res = await fetch('/api/user/billing/history', { credentials: 'include' });
-      if (!res.ok) { histEl.textContent = 'Billing history unavailable right now.'; return; }
+      if (!res.ok) { histEl.textContent = nlEn('Betaalgeschiedenis is nu niet beschikbaar.', 'Billing history unavailable right now.'); return; }
       const d = await res.json();
       const rows = (d && d.history) || [];
-      if (rows.length === 0) { histEl.textContent = 'No billing events yet.'; return; }
+      if (rows.length === 0) { histEl.textContent = nlEn('Nog geen betaalgebeurtenissen.', 'No billing events yet.'); return; }
       histEl.textContent = '';
       rows.forEach(function(e) { histEl.appendChild(historyRow(e)); });
     } catch(err) {
-      histEl.textContent = 'Could not load billing history.';
+      histEl.textContent = nlEn('Betaalgeschiedenis kon niet worden geladen.', 'Could not load billing history.');
     }
   }
 
   document.getElementById('billing-cancel-btn').addEventListener('click', async function() {
-    if (!confirm('Cancel your plan? You keep access until the end of your billing period.')) return;
+    if (!confirm(nlEn('Uw plan opzeggen? U houdt toegang tot het einde van de betaalde periode.', 'Cancel your plan? You keep access until the end of your billing period.'))) return;
     const res = await fetch('/api/user/billing/cancel', { method: 'POST', credentials: 'include' });
     if (res.ok) {
       const d = await res.json();
-      alert('Cancellation scheduled. Your plan downgrades on ' + paramantDate.day(d.scheduled_downgrade_at));
+      alert(nlEn('Opzegging gepland. Uw plan gaat terug op ', 'Cancellation scheduled. Your plan downgrades on ') + paramantDate.day(d.scheduled_downgrade_at));
       loadBilling();
     }
   });
@@ -501,10 +504,10 @@
     if (!el) return;
     try {
       const res = await fetch('/api/user/billing/invoices', { credentials: 'include' });
-      if (!res.ok) { el.textContent = 'Invoices unavailable right now.'; return; }
+      if (!res.ok) { el.textContent = nlEn('Facturen zijn nu niet beschikbaar.', 'Invoices unavailable right now.'); return; }
       const d = await res.json();
       const rows = (d && d.invoices) || [];
-      if (rows.length === 0) { el.textContent = 'No invoices yet. One is issued for every payment.'; return; }
+      if (rows.length === 0) { el.textContent = nlEn('Nog geen facturen. Bij elke betaling komt er een.', 'No invoices yet. One is issued for every payment.'); return; }
       el.textContent = '';
       rows.forEach(function(inv) {
         const row = document.createElement('div');
@@ -521,11 +524,11 @@
         // says which invoice it belongs to.
         if (inv.kind === 'credit_note') {
           left.appendChild(document.createTextNode(
-            ' · ' + (inv.partial ? 'partial credit for ' : 'credit for ') + inv.credit_for));
+            ' · ' + (inv.partial ? nlEn('gedeeltelijke creditering van ', 'partial credit for ') : nlEn('creditering van ', 'credit for ')) + inv.credit_for));
         } else if (inv.kind !== 'invoice') {
-          left.appendChild(document.createTextNode(' · receipt'));
+          left.appendChild(document.createTextNode(nlEn(' · ontvangstbewijs', ' · receipt')));
         }
-        if (inv.reversed_at) left.appendChild(document.createTextNode(' · reversed'));
+        if (inv.reversed_at) left.appendChild(document.createTextNode(nlEn(' · teruggedraaid', ' · reversed')));
         const right = document.createElement('div');
         right.className = 'info-value';
         const amount = document.createElement('span');
@@ -535,14 +538,14 @@
         right.appendChild(document.createTextNode(' '));
         const link = document.createElement('a');
         link.href = '/api/user/billing/invoices/' + encodeURIComponent(inv.number) + '.pdf';
-        link.textContent = 'Download PDF';
+        link.textContent = nlEn('PDF downloaden', 'Download PDF');
         right.appendChild(link);
         row.appendChild(left);
         row.appendChild(right);
         el.appendChild(row);
       });
     } catch (err) {
-      el.textContent = 'Could not load invoices.';
+      el.textContent = nlEn('Facturen konden niet worden geladen.', 'Could not load invoices.');
     }
   }
 
@@ -571,7 +574,7 @@
       const msg = document.getElementById('billing-profile-msg');
       const btn = document.getElementById('billing-profile-save');
       btn.disabled = true;
-      msg.textContent = 'Saving...';
+      msg.textContent = nlEn('Opslaan...', 'Saving...');
       try {
         const res = await fetch('/api/user/billing/profile', {
           method: 'POST',
@@ -584,10 +587,10 @@
           }),
         });
         msg.textContent = res.ok
-          ? 'Saved. New invoices will carry these details.'
-          : 'Could not save. Try again.';
+          ? nlEn('Opgeslagen. Nieuwe facturen krijgen deze gegevens.', 'Saved. New invoices will carry these details.')
+          : nlEn('Opslaan lukte niet. Probeer het opnieuw.', 'Could not save. Try again.');
       } catch (err) {
-        msg.textContent = 'Could not save. Try again.';
+        msg.textContent = nlEn('Opslaan lukte niet. Probeer het opnieuw.', 'Could not save. Try again.');
       }
       btn.disabled = false;
     });

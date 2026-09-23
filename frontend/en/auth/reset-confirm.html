@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#15191C;color:#EAE2CE}html[data-theme="dark"]{color-scheme:dark}@media (prefers-color-scheme:dark){html[data-theme="auto"],html[data-theme="auto"] body{background:#15191C;color:#EAE2CE}html[data-theme="auto"]{color-scheme:dark}}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nieuwe authenticator-app bevestigen · Paramant</title>
-<link rel="canonical" href="https://paramant.app/auth/reset-confirm">
+<title>Confirm authenticator reset · Paramant</title>
+<link rel="canonical" href="https://paramant.app/en/auth/reset-confirm">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/auth/reset-confirm">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/auth/reset-confirm">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/auth/reset-confirm">
@@ -44,76 +44,76 @@
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/parasend" class="nav-link">Versturen</a></li>
-    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
-    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
-    <li><a href="/security" class="nav-link">Beveiliging</a></li>
-    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
+    <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/security" class="nav-link">Security</a></li>
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Hulp</a>
-    <a href="/auth/login" class="nav-signin">Inloggen</a>
-    <a href="/signup" class="nav-cta">Account maken</a>
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
-  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
-  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
-  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+  <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/security" class="nav-mobile-standalone">Security</a>
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
-  <a href="/help" class="nav-tail-link">Hulp</a>
+  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
 </div>
 
 <main class="container-sm">
 
 <section class="section-lg">
-  <div class="eyebrow"><span class="bar"></span>authenticator-app</div>
-  <h1>Bevestig deze <em>reset</em>.</h1>
+  <div class="eyebrow"><span class="bar"></span>authenticator reset</div>
+  <h1>Confirm this <em>reset</em>.</h1>
 </section>
 
 <section class="section">
   <div id="initial-view">
-    <p class="lede">U krijgt twee mails, na elkaar. Deze pagina bevestigt dat u het bent. De volgende mail bevat de link waarmee u een nieuwe authenticator-app koppelt.</p>
-    <p>Die splitsing is met opzet: wie even in uw mailbox kon kijken, kan de reset niet afmaken. De tweede link komt pas na deze bevestiging en moet ook geopend worden.</p>
+    <p class="lede">You get two emails, one after the other. This page confirms that it is you. The next mail carries the link that links a new authenticator app.</p>
+    <p>Splitting it in two is the point: someone who briefly had your mailbox open cannot finish the reset, because the second link is only sent after this confirmation and has to be opened as well.</p>
 
     <div class="warning-box">
-      Bevestig alleen als u deze reset zelf hebt aangevraagd. Zo niet, sluit dan deze pagina. Er verandert niets en uw huidige authenticator-app blijft werken.
+      Only confirm if you asked for this reset yourself. If you did not, close this page. Nothing changes and your current authenticator keeps working.
     </div>
 
     <button id="confirm-btn" class="btn btn-primary mt-3">
-      Ja, stel mijn authenticator-app opnieuw in
+      Yes, reset my authenticator
     </button>
 
     <div id="error" class="error mt-3" role="alert" aria-live="assertive"></div>
   </div>
 
   <div id="success-view" style="display:none">
-    <p class="lede" style="color:var(--ok-ink)">Bevestigd. De tweede mail, met de instellink, is onderweg.</p>
-    <p>Zoek een mail van noreply@paramant.app met een instellink. Open die, scan de QR-code, en uw nieuwe authenticator-app is gekoppeld.</p>
-    <p style="margin-top:8px">Verwijder eerst de oude Paramant-regel in uw authenticator-app. Die codes werken niet meer.</p>
-    <p class="footer-text mt-4"><a href="/auth/login">Terug naar inloggen</a></p>
+    <p class="lede" style="color:var(--ok-ink)">Confirmed. The second email, the one with the setup link, is on its way.</p>
+    <p>Look for a mail from noreply@paramant.app with a setup link. Open it, scan the QR code, and your new authenticator app is linked.</p>
+    <p style="margin-top:8px">Delete the old Paramant entry in your authenticator app first. Its codes no longer work.</p>
+    <p class="footer-text mt-4"><a href="/en/auth/login">Return to sign in</a></p>
   </div>
 
   <div id="expired-view" style="display:none">
-    <p class="lede is-bad">Deze bevestigingslink werkt niet meer.</p>
-    <p>Een bevestigingslink werkt 60 minuten, zodat niemand iets met een oude mail kan doen. Vraag een nieuwe aan en begin opnieuw.</p>
+    <p class="lede is-bad">This confirmation link no longer works.</p>
+    <p>Confirmation links last 60 minutes, so nobody can act on an old mail. Ask for a new one and start again.</p>
     <p class="footer-text mt-4">
-      <a href="/auth/request-reset">Nieuwe resetlink aanvragen</a>
+      <a href="/en/auth/request-reset">Request a new reset link</a>
     </p>
   </div>
 
   <p class="small mt-4" style="color:var(--ink-dim)">
-    Paramant is een product van <strong>Paramantis Solutions B.V.</strong>, Harderwijk,
-    Nederland. <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>
+    Paramant is a product of <strong>Paramantis Solutions B.V.</strong>, Harderwijk,
+    the Netherlands. <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>
   </p>
 </section>
 </main>
@@ -121,9 +121,9 @@
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=10" defer></script>
 <script src="/js/auth-reset-confirm.js?v=4"></script>
-<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/auth/reset-confirm" hreflang="en" lang="en">This page in English</a></p>
+<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/auth/reset-confirm" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
 <footer class="legal-strip">
-  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a>
+  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
 </footer>
 </body>
 </html>

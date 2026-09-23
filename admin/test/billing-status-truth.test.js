@@ -126,11 +126,17 @@ test('the account page renders the term end', () => {
   assert.match(js, /d\.access_until/,
     'the account page must read the term end the API now sends');
 
+  // /account is Dutch since 23 September 2026; /en/account is its English copy.
   const html = fs.readFileSync(
-    path.join(__dirname, '..', '..', 'frontend', 'account.html'), 'utf8');
+    path.join(__dirname, '..', '..', 'frontend', 'en', 'account.html'), 'utf8');
   assert.match(html, /Access until/, 'the row must name what the date is');
   assert.doesNotMatch(html, /Next billing date/,
     'nothing bills again by itself, so no row may promise a next billing date');
   assert.doesNotMatch(html, /renewal date and invoices are below/,
     'neither a renewal date nor an invoice is produced today');
+  const htmlNl = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'frontend', 'account.html'), 'utf8');
+  assert.match(htmlNl, /Toegang tot/, 'the Dutch row must name what the date is');
+  assert.doesNotMatch(htmlNl, /Volgende betaaldatum|Volgende factuurdatum|Volgende incasso/,
+    'nothing bills again by itself, so no Dutch row may promise a next billing date');
 });

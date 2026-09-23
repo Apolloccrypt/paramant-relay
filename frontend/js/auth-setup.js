@@ -1,5 +1,14 @@
+// One file, two languages: the Dutch page and its English copy under /en/ load
+// this same script, and <html lang> says which of the two strings to show.
+function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || '') ? en : nl; }
 (function() {
   const token = window.location.pathname.split('/').pop();
+  // The language switch names the page, not the link in the mail: carry the
+  // token across so the other language opens the same setup.
+  const langSwitch = document.querySelector('.lang-switch a');
+  if (langSwitch && token && token !== 'setup') {
+    langSwitch.setAttribute('href', langSwitch.getAttribute('href') + '/' + encodeURIComponent(token));
+  }
   let setupData = null;
   let backupCodes = [];
 
@@ -65,7 +74,7 @@
     });
 
     if (!res.ok) {
-      errorDiv.textContent = 'That code was not accepted. Codes change every 30 seconds, so use the one your app is showing right now.';
+      errorDiv.textContent = nlEn('Deze code werd niet geaccepteerd. De code verandert elke 30 seconden, dus gebruik de code die uw app nu toont.', 'That code was not accepted. Codes change every 30 seconds, so use the one your app is showing right now.');
       errorDiv.classList.add('visible');
       return;
     }
@@ -83,7 +92,7 @@
     // so an empty set here means a genuine relay/activation failure, not the old
     // reload race. Surface a real error instead of a silent empty success screen.
     if (!Array.isArray(backupCodes) || backupCodes.length === 0) {
-      errorDiv.innerHTML = 'Your authenticator app is linked, so you can sign in. Your backup codes did not come through, which is usually temporary. Mail <a href="mailto:hello@paramant.app?subject=Setup%20incomplete%20-%20backup%20codes" style="color:#92400E;text-decoration:underline">hello@paramant.app</a> with the subject <code>Setup incomplete</code> and we issue a new set.';
+      errorDiv.innerHTML = nlEn('Uw authenticator-app is gekoppeld, dus u kunt inloggen. Uw back-upcodes kwamen niet door, meestal is dat tijdelijk. Mail <a href="mailto:hello@paramant.app?subject=Instellen%20onvolledig%20-%20back-upcodes" style="color:#92400E;text-decoration:underline">hello@paramant.app</a> met als onderwerp <code>Instellen onvolledig</code>, dan maken wij een nieuwe set.', 'Your authenticator app is linked, so you can sign in. Your backup codes did not come through, which is usually temporary. Mail <a href="mailto:hello@paramant.app?subject=Setup%20incomplete%20-%20backup%20codes" style="color:#92400E;text-decoration:underline">hello@paramant.app</a> with the subject <code>Setup incomplete</code> and we issue a new set.');
       errorDiv.classList.add('visible');
       return;
     }
@@ -110,10 +119,10 @@
 
   document.getElementById('download-codes').addEventListener('click', function() {
     const blob = new Blob([
-      'Paramant backup codes\n' +
-      'Save these in a safe place. Each can be used once.\n\n' +
+      nlEn('Paramant back-upcodes\n', 'Paramant backup codes\n') +
+      nlEn('Bewaar deze op een veilige plek. Elke code werkt één keer.\n\n', 'Save these in a safe place. Each can be used once.\n\n') +
       backupCodes.join('\n') +
-      '\n\nGenerated: ' + new Date().toISOString()
+      nlEn('\n\nAangemaakt: ', '\n\nGenerated: ') + new Date().toISOString()
     ], { type: 'text/plain' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

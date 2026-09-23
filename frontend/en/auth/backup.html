@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#15191C;color:#EAE2CE}html[data-theme="dark"]{color-scheme:dark}@media (prefers-color-scheme:dark){html[data-theme="auto"],html[data-theme="auto"] body{background:#15191C;color:#EAE2CE}html[data-theme="auto"]{color-scheme:dark}}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inloggen met een back-upcode · Paramant</title>
-<link rel="canonical" href="https://paramant.app/auth/backup">
+<title>Sign in with a backup code · Paramant</title>
+<link rel="canonical" href="https://paramant.app/en/auth/backup">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/auth/backup">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/auth/backup">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/auth/backup">
@@ -35,82 +35,82 @@
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/parasend" class="nav-link">Versturen</a></li>
-    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
-    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
-    <li><a href="/security" class="nav-link">Beveiliging</a></li>
-    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
+    <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/security" class="nav-link">Security</a></li>
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Hulp</a>
-    <a href="/auth/login" class="nav-signin">Inloggen</a>
-    <a href="/signup" class="nav-cta">Account maken</a>
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
-  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
-  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
-  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+  <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/security" class="nav-mobile-standalone">Security</a>
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
-  <a href="/help" class="nav-tail-link">Hulp</a>
+  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
 </div>
 
 <main class="container-sm">
 
 <section class="section-lg">
-  <div class="eyebrow"><span class="bar"></span>back-upcode</div>
-  <h1>Gebruik een <em>back-upcode</em>.</h1>
+  <div class="eyebrow"><span class="bar"></span>backup recovery</div>
+  <h1>Use a <em>backup code</em>.</h1>
   <p class="lede mt-3">
-    Gebruik een van de codes die u bewaarde toen u uw account instelde. Elke code
-    werkt één keer en laat u binnen zonder uw authenticator-app.
+    Use one of the codes you saved when you set up your account; each code works
+    once and gets you in without your authenticator app.
   </p>
 </section>
 
 <section class="section">
   <form id="backup-form" class="form-card">
-    <label for="email">E-mailadres</label>
+    <label for="email">Email address</label>
     <input type="email" id="email" name="email" required autocomplete="username"
            autofocus>
 
-    <label for="code" class="mt-3">Back-upcode</label>
+    <label for="code" class="mt-3">Backup code</label>
     <input type="text" id="code" name="code" required autocomplete="off"
            placeholder="XXXX-YYYY-ZZZZ" spellcheck="false">
     <p class="small mt-2">
-      Twaalf tekens, drie groepen van vier, gescheiden door streepjes. Hoofdletters maken niet uit.
+      Twelve characters, three groups of four, separated by dashes. Capitals do not matter.
     </p>
 
     <button type="submit" class="btn btn-primary mt-3">
-      Inloggen met back-upcode
+      Sign in with backup code
     </button>
 
     <div id="error" class="error" role="alert" aria-live="assertive"></div>
   </form>
 
   <div class="warning-box mt-4">
-    <strong>Doe dit zodra u binnen bent</strong>
+    <strong>Do this once you are in</strong>
     <p>
-      Een gebruikte code is op. Open <a href="/account">uw accountinstellingen</a> voor een nieuwe set
-      back-upcodes, en om een nieuwe authenticator-app te koppelen als de oude echt weg is.
+      A used code is gone. Open <a href="/en/account">your account settings</a> to issue a fresh set of
+      backup codes, and to link a new authenticator app if the old one is lost for good.
     </p>
   </div>
 
   <p class="footer-text mt-4">
-    <a href="/auth/login">Terug naar gewoon inloggen</a>
+    <a href="/en/auth/login">Back to the normal sign-in</a>
   </p>
 </section>
 
 <p class="small" style="color:var(--ink-dim);margin-top:24px">
-  Paramant is een product van <strong>Paramantis Solutions B.V.</strong>, Harderwijk,
-  Nederland. <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>
+  Paramant is a product of <strong>Paramantis Solutions B.V.</strong>, Harderwijk,
+  the Netherlands. <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>
 </p>
 </main>
 
@@ -118,9 +118,9 @@
 <script src="/js/nav-auth.js?v=10" defer></script>
 <script src="/js/auth-backup.js?v=3"></script>
 
-<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/auth/backup" hreflang="en" lang="en">This page in English</a></p>
+<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/auth/backup" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
 <footer class="legal-strip">
-  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a>
+  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
 </footer>
 </body>
 </html>

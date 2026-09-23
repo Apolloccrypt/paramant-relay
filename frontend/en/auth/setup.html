@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#15191C;color:#EAE2CE}html[data-theme="dark"]{color-scheme:dark}@media (prefers-color-scheme:dark){html[data-theme="auto"],html[data-theme="auto"] body{background:#15191C;color:#EAE2CE}html[data-theme="auto"]{color-scheme:dark}}</style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Set up your account · Paramant</title>
+<link rel="canonical" href="https://paramant.app/en/auth/setup">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/auth/setup">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/auth/setup">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/auth/setup">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/design-system.css?v=31">
+<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<script src="/js/qrcode.min.js?v=1"></script>
+<style>
+/* Een auth-scherm is op een telefoon één taak. Kop, één zin en de knop moeten
+   samen in de eerste 844px bij 390px breed passen; met de standaard
+   sectiepadding stond de knop eronder. Alleen op deze pagina, alleen bestaande
+   tokens, design-system.css blijft ongemoeid. */
+@media (max-width: 600px) {
+  .section-lg { padding-top: var(--space-5); padding-bottom: var(--space-3); }
+  .section { padding: var(--space-5) 0; border-top: none; }
+}
+</style>
+<meta name="theme-color" content="#FFFFFF">
+<link rel="stylesheet" href="/app-2026.css?v=9">
+<script src="/js/theme.js?v=5"></script>
+<!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
+     Blocking and above every other script, so it exists before any renderer runs. -->
+<script src="/js/format-date.js?v=1"></script>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+    <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/security" class="nav-link">Security</a></li>
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/docs" class="nav-link">Docs</a></li>
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/security" class="nav-mobile-standalone">Security</a>
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
+</div>
+
+<main class="container-lg">
+
+<section class="section-lg">
+  <div class="eyebrow"><span class="bar"></span>step 3 of 5</div>
+  <h1>Choose how you <em>sign in</em>.</h1>
+  <p class="lede mt-3">
+    Pick one now and add the other later; after this you save your backup codes and the account is ready to use.
+  </p>
+</section>
+
+<!-- Step 3: pick a sign-in method. Passkey is recommended; the authenticator
+     route stays scanner-safe (no POST until the user clicks "instead"). -->
+<section id="state-loading" class="section">
+  <div class="card" style="border-left:3px solid var(--ochre)">
+    <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Use a passkey &middot; Recommended</div>
+    <p style="margin:0 0 16px">
+      A passkey lives on this device and nowhere else. You unlock it with your
+      fingerprint, your face or your device PIN, so there is nothing to remember
+      and nothing to type. Best if you work mostly from one phone or one laptop.
+    </p>
+    <button type="button" class="btn btn-primary" id="passkey-register-btn">Set up a passkey</button>
+    <p id="passkey-status" class="small" aria-live="polite"></p>
+  </div>
+
+  <div class="card mt-3">
+    <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Use an authenticator app</div>
+    <p style="margin:0 0 16px">
+      An app on your phone shows a fresh 6-digit code every 30 seconds and you
+      type that code to sign in. Better if you move between several computers,
+      or if colleagues share one workstation.
+    </p>
+    <button type="button" class="btn btn-secondary" id="start-btn">Set up an app instead</button>
+  </div>
+</section>
+
+<!-- Connecting state -->
+<section id="state-connecting" class="section hidden">
+  <p class="lede">Generating your QR code&#8230;</p>
+</section>
+
+<!-- Expired/invalid state -->
+<section id="state-invalid" class="section hidden">
+  <div class="marker">
+    <div class="num">&ndash;</div>
+    <h2>This link is no longer valid.</h2>
+    <div class="tag">token expired<br>or already used</div>
+  </div>
+
+  <p style="margin-top:16px">
+    Setup links last 14 days and work once. This one has expired, has already
+    been used, or was not copied in full. Start again and we send a fresh link
+    to the same email address.
+  </p>
+
+  <div class="cta-row" style="margin-top:24px">
+    <a href="/en/signup" class="btn btn-primary">Start over</a>
+  </div>
+</section>
+
+<!-- Active setup -->
+<section id="state-active" class="section hidden">
+  <div class="eyebrow"><span class="bar"></span>step 4 of 5</div>
+  <div class="marker">
+    <div class="num">01</div>
+    <h2>Add Paramant to your authenticator app.</h2>
+    <div class="tag">scan or<br>type the key</div>
+  </div>
+
+  <div class="setup-grid">
+    <div class="qr-card">
+      <div id="qr-code"></div>
+      <p class="qr-caption">
+        Open your authenticator app, choose to add an account, and scan this code.
+      </p>
+    </div>
+
+    <div class="setup-info">
+      <div class="info-row">
+        <div class="info-label">Account</div>
+        <div class="info-value" id="setup-email">your account</div>
+      </div>
+
+      <div class="info-row">
+        <div class="info-label">Algorithm</div>
+        <div class="info-value">SHA-256 &middot; 6 digits &middot; 30 seconds</div>
+      </div>
+
+      <div class="info-row">
+        <div class="info-label">Can't scan?</div>
+        <div class="info-value">
+          <code class="secret-display" id="secret-display">your key</code>
+          <button type="button" class="btn btn-small btn-secondary" id="copy-secret">Copy</button>
+        </div>
+        <p class="small mt-2">
+          Type this key into your authenticator app by hand instead. It works the same way.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <details class="mt-4" style="border:1px solid var(--ink-hair);border-radius:6px;padding:14px 18px">
+    <summary style="cursor:pointer;font-weight:600;color:var(--navy)">Which apps work?</summary>
+    <p class="small mt-2" style="margin-bottom:0">
+      Every standard authenticator app works, including Google Authenticator and Microsoft Authenticator.
+      For the strongest setup we recommend a SHA-256 app: Raivo or 2FAS (iPhone), Aegis (Android),
+      1Password, Bitwarden, Authy, or Ente Auth. Any of these is a great choice.
+      <a href="/help/authenticator-apps">More about authenticator apps</a>.
+    </p>
+  </details>
+</section>
+
+<!-- Verify -->
+<section id="state-verify" class="section hidden">
+  <div class="marker">
+    <div class="num">02</div>
+    <h2>Enter the current code.</h2>
+    <div class="tag">verify<br>setup works</div>
+  </div>
+
+  <form id="verify-form" class="form-card">
+    <label for="verify-code">6-digit code your app is showing now</label>
+    <input type="text" id="verify-code" required inputmode="numeric"
+           pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
+           placeholder="&bull; &bull; &bull; &bull; &bull; &bull;">
+
+    <button type="submit" class="btn btn-primary mt-3" id="verify-btn">
+      Confirm and activate account
+    </button>
+
+    <div id="verify-error" class="error" role="alert" aria-live="assertive"></div>
+  </form>
+</section>
+
+<!-- Success + backup codes -->
+<section id="state-success" class="section hidden">
+  <div class="eyebrow"><span class="bar"></span>step 5 of 5</div>
+  <div class="marker">
+    <div class="num">02</div>
+    <h2>Save your emergency codes.</h2>
+    <div class="tag">shown<br>once</div>
+  </div>
+
+  <div class="warning-box">
+    <strong>Shown once. Save them now.</strong>
+    <p>
+      Each code signs you in once if you lose your phone or your authenticator app.
+      They are generated on our side and shown here only, so we cannot show them again
+      or recover them for you. Save them somewhere you can reach without your phone.
+    </p>
+  </div>
+
+  <div id="backup-codes" class="backup-grid"></div>
+
+  <div class="cta-row mt-3">
+    <button type="button" class="btn btn-primary" id="download-codes">Download my codes</button>
+  </div>
+  <p class="small mt-2">
+    or <button type="button" id="copy-codes" style="background:none;border:none;color:var(--cobalt);font-weight:600;cursor:pointer;text-decoration:underline;padding:0;font:inherit">copy them</button>
+    &middot; <button type="button" id="print-codes" style="background:none;border:none;color:var(--cobalt);font-weight:600;cursor:pointer;text-decoration:underline;padding:0;font:inherit">print</button>
+  </p>
+
+  <div class="form-checkbox mt-4">
+    <input type="checkbox" id="saved-confirm">
+    <label for="saved-confirm">
+      I have saved my codes somewhere I can reach without my phone.
+    </label>
+  </div>
+
+  <button type="button" class="btn btn-primary mt-3" id="finish-btn" disabled>
+    Finish setup
+  </button>
+</section>
+
+<!-- Passkey success + backup codes (separate from the TOTP success section) -->
+<section id="state-passkey-success" class="section hidden">
+  <div class="marker">
+    <div class="num">&#10003;</div>
+    <h2>Passkey registered. Save your backup codes.</h2>
+    <div class="tag">one-time<br>display</div>
+  </div>
+
+  <div class="warning-box">
+    <strong>Shown once. Save them now.</strong>
+    <p>Each code signs you in once if you lose the device your passkey lives on. This is the only time they are shown.</p>
+  </div>
+
+  <div id="passkey-backup-codes" class="backup-grid"></div>
+
+  <div class="cta-row mt-3">
+    <button type="button" class="btn btn-secondary" id="passkey-copy-codes">Copy all</button>
+    <button type="button" class="btn btn-secondary" id="passkey-download-codes">Download .txt</button>
+  </div>
+
+  <button type="button" class="btn btn-primary mt-3" id="passkey-finish-btn">Continue to dashboard</button>
+</section>
+
+<!-- Welcome: a finish line, not another task. Shown after the TOTP route's
+     "Finish setup". (The passkey route's Continue still lands on /dashboard via
+     passkey.js; aligning it to this screen is a small follow-up: a passkey.js
+     edit + a site-wide passkey.js ?v= bump.) -->
+<section id="state-welcome" class="section hidden">
+  <div class="eyebrow"><span class="bar"></span>all set</div>
+  <h2>You're all set.</h2>
+  <p class="lede mt-3">Your account is active. Two things you can do right now.</p>
+  <div class="grid2 mt-3">
+    <a href="/parashare" class="card" style="border-left:3px solid var(--ochre);text-decoration:none;display:block">
+      <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Send a file</div>
+      <p class="small" style="margin:0">Encrypt a file in your browser and send a link that the web app burns on the first read, on every plan.</p>
+    </a>
+    <a href="/sign" class="card" style="text-decoration:none;display:block">
+      <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Sign a document</div>
+      <p class="small" style="margin:0">Sign a PDF on this device. The private key never reaches the relay.</p>
+    </a>
+  </div>
+  <p class="small mt-3">You can always come back to this from your <a href="/en/dashboard">dashboard</a>.</p>
+</section>
+
+<p class="small" style="color:var(--ink-dim);margin-top:24px">
+  Paramant is a product of <strong>Paramantis Solutions B.V.</strong>, Harderwijk,
+  the Netherlands. <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>
+</p>
+</main>
+
+<script src="/nav.js?v=15" defer></script>
+<script src="/js/nav-auth.js?v=10" defer></script>
+<script src="/js/auth-setup.js?v=5"></script>
+<script type="module" src="/js/passkey.js?v=6"></script>
+
+<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/auth/setup" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
+<footer class="legal-strip">
+  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
+</footer>
+</body>
+</html>

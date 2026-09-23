@@ -1,3 +1,6 @@
+// One file, two languages: the Dutch page and its English copy under /en/ load
+// this same script, and <html lang> says which of the two strings to show.
+function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || '') ? en : nl; }
 /* Paramant user dashboard. Client-side renderer.
  *
  * Fetches GET /api/user/me (JSON, credentials: include) and hydrates the
@@ -43,12 +46,12 @@
   function fmtMinutesUntil(iso) {
     if (!iso) return '--';
     var ms = new Date(iso).getTime() - Date.now();
-    if (isNaN(ms) || ms <= 0) return 'expired';
+    if (isNaN(ms) || ms <= 0) return nlEn('verlopen', 'expired');
     var min = Math.round(ms / 60000);
     if (min < 60) return min + ' min';
     var h = Math.floor(min / 60);
     var r = min % 60;
-    return h + 'h ' + (r < 10 ? '0' + r : r) + 'm';
+    return h + nlEn(' u ', 'h ') + (r < 10 ? '0' + r : r) + nlEn(' min', 'm');
   }
 
   function showError(detail) {
@@ -137,13 +140,13 @@
     var when = paramantDate.day(term.at);
     if (line) {
       line.textContent = term.ended
-        ? 'Ended on ' + when + ', now on Community.'
-        : 'Ends on ' + when + ', nothing renews automatically.';
+        ? nlEn('Afgelopen op ', 'Ended on ') + when + nlEn(', nu op Community.', ', now on Community.')
+        : nlEn('Loopt af op ', 'Ends on ') + when + nlEn(', er wordt niets automatisch verlengd.', ', nothing renews automatically.');
       line.hidden = false;
     }
     if (warn && term.warn) {
       var text = warn.querySelector('[data-dh="term-warn"]');
-      if (text) text.textContent = 'Your plan ends on ' + when + '. Renew for another month or year, or let it fall back to Community. Nothing is charged automatically.';
+      if (text) text.textContent = nlEn('Uw plan loopt af op ', 'Your plan ends on ') + when + nlEn('. Verleng met een maand of een jaar, of laat het terugvallen op Community. Er wordt niets automatisch afgeschreven.', '. Renew for another month or year, or let it fall back to Community. Nothing is charged automatically.');
       warn.hidden = false;
     }
   }
@@ -156,13 +159,13 @@
   // read what he bought.
   var PRODUCT_INCLUDES = {
     parasign: {
-      pro: 'Firm on ParaSign: 100 signatures a month, and a connection you can plug into your own systems.',
-      business: 'ParaSign Business: 1,000 signatures a month, support with a name on it that answers within one business day, help answering your customers\u2019 security questionnaires, and an audit trail you can export as a file.',
-      enterprise: 'ParaSign Enterprise: your own dedicated relay, a sector relay for health, legal or finance, a service level agreement with credits, a self-hosting licence and audit support.'
+      pro: nlEn('Firm voor Ondertekenen: 100 handtekeningen per maand, en een koppeling met uw eigen systemen.', 'Firm on ParaSign: 100 signatures a month, and a connection you can plug into your own systems.'),
+      business: nlEn('Ondertekenen Business: 1.000 handtekeningen per maand, ondersteuning van een vast persoon die binnen één werkdag antwoordt, hulp bij de beveiligingsvragenlijsten van uw klanten, en een audittrail die u als bestand kunt exporteren.', 'ParaSign Business: 1,000 signatures a month, support with a name on it that answers within one business day, help answering your customers\u2019 security questionnaires, and an audit trail you can export as a file.'),
+      enterprise: nlEn('Ondertekenen Enterprise: een eigen relay, een sectorrelay voor zorg, juridisch of financieel, een SLA met compensatie, een licentie om zelf te hosten en hulp bij audits.', 'ParaSign Enterprise: your own dedicated relay, a sector relay for health, legal or finance, a service level agreement with credits, a self-hosting licence and audit support.')
     },
     parasend: {
-      pro: 'Firm on ParaSend: links that stay open 24 hours, up to 10 reads each, up to 50 registered devices, a record of what you sent, and no rate limit.',
-      enterprise: 'ParaSend Enterprise: links that stay open 7 days, up to 100 reads each, unlimited devices, your own dedicated relay, a signed Data Processing Agreement and 99.95% uptime.'
+      pro: nlEn('Firm voor Versturen: links die 24 uur open blijven, tot 10 keer te openen, tot 50 geregistreerde apparaten, een overzicht van wat u verstuurde, en geen snelheidslimiet.', 'Firm on ParaSend: links that stay open 24 hours, up to 10 reads each, up to 50 registered devices, a record of what you sent, and no rate limit.'),
+      enterprise: nlEn('Versturen Enterprise: links die 7 dagen open blijven, tot 100 keer te openen, onbeperkt apparaten, een eigen relay, een getekende verwerkersovereenkomst en 99,95% beschikbaarheid.', 'ParaSend Enterprise: links that stay open 7 days, up to 100 reads each, unlimited devices, your own dedicated relay, a signed Data Processing Agreement and 99.95% uptime.')
     }
   };
 
@@ -201,19 +204,19 @@
     var lede = band.querySelector('[data-dh="return-lede"]');
     band.hidden = false;
     if (lastAccountIsPaid) {
-      if (kicker) kicker.textContent = 'Payment received';
-      if (lede) lede.textContent = 'Thank you. Your plan is active and what it includes is below. The term you bought and the day it ends are under Plan and billing.';
+      if (kicker) kicker.textContent = nlEn('Betaling ontvangen', 'Payment received');
+      if (lede) lede.textContent = nlEn('Dank u. Uw plan is actief en wat erbij hoort staat hieronder. De termijn die u kocht en de dag waarop die afloopt staan onder Plan en betaling.', 'Thank you. Your plan is active and what it includes is below. The term you bought and the day it ends are under Plan and billing.');
       clearBillingParam();
       return;
     }
     if (tries > 0) {
-      if (kicker) kicker.textContent = 'Confirming your payment';
-      if (lede) lede.textContent = 'Your bank has sent you back. We are waiting for the payment to be confirmed, which usually takes a few seconds. This page updates by itself.';
+      if (kicker) kicker.textContent = nlEn('Uw betaling wordt bevestigd', 'Confirming your payment');
+      if (lede) lede.textContent = nlEn('Uw bank heeft u teruggestuurd. We wachten op de bevestiging van de betaling, meestal duurt dat een paar seconden. Deze pagina werkt zichzelf bij.', 'Your bank has sent you back. We are waiting for the payment to be confirmed, which usually takes a few seconds. This page updates by itself.');
       window.setTimeout(function () { refreshAccount(tries - 1); }, RETURN_DELAY_MS);
       return;
     }
-    if (kicker) kicker.textContent = 'Payment not confirmed yet';
-    if (lede) lede.textContent = 'Your payment has not reached us yet. Nothing is lost: as soon as it is confirmed the plan is granted by itself. Reload this page in a minute, and mail privacy@paramant.app if it still has not appeared.';
+    if (kicker) kicker.textContent = nlEn('Betaling nog niet bevestigd', 'Payment not confirmed yet');
+    if (lede) lede.textContent = nlEn('Uw betaling is nog niet bij ons binnen. Er gaat niets verloren: zodra ze bevestigd is, krijgt u het plan vanzelf. Laad deze pagina over een minuut opnieuw, en mail privacy@paramant.app als het er dan nog niet staat.', 'Your payment has not reached us yet. Nothing is lost: as soon as it is confirmed the plan is granted by itself. Reload this page in a minute, and mail privacy@paramant.app if it still has not appeared.');
     clearBillingParam();
   }
 
@@ -266,8 +269,8 @@
         if (copy) lines.push(copy);
       }
       if (!lines.length && planId !== 'community') {
-        lines.push('Your account is on the ' + planName + ' plan, with the ' + planName +
-                   ' limits on both ParaSign and ParaSend.');
+        lines.push(nlEn('Uw account staat op het ', 'Your account is on the ') + planName + nlEn('-plan, met de limieten van ', ' plan, with the ') + planName +
+                   nlEn(' voor zowel Ondertekenen als Versturen.', ' limits on both ParaSign and ParaSend.'));
       }
       paid.hidden = isFree || !lines.length;
       if (!paid.hidden) {
@@ -315,7 +318,7 @@
     var list = document.getElementById('dh-sends');
     var refresh = document.getElementById('dh-sends-refresh');
     if (!section || !list) return;
-    if (refresh) { refresh.disabled = true; refresh.textContent = 'Refreshing'; }
+    if (refresh) { refresh.disabled = true; refresh.textContent = nlEn('Bezig met vernieuwen', 'Refreshing'); }
     fetch('/api/user/sends', {
       credentials: 'include', headers: { 'Accept': 'application/json' }, cache: 'no-store'
     }).then(function (r) {
@@ -335,39 +338,39 @@
       show(section);
       if (list) {
         list.innerHTML = '<div class="dh-rowsay" role="status">'
-          + 'Your sends could not be read just now. Nothing has changed; '
-          + 'use Refresh to try again.</div>';
+          + nlEn('Uw verzendingen konden nu niet worden gelezen. Er is niets veranderd. ', 'Your sends could not be read just now. Nothing has changed; ')
+          + nlEn('Kies Vernieuwen om het opnieuw te proberen.</div>', 'use Refresh to try again.</div>');
       }
     }).then(function () {
-      if (refresh) { refresh.disabled = false; refresh.textContent = 'Refresh'; }
+      if (refresh) { refresh.disabled = false; refresh.textContent = nlEn('Vernieuwen', 'Refresh'); }
     });
   }
 
   function sendWaitingLine(s) {
-    if (s.status === 'expired') return 'This send has expired. The file is gone.';
-    if (s.outstanding === 0) return 'Everyone has collected it.';
-    if (s.outstanding === 1) return 'One person has not collected yet.';
-    return s.outstanding + ' people have not collected yet.';
+    if (s.status === 'expired') return nlEn('Deze verzending is verlopen. Het bestand is weg.', 'This send has expired. The file is gone.');
+    if (s.outstanding === 0) return nlEn('Iedereen heeft het opgehaald.', 'Everyone has collected it.');
+    if (s.outstanding === 1) return nlEn('Eén persoon heeft het nog niet opgehaald.', 'One person has not collected yet.');
+    return s.outstanding + nlEn(' mensen hebben het nog niet opgehaald.', ' people have not collected yet.');
   }
 
   function renderSends() {
     var list = document.getElementById('dh-sends');
     if (!list) return;
     list.innerHTML = sends.map(function (s) {
-      var naam = s.filename || 'A file';
-      var deel = (s.collected || 0) + ' of ' + (s.total || 0) + ' collected';
+      var naam = s.filename || nlEn('Een bestand', 'A file');
+      var deel = (s.collected || 0) + nlEn(' van ', ' of ') + (s.total || 0) + nlEn(' opgehaald', ' collected');
       var pct = s.total ? Math.round(((s.collected || 0) / s.total) * 100) : 0;
       var staat = s.status === 'expired' ? 'cancelled'
                 : s.outstanding === 0 ? 'completed' : 'waiting';
       return '<div class="dh-send-row" data-send-id="' + esc(s.id || '') + '">' +
         '<button type="button" class="dh-send-open" data-pa-action="send-open" ' +
-          'data-send-id="' + esc(s.id || '') + '" aria-label="Open details for ' + esc(naam) + '">' +
+          'data-send-id="' + esc(s.id || '') + nlEn('" aria-label="Details openen van ', '" aria-label="Open details for ') + esc(naam) + '">' +
           '<div class="dh-send-name"><strong title="' + esc(naam) + '">' + esc(naam) + '</strong>' +
           '<span>Sent ' + esc(fmtDate(s.created_at)) + '</span></div>' +
           '<div class="dh-send-progress"><span>' + esc(deel) + '</span>' +
           '<div class="dh-progress" aria-label="' + esc(deel) + '"><i style="width:' + pct + '%"></i></div></div>' +
-          '<div class="dh-status ' + staat + '">' + (s.status === 'expired' ? 'Expired'
-            : s.outstanding === 0 ? 'Complete' : 'In progress') + '</div>' +
+          '<div class="dh-status ' + staat + '">' + (s.status === 'expired' ? nlEn('Verlopen', 'Expired')
+            : s.outstanding === 0 ? nlEn('Compleet', 'Complete') : nlEn('Bezig', 'In progress')) + '</div>' +
         '</button>' +
         '<div class="dh-send-foot">' +
           '<span class="dh-send-next">' + esc(sendWaitingLine(s)) + '</span>' +
@@ -385,33 +388,33 @@
     if (!host) return;
     if (!host.hidden) { host.hidden = true; return; }
     host.hidden = false;
-    host.innerHTML = '<span class="dh-rowsay">Reading who has been...</span>';
+    host.innerHTML = nlEn('<span class="dh-rowsay">Ophalers worden gelezen...</span>', '<span class="dh-rowsay">Reading who has been...</span>');
     fetch('/api/user/sends/' + encodeURIComponent(id), {
       credentials: 'include', headers: { 'Accept': 'application/json' }, cache: 'no-store'
     }).then(function (r) { return r.json(); }).then(function (body) {
       var people = (body && Array.isArray(body.recipients)) ? body.recipients : [];
-      if (!people.length) { host.innerHTML = '<span class="dh-rowsay">No recipients on this send.</span>'; return; }
+      if (!people.length) { host.innerHTML = nlEn('<span class="dh-rowsay">Deze verzending heeft geen ontvangers.</span>', '<span class="dh-rowsay">No recipients on this send.</span>'); return; }
       host.innerHTML = people.map(function (p) {
         var wanneer = p.picked_up_at ? fmtDate(p.picked_up_at) : '';
         var knoppen = p.status === 'waiting'
           ? '<button type="button" class="dh-rowbtn" data-pa-action="send-remind" ' +
               'data-send-id="' + esc(id) + '" data-email="' + esc(p.email) + '" ' +
-              'title="Sends a nudge. Their original link still works and does not change."' +
-              '>Remind</button>' +
+              nlEn('title="Stuurt een herinnering. De oorspronkelijke link blijft werken en verandert niet."', 'title="Sends a nudge. Their original link still works and does not change."') +
+              nlEn('>Herinneren</button>', '>Remind</button>') +
             '<button type="button" class="dh-rowbtn danger" data-pa-action="send-revoke" ' +
-              'data-send-id="' + esc(id) + '" data-email="' + esc(p.email) + '">Withdraw</button>'
+              'data-send-id="' + esc(id) + '" data-email="' + esc(p.email) + nlEn('">Intrekken</button>', '">Withdraw</button>')
           : '';
         return '<div class="dh-send-person">' +
           '<span class="dh-send-who">' + esc(p.email) + '</span>' +
           '<span class="dh-dot ' + esc(p.status) + '">' +
-            (p.status === 'collected' ? 'Collected' : p.status === 'revoked' ? 'Withdrawn' : 'Waiting') +
+            (p.status === 'collected' ? nlEn('Opgehaald', 'Collected') : p.status === 'revoked' ? nlEn('Ingetrokken', 'Withdrawn') : nlEn('Wacht', 'Waiting')) +
           '</span>' +
           (wanneer ? '<span class="dh-send-when">' + esc(wanneer) + '</span>' : '') +
           knoppen +
         '</div>';
       }).join('');
     }).catch(function () {
-      host.innerHTML = '<span class="dh-rowsay fail">Could not read this send. Try again.</span>';
+      host.innerHTML = nlEn('<span class="dh-rowsay fail">Deze verzending kon niet worden gelezen. Probeer het opnieuw.</span>', '<span class="dh-rowsay fail">Could not read this send. Try again.</span>');
     });
   }
 
@@ -421,12 +424,12 @@
     var row = button && button.closest ? button.closest('.dh-send-person') : null;
     if (!row) return;
     row.innerHTML =
-      '<span class="dh-rowask">Withdraw <strong>' + esc(email) + '</strong>? ' +
-        'Their link stops working. The rest of the group keeps theirs.</span>' +
+      nlEn('<span class="dh-rowask"><strong>', '<span class="dh-rowask">Withdraw <strong>') + esc(email) + nlEn('</strong> intrekken? ', '</strong>? ') +
+        nlEn('Die link werkt dan niet meer. De rest van de groep houdt de eigen link.</span>', 'Their link stops working. The rest of the group keeps theirs.</span>') +
       '<button type="button" class="dh-rowbtn" data-pa-action="send-open" ' +
-        'data-send-id="' + esc(id) + '">Keep it</button>' +
+        'data-send-id="' + esc(id) + nlEn('">Laten staan</button>', '">Keep it</button>') +
       '<button type="button" class="dh-rowbtn danger" data-pa-action="send-revoke-do" ' +
-        'data-send-id="' + esc(id) + '" data-email="' + esc(email) + '">Yes, withdraw</button>';
+        'data-send-id="' + esc(id) + '" data-email="' + esc(email) + nlEn('">Ja, intrekken</button>', '">Yes, withdraw</button>');
     var veilig = row.querySelector('[data-pa-action="send-open"]');
     if (veilig && veilig.focus) veilig.focus();
   }
@@ -434,7 +437,7 @@
   function sendAction(pad, id, email, button, klaar) {
     if (button) button.disabled = true;
     var row = button && button.closest ? button.closest('.dh-send-person') : null;
-    if (row) row.innerHTML = '<span class="dh-rowsay" role="status">Working...</span>';
+    if (row) row.innerHTML = nlEn('<span class="dh-rowsay" role="status">Bezig...</span>', '<span class="dh-rowsay" role="status">Working...</span>');
     fetch('/api/user/sends/' + encodeURIComponent(id) + '/' + pad, {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -450,12 +453,12 @@
     }).catch(function (err) {
       if (row) {
         row.innerHTML = '<span class="dh-rowsay fail" role="status">' +
-          esc(err.message === 'already_collected' ? 'They already collected it.'
+          esc(err.message === 'already_collected' ? nlEn('Het is al opgehaald.', 'They already collected it.')
             : err.message === 'reminder_limit'
-              ? 'They have had three reminders. Send the file again instead.'
+              ? nlEn('Er zijn al drie herinneringen gestuurd. Verstuur het bestand liever opnieuw.', 'They have had three reminders. Send the file again instead.')
             : err.message === 'reminder_not_sent'
-              ? 'The mail did not leave our side. Nothing changed; try again in a minute.'
-            : 'That did not go through. Nothing changed.') + '</span>';
+              ? nlEn('De mail is niet bij ons weggegaan. Er is niets veranderd. Probeer het over een minuut opnieuw.', 'The mail did not leave our side. Nothing changed; try again in a minute.')
+            : nlEn('Dat is niet gelukt. Er is niets veranderd.', 'That did not go through. Nothing changed.')) + '</span>';
       }
       // Leave a way back rather than a dead row with an error in it.
       setTimeout(function () { var h = document.querySelector('[data-send-people="' + cssEscape(id) + '"]'); if (h) { h.hidden = true; openSend(id); } }, 3500);
@@ -513,7 +516,7 @@
       if (act === 'send-remind') {
         ev.preventDefault();
         sendAction('reinvite', t.getAttribute('data-send-id'),
-                   t.getAttribute('data-email'), t, 'Reminder sent. Their link is unchanged.');
+                   t.getAttribute('data-email'), t, nlEn('Herinnering verstuurd. De link is niet veranderd.', 'Reminder sent. Their link is unchanged.'));
         return;
       }
       if (act === 'send-revoke') {
@@ -524,7 +527,7 @@
       if (act === 'send-revoke-do') {
         ev.preventDefault();
         sendAction('revoke', t.getAttribute('data-send-id'),
-                   t.getAttribute('data-email'), t, 'Withdrawn. Their link no longer works.');
+                   t.getAttribute('data-email'), t, nlEn('Ingetrokken. Die link werkt niet meer.', 'Withdrawn. Their link no longer works.'));
         return;
       }
       if (act === 'document-open') {
@@ -570,11 +573,11 @@
 
   function documentLabel(state) {
     return ({
-      waiting: 'Waiting for signatures',
-      in_progress: 'In progress',
-      completed: 'Completed',
-      cancelled: 'Cancelled'
-    })[state] || 'Open';
+      waiting: nlEn('Wacht op handtekeningen', 'Waiting for signatures'),
+      in_progress: nlEn('Bezig', 'In progress'),
+      completed: nlEn('Afgerond', 'Completed'),
+      cancelled: nlEn('Geannuleerd', 'Cancelled')
+    })[state] || nlEn('Lopend', 'Open');
   }
 
   function renderDocumentCounts() {
@@ -601,14 +604,14 @@
     var visible = documents.filter(function (doc) { return documentMatches(doc, documentFilter); });
     if (!visible.length) {
       var empty = documentFilter === 'open'
-        ? ['No open requests', 'Start a signing request when you need someone to sign a document.']
-        : ['Nothing here yet', 'Documents in this state will appear here automatically.'];
+        ? [nlEn('Geen lopende verzoeken', 'No open requests'), nlEn('Start een ondertekenverzoek als iemand een document moet tekenen.', 'Start a signing request when you need someone to sign a document.')]
+        : [nlEn('Hier staat nog niets', 'Nothing here yet'), nlEn('Documenten met deze status verschijnen hier vanzelf.', 'Documents in this state will appear here automatically.')];
       // An empty state that only describes the way out is a dead end. The one
       // action that fills this list is a signing request, so it gets a button
       // to the page that starts one. Send is deliberately not offered here:
       // this list counts signing requests, not deliveries.
       list.innerHTML = '<div class="dh-empty"><strong>' + empty[0] + '</strong><span>' + empty[1] + '</span>' +
-        '<a class="dh-btn dh-empty-cta" href="/sign?mode=invite">Start a signing request</a></div>';
+        nlEn('<a class="dh-btn dh-empty-cta" href="/sign?mode=invite">Ondertekenverzoek starten</a></div>', '<a class="dh-btn dh-empty-cta" href="/sign?mode=invite">Start a signing request</a></div>');
       return;
     }
     list.innerHTML = visible.map(function (doc) {
@@ -616,7 +619,7 @@
       var total = Math.max(0, Number(doc.party_count || 0));
       var signed = Math.max(0, Math.min(total, Number(doc.signed_count || 0)));
       var pct = total ? Math.round((signed / total) * 100) : 0;
-      var name = doc.original_filename || 'Signing request';
+      var name = doc.original_filename || nlEn('Ondertekenverzoek', 'Signing request');
       // The reference used to be cut to ten characters in code, which sliced
       // env_waiting_... into "env_waitin": a fragment that looks like a whole
       // value and is useless for support. The full value goes in, CSS shortens
@@ -630,12 +633,12 @@
       // strip under it says what happens next in words and carries the one
       // control that closes the loop. Both are real buttons, side by side
       // rather than nested, which a button-inside-a-button could never be.
-      return '<button type="button" class="dh-document" data-document-id="' + esc(doc.id || '') + '" aria-label="Open details for ' + esc(name) + '">' +
+      return '<button type="button" class="dh-document" data-document-id="' + esc(doc.id || '') + nlEn('" aria-label="Details openen van ', '" aria-label="Open details for ') + esc(name) + '">' +
         '<div class="dh-document-name"><strong title="' + esc(name) + '">' + esc(name) + '</strong>' +
-        '<span>Created ' + esc(fmtDate(doc.created_at)) +
-        (reference ? ' <span class="dh-doc-ref" title="' + esc(reference) + '">· Ref ' + esc(reference) + '</span>' : '') +
+        nlEn('<span>Gemaakt ', '<span>Created ') + esc(fmtDate(doc.created_at)) +
+        (reference ? ' <span class="dh-doc-ref" title="' + esc(reference) + nlEn('">· Kenmerk ', '">· Ref ') + esc(reference) + '</span>' : '') +
         '</span></div>' +
-        '<div class="dh-document-progress"><span>' + signed + ' of ' + total + ' signed</span><div class="dh-progress" aria-label="' + signed + ' of ' + total + ' signed"><i style="width:' + pct + '%"></i></div></div>' +
+        '<div class="dh-document-progress"><span>' + signed + nlEn(' van ', ' of ') + total + nlEn(' getekend</span><div class="dh-progress" aria-label="', ' signed</span><div class="dh-progress" aria-label="') + signed + nlEn(' van ', ' of ') + total + nlEn(' getekend"><i style="width:', ' signed"><i style="width:') + pct + '%"></i></div></div>' +
         '<div class="dh-status ' + state + '">' + documentLabel(state) + '</div>' +
         '</button>';
     }).join('');
@@ -645,17 +648,17 @@
   // thing IS; this says what it is waiting for. Without it a sender reads
   // "Waiting for signatures" and still has to open the row to learn on whom.
   function documentNext(doc, state, total, signed) {
-    if (state === 'completed') return 'Signed by everyone. The proof is yours to download.';
-    if (state === 'cancelled') return 'Withdrawn. Nobody can add a signature.';
+    if (state === 'completed') return nlEn('Door iedereen getekend. U kunt het bewijs downloaden.', 'Signed by everyone. The proof is yours to download.');
+    if (state === 'cancelled') return nlEn('Ingetrokken. Niemand kan nog tekenen.', 'Withdrawn. Nobody can add a signature.');
     var parties = Array.isArray(doc.parties) ? doc.parties : [];
     var waiting = parties.filter(function (p) { return p.status !== 'signed'; });
     if (waiting.length === 1 && (waiting[0].label || waiting[0].email)) {
-      return 'Waiting for ' + (waiting[0].label || waiting[0].email) + '.';
+      return nlEn('Wacht op ', 'Waiting for ') + (waiting[0].label || waiting[0].email) + '.';
     }
     var open = Math.max(0, total - signed);
-    if (open === 1) return 'Waiting for one person.';
-    if (open > 1) return 'Waiting for ' + open + ' people.';
-    return 'Waiting for the relay to confirm.';
+    if (open === 1) return nlEn('Wacht op één persoon.', 'Waiting for one person.');
+    if (open > 1) return nlEn('Wacht op ', 'Waiting for ') + open + nlEn(' mensen.', ' people.');
+    return nlEn('Wacht op bevestiging van de relay.', 'Waiting for the relay to confirm.');
   }
 
   // The controls that belong to a row's state. Withdraw sits here rather than
@@ -664,10 +667,10 @@
   function documentActions(doc, state) {
     var id = esc(doc.id || '');
     if (state === 'completed') {
-      return '<a class="dh-rowbtn" href="/api/user/documents/' + encodeURIComponent(doc.id) + '/receipt" download>Download proof</a>';
+      return '<a class="dh-rowbtn" href="/api/user/documents/' + encodeURIComponent(doc.id) + nlEn('/receipt" download>Bewijs downloaden</a>', '/receipt" download>Download proof</a>');
     }
     if (state === 'waiting' || state === 'in_progress') {
-      return '<button type="button" class="dh-rowbtn danger" data-pa-action="document-withdraw-ask" data-document-id="' + id + '">Withdraw</button>';
+      return '<button type="button" class="dh-rowbtn danger" data-pa-action="document-withdraw-ask" data-document-id="' + id + nlEn('">Intrekken</button>', '">Withdraw</button>');
     }
     return '';
   }
@@ -680,16 +683,16 @@
     var host = document.querySelector('.dh-document-acts[data-document-id="' + cssEscape(id) + '"]');
     if (!host) return;
     var doc = documentById(id);
-    var name = (doc && doc.original_filename) || 'this request';
+    var name = (doc && doc.original_filename) || nlEn('dit verzoek', 'this request');
     // Foolproof, in the literal sense: a second click in the same spot must not
     // finish a one-way action. So the safe answer takes the place the Withdraw
     // button just had, and the irreversible one sits after it. The document is
     // named, because a row you clicked by accident looks exactly like the row
     // next to it.
     host.innerHTML =
-      '<span class="dh-rowask">Withdraw <strong>' + esc(name) + '</strong>? Signatures already given stay in the record, nobody can add another.</span>' +
-      '<button type="button" class="dh-rowbtn" data-pa-action="document-withdraw-no" data-document-id="' + esc(id) + '">Keep it open</button>' +
-      '<button type="button" class="dh-rowbtn danger" data-pa-action="document-withdraw-do" data-document-id="' + esc(id) + '">Yes, withdraw</button>';
+      nlEn('<span class="dh-rowask"><strong>', '<span class="dh-rowask">Withdraw <strong>') + esc(name) + nlEn('</strong> intrekken? Gezette handtekeningen blijven vastgelegd, niemand kan er nog een toevoegen.</span>', '</strong>? Signatures already given stay in the record, nobody can add another.</span>') +
+      '<button type="button" class="dh-rowbtn" data-pa-action="document-withdraw-no" data-document-id="' + esc(id) + nlEn('">Open laten</button>', '">Keep it open</button>') +
+      '<button type="button" class="dh-rowbtn danger" data-pa-action="document-withdraw-do" data-document-id="' + esc(id) + nlEn('">Ja, intrekken</button>', '">Yes, withdraw</button>');
     var safe = host.querySelector('[data-pa-action="document-withdraw-no"]');
     if (safe && safe.focus) safe.focus();
   }
@@ -729,26 +732,26 @@
     var state = documentState(doc);
     var total = Math.max(0, Number(doc.party_count || 0));
     var signed = Math.max(0, Math.min(total, Number(doc.signed_count || 0)));
-    title.textContent = doc.original_filename || 'Signing request';
+    title.textContent = doc.original_filename || nlEn('Ondertekenverzoek', 'Signing request');
     var parties = Array.isArray(doc.parties) ? doc.parties : [];
     var partyText = parties.length ? parties.map(function (p) {
-      return esc(p.label || ('Signer ' + (Number(p.index || 0) + 1))) + ': ' + esc(p.status === 'signed' ? 'signed' : p.status === 'viewed' ? 'opened' : 'waiting');
-    }).join('<br>') : signed + ' of ' + total + ' signed';
+      return esc(p.label || (nlEn('Ondertekenaar ', 'Signer ') + (Number(p.index || 0) + 1))) + ': ' + esc(p.status === 'signed' ? nlEn('getekend', 'signed') : p.status === 'viewed' ? nlEn('geopend', 'opened') : nlEn('wacht', 'waiting'));
+    }).join('<br>') : signed + nlEn(' van ', ' of ') + total + nlEn(' getekend', ' signed');
     var help = state === 'completed'
-      ? 'The relay keeps the cryptographic proof, not a plaintext copy of your document. Download the .psign proof here. Keep it next to your locally saved signed document. You can verify both later in Paramant.'
+      ? nlEn('De relay bewaart het cryptografische bewijs, geen leesbare kopie van uw document. Download hier het .psign-bewijs. Bewaar het naast uw eigen opgeslagen ondertekende document. U kunt beide later in Paramant controleren.', 'The relay keeps the cryptographic proof, not a plaintext copy of your document. Download the .psign proof here. Keep it next to your locally saved signed document. You can verify both later in Paramant.')
       : state === 'cancelled'
-        ? 'This request is closed. Existing signatures remain in the audit record, but nobody can add another signature.'
-        : 'This request is still open. Paramant stores the delivered document encrypted. The plaintext document and its key are not recoverable from the relay dashboard.';
+        ? nlEn('Dit verzoek is gesloten. Gezette handtekeningen blijven in het auditlog, maar niemand kan nog tekenen.', 'This request is closed. Existing signatures remain in the audit record, but nobody can add another signature.')
+        : nlEn('Dit verzoek loopt nog. Paramant bewaart het afgeleverde document versleuteld. Het leesbare document en de sleutel zijn niet terug te halen via het relay-overzicht.', 'This request is still open. Paramant stores the delivered document encrypted. The plaintext document and its key are not recoverable from the relay dashboard.');
     var actions = '';
-    if (state === 'completed') actions += '<a class="dh-btn" href="/api/user/documents/' + encodeURIComponent(doc.id) + '/receipt" download>Download .psign proof</a>';
-    if (state === 'waiting' || state === 'in_progress') actions += '<button class="dh-btn danger" type="button" data-pa-action="document-cancel" data-document-id="' + esc(doc.id) + '">Cancel request</button>';
-    actions += '<a class="dh-btn" href="/verify">Verify a document</a>';
+    if (state === 'completed') actions += '<a class="dh-btn" href="/api/user/documents/' + encodeURIComponent(doc.id) + nlEn('/receipt" download>.psign-bewijs downloaden</a>', '/receipt" download>Download .psign proof</a>');
+    if (state === 'waiting' || state === 'in_progress') actions += '<button class="dh-btn danger" type="button" data-pa-action="document-cancel" data-document-id="' + esc(doc.id) + nlEn('">Verzoek annuleren</button>', '">Cancel request</button>');
+    actions += nlEn('<a class="dh-btn" href="/verify">Een document controleren</a>', '<a class="dh-btn" href="/verify">Verify a document</a>');
     body.innerHTML = '<dl class="dh-doc-kv">' +
       '<dt>Status</dt><dd>' + esc(documentLabel(state)) + '</dd>' +
-      '<dt>Reference</dt><dd>' + esc(doc.id || '') + '</dd>' +
-      '<dt>Created</dt><dd>' + esc(fmtDate(doc.created_at)) + '</dd>' +
-      '<dt>Expires</dt><dd>' + esc(fmtDate(doc.expires_at)) + '</dd>' +
-      '<dt>Signers</dt><dd>' + partyText + '</dd></dl>' +
+      nlEn('<dt>Kenmerk</dt><dd>', '<dt>Reference</dt><dd>') + esc(doc.id || '') + '</dd>' +
+      nlEn('<dt>Gemaakt</dt><dd>', '<dt>Created</dt><dd>') + esc(fmtDate(doc.created_at)) + '</dd>' +
+      nlEn('<dt>Verloopt</dt><dd>', '<dt>Expires</dt><dd>') + esc(fmtDate(doc.expires_at)) + '</dd>' +
+      nlEn('<dt>Ondertekenaars</dt><dd>', '<dt>Signers</dt><dd>') + partyText + '</dd></dl>' +
       '<div class="dh-doc-help">' + esc(help) + '</div>' +
       '<div class="dh-doc-actions">' + actions + '</div><div class="dh-doc-message" id="dh-doc-message" aria-live="polite"></div>';
     dialog.hidden = false;
@@ -793,11 +796,11 @@
     // verbouwen hoort in een tak die over ondertekenen gaat, niet hier: het
     // koste drie reparaties aan een bestaande browsertest en leverde de klant
     // van deze tak niets op.
-    if (!doc || !confirm('Cancel this signing request? Nobody will be able to add another signature.')) return;
+    if (!doc || !confirm(nlEn('Dit ondertekenverzoek annuleren? Daarna kan niemand nog tekenen.', 'Cancel this signing request? Nobody will be able to add another signature.'))) return;
     if (button) button.disabled = true;
-    rowSay(id, 'Withdrawing...');
+    rowSay(id, nlEn('Bezig met intrekken...', 'Withdrawing...'));
     var message = document.getElementById('dh-doc-message');
-    if (message) message.textContent = 'Cancelling request...';
+    if (message) message.textContent = nlEn('Verzoek wordt geannuleerd...', 'Cancelling request...');
     fetch('/api/user/documents/' + encodeURIComponent(id) + '/cancel', {
       method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}'
     }).then(function (r) {
@@ -826,8 +829,8 @@
     }).catch(function (err) {
       if (button) button.disabled = false;
       var uitleg = err.message === 'already_complete'
-        ? 'Everyone had already signed. Nothing was withdrawn.'
-        : 'Withdrawing did not go through. The request is unchanged.';
+        ? nlEn('Iedereen had al getekend. Er is niets ingetrokken.', 'Everyone had already signed. Nothing was withdrawn.')
+        : nlEn('Intrekken is niet gelukt. Het verzoek is niet veranderd.', 'Withdrawing did not go through. The request is unchanged.');
       rowSay(id, uitleg, 'fail');
       // Leave a way back: after a failure the row gets its buttons again, so a
       // sender is never stuck looking at an error with nothing to press.
@@ -840,7 +843,7 @@
     var list = document.getElementById('dh-documents');
     var refresh = document.getElementById('dh-documents-refresh');
     if (!list) return;
-    if (refresh) { refresh.disabled = true; refresh.textContent = 'Refreshing'; }
+    if (refresh) { refresh.disabled = true; refresh.textContent = nlEn('Bezig met vernieuwen', 'Refreshing'); }
     fetch('/api/user/documents', {
       credentials: 'include',
       headers: { 'Accept': 'application/json' },
@@ -852,9 +855,9 @@
       documents = Array.isArray(body.documents) ? body.documents : [];
       renderDocuments();
     }).catch(function () {
-      list.innerHTML = '<div class="dh-empty"><strong>Document status is unavailable</strong><span>Your documents are unchanged. <button class="dh-refresh" type="button" data-pa-action="documents-refresh">Try again</button></span></div>';
+      list.innerHTML = nlEn('<div class="dh-empty"><strong>De documentstatus is niet beschikbaar</strong><span>Uw documenten zijn niet veranderd. <button class="dh-refresh" type="button" data-pa-action="documents-refresh">Opnieuw proberen</button></span></div>', '<div class="dh-empty"><strong>Document status is unavailable</strong><span>Your documents are unchanged. <button class="dh-refresh" type="button" data-pa-action="documents-refresh">Try again</button></span></div>');
     }).finally(function () {
-      if (refresh) { refresh.disabled = false; refresh.textContent = 'Refresh'; }
+      if (refresh) { refresh.disabled = false; refresh.textContent = nlEn('Vernieuwen', 'Refresh'); }
     });
   }
 
@@ -877,7 +880,7 @@
     var list = document.getElementById('dh-inbox-list');
     var refresh = document.getElementById('dh-inbox-refresh');
     if (!section || !list) return;
-    if (refresh) { refresh.disabled = true; refresh.textContent = 'Refreshing'; }
+    if (refresh) { refresh.disabled = true; refresh.textContent = nlEn('Bezig met vernieuwen', 'Refreshing'); }
     fetch('/api/user/parasign/inbox', {
       credentials: 'include',
       headers: { 'Accept': 'application/json' },
@@ -889,19 +892,19 @@
       var rows = Array.isArray(body.documents) ? body.documents : [];
       if (!rows.length) { hide(section); return; }
       list.innerHTML = rows.map(function (doc) {
-        var name = doc.document || 'Signing request';
+        var name = doc.document || nlEn('Ondertekenverzoek', 'Signing request');
         // Who and when, and only what arrived. An unnamed sender is left out
         // rather than guessed at.
         var from = String(doc.sender || '').trim();
         var when = doc.sent_at ? fmtDate(doc.sent_at) : '';
         var bits = [];
-        if (from) bits.push('From ' + esc(from));
-        if (when) bits.push((from ? 'sent ' : 'Sent ') + esc(when));
-        if (doc.signing_closes_at) bits.push('signing closes ' + esc(fmtDate(doc.signing_closes_at)));
+        if (from) bits.push(nlEn('Van ', 'From ') + esc(from));
+        if (when) bits.push((from ? nlEn('verstuurd ', 'sent ') : nlEn('Verstuurd ', 'Sent ')) + esc(when));
+        if (doc.signing_closes_at) bits.push(nlEn('tekenen kan tot ', 'signing closes ') + esc(fmtDate(doc.signing_closes_at)));
         return '<div class="dh-inbox-row">' +
           '<div class="dh-inbox-name"><strong title="' + esc(name) + '">' + esc(name) + '</strong>' +
           (bits.length ? '<span>' + bits.join(' &middot; ') + '</span>' : '') + '</div>' +
-          '<button class="dh-inbox-act" type="button" data-pa-action="inbox-resend" data-document-id="' + esc(doc.id || '') + '">Send me the link again</button>' +
+          '<button class="dh-inbox-act" type="button" data-pa-action="inbox-resend" data-document-id="' + esc(doc.id || '') + nlEn('">Stuur mij de link opnieuw</button>', '">Send me the link again</button>') +
           '</div>';
       }).join('');
       show(section);
@@ -911,7 +914,7 @@
       // tell, and it is the expensive one: the reader stops looking.
       hide(section);
     }).finally(function () {
-      if (refresh) { refresh.disabled = false; refresh.textContent = 'Refresh'; }
+      if (refresh) { refresh.disabled = false; refresh.textContent = nlEn('Vernieuwen', 'Refresh'); }
     });
   }
 
@@ -921,7 +924,7 @@
   function resendInvitation(id, button) {
     if (!id || !button || button.disabled) return;
     button.disabled = true;
-    button.textContent = 'Sending';
+    button.textContent = nlEn('Bezig met versturen', 'Sending');
     fetch('/api/user/parasign/inbox/' + encodeURIComponent(id) + '/resend', {
       method: 'POST',
       credentials: 'include',
@@ -937,11 +940,11 @@
     }).then(function (body) {
       // The address comes back from the server and is the reader's own: it is
       // the only address the mail could have gone to.
-      button.textContent = body && body.sent_to ? 'Sent to ' + body.sent_to : 'Sent';
+      button.textContent = body && body.sent_to ? nlEn('Verstuurd naar ', 'Sent to ') + body.sent_to : nlEn('Verstuurd', 'Sent');
     }).catch(function (err) {
       button.textContent = err.message === 'rate_limited'
-        ? 'Already sent, try again in an hour'
-        : 'Could not send, try again later';
+        ? nlEn('Al verstuurd, probeer het over een uur opnieuw', 'Already sent, try again in an hour')
+        : nlEn('Versturen is niet gelukt, probeer het later opnieuw', 'Could not send, try again later');
       if (err.message !== 'rate_limited') button.disabled = false;
     });
   }
@@ -1010,7 +1013,7 @@
       }).catch(function () {
         for (i = 0; i < btns.length; i++) btns[i].disabled = false;
         var note = document.getElementById('dh-purpose-note');
-        if (note) { note.hidden = false; note.textContent = 'Could not save right now. Try again, or skip.'; }
+        if (note) { note.hidden = false; note.textContent = nlEn('Opslaan lukt nu niet. Probeer het opnieuw, of sla over.', 'Could not save right now. Try again, or skip.'); }
       });
     });
   }
@@ -1042,15 +1045,15 @@
       if (signing && Array.isArray(signing.keys) && signing.keys.length === 0) {
         items.push({
           href: '/account#signing-identity-section',
-          title: 'Set up document signing',
-          body: 'Create your ML-DSA-65 signing key so you can sign and co-sign documents.'
+          title: nlEn('Ondertekenen instellen', 'Set up document signing'),
+          body: nlEn('Maak uw ML-DSA-65-ondertekensleutel, zodat u documenten kunt ondertekenen en medeondertekenen.', 'Create your ML-DSA-65 signing key so you can sign and co-sign documents.')
         });
       }
       if (passkeys && Array.isArray(passkeys.passkeys) && passkeys.passkeys.length === 0) {
         items.push({
           href: '/account#passkey-section',
-          title: 'Add a sign-in passkey',
-          body: 'Use Face ID, Touch ID, or a security key to sign in without a code.'
+          title: nlEn('Passkey toevoegen om in te loggen', 'Add a sign-in passkey'),
+          body: nlEn('Log in met Face ID, Touch ID of een beveiligingssleutel, zonder code.', 'Use Face ID, Touch ID, or a security key to sign in without a code.')
         });
       }
       if (!items.length) return;
@@ -1084,7 +1087,7 @@
     var hm = p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
     var now = new Date();
     if (d.toDateString() === now.toDateString()) return hm;
-    var mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()];
+    var mon = [nlEn('jan', 'Jan'), nlEn('feb', 'Feb'), nlEn('mrt', 'Mar'), nlEn('apr', 'Apr'), nlEn('mei', 'May'), nlEn('jun', 'Jun'), nlEn('jul', 'Jul'), nlEn('aug', 'Aug'), nlEn('sep', 'Sep'), nlEn('okt', 'Oct'), nlEn('nov', 'Nov'), nlEn('dec', 'Dec')][d.getMonth()];
     var day = d.getDate() + ' ' + mon + (d.getFullYear() !== now.getFullYear() ? ' ' + d.getFullYear() : '');
     return day + ' ' + hm;
   }
@@ -1110,7 +1113,7 @@
       ? rows.slice(0, 50).map(function (ev) {
           return '<div class="dh-tl-row"><span class="t">' + fmtTime(ev.ts) + '</span><span class="e">' + esc(ev.event_type || 'event') + '</span></div>';
         }).join('')
-      : '<div class="dh-ops-dim">No activity' + (f ? ' matches "' + esc(opsFilter) + '"' : ' yet') + '.</div>';
+      : nlEn('<div class="dh-ops-dim">', '<div class="dh-ops-dim">No activity') + (f ? nlEn('Geen activiteit die past bij "', ' matches "') + esc(opsFilter) + '"' : nlEn('Nog geen activiteit', ' yet')) + '.</div>';
   }
   function renderOps(d) {
     // No key on this page, not even a masked one. /account is the one page that
@@ -1122,8 +1125,8 @@
     var keysEl = document.getElementById('dh-ops-keys');
     if (keysEl) {
       keysEl.innerHTML =
-        '<div class="dh-ops-row"><span class="dim">account key</span><span class="dim"><a href="/account">on your account page</a></span></div>' +
-        '<div class="dh-ops-row"><span class="dim">last used</span><span class="dim">tracked via activity</span></div>';
+        nlEn('<div class="dh-ops-row"><span class="dim">accountsleutel</span><span class="dim"><a href="/account">op uw accountpagina</a></span></div>', '<div class="dh-ops-row"><span class="dim">account key</span><span class="dim"><a href="/account">on your account page</a></span></div>') +
+        nlEn('<div class="dh-ops-row"><span class="dim">laatst gebruikt</span><span class="dim">zie activiteit</span></div>', '<div class="dh-ops-row"><span class="dim">last used</span><span class="dim">tracked via activity</span></div>');
     }
     var q = d.quota || { transfers: 0, signs: 0, caps: {} };
     var caps = q.caps || {};
@@ -1132,12 +1135,12 @@
       return '<div class="dh-usage-row"><div class="dh-usage-lab"><span>' + label + '</span><span><b>' + (used || 0) + '</b> / ' + b.capTxt + '</span></div>' +
         '<div class="dh-bar' + (b.warn ? ' warn' : '') + '"><i style="width:' + b.pct + '%"></i></div>' +
         // The link goes to /pricing, so it has to name a card that is on it.
-        (b.warn ? '<a class="dh-usage-upsell" href="/pricing">Upgrade to Firm</a>' : '') + '</div>';
+        (b.warn ? nlEn('<a class="dh-usage-upsell" href="/pricing">Overstappen naar Firm</a>', '<a class="dh-usage-upsell" href="/pricing">Upgrade to Firm</a>') : '') + '</div>';
     }
     var usageEl = document.getElementById('dh-ops-usage');
     if (usageEl) {
-      usageEl.innerHTML = usageRow('Transfers', q.transfers, caps.transfers) + usageRow('Signings', q.signs, caps.signs) +
-        '<div class="dh-ops-dim" style="font-size:10px">Live, refreshes every 5s.</div>';
+      usageEl.innerHTML = usageRow(nlEn('Verzendingen', 'Transfers'), q.transfers, caps.transfers) + usageRow(nlEn('Ondertekeningen', 'Signings'), q.signs, caps.signs) +
+        nlEn('<div class="dh-ops-dim" style="font-size:10px">Live, elke 5 seconden vernieuwd.</div>', '<div class="dh-ops-dim" style="font-size:10px">Live, refreshes every 5s.</div>');
     }
     opsAudit = d.audit || [];
     renderOpsTimeline();
@@ -1190,7 +1193,7 @@
       })
       .catch(function () {
         if (timer) clearTimeout(timer);
-        showError('Network error');
+        showError(nlEn('Netwerkfout', 'Network error'));
       });
   }
 

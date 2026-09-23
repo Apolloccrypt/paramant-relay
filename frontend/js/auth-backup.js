@@ -1,3 +1,6 @@
+// One file, two languages: the Dutch page and its English copy under /en/ load
+// this same script, and <html lang> says which of the two strings to show.
+function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || '') ? en : nl; }
 (function() {
   const form = document.getElementById('backup-form');
   const errorDiv = document.getElementById('error');
@@ -17,9 +20,9 @@
     });
 
     if (res.ok) {
-      window.location = '/dashboard';
+      window.location = nlEn('/dashboard', '/en/dashboard');
     } else {
-      errorDiv.textContent = 'That email and backup code do not match. Each code works once, so check you are not reusing one you already used.';
+      errorDiv.textContent = nlEn('Dit e-mailadres en deze back-upcode horen niet bij elkaar. Elke code werkt één keer, dus controleer of u er niet een gebruikt die al op is.', 'That email and backup code do not match. Each code works once, so check you are not reusing one you already used.');
       errorDiv.classList.add('visible');
     }
   });

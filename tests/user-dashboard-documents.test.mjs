@@ -14,6 +14,8 @@ const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   if (pathname === '/dashboard') pathname = '/dashboard.html';
   if (pathname === '/account') pathname = '/account.html';
+  if (pathname === '/en/dashboard') pathname = '/en/dashboard.html';
+  if (pathname === '/en/account') pathname = '/en/account.html';
   const file = path.join(ROOT, pathname);
   if (!file.startsWith(ROOT)) { res.writeHead(403); return res.end(); }
   fs.readFile(file, (error, body) => {
@@ -74,7 +76,10 @@ await page.route('**/api/user/parasign/inbox/*/resend', (route) => {
 const checks = [];
 function ok(name, condition, detail='') { checks.push({ name, pass:!!condition, detail:String(detail) }); }
 
-await page.goto(ORIGIN + '/dashboard', { waitUntil:'networkidle' });
+// /dashboard and /account are Dutch since 23 September 2026. The English copies
+// under /en/ load the same scripts, so this suite walks the whole flow there,
+// word for word as before, and the Dutch page is checked at the end.
+await page.goto(ORIGIN + '/en/dashboard', { waitUntil:'networkidle' });
 await page.locator('#dh-root:not([hidden])').waitFor();
 await page.waitForFunction(() => document.querySelectorAll('.dh-document').length === 2);
 const mainText = await page.locator('main').innerText();
@@ -248,7 +253,7 @@ await planPage.route('**/api/user/me', (route) => route.fulfill({ status:200, co
 
 async function planCase(state) {
   planState = state;
-  await planPage.goto(ORIGIN + '/dashboard', { waitUntil:'domcontentloaded' });
+  await planPage.goto(ORIGIN + '/en/dashboard', { waitUntil:'domcontentloaded' });
   await planPage.locator('#dh-root:not([hidden])').waitFor();
   return {
     // textContent, not innerText: the chip is uppercased in CSS, and what is
@@ -322,7 +327,7 @@ await acctPage.route('**/api/user/account', (route) => route.fulfill({ status:20
 
 async function acctCase(state) {
   acctState = state;
-  await acctPage.goto(ORIGIN + '/account', { waitUntil:'domcontentloaded' });
+  await acctPage.goto(ORIGIN + '/en/account', { waitUntil:'domcontentloaded' });
   await acctPage.locator('#billing-content:not(.hidden)').waitFor();
   return {
     chip: (await acctPage.locator('#plan-chip').textContent()).trim(),
@@ -374,6 +379,34 @@ ok('an expired paid period falls back to Community on /account too',
   acctLapsed.chip === 'Community' && acctLapsed.current === 'Community' &&
   acctLapsed.active === false && acctLapsed.cancel === false &&
   acctLapsed.giveBack === true, JSON.stringify(acctLapsed));
+
+// ── The Dutch page, on the same script ───────────────────────────────────────
+{
+  const nl = await browser.newPage({ viewport:{ width:390, height:844 } });
+  await nl.route('**/api/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
+  await nl.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
+  await nl.route('**/api/user/me', (route) => route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({
+    email:'demo@example.com', label:'Demo', plan:'pro', created_at:'2026-06-01T10:00:00.000Z',
+    backup_codes_remaining:8, session_expires_at:'2026-07-21T16:00:00.000Z', usage_purpose:'organisation' }) }));
+  await nl.route('**/api/user/documents', (route) => route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ documents:[
+    { id:'env_waiting_abcdefghijklmnop', original_filename:'Lease agreement.pdf', status:'sent', created_at:'2026-07-21T10:00:00.000Z', party_count:2, signed_count:0 },
+    { id:'env_progress_abcdefghijklmnop', original_filename:'Service order.pdf', status:'sent', created_at:'2026-07-20T10:00:00.000Z', party_count:3, signed_count:1 },
+    { id:'env_void_abcdefghijklmnop', original_filename:'<img src=x onerror=window.dashboardInjected=1>', status:'void', created_at:'2026-07-18T10:00:00.000Z', party_count:1, signed_count:0 },
+  ] }) }));
+  await nl.goto(ORIGIN + '/dashboard', { waitUntil:'networkidle' });
+  await nl.locator('#dh-root:not([hidden])').waitFor();
+  await nl.waitForFunction(() => document.querySelectorAll('.dh-document').length === 2);
+  const nlMain = await nl.locator('main').innerText();
+  const nlDocs = await nl.locator('#dh-documents').innerText();
+  ok('nl: the mission line is Dutch', /Belangrijke documenten, onder controle/.test(nlMain), nlMain.slice(0, 200));
+  ok('nl: the same three actions lead', await nl.locator('.dh-start-card').count() === 3
+    && await nl.locator('.dh-start-card').nth(0).getAttribute('href') === '/sign?mode=invite', await nl.locator('.dh-start').innerText());
+  ok('nl: the open filter says in Dutch where each document stands',
+    /Wacht op handtekeningen/.test(nlDocs) && /Bezig/.test(nlDocs) && !/Waiting for signatures|In progress/.test(nlDocs), nlDocs);
+  ok('nl: filenames are rendered as text here too', await nl.locator('.dh-document img').count() === 0
+    && await nl.evaluate(() => !window.dashboardInjected), nlDocs);
+  await nl.close();
+}
 
 for (const check of checks) console.log(`${check.pass ? 'PASS' : 'FAIL'} ${check.name}${check.detail ? ' :: ' + check.detail : ''}`);
 await browser.close();

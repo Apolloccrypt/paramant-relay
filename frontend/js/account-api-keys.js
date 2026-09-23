@@ -1,3 +1,6 @@
+// One file, two languages: the Dutch page and its English copy under /en/ load
+// this same script, and <html lang> says which of the two strings to show.
+function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || '') ? en : nl; }
 // The ParaSign API keys block on /account.
 //
 // /pricing sells Firm with "a developer API with its own documentation and
@@ -29,7 +32,7 @@
     if (!list) return;
     list.textContent = '';
     if (!keys || !keys.length) {
-      list.textContent = 'No API keys yet.';
+      list.textContent = nlEn('Nog geen API-sleutels.', 'No API keys yet.');
       return;
     }
     var ul = document.createElement('ul');
@@ -49,15 +52,15 @@
       var revoke = document.createElement('button');
       revoke.type = 'button';
       revoke.className = 'btn btn-secondary btn-small';
-      revoke.textContent = 'Revoke';
+      revoke.textContent = nlEn('Intrekken', 'Revoke');
       revoke.addEventListener('click', function () {
-        if (!window.confirm('Revoke this key? Anything using it stops working immediately.')) return;
-        say('Revoking…');
+        if (!window.confirm(nlEn('Deze sleutel intrekken? Alles wat hem gebruikt, stopt direct.', 'Revoke this key? Anything using it stops working immediately.'))) return;
+        say(nlEn('Intrekken…', 'Revoking…'));
         fetch('/api/user/parasign-keys', {
           method: 'DELETE', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ kid: k.kid }),
-        }).then(function () { say('Key revoked.'); load(); })
-          .catch(function () { say('Could not revoke that key.'); });
+        }).then(function () { say(nlEn('Sleutel ingetrokken.', 'Key revoked.')); load(); })
+          .catch(function () { say(nlEn('Die sleutel kon niet worden ingetrokken.', 'Could not revoke that key.')); });
       });
       li.appendChild(code); li.appendChild(mode); li.appendChild(revoke);
       ul.appendChild(li);
@@ -84,24 +87,24 @@
 
   if (btn) {
     btn.addEventListener('click', function () {
-      say('Creating…');
+      say(nlEn('Maken…', 'Creating…'));
       fetch('/api/user/parasign-keys', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label: 'account' }),
       }).then(function (r) { return r.json().then(function (b) { return { status: r.status, body: b }; }); })
         .then(function (out) {
           if (out.status !== 201 && out.status !== 200) {
-            say((out.body && out.body.message) || 'Could not create a key.');
+            say((out.body && out.body.message) || nlEn('De sleutel kon niet worden gemaakt.', 'Could not create a key.'));
             return;
           }
           say('');
           if (fresh) {
-            fresh.textContent = out.body.key + '  ·  copy it now; it is shown once and cannot be read again.';
+            fresh.textContent = out.body.key + nlEn('  ·  kopieer hem nu. U ziet hem één keer en daarna niet meer.', '  ·  copy it now; it is shown once and cannot be read again.');
             fresh.hidden = false;
           }
           load();
         })
-        .catch(function () { say('Could not create a key.'); });
+        .catch(function () { say(nlEn('De sleutel kon niet worden gemaakt.', 'Could not create a key.')); });
     });
   }
 

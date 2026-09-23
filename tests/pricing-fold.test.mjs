@@ -41,7 +41,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const MIME = { '.js':'text/javascript', '.css':'text/css', '.html':'text/html', '.svg':'image/svg+xml', '.png':'image/png', '.woff2':'font/woff2', '.json':'application/json' };
-const aliases = { '/pricing':'/pricing.html', '/en/pricing':'/en/pricing.html', '/signup':'/signup.html' };
+const aliases = { '/pricing':'/pricing.html', '/en/pricing':'/en/pricing.html', '/signup':'/signup.html', '/en/signup':'/en/signup.html' };
 const FOLD = { width: 390, height: 844 };
 
 const server = http.createServer((req, res) => {
@@ -186,7 +186,7 @@ test('the first screen at 390px spends no words on jargon', async () => {
 
 test('pricing and signup use one term for what a free account gives', async () => {
   const pricing = await open(FOLD.width, FOLD.height);
-  const signup = await open(FOLD.width, FOLD.height, 'signup');
+  const signup = await open(FOLD.width, FOLD.height, 'en/signup');
   const text = async (page) => page.evaluate(() => document.body.innerText.replace(/\s+/g, ' '));
   const [pricingText, signupText] = [await text(pricing), await text(signup)];
   await pricing.close();
@@ -197,6 +197,23 @@ test('pricing and signup use one term for what a free account gives', async () =
   for (const [label, body] of [['pricing', pricingText], ['signup', signupText]]) {
     assert.doesNotMatch(body, /\d+ documents a month/,
       `/${label} says "documents a month" where the rest of the site says "${TERM}"; one term, one product`);
+  }
+});
+
+// The Dutch pair since 23 September 2026: /pricing and /signup, one Dutch term.
+test('the Dutch pricing and signup pages use one term too', async () => {
+  const pricing = await open(FOLD.width, FOLD.height, 'pricing');
+  const signup = await open(FOLD.width, FOLD.height, 'signup');
+  const text = async (page) => page.evaluate(() => document.body.innerText.replace(/\s+/g, ' '));
+  const [pricingText, signupText] = [await text(pricing), await text(signup)];
+  await pricing.close();
+  await signup.close();
+  const TERM = '2 handtekeningen per maand';
+  assert.ok(pricingText.includes(TERM), `/pricing must say "${TERM}"`);
+  assert.ok(signupText.includes(TERM), `/signup must use the same words as /pricing: "${TERM}"`);
+  for (const [label, body] of [['pricing', pricingText], ['signup', signupText]]) {
+    assert.doesNotMatch(body, /\d+ documenten per maand/,
+      `/${label} says "documenten per maand" where the rest of the site says "${TERM}"`);
   }
 });
 
