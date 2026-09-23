@@ -10,8 +10,13 @@
 //
 // Wat het NIET doet: de ophaalcode invoeren. Die komt per mail aan bij de
 // ontvanger, en dat postvak hoort niet van ons te zijn. Alles ervoor en
-// eromheen wordt wel echt gedaan, en de proefverzending wordt daarna weer
-// ingetrokken.
+// eromheen wordt wel echt gedaan.
+//
+// Wat het ook NIET doet: de proefverzending intrekken. De enige intrekroute,
+// POST /v2/user/sends/revoke, is intern (INTERNAL_AUTH_TOKEN plus user_id) en
+// trekt een ontvanger per keer in; met alleen een API-sleutel is hij niet te
+// bereiken, en een DELETE /v2/sends/:id bestaat niet. De verzending heeft een
+// ttl van een uur en verdwijnt dan vanzelf, met het bestand.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -203,10 +208,10 @@ ok('en de ontvanger hoort hoeveel pogingen hij nog heeft',
    /tries_left/.test(foutTekst), foutTekst.slice(0, 90));
 
 // ---- 8. opruimen --------------------------------------------------------
-if (vj.id) {
-  const weg = await api('/v2/sends/' + encodeURIComponent(vj.id), { method: 'DELETE' });
-  ok('de proefverzending is ingetrokken', weg.status === 200 || weg.status === 204,
-     'status ' + weg.status);
+// Niet ingetrokken, zie de kop. Wel gezegd wanneer hij verdwijnt.
+if (vj.send_id) {
+  console.log('\nproefverzending ' + vj.send_id + ' blijft staan tot '
+    + (vj.expires_at || 'het einde van zijn ttl') + ' en verdwijnt dan vanzelf.');
 }
 
 const gezakt = uit.filter((u) => !u.pass);

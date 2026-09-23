@@ -268,6 +268,14 @@
   }
 
   function start() {
+    // /ontvang/ with nothing after it is not a broken link, it is no link:
+    // somebody typed the address or followed a menu. Nothing is wrong, so
+    // nothing reads as an error.
+    if (/^\/ontvang\/?$/.test(location.pathname)) {
+      hide('step-start'); hide('step-code'); hide('step-done'); hide('step-stop');
+      show('step-empty');
+      return;
+    }
     if (!TOKEN || TOKEN.length < 16) return stop('unknown_token');
 
     var ask = el('ask');

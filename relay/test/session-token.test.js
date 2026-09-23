@@ -98,6 +98,10 @@ test('the five routes a ParaSend transfer walks are the routes the token opens',
     ['GET', '/v2/pubkey/inv_0123456789abcdef0123456789abcdef'],
     // And the upload.
     ['POST', '/v2/inbound'],
+    // A send to named recipients: the list is checked before the upload, then
+    // the blocks become one send. Both from the same signed-in page.
+    ['POST', '/v2/sends/precheck'],
+    ['POST', '/v2/sends'],
   ];
   for (const [method, path] of walk) {
     assert.strictEqual(st.scopeAllows(method, path), true,

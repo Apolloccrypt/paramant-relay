@@ -313,7 +313,7 @@ Pass this to `POST /v2/verify-receipt` to cryptographically confirm delivery.
 
 ### POST /v2/verify-receipt — Verify a delivery receipt
 
-Public. No API key required.
+Requires an API key (`X-Api-Key`); without one the relay answers 401.
 
 This endpoint asks the relay to check its own signature. To check a receipt
 without the relay, and without a network connection at all, open
@@ -746,7 +746,7 @@ him. An account with no tier on file is held to Community.
 
 | | Community | Firm | Enterprise |
 |---|---|---|---|
-| Transfers per month | 10 | 500 | 1,000,000 |
+| Transfers per month | 50 | 500 | unlimited |
 | Link lifetime (max TTL) | 1 hour | 24 hours | 7 days |
 | Reads per link (max views) | 1 | 10 | 100 |
 | Registered devices | 5 | 50 | unlimited |

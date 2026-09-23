@@ -34,6 +34,13 @@ op drie plekken:
   git config core.hooksPath .githooks
   ```
 
+## Operating production
+
+[`RUNBOOK.md`](RUNBOOK.md) is the model-independent runbook: access and escrow
+(secret names only), deploy and rollback, incidents, monitoring without AI,
+backup and restore, and the merge rules. Read it before touching production;
+it says per command whether it runs on the admin machine or on the server.
+
 ## Cursor Cloud specific instructions
 
 PARAMANT is a post-quantum encrypted file relay. The components relevant to local

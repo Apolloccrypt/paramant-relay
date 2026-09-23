@@ -163,6 +163,14 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 </div>
 <main id="main-content">
 
+<!-- No session in the address: nobody sent this visitor a link. A calm page,
+     not an error. -->
+<div class="step" id="step-empty">
+  <h1>Nothing to pick up yet</h1>
+  <p class="sub">This page opens by itself from the link you were sent.</p>
+  <a href="/parasend" class="btn">Send something yourself</a>
+</div>
+
 <!-- STEP 1: Generating keypair -->
 <div class="step active" id="step-keygen">
   <h1>Secure receive</h1>
@@ -282,7 +290,7 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <script src="/js/delegate.js?v=1" defer></script>
 <script src="/js/done-state.js?v=1" defer></script>
 <script src="/js/handshake-meta.js?v=1" defer></script>
-<script src="/js/ontvang.page.js?v=4" defer></script>
+<script src="/js/ontvang.page.js?v=5" defer></script>
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=9" defer></script>
 </body>

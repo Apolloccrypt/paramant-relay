@@ -755,6 +755,16 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
       <div class="progress-bar-wrap" role="progressbar" id="seal-progress-track" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-bar" id="seal-progress"></div></div>
     </div>
   </div>
+  <button type="button" class="btn btn-outline" id="seal-back" data-click="backToSetup" hidden>Back</button>
+</div>
+
+<!-- The recipient list does not fit the plan. Asked before anything is sealed
+     or uploaded (POST /v2/sends/precheck), so nothing was spent. -->
+<div class="step" id="step-over-limit">
+  <h2 class="paramant-h1">Too many people for this plan</h2>
+  <p class="sub" id="over-limit-line"></p>
+  <a class="btn" href="/pricing">See plans</a>
+  <button type="button" class="btn btn-outline" data-click="backToSetup">Back</button>
 </div>
 
 <!-- SEND A LINK: the link is ready. Reached only from the Send-a-link stand;
@@ -881,7 +891,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <script src="/js/done-state.js?v=1" defer></script>
 <script src="/js/handshake-meta.js?v=1" defer></script>
 <script src="/js/send-wrap.js?v=1" defer></script>
-<script src="/js/parashare.page.js?v=16" defer></script>
+<script src="/js/parashare.page.js?v=17" defer></script>
 <script src="/nav.js?v=15" defer></script>
 <script src="/js/nav-auth.js?v=9" defer></script>
 <footer>

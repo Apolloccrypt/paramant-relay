@@ -674,7 +674,20 @@ function loadOrCreateRelayIdentity() {
     relayIdentity = { sk, pk, pk_hash };
     log('info', 'relay_identity_loaded', { pk_hash: pk_hash.slice(0, 16) + '…', file: RELAY_IDENTITY_FILE });
   } catch (e) {
-    if (e.code !== 'ENOENT') log('warn', 'relay_identity_load_failed', { err: e.message, file: RELAY_IDENTITY_FILE });
+    // Only a file that does not exist yet earns a new identity. A file that is
+    // there but unreadable (EACCES, EISDIR) or not valid JSON is an identity
+    // this relay HAD: minting a fresh one over it would silently change the
+    // key every receipt and signed head was issued under, and overwrite the
+    // only copy of the old one. Stop instead and let the operator look.
+    if (e.code !== 'ENOENT') {
+      log('error', 'relay_identity_unreadable', {
+        err: e.message, code: e.code || e.name, file: RELAY_IDENTITY_FILE,
+        hint: 'refusing to generate a new identity over an existing file; restore it from backup or move it aside deliberately',
+      });
+      // 78 is EX_CONFIG. console.log is synchronous on files and pipes, so
+      // the line above is out before the exit.
+      process.exit(78);
+    }
     // Generate new keypair
     try {
       const kp = registry.getSig(0x0002).generateKeyPair();
@@ -1439,6 +1452,35 @@ p{color:#666;font-size:.82rem}
 </div>
 </body></html>`;
 }
+
+// A /v2/dl link whose token is not 48 hex characters: cut off when copied, or
+// never ours. Before this it fell through to the auth gate and the receiver
+// saw a 401 about API keys. Nothing was burned, so the burned page is wrong too.
+function _dlInvalidPage() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PARAMANT - Link invalid</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0d0d;color:#e0e0e0;font-family:system-ui,sans-serif;display:flex;
+  align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.card{background:#161616;border:1px solid #2a2a2a;border-radius:12px;
+  max-width:440px;width:100%;padding:36px 32px;text-align:center}
+h1{font-size:1.05rem;font-weight:600;margin-bottom:8px}
+p{color:#999;font-size:.9rem;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>This link is invalid or incomplete.</h1>
+  <p>Part of it may have been cut off when it was copied. Open it again from the message you were sent.</p>
+</div>
+</body></html>`;
+}
+const DL_INVALID = { error: 'invalid_link', message: 'This link is invalid or incomplete.' };
 
 // ── CT Log public web UI ──────────────────────────────────────────────────────
 const CT_PAGE = (() => {
@@ -4575,6 +4617,40 @@ async function handleRelayRequest(req, res) {
     }
   }
 
+  // ── POST /v2/sends/precheck: the recipient list, before any upload ────────
+  //
+  // The same check POST /v2/sends makes (tiers.checkRecipients on the ParaSend
+  // tier), without a single block. The page asks this first, so a Community
+  // sender with two addresses is told about the ceiling of one BEFORE the file
+  // is sealed and uploaded, instead of after: then a transfer was counted and
+  // the loose blocks sat in memory for a send that was refused. Nothing is
+  // counted, stored or mailed here, and the invitation budget is not touched.
+  if (req.method === 'POST' && path === '/v2/sends/precheck') {
+    const kd = apiKeys.get(apiKey);
+    if (!kd || !kd.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
+    let input;
+    try { input = JSON.parse((await readBody(req, 65536)).toString()); }
+    catch (e) {
+      const teGroot = /too large/i.test(String((e && e.message) || ''));
+      res.writeHead(teGroot ? 413 : 400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: teGroot ? 'body_too_large' : 'invalid_json' }));
+    }
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      res.writeHead(400); return res.end(J({ error: 'invalid_json' }));
+    }
+    const _tierP = parasendLimitsOf(kd).tier;
+    const chk = tiers.checkRecipients(_tierP, input.recipients);
+    if (!chk.ok) {
+      const status = chk.reason === 'over_limit' ? 403 : 400;
+      res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ error: chk.reason, dimension: 'max_recipients', plan: chk.plan,
+                         limit: chk.limit, asked: chk.count || undefined,
+                         rejected: chk.rejected || undefined }));
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(J({ ok: true, plan: chk.plan, limit: chk.limit, count: chk.count }));
+  }
+
   // ── POST /v2/sends: van geuploade blokken naar een verzending ─────────────
   //
   // WHY THIS IS A SECOND STEP. A file goes up in blocks of a fixed size: a
@@ -6269,6 +6345,18 @@ async function handleRelayRequest(req, res) {
     const ttl_left = Math.round((td.expires_ms - Date.now()) / 1000);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, enc_meta: td.enc_meta || null, file_size: td.file_size, ttl_left_s: ttl_left, used: false }));
+  }
+
+  // ── GET /v2/dl/<anything else>: a token that is not [a-f0-9]{48} ─────────
+  // The three routes above only match a well-formed token. Everything else
+  // under /v2/dl/ answers here, as a link problem, not as an auth problem.
+  if (path.startsWith('/v2/dl/') && req.method === 'GET') {
+    if (/\/(get|info)$/.test(path)) {
+      res.writeHead(400, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J(DL_INVALID));
+    }
+    res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(_dlInvalidPage());
   }
 
   // ── POST /v2/session/join — Receiver bewijst kennis van PSS + bindt pubkeys ─

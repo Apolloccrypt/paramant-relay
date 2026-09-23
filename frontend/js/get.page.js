@@ -115,14 +115,55 @@ function downloadBytes(bytes, name, mime) {
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
 }
 
+// A download token is 48 lowercase hex characters (relay.js /v2/dl routes).
+const TOKEN_RE = /^[a-f0-9]{48}$/;
+
+// A link cut off or mangled on its way here. Not an error of ours and not
+// something the dashboard can fix: the receiver needs the whole link again.
+function showInvalid() {
+  showStep('step-invalid');
+}
+
+// What the paste box accepts: a link to this site's own /get (with a token
+// and the key after #) or /ontvang. `new URL(v, origin)` never fails on
+// ordinary text, it turns "hello" into origin + "/hello", so the check is on
+// the result, not on the parse.
+function receiveTarget(v) {
+  let raw = v;
+  // "paramant.app/get?t=..." without a scheme.
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(?::\d+)?\//i.test(raw)) raw = 'https://' + raw;
+  let u;
+  try { u = new URL(raw, location.origin); } catch { return { err: 'invalid' }; }
+  if (u.origin !== location.origin) return { err: 'foreign' };
+  if (u.pathname === '/get' || u.pathname === '/get.html') {
+    const t = u.searchParams.get('t') || '';
+    if (!TOKEN_RE.test(t) || u.hash.length < 2) return { err: 'invalid' };
+    return { href: u.href };
+  }
+  if (/^\/ontvang\/[A-Za-z0-9_-]{16,128}$/.test(u.pathname)) return { href: u.href };
+  return { err: 'invalid' };
+}
+
 function goReceive() {
   const el = document.getElementById('enter-link');
   const errEl = document.getElementById('enter-err');
   if (errEl) errEl.textContent = '';
   const v = (el && el.value || '').trim();
   if (!v) return;
-  try { location.href = new URL(v, location.origin).href; }
-  catch { if (errEl) errEl.textContent = 'That does not look like a valid receive link.'; }
+  const got = receiveTarget(v);
+  if (got.href) {
+    // Same page, different query or fragment: a hash-only change does not
+    // reload, so load it explicitly.
+    const sameDoc = got.href.split('#')[0] === location.href.split('#')[0];
+    location.href = got.href;
+    if (sameDoc) location.reload();
+    return;
+  }
+  if (errEl) {
+    errEl.textContent = got.err === 'foreign'
+      ? 'That link is not a ' + location.host + ' link, so it is not opened here.'
+      : 'That does not look like a valid receive link.';
+  }
 }
 
 async function init() {
@@ -135,15 +176,17 @@ async function init() {
     showStep('step-enter');
     return;
   }
-  if (!token || !fragment) {
-    showError('Invalid link — missing download token or encryption key.');
+  // A missing half, a token of the wrong shape or a key that is too short all
+  // mean the same to the receiver: the link did not arrive whole.
+  if (!token || !fragment || !TOKEN_RE.test(token)) {
+    showInvalid();
     return;
   }
 
   // Decode key+iv from fragment (44 bytes: first 32 = AES key, next 12 = IV)
   const keyIv = fromB64url(fragment);
   if (!keyIv || keyIv.length < 44) {
-    showError('Invalid link — encryption key is malformed or truncated.');
+    showInvalid();
     return;
   }
   const rawKey = keyIv.slice(0, 32);
@@ -163,6 +206,10 @@ async function init() {
 
     if (r.status === 410 || r.status === 404) {
       showStep('step-burned');
+      return;
+    }
+    if (r.status === 400 || r.status === 401) {
+      showInvalid();
       return;
     }
     if (!r.ok) {
@@ -281,4 +328,10 @@ function saveAgain() {
 window.addEventListener('DOMContentLoaded', init);
 
 act('click','goReceive',()=>goReceive());
+window.addEventListener('DOMContentLoaded', () => {
+  const el = document.getElementById('enter-link');
+  if (el) el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); goReceive(); }
+  });
+});
 act('click','saveAgain',()=>saveAgain());

@@ -2497,9 +2497,9 @@ test('the ParaSend credential /privacy describes is the credential the code impl
   const countRules = (from, to) => (scope.slice(scope.indexOf(from), scope.indexOf(to))
     .match(/\{ method:/g) || []).length;
   const rules = countRules('const SCOPE = [', 'const APP_SCOPE = [');
-  assert.equal(rules, 6,
-    `the relay's ParaSend allowlist now has ${rules} entries; /privacy says five, so change the page with the code`);
-  assert.ok(priv.includes('the relay accepts it on the six requests a transfer makes and refuses it on everything else'),
+  assert.equal(rules, 7,
+    `the relay's ParaSend allowlist now has ${rules} entries; /privacy says seven, so change the page with the code`);
+  assert.ok(priv.includes('the relay accepts it on the seven requests a transfer makes and refuses it on everything else'),
     'privacy: the storage section must state what the token can and cannot do');
   const appRules = countRules('const APP_SCOPE = [', 'const PURPOSE_PARASEND');
   assert.equal(appRules, 5,

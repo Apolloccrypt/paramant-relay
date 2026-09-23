@@ -325,15 +325,12 @@ api.post('/auth/login', async (req, res) => {
     return res.status(429).json({ error: 'Too many login attempts — try again in 15 minutes' });
   }
   const { token, totp } = req.body || {};
-  if (!token) return res.status(401).json({ error: 'Token required' });
-  if (!totp || !/^\d{6}$/.test(totp)) return res.status(400).json({ error: 'TOTP code required (6 digits)' });
-  // Fix 1 + Fix 3: timing-safe ADMIN_TOKEN comparison only — pgp_ enterprise path removed
-  // (pgp_ keys are regular API keys managed per-sector; they don't grant admin access)
-  const tokenBuf = Buffer.from(token, 'utf8');
-  const adminBuf = Buffer.from(ADMIN_TOKEN, 'utf8');
-  const isMaster = ADMIN_TOKEN.length > 0
-    && tokenBuf.length === adminBuf.length
-    && crypto.timingSafeEqual(tokenBuf, adminBuf);
+  // Both must be strings. Buffer.from() on a number or an object throws, and
+  // express answered that with a 500; /^\d{6}$/ also coerces 123456 to a match.
+  if (typeof token !== 'string' || !token) return res.status(401).json({ error: 'Token required' });
+  if (typeof totp !== 'string' || !/^\d{6}$/.test(totp)) return res.status(400).json({ error: 'TOTP code required (6 digits)' });
+  // Timing-safe ADMIN_TOKEN comparison only. An empty ADMIN_TOKEN never matches.
+  const isMaster = ADMIN_TOKEN.length > 0 && safeEqual(token, ADMIN_TOKEN);
   if (!isMaster) return res.status(401).json({ error: 'Invalid token' });
   try {
     const r = await relayFetch('health', '/v2/admin/verify-mfa', 'POST', { totp_code: totp }, false, ADMIN_TOKEN);
