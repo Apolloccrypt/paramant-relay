@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<style id="critical-css">html,body{background:#15191C;color:#EAE2CE;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}html{color-scheme:dark}</style>
+<style id="critical-css">html,body{background:#FAF8F3;color:#0C1B2A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#15191C">
+<meta name="theme-color" content="#0B3A6A">
 <title>ParaSign by Paramant &middot; sign and send documents in the EU</title>
 <meta property="og:site_name" content="Paramant">
 <meta name="description" content="Get documents signed and send files safely, straight from your browser. Built and hosted in the EU by Paramantis Solutions B.V. The Community plan is free, forever.">
@@ -25,63 +25,46 @@
 <link rel="stylesheet" href="/design-system.css?v=29">
 <link rel="stylesheet" href="/nav.css?v=25">
 <style>
-/* The homepage keeps the night it had since PR #404: the rest of the site is
-   back on the bone palette of design-system.css, this page re-points the same
-   token names at the night so the nav, the menu and the footer follow it. */
+/* The homepage on the paper it had before PR #404: warm paper #FAF8F3, ink
+   #0C1B2A, one cobalt accent, and one dark object per screen (the Community
+   panel). The layout, the band and every word since #404 stay; only the
+   palette went back. The design-system names are re-pointed so the nav, the
+   menu and the footer follow the page.
+   Measured with WCAG 2.1 on #FAF8F3: ink 16.5, ink-2 #3F4D5C 8.6, ink-3
+   #5F6B78 5.1, cobalt 6.3, petrol 7.0. */
 :root{
-  --tint:234, 226, 206;
-  --night:#15191C;
-  --night-2:#101316;
-  --cream:#EAE2CE;
-  --ochre:#D9A441;
-  --ochre-2:#C7912E;
-  --ochre-ink:#8A5E10;
-  --on-ochre:#141414;
+  --tint:12, 27, 42;
+  --night:#FAF8F3;
+  --night-2:#F3F0E8;
+  --cream:#0C1B2A;
+  --ochre:#1D4ED8;
+  --ochre-2:#173FB3;
+  --ochre-ink:#1D4ED8;
+  --on-ochre:#FFFFFF;
   --petrol:#155E75;
-  --petrol-ink:#3FA3C4;
-  --brick:#C4604F;
-  --brick-ink:#E08A78;
-  --ok-ink:#8FC7A4;
-  --warn-ink:#E3C169;
-  --paper:#F1EAD6;
-  --paper-2:#E7DDC4;
-  --paper-ink:#1B1F22;
-  --paper-ink-2:#4A4A44;
-  --paper-line:rgba(27, 31, 34, .18);
+  --petrol-ink:#155E75;
+  --paper:#FFFFFF;
+  --paper-2:#F1EAD6;
+  --paper-ink:#0C1B2A;
+  --paper-ink-2:#3F4D5C;
   --bone:var(--night);
   --bone-2:var(--night-2);
-  --card:rgba(var(--tint), .045);
-  --card-2:rgba(var(--tint), .075);
-  --card-line:rgba(var(--tint), .14);
-  --surface:var(--card);
   --navy:var(--cream);
-  --navy-2:var(--cream);
   --ink:var(--cream);
-  --ink-2:rgba(var(--tint), .80);
-  --ink-dim:rgba(var(--tint), .62);
-  --ink-hair:rgba(var(--tint), .16);
-  --ink-ghost:rgba(var(--tint), .06);
-  --line:var(--ink-hair);
-  --line-2:rgba(var(--tint), .32);
+  --ink-2:#3F4D5C;
+  --ink-dim:#5F6B78;
+  --ink-hair:rgba(12, 27, 42, .12);
+  --ink-ghost:rgba(12, 27, 42, .05);
+  --line:rgba(12, 27, 42, .12);
+  --line-2:rgba(12, 27, 42, .22);
+  --card:#FFFFFF;
+  --card-line:rgba(12, 27, 42, .12);
   --cobalt:var(--ochre);
   --cobalt-2:var(--ochre-2);
-  --accent:var(--ochre);
-  --accent-hov:var(--ochre-2);
-  --accent-ink:var(--on-ochre);
-  --accent-soft:rgba(217, 164, 65, .10);
-  --accent-ring:rgba(217, 164, 65, .50);
   --lime:var(--ochre);
-  --invert:#0C0F11;
-  --invert-ink:var(--cream);
-  --invert-dim:var(--ink-2);
-  --invert-hair:var(--line-2);
-  --bone-on-navy:var(--invert-ink);
-  --bone-on-navy-dim:var(--invert-dim);
-  --bone-on-navy-hair:var(--invert-hair);
-  --bone-blur:rgba(21, 25, 28, .92);
-  --black:var(--cream);
+  --bone-blur:rgba(250, 248, 243, .92);
   --r:16px;
-  color-scheme:dark;
+  color-scheme:light;
 }
 html{background:var(--night)}
 body{color:var(--ink)}
@@ -91,7 +74,7 @@ body{color:var(--ink)}
    the drawn document and the receipt live nowhere else. */
 :root{
   --fg:var(--ink); --fg-mid:var(--ink-2); --fg-dim:var(--ink-dim);
-  --teal:#8FB3C4;   /* the band at first light, and nowhere else */
+  --teal:#155E75;   /* the petrol as ink on the paper */
   --pad:clamp(16px,4vw,28px); --maxw:780px;
   --hp-paper:var(--night); --hp-paper-2:var(--night-2); --hp-ink:var(--cream); --hp-ink-2:var(--fg-mid); --hp-ink-3:var(--fg-dim);
   --hp-line:var(--line); --hp-line-2:var(--line-2); --hp-night:var(--paper); --hp-night-2:var(--paper-2);
@@ -114,13 +97,13 @@ main{display:block;overflow:hidden}
 
 /* buttons: one ochre, one hairline */
 .hp-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 18px;border-radius:12px;font-size:15px;font-weight:600;text-decoration:none;line-height:1;transition:background .15s,color .15s,border-color .15s,transform .15s;white-space:nowrap}
-.hp-btn-fill{background:var(--ochre);color:#141414;border:1px solid var(--ochre)}
+.hp-btn-fill{background:var(--ochre);color:var(--on-ochre);border:1px solid var(--ochre)}
 .hp-btn-fill:hover{background:var(--ochre-2);border-color:var(--ochre-2)}
 .hp-btn-line{background:var(--card);color:var(--fg);border:1px solid var(--line-2)}
 .hp-btn-line:hover{border-color:var(--fg);background:rgba(var(--tint),.09)}
-.hp-btn-paper{background:var(--paper-ink);color:var(--cream);border:1px solid var(--paper-ink)}
-.hp-btn-paper:hover{background:#000}
-.hp-btn:focus-visible{outline:3px solid rgba(217,164,65,.5);outline-offset:2px}
+.hp-btn-paper{background:var(--paper-ink);color:var(--paper);border:1px solid var(--paper-ink)}
+.hp-btn-paper:hover{background:#fff}
+.hp-btn:focus-visible{outline:3px solid rgba(29,78,216,.5);outline-offset:2px}
 .hp-btn:active{transform:translateY(1px)}
 
 /* ---------- signed in: the hero is the whole page ----------
@@ -278,7 +261,7 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
 /* the art: a document that gets signed, sealed, and then is gone. Desktop only; on a phone the band is the picture. */
 .hp-art{position:relative;z-index:1;height:150px;pointer-events:none;user-select:none}
 .hp-art-glow{position:absolute;inset:-40% -20%;background:
-  radial-gradient(40% 50% at 70% 40%, rgba(217,164,65,.14), transparent 70%),
+  radial-gradient(40% 50% at 70% 40%, rgba(29,78,216,.14), transparent 70%),
   radial-gradient(30% 40% at 30% 70%, rgba(21,94,117,.35), transparent 70%);filter:blur(12px)}
 .hp-doc{position:absolute;left:50%;top:0;width:min(260px, 62vw);aspect-ratio:1/1.32;transform:translateX(-50%) rotate(-4deg);background:var(--paper);border:1px solid rgba(0,0,0,.2);border-radius:4px;box-shadow:0 30px 60px -30px rgba(0,0,0,.8);padding:9% 9% 12%;display:flex;flex-direction:column;gap:7%;
   -webkit-mask-image:linear-gradient(180deg,#000 0,#000 58%,rgba(0,0,0,.55) 74%,transparent 100%);mask-image:linear-gradient(180deg,#000 0,#000 58%,rgba(0,0,0,.55) 74%,transparent 100%);
@@ -289,10 +272,10 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
 .hp-doc i.w1{width:92%} .hp-doc i.w2{width:78%} .hp-doc i.w3{width:86%} .hp-doc i.w4{width:54%}
 .hp-doc svg{width:56%;height:auto;margin-top:auto;overflow:visible}
 .hp-doc svg path{fill:none;stroke:var(--petrol);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:420;stroke-dashoffset:420;animation:hp-sign 16s ease-in-out infinite}
-.hp-seal{position:absolute;right:8%;top:7%;width:19%;aspect-ratio:1;border-radius:50%;border:1.5px solid var(--ochre-2);background:radial-gradient(circle at 50% 50%, rgba(217,164,65,.9), rgba(217,164,65,.5) 60%, transparent 62%);display:grid;place-items:center;font-family:var(--hp-mono);font-size:8px;color:#141414;letter-spacing:.08em;transform:scale(0);animation:hp-seal 16s ease-in-out infinite}
+.hp-seal{position:absolute;right:8%;top:7%;width:19%;aspect-ratio:1;border-radius:50%;border:1.5px solid var(--ochre-2);background:radial-gradient(circle at 50% 50%, rgba(29,78,216,.9), rgba(29,78,216,.5) 60%, transparent 62%);display:grid;place-items:center;font-family:var(--hp-mono);font-size:8px;color:#141414;letter-spacing:.08em;transform:scale(0);animation:hp-seal 16s ease-in-out infinite}
 .hp-dust{position:absolute;left:50%;top:0;width:min(260px, 62vw);height:100%;transform:translateX(-50%);background-image:
   radial-gradient(circle, rgba(234,226,206,.6) 1px, transparent 1.6px),
-  radial-gradient(circle, rgba(217,164,65,.6) 1px, transparent 1.6px),
+  radial-gradient(circle, rgba(29,78,216,.6) 1px, transparent 1.6px),
   radial-gradient(circle, rgba(234,226,206,.35) .8px, transparent 1.4px);
   background-size:23px 29px, 37px 41px, 17px 19px;background-position:0 0, 9px 13px, 5px 3px;opacity:0;
   -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 40%,#000 70%,transparent 100%);mask-image:linear-gradient(180deg,transparent 0,#000 40%,#000 70%,transparent 100%);
@@ -360,6 +343,7 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
 .gift-grid{display:grid;gap:16px;margin-top:28px}
 .panel{border-radius:var(--r);padding:28px 24px;position:relative;overflow:hidden;min-width:0}
 @media (min-width:900px){.panel{padding:40px 40px}}
+.panel-night{--paper:#0C1622;--paper-ink:#F4F7FA;--paper-ink-2:rgba(244,247,250,.80)}
 .panel-night{background:var(--paper);color:var(--paper-ink);box-shadow:0 30px 60px -40px rgba(0,0,0,.9)}
 .panel-night::after{content:none}
 .panel-paper{background:var(--card);border:1px solid var(--card-line)}
@@ -396,7 +380,7 @@ html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-t
 .prod-grid h3{font-size:clamp(1.25rem,1.1vw + .9rem,1.6rem);line-height:1.15;letter-spacing:-.02em;margin:0 0 14px;max-width:18ch;color:var(--fg)}
 .prod-lines{list-style:none;margin:0;padding:0;display:grid;gap:9px}
 .prod-lines li{font-size:15px;line-height:1.55;color:var(--fg-mid);padding:0 0 0 22px;margin:0;position:relative;border:0;background:none;box-shadow:none;border-radius:0}
-.prod-lines li::before{content:"";position:absolute;left:0;top:.55em;width:10px;height:10px;border-radius:50%;border:1.5px solid var(--ochre);background:rgba(217,164,65,.35)}
+.prod-lines li::before{content:"";position:absolute;left:0;top:.55em;width:10px;height:10px;border-radius:50%;border:1.5px solid var(--ochre);background:rgba(29,78,216,.35)}
 .prod-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
 
 /* ---------- three steps ---------- */
