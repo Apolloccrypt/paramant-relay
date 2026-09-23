@@ -199,8 +199,8 @@ section p+p{margin-top:14px}
 </div>
 
 <div class="hero">
-  <div class="hero-label">ENTERPRISE &middot; GDPR &middot; CHAIN OF CUSTODY</div>
-  <h1>Audit log export with a <em>GDPR chain of custody.</em></h1>
+  <div class="hero-label">ENTERPRISE &middot; GDPR &middot; ONE-TIME LINK</div>
+  <h1>Hand over audit logs <em>without a copy in a mailbox.</em></h1>
   <p class="lead">Your GDPR Article 30 records describe how you process personal data. Emailing them to an investigator at a data protection authority or to an external auditor creates a second exposure. Paramant closes that gap.</p>
 </div>
 
@@ -215,8 +215,9 @@ section p+p{margin-top:14px}
 
   <section>
     <span class="sec-eyebrow">What Paramant adds</span>
-    <h2>Burn-on-read delivery with a cryptographic receipt.</h2>
-    <p>Paramant encrypts the audit package with ML-KEM-768 + AES-256-GCM. After the investigator or auditor downloads, the relay wipes its copy from RAM. The ML-DSA-65 signed receipt records the file hash, the relay that served it, the retrieval timestamp and the package's place in the transparency log. It names no recipient, and it cannot: the relay never learns who collected the package, which is the same design that stops it reading the contents. So the receipt proves which package and hash were delivered, once, and when. It does not prove to whom.</p>
+    <h2>Delivered once, then wiped.</h2>
+    <p>Your browser encrypts the audit package with AES-256-GCM before it leaves. The key sits in the link, after the # sign, and never reaches our server. Once the investigator or auditor downloads the package, the relay wipes its copy from memory. Anyone who opens the link after that sees that the file has already been collected and wiped.</p>
+    <p>This route does not produce a signed receipt. Paramant only makes one when a file is collected through the API. AES-256-GCM does show whether anything was changed: a modified package will not decrypt.</p>
     <p>On this route, which is a ParaSend web app transfer, the relay holds only ciphertext and cannot read what it carries. EU/DE hosting means no US CLOUD Act production orders apply. The transmission does not create a second data controller for the audit evidence.</p>
   </section>
 
@@ -229,7 +230,7 @@ section p+p{margin-top:14px}
         <div class="step-row"><div class="step-num">02</div><div class="step-body"><strong>Paramant creates</strong> an encrypted one-time link; on this ParaSend route the relay holds only ciphertext</div></div>
         <div class="step-row"><div class="step-num">03</div><div class="step-body"><strong>The link is sent</strong> to the investigator or auditor (the sensitive data itself does not travel by email)</div></div>
         <div class="step-row"><div class="step-num">04</div><div class="step-body"><strong>The investigator downloads</strong>; the relay clears its copy from RAM straight after</div></div>
-        <div class="step-row"><div class="step-num">05</div><div class="step-body"><strong>Chain-of-custody receipt</strong> kept by both parties; its entry in the public transparency log (CT log) allows independent verification</div></div>
+        <div class="step-row"><div class="step-num">05</div><div class="step-body"><strong>The link stops working</strong>; anyone who opens it again sees that the file has already been collected and wiped</div></div>
       </div>
     </div>
   </section>
@@ -242,9 +243,9 @@ section p+p{margin-top:14px}
         <tr><th>Requirement</th><th>Paramant control</th></tr>
       </thead>
       <tbody>
-        <tr><td>GDPR Art.&nbsp;32: appropriate technical measures</td><td>ML-KEM-768 + AES-256-GCM in transit; relay cannot decrypt; EU/DE hosting</td></tr>
+        <tr><td>GDPR Art.&nbsp;32: appropriate technical measures</td><td>AES-256-GCM in your browser, with the key only in the link; relay cannot decrypt; EU/DE hosting</td></tr>
         <tr><td>GDPR Art.&nbsp;5(1)(e): storage limitation</td><td>Burn-on-read: a web app transfer is held only until the first download, then wiped; an API link is wiped after its last read</td></tr>
-        <tr><td>Evidence integrity</td><td>ML-DSA-65 signed receipt with SHA-256 file hash; tamper-evident by construction</td></tr>
+        <tr><td>Evidence integrity</td><td>AES-256-GCM is authenticated encryption: a modified package will not decrypt. This route does not produce a signed receipt.</td></tr>
         <tr><td>GDPR Art.&nbsp;28: processor agreement</td><td>Standard DPA at <a href="/dpa">/dpa</a>, signable electronically and applies to all plans. The relay does process personal data (account email, IP for rate limiting and abuse-prevention); what it never holds is document plaintext or keys.</td></tr>
       </tbody>
     </table>
@@ -257,7 +258,7 @@ section p+p{margin-top:14px}
   <p style="font-size:14px;color:var(--bone-on-navy-dim);margin-bottom:28px;max-width:520px;margin-left:auto;margin-right:auto">The Community plan suits a DPO working alone. The Business plan suits teams with regular audit obligations.</p>
   <a href="/signup" class="btn-primary">Create a free account &rarr;</a>
   <a href="/dpa" class="btn-sec">Download the DPA &rarr;</a>
-  <p style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--bone-on-navy-dim);margin-top:24px">ML-KEM-768 &middot; ML-DSA-65 &middot; GDPR Art. 32 &middot; EU/DE</p>
+  <p style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--bone-on-navy-dim);margin-top:24px">AES-256-GCM &middot; GDPR Art. 32 &middot; EU/DE</p>
 </div>
 
 <footer>
