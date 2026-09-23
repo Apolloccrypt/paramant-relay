@@ -1,23 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Industrial OT brief · Paramant</title>
+<title>Industriële OT-brief · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<meta name="twitter:description" content="The problem with OT and IT data transfer is architectural, not operational. A RAM-only relay for the DMZ zone boundary. No VPN, no persistent storage.">
-<meta name="twitter:title" content="Industrial OT brief · Paramant">
+<meta name="twitter:description" content="Gegevensoverdracht tussen OT en IT is een probleem van architectuur. Een relay die alleen in RAM werkt, in de DMZ. Geen VPN, geen blijvende opslag.">
+<meta name="twitter:title" content="Industriële OT-brief · Paramant">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:image" content="https://paramant.app/og-image.png">
-<meta property="og:title" content="Industrial OT brief · Paramant">
-<meta property="og:description" content="The problem with OT and IT data transfer is architectural, not operational. A RAM-only relay for the DMZ zone boundary. No VPN, no persistent storage.">
+<meta property="og:title" content="Industriële OT-brief · Paramant">
+<meta property="og:description" content="Gegevensoverdracht tussen OT en IT is een probleem van architectuur. Een relay die alleen in RAM werkt, in de DMZ. Geen VPN, geen blijvende opslag.">
 <meta property="og:url" content="https://paramant.app/docs/paramant-ot-brief">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Paramant">
 <link rel="canonical" href="https://paramant.app/docs/paramant-ot-brief">
-<meta name="description" content="The problem with OT and IT data transfer is architectural, not operational. A RAM-only relay for the DMZ zone boundary. No VPN, no persistent storage.">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/docs/paramant-ot-brief">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/docs/paramant-ot-brief">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/docs/paramant-ot-brief">
+<meta name="description" content="Gegevensoverdracht tussen OT en IT is een probleem van architectuur. Een relay die alleen in RAM werkt, in de DMZ. Geen VPN, geen blijvende opslag.">
 <style>
 :root {
   --doc-bg: #f4efe2; --doc-ink: #0a0a0a; --doc-ink-dim: #444; --doc-ink-ghost: #777;
@@ -151,15 +154,15 @@ footer {
       "@type": "WebPage",
       "@id": "https://paramant.app/docs/paramant-ot-brief#webpage",
       "url": "https://paramant.app/docs/paramant-ot-brief",
-      "name": "Industrial OT brief · Paramant",
+      "name": "Industriële OT-brief · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "en",
-      "description": "The problem with OT and IT data transfer is architectural, not operational. A RAM-only relay for the DMZ zone boundary. No VPN, no persistent storage."
+      "inLanguage": "nl",
+      "description": "Gegevensoverdracht tussen OT en IT is een probleem van architectuur. Een relay die alleen in RAM werkt, in de DMZ. Geen VPN, geen blijvende opslag."
     },
     {
       "@type": "BreadcrumbList",
@@ -180,7 +183,7 @@ footer {
         {
           "@type": "ListItem",
           "position": 3,
-          "name": "Industrial OT brief"
+          "name": "Industriële OT-brief"
         }
       ]
     },
@@ -219,69 +222,69 @@ footer {
 </head>
 <body>
 
-<!-- PAGE 1 — EXECUTIVE SUMMARY -->
+<!-- PAGE 1: EXECUTIVE SUMMARY -->
 <header>
   <div class="logo-block">
     <h1>PARAMANT</h1>
-    <p>Ghost Pipe — Industrial OT Brief</p>
+    <p>Ghost Pipe: industriële OT-brief</p>
   </div>
   <div class="badge-block">
     <span class="badge green">ML-KEM-768</span>
     <span class="badge green">IEC 62443</span>
     <span class="badge">Burn-on-read</span>
-    <span class="badge">Self-hosted</span>
+    <span class="badge">Zelf gehost</span>
     <span class="badge">ARM64</span>
   </div>
 </header>
 <main id="main-content">
 
 <div class="intro-block">
-  <p>The problem with OT/IT data transfer is architectural, not operational.</p>
-  <small>OT networks cannot connect directly to cloud systems. VPNs create persistent attack surfaces. Legacy protocols (FTP, SMB, OPC-DA) are not quantum-safe. Sensor data in transit is being collected now for future decryption — the Harvest Now, Decrypt Later (HNDL) threat. Ghost Pipe is a quantum-safe data conduit designed for the IEC 62443 zone boundary.</small>
+  <p>Het probleem met gegevensoverdracht tussen OT en IT zit in de architectuur, niet in de bediening.</p>
+  <small>OT-netwerken kunnen niet rechtstreeks met cloudsystemen verbinden. VPN&rsquo;s zorgen voor een blijvend aanvalsoppervlak. Oudere protocollen (FTP, SMB, OPC-DA) zijn niet bestand tegen quantumcomputers. Sensordata onderweg wordt nu al verzameld om later te ontsleutelen: de dreiging van Harvest Now, Decrypt Later (HNDL). Ghost Pipe is een quantumveilig datakanaal, ontworpen voor de zonegrens van IEC 62443.</small>
 </div>
 
-<h2>Solution</h2>
+<h2>Oplossing</h2>
 <div class="two-col">
   <div>
-    <h3>What the relay is</h3>
-    <p>A RAM-only relay for the DMZ zone boundary. No VPN. No network reconfiguration. No persistent storage. Sensor data enters encrypted, burns after delivery. The relay is a conduit, not a server.</p>
-    <p>Deployable on a Raspberry Pi 3B+ at the field level, or in your existing DMZ on any Linux server.</p>
+    <h3>Wat de relay is</h3>
+    <p>Een relay die alleen in RAM werkt, voor de zonegrens in de DMZ. Geen VPN. Geen aanpassing van het netwerk. Geen blijvende opslag. Sensordata komt versleuteld binnen en wordt na aflevering vernietigd. De relay is een doorgeefluik, geen server.</p>
+    <p>Te plaatsen op een Raspberry Pi 3B+ op veldniveau, of in uw bestaande DMZ op elke Linux-server.</p>
   </div>
   <div>
-    <h3>What it is not</h3>
-    <p>Not a SCADA historian. Not a VPN replacement for general traffic. Not a cloud service you depend on — the relay runs in your own infrastructure, under your own keys, and operates without external connectivity if needed.</p>
+    <h3>Wat het niet is</h3>
+    <p>Geen SCADA-historian. Geen vervanging van een VPN voor algemeen verkeer. Geen clouddienst waar u van afhankelijk bent: de relay draait in uw eigen infrastructuur, met uw eigen sleutels, en werkt zo nodig zonder externe verbinding.</p>
   </div>
 </div>
 
-<h2>Key Properties</h2>
+<h2>Belangrijkste eigenschappen</h2>
 <ul class="prop-list">
-  <li>ML-KEM-768 (NIST FIPS 203) — post-quantum key exchange, immune to harvest-now-decrypt-later</li>
-  <li>ML-DSA-65 (NIST FIPS 204) — post-quantum device signatures on every transfer</li>
-  <li>RAM-only relay — zero persistent storage, nothing to breach, nothing to image in a forensic incident</li>
-  <li>IEC 62443 SR 4.1, 4.2, 3.1, 2.8, 5.2 — compliance documentation included and maintained</li>
-  <li>ARM64 native — runs on Raspberry Pi 3B+ at the field level (512 MB RAM minimum)</li>
-  <li>Self-hosted relay in your DMZ — no external dependency, no SaaS relationship required</li>
-  <li>EU/DE jurisdiction — Hetzner, Germany, no US CLOUD Act exposure on managed relay</li>
-  <li>Source-available — BUSL-1.1, audit every line at github.com/Apolloccrypt/paramant-relay</li>
-  <li>CT audit log — Merkle-based tamper-evident log, every transfer cryptographically provable</li>
+  <li>ML-KEM-768 (NIST FIPS 203): post-quantum sleuteluitwisseling, bestand tegen harvest-now-decrypt-later</li>
+  <li>ML-DSA-65 (NIST FIPS 204): post-quantum apparaathandtekeningen bij elke overdracht</li>
+  <li>Relay alleen in RAM: geen blijvende opslag, niets om in te breken, niets om bij een forensisch incident te kopiëren</li>
+  <li>IEC 62443 SR 4.1, 4.2, 3.1, 2.8, 5.2: compliancedocumentatie inbegrepen en bijgehouden</li>
+  <li>Native ARM64: draait op een Raspberry Pi 3B+ op veldniveau (minimaal 512 MB RAM)</li>
+  <li>Zelf gehoste relay in uw DMZ: geen externe afhankelijkheid, geen SaaS-relatie nodig</li>
+  <li>Rechtsgebied EU/DE: Hetzner, Duitsland, de beheerde relay valt niet onder de Amerikaanse CLOUD Act</li>
+  <li>Broncode inzichtelijk: BUSL-1.1, controleer elke regel op github.com/Apolloccrypt/paramant-relay</li>
+  <li>CT-auditlog: log op basis van Merkle-bomen waarin knoeien zichtbaar wordt, elke overdracht cryptografisch aantoonbaar</li>
 </ul>
 
 <div class="page-break"></div>
 
-<!-- PAGE 2 — ARCHITECTURE -->
+<!-- PAGE 2: ARCHITECTURE -->
 <header>
   <div class="logo-block">
     <h2 class="paramant-h1">PARAMANT / OT</h2>
-    <p>Architecture &amp; Deployment</p>
+    <p>Architectuur en installatie</p>
   </div>
   <div class="badge-block">
     <span class="badge">Purdue Model</span>
     <span class="badge">Ghost Pipe v2</span>
-    <span class="badge">April 2026</span>
+    <span class="badge">april 2026</span>
   </div>
 </header>
 
-<h2>Purdue Model Placement</h2>
+<h2>Plaats in het Purdue-model</h2>
 <div class="arch-box">Level 4  Enterprise IT      ←  Cloud SCADA / historian / ERP
 Level 3  Operations IT      ←  paramant-receiver (Linux daemon or Python)
          ─────────────────────────────────────────────────────────────────
@@ -291,137 +294,137 @@ Level 2  Control            ←  paramant-sender (PLC gateway / HMI)
 Level 1  Field devices           PLC / DCS / sensor output → gateway
 Level 0  Physical process</div>
 
-<h2>Data Flow</h2>
+<h2>Gegevensstroom</h2>
 <div class="arch-box">PLC output
   → paramant-sender (Level 2)
   → [ML-KEM-768 encrypt client-side]
-  → Ghost Pipe relay (DMZ) — stores ciphertext in RAM only, TTL 10 min default
+  → Ghost Pipe relay (DMZ): stores ciphertext in RAM only, TTL 10 min default
   → [burn-on-read]
   → paramant-receiver (Level 3)
   → [client-side decrypt]
   → SCADA historian / cloud</div>
 
-<p>On the Ghost Pipe and SDK paths in this brief the relay holds only ciphertext, only in RAM, only until delivered. It has no knowledge of sensor values, device identifiers, or process state. A full relay compromise yields zero plaintext.</p>
+<p>Op de Ghost Pipe- en SDK-routes in deze brief bewaart de relay alleen versleutelde data, alleen in RAM, en alleen tot de aflevering. Hij weet niets van sensorwaarden, apparaat-ID&rsquo;s of processtatus. Ook als de relay volledig wordt gekraakt, levert dat geen enkele leesbare data op.</p>
 
-<h2>Relay Properties</h2>
+<h2>Eigenschappen van de relay</h2>
 <div class="two-col">
   <div>
     <ul>
-      <li>Receives only ciphertext — never sees plaintext sensor values</li>
-      <li>RAM-only store — wiped after delivery or TTL expiry</li>
-      <li>ML-DSA-65 signed Signed Tree Head after every Merkle update</li>
-      <li>Inclusion proof per transfer — tamper-detectable by any party</li>
-      <li>Device identity registry — <code>/v2/did/register</code></li>
+      <li>Ontvangt alleen versleutelde data: ziet nooit leesbare sensorwaarden</li>
+      <li>Opslag alleen in RAM: gewist na aflevering of na afloop van de TTL</li>
+      <li>Signed Tree Head, ondertekend met ML-DSA-65, na elke Merkle-update</li>
+      <li>Inclusion proof per overdracht: iedereen kan knoeien opsporen</li>
+      <li>Register van apparaatidentiteiten: <code>/v2/did/register</code></li>
     </ul>
   </div>
   <div>
     <ul>
-      <li>WebSocket streaming — low-latency for continuous sensor data</li>
-      <li>NATS.io integration — optional push transport</li>
-      <li>Per-device API keys — revocation supported</li>
-      <li>Air-gap capable — no upstream internet required in self-hosted mode</li>
-      <li>Docker Compose — single <code>docker compose up</code></li>
+      <li>WebSocket-streaming: lage vertraging voor doorlopende sensordata</li>
+      <li>Koppeling met NATS.io: optioneel push-transport</li>
+      <li>API-sleutels per apparaat: intrekken wordt ondersteund</li>
+      <li>Geschikt voor air-gap: zelf gehost is geen internetverbinding nodig</li>
+      <li>Docker Compose: één keer <code>docker compose up</code></li>
     </ul>
   </div>
 </div>
 
-<h2>Integration Examples</h2>
+<h2>Voorbeelden van koppelingen</h2>
 <div class="two-col">
   <div>
-    <h3>Continuous sensor mode</h3>
+    <h3>Doorlopende sensormodus</h3>
     <div class="code-block">paramant-sender \
   --interval 15 \
   --device-id plc-line-01 \
   --key pgp_xxx \
   sensor-output.json</div>
-    <p>Sends one encrypted packet every 15 seconds. Each burns after the receiver reads it. Interval and TTL configurable.</p>
+    <p>Verstuurt elke 15 seconden één versleuteld pakket. Elk pakket wordt vernietigd zodra de ontvanger het leest. Interval en TTL zijn in te stellen.</p>
   </div>
   <div>
-    <h3>Firmware distribution</h3>
+    <h3>Firmware verspreiden</h3>
     <div class="code-block">paramant-firmware \
   --sign firmware-v2.1.bin \
   --device-group factory-01 \
   --key pgp_xxx \
   --ttl 86400</div>
-    <p>Signs the firmware binary with ML-DSA-65, distributes to device group. Each device downloads once and the package burns.</p>
+    <p>Ondertekent het firmwarebestand met ML-DSA-65 en verspreidt het naar een apparaatgroep. Elk apparaat downloadt één keer en daarna wordt het pakket vernietigd.</p>
   </div>
 </div>
 
-<h2>Edge Deployment (Raspberry Pi)</h2>
+<h2>Installatie aan de rand (Raspberry Pi)</h2>
 <div class="code-block">curl -fsSL https://paramant.app/install-pi.sh | bash
 # → Installs relay on ARM64, configures systemd service, generates relay identity</div>
-<p>Minimum hardware: Raspberry Pi 3B+ · 512 MB RAM · 4 GB SD · Ethernet. No display required. Connects to your DMZ network segment.</p>
+<p>Minimale hardware: Raspberry Pi 3B+ · 512 MB RAM · 4 GB SD · Ethernet. Geen scherm nodig. Wordt aangesloten op het netwerksegment van uw DMZ.</p>
 
 <div class="page-break"></div>
 
-<!-- PAGE 3 — IEC 62443 COMPLIANCE -->
+<!-- PAGE 3: IEC 62443 COMPLIANCE -->
 <header>
   <div class="logo-block">
     <h2 class="paramant-h1">PARAMANT / OT</h2>
-    <p>IEC 62443 Compliance Matrix</p>
+    <p>Compliancematrix IEC 62443</p>
   </div>
   <div class="badge-block">
     <span class="badge green">IEC 62443-3-3</span>
-    <span class="badge green">SL-T 2 default</span>
-    <span class="badge green">SL-T 3 self-hosted</span>
+    <span class="badge green">SL-T 2 standaard</span>
+    <span class="badge green">SL-T 3 zelf gehost</span>
   </div>
 </header>
 
-<p style="margin-bottom:10px">The table below maps IEC 62443-3-3 System Security Requirements to Ghost Pipe protocol properties. Documentation available at <strong>paramant.app/docs#compliance-iec62443</strong>.</p>
+<p style="margin-bottom:10px">De tabel hieronder koppelt de System Security Requirements van IEC 62443-3-3 aan eigenschappen van het Ghost Pipe-protocol. Documentatie staat op <strong>paramant.app/docs#compliance-iec62443</strong>.</p>
 
 <table>
   <tr>
-    <th style="width:15%">Requirement</th>
-    <th style="width:28%">Title</th>
-    <th style="width:47%">Ghost Pipe implementation</th>
+    <th style="width:15%">Eis</th>
+    <th style="width:28%">Titel</th>
+    <th style="width:47%">Uitwerking in Ghost Pipe</th>
     <th style="width:10%">SL-T</th>
   </tr>
   <tr>
     <td class="sr-ref">SR 4.1</td>
-    <td>Information confidentiality</td>
-    <td>ML-KEM-768 client-side encryption. Relay never holds plaintext on the SDK and Ghost Pipe paths this brief describes. Fixed-padding blobs, so traffic analysis is blind and SCADA message sizes are not leaked.</td>
+    <td>Vertrouwelijkheid van informatie</td>
+    <td>Versleuteling met ML-KEM-768 bij de client. Op de SDK- en Ghost Pipe-routes uit deze brief heeft de relay nooit leesbare data. Blobs met vaste opvulling, zodat verkeersanalyse niets ziet en de grootte van SCADA-berichten niet uitlekt.</td>
     <td class="check-col">2–3</td>
   </tr>
   <tr>
     <td class="sr-ref">SR 4.2</td>
-    <td>Use control</td>
-    <td>API key per device (<code>pgp_</code> end-user, <code>plk_</code> operator). Device identity registration via <code>/v2/did/register</code>. Key revocation supported. Per-key audit trail.</td>
+    <td>Gebruikscontrole</td>
+    <td>API-sleutel per apparaat (<code>pgp_</code> eindgebruiker, <code>plk_</code> beheerder). Registratie van apparaatidentiteit via <code>/v2/did/register</code>. Sleutels zijn in te trekken. Audittrail per sleutel.</td>
     <td class="check-col">2–3</td>
   </tr>
   <tr>
     <td class="sr-ref">SR 3.1</td>
-    <td>Communication integrity</td>
-    <td>ML-DSA-65 (NIST FIPS 204) Signed Tree Head after every Merkle root update. Inclusion proof per transfer — tamper detectable by any party, including independent auditors.</td>
+    <td>Integriteit van communicatie</td>
+    <td>Signed Tree Head met ML-DSA-65 (NIST FIPS 204) na elke update van de Merkle-root. Inclusion proof per overdracht: iedereen kan knoeien opsporen, ook onafhankelijke auditors.</td>
     <td class="check-col">2–3</td>
   </tr>
   <tr>
     <td class="sr-ref">SR 2.8</td>
-    <td>Auditable events</td>
-    <td>Public Certificate Transparency log at paramant.app/ct. Append-only, tamper-evident, publicly verifiable. Export to SIEM supported (JSON + CSV). Every transfer hash logged.</td>
+    <td>Controleerbare gebeurtenissen</td>
+    <td>Openbaar Certificate Transparency-log op paramant.app/ct. Alleen aanvullen, knoeien wordt zichtbaar, door iedereen te controleren. Export naar SIEM wordt ondersteund (JSON + CSV). De hash van elke overdracht wordt gelogd.</td>
     <td class="check-col">2–3</td>
   </tr>
   <tr>
     <td class="sr-ref">SR 5.2</td>
-    <td>Zone boundary protection</td>
-    <td>Self-hosted relay deployed in DMZ. No persistent data crosses zone boundaries. No direct L2↔L3 connection required. Relay operates without external internet in air-gap mode.</td>
+    <td>Bescherming van de zonegrens</td>
+    <td>Zelf gehoste relay in de DMZ. Er gaat geen blijvende data over zonegrenzen. Geen directe verbinding tussen L2 en L3 nodig. In air-gapmodus werkt de relay zonder extern internet.</td>
     <td class="check-col">2–3</td>
   </tr>
   <tr>
     <td class="sr-ref">SR 1.1</td>
-    <td>Human user identification</td>
-    <td>Device enrollment via <code>POST /v2/did/register</code> with ECDH public key. DID (Decentralized Identifier) per device. Key rotation and revocation supported.</td>
+    <td>Identificatie van menselijke gebruikers</td>
+    <td>Aanmelden van apparaten via <code>POST /v2/did/register</code> met een publieke ECDH-sleutel. Een DID (Decentralized Identifier) per apparaat. Sleutels vervangen en intrekken wordt ondersteund.</td>
     <td class="check-col">2</td>
   </tr>
   <tr>
     <td class="sr-ref">SR 1.2</td>
-    <td>Software process identity</td>
-    <td>Device identity bound to ML-DSA-65 public key. Every transfer signed by the originating device. Identity not forgeable by the relay.</td>
+    <td>Identiteit van softwareprocessen</td>
+    <td>Apparaatidentiteit gekoppeld aan een publieke ML-DSA-65-sleutel. Elke overdracht is ondertekend door het apparaat van herkomst. De relay kan de identiteit niet vervalsen.</td>
     <td class="check-col">2</td>
   </tr>
   <tr>
     <td class="sr-ref">SR 2.1</td>
-    <td>Authorisation enforcement</td>
-    <td>Per-key transfer quota and rate limiting. Plan-based access control (free / pro / enterprise). Relay rejects keys that exceed plan limits with HTTP 402/429.</td>
+    <td>Handhaving van autorisatie</td>
+    <td>Quotum en snelheidslimiet per sleutel. Toegang op basis van abonnement (free / pro / enterprise). De relay weigert sleutels boven de limiet van het abonnement met HTTP 402/429.</td>
     <td class="check-col">2</td>
   </tr>
 </table>
@@ -430,31 +433,31 @@ Level 0  Physical process</div>
   <div>
     <h3>Security Level Target</h3>
     <ul>
-      <li><strong>SL-T 2</strong> — default managed relay configuration</li>
-      <li><strong>SL-T 3</strong> — self-hosted relay, air-gapped, no external internet</li>
-      <li>SL-T 3 requires: self-hosted relay + private sector + no external DNS dependency</li>
+      <li><strong>SL-T 2</strong>: standaardinstelling van de beheerde relay</li>
+      <li><strong>SL-T 3</strong>: zelf gehoste relay, air-gapped, geen extern internet</li>
+      <li>SL-T 3 vereist: zelf gehoste relay + eigen sector + geen afhankelijkheid van externe DNS</li>
     </ul>
   </div>
   <div>
-    <h3>Independent audit</h3>
+    <h3>Onafhankelijke audit</h3>
     <ul>
-      <li>RAPTOR security audit completed April 2026</li>
-      <li>All critical and high findings resolved</li>
-      <li>Full report available on request to qualified prospects</li>
-      <li>Source code: github.com/Apolloccrypt/paramant-relay</li>
+      <li>Beveiligingsaudit door RAPTOR afgerond in april 2026</li>
+      <li>Alle kritieke en hoge bevindingen opgelost</li>
+      <li>Volledig rapport op aanvraag beschikbaar voor serieuze geïnteresseerden</li>
+      <li>Broncode: github.com/Apolloccrypt/paramant-relay</li>
     </ul>
   </div>
 </div>
 
-<p style="margin-top:10px;font-size:8.5pt;color:var(--doc-ink-dim)"><strong>Note:</strong> Compliance documentation maps Ghost Pipe capabilities to IEC 62443 requirements. It is not a third-party certification. Customers seeking SL-T 3 certification should engage a certified IACS assessment body (e.g., TÜV, DNV) for formal verification.</p>
+<p style="margin-top:10px;font-size:8.5pt;color:var(--doc-ink-dim)"><strong>Let op:</strong> de compliancedocumentatie koppelt wat Ghost Pipe kan aan de eisen van IEC 62443. Het is geen certificering door een derde partij. Klanten die SL-T 3-certificering willen, schakelen voor formele toetsing een gecertificeerde IACS-keuringsinstantie in (bijvoorbeeld TÜV of DNV).</p>
 
 <div class="page-break"></div>
 
-<!-- PAGE 4 — PERFORMANCE, DEPLOYMENT, PRICING -->
+<!-- PAGE 4: PERFORMANCE, DEPLOYMENT, PRICING -->
 <header>
   <div class="logo-block">
     <h2 class="paramant-h1">PARAMANT / OT</h2>
-    <p>Deployment &amp; Pricing</p>
+    <p>Installatie en prijzen</p>
   </div>
   <div class="badge-block">
     <span class="badge">Hetzner DE</span>
@@ -463,108 +466,108 @@ Level 0  Physical process</div>
   </div>
 </header>
 
-<h2>Performance Reference</h2>
+<h2>Prestaties ter referentie</h2>
 <table>
   <tr>
     <th>Payload</th>
-    <th>Relay (EU/DE managed)</th>
-    <th>Self-hosted LAN</th>
-    <th>Notes</th>
+    <th>Relay (beheerd, EU/DE)</th>
+    <th>Zelf gehost, LAN</th>
+    <th>Opmerkingen</th>
   </tr>
   <tr>
-    <td>4 KB sensor packet</td>
+    <td>Sensorpakket van 4 KB</td>
     <td>p50: ~80ms · p95: ~180ms</td>
-    <td>&lt;10ms typical</td>
-    <td>Includes TLS + ML-KEM encapsulation</td>
+    <td>doorgaans &lt;10ms</td>
+    <td>Inclusief TLS + ML-KEM-encapsulatie</td>
   </tr>
   <tr>
-    <td>64 KB config blob</td>
+    <td>Configuratieblob van 64 KB</td>
     <td>p50: ~140ms · p95: ~320ms</td>
-    <td>&lt;20ms typical</td>
-    <td>Single chunk, base64 encoded</td>
+    <td>doorgaans &lt;20ms</td>
+    <td>Eén blok, base64-gecodeerd</td>
   </tr>
   <tr>
-    <td>1 MB firmware chunk</td>
+    <td>Firmwareblok van 1 MB</td>
     <td>p50: ~900ms · p95: ~2.1s</td>
-    <td>&lt;80ms typical</td>
-    <td>500 MB per file, in 5 MB blocks</td>
+    <td>doorgaans &lt;80ms</td>
+    <td>500 MB per bestand, in blokken van 5 MB</td>
   </tr>
   <tr>
-    <td>5 MB max blob</td>
+    <td>Maximale blob van 5 MB</td>
     <td>p50: ~4.2s · p95: ~9s</td>
-    <td>&lt;400ms typical</td>
-    <td>RAM limit per relay: 512 MB</td>
+    <td>doorgaans &lt;400ms</td>
+    <td>RAM-limiet per relay: 512 MB</td>
   </tr>
 </table>
-<p class="perf-note">Benchmarks: EU sender/receiver pair, Hetzner relay in Germany, 100 Mbps uplink. Self-hosted LAN: 1 Gbps local network. Run <code>paramant-benchmark.py</code> to validate in your environment.</p>
+<p class="perf-note">Benchmarks: verzender en ontvanger in de EU, Hetzner-relay in Duitsland, 100 Mbps uplink. Zelf gehost LAN: lokaal netwerk van 1 Gbps. Draai <code>paramant-benchmark.py</code> om het in uw eigen omgeving te toetsen.</p>
 
-<h2>Deployment Options</h2>
+<h2>Installatiemogelijkheden</h2>
 <div class="three-col">
   <div>
-    <h3>Managed relay</h3>
-    <p>iot.paramant.app — Hetzner DE. Free evaluation: 1000 transfers / 30 days, no daily cap. Pro and Enterprise keys available.</p>
-    <p style="margin-top:6px;font-size:8.5pt;color:var(--doc-ink-dim)">No infrastructure required. Start evaluating in minutes.</p>
+    <h3>Beheerde relay</h3>
+    <p>iot.paramant.app, Hetzner DE. Gratis evaluatie: 1000 overdrachten per 30 dagen, geen daglimiet. Pro- en Enterprise-sleutels beschikbaar.</p>
+    <p style="margin-top:6px;font-size:8.5pt;color:var(--doc-ink-dim)">Geen eigen infrastructuur nodig. Binnen een paar minuten kunt u beginnen met evalueren.</p>
   </div>
   <div>
-    <h3>Self-hosted (Linux)</h3>
+    <h3>Zelf gehost (Linux)</h3>
     <div class="code-block" style="font-size:7.5pt">docker compose up -d
 # or
 curl -fsSL paramant.app/install.sh | bash</div>
-    <p style="font-size:8.5pt;color:var(--doc-ink-dim)">Any Linux server. systemd unit included. Reverse proxy config for nginx/Caddy provided.</p>
+    <p style="font-size:8.5pt;color:var(--doc-ink-dim)">Elke Linux-server. Inclusief systemd-unit. Reverse-proxyconfiguratie voor nginx/Caddy wordt meegeleverd.</p>
   </div>
   <div>
-    <h3>Edge (Raspberry Pi)</h3>
+    <h3>Aan de rand (Raspberry Pi)</h3>
     <div class="code-block" style="font-size:7.5pt">curl -fsSL \
   paramant.app/install-pi.sh \
   | bash</div>
-    <p style="font-size:8.5pt;color:var(--doc-ink-dim)">ARM64 native. 512 MB RAM min. Runs headless. Ideal for field-level DMZ segment.</p>
+    <p style="font-size:8.5pt;color:var(--doc-ink-dim)">Native ARM64. Minimaal 512 MB RAM. Draait zonder scherm. Geschikt voor een DMZ-segment op veldniveau.</p>
   </div>
 </div>
 
-<h2>Pricing</h2>
+<h2>Prijzen</h2>
 <div class="tier-row">
   <div class="tier">
-    <div class="tier-name">Evaluation</div>
-    <div class="tier-price">Free</div>
-    <div class="tier-desc">Managed relay, no CC</div>
+    <div class="tier-name">Evaluatie</div>
+    <div class="tier-price">Gratis</div>
+    <div class="tier-desc">Beheerde relay, geen creditcard</div>
     <ul>
-      <li>1000 transfers / 30 days</li>
-      <li>No daily cap</li>
-      <li>500 MB per file, in 5 MB blocks</li>
-      <li>1 OT device</li>
+      <li>1000 overdrachten per 30 dagen</li>
+      <li>Geen daglimiet</li>
+      <li>500 MB per bestand, in blokken van 5 MB</li>
+      <li>1 OT-apparaat</li>
     </ul>
   </div>
   <div class="tier hl">
     <div class="tier-name">Pro</div>
-    <div class="tier-price">€12<sub>/mo</sub></div>
-    <div class="tier-desc">Managed relay</div>
+    <div class="tier-price">€12<sub>/mnd</sub></div>
+    <div class="tier-desc">Beheerde relay</div>
     <ul>
-      <li>500 transfers a month</li>
-      <li>500 MB per file, in 5 MB blocks</li>
-      <li>5 OT devices</li>
-      <li>WebSocket streaming</li>
+      <li>500 overdrachten per maand</li>
+      <li>500 MB per bestand, in blokken van 5 MB</li>
+      <li>5 OT-apparaten</li>
+      <li>WebSocket-streaming</li>
     </ul>
   </div>
   <div class="tier">
     <div class="tier-name">Enterprise</div>
-    <div class="tier-price">Custom</div>
-    <div class="tier-desc">Dedicated or on-premise</div>
+    <div class="tier-price">Op maat</div>
+    <div class="tier-desc">Eigen relay of on-premise</div>
     <ul>
-      <li>Dedicated relay</li>
-      <li>Custom SLA / DPA</li>
-      <li>Unlimited devices</li>
-      <li>IEC 62443 compliance docs</li>
+      <li>Eigen relay</li>
+      <li>SLA / verwerkersovereenkomst op maat</li>
+      <li>Onbeperkt aantal apparaten</li>
+      <li>Compliancedocumentatie IEC 62443</li>
       <li>On-premise / air-gap</li>
     </ul>
   </div>
 </div>
 
-<p>Community self-hosted: BUSL-1.1 free forever, up to 5 users. Your server, your jurisdiction, your keys. No license required for evaluation.</p>
+<p>Community zelf gehost: BUSL-1.1, altijd gratis, tot 5 gebruikers. Uw server, uw rechtsgebied, uw sleutels. Voor evaluatie is geen licentie nodig.</p>
 
 </main>
 <footer>
   <div class="footer-l">
-    Request evaluation key or enterprise contact.
+    Vraag een evaluatiesleutel aan of neem contact op voor Enterprise.
     <span>paramant.app/signup · privacy@paramant.app</span>
   </div>
   <div class="footer-r">
@@ -574,7 +577,7 @@ curl -fsSL paramant.app/install.sh | bash</div>
   </div>
 </footer>
 
-<button class="print-btn" >Print / Save PDF</button>
+<button class="print-btn" >Afdrukken / opslaan als pdf</button>
   <script src="/js/print-btn.js?v=1"></script>
 </body>
 </html>

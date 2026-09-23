@@ -1,24 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Trust and verification · Paramant</title>
+<title>Vertrouwen en controle · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="What Paramant can see on your own server, what it can do, and how you check both yourself. Every claim on the page is tagged live or planned.">
-<meta property="og:title" content="Trust and verification · Paramant">
-<meta property="og:description" content="What Paramant can see on your own server, what it can do, and how you check both yourself. Every claim on the page is tagged live or planned.">
+<meta name="description" content="Wat Paramant op uw eigen server kan zien, wat het kan doen en hoe u beide zelf controleert. Elke bewering op deze pagina is gemarkeerd als live of gepland.">
+<meta property="og:title" content="Vertrouwen en controle · Paramant">
+<meta property="og:description" content="Wat Paramant op uw eigen server kan zien, wat het kan doen en hoe u beide zelf controleert. Elke bewering op deze pagina is gemarkeerd als live of gepland.">
 <meta property="og:url" content="https://paramant.app/trust">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Trust and verification · Paramant">
-<meta name="twitter:description" content="What Paramant can see on your own server, what it can do, and how you check both yourself. Every claim on the page is tagged live or planned.">
+<meta name="twitter:title" content="Vertrouwen en controle · Paramant">
+<meta name="twitter:description" content="Wat Paramant op uw eigen server kan zien, wat het kan doen en hoe u beide zelf controleert. Elke bewering op deze pagina is gemarkeerd als live of gepland.">
 <link rel="canonical" href="https://paramant.app/trust">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/trust">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/trust">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/trust">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -27,7 +30,7 @@
 <meta name="theme-color" content="#0B3A6A">
 
 <link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/nav.css?v=27">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -163,15 +166,15 @@ code{font-family:var(--mono);font-size:.92em;color:var(--cobalt)}
       "@type": "WebPage",
       "@id": "https://paramant.app/trust#webpage",
       "url": "https://paramant.app/trust",
-      "name": "Trust and verification · Paramant",
+      "name": "Vertrouwen en controle · Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "en",
-      "description": "What Paramant can see on your own server, what it can do, and how you check both yourself. Every claim on the page is tagged live or planned."
+      "inLanguage": "nl",
+      "description": "Wat Paramant op uw eigen server kan zien, wat het kan doen en hoe u beide zelf controleert. Elke bewering op deze pagina is gemarkeerd als live of gepland."
     },
     {
       "@type": "Organization",
@@ -207,208 +210,211 @@ code{font-family:var(--mono);font-size:.92em;color:var(--cobalt)}
 </script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
-    <li><a href="/security" class="nav-link">Security</a></li>
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/docs" class="nav-link">Docs</a></li>
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/trust" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/trust" hreflang="en" lang="en">EN</a></div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
-  <a href="/security" class="nav-mobile-standalone">Security</a>
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/trust" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/trust" hreflang="en" lang="en">EN</a></span>
 </div>
 <section class="page-hero page-hero--navy">
 <div class="page-hero-inner">
-  <span class="eyebrow">TRANSPARENCY</span>
-  <h1>Trust &amp; Verification</h1>
-  <p class="lede">For organisations that run Paramant on their own server, and for anyone who has to check a supplier before it goes near client documents. What we can see, what we can do, and how you verify both, without taking our word for it. If you use the hosted service at paramant.app, the <a href="/security">security page</a> is the shorter answer.</p>
+  <span class="eyebrow">TRANSPARANTIE</span>
+  <h1>Vertrouwen en controle</h1>
+  <p class="lede">Voor organisaties die Paramant op hun eigen server draaien, en voor iedereen die een leverancier moet controleren voordat die bij klantdocumenten komt. Wat wij kunnen zien, wat wij kunnen doen en hoe u beide controleert, zonder ons op ons woord te geloven. Gebruikt u de gehoste dienst op paramant.app, dan is de <a href="/security">beveiligingspagina</a> het kortere antwoord.</p>
   <div class="hero-cta">
-    <a href="/security" class="btn btn-primary">See the evidence &rarr;</a>
-    <a href="/pricing" class="btn btn-secondary">See pricing &rarr;</a>
+    <a href="/security" class="btn btn-primary">Bekijk het bewijs &rarr;</a>
+    <a href="/pricing" class="btn btn-secondary">Bekijk de prijzen &rarr;</a>
   </div>
 </div>
 </section>
 
 <main id="main-content">
 
-  <h3>Who this page is for</h3>
+  <h3>Voor wie deze pagina is</h3>
   <div class="card">
-    <p style="margin:0 0 12px;line-height:1.8">Everything below is written for the two readers named above: the person who runs the server that passes the files on, and the reviewer who has to sign off on it. It answers what Paramant can and cannot do to a server it does not own.</p>
-    <p style="margin:0;line-height:1.8">Free for everyone, paid for organisations. ParaSign Community and ParaSend Community cost &euro;0, forever, with no card required. Organisations pay for the higher limits: Firm, ParaSign Business and Enterprise, ParaSend Enterprise. Firm is one payment that covers both products. A dedicated relay, an SLA and a self-hosting licence are what ParaSign Enterprise and ParaSend Enterprise pay for. Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. <a href="/pricing">See pricing &rarr;</a></p>
+    <p style="margin:0 0 12px;line-height:1.8">Alles hieronder is geschreven voor de twee lezers die hierboven staan: wie de server beheert die de bestanden doorgeeft, en wie die moet goedkeuren. Het beantwoordt wat Paramant wel en niet kan op een server die niet van Paramant is.</p>
+    <p style="margin:0;line-height:1.8">Gratis voor iedereen, betaald voor organisaties. Ondertekenen Community en Versturen Community kosten &euro;0, voor altijd, zonder betaalkaart. Organisaties betalen voor de hogere limieten: Firm, Ondertekenen Business en Enterprise, Versturen Enterprise. Firm is één betaling voor beide producten. Bij Ondertekenen Enterprise en Versturen Enterprise betaalt u voor een eigen relay, een SLA en een licentie om zelf te hosten. Elk abonnement krijgt dezelfde versleuteling, dezelfde post-quantum handtekeningen en dezelfde openbare bewijslog. <a href="/pricing">Bekijk de prijzen &rarr;</a></p>
   </div>
 
-  <h3>How to read this page</h3>
+  <h3>Zo leest u deze pagina</h3>
   <div class="card">
-    <p style="margin:0 0 12px;line-height:1.8">Paramant is moving from a single self-hosted binary to an open-core product: the relay stays open and runs entirely on your server, while Paramant operates a central licensing and management plane. That transition is partly live and partly still on paper.</p>
-    <p style="margin:0;line-height:1.8">So every claim below is tagged. <span class="badge badge-live">Live</span> means it works today on the public relay. <span class="badge badge-planned">Planned</span> means it is specified in a public design document (an ADR) but not yet implemented. We mark it so you are never told a capability exists before it does.</p>
+    <p style="margin:0 0 12px;line-height:1.8">Paramant gaat van één zelf gehost programma naar een open-core product. De relay blijft open en draait volledig op uw server. Paramant beheert een centrale laag voor licenties en beheer. Die overgang is deels live en deels nog op papier.</p>
+    <p style="margin:0;line-height:1.8">Daarom is elke bewering hieronder gemarkeerd. <span class="badge badge-live">Live</span> betekent dat het vandaag werkt op de openbare relay. <span class="badge badge-planned">Gepland</span> betekent dat het is vastgelegd in een openbaar ontwerpdocument (een ADR), maar nog niet is gebouwd. Zo leest u nooit dat iets bestaat voordat het er is.</p>
   </div>
 
   <!-- ───────────────────── License-check ───────────────────── -->
-  <h2 id="license-check">How license-check works</h2>
+  <h2 id="license-check">Zo werkt de licentiecontrole</h2>
 
-  <p><strong>Today <span class="badge badge-live">Live</span></strong> the relay's entitlement is an <em>offline</em> license. Your <code>PLK_KEY</code> is a license token signed by Paramant (Ed25519) that the relay verifies locally against an embedded public key. It carries a user cap, an expiry and who it was issued to. The relay does <strong>not</strong> phone home to validate it: with no key, or an expired one, the relay simply runs as Community Edition (5 users). Nothing leaves your server to check a license.</p>
+  <p><strong>Nu <span class="badge badge-live">Live</span></strong> werkt de relay met een <em>offline</em> licentie. Uw <code>PLK_KEY</code> is een licentietoken dat Paramant heeft ondertekend (Ed25519). De relay controleert het lokaal met een ingebouwde publieke sleutel. Het token bevat een maximum aantal gebruikers, een vervaldatum en aan wie het is uitgegeven. De relay belt <strong>niet</strong> naar huis om het te controleren. Zonder sleutel, of met een verlopen sleutel, draait de relay gewoon als Community Edition (5 gebruikers). Er gaat niets van uw server af om een licentie te controleren.</p>
 
-  <p><strong>Planned <span class="badge badge-planned">Planned</span></strong> to sell tiers with capabilities beyond a user-count, the design adds an <em>online</em> license-check. Under that model your relay calls a Paramant licensing endpoint at startup and every 6 hours. The request carries your license-key, a relay-identity (the fingerprint of the ML-DSA-65 public key your relay generates on first boot), the relay version, and a telemetry block that is off by default.</p>
+  <p><strong>Gepland <span class="badge badge-planned">Gepland</span></strong> om abonnementen te kunnen verkopen met meer dan een aantal gebruikers, voegt het ontwerp een <em>online</em> licentiecontrole toe. In dat model roept uw relay bij het opstarten en elke 6 uur een licentie-endpoint van Paramant aan. Het verzoek bevat uw licentiesleutel, een relay-identiteit (de vingerafdruk van de ML-DSA-65-publieke sleutel die uw relay bij de eerste start maakt), de relayversie en een telemetrieblok dat standaard uit staat.</p>
 
-  <p>The response is a <strong>signed capability-set</strong> that says which features your tier unlocks, and it is valid for a few hours. Your relay verifies the ML-DSA-65 signature against an embedded Paramant licensing key; an unsigned or invalid response is rejected. If the licensing endpoint is unreachable, the relay keeps using its last cached capability-set for up to 7 days, then degrades to Community mode. There are no surprise lockouts: an outage on our side cannot instantly disable your relay.</p>
+  <p>Het antwoord is een <strong>ondertekende capability-set</strong>: welke functies uw abonnement vrijgeeft. Die is een paar uur geldig. Uw relay controleert de ML-DSA-65-handtekening met een ingebouwde licentiesleutel van Paramant. Een antwoord zonder of met een ongeldige handtekening wordt geweigerd. Is het licentie-endpoint niet bereikbaar, dan gebruikt de relay tot 7 dagen de laatst bewaarde capability-set en valt daarna terug naar de Community-modus. U wordt niet onverwacht buitengesloten: een storing bij ons kan uw relay niet direct uitschakelen.</p>
 
-  <p class="see-also">Full wire-protocol specification: ADR R013 (Draft) in the public <a href="https://github.com/Apolloccrypt/paramant-relay/tree/main/docs/adrs">ADR directory</a>.</p>
+  <p class="see-also">Volledige specificatie van het protocol: ADR R013 (concept) in de openbare <a href="https://github.com/Apolloccrypt/paramant-relay/tree/main/docs/adrs">ADR-map</a>.</p>
 
   <!-- ───────────────────── What we see ───────────────────── -->
-  <h2 id="what-we-see">What Paramant sees of your relay</h2>
+  <h2 id="what-we-see">Wat Paramant van uw relay ziet</h2>
 
-  <p>With today's offline license, the answer is simple: <strong>nothing at runtime</strong>. The relay makes no licensing call. The breakdown below describes the <span class="badge badge-planned">Planned</span> online model, so you can judge it before it ships.</p>
+  <p>Met de huidige offline licentie is het antwoord eenvoudig: <strong>niets tijdens het draaien</strong>. De relay doet geen licentieaanroep. Het overzicht hieronder beschrijft het <span class="badge badge-planned">Gepland</span> online model, zodat u het kunt beoordelen voordat het er is.</p>
 
-  <h3>Always (each check-in)</h3>
+  <h3>Altijd (bij elke check-in)</h3>
   <ul>
-    <li>Your license-key: how we identify your subscription</li>
-    <li>Your relay's identity fingerprint (ML-DSA-65 public-key hash)</li>
-    <li>Your relay's version number</li>
-    <li>The timestamp of the check-in</li>
+    <li>Uw licentiesleutel: zo herkennen wij uw abonnement</li>
+    <li>De identiteitsvingerafdruk van uw relay (hash van de ML-DSA-65-publieke sleutel)</li>
+    <li>Het versienummer van uw relay</li>
+    <li>Het tijdstip van de check-in</li>
   </ul>
 
-  <h3>Only if you opt in (telemetry, off by default)</h3>
+  <h3>Alleen als u ervoor kiest (telemetrie, standaard uit)</h3>
   <ul>
-    <li>Aggregate user count: a number, never identities</li>
-    <li>Aggregate transfer count per 24h: a number, never hashes</li>
-    <li>Error rates (5xx rate, auth-failure rate)</li>
+    <li>Totaal aantal gebruikers: een getal, nooit identiteiten</li>
+    <li>Totaal aantal verzendingen per 24 uur: een getal, nooit hashes</li>
+    <li>Foutpercentages (aandeel 5xx, aandeel mislukte aanmeldingen)</li>
     <li>Uptime</li>
   </ul>
 
-  <h3>Never, even with telemetry on</h3>
+  <h3>Nooit, ook niet met telemetrie aan</h3>
   <ul>
-    <li>File content: we do not hold your decryption keys, anywhere</li>
-    <li>Identities of your users (emails, names)</li>
-    <li>File hashes: they would link to specific transfers</li>
-    <li>Source or destination addresses of your transfers</li>
-    <li>CT-log content beyond aggregate counts</li>
+    <li>Inhoud van bestanden: wij hebben uw sleutels nergens</li>
+    <li>Identiteiten van uw gebruikers (e-mailadressen, namen)</li>
+    <li>Hashes van bestanden: die zouden naar bepaalde verzendingen leiden</li>
+    <li>Afzender- of bestemmingsadressen van uw verzendingen</li>
+    <li>Inhoud van de CT-log, behalve totalen</li>
   </ul>
 
-  <p class="note note--planned"><span class="badge badge-planned">Planned</span> Before telemetry can be enabled, the admin panel will show a preview of the exact payload your relay would send, with no hidden fields, so opting in is an informed choice rather than a blind toggle.</p>
+  <p class="note note--planned"><span class="badge badge-planned">Gepland</span> Voordat telemetrie aan kan, toont het beheerpaneel precies wat uw relay zou versturen, zonder verborgen velden. Zo kiest u bewust en zet u niet blind een schakelaar om.</p>
 
   <!-- ───────────────────── Verify ───────────────────── -->
-  <h2 id="verify-deployment">How to verify your deployment</h2>
+  <h2 id="verify-deployment">Zo controleert u uw installatie</h2>
 
-  <p>You do not have to trust these statements. The public surface lets you check them.</p>
+  <p>U hoeft deze uitspraken niet te geloven. Met wat openbaar is kunt u ze controleren.</p>
 
-  <h3>1. Source <span class="badge badge-live">Live</span></h3>
-  <p>Everything that runs on your server is in the public <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub repository</a> under BUSL-1.1: the relay, the admin panel, the SDKs, and the license-<em>client</em> code that does the check-in. You can read exactly what your relay does, including every field it would send, and build it yourself:</p>
+  <h3>1. Broncode <span class="badge badge-live">Live</span></h3>
+  <p>Alles wat op uw server draait staat in de openbare <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub-repository</a> onder BUSL-1.1: de relay, het beheerpaneel, de SDK's en de code van de licentie-<em>client</em> die de check-in doet. U kunt precies lezen wat uw relay doet, ook elk veld dat hij zou versturen, en hem zelf bouwen:</p>
   <pre><code>git clone https://github.com/Apolloccrypt/paramant-relay
 cd paramant-relay
 git checkout v3.0.0
 docker compose build   # build locally instead of pulling the published image</code></pre>
 
-  <h3>2. Published image <span class="badge badge-live">Live</span></h3>
-  <p>The <a href="https://hub.docker.com/r/mtty001/relay">Docker Hub image</a> is built from that repository by the project's public GitHub Actions workflow. You can compare a locally built image against the published tag, or skip the published image entirely and run your own build.</p>
+  <h3>2. Gepubliceerd image <span class="badge badge-live">Live</span></h3>
+  <p>Het <a href="https://hub.docker.com/r/mtty001/relay">image op Docker Hub</a> wordt uit die repository gebouwd door de openbare GitHub Actions-workflow van het project. U kunt een lokaal gebouwd image vergelijken met de gepubliceerde tag, of het gepubliceerde image overslaan en uw eigen build draaien.</p>
 
-  <h3>3. Signed releases <span class="badge badge-planned">Planned</span></h3>
-  <p>Cryptographically signed release artifacts (so you can verify provenance without a local rebuild) are part of the supply-chain design but not yet in place. Once live, verification will look like:</p>
+  <h3>3. Ondertekende releases <span class="badge badge-planned">Gepland</span></h3>
+  <p>Cryptografisch ondertekende releasebestanden (zodat u de herkomst kunt controleren zonder zelf te bouwen) horen bij het ontwerp van de toeleveringsketen, maar zijn er nog niet. Zodra ze live zijn, ziet de controle er zo uit:</p>
   <pre><code>cosign verify mtty001/relay:3.0.0 \
   --key https://paramant.app/.well-known/paramant-release.pub</code></pre>
-  <p class="see-also">Release-signing and supply-chain integrity are tracked in the release-process ADR (R015, in progress) in the public <a href="https://github.com/Apolloccrypt/paramant-relay/tree/main/docs/adrs">ADR directory</a>.</p>
+  <p class="see-also">Het ondertekenen van releases en de integriteit van de toeleveringsketen staan in de ADR over het releaseproces (R015, in bewerking) in de openbare <a href="https://github.com/Apolloccrypt/paramant-relay/tree/main/docs/adrs">ADR-map</a>.</p>
 
-  <h3>4. Behaviour <span class="badge badge-live">Live</span></h3>
-  <p>Every transfer your relay handles is appended to its own public <a href="/ct-log">Certificate Transparency log</a>, a signed Merkle tree you can inspect and archive independently. The relay's logs record its outbound calls; once online license-check ships, each check-in is logged too, so you can watch what your relay sends.</p>
+  <h3>4. Gedrag <span class="badge badge-live">Live</span></h3>
+  <p>Elke verzending die uw relay afhandelt wordt toegevoegd aan zijn eigen openbare <a href="/ct-log">Certificate Transparency-log</a>, een ondertekende Merkle-boom die u zelf kunt inzien en archiveren. De logs van de relay leggen zijn uitgaande aanroepen vast. Zodra de online licentiecontrole er is, wordt ook elke check-in gelogd, zodat u kunt zien wat uw relay verstuurt.</p>
 
   <!-- ───────────────────── Remote actions ───────────────────── -->
-  <h2 id="remote-actions">What Paramant can do remotely</h2>
+  <h2 id="remote-actions">Wat Paramant op afstand kan doen</h2>
 
-  <p>The remote-action model below is <span class="badge badge-planned">Planned</span>: specified, not yet implemented. The structural limits in "Not possible", however, hold <span class="badge badge-live">Live</span> today, because they follow from the architecture rather than from policy.</p>
+  <p>Het model voor acties op afstand hieronder is <span class="badge badge-planned">Gepland</span>: vastgelegd, nog niet gebouwd. De vaste grenzen onder "Niet mogelijk" gelden wel al <span class="badge badge-live">Live</span>, omdat ze volgen uit de architectuur en niet uit beleid.</p>
 
-  <p>In the design, every remote action is recorded to <strong>your relay's own CT log</strong>, where you can verify it independently: you see what was done, when, and by which Paramant role (Owner or Support). Our internal audit-trail additionally records which individual acted, but that record is private to us.</p>
+  <p>In het ontwerp wordt elke actie op afstand vastgelegd in <strong>de eigen CT-log van uw relay</strong>, waar u die zelf kunt controleren: u ziet wat er is gedaan, wanneer en door welke rol bij Paramant (Owner of Support). Ons interne audittrail legt daarnaast vast welke persoon het deed, maar dat blijft intern.</p>
 
-  <h3>Possible remote actions (planned)</h3>
+  <h3>Mogelijke acties op afstand (gepland)</h3>
   <dl>
-    <dt>Issue a short-lived support key</dt>
-    <dd>A time-boxed key for debugging an issue you reported. You can revoke it immediately from your admin panel.</dd>
+    <dt>Een kortlevende supportsleutel uitgeven</dt>
+    <dd>Een sleutel met een tijdslimiet om een probleem te onderzoeken dat u meldde. U kunt hem direct intrekken in uw beheerpaneel.</dd>
 
-    <dt>Offer an update</dt>
-    <dd>Make a new release available to your relay. How it applies follows your tier: a banner you act on, an opt-in update window, or explicit approval. Never a silent push you did not agree to.</dd>
+    <dt>Een update aanbieden</dt>
+    <dd>Een nieuwe release beschikbaar maken voor uw relay. Hoe die wordt toegepast hangt af van uw abonnement: een melding waar u zelf op reageert, een updatevenster waar u voor kiest, of uitdrukkelijke goedkeuring. Nooit een stille update waar u niet mee instemde.</dd>
 
-    <dt>Set drain mode</dt>
-    <dd>Ask the relay to refuse new uploads, finish in-flight transfers, then idle. Used ahead of maintenance.</dd>
+    <dt>Afbouwmodus instellen</dt>
+    <dd>De relay vragen nieuwe uploads te weigeren, lopende verzendingen af te maken en daarna stil te staan. Wordt gebruikt voor onderhoud.</dd>
 
-    <dt>Adjust your capability-set</dt>
-    <dd>Apply a tier change (trial extension, upgrade after payment). It takes effect on the next check-in.</dd>
+    <dt>Uw capability-set aanpassen</dt>
+    <dd>Een wijziging van abonnement doorvoeren (proefperiode verlengen, upgrade na betaling). Dat gaat in bij de volgende check-in.</dd>
   </dl>
 
-  <h3>Not possible, structurally <span class="badge badge-live">Live</span></h3>
+  <h3>Niet mogelijk, door de opbouw <span class="badge badge-live">Live</span></h3>
   <ul>
-    <li>Read your file content: we never hold decryption keys, anywhere</li>
-    <li>Rewrite your CT log without it showing: a rewrite contradicts every signed tree head issued before it, and each receipt carries one</li>
-    <li>Bypass your local TOTP or admin key: there is no backdoor in the source, and the source is public</li>
-    <li>Reach your users' data or another deployment: relays are isolated by design</li>
-    <li>Switch off your audit log: CT-log writes are not gated by any capability</li>
+    <li>Uw bestanden lezen: wij hebben nergens sleutels om te ontsleutelen</li>
+    <li>Uw CT-log herschrijven zonder dat het opvalt: een herschrijving spreekt elke eerder ondertekende tree head tegen, en elk ontvangstbewijs bevat er een</li>
+    <li>Uw lokale TOTP of beheersleutel omzeilen: er zit geen achterdeur in de broncode, en de broncode is openbaar</li>
+    <li>Bij de gegevens van uw gebruikers of een andere installatie komen: relays zijn per ontwerp van elkaar gescheiden</li>
+    <li>Uw auditlog uitzetten: schrijven naar de CT-log hangt van geen enkele capability af</li>
   </ul>
 
-  <p class="see-also">Remote-action protocol: the management-plane ADR (R014, in progress) in the public <a href="https://github.com/Apolloccrypt/paramant-relay/tree/main/docs/adrs">ADR directory</a>.</p>
+  <p class="see-also">Protocol voor acties op afstand: de ADR over de beheerlaag (R014, in bewerking) in de openbare <a href="https://github.com/Apolloccrypt/paramant-relay/tree/main/docs/adrs">ADR-map</a>.</p>
 
   <!-- ───────────────────── Open-core ───────────────────── -->
-  <h2 id="open-core">Open-core: what is open, what is closed</h2>
+  <h2 id="open-core">Open-core: wat open is, wat gesloten is</h2>
 
-  <p>Paramant follows the open-core model used by HashiCorp, GitLab, Elastic and Sentry: the software you run is open; the service operating it is not.</p>
+  <p>Paramant volgt het open-core model dat ook HashiCorp, GitLab, Elastic en Sentry gebruiken: de software die u draait is open, de dienst die haar beheert niet.</p>
 
-  <h3>Open: BUSL-1.1, public on GitHub <span class="badge badge-live">Live</span></h3>
+  <h3>Open: BUSL-1.1, openbaar op GitHub <span class="badge badge-live">Live</span></h3>
   <ul>
-    <li>The relay: everything that runs on your server</li>
-    <li>The SDKs and CLI tools</li>
-    <li>The frontend: admin panel, setup wizard, dashboard</li>
-    <li>The license-<em>client</em>: the check-in code on your relay</li>
-    <li>All ADRs, including the licensing and management-plane protocols</li>
-    <li>The cryptographic specification and test vectors</li>
+    <li>De relay: alles wat op uw server draait</li>
+    <li>De SDK's en CLI-tools</li>
+    <li>De frontend: beheerpaneel, installatiewizard, dashboard</li>
+    <li>De licentie-<em>client</em>: de check-incode op uw relay</li>
+    <li>Alle ADR's, ook de protocollen voor licenties en de beheerlaag</li>
+    <li>De cryptografische specificatie en testvectoren</li>
   </ul>
-  <p><a href="https://github.com/Apolloccrypt/paramant-relay">View the public repository &rarr;</a></p>
+  <p><a href="https://github.com/Apolloccrypt/paramant-relay">Bekijk de openbare repository &rarr;</a></p>
 
-  <h3>Closed: operated privately by Paramant</h3>
+  <h3>Gesloten: intern beheerd door Paramant</h3>
   <ul>
-    <li>The license-<em>server</em>: the service side of the check-in</li>
-    <li>The internal fleet-management dashboard</li>
-    <li>The customer and billing databases</li>
-    <li>Support tooling and email templates</li>
+    <li>De licentie-<em>server</em>: de dienstkant van de check-in</li>
+    <li>Het interne dashboard voor het beheer van alle relays</li>
+    <li>De databases voor klanten en facturatie</li>
+    <li>Supporttools en e-mailsjablonen</li>
   </ul>
-  <p>The <em>protocols</em> are public; only our implementation of the server side is private, the same way GitLab keeps its operations private while its core stays open. Because the protocol and the client are open, you can audit exactly what your relay says to us and what it accepts back.</p>
+  <p>De <em>protocollen</em> zijn openbaar. Alleen onze uitvoering van de serverkant is intern, zoals GitLab zijn bedrijfsvoering intern houdt terwijl de kern open blijft. Omdat het protocol en de client open zijn, kunt u precies nagaan wat uw relay tegen ons zegt en wat hij terug accepteert.</p>
 
-  <p class="see-also">The open-core split is documented in the open-core ADR (R016) in the public <a href="https://github.com/Apolloccrypt/paramant-relay/tree/main/docs/adrs">ADR directory</a>.</p>
+  <p class="see-also">De open-core verdeling staat in de open-core ADR (R016) in de openbare <a href="https://github.com/Apolloccrypt/paramant-relay/tree/main/docs/adrs">ADR-map</a>.</p>
 
   <!-- ───────────────────── Independent verification ───────────────────── -->
-  <h2 id="independent">Independent verification</h2>
+  <h2 id="independent">Onafhankelijke controle</h2>
 
-  <p>Three external security audits in April 2026 reviewed the relay code: two by R. Zwarts, one by Ryan Williams of Smart Cyber Solutions. Together they produced 40 findings, 4 of them critical. Dates, finding counts and the resolving commits are in the audit table on the <a href="/docs#audits">docs page</a>; every finding is written up in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md">SECURITY.md</a>. The Smart Cyber Solutions review is published in full as the <a href="/docs/security-audit-2026-04.md">April 2026 audit report</a>; the raw pentest output behind it is not published. A further external review of the v3.0.0 and open-core architecture is <span class="badge badge-planned">planned</span>; results will be published there when complete.</p>
+  <p>In april 2026 hebben drie externe beveiligingsaudits de code van de relay beoordeeld: twee door R. Zwarts, één door Ryan Williams van Smart Cyber Solutions. Samen leverden ze 40 bevindingen op, waarvan 4 kritiek. Datums, aantallen bevindingen en de commits die ze oplosten staan in de audittabel op de <a href="/docs#audits">docs-pagina</a>. Elke bevinding is beschreven in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md">SECURITY.md</a>. De beoordeling van Smart Cyber Solutions is volledig gepubliceerd als het <a href="/docs/security-audit-2026-04.md">auditrapport van april 2026</a>. De ruwe pentestuitvoer daarachter is niet gepubliceerd. Een volgende externe beoordeling van v3.0.0 en de open-core architectuur is <span class="badge badge-planned">gepland</span>. De uitkomsten worden daar gepubliceerd zodra ze klaar zijn.</p>
 
-  <p>If you are running your own audit, the public surface (relay, SDKs, frontend and the protocol specifications) is enough to verify every claim on this page for yourself.</p>
+  <p>Doet u zelf een audit, dan is wat openbaar is (relay, SDK's, frontend en de protocolspecificaties) genoeg om elke bewering op deze pagina zelf te controleren.</p>
 
   <!-- ───────────────────── Questions ───────────────────── -->
-  <h2 id="questions">Questions</h2>
+  <h2 id="questions">Vragen</h2>
 
-  <p>Security reports and questions: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>. For sensitive material, our PGP key and full policy are in <a href="/.well-known/security.txt">security.txt</a>.</p>
+  <p>Beveiligingsmeldingen en vragen: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>. Voor gevoelig materiaal staan onze PGP-sleutel en het volledige beleid in <a href="/.well-known/security.txt">security.txt</a>.</p>
 
-  <p>General questions: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
+  <p>Algemene vragen: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
 
-  <p>Commercial and license questions: see <a href="/pricing">pricing</a> or email <a href="mailto:hello@paramant.app">hello@paramant.app</a>.</p>
+  <p>Vragen over prijzen en licenties: zie <a href="/pricing">prijzen</a> of mail naar <a href="mailto:hello@paramant.app">hello@paramant.app</a>.</p>
 
 </main>
 <footer>
@@ -416,31 +422,31 @@ docker compose build   # build locally instead of pulling the published image</c
     <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Company</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/about">About</a>
-          <a href="/changelog">Changelog</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/privacy">Privacy Policy</a>
-          <a href="/dpa">Data Processing Agreement</a>
-          <a href="/terms">Terms of Service</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/license">License</a>
+          <a href="/license">Licentie</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=10" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
 </body>
 </html>

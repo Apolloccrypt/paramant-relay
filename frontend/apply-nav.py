@@ -105,6 +105,74 @@ NL_PAGES_SIGN_HELP = {'sign.html', 'parasign.html'} | {
     'help/' + f for f in os.listdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'help'))
     if f.endswith('.html')}
 
+# Since the whole site went Dutch, the language of the bar no longer comes from
+# NL_PAGES but from the page itself: the Dutch bar, footer and strip on every
+# page whose <html lang> is not "en", the English ones where it is (the copies
+# under /en, and any page not yet translated). NL_PAGES stays as the record of
+# the first four; a page listed there is Dutch by its own lang anyway. nav.js
+# and js/nav-auth.js decide on the same <html lang>, so the generator and the
+# re-render can never disagree about a page.
+def is_english(rel):
+    """Where the page sits: under /en or not. Decides the link targets."""
+    return rel.startswith('en/')
+
+
+def speaks_english(html):
+    """What the page says it is. Decides the language of the bar."""
+    m = re.search(r'<html\b[^>]*\blang="([^"]+)"', html)
+    return bool(m) and m.group(1).lower().startswith('en')
+
+
+# The language switch. Every page carries "NL | EN" in the bar, the current
+# language marked, and each half links to the same page in that language: the
+# path with or without /en in front. A page without a counterpart links to the
+# home page of the other language instead of to a 404. No cookie, no redirect
+# on the browser's language: the URL is the whole truth, so a link someone
+# shares opens in the language they read it in.
+def url_of(rel):
+    slug = rel[:-len('.html')]
+    if slug == 'index':
+        return '/'
+    if slug.endswith('/index'):
+        slug = slug[:-len('/index')]
+    return '/' + slug
+
+
+def lang_urls(rel):
+    """(nl_url, en_url) for the page at rel, each falling back to the home
+    page of that language when the counterpart file does not exist."""
+    if is_english(rel):
+        nl_rel, en_rel = rel[len('en/'):], rel
+    else:
+        nl_rel, en_rel = rel, 'en/' + rel
+    nl = url_of(nl_rel) if os.path.exists(os.path.join(frontend, nl_rel)) else '/'
+    en = url_of(en_rel) if os.path.exists(os.path.join(frontend, en_rel)) else '/en'
+    return nl, en
+
+
+def to_english_links(block):
+    """Point the links of an English bar or footer at the English page where
+    one exists, so an English reader is not dropped on a Dutch page by the
+    chrome of an English one. A route with no English page keeps its link."""
+    def swap(m):
+        path, frag = m.group(1), m.group(2) or ''
+        rel = 'index.html' if path == '/' else path.lstrip('/') + '.html'
+        if os.path.exists(os.path.join(frontend, 'en', rel)):
+            return 'href="' + ('/en' if path == '/' else '/en' + path) + frag + '"'
+        return m.group(0)
+    return re.sub(r'href="(/[^"#?]*)(#[^"]*)?"', swap, block)
+
+
+def lang_switch(rel, tag='div', english=None):
+    nl, en = lang_urls(rel)
+    if english is None:
+        english = is_english(rel)
+    on = ' aria-current="true"'
+    return (f'<{tag} class="nav-lang" role="group" aria-label="Taal / Language">'
+            f'<a href="{nl}" hreflang="nl" lang="nl"{"" if english else on}>NL</a>'
+            '<span class="nav-lang-sep" aria-hidden="true">|</span>'
+            f'<a href="{en}" hreflang="en" lang="en"{on if english else ""}>EN</a></{tag}>')
+
 NEW_NAV_NL = '''\
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
@@ -185,9 +253,9 @@ LEGAL_STRIP_NL = '''\
 </footer>'''
 
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=31">'
-NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=26">'
-NAV_JS    = '<script src="/nav.js?v=15" defer></script>'
-NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=10" defer></script>'
+NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=27">'
+NAV_JS    = '<script src="/nav.js?v=16" defer></script>'
+NAV_AUTH_JS = '<script src="/js/nav-auth.js?v=11" defer></script>'
 
 # Pages that don't have <nav class="nav"> yet but should — inject the canonical
 # nav after <body> (or after a skip-link if present). App shells (admin,
@@ -214,13 +282,14 @@ KEEP_OWN_NAV = {
 }
 
 
-def inject_legal_strip(html, strip=LEGAL_STRIP):
+def inject_legal_strip(html, strip=None):
     """Give footerless pages one line with privacy, dpa and terms.
 
     Pages that already carry a real <footer> keep it. The strip uses
     <footer class="legal-strip">, which the plain <footer> replacement above
     never matches, so stamping stays idempotent and edits here still
     propagate on the next run."""
+    strip = strip or LEGAL_STRIP_NL
     if 'class="legal-strip"' in html:
         return re.sub(r'<footer class="legal-strip">.*?</footer>', lambda m: strip,
                       html, flags=re.DOTALL)
@@ -307,8 +376,10 @@ def inject_nav_auth_js(html):
     return html
 
 
-def inject_nav_block(html):
-    """Insert NEW_NAV + NEW_MOBILE after the skip-link (or <body> if none)."""
+def inject_nav_block(html, nav=None, mobile=None):
+    """Insert the nav + mobile drawer after the skip-link (or <body> if none)."""
+    nav = nav or NEW_NAV_NL
+    mobile = mobile or NEW_MOBILE_NL
     skip = re.search(r'<a href="#main-content"[^>]*class="skip-link"[^>]*>[^<]*</a>', html)
     if skip:
         i = skip.end()
@@ -317,7 +388,7 @@ def inject_nav_block(html):
         if not body:
             return html
         i = body.end()
-    return html[:i] + '\n' + NEW_NAV + '\n' + NEW_MOBILE + html[i:]
+    return html[:i] + '\n' + nav + '\n' + mobile + html[i:]
 
 
 def replace_mobile_div(html, mobile=None):
@@ -328,7 +399,7 @@ def replace_mobile_div(html, mobile=None):
     </div>, so without this the second run would leave the old tail sitting
     after the new one and the idempotency gate would go red. The tail holds
     anchors and no nested divs, so one non-greedy match takes it out."""
-    mobile = mobile or NEW_MOBILE
+    mobile = mobile or NEW_MOBILE_NL
     html = re.sub(r'\n?<div class="nav-mobile-tail".*?</div>', '',
                   html, flags=re.DOTALL)
     start = html.find('<div class="nav-mobile"')
@@ -383,18 +454,32 @@ def process(fpath):
     if rel in KEEP_OWN_NAV:
         return renumber_shared_assets(fpath, original)
     content = original
+    english = speaks_english(content)
+    if english:
+        nav, mobile, footer, strip = (to_english_links(b) for b in (NEW_NAV, NEW_MOBILE, NEW_FOOTER, LEGAL_STRIP))
+    else:
+        nav, mobile, footer, strip = NEW_NAV_NL, NEW_MOBILE_NL, NEW_FOOTER_NL, LEGAL_STRIP_NL
     if '<nav class="nav">' not in content:
         if rel not in ADD_NAV_TO:
             return renumber_shared_assets(fpath, original)
-        content = inject_nav_block(content)
+        content = inject_nav_block(content, nav, mobile)
         if '<nav class="nav">' not in content:
             return False
-    dutch = rel in NL_PAGES or rel in NL_PAGES_SIGN_HELP
-    nav, mobile, footer = (NEW_NAV_NL, NEW_MOBILE_NL, NEW_FOOTER_NL) if dutch else (NEW_NAV, NEW_MOBILE, NEW_FOOTER)
+    # The switch sits in the bar from 701px up. Below that the bar keeps its one
+    # action beside the menu button (nav.css), and the switch hangs in the strip
+    # under the drawer instead, next to Sign in and Help. A <span> there, not a
+    # <div>: replace_mobile_div takes the strip out with a non-greedy match up to
+    # its first </div>, which a nested div would cut short.
+    nav = nav.replace('  <button class="nav-hamburger"', '  ' + lang_switch(rel, english=english) + '\n\n  <button class="nav-hamburger"', 1)
+    assert mobile.endswith('</div>')
+    mobile = mobile[:-len('</div>')] + '  ' + lang_switch(rel, 'span', english) + '\n</div>'
     updated = re.sub(r'<nav class="nav">.*?</nav>', lambda m: nav, content, flags=re.DOTALL)
     updated = replace_mobile_div(updated, mobile)
     updated = re.sub(r'<footer>.*?</footer>', lambda m: footer, updated, flags=re.DOTALL)
-    updated = inject_legal_strip(updated, LEGAL_STRIP_NL if dutch else LEGAL_STRIP)
+    updated = inject_legal_strip(updated, strip)
+    updated = re.sub(r'(<a href="#main-content" class="skip-link">)[^<]*(</a>)',
+                     lambda m: m.group(1) + ('Skip to main content' if english else 'Naar de inhoud') + m.group(2),
+                     updated, count=1)
     updated = inject_main(updated)
     updated = inject_design_system(updated)
     updated = inject_nav_js(updated)

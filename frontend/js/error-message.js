@@ -25,17 +25,29 @@
   else root.paramantErrors = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
 
-  var SUPPORT_FAILURE_MESSAGE =
-    'Something went wrong on our side. Try again in a minute; if it keeps happening, ' +
-    'mail privacy@paramant.app with the time and what you did.';
+  // Dutch is the site's main language since 23 September 2026. The English
+  // pages under /en carry <html lang="en"> and keep the English sentences; every
+  // other page, and node (no document), gets the Dutch ones.
+  var ENGLISH = typeof document !== 'undefined' && document.documentElement &&
+    document.documentElement.lang === 'en';
+
+  var SUPPORT_FAILURE_MESSAGE = ENGLISH
+    ? 'Something went wrong on our side. Try again in a minute; if it keeps happening, ' +
+      'mail privacy@paramant.app with the time and what you did.'
+    : 'Er ging aan onze kant iets mis. Probeer het over een minuut opnieuw; blijft het gebeuren, ' +
+      'mail dan privacy@paramant.app met het tijdstip en wat u deed.';
 
   // The cases we DID plan for. Each tells the customer something he can act on
   // that the generic sentence cannot, so they keep their own words. Every other
   // code, and every error with no code at all, is unplanned by definition.
-  var KNOWN = {
+  var KNOWN = ENGLISH ? {
     totp_required:    'Enter the 6-digit code from your authenticator app.',
-    totp_invalid:     'That authenticator code didn’t match. Try the current 6-digit code.',
+    totp_invalid:     'That authenticator code didn\u2019t match. Try the current 6-digit code.',
     totp_unavailable: 'Set up an authenticator app on your account first, then sign with its code.',
+  } : {
+    totp_required:    'Vul de 6-cijferige code uit uw authenticator-app in.',
+    totp_invalid:     'Die code klopt niet. Probeer de huidige 6-cijferige code.',
+    totp_unavailable: 'Stel eerst een authenticator-app in op uw account en onderteken dan met de code daaruit.',
   };
 
   function isKnownFailure(error) {

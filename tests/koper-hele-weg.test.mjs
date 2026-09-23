@@ -150,13 +150,19 @@ test('1. de kassa rekent het bedrag af dat op de knop staat', async () => {
 test('2. de vier schermen zeggen na de betaling hetzelfde', async () => {
   // Deze vier spraken elkaar tegen: dat is de reden dat poort 6 bestaat.
   const thuis = await schermtekst(S.pageK, '/');
+  const thuisEn = await schermtekst(S.pageK, '/en/');
   const account = await schermtekst(S.pageK, '/account');
   const dashboard = await schermtekst(S.pageK, '/dashboard');
 
-  assert.match(thuis, new RegExp(`${FIRM_SIGNS} of ${FIRM_SIGNS} signatures left`),
+  // / is Nederlands, /en de Engelse homepage; beide moeten het zeggen.
+  assert.match(thuis, new RegExp(`${FIRM_SIGNS} van ${FIRM_SIGNS} handtekeningen over deze maand`),
     'de ingelogde homepage toont de gekochte limiet niet');
-  assert.doesNotMatch(thuis, /Community, free for good/,
+  assert.doesNotMatch(thuis, /Community, gratis, voor altijd/,
     'de homepage noemt een betalend account nog Community');
+  assert.match(thuisEn, new RegExp(`${FIRM_SIGNS} of ${FIRM_SIGNS} signatures left`),
+    'de Engelse ingelogde homepage toont de gekochte limiet niet');
+  assert.doesNotMatch(thuisEn, /Community, free for good/,
+    'de Engelse homepage noemt een betalend account nog Community');
   assert.match(account, /FIRM PLAN/, '/account noemt het plan niet Firm');
   assert.match(dashboard, /FIRM PLAN/, '/dashboard noemt het plan niet Firm');
   // De termijn staat op beide schermen, met dezelfde zin.

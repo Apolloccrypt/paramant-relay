@@ -14,11 +14,11 @@
     var errBox = document.getElementById('errorBox');
 
     errBox.style.display = 'none';
-    if (!name || !org || !email) { showError('Name, organisation, and email are required.'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showError('Please enter a valid email address.'); return; }
+    if (!name || !org || !email) { showError('Naam, organisatie en e-mailadres zijn verplicht.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showError('Vul een geldig e-mailadres in.'); return; }
 
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>Signing&hellip;';
+    btn.innerHTML = '<span class="spinner"></span>Bezig met ondertekenen&hellip;';
 
     try {
       var r = await fetch('/api/sign-dpa', {
@@ -29,20 +29,20 @@
       });
       var d = await r.json();
       if (r.ok && d.ok) {
-        document.getElementById('refNumber').textContent = 'Reference: ' + d.ref;
+        document.getElementById('refNumber').textContent = 'Referentie: ' + d.ref;
         document.getElementById('sigEmailDisplay').textContent = email;
         document.getElementById('successBox').style.display = 'block';
         btn.style.display = 'none';
         consent.disabled = true;
       } else {
-        showError(d.error || 'Something went wrong. Please try again or email privacy@paramant.app.');
+        showError(d.error || 'Er ging iets mis. Probeer het opnieuw of mail naar privacy@paramant.app.');
         btn.disabled = false;
-        btn.textContent = 'Sign agreement';
+        btn.textContent = 'Overeenkomst ondertekenen';
       }
     } catch (e) {
-      showError('Network error. Please check your connection and try again.');
+      showError('Netwerkfout. Controleer uw verbinding en probeer het opnieuw.');
       btn.disabled = false;
-      btn.textContent = 'Sign agreement';
+      btn.textContent = 'Overeenkomst ondertekenen';
     }
   });
 

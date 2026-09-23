@@ -69,20 +69,20 @@ function collectStep(n) {
 function validateStep(n) {
   var c = state.config;
   if (n === 1) {
-    return c.sectors.length ? null : 'Select at least one sector.';
+    return c.sectors.length ? null : 'Kies minstens één sector.';
   }
   if (n === 2) {
     if (c.domain && !DOMAIN_RE.test(c.domain.toLowerCase())) {
-      return 'That domain looks invalid. Use e.g. relay.your-org.com, or leave it blank for localhost mode.';
+      return 'Dat domein lijkt niet geldig. Gebruik bijvoorbeeld relay.your-org.com, of laat het leeg voor localhost-modus.';
     }
     return null; // empty domain = localhost mode, allowed
   }
   if (n === 3) {
-    return EMAIL_RE.test(c.adminEmail) ? null : 'A valid admin email is required.';
+    return EMAIL_RE.test(c.adminEmail) ? null : 'Een geldig e-mailadres van de beheerder is verplicht.';
   }
   if (n === 4) {
     if (c.firstUserEmail && !EMAIL_RE.test(c.firstUserEmail)) {
-      return 'First-user email is invalid. Leave it blank to skip creating a user now.';
+      return 'Het e-mailadres van de eerste gebruiker is niet geldig. Laat het leeg als u nu nog geen gebruiker wilt aanmaken.';
     }
     return null; // first user is optional
   }
@@ -112,7 +112,7 @@ function dnsPreflight() {
   var domain = $('[name="domain"]', stepEl(2)).value.trim().toLowerCase();
   if (!domain) { out.textContent = ''; return; }
   if (!DOMAIN_RE.test(domain)) { out.textContent = ''; return; }
-  out.textContent = 'Checking DNS for ' + domain + '...';
+  out.textContent = 'DNS controleren voor ' + domain + '...';
   fetch('/v2/setup/dns-check?domain=' + encodeURIComponent(domain))
     .then(function (r) { return r.json(); })
     .then(function (d) {
@@ -120,7 +120,7 @@ function dnsPreflight() {
         out.textContent = 'DNS OK: ' + domain + ' -> ' + (d.addresses || []).join(', ');
         out.style.color = '#0a7';
       } else {
-        out.textContent = 'DNS not resolving yet for ' + domain + '. You can still continue and configure DNS later.';
+        out.textContent = 'DNS voor ' + domain + ' werkt nog niet. U kunt gewoon doorgaan en DNS later instellen.';
         out.style.color = '#a60';
       }
     })
@@ -152,10 +152,10 @@ function renderReview() {
   var out = $('#review-summary');
   if (!out) { return; }
   var rows = [
-    { step: 1, label: 'Sectors', value: c.sectors.join(', ') },
-    { step: 2, label: 'Domain', value: c.domain ? (c.domain + (c.autoTls ? ' (auto-TLS)' : ' (no TLS)')) : 'localhost mode' },
-    { step: 3, label: 'Admin', value: c.adminEmail + (c.enableTotp ? ' (TOTP on)' : '') },
-    { step: 4, label: 'First user', value: c.firstUserEmail ? (c.firstUserEmail + ' / ' + (c.firstUserLabel || 'first-user') + ' / ' + c.firstUserPlan) : 'skip for now' },
+    { step: 1, label: 'Sectoren', value: c.sectors.join(', ') },
+    { step: 2, label: 'Domein', value: c.domain ? (c.domain + (c.autoTls ? ' (automatische TLS)' : ' (geen TLS)')) : 'localhost-modus' },
+    { step: 3, label: 'Beheerder', value: c.adminEmail + (c.enableTotp ? ' (TOTP aan)' : '') },
+    { step: 4, label: 'Eerste gebruiker', value: c.firstUserEmail ? (c.firstUserEmail + ' / ' + (c.firstUserLabel || 'first-user') + ' / ' + c.firstUserPlan) : 'nu overslaan' },
     { step: 5, label: 'Compliance', value: c.complianceTemplate }
   ];
   var html = '<dl class="review-list">';
@@ -163,7 +163,7 @@ function renderReview() {
     html += '<div class="review-row" style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)">' +
       '<dt style="color:var(--ink-dim)">' + esc(r.label) + '</dt>' +
       '<dd style="margin:0;text-align:right"><span>' + esc(r.value) + '</span> ' +
-      '<button type="button" class="edit-link" data-edit="' + r.step + '" style="background:none;border:none;color:var(--ochre);cursor:pointer;font-size:12px">Edit</button></dd>' +
+      '<button type="button" class="edit-link" data-edit="' + r.step + '" style="background:none;border:none;color:var(--ochre);cursor:pointer;font-size:12px">Wijzigen</button></dd>' +
       '</div>';
   });
   html += '</dl>';
@@ -181,9 +181,9 @@ function checkSetupMode() {
         var main = $('.setup-wizard');
         if (main) {
           main.innerHTML =
-            '<h1>Setup already complete</h1>' +
-            '<p>This relay already has at least one user, so first-time ' +
-            'setup is closed. <a href="/auth/login">Sign in</a> instead.</p>';
+            '<h1>Installatie is al klaar</h1>' +
+            '<p>Deze relay heeft al minstens één gebruiker, dus de eerste ' +
+            'installatie is gesloten. <a href="/auth/login">Log in</a>.</p>';
         }
       }
     })
@@ -194,33 +194,33 @@ function renderDone(res) {
   var body = $('#done-body');
   if (!body) { return; }
   var b = (res && res.body) || {};
-  var html = '<p>Your relay is configured and your admin key is ready. ' +
-    '<strong>Copy it now</strong> -- it is shown only once.</p>';
+  var html = '<p>Uw relay is ingesteld en uw beheersleutel staat klaar. ' +
+    '<strong>Kopieer hem nu</strong>: hij wordt maar één keer getoond.</p>';
   if (b.admin_api_key) {
     html += '<p style="font-family:monospace;background:#f5f7fa;border:1px solid #e0e0e0;padding:10px;word-break:break-all">' +
       esc(b.admin_api_key) + '</p>' +
-      '<button type="button" id="copy-key" class="btn">Copy admin key</button>';
+      '<button type="button" id="copy-key" class="btn">Beheersleutel kopiëren</button>';
   }
   if (b.first_user_api_key) {
-    html += '<p class="hint">First-user key: <code>' + esc(b.first_user_api_key_masked || '') + '</code> (delivered separately).</p>';
+    html += '<p class="hint">Sleutel van de eerste gebruiker: <code>' + esc(b.first_user_api_key_masked || '') + '</code> (apart bezorgd).</p>';
   }
   if (b.next_step === 'restart_relay') {
-    html += '<p class="hint">A new <code>.env</code> was written' +
-      (b.env_backed_up ? ' (previous one backed up to <code>.env.pre-setup</code>)' : '') +
-      '. Restart the relay (<code>docker compose up -d</code>) to apply compliance and TLS settings.</p>';
+    html += '<p class="hint">Er is een nieuwe <code>.env</code> geschreven' +
+      (b.env_backed_up ? ' (de vorige staat als reservekopie in <code>.env.pre-setup</code>)' : '') +
+      '. Herstart de relay (<code>docker compose up -d</code>) om de compliance- en TLS-instellingen toe te passen.</p>';
   }
   var healthHref = safeHref(b.health_url || '/all-systems-go');
   var dashHref = safeHref(b.dashboard_url || '/dashboard');
   html += '<div class="actions" style="margin-top:16px">' +
-    '<a class="btn" href="' + esc(healthHref) + '">Check all systems</a> ' +
-    '<a class="btn" href="' + esc(dashHref) + (dashHref === '#' ? '' : '?welcome=1') + '">Go to dashboard</a>' +
+    '<a class="btn" href="' + esc(healthHref) + '">Alle systemen controleren</a> ' +
+    '<a class="btn" href="' + esc(dashHref) + (dashHref === '#' ? '' : '?welcome=1') + '">Naar het dashboard</a>' +
     '</div>';
   body.innerHTML = html;
   var copyBtn = $('#copy-key');
   if (copyBtn && b.admin_api_key) {
     copyBtn.addEventListener('click', function () {
       if (navigator.clipboard) {
-        navigator.clipboard.writeText(b.admin_api_key).then(function () { copyBtn.textContent = 'Copied'; });
+        navigator.clipboard.writeText(b.admin_api_key).then(function () { copyBtn.textContent = 'Gekopieerd'; });
       }
     });
   }
@@ -230,7 +230,7 @@ function applyConfig() {
   collectStep(state.step);
   var status = $('#apply-status');
   var applyBtn = $('#apply');
-  if (status) { status.style.color = ''; status.textContent = 'Configuring...'; }
+  if (status) { status.style.color = ''; status.textContent = 'Bezig met instellen...'; }
   if (applyBtn) { applyBtn.disabled = true; }
   return fetch('/v2/setup/apply', {
     method: 'POST',
@@ -251,20 +251,20 @@ function applyConfig() {
       if (!status) { return; }
       status.style.color = '#b00020';
       if (res.status >= 500) {
-        status.textContent = 'Setup failed (HTTP ' + res.status + '). ' +
-          ((res.body && res.body.error) ? res.body.error : 'Check the relay logs: docker compose logs relay');
+        status.textContent = 'Installatie mislukt (HTTP ' + res.status + '). ' +
+          ((res.body && res.body.error) ? res.body.error : 'Bekijk de logs van de relay: docker compose logs relay');
       } else {
         // 4xx: validation -- show message and let the user correct an earlier step.
         status.textContent = (res.body && res.body.error)
           ? res.body.error
-          : ('Please review your input (HTTP ' + res.status + ').');
+          : ('Controleer uw invoer (HTTP ' + res.status + ').');
       }
     })
     .catch(function () {
       if (applyBtn) { applyBtn.disabled = false; }
       if (status) {
         status.style.color = '#b00020';
-        status.textContent = 'Could not reach the relay. Your configuration is shown above; you can apply it manually for now.';
+        status.textContent = 'De relay is niet bereikbaar. Uw instellingen staan hierboven, u kunt ze voorlopig met de hand toepassen.';
       }
     });
 }

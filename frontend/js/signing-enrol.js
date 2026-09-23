@@ -10,7 +10,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
 // (parasign-signer.js) — the EXACT path /sign and /co-sign use — so this file
 // just wires the button + status and can never drift from the sign flow.
 // Self-hosted deps only (CSP script-src 'self'); no-ops if the button is absent.
-import { ensureSigningKey, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=15';
+import { ensureSigningKey, resolvePasskeySigningKey } from '/js/parasign-signer.js?v=17';
 
 function wireSigningEnrol() {
   const btn = document.getElementById('signing-enrol-btn');

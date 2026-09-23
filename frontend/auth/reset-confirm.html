@@ -13,7 +13,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/nav.css?v=27">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 /* Same compact phone rhythm as /auth/backup: existing tokens only,
@@ -57,6 +57,8 @@
     <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/auth/reset-confirm" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/auth/reset-confirm" hreflang="en" lang="en">EN</a></div>
+
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
@@ -71,6 +73,7 @@
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
   <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/auth/reset-confirm" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/auth/reset-confirm" hreflang="en" lang="en">EN</a></span>
 </div>
 
 <main class="container-sm">
@@ -118,8 +121,8 @@
 </section>
 </main>
 
-<script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=10" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
 <script src="/js/auth-reset-confirm.js?v=4"></script>
 <p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/auth/reset-confirm" hreflang="en" lang="en">This page in English</a></p>
 <footer class="legal-strip">

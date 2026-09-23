@@ -30,6 +30,10 @@ REDIRECTS = {"iot"}
 PRIVATE = {
     "404", "account", "admin", "all-systems-go", "claim", "co-sign", "dashboard",
     "developer", "get", "ontvang", "request-key", "setup",
+    # ophalen.html is what nginx serves on /ontvang/<token>: the URL is the
+    # secret, so it gets no canonical, no og:url and no description. Kept in
+    # step with PRIVATE in tests/seo-contract.test.mjs, which already names it.
+    "ophalen",
     # /parashare sits behind the same nginx auth_request the test's PRIVATE set
     # names it for. It was in this list's counterpart and not in this list, so
     # the two files disagreed about one page.
@@ -152,11 +156,23 @@ ORG = {
     "knowsLanguage": ["nl", "en"]}
 
 
-# The pages written in Dutch. /gereedschap was the first; since 23 September
-# 2026 the homepage, /pricing, /about and /security are Dutch as well, with the
-# English text under /en/. inLanguage follows the page; a Dutch page carrying
-# inLanguage "en" is a small lie in the one block that exists to be machine-read.
-DUTCH = {"gereedschap", "index", "pricing", "about", "security"}
+# Dutch is the main language of the whole site since 23 September 2026; the
+# English text lives under /en/. inLanguage follows the page's own
+# <html lang>, so it cannot drift from what the page says it is. A Dutch page
+# carrying inLanguage "en" is a small lie in the one block that exists to be
+# machine-read.
+def is_dutch(slug):
+    path = os.path.join(FRONTEND, slug + ".html")
+    try:
+        with open(path, encoding="utf-8") as f:
+            html = f.read()
+    except OSError:
+        return False
+    # The legal pages carry a Dutch heading over an English binding text, and
+    # mark that text <main lang="en">. What a machine reads there is English.
+    if re.search(r'<main[^>]*\blang="en"', html):
+        return False
+    return re.search(r'<html[^>]*\blang="nl"', html) is not None
 
 
 def graph_for(slug, title, desc):
@@ -175,7 +191,7 @@ def graph_for(slug, title, desc):
         "name": clean(title),
         "isPartOf": {"@id": f"{ORIGIN}/#website"},
         "publisher": {"@id": f"{ORIGIN}/#organization"},
-        "inLanguage": "nl" if slug in DUTCH else "en"}
+        "inLanguage": "nl" if is_dutch(slug) else "en"}
     if desc:
         page["description"] = desc
     nodes = [page]
@@ -224,14 +240,37 @@ def graph_for(slug, title, desc):
 MARK = ' data-paramant-seo="1"'
 
 
+def base_slug(slug):
+    """The page an /en/ copy is the English text of: en/docs -> docs."""
+    return slug[len("en/"):] if slug.startswith("en/") else slug
+
+
+def counterpart(slug):
+    """(nl_slug, en_slug) when both language versions exist on disk, else None."""
+    nl, en = base_slug(slug), "en/" + base_slug(slug)
+    if all(os.path.exists(os.path.join(FRONTEND, s + ".html")) for s in (nl, en)):
+        return nl, en
+    return None
+
+
+ALT_RX = re.compile(r'<link rel="alternate" hreflang="[^"]+" href="[^"]*">\n?', re.I)
+
+
+def hreflang_block(nl, en):
+    return (f'<link rel="alternate" hreflang="nl" href="{url_for(nl)}">\n'
+            f'<link rel="alternate" hreflang="en" href="{url_for(en)}">\n'
+            f'<link rel="alternate" hreflang="x-default" href="{url_for(nl)}">\n')
+
+
 def apply(slug, path, check=False):
     html = open(path, encoding="utf-8").read()
     original = html
     changes = []
     # A redirect stub needs no description of its own, but must NOT be
     # noindexed: its canonical is what passes the signal on to the real page.
-    redirect = slug in REDIRECTS
-    private = slug in PRIVATE
+    # An /en/ copy is private or a redirect exactly when its Dutch page is.
+    redirect = base_slug(slug) in REDIRECTS
+    private = base_slug(slug) in PRIVATE
     skip_content = private or redirect
     url = url_for(slug)
 
@@ -265,6 +304,23 @@ def apply(slug, path, check=False):
     if not re.search(r'rel=["\']canonical["\']', html, re.I):
         html = re.sub(r"(</title>)", r"\1\n" + f'<link rel="canonical" href="{url}">', html, count=1, flags=re.I)
         changes.append("canonical")
+
+    # 2b. hreflang. A page that exists in both languages names both, with the
+    #     Dutch one as x-default, right under its canonical. Regenerated, so a
+    #     page that gains or loses its counterpart follows on the next run.
+    pair = counterpart(slug)
+    if pair and not redirect:
+        want = hreflang_block(*pair)
+        stripped = ALT_RX.sub("", html)
+        canon = re.search(r'<link rel="canonical"[^>]*>\n?', stripped, re.I)
+        if canon:
+            end = canon.end()
+            if not stripped[canon.start():end].endswith("\n"):
+                want = "\n" + want
+            candidate = stripped[:end] + want + stripped[end:]
+            if candidate != html:
+                html = candidate
+                changes.append("hreflang")
 
     # 3. robots noindex for anything private.
     if private and not re.search(r'name=["\']robots["\'][^>]*noindex', html, re.I):

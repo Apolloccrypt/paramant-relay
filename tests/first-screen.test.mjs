@@ -86,6 +86,9 @@ const aliases = {
   '/en/about': '/en/about.html',
   '/en/parasign': '/en/parasign.html',
   '/en/security': '/en/security.html',
+  '/en/trust': '/en/trust.html',
+  '/en/docs': '/en/docs.html',
+  '/en/download': '/en/download.html',
 };
 
 const server = http.createServer((req, res) => {
@@ -292,6 +295,14 @@ const PAGES = [
   {
     slug: '/trust',
     claims: [
+      { name: 'the lede', css: '.page-hero .lede', text: 'Voor organisaties die Paramant op hun eigen server draaien' },
+      { name: 'the first action', css: '.hero-cta a.btn-primary', href: '/security' },
+      { name: 'the second action', css: '.hero-cta a.btn-secondary', href: '/pricing' },
+    ],
+  },
+  {
+    slug: '/en/trust',
+    claims: [
       { name: 'the lede', css: '.page-hero .lede', text: 'For organisations that run Paramant on their own server' },
       { name: 'the first action', css: '.hero-cta a.btn-primary', href: '/security' },
       { name: 'the second action', css: '.hero-cta a.btn-secondary', href: '/pricing' },
@@ -299,6 +310,16 @@ const PAGES = [
   },
   {
     slug: '/docs',
+    claims: [
+      // The one line on a reference page written for the person who decides
+      // rather than the person who integrates.
+      { name: 'the line for the buyer', css: 'p.docs-buyer', text: 'Overweegt u Paramant?' },
+      { name: 'the first button', css: '.docs-hero-actions a.docs-hero-btn', nth: 0, href: '#quickstart' },
+      { name: 'the second button', css: '.docs-hero-actions a.docs-hero-btn', nth: 1, href: '/pricing' },
+    ],
+  },
+  {
+    slug: '/en/docs',
     claims: [
       // The one line on a reference page written for the person who decides
       // rather than the person who integrates.
@@ -324,6 +345,15 @@ const PAGES = [
   },
   {
     slug: '/download',
+    claims: [
+      { name: 'the status sentence', css: 'header.dl-lead h1', text: 'niet meer onderhouden' },
+      { name: 'the sentence under it', css: 'header.dl-lead p.dl-sub', text: 'De laatste build is van maart 2026' },
+      { name: 'the first button', css: '.dl-actions a.btn-primary', href: '/' },
+      { name: 'the second button', css: '.dl-actions a.btn-outline', href: '/pricing' },
+    ],
+  },
+  {
+    slug: '/en/download',
     claims: [
       { name: 'the status sentence', css: 'header.dl-lead h1', text: 'no longer maintained' },
       { name: 'the sentence under it', css: 'header.dl-lead p.dl-sub', text: 'The last build is from March 2026' },

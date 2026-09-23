@@ -44,10 +44,13 @@
   var forms = document.querySelectorAll('[data-redeem-form]');
   if (!forms.length) return;
 
-  var BUSY = 'Checking your code...';
-  var NO_HELPER = 'This page could not start. Reload and try again.';
-  var OFFLINE = 'We could not reach the server. Please try again in a minute.';
-  var EMPTY = 'Enter your code first.';
+  // The page's own language: Dutch on every page that declares <html lang="nl">,
+  // English on the pages that still declare "en" (the copies under /en).
+  var EN = document.documentElement.lang === 'en';
+  var BUSY = EN ? 'Checking your code...' : 'Uw code wordt gecontroleerd...';
+  var NO_HELPER = EN ? 'This page could not start. Reload and try again.' : 'Deze pagina kon niet starten. Laad hem opnieuw en probeer het nog eens.';
+  var OFFLINE = EN ? 'We could not reach the server. Please try again in a minute.' : 'We konden de server niet bereiken. Probeer het over een minuut opnieuw.';
+  var EMPTY = EN ? 'Enter your code first.' : 'Vul eerst uw code in.';
 
   function say(form, text, kind) {
     var el = form.querySelector('[data-redeem-message]');
@@ -114,7 +117,7 @@
       if (!out) return;
       busy(form, false);
       if (out.status === 200 && out.data.ok) {
-        say(form, out.data.message || 'Your code is redeemed.', 'info');
+        say(form, out.data.message || (EN ? 'Your code is redeemed.' : 'Uw code is ingewisseld.'), 'info');
         if (input) input.value = '';
         /* The plan on this page is now out of date. Let whichever page we are
          * on refresh the block that shows it, without this file knowing which

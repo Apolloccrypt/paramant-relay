@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Changelog · Paramant release history</title>
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:height" content="630">
+<meta property="og:image:width" content="1200">
+<meta property="og:site_name" content="Paramant">
+<meta name="description" content="Transparent Paramant release history. What changed, when, and why. Security-relevant items are always listed.">
+<meta property="og:title" content="Changelog · Paramant release history">
+<meta property="og:description" content="Transparent Paramant release history. What changed, when, and why. Security-relevant items are always listed.">
+<meta property="og:url" content="https://paramant.app/en/changelog">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Changelog · Paramant release history">
+<meta name="twitter:description" content="Transparent Paramant release history. What changed, when, and why. Security-relevant items are always listed.">
+<link rel="canonical" href="https://paramant.app/en/changelog">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/changelog">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/changelog">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/changelog">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B3A6A">
+
+<link rel="stylesheet" href="/design-system.css?v=31">
+<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+  <style>
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bone);color:var(--ink)}
+main{max-width:780px;margin:0 auto;padding:80px 48px 120px}
+h1{font-size:36px;font-weight:600;letter-spacing:-.03em;margin-bottom:12px}
+.lead{font-size:16px;color:var(--ink-dim);line-height:1.7;margin-bottom:60px;max-width:560px}
+.release{margin-bottom:64px;border-top:2px solid var(--cobalt);padding-top:32px}
+.release:first-of-type{border-top:none;padding-top:0}
+.release-header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:8px}
+h2{font-size:20px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+.release-date{font-size:12px;color:var(--ink-dim);font-family:monospace;letter-spacing:.06em;text-transform:uppercase}
+.release-summary{font-size:15px;color:var(--ink-dim);line-height:1.7;margin-bottom:28px;max-width:620px}
+h3{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin:28px 0 12px}
+ul{padding-left:20px;margin-bottom:0}
+li{font-size:14px;color:var(--ink-dim);line-height:1.8;margin-bottom:4px}
+li strong{color:var(--ink)}
+code{background:rgba(var(--tint), .06);padding:2px 5px;font-size:12px;font-family:monospace}
+.badge{display:inline-block;font-size:11px;font-family:monospace;padding:2px 7px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+.badge-added{background:rgba(29, 78, 216, .25);color:var(--ok-ink)}
+.badge-changed{background:rgba(29, 78, 216, .08);color:var(--cobalt)}
+.badge-fixed{background:rgba(var(--tint), .06);color:var(--ink-2)}
+.badge-security{background:var(--card);color:var(--warn-ink)}
+.unreleased{opacity:.6}
+footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.footer-links{display:flex;gap:20px;flex-wrap:wrap}
+.footer-links a{font-size:12px;color:var(--cobalt);text-decoration:none}
+.footer-meta{font-size:12px;color:var(--ink-dim)}
+@media(max-width:640px){main{padding:48px 20px 80px}h1{font-size:26px}footer{padding:32px 20px;flex-direction:column}}
+</style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/en/changelog#webpage",
+      "url": "https://paramant.app/en/changelog",
+      "name": "Changelog · Paramant release history",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "en",
+      "description": "Transparent Paramant release history. What changed, when, and why. Security-relevant items are always listed."
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://paramant.app/en/changelog#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Paramant",
+          "item": "https://paramant.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "En",
+          "item": "https://paramant.app/en"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Changelog"
+        }
+      ]
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<nav class="nav">
+  <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/security" class="nav-link">Security</a></li>
+    <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/en/docs" class="nav-link">Docs</a></li>
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/auth/login" class="nav-signin">Sign in</a>
+    <a href="/en/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/changelog" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/changelog" hreflang="en" lang="en" aria-current="true">EN</a></div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/security" class="nav-mobile-standalone">Security</a>
+  <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/changelog" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/changelog" hreflang="en" lang="en" aria-current="true">EN</a></span>
+</div>
+
+<nav id="nav"></nav>
+<script src="/nav.js?v=16"></script>
+
+<main id="main-content">
+  <section class="page-hero">
+  <div class="page-hero-inner">
+    <span class="eyebrow">RELEASE HISTORY</span>
+    <h1>Changelog</h1>
+    <p class="lede">Transparent release history. What changed, when, and why. Security-relevant items are always listed.</p>
+  </div>
+</section>
+
+  <!-- ── UNRELEASED ───────────────────────────────────────────── -->
+  <section class="release unreleased">
+    <div class="release-header">
+      <h2>Unreleased</h2>
+    </div>
+    <p class="release-summary">Features in active development.</p>
+    <h3>Added</h3>
+    <ul>
+      <!-- Billing left the Planned list below, where it stood as "Mollie
+           integration for billing (currently stub mode)". That has not been
+           true since payments went live: relay.js POST /v2/billing/checkout
+           calls Mollie unconditionally and the webhook issues the document by
+           itself. Same facts as CHANGELOG.md under Unreleased. -->
+      <li>Payments through Mollie: one payment per term, no subscription and no direct debit</li>
+      <li>A numbered document per payment, issued automatically: an invoice, or a payment receipt while our VAT number is pending</li>
+      <li>A numbered credit note when money goes back, on a chargeback or a refund</li>
+      <li>Both appear on your account page and arrive by email as a PDF</li>
+    </ul>
+    <h3>Planned</h3>
+    <ul>
+      <li>Prometheus + Grafana monitoring via Tailscale-only access</li>
+      <li>Outlook add-in (<code>addin.paramant.app</code>): source scaffold done</li>
+      <li>Chrome Web Store public listing</li>
+      <li>Team accounts + SSO</li>
+      <li>WebAuthn / Passkey second-factor option</li>
+      <li>Admin email preview modal with per-user send actions</li>
+      <li>Public status page</li>
+    </ul>
+  </section>
+
+  <!-- ── 0.9.0-beta (session 4: 2026-04-20) ─────────────────── -->
+  <section class="release">
+    <div class="release-header">
+      <h2>v0.9.0-beta</h2>
+      <span class="release-date">20 April 2026</span>
+    </div>
+    <p class="release-summary">Admin panel hardening + email overhaul + TOTP security sprint.</p>
+
+    <h3><span class="badge badge-added">Added</span></h3>
+    <ul>
+      <li><strong>Enterprise email templates</strong>: centralized <code>admin/lib/email-templates.js</code> with 5 dual-body (plain-text + HTML) transactional emails. Brand-consistent Paramant design. Preheader text, masked IP footer, List-Unsubscribe header, reply-to.</li>
+      <li><strong>Force TOTP per user</strong>: admin can require TOTP setup before next login; active sessions revoked immediately on enable</li>
+      <li><strong>Two-stage TOTP reset</strong>: request email → confirmation email (1h TTL) → TOTP cleared only after confirmation link clicked</li>
+      <li>Email enumeration protection on <code>/api/user/auth/request-totp-reset</code> (always returns 200)</li>
+      <li>Rich per-user email action menu with preview-before-send</li>
+      <li>Server-side pagination on Users list (<code>page</code>, <code>page_size</code>, <code>status</code>, <code>plan</code> filters)</li>
+      <li>Audit logging on all mutating admin endpoints</li>
+      <li>Global audit ZSET for O(log n) recent-events queries</li>
+      <li><code>email</code> + <code>created</code> fields on user records (new + backfilled)</li>
+      <li>API key masking in users list (first 8 + last 4 chars)</li>
+      <li>Clean JSON error responses: no HTML stack traces</li>
+      <li>WCAG AA on admin panel (ARIA, keyboard nav, skip link, focus indicators)</li>
+      <li>Admin panel documentation (<code>admin/ADMIN.md</code>)</li>
+    </ul>
+
+    <h3><span class="badge badge-changed">Changed</span></h3>
+    <ul>
+      <li>From-address on all transactional emails: <code>noreply@</code> → <code>hello@paramant.app</code></li>
+      <li>TOTP reset confirmation TTL: 15 min → 60 min</li>
+      <li><code>delete_account</code> admin rate limit: 3/day → 50/day</li>
+    </ul>
+
+    <h3><span class="badge badge-fixed">Fixed</span></h3>
+    <ul>
+      <li>Admin panel showing <code>&#8212;</code> instead of <code>0</code> for empty stat cards</li>
+      <li>Relay dashboard showing 0h uptime</li>
+      <li>Delete-account causing "Error loading users" on next refresh</li>
+      <li>Missing <code>ADMIN_TOKEN</code> headers on internal <code>callRelay()</code> calls (all returning 401)</li>
+      <li>Modal element IDs not matching JS function references</li>
+    </ul>
+
+    <h3><span class="badge badge-security">Security</span></h3>
+    <ul>
+      <li>TOTP reset requires inbox access: attacker with known email cannot force a reset</li>
+      <li>Rate limits on reset flow: 5/email/24h + 10/IP/1h</li>
+      <li>Error responses are JSON only: no internal paths or server info leaked</li>
+      <li>24/24 integration tests passing</li>
+    </ul>
+  </section>
+
+  <!-- ── 0.9.0-beta (session 1–3: 2026-04-19) ────────────────── -->
+  <section class="release">
+    <div class="release-header">
+      <h2>v0.9.0-beta</h2>
+      <span class="release-date">19 April 2026</span>
+    </div>
+    <p class="release-summary">Enterprise readiness sprint. Admin panel redesign + security audit.</p>
+
+    <h3><span class="badge badge-added">Added</span></h3>
+    <ul>
+      <li>Five-tab admin dashboard (Overview, Users, Audit, Billing, Relay): v4 Denim Edit styling</li>
+      <li>User signup flow at <code>/signup</code> with TOTP enrollment (no password)</li>
+      <li>Billing scaffold with Mollie placeholder: checkout, cancel, status, history</li>
+      <li>Chromium browser extension (dual-mode: API key + TOTP)</li>
+      <li>Wazuh SIEM agent connected via Tailscale</li>
+      <li>Security audit executed: 6-layer scope, low risk (0 critical, 0 high)</li>
+    </ul>
+
+    <h3><span class="badge badge-changed">Changed</span></h3>
+    <ul>
+      <li>GitHub Actions pinned to commit SHAs for supply-chain security</li>
+      <li>TOTP v2 rolled out to beta users; Q2 2026 banners removed</li>
+      <li>Setup flow button-gated to prevent email scanner token consumption</li>
+      <li><code>POST /api/user/auth/setup/:token</code> idempotent for provisional enrollments</li>
+      <li><code>@noble/post-quantum</code> updated to 0.6.1</li>
+    </ul>
+
+    <h3><span class="badge badge-fixed">Fixed</span></h3>
+    <ul>
+      <li>Setup token consumed by email scanners (Gmail, Barracuda, Proofpoint)</li>
+      <li><code>INTERNAL_AUTH_TOKEN</code> missing from admin container: relay calls returning 401</li>
+      <li>Wazuh agent connectivity after UFW default-deny reboot</li>
+    </ul>
+
+    <h3><span class="badge badge-security">Security</span></h3>
+    <ul>
+      <li>Setup tokens no longer consumed by email preview scanners</li>
+      <li>Full 6-layer automated audit completed; all findings fixed same session</li>
+      <li>Load tested to 500 req/s: p95 135ms, zero errors</li>
+    </ul>
+  </section>
+
+</main>
+
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid footer-slim">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="/en/about">About</a>
+          <a href="/en/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Legal</div>
+        <div class="footer-links">
+          <a href="/en/privacy">Privacy Policy</a>
+          <a href="/en/dpa">Data Processing Agreement</a>
+          <a href="/en/terms">Terms of Service</a>
+          <a href="/en/sla">SLA</a>
+          <a href="/en/license">License</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
+</body>
+</html>

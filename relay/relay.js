@@ -169,6 +169,7 @@ const transferNotify   = require('./lib/transfer-notify');   // ParaSend Pro upl
 const invoiceMod       = require('./lib/invoice');            // invoice numbering, records and VAT split
 const invoicePdf       = require('./lib/invoice-pdf');        // one-page PDF writer, no dependency
 const creditNote       = require('./lib/credit-note');        // credit notes (CN series) for money that goes back
+const billingMail      = require('./lib/billing-mail');       // bilingual (NL, then EN) text of the invoice and credit-note mails
 const billingHistory   = require('./lib/billing-history');    // one chronological list, derived from the records
 const billingExport    = require('./lib/billing-export');     // period export of both series, CSV/JSON, for the books
 const zipStore         = require('./lib/zip-store');          // store-only zip writer, no dependency
@@ -3036,28 +3037,12 @@ function _mailInvoice(record) {
   let pdf;
   try { pdf = invoicePdf.render(record, { buyerHint: invoiceMod.BUYER_HINT }); }
   catch (e) { log('warn', 'billing_invoice_pdf_failed', { number: record.number, err: e.message }); return false; }
-  const isInvoice = record.kind === 'invoice';
-  const subject = `${isInvoice ? 'Invoice' : 'Payment receipt'} ${record.number} - ${record.seller.name}`;
-  const lines = [
-    `Thank you for your payment.`,
-    ``,
-    `${record.title} ${record.number}`,
-    `Date: ${record.invoice_date}`,
-    `${record.description}`,
-    `Total: ${record.currency} ${record.amount_gross} (incl. ${record.vat_rate}% VAT, ${record.currency} ${record.amount_vat})`,
-    ``,
-    isInvoice ? '' : `${invoiceMod.RECEIPT_NOTE}`,
-    invoiceMod.buyerIsComplete(record.buyer) ? '' : `${invoiceMod.BUYER_HINT}.`,
-    ``,
-    `The document is attached, and every document stays available on your account page.`,
-    ``,
-    record.seller.name,
-  ].filter((l, i, a) => !(l === '' && a[i - 1] === ''));
+  const { subject, text } = billingMail.invoiceMail(record);
   return mailLater({
     to: record.buyer.email,
     from: 'PARAMANT <billing@paramant.app>',
     subject,
-    text: lines.join('\n'),
+    text,
     attachments: [{ filename: `${record.number}.pdf`, content: pdf.toString('base64') }],
   });
 }
@@ -3108,31 +3093,12 @@ function _mailCreditNote(record) {
   let pdf;
   try { pdf = invoicePdf.render(record, { buyerHint: invoiceMod.BUYER_HINT }); }
   catch (e) { log('warn', 'billing_credit_pdf_failed', { number: record.number, err: e.message }); return false; }
-  const chargedBack = record.reason === 'chargeback';
-  const subject = `${record.title} ${record.number} - ${record.seller.name}`;
-  const lines = [
-    chargedBack
-      ? `Your payment was charged back, so the invoice below has been credited.`
-      : `Your payment has been refunded, so the invoice below has been credited.`,
-    ``,
-    `${record.title} ${record.number}`,
-    `Date: ${record.invoice_date}`,
-    `Credit for invoice ${record.credit_for} of ${record.credit_for_date}`,
-    `${record.description}`,
-    `Total credited: ${record.currency} ${record.amount_gross} (incl. ${record.vat_rate}% VAT, ${record.currency} ${record.amount_vat})`,
-    ``,
-    record.partial ? 'This is a partial credit. The remainder of that invoice still stands.' : '',
-    record.note || '',
-    ``,
-    `The document is attached, and every document stays available on your account page.`,
-    ``,
-    record.seller.name,
-  ].filter((l, i, a) => !(l === '' && a[i - 1] === ''));
+  const { subject, text } = billingMail.creditNoteMail(record);
   return mailLater({
     to: record.buyer.email,
     from: 'PARAMANT <billing@paramant.app>',
     subject,
-    text: lines.join('\n'),
+    text,
     attachments: [{ filename: `${record.number}.pdf`, content: pdf.toString('base64') }],
   });
 }

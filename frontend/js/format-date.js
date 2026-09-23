@@ -40,8 +40,15 @@
 (function () {
   if (window.paramantDate && window.paramantDate.__paramant) return;
 
-  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'];
+  // Dutch is the site's main language since 23 September 2026: "8 september
+  // 2026". The English pages under /en carry <html lang="en"> and keep
+  // "8 September 2026". Same shape either way: day, month in full, year.
+  var ENGLISH = document.documentElement && document.documentElement.lang === 'en';
+  var MONTHS = ENGLISH
+    ? ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December']
+    : ['januari', 'februari', 'maart', 'april', 'mei', 'juni',
+      'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
 
   function toDate(value) {
     if (value == null || value === '') return null;
@@ -51,7 +58,7 @@
 
   function pad(n) { return n < 10 ? '0' + n : String(n); }
 
-  // "8 September 2026". The one format the site shows a reader.
+  // "8 september 2026". The one format the site shows a reader.
   function day(value, fallback) {
     var d = toDate(value);
     if (!d) return fallback === undefined ? '--' : fallback;

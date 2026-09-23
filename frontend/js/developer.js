@@ -23,7 +23,7 @@
   function copyText(text, button) {
     if (!navigator.clipboard) return Promise.reject(new Error('clipboard_unavailable'));
     return navigator.clipboard.writeText(text).then(function () {
-      var old = button.textContent; button.textContent = 'Copied';
+      var old = button.textContent; button.textContent = 'Gekopieerd';
       setTimeout(function () { button.textContent = old; }, 1400);
     });
   }
@@ -60,16 +60,16 @@
     // holds even enterprise to a real number). So the honest reading of an
     // absent cap is "we do not know right now", and the page says that instead
     // of promising a limit nobody grants.
-    byId('sign-cap').textContent = cap == null ? 'of --' : 'of ' + cap;
+    byId('sign-cap').textContent = cap == null ? 'van --' : 'van ' + cap;
     var percent = cap == null ? 0 : Math.min(100, Math.round((used / Math.max(1, cap)) * 100));
     var bar = byId('sign-bar'); bar.style.width = percent + '%'; bar.className = percent >= 80 ? 'warn' : '';
-    byId('usage-note').textContent = cap == null ? 'Your monthly signing allowance could not be read just now.' : Math.max(0, cap - used) + ' signatures remain in the current month.';
+    byId('usage-note').textContent = cap == null ? 'Uw maandtegoed voor ondertekenen kon nu niet worden gelezen.' : 'Nog ' + Math.max(0, cap - used) + ' handtekeningen over deze maand.';
     renderActivity((data.audit || []).filter(isSignEvent));
   }
 
   function renderActivity(events) {
     var host = byId('activity');
-    if (!events.length) { host.innerHTML = '<div class="empty">No ParaSign activity yet. Create a signing request through the API to see it here.</div>'; return; }
+    if (!events.length) { host.innerHTML = '<div class="empty">Nog geen activiteit bij Ondertekenen. Maak via de API een ondertekenverzoek aan, dan ziet u het hier.</div>'; return; }
     host.innerHTML = events.slice(0, 20).map(function (event) {
       return '<div class="event"><time>' + esc(formatTime(event.ts)) + '</time><span>' + esc(event.event_type || 'parasign_event') + '</span></div>';
     }).join('');
@@ -77,17 +77,17 @@
 
   function renderKeys(keys) {
     var host = byId('psk-keys');
-    if (!keys || !keys.length) { host.innerHTML = '<div class="empty">No ParaSign API key yet. Create one to connect your first application.</div>'; return; }
+    if (!keys || !keys.length) { host.innerHTML = '<div class="empty">Nog geen API-sleutel voor Ondertekenen. Maak er een aan om uw eerste toepassing te koppelen.</div>'; return; }
     host.innerHTML = keys.map(function (key) {
       var active = key.active !== false;
       var id = key.kid || '';
-      return '<div class="key-row"><div class="key-main"><div class="key-value">' + esc(key.key_masked || id || '--') + '</div><div class="key-meta"><span class="pill ' + (active ? '' : 'off') + '">' + (active ? 'active' : 'revoked') + '</span>' + (key.label ? '<span>' + esc(key.label) + '</span>' : '') + (key.mode ? '<span>' + esc(key.mode) + '</span>' : '') + '</div></div>' + (active ? '<button class="key-revoke" type="button" data-revoke="' + esc(id) + '">Revoke</button>' : '') + '</div>';
+      return '<div class="key-row"><div class="key-main"><div class="key-value">' + esc(key.key_masked || id || '--') + '</div><div class="key-meta"><span class="pill ' + (active ? '' : 'off') + '">' + (active ? 'actief' : 'ingetrokken') + '</span>' + (key.label ? '<span>' + esc(key.label) + '</span>' : '') + (key.mode ? '<span>' + esc(key.mode) + '</span>' : '') + '</div></div>' + (active ? '<button class="key-revoke" type="button" data-revoke="' + esc(id) + '">Intrekken</button>' : '') + '</div>';
     }).join('');
   }
 
   function loadKeys() {
     return json(API).then(function (data) { renderKeys(data.keys || []); }).catch(function (error) {
-      byId('psk-keys').innerHTML = '<div class="empty">Could not load API keys. ' + esc(error.message) + '</div>';
+      byId('psk-keys').innerHTML = '<div class="empty">De API-sleutels konden niet worden geladen. ' + esc(error.message) + '</div>';
     });
   }
   function loadSnapshot() {
@@ -114,26 +114,26 @@
     var button = byId('psk-generate');
     var label = byId('psk-label').value.trim();
     var error = byId('psk-error');
-    button.disabled = true; button.textContent = 'Creating'; error.hidden = true;
+    button.disabled = true; button.textContent = 'Bezig met maken'; error.hidden = true;
     json(API, { method:'POST', headers:{ 'Content-Type':'application/json', Accept:'application/json' }, body:JSON.stringify({ label:label }) }).then(function (data) {
       byId('psk-secret').textContent = data.key || '';
       // The key's own plan when the relay named one, otherwise the account's
       // ParaSign tier from the snapshot. Not the unified plan: this is a
       // ParaSign key, so the tier beside it is the ParaSign one.
       var snapTier = snapshot && snapshot.tiers && snapshot.tiers.parasign;
-      byId('psk-meta').textContent = 'Key ' + (data.kid || '--') + ' · ' + (data.mode || 'live') + ' · plan ' + (data.plan || snapTier || '--');
+      byId('psk-meta').textContent = 'Sleutel ' + (data.kid || '--') + ' · ' + (data.mode || 'live') + ' · abonnement ' + (data.plan || snapTier || '--');
       showView('secret'); loadKeys();
     }).catch(function (failure) {
-      error.textContent = failure.status === 403 ? 'Your account does not have ParaSign API access. Check the plan or ask an administrator to enable it.' : 'The key could not be created. ' + failure.message;
+      error.textContent = failure.status === 403 ? 'Uw account heeft geen toegang tot de API voor Ondertekenen. Controleer uw abonnement of vraag een beheerder om toegang.' : 'De sleutel kon niet worden gemaakt. ' + failure.message;
       error.hidden = false;
-    }).finally(function () { button.disabled = false; button.textContent = 'Create key'; });
+    }).finally(function () { button.disabled = false; button.textContent = 'Sleutel maken'; });
   }
   function revokeKey(kid, button) {
-    if (!kid || !window.confirm('Revoke this ParaSign API key? Applications using it will stop working immediately.')) return;
+    if (!kid || !window.confirm('Deze API-sleutel voor Ondertekenen intrekken? Toepassingen die hem gebruiken, werken dan direct niet meer.')) return;
     button.disabled = true;
     json(API, { method:'DELETE', headers:{ 'Content-Type':'application/json', Accept:'application/json' }, body:JSON.stringify({ kid:kid }) }).then(loadKeys).catch(function (error) {
       button.disabled = false;
-      window.alert('The key could not be revoked. ' + error.message);
+      window.alert('De sleutel kon niet worden ingetrokken. ' + error.message);
     });
   }
 

@@ -60,10 +60,13 @@ async function visibleActions(page) {
 }
 
 // Both languages: /ontvang is Dutch, /en/ontvang keeps the original English words.
+// The page speaks the language of its <html lang>, and each language is held to
+// its own exact sentences; the Dutch page may not show the English alarm words
+// either.
 const LANGS = [
   { name: 'nl', pre: '', empty: /Er staat nog niets klaar/, opens: /Deze pagina opent vanzelf via de link die u kreeg\./,
-    alarm: /Ontvangen is mislukt|ongeldig of onvolledig|werkt niet|Opnieuw proberen/i, button: 'Zelf iets versturen',
-    invalid: /Deze link is ongeldig of onvolledig/, stop: /werkt niet/ },
+    alarm: /Ontvangen is mislukt|ongeldig of onvolledig|werkt niet|Opnieuw proberen|Transfer failed|Invalid or missing|cannot be used|Try again|mislukt|Probeer het opnieuw/i, button: 'Zelf iets versturen',
+    invalid: /Deze link is ongeldig of onvolledig/, stop: /Deze link werkt niet/ },
   { name: 'en', pre: '/en', empty: /Nothing to pick up yet/, opens: /This page opens by itself from the link you were sent\./,
     alarm: /Transfer failed|Invalid or missing|cannot be used|Try again/i, button: 'Send something yourself',
     invalid: /Invalid or missing session token/, stop: /cannot be used/ },
@@ -76,6 +79,7 @@ for (const L of LANGS) {
       await page.route('https://*.paramant.app/**', (r) => r.abort());
       try {
         await page.goto(OE_ORIGIN + addr);
+        assert.equal(await page.evaluate(() => document.documentElement.lang), L.name, `${addr}: unexpected <html lang>`);
         await page.waitForFunction((src) => {
           const h = [...document.querySelectorAll('h1')].find((e) => e.offsetParent !== null);
           return h && new RegExp(src).test(h.textContent);

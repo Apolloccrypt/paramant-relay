@@ -67,7 +67,7 @@
       sixDigits: 'De code heeft zes cijfers.',
       checking: 'Even controleren...',
       lastTry: 'Die code klopt niet, en dat was de laatste poging.',
-      wrong: function (n) { return 'Die code klopt niet. Nog ' + n + (n === 1 ? ' poging.' : ' pogingen.'); },
+      wrong: function (n) { return 'Die code klopt niet. Nog ' + n + (n === 1 ? ' poging over.' : ' pogingen over.'); },
       codeExpired: 'Die code is verlopen. Vraag een nieuwe aan.',
       askFirst: 'Vraag eerst een code aan.',
       cannotOpen: 'Het bestand is aangekomen, maar deze link kan het niet openen. '
@@ -298,7 +298,7 @@
     var dv = new DataView(plain.buffer, plain.byteOffset, 4);
     var naamLen = dv.getUint32(0, true);
     if (naamLen > plain.length - 4) throw new Error('bad_payload');
-    var naam = new TextDecoder().decode(plain.subarray(4, 4 + naamLen)) || 'file';
+    var naam = new TextDecoder().decode(plain.subarray(4, 4 + naamLen)) || 'bestand';
     var body = plain.subarray(4 + naamLen);
     return { naam: naam, blob: new Blob([body], { type: 'application/octet-stream' }) };
   }

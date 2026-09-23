@@ -36,7 +36,7 @@ const MIME = {
   '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css',
   '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2',
 };
-const aliases = { '/': '/index.html', '/account': '/account.html', '/pricing': '/pricing.html', '/en/account': '/en/account.html' };
+const aliases = { '/': '/index.html', '/account': '/account.html', '/pricing': '/pricing.html', '/en/pricing': '/en/pricing.html', '/en/account': '/en/account.html' };
 
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
@@ -109,13 +109,19 @@ async function typeAndSubmit(page, code) {
   await page.click('[data-redeem-form] [data-redeem-submit]');
   await page.waitForFunction(() => {
     const el = document.querySelector('[data-redeem-form] [data-redeem-message]');
-    return el && !el.hidden && el.textContent && !/Checking your code/.test(el.textContent);
+    return el && !el.hidden && el.textContent && !/Checking your code|Uw code wordt gecontroleerd/.test(el.textContent);
   }, null, { timeout: 10000 });
   return page.textContent('[data-redeem-form] [data-redeem-message]');
 }
 
-// /account is Dutch since 23 September 2026 as well; /en/account is its English copy.
-for (const slug of ['/pricing', '/account', '/en/account']) {
+// /pricing and /account are Dutch since 23 September 2026; /en/pricing and
+// /en/account carry the English text. js/redeem-code.js speaks the language the
+// page declares.
+const REDEEM_COPY = {
+  en: { empty: 'Enter your code first.', offline: /try again in a minute/i },
+  nl: { empty: 'Vul eerst uw code in.', offline: /probeer het over een minuut opnieuw/i },
+};
+for (const slug of ['/pricing', '/en/pricing', '/account', '/en/account']) {
   test(`${slug} carries the code field, and asks for no credential until it is used`, async () => {
     const { page, calls } = await open(slug, (route) => json(route, GRANTED));
     // 4. Nothing on load. The whole point of the app token is that reading a
@@ -168,13 +174,15 @@ for (const slug of ['/pricing', '/account', '/en/account']) {
       const el = document.querySelector('[data-redeem-form] [data-redeem-message]');
       return el && !el.hidden && el.textContent;
     }, null, { timeout: 10000 });
+    const copy = REDEEM_COPY[await page.evaluate(() => document.documentElement.lang)];
+    assert.ok(copy, `${slug}: unexpected <html lang>`);
     assert.equal((await page.textContent('[data-redeem-form] [data-redeem-message]')).trim(),
-      'Enter your code first.');
+      copy.empty);
     assert.equal(calls.redeem, 0, 'an empty box must not reach the relay');
 
     // Server unreachable: one sentence, and the button works again afterwards.
     const msg = await typeAndSubmit(page, 'COFFEE');
-    assert.match(msg, /try again in a minute/i, msg);
+    assert.match(msg, copy.offline, msg);
     assert.equal(await page.isDisabled('[data-redeem-form] [data-redeem-submit]'), false,
       'a failed attempt must not leave the button stuck');
     await page.close();

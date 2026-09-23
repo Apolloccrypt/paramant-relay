@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin · Paramant</title>
+<title>Beheer · Paramant</title>
 <meta name="robots" content="noindex, nofollow">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -164,51 +164,51 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .chip.required-missing{background:rgba(196, 96, 79, .08);color:var(--brick-ink);font-weight:600}
 .chip.required-ok{background:rgba(29, 78, 216, .08);color:var(--cobalt)}
 </style>
-<meta property="og:title" content="Admin · Paramant">
-<meta property="og:description" content="Admin · Paramant">
+<meta property="og:title" content="Beheer · Paramant">
+<meta property="og:description" content="Beheer · Paramant">
 <meta property="og:url" content="https://paramant.app/admin">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Admin · Paramant">
-<meta name="twitter:description" content="Admin · Paramant">
+<meta name="twitter:title" content="Beheer · Paramant">
+<meta name="twitter:description" content="Beheer · Paramant">
 <link rel="canonical" href="https://paramant.app/admin">
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 <div aria-live="polite" aria-atomic="true" id="sr-live" class="sr-only"></div>
 
 <!-- LOGIN -->
 <div id="view-login" class="lw">
   <div class="lb">
     <div class="l-brand">PARAMANT · Infra</div>
-    <h1 class="l-title">Admin panel</h1>
-    <p class="l-sub">Two-factor authentication required to access the dashboard.</p>
-    <label class="l-lbl" for="l-token">Admin token</label>
-    <input id="l-token" type="password" class="l-inp" placeholder="Enter admin token" autocomplete="current-password">
-    <label class="l-lbl" for="l-totp">TOTP code <small style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">(Authenticator app)</small></label>
+    <h1 class="l-title">Beheerpaneel</h1>
+    <p class="l-sub">Voor het dashboard is inloggen in twee stappen nodig.</p>
+    <label class="l-lbl" for="l-token">Beheertoken</label>
+    <input id="l-token" type="password" class="l-inp" placeholder="Voer het beheertoken in" autocomplete="current-password">
+    <label class="l-lbl" for="l-totp">TOTP-code <small style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">(authenticator-app)</small></label>
     <input id="l-totp" type="text" class="l-inp l-totp" placeholder="000000" maxlength="6" autocomplete="one-time-code" inputmode="numeric">
-    <button id="l-btn" class="l-btn" data-click="doLogin">Sign in</button>
+    <button id="l-btn" class="l-btn" data-click="doLogin">Inloggen</button>
     <div id="l-err" class="l-err"></div>
-    <div class="l-note">Session expires after 1 hour</div>
+    <div class="l-note">De sessie verloopt na 1 uur</div>
   </div>
 </div>
 
 <!-- DASHBOARD -->
 <div id="view-dashboard" class="shell">
   <header class="hdr" role="banner">
-    <div class="hdr-brand">PARAMANT · Admin</div>
-    <nav class="tabs" id="nav-tabs" role="navigation" aria-label="Admin sections">
-      <button role="tab" aria-selected="true" aria-controls="tab-overview" id="tabBtn-overview" tabindex="0" data-tab="overview" class="on" data-click="switchTab">Overview</button>
-      <button role="tab" aria-selected="false" aria-controls="tab-users" id="tabBtn-users" tabindex="-1" data-tab="users" data-click="switchTab">Users</button>
+    <div class="hdr-brand">PARAMANT · Beheer</div>
+    <nav class="tabs" id="nav-tabs" role="navigation" aria-label="Onderdelen van het beheer">
+      <button role="tab" aria-selected="true" aria-controls="tab-overview" id="tabBtn-overview" tabindex="0" data-tab="overview" class="on" data-click="switchTab">Overzicht</button>
+      <button role="tab" aria-selected="false" aria-controls="tab-users" id="tabBtn-users" tabindex="-1" data-tab="users" data-click="switchTab">Gebruikers</button>
       <button role="tab" aria-selected="false" aria-controls="tab-audit" id="tabBtn-audit" tabindex="-1" data-tab="audit" data-click="switchTab">Audit</button>
-      <button role="tab" aria-selected="false" aria-controls="tab-billing" id="tabBtn-billing" tabindex="-1" data-tab="billing" data-click="switchTab">Billing</button>
+      <button role="tab" aria-selected="false" aria-controls="tab-billing" id="tabBtn-billing" tabindex="-1" data-tab="billing" data-click="switchTab">Betalingen</button>
       <button role="tab" aria-selected="false" aria-controls="tab-relay" id="tabBtn-relay" tabindex="-1" data-tab="relay" data-click="switchTab">Relay</button>
     </nav>
     <div class="hdr-meta">
-      <span class="lic">v3.0.0 · Licensed</span>
+      <span class="lic">v3.0.0 · Gelicentieerd</span>
       <a class="lo-btn" href="/admin/stand">Stand</a>
-      <button class="lo-btn" data-click="doLogout">Sign out</button>
+      <button class="lo-btn" data-click="doLogout">Uitloggen</button>
     </div>
   </header>
   <main class="main" role="main" id="main-content">
@@ -224,13 +224,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 <div id="mo-email" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-email-title">
   <div class="mb">
     <div class="mh">
-      <span id="mo-email-title" class="mt">Email preview</span>
-      <button class="close-mo" data-click="closeModal" data-modal="mo-email" aria-label="Close">&times;</button>
+      <span id="mo-email-title" class="mt">Voorbeeld van de e-mail</span>
+      <button class="close-mo" data-click="closeModal" data-modal="mo-email" aria-label="Sluiten">&times;</button>
     </div>
     <div class="mbody">
       <div class="ep-tabs">
         <button class="ep-tab on" data-click="epTab" data-arg="html" id="ep-tab-html">HTML</button>
-        <button class="ep-tab" data-click="epTab" data-arg="text" id="ep-tab-text">Plain text</button>
+        <button class="ep-tab" data-click="epTab" data-arg="text" id="ep-tab-text">Platte tekst</button>
       </div>
       <div id="ep-subj" class="ep-subj"></div>
       <div class="ep-content">
@@ -239,8 +239,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
       </div>
     </div>
     <div class="mfoot">
-      <button class="btn" data-click="closeModal" data-modal="mo-email">Cancel</button>
-      <button class="btn pri" id="ep-send-btn" data-click="doSendEmail">Send email &rarr;</button>
+      <button class="btn" data-click="closeModal" data-modal="mo-email">Annuleren</button>
+      <button class="btn pri" id="ep-send-btn" data-click="doSendEmail">E-mail versturen &rarr;</button>
     </div>
   </div>
 </div>
@@ -248,13 +248,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 <div id="mo-plan" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-plan-title">
   <div class="mb">
     <div class="mh">
-      <span id="mo-plan-title" class="mt">Change plan</span>
-      <button class="close-mo" data-click="closeModal" data-modal="mo-plan" aria-label="Close">&times;</button>
+      <span id="mo-plan-title" class="mt">Abonnement wijzigen</span>
+      <button class="close-mo" data-click="closeModal" data-modal="mo-plan" aria-label="Sluiten">&times;</button>
     </div>
     <div class="mbody">
-      <div class="mc"><label>Current plan</label><span id="cp-current" style="font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--ink-2)"></span></div>
+      <div class="mc"><label>Huidig abonnement</label><span id="cp-current" style="font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--ink-2)"></span></div>
       <div class="mc">
-        <label for="cp-plan">New plan</label>
+        <label for="cp-plan">Nieuw abonnement</label>
         <select id="cp-plan">
           <option value="community">community</option>
           <option value="pro">pro</option>
@@ -263,12 +263,12 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
       </div>
       <div class="mc" style="display:flex;align-items:center;gap:8px">
         <input type="checkbox" id="cp-notify" checked>
-        <label for="cp-notify" style="margin:0;font-size:12px;cursor:pointer">Notify user by email</label>
+        <label for="cp-notify" style="margin:0;font-size:12px;cursor:pointer">Gebruiker per e-mail laten weten</label>
       </div>
     </div>
     <div class="mfoot">
-      <button class="btn" data-click="closeModal" data-modal="mo-plan">Cancel</button>
-      <button class="btn pri" id="cp-btn" data-click="doChangePlan">Save</button>
+      <button class="btn" data-click="closeModal" data-modal="mo-plan">Annuleren</button>
+      <button class="btn pri" id="cp-btn" data-click="doChangePlan">Opslaan</button>
     </div>
   </div>
 </div>
@@ -276,20 +276,20 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 <div id="mo-disable" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-disable-title">
   <div class="mb">
     <div class="mh">
-      <span id="mo-disable-title" class="mt">Disable key</span>
-      <button class="close-mo" data-click="closeModal" data-modal="mo-disable" aria-label="Close">&times;</button>
+      <span id="mo-disable-title" class="mt">Sleutel uitschakelen</span>
+      <button class="close-mo" data-click="closeModal" data-modal="mo-disable" aria-label="Sluiten">&times;</button>
     </div>
     <div class="mbody">
-      <p style="font-size:13px;color:var(--ink-2);margin:0 0 12px">Disabling this key will immediately block all API access. It can be re-enabled manually.</p>
-      <div class="mc"><label>Reason (optional)</label><input type="text" id="dk-reason" placeholder="e.g. abuse, non-payment"></div>
+      <p style="font-size:13px;color:var(--ink-2);margin:0 0 12px">Als u deze sleutel uitschakelt, is alle API-toegang direct geblokkeerd. U kunt hem later met de hand weer inschakelen.</p>
+      <div class="mc"><label>Reden (optioneel)</label><input type="text" id="dk-reason" placeholder="bijv. misbruik, niet betaald"></div>
       <div class="mc" style="display:flex;align-items:center;gap:8px">
         <input type="checkbox" id="dk-notify">
-        <label for="dk-notify" style="margin:0;font-size:12px;cursor:pointer">Notify user by email</label>
+        <label for="dk-notify" style="margin:0;font-size:12px;cursor:pointer">Gebruiker per e-mail laten weten</label>
       </div>
     </div>
     <div class="mfoot">
-      <button class="btn" data-click="closeModal" data-modal="mo-disable">Cancel</button>
-      <button class="btn danger" id="dk-btn" data-click="doDisableKey">Disable key</button>
+      <button class="btn" data-click="closeModal" data-modal="mo-disable">Annuleren</button>
+      <button class="btn danger" id="dk-btn" data-click="doDisableKey">Sleutel uitschakelen</button>
     </div>
   </div>
 </div>
@@ -297,30 +297,30 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 <div id="mo-delete" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-delete-title">
   <div class="mb">
     <div class="mh">
-      <span id="mo-delete-title" class="mt">Deactivate account</span>
-      <button class="close-mo" data-click="closeModal" data-modal="mo-delete" aria-label="Close">&times;</button>
+      <span id="mo-delete-title" class="mt">Account deactiveren</span>
+      <button class="close-mo" data-click="closeModal" data-modal="mo-delete" aria-label="Sluiten">&times;</button>
     </div>
     <div class="mbody">
-      <p style="font-size:13px;color:var(--brick-ink);font-weight:600;margin:0 0 10px">This blocks the account key and removes active sessions and TOTP.</p>
-      <div id="da-recent-warn" style="display:none;background:var(--card);border-left:3px solid var(--brick);padding:10px 12px;margin:0 0 12px;font-size:12px;color:var(--brick-ink);border-radius:3px"><strong>Heads up:</strong> this account is less than 24 hours old. Are you sure it isn't a real tester?</div>
+      <p style="font-size:13px;color:var(--brick-ink);font-weight:600;margin:0 0 10px">Dit blokkeert de sleutel van het account en verwijdert actieve sessies en TOTP.</p>
+      <div id="da-recent-warn" style="display:none;background:var(--card);border-left:3px solid var(--brick);padding:10px 12px;margin:0 0 12px;font-size:12px;color:var(--brick-ink);border-radius:3px"><strong>Let op:</strong> dit account is minder dan 24 uur oud. Weet u zeker dat het geen echte tester is?</div>
       <div style="background:var(--card);border:1px solid rgba(var(--tint), .08);padding:12px 14px;margin:0 0 12px;border-radius:3px">
         <div style="display:grid;grid-template-columns:90px 1fr;gap:6px 12px;font-size:12px">
-          <div style="color:var(--ink-dim)">Email</div><div id="da-email" style="font-weight:600;color:var(--ink);word-break:break-all">&mdash;</div>
+          <div style="color:var(--ink-dim)">E-mail</div><div id="da-email" style="font-weight:600;color:var(--ink);word-break:break-all">&mdash;</div>
           <div style="color:var(--ink-dim)">Label</div><div id="da-label" style="color:var(--ink-2)">&mdash;</div>
-          <div style="color:var(--ink-dim)">Plan</div><div><span id="da-plan" class="badge community">&mdash;</span></div>
-          <div style="color:var(--ink-dim)">Created</div><div id="da-created" class="mono" style="font-size:11px;color:var(--ink-2)">&mdash;</div>
-          <div style="color:var(--ink-dim)">Key</div><div id="da-target" class="mono" style="font-size:11px;color:var(--ink-2);word-break:break-all">&mdash;</div>
+          <div style="color:var(--ink-dim)">Abonnement</div><div><span id="da-plan" class="badge community">&mdash;</span></div>
+          <div style="color:var(--ink-dim)">Aangemaakt</div><div id="da-created" class="mono" style="font-size:11px;color:var(--ink-2)">&mdash;</div>
+          <div style="color:var(--ink-dim)">Sleutel</div><div id="da-target" class="mono" style="font-size:11px;color:var(--ink-2);word-break:break-all">&mdash;</div>
         </div>
       </div>
       <div class="mc" style="display:flex;align-items:center;gap:8px">
         <input type="checkbox" id="da-notify" checked>
-        <label for="da-notify" style="margin:0;font-size:12px;cursor:pointer">Send deactivation confirmation email</label>
+        <label for="da-notify" style="margin:0;font-size:12px;cursor:pointer">Bevestiging van de deactivering per e-mail sturen</label>
       </div>
-      <div class="mc" style="margin-top:10px"><label>Type DEACTIVATE to confirm</label><input type="text" id="da-confirm" placeholder="DEACTIVATE" autocomplete="off" data-input="confirmDelete"></div>
+      <div class="mc" style="margin-top:10px"><label>Typ DEACTIVATE om te bevestigen</label><input type="text" id="da-confirm" placeholder="DEACTIVATE" autocomplete="off" data-input="confirmDelete"></div>
     </div>
     <div class="mfoot">
-      <button class="btn" data-click="closeModal" data-modal="mo-delete">Cancel</button>
-      <button class="btn danger" id="da-btn" data-click="doDeleteAccount">Deactivate account</button>
+      <button class="btn" data-click="closeModal" data-modal="mo-delete">Annuleren</button>
+      <button class="btn danger" id="da-btn" data-click="doDeleteAccount">Account deactiveren</button>
     </div>
   </div>
 </div>
@@ -328,14 +328,14 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 <div id="mo-details" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-details-title">
   <div class="mb">
     <div class="mh">
-      <span id="mo-details-title" class="mt">User details</span>
-      <button class="close-mo" data-click="closeModal" data-modal="mo-details" aria-label="Close">&times;</button>
+      <span id="mo-details-title" class="mt">Gegevens van de gebruiker</span>
+      <button class="close-mo" data-click="closeModal" data-modal="mo-details" aria-label="Sluiten">&times;</button>
     </div>
     <div class="mbody" id="mo-details-body">
-      <div class="empty"><span class="sp-icon"></span>Loading…</div>
+      <div class="empty"><span class="sp-icon"></span>Laden…</div>
     </div>
     <div class="mfoot">
-      <button class="btn" data-click="closeModal" data-modal="mo-details">Close</button>
+      <button class="btn" data-click="closeModal" data-modal="mo-details">Sluiten</button>
     </div>
   </div>
 </div>
@@ -344,19 +344,19 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 <div id="mo-force-totp" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-force-totp-title">
   <div class="mb">
     <div class="mh">
-      <span id="mo-force-totp-title" class="mt">Require TOTP</span>
-      <button class="close-mo" data-click="closeModal" data-modal="mo-force-totp" aria-label="Close">&times;</button>
+      <span id="mo-force-totp-title" class="mt">TOTP verplicht stellen</span>
+      <button class="close-mo" data-click="closeModal" data-modal="mo-force-totp" aria-label="Sluiten">&times;</button>
     </div>
     <div class="mbody" id="mo-force-totp-body"></div>
     <div class="mfoot">
-      <button class="btn" data-click="closeModal" data-modal="mo-force-totp">Cancel</button>
-      <button class="btn pri" id="ft-btn" data-click="doForceTotpRequirement">Require TOTP</button>
+      <button class="btn" data-click="closeModal" data-modal="mo-force-totp">Annuleren</button>
+      <button class="btn pri" id="ft-btn" data-click="doForceTotpRequirement">TOTP verplicht stellen</button>
     </div>
   </div>
 </div>
 
 
 <script src="/js/delegate.js?v=1" defer></script>
-<script src="/js/admin.page.js?v=3" defer></script>
+<script src="/js/admin.page.js?v=4" defer></script>
 </body>
 </html>

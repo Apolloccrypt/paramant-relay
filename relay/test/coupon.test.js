@@ -187,7 +187,14 @@ test('the confirmation mail says what was given and that no money moved', () => 
     siteUrl: 'https://paramant.app',
   });
   assert.ok(msg, 'a mail must be built for a real grant');
-  assert.strictEqual(msg.subject, 'Your code COFFEE is redeemed');
+  assert.strictEqual(msg.subject, 'Uw code COFFEE is ingewisseld / Your code COFFEE is redeemed');
+  // Dutch first, English below it, same facts.
+  assert.ok(msg.text.startsWith('Dank u. Uw code COFFEE geeft u 3 maanden Ondertekenen Pro.'), msg.text);
+  assert.ok(msg.text.includes('Ondertekenen Pro tot 3 december 2026'), msg.text);
+  assert.ok(msg.text.includes('Er is niets afgeschreven en dat gebeurt ook niet.'), msg.text);
+  assert.ok(msg.text.indexOf('Dank u.') < msg.text.indexOf('Thank you.'), 'the Dutch text comes first');
+  assert.ok(msg.html.includes('Uw code COFFEE is ingewisseld'), msg.html);
+  assert.ok(!/!/.test(msg.text), 'no exclamation marks');
   assert.ok(msg.text.includes('ParaSign Pro until 3 December 2026'), msg.text);
   assert.ok(msg.text.includes('Nothing was charged and nothing will be.'), msg.text);
   // It is not a subscription mail. The reader must not be left looking for

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const MIME = { '.js':'text/javascript', '.css':'text/css', '.html':'text/html', '.svg':'image/svg+xml', '.png':'image/png', '.woff2':'font/woff2' };
-const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/account':'/account.html', '/en/account':'/en/account.html', '/developer':'/developer.html', '/pricing':'/pricing.html', '/parashare':'/parashare.html', '/help':'/help/index.html', '/en':'/en/index.html' };
+const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/account':'/account.html', '/en/account':'/en/account.html', '/developer':'/developer.html', '/pricing':'/pricing.html', '/parashare':'/parashare.html', '/help':'/help/index.html', '/en':'/en/index.html', '/en/docs':'/en/docs.html', '/en/pricing':'/en/pricing.html' };
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   pathname = aliases[pathname] || pathname;
@@ -258,7 +258,8 @@ const hamburgerWithoutTail = everyPage
 ok('no page carries a menu button without the strip that catches what it takes away', hamburgerWithoutTail.length === 0, hamburgerWithoutTail.join(', ') || `${everyPage.filter(([, html]) => html.includes('id="nav-hamburger"')).length} pages with a menu button`);
 const withoutHelp = stamped.filter(([, html]) => !/<a href="\/help"/.test(html)).map(([name]) => name);
 ok('every stamped page links support', stamped.length > 0 && withoutHelp.length === 0, withoutHelp.join(', ') || `${stamped.length} pages`);
-const withoutLegal = stamped.filter(([, html]) => !['/privacy', '/dpa', '/terms'].every((href) => html.includes(`href="${href}"`))).map(([name]) => name);
+// A page that declares lang="en" names the English legal texts, under /en.
+const withoutLegal = stamped.filter(([, html]) => !['/privacy', '/dpa', '/terms'].every((href) => html.includes(`href="${/<html\b[^>]*\blang="en/i.test(html) ? '/en' + href : href}"`))).map(([name]) => name);
 ok('every stamped page names privacy, dpa and terms', withoutLegal.length === 0, withoutLegal.join(', ') || `${stamped.length} pages`);
 
 const homePage = await browser.newPage({ viewport:{ width:390, height:844 } });
@@ -288,7 +289,7 @@ const homeSections = await homePage.evaluate(() => {
 ok('the signed-in homepage stops after the hero', homeSections.total > 1 && JSON.stringify(homeSections.visible) === JSON.stringify(['home-hero']), JSON.stringify(homeSections));
 // Mick, 4 September: one note is enough. The founder line left both hero states,
 // so what the signed-in hero has to carry is the workspace a customer came for.
-ok('the signed-in hero opens on the documents', (await homePage.locator('[data-home="in"]').innerText()).includes('Your documents'), await homePage.locator('[data-home="in"]').innerText());
+ok('the signed-in hero opens on the documents', (await homePage.locator('[data-home="in"]').innerText()).includes('Uw documenten'), await homePage.locator('[data-home="in"]').innerText());
 if (process.env.PARAMANT_HOME_SCREENSHOT_PATH) await stableScreenshot(homePage, { path:process.env.PARAMANT_HOME_SCREENSHOT_PATH });
 await homePage.close();
 
@@ -375,16 +376,25 @@ await appPage.goto(ORIGIN + '/dashboard', { waitUntil:'domcontentloaded' });
 // do, then Verify and Settings. It went from five entries to six when /vault
 // joined Send and Sign as the third verb ("Lock a file"), so this list and
 // APP_NAV in frontend/js/nav-auth.js are updated together or not at all.
-const WORKSPACE_NAV = ['Documents','Send','Sign','Lock a file','Verify','Settings'];
+// Since 23 September 2026 the bar speaks the page's own <html lang>: Dutch by
+// default, English on a page that declares lang="en". Same six, same order.
+const WORKSPACE = {
+  nl: ['Documenten','Versturen','Ondertekenen','Bestand vergrendelen','Controleren','Instellingen'],
+  en: ['Documents','Send','Sign','Lock a file','Verify','Settings'],
+};
+const DEV_SETTINGS = { nl: 'Ontwikkelaarsinstellingen', en: 'Developer settings' };
+const appLang = await appPage.evaluate(() => (/^en/i.test(document.documentElement.lang) ? 'en' : 'nl'));
+const WORKSPACE_NAV = WORKSPACE[appLang];
+const WORKSPACE_NAV_EN = WORKSPACE.en;
 await appPage.waitForFunction((expected) => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === expected, WORKSPACE_NAV.join(','));
 const appDesktop = await appPage.locator('nav.nav .nav-links .nav-link').allInnerTexts();
 ok('signed-in navigation follows document work', JSON.stringify(appDesktop) === JSON.stringify(WORKSPACE_NAV), appDesktop.join(', '));
-ok('locking a file is a verb in the bar, next to the other two', appDesktop.indexOf('Lock a file') === appDesktop.indexOf('Sign') + 1 && await appPage.locator('nav.nav .nav-links a[href="/vault"]').count() === 1, appDesktop.join(', '));
+ok('locking a file is a verb in the bar, next to the other two', appDesktop.indexOf(WORKSPACE_NAV[3]) === appDesktop.indexOf(WORKSPACE_NAV[2]) + 1 && await appPage.locator('nav.nav .nav-links a[href="/vault"]').count() === 1, appDesktop.join(', '));
 ok('dashboard removes its duplicate marketing drawer', await appPage.locator('#nav-mobile-marketing').count() === 0 && await appPage.locator('nav.nav .nav-links').count() === 1, await appPage.locator('nav.nav .nav-links').count());
 await appPage.locator('#nav-hamburger').click();
 const appMobile = await appPage.locator('#nav-mobile a').allInnerTexts();
 ok('signed-in mobile menu matches the workspace', appMobile.map((item) => item.toLowerCase()).join(',') === appDesktop.map((item) => item.toLowerCase()).join(','), appMobile.join(', '));
-ok('developer tools are settings, not a sixth product', await appPage.locator('.nav-user-menu a', { hasText:'Developer settings' }).count() === 1 && !appMobile.includes('Developer settings'), appMobile.join(', '));
+ok('developer tools are settings, not a sixth product', await appPage.locator('.nav-user-menu a', { hasText:DEV_SETTINGS[appLang] }).count() === 1 && !appMobile.includes(DEV_SETTINGS[appLang]), appMobile.join(', '));
 
 // Support survives signing in, and it is measured in TAPS.
 //
@@ -544,11 +554,42 @@ const developerPage = await browser.newPage({ viewport:{ width:1280, height:900 
 await developerPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
 await developerPage.route('**/api/developer/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
 await developerPage.goto(ORIGIN + '/developer', { waitUntil:'domcontentloaded' });
-await developerPage.waitForFunction((expected) => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === expected, WORKSPACE_NAV.join(','));
+await developerPage.waitForFunction((expected) => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === expected, WORKSPACE.nl.join(','));
 const developerNav = await developerPage.locator('nav.nav .nav-links .nav-link').allInnerTexts();
-ok('developer page is presented as settings inside the same shell', await developerPage.title() === 'Developer settings · Paramant' && developerNav.map((item) => item.toLowerCase()).join(',') === WORKSPACE_NAV.map((item) => item.toLowerCase()).join(','), await developerPage.title());
-ok('developer page shares the settings hierarchy', JSON.stringify(await developerPage.locator('.settings-tabs a').allInnerTexts()) === JSON.stringify(['Account & security','Plan & billing','Developer settings']) && await developerPage.locator('.settings-tabs a[aria-current="page"]').getAttribute('href') === '/developer', await developerPage.locator('.settings-tabs').innerText());
+ok('developer page is presented as settings inside the same shell', await developerPage.title() === 'Ontwikkelaarsinstellingen · Paramant' && developerNav.map((item) => item.toLowerCase()).join(',') === WORKSPACE.nl.map((item) => item.toLowerCase()).join(','), await developerPage.title());
+ok('developer page shares the settings hierarchy', JSON.stringify(await developerPage.locator('.settings-tabs a').allInnerTexts()) === JSON.stringify(['Account en beveiliging','Abonnement en betaling','Ontwikkelaarsinstellingen']) && await developerPage.locator('.settings-tabs a[aria-current="page"]').getAttribute('href') === '/developer', await developerPage.locator('.settings-tabs').innerText());
 await developerPage.close();
+
+// The English pages keep the English workspace bar and account menu, signed in.
+const enAppPage = await browser.newPage({ viewport:{ width:1280, height:900 } });
+await enAppPage.route('**/api/user/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
+await enAppPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
+await enAppPage.goto(ORIGIN + '/en/docs', { waitUntil:'domcontentloaded' });
+await enAppPage.waitForFunction((expected) => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === expected, WORKSPACE_NAV_EN.join(','));
+ok('an English page keeps the English workspace bar', JSON.stringify(await enAppPage.locator('nav.nav .nav-links .nav-link').allInnerTexts()) === JSON.stringify(WORKSPACE_NAV_EN));
+ok('and the English account menu', await enAppPage.locator('.nav-user-menu a', { hasText:'Developer settings' }).count() === 1 && await enAppPage.locator('#nav-signout').innerText() === 'Sign out', await enAppPage.locator('.nav-user-menu').innerText());
+await enAppPage.close();
+
+// The language switch. On a desktop it sits in the bar and takes you to the
+// same page in the other language; on a phone the bar keeps its one action and
+// the switch is in the strip under the drawer, next to Sign in and Help.
+const langDesk = await browser.newPage({ viewport:{ width:1280, height:900 } });
+await langDesk.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
+await langDesk.goto(ORIGIN + '/pricing', { waitUntil:'domcontentloaded' });
+const deskSwitch = langDesk.locator('nav.nav .nav-lang');
+ok('the desktop bar shows NL | EN with Dutch marked current', await deskSwitch.isVisible() && await deskSwitch.getAttribute('aria-label') === 'Taal / Language' && await deskSwitch.locator('a[aria-current]').innerText() === 'NL', await deskSwitch.innerText());
+await Promise.all([langDesk.waitForURL(ORIGIN + '/en/pricing'), deskSwitch.locator('a', { hasText:'EN' }).click()]);
+ok('EN goes to the same page in English, and marks EN current there', await langDesk.evaluate(() => document.documentElement.lang) === 'en' && await langDesk.locator('nav.nav .nav-lang a[aria-current]').innerText() === 'EN', langDesk.url());
+await langDesk.close();
+const langPhone = await browser.newPage({ viewport:{ width:390, height:844 } });
+await langPhone.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
+await langPhone.goto(ORIGIN + '/pricing', { waitUntil:'domcontentloaded' });
+ok('the phone bar leaves the switch to the drawer', !(await langPhone.locator('nav.nav .nav-lang').isVisible()));
+await langPhone.locator('#nav-hamburger').click();
+const tailSwitch = langPhone.locator('#nav-mobile-tail .nav-lang');
+const tailBox = await tailSwitch.boundingBox();
+ok('the drawer strip carries NL | EN, 44px tall', await tailSwitch.isVisible() && tailBox && tailBox.height >= 44 && await tailSwitch.locator('a[href="/en/pricing"]').count() === 1, JSON.stringify(tailBox));
+await langPhone.close();
 
 for (const check of checks) console.log(`${check.pass ? 'PASS' : 'FAIL'} ${check.name}${check.detail ? ' :: ' + check.detail : ''}`);
 await browser.close();

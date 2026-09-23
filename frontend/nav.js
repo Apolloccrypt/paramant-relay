@@ -2,6 +2,10 @@
 (function () {
   'use strict';
 
+  // Dutch is the main language; a page that declares <html lang="en"> (the
+  // copies under /en) gets the English words. Same rule as apply-nav.py.
+  var EN = /^en\b/i.test(document.documentElement.lang || '');
+
   var hamburger = document.getElementById('nav-hamburger');
   var mobile    = document.getElementById('nav-mobile');
   var closeBtn  = document.querySelector('.nav-mobile-close');
@@ -148,8 +152,11 @@
     tail = document.createElement('div');
     tail.className = 'nav-mobile-tail';
     tail.id = 'nav-mobile-tail';
-    tail.innerHTML = '<a href="/auth/login" class="nav-tail-btn">Sign in</a>' +
-                     '<a href="/help" class="nav-tail-link">Help</a>';
+    tail.innerHTML = EN
+      ? '<a href="/auth/login" class="nav-tail-btn">Sign in</a>' +
+        '<a href="/help" class="nav-tail-link">Help</a>'
+      : '<a href="/auth/login" class="nav-tail-btn">Inloggen</a>' +
+        '<a href="/help" class="nav-tail-link">Hulp</a>';
     mobile.parentNode.insertBefore(tail, mobile.nextSibling);
   }
 
@@ -166,7 +173,7 @@
     mobile.classList.add('open');
     if (tail) tail.classList.add('open');
     hamburger.setAttribute('aria-expanded', 'true');
-    hamburger.setAttribute('aria-label', 'Close menu');
+    hamburger.setAttribute('aria-label', EN ? 'Close menu' : 'Menu sluiten');
     lockScroll();
     if (closeBtn) closeBtn.focus();
   }
@@ -175,7 +182,7 @@
     mobile.classList.remove('open');
     if (tail) tail.classList.remove('open');
     hamburger.setAttribute('aria-expanded', 'false');
-    hamburger.setAttribute('aria-label', 'Open menu');
+    hamburger.setAttribute('aria-label', EN ? 'Open menu' : 'Menu openen');
     unlockScroll();
     hamburger.focus({ preventScroll: true });
   }

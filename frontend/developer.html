@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#f5f7fb;color:#0b3a6a;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none!important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Developer settings · Paramant</title>
+<title>Ontwikkelaarsinstellingen · Paramant</title>
 <link rel="canonical" href="https://paramant.app/developer">
 <meta name="robots" content="noindex,nofollow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#0b3a6a">
 <link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/nav.css?v=27">
 <style>
 *{box-sizing:border-box}
 body{background:linear-gradient(180deg,#f8faff 0,var(--card) 460px)}
@@ -53,45 +53,45 @@ pre{margin:0;padding:20px;background:#0d1d33;color:#d7e7f8;overflow:auto;font-fa
 </style>
 </head>
 <body>
-<a href="#main" class="skip-link">Skip to main content</a>
+<a href="#main" class="skip-link">Naar de inhoud</a>
 <nav class="nav">
   <a href="/" class="nav-logo" aria-label="Paramant"><img src="/favicon-32.png" alt="" class="nav-logo-mark">aramant</a>
-  <ul class="nav-links"><li><a href="/dashboard" class="nav-link">Documents</a></li><li><a href="/developer" class="nav-link nav-link-strong">Developer settings</a></li><li><a href="/docs#v1-envelopes" class="nav-link">API docs</a></li></ul>
+  <ul class="nav-links"><li><a href="/dashboard" class="nav-link">Documenten</a></li><li><a href="/developer" class="nav-link nav-link-strong">Ontwikkelaarsinstellingen</a></li><li><a href="/docs#v1-envelopes" class="nav-link">API-documentatie</a></li></ul>
   <div class="nav-auth" id="nav-auth"><a href="/account" class="nav-signin">Account</a></div>
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false"><span></span><span></span><span></span></button>
 </nav>
-<div class="nav-mobile" id="nav-mobile"><a href="/dashboard" class="nav-mobile-standalone">Documents</a><a href="/developer" class="nav-mobile-standalone" aria-current="page">Developer settings</a></div>
+<div class="nav-mobile" id="nav-mobile"><a href="/dashboard" class="nav-mobile-standalone">Documenten</a><a href="/developer" class="nav-mobile-standalone" aria-current="page">Ontwikkelaarsinstellingen</a></div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
 </div>
 
 <main id="main" class="dev">
-  <nav class="settings-tabs" aria-label="Settings sections">
-    <a href="/account">Account &amp; security</a>
-    <a href="/account#billing-section">Plan &amp; billing</a>
-    <a href="/developer" aria-current="page">Developer settings</a>
+  <nav class="settings-tabs" aria-label="Onderdelen van de instellingen">
+    <a href="/account">Account en beveiliging</a>
+    <a href="/account#billing-section">Abonnement en betaling</a>
+    <a href="/developer" aria-current="page">Ontwikkelaarsinstellingen</a>
   </nav>
   <header class="hero">
-    <div><p class="eyebrow">Settings · ParaSign API</p><h1>Build signing into your product.</h1><p class="lede">Create signing requests, follow every signer and retrieve an offline-verifiable proof. Every ParaSign API endpoint is in the <a href="/docs#v1-envelopes">API reference</a>, so you can read the whole surface before you connect anything. API access is included from Firm; see <a href="/pricing">pricing</a>.</p></div>
-    <div class="account"><span class="status-dot" id="api-status-dot"></span><span data-dv="email">Loading account</span><span>·</span><strong data-dv="plan">--</strong></div>
+    <div><p class="eyebrow">Instellingen · API voor Ondertekenen</p><h1>Ondertekenen in uw eigen product.</h1><p class="lede">Maak ondertekenverzoeken aan, volg elke ondertekenaar en haal een bewijs op dat u offline kunt controleren. Elk endpoint van de API voor Ondertekenen staat in de <a href="/docs#v1-envelopes">API-referentie</a>. Zo leest u alles na voordat u iets koppelt. API-toegang zit in het abonnement vanaf Firm, zie <a href="/pricing">prijzen</a>.</p></div>
+    <div class="account"><span class="status-dot" id="api-status-dot"></span><span data-dv="email">Account wordt geladen</span><span>·</span><strong data-dv="plan">--</strong></div>
   </header>
 
-  <div class="steps" aria-label="ParaSign API flow">
-    <div class="step"><b>01 · CREATE</b><span>Send a PDF and signer list. Receive one hosted signing URL per recipient.</span></div>
-    <div class="step"><b>02 · FOLLOW</b><span>Use status and signed webhooks to keep your invoice or contract flow in sync.</span></div>
-    <div class="step"><b>03 · PROVE</b><span>Retrieve the completed .psign receipt and verify it independently.</span></div>
+  <div class="steps" aria-label="Verloop van de API voor Ondertekenen">
+    <div class="step"><b>01 · AANMAKEN</b><span>Stuur een pdf en een lijst met ondertekenaars. U krijgt per ontvanger een eigen ondertekenlink terug.</span></div>
+    <div class="step"><b>02 · VOLGEN</b><span>Houd uw facturen of contracten bij met de status en ondertekende webhooks.</span></div>
+    <div class="step"><b>03 · BEWIJZEN</b><span>Haal het afgeronde .psign-bewijs op en controleer het zelfstandig.</span></div>
   </div>
 
   <div class="grid">
     <div class="stack">
       <section class="card" aria-labelledby="keys-title">
-        <div class="card-head"><div><h2 id="keys-title">API keys</h2><p class="card-sub">ParaSign keys start with psk_. A new secret is shown once and is never stored in this browser.</p></div><button class="btn btn-primary" id="psk-new" type="button">Create API key</button></div>
-        <div class="key-list" id="psk-keys"><div class="empty">Loading your ParaSign keys.</div></div>
+        <div class="card-head"><div><h2 id="keys-title">API-sleutels</h2><p class="card-sub">Sleutels voor Ondertekenen beginnen met psk_. Een nieuwe geheime sleutel ziet u één keer. Deze browser bewaart hem nooit.</p></div><button class="btn btn-primary" id="psk-new" type="button">API-sleutel maken</button></div>
+        <div class="key-list" id="psk-keys"><div class="empty">Uw sleutels voor Ondertekenen worden geladen.</div></div>
       </section>
 
       <section class="card code-card" aria-labelledby="quick-title">
-        <div class="code-head"><strong id="quick-title">Create a signing request</strong><button class="copy" id="copy-example" type="button">Copy</button></div>
+        <div class="code-head"><strong id="quick-title">Een ondertekenverzoek maken</strong><button class="copy" id="copy-example" type="button">Kopiëren</button></div>
         <pre id="quick-example">export PARAMANT_PARASIGN_KEY='psk_live_...'
 
 curl -X POST https://paramant.app/v1/envelopes \
@@ -109,26 +109,26 @@ curl -X POST https://paramant.app/v1/envelopes \
 
     <aside class="stack">
       <section class="card" aria-labelledby="usage-title">
-        <div class="card-head"><div><h2 id="usage-title">Signatures this month</h2><p class="card-sub">Live usage from the signing quota.</p></div></div>
-        <div class="usage-number"><strong id="sign-used">--</strong><span id="sign-cap">of --</span></div>
+        <div class="card-head"><div><h2 id="usage-title">Handtekeningen deze maand</h2><p class="card-sub">Actueel verbruik van uw tegoed voor ondertekenen.</p></div></div>
+        <div class="usage-number"><strong id="sign-used">--</strong><span id="sign-cap">van --</span></div>
         <div class="bar" aria-hidden="true"><span id="sign-bar"></span></div>
-        <p class="usage-note" id="usage-note">Loading usage.</p>
+        <p class="usage-note" id="usage-note">Verbruik wordt geladen.</p>
       </section>
 
       <section class="card" aria-labelledby="links-title">
-        <div class="card-head"><div><h2 id="links-title">Build and operate</h2><p class="card-sub">The complete surface for the live API.</p></div></div>
+        <div class="card-head"><div><h2 id="links-title">Bouwen en beheren</h2><p class="card-sub">Alles over de live API.</p></div></div>
         <div class="links">
-          <a class="link" href="/docs#quickstart">Quick start <span>&rarr;</span></a>
-          <a class="link" href="/docs#v1-envelopes">API reference <span>&rarr;</span></a>
-          <a class="link" href="/docs#v1-envelopes">Webhooks and signatures <span>&rarr;</span></a>
-          <a class="link" href="/verify">Verify a .psign receipt <span>&rarr;</span></a>
-          <a class="link" href="/status">Service status <span>&rarr;</span></a>
+          <a class="link" href="/docs#quickstart">Snel starten <span>&rarr;</span></a>
+          <a class="link" href="/docs#v1-envelopes">API-referentie <span>&rarr;</span></a>
+          <a class="link" href="/docs#v1-envelopes">Webhooks en handtekeningen <span>&rarr;</span></a>
+          <a class="link" href="/verify">Een .psign-bewijs controleren <span>&rarr;</span></a>
+          <a class="link" href="/status">Status van de dienst <span>&rarr;</span></a>
         </div>
       </section>
 
       <section class="card" aria-labelledby="activity-title">
-        <div class="card-head"><div><h2 id="activity-title">Signing activity</h2><p class="card-sub">Latest ParaSign events for this account.</p></div></div>
-        <div class="activity" id="activity"><div class="empty">Loading activity.</div></div>
+        <div class="card-head"><div><h2 id="activity-title">Activiteit bij ondertekenen</h2><p class="card-sub">De laatste gebeurtenissen van Ondertekenen voor dit account.</p></div></div>
+        <div class="activity" id="activity"><div class="empty">Activiteit wordt geladen.</div></div>
       </section>
     </aside>
   </div>
@@ -136,27 +136,27 @@ curl -X POST https://paramant.app/v1/envelopes \
 
 <div class="modal" id="psk-modal" hidden role="dialog" aria-modal="true" aria-labelledby="psk-title">
   <div class="modal-card">
-    <button class="modal-x" type="button" data-close aria-label="Close">&times;</button>
+    <button class="modal-x" type="button" data-close aria-label="Sluiten">&times;</button>
     <div data-view="create">
-      <h2 id="psk-title">Create a ParaSign API key</h2>
-      <p class="card-sub">Use a separate key for each application or environment. This makes rotation and revocation safer.</p>
-      <div class="field"><label for="psk-label">Key label</label><input id="psk-label" maxlength="80" placeholder="Production signing service" autocomplete="off"></div>
-      <div class="notice">The full key is shown once. Store it in a secrets manager, not in source code or browser storage.</div>
+      <h2 id="psk-title">Een API-sleutel voor Ondertekenen maken</h2>
+      <p class="card-sub">Gebruik per toepassing of omgeving een eigen sleutel. Dan kunt u een sleutel veiliger vervangen of intrekken.</p>
+      <div class="field"><label for="psk-label">Naam van de sleutel</label><input id="psk-label" maxlength="80" placeholder="Ondertekenen in productie" autocomplete="off"></div>
+      <div class="notice">De volledige sleutel ziet u één keer. Bewaar hem in een secrets manager, niet in broncode of in de browser.</div>
       <p class="error" id="psk-error" hidden></p>
-      <div class="actions"><button class="btn btn-primary" id="psk-generate" type="button">Create key</button><button class="btn btn-secondary" type="button" data-close>Cancel</button></div>
+      <div class="actions"><button class="btn btn-primary" id="psk-generate" type="button">Sleutel maken</button><button class="btn btn-secondary" type="button" data-close>Annuleren</button></div>
     </div>
     <div data-view="secret" hidden>
-      <h2>API key created</h2>
-      <div class="notice">Copy this key now. After this dialog closes, Paramant shows only its masked identifier.</div>
+      <h2>API-sleutel gemaakt</h2>
+      <div class="notice">Kopieer deze sleutel nu. Als dit venster sluit, toont Paramant alleen nog de afgeschermde aanduiding.</div>
       <div class="secret" id="psk-secret"></div>
       <p class="card-sub" id="psk-meta"></p>
-      <div class="actions"><button class="btn btn-primary" id="psk-copy" type="button">Copy key</button><button class="btn btn-secondary" type="button" data-close>Done</button></div>
+      <div class="actions"><button class="btn btn-primary" id="psk-copy" type="button">Sleutel kopiëren</button><button class="btn btn-secondary" type="button" data-close>Klaar</button></div>
     </div>
   </div>
 </div>
 
-<script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=10" defer></script>
-<script src="/js/developer.js?v=8" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
+<script src="/js/developer.js?v=9" defer></script>
 </body>
 </html>
