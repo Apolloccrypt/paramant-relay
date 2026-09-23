@@ -42,6 +42,12 @@ const PRIVATE = new Set([
   'parashare',
   'auth/backup', 'auth/login', 'auth/request-reset', 'auth/reset-confirm',
   'auth/setup', 'billing/checkout', 'signup/verified',
+  // The English copies of the sign-in and account pages (23-09-2026) carry the
+  // same noindex as the Dutch pages they mirror. en/signup is public, like
+  // /signup, and sits in the sitemap.
+  'en/account', 'en/claim', 'en/dashboard', 'en/request-key',
+  'en/auth/backup', 'en/auth/login', 'en/auth/request-reset', 'en/auth/reset-confirm',
+  'en/auth/setup', 'en/billing/checkout', 'en/signup/verified',
 ]);
 
 // Meta-refresh stubs. They point their canonical at the real page and are held
@@ -403,7 +409,8 @@ test('every public page names the company and the founder in its Organization no
 //              page now leads with the fact that can be checked: the last
 //              release is v0.2.1 of 28 March 2026 and none has followed.
 //   trust      frontend/trust.html tags every claim live or planned.
-//   signup     the ParaSign Community card on frontend/pricing.html.
+//   signup     the Community card on frontend/pricing.html (Dutch since 23
+//              September 2026: 2 signatures and 50 sends a month, no card).
 //   rules      frontend/rules.html carries the nine rules and their verify
 //              links. It was /pararules until the two-product-names round;
 //              pinned here because the retired brand is exactly what creeps
@@ -466,6 +473,10 @@ const PINNED = {
     desc: 'What Paramant can see on your own server, what it can do, and how you check both yourself. Every claim on the page is tagged live or planned.',
   },
   signup: {
+    title: 'Maak een gratis Paramant-account',
+    desc: 'Maak een gratis Paramant-account. Community is gratis, voor altijd: 2 handtekeningen en 50 verzendingen per maand. Geen betaalkaart nodig.',
+  },
+  'en/signup': {
     title: 'Create a free Paramant account',
     desc: 'Create a Paramant account. ParaSign Community gives 2 signatures a month, unlimited receiving and full post-quantum crypto, forever. No card required.',
   },

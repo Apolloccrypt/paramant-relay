@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const MIME = { '.js':'text/javascript', '.css':'text/css', '.html':'text/html', '.svg':'image/svg+xml', '.png':'image/png', '.woff2':'font/woff2' };
-const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/account':'/account.html', '/developer':'/developer.html', '/pricing':'/pricing.html', '/parashare':'/parashare.html', '/help':'/help/index.html', '/en':'/en/index.html' };
+const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/account':'/account.html', '/en/account':'/en/account.html', '/developer':'/developer.html', '/pricing':'/pricing.html', '/parashare':'/parashare.html', '/help':'/help/index.html', '/en':'/en/index.html' };
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   pathname = aliases[pathname] || pathname;
@@ -516,13 +516,29 @@ await accountPage.route('**/api/user/billing/status', (route) => route.fulfill({
 await accountPage.goto(ORIGIN + '/account', { waitUntil:'domcontentloaded' });
 await accountPage.locator('#state-account:not(.hidden)').waitFor();
 await accountPage.locator('.nav-user').waitFor();
-ok('account, billing and developer are one settings hierarchy', JSON.stringify(await accountPage.locator('.settings-tabs a').allInnerTexts()) === JSON.stringify(['Account & security','Plan & billing','Developer settings']) && await accountPage.locator('.settings-tabs a[aria-current="page"]').getAttribute('href') === '/account', await accountPage.locator('.settings-tabs').innerText());
-ok('legacy account key is advanced instead of the first task', await accountPage.locator('details.acct-advanced:not([open])').count() === 1 && await accountPage.locator('.acct-card:not(.acct-advanced)').first().locator('h2').innerText() === 'Security.', await accountPage.locator('main').innerText());
+ok('account, billing and developer are one settings hierarchy', JSON.stringify(await accountPage.locator('.settings-tabs a').allInnerTexts()) === JSON.stringify(['Account en beveiliging','Plan en betalingen','Instellingen voor ontwikkelaars']) && await accountPage.locator('.settings-tabs a[aria-current="page"]').getAttribute('href') === '/account', await accountPage.locator('.settings-tabs').innerText());
+ok('legacy account key is advanced instead of the first task', await accountPage.locator('details.acct-advanced:not([open])').count() === 1 && await accountPage.locator('.acct-card:not(.acct-advanced)').first().locator('h2').innerText() === 'Beveiliging.', await accountPage.locator('main').innerText());
 ok('billing settings do not claim live checkout is a stub', !/stub mode|no real payments/i.test(await accountPage.locator('#billing-section').innerText()), await accountPage.locator('#billing-section').innerText());
-ok('account action describes deactivation instead of erasure', /account record is retained/i.test(await accountPage.locator('.acct-card.danger').innerText()) && !/permanent|delete account/i.test(await accountPage.locator('.acct-card.danger').innerText()), await accountPage.locator('.acct-card.danger').innerText());
+ok('account action describes deactivation instead of erasure', /accountrecord blijft bewaard/i.test(await accountPage.locator('.acct-card.danger').innerText()) && !/permanent|delete account|definitief|account verwijderen/i.test(await accountPage.locator('.acct-card.danger').innerText()), await accountPage.locator('.acct-card.danger').innerText());
 ok('settings fit the phone viewport', await accountPage.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth), await accountPage.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
 if (process.env.PARAMANT_SETTINGS_SCREENSHOT_PATH) await stableScreenshot(accountPage, { path:process.env.PARAMANT_SETTINGS_SCREENSHOT_PATH, fullPage:true });
 await accountPage.close();
+// /account is Dutch since 23 September 2026; its English copy under /en/ is held
+// to the same settings shape, in English.
+const accountPageEn = await browser.newPage({ viewport:{ width:390, height:844 } });
+await accountPageEn.route('**/api/user/**', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{}' }));
+await accountPageEn.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));
+await accountPageEn.route('**/api/user/account', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"email":"demo@example.com","api_key_masked":"pgp_demo...","plan":"pro","label":"Demo","created_at":"2026-06-01T10:00:00.000Z","backup_codes_remaining":8,"session_expires_at":"2026-07-21T16:00:00.000Z","sessions":[]}' }));
+await accountPageEn.route('**/api/user/billing/status', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"current_plan":"pro"}' }));
+await accountPageEn.goto(ORIGIN + '/en/account', { waitUntil:'domcontentloaded' });
+await accountPageEn.locator('#state-account:not(.hidden)').waitFor();
+await accountPageEn.locator('.nav-user').waitFor();
+ok('en: account, billing and developer are one settings hierarchy', JSON.stringify(await accountPageEn.locator('.settings-tabs a').allInnerTexts()) === JSON.stringify(['Account & security','Plan & billing','Developer settings']) && await accountPageEn.locator('.settings-tabs a[aria-current="page"]').getAttribute('href') === '/en/account', await accountPageEn.locator('.settings-tabs').innerText());
+ok('en: legacy account key is advanced instead of the first task', await accountPageEn.locator('details.acct-advanced:not([open])').count() === 1 && await accountPageEn.locator('.acct-card:not(.acct-advanced)').first().locator('h2').innerText() === 'Security.', await accountPageEn.locator('main').innerText());
+ok('en: billing settings do not claim live checkout is a stub', !/stub mode|no real payments/i.test(await accountPageEn.locator('#billing-section').innerText()), await accountPageEn.locator('#billing-section').innerText());
+ok('en: account action describes deactivation instead of erasure', /account record is retained/i.test(await accountPageEn.locator('.acct-card.danger').innerText()) && !/permanent|delete account/i.test(await accountPageEn.locator('.acct-card.danger').innerText()), await accountPageEn.locator('.acct-card.danger').innerText());
+ok('en: settings fit the phone viewport', await accountPageEn.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth), await accountPageEn.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
+await accountPageEn.close();
 
 const developerPage = await browser.newPage({ viewport:{ width:1280, height:900 } });
 await developerPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));

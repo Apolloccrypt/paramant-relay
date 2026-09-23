@@ -47,9 +47,12 @@ function wrap(bodyText, bodyHtml, meta = {}) {
   };
 }
 
-function htmlShell(preheader, bodyHtml) {
+function htmlShell(preheader, bodyHtml, lang = 'en') {
+  const tagline = lang === 'nl'
+    ? 'Paramant, versleuteld versturen en ondertekenen.'
+    : 'Paramant &mdash; post-quantum encrypted file relay.';
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -67,7 +70,7 @@ function htmlShell(preheader, bodyHtml) {
         ${bodyHtml}
       </td></tr>
       <tr><td style="padding:24px 40px;border-top:1px solid rgba(11,58,106,0.08);font-size:12px;color:#64748b;line-height:1.6;">
-        <p style="margin:0 0 8px 0;">Paramant &mdash; post-quantum encrypted file relay.</p>
+        <p style="margin:0 0 8px 0;">${tagline}</p>
         <p style="margin:0;"><a href="https://paramant.app" style="color:#1D4ED8;text-decoration:none;">paramant.app</a> &middot; <a href="https://paramant.app/security" style="color:#1D4ED8;text-decoration:none;">Security</a> &middot; <a href="https://paramant.app/help" style="color:#1D4ED8;text-decoration:none;">Help</a></p>
       </td></tr>
     </table>
@@ -81,6 +84,31 @@ function btn(url, label) {
   return `<div style="margin:24px 0;"><a href="${url}" style="display:inline-block;background:#1D4ED8;color:#ffffff;text-decoration:none;padding:12px 24px;font-weight:500;font-family:system-ui,sans-serif;">${label}</a></div>`;
 }
 
+// ── DUTCH FIRST, ENGLISH BELOW ──────────────────────────────────────────────
+// The account mails are Dutch since 23 September 2026, with the English text
+// under it. The action that sends them (sign up, reset, deactivate) does not
+// carry the language of the page it started on, so one mail serves both
+// readers: Dutch on top because that is the site's main language, English
+// below a clear divider for whoever came in through /en/.
+function bilingualMail({ subject, preheader, nlText, enText, nlHtml, enHtml, refId }) {
+  const text = `${nlText}\n\n-------- English --------\n\n${enText}`;
+  const html = htmlShell(preheader, `
+    <div lang="nl">${nlHtml}</div>
+    <hr style="border:none;border-top:1px solid rgba(11,58,106,0.16);margin:32px 0 8px 0;">
+    <p style="margin:0 0 16px 0;font-family:monospace;font-size:11px;letter-spacing:0.15em;color:#64748b;">ENGLISH</p>
+    <div lang="en">${enHtml}</div>
+  `, 'nl');
+  return { ...wrap(text, html, { refId }), subject };
+}
+
+// The lifetime arrives as an English phrase from admin/server.js
+// (setupTokenValidFor): "1 hour", "36 hours", "2 days".
+function nlDuration(phrase) {
+  return String(phrase)
+    .replace(/\b1 hour\b/, '1 uur').replace(/\b(\d+) hours\b/, '$1 uur')
+    .replace(/\b1 day\b/, '1 dag').replace(/\b(\d+) days\b/, '$1 dagen');
+}
+
 // ── 1. SETUP EMAIL ────────────────────────────────────────────────────────────
 // `validFor` is the human phrase for the link's lifetime. It is a parameter and
 // not a constant, because the number lives in admin/server.js
@@ -90,14 +118,14 @@ function btn(url, label) {
 function setupEmail({ token, requestedAt, requestIP, isReset = false, validFor = '2 days' }) {
   const url = `${BASE_URL}/auth/setup/${token}`;
   const preheader = isReset
-    ? 'Your TOTP authenticator has been cleared. Scan the QR code to re-enroll.'
-    : 'Scan the QR code with your authenticator app to finish signup.';
+    ? 'Uw authenticator-app is losgekoppeld. Scan de nieuwe QR-code.'
+    : 'Scan de QR-code met uw authenticator-app om uw account af te maken.';
 
   const resetWarn = isReset
     ? '\nIMPORTANT: delete your old Paramant entry from your authenticator app\nbefore scanning the new QR code — the old entry no longer works.\n'
     : '';
 
-  const text = `Hi,
+  const enText = `Hi,
 
 ${isReset ? 'Your TOTP authenticator has been reset.' : 'Welcome to Paramant.'} To ${isReset ? 'reset your' : 'finish setting up your'} account,
 connect an authenticator app. This is what Paramant uses instead of a password.
@@ -135,7 +163,7 @@ https://paramant.app`;
       </div>`
     : '';
 
-  const html = htmlShell(preheader, `
+  const enHtml = `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">${isReset ? 'Set up your new Paramant authenticator' : 'Complete your Paramant account setup'}</h1>
     ${resetBanner}
     <p style="margin:0 0 16px 0;line-height:1.6;">${isReset ? 'Your TOTP authenticator has been reset.' : 'Welcome to Paramant.'} To ${isReset ? 'reset your' : 'finish setting up your'} account, connect an authenticator app &mdash; this is what Paramant uses instead of a password.</p>
@@ -149,20 +177,60 @@ https://paramant.app`;
     <hr style="border:none;border-top:1px solid rgba(11,58,106,0.08);margin:24px 0;">
     <p style="margin:0 0 8px 0;font-size:13px;color:#64748b;">${isReset ? '<strong>Did not request this reset?</strong> Contact support immediately at <a href="mailto:hello@paramant.app" style="color:#1D4ED8;">hello@paramant.app</a>.' : '<strong>Did not sign up for Paramant?</strong> Ignore this email. No account is created until you complete setup.'}</p>
     <p style="margin:16px 0 0 0;font-size:12px;color:#94a3b8;font-family:monospace;">Time: ${formatTS(requestedAt || Date.now())}<br>IP: ${escHtml(maskIP(requestIP))}</p>
-  `);
+  `;
 
-  return {
-    ...wrap(text, html, { refId: 'setup-' + refIdHash(token) }),
-    subject: isReset ? 'Set up your new Paramant authenticator' : 'Complete your Paramant account setup',
-  };
+  const nlValid = nlDuration(validFor);
+  const nlText = `Hallo,
+
+${isReset ? 'Uw authenticator-app is losgekoppeld.' : 'Welkom bij Paramant.'} Koppel een authenticator-app om ${isReset ? 'uw account weer te gebruiken' : 'uw account af te maken'}.
+Die gebruikt Paramant in plaats van een wachtwoord.
+
+${isReset ? 'Nieuwe authenticator-app instellen' : 'Account afmaken'}:
+${url}
+${isReset ? '\nBELANGRIJK: verwijder eerst de oude Paramant-regel uit uw authenticator-app.\nDie codes werken niet meer.\n' : ''}
+De link opent een pagina met een QR-code. Scan die met uw authenticator-app
+(Google Authenticator, Authy, 1Password of een andere TOTP-app). Lukt scannen
+niet, dan kunt u de sleutel ook met de hand invullen. U kunt daar ook een passkey kiezen.
+
+Deze link werkt ${nlValid}.
+
+Na het instellen krijgt u 10 back-upcodes. Bewaar die op een veilige plek
+(wachtwoordbeheerder, of op papier in een la) voor als u uw telefoon kwijtraakt.
+
+${isReset ? 'Hebt u deze reset niet aangevraagd? Mail dan meteen hello@paramant.app.' : 'Hebt u zich niet aangemeld bij Paramant? Dan kunt u deze mail negeren. Er komt pas een account als het instellen is afgerond.'}
+
+Tijd:  ${formatTS(requestedAt || Date.now())}
+IP:    ${maskIP(requestIP)}
+
+Paramant
+https://paramant.app`;
+
+  const nlHtml = `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">${isReset ? 'Stel uw nieuwe authenticator-app in' : 'Maak uw Paramant-account af'}</h1>
+    ${isReset ? `<div style="background:#FEF3C7;border-left:3px solid #D97706;padding:12px 16px;margin:0 0 20px 0;">
+        <p style="margin:0;line-height:1.5;color:#92400E;font-size:14px;"><strong>Authenticator-app losgekoppeld.</strong> Verwijder eerst de oude Paramant-regel uit uw app. Die codes werken niet meer.</p>
+      </div>` : ''}
+    <p style="margin:0 0 16px 0;line-height:1.6;">${isReset ? 'Uw authenticator-app is losgekoppeld.' : 'Welkom bij Paramant.'} Koppel een authenticator-app of een passkey om ${isReset ? 'uw account weer te gebruiken' : 'uw account af te maken'}. Die gebruikt Paramant in plaats van een wachtwoord.</p>
+    ${btn(url, isReset ? 'Nieuwe authenticator-app instellen' : 'Account afmaken')}
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">De link opent een pagina met een QR-code. Scan die met uw authenticator-app (Google Authenticator, Authy, 1Password of een andere TOTP-app). U kunt de sleutel ook met de hand invullen.</p>
+    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">Deze link werkt <strong>${escHtml(nlValid)}</strong>.</p>
+    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:13px;">Na het instellen krijgt u 10 back-upcodes. Bewaar die op een veilige plek (wachtwoordbeheerder, of op papier in een la) voor als u uw telefoon kwijtraakt.</p>
+    <p style="margin:0 0 8px 0;font-size:13px;color:#64748b;">${isReset ? '<strong>Deze reset niet aangevraagd?</strong> Mail dan meteen <a href="mailto:hello@paramant.app" style="color:#1D4ED8;">hello@paramant.app</a>.' : '<strong>Niet aangemeld bij Paramant?</strong> Dan kunt u deze mail negeren. Er komt pas een account als het instellen is afgerond.'}</p>
+  `;
+
+  return bilingualMail({
+    subject: isReset ? 'Stel uw nieuwe authenticator-app in voor Paramant' : 'Maak uw Paramant-account af',
+    preheader, nlText, enText, nlHtml, enHtml,
+    refId: 'setup-' + refIdHash(token),
+  });
 }
 
 // ── 2. RESET CONFIRMATION EMAIL ───────────────────────────────────────────────
 function resetConfirmationEmail({ confirmToken, requestedAt, requestIP }) {
   const url = `${BASE_URL}/auth/reset-confirm/${confirmToken}`;
-  const preheader = 'Confirm that you requested a TOTP authenticator reset — link expires in 1 hour.';
+  const preheader = 'Bevestig dat u een nieuwe authenticator-app wilt koppelen. De link werkt 1 uur.';
 
-  const text = `Hi,
+  const enText = `Hi,
 
 Someone requested a reset of your Paramant authenticator (TOTP).
 
@@ -190,7 +258,7 @@ Request details:
 Paramant
 https://paramant.app`;
 
-  const html = htmlShell(preheader, `
+  const enHtml = `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Did you request a TOTP reset?</h1>
     <p style="margin:0 0 16px 0;line-height:1.6;">Someone requested a reset of your Paramant authenticator (TOTP).</p>
     <p style="margin:0 0 16px 0;line-height:1.6;">If this was you, click below to confirm. You will then receive a second email with your new authenticator setup link.</p>
@@ -206,12 +274,50 @@ https://paramant.app`;
       Time: ${formatTS(typeof requestedAt === 'number' ? requestedAt : Date.parse(requestedAt))}<br>
       IP: ${escHtml(maskIP(requestIP))}
     </p>
-  `);
+  `;
 
-  return {
-    ...wrap(text, html, { refId: 'reset-confirm-' + refIdHash(confirmToken) }),
-    subject: 'Did you request a TOTP reset? — Paramant',
-  };
+  const when = formatTS(typeof requestedAt === 'number' ? requestedAt : Date.parse(requestedAt));
+  const nlText = `Hallo,
+
+Iemand vroeg om uw Paramant-account aan een nieuwe authenticator-app te koppelen.
+
+Was u dat, bevestig het dan met de link hieronder. Daarna krijgt u een tweede
+mail met de link om de nieuwe authenticator-app in te stellen.
+
+Reset bevestigen:
+${url}
+
+Deze link werkt 1 uur.
+
+Was u dit niet, negeer deze mail dan. Er verandert niets en uw huidige
+authenticator-app blijft gewoon werken.
+
+Waarom twee mails? Wie alleen uw e-mailadres kent, kan zo geen reset
+afdwingen. Daarvoor is ook toegang tot uw inbox nodig.
+
+Tijd: ${when}
+IP:   ${maskIP(requestIP)}
+
+Paramant
+https://paramant.app`;
+
+  const nlHtml = `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Vroeg u om een nieuwe authenticator-app?</h1>
+    <p style="margin:0 0 16px 0;line-height:1.6;">Iemand vroeg om uw Paramant-account aan een nieuwe authenticator-app te koppelen.</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;">Was u dat, bevestig het dan hieronder. Daarna krijgt u een tweede mail met de link om de nieuwe authenticator-app in te stellen.</p>
+    ${btn(url, 'Reset bevestigen')}
+    <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">Deze link werkt <strong>1 uur</strong>.</p>
+    <div style="background:#F0F9FF;border-left:3px solid #1D4ED8;padding:12px 16px;margin:0 0 24px 0;">
+      <p style="margin:0;line-height:1.5;color:#0B3A6A;font-size:14px;"><strong>Niet aangevraagd?</strong> Negeer deze mail. Er verandert niets en uw huidige authenticator-app blijft gewoon werken.</p>
+    </div>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:13px;">Waarom twee mails? Wie alleen uw e-mailadres kent, kan zo geen reset afdwingen. Daarvoor is ook toegang tot uw inbox nodig.</p>
+  `;
+
+  return bilingualMail({
+    subject: 'Nieuwe authenticator-app bevestigen · Paramant',
+    preheader, nlText, enText, nlHtml, enHtml,
+    refId: 'reset-confirm-' + refIdHash(confirmToken),
+  });
 }
 
 // ── 3. WELCOME / API KEY EMAIL ────────────────────────────────────────────────
@@ -427,10 +533,10 @@ https://paramant.app`;
 // so the old wording understated what happened, and a mail that undersells an
 // erasure is as untrue as one that oversells it.
 function accountDeletionEmail({ email, deletedAt, reason }) {
-  const preheader = 'Your Paramant account has been deactivated.';
+  const preheader = 'Uw Paramant-account is gedeactiveerd.';
   const dateStr = formatTS(typeof deletedAt === 'number' ? deletedAt : Date.parse(deletedAt));
 
-  const text = `Hi,
+  const enText = `Hi,
 
 Your Paramant account (${email}) was deactivated on ${dateStr}.
 
@@ -452,7 +558,7 @@ support@paramant.app.
 Paramant
 https://paramant.app`;
 
-  const html = htmlShell(preheader, `
+  const enHtml = `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Account deactivated</h1>
     <p style="margin:0 0 20px 0;line-height:1.6;">Your Paramant account (${escHtml(email)}) was deactivated on <strong>${dateStr}</strong>.</p>
     <p style="margin:0 0 20px 0;line-height:1.6;">Its API key can no longer be used. Active sessions and the TOTP setup were removed, and your personal data was erased from our systems.</p>
@@ -468,9 +574,49 @@ https://paramant.app`;
       <p style="margin:0;font-size:13px;color:#475569;"><strong>Reason:</strong> ${reason ? escHtml(reason) : 'not specified'}</p>
     </div>
     <p style="margin:16px 0 0 0;line-height:1.6;color:#475569;font-size:14px;">If this was a mistake or you want to restore access, contact <a href="mailto:support@paramant.app" style="color:#1D4ED8;">support@paramant.app</a>.</p>
-  `);
+  `;
 
-  return { ...wrap(text, html, { refId: 'deletion-' + Date.now() }), subject: 'Your Paramant account has been deactivated' };
+  const nlText = `Hallo,
+
+Uw Paramant-account (${email}) is gedeactiveerd op ${dateStr}.
+
+De API-sleutel werkt niet meer. Actieve sessies en de koppeling met uw authenticator-app zijn verwijderd, en uw persoonsgegevens zijn uit onze systemen gewist.
+
+Wat dit betekent:
+- De API-sleutel werkt niet meer
+- Actieve sessies zijn beëindigd
+- Persoonsgegevens zijn uit onze systemen verwijderd
+- Betaalgegevens bewaren wij zo lang als de belastingwet vraagt
+
+Vragen over wat er bewaard is en waarom? Mail privacy@paramant.app.
+
+Reden: ${reason || 'niet opgegeven'}
+
+Was dit een vergissing, of wilt u weer toegang? Mail support@paramant.app.
+
+Paramant
+https://paramant.app`;
+
+  const nlHtml = `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Account gedeactiveerd</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Uw Paramant-account (${escHtml(email)}) is gedeactiveerd op <strong>${dateStr}</strong>.</p>
+    <p style="margin:0 0 20px 0;line-height:1.6;">De API-sleutel werkt niet meer. Actieve sessies en de koppeling met uw authenticator-app zijn verwijderd, en uw persoonsgegevens zijn uit onze systemen gewist.</p>
+    <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
+      <li>De API-sleutel werkt niet meer</li>
+      <li>Actieve sessies zijn beëindigd</li>
+      <li>Persoonsgegevens zijn uit onze systemen verwijderd</li>
+      <li>Betaalgegevens bewaren wij zo lang als de belastingwet vraagt</li>
+    </ul>
+    <p style="margin:0 0 20px 0;line-height:1.6;color:#475569;font-size:14px;">Vragen over wat er bewaard is en waarom? Mail <a href="mailto:privacy@paramant.app" style="color:#1D4ED8;">privacy@paramant.app</a>.</p>
+    <p style="margin:0 0 20px 0;font-size:13px;color:#475569;"><strong>Reden:</strong> ${reason ? escHtml(reason) : 'niet opgegeven'}</p>
+    <p style="margin:0;line-height:1.6;color:#475569;font-size:14px;">Was dit een vergissing, of wilt u weer toegang? Mail <a href="mailto:support@paramant.app" style="color:#1D4ED8;">support@paramant.app</a>.</p>
+  `;
+
+  return bilingualMail({
+    subject: 'Uw Paramant-account is gedeactiveerd',
+    preheader, nlText, enText, nlHtml, enHtml,
+    refId: 'deletion-' + Date.now(),
+  });
 }
 
 // ── SIGNUP VERIFICATION EMAIL ────────────────────────────────────────────────
@@ -479,8 +625,8 @@ function signupVerificationEmail({ email, token, requestedAt, requestIP }) {
   const dateStr = formatTS(requestedAt);
   const maskedIp = maskIP(requestIP);
 
-  const preheader = 'Confirm your email to activate your Paramant account.';
-  const text = [
+  const preheader = 'Bevestig uw e-mailadres om uw Paramant-account te activeren.';
+  const enText = [
     'Verify your Paramant account',
     '',
     `You requested an account for ${email}.`,
@@ -495,7 +641,7 @@ function signupVerificationEmail({ email, token, requestedAt, requestIP }) {
     '— Paramant',
   ].join('\n');
 
-  const html = htmlShell(preheader, `
+  const enHtml = `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Verify your email</h1>
     <p style="margin:0 0 20px 0;line-height:1.6;">
       You requested a Paramant account for <strong>${escHtml(email)}</strong>. Click the button below to confirm your email address and activate your account.
@@ -513,9 +659,46 @@ function signupVerificationEmail({ email, token, requestedAt, requestIP }) {
         <br>Requested ${dateStr}${requestIP ? ' · IP: ' + escHtml(maskedIp) : ''}.
       </p>
     </div>
-  `);
+  `;
 
-  return { ...wrap(text, html, { refId: 'verify-' + refIdHash(token) }), subject: 'Verify your Paramant account' };
+  const nlText = [
+    'Bevestig uw Paramant-account',
+    '',
+    `U vroeg een account aan voor ${email}.`,
+    'Open de link hieronder om uw e-mailadres te bevestigen en uw account te activeren:',
+    '',
+    url,
+    '',
+    'Deze link werkt 24 uur. Hebt u dit niet aangevraagd, dan kunt u deze mail negeren.',
+    '',
+    `Aangevraagd: ${dateStr}${requestIP ? ' · IP: ' + maskedIp : ''}`,
+    '',
+    'Paramant',
+  ].join('\n');
+
+  const nlHtml = `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Bevestig uw e-mailadres</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">
+      U vroeg een Paramant-account aan voor <strong>${escHtml(email)}</strong>. Klik op de knop om uw e-mailadres te bevestigen en uw account te activeren.
+    </p>
+    <div style="text-align:center;margin:0 0 28px 0;">
+      <a href="${url}" style="display:inline-block;background:#1D4ED8;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:6px;text-decoration:none;letter-spacing:0.01em;">E-mailadres bevestigen</a>
+    </div>
+    <p style="margin:0 0 8px 0;font-size:13px;color:#64748B;">
+      Of kopieer deze link naar uw browser:<br>
+      <a href="${url}" style="color:#1D4ED8;word-break:break-all;">${url}</a>
+    </p>
+    <p style="margin:16px 0 0 0;font-size:12px;color:#94A3B8;line-height:1.6;">
+      Deze link werkt <strong>24 uur</strong>. Hebt u geen Paramant-account aangevraagd, negeer deze mail dan. Er wordt dan geen account gemaakt.
+      <br>Aangevraagd ${dateStr}${requestIP ? ' · IP: ' + escHtml(maskedIp) : ''}.
+    </p>
+  `;
+
+  return bilingualMail({
+    subject: 'Bevestig uw Paramant-account',
+    preheader, nlText, enText, nlHtml, enHtml,
+    refId: 'verify-' + refIdHash(token),
+  });
 }
 
 // ── DUPLICATE SIGNUP ATTEMPT NOTICE ─────────────────────────────────────────
@@ -528,8 +711,8 @@ function duplicateSignupAttemptEmail({ email, requestedAt, requestIP }) {
   const maskedIp = maskIP(requestIP);
   const loginUrl = `${BASE_URL}/auth/login`;
 
-  const preheader = 'Someone tried to create a Paramant account with your email.';
-  const text = [
+  const preheader = 'Iemand probeerde een Paramant-account te maken met uw e-mailadres.';
+  const enText = [
     'Signup attempt on your Paramant account',
     '',
     `Someone just attempted to create a Paramant account using ${email}.`,
@@ -545,7 +728,7 @@ function duplicateSignupAttemptEmail({ email, requestedAt, requestIP }) {
     'Paramant',
   ].join('\n');
 
-  const html = htmlShell(preheader, `
+  const enHtml = `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Signup attempt on your account</h1>
     <p style="margin:0 0 20px 0;line-height:1.6;">
       Someone just tried to create a Paramant account with <strong>${escHtml(email)}</strong>. Your existing account was not changed and no new account was created.
@@ -562,9 +745,44 @@ function duplicateSignupAttemptEmail({ email, requestedAt, requestIP }) {
         <br>Attempt at ${dateStr}${requestIP ? ' . IP: ' + escHtml(maskedIp) : ''}.
       </p>
     </div>
-  `);
+  `;
 
-  return { ...wrap(text, html, { refId: 'dup-' + Date.now().toString(36) }), subject: 'Signup attempt on your Paramant account' };
+  const nlText = [
+    'Aanmeldpoging op uw Paramant-account',
+    '',
+    `Iemand probeerde net een Paramant-account te maken met ${email}.`,
+    'Uw bestaande account is niet veranderd en er is geen nieuw account gemaakt.',
+    '',
+    'Wilde u zelf inloggen? Gebruik dan de inlogpagina:',
+    loginUrl,
+    '',
+    'Was u dit niet, negeer deze mail dan. De poging is afgeremd.',
+    '',
+    `Poging op: ${dateStr}${requestIP ? ' . IP: ' + maskedIp : ''}`,
+    '',
+    'Paramant',
+  ].join('\n');
+
+  const nlHtml = `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Aanmeldpoging op uw account</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">
+      Iemand probeerde net een Paramant-account te maken met <strong>${escHtml(email)}</strong>. Uw bestaande account is niet veranderd en er is geen nieuw account gemaakt.
+    </p>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Wilde u zelf inloggen? Gebruik dan de inlogpagina:</p>
+    <div style="text-align:center;margin:0 0 28px 0;">
+      <a href="${loginUrl}" style="display:inline-block;background:#1D4ED8;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:6px;text-decoration:none;letter-spacing:0.01em;">Inloggen bij Paramant</a>
+    </div>
+    <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
+      Was u dit niet, negeer deze mail dan. De poging is afgeremd en er is geen account gemaakt.
+      <br>Poging op ${dateStr}${requestIP ? ' . IP: ' + escHtml(maskedIp) : ''}.
+    </p>
+  `;
+
+  return bilingualMail({
+    subject: 'Aanmeldpoging op uw Paramant-account',
+    preheader, nlText, enText, nlHtml, enHtml,
+    refId: 'dup-' + Date.now().toString(36),
+  });
 }
 
 // ── BACKUP CODES RESET NOTIFICATION ─────────────────────────────────────────

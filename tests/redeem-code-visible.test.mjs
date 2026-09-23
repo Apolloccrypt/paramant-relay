@@ -36,7 +36,7 @@ const MIME = {
   '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css',
   '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2',
 };
-const aliases = { '/': '/index.html', '/account': '/account.html', '/pricing': '/pricing.html' };
+const aliases = { '/': '/index.html', '/account': '/account.html', '/pricing': '/pricing.html', '/en/account': '/en/account.html' };
 
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
@@ -114,7 +114,8 @@ async function typeAndSubmit(page, code) {
   return page.textContent('[data-redeem-form] [data-redeem-message]');
 }
 
-for (const slug of ['/pricing', '/account']) {
+// /account is Dutch since 23 September 2026 as well; /en/account is its English copy.
+for (const slug of ['/pricing', '/account', '/en/account']) {
   test(`${slug} carries the code field, and asks for no credential until it is used`, async () => {
     const { page, calls } = await open(slug, (route) => json(route, GRANTED));
     // 4. Nothing on load. The whole point of the app token is that reading a
@@ -128,8 +129,8 @@ for (const slug of ['/pricing', '/account']) {
     assert.ok(button, `${slug} has no submit button inside the redeem form`);
     // The claim that made this field allowed on a page about prices.
     const text = await page.textContent('[data-redeem-form]');
-    // /pricing is Dutch since 23 September 2026 and says it in Dutch.
-    assert.match(text, slug === '/pricing' ? /er wordt niets afgeschreven, nu niet en later niet/i : /nothing is charged, now or later/i,
+    // /pricing and /account are Dutch since 23 September 2026 and say it in Dutch.
+    assert.match(text, slug.startsWith('/en/') ? /nothing is charged, now or later/i : /er wordt niets afgeschreven, nu niet en later niet/i,
       `${slug}: the field must say a code charges nothing, which is what the relay does`);
     await page.close();
   });

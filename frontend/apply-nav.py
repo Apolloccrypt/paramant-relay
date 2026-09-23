@@ -88,7 +88,15 @@ NEW_FOOTER = '''\
 # the same bar in Dutch, with the two outward product names Mick settled on:
 # Versturen and Ondertekenen. js/nav-auth.js re-renders the same Dutch list
 # when <html lang="nl">, so the two may never drift apart.
-NL_PAGES = {'index.html', 'pricing.html', 'about.html', 'security.html'}
+# Account and sign-in pages followed on the same day: one language from the
+# first screen to the dashboard.
+NL_PAGES = {
+    'index.html', 'pricing.html', 'about.html', 'security.html',
+    'auth/login.html', 'auth/setup.html', 'auth/backup.html',
+    'auth/request-reset.html', 'auth/reset-confirm.html',
+    'signup.html', 'signup/verified.html', 'request-key.html',
+    'account.html', 'dashboard.html',
+}
 
 NEW_NAV_NL = '''\
 <nav class="nav">
@@ -164,6 +172,11 @@ LEGAL_STRIP = '''\
   <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
 </footer>'''
 
+LEGAL_STRIP_NL = '''\
+<footer class="legal-strip">
+  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a>
+</footer>'''
+
 DS_LINK   = '<link rel="stylesheet" href="/design-system.css?v=30">'
 NAV_LINK  = '<link rel="stylesheet" href="/nav.css?v=26">'
 NAV_JS    = '<script src="/nav.js?v=15" defer></script>'
@@ -193,7 +206,7 @@ KEEP_OWN_NAV = {
 }
 
 
-def inject_legal_strip(html):
+def inject_legal_strip(html, strip=LEGAL_STRIP):
     """Give footerless pages one line with privacy, dpa and terms.
 
     Pages that already carry a real <footer> keep it. The strip uses
@@ -201,7 +214,7 @@ def inject_legal_strip(html):
     never matches, so stamping stays idempotent and edits here still
     propagate on the next run."""
     if 'class="legal-strip"' in html:
-        return re.sub(r'<footer class="legal-strip">.*?</footer>', LEGAL_STRIP,
+        return re.sub(r'<footer class="legal-strip">.*?</footer>', lambda m: strip,
                       html, flags=re.DOTALL)
     if re.search(r'<footer\b', html):
         return html
@@ -209,8 +222,8 @@ def inject_legal_strip(html):
     if body_close == -1:
         # download.html has no </body> at all. The strip still belongs on the
         # page, so append it rather than skip the page.
-        return html.rstrip() + '\n' + LEGAL_STRIP + '\n'
-    return html[:body_close] + LEGAL_STRIP + '\n' + html[body_close:]
+        return html.rstrip() + '\n' + strip + '\n'
+    return html[:body_close] + strip + '\n' + html[body_close:]
 
 
 def inject_main(html):
@@ -373,7 +386,7 @@ def process(fpath):
     updated = re.sub(r'<nav class="nav">.*?</nav>', lambda m: nav, content, flags=re.DOTALL)
     updated = replace_mobile_div(updated, mobile)
     updated = re.sub(r'<footer>.*?</footer>', lambda m: footer, updated, flags=re.DOTALL)
-    updated = inject_legal_strip(updated)
+    updated = inject_legal_strip(updated, LEGAL_STRIP_NL if dutch else LEGAL_STRIP)
     updated = inject_main(updated)
     updated = inject_design_system(updated)
     updated = inject_nav_js(updated)

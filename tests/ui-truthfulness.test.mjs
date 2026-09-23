@@ -10,10 +10,10 @@ const adminHtml = read('admin/public/index.html') + read('frontend/admin.html');
 const adminJs = read('admin/public/app.js') + read('frontend/js/admin.page.js');
 const email = read('admin/lib/email-templates.js');
 
-assert.doesNotMatch(account + accountJs + adminHtml + adminJs, /Delete account permanently|Account deleted|permanent, cannot undo/i);
-assert.match(account, /makes its API key unusable/i);
-assert.match(account, /sessions and TOTP setup are removed/i);
-assert.match(account, /account record is retained/i);
+assert.doesNotMatch(account + accountJs + adminHtml + adminJs, /Delete account permanently|Account deleted|permanent, cannot undo|Account definitief verwijderen|Account verwijderd|definitief, kan niet ongedaan/i);
+assert.match(account, /werkt de API-sleutel niet meer/i);
+assert.match(account, /sessies en de koppeling met uw authenticator-app worden verwijderd/i);
+assert.match(account, /accountrecord blijft bewaard/i);
 assert.doesNotMatch(account, /Stub mode|No real payments are charged|Mollie integration pending/i);
 assert.match(adminHtml, /blocks the account key and removes active sessions and TOTP/i);
 assert.match(adminHtml, /Type DEACTIVATE to confirm/);
@@ -114,13 +114,21 @@ assert.match(signJs, /function showSessionRequirement/,
 // saying what the screen does and what happens next, one action, and no promise.
 // These assertions pin the sentence each screen now opens with, so a rewrite
 // that quietly drops the explanation fails here instead of in production.
+// Since 23 September 2026 these screens are Dutch on their own path and English
+// under /en/. Both copies are held to the same sentence, each in its language.
 const authFirstSentence = {
-  'frontend/auth/login.html': /No password to type: sign in with your passkey/i,
-  'frontend/auth/setup.html': /Pick one now and add the other later/i,
-  'frontend/auth/backup.html': /each code works\s+once and gets you in without your authenticator app/i,
-  'frontend/auth/request-reset.html': /if it matches an account, we send a link/i,
-  'frontend/auth/reset-confirm.html': /You get two emails, one after the other/i,
-  'frontend/signup/verified.html': /Paramant has no passwords/i,
+  'frontend/en/auth/login.html': /No password to type: sign in with your passkey/i,
+  'frontend/en/auth/setup.html': /Pick one now and add the other later/i,
+  'frontend/en/auth/backup.html': /each code works\s+once and gets you in without your authenticator app/i,
+  'frontend/en/auth/request-reset.html': /if it matches an account, we send a link/i,
+  'frontend/en/auth/reset-confirm.html': /You get two emails, one after the other/i,
+  'frontend/en/signup/verified.html': /Paramant has no passwords/i,
+  'frontend/auth/login.html': /Geen wachtwoord nodig: log in met uw passkey/i,
+  'frontend/auth/setup.html': /Kies er nu één en voeg de andere later toe/i,
+  'frontend/auth/backup.html': /Elke code\s+werkt één keer en laat u binnen zonder uw authenticator-app/i,
+  'frontend/auth/request-reset.html': /Hoort het bij een account, dan sturen wij\s+een link/i,
+  'frontend/auth/reset-confirm.html': /U krijgt twee mails, na elkaar/i,
+  'frontend/signup/verified.html': /Paramant werkt zonder wachtwoorden/i,
 };
 for (const [file, rx] of Object.entries(authFirstSentence)) {
   assert.match(read(file), rx, `${file} must open by saying what this screen does`);
@@ -131,7 +139,7 @@ for (const [file, rx] of Object.entries(authFirstSentence)) {
 const authVisible = Object.keys(authFirstSentence)
   .map((file) => read(file).replace(/<!--[\s\S]*?-->/g, ''))
   .join('\n');
-assert.doesNotMatch(authVisible, /EUR\s?\d|€|per month|Community tier|Mick Beer/i,
+assert.doesNotMatch(authVisible, /EUR\s?\d|€|per month|per maand|Community tier|Community-plan|Mick Beer/i,
   'auth screens must not carry pricing, tier names or the founder block');
 
 // A ParaSign signature is a Simple Electronic Signature (/about pins that
@@ -139,7 +147,7 @@ assert.doesNotMatch(authVisible, /EUR\s?\d|€|per month|Community tier|Mick Bee
 // to a PDF", which promises a legal effect the product does not deliver and
 // which tests/ui-truthfulness already forbids on /sign. Same rule, same surface.
 assert.doesNotMatch(authVisible,
-  /legally.binding|identity verified|verified signer|signer verified/i,
+  /legally.binding|identity verified|verified signer|signer verified|juridisch bindend|identiteit geverifieerd|geverifieerde ondertekenaar/i,
   'the auth screens must not claim a legal effect or a verified identity');
 
 console.log('ui-truthfulness: the auth screens say what they do and sell nothing');
@@ -155,7 +163,8 @@ console.log('ui-truthfulness: the auth screens say what they do and sell nothing
 //    container as /auth/login and /auth/backup.
 const styled = ['frontend/design-system.css', 'frontend/nav.css']
   .map(read).join('\n');
-for (const file of ['frontend/auth/request-reset.html', 'frontend/auth/reset-confirm.html']) {
+for (const file of ['frontend/auth/request-reset.html', 'frontend/auth/reset-confirm.html',
+                    'frontend/en/auth/request-reset.html', 'frontend/en/auth/reset-confirm.html']) {
   const main = read(file).match(/<main class="([^"]+)"/);
   assert.ok(main, `${file} must have a <main> with a class`);
   for (const cls of main[1].split(/\s+/)) {
@@ -167,16 +176,23 @@ for (const file of ['frontend/auth/request-reset.html', 'frontend/auth/reset-con
 // 2. The reset confirmation token is written with { EX: 3600 } (admin/server.js).
 //    The page claimed 15 minutes and justified it as a safety property, which
 //    made a wrong number sound deliberate.
-const resetConfirm = read('frontend/auth/reset-confirm.html');
+const resetConfirm = read('frontend/en/auth/reset-confirm.html');
+const resetConfirmNl = read('frontend/auth/reset-confirm.html');
 assert.match(resetConfirm, /Confirmation links last 60 minutes/i,
   'reset-confirm must state the TTL the code actually sets (EX: 3600)');
+assert.match(resetConfirmNl, /Een bevestigingslink werkt 60 minuten/i,
+  'the Dutch reset-confirm must state the same TTL (EX: 3600)');
 assert.doesNotMatch(resetConfirm, /arrives within a minute|within a minute/i,
   'no delivery-time promise: the reset mail is sent fire-and-forget');
+assert.doesNotMatch(resetConfirmNl, /binnen een minuut/i,
+  'no delivery-time promise in Dutch either');
 
 // 3. Clicking through from a mail to "confirm" and then being told a second mail
 //    follows reads as phishing unless the page says why it is split in two.
 assert.match(resetConfirm, /someone who briefly had your mailbox open/i,
   'reset-confirm must say why the reset takes two emails');
+assert.match(resetConfirmNl, /wie even in uw mailbox kon kijken/i,
+  'the Dutch reset-confirm must say why the reset takes two emails');
 
 // 4. The sign-in 429 is now per IP and ONLY per IP (5 per 900s,
 //    admin/lib/login-ratelimit.js). The per-email counter that used to share
@@ -194,6 +210,10 @@ assert.match(loginJs, /counts the connection, not your account/i,
   'the 429 text must name the counter that can actually cause it');
 assert.match(loginJs, /nobody can trigger it by guessing at your email address/i,
   'and must say the thing that changed, because it is what a locked-out reader is looking for');
+assert.match(loginJs, /De grens telt de verbinding, niet uw account/,
+  'the Dutch 429 text must name the same counter');
+assert.match(loginJs, /niemand kan hem veroorzaken door uw e-mailadres te raden/,
+  'and say the same thing that changed');
 
 // 4a. The 428 is the priced attempt, not a refusal, and the page handles it by
 //     solving the challenge and posting again. The message is only for the case
@@ -204,8 +224,12 @@ assert.match(loginJs, /ParamantCaptcha\.getCaptchaProof/,
   'and it must solve it with the proof-of-work helper the page loads');
 assert.match(loginJs, /extra verification this sign-in needs/i,
   'and when the challenge itself fails, the message must be about the verification, not about being blocked');
-assert.ok(read('frontend/auth/login.html').includes('/js/pow-captcha.js'),
-  'the login page must actually load the proof-of-work helper it calls');
+assert.match(loginJs, /De extra controle voor deze inlogpoging lukte niet/,
+  'the Dutch 428 text must be about the verification too');
+for (const file of ['frontend/auth/login.html', 'frontend/en/auth/login.html']) {
+  assert.ok(read(file).includes('/js/pow-captcha.js'),
+    `${file} must actually load the proof-of-work helper it calls`);
+}
 
 // 4b. A 503 means the TOTP single-use guard could not reach Redis and verification
 //     failed closed. Nothing is wrong with the code or the account, and the page
@@ -214,6 +238,8 @@ assert.match(loginJs, /res\.status === 503/,
   'the login page must handle the fail-closed 503 separately from a wrong code');
 assert.match(loginJs, /Nothing is wrong with your account or your code/i,
   'the 503 text must say the outage is ours, not theirs');
+assert.match(loginJs, /Er is niets mis met uw account of uw code/,
+  'the Dutch 503 text must say the outage is ours, not theirs');
 
 // 4b. POST /api/user/auth/request-totp-reset sends a CONFIRMATION mail whose
 //     token is { EX: 3600 } (admin/server.js:1890). The 14 day setup token is
@@ -228,19 +254,25 @@ assert.match(requestResetJs, /valid for 60 minutes/i,
   'the confirmation token is EX 3600, so the success message must say 60 minutes');
 assert.match(requestResetJs, /that one works for 14 days/i,
   'the 14 days belong to the second mail, the one with the setup link');
-assert.doesNotMatch(requestResetJs, /a setup link is on its way/i,
+assert.match(requestResetJs, /Die eerste mail bevestigt alleen het verzoek, en de link werkt 60 minuten/,
+  'the Dutch success message must attach the 60 minutes to the first mail');
+assert.match(requestResetJs, /Die werkt 14 dagen/,
+  'and the 14 days to the second');
+assert.doesNotMatch(requestResetJs, /a setup link is on its way|een instellink is onderweg/i,
   'no setup link exists until the confirmation is opened');
 
 //     And the success message has to be visible when it fires: #success sat
 //     inside #reset-form, which auth-request-reset.js hides on success, so the
 //     confirmation was hidden with its parent and the screen went blank.
-const requestResetHtml = read('frontend/auth/request-reset.html');
-const resetFormBlock = requestResetHtml.slice(requestResetHtml.indexOf('<form id="reset-form"'),
-                                              requestResetHtml.indexOf('</form>'));
-assert.doesNotMatch(resetFormBlock, /id="success"/,
-  'the success message must sit outside #reset-form: the handler hides that form on success');
-assert.match(requestResetHtml, /id="success"/,
-  'request-reset still needs a success container, just not inside the form');
+for (const file of ['frontend/auth/request-reset.html', 'frontend/en/auth/request-reset.html']) {
+  const requestResetHtml = read(file);
+  const resetFormBlock = requestResetHtml.slice(requestResetHtml.indexOf('<form id="reset-form"'),
+                                                requestResetHtml.indexOf('</form>'));
+  assert.doesNotMatch(resetFormBlock, /id="success"/,
+    `${file}: the success message must sit outside #reset-form: the handler hides that form on success`);
+  assert.match(requestResetHtml, /id="success"/,
+    `${file}: request-reset still needs a success container, just not inside the form`);
+}
 
 //     The same endpoint answers 429 with retry_after 86400 (admin/server.js:1875)
 //     off a 5-per-address-per-24h and 10-per-connection-per-hour limit. A shared
@@ -249,6 +281,8 @@ assert.match(requestResetJs, /res\.status === 429/,
   'request-reset must handle 429 separately: retrying does not help for up to a day');
 assert.match(requestResetJs, /up to 24 hours to clear/i,
   'the 429 text must state the wait the server actually imposes (retry_after 86400)');
+assert.match(requestResetJs, /dus dit kan tot 24 uur duren/,
+  'the Dutch 429 text must state the same wait');
 
 // 5. Every one of these screens must name the party behind the product and the
 //    country it sits in. The stamped legal-strip carries the documents, not the
@@ -256,23 +290,25 @@ assert.match(requestResetJs, /up to 24 hours to clear/i,
 for (const file of Object.keys(authFirstSentence)) {
   assert.match(read(file), /Paramantis Solutions B\.V\./,
     `${file} must name the company behind the product`);
-  assert.match(read(file), /Harderwijk,\s+the Netherlands/,
+  assert.match(read(file), file.startsWith('frontend/en/') ? /Harderwijk,\s+the Netherlands/ : /Harderwijk,\s+Nederland/,
     `${file} must name the country the company sits in`);
 }
 
 // 6. /signup/verified made a lawyer choose between seven authenticator apps and
 //    told them a SHA-256 app is "stronger" without saying what that means.
-const verified = read('frontend/signup/verified.html');
-assert.doesNotMatch(verified, /SHA-256 app is stronger|Raivo|Aegis|2FAS|Ente Auth/i,
-  'verified must not ask the reader to rank authenticator apps; link the help page');
-assert.match(verified, /help\/authenticator-apps/,
-  'verified must link the help page that does compare the apps');
-assert.doesNotMatch(verified, /class="next-num"/,
-  'no step badge numbered 2 on a page that has no step 1');
-// Same rule as reset-confirm: the setup mail is dispatched fire-and-forget and
-// nothing in the code knows what the receiving provider will do with it.
-assert.doesNotMatch(verified, /can take up to 60 seconds|arrives within a minute/i,
-  'no delivery-time promise on verified either: the rule holds on every screen');
+for (const file of ['frontend/signup/verified.html', 'frontend/en/signup/verified.html']) {
+  const verified = read(file);
+  assert.doesNotMatch(verified, /SHA-256 app is stronger|SHA-256-app is sterker|Raivo|Aegis|2FAS|Ente Auth/i,
+    `${file}: verified must not ask the reader to rank authenticator apps; link the help page`);
+  assert.match(verified, /help\/authenticator-apps/,
+    `${file}: verified must link the help page that does compare the apps`);
+  assert.doesNotMatch(verified, /class="next-num"/,
+    `${file}: no step badge numbered 2 on a page that has no step 1`);
+  // Same rule as reset-confirm: the setup mail is dispatched fire-and-forget and
+  // nothing in the code knows what the receiving provider will do with it.
+  assert.doesNotMatch(verified, /can take up to 60 seconds|arrives within a minute|binnen een minuut|tot 60 seconden/i,
+    `${file}: no delivery-time promise on verified either: the rule holds on every screen`);
+}
 
 
 // 7. .lede carries no top margin and h1 carries no bottom margin, so on
@@ -281,7 +317,8 @@ assert.doesNotMatch(verified, /can take up to 60 seconds|arrives within a minute
 //    verified). The .mt-3 utility (16px) restores the gap without changing .lede
 //    for the eleven other pages that use it.
 for (const file of ['frontend/auth/setup.html', 'frontend/auth/backup.html',
-                    'frontend/auth/request-reset.html']) {
+                    'frontend/auth/request-reset.html', 'frontend/en/auth/setup.html',
+                    'frontend/en/auth/backup.html', 'frontend/en/auth/request-reset.html']) {
   const html = read(file);
   const afterH1 = html.slice(html.indexOf('</h1>'));
   assert.match(afterH1.slice(0, 200), /<p class="lede mt-3">/,
@@ -726,8 +763,18 @@ assert.doesNotMatch(heroText, /for sending, from/,
 // One term for the free limit, on both pages a buyer reads in the same minute.
 // /pricing said "2 signatures a month" and /signup said "sign 2 documents a
 // month", which reads as two different products.
-const signupVisible = read('frontend/signup.html').replace(/<!--[\s\S]*?-->/g, '');
-for (const [label, html] of [['pricing.html', pricingVisible], ['signup.html', signupVisible]]) {
+const signupVisible = read('frontend/en/signup.html').replace(/<!--[\s\S]*?-->/g, '');
+const signupVisibleNl = read('frontend/signup.html').replace(/<!--[\s\S]*?-->/g, '');
+// The Dutch pair says it the Dutch way, one term on both pages.
+for (const [label, html] of [['pricing.html', read('frontend/pricing.html')], ['signup.html', signupVisibleNl]]) {
+  assert.match(html, /2 handtekeningen per maand/,
+    `${label} must name the free limit in the site's one Dutch term: "2 handtekeningen per maand"`);
+  assert.doesNotMatch(html, /\d+ documenten per maand/,
+    `${label} uses "documenten per maand" for the signature limit; the term is "2 handtekeningen per maand"`);
+}
+assert.doesNotMatch(signupVisibleNl, /class="tier-card"|privacy- en securityonderzoeker/,
+  'the Dutch signup.html must not carry tier tables or a founder block either');
+for (const [label, html] of [['en/pricing.html', pricingVisible], ['en/signup.html', signupVisible]]) {
   assert.match(html, /2 signatures a month/,
     `${label} must name the free limit in the site's one term: "2 signatures a month"`);
   assert.doesNotMatch(html, /\d+ documents a month/,
@@ -2102,11 +2149,18 @@ console.log('ui-truthfulness: the rules page is Our rules on /rules, with /parar
   assert.doesNotMatch(themeJs, /fetch\(|XMLHttpRequest|navigator\.sendBeacon/,
     'theme.js must not send the choice anywhere; /account and /privacy both say it stays in the browser');
 
-  assert.match(account, /Light is the default and it stays light until you change it here/,
+  const accountEn = read('frontend/en/account.html');
+  assert.match(accountEn, /Light is the default and it stays light until you change it here/,
+    '/en/account must say that light is the default, because app-2026.css makes it so');
+  assert.match(accountEn, /kept in this\s+browser only/,
+    '/en/account must say the choice never leaves the browser');
+  assert.match(accountEn, /The public pages stay light\./,
+    '/en/account promises the marketing pages stay light; tests/app-theme.test.mjs measures that');
+  assert.match(account, /Licht is de standaard en blijft zo tot u het hier wijzigt/,
     '/account must say that light is the default, because app-2026.css makes it so');
-  assert.match(account, /kept in this\s+browser only/,
+  assert.match(account, /alleen in deze\s+browser bewaard/,
     '/account must say the choice never leaves the browser');
-  assert.match(account, /The public pages stay light\./,
+  assert.match(account, /De openbare pagina's blijven licht\./,
     '/account promises the marketing pages stay light; tests/app-theme.test.mjs measures that');
 })();
 

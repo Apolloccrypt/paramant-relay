@@ -1,25 +1,25 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#FBFAF7;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#15191C;color:#EAE2CE}html[data-theme="dark"]{color-scheme:dark}@media (prefers-color-scheme:dark){html[data-theme="auto"],html[data-theme="auto"] body{background:#15191C;color:#EAE2CE}html[data-theme="auto"]{color-scheme:dark}}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Uw account · Paramant</title>
+<title>Your account · Paramant</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="/design-system.css?v=30">
 <link rel="stylesheet" href="/nav.css?v=26">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
-<meta property="og:title" content="Uw account · Paramant">
-<meta property="og:description" content="Uw account · Paramant">
-<meta property="og:url" content="https://paramant.app/account">
+<meta property="og:title" content="Your account · Paramant">
+<meta property="og:description" content="Your account · Paramant">
+<meta property="og:url" content="https://paramant.app/en/account">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Uw account · Paramant">
-<meta name="twitter:description" content="Uw account · Paramant">
-<link rel="canonical" href="https://paramant.app/account">
+<meta name="twitter:title" content="Your account · Paramant">
+<meta name="twitter:description" content="Your account · Paramant">
+<link rel="canonical" href="https://paramant.app/en/account">
 <link rel="alternate" hreflang="nl" href="https://paramant.app/account">
 <link rel="alternate" hreflang="en" href="https://paramant.app/en/account">
 <link rel="alternate" hreflang="x-default" href="https://paramant.app/account">
@@ -146,8 +146,8 @@ main.acct input::placeholder { color: var(--ink-3); }
 .acct-advanced > summary::-webkit-details-marker { display:none; }
 .acct-advanced > summary { min-height: var(--tap); }
 .acct-advanced > summary:focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--r-1); }
-.acct-advanced > summary::after { content:'Tonen'; align-self:flex-start; margin-top:10px; color:var(--accent); font:600 12px/1 var(--sans); }
-.acct-advanced[open] > summary::after { content:'Verbergen'; }
+.acct-advanced > summary::after { content:'Show'; align-self:flex-start; margin-top:10px; color:var(--accent); font:600 12px/1 var(--sans); }
+.acct-advanced[open] > summary::after { content:'Hide'; }
 .acct-advanced > summary strong { color:var(--ink-1); font:600 16px/1.25 var(--sans); }
 .acct-advanced > summary span { color:var(--ink-2); font:13px/1.55 var(--sans); }
 .acct-advanced-body { margin-top:var(--space-4); padding-top:var(--space-3); border-top:1px solid var(--line); }
@@ -161,167 +161,167 @@ main.acct input::placeholder { color: var(--ink-3); }
 <script src="/js/format-date.js?v=1"></script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Naar de inhoud</a>
+<a href="#main-content" class="skip-link">Skip to main content</a>
 
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/parasend" class="nav-link">Versturen</a></li>
-    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
-    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
-    <li><a href="/security" class="nav-link">Beveiliging</a></li>
-    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
+    <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/security" class="nav-link">Security</a></li>
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Hulp</a>
-    <a href="/auth/login" class="nav-signin">Inloggen</a>
-    <a href="/signup" class="nav-cta">Account maken</a>
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
-  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
-  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
-  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+  <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/security" class="nav-mobile-standalone">Security</a>
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
-  <a href="/help" class="nav-tail-link">Hulp</a>
+  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
 </div>
 
 <main id="main-content" class="acct">
 
 <section id="state-loading" class="section-lg">
-  <p class="lede">Uw account wordt geladen...</p>
+  <p class="lede">Loading your account...</p>
 </section>
 
 <section id="state-unauth" class="section-lg hidden">
-  <p class="lede">U bent niet ingelogd. <a href="/auth/login">Inloggen</a></p>
+  <p class="lede">You are not signed in. <a href="/en/auth/login">Sign in</a></p>
 </section>
 
 <div id="state-account" class="hidden">
 
-<nav class="settings-tabs" aria-label="Onderdelen van de instellingen">
-  <a href="/account" aria-current="page">Account en beveiliging</a>
-  <a href="/account#billing-section">Plan en betalingen</a>
-  <a href="/developer">Instellingen voor ontwikkelaars</a>
+<nav class="settings-tabs" aria-label="Settings sections">
+  <a href="/en/account" aria-current="page">Account &amp; security</a>
+  <a href="/en/account#billing-section">Plan &amp; billing</a>
+  <a href="/developer">Developer settings</a>
 </nav>
 
 <header class="acct-hero">
   <div>
-    <h1>Accountinstellingen</h1>
-    <div class="acct-session"><strong id="account-email">&mdash;</strong><br>Uw sessie loopt af over <span id="session-timer">&mdash;</span>. Log uit en weer in voor een nieuwe sessie.</div>
+    <h1>Account settings</h1>
+    <div class="acct-session"><strong id="account-email">&mdash;</strong><br>Session ends in <span id="session-timer">&mdash;</span>. Renew by signing out and back in.</div>
   </div>
   <span class="acct-plan"><strong id="plan-chip">&mdash;</strong><span>plan</span></span>
 </header>
 
 <details class="acct-card acct-advanced" id="acct-advanced">
-  <summary><strong>Geavanceerde accountsleutel</strong><span>Voor oudere SDK's, scripts en IoT-toegang. Voor gewoon gebruik met documenten hebt u deze niet nodig.</span></summary>
+  <summary><strong>Advanced account key</strong><span>For legacy SDK, script and IoT access. Normal document use does not need this.</span></summary>
   <div class="acct-advanced-body">
   <div class="info-row">
-    <div class="info-label">Sleutel</div>
+    <div class="info-label">Key</div>
     <div class="info-value">
       <code class="secret-display" id="api-key">&mdash;</code>
-      <button type="button" class="btn btn-small btn-secondary" id="copy-key">Kopiëren</button>
-      <button type="button" class="btn btn-small btn-secondary" id="show-key">Tonen</button>
+      <button type="button" class="btn btn-small btn-secondary" id="copy-key">Copy</button>
+      <button type="button" class="btn btn-small btn-secondary" id="show-key">Show</button>
     </div>
   </div>
   <div class="info-row"><div class="info-label">Plan</div><div class="info-value" id="plan">&mdash;</div></div>
   <div class="info-row"><div class="info-label">Label</div><div class="info-value" id="label">&mdash;</div></div>
-  <div class="info-row"><div class="info-label">Gemaakt</div><div class="info-value" id="created">&mdash;</div></div>
+  <div class="info-row"><div class="info-label">Created</div><div class="info-value" id="created">&mdash;</div></div>
   <p class="small mt-3">
-    Gebruik deze sleutel in scripts, SDK's en IoT-apparaten: stuur hem mee in de HTTP-header <code>X-Api-Key</code>. Zie de <a href="/docs">API-documentatie</a>.
+    Use this key in scripts, SDKs, and IoT devices: send it in the <code>X-Api-Key</code> HTTP header. See <a href="/docs">API documentation</a>.
   </p>
   </div>
 </details>
 
 <section class="acct-card">
-  <div class="acct-kicker">Beveiliging &middot; authenticator-app en back-upcodes</div>
-  <h2>Beveiliging.</h2>
+  <div class="acct-kicker">Security &middot; authenticator and backups</div>
+  <h2>Security.</h2>
   <div class="acct-grid2">
     <div class="acct-block">
-      <h3>Authenticator-app</h3>
-      <p>Gekoppeld. Algoritme: SHA-256, 30 seconden, 6 cijfers.</p>
-      <button type="button" class="btn btn-secondary btn-small" id="reset-totp">Nieuwe authenticator-app instellen</button>
-      <p class="small mt-2">De huidige codes werken dan niet meer. U scant een nieuwe QR-code.</p>
+      <h3>Authenticator app</h3>
+      <p>Connected. Algorithm: SHA-256, 30 seconds, 6 digits.</p>
+      <button type="button" class="btn btn-secondary btn-small" id="reset-totp">Set up a new authenticator</button>
+      <p class="small mt-2">Invalidates current TOTP. You will need to scan a new QR code.</p>
     </div>
     <div class="acct-block">
-      <h3>Back-upcodes</h3>
-      <p><span id="backup-count">&mdash;</span> van de 10 over.</p>
-      <button type="button" class="btn btn-secondary btn-small" id="regen-backup">Alle codes vernieuwen</button>
-      <p class="small mt-2">De huidige codes vervallen. De nieuwe codes ziet u één keer.</p>
+      <h3>Backup codes</h3>
+      <p><span id="backup-count">&mdash;</span> remaining of 10.</p>
+      <button type="button" class="btn btn-secondary btn-small" id="regen-backup">Regenerate all codes</button>
+      <p class="small mt-2">Current codes become invalid. New codes shown once.</p>
     </div>
   </div>
 </section>
 
 <section class="acct-card" id="passkey-section">
-  <div class="acct-kicker">Inloggen met een passkey &middot; WebAuthn, aan het apparaat gebonden</div>
-  <h2>Inloggen met een passkey.</h2>
+  <div class="acct-kicker">Passkey sign-in &middot; WebAuthn, device-bound</div>
+  <h2>Passkey sign-in.</h2>
   <p class="acct-lead">
-    Log in met Face ID, Touch ID, Windows Hello of een beveiligingssleutel, zonder code te typen.
-    Een passkey toevoegen is een wijziging in uw beveiliging, dus daarvoor vragen we uw huidige code van 6 cijfers.
+    Sign in with Face ID, Touch ID, Windows Hello, or a security key &mdash; no code to type.
+    Adding a passkey is a security change, so it needs your current 6-digit TOTP code.
   </p>
   <div class="acct-block">
-    <h3>Uw passkeys</h3>
-    <p style="margin:0 0 12px" id="account-passkey-empty" class="small">Uw account wordt gecontroleerd...</p>
+    <h3>Your passkeys</h3>
+    <p style="margin:0 0 12px" id="account-passkey-empty" class="small">Checking your account...</p>
     <ul id="account-passkey-list" style="margin:0;padding:0;list-style:none"></ul>
   </div>
   <div class="acct-inline">
     <input type="text" id="account-passkey-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
-           placeholder="Code van 6 cijfers" aria-label="Code van 6 cijfers uit uw authenticator-app" autocomplete="one-time-code" style="max-width:150px">
-    <button type="button" class="btn btn-secondary btn-small" id="account-passkey-btn">Passkey activeren</button>
+           placeholder="TOTP code" autocomplete="one-time-code" style="max-width:150px">
+    <button type="button" class="btn btn-secondary btn-small" id="account-passkey-btn">Activate passkey</button>
   </div>
   <p id="account-passkey-status" class="small" aria-live="polite" style="margin-top:8px"></p>
 </section>
 
 <section class="acct-card" id="signing-identity-section">
-  <div class="acct-kicker">Ondertekensleutel &middot; ML-DSA-65, blijvend</div>
-  <h2>Ondertekensleutel.</h2>
+  <div class="acct-kicker">Signing identity &middot; ML-DSA-65, persistent</div>
+  <h2>Signing identity.</h2>
   <p class="acct-lead">
-    Met uw ondertekensleutel ondertekent u documenten. Dat staat los van inloggen. De publieke sleutels horen bij uw
-    account, zodat anderen kunnen nagaan dat een handtekening van u is. De privésleutels verlaten uw browser nooit.
+    Your signing key signs documents, separate from signing in. Public keys are bound to your
+    account so verifiers can attribute signatures; private keys never leave your browser.
   </p>
   <div class="acct-grid2">
     <div class="acct-block">
-      <h3>Geregistreerde sleutels</h3>
-      <p style="margin:0 0 12px" id="signing-empty" class="small">Uw account wordt gecontroleerd...</p>
+      <h3>Enrolled keys</h3>
+      <p style="margin:0 0 12px" id="signing-empty" class="small">Checking your account...</p>
       <ul id="signing-list" style="margin:0;padding:0;list-style:none"></ul>
       <div id="revoke-totp-wrap" hidden style="margin-top:10px;padding:12px 14px;border:1px solid var(--ink-hair);border-radius:6px">
-        <p class="small" style="margin:0 0 8px">Vul de code van 6 cijfers uit uw authenticator-app in om deze ondertekensleutel in te trekken.</p>
+        <p class="small" style="margin:0 0 8px">Enter your 6-digit authenticator code to revoke this signing key.</p>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input type="text" id="revoke-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="Code van 6 cijfers" aria-label="Code van 6 cijfers" style="max-width:140px">
-          <button type="button" class="btn btn-small" id="revoke-totp-confirm">Intrekken bevestigen</button>
-          <button type="button" class="btn btn-small btn-secondary" id="revoke-totp-cancel">Annuleren</button>
+          <input type="text" id="revoke-totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" style="max-width:140px">
+          <button type="button" class="btn btn-small" id="revoke-totp-confirm">Confirm revoke</button>
+          <button type="button" class="btn btn-small btn-secondary" id="revoke-totp-cancel">Cancel</button>
         </div>
       </div>
     </div>
     <div class="acct-block">
-      <h3>Kluis in deze browser</h3>
-      <p style="margin:0 0 12px" id="vault-status" class="small">Deze browser wordt gecontroleerd...</p>
-      <p class="small"><strong>Uw ondertekensleutel staat versleuteld in deze browser en gaat alleen open met uw passkey (Face ID, Touch ID of een beveiligingssleutel). Wij zien hem nooit. Raakt u dit apparaat kwijt? Stel ondertekenen dan opnieuw in op een nieuw apparaat. Uw account bewaart elke publieke sleutel, dus oude handtekeningen blijven controleerbaar.</strong></p>
+      <h3>Browser vault</h3>
+      <p style="margin:0 0 12px" id="vault-status" class="small">Checking this browser...</p>
+      <p class="small"><strong>Your signing key is encrypted in this browser and unlocked only by your passkey (Face ID / Touch ID / security key). We never see it. Lose this device? Set up signing again on a new one. Your account keeps every public key, so old signatures stay verifiable.</strong></p>
     </div>
   </div>
   <hr class="acct-divider">
   <div class="acct-block">
-    <h3>Uw ondertekensleutel instellen</h3>
+    <h3>Set up your signing key</h3>
     <p class="small">
-      Uw ondertekensleutel wordt hier gemaakt, in deze browser, met ML-DSA-65 (post-quantum), en
-      alleen u hebt hem. U stelt hem in, en opent hem bij elke handtekening, met DEZELFDE
-      passkey waarmee u inlogt (Face ID, Touch ID of een beveiligingssleutel). Geen wachtwoordzin, geen extra
-      code: uw passkey is uw ondertekensleutel. Geen passkey in deze browser? U kunt nog steeds
-      ondertekenen via <a href="/sign">/sign</a> met de code uit uw authenticator-app.
+      Your signing key is created here, in this browser, with ML-DSA-65 (post-quantum), and
+      only you hold it. You set it up, and unlock it every time you sign, with the SAME
+      passkey you sign in with (Face ID, Touch ID, or a security key). No passphrase, no extra
+      code: your sign-in passkey is your signing key. No passkey on this browser? You can still
+      sign at <a href="/sign">/sign</a> with your authenticator code instead.
     </p>
     <div class="acct-field">
-      <input type="text" id="signing-enrol-label" maxlength="40" placeholder="Label (optioneel, bijvoorbeeld iPhone)" aria-label="Label (optioneel)" autocomplete="off">
+      <input type="text" id="signing-enrol-label" maxlength="40" placeholder="Label (optional, e.g. iPhone)" autocomplete="off">
       <div style="margin-top:10px">
-        <button type="button" class="btn btn-primary btn-small" id="signing-enrol-btn">Ondertekenen instellen met mijn passkey</button>
+        <button type="button" class="btn btn-primary btn-small" id="signing-enrol-btn">Set up signing with my passkey</button>
       </div>
     </div>
     <p id="signing-enrol-status" class="small" aria-live="polite" style="margin-top:8px"></p>
@@ -329,39 +329,39 @@ main.acct input::placeholder { color: var(--ink-3); }
 </section>
 
 <section class="acct-card">
-  <div class="acct-kicker">Actieve sessies &middot; ingelogde apparaten</div>
-  <h2>Actieve sessies.</h2>
+  <div class="acct-kicker">Active sessions &middot; devices signed in</div>
+  <h2>Active sessions.</h2>
   <div id="sessions-list"></div>
   <div class="acct-actions">
-    <button type="button" class="btn btn-secondary btn-small" id="sign-out-all">Overal uitloggen behalve hier</button>
-    <button type="button" class="btn btn-secondary btn-small" id="sign-out">Uitloggen (deze browser)</button>
+    <button type="button" class="btn btn-secondary btn-small" id="sign-out-all">Sign out everywhere except this session</button>
+    <button type="button" class="btn btn-secondary btn-small" id="sign-out">Sign out (this browser)</button>
   </div>
-  <p class="small mt-2">Uitloggen beëindigt de sessie op dat apparaat. Uw account blijft actief.</p>
+  <p class="small mt-2">Signing out clears the session on that device. Your account stays active.</p>
 </section>
 
 
 <section class="acct-card" id="appearance-section">
-  <div class="acct-kicker">Weergave &middot; licht en donker</div>
-  <h2>Weergave.</h2>
+  <div class="acct-kicker">Appearance &middot; light and dark</div>
+  <h2>Appearance.</h2>
   <p class="acct-lead">
-    Licht is de standaard en blijft zo tot u het hier wijzigt. Uw keuze wordt alleen in deze
-    browser bewaard en geldt voor de pagina's achter uw login: uw dashboard, ondertekenen,
-    versturen, deze pagina en de inlogschermen. De openbare pagina's blijven licht.
+    Light is the default and it stays light until you change it here. Your choice is kept in this
+    browser only, and it applies to the pages behind your sign-in: your dashboard, signing,
+    sending, this page and the sign-in screens. The public pages stay light.
   </p>
   <fieldset class="theme-choice" id="theme-choice">
-    <legend>Weergave</legend>
-    <label><input type="radio" name="appearance" value="auto"><span>Volg mijn systeem</span></label>
-    <label><input type="radio" name="appearance" value="light"><span>Licht</span></label>
-    <label><input type="radio" name="appearance" value="dark"><span>Donker</span></label>
+    <legend>Appearance</legend>
+    <label><input type="radio" name="appearance" value="auto"><span>Follow my system</span></label>
+    <label><input type="radio" name="appearance" value="light"><span>Light</span></label>
+    <label><input type="radio" name="appearance" value="dark"><span>Dark</span></label>
   </fieldset>
 </section>
 
 
 <section class="acct-card" id="billing-section">
-  <div class="acct-kicker">Plan en betalingen &middot; abonnement en geschiedenis</div>
-  <h2>Plan en betalingen.</h2>
+  <div class="acct-kicker">Plan &amp; billing &middot; subscription and history</div>
+  <h2>Plan &amp; billing.</h2>
 
-  <div id="billing-loading" style="color:var(--ink-dim);font-size:var(--text-sm)">Betaalstatus wordt geladen…</div>
+  <div id="billing-loading" style="color:var(--ink-dim);font-size:var(--text-sm)">Loading billing status…</div>
 
   <div id="billing-content" class="hidden">
     <!-- Shown by js/account.inline1.js only while the account pays for neither
@@ -369,15 +369,15 @@ main.acct input::placeholder { color: var(--ink-3); }
          business plans pay for it, and one link is the whole upgrade path. -->
     <div class="acct-plan-band free" id="billing-community" hidden>
       <p class="acct-plan-kicker">Community &middot; &euro;0</p>
-      <p class="acct-plan-lede">U gebruikt het Community-plan en dat blijft gratis. De zakelijke plannen betalen de servers en houden het zo.</p>
-      <p class="acct-plan-adds">Ze verhogen 2 handtekeningen per maand naar 100 of 1.000, houden links langer open, bewaren een overzicht van wat u verstuurde, geven u ondersteuning met een naam erbij, en een audittrail die u kunt exporteren en overdragen.</p>
-      <a class="acct-plan-cta" href="/pricing">Bekijk de zakelijke plannen &rarr;</a>
+      <p class="acct-plan-lede">You are on the Community plan and it stays free. The business plans pay for the servers and keep it that way.</p>
+      <p class="acct-plan-adds">They raise 2 signatures a month to 100 or 1,000, keep links open longer, keep a record of what you sent, give you support with a name on it, and an audit trail you can export and hand over.</p>
+      <a class="acct-plan-cta" href="/en/pricing">See the business plans &rarr;</a>
     </div>
     <!-- Shown on a paid plan. No link to a higher tier: a customer who pays is
          reading his own subscription, not an offer. -->
     <div class="acct-plan-band paid" id="billing-paid" hidden>
-      <p class="acct-plan-kicker">Uw plan &middot; actief</p>
-      <p class="acct-plan-lede">Dank u. Wat u betaalt, houdt het Community-plan gratis voor iedereen. Uw plan en de dag waarop de gekochte periode afloopt, staan hieronder.</p>
+      <p class="acct-plan-kicker">Your plan &middot; active</p>
+      <p class="acct-plan-lede">Thank you. What you pay is what keeps the Community plan free for everyone else. Your plan and the day the term you bought runs out are below.</p>
     </div>
     <!-- Shown by js/account.inline1.js from seven days before the bought term
          runs out. One-off payments mean there is nothing to cancel and nothing
@@ -385,13 +385,13 @@ main.acct input::placeholder { color: var(--ink-3); }
          moves by itself. -->
     <div class="plan-term-warn" id="billing-term-warn" role="status" hidden>
       <p class="plan-term-warn-text" data-term="text">&mdash;</p>
-      <a class="plan-term-warn-cta" href="/pricing">Verlengen</a>
+      <a class="plan-term-warn-cta" href="/en/pricing">Renew</a>
     </div>
     <div class="info-row">
-      <div class="info-label">Huidig plan</div>
+      <div class="info-label">Current plan</div>
       <div class="info-value">
         <span id="billing-plan">&mdash;</span>
-        <span id="billing-active-badge" class="plan-tier-active hidden">Actief</span>
+        <span id="billing-active-badge" class="plan-tier-active hidden">Active</span>
       </div>
     </div>
     <!-- The same fact in one line, whenever a term end is on record: before it,
@@ -403,17 +403,17 @@ main.acct input::placeholder { color: var(--ink-3); }
          (see /terms), so what a customer needs is the day access stops, not a
          collection date. The renewal note under it says so in words. -->
     <div class="info-row" id="billing-next-row" style="display:none">
-      <div class="info-label">Toegang tot</div>
+      <div class="info-label">Access until</div>
       <div class="info-value" id="billing-next">&mdash;</div>
     </div>
-    <p id="billing-renew-note" class="acct-note" hidden style="font-size:var(--text-sm);color:var(--ink-dim);margin-top:var(--space-2)">Dit is een eenmalige betaling voor de periode die u kocht. Er wordt niets vanzelf opnieuw afgeschreven. Koop voor deze datum een nieuwe periode om het plan door te laten lopen.</p>
+    <p id="billing-renew-note" class="acct-note" hidden style="font-size:var(--text-sm);color:var(--ink-dim);margin-top:var(--space-2)">This is a one-off payment for the term you bought. Nothing is collected again by itself. Buy another term before this date to keep the plan running.</p>
     <div class="info-row" id="billing-cancel-row" style="display:none">
-      <div class="info-label">Opzegging</div>
+      <div class="info-label">Cancellation</div>
       <div class="info-value" id="billing-cancel-date" style="color:var(--warn-ink)">&mdash;</div>
     </div>
     <div class="acct-actions">
-      <a href="/pricing" class="btn btn-secondary btn-small">Plannen bekijken</a>
-      <button id="billing-cancel-btn" class="btn btn-danger btn-small hidden">Plan opzeggen</button>
+      <a href="/en/pricing" class="btn btn-secondary btn-small">View plans</a>
+      <button id="billing-cancel-btn" class="btn btn-danger btn-small hidden">Cancel plan</button>
     </div>
 
     <!-- HAVE A CODE. The same form as the one on /pricing, driven by the same
@@ -423,14 +423,14 @@ main.acct input::placeholder { color: var(--ink-3); }
          leaves no invoice and no credit note, and the only thing it changes is
          the plan and the date above. See relay/lib/coupon.js. -->
     <form data-redeem-form class="acct-form" style="margin-top:var(--space-4)">
-      <p class="acct-plan-kicker" style="margin:0 0 8px">Hebt u een code?</p>
-      <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)">Een code geeft u een periode cadeau. Het is geen korting en geen betaling: er wordt niets afgeschreven, nu niet en later niet, en er is niets om op te zeggen. Loopt er al een betaalde periode, dan komt het cadeau daarna.</p>
+      <p class="acct-plan-kicker" style="margin:0 0 8px">Have a code?</p>
+      <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)">A code gives you a term as a gift. It is not a discount and not a payment: nothing is charged, now or later, and there is nothing to cancel. If you already have a paid term running, the gift is added after it.</p>
       <label class="acct-field">
-        <span class="acct-field-label">Uw code</span>
+        <span class="acct-field-label">Your code</span>
         <input type="text" name="code" data-redeem-input maxlength="32" autocomplete="off" autocapitalize="characters" spellcheck="false">
       </label>
       <div class="acct-actions">
-        <button type="submit" class="btn btn-secondary btn-small" data-redeem-submit>Code inwisselen</button>
+        <button type="submit" class="btn btn-secondary btn-small" data-redeem-submit>Redeem code</button>
         <span data-redeem-message role="status" hidden style="font-size:var(--text-sm);color:var(--ink-dim)"></span>
       </div>
     </form>
@@ -443,11 +443,11 @@ main.acct input::placeholder { color: var(--ink-3); }
          account is entitled; a free account gets 403 and sees nothing. The key
          is shown once and never stored here. -->
     <div id="parasign-api-block" hidden>
-      <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">API-sleutels voor ParaSign</h3>
-      <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)">Uw plan bevat de ParaSign-API, zodat ondertekenen in uw eigen software kan draaien. Een sleutel ziet u één keer, hier, en daarna niet meer. Kwijt? Maak dan een nieuwe. <a href="/docs#parasign-api" style="color:var(--cobalt)">Lees de documentatie</a>.</p>
-      <div id="parasign-api-list" style="font-size:var(--text-sm);color:var(--ink-dim)">Laden&hellip;</div>
+      <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">ParaSign API keys</h3>
+      <p style="font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)">Your plan includes the ParaSign API, so signing can run inside your own software. A key is shown once, here, and cannot be read again; make a new one if you lose it. <a href="/docs#parasign-api" style="color:var(--cobalt)">Read the documentation</a>.</p>
+      <div id="parasign-api-list" style="font-size:var(--text-sm);color:var(--ink-dim)">Loading&hellip;</div>
       <div class="acct-actions">
-        <button id="parasign-api-new" class="btn btn-secondary btn-small">Sleutel maken</button>
+        <button id="parasign-api-new" class="btn btn-secondary btn-small">Create a key</button>
       </div>
       <p id="parasign-api-fresh" hidden style="font-size:var(--text-sm);word-break:break-all;background:var(--surface-2);padding:var(--space-3);border-radius:6px;margin-top:var(--space-3)"></p>
       <p id="parasign-api-msg" role="status" hidden style="font-size:var(--text-sm);color:var(--ink-dim)"></p>
@@ -458,51 +458,51 @@ main.acct input::placeholder { color: var(--ink-3); }
          Mollie confirms the money, and every refund or chargeback gets a credit
          note with its own number that refers back to it. The list is read-only
          here: a document is never edited after it is issued. -->
-    <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Facturen en creditnota's</h3>
-    <div id="billing-invoices" style="font-size:var(--text-sm);color:var(--ink-dim)">Facturen worden geladen&hellip;</div>
+    <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Invoices and credit notes</h3>
+    <div id="billing-invoices" style="font-size:var(--text-sm);color:var(--ink-dim)">Loading invoices&hellip;</div>
 
     <hr class="acct-divider">
     <!-- What goes in the "Billed to" block. All three optional: without them a
          document is still issued to the email address on this account. -->
-    <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Bedrijfsgegevens voor facturen</h3>
+    <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Company details for invoices</h3>
     <p class="acct-note" style="font-size:var(--text-sm);color:var(--ink-dim);margin-bottom:var(--space-3)">
-      Optioneel. Vult u deze in, dan staan ze op elke factuur die vanaf nu wordt gemaakt. Facturen die er al zijn, houden de gegevens waarmee ze zijn gemaakt.
+      Optional. Fill these in and they appear on every invoice issued from now on. Invoices already issued keep the details they were issued with.
     </p>
     <form id="billing-profile-form" class="acct-form">
       <label class="acct-field">
-        <span class="acct-field-label">Bedrijfsnaam</span>
+        <span class="acct-field-label">Company name</span>
         <input type="text" id="billing-company" name="company" maxlength="120" autocomplete="organization">
       </label>
       <label class="acct-field">
-        <span class="acct-field-label">Adres</span>
+        <span class="acct-field-label">Address</span>
         <textarea id="billing-address" name="address" rows="3" maxlength="300" autocomplete="street-address"></textarea>
       </label>
       <label class="acct-field">
-        <span class="acct-field-label">Btw-nummer</span>
+        <span class="acct-field-label">VAT number</span>
         <input type="text" id="billing-vat" name="vat" maxlength="40">
       </label>
       <div class="acct-actions">
-        <button type="submit" class="btn btn-secondary btn-small" id="billing-profile-save">Bedrijfsgegevens opslaan</button>
+        <button type="submit" class="btn btn-secondary btn-small" id="billing-profile-save">Save company details</button>
         <span id="billing-profile-msg" style="font-size:var(--text-sm);color:var(--ink-dim)"></span>
       </div>
     </form>
 
     <hr class="acct-divider">
-    <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Betaalgeschiedenis</h3>
+    <h3 style="font-size:var(--text-sm);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:var(--space-3)">Billing history</h3>
     <!-- Payments, credit notes, the terms that ended and any plan change, in one
          list, newest first. Derived from the documents themselves, so it can
          never disagree with them. -->
-    <div id="billing-history" style="font-size:var(--text-sm);color:var(--ink-dim)">Betaalgeschiedenis wordt geladen&hellip;</div>
+    <div id="billing-history" style="font-size:var(--text-sm);color:var(--ink-dim)">Loading billing history&hellip;</div>
   </div>
 </section>
 
 <section class="acct-card danger">
-  <div class="acct-kicker">Account deactiveren &middot; blokkeert toegang voortaan</div>
-  <h2>Account deactiveren.</h2>
+  <div class="acct-kicker">Deactivate account &middot; blocks future access</div>
+  <h2>Deactivate account.</h2>
   <p class="acct-lead">
-    Hiermee deactiveert u uw account en werkt de API-sleutel niet meer. Uw sessies en de koppeling met uw authenticator-app worden verwijderd. Het accountrecord blijft bewaard.
+    Deactivates your account and makes its API key unusable. Your sessions and TOTP setup are removed. The account record is retained.
   </p>
-  <button type="button" class="btn btn-danger" id="delete-account">Account deactiveren</button>
+  <button type="button" class="btn btn-danger" id="delete-account">Deactivate account</button>
 </section>
 
 </div><!-- /state-account -->
@@ -521,9 +521,9 @@ main.acct input::placeholder { color: var(--ink-3); }
 <script type="module" src="/js/signing-enrol.js?v=15"></script>
 <script src="/js/account-theme.js?v=3" defer></script>
 
-<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/account" hreflang="en" lang="en">This page in English</a></p>
+<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/account" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
 <footer class="legal-strip">
-  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a>
+  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
 </footer>
 </body>
 </html>
