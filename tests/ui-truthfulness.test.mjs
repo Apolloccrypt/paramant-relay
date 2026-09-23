@@ -966,6 +966,9 @@ const visible = (file) => visible0(read(file));
 const { default: tiers } = await import('../relay/lib/tiers.js');
 const parasign = visible('frontend/parasign.html');
 const parasend = visible('frontend/parasend.html');
+// De Engelse kopie van /parasend. De Engelse pins hieronder gelden voor die
+// kopie, de Nederlandse voor /parasend zelf.
+const parasendEn = visible('frontend/en/parasend.html');
 const aboutVisible = visible('frontend/en/about.html');
 // pricingVisible above is the same page as markup; this is its plain text.
 const pricingText = visible('frontend/en/pricing.html');
@@ -980,10 +983,16 @@ const EU_CLAIM = 'Hetzner Germany, Bunny DNS (Slovenia). No US provider in the d
 // luiden: mail verhuisde in september 2026 van Resend (VS) naar Mailjet (FR).
 const EU_EXCEPTION = 'Email goes out via Mailjet';
 const homeVisible = visible('frontend/en/index.html');
-for (const [name, text] of [['index', homeVisible], ['parasign', parasign], ['parasend', parasend]]) {
+for (const [name, text] of [['index', homeVisible], ['parasign', parasign], ['en/parasend', parasendEn]]) {
   assert.ok(text.includes(EU_CLAIM), `${name}.html lost the data-path wording of the EU claim`);
   assert.ok(text.includes(EU_EXCEPTION), `${name}.html states the EU claim without naming the Resend exception`);
 }
+// /parasend is Nederlands sinds 23 september 2026: dezelfde claim, dezelfde
+// begrenzing tot de weg van de data, in de taal van de pagina.
+assert.ok(parasend.includes('Hetzner in Duitsland, Bunny DNS (Slovenië). Geen Amerikaanse partij in de weg van de data.'),
+  'parasend.html lost the data-path wording of the EU claim');
+assert.ok(parasend.includes('Mail gaat via Mailjet'),
+  'parasend.html states the EU claim without naming the Resend exception');
 // And it may not be offered against a source that does not carry it. The
 // Jurisdiction and privacy table on /security lists Hetzner Nuremberg, the legal
 // jurisdiction, the CLOUD Act row, retention, IP logging and analytics. Bunny is
@@ -994,13 +1003,13 @@ const securityJurisdiction = (read('frontend/en/security.html')
 assert.ok(securityJurisdiction, 'security.html must keep its Jurisdiction and privacy table');
 assert.ok(!/Bunny/i.test(securityJurisdiction),
   'the /security jurisdiction table now names Bunny; the product pages may point at it again');
-for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
+for (const [name, text] of [['parasign', parasign], ['parasend', parasend], ['en/parasend', parasendEn]]) {
   assert.doesNotMatch(text, /Bunny DNS[^.]*\.[^.]*\.[^.]*\.[^.]*jurisdiction table is on the/,
     `${name}.html sends the reader to the /security jurisdiction table for a claim that table does not carry`);
 }
 // The broader claim is the one section 9 of the guide holds open. It may stay
 // on /security, where the table qualifies it, and nowhere near a product hero.
-for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
+for (const [name, text] of [['parasign', parasign], ['parasend', parasend], ['en/parasend', parasendEn]]) {
   assert.doesNotMatch(text, /no US (company|provider) in the chain|no US company\b/i,
     `${name}.html claims more than the data path, which /privacy does not support`);
 }
@@ -1088,15 +1097,19 @@ for (const claim of [
 // Proof 3. The sentence the whole free-versus-paid split rests on. If the
 // pricing model ever gates cryptography behind a tier, this is what fails first.
 const SPLIT = 'Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.';
-for (const [name, text] of [['pricing', pricingText], ['parasign', parasign], ['parasend', parasend]]) {
+for (const [name, text] of [['pricing', pricingText], ['parasign', parasign], ['en/parasend', parasendEn]]) {
   assert.ok(text.includes(SPLIT), `${name}.html lost the pay-for-volume sentence`);
 }
+assert.ok(parasend.includes('Elk plan krijgt dezelfde versleuteling, dezelfde post-quantumhandtekeningen en hetzelfde openbare logboek. U betaalt voor volume, nooit voor veiligheid. En u betaalt per organisatie, niet per gebruiker.'),
+  'parasend.html lost the pay-for-volume sentence');
 // The other half of the split: the free plan is permanent, it is called
 // Community, and the reason it stays free is named in the same sentence.
 const FREE_FOREVER = 'not to unlock features, and that is what keeps the Community plan free';
-for (const [name, text] of [['pricing', pricingText], ['parasign', parasign], ['parasend', parasend]]) {
+for (const [name, text] of [['pricing', pricingText], ['parasign', parasign], ['en/parasend', parasendEn]]) {
   assert.ok(text.includes(FREE_FOREVER), `${name}.html lost the Community-plan promise`);
 }
+assert.ok(parasend.includes('niet om functies te ontgrendelen. Daardoor blijft het Community-plan gratis'),
+  'parasend.html lost the Community-plan promise');
 // /sign carries the same split in one line, next to the account requirement,
 // and it names the plan the way /pricing names it.
 assert.match(signVisibleText, /Community accounts sign 2 documents a month/,
@@ -1110,7 +1123,7 @@ assert.doesNotMatch(signVisibleText, /\bFree accounts\b|tier named Free|the tier
 // carries the line. The product pages name the company instead.
 const FOUNDER = 'Mick Beer, privacy and security researcher';
 assert.ok(aboutVisible.includes(FOUNDER), 'about.html must name the founder with his exact title');
-for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
+for (const [name, text] of [['parasign', parasign], ['parasend', parasend], ['en/parasend', parasendEn]]) {
   assert.ok(!text.includes('Mick Beer'),
     `${name}.html must not name the founder in its body copy; /about carries that line`);
   assert.ok(text.includes('Paramantis Solutions B.V.'),
@@ -1124,7 +1137,9 @@ const GIVE_BACK = 'The Community plan is his way of giving something back to soc
 assert.ok(aboutVisible.includes(GIVE_BACK), 'about.html lost the give-back sentence the product pages quote');
 // Mick, 4 September: parasend states the same promise without the person, since
 // "his" has nothing to point at once the name is gone.
-assert.ok(parasend.includes('The Community plan is free and stays free; the business plans pay for the servers and keep it that way.'),
+assert.ok(parasendEn.includes('The Community plan is free and stays free; the business plans pay for the servers and keep it that way.'),
+  'en/parasend.html must keep the promise that the free plan stays free and say what pays for it');
+assert.ok(parasend.includes('Het Community-plan is gratis en blijft gratis. De zakelijke plannen betalen de servers en houden dat zo.'),
   'parasend.html must keep the promise that the free plan stays free and say what pays for it');
 
 // The limits, stated in the same voice as the promises. Both already shipped
@@ -1143,11 +1158,25 @@ assert.ok(visible0(parasignHero).includes('legal, finance and healthcare practic
 assert.ok(visible0(parasignHero).includes(`${tiers.tierLimit('community', 'signs_month')} signatures a month`),
   'the free promise in the /parasign hero must carry the number tiers.js enforces');
 const parasendHero = read('frontend/parasend.html').split('<section class="ps-band"')[0];
-const communityHeroFacts = [
+const parasendEnHero = read('frontend/en/parasend.html').split('<section class="ps-band"')[0];
+for (const fact of [
   `${tiers.tierLimit('community', 'transfers_month')} transfers a month`,
   `${tiers.tierLimit('community', 'file_mb')} MB a file`,
   `links that last an hour`,
   `gone after one read`,
+]) {
+  assert.ok(visible0(parasendEnHero).includes(fact),
+    `the free promise in the /en/parasend hero must carry the limit tiers.js enforces: ${fact}`);
+}
+assert.doesNotMatch(visible0(parasendEnHero), /uploads (per|an) hour/i,
+  'the /en/parasend hero states the deprecated anon-endpoint rate as if it were a plan limit');
+assert.ok(visible0(parasendEnHero).includes('For offices that email client documents'),
+  '/en/parasend must name who it is for in the first screen');
+const communityHeroFacts = [
+  `${tiers.tierLimit('community', 'transfers_month')} verzendingen per maand`,
+  `${tiers.tierLimit('community', 'file_mb')} MB per bestand`,
+  `links die een uur geldig zijn`,
+  `na één keer lezen weg`,
 ];
 for (const fact of communityHeroFacts) {
   assert.ok(visible0(parasendHero).includes(fact),
@@ -1155,19 +1184,20 @@ for (const fact of communityHeroFacts) {
 }
 assert.ok(tiers.tierLimit('community', 'view_ttl_ms') === 3_600_000 && tiers.tierLimit('community', 'max_views') === 1,
   'the one-hour, one-read wording in the /parasend hero no longer matches tiers.js');
-assert.doesNotMatch(visible0(parasendHero), /uploads (per|an) hour/i,
+assert.doesNotMatch(visible0(parasendHero), /uploads (per|an) hour|uploads per uur/i,
   'the /parasend hero states the deprecated anon-endpoint rate as if it were a plan limit');
-assert.ok(visible0(parasendHero).includes('For offices that email client documents'),
+assert.ok(visible0(parasendHero).includes('Voor kantoren die nu klantdossiers'),
   '/parasend must name who it is for in the first screen');
 
 const NO_CERT = 'Paramant does not hold third-party certification for these frameworks.';
 assert.ok(pricing.includes(NO_CERT), 'pricing.html lost the certification limit');
-assert.ok(parasend.includes(NO_CERT), 'parasend.html quotes the compliance documentation, so it must carry its limit');
+assert.ok(parasendEn.includes(NO_CERT), 'en/parasend.html quotes the compliance documentation, so it must carry its limit');
+assert.ok(parasend.includes('Paramant heeft voor deze kaders geen certificering door een derde.'), 'parasend.html quotes the compliance documentation, so it must carry its limit');
 
 // A product page must not claim the identity or legal effect that /sign is
 // already forbidden from claiming. Same overclaim, wider surface.
-for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
-  assert.doesNotMatch(text, /identity verified|verified signer|signer verified|legally binding/i,
+for (const [name, text] of [['parasign', parasign], ['parasend', parasend], ['en/parasend', parasendEn]]) {
+  assert.doesNotMatch(text, /identity verified|verified signer|signer verified|legally binding|identiteit geverifieerd|geverifieerde ondertekenaar|juridisch bindend/i,
     `${name}.html must not claim a verified identity or legal effect it cannot deliver`);
 }
 
@@ -1199,14 +1229,16 @@ assert.equal(shareKem, 'ML-KEM-768 + ECDH P-256', 'the ParaShare KEM in the regi
 // name is what stopped this file parsing on main, so nothing here reaches it.
 (function registerSignatureWording() {
   const SIG_ON_PAGE = {
-    'n/a': { parasend: 'signature n/a', pricing: 'no default signature algorithm' },
-    'ML-DSA-65': { parasend: 'signature ML-DSA-65', pricing: 'ML-DSA-65 as its default signature algorithm' },
+    'n/a': { parasend: 'handtekening n.v.t.', parasendEn: 'signature n/a', pricing: 'no default signature algorithm' },
+    'ML-DSA-65': { parasend: 'handtekening ML-DSA-65', parasendEn: 'signature ML-DSA-65', pricing: 'ML-DSA-65 as its default signature algorithm' },
   };
   const wanted = SIG_ON_PAGE[shareSig];
   assert.ok(wanted,
     `crypto-agility.html now gives ParaShare (webapp) SIG "${shareSig}". /parasend and /pricing both ` +
     `describe that column in words, and this test has no wording for the new value, so update both ` +
     `pages and SIG_ON_PAGE together.`);
+  assert.ok(parasendEn.includes(wanted.parasendEn),
+    `the register gives ParaShare (webapp) SIG "${shareSig}", so /en/parasend must say "${wanted.parasendEn}"`);
   assert.ok(parasend.includes(wanted.parasend),
     `the register gives ParaShare (webapp) SIG "${shareSig}", so /parasend must say "${wanted.parasend}"`);
   assert.ok(pricing.includes(wanted.pricing),
@@ -1215,19 +1247,27 @@ assert.equal(shareKem, 'ML-KEM-768 + ECDH P-256', 'the ParaShare KEM in the regi
   // does not give the webapp.
   for (const [sig, wording] of Object.entries(SIG_ON_PAGE)) {
     if (sig === shareSig) continue;
+    assert.ok(!parasendEn.includes(wording.parasendEn),
+      `/en/parasend describes ParaShare as "${wording.parasendEn}" while the register says "${shareSig}"`);
     assert.ok(!parasend.includes(wording.parasend),
       `/parasend describes ParaShare as "${wording.parasend}" while the register says "${shareSig}"`);
     assert.ok(!pricing.includes(wording.pricing),
       `/pricing describes ParaShare as "${wording.pricing}" while the register says "${shareSig}"`);
   }
 })();
-assert.ok(parasend.includes(`the webapp on the ${shareWire} wire`),
+assert.ok(parasendEn.includes(`the webapp on the ${shareWire} wire`),
+  '/en/parasend must state the wire format the register gives the webapp, not a better one');
+assert.ok(parasend.includes(`de webapp op het ${shareWire}-formaat`),
   '/parasend must state the wire format the register gives the webapp, not a better one');
 if (shareSig !== 'ML-DSA-65') {
-  assert.doesNotMatch(parasend, /ParaShare[^.]*ML-DSA-65 signed receipts/,
+  assert.doesNotMatch(parasendEn, /ParaShare[^.]*ML-DSA-65 signed receipts/,
+    'the register gives ParaShare no signature, so /en/parasend may not sell it ML-DSA-65 signed receipts');
+  assert.doesNotMatch(parasend, /ParaShare[^.]*ML-DSA-65 signed receipts|ParaShare[^.]*ondertekende ontvangstbewijzen/,
     'the register gives ParaShare no signature, so /parasend may not sell it ML-DSA-65 signed receipts');
 }
-assert.doesNotMatch(parasend, /proof that the file came from you/,
+assert.doesNotMatch(parasendEn, /proof that the file came from you/,
+  '/en/parasend may not promise sender proof on a path the register gives no signature');
+assert.doesNotMatch(parasend, /proof that the file came from you|bewijs dat het bestand van u (komt|kwam)/,
   '/parasend may not promise sender proof on a path the register gives no signature');
 
 // Tone, section 6 of the guide. We have no testimonials, no customer logos and
@@ -1237,7 +1277,7 @@ assert.doesNotMatch(parasend, /proof that the file came from you/,
 // sentence these pages quote ("not to unlock features"), so banning it would
 // fail on shipped copy the guide itself pins.
 const BANNED = /revolutionary|seamless|cutting-edge|enterprise-grade|military-grade|trusted by|world-class|effortless|next-generation|empower|journey/i;
-for (const [name, text] of [['parasign', parasign], ['parasend', parasend]]) {
+for (const [name, text] of [['parasign', parasign], ['parasend', parasend], ['en/parasend', parasendEn]]) {
   assert.doesNotMatch(text, BANNED, `${name}.html uses vocabulary the messaging guide bans`);
 }
 
@@ -2128,9 +2168,26 @@ console.log('ui-truthfulness: the appearance switch says only what theme.js and 
 // step, and this block goes red.
 (() => {
   const parashare = read('frontend/parashare.html');
+  const parashareEn = read('frontend/en/parashare.html');
   const psJs = read('frontend/js/parashare.page.js');
 
-  assert.match(parashare, /The person you send to has to be online while you send; you confirm a short code together\./,
+  assert.match(parashareEn, /The person you send to has to be online while you send; you confirm a short code together\./,
+    '/en/parashare must say above step 1 that the receiver has to be there; a sender should not discover a live handshake on step 2');
+  assert.match(parashareEn, /id="ps-mode-live"[^>]*aria-checked="true"/,
+    '/en/parashare: the live stand must be the one selected on arrival');
+  assert.match(psJs, /does not have to be online/,
+    'the English "Send a link" stand must say the receiver does not have to be online; that is the whole reason it exists');
+  assert.match(parashareEn, /Compare this code together/,
+    '/en/parashare: the card where the two of you compare must be named after what it asks you to do');
+  {
+    const setupAt = parashareEn.indexOf('id="step-setup"');
+    const noteAt = parashareEn.indexOf('The person you send to has to be online');
+    const kiezerAt = parashareEn.indexOf('id="file-input"');
+    assert.ok(setupAt > 0 && noteAt > setupAt && kiezerAt > noteAt,
+      '/en/parashare: the sentence must stand inside #step-setup and above the file picker');
+  }
+
+  assert.match(parashare, /De ontvanger moet online zijn terwijl u verstuurt\. U controleert samen een korte controlecode\./,
     '/parashare must say above step 1 that the receiver has to be there; a sender should not discover a live handshake on step 2');
 
   // The sentence above became a sentence about ONE of two stands the moment
@@ -2149,12 +2206,12 @@ console.log('ui-truthfulness: the appearance switch says only what theme.js and 
     'the "Send a link" stand must not be pre-selected while the live sentence stands above step 1');
   assert.match(psJs, /note\.textContent = \(sendMode === 'link'\)/,
     'setSendMode no longer swaps the live-handshake sentence; choosing "Send a link" would leave a promise on screen that that stand does not keep');
-  assert.match(psJs, /does not have to be online/,
+  assert.match(psJs, /hoeft niet online te zijn/,
     'the "Send a link" stand must say the receiver does not have to be online; that is the whole reason it exists');
   // Above step 1 means above it, not somewhere on the page: the sentence has to
   // sit before the step-1 guide inside #step-setup.
   const setupAt = parashare.indexOf('id="step-setup"');
-  const noteAt = parashare.indexOf('The person you send to has to be online');
+  const noteAt = parashare.indexOf('De ontvanger moet online zijn');
   // De bovengrens was "Step 1 of 5", en die tekst is weg: de stepper telde
   // stappen mee die in de link-stand niet bestaan, en werd weggehaald toen dat
   // scherm te vol bleek. De eis eronder is niet veranderd -- de zin moet boven
@@ -2181,7 +2238,7 @@ console.log('ui-truthfulness: the appearance switch says only what theme.js and 
   // Claim 2: there really is a short code, and both sides work it out.
   assert.match(psJs, /async function genFingerprint\(/,
     'the short code the sentence promises is genFingerprint; without it the sentence describes nothing');
-  assert.match(parashare, /Compare this code together/,
+  assert.match(parashare, /Vergelijk deze controlecode samen/,
     'the card where the two of you compare must be named after what it asks you to do');
   assert.match(read('frontend/js/ontvang.page.js'), /genFingerprint|fp-display/,
     'the receiver side must compute a code too, otherwise "together" is one-sided');

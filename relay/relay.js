@@ -274,18 +274,50 @@ function modeAllows(p) {
 // from a phishing attempt, and a corporate spam filter will treat it as one.
 // Answering both costs three lines and is the difference between a document
 // that arrives and a ticket at somebody's IT desk.
-function VOET(wie, antwoordAdres) {
+function VOET(wie, antwoordAdres, taal) {
   const wieHtml = escHtml(wie || '');
-  return '<hr style="border:0;border-top:1px solid #e3e7e9;margin:22px 0 12px">'
-       + '<p style="color:#8a949a;font-size:12px;line-height:1.6;margin:0">'
-       + 'You are getting this because ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
+  const nl = 'U krijgt dit bericht omdat ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
+                                                   : 'een klant van Paramant')
+       + ' uw adres heeft ingevuld. Paramant vervoert het bestand versleuteld en '
+       + 'kan het zelf niet openen.'
+       + (antwoordAdres ? '<br>Beantwoord deze mail om de afzender direct te bereiken.' : '');
+  const en = 'You are getting this because ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
                                                    : 'a Paramant customer')
        + ' entered your address. Paramant carries the file in encrypted form and '
        + 'cannot open it.'
-       + (antwoordAdres ? '<br>Reply to this mail to reach them directly.' : '')
-       + '<br>Paramantis Solutions B.V., Harderwijk, the Netherlands &middot; '
+       + (antwoordAdres ? '<br>Reply to this mail to reach them directly.' : '');
+  const tekst = taal === 'en' ? en
+              : taal === 'nl' ? nl
+              : nl + '<br><br><span lang="en">' + en + '</span>';
+  return '<hr style="border:0;border-top:1px solid #e3e7e9;margin:22px 0 12px">'
+       + '<p style="color:#8a949a;font-size:12px;line-height:1.6;margin:0">'
+       + tekst
+       + '<br>Paramantis Solutions B.V., Harderwijk' + (taal === 'en' ? ', the Netherlands' : '')
+       + ' &middot; '
        + '<a href="https://paramant.app/privacy" style="color:#8a949a">privacy</a>'
        + '</p>';
+}
+
+// The language of a mail to a recipient. The sending page passes the language
+// it was shown in ('nl' or 'en'); a send without one gets Dutch with the
+// English text underneath, so a recipient abroad is never left with a mail
+// they cannot read.
+function mailTaal(waarde) {
+  return waarde === 'nl' || waarde === 'en' ? waarde : '';
+}
+function tweetaligTekst(taal, nl, en) {
+  if (taal === 'en') return en;
+  if (taal === 'nl') return nl;
+  return nl + '\n\n-- English --\n\n' + en;
+}
+function tweetaligHtml(taal, nl, en) {
+  if (taal === 'en') return en;
+  if (taal === 'nl') return nl;
+  return nl + '<hr style="border:0;border-top:1px solid #e3e7e9;margin:22px 0 12px">'
+       + '<div lang="en">' + en + '</div>';
+}
+function mailDatum(ms, taal, opties) {
+  return new Date(ms).toLocaleString(taal === 'en' ? 'en-GB' : 'nl-NL', opties);
 }
 
 // Which sector an account lives on, from its key label -- the same derivation
@@ -4754,7 +4786,7 @@ async function handleRelayRequest(req, res) {
         ttlMs: input.ttl_ms, filename: input.filename, accountId: acctOf(apiKey),
         // From the key record, never from the request: a sender may not choose
         // whose name appears above a mail thirty strangers receive.
-        sender: { naam: kd.label || '', email: kd.email || '' },
+        sender: { naam: kd.label || '', email: kd.email || '', taal: mailTaal(input.lang) },
       });
       if (!made.ok) {
         // No send, no mail, so the seats go back. Otherwise a sender who trips
@@ -4784,8 +4816,10 @@ async function handleRelayRequest(req, res) {
       for (const h of hashes) blobDrop(h);
 
       const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
-      const tot = new Date(made.expires_at).toLocaleString('en-GB',
-        { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+      const taal = mailTaal(input.lang);
+      const _totOpt = { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' };
+      const tot = mailDatum(made.expires_at, 'nl', _totOpt);
+      const totEn = mailDatum(made.expires_at, 'en', _totOpt);
       // Escaped: this name is chosen by the sender and lands in the HTML of up
       // to thirty mails from paramant.app to people who are not our customers.
       // An unescaped one could carry a link or a tracking pixel of its own.
@@ -4816,7 +4850,7 @@ async function handleRelayRequest(req, res) {
         .replace(/\b(?:https?:\/\/|www\.)\S*/gi, '[link]')
         .replace(/\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/gi, '[adres]')
         .trim()
-        .slice(0, 120)) || 'a file';
+        .slice(0, 120)) || (taal === 'en' ? 'a file' : 'een bestand');
       const naam = escHtml(naamRuw);
       // The human above the mail. Thirty people who are not our customers get
       // this, and a message with no sender in it reads as phishing no matter
@@ -4828,7 +4862,9 @@ async function handleRelayRequest(req, res) {
       // receives a confidential document is not for the group to know.
       const sector = sectorOfKey(kd);
       for (const [adres, token] of Object.entries(made.tokens)) {
-        const link = base + '/ontvang/' + encodeURIComponent(token)
+        // An English send lands on the English page. Every other link stays on
+        // the Dutch path, which is also where mails sent before 23-09 point.
+        const link = base + (taal === 'en' ? '/en' : '') + '/ontvang/' + encodeURIComponent(token)
                    + '?r=' + encodeURIComponent(sector);
         // await, so `invited` counts what a provider accepted instead of how
         // often we tried. A 201 saying "invited: 30" while nothing arrived is
@@ -4837,27 +4873,50 @@ async function handleRelayRequest(req, res) {
           to: adres,
           from: mailer.afzenderNamens(undefined, wieRuw),
           replyTo: kd.email || undefined,
-          subject: wieRuw ? wieRuw + ' sent you a file' : 'A file is waiting for you',
+          subject: taal === 'en'
+            ? (wieRuw ? wieRuw + ' sent you a file' : 'A file is waiting for you')
+            : (wieRuw ? wieRuw + ' heeft u een bestand gestuurd' : 'Er staat een bestand voor u klaar'),
           // The plain-text half takes the unescaped name: HTML entities in a
           // text mail read as noise, and there is nothing to inject into.
-          text: (wieRuw ? wieRuw + ' sent you a file through Paramant.' : 'A file is waiting for you.')
+          text: tweetaligTekst(taal,
+                (wieRuw ? wieRuw + ' heeft u via Paramant een bestand gestuurd.' : 'Er staat een bestand voor u klaar.')
               + '\n\n' + naamRuw + '\n\n' + link
+              + '\n\nDeze link is alleen voor u en werkt één keer. Als u hem opent, sturen we een '
+              + 'korte controlecode naar dit adres. Zo kan alleen wie deze mailbox leest het '
+              + 'bestand ophalen. Beschikbaar tot ' + tot + '.'
+              + '\n\nU krijgt dit bericht omdat ' + (wieRuw || 'een klant van Paramant')
+              + ' uw adres heeft ingevuld. Paramant vervoert het bestand, maar kan het niet openen.'
+              + (kd.email ? '\nBeantwoord deze mail om de afzender direct te bereiken.' : ''),
+                (wieRuw ? wieRuw + ' sent you a file through Paramant.' : 'A file is waiting for you.')
+              + (taal === 'en' ? '\n\n' + naamRuw + '\n\n' + link : '\n\nUse the link above.')
               + '\n\nThe link is yours alone and works once. Opening it sends a short code '
               + 'to this address, so only somebody who can read this mailbox can collect the '
-              + 'file. Available until ' + tot + '.'
+              + 'file. Available until ' + totEn + '.'
               + '\n\nYou are getting this because ' + (wieRuw || 'a Paramant customer')
               + ' entered your address. Paramant carries the file; we cannot open it.'
-              + (kd.email ? '\nReply to this mail to reach them directly.' : ''),
-          html: '<p>' + (wie ? '<strong>' + wie + '</strong> sent you a file through Paramant.'
-                             : 'A file is waiting for you.') + '</p>'
+              + (kd.email ? '\nReply to this mail to reach them directly.' : '')),
+          html: tweetaligHtml(taal,
+                '<p>' + (wie ? '<strong>' + wie + '</strong> heeft u via Paramant een bestand gestuurd.'
+                             : 'Er staat een bestand voor u klaar.') + '</p>'
               + '<p style="font-weight:600">' + naam + '</p>'
               + '<p><a href="' + link + '" style="display:inline-block;padding:11px 18px;'
               + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">'
-              + 'Open the file</a></p>'
+              + 'Bestand openen</a></p>'
+              + '<p style="color:#666;font-size:13px">Deze link is alleen voor u en werkt één keer. '
+              + 'Als u hem opent, sturen we een korte controlecode naar dit adres. Zo kan alleen '
+              + 'wie deze mailbox leest het bestand ophalen.<br>Beschikbaar tot ' + tot + '.</p>',
+                '<p>' + (wie ? '<strong>' + wie + '</strong> sent you a file through Paramant.'
+                             : 'A file is waiting for you.') + '</p>'
+              + (taal === 'en'
+                  ? '<p style="font-weight:600">' + naam + '</p>'
+                  + '<p><a href="' + link + '" style="display:inline-block;padding:11px 18px;'
+                  + 'border-radius:6px;background:#0f5f6b;color:#fff;text-decoration:none">'
+                  + 'Open the file</a></p>'
+                  : '<p>Use the button above to open the file.</p>')
               + '<p style="color:#666;font-size:13px">This link is yours alone and works once. '
               + 'Opening it sends a short code to this address, so only somebody who can read '
-              + 'this mailbox can collect the file.<br>Available until ' + tot + '.</p>'
-              + VOET(wieRuw, kd.email),
+              + 'this mailbox can collect the file.<br>Available until ' + totEn + '.</p>')
+              + VOET(wieRuw, kd.email, taal),
         });
         if (bezorgd && bezorgd.ok) gemaild += 1;
         else log('warn', 'invitation_failed', { reason: bezorgd && bezorgd.reason });
@@ -4981,26 +5040,41 @@ async function handleRelayRequest(req, res) {
         res.writeHead(out.reason === 'reminder_limit' ? 429 : 409);
         return res.end(J({ error: out.reason, limit: out.limit }));
       }
-      const tot = new Date(out.expires_at || Date.now()).toLocaleString('en-GB',
-        { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
-          timeZone: 'Europe/Amsterdam', timeZoneName: 'short' });
+      const taal3 = mailTaal(out.lang);
+      const _remOpt = { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit',
+                        minute: '2-digit', timeZone: 'Europe/Amsterdam', timeZoneName: 'short' };
+      const tot = mailDatum(out.expires_at || Date.now(), 'nl', _remOpt);
+      const totEn = mailDatum(out.expires_at || Date.now(), 'en', _remOpt);
       // Awaited, so the dashboard's "reminder sent" is about what happened.
       const wie3 = mailer.veiligeNaam(out.sender_name || '');
       const bezorgd = await mailer.stuur({
         to: out.email,
         from: mailer.afzenderNamens(undefined, wie3),
         replyTo: out.sender_email || undefined,
-        subject: wie3 ? 'A reminder from ' + wie3 + ': your file is still waiting'
-                      : 'A reminder: a file is still waiting for you',
-        text: 'A file is still waiting for you.\n\nUse the link in the earlier mail '
+        subject: taal3 === 'en'
+          ? (wie3 ? 'A reminder from ' + wie3 + ': your file is still waiting'
+                  : 'A reminder: a file is still waiting for you')
+          : (wie3 ? 'Herinnering van ' + wie3 + ': uw bestand staat nog klaar'
+                  : 'Herinnering: er staat nog een bestand voor u klaar'),
+        text: tweetaligTekst(taal3,
+              'Er staat nog een bestand voor u klaar.\n\nGebruik de link uit de eerdere mail '
+            + 'van Paramant. Die werkt nog en is nog steeds alleen voor u. '
+            + 'Beschikbaar tot ' + tot + '.',
+              'A file is still waiting for you.\n\nUse the link in the earlier mail '
             + 'from Paramant; it still works and it is still yours alone. '
-            + 'Available until ' + tot + '.',
-        html: '<p>A file is still waiting for you.</p>'
+            + 'Available until ' + totEn + '.'),
+        html: tweetaligHtml(taal3,
+              '<p>Er staat nog een bestand voor u klaar.</p>'
+            + '<p>Gebruik de link uit de eerdere mail van Paramant. Die werkt nog '
+            + 'en is nog steeds alleen voor u.</p>'
+            + '<p style="color:#666;font-size:13px">Beschikbaar tot ' + escHtml(tot) + '. '
+            + 'Kunt u die mail niet vinden? Vraag de afzender het bestand opnieuw te sturen.</p>',
+              '<p>A file is still waiting for you.</p>'
             + '<p>Use the link in the earlier mail from Paramant. It still works, '
             + 'and it is still yours alone.</p>'
-            + '<p style="color:#666;font-size:13px">Available until ' + escHtml(tot) + '. '
-            + 'Cannot find that mail? Ask the sender to send the file again.</p>'
-            + VOET(wie3, out.sender_email),
+            + '<p style="color:#666;font-size:13px">Available until ' + escHtml(totEn) + '. '
+            + 'Cannot find that mail? Ask the sender to send the file again.</p>')
+            + VOET(wie3, out.sender_email, taal3),
       });
       if (!bezorgd || !bezorgd.ok) {
         log('warn', 'reminder_not_mailed', { id: sendId, reason: bezorgd && bezorgd.reason });
@@ -6863,24 +6937,42 @@ async function handleRelayRequest(req, res) {
       // reliable way to make a legitimate code look like a scam.
       const wie2 = mailer.veiligeNaam(vraag.sender_name || '');
       const bestand2 = escHtml(String(vraag.filename || '').slice(0, 120));
+      const taal2 = mailTaal(vraag.lang);
       const bezorgd = await mailer.stuur({
         to: vraag.email,
         from: mailer.afzenderNamens(undefined, wie2),
         replyTo: vraag.sender_email || undefined,
-        subject: 'Your code to open the file',
-        text: 'Your code is ' + vraag.code + '. It works for ' + minuten + ' minutes.'
+        subject: taal2 === 'en' ? 'Your code to open the file'
+                                : 'Uw controlecode om het bestand te openen',
+        text: tweetaligTekst(taal2,
+              'Uw controlecode is ' + vraag.code + '. Hij werkt ' + minuten + ' minuten.'
+            + (vraag.filename ? '\n\nHij opent: ' + vraag.filename : '')
+            + (wie2 ? '\nGestuurd door ' + wie2 + ' via Paramant.' : '')
+            + '\n\nHeeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders uw link. '
+            + 'Geef de code niet door en laat het de afzender weten.',
+              'Your code is ' + vraag.code + '. It works for ' + minuten + ' minutes.'
             + (vraag.filename ? '\n\nIt opens: ' + vraag.filename : '')
             + (wie2 ? '\nSent to you by ' + wie2 + ' through Paramant.' : '')
             + '\n\nIf you did not just ask for this code, somebody else has your link. '
-            + 'Do not pass the code on, and let the sender know.',
-        html: '<p>Your code to open the file:</p>'
+            + 'Do not pass the code on, and let the sender know.'),
+        html: tweetaligHtml(taal2,
+              '<p>Uw controlecode om het bestand te openen:</p>'
             + '<p style="font:600 28px/1.2 monospace;letter-spacing:.14em">' + vraag.code + '</p>'
+            + (bestand2 ? '<p style="color:#666;font-size:13px">Hij opent: <strong>'
+                          + bestand2 + '</strong></p>' : '')
+            + '<p style="color:#666;font-size:13px">Hij werkt ' + minuten
+            + ' minuten.<br>Heeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders '
+            + 'uw link. Geef de code niet door en laat het de afzender weten.</p>',
+              '<p>Your code to open the file' + (taal2 === 'en' ? ':' : ' is the one above.') + '</p>'
+            + (taal2 === 'en'
+                ? '<p style="font:600 28px/1.2 monospace;letter-spacing:.14em">' + vraag.code + '</p>'
+                : '')
             + (bestand2 ? '<p style="color:#666;font-size:13px">It opens: <strong>'
                           + bestand2 + '</strong></p>' : '')
             + '<p style="color:#666;font-size:13px">It works for ' + minuten
             + ' minutes.<br>If you did not just ask for this code, somebody else has your '
-            + 'link. Do not pass the code on, and let the sender know.</p>'
-            + VOET(wie2, vraag.sender_email),
+            + 'link. Do not pass the code on, and let the sender know.</p>')
+            + VOET(wie2, vraag.sender_email, taal2),
       });
       if (!bezorgd || !bezorgd.ok) {
         log('warn', 'pickup_code_not_mailed', { reason: bezorgd && bezorgd.reason });

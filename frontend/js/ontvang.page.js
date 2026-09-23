@@ -8,6 +8,80 @@ const RELAY_SECTORS = {
   iot:     'https://iot.paramant.app',
 };
 
+// Two languages, one file. The page says which one it is in <html lang>:
+// /ontvang is Dutch, /en/ontvang is English.
+const LANG = (document.documentElement.lang || 'nl').slice(0, 2) === 'en' ? 'en' : 'nl';
+const T = {
+  nl: {
+    badLink: 'Deze link is ongeldig of onvolledig.',
+    libFail: 'De versleuteling kon niet laden. Ververs de pagina en probeer het opnieuw. Ga niet verder zonder deze versleuteling.',
+    restoring: 'Sleutels worden hersteld...',
+    genKem: 'Sleutels worden gemaakt (ML-KEM-768)...',
+    genEcdh: 'Sleutels worden gemaakt (ECDH P-256)...',
+    keysReady: 'Sleutels klaar. Verbinding maken...',
+    inUse: 'Deze link is al in gebruik. Vraag de afzender om een nieuwe.',
+    waitFp: 'Klaar. Wacht tot de afzender de controlecode bevestigt.',
+    fpOkTitle: 'Controlecode bevestigd. Bestand komt binnen...',
+    fpOkStatus: 'De afzender heeft de controlecode bevestigd. Het bestand wordt voor u verzegeld.',
+    peerLeft: 'De verbinding met de afzender is verbroken.',
+    keygenFail: 'Sleutels maken is mislukt: ',
+    dlChunk: (i, n) => `Deel ${i} van ${n} wordt gedownload...`,
+    notAnnounced: (i) => 'Deel ' + i + ' is nooit door de afzender aangemeld',
+    dlFail: (i, st) => 'Downloaden van deel ' + i + ' is mislukt (' + st + '). Het is verlopen of al opgehaald.',
+    decChunk: (i, n) => `Deel ${i} van ${n} wordt ontsleuteld...`,
+    bridge: 'De versleuteling is nog niet klaar',
+    saving: 'Bestand wordt opgeslagen...',
+    haveFile: 'U hebt het bestand.',
+    savedLine: (name) => name + ' staat op uw apparaat. Onze kopie is voorgoed vernietigd.',
+    decFail: 'Ontsleutelen is mislukt: ',
+    vaultRecv: (n) => 'Map wordt ontvangen: ' + n + ' bestanden...',
+    vaultStep: (i, n) => 'Map: ' + i + ' van ' + n + ' gedownload',
+    haveFiles: 'U hebt de bestanden.',
+    savedFiles: (n) => n + ' bestanden staan op uw apparaat. Onze kopieën zijn voorgoed vernietigd.',
+    burnLine: (b) => 'blok ' + b.chunk + '  hash ' + b.hash + '...  gewist ' + b.ts,
+  },
+  en: {
+    badLink: 'Invalid or missing session token',
+    libFail: 'ML-KEM-768 library failed to load. Refresh the page and try again. Do not proceed without post-quantum encryption.',
+    restoring: 'Restoring keypair...',
+    genKem: 'Generating ML-KEM-768 keypair...',
+    genEcdh: 'Generating ECDH P-256 keypair...',
+    keysReady: 'Keypair ready - connecting to relay...',
+    inUse: 'This link is already in use. Ask the sender for a new one.',
+    waitFp: 'Ready - waiting for sender to verify fingerprint',
+    fpOkTitle: 'Fingerprint confirmed - receiving file...',
+    fpOkStatus: 'Sender confirmed fingerprint - file is being encrypted for you',
+    peerLeft: 'Sender disconnected',
+    keygenFail: 'Keypair generation failed: ',
+    dlChunk: (i, n) => `Downloading chunk ${i}/${n}...`,
+    notAnnounced: (i) => 'Chunk ' + i + ' was never announced by the sender',
+    dlFail: (i, st) => 'Download failed for chunk ' + i + ': ' + st + ' - blob expired or already burned',
+    decChunk: (i, n) => `Decrypting chunk ${i}/${n} with ML-KEM-768...`,
+    bridge: 'WASM crypto bridge not ready',
+    saving: 'Saving file...',
+    haveFile: 'You have the file.',
+    savedLine: (name) => name + ' is saved on your device. Our copy has been permanently destroyed.',
+    decFail: 'Decryption failed: ',
+    vaultRecv: (n) => 'Receiving vault \u2014 ' + n + ' files...',
+    vaultStep: (i, n) => 'Vault: ' + i + '/' + n + ' downloaded',
+    haveFiles: 'You have the files.',
+    savedFiles: (n) => n + ' files are saved on your device. Our copies have been permanently destroyed.',
+    burnLine: (b) => 'block ' + b.chunk + '  hash ' + b.hash + '...  wiped ' + b.ts,
+  },
+};
+function t(k) { return T[LANG][k]; }
+
+// The language switch keeps the session in the address, so a reader who
+// switches lands on the same hand-over in the other language.
+function langSwitch() {
+  const a = document.getElementById('lang-switch-link');
+  if (!a) return;
+  const p = location.pathname;
+  const naar = LANG === 'en' ? (p.replace(/^\/en(?=\/|$)/, '') || '/') : '/en' + p;
+  a.href = naar + location.search + location.hash;
+}
+langSwitch();
+
 function $(id) { return document.getElementById(id); }
 function showStep(id) {
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
@@ -58,7 +132,7 @@ if (!sessionToken) {
 } else if (!tokenValid) {
   // A bad link is a bad link whether or not the crypto library ever arrives, so
   // say so now instead of waiting on a signal that may never come.
-  showError('Invalid or missing session token');
+  showError(t('badLink'));
 }
 
 // ── State ──
@@ -78,12 +152,12 @@ async function init() {
   try {
     await window.ready.within('mlkem', 20000, 'ML-KEM-768 library');
   } catch {
-    showError('ML-KEM-768 library failed to load. Refresh the page and try again. Do not proceed without post-quantum encryption.');
+    showError(t('libFail'));
     return;
   }
   // Loaded, but is it the real thing? Refuse to fall back to weaker crypto.
   if (typeof ml_kem768 === 'undefined' || !ml_kem768?.keygen) {
-    showError('ML-KEM-768 library failed to load. Refresh the page and try again. Do not proceed without post-quantum encryption.');
+    showError(t('libFail'));
     return;
   }
   try {
@@ -93,7 +167,7 @@ async function init() {
     let kyberPubHex, ecdhPubHex;
 
     if (cached) {
-      $('keygen-status').textContent = 'Restoring keypair...';
+      $('keygen-status').textContent = t('restoring');
       $('keygen-progress').style.width = '60%';
       const kp = JSON.parse(cached);
       kyberPubHex = kp.kyberPubHex;
@@ -108,13 +182,13 @@ async function init() {
       myPrivateKey_ECDH_RAW = b64urlToU8(kp.ecdhSecJwk.d);
     } else {
       // Generate ML-KEM-768 keypair via Web Worker (non-blocking)
-      $('keygen-status').textContent = 'Generating ML-KEM-768 keypair...';
+      $('keygen-status').textContent = t('genKem');
       $('keygen-progress').style.width = '40%';
           const { publicKey: kyberPub, secretKey: kyberSec } = await new Promise(resolve => setTimeout(() => resolve(ml_kem768.keygen()), 50));
       myPrivateKey_MLKEM = kyberSec;
 
       // Generate ECDH P-256 keypair
-      $('keygen-status').textContent = 'Generating ECDH P-256 keypair...';
+      $('keygen-status').textContent = t('genEcdh');
       $('keygen-progress').style.width = '70%';
       const ecdhPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
       myPrivateKey_ECDH = ecdhPair.privateKey;
@@ -135,7 +209,7 @@ async function init() {
     }
 
     $('keygen-progress').style.width = '100%';
-    $('keygen-status').textContent = 'Keypair ready - connecting to relay...';
+    $('keygen-status').textContent = t('keysReady');
 
     const fp = await genFingerprint(kyberPubHex, ecdhPubHex);
 
@@ -161,10 +235,10 @@ async function init() {
         signal: AbortSignal.timeout(8000)
       });
       if (reg.status === 409) {
-        $('fp-status').textContent = 'This link is already in use. Ask the sender for a new one.';
+        $('fp-status').textContent = t('inUse');
         return;
       }
-      $('fp-status').textContent = 'Ready - waiting for sender to verify fingerprint';
+      $('fp-status').textContent = t('waitFp');
     } catch(e) { console.warn('pubkey register failed', e); }
 
     // Connect WebSocket (best-effort — ontvanger heeft geen API key, kan falen)
@@ -187,15 +261,15 @@ async function init() {
         }
 
         if (payload?.type === 'fingerprint_ok') {
-          $('fp-title').textContent = 'Fingerprint confirmed - receiving file...';
-          $('fp-status').textContent = 'Sender confirmed fingerprint - file is being encrypted for you';
+          $('fp-title').textContent = t('fpOkTitle');
+          $('fp-status').textContent = t('fpOkStatus');
         }
 
         // ook via HTTP polling afgehandeld hieronder
 
         if (msg.type === 'peer_left') {
           if (!$('step-done').classList.contains('active')) {
-            showError('Sender disconnected');
+            showError(t('peerLeft'));
           }
         }
       } catch(err) {
@@ -308,7 +382,7 @@ async function init() {
     }, 2000);
 
   } catch(e) {
-    showError('Keypair generation failed: ' + e.message);
+    showError(t('keygenFail') + e.message);
   }
 }
 
@@ -332,21 +406,21 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
     for (let i = 0; i < totalChunks; i++) {
       const pct = Math.round(10 + (i / totalChunks) * 75);
       $('recv-progress').style.width = pct + '%';
-      $('recv-status').textContent = `Downloading chunk ${i+1}/${totalChunks}...`;
+      $('recv-status').textContent = t('dlChunk')(i+1, totalChunks);
 
       const tok = await awaitToken(i);
-      if (!tok) throw new Error('Chunk ' + (i+1) + ' was never announced by the sender');
+      if (!tok) throw new Error(t('notAnnounced')(i+1));
       const r = await fetch(`${RELAY_API}/v2/dl/${tok}/get`, {
         signal: AbortSignal.timeout(60000)
       });
-      if (!r.ok) throw new Error('Download failed for chunk ' + (i+1) + ': ' + r.status + ' - blob expired or already burned');
+      if (!r.ok) throw new Error(t('dlFail')(i+1, r.status));
       const burnHash = r.headers.get('X-Hash') || r.headers.get('X-Paramant-Hash') || '';
       burnedHashes.push({ chunk: i+1, hash: burnHash.slice(0,16), ts: new Date().toISOString() });
       const raw = new Uint8Array(await r.arrayBuffer());
 
-      $('recv-status').textContent = `Decrypting chunk ${i+1}/${totalChunks} with ML-KEM-768...`;
+      $('recv-status').textContent = t('decChunk')(i+1, totalChunks);
 
-      if (!window._cryptoBridge) throw new Error('WASM crypto bridge not ready');
+      if (!window._cryptoBridge) throw new Error(t('bridge'));
       const plainPadded = await window._cryptoBridge.decryptBlob(raw, kyberSec, ecdhPrivRaw);
 
       // Strip metadata header: META_MAGIC(4) | metaLen(4) | meta | chunkData
@@ -385,7 +459,7 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
     }
 
     $('recv-progress').style.width = '100%';
-    $('recv-status').textContent = 'Saving file...';
+    $('recv-status').textContent = t('saving');
 
     let totalSize = 0;
     let savedBlob = null;
@@ -413,8 +487,8 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
       // down under "What made this safe".
       const sizeStr = totalSize > 0 ? ' (' + formatSize(totalSize) + ')' : '';
       window.paramantDone.fill('step-done', {
-        title: 'You have the file.',
-        line: fileName + sizeStr + ' is saved on your device. Our copy has been permanently destroyed.',
+        title: t('haveFile'),
+        line: t('savedLine')(fileName + sizeStr),
       });
       offerSaveAgain(savedBlob, fileName);
       renderBurnReceipt(burnedHashes);
@@ -435,14 +509,14 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
 
   } catch(e) {
     if (fileWriter) { try { await fileWriter.abort(); } catch(_) {} fileWriter = null; }
-    showError('Decryption failed: ' + e.message);
+    showError(t('decFail') + e.message);
   }
 }
 
 
 async function receiveVault(vaultFiles, ttl_ms, kyberSec, ecdhPriv) {
   showStep('step-receiving');
-  $('recv-status').textContent = 'Receiving vault — ' + vaultFiles.length + ' files...';
+  $('recv-status').textContent = t('vaultRecv')(vaultFiles.length);
 
   const burnedHashes = [];
 
@@ -452,12 +526,12 @@ async function receiveVault(vaultFiles, ttl_ms, kyberSec, ecdhPriv) {
       { tokens: vf.tokens.join(','), file_name: 'download', total_chunks: vf.tokens.length, ttl_ms, _vaultIdx: fi, _vaultTotal: vaultFiles.length },
       kyberSec, ecdhPriv, { silent: fi < vaultFiles.length - 1 }
     );
-    $('recv-status').textContent = 'Vault: ' + (fi+1) + '/' + vaultFiles.length + ' downloaded';
+    $('recv-status').textContent = t('vaultStep')(fi+1, vaultFiles.length);
   }
 
   window.paramantDone.fill('step-done', {
-    title: 'You have the files.',
-    line: vaultFiles.length + ' files are saved on your device. Our copies have been permanently destroyed.',
+    title: t('haveFiles'),
+    line: t('savedFiles')(vaultFiles.length),
   });
   // Each file in a vault saved itself as it arrived; there is no single blob
   // left to hand over again, so the screen keeps the dashboard as its one
@@ -499,7 +573,7 @@ function renderBurnReceipt(burnedHashes) {
   if (!el) return;
   if (!burnedHashes || !burnedHashes.length) { el.hidden = true; return; }
   el.textContent = burnedHashes
-    .map(b => 'block ' + b.chunk + '  hash ' + b.hash + '...  wiped ' + b.ts)
+    .map(b => t('burnLine')(b))
     .join('\n');
   el.hidden = false;
 }

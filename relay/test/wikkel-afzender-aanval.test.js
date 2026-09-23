@@ -122,7 +122,7 @@ async function haalOp(token, adres) {
   if (cr.status !== 200) return { stap: 'code', status: cr.status,
                                   body: await cr.json().catch(() => ({})) };
   await new Promise((r) => setTimeout(r, 200));
-  const mail = post.find((p) => /code to open the file/i.test(p.subject || '')
+  const mail = post.find((p) => /controlecode om het bestand te openen/i.test(p.subject || '')
                               && (p.to || []).includes(adres));
   assert.ok(mail, 'geen codemail voor ' + adres);
   const code = (String(mail.text).match(/\b(\d{6})\b/) || [])[1];
@@ -371,7 +371,7 @@ test('de bestandssleutel staat in geen respons, header, log of mail', async () =
     assert.ok(!alleMail.includes(v), 'de sleutel stond in een mail');
   }
   assert.ok(!alleMail.includes(wikkel), 'de wikkel stond in een mail');
-  const uitnodiging = regels.filter((l) => l.includes('sent you a file'));
+  const uitnodiging = regels.filter((l) => l.includes('heeft u een bestand gestuurd'));
   assert.ok(uitnodiging.some((l) => l.includes(token)),
     'het token hoort juist WEL in de uitnodiging: anders komt niemand binnen');
 });

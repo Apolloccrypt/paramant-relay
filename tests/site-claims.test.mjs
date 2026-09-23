@@ -111,7 +111,8 @@ function visible(html) {
 // Same as seo-contract.test.mjs: everything under frontend/ that is public.
 const PRIVATE = new Set([
   '404', 'account', 'admin', 'all-systems-go', 'claim', 'co-sign', 'dashboard',
-  'developer', 'get', 'ontvang', 'request-key', 'setup', 'parashare', 'iot',
+  'developer', 'get', 'ontvang', 'request-key', 'setup', 'parashare', 'en/parashare', 'iot',
+  'en/get', 'en/ontvang', 'en/ophalen',
   'auth/backup', 'auth/login', 'auth/request-reset', 'auth/reset-confirm',
   'auth/setup', 'billing/checkout', 'signup/verified',
 ]);
@@ -1311,7 +1312,7 @@ test('no page a visitor can open loads anything from a third party, which is wha
   };
   // Reachable without an account: every public page, plus the two share-link
   // landing pages that PRIVATE excludes from the sitemap but not from a visitor.
-  const reachable = [...new Set([...publicPages(), 'ontvang', 'parashare'])].sort();
+  const reachable = [...new Set([...publicPages(), 'ontvang', 'en/ontvang', 'parashare', 'en/parashare'])].sort();
   assert.ok(reachable.includes('ontvang') && reachable.includes('parashare'),
     'the two share-link landing pages must be in the scan');
 
@@ -1333,8 +1334,10 @@ test('no page a visitor can open loads anything from a third party, which is wha
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 
   // And the two pages that make the promise still make it.
-  assert.match(visible(page('parasend')), /No third-party requests/, 'parasend: the promise must still be on the page');
-  assert.match(visible(page('parasend')), /No fonts, CDNs, analytics or pixels/, 'parasend: name what is not loaded');
+  assert.match(visible(page('en/parasend')), /No third-party requests/, 'en/parasend: the promise must still be on the page');
+  assert.match(visible(page('en/parasend')), /No fonts, CDNs, analytics or pixels/, 'en/parasend: name what is not loaded');
+  assert.match(visible(page('parasend')), /Geen verzoeken aan derden/, 'parasend: the promise must still be on the page');
+  assert.match(visible(page('parasend')), /Geen lettertypen, CDN's, analytics of pixels/, 'parasend: name what is not loaded');
   assert.match(visible(page('en/pricing')), /No tracking\./, 'pricing: the free tier line must still say No tracking.');
 });
 
@@ -2302,12 +2305,12 @@ test('every page that promises burn-on-read says which client and which plan it 
   // The screens a customer reaches after signing in are not in publicPages, and
   // both of them carried the flat claim. /get, /ontvang and /parashare are the
   // share flow, which anyone with a link opens without an account.
-  const SIGNED_IN = ['dashboard', 'auth/setup', 'get', 'ontvang', 'parashare'];
+  const SIGNED_IN = ['dashboard', 'auth/setup', 'get', 'en/get', 'ontvang', 'en/ontvang', 'parashare', 'en/parashare'];
   const everyPage = [...publicPages(), ...SIGNED_IN];
   // Pages about a client that never sends max_views. Naming a plan is not a
   // qualification here; naming the client is.
   const CLIENT_ONLY = new Set([
-    'parasend', 'get', 'ontvang', 'parashare', 'dashboard', 'auth/setup',
+    'parasend', 'en/parasend', 'get', 'en/get', 'ontvang', 'en/ontvang', 'parashare', 'en/parashare', 'dashboard', 'auth/setup',
     'help/gmail-extension', 'help/outlook-extension',
   ]);
   const CLIENT = /\bweb app\b|\bextensions?\b|\badd-in\b/i;
@@ -2360,7 +2363,7 @@ test('every page that promises burn-on-read says which client and which plan it 
     const j = i >= 0 ? i : html.indexOf('</head>');
     return html.slice(0, j >= 0 ? j : html.length);
   };
-  const DL_LINK_PAGES = new Set(['get', 'ontvang', 'parashare']);
+  const DL_LINK_PAGES = new Set(['get', 'en/get', 'ontvang', 'en/ontvang', 'parashare', 'en/parashare']);
   const headClaims = [];
   for (const slug of everyPage) {
     if (DL_LINK_PAGES.has(slug)) continue; // pinned to the /v2/dl assertion above
@@ -2412,16 +2415,23 @@ test('every page that promises burn-on-read says which client and which plan it 
   // named Pro and stopped there. The tiers.js row is still 'pro'; the plan it is
   // sold under has been Firm since 6 September 2026.
   const unified = `The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to ${reads.pro} reads on Firm and ${reads.enterprise} on Enterprise.`;
-  for (const slug of ['parasend', 'en/pricing', 'security', 'help/gmail-extension', 'help/outlook-extension']) {
+  for (const slug of ['en/parasend', 'en/pricing', 'security', 'help/gmail-extension', 'help/outlook-extension']) {
     assert.ok(flatten(bodyOf(page(slug))).includes(unified),
       `${slug}: must carry the client-and-plan sentence in full: "${unified}"`);
   }
+  // /parasend is Nederlands sinds 23 september 2026: dezelfde zin, dezelfde
+  // getallen uit tiers.js, in de taal van de pagina.
+  const unifiedNl = `De web app en de extensies wissen het bestand bij elk plan na de eerste keer lezen. Via de API kan een betaalde link vaker gelezen worden: tot ${reads.pro} keer bij Firm en ${reads.enterprise} keer bij Enterprise.`;
+  assert.ok(flatten(bodyOf(page('parasend'))).includes(unifiedNl),
+    `parasend: must carry the client-and-plan sentence in full: "${unifiedNl}"`);
   // And the buyer has to be told why more reads is worth paying for, or the
   // honest version reads as a downgrade next to "burns on the first read".
-  for (const slug of ['parasend', 'en/pricing']) {
+  for (const slug of ['en/parasend', 'en/pricing']) {
     assert.ok(flatten(bodyOf(page(slug))).includes('one link a whole team can open'),
       `${slug}: more reads has to be sold as a feature, not confessed as a weaker promise`);
   }
+  assert.ok(flatten(bodyOf(page('parasend'))).includes('één link die een heel team kan openen'),
+    'parasend: more reads has to be sold as a feature, not confessed as a weaker promise');
 
   // The ParaSend tier cards, which are where a buyer reads the number before he
   // pays for it. Community's card is the one page element allowed to say "Burn
@@ -2433,9 +2443,13 @@ test('every page that promises burn-on-read says which client and which plan it 
     `pricing: the ParaSend Firm card must offer the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
   assert.ok(pricingSrc.includes(`<li>Up to ${reads.enterprise} reads per link through the API</li>`),
     `pricing: the ParaSend Enterprise card must offer the ${reads.enterprise} reads per link tiers.js grants, and say they come through the API`);
-  assert.ok(page('parasend').includes(`<li>Up to ${reads.pro} reads per link through the API</li>`),
+  assert.ok(page('en/parasend').includes(`<li>Up to ${reads.pro} reads per link through the API</li>`),
+    `en/parasend: the Firm card must offer the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
+  assert.ok(page('en/parasend').includes('<li>Burn on first read</li>'),
+    'en/parasend: the Community card must still say the link burns on the first read');
+  assert.ok(page('parasend').includes(`<li>Tot ${reads.pro} keer lezen per link via de API</li>`),
     `parasend: the Firm card must offer the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
-  assert.ok(page('parasend').includes('<li>Burn on first read</li>'),
+  assert.ok(page('parasend').includes('<li>Gewist na de eerste keer lezen</li>'),
     'parasend: the Community card must still say the link burns on the first read');
   assert.ok(flatten(bodyOf(page('en/index'))).includes(`up to ${reads.pro} reads per link through the API`),
     `index: the ParaSend Firm price line must name the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
@@ -2556,7 +2570,9 @@ test('the ParaSend credential /privacy describes is the credential the code impl
   // 5. The manual self-host escape on /parashare is named rather than hidden.
   assert.ok(priv.includes('you can still type a key by hand on that page'),
     'privacy: the self-host exception must be stated, because on that path a key really is typed into the browser');
-  assert.match(page('parashare'), /data-click="expandApiKeyCard">Use a key by hand/,
+  assert.match(page('en/parashare'), /data-click="expandApiKeyCard">Use a key by hand/,
+    'and /en/parashare must still offer it, or /privacy describes a door that is not there');
+  assert.match(page('parashare'), /data-click="expandApiKeyCard">Een sleutel met de hand invoeren/,
     'and /parashare must still offer it, or /privacy describes a door that is not there');
 });
 
@@ -2681,6 +2697,11 @@ test('the two legal facts are stated with their limits, and never as a promise',
 //                                   one-time download token
 test('the pages before the button say the ParaSend web app is a live handshake, and say what is not', () => {
   const SENTENCE = 'In the web app you and the receiver are both online and compare a short code, and the file is handed over live. Sending to someone who is not online right now needs the API, the SDK, or the Send a link mode in the web app.';
+  // /parasend is Nederlands sinds 23 september 2026 en draagt dezelfde zin in
+  // het Nederlands, met de standnamen die /parashare toont.
+  const SENTENCE_NL = 'Met Samen, nu zijn u en de ontvanger allebei online en vergelijkt u een korte controlecode. Is de ontvanger niet online, kies dan Later ophalen in de web app, of de API of SDK.';
+  const sentenceOf = (slug) => (slug === 'parasend' ? SENTENCE_NL : SENTENCE);
+  const THREE = ['en/index', 'en/parasend', 'parasend', 'en/pricing'];
 
   // Half one. The web app really does need the other side present, and really
   // does compare a code before anything moves.
@@ -2689,10 +2710,13 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
     'the ParaSend web app no longer holds a socket open to the other side; "both online" may no longer be stated as a fact');
   assert.match(share, /wss:\/\/|RELAY_WS|relay\.paramant\.app/,
     'the ParaSend web app no longer dials the relay socket; check the live-handshake sentence before trusting it');
-  assert.ok(/short code|sas|safety number|compare/i.test(share),
+  assert.ok(/short code|sas|safety number|compare/i.test(share) && /controlecode|vergelijk/i.test(share),
     'the ParaSend web app no longer derives a code for the two sides to compare; the sentence promises one');
-  assert.match(read('frontend/parashare.html'),
+  assert.match(read('frontend/en/parashare.html'),
     /The person you send to has to be online while you send; you confirm a short code together\./,
+    '/en/parashare step 1 no longer carries the sentence the three pages before it now summarise');
+  assert.match(read('frontend/parashare.html'),
+    /De ontvanger moet online zijn terwijl u verstuurt\. U controleert samen een korte controlecode\./,
     '/parashare step 1 no longer carries the sentence the three pages before it now summarise');
 
   // Half two. There IS an asynchronous route, it is the API, and it holds the
@@ -2719,7 +2743,11 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
   // because the copy is what this block exists to distrust.
   assert.match(read('frontend/parashare.html'), /data-click="chooseModeLink"/,
     '/parashare no longer offers the "Send a link" stand that the three pages send a buyer to');
-  assert.ok(visible(read('frontend/parashare.html')).includes('Send a link'),
+  assert.match(read('frontend/en/parashare.html'), /data-click="chooseModeLink"/,
+    '/en/parashare no longer offers the "Send a link" stand that the three pages send a buyer to');
+  assert.ok(visible(read('frontend/en/parashare.html')).includes('Send a link'),
+    '/en/parashare must name the stand in the same words the three pages use, or the buyer arrives and cannot find it');
+  assert.ok(visible(read('frontend/parashare.html')).includes('Later ophalen'),
     '/parashare must name the stand in the same words the three pages use, or the buyer arrives and cannot find it');
   assert.match(share, /function createLink\(/,
     'the "Send a link" stand has no flow behind it; the tail of the sentence promises one');
@@ -2738,20 +2766,27 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
 
   // The three pages. Same sentence on all three: the site says this one way, as
   // it does with the read counts above.
-  for (const slug of ['en/index', 'parasend', 'en/pricing']) {
+  for (const slug of THREE) {
     const text = visible(page(slug)).replace(/\s+/g, ' ');
-    assert.ok(text.includes(SENTENCE),
-      `${slug}: must carry the live-handshake sentence in full, before the button: "${SENTENCE}"`);
+    assert.ok(text.includes(sentenceOf(slug)),
+      `${slug}: must carry the live-handshake sentence in full, before the button: "${sentenceOf(slug)}"`);
   }
 
   // Both halves, phrase by phrase, so a rewrite that keeps the shape but drops
   // the plain words fails here rather than in a review a year from now.
-  for (const slug of ['en/index', 'parasend', 'en/pricing']) {
+  for (const slug of ['en/index', 'en/parasend', 'en/pricing']) {
     const text = visible(page(slug)).replace(/\s+/g, ' ');
     assert.ok(text.includes('both online'),
       `${slug}: the words "both online" are the whole point; a paraphrase is what hid this for months`);
     assert.ok(text.includes('compare a short code'),
       `${slug}: must say the two sides compare a short code, in those words`);
+  }
+  {
+    const text = visible(page('parasend')).replace(/\s+/g, ' ');
+    assert.ok(text.includes('allebei online'),
+      'parasend: the words "allebei online" are the whole point; a paraphrase is what hid this for months');
+    assert.ok(text.includes('vergelijkt u een korte controlecode'),
+      'parasend: must say the two sides compare a short code, in those words');
   }
 
   // It has to come BEFORE the call to action on each page, or it is the same
@@ -2761,11 +2796,12 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
   const before = {
     'en/index': /class="prod-cta"><a class="hp-btn hp-btn-line" href="\/parasend"/,
     parasend: /<div class="ps-actions">/,
+    'en/parasend': /<div class="ps-actions">/,
     'en/pricing': /<div class="tier-grid">/,
   };
   for (const [slug, cta] of Object.entries(before)) {
     const html = visible(page(slug));
-    const said = html.replace(/\s+/g, ' ').indexOf(SENTENCE);
+    const said = html.replace(/\s+/g, ' ').indexOf(sentenceOf(slug));
     // The sentence index is measured on collapsed text and the CTA on raw html,
     // so compare on one string: collapse both.
     const flat = html.replace(/\s+/g, ' ');
@@ -2826,10 +2862,13 @@ test('the ParaSend read counts are the ones tiers.js grants to plans ParaSend se
   // Firm reads the 'pro' row of tiers.js: it grants the ParaSend Pro tier, and
   // the entitlement tier names never moved, only the name the plan is sold under.
   const sentence = `Through the API a paid link can allow more reads: up to ${viewsOf('pro')} reads on Firm and ${viewsOf('enterprise')} on Enterprise.`;
-  for (const slug of ['en/pricing', 'parasend', 'security']) {
+  for (const slug of ['en/pricing', 'en/parasend', 'security']) {
     assert.ok(visible(page(slug)).replace(/\s+/g, ' ').includes(sentence),
       `${slug}: must name the API read counts as "${sentence}", the max_views tiers.js grants to the plans ParaSend sells`);
   }
+  const sentenceNl = `Via de API kan een betaalde link vaker gelezen worden: tot ${viewsOf('pro')} keer bij Firm en ${viewsOf('enterprise')} keer bij Enterprise.`;
+  assert.ok(visible(page('parasend')).replace(/\s+/g, ' ').includes(sentenceNl),
+    `parasend: must name the API read counts as "${sentenceNl}", the max_views tiers.js grants to the plans ParaSend sells`);
 
   // And Business may not come back beside a ParaSend read count anywhere on the
   // site. Still scoped to reads on purpose: the link lifetimes are the other
@@ -3256,7 +3295,8 @@ test('the recipients per send on the site are the max_recipients tiers.js sets',
   const flat = (slug) => visible(page(slug)).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
   const must = {
     'en/pricing': ['One recipient per send', `Up to ${firm} recipients per send, each with their own one-time link`],
-    parasend: ['One recipient per send', `Up to ${firm} recipients per send, each with their own one-time link`],
+    parasend: ['Eén ontvanger per verzending', `Tot ${firm} ontvangers per verzending, elk met een eigen eenmalige link`],
+    'en/parasend': ['One recipient per send', `Up to ${firm} recipients per send, each with their own one-time link`],
     'en/index': ['one recipient per send', `up to ${firm} recipients per send`],
     docs: [`One recipient per send on Community, up to ${firm} on Firm and Enterprise`],
     press: [`up to ${firm} named recipients`, `One per send on Community · up to ${firm} per send on Firm and Enterprise`],
@@ -3273,8 +3313,8 @@ test('the recipients per send on the site are the max_recipients tiers.js sets',
   const offenders = [];
   for (const slug of publicPages()) {
     const text = flat(slug);
-    for (const m of text.matchAll(/\bup to (\d+) (?:named )?recipients\b|\b(\d+) recipients per send\b/gi)) {
-      const n = Number(m[1] || m[2]);
+    for (const m of text.matchAll(/\bup to (\d+) (?:named )?recipients\b|\b(\d+) recipients per send\b|\btot (\d+) ontvangers\b|\b(\d+) ontvangers per verzending\b/gi)) {
+      const n = Number(m[1] || m[2] || m[3] || m[4]);
       if (n !== firm) offenders.push(`${slug}: "${m[0]}", and tiers.js grants ${firm} on the paid plans`);
     }
   }

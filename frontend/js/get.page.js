@@ -1,5 +1,84 @@
 'use strict';
 
+// Two languages, one file. The page says which one it is in <html lang>:
+// /get is Dutch, /en/get is English.
+const LANG = (document.documentElement.lang || 'nl').slice(0, 2) === 'en' ? 'en' : 'nl';
+const T = {
+  nl: {
+    foreign: (host) => 'Die link is geen link van ' + host + ', dus hij wordt hier niet geopend.',
+    invalid: 'Dat lijkt geen geldige link om iets te ontvangen.',
+    importTitle: 'Sleutel laden...',
+    importStatus: 'De sleutel uit de link wordt geladen...',
+    dlTitle: 'Downloaden...',
+    dlStatus: 'Het verzegelde bestand wordt gedownload...',
+    dlFail: (st) => 'Downloaden is mislukt (HTTP ' + st + ').',
+    decTitle: 'Ontsleutelen...',
+    decStatus: 'Het bestand wordt ontsleuteld...',
+    decFail: 'Ontsleutelen is mislukt. De link is misschien beschadigd of aangepast.',
+    tooShort: 'Het ontsleutelde bestand is te kort.',
+    headerBad: 'De kop van het ontsleutelde bestand is beschadigd.',
+    opening: 'Het document wordt geopend...',
+    done: 'Klaar.',
+    pages: (n, shown) => n + (n === 1 ? ' pagina' : ' pagina\'s') + (n > shown ? ', eerste ' + shown + ' getoond' : ''),
+    haveFile: 'U hebt het bestand.',
+    pdfLine: (name, pc, size) => name + ' (' + pc + ', ' + size + ') is hier ' +
+      'geopend in dit tabblad. Onze kopie is voorgoed vernietigd, dus sla het nu op als ' +
+      'u het wilt bewaren.',
+    save: 'Opslaan',
+    pdfFallback: 'Het document opent hier niet. Het wordt opgeslagen...',
+    saving: 'Bestand wordt opgeslagen...',
+    savedLine: (name, size) => name + ' (' + size + ') staat op uw apparaat. ' +
+      'Onze kopie is voorgoed vernietigd.',
+    unknown: 'Onbekende fout',
+  },
+  en: {
+    foreign: (host) => 'That link is not a ' + host + ' link, so it is not opened here.',
+    invalid: 'That does not look like a valid receive link.',
+    importTitle: 'Importing key...',
+    importStatus: 'Importing decryption key...',
+    dlTitle: 'Downloading...',
+    dlStatus: 'Downloading encrypted file from relay...',
+    dlFail: (st) => 'Download failed: HTTP ' + st,
+    decTitle: 'Decrypting...',
+    decStatus: 'Decrypting with AES-256-GCM...',
+    decFail: 'Decryption failed. The link may be corrupted or tampered with.',
+    tooShort: 'Decrypted payload too short',
+    headerBad: 'Decrypted payload header corrupt',
+    opening: 'Opening the document...',
+    done: 'Done.',
+    pages: (n, shown) => n + ' page' + (n === 1 ? '' : 's') + (n > shown ? ', first ' + shown + ' shown' : ''),
+    haveFile: 'You have the file.',
+    pdfLine: (name, pc, size) => name + ' (' + pc + ', ' + size + ') is open ' +
+      'here in this tab. Our copy has been permanently destroyed, so save it now if ' +
+      'you want to keep it.',
+    save: 'Save',
+    pdfFallback: 'The document would not open here, saving it instead...',
+    saving: 'Saving file...',
+    savedLine: (name, size) => name + ' (' + size + ') is saved on your device. ' +
+      'Our copy has been permanently destroyed.',
+    unknown: 'Unknown error',
+  },
+};
+function t(k) { return T[LANG][k]; }
+
+// The language switch keeps the whole address, the key after # included, so
+// it never travels anywhere but this browser.
+function langSwitch() {
+  const a = document.getElementById('lang-switch-link');
+  if (!a) return;
+  // With a one-time link in the address the file is fetched on arrival, so a
+  // second load in the other language would find it already gone. The switch
+  // is only offered on the bare page.
+  if (new URLSearchParams(location.search).get('t')) {
+    (a.closest('.lang-switch') || a).hidden = true;
+    return;
+  }
+  const p = location.pathname;
+  const naar = LANG === 'en' ? (p.replace(/^\/en(?=\/|$)/, '') || '/') : '/en' + p;
+  a.href = naar + location.search + location.hash;
+}
+langSwitch();
+
 // Which relay sector holds the blob. An account is valid on exactly one sector,
 // and the sender's page knows which one, so the link carries it in `&r=`. Before
 // that this file always asked health, which is right for most accounts and
@@ -135,12 +214,12 @@ function receiveTarget(v) {
   let u;
   try { u = new URL(raw, location.origin); } catch { return { err: 'invalid' }; }
   if (u.origin !== location.origin) return { err: 'foreign' };
-  if (u.pathname === '/get' || u.pathname === '/get.html') {
+  if (/^(\/en)?\/get(\.html)?$/.test(u.pathname)) {
     const t = u.searchParams.get('t') || '';
     if (!TOKEN_RE.test(t) || u.hash.length < 2) return { err: 'invalid' };
     return { href: u.href };
   }
-  if (/^\/ontvang\/[A-Za-z0-9_-]{16,128}$/.test(u.pathname)) return { href: u.href };
+  if (/^(\/en)?\/ontvang\/[A-Za-z0-9_-]{16,128}$/.test(u.pathname)) return { href: u.href };
   return { err: 'invalid' };
 }
 
@@ -161,8 +240,8 @@ function goReceive() {
   }
   if (errEl) {
     errEl.textContent = got.err === 'foreign'
-      ? 'That link is not a ' + location.host + ' link, so it is not opened here.'
-      : 'That does not look like a valid receive link.';
+      ? t('foreign')(location.host)
+      : t('invalid');
   }
 }
 
@@ -193,12 +272,12 @@ async function init() {
   const iv = keyIv.slice(32, 44);
 
   try {
-    setTitle('Importing key...');
-    setStatus('Importing decryption key...', 10);
+    setTitle(t('importTitle'));
+    setStatus(t('importStatus'), 10);
     const aesKey = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
 
-    setTitle('Downloading...');
-    setStatus('Downloading encrypted file from relay...', 30);
+    setTitle(t('dlTitle'));
+    setStatus(t('dlStatus'), 30);
 
     const r = await fetch(RELAY + '/v2/dl/' + token + '/get', {
       signal: AbortSignal.timeout(60000),
@@ -213,25 +292,25 @@ async function init() {
       return;
     }
     if (!r.ok) {
-      throw new Error('Download failed: HTTP ' + r.status);
+      throw new Error(t('dlFail')(r.status));
     }
 
-    setTitle('Decrypting...');
-    setStatus('Decrypting with AES-256-GCM...', 65);
+    setTitle(t('decTitle'));
+    setStatus(t('decStatus'), 65);
 
     const ciphertext = await r.arrayBuffer();
     let plaintext;
     try {
       plaintext = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, ciphertext));
     } catch {
-      showError('Decryption failed. The link may be corrupted or tampered with.');
+      showError(t('decFail'));
       return;
     }
 
     // Parse header: [uint32-LE nameLen][nameBytes][fileBytes]
-    if (plaintext.length < 4) throw new Error('Decrypted payload too short');
+    if (plaintext.length < 4) throw new Error(t('tooShort'));
     const nameLen = new DataView(plaintext.buffer).getUint32(0, true);
-    if (plaintext.length < 4 + nameLen) throw new Error('Decrypted payload header corrupt');
+    if (plaintext.length < 4 + nameLen) throw new Error(t('headerBad'));
     const filename = new TextDecoder().decode(plaintext.slice(4, 4 + nameLen)) || 'download';
     const fileData = plaintext.slice(4 + nameLen);
 
@@ -241,20 +320,17 @@ async function init() {
                   fileData[2] === 0x44 && fileData[3] === 0x46;
 
     if (isPdf) {
-      setStatus('Opening the document...', 90);
+      setStatus(t('opening'), 90);
       try {
         const preview = await renderPdfPreview(fileData);
-        setStatus('Done.', 100);
+        setStatus(t('done'), 100);
         // Same heading and same shape as every other ending. The sentence says
         // what is true of THIS branch: nothing has been written to disk yet,
         // and the link is already spent, so saving is the one thing left to do.
-        const pageCount = preview.pages + ' page' + (preview.pages === 1 ? '' : 's') +
-          (preview.pages > preview.shown ? ', first ' + preview.shown + ' shown' : '');
+        const pageCount = t('pages')(preview.pages, preview.shown);
         window.paramantDone.fill('step-done', {
-          title: 'You have the file.',
-          line: filename + ' (' + pageCount + ', ' + formatSize(fileData.length) + ') is open ' +
-                'here in this tab. Our copy has been permanently destroyed, so save it now if ' +
-                'you want to keep it.',
+          title: t('haveFile'),
+          line: t('pdfLine')(filename, pageCount, formatSize(fileData.length)),
         });
         window.paramantDone.payload('step-done', preview.node);
         const note = document.getElementById('done-pdf-note');
@@ -265,16 +341,16 @@ async function init() {
         // who comes back to it has to still be able to save it.
         savedFile = { name: filename, bytes: fileData, mime: 'application/pdf' };
         const saveBtn = document.getElementById('done-save');
-        if (saveBtn) saveBtn.textContent = 'Save';
+        if (saveBtn) saveBtn.textContent = t('save');
         showStep('step-done');
         return;
       } catch (e) {
         // Fall through to the plain save if the document will not open.
-        setStatus('The document would not open here, saving it instead...', 95);
+        setStatus(t('pdfFallback'), 95);
       }
     }
 
-    setStatus('Saving file...', 90);
+    setStatus(t('saving'), 90);
 
     // Trigger browser download (non-PDF path, or PDF preview fallback)
     const blob = new Blob([fileData]);
@@ -286,14 +362,13 @@ async function init() {
     a.click();
     setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
 
-    setStatus('Done.', 100);
+    setStatus(t('done'), 100);
 
     // The end screen. One sentence in ordinary words; the algorithm names live
     // in the folded <details> next to it, not on the reader's face.
     window.paramantDone.fill('step-done', {
-      title: 'You have the file.',
-      line: filename + ' (' + formatSize(fileData.length) + ') is saved on your device. ' +
-            'Our copy has been permanently destroyed.',
+      title: t('haveFile'),
+      line: t('savedLine')(filename, formatSize(fileData.length)),
     });
     // A browser can refuse or a person can dismiss a save dialog, and the bytes
     // are then unreachable for good: the link is spent and will not open again.
@@ -306,7 +381,7 @@ async function init() {
     showStep('step-done');
 
   } catch (e) {
-    showError(e.message || 'Unknown error');
+    showError(e.message || t('unknown'));
   }
 }
 

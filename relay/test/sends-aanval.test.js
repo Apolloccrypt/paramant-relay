@@ -81,7 +81,7 @@ async function ophalen(token) {
     body: JSON.stringify({ action: 'code' }),
   });
   await new Promise((r) => setTimeout(r, 250));   // de log loopt iets achter
-  const m = /Your code is (\d{6})/.exec((post[post.length - 1] || {}).text || '');
+  const m = /Uw controlecode is (\d{6})/.exec((post[post.length - 1] || {}).text || '');
   if (!m) return { stap1: p1.status, code: null, stap2: null };
   const p2 = await fetch(BASE + '/v2/pickup/' + token, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },

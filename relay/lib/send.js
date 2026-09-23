@@ -300,6 +300,9 @@ function createSendStore({ store, log, now }) {
         // the shape that gets a message quarantined.
         sender_name: String((sender && sender.naam) || '').slice(0, 60),
         sender_email: String((sender && sender.email) || '').slice(0, 254),
+        // The language the sending page was shown in, for the code mail and the
+        // reminder later. Empty means both: Dutch with the English underneath.
+        lang: (sender && (sender.taal === 'nl' || sender.taal === 'en')) ? sender.taal : '',
         salt: built.salt,
         created_at: created,
         expires_at: created + ttl,
@@ -453,7 +456,7 @@ function createSendStore({ store, log, now }) {
       return { ok: true, email: record.email, masked: maskEmail(record.email),
                code, expires_in_s: Math.floor(CODE_TTL_MS / 1000),
                sender_name: send.sender_name || '', sender_email: send.sender_email || '',
-               filename: send.filename || '' };
+               lang: send.lang || '', filename: send.filename || '' };
     },
 
     // Shared lookup for every token-bearing call.
@@ -717,7 +720,7 @@ function createSendStore({ store, log, now }) {
       return { ok: true, email: record.email, reminders: uit.reminders,
                invited_at: uit.invited_at, expires_at: send.expires_at,
                sender_name: send.sender_name || '', sender_email: send.sender_email || '',
-               filename: send.filename || '' };
+               lang: send.lang || '', filename: send.filename || '' };
     },
   };
 }

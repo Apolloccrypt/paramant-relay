@@ -72,6 +72,7 @@ const aliases = {
   '/': '/index.html',
   '/parasign': '/parasign.html',
   '/parasend': '/parasend.html',
+  '/en/parasend': '/en/parasend.html',
   '/about': '/about.html',
   '/security': '/security.html',
   '/trust': '/trust.html',
@@ -217,6 +218,15 @@ const PAGES = [
   },
   {
     slug: '/parasend',
+    claims: [
+      { name: 'the line that says who it is for', css: 'p.ps-who', text: 'Voor kantoren die nu klantdossiers' },
+      { name: 'the first action', css: '.ps-actions a.btn-primary', href: '/parashare' },
+      { name: 'the free limit', css: 'p.ps-sub', text: '50 verzendingen per maand' },
+    ],
+  },
+  {
+    // De Engelse kopie van /parasend houdt de Engelse pins.
+    slug: '/en/parasend',
     claims: [
       { name: 'the line that says who it is for', css: 'p.ps-who', text: 'For offices that email client documents' },
       { name: 'the first action', css: '.ps-actions a.btn-primary', href: '/parashare' },

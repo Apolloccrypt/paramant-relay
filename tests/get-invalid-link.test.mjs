@@ -31,7 +31,7 @@ const gilRelayCalls = [];
 before(async () => {
   gilServer = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
-    const rel = url.pathname === '/get' ? '/get.html' : url.pathname;
+    const rel = url.pathname === '/get' ? '/get.html' : url.pathname === '/en/get' ? '/en/get.html' : url.pathname;
     const file = path.join(GIL_ROOT, rel);
     if (!file.startsWith(GIL_ROOT)) { res.writeHead(403); return res.end('no'); }
     fs.readFile(file, (err, buf) => {
@@ -73,84 +73,94 @@ async function visibleText(page) {
   return page.evaluate(() => document.querySelector('.step.active').innerText);
 }
 
-for (const [name, query] of [
-  ['a token cut short', `t=${GIL_TOKEN.slice(0, 30)}#${GIL_KEY}`],
-  ['a token with capitals', `t=${GIL_TOKEN.toUpperCase()}#${GIL_KEY}`],
-  ['a token without the key after #', `t=${GIL_TOKEN}`],
-  ['a key cut short', `t=${GIL_TOKEN}#${GIL_KEY.slice(0, 20)}`],
-]) {
-  test(`/get with ${name} says the link is invalid or incomplete, and never asks the relay`, async () => {
-    const before = gilRelayCalls.length;
-    const page = await open(`${GIL_ORIGIN}/get?${query}`);
+// Both languages: /get is Dutch, /en/get keeps the original English words.
+const LANGS = [
+  { name: 'nl', pre: '', invalid: /ongeldig of onvolledig/i,
+    bad: /lijkt geen geldige link om iets te ontvangen/, foreign: /geen link van .*, dus hij wordt hier niet geopend/ },
+  { name: 'en', pre: '/en', invalid: /invalid or incomplete/i,
+    bad: /does not look like a valid receive link/, foreign: /not a .* link/ },
+];
+
+for (const L of LANGS) {
+  for (const [name, query] of [
+    ['a token cut short', `t=${GIL_TOKEN.slice(0, 30)}#${GIL_KEY}`],
+    ['a token with capitals', `t=${GIL_TOKEN.toUpperCase()}#${GIL_KEY}`],
+    ['a token without the key after #', `t=${GIL_TOKEN}`],
+    ['a key cut short', `t=${GIL_TOKEN}#${GIL_KEY.slice(0, 20)}`],
+  ]) {
+    test(`/get with ${name} says the link is invalid or incomplete, and never asks the relay (${L.name})`, async () => {
+      const before = gilRelayCalls.length;
+      const page = await open(`${GIL_ORIGIN}${L.pre}/get?${query}`);
+      try {
+        assert.equal(await activeStep(page), 'step-invalid');
+        const text = await visibleText(page);
+        assert.match(text, L.invalid);
+        assert.doesNotMatch(text, /HTTP \d{3}/);
+        assert.doesNotMatch(text, /dashboard/i);
+        assert.equal(gilRelayCalls.length, before, 'no request reached the relay');
+      } finally { await page.close(); }
+    });
+  }
+
+  test(`/get with a well-formed token the relay refuses (401) also says invalid, not HTTP 401 (${L.name})`, async () => {
+    const page = await open(`${GIL_ORIGIN}${L.pre}/get?t=${GIL_TOKEN}#${GIL_KEY}`, 401);
     try {
       assert.equal(await activeStep(page), 'step-invalid');
       const text = await visibleText(page);
-      assert.match(text, /invalid or incomplete/i);
-      assert.doesNotMatch(text, /HTTP \d{3}/);
+      assert.doesNotMatch(text, /HTTP 401/);
       assert.doesNotMatch(text, /dashboard/i);
-      assert.equal(gilRelayCalls.length, before, 'no request reached the relay');
+    } finally { await page.close(); }
+  });
+
+  async function paste(page, value, how) {
+    await page.fill('#enter-link', value);
+    if (how === 'enter') await page.press('#enter-link', 'Enter');
+    else await page.click('[data-click="goReceive"]');
+  }
+
+  test(`the paste box: plain text shows the error and stays on /get (${L.name})`, async () => {
+    const page = await open(`${GIL_ORIGIN}${L.pre}/get`);
+    try {
+      assert.equal(await activeStep(page), 'step-enter');
+      await paste(page, 'hello there', 'click');
+      await page.waitForTimeout(300);
+      assert.equal(new URL(page.url()).pathname, L.pre + '/get');
+      assert.match(await page.textContent('#enter-err'), L.bad);
+    } finally { await page.close(); }
+  });
+
+  test(`the paste box: Enter submits (${L.name})`, async () => {
+    const page = await open(`${GIL_ORIGIN}${L.pre}/get`);
+    try {
+      await activeStep(page);
+      await paste(page, 'nonsense', 'enter');
+      await page.waitForTimeout(300);
+      assert.match(await page.textContent('#enter-err'), L.bad);
+      await page.fill('#enter-link', `${GIL_ORIGIN}${L.pre}/get?t=${GIL_TOKEN}#${GIL_KEY}`);
+      await Promise.all([page.waitForURL(/\?t=/), page.press('#enter-link', 'Enter')]);
+      assert.equal(new URL(page.url()).searchParams.get('t'), GIL_TOKEN);
+    } finally { await page.close(); }
+  });
+
+  test(`the paste box: a link to another site is refused and not followed (${L.name})`, async () => {
+    const page = await open(`${GIL_ORIGIN}${L.pre}/get`);
+    try {
+      await activeStep(page);
+      await paste(page, `https://example.com${L.pre}/get?t=${GIL_TOKEN}#${GIL_KEY}`, 'click');
+      await page.waitForTimeout(300);
+      assert.equal(new URL(page.url()).origin, GIL_ORIGIN);
+      assert.match(await page.textContent('#enter-err'), L.foreign);
+    } finally { await page.close(); }
+  });
+
+  test(`the paste box: a same-site link with a truncated token is refused (${L.name})`, async () => {
+    const page = await open(`${GIL_ORIGIN}${L.pre}/get`);
+    try {
+      await activeStep(page);
+      await paste(page, `${GIL_ORIGIN}${L.pre}/get?t=${GIL_TOKEN.slice(0, 10)}#${GIL_KEY}`, 'click');
+      await page.waitForTimeout(300);
+      assert.equal(new URL(page.url()).search, '');
+      assert.match(await page.textContent('#enter-err'), L.bad);
     } finally { await page.close(); }
   });
 }
-
-test('/get with a well-formed token the relay refuses (401) also says invalid, not HTTP 401', async () => {
-  const page = await open(`${GIL_ORIGIN}/get?t=${GIL_TOKEN}#${GIL_KEY}`, 401);
-  try {
-    assert.equal(await activeStep(page), 'step-invalid');
-    const text = await visibleText(page);
-    assert.doesNotMatch(text, /HTTP 401/);
-    assert.doesNotMatch(text, /dashboard/i);
-  } finally { await page.close(); }
-});
-
-async function paste(page, value, how) {
-  await page.fill('#enter-link', value);
-  if (how === 'enter') await page.press('#enter-link', 'Enter');
-  else await page.click('[data-click="goReceive"]');
-}
-
-test('the paste box: plain text shows the error and stays on /get', async () => {
-  const page = await open(`${GIL_ORIGIN}/get`);
-  try {
-    assert.equal(await activeStep(page), 'step-enter');
-    await paste(page, 'hello there', 'click');
-    await page.waitForTimeout(300);
-    assert.equal(new URL(page.url()).pathname, '/get');
-    assert.match(await page.textContent('#enter-err'), /does not look like a valid receive link/);
-  } finally { await page.close(); }
-});
-
-test('the paste box: Enter submits', async () => {
-  const page = await open(`${GIL_ORIGIN}/get`);
-  try {
-    await activeStep(page);
-    await paste(page, 'nonsense', 'enter');
-    await page.waitForTimeout(300);
-    assert.match(await page.textContent('#enter-err'), /does not look like a valid receive link/);
-    await page.fill('#enter-link', `${GIL_ORIGIN}/get?t=${GIL_TOKEN}#${GIL_KEY}`);
-    await Promise.all([page.waitForURL(/\?t=/), page.press('#enter-link', 'Enter')]);
-    assert.equal(new URL(page.url()).searchParams.get('t'), GIL_TOKEN);
-  } finally { await page.close(); }
-});
-
-test('the paste box: a link to another site is refused and not followed', async () => {
-  const page = await open(`${GIL_ORIGIN}/get`);
-  try {
-    await activeStep(page);
-    await paste(page, `https://example.com/get?t=${GIL_TOKEN}#${GIL_KEY}`, 'click');
-    await page.waitForTimeout(300);
-    assert.equal(new URL(page.url()).origin, GIL_ORIGIN);
-    assert.match(await page.textContent('#enter-err'), /not a .* link/);
-  } finally { await page.close(); }
-});
-
-test('the paste box: a same-site link with a truncated token is refused', async () => {
-  const page = await open(`${GIL_ORIGIN}/get`);
-  try {
-    await activeStep(page);
-    await paste(page, `${GIL_ORIGIN}/get?t=${GIL_TOKEN.slice(0, 10)}#${GIL_KEY}`, 'click');
-    await page.waitForTimeout(300);
-    assert.equal(new URL(page.url()).search, '');
-    assert.match(await page.textContent('#enter-err'), /does not look like a valid receive link/);
-  } finally { await page.close(); }
-});

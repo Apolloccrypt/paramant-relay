@@ -347,7 +347,7 @@ test('na een verdrongen code kan de ontvanger er nog uit, maar het kost hem pogi
   let tweede = null;
   for (let i = 0; i < 60 && !tweede; i++) {
     const mail = R.post.slice(voor).reverse().find(
-      (p) => /code to open the file/i.test(p.subject || '') && (p.to || []).includes(adres));
+      (p) => /controlecode om het bestand te openen/i.test(p.subject || '') && (p.to || []).includes(adres));
     if (mail) tweede = (String(mail.text).match(/\b(\d{6})\b/) || [])[1];
     if (!tweede) await new Promise((r) => setTimeout(r, 50));
   }

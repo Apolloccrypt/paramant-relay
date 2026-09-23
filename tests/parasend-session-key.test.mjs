@@ -43,7 +43,11 @@ import { fileURLToPath } from 'node:url';
 
 const PS_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PS_JS = fs.readFileSync(path.join(PS_ROOT, 'frontend/js/parashare.page.js'), 'utf8');
-const PS_HTML = fs.readFileSync(path.join(PS_ROOT, 'frontend/parashare.html'), 'utf8');
+// De Engelse kopie: de pins in dit bestand zijn de Engelse zinnen, en de
+// harness draait de pagina standaard als lang="en". De Nederlandse /parashare
+// heeft een eigen test onderaan.
+const PS_HTML = fs.readFileSync(path.join(PS_ROOT, 'frontend/en/parashare.html'), 'utf8');
+const PS_HTML_NL = fs.readFileSync(path.join(PS_ROOT, 'frontend/parashare.html'), 'utf8');
 // The real error module, run INSIDE the context the way the page loads it: as a
 // plain script that assigns self.paramantErrors. Requiring it here instead would
 // close it over this process's console, and half of what this suite measures is
@@ -78,7 +82,7 @@ function makeElement(id) {
 }
 
 // A run of the page: the vm context, the DOM it saw, and what it asked for.
-function runPage({ keyResponses, sectorOk = true, relayStatus = null }) {
+function runPage({ keyResponses, sectorOk = true, relayStatus = null, lang = 'en' }) {
   const elements = new Map();
   const getElementById = (id) => {
     if (!elements.has(id)) elements.set(id, makeElement(id));
@@ -113,6 +117,7 @@ function runPage({ keyResponses, sectorOk = true, relayStatus = null }) {
       removeItem: (k) => { calls.storage.push(['remove', k]); },
     },
     document: {
+      documentElement: { lang },
       getElementById,
       querySelector: () => null,
       querySelectorAll: () => [],
@@ -652,4 +657,40 @@ test('a token that expires during a long session is replaced, before and after t
   assert.equal(answer.status, 401);
   assert.equal(mintDown.calls.key - spent, 1,
     'a call whose refresh already failed must not mint a second time on the 401 it was always going to get');
+});
+
+// ── De Nederlandse /parashare ───────────────────────────────────────────────
+// Dezelfde pagina in het Nederlands: dezelfde banner, dezelfde uitweg met de
+// hand, dezelfde regel dat stap 1 en 2 geen jargon tonen, en dezelfde code die
+// met lang="nl" Nederlandse zinnen op het scherm zet.
+test('de Nederlandse /parashare zegt hetzelfde, in het Nederlands', async () => {
+  assert.match(PS_HTML_NL, /<html lang="nl">/, 'de Nederlandse pagina moet lang="nl" dragen, anders spreekt de code Engels');
+  assert.ok(PS_HTML_NL.includes('Uw accountsessie kon niet starten. Log opnieuw in. Blijft het gebeuren, mail dan <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.'),
+    'de banner noemt het ene dat u kunt doen en het ene adres om te mailen');
+  const bannerAt = PS_HTML_NL.indexOf('id="ps-key-error"');
+  const banner = PS_HTML_NL.slice(bannerAt, bannerAt + 900);
+  assert.match(banner, /class="ps-alert-primary" href="\/auth\/login">Opnieuw inloggen</, 'opnieuw inloggen is de hoofdactie');
+  assert.match(banner, /data-click="expandApiKeyCard">Een sleutel met de hand invoeren</, 'de uitweg met de hand blijft bereikbaar');
+  assert.match(banner, /voor een eigen relay/, 'en zegt voor wie die uitweg is');
+  assert.match(PS_HTML_NL, /<details class="ps-how">[\s\S]*?<summary>Hoe dit werkt<\/summary>/, 'de techniek staat een klik verder');
+  const howPanel = /<details class="ps-how">([\s\S]*?)<\/details>/.exec(PS_HTML_NL);
+  for (const name of ['ML-KEM-768', 'ML-DSA-65', 'AES-256-GCM']) {
+    assert.ok(howPanel && howPanel[1].includes(name), `het paneel houdt de echte naam ${name}`);
+  }
+  const flowText = PS_HTML_NL
+    .slice(PS_HTML_NL.indexOf('id="step-setup"'), PS_HTML_NL.indexOf('id="step-encrypting"'))
+    .replace(/<details class="ps-how">[\s\S]*?<\/details>/, ' ')
+    .replace(/<[^>]+>/g, ' ');
+  for (const word of ['keypair', 'key pair', 'sleutelpaar', 'plaintext', 'ML-KEM', 'ML-DSA', 'AES-256', 'fingerprint', 'vingerafdruk', 'vault mode', 'blob']) {
+    assert.ok(!new RegExp(word, 'i').test(flowText), `stap 1 en 2 zeggen nog "${word}"`);
+  }
+  assert.match(PS_HTML_NL, /<div class="card-head-title">Vergelijk deze controlecode samen<\/div>/, 'de controlekaart heet naar wat u doet');
+  assert.match(PS_HTML_NL, /<span class="ps-step-label">3 &middot; Vergelijken<\/span>/, 'de stepper noemt dezelfde stap zo');
+
+  const run = await loadPage({ keyResponses: [ok200], lang: 'nl' });
+  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'Uw account wordt gebruikt');
+  const leeg = await loadPage({ keyResponses: [{ status: 500, body: {} }], lang: 'nl' });
+  evalIn(leeg, 'expandApiKeyCard()');
+  assert.equal(leeg.getElementById('key-status').textContent, 'Vul uw API-sleutel in om verder te gaan',
+    'een leeg veld krijgt een uitnodiging, geen oordeel');
 });

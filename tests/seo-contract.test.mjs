@@ -32,6 +32,8 @@ const PRIVATE = new Set([
   // zoekresultaat zetten, en een og:url zou hem in elke linkpreview zetten.
   // Hoort dus bij de noindex-afspraak, niet bij de vindbaarheidsafspraak.
   'ophalen',
+  // De Engelse kopieen van /get, /ontvang en /ontvang/<token>: zelfde flow, zelfde afspraak.
+  'en/get', 'en/ontvang', 'en/ophalen',
   // /parashare sits behind the same nginx auth_request that /sign used to, so
   // by the rule at the top of this list it belongs here: gated pages are held
   // to the noindex contract, not the discoverability one. It was in the sitemap
@@ -40,6 +42,8 @@ const PRIVATE = new Set([
   // close ParaShare; the page and its gate are untouched. It stops the sitemap
   // from claiming a door is open that is not.
   'parashare',
+  // De Engelse kopie van /parashare, zelfde poort en dus dezelfde afspraak.
+  'en/parashare',
   'auth/backup', 'auth/login', 'auth/request-reset', 'auth/reset-confirm',
   'auth/setup', 'billing/checkout', 'signup/verified',
 ]);
@@ -454,8 +458,8 @@ const PINNED = {
   // receipt a ParaSend transfer leaves behind, so the promise in the preview
   // had to cover both proofs instead of only the signed document.
   verify: {
-    title: 'Check a signed document or a delivery receipt · Paramant',
-    desc: 'Check a signed document, or the receipt that proves a file was delivered. Both happen in your browser, without an account and without uploading anything.',
+    title: 'Document of ontvangstbewijs controleren · Paramant',
+    desc: 'Controleer een ondertekend document, of het bewijs dat een bestand is afgeleverd. Beide gebeuren in uw browser, zonder account en zonder iets te uploaden.',
   },
   download: {
     title: 'The Paramant desktop app is no longer maintained',

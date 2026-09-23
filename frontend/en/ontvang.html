@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <!-- Sticky readiness signals. Plain script in <head> on purpose: it must run
@@ -7,7 +7,7 @@
 <script src="/js/ready.js?v=1"></script>
 <style id="critical-css">html,body{background:#F8FAFC;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Bestand ontvangen · Paramant</title>
+<title>Receive a file · Paramant</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/design-system.css?v=30">
 <link rel="stylesheet" href="/nav.css?v=26">
@@ -18,19 +18,19 @@
      against the codebase as a whole: naming an algorithm the product has, on a route
      that does not run it, is the class of untrue sentence that reads as a fact. -->
 <meta name="paramant:path" content="live">
-<meta name="description" content="Er staat een beveiligd bestand voor u klaar. Het wordt in uw browser geopend en verdwijnt na één download.">
-<meta property="og:title" content="Er staat een beveiligd bestand klaar · Paramant">
-<meta property="og:description" content="Er staat een beveiligd bestand voor u klaar. Het wordt in uw browser geopend en verdwijnt na één download. Er blijft niets op de server staan.">
-<meta property="og:url" content="https://paramant.app/ontvang">
+<meta name="description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download.">
+<meta property="og:title" content="A secure file is waiting · Paramant">
+<meta property="og:description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download. Nothing is stored on the server.">
+<meta property="og:url" content="https://paramant.app/en/ontvang">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Er staat een beveiligd bestand klaar · Paramant">
-<meta name="twitter:description" content="Er staat een beveiligd bestand voor u klaar. Het wordt in uw browser geopend en verdwijnt na één download. Er blijft niets op de server staan.">
+<meta name="twitter:title" content="A secure file is waiting · Paramant">
+<meta name="twitter:description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download. Nothing is stored on the server.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<link rel="canonical" href="https://paramant.app/ontvang">
+<link rel="canonical" href="https://paramant.app/en/ontvang">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bone);color:var(--ink);font-family:var(--mono);min-height:100vh}
@@ -128,58 +128,58 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 </style>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Naar de inhoud</a>
+<a href="#main-content" class="skip-link">Skip to main content</a>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/parasend" class="nav-link">Versturen</a></li>
-    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
-    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
-    <li><a href="/security" class="nav-link">Beveiliging</a></li>
-    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
+    <li><a href="/#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/security" class="nav-link">Security</a></li>
+    <li><a href="/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Hulp</a>
-    <a href="/auth/login" class="nav-signin">Inloggen</a>
-    <a href="/signup" class="nav-cta">Account maken</a>
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/auth/login" class="nav-signin">Sign in</a>
+    <a href="/signup" class="nav-cta">Create account</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
-  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
-  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
-  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
+  <a href="/#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/security" class="nav-mobile-standalone">Security</a>
+  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
-  <a href="/help" class="nav-tail-link">Hulp</a>
+  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
 </div>
 <main id="main-content">
 
 <!-- No session in the address: nobody sent this visitor a link. A calm page,
      not an error. -->
 <div class="step" id="step-empty">
-  <h1>Er staat nog niets klaar</h1>
-  <p class="sub">Deze pagina opent vanzelf via de link die u kreeg.</p>
-  <a href="/parasend" class="btn">Zelf iets versturen</a>
+  <h1>Nothing to pick up yet</h1>
+  <p class="sub">This page opens by itself from the link you were sent.</p>
+  <a href="/parasend" class="btn">Send something yourself</a>
 </div>
 
 <!-- STEP 1: Generating keypair -->
 <div class="step active" id="step-keygen">
-  <h1>Veilig ontvangen</h1>
-  <p class="sub">Uw browser maakt nu uw eigen sleutels. De geheime sleutel verlaat uw apparaat nooit. Lees daarna de controlecode voor aan de afzender, zo weet u allebei dat de verbinding klopt.</p>
+  <h1>Secure receive</h1>
+  <p class="sub">Your browser is generating a post-quantum keypair. The private key never leaves your device. Share your fingerprint with the sender to verify the connection.</p>
 
   <div class="card">
-    <div class="card-head"><div class="dot amber" id="keygen-dot"></div><div class="card-head-title" id="keygen-title">Sleutels worden gemaakt...</div></div>
+    <div class="card-head"><div class="dot amber" id="keygen-dot"></div><div class="card-head-title" id="keygen-title">Generating keypair...</div></div>
     <div class="card-body">
-      <div class="status-line" id="keygen-status">Uw browser maakt de sleutels (ML-KEM-768 en ECDH P-256)...</div>
+      <div class="status-line" id="keygen-status">Generating ML-KEM-768 + ECDH P-256 keypair in your browser...</div>
       <div class="progress-bar-wrap"><div class="progress-bar" id="keygen-progress" style="width:30%"></div></div>
     </div>
   </div>
@@ -187,28 +187,28 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 <!-- STEP 2: Show fingerprint, wait for sender -->
 <div class="step" id="step-fingerprint">
-  <h1>Uw controlecode</h1>
-  <p class="sub">Lees deze controlecode voor aan de afzender. Die bevestigt dat hij gelijk is aan de code op zijn scherm, pas dan wordt het bestand verzegeld. Zo kan niemand ertussen komen.</p>
+  <h1>Your fingerprint</h1>
+  <p class="sub">Tell the sender your fingerprint. They must confirm it matches on their screen before the file is encrypted. This prevents the relay from intercepting.</p>
 
   <div class="card">
-    <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title" id="fp-title">Wacht op bevestiging van de afzender...</div></div>
+    <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title" id="fp-title">Waiting for sender to verify...</div></div>
     <div class="card-body">
-      <p class="fingerprint-label">Lees dit voor aan de afzender:</p>
+      <p class="fingerprint-label">Read this to the sender:</p>
       <div class="fingerprint" id="fp-display">-</div>
-      <div class="status-line" id="fp-status">Verbonden. De afzender controleert uw controlecode.</div>
+      <div class="status-line" id="fp-status">Connected - sender is verifying your fingerprint</div>
     </div>
   </div>
 </div>
 
 <!-- STEP 3: Receiving & decrypting -->
 <div class="step" id="step-receiving">
-  <h1>Bestand komt binnen...</h1>
-  <p class="sub">Het bestand wordt gedownload en met uw eigen sleutel geopend. Paramant heeft die sleutel nooit gehad.</p>
+  <h1>Receiving file...</h1>
+  <p class="sub">Downloading and decrypting with your private key. The relay never had access to the decryption key.</p>
 
   <div class="card">
-    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Ontsleutelen</div></div>
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Decrypting</div></div>
     <div class="card-body">
-      <div class="status-line" id="recv-status">Downloaden...</div>
+      <div class="status-line" id="recv-status">Downloading...</div>
       <div class="progress-bar-wrap"><div class="progress-bar" id="recv-progress"></div></div>
       <div class="status-line" id="recv-detail" style="color:var(--ink-dim)"></div>
     </div>
@@ -221,22 +221,22 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <div class="step" id="step-done">
   <div class="done-state">
     <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
-    <h1 class="done-title">U hebt het bestand.</h1>
-    <p class="done-line" id="done-status">Het staat op uw apparaat. Onze kopie is voorgoed vernietigd.</p>
+    <h1 class="done-title">You have the file.</h1>
+    <p class="done-line" id="done-status">It is saved on your device. Our copy has been permanently destroyed.</p>
 
     <div class="done-payload"></div>
 
     <div class="done-actions">
-      <button class="btn done-primary" id="done-save" type="button" data-click="saveAgain" hidden>Nog een keer opslaan</button>
-      <a class="done-quiet" id="done-dashboard" href="/dashboard">Naar uw overzicht</a>
+      <button class="btn done-primary" id="done-save" type="button" data-click="saveAgain" hidden>Save it again</button>
+      <a class="done-quiet" id="done-dashboard" href="/dashboard">Open your dashboard</a>
     </div>
 
     <details class="done-details">
-      <summary>Waarom dit veilig was</summary>
+      <summary>What made this safe</summary>
       <div class="done-details-body">
-        <p>Uw browser maakte bij het openen van deze pagina een eigen sleutelpaar en hield de geheime helft hier, waar hij nog steeds is. De afzender verzegelde het bestand met de openbare helft voordat het zijn apparaat verliet. Wat onderweg was, kon dus alleen door u worden geopend (<code>ML-KEM-768</code> met <code>ECDH P-256</code> voor de sleuteluitwisseling, <code>AES-256-GCM</code> voor het bestand).</p>
-        <p>De controlecode die u samen voorlas, is ook aan deze kant berekend, uit uw eigen sleutels. Staat op beide schermen dezelfde code, dan heeft niemand onderweg een sleutel verwisseld.</p>
-        <p>Een verzending via deze webapp wordt één keer gelezen. Elk deel is bij ons gewist zodra uw browser het ophaalde, en komt niemand het ophalen, dan wordt onze kopie na afloop van de termijn ook vernietigd. Wat onze server onderweg meldde, staat hieronder.</p>
+        <p>Your browser made its own pair of keys when this page opened and kept the private half here, where it still is. The sender locked the file for the public half before it left their device, so what travelled was sealed for you and for nobody else (<code>ML-KEM-768</code> with <code>ECDH P-256</code> for the key exchange, <code>AES-256-GCM</code> for the file).</p>
+        <p>The short code you both read out was worked out on this side too, from your own keys. Two screens showing the same code is what tells you nobody swapped a key in between.</p>
+        <p>A transfer through this web app is read once. Each block was wiped on our side as your browser took it, and our copy is destroyed on its own clock as well if nobody ever comes for it. What our relay reported on the way is written below.</p>
         <pre id="burn-receipt" hidden></pre>
       </div>
     </details>
@@ -244,42 +244,42 @@ h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 </div>
 
 <div class="step" id="step-error">
-  <h1>Ontvangen is mislukt</h1>
+  <h1>Transfer failed</h1>
   <div class="card">
-    <div class="card-head"><div class="dot" style="background:rgba(196, 96, 79, 1)"></div><div class="card-head-title">Fout</div></div>
+    <div class="card-head"><div class="dot" style="background:rgba(196, 96, 79, 1)"></div><div class="card-head-title">Error</div></div>
     <div class="card-body">
-      <div class="status-line err" id="error-msg">Onbekende fout</div>
+      <div class="status-line err" id="error-msg">Unknown error</div>
     </div>
   </div>
-  <button class="btn" style="margin-top:8px" data-click="reload">Opnieuw proberen</button>
+  <button class="btn" style="margin-top:8px" data-click="reload">Try again</button>
 </div>
 
 </main>
-<p class="lang-switch" style="max-width:580px;margin:0 auto;padding:24px 16px;font-size:14px"><a id="lang-switch-link" href="/en/ontvang" hreflang="en" lang="en" style="color:var(--ink)">This page in English</a></p>
+<p class="lang-switch" style="max-width:580px;margin:0 auto;padding:24px 16px;font-size:14px"><a id="lang-switch-link" href="/ontvang" hreflang="nl" lang="nl" style="color:var(--ink)">Deze pagina in het Nederlands</a></p>
 
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Bedrijf</div>
+        <div class="footer-col-label">Company</div>
         <div class="footer-links">
-          <a href="/about">Over Paramant</a>
-          <a href="/changelog">Wijzigingen</a>
+          <a href="/about">About</a>
+          <a href="/changelog">Changelog</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Juridisch</div>
+        <div class="footer-col-label">Legal</div>
         <div class="footer-links">
-          <a href="/privacy">Privacybeleid</a>
-          <a href="/dpa">Verwerkersovereenkomst</a>
-          <a href="/terms">Voorwaarden</a>
+          <a href="/privacy">Privacy Policy</a>
+          <a href="/dpa">Data Processing Agreement</a>
+          <a href="/terms">Terms of Service</a>
           <a href="/sla">SLA</a>
-          <a href="/license">Licentie</a>
+          <a href="/license">License</a>
         </div>
       </div>
     </div>

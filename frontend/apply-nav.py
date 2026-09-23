@@ -88,7 +88,7 @@ NEW_FOOTER = '''\
 # the same bar in Dutch, with the two outward product names Mick settled on:
 # Versturen and Ondertekenen. js/nav-auth.js re-renders the same Dutch list
 # when <html lang="nl">, so the two may never drift apart.
-NL_PAGES = {'index.html', 'pricing.html', 'about.html', 'security.html'}
+NL_PAGES = {'index.html', 'pricing.html', 'about.html', 'security.html', 'get.html', 'ontvang.html', 'parasend.html', 'parashare.html', 'verify.html'}
 
 NEW_NAV_NL = '''\
 <nav class="nav">

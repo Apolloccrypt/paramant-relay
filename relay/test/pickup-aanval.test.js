@@ -109,7 +109,7 @@ async function vraagCode(token, adres) {
   post.length = 0;
   const r = await pickup(token, { action: 'code' });
   await wachtOpPost();
-  const mail = post.find((p) => /code to open the file/i.test(p.subject || '')
+  const mail = post.find((p) => /controlecode om het bestand te openen/i.test(p.subject || '')
                              && (p.to || []).includes(adres));
   const code = mail ? (String(mail.text).match(/\b(\d{6})\b/) || [])[1] : null;
   return { status: r.status, body: await r.json().catch(() => ({})), mail, code };
@@ -145,7 +145,7 @@ test('1b: de mailprovider draagt beide helften, en dat is de grens van dit ontwe
   post.length = 0;
   const v = await maakVerzending([adres]);
   await wachtOpPost();
-  const uitnodiging = post.find((p) => /sent you a file/.test(p.subject || '')
+  const uitnodiging = post.find((p) => /heeft u een bestand gestuurd/.test(p.subject || '')
                                      && (p.to || []).includes(adres));
   assert.ok(uitnodiging, 'geen uitnodiging');
 
@@ -249,7 +249,7 @@ test('2f: hoeveel mail een onderschepper in een vreemde bus kan duwen', async ()
     gemaild++;
   }
   await wachtOpPost();
-  const bus = post.filter((p) => /code to open the file/i.test(p.subject || '')).length;
+  const bus = post.filter((p) => /controlecode om het bestand te openen/i.test(p.subject || '')).length;
   assert.ok(gemaild <= send.MAX_CODE_REQUESTS,
     `${gemaild} codes geaccepteerd, het plafond is ${send.MAX_CODE_REQUESTS}`);
   assert.ok(bus <= send.MAX_CODE_REQUESTS,
