@@ -27,9 +27,9 @@ body::after {
   z-index: 100;
   pointer-events: none;
   background: linear-gradient(90deg,
-    rgba(217, 164, 65, 0) 0%,
+    rgba(29, 78, 216, 0) 0%,
     var(--rp-lime) 50%,
-    rgba(217, 164, 65, 0) 100%);
+    rgba(29, 78, 216, 0) 100%);
   transform: translateX(-320px);
   animation: relay-pulse var(--rp-period) ease-in-out 0.5s infinite;
   will-change: transform, opacity;

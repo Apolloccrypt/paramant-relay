@@ -28,8 +28,8 @@
         text: setupData.otpauth,
         width: 240,
         height: 240,
-        colorDark: '#1B1F22',
-        colorLight: '#F1EAD6',
+        colorDark: '#0B3A6A',
+        colorLight: '#F8FAFC',
         correctLevel: QRCode.CorrectLevel.M,
       });
 

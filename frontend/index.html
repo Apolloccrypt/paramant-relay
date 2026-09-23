@@ -22,9 +22,69 @@
 <link rel="canonical" href="https://paramant.app/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="/design-system.css?v=28">
-<link rel="stylesheet" href="/nav.css?v=24">
+<link rel="stylesheet" href="/design-system.css?v=29">
+<link rel="stylesheet" href="/nav.css?v=25">
 <style>
+/* The homepage keeps the night it had since PR #404: the rest of the site is
+   back on the bone palette of design-system.css, this page re-points the same
+   token names at the night so the nav, the menu and the footer follow it. */
+:root{
+  --tint:234, 226, 206;
+  --night:#15191C;
+  --night-2:#101316;
+  --cream:#EAE2CE;
+  --ochre:#D9A441;
+  --ochre-2:#C7912E;
+  --ochre-ink:#8A5E10;
+  --on-ochre:#141414;
+  --petrol:#155E75;
+  --petrol-ink:#3FA3C4;
+  --brick:#C4604F;
+  --brick-ink:#E08A78;
+  --ok-ink:#8FC7A4;
+  --warn-ink:#E3C169;
+  --paper:#F1EAD6;
+  --paper-2:#E7DDC4;
+  --paper-ink:#1B1F22;
+  --paper-ink-2:#4A4A44;
+  --paper-line:rgba(27, 31, 34, .18);
+  --bone:var(--night);
+  --bone-2:var(--night-2);
+  --card:rgba(var(--tint), .045);
+  --card-2:rgba(var(--tint), .075);
+  --card-line:rgba(var(--tint), .14);
+  --surface:var(--card);
+  --navy:var(--cream);
+  --navy-2:var(--cream);
+  --ink:var(--cream);
+  --ink-2:rgba(var(--tint), .80);
+  --ink-dim:rgba(var(--tint), .62);
+  --ink-hair:rgba(var(--tint), .16);
+  --ink-ghost:rgba(var(--tint), .06);
+  --line:var(--ink-hair);
+  --line-2:rgba(var(--tint), .32);
+  --cobalt:var(--ochre);
+  --cobalt-2:var(--ochre-2);
+  --accent:var(--ochre);
+  --accent-hov:var(--ochre-2);
+  --accent-ink:var(--on-ochre);
+  --accent-soft:rgba(217, 164, 65, .10);
+  --accent-ring:rgba(217, 164, 65, .50);
+  --lime:var(--ochre);
+  --invert:#0C0F11;
+  --invert-ink:var(--cream);
+  --invert-dim:var(--ink-2);
+  --invert-hair:var(--line-2);
+  --bone-on-navy:var(--invert-ink);
+  --bone-on-navy-dim:var(--invert-dim);
+  --bone-on-navy-hair:var(--invert-hair);
+  --bone-blur:rgba(21, 25, 28, .92);
+  --black:var(--cream);
+  --r:16px;
+  color-scheme:dark;
+}
+html{background:var(--night)}
+body{color:var(--ink)}
 /* Homepage 2026, night edition: the same hand as BeerWeer. The night itself is
    no longer here: frontend/design-system.css carries it for the whole site, so
    this block is only what the homepage owns on top of it. The band, the letter,
