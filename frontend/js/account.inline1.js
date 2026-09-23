@@ -105,7 +105,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       document.getElementById('plan').textContent = planName(data, data.plan);
       var planChip = document.getElementById('plan-chip');
       if (planChip) planChip.textContent = planName(data, data.plan);
-      document.getElementById('label').textContent = data.label || '—';
+      document.getElementById('label').textContent = data.label || '-';
       document.getElementById('created').textContent = paramantDate.day(data.created_at, nlEn('Onbekend', 'Unknown'));
       document.getElementById('backup-count').textContent = data.backup_codes_remaining;
 

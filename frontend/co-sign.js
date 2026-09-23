@@ -314,7 +314,7 @@ async function prepareSigning() {
   if (__signKey) {
     setStatus('', L('Ingelogd als ', 'Signed in as ') + escapeHtml(__session.email || L('uw account', 'your account')) + L('. U tekent met uw ondertekensleutel (vingerafdruk ', '. You\'ll sign with your signing key (fingerprint ') + escapeHtml(__signKey.fingerprint) + ').');
   } else {
-    setStatus('', L('Ingelogd als ', 'Signed in as ') + escapeHtml(__session.email || L('uw account', 'your account')) + L('. U tekent met de passkey waarmee u inlogt. Die zet u met één tik klaar als u tekent. Geen passkey op dit apparaat? Dan tekent u met de code uit uw authenticator-app.', '. You\'ll sign with your sign-in passkey \u2014 set up with one tap when you sign. No passkey here? You can sign with your authenticator code instead.'));
+    setStatus('', L('Ingelogd als ', 'Signed in as ') + escapeHtml(__session.email || L('uw account', 'your account')) + L('. U tekent met de passkey waarmee u inlogt. Die zet u met één tik klaar als u tekent. Geen passkey op dit apparaat? Dan tekent u met de code uit uw authenticator-app.', '. You\'ll sign with your sign-in passkey. It is set up with one tap when you sign. No passkey here? You can sign with your authenticator code instead.'));
   }
   $('sign-confirm').onclick = doSign;
   refreshSignGate();   // stays disabled until the document has been reviewed (or blind-signing is acknowledged)
@@ -826,7 +826,7 @@ async function doSign() {
       return;
     }
     let msg;
-    if (e && e.code === 'no_passkey') msg = L('Voeg eerst een passkey toe aan uw account (Account, Inloggen met passkey) en open daarna deze link opnieuw. De passkey waarmee u inlogt wordt dan uw ondertekensleutel.', 'Add a passkey to your account first (Account → Passkey sign-in), then return to this link \u2014 your sign-in passkey becomes your signing key.');
+    if (e && e.code === 'no_passkey') msg = L('Voeg eerst een passkey toe aan uw account (Account, Inloggen met passkey) en open daarna deze link opnieuw. De passkey waarmee u inlogt wordt dan uw ondertekensleutel.', 'Add a passkey to your account first (Account → Passkey sign-in), then return to this link. Your sign-in passkey becomes your signing key.');
     else if (e && (e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
     else if (e && e.name === 'NotAllowedError') msg = L('De bevestiging met uw passkey is geannuleerd of duurde te lang. Tik op Ondertekenen om het opnieuw te proberen.', 'Passkey confirmation was cancelled or timed out. Tap Sign to try again.');
     else if (e && e.status === 401) msg = L('Uw sessie is verlopen. Log opnieuw in als de uitgenodigde ontvanger en probeer het nog eens.', 'Your session expired. Sign in again as the invited recipient, then retry.');

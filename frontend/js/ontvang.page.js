@@ -62,7 +62,7 @@ const T = {
     haveFile: 'You have the file.',
     savedLine: (name) => name + ' is saved on your device. Our copy has been permanently destroyed.',
     decFail: 'Decryption failed: ',
-    vaultRecv: (n) => 'Receiving vault \u2014 ' + n + ' files...',
+    vaultRecv: (n) => 'Receiving vault: ' + n + ' files...',
     vaultStep: (i, n) => 'Vault: ' + i + '/' + n + ' downloaded',
     haveFiles: 'You have the files.',
     savedFiles: (n) => n + ' files are saved on your device. Our copies have been permanently destroyed.',

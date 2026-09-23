@@ -125,7 +125,7 @@
             setOverall(allOk, true);
             var now = new Date();
             document.getElementById('lastChecked').textContent =
-              'Last checked: ' + now.toLocaleTimeString() + ' \u2014 next check in 30s';
+              'Last checked: ' + now.toLocaleTimeString() + ' · next check in 30 s';
           }
         });
     });

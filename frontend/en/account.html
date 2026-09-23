@@ -221,9 +221,9 @@ main.acct input::placeholder { color: var(--ink-3); }
 <header class="acct-hero">
   <div>
     <h1>Account settings</h1>
-    <div class="acct-session"><strong id="account-email">&mdash;</strong><br>Session ends in <span id="session-timer">&mdash;</span>. Renew by signing out and back in.</div>
+    <div class="acct-session"><strong id="account-email">-</strong><br>Session ends in <span id="session-timer">-</span>. Renew by signing out and back in.</div>
   </div>
-  <span class="acct-plan"><strong id="plan-chip">&mdash;</strong><span>plan</span></span>
+  <span class="acct-plan"><strong id="plan-chip">-</strong><span>plan</span></span>
 </header>
 
 <details class="acct-card acct-advanced" id="acct-advanced">
@@ -232,14 +232,14 @@ main.acct input::placeholder { color: var(--ink-3); }
   <div class="info-row">
     <div class="info-label">Key</div>
     <div class="info-value">
-      <code class="secret-display" id="api-key">&mdash;</code>
+      <code class="secret-display" id="api-key">-</code>
       <button type="button" class="btn btn-small btn-secondary" id="copy-key">Copy</button>
       <button type="button" class="btn btn-small btn-secondary" id="show-key">Show</button>
     </div>
   </div>
-  <div class="info-row"><div class="info-label">Plan</div><div class="info-value" id="plan">&mdash;</div></div>
-  <div class="info-row"><div class="info-label">Label</div><div class="info-value" id="label">&mdash;</div></div>
-  <div class="info-row"><div class="info-label">Created</div><div class="info-value" id="created">&mdash;</div></div>
+  <div class="info-row"><div class="info-label">Plan</div><div class="info-value" id="plan">-</div></div>
+  <div class="info-row"><div class="info-label">Label</div><div class="info-value" id="label">-</div></div>
+  <div class="info-row"><div class="info-label">Created</div><div class="info-value" id="created">-</div></div>
   <p class="small mt-3">
     Use this key in scripts, SDKs, and IoT devices: send it in the <code>X-Api-Key</code> HTTP header. See <a href="/docs">API documentation</a>.
   </p>
@@ -258,7 +258,7 @@ main.acct input::placeholder { color: var(--ink-3); }
     </div>
     <div class="acct-block">
       <h3>Backup codes</h3>
-      <p><span id="backup-count">&mdash;</span> remaining of 10.</p>
+      <p><span id="backup-count">-</span> remaining of 10.</p>
       <button type="button" class="btn btn-secondary btn-small" id="regen-backup">Regenerate all codes</button>
       <p class="small mt-2">Your current codes stop working. The new codes are shown once.</p>
     </div>
@@ -389,13 +389,13 @@ main.acct input::placeholder { color: var(--ink-3); }
          to stop, so the only thing worth saying is the date and that no money
          moves by itself. -->
     <div class="plan-term-warn" id="billing-term-warn" role="status" hidden>
-      <p class="plan-term-warn-text" data-term="text">&mdash;</p>
+      <p class="plan-term-warn-text" data-term="text">-</p>
       <a class="plan-term-warn-cta" href="/en/pricing">Renew</a>
     </div>
     <div class="info-row">
       <div class="info-label">Current plan</div>
       <div class="info-value">
-        <span id="billing-plan">&mdash;</span>
+        <span id="billing-plan">-</span>
         <span id="billing-active-badge" class="plan-tier-active hidden">Active</span>
       </div>
     </div>
@@ -403,18 +403,18 @@ main.acct input::placeholder { color: var(--ink-3); }
          the day it stops; after it, the day it stopped and where the account
          landed. Filled from paid_until_*, which the relay has emitted since the
          betaalpad fixes. -->
-    <p class="plan-term-line" id="billing-term-line" hidden>&mdash;</p>
+    <p class="plan-term-line" id="billing-term-line" hidden>-</p>
     <!-- Each checkout buys one term and nothing is collected again by itself
          (see /terms), so what a customer needs is the day access stops, not a
          collection date. The renewal note under it says so in words. -->
     <div class="info-row" id="billing-next-row" style="display:none">
       <div class="info-label">Access until</div>
-      <div class="info-value" id="billing-next">&mdash;</div>
+      <div class="info-value" id="billing-next">-</div>
     </div>
     <p id="billing-renew-note" class="acct-note" hidden style="font-size:var(--text-sm);color:var(--ink-dim);margin-top:var(--space-2)">This is a one-off payment for the term you bought. Nothing is collected again by itself. Buy another term before this date to keep the plan running.</p>
     <div class="info-row" id="billing-cancel-row" style="display:none">
       <div class="info-label">Cancellation</div>
-      <div class="info-value" id="billing-cancel-date" style="color:var(--warn-ink)">&mdash;</div>
+      <div class="info-value" id="billing-cancel-date" style="color:var(--warn-ink)">-</div>
     </div>
     <div class="acct-actions">
       <a href="/en/pricing" class="btn btn-secondary btn-small">View plans</a>
@@ -517,7 +517,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 <script src="/nav.js?v=16" defer></script>
 <script src="/js/nav-auth.js?v=12" defer></script>
 <script src="/js/account-api-keys.js?v=2" defer></script>
-<script src="/js/account.inline1.js?v=9"></script>
+<script src="/js/account.inline1.js?v=10"></script>
 <script src="/js/app-session-token.js?v=1" defer></script>
 <script src="/js/redeem-code.js?v=3" defer></script>
 
