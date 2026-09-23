@@ -19,10 +19,23 @@
 // (/api/user/sign/*), bound to the logged-in invitee session.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
 import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=15';
-import { promptTotp } from '/js/totp-prompt.js?v=1';
-import { decryptDocumentCapsule, parseDocumentKeyFragment } from '/js/parasign-document-capsule.js?v=1';
+import { promptTotp } from '/js/totp-prompt.js?v=2';
+import { decryptDocumentCapsule, parseDocumentKeyFragment } from '/js/parasign-document-capsule.js?v=2';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
+
+// One file for /co-sign (Dutch, the default) and /en/co-sign. Every sentence a
+// person reads goes through L(dutch, english); the page's lang attribute picks.
+const EN = document.documentElement.lang === 'en';
+const L = (nl, en) => (EN ? en : nl);
+
+// The language link has to carry the query (which envelope, which party, the
+// invite token) and the #fragment (the document key). A fragment never leaves
+// the browser, so a plain link with it is as safe as the address bar.
+{
+  const langLink = document.getElementById('lang-switch-link');
+  if (langLink) langLink.href = (EN ? '/co-sign' : '/en/co-sign') + location.search + location.hash;
+}
 
 // ---------- helpers ----------
 function $(id) { return document.getElementById(id); }
@@ -40,7 +53,7 @@ function bytesToDataUrl(bytes, mime) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(r.result);
-    r.onerror = () => reject(new Error('FileReader error'));
+    r.onerror = () => reject(new Error(L('het bestand kon niet worden gelezen', 'FileReader error')));
     r.readAsDataURL(new Blob([bytes], { type: mime }));
   });
 }
@@ -118,15 +131,15 @@ async function init() {
   const partyIndex = parseInt(params.get('p') || '', 10);
   __inviteToken = (params.get('t') || '').trim();
   if (!envId || !Number.isInteger(partyIndex) || partyIndex < 0) {
-    return showError('Missing or invalid env / p query parameter.');
+    return showError(L('Deze link is onvolledig. De gegevens van het verzoek ontbreken of kloppen niet.', 'Missing or invalid env / p query parameter.'));
   }
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(envId)) {
-    return showError('Envelope id is malformed.');
+    return showError(L('De link bevat geen geldig verzoek.', 'Envelope id is malformed.'));
   }
   __partyIndex = partyIndex;
 
   showStep('step-loading');
-  $('loading-msg').textContent = 'Fetching envelope...';
+  $('loading-msg').textContent = L('Het verzoek wordt opgehaald...', 'Fetching envelope...');
 
   try {
     // Ask as this party, not as a passer-by. The public projection is
@@ -136,12 +149,12 @@ async function init() {
     // it to them, and this page has been holding it all along.
     const partyQuery = '?p=' + encodeURIComponent(partyIndex) + '&t=' + encodeURIComponent(__inviteToken);
     const r = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(envId) + partyQuery);
-    if (r.status === 404) return showError('Envelope not found, expired, or already burned.');
-    if (r.status === 429) return showError('Rate-limited - too many requests from this address. Try again in a minute.');
-    if (!r.ok) return showError('Relay error: HTTP ' + r.status);
+    if (r.status === 404) return showError(L('Dit verzoek bestaat niet, is verlopen of is al gebruikt.', 'Envelope not found, expired, or already burned.'));
+    if (r.status === 429) return showError(L('Te veel verzoeken vanaf dit adres. Probeer het over een minuut opnieuw.', 'Rate-limited - too many requests from this address. Try again in a minute.'));
+    if (!r.ok) return showError(L('De relay gaf een fout (HTTP ' + r.status + ').', 'Relay error: HTTP ' + r.status));
     const data = await r.json();
     __envelope = data.envelope;
-    if (__partyIndex >= __envelope.party_count) return showError('Party index out of range for this envelope.');
+    if (__partyIndex >= __envelope.party_count) return showError(L('Deze link verwijst naar een ondertekenaar die niet in dit verzoek staat.', 'Party index out of range for this envelope.'));
 
     // Best-effort viewed-receipt (token-gated for email-bound envelopes); ignore failures.
     try {
@@ -155,9 +168,9 @@ async function init() {
     showStep('step-cosign');
     await prepareSigning();
     if (__session) await loadDeliveredDocument(envId, partyIndex);
-    else setDeliveryStatus('warn', 'Sign in with the invited email address to open this encrypted document.');
+    else setDeliveryStatus('warn', L('Log in met het uitgenodigde e-mailadres om dit versleutelde document te openen.', 'Sign in with the invited email address to open this encrypted document.'));
   } catch (e) {
-    showError(e.message || 'Network error');
+    showError(e.message || L('Er is geen verbinding. Controleer uw internet en probeer het opnieuw.', 'Network error'));
   }
 }
 
@@ -165,10 +178,10 @@ function renderEnvelope() {
   const e = __envelope;
   $('env-id').textContent = e.id;
   $('env-hash').textContent = e.doc_hash;
-  $('env-filename').textContent = e.original_filename || '(not provided)';
+  $('env-filename').textContent = e.original_filename || L('(niet opgegeven)', '(not provided)');
   $('env-created').textContent = e.created_at || '-';
   $('env-expires').textContent = e.expires_at || '-';
-  $('env-progress').textContent = e.signed_count + ' / ' + e.party_count + ' signed';
+  $('env-progress').textContent = e.signed_count + ' / ' + e.party_count + L(' getekend', ' signed');
   $('env-status').textContent = 'Status: ' + (e.status || '-');
   const dot = $('env-status-dot');
   dot.className = 'dot ' + (e.status === 'complete' ? '' : e.status === 'sent' ? 'amber' : '');
@@ -178,22 +191,22 @@ function renderEnvelope() {
   for (const p of e.parties) {
     const row = document.createElement('div');
     row.className = 'party-row' + (p.index === __partyIndex ? ' me' : '');
-    const label = escapeHtml(p.label || ('Party ' + (p.index + 1)));
+    const label = escapeHtml(p.label || (L('Ondertekenaar ', 'Party ') + (p.index + 1)));
     // Allowlist the status to a known enum before putting it in the class attr
     // (and the visible label) so a hostile relay value can't break out of the
     // attribute. Unknown -> 'pending'.
     const statusClass = (p.status === 'signed' || p.status === 'viewed') ? p.status : 'pending';
-    const statusText = statusClass === 'signed' ? 'SIGNED' : statusClass === 'viewed' ? 'VIEWED' : 'PENDING';
+    const statusText = statusClass === 'signed' ? L('GETEKEND', 'SIGNED') : statusClass === 'viewed' ? L('BEKEKEN', 'VIEWED') : L('WACHT', 'PENDING');
     const idx = Number(p.index);
     row.innerHTML =
       '<div class="party-idx">#' + (Number.isFinite(idx) ? idx : '') + '</div>' +
-      '<div class="party-label">' + label + (p.index === __partyIndex ? ' (you)' : '') + '</div>' +
+      '<div class="party-label">' + label + (p.index === __partyIndex ? L(' (u)', ' (you)') : '') + '</div>' +
       '<div class="party-status ' + statusClass + '">' + statusText + '</div>';
     list.appendChild(row);
   }
 
   const me = e.parties[__partyIndex] || {};
-  $('me-label').textContent = (me.label || 'party ' + (__partyIndex + 1));
+  $('me-label').textContent = (me.label || L('ondertekenaar ', 'party ') + (__partyIndex + 1));
   $('verify-file').onchange = onVerifyFile;
   const go = $('requested-note-go');
   if (go) go.onclick = () => scrollToRequestedSpot('smooth');
@@ -205,7 +218,7 @@ function renderEnvelope() {
     { const note = $('requested-note'); if (note) note.hidden = true; }
     saveAppearanceDraft();
     __appearanceTool = '';
-    setAppearanceHelp('Your visible fields were cleared. You can place them again or sign without a visible mark.', false);
+    setAppearanceHelp(L('Uw zichtbare velden zijn gewist. U kunt ze opnieuw plaatsen of tekenen zonder zichtbare stempel.', 'Your visible fields were cleared. You can place them again or sign without a visible mark.'), false);
     renderAppearanceOverlays();
   };
 }
@@ -266,7 +279,7 @@ async function loadSession() {
 async function prepareSigning() {
   const me = __envelope.parties[__partyIndex] || {};
   if (me.status === 'signed') {
-    setStatus('ok', 'This slot has already been signed. Nothing to do.');
+    setStatus('ok', L('Op deze plek is al getekend. Er hoeft niets meer te gebeuren.', 'This slot has already been signed. Nothing to do.'));
     return;
   }
 
@@ -275,11 +288,11 @@ async function prepareSigning() {
   // with no session to sign in first.
   __session = await loadSession();
   if (!__session) {
-    setStatus('warn', 'Sign in as the recipient this invite was sent to, then return here to sign.');
+    setStatus('warn', L('Log in als de ontvanger aan wie deze uitnodiging is gestuurd. Kom daarna hier terug om te tekenen.', 'Sign in as the recipient this invite was sent to, then return here to sign.'));
     // Preserve the fragment: it contains the document decryption key and is not
     // sent to either Paramant or the identity provider.
     const ret = encodeURIComponent(location.pathname + location.search + location.hash);
-    showCta('<a class="btn" href="/auth/login?return=' + ret + '">Sign in to continue</a>');
+    showCta('<a class="btn" href="/auth/login?return=' + ret + L('">Inloggen om verder te gaan</a>', '">Sign in to continue</a>'));
     return;
   }
 
@@ -293,15 +306,15 @@ async function prepareSigning() {
     if (e && e.code === 'no_signing_passkey') {
       __signKey = null;   // doSign() will set it up with one tap before signing
     } else {
-      setStatus('err', e.message || 'Could not check your signing key.');
+      setStatus('err', e.message || L('Uw ondertekensleutel kon niet worden gecontroleerd.', 'Could not check your signing key.'));
       return;
     }
   }
 
   if (__signKey) {
-    setStatus('', 'Signed in as ' + escapeHtml(__session.email || 'your account') + '. You\'ll sign with your signing key (fingerprint ' + escapeHtml(__signKey.fingerprint) + ').');
+    setStatus('', L('Ingelogd als ', 'Signed in as ') + escapeHtml(__session.email || L('uw account', 'your account')) + L('. U tekent met uw ondertekensleutel (vingerafdruk ', '. You\'ll sign with your signing key (fingerprint ') + escapeHtml(__signKey.fingerprint) + ').');
   } else {
-    setStatus('', 'Signed in as ' + escapeHtml(__session.email || 'your account') + '. You\'ll sign with your sign-in passkey — set up with one tap when you sign. No passkey here? You can sign with your authenticator code instead.');
+    setStatus('', L('Ingelogd als ', 'Signed in as ') + escapeHtml(__session.email || L('uw account', 'your account')) + L('. U tekent met de passkey waarmee u inlogt. Die zet u met één tik klaar als u tekent. Geen passkey op dit apparaat? Dan tekent u met de code uit uw authenticator-app.', '. You\'ll sign with your sign-in passkey \u2014 set up with one tap when you sign. No passkey here? You can sign with your authenticator code instead.'));
   }
   $('sign-confirm').onclick = doSign;
   refreshSignGate();   // stays disabled until the document has been reviewed (or blind-signing is acknowledged)
@@ -326,23 +339,23 @@ async function loadDeliveredDocument(envId, partyIndex) {
   let key;
   try { key = parseDocumentKeyFragment(location.hash); }
   catch (e) {
-    setDeliveryStatus('err', e.message + ' Choose the document manually below.');
+    setDeliveryStatus('err', e.message + L(' Kies het document hieronder zelf.', ' Choose the document manually below.'));
     return;
   }
   if (!key) {
-    setDeliveryStatus('warn', 'This signing link does not contain an encrypted document key. Ask the sender for the complete link, or choose the document manually below.');
+    setDeliveryStatus('warn', L('In deze link zit geen sleutel voor het versleutelde document. Vraag de afzender om de volledige link, of kies het document hieronder zelf.', 'This signing link does not contain an encrypted document key. Ask the sender for the complete link, or choose the document manually below.'));
     return;
   }
   key.fill(0); // decryptDocumentCapsule parses a fresh copy when it needs it.
-  setDeliveryStatus('', 'Downloading the encrypted document...');
+  setDeliveryStatus('', L('Het versleutelde document wordt gedownload...', 'Downloading the encrypted document...'));
   try {
     const url = '/api/user/envelopes/' + encodeURIComponent(envId) + '/document?p=' + encodeURIComponent(partyIndex) + '&t=' + encodeURIComponent(__inviteToken);
     const r = await fetch(url, { credentials: 'include', cache: 'no-store', signal: AbortSignal.timeout(60000) });
-    if (r.status === 401) throw new Error('Sign in with the invited email address to open this document.');
-    if (r.status === 403) throw new Error('This invitation belongs to a different email address. Sign in with the invited address.');
-    if (r.status === 404) throw new Error('The encrypted document is unavailable. It may be an older request or the link may be incomplete.');
-    if (r.status === 410) throw new Error('This signing request or its document has expired. Ask the sender for a new request.');
-    if (!r.ok) throw new Error('The encrypted document could not be downloaded (HTTP ' + r.status + ').');
+    if (r.status === 401) throw new Error(L('Log in met het uitgenodigde e-mailadres om dit document te openen.', 'Sign in with the invited email address to open this document.'));
+    if (r.status === 403) throw new Error(L('Deze uitnodiging hoort bij een ander e-mailadres. Log in met het uitgenodigde adres.', 'This invitation belongs to a different email address. Sign in with the invited address.'));
+    if (r.status === 404) throw new Error(L('Het versleutelde document is niet beschikbaar. Misschien is het een ouder verzoek, of is de link onvolledig.', 'The encrypted document is unavailable. It may be an older request or the link may be incomplete.'));
+    if (r.status === 410) throw new Error(L('Dit verzoek of het document is verlopen. Vraag de afzender om een nieuw verzoek.', 'This signing request or its document has expired. Ask the sender for a new request.'));
+    if (!r.ok) throw new Error(L('Het versleutelde document kon niet worden gedownload (HTTP ', 'The encrypted document could not be downloaded (HTTP ') + r.status + ').');
     const capsule = new Uint8Array(await r.arrayBuffer());
     let delivered;
     try {
@@ -352,10 +365,10 @@ async function loadDeliveredDocument(envId, partyIndex) {
     }
     await verifyAndRenderDocument(delivered.bytes, 'delivery');
     if (__hashMatches) {
-      setDeliveryStatus('ok', 'Encrypted document loaded, decrypted and matched to this signing request.');
+      setDeliveryStatus('ok', L('Het versleutelde document is geladen, ontsleuteld en klopt met dit verzoek.', 'Encrypted document loaded, decrypted and matched to this signing request.'));
     }
   } catch (e) {
-    setDeliveryStatus('err', (e.message || 'Automatic document loading failed.') + ' Choose the document manually below.');
+    setDeliveryStatus('err', (e.message || L('Het document kon niet vanzelf worden geladen.', 'Automatic document loading failed.')) + L(' Kies het document hieronder zelf.', ' Choose the document manually below.'));
   }
 }
 
@@ -374,11 +387,11 @@ async function verifyAndRenderDocument(buf, source) {
   if (__hashMatches) {
     b.className = 'banner ok';
     b.textContent = source === 'delivery'
-      ? 'Hash matches. This is the document delivered with this signing request.'
-      : 'Hash matches. This is the exact document in this envelope - what you see below is what you sign.';
+      ? L('De hash klopt. Dit is het document dat bij dit verzoek hoort.', 'Hash matches. This is the document delivered with this signing request.')
+      : L('De hash klopt. Dit is precies het document uit dit verzoek. Wat u hieronder ziet, is wat u ondertekent.', 'Hash matches. This is the exact document in this envelope - what you see below is what you sign.');
   } else {
     b.className = 'banner err';
-    b.textContent = 'Hash mismatch. The file you opened differs from the one in this envelope - do not sign it. Computed: ' + h.slice(0, 16) + '... Expected: ' + __envelope.doc_hash.slice(0, 16) + '...';
+    b.textContent = L('De hash klopt niet. Het bestand dat u opende is niet het document uit dit verzoek. Onderteken het niet. Berekend: ', 'Hash mismatch. The file you opened differs from the one in this envelope - do not sign it. Computed: ') + h.slice(0, 16) + L('... Verwacht: ', '... Expected: ') + __envelope.doc_hash.slice(0, 16) + '...';
   }
   await renderDocPreview(buf);
   const editor = $('appearance-editor');
@@ -387,7 +400,7 @@ async function verifyAndRenderDocument(buf, source) {
   // Say out loud whose box this is. The requested spot is a suggestion: what a
   // signature binds is the position the signer actually used.
   if (seed && editorOn) {
-    setAppearanceHelp('The sender asked for your signature in the marked spot. Choose Place my signature to move it: your signature binds where you actually sign, not where it was requested.', false);
+    setAppearanceHelp(L('De afzender vraagt uw handtekening op de gemarkeerde plek. Kies Plaats mijn handtekening om hem te verplaatsen. Uw handtekening geldt voor de plek waar u echt tekent, niet voor de plek die werd gevraagd.', 'The sender asked for your signature in the marked spot. Choose Place my signature to move it: your signature binds where you actually sign, not where it was requested.'), false);
   }
   // The requested spot can be on page three of a long agreement, so pointing at
   // it is not enough: take the reader there, and leave a way back to it.
@@ -410,7 +423,7 @@ async function verifyAndRenderDocument(buf, source) {
 async function renderDocPreview(bytes) {
   const host = $('doc-preview');
   host.hidden = false;
-  host.innerHTML = '<div class="doc-preview-meta">Rendering document...</div>';
+  host.innerHTML = L('<div class="doc-preview-meta">Het document wordt getoond...</div>', '<div class="doc-preview-meta">Rendering document...</div>');
   try {
     if (isPdfBytes(bytes)) {
       await renderPdfPreview(bytes, host);
@@ -419,11 +432,11 @@ async function renderDocPreview(bytes) {
       if (mime && mime.startsWith('image/')) {
         await renderImagePreview(bytes, mime, host);
       } else {
-        host.innerHTML = '<div class="doc-preview-meta">This file type cannot be shown in the browser. The hash check above already proves it is the exact document in this envelope - open it in your own app to read it before you sign.</div>';
+        host.innerHTML = L('<div class="doc-preview-meta">Dit soort bestand kan de browser niet tonen. De controle van de hash hierboven bewijst al dat dit precies het document uit dit verzoek is. Open het in uw eigen programma en lees het voordat u tekent.</div>', '<div class="doc-preview-meta">This file type cannot be shown in the browser. The hash check above already proves it is the exact document in this envelope - open it in your own app to read it before you sign.</div>');
       }
     }
   } catch (e) {
-    host.innerHTML = '<div class="doc-preview-meta">Could not render a preview (' + escapeHtml(e.message || 'error') + '). The hash check above still tells you whether this is the right file.</div>';
+    host.innerHTML = L('<div class="doc-preview-meta">Er kan geen voorbeeld worden getoond (', '<div class="doc-preview-meta">Could not render a preview (') + escapeHtml(e.message || L('fout', 'error')) + L('). De controle van de hash hierboven zegt nog steeds of dit het juiste bestand is.</div>', '). The hash check above still tells you whether this is the right file.</div>');
   }
 }
 
@@ -468,8 +481,8 @@ async function renderPdfPreview(bytes, host) {
   }
   const meta = document.createElement('div');
   meta.className = 'doc-preview-meta';
-  meta.textContent = pdf.numPages + ' page' + (pdf.numPages === 1 ? '' : 's') +
-    (pdf.numPages > maxPages ? ' (showing first ' + maxPages + ')' : '');
+  meta.textContent = pdf.numPages + (EN ? (' page' + (pdf.numPages === 1 ? '' : 's')) : (pdf.numPages === 1 ? ' pagina' : " pagina's")) +
+    (pdf.numPages > maxPages ? L(' (de eerste ', ' (showing first ') + maxPages + L(' worden getoond)', ')') : '');
   host.appendChild(meta);
   renderAppearanceOverlays();
 }
@@ -480,7 +493,7 @@ async function renderImagePreview(bytes, mime, host) {
   const wrap = document.createElement('div');
   wrap.className = 'doc-page';
   const img = document.createElement('img');
-  img.alt = 'Document to sign';
+  img.alt = L('Document om te ondertekenen', 'Document to sign');
   img.src = url;
   wrap.appendChild(img);
   host.appendChild(wrap);
@@ -511,8 +524,8 @@ function armAppearanceTool(type) {
   if (!__documentBytes || !isPdfBytes(__documentBytes)) return;
   __appearanceTool = type;
   setAppearanceHelp(type === 'seal'
-    ? 'Signature selected. Click the PDF where your verified Paramant seal should appear.'
-    : 'Date selected. Click the PDF where the signing date should appear.', true);
+    ? L('Handtekening gekozen. Klik op de plek in het document waar uw gecontroleerde Paramant-stempel moet komen.', 'Signature selected. Click the PDF where your verified Paramant seal should appear.')
+    : L('Datum gekozen. Klik op de plek in het document waar de datum van ondertekening moet komen.', 'Date selected. Click the PDF where the signing date should appear.'), true);
 }
 
 function placeAppearanceField(event) {
@@ -543,14 +556,14 @@ function placeAppearanceField(event) {
   saveAppearanceDraft();
   __appearanceTool = '';
   setAppearanceHelp(field.type === 'seal'
-    ? 'Your signature seal is placed. Drag is not needed: choose Place my signature again to move it.'
-    : 'The signing date is placed. Choose Place date again to move it.', false);
+    ? L('Uw stempel staat. Slepen hoeft niet: kies opnieuw Plaats mijn handtekening om hem te verplaatsen.', 'Your signature seal is placed. Drag is not needed: choose Place my signature again to move it.')
+    : L('De datum staat. Kies opnieuw Plaats datum om hem te verplaatsen.', 'The signing date is placed. Choose Place date again to move it.'), false);
   renderAppearanceOverlays();
 }
 
 function appearanceText(type, party, current) {
   if (type === 'date') return current ? new Date().toISOString().slice(0, 10) : String(party.signed_at || '').slice(0, 10);
-  return 'Paramant signed · ' + String(party.label || 'Signer');
+  return L('Paramant ondertekend · ', 'Paramant signed · ') + String(party.label || L('Ondertekenaar', 'Signer'));
 }
 
 function addAppearanceNode(layer, field, party, current, requested) {
@@ -562,12 +575,12 @@ function addAppearanceNode(layer, field, party, current, requested) {
   node.style.height = (field.h * 100) + '%';
   // A requested box names nobody and carries no date: nothing has been signed
   // there yet, and showing a name would be a signature the signer never made.
-  node.textContent = requested ? 'Requested spot · your signature goes here' : appearanceText(field.type, party, current);
+  node.textContent = requested ? L('Gevraagde plek · hier komt uw handtekening', 'Requested spot · your signature goes here') : appearanceText(field.type, party, current);
   if (current && !requested) {
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'appearance-remove';
-    remove.setAttribute('aria-label', 'Remove ' + field.type + ' field');
+    remove.setAttribute('aria-label', L(field.type === 'date' ? 'Verwijder het datumveld' : 'Verwijder het handtekeningveld', 'Remove ' + field.type + ' field'));
     remove.textContent = '×';
     remove.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -651,7 +664,7 @@ export async function buildSignedPdf(currentResult) {
         page.drawRectangle({ x, y, width: w, height: h, color: rgb(1, 1, 1), opacity: 0.94, borderColor: rgb(.22, .32, .48), borderWidth: 1 });
         page.drawText(text, { x: x + 5, y: y + Math.max(4, h * .3), size: Math.max(7, Math.min(11, h * .32)), font: regular, color: rgb(.04, .18, .35) });
       } else {
-        const label = safePdfText(record.party.label || 'Signer', 70);
+        const label = safePdfText(record.party.label || L('Ondertekenaar', 'Signer'), 70);
         const fingerprint = safePdfText(record.party.signer_pk_hash || '', 16);
         const date = safePdfText(record.party.signed_at || '', 24);
         page.drawRectangle({ x, y, width: w, height: h, color: rgb(1, 1, 1), opacity: 0.94, borderColor: rgb(.08, .31, .84), borderWidth: 1.4 });
@@ -668,7 +681,7 @@ export async function buildSignedPdf(currentResult) {
 
 // ---------- WYSIWYS gate: you cannot sign until you have opened the document (or explicitly accept signing blind) ----------
 function blindLinkHtml() {
-  return ' <button type="button" class="blind-link" id="blind-ack">I do not have the file - sign the hash blind</button>';
+  return L(' <button type="button" class="blind-link" id="blind-ack">Ik heb het bestand niet. Onderteken alleen de hash</button>', ' <button type="button" class="blind-link" id="blind-ack">I do not have the file - sign the hash blind</button>');
 }
 function refreshSignGate() {
   const btn = $('sign-confirm');
@@ -682,13 +695,13 @@ function refreshSignGate() {
   btn.disabled = !reviewed;
   gate.hidden = false;
   if (__hashMatches === true) {
-    gate.innerHTML = '<span style="color:var(--cobalt)">You have opened and verified the document above.</span>';
+    gate.innerHTML = L('<span style="color:var(--cobalt)">U heeft het document hierboven geopend en gecontroleerd.</span>', '<span style="color:var(--cobalt)">You have opened and verified the document above.</span>');
   } else if (__hashMatches === false && !__blindAck) {
-    gate.innerHTML = 'The file you opened does not match this envelope, so signing is blocked. Open the correct document, or' + blindLinkHtml();
+    gate.innerHTML = L('Het bestand dat u opende hoort niet bij dit verzoek, dus ondertekenen is geblokkeerd. Open het juiste document, of', 'The file you opened does not match this envelope, so signing is blocked. Open the correct document, or') + blindLinkHtml();
   } else if (__blindAck) {
-    gate.innerHTML = '<span style="color:#b45309">Signing blind - you have not opened the document. Your signature still covers its hash.</span> <button type="button" class="blind-link" id="blind-undo">Open the document instead</button>';
+    gate.innerHTML = L('<span style="color:#b45309">U tekent zonder het document te hebben geopend. Uw handtekening dekt wel de hash ervan.</span> <button type="button" class="blind-link" id="blind-undo">Toch het document openen</button>', '<span style="color:#b45309">Signing blind - you have not opened the document. Your signature still covers its hash.</span> <button type="button" class="blind-link" id="blind-undo">Open the document instead</button>');
   } else {
-    gate.innerHTML = 'Open the document above to review it before signing, or' + blindLinkHtml();
+    gate.innerHTML = L('Open het document hierboven en bekijk het voordat u tekent, of', 'Open the document above to review it before signing, or') + blindLinkHtml();
   }
   const ack = $('blind-ack'); if (ack) ack.onclick = () => { __blindAck = true; refreshSignGate(); };
   const undo = $('blind-undo'); if (undo) undo.onclick = () => { __blindAck = false; refreshSignGate(); };
@@ -699,15 +712,15 @@ async function doSign() {
   // The review gate keeps this button disabled until the document is verified or
   // blind-signing is acknowledged; re-check here as defence in depth.
   if (__hashMatches !== true && !__blindAck) {
-    setStatus('err', 'Open and review the document above before signing.');
+    setStatus('err', L('Open en bekijk het document hierboven voordat u tekent.', 'Open and review the document above before signing.'));
     refreshSignGate();
     return;
   }
   if (__blindAck && __hashMatches !== true) {
-    if (!confirm('You have not opened the document - you would be signing its hash blind. Continue?')) return;
+    if (!confirm(L('U heeft het document niet geopend. U ondertekent dan alleen de hash, zonder het document te zien. Doorgaan?', 'You have not opened the document - you would be signing its hash blind. Continue?'))) return;
   }
   if (__documentBytes && isPdfBytes(__documentBytes) && Number(__envelope.recipe_version) >= 5 && __appearance.fields.length === 0) {
-    if (!confirm('Sign without a visible mark on the PDF? Your cryptographic signature will still be recorded.')) return;
+    if (!confirm(L('Ondertekenen zonder zichtbare stempel in het document? Uw cryptografische handtekening wordt wel vastgelegd.', 'Sign without a visible mark on the PDF? Your cryptographic signature will still be recorded.'))) return;
   }
   $('sign-confirm').disabled = true;
   $('sign-cta').hidden = true;
@@ -727,7 +740,7 @@ async function doSign() {
         if (!e || (e.code !== 'prf_unsupported' && e.code !== 'no_passkey')) throw e;
         const code = await promptTotp('cs-pass');
         if (code == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
-        setStatus('', 'Setting up your signing key…');
+        setStatus('', L('Uw ondertekensleutel wordt klaargezet...', 'Setting up your signing key…'));
         ({ signKey: __signKey, signer: __ephemeralSigner } = await enrolEphemeralSigningKeyWithTotp({ totp: code, onStatus: (m) => setStatus('', m) }));
       }
     }
@@ -735,7 +748,7 @@ async function doSign() {
     // 1) Per-document activation (authorize -> one-shot token). The admin checks
     //    the invited email == this party's email and the doc hash, then mints a
     //    300s one-shot activation. No token -> the client cannot proceed to unlock.
-    setStatus('', 'Requesting signing authorization...');
+    setStatus('', L('Toestemming om te ondertekenen wordt gevraagd...', 'Requesting signing authorization...'));
     const act = await requestSignActivation({
       envelopeId: __envelope.id,
       partyIndex: __partyIndex,
@@ -745,7 +758,7 @@ async function doSign() {
 
     // 2) Passkey-PRF unlock + sign of the v3 domain-prefixed message. The secret
     //    key lives ONLY inside the ActivatedSigner and is zeroized by dispose().
-    setStatus('', 'Confirm to sign (Face ID / Touch ID / security key)...');
+    setStatus('', L('Bevestig om te ondertekenen (Face ID, Touch ID of beveiligingssleutel)...', 'Confirm to sign (Face ID / Touch ID / security key)...'));
     // PRF key: unlock with one passkey tap. TOTP fallback: the signer was already
     // produced (in memory) when the code was entered, so just use it.
     const signer = __ephemeralSigner || await new LocalVaultSigner().activate({ vaultId: __signKey.vaultId, rpId: location.hostname });
@@ -769,12 +782,12 @@ async function doSign() {
 
     // 3) Submit. The admin consumes the activation atomically (GETDEL) and
     //    forwards to the relay sign with the verified email binding.
-    setStatus('', 'Recording your signature...');
+    setStatus('', L('Uw handtekening wordt vastgelegd...', 'Recording your signature...'));
     const data = await submitSignature({ activationId: act.activation_id, signerPublicKey: signer.publicKey, signature: sigB64, appearance });
 
     $('done-env-id').textContent = __envelope.id;
     $('done-status').textContent = data.status || '-';
-    $('done-progress').textContent = (data.signed_count != null ? data.signed_count : '?') + ' / ' + (data.party_count != null ? data.party_count : __envelope.party_count) + ' signed';
+    $('done-progress').textContent = (data.signed_count != null ? data.signed_count : '?') + ' / ' + (data.party_count != null ? data.party_count : __envelope.party_count) + L(' getekend', ' signed');
     $('done-pk').textContent = __signKey.fingerprint;
     renderQuotaNote(data.quota);
     await refreshEnvelopeStatus();
@@ -786,7 +799,7 @@ async function doSign() {
       if (note) note.hidden = false;
       download.onclick = () => {
         const source = (__envelope.original_filename || 'document.pdf').replace(/\.pdf$/i, '');
-        downloadBytes(__signedPdfBytes, source + '-signed.pdf', 'application/pdf');
+        downloadBytes(__signedPdfBytes, source + L('-ondertekend.pdf', '-signed.pdf'), 'application/pdf');
       };
     }
     const proof = $('done-download-proof');
@@ -807,29 +820,29 @@ async function doSign() {
     // Free monthly signing limit (relay 402, dimension/plan/limit passed
     // through by the admin proxy): a purchase moment, not an error dump.
     if (e && e.status === 402 && window.paQuotaUpgrade && window.paQuotaUpgrade.isQuota402(e.status, e.data)) {
-      setStatus('err', 'Free monthly signing limit reached.');
+      setStatus('err', L('U heeft uw gratis handtekeningen voor deze maand gebruikt.', 'Free monthly signing limit reached.'));
       showCta(window.paQuotaUpgrade.html(e.data));
       $('sign-confirm').disabled = false;
       return;
     }
     let msg;
-    if (e && e.code === 'no_passkey') msg = 'Add a passkey to your account first (Account → Passkey sign-in), then return to this link — your sign-in passkey becomes your signing key.';
+    if (e && e.code === 'no_passkey') msg = L('Voeg eerst een passkey toe aan uw account (Account, Inloggen met passkey) en open daarna deze link opnieuw. De passkey waarmee u inlogt wordt dan uw ondertekensleutel.', 'Add a passkey to your account first (Account → Passkey sign-in), then return to this link \u2014 your sign-in passkey becomes your signing key.');
     else if (e && (e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
-    else if (e && e.name === 'NotAllowedError') msg = 'Passkey confirmation was cancelled or timed out. Tap Sign to try again.';
-    else if (e && e.status === 401) msg = 'Your session expired. Sign in again as the invited recipient, then retry.';
-    else if (e && e.status === 403) msg = 'This invite is bound to a different email address. Sign in with the address the invite was sent to.';
-    else if (e && e.status === 410) msg = 'This signing invite has expired (invites are valid for 7 days). Ask the sender for a new link.';
-    else if (e && e.status === 409) msg = 'That signing authorization was already used or expired. Reload the page and try again.';
-    else if (e && e.code === 'cancelled') msg = 'Signing cancelled. Tap Sign when you’re ready.';
-    else if (e && (e.code === 'totp_invalid' || e.code === 'totp_required')) msg = 'That authenticator code didn’t match. Tap Sign and enter the current 6-digit code.';
-    else if (e && e.code === 'totp_unavailable') msg = 'Set up an authenticator app on your account first (Account → Two-factor), then sign with its code.';
+    else if (e && e.name === 'NotAllowedError') msg = L('De bevestiging met uw passkey is geannuleerd of duurde te lang. Tik op Ondertekenen om het opnieuw te proberen.', 'Passkey confirmation was cancelled or timed out. Tap Sign to try again.');
+    else if (e && e.status === 401) msg = L('Uw sessie is verlopen. Log opnieuw in als de uitgenodigde ontvanger en probeer het nog eens.', 'Your session expired. Sign in again as the invited recipient, then retry.');
+    else if (e && e.status === 403) msg = L('Deze uitnodiging hoort bij een ander e-mailadres. Log in met het adres waar de uitnodiging naartoe ging.', 'This invite is bound to a different email address. Sign in with the address the invite was sent to.');
+    else if (e && e.status === 410) msg = L('Deze uitnodiging is verlopen (een uitnodiging is 7 dagen geldig). Vraag de afzender om een nieuwe link.', 'This signing invite has expired (invites are valid for 7 days). Ask the sender for a new link.');
+    else if (e && e.status === 409) msg = L('Deze toestemming om te ondertekenen is al gebruikt of verlopen. Laad de pagina opnieuw en probeer het nog eens.', 'That signing authorization was already used or expired. Reload the page and try again.');
+    else if (e && e.code === 'cancelled') msg = L('Ondertekenen is geannuleerd. Tik op Ondertekenen als u klaar bent.', 'Signing cancelled. Tap Sign when you’re ready.');
+    else if (e && (e.code === 'totp_invalid' || e.code === 'totp_required')) msg = L('Die code klopte niet. Tik op Ondertekenen en vul de huidige code van 6 cijfers in.', 'That authenticator code didn’t match. Tap Sign and enter the current 6-digit code.');
+    else if (e && e.code === 'totp_unavailable') msg = L('Stel eerst een authenticator-app in op uw account (Account, Tweestapsverificatie) en teken daarna met de code.', 'Set up an authenticator app on your account first (Account → Two-factor), then sign with its code.');
     // Already translated by the signer (js/error-message.js): the message on
     // this error is our own vetted sentence with a next step, never the wire's
     // "http_502" or a browser's TypeError text. The detail is in the console.
     else if (e && e.code === 'service_error') msg = e.message;
-    else if (e && (e.code === 'prf_unsupported' || e.code === 'need_passkey')) msg = 'Your passkey can’t do one-tap signing here. Tap Sign to sign with your authenticator code instead.';
-    else if (e && e.status) msg = 'Signing could not be completed right now (server error ' + e.status + '). Please try again in a moment.';
-    else msg = 'Your passkey could not complete signing on this browser. Tap Sign to try again. If it keeps failing, try a different browser, or use the passkey on your phone.';
+    else if (e && (e.code === 'prf_unsupported' || e.code === 'need_passkey')) msg = L('Uw passkey kan hier niet met één tik ondertekenen. Tik op Ondertekenen om met de code uit uw authenticator-app te tekenen.', 'Your passkey can’t do one-tap signing here. Tap Sign to sign with your authenticator code instead.');
+    else if (e && e.status) msg = L('Ondertekenen lukt nu niet (serverfout ', 'Signing could not be completed right now (server error ') + e.status + L('). Probeer het zo opnieuw.', '). Please try again in a moment.');
+    else msg = L('Uw passkey kon het ondertekenen in deze browser niet afronden. Tik op Ondertekenen om het opnieuw te proberen. Lukt het steeds niet, probeer dan een andere browser of gebruik de passkey op uw telefoon.', 'Your passkey could not complete signing on this browser. Tap Sign to try again. If it keeps failing, try a different browser, or use the passkey on your phone.');
     setStatus('err', msg);
     $('sign-confirm').disabled = false;
   }

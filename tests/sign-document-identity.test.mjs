@@ -113,7 +113,7 @@ await invite.locator('#ds-recipients-continue').waitFor();
 const sendLabel = (await invite.locator('#ds-recipients-continue').innerText()).trim();
 const beforeSend = await documentLine(invite);
 ok('the file is named on the screen that sends it',
-  sendLabel === 'Send for signature' && beforeSend.visible && beforeSend.inViewport && /huur\.pdf/.test(beforeSend.text),
+  sendLabel === 'Versturen om te laten tekenen' && beforeSend.visible && beforeSend.inViewport && /huur\.pdf/.test(beforeSend.text),
   JSON.stringify({ sendLabel, ...beforeSend }));
 await invite.close();
 

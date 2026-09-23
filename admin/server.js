@@ -2189,6 +2189,8 @@ api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
   const subject = (req.body?.subject || "").toString().trim().slice(0, 140);
   const message = (req.body?.message || "").toString().trim().slice(0, 1000);
   const senderLabel = req.userSession.email;
+  // Optional. Without it the invitation is Dutch with the English underneath.
+  const lang = ["nl", "en"].includes(req.body?.lang) ? req.body.lang : undefined;
   const results = await Promise.all(checked.map(async (item) => {
     try {
       await emailTemplates.sendEmail(item.email, emailTemplates.signingInviteEmail({
@@ -2203,6 +2205,7 @@ api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
         message,
         envelopeId: id,
         partyIndex: item.partyIndex,
+        lang,
       }));
       return { party_index: item.partyIndex, ok: true };
     } catch {

@@ -184,7 +184,7 @@ for (const { page: pg, prefix } of PANELS) {
   await page.goto(`${ORIGIN}/${pg}`, { waitUntil: 'domcontentloaded' });
   const r = await page.evaluate(async (prefix) => {
     const out = {};
-    const { promptTotp } = await import('/js/totp-prompt.js?v=1');
+    const { promptTotp } = await import('/js/totp-prompt.js?v=2');
     const $ = (s) => document.getElementById(s);
     out.panelExists = !!$(prefix + '-panel') && !!$(prefix + '-input') && !!$(prefix + '-confirm');
     const tick = () => new Promise(r => setTimeout(r, 15));
@@ -247,7 +247,7 @@ const phase4 = await page.evaluate(async () => {
     continued: document.getElementById('ds-place-continue').disabled === false,
     pages: outPdf.getPageCount(),
     text,
-    sheetPreview: !!sheetPreview && !!finalSheetPreview && /Extra final page 2/.test(finalSheetPreview.textContent),
+    sheetPreview: !!sheetPreview && !!finalSheetPreview && /Extra laatste pagina 2/.test(finalSheetPreview.textContent),
     bothPreview: !!bothPreview && !document.querySelector('.ds-stamp-marker').hidden,
     bothPages: bothPdf.numPages,
     bothPage1,
@@ -425,13 +425,13 @@ await browser.close();
 await new Promise(r => server.close(r));
 
 const all = [...phase1, ...phase2a, ...phase2b1, ...phase2b2, ...phase2c, ...phase3,
-  { name: 'P4 separate sheet appends a referenced page and shows its preview', pass: phase4.continued && phase4.pages === 2 && phase4.text.includes('ParaSign signature sheet') && phase4.text.includes('sheet-source.pdf') && phase4.text.includes('Source SHA3-256') && phase4.sheetPreview, detail: JSON.stringify(phase4) },
-  { name: 'P5 inline seal plus separate sheet renders both outputs', pass: phase4.bothPreview && phase4.bothPages === 2 && phase4.bothPage1.includes('Demo signer') && phase4.bothPage2.includes('ParaSign signature sheet'), detail: JSON.stringify(phase4) },
+  { name: 'P4 separate sheet appends a referenced page and shows its preview', pass: phase4.continued && phase4.pages === 2 && phase4.text.includes('ParaSign-handtekeningblad') && phase4.text.includes('ParaSign signature sheet') && phase4.text.includes('sheet-source.pdf') && phase4.text.includes('SHA3-256 bron') && phase4.text.includes('Source SHA3-256') && phase4.text.includes('Controleer de getekende pdf samen met het bijbehorende .psign-bestand.') && phase4.text.includes('Verify the signed PDF together with its .psign file.') && phase4.sheetPreview, detail: JSON.stringify(phase4) },
+  { name: 'P5 inline seal plus separate sheet renders both outputs', pass: phase4.bothPreview && phase4.bothPages === 2 && phase4.bothPage1.includes('Demo signer') && phase4.bothPage2.includes('ParaSign-handtekeningblad') && phase4.bothPage2.includes('ParaSign signature sheet'), detail: JSON.stringify(phase4) },
   { name: 'P6 stamp drag follows the pointer before release through a transform', pass: stampDrag.transformX > 50 && stampDrag.transformY > 20 && /translate3d/.test(stampDrag.transform), detail: JSON.stringify(stampDrag) },
-  { name: 'P7 stamp delete and resize controls are visible and keyboard reachable', pass: stampControls.deleteVisible.width >= 28 && stampControls.deleteVisible.height >= 28 && stampControls.resizeVisible.width >= 28 && stampControls.resizeVisible.height >= 28 && stampControls.resizeTag === 'BUTTON' && /arrow keys/i.test(stampControls.resizeLabel) && stampControls.keyboardResized, detail: JSON.stringify(stampControls) },
+  { name: 'P7 stamp delete and resize controls are visible and keyboard reachable', pass: stampControls.deleteVisible.width >= 28 && stampControls.deleteVisible.height >= 28 && stampControls.resizeVisible.width >= 28 && stampControls.resizeVisible.height >= 28 && stampControls.resizeTag === 'BUTTON' && /pijltjestoetsen/i.test(stampControls.resizeLabel) && stampControls.keyboardResized, detail: JSON.stringify(stampControls) },
   { name: 'P8 PDF pen canvas covers the page and draws through the visible stamp', pass: penLive.live.tag === 'CANVAS' && penLive.ink > 0 && penLive.live.width >= penLive.canvas.width * 0.99 && penLive.live.height >= penLive.canvas.height * 0.99 && !penLive.stampBlocksPen && committedDraws === 1, detail: JSON.stringify({ penLive, committedDraws }) },
-  { name: 'P9 edit tools arm, place visibly and export their content', pass: dateArmed === 'true' && /Click the PDF/.test(dateHint) && datePlaced.nearClick && datePlaced.activeAfter === 'false' && /added/i.test(datePlaced.hint) && Object.values(placedTools).every(v => v.count === 1 && v.width > 10 && v.height > 8) && datePdf.includes(datePlaced.text) && datePdf.includes('Placed text') && datePdf.includes('Placed note'), detail: JSON.stringify({ dateArmed, dateHint, datePlaced, placedTools, datePdf }) },
-  { name: 'P10 signature canvas stroke is visible before release and export has no fixed delay', pass: phase5.inkDuringPointerDown > 0 && phase5.exportDelayMs < 200 && /ready/i.test(phase5.status), detail: JSON.stringify(phase5) }];
+  { name: 'P9 edit tools arm, place visibly and export their content', pass: dateArmed === 'true' && /Klik op de pdf/.test(dateHint) && datePlaced.nearClick && datePlaced.activeAfter === 'false' && /toegevoegd/i.test(datePlaced.hint) && Object.values(placedTools).every(v => v.count === 1 && v.width > 10 && v.height > 8) && datePdf.includes(datePlaced.text) && datePdf.includes('Placed text') && datePdf.includes('Placed note'), detail: JSON.stringify({ dateArmed, dateHint, datePlaced, placedTools, datePdf }) },
+  { name: 'P10 signature canvas stroke is visible before release and export has no fixed delay', pass: phase5.inkDuringPointerDown > 0 && phase5.exportDelayMs < 200 && /klaar/i.test(phase5.status), detail: JSON.stringify(phase5) }];
 let passed = 0;
 console.log('\n================ ParaSign signing — FULL functional test ================');
 for (const t of all) { console.log(`  ${t.pass ? 'PASS' : 'FAIL'}  ${t.name}${t.detail ? '   (' + t.detail + ')' : ''}`); if (t.pass) passed++; }

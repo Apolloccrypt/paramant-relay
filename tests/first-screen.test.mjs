@@ -84,6 +84,7 @@ const aliases = {
   // deploy/nginx-paramant-live.conf maps /en onto frontend/en/index.html.
   '/en': '/en/index.html',
   '/en/about': '/en/about.html',
+  '/en/parasign': '/en/parasign.html',
   '/en/security': '/en/security.html',
 };
 
@@ -202,7 +203,17 @@ const PAGES = [
     ],
   },
   {
+    // Dutch since 23 September 2026; the English original is /en/parasign below.
     slug: '/parasign',
+    claims: [
+      { name: 'the line that says who it is for', css: 'p.ps-who', text: 'Voor juridische, financiële en zorgpraktijken' },
+      { name: 'the first action', css: '.ps-actions a.btn-primary', href: '/sign' },
+      { name: 'the SES scope statement', css: '.scope-note p', phrase: 'Simple Electronic Signature (SES)', at: 815 },
+      { name: 'the free limit', css: 'p.ps-fine', text: '2 handtekeningen per maand' },
+    ],
+  },
+  {
+    slug: '/en/parasign',
     claims: [
       { name: 'the line that says who it is for', css: 'p.ps-who', text: 'For legal, finance and healthcare practices' },
       { name: 'the first action', css: '.ps-actions a.btn-primary', href: '/sign' },
@@ -301,14 +312,14 @@ const PAGES = [
     // Three questions, three answers, no scrolling. An answer whose last line
     // is cut off is a page that has not answered.
     claims: [
-      { name: 'the first answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 0, text: 'Signing a document needs an account' },
-      { name: 'the second answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 1, text: 'ParaSign Community is free' },
+      { name: 'the first answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 0, text: 'Voor het ondertekenen van een document heeft u een account nodig' },
+      { name: 'the second answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 1, text: 'ParaSign Community is gratis' },
       // The third answer is where the page says the documents live in Germany,
       // which is the answer the buyer this page was rewritten for came to read.
       // It ended at 860 in DejaVu; the Q&A block, its heading and the space
       // between a question and its answer are tighter on a phone, which lifts it
       // to 822 with all three answers intact.
-      { name: 'the third answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 2, text: 'Hetzner Nuremberg', at: 822 },
+      { name: 'the third answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 2, text: 'Hetzner in Neurenberg', at: 822 },
     ],
   },
   {

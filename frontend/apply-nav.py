@@ -99,6 +99,11 @@ NL_PAGES = {
     'account.html', 'dashboard.html',
     'get.html', 'ontvang.html', 'parasend.html', 'parashare.html', 'verify.html',
 }
+# The signing pages and the help articles followed the same day, with their
+# English text under /en/sign, /en/parasign and /en/help/.
+NL_PAGES_SIGN_HELP = {'sign.html', 'parasign.html'} | {
+    'help/' + f for f in os.listdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'help'))
+    if f.endswith('.html')}
 
 NEW_NAV_NL = '''\
 <nav class="nav">
@@ -204,6 +209,7 @@ ADD_NAV_TO = {
 # product, so the generator leaves them alone.
 KEEP_OWN_NAV = {
     'co-sign.html',
+    'en/co-sign.html',
     'developer.html',
 }
 
@@ -383,7 +389,7 @@ def process(fpath):
         content = inject_nav_block(content)
         if '<nav class="nav">' not in content:
             return False
-    dutch = rel in NL_PAGES
+    dutch = rel in NL_PAGES or rel in NL_PAGES_SIGN_HELP
     nav, mobile, footer = (NEW_NAV_NL, NEW_MOBILE_NL, NEW_FOOTER_NL) if dutch else (NEW_NAV, NEW_MOBILE, NEW_FOOTER)
     updated = re.sub(r'<nav class="nav">.*?</nav>', lambda m: nav, content, flags=re.DOTALL)
     updated = replace_mobile_div(updated, mobile)

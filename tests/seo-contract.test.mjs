@@ -25,7 +25,7 @@ const ORIGIN = 'https://paramant.app';
 // indexed and must NOT appear in the sitemap; they are held to the noindex
 // contract instead of the discoverability contract.
 const PRIVATE = new Set([
-  '404', 'account', 'admin', 'all-systems-go', 'claim', 'co-sign', 'dashboard',
+  '404', 'account', 'admin', 'all-systems-go', 'claim', 'co-sign', 'en/co-sign', 'dashboard',
   'developer', 'get', 'ontvang', 'request-key', 'setup',
   // ophalen.html is wat nginx op /ontvang/<token> serveert: een eenmalige
   // flow, en de URL zelf IS het geheim. Indexeren zou een token in een
@@ -458,6 +458,10 @@ const PINNED = {
     desc: 'Paramant is a product of Paramantis Solutions B.V. in Harderwijk, founded by Mick Beer, privacy and security researcher. Company, mission, and how to check us.',
   },
   sign: {
+    title: 'Een pdf ondertekenen in uw browser · Paramant',
+    desc: 'Onderteken een pdf in uw browser. Het document en uw ondertekensleutel blijven daar, en iedereen kan het getekende document achteraf controleren.',
+  },
+  'en/sign': {
     title: 'Sign a PDF in your browser · Paramant',
     desc: 'Sign a PDF in your browser. The document text and your signing key never leave it, and anyone can check the finished document afterwards.',
   },

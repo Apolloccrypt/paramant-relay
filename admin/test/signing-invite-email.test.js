@@ -51,7 +51,18 @@ const noSubject = signingInviteEmail({
   documentName: 'opzegging-huurcontract.pdf',
   envelopeId: 'env_demo_abcdefghijklmnop', partyIndex: 0,
 });
-assert.equal(noSubject.subject, 'Signature requested', 'the default subject names no document');
+assert.equal(noSubject.subject, 'Verzoek om te ondertekenen / Signature requested', 'the default subject names no document, in both languages');
 assert.ok(!noSubject.text.includes(key) && !noSubject.html.includes(key), 'and still carries no key');
 
-console.log('signing-invite-email: 14 checks passed');
+// Dutch first, English underneath, unless the caller names one language.
+assert.ok(mail.text.indexOf('Log in met het e-mailadres waarop u bent uitgenodigd') < mail.text.indexOf('Sign in with this invited email address'), 'Dutch comes before English');
+assert.ok(/Hij opent het document niet/.test(mail.text), 'the Dutch text says what the link cannot do');
+assert.ok(/<html lang="nl">/.test(mail.html), 'the bilingual mail is marked Dutch first');
+const onlyEn = signingInviteEmail({ inviteUrl: withKey, envelopeId: 'env_demo_abcdefghijklmnop', partyIndex: 0, lang: 'en' });
+assert.equal(onlyEn.subject, 'Signature requested', 'lang en keeps the English default subject');
+assert.ok(!/Hij opent het document niet/.test(onlyEn.text) && /It does not open the document/.test(onlyEn.text), 'lang en is English only');
+const onlyNl = signingInviteEmail({ inviteUrl: withKey, envelopeId: 'env_demo_abcdefghijklmnop', partyIndex: 0, lang: 'nl' });
+assert.equal(onlyNl.subject, 'Verzoek om te ondertekenen', 'lang nl has the Dutch default subject');
+assert.ok(!/It does not open the document/.test(onlyNl.text) && !onlyNl.text.includes(key) && !onlyNl.html.includes(key), 'lang nl is Dutch only and carries no key');
+
+console.log('signing-invite-email: 22 checks passed');

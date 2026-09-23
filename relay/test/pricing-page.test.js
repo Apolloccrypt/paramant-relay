@@ -253,7 +253,7 @@ function showsAmount(pageHtml, amount) {
 function showsAmountOnCard(pageHtml, amount, interval) {
   const re = interval === 'monthly'
     ? new RegExp('<div class="tier-price">' + esc(amount) + '(?![\\d.,])')
-    : new RegExp('Annual:?\\s*' + esc(amount) + '(?![\\d.,])');
+    : new RegExp('(?:Annual|Per jaar):?\\s*' + esc(amount) + '(?![\\d.,])');
   return re.test(pageHtml);
 }
 
@@ -263,7 +263,8 @@ function showsAmountOnCard(pageHtml, amount, interval) {
 // to one page without the other turns this suite red instead of leaving two
 // prices on the site.
 const parasignHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', 'parasign.html'), 'utf8');
-for (const s of ['2 signatures a month', '100 signatures a month; after that signing waits for the new month', '1,000 signatures a month']) {
+// /parasign is Dutch since 23 September 2026, so the same three lines in Dutch.
+for (const s of ['2 handtekeningen per maand', '100 handtekeningen per maand; daarna wacht ondertekenen tot de nieuwe maand', '1.000 handtekeningen per maand']) {
   assert(parasignHtml.includes(s), 'parasign.html lost the quota line: ' + s);
 }
 assert(/excl\. btw/.test(parasignHtml) && /incl\. 21% btw/.test(parasignHtml), 'parasign.html must state excl. btw and the incl. 21% btw checkout amount');
@@ -512,12 +513,14 @@ ok('every amount and discount sits on the card of the plan it belongs to (' + bo
 // Firm covers both products, so both product pages have to quote it; ParaSign
 // Business is quoted on /parasign only, which is the only page that sells it.
 const PRODUCT_PAGES = [
-  { product: 'parasign', file: 'parasign.html', sells: ['firm/firm', 'parasign/business'] },
+  // /parasign is Dutch since 23 September 2026 and writes its amounts the Dutch
+  // way: a dot for thousands, a comma for cents.
+  { product: 'parasign', file: 'parasign.html', sells: ['firm/firm', 'parasign/business'], locale: 'nl-NL' },
   // Since the NL | EN switch (23-09-2026) /parasend is Dutch and the English
   // text it had lives at /en/parasend unchanged. The checks below that read
   // English hold the English copy; the Dutch page is held to the same numbers
   // in Dutch further down.
-  { product: 'parasend', file: 'en/parasend.html', sells: ['firm/firm'] },
+  { product: 'parasend', file: 'en/parasend.html', sells: ['firm/firm'], locale: 'en-US' },
 ];
 const productHtml = {};
 for (const page of PRODUCT_PAGES) {
@@ -526,10 +529,10 @@ for (const page of PRODUCT_PAGES) {
   for (const v of VARIANTS.filter(x => page.sells.includes(x.product + '/' + x.plan))) {
     const order = catalog.resolveOrder({ product: v.product, plan: v.plan, interval: v.interval });
     assert(!order.error, 'catalog rejects ' + v.plan + '/' + v.interval + ': ' + order.error);
-    const excl = '&euro;' + v.excl.toLocaleString('en-US');
+    const excl = '&euro;' + v.excl.toLocaleString(page.locale);
     assert(showsAmountOnCard(pageHtml, excl, v.interval),
       page.file + ' no longer shows ' + excl + ' on the ' + v.plan + ' card for ' + v.interval);
-    const incl = '&euro;' + Number(order.amount).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    const incl = '&euro;' + Number(order.amount).toLocaleString(page.locale, { minimumFractionDigits: 2 });
     assert(showsAmount(pageHtml, incl), page.file + ' no longer shows the catalog amount ' + incl + ' incl. btw for ' + v.plan + '/' + v.interval);
     ok(page.file + ' ' + v.plan + ' ' + v.interval + ': shows ' + excl + ' excl and ' + incl + ' incl');
   }
@@ -654,10 +657,10 @@ for (const [name, pageHtml] of [['parasign.html', productHtml.parasign], ['paras
   assert(/No hourly cap on API retrievals/.test(productHtml.parasend),
     'parasend.html must state the Enterprise hourly position tiers.js gives it (unlimited)');
   for (const [name, pageHtml] of [['parasign.html', productHtml.parasign], ['parasend.html', productHtml.parasend]]) {
-    assert(!/(sends|uploads) an hour/i.test(pageHtml),
+    assert(!/(sends|uploads) an hour|(verzendingen|uploads) per uur/i.test(pageHtml),
       name + ' calls the hourly figure a send rate; outbound_per_hour counts retrievals through GET /v2/outbound, not sends');
   }
-  assert(new RegExp('Up to ' + tiers.tierLimit('pro', 'outbound_per_hour') + ' ParaSend retrievals an hour').test(productHtml.parasign),
+  assert(new RegExp('Tot ' + tiers.tierLimit('pro', 'outbound_per_hour') + ' keer per uur een ParaSend-bestand ophalen').test(productHtml.parasign),
     'parasign.html must quote the hourly retrieval ceiling a ParaSign Pro account derives (' +
     tiers.tierLimit('pro', 'outbound_per_hour') + ')');
   ok('the hourly retrieval ceiling on /parasend and /parasign comes from tiers.js (' +
@@ -684,11 +687,14 @@ for (const [name, pageHtml] of [['parasign.html', productHtml.parasign], ['paras
     const dim = receivingDim(block.quotas);
     assert(!dim, 'entitlements.js meters receiving for ' + product + ' (' + dim + '), so "No limit on receiving" is no longer true');
   }
-  for (const [name, pageHtml] of [['pricing.html', html], ['parasign.html', productHtml.parasign]]) {
+  // /parasign is Dutch since 23 September 2026 and says the same in Dutch.
+  assert(productHtml.parasign.includes('Geen grens op ontvangen'),
+    'parasign.html dropped the receiving line; it is the one claim on these pages backed by a field that does not exist');
+  for (const [name, pageHtml] of [['pricing.html', html]]) {
     assert(pageHtml.includes('No limit on receiving'),
       name + ' dropped the receiving line; it is the one claim on these pages backed by a field that does not exist');
   }
-  assert(/Receiving is not metered\./.test(productHtml.parasign),
+  assert(/Ontvangen wordt niet geteld\./.test(productHtml.parasign),
     '/parasign must say what "no limit on receiving" rests on, and that signing what you receive is still counted');
   ok('"No limit on receiving" holds: no receiving dimension in tiers.js or in the entitlement quotas');
 })();
@@ -711,7 +717,7 @@ for (const [name, pageHtml] of [['parasign.html', productHtml.parasign], ['paras
 // account and ask the entitlement layer what ParaSend then delivers. A card may
 // name a transfer ceiling exactly when its own plan hands one over.
 (function signingCardsClaimOnlyDeliveredTransfers() {
-  const TRANSFER_FIGURE = /[\d][\d,]*\s*(?:ParaSend\s+)?transfers/i;
+  const TRANSFER_FIGURE = /[\d][\d,.]*\s*(?:ParaSend\s+)?(?:transfers|verzendingen)/i;
   const parasignGrid = html.slice(html.indexOf('<!-- TIER CARDS: PARASIGN -->'), html.indexOf('<!-- TIER CARDS: PARASEND -->'));
   assert(parasignGrid.length > 500, 'the ParaSign tier grid markers moved; this gate would read nothing');
 
@@ -779,7 +785,7 @@ ok('no page still names a US company as the mail carrier');
 
 // The signature quota lines stay pinned to the words /pricing uses: they are
 // billing copy, not a tiers.js row.
-for (const line of ['2 signatures a month', '100 signatures a month; after that signing waits for the new month', '1,000 signatures a month']) {
+for (const line of ['2 handtekeningen per maand', '100 handtekeningen per maand; daarna wacht ondertekenen tot de nieuwe maand', '1.000 handtekeningen per maand']) {
   assert(productHtml.parasign.includes(line), 'parasign.html lost the quota line: ' + line);
 }
 assert(tiers.tierLimit('community', 'signs_month') === 2,
@@ -828,13 +834,25 @@ ok('the compliance bullet on /parasend carries its own limit');
 // the wording is pinned, so a page that reverts fails here and says so plainly.
 (function oneMonthlyForm() {
   const MONTHLY_FORM = /([\d,]+) (signatures|transfers|ParaSend transfers) per month/;
-  const PAGES = ['en/pricing.html', 'en/parasend.html', 'parasign.html', 'en/index.html', 'signup.html', 'help/index.html'];
+  // /help, /parasend, /parasign and /signup are Dutch since 23 September 2026;
+  // their English copies live under /en. Both are held: the Dutch pages may not
+  // carry a stray English form either.
+  const PAGES = ['en/pricing.html', 'en/parasend.html', 'parasend.html', 'parasign.html', 'en/parasign.html', 'en/index.html', 'signup.html', 'en/signup.html', 'help/index.html', 'en/help/index.html'];
   for (const rel of PAGES) {
     const pageHtml = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', ...rel.split('/')), 'utf8');
     const stray = MONTHLY_FORM.exec(pageHtml);
     assert(!stray, rel + ' says "' + (stray ? stray[0] : '') + '"; the site says "' +
       (stray ? stray[1] + ' ' + stray[2] : 'N noun') + ' a month" and one limit gets one spelling');
     assert(/(signatures|transfers) a month/.test(pageHtml),
+      rel + ' no longer states a monthly allowance at all, so this gate is guarding nothing');
+  }
+  // /parasign and /help are Dutch since 23 September 2026. Their one form is
+  // "per maand".
+  for (const rel of ['parasign.html', 'help/index.html']) {
+    const pageNl = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', ...rel.split('/')), 'utf8');
+    const strayNl = /([\d.]+) (handtekeningen|verzendingen) (in de|elke|een|iedere) maand|([\d,]+) (signatures|transfers) (per|a) month/.exec(pageNl);
+    assert(!strayNl, rel + ' says "' + (strayNl ? strayNl[0] : '') + '"; the Dutch form is "N handtekeningen per maand"');
+    assert(/(handtekeningen|verzendingen) per maand/.test(pageNl),
       rel + ' no longer states a monthly allowance at all, so this gate is guarding nothing');
   }
   ok('every page that repeats a monthly limit uses one spelling ("a month")');

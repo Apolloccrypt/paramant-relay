@@ -10,6 +10,9 @@
   else root.ParasignPdfOps = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
 
+  // Dutch by default; the English copy of the page (lang="en") gets English.
+  const L = (nl, en) => (typeof document !== 'undefined' && document.documentElement && document.documentElement.lang === 'en' ? en : nl);
+
   async function pageCount(PDFLib, bytes) {
     const doc = await PDFLib.PDFDocument.load(bytes);
     return doc.getPageCount();
@@ -20,10 +23,10 @@
   async function reorderPages(PDFLib, bytes, order) {
     const src = await PDFLib.PDFDocument.load(bytes);
     const n = src.getPageCount();
-    if (!Array.isArray(order) || order.length !== n) throw new Error('order must list every page exactly once');
+    if (!Array.isArray(order) || order.length !== n) throw new Error(L('de volgorde moet elke pagina precies één keer noemen', 'order must list every page exactly once'));
     const seen = new Set(order);
     if (seen.size !== n || order.some(i => !Number.isInteger(i) || i < 0 || i >= n)) {
-      throw new Error('order must be a permutation of 0..' + (n - 1));
+      throw new Error(L('de volgorde moet een permutatie zijn van 0..', 'order must be a permutation of 0..') + (n - 1));
     }
     const out = await PDFLib.PDFDocument.create();
     const pages = await out.copyPages(src, order);
@@ -42,8 +45,8 @@
 
   async function deletePage(PDFLib, bytes, index) {
     const doc = await PDFLib.PDFDocument.load(bytes);
-    if (doc.getPageCount() <= 1) throw new Error('cannot delete the last page');
-    if (index < 0 || index >= doc.getPageCount()) throw new Error('page index out of range');
+    if (doc.getPageCount() <= 1) throw new Error(L('de laatste pagina kan niet worden verwijderd', 'cannot delete the last page'));
+    if (index < 0 || index >= doc.getPageCount()) throw new Error(L('paginanummer buiten bereik', 'page index out of range'));
     doc.removePage(index);
     return await doc.save();
   }
@@ -73,7 +76,7 @@
   async function extractRange(PDFLib, bytes, from, to) {
     const src = await PDFLib.PDFDocument.load(bytes);
     const n = src.getPageCount();
-    if (from < 0 || to < from || to >= n) throw new Error('invalid page range');
+    if (from < 0 || to < from || to >= n) throw new Error(L('ongeldig paginabereik', 'invalid page range'));
     const idx = [];
     for (let i = from; i <= to; i++) idx.push(i);
     const out = await PDFLib.PDFDocument.create();

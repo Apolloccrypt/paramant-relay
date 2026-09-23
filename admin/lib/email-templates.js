@@ -47,12 +47,16 @@ function wrap(bodyText, bodyHtml, meta = {}) {
   };
 }
 
+// `lang` is for the mails that are Dutch first (the signing invitation, the
+// account mails). Every other mail calls this with two arguments and gets
+// exactly what it had.
 function htmlShell(preheader, bodyHtml, lang = 'en') {
-  const tagline = lang === 'nl'
+  const nl = lang === 'nl';
+  const tagline = nl
     ? 'Paramant, versleuteld versturen en ondertekenen.'
     : 'Paramant &mdash; post-quantum encrypted file relay.';
   return `<!DOCTYPE html>
-<html lang="${lang}">
+<html lang="${nl ? 'nl' : 'en'}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -71,7 +75,7 @@ function htmlShell(preheader, bodyHtml, lang = 'en') {
       </td></tr>
       <tr><td style="padding:24px 40px;border-top:1px solid rgba(11,58,106,0.08);font-size:12px;color:#64748b;line-height:1.6;">
         <p style="margin:0 0 8px 0;">${tagline}</p>
-        <p style="margin:0;"><a href="https://paramant.app" style="color:#1D4ED8;text-decoration:none;">paramant.app</a> &middot; <a href="https://paramant.app/security" style="color:#1D4ED8;text-decoration:none;">Security</a> &middot; <a href="https://paramant.app/help" style="color:#1D4ED8;text-decoration:none;">Help</a></p>
+        <p style="margin:0;"><a href="https://paramant.app" style="color:#1D4ED8;text-decoration:none;">paramant.app</a> &middot; <a href="https://paramant.app/security" style="color:#1D4ED8;text-decoration:none;">${nl ? 'Beveiliging' : 'Security'}</a> &middot; <a href="https://paramant.app/help" style="color:#1D4ED8;text-decoration:none;">${nl ? 'Hulp' : 'Help'}</a></p>
       </td></tr>
     </table>
   </td></tr>
@@ -932,45 +936,74 @@ ${BASE_URL}`;
 // This is why the function takes neither a documentName nor a flag for whether
 // the link carries a key: there is one kind of invitation mail now, and it is
 // the one that can be posted abroad without contradicting the site.
-function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt, subject, message, envelopeId, partyIndex }) {
+function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt, subject, message, envelopeId, partyIndex, lang }) {
   // The last gate before the mail provider, and the one that holds even when
   // the two in front of it are wrong. The browser cuts the fragment off before
   // it posts the invitation, and the invitations endpoint refuses a link that
   // still has one; this cuts it again. A key arriving here is a bug upstream,
   // and an outgoing mail is the worst possible place to discover it.
   const noticeUrl = String(inviteUrl || '').split('#')[0];
-  const safeSubject = String(subject || '').trim().slice(0, 140) || 'Signature requested';
-  const greeting = recipientLabel ? `Hi ${recipientLabel},` : 'Hi,';
-  const sender = senderLabel || 'A Paramant user';
-  const expiry = expiresAt ? formatTS(expiresAt) : '7 days after creation';
+  // Dutch first with the English underneath, because the sender does not know
+  // which language the recipient reads. A caller that does know passes
+  // lang 'nl' or 'en' and gets that one language only.
+  const langs = lang === 'nl' ? ['nl'] : lang === 'en' ? ['en'] : ['nl', 'en'];
+  const DEFAULT_SUBJECT = { nl: 'Verzoek om te ondertekenen', en: 'Signature requested' };
+  const safeSubject = String(subject || '').trim().slice(0, 140)
+    || langs.map((l) => DEFAULT_SUBJECT[l]).join(' / ');
+  const expiryTs = expiresAt ? formatTS(expiresAt) : '';
   const note = String(message || '').trim().slice(0, 1000);
-  const carriesText = `This link opens the request. It does not open the document. The key that
-unlocks it is deliberately not in this email, so ask the sender for their
-complete link, or open the file if you already have a copy.`;
-  const carriesHtml = 'This link opens the request. It does not open the document. The key that unlocks it is deliberately not in this email, so ask the sender for their complete link, or open the file if you already have a copy.';
-  const text = `${greeting}
+  const W = {
+    nl: {
+      greeting: recipientLabel ? `Beste ${recipientLabel},` : 'Beste,',
+      sender: senderLabel || 'Een Paramant-gebruiker',
+      asks: 'heeft u gevraagd een document te bekijken en te ondertekenen.',
+      carries: 'Deze link opent het verzoek. Hij opent het document niet. De sleutel die het document opent staat bewust niet in deze e-mail. Vraag de afzender om de volledige link, of open het bestand als u al een kopie hebt.',
+      open: 'Open het verzoek',
+      fromSender: 'Bericht van de afzender:',
+      signIn: 'Log in met het e-mailadres waarop u bent uitgenodigd. Stuur de link niet door.',
+      closes: `Ondertekenen kan tot ${expiryTs || '7 dagen na het aanmaken'}.`,
+      heading: 'Verzoek om te ondertekenen',
+      pre: 'Er wacht een document op uw handtekening in Paramant.',
+    },
+    en: {
+      greeting: recipientLabel ? `Hi ${recipientLabel},` : 'Hi,',
+      sender: senderLabel || 'A Paramant user',
+      asks: 'has asked you to review and sign a document.',
+      carries: 'This link opens the request. It does not open the document. The key that unlocks it is deliberately not in this email, so ask the sender for their complete link, or open the file if you already have a copy.',
+      open: 'Open the request',
+      fromSender: 'Message from the sender:',
+      signIn: 'Sign in with this invited email address. Do not forward the link.',
+      closes: `Signing closes at ${expiryTs || '7 days after creation'}.`,
+      heading: 'Signature requested',
+      pre: 'A document is waiting for your signature in Paramant.',
+    },
+  };
+  const textBlock = (w) => `${w.greeting}
 
-${sender} has asked you to review and sign a document.
-${carriesText}
+${w.sender} ${w.asks}
+${w.carries}
 
-Open the request:
+${w.open}:
 ${noticeUrl}
 
-${note ? `Message from the sender:\n${note}\n\n` : ''}Sign in with this invited email address. Do not forward the link.
-Signing closes at ${expiry}.
+${note ? `${w.fromSender}\n${note}\n\n` : ''}${w.signIn}
+${w.closes}`;
+  const text = langs.map((l) => textBlock(W[l])).join('\n\n---\n\n') + `
 
 Paramant
 ${BASE_URL}`;
-  const html = htmlShell('A document is waiting for your signature in Paramant.', `
-    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Signature requested</h1>
-    <p style="margin:0 0 16px 0;line-height:1.6;">${escHtml(greeting)}</p>
-    <p style="margin:0 0 16px 0;line-height:1.6;"><strong>${escHtml(sender)}</strong> has asked you to review and sign a document.</p>
-    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">${escHtml(carriesHtml)}</p>
-    ${note ? `<div style="margin:20px 0;padding:14px 16px;background:#F8FAFC;border:1px solid #E2E8F0;line-height:1.6;color:#334155;">${escHtml(note).replace(/\n/g, '<br>')}</div>` : ''}
-    ${btn(noticeUrl, 'Open the request')}
-    <p style="margin:20px 0 8px 0;line-height:1.6;color:#92400E;font-size:13px;"><strong>Sign in with this invited email address. Do not forward the link.</strong></p>
-    <p style="margin:0;color:#64748b;font-size:12px;">Signing closes at ${escHtml(expiry)}.</p>
-  `);
+  const htmlBlock = (w, first) => `
+    <h1 style="margin:${first ? '0' : '32px'} 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">${escHtml(w.heading)}</h1>
+    <p style="margin:0 0 16px 0;line-height:1.6;">${escHtml(w.greeting)}</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;"><strong>${escHtml(w.sender)}</strong> ${escHtml(w.asks)}</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">${escHtml(w.carries)}</p>
+    ${note && first ? `<div style="margin:20px 0;padding:14px 16px;background:#F8FAFC;border:1px solid #E2E8F0;line-height:1.6;color:#334155;">${escHtml(note).replace(/\n/g, '<br>')}</div>` : ''}
+    ${btn(noticeUrl, escHtml(w.open))}
+    <p style="margin:20px 0 8px 0;line-height:1.6;color:#92400E;font-size:13px;"><strong>${escHtml(w.signIn)}</strong></p>
+    <p style="margin:0;color:#64748b;font-size:12px;">${escHtml(w.closes)}</p>`;
+  const html = htmlShell(langs.map((l) => W[l].pre).join(' '),
+    langs.map((l, i) => htmlBlock(W[l], i === 0)).join('\n    <hr style="margin:32px 0 0 0;border:0;border-top:1px solid #E2E8F0;">'),
+    langs[0]);
   return {
     ...wrap(text, html, { refId: 'sign-' + refIdHash(`${envelopeId}:${partyIndex}`) }),
     subject: safeSubject,
