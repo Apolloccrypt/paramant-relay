@@ -72,6 +72,7 @@ const aliases = {
   '/': '/index.html',
   '/parasign': '/parasign.html',
   '/parasend': '/parasend.html',
+  '/en/parasend': '/en/parasend.html',
   '/about': '/about.html',
   '/security': '/security.html',
   '/trust': '/trust.html',
@@ -83,7 +84,11 @@ const aliases = {
   // deploy/nginx-paramant-live.conf maps /en onto frontend/en/index.html.
   '/en': '/en/index.html',
   '/en/about': '/en/about.html',
+  '/en/parasign': '/en/parasign.html',
   '/en/security': '/en/security.html',
+  '/en/trust': '/en/trust.html',
+  '/en/docs': '/en/docs.html',
+  '/en/download': '/en/download.html',
 };
 
 const server = http.createServer((req, res) => {
@@ -201,7 +206,17 @@ const PAGES = [
     ],
   },
   {
+    // Dutch since 23 September 2026; the English original is /en/parasign below.
     slug: '/parasign',
+    claims: [
+      { name: 'the line that says who it is for', css: 'p.ps-who', text: 'Voor juridische, financiële en zorgpraktijken' },
+      { name: 'the first action', css: '.ps-actions a.btn-primary', href: '/sign' },
+      { name: 'the SES scope statement', css: '.scope-note p', phrase: 'Simple Electronic Signature (SES)', at: 815 },
+      { name: 'the free limit', css: 'p.ps-fine', text: '2 handtekeningen per maand' },
+    ],
+  },
+  {
+    slug: '/en/parasign',
     claims: [
       { name: 'the line that says who it is for', css: 'p.ps-who', text: 'For legal, finance and healthcare practices' },
       { name: 'the first action', css: '.ps-actions a.btn-primary', href: '/sign' },
@@ -217,6 +232,15 @@ const PAGES = [
   },
   {
     slug: '/parasend',
+    claims: [
+      { name: 'the line that says who it is for', css: 'p.ps-who', text: 'Voor kantoren die nu klantdossiers' },
+      { name: 'the first action', css: '.ps-actions a.btn-primary', href: '/parashare' },
+      { name: 'the free limit', css: 'p.ps-sub', text: '50 verzendingen per maand' },
+    ],
+  },
+  {
+    // De Engelse kopie van /parasend houdt de Engelse pins.
+    slug: '/en/parasend',
     claims: [
       { name: 'the line that says who it is for', css: 'p.ps-who', text: 'For offices that email client documents' },
       { name: 'the first action', css: '.ps-actions a.btn-primary', href: '/parashare' },
@@ -271,6 +295,14 @@ const PAGES = [
   {
     slug: '/trust',
     claims: [
+      { name: 'the lede', css: '.page-hero .lede', text: 'Voor organisaties die Paramant op hun eigen server draaien' },
+      { name: 'the first action', css: '.hero-cta a.btn-primary', href: '/security' },
+      { name: 'the second action', css: '.hero-cta a.btn-secondary', href: '/pricing' },
+    ],
+  },
+  {
+    slug: '/en/trust',
+    claims: [
       { name: 'the lede', css: '.page-hero .lede', text: 'For organisations that run Paramant on their own server' },
       { name: 'the first action', css: '.hero-cta a.btn-primary', href: '/security' },
       { name: 'the second action', css: '.hero-cta a.btn-secondary', href: '/pricing' },
@@ -278,6 +310,16 @@ const PAGES = [
   },
   {
     slug: '/docs',
+    claims: [
+      // The one line on a reference page written for the person who decides
+      // rather than the person who integrates.
+      { name: 'the line for the buyer', css: 'p.docs-buyer', text: 'Overweegt u Paramant?' },
+      { name: 'the first button', css: '.docs-hero-actions a.docs-hero-btn', nth: 0, href: '#quickstart' },
+      { name: 'the second button', css: '.docs-hero-actions a.docs-hero-btn', nth: 1, href: '/pricing' },
+    ],
+  },
+  {
+    slug: '/en/docs',
     claims: [
       // The one line on a reference page written for the person who decides
       // rather than the person who integrates.
@@ -291,18 +333,27 @@ const PAGES = [
     // Three questions, three answers, no scrolling. An answer whose last line
     // is cut off is a page that has not answered.
     claims: [
-      { name: 'the first answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 0, text: 'Signing a document needs an account' },
-      { name: 'the second answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 1, text: 'ParaSign Community is free' },
+      { name: 'the first answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 0, text: 'Voor het ondertekenen van een document heeft u een account nodig' },
+      { name: 'the second answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 1, text: 'ParaSign Community is gratis' },
       // The third answer is where the page says the documents live in Germany,
       // which is the answer the buyer this page was rewritten for came to read.
       // It ended at 860 in DejaVu; the Q&A block, its heading and the space
       // between a question and its answer are tighter on a phone, which lifts it
       // to 822 with all three answers intact.
-      { name: 'the third answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 2, text: 'Hetzner Nuremberg', at: 822 },
+      { name: 'the third answer', css: '.buyer-qa-item p.buyer-qa-a', nth: 2, text: 'Hetzner in Neurenberg', at: 822 },
     ],
   },
   {
     slug: '/download',
+    claims: [
+      { name: 'the status sentence', css: 'header.dl-lead h1', text: 'niet meer onderhouden' },
+      { name: 'the sentence under it', css: 'header.dl-lead p.dl-sub', text: 'De laatste build is van maart 2026' },
+      { name: 'the first button', css: '.dl-actions a.btn-primary', href: '/' },
+      { name: 'the second button', css: '.dl-actions a.btn-outline', href: '/pricing' },
+    ],
+  },
+  {
+    slug: '/en/download',
     claims: [
       { name: 'the status sentence', css: 'header.dl-lead h1', text: 'no longer maintained' },
       { name: 'the sentence under it', css: 'header.dl-lead p.dl-sub', text: 'The last build is from March 2026' },

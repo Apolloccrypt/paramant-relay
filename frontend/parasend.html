@@ -1,21 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ParaSend &middot; Encrypted file transfer by Paramant</title>
+<title>ParaSend &middot; Versleuteld bestanden versturen met Paramant</title>
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Send a file scrambled on your device that the web app deletes after the first read. Never stored on disk, servers in Germany. Free for everyone, paid for volume.">
-<meta property="og:title" content="ParaSend &middot; Encrypted file transfer by Paramant">
-<meta property="og:description" content="Send a file scrambled on your device that the web app deletes after the first read. Never stored on disk, servers in Germany. Free for everyone, paid for volume.">
+<meta name="description" content="Verstuur een bestand dat op uw apparaat wordt verzegeld en na de eerste keer lezen verdwijnt. Nooit op schijf, servers in Duitsland. Gratis voor iedereen.">
+<meta property="og:title" content="ParaSend &middot; Versleuteld bestanden versturen met Paramant">
+<meta property="og:description" content="Verstuur een bestand dat op uw apparaat wordt verzegeld en na de eerste keer lezen verdwijnt. Nooit op schijf, servers in Duitsland. Gratis voor iedereen.">
 <meta property="og:url" content="https://paramant.app/parasend">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="ParaSend &middot; Encrypted file transfer by Paramant">
-<meta name="twitter:description" content="Send a file scrambled on your device that the web app deletes after the first read. Never stored on disk, servers in Germany. Free for everyone, paid for volume.">
+<meta name="twitter:title" content="ParaSend &middot; Versleuteld bestanden versturen met Paramant">
+<meta name="twitter:description" content="Verstuur een bestand dat op uw apparaat wordt verzegeld en na de eerste keer lezen verdwijnt. Nooit op schijf, servers in Duitsland. Gratis voor iedereen.">
 <link rel="canonical" href="https://paramant.app/parasend">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/parasend">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/parasend">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/parasend">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -24,7 +27,7 @@
 <meta name="theme-color" content="#0B3A6A">
 
 <link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/nav.css?v=27">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 .ps-hero{padding:var(--space-10) 0 var(--space-6)}
@@ -115,15 +118,15 @@
       "@type": "WebPage",
       "@id": "https://paramant.app/parasend#webpage",
       "url": "https://paramant.app/parasend",
-      "name": "ParaSend · Encrypted file transfer by Paramant",
+      "name": "ParaSend · Versleuteld bestanden versturen met Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "en",
-      "description": "Send a file scrambled on your device that the web app deletes after the first read. Never stored on disk, servers in Germany. Free for everyone, paid for volume."
+      "inLanguage": "nl",
+      "description": "Verstuur een bestand dat op uw apparaat wordt verzegeld en na de eerste keer lezen verdwijnt. Nooit op schijf, servers in Duitsland. Gratis voor iedereen."
     },
     {
       "@type": "SoftwareApplication",
@@ -170,39 +173,42 @@
 </script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
-    <li><a href="/security" class="nav-link">Security</a></li>
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/docs" class="nav-link">Docs</a></li>
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/parasend" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/parasend" hreflang="en" lang="en">EN</a></div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
-  <a href="/security" class="nav-mobile-standalone">Security</a>
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/parasend" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/parasend" hreflang="en" lang="en">EN</a></span>
 </div>
 <main>
 
@@ -212,24 +218,24 @@
   <div class="container-md">
     <div class="sec-head">
       <span class="num">00</span>
-      <h1 class="paramant-h2">Send a file that deletes itself after reading.</h1>
-      <span class="mono-eyebrow">ParaSend &middot; sending files without leaving a copy behind</span>
+      <h1 class="paramant-h2">Verstuur een bestand dat zichzelf wist na het lezen.</h1>
+      <span class="mono-eyebrow">ParaSend &middot; bestanden versturen zonder dat er een kopie achterblijft</span>
     </div>
-    <p class="ps-lede">Your file is locked on your own device before it is sent, and our copy is wiped after its last read. Servers in Germany, under EU law.</p>
-    <p class="ps-who">For offices that email client documents, contracts and personal data today, and would rather not leave them sitting in a mailbox.</p>
+    <p class="ps-lede">Uw bestand wordt op uw eigen apparaat verzegeld, en onze kopie verdwijnt na de laatste keer lezen. Servers in Duitsland.</p>
+    <p class="ps-who">Voor kantoren die nu klantdossiers, contracten en persoonsgegevens mailen.</p>
     <!-- The one thing a buyer used to find out only on /parashare, step 1, after
          he had already decided. A reviewer reading this page on 3 September 2026
          called it the single reason he would not buy: an office sends a payslip
          and gets on with its work, and a receiver who has to be sitting there at
          the same moment is not a route that office can use. So it is said here,
          above the button, in the words the reviewer would have wanted. -->
-    <p class="ps-live">In the web app you and the receiver are both online and compare a short code, and the file is handed over live. Sending to someone who is not online right now needs the API, the SDK, or the Send a link mode in the web app.</p>
+    <p class="ps-live">Met Samen, nu zijn u en de ontvanger allebei online en vergelijkt u een korte controlecode. Is de ontvanger niet online, kies dan Later ophalen in de web app, of de API of SDK.</p>
     <div class="ps-actions">
-      <a href="/parashare" class="btn btn-primary">Send a file &rarr;</a>
-      <a href="/pricing" class="btn btn-secondary">See pricing &rarr;</a>
+      <a href="/parashare" class="btn btn-primary">Bestand versturen &rarr;</a>
+      <a href="/pricing" class="btn btn-secondary">Prijzen bekijken &rarr;</a>
     </div>
-    <p class="ps-sub">Free on the Community plan, forever: 50 transfers a month, 500 MB a file handed over live, 5 MB by one-time link, links that last an hour, and a web app link gone after one read.</p>
-    <p class="ps-note">Sending needs a free account. Receiving does not: the person you send to opens the link, gets the file, and the copy is wiped after its last read. Keep your own copy, because a file that is gone cannot be fetched again.</p>
+    <p class="ps-sub">Gratis met Community, voor altijd: 50 verzendingen per maand, 500 MB per bestand met Samen, nu, 5 MB per eenmalige link, links die een uur geldig zijn, en een webapp-link die na één keer lezen weg is.</p>
+    <p class="ps-note">Versturen vraagt een gratis account. Ontvangen niet: de ontvanger opent de link, krijgt het bestand, en de kopie wordt na de laatste keer lezen gewist. Bewaar zelf een kopie, want een bestand dat weg is, kan niemand meer ophalen.</p>
   </div>
 </section>
 
@@ -238,44 +244,44 @@
      down, after the page has said what the product actually does. -->
 <section class="ps-band">
   <div class="container-md">
-    <span class="mono-eyebrow">01 / Free for everyone</span>
-    <h2 style="margin-top:var(--space-2)">Free for everyone. Paid for organisations.</h2>
-    <p><strong>The Community plan is free, forever.</strong> It is not a trial and not a funnel. Businesses pay for the higher limits (longer links, more reads through the API, more devices, a dedicated relay), not to unlock features, and that is what keeps the Community plan free. More reads is not a weaker promise: it is one link a whole team can open, or a counterparty reopening it after a misclick, instead of you sending the file a second time.</p>
-    <p><strong>Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.</strong></p>
-    <p class="ps-sub">The plans and what each one costs are <a href="#plans">further down this page</a>. Checkout and the full comparison are on the <a href="/pricing">pricing page</a>.</p>
+    <span class="mono-eyebrow">01 / Gratis voor iedereen</span>
+    <h2 style="margin-top:var(--space-2)">Gratis voor iedereen. Betaald voor organisaties.</h2>
+    <p><strong>Het Community-plan is gratis, voor altijd.</strong> Het is geen proefperiode en geen lokkertje. Bedrijven betalen voor hogere limieten (langere links, vaker lezen via de API, meer apparaten, een eigen relay), niet om functies te ontgrendelen. Daardoor blijft het Community-plan gratis. Vaker lezen is geen zwakkere belofte: het is één link die een heel team kan openen, of een wederpartij die hem na een misklik nog eens opent, zonder dat u het bestand opnieuw verstuurt.</p>
+    <p><strong>Elk plan krijgt dezelfde versleuteling, dezelfde post-quantumhandtekeningen en hetzelfde openbare logboek. U betaalt voor volume, nooit voor veiligheid. En u betaalt per organisatie, niet per gebruiker.</strong></p>
+    <p class="ps-sub">De plannen en wat ze kosten staan <a href="#plans">verderop op deze pagina</a>. Afrekenen en de volledige vergelijking vindt u op de <a href="/pricing">prijzenpagina</a>.</p>
   </div>
 </section>
 
 <!-- WHAT IT DOES -->
 <section class="ps-band">
   <div class="container-md">
-    <span class="mono-eyebrow">02 / What it does</span>
-    <h2 style="margin-top:var(--space-2)">Scrambled here, unreadable in transit, gone after its last read</h2>
-    <p>ParaSend is the transfer half of Paramant. It runs on the same post-quantum core as ParaSign. Your file is encrypted before it leaves your device, so our servers hold nothing they could hand over or lose.</p>
+    <span class="mono-eyebrow">02 / Wat het doet</span>
+    <h2 style="margin-top:var(--space-2)">Hier verzegeld, onleesbaar onderweg, weg na de laatste keer lezen</h2>
+    <p>ParaSend is het verzenddeel van Paramant. Het draait op dezelfde post-quantumkern als ParaSign. Uw bestand wordt versleuteld voordat het uw apparaat verlaat. Onze servers hebben dus niets dat ze kunnen afgeven of kwijtraken.</p>
     <div class="check-grid">
       <div class="check-card">
-        <div class="k">Locked before it leaves you</div>
-        <p>Your browser locks the file on your own device. Our servers only ever hold the locked version, never the file itself and never the key that opens it.</p>
+        <div class="k">Verzegeld voordat het vertrekt</div>
+        <p>Uw browser verzegelt het bestand op uw eigen apparaat. Onze servers hebben alleen de verzegelde versie, nooit het bestand zelf en nooit de sleutel die het opent.</p>
       </div>
       <div class="check-card">
-        <div class="k">Gone after its last read</div>
-        <p>Nothing is written to disk. The file sits in server memory and is wiped after the last read the link allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Firm and 100 on Enterprise. It goes the same way when the link runs out, whichever comes first.</p>
+        <div class="k">Weg na de laatste keer lezen</div>
+        <p>Er wordt niets op schijf gezet. Het bestand staat in het geheugen van de server en wordt gewist na de laatste keer lezen die de link toestaat. De web app en de extensies wissen het bestand bij elk plan na de eerste keer lezen. Via de API kan een betaalde link vaker gelezen worden: tot 10 keer bij Firm en 100 keer bij Enterprise. Het bestand verdwijnt ook als de link verloopt, wat er ook eerst komt.</p>
       </div>
       <div class="check-card">
-        <div class="k">No account for receivers</div>
-        <p>The recipient opens the link, gets the file, and that is the whole flow. No account, nothing to install.</p>
+        <div class="k">Geen account voor de ontvanger</div>
+        <p>De ontvanger opent de link en krijgt het bestand. Meer is het niet. Geen account, niets te installeren.</p>
       </div>
       <div class="check-card">
-        <div class="k">It opens on their device, or nowhere</div>
-        <p>The file is locked to a key registered on the recipient's device, so it opens there and nowhere else, and a file altered on the way does not open at all. The send screen you use for this is the ParaSend web app.</p>
+        <div class="k">Het opent op hun apparaat, of nergens</div>
+        <p>Het bestand is verzegeld voor een sleutel op het apparaat van de ontvanger. Het opent daar en nergens anders, en een bestand dat onderweg is veranderd, opent helemaal niet. Het verzendscherm hiervoor is de ParaSend web app.</p>
       </div>
       <div class="check-card">
-        <div class="k">Lock a file for yourself</div>
-        <p>No recipient, no account: <a href="/vault">lock a file</a> into a .prmnt container with a passphrase. The file and the passphrase never leave your browser.</p>
+        <div class="k">Een bestand voor uzelf verzegelen</div>
+        <p>Geen ontvanger, geen account: <a href="/vault">verzegel een bestand</a> in een .prmnt-bestand met een wachtzin. Het bestand en de wachtzin verlaten uw browser nooit.</p>
       </div>
       <div class="check-card">
-        <div class="k">Your own server, if you need one</div>
-        <p>A larger organisation can run its own instance, on our hardware or on its own, with its own limits. That is the Enterprise plan.</p>
+        <div class="k">Uw eigen server, als u die nodig hebt</div>
+        <p>Een grotere organisatie kan een eigen installatie draaien, op onze hardware of op die van zichzelf, met eigen limieten. Dat is het Enterprise-plan.</p>
       </div>
     </div>
   </div>
@@ -284,13 +290,13 @@
 <!-- HOW TO BEGIN -->
 <section class="ps-band">
   <div class="container-md">
-    <span class="mono-eyebrow">03 / How to begin</span>
-    <h2 style="margin-top:var(--space-2)">Three steps to a file that disappears</h2>
-    <p>Sending needs a Paramant account. Receiving needs nothing at all.</p>
+    <span class="mono-eyebrow">03 / Zo begint u</span>
+    <h2 style="margin-top:var(--space-2)">Drie stappen naar een bestand dat verdwijnt</h2>
+    <p>Versturen vraagt een Paramant-account. Ontvangen vraagt helemaal niets.</p>
     <ol class="ps-steps">
-      <li><strong><a href="/signup">Create a free account</a>.</strong> No card, no time limit. The Community tier sends with a 1 hour link, and the web app burns it on the first read, forever.</li>
-      <li><strong><a href="/parashare">Open the ParaSend web app</a> and pick your file.</strong> It is scrambled in your browser before anything is uploaded, so what our servers receive is unreadable, and they keep it in memory only.</li>
-      <li><strong>Share the link.</strong> The recipient opens it and the file is wiped after its last read. On the Community plan the link expires after an hour whether it is opened or not.</li>
+      <li><strong><a href="/signup">Maak een gratis account</a>.</strong> Geen betaalkaart, geen tijdslimiet. Het Community-plan verstuurt met een link van 1 uur, en de web app wist hem na de eerste keer lezen, voor altijd.</li>
+      <li><strong><a href="/parashare">Open de ParaSend web app</a> en kies uw bestand.</strong> Het wordt in uw browser verzegeld voordat er iets wordt geüpload. Wat onze servers ontvangen is dus onleesbaar, en ze bewaren het alleen in het geheugen.</li>
+      <li><strong>Deel de link.</strong> De ontvanger opent hem en het bestand wordt na de laatste keer lezen gewist. Bij het Community-plan verloopt de link na een uur, geopend of niet.</li>
     </ol>
   </div>
 </section>
@@ -298,12 +304,12 @@
 <!-- WHO IS BEHIND IT -->
 <section class="ps-band">
   <div class="container-md">
-    <span class="mono-eyebrow">04 / Who is behind it</span>
-    <h2 style="margin-top:var(--space-2)">Built in Harderwijk, in the Netherlands</h2>
+    <span class="mono-eyebrow">04 / Wie erachter zit</span>
+    <h2 style="margin-top:var(--space-2)">Gebouwd in Harderwijk</h2>
     <div class="person-card">
-      <p>Paramant is a product of <strong>Paramantis Solutions B.V.</strong> in Harderwijk, the Netherlands. The product is built on choices you can check for yourself: post-quantum signatures, a public transparency log, offline-verifiable documents, and source code you can inspect yourself.</p>
-      <p>The Community plan is free and stays free; the business plans pay for the servers and keep it that way. Paramantis Solutions B.V. is the contracting and responsible party.</p>
-      <p><a href="/about">More about Paramant &rarr;</a></p>
+      <p>Paramant is een product van <strong>Paramantis Solutions B.V.</strong> in Harderwijk. Het product rust op keuzes die u zelf kunt controleren: post-quantumhandtekeningen, een openbaar logboek, documenten die u offline kunt controleren, en broncode die u zelf kunt inzien.</p>
+      <p>Het Community-plan is gratis en blijft gratis. De zakelijke plannen betalen de servers en houden dat zo. Paramantis Solutions B.V. is de contractpartij en is verantwoordelijk.</p>
+      <p><a href="/about">Meer over Paramant &rarr;</a></p>
     </div>
   </div>
 </section>
@@ -311,117 +317,117 @@
 <!-- THE PLANS: the tier tables, after the product has been explained. -->
 <section class="ps-band" id="plans">
   <div class="container-md">
-    <span class="mono-eyebrow">05 / The plans</span>
-    <h2 style="margin-top:var(--space-2)">What each plan gives you</h2>
-<span class="split-label">Free for everyone <span class="who">&middot; anyone with a browser</span></span>
+    <span class="mono-eyebrow">05 / De plannen</span>
+    <h2 style="margin-top:var(--space-2)">Wat elk plan u geeft</h2>
+<span class="split-label">Gratis voor iedereen <span class="who">&middot; iedereen met een browser</span></span>
     <div class="tier-grid one">
       <div class="tier-card featured">
         <div class="tier-name">Community</div>
         <div class="tier-price">&euro;0</div>
-        <div class="tier-note">Forever &middot; no card required</div>
+        <div class="tier-note">Voor altijd &middot; geen betaalkaart nodig</div>
         <ul>
-          <li>Encrypted in your browser, key never sent</li>
-          <li>50 transfers a month</li>
-          <li>500 MB per file over the live hand-over, on every plan</li>
-          <li>5 MB per file over a one-time link, on every plan</li>
-          <li>1 hour link expiry</li>
-          <li>Burn on first read</li>
-          <li>One recipient per send</li>
-          <li>Up to 50 retrievals an hour through the API</li>
-          <li>Up to 5 registered devices for the ParaSend web app</li>
+          <li>Versleuteld in uw browser, sleutel nooit verstuurd</li>
+          <li>50 verzendingen per maand</li>
+          <li>500 MB per bestand met Samen, nu, bij elk plan</li>
+          <li>5 MB per bestand met een eenmalige link, bij elk plan</li>
+          <li>Link verloopt na 1 uur</li>
+          <li>Gewist na de eerste keer lezen</li>
+          <li>Eén ontvanger per verzending</li>
+          <li>Tot 50 keer ophalen per uur via de API</li>
+          <li>Tot 5 geregistreerde apparaten voor de ParaSend web app</li>
         </ul>
       </div>
     </div>
 
-    <span class="split-label">For organisations <span class="who">&middot; the business plans</span></span>
+    <span class="split-label">Voor organisaties <span class="who">&middot; de zakelijke plannen</span></span>
     <div class="tier-grid">
       <div class="tier-card">
         <div class="tier-name">Firm</div>
-        <div class="tier-price">&euro;29<span>/mo</span></div>
-        <div class="tier-note">excl. btw &middot; <span class="incl">charged &euro;35.09/mo incl. 21% btw</span><br>Annual &euro;290 excl. &middot; 16.7% off</div>
+        <div class="tier-price">&euro;29<span>/mnd</span></div>
+        <div class="tier-note">excl. btw &middot; <span class="incl">u betaalt &euro;35,09/mnd incl. 21% btw</span><br>Per jaar &euro;290 excl. &middot; 16,7% korting</div>
         <ul>
-          <li>Everything in Community</li>
-          <li>100 signatures a month on ParaSign, in the same payment</li>
-          <li>500 transfers a month</li>
-          <li>24 hour link expiry</li>
-          <li>Up to 10 reads per link through the API</li>
-          <li>Up to 30 recipients per send, each with their own one-time link</li>
-          <li>Up to 500 retrievals an hour through the API</li>
-          <li>Up to 50 registered devices</li>
-          <li>Send history and link management</li>
-          <li>Webhooks on upload and download</li>
-          <li>Email notifications, carried inside the EU</li>
+          <li>Alles uit Community</li>
+          <li>100 handtekeningen per maand met ParaSign, in dezelfde betaling</li>
+          <li>500 verzendingen per maand</li>
+          <li>Link verloopt na 24 uur</li>
+          <li>Tot 10 keer lezen per link via de API</li>
+          <li>Tot 30 ontvangers per verzending, elk met een eigen eenmalige link</li>
+          <li>Tot 500 keer ophalen per uur via de API</li>
+          <li>Tot 50 geregistreerde apparaten</li>
+          <li>Verzendgeschiedenis en linkbeheer</li>
+          <li>Webhooks bij upload en download</li>
+          <li>E-mailmeldingen, verstuurd binnen de EU</li>
         </ul>
       </div>
       <div class="tier-card">
         <div class="tier-name">Enterprise</div>
-        <div class="tier-price">Custom</div>
-        <div class="tier-note">Per organisation</div>
+        <div class="tier-price">Op maat</div>
+        <div class="tier-note">Per organisatie</div>
         <ul>
-          <li>Everything in Firm</li>
-          <li>7 day link expiry</li>
-          <li>Up to 100 reads per link through the API</li>
-          <li>No hourly cap on API retrievals</li>
-          <li>Dedicated relay on our infra or yours</li>
-          <li>IEC 62443 / NIS2 / NEN 7510 documentation as input for your own compliance process, not third-party certification</li>
-          <li>Custom DPA terms negotiated in the contract</li>
-          <li>SLA 99.95%, priority incident response</li>
+          <li>Alles uit Firm</li>
+          <li>Link verloopt na 7 dagen</li>
+          <li>Tot 100 keer lezen per link via de API</li>
+          <li>Geen uurlimiet op ophalen via de API</li>
+          <li>Eigen relay op onze of uw infrastructuur</li>
+          <li>Documentatie voor IEC 62443 / NIS2 / NEN 7510 als input voor uw eigen compliance, geen certificering door een derde</li>
+          <li>Eigen afspraken in de verwerkersovereenkomst, vastgelegd in het contract</li>
+          <li>SLA 99,95%, voorrang bij incidenten</li>
         </ul>
       </div>
     </div>
-    <p class="ps-fine">What the hourly figure counts: fetching a transfer back yourself with your own API key, the route the SDKs and scripts use. A recipient who opens the link you sent goes through the download token instead, and that path is not counted against your hour. Past the ceiling the relay answers 429 until the hour rolls over. The number is outbound_per_hour in relay/lib/tiers.js, the same table the transfer, file size and link limits above come from.</p>
-    <p class="ps-fine">Every tier stores transfers in RAM and every tier uses the same cryptography. There is no lesser encryption at lower tiers. Cryptography is not a paywalled feature at Paramant.</p>
-    <p class="ps-fine">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Firm &euro;35.09/mo or &euro;350.90/yr. Checkout and the full comparison are on the <a href="/pricing">pricing page</a>.</p>
+    <p class="ps-fine">Wat het getal per uur telt: zelf een verzending terughalen met uw eigen API-sleutel, de route die de SDK's en scripts gebruiken. Een ontvanger die uw link opent, gaat via het downloadtoken, en dat telt niet mee voor uw uur. Boven de grens antwoordt de relay met 429 tot het volgende uur begint. Het getal is outbound_per_hour in relay/lib/tiers.js, dezelfde tabel waar de limieten voor verzendingen, bestandsgrootte en links hierboven vandaan komen.</p>
+    <p class="ps-fine">Elk plan bewaart verzendingen in het werkgeheugen en elk plan gebruikt dezelfde cryptografie. Een goedkoper plan krijgt geen zwakkere versleuteling. Bij Paramant zit cryptografie niet achter een betaalmuur.</p>
+    <p class="ps-fine">Prijzen zijn excl. btw. Bij het afrekenen betaalt u incl. 21% btw: Firm &euro;35,09/mnd of &euro;350,90/jaar. Afrekenen en de volledige vergelijking vindt u op de <a href="/pricing">prijzenpagina</a>.</p>
   </div>
 </section>
 
 <!-- THE PROOF, AND THE LIMITS -->
 <section class="ps-band">
   <div class="container-md">
-    <span class="mono-eyebrow">06 / The proof</span>
-    <h2 style="margin-top:var(--space-2)">Every claim has a place to check it</h2>
-    <p>You should not have to trust us. You should be able to check. Each point below links to where you can.</p>
+    <span class="mono-eyebrow">06 / Het bewijs</span>
+    <h2 style="margin-top:var(--space-2)">Elke bewering kunt u ergens controleren</h2>
+    <p>U hoeft ons niet te vertrouwen. U moet het kunnen controleren. Elk punt hieronder linkt naar de plek waar dat kan.</p>
     <div class="check-grid">
       <div class="check-card">
-        <div class="k">We never had it</div>
-        <p>AES-256-GCM with a key your browser generates. The relay only ever holds ciphertext, never the plaintext and never the key, and it holds it in RAM until its last read burns it. A web app transfer is stored in blocks of a fixed 5 MB, so a block says nothing about the size of the file. The retention row is on the <a href="/security">security page</a>.</p>
+        <div class="k">Wij hadden het nooit</div>
+        <p>AES-256-GCM met een sleutel die uw browser maakt. De relay heeft alleen versleutelde data, nooit de leesbare tekst en nooit de sleutel, en houdt die in het werkgeheugen tot de laatste keer lezen hem wist. Een verzending uit de web app wordt bewaard in blokken van vast 5 MB. Een blok zegt dus niets over de grootte van het bestand. De bewaarregel staat op de <a href="/security">beveiligingspagina</a>.</p>
       </div>
       <div class="check-card">
-        <div class="k">The wire format, in full</div>
-        <p>The ParaSend web app uses ML-KEM-768 plus ECDH P-256 hybrid key exchange. The register lists the webapp on the pre-v1 hybrid wire, signature n/a, migrating to v1; ML-DSA-65 signed receipts are live on the v1 wire in sdk-py 3.0.0 and sdk-js 3.0.0. Read the register on the <a href="/crypto-agility">crypto agility page</a>.</p>
+        <div class="k">Het berichtformaat, volledig</div>
+        <p>De ParaSend web app gebruikt een hybride sleuteluitwisseling met ML-KEM-768 en ECDH P-256. Het register noemt de webapp op het pre-v1 hybrid-formaat, handtekening n.v.t., op weg naar v1. Met ML-DSA-65 ondertekende ontvangstbewijzen zijn live op het v1-formaat in sdk-py 3.0.0 en sdk-js 3.0.0. Lees het register op de <a href="/crypto-agility">pagina over crypto-wendbaarheid</a>.</p>
       </div>
       <div class="check-card">
-        <div class="k">You own your keys</div>
-        <p>Generated on your device, never sent. We see only the public half. Read <a href="/rules">our rules</a>.</p>
+        <div class="k">Uw sleutels zijn van u</div>
+        <p>Gemaakt op uw apparaat, nooit verstuurd. Wij zien alleen de openbare helft. Lees <a href="/rules">onze regels</a>.</p>
       </div>
       <div class="check-card">
-        <div class="k">EU soil, EU law</div>
-        <p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path. Email goes out via Mailjet (France), as <a href="/privacy">/privacy</a> sets out. No US provider touches a file or a key. The subprocessors are listed there, and rule 5 states the same claim in full on <a href="/rules">our rules page</a>.</p>
+        <div class="k">Europese grond, Europees recht</div>
+        <p>Hetzner in Duitsland, Bunny DNS (Slovenië). Geen Amerikaanse partij in de weg van de data. Mail gaat via Mailjet (Frankrijk), zoals <a href="/privacy">/privacy</a> uitlegt. Geen Amerikaanse partij komt aan een bestand of een sleutel. De subverwerkers staan daar, en regel 5 zegt hetzelfde volledig op <a href="/rules">onze regelspagina</a>.</p>
       </div>
       <div class="check-card">
-        <div class="k">No third-party requests</div>
-        <p>Your browser talks only to us. No fonts, CDNs, analytics or pixels. Open devtools and check.</p>
+        <div class="k">Geen verzoeken aan derden</div>
+        <p>Uw browser praat alleen met ons. Geen lettertypen, CDN's, analytics of pixels. Open de ontwikkelaarstools en kijk zelf.</p>
       </div>
       <div class="check-card">
-        <div class="k">Quantum-ready by default</div>
-        <p>FIPS 203/204 today, not &ldquo;soon&rdquo;. The algorithm register is on the <a href="/crypto-agility">crypto agility page</a>.</p>
+        <div class="k">Standaard klaar voor quantum</div>
+        <p>FIPS 203/204 vandaag, niet &ldquo;binnenkort&rdquo;. Het register van algoritmen staat op de <a href="/crypto-agility">pagina over crypto-wendbaarheid</a>.</p>
       </div>
       <div class="check-card">
-        <div class="k">Dedicated relays, on the same rules</div>
-        <p>Enterprise customers run a dedicated relay on our infrastructure or their own, with limits configured per tenant within its RAM budget. The tiers are on the <a href="/pricing">pricing page</a>.</p>
+        <div class="k">Eigen relays, met dezelfde regels</div>
+        <p>Enterprise-klanten draaien een eigen relay op onze infrastructuur of op die van zichzelf, met limieten per klant binnen het beschikbare werkgeheugen. De plannen staan op de <a href="/pricing">prijzenpagina</a>.</p>
       </div>
       <div class="check-card">
-        <div class="k">Source-available code</div>
-        <p>The relay is source-available. Read it on <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a> and run it yourself.</p>
+        <div class="k">Broncode in te zien</div>
+        <p>De broncode van de relay is openbaar in te zien. Lees hem op <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a> en draai hem zelf.</p>
       </div>
     </div>
     <div class="scope-note">
-      <p><strong>What the compliance documentation is.</strong> Architecture documents, security controls mappings and technical reference materials aligned to IEC 62443, NIS2 and NEN 7510. This is documentation you can use as input for your own compliance process. Paramant does not hold third-party certification for these frameworks.</p>
-      <p><strong>What burn-on-read costs you.</strong> A file is wiped after its last read, or on expiry, whichever comes first. There is no disk storage, so a file that is gone cannot be fetched again. Keep your own copy.</p>
+      <p><strong>Wat de compliance-documentatie is.</strong> Architectuurdocumenten, een overzicht van beveiligingsmaatregelen en technisch naslagmateriaal, afgestemd op IEC 62443, NIS2 en NEN 7510. U kunt dit gebruiken als input voor uw eigen compliance. Paramant heeft voor deze kaders geen certificering door een derde.</p>
+      <p><strong>Wat wissen na het lezen u kost.</strong> Een bestand wordt gewist na de laatste keer lezen, of als de link verloopt, wat er ook eerst komt. Er is geen opslag op schijf. Een bestand dat weg is, kan niemand meer ophalen. Bewaar zelf een kopie.</p>
     </div>
     <div class="ps-actions">
-      <a href="/parashare" class="btn btn-primary">Send a file &rarr;</a>
-      <a href="/pricing" class="btn btn-secondary">See pricing &rarr;</a>
+      <a href="/parashare" class="btn btn-primary">Bestand versturen &rarr;</a>
+      <a href="/pricing" class="btn btn-secondary">Prijzen bekijken &rarr;</a>
     </div>
   </div>
 </section>
@@ -429,43 +435,44 @@
 <!-- DEVELOPERS, LAST -->
 <section class="ps-band">
   <div class="container-md">
-    <span class="mono-eyebrow">07 / Developers</span>
-    <h2 style="margin-top:var(--space-2)">Send from your own code</h2>
-    <p class="dev-line">There is an open SDK in JavaScript and Python and a self-host installer. Read the <a href="/docs">documentation</a>, or run the relay yourself from <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a>.</p>
+    <span class="mono-eyebrow">07 / Ontwikkelaars</span>
+    <h2 style="margin-top:var(--space-2)">Versturen vanuit uw eigen code</h2>
+    <p class="dev-line">Er is een open SDK in JavaScript en Python en een installatie om zelf te hosten. Lees de <a href="/docs">documentatie</a>, of draai de relay zelf vanaf <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a>.</p>
   </div>
 </section>
 
 </main>
+<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/parasend" hreflang="en" lang="en">This page in English</a></p>
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Company</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/about">About</a>
-          <a href="/changelog">Changelog</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/privacy">Privacy Policy</a>
-          <a href="/dpa">Data Processing Agreement</a>
-          <a href="/terms">Terms of Service</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/license">License</a>
+          <a href="/license">Licentie</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=10" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
 </body>
 </html>

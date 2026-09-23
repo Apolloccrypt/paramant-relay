@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Authenticator apps · Paramant Help</title>
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<meta name="twitter:description" content="Every standard authenticator app works with Paramant, including Google Authenticator. For the strongest setup, use a SHA-256 app such as Authy or 1Password.">
+<meta name="twitter:title" content="Authenticator apps · Paramant Help">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:height" content="630">
+<meta property="og:image:width" content="1200">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta property="og:title" content="Authenticator apps · Paramant Help">
+<meta property="og:description" content="Every standard authenticator app works with Paramant, including Google Authenticator. For the strongest setup, use a SHA-256 app such as Authy or 1Password.">
+<meta property="og:url" content="https://paramant.app/en/help/authenticator-apps">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Paramant">
+<link rel="canonical" href="https://paramant.app/en/help/authenticator-apps">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/help/authenticator-apps">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/help/authenticator-apps">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/help/authenticator-apps">
+<meta name="description" content="Every standard authenticator app works with Paramant, including Google Authenticator. For the strongest setup, use a SHA-256 app such as Authy or 1Password.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B3A6A">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+main{max-width:780px;margin:0 auto;padding:80px 48px 120px}
+.breadcrumb{font-size:var(--text-xs);color:var(--ink-dim);margin-bottom:32px}
+.breadcrumb a{color:var(--cobalt);text-decoration:none}
+.breadcrumb a:hover{opacity:.7}
+.breadcrumb span{margin:0 8px;color:var(--ink-ghost)}
+h1{font-size:36px;font-weight:600;letter-spacing:-.03em;margin-bottom:12px}
+.lead{font-size:var(--text-base);color:var(--ink-dim);line-height:1.7;margin-bottom:48px;max-width:580px}
+h2{font-size:18px;font-weight:600;letter-spacing:-.01em;margin-bottom:12px;margin-top:48px}
+p{color:var(--ink-dim);line-height:1.8;margin-bottom:16px;font-size:var(--text-base)}
+p strong{color:var(--ink)}
+a{color:var(--cobalt);text-decoration:none}
+a:hover{opacity:.7}
+em{color:var(--cobalt)}
+.tip{border-left:3px solid var(--cobalt);padding:12px 16px;margin:16px 0;background:var(--ink-ghost)}
+.tip p{margin:0;font-size:var(--text-sm)}
+.warn{border-left:3px solid var(--lime);padding:12px 16px;margin:16px 0;background:var(--ink-ghost)}
+.warn p{margin:0;font-size:var(--text-sm)}
+.divider{border:none;border-top:1px solid var(--ink-hair);margin:48px 0}
+.next-steps{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}
+.next-step-card{border:1px solid var(--ink-hair);padding:18px 20px;text-decoration:none;color:inherit;display:block}
+.next-step-card:hover{border-color:var(--cobalt);opacity:1}
+.next-step-card h3{font-size:var(--text-sm);font-weight:600;color:var(--ink);margin:0 0 4px}
+.next-step-card p{font-size:var(--text-xs);color:var(--ink-dim);margin:0;line-height:1.5}
+footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+@media(max-width:640px){
+  main{padding:48px 20px 80px}
+  h1{font-size:26px}
+  .next-steps{grid-template-columns:1fr}
+  footer{padding:32px 20px;flex-direction:column}
+}
+</style>
+<link rel="stylesheet" href="/design-system.css?v=31">
+<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<style>
+.nav-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-family: IBM Plex Mono, monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+  text-decoration: none;
+  border: 1px solid var(--ink-hair);
+  transition: all 140ms ease;
+  margin-right: 12px;
+}
+.nav-help::before {
+  content: "?";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--ink-dim);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-dim);
+  font-family: Inter, sans-serif;
+  line-height: 1;
+}
+.nav-help:hover {
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(29, 78, 216, 0.08);
+}
+.nav-help:hover::before {
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
+}
+.nav-help:focus-visible {
+  outline: 2px solid var(--ochre);
+  outline-offset: 2px;
+}
+.nav-help-mobile {
+  display: block;
+  padding: 12px 20px;
+  font-family: IBM Plex Mono, monospace;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ink-hair);
+}
+.nav-help-mobile:hover {
+  color: var(--ink);
+  background: rgba(29, 78, 216, 0.08);
+}
+@media (max-width: 900px) {
+  .nav-help { display: none; }
+}
+</style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/en/help/authenticator-apps#webpage",
+      "url": "https://paramant.app/en/help/authenticator-apps",
+      "name": "Authenticator apps · Paramant Help",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "en",
+      "description": "Every standard authenticator app works with Paramant, including Google Authenticator. For the strongest setup, use a SHA-256 app such as Authy or 1Password."
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://paramant.app/en/help/authenticator-apps#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Paramant",
+          "item": "https://paramant.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "En",
+          "item": "https://paramant.app/en"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Authenticator apps"
+        }
+      ]
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/security" class="nav-link">Security</a></li>
+    <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/en/docs" class="nav-link">Docs</a></li>
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/auth/login" class="nav-signin">Sign in</a>
+    <a href="/en/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/authenticator-apps" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/authenticator-apps" hreflang="en" lang="en" aria-current="true">EN</a></div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/security" class="nav-mobile-standalone">Security</a>
+  <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/authenticator-apps" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/authenticator-apps" hreflang="en" lang="en" aria-current="true">EN</a></span>
+</div>
+  <div class="nav-mobile-cta">
+    <a href="/help" class="nav-help-mobile nav-mobile-standalone">HELP</a>
+    <a href="/auth/login" class="btn btn-ghost-dark">Sign in</a>
+    <a href="/signup" class="btn btn-lime">Create account</a>
+  </div>
+
+<main>
+
+  <div class="breadcrumb">
+    <a href="/help">Help</a>
+    <span>/</span>
+    Authenticator apps
+  </div>
+
+  <h1>Authenticator <em>apps</em></h1>
+  <p class="lead">Every standard authenticator app works with Paramant. A SHA-256 app gives you the strongest setup.</p>
+
+  <h2>Why we recommend SHA-256</h2>
+  <p>Paramant's relay accepts both SHA-256 and SHA-1 TOTP codes, so every standard authenticator app works. We recommend SHA-256 because it keeps the MFA layer on the same cryptographic standard as the rest of the transport, which is built around post-quantum key exchange and FIPS 203 primitives. HMAC-SHA1 is not broken and RFC 6238 uses it as the default, so a SHA-1 app is perfectly safe to use. SHA-256 is simply the stronger, more consistent choice.</p>
+
+  <h2>Recommended apps (SHA-256)</h2>
+  <p>Authy, 1Password, Aegis (Android, open source), Raivo (iOS, open source), Bitwarden, Ente Auth (iOS and Android, open source), and 2FAS all support SHA-256 TOTP. Any of these will work with the QR code shown on the setup page and give you the strongest setup.</p>
+  <div class="tip"><p>Not sure which to pick? Aegis on Android and Raivo on iOS are open source, store codes locally, and have no cloud dependency. 1Password and Bitwarden are good choices if you already use a password manager.</p></div>
+
+  <h2>Also works (SHA-1)</h2>
+  <p>Google Authenticator, Microsoft Authenticator, and the authenticator built into iCloud Keychain use SHA-1 TOTP. Paramant accepts SHA-1 codes, so these apps work fine. For the strongest setup we still recommend one of the SHA-256 apps above.</p>
+  <div class="tip"><p>Already using Google Authenticator? It keeps working. Switching to a SHA-256 app such as Raivo or Aegis is a small upgrade, not a requirement.</p></div>
+
+  <h2>Upgrading to a SHA-256 app</h2>
+  <p>Google Authenticator works with Paramant. For the strongest setup you can keep it for your other services and add a SHA-256 app (Aegis on Android, Raivo on iOS) specifically for Paramant. Having multiple authenticator apps on one device is supported and common.</p>
+
+  <hr class="divider">
+
+  <h2 style="margin-top:0">Related</h2>
+  <div class="next-steps">
+    <a href="/auth/setup" class="next-step-card">
+      <h3>Set up authenticator</h3>
+      <p>Scan the QR code and confirm your first code.</p>
+    </a>
+    <a href="/security" class="next-step-card">
+      <h3>Security overview</h3>
+      <p>Full cryptographic posture and protocol details.</p>
+    </a>
+  </div>
+
+</main>
+
+<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/help/authenticator-apps" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
+
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid footer-slim">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="/en/about">About</a>
+          <a href="/en/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Legal</div>
+        <div class="footer-links">
+          <a href="/en/privacy">Privacy Policy</a>
+          <a href="/en/dpa">Data Processing Agreement</a>
+          <a href="/en/terms">Terms of Service</a>
+          <a href="/en/sla">SLA</a>
+          <a href="/en/license">License</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
+</body>
+</html>

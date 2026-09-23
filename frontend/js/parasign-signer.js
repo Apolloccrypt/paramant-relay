@@ -11,8 +11,17 @@ import { vaultGetPrfWrapInfo, vaultUnlockPrf, vaultAddPrfWrap, vaultCreatePrfOnl
 // namespace off the global. Side-effect import, then read it, the same way
 // js/parasign-pdf-ops.js is reached. It owns the one sentence a customer sees
 // when we have no better answer than "not your fault, here is who to mail".
-import '/js/error-message.js?v=1';
+import '/js/error-message.js?v=2';
 const paramantErrors = self.paramantErrors;
+
+// One file, both languages. Every sentence a customer can see from this module
+// (status lines and error messages; not console output, error codes or field
+// names) picks Dutch by default and English only on a page that says
+// <html lang="en">. Read at call time, and guarded: the node tests import this
+// module with no document at all, and there it is Dutch.
+function tr(nl, en) {
+  return (typeof document !== 'undefined' && document.documentElement && document.documentElement.lang === 'en') ? en : nl;
+}
 
 // Byte-identical to relay/envelope.js SIGN_DOMAIN_DOC (recipe v3). Keep in sync
 // across relay + SDK + core.
@@ -56,23 +65,23 @@ function toHex(u8) {
 
 export function normaliseSigningAppearance(value) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  if (source.version !== undefined && source.version !== 1) throw new Error('Unsupported signature appearance version.');
+  if (source.version !== undefined && source.version !== 1) throw new Error(tr('Deze versie van de handtekeningplaatsing wordt niet ondersteund.', 'Unsupported signature appearance version.'));
   const input = source.fields === undefined ? [] : source.fields;
-  if (!Array.isArray(input) || input.length > 8) throw new Error('Invalid signature appearance.');
+  if (!Array.isArray(input) || input.length > 8) throw new Error(tr('De plaatsing van de handtekening is ongeldig.', 'Invalid signature appearance.'));
   const fields = input.map((field) => {
-    if (!field || typeof field !== 'object' || Array.isArray(field)) throw new Error('Invalid signature appearance field.');
+    if (!field || typeof field !== 'object' || Array.isArray(field)) throw new Error(tr('Een veld van de handtekeningplaatsing is ongeldig.', 'Invalid signature appearance field.'));
     const type = String(field.type || '');
-    if (type !== 'seal' && type !== 'date') throw new Error('Invalid signature appearance field type.');
+    if (type !== 'seal' && type !== 'date') throw new Error(tr('Het soort veld van de handtekeningplaatsing is ongeldig.', 'Invalid signature appearance field type.'));
     const pageIndex = Number(field.page_index);
-    if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex > 999) throw new Error('Invalid signature appearance page.');
+    if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex > 999) throw new Error(tr('De pagina van de handtekeningplaatsing is ongeldig.', 'Invalid signature appearance page.'));
     const clean = { type, page_index: pageIndex };
     for (const name of ['x', 'y', 'w', 'h']) {
       const n = Number(field[name]);
-      if (!Number.isFinite(n) || n < 0 || n > 1) throw new Error('Invalid signature appearance coordinate.');
+      if (!Number.isFinite(n) || n < 0 || n > 1) throw new Error(tr('Een positie van de handtekeningplaatsing is ongeldig.', 'Invalid signature appearance coordinate.'));
       clean[name] = Math.round(n * 1000000) / 1000000;
     }
     if (clean.w < 0.02 || clean.h < 0.01 || clean.x + clean.w > 1.000001 || clean.y + clean.h > 1.000001) {
-      throw new Error('Signature appearance is outside the page.');
+      throw new Error(tr('De handtekening valt buiten de pagina.', 'Signature appearance is outside the page.'));
     }
     return clean;
   });
@@ -138,7 +147,7 @@ export function buildDocSignMessage({ envelopeId, docHash, partyIndex, emailHash
 // is never written to the vault). If no PRF signing key is enrolled on this
 // device, throws code 'no_signing_passkey'.
 export async function resolvePasskeySigningKey() {
-  if (!(await vaultAvailable())) throw new Error('This browser cannot store signing keys (IndexedDB/WebCrypto unavailable).');
+  if (!(await vaultAvailable())) throw new Error(tr('Deze browser kan geen ondertekensleutels bewaren (IndexedDB of WebCrypto ontbreekt).', 'This browser cannot store signing keys (IndexedDB/WebCrypto unavailable).'));
   const keys = await vaultList();
   const candidates = keys.filter((k) => (k.kekSources || []).some((s) => s === 'webauthn-prf'));
   // Verify the PRF wrap is actually present (not just listed in kekSources). A
@@ -153,7 +162,7 @@ export async function resolvePasskeySigningKey() {
       kekSources: k.kekSources || [], hasPrf: true,
     };
   }
-  const e = new Error('No signing key on this device yet. Set one up when you sign.');
+  const e = new Error(tr('Er staat nog geen ondertekensleutel op dit apparaat. U maakt er een aan wanneer u ondertekent.', 'No signing key on this device yet. Set one up when you sign.'));
   e.code = 'no_signing_passkey';
   throw e;
 }
@@ -237,7 +246,7 @@ export class LocalVaultSigner {
   async activate({ vaultId, rpId } = {}) {
     const info = await vaultGetPrfWrapInfo(vaultId);
     if (!info) {
-      const e = new Error('This signing key can no longer be unlocked on this browser. Sign again to set up a fresh one.');
+      const e = new Error(tr('Deze ondertekensleutel is in deze browser niet meer te ontgrendelen. Onderteken opnieuw om een nieuwe aan te maken.', 'This signing key can no longer be unlocked on this browser. Sign again to set up a fresh one.'));
       e.code = 'need_passkey';
       throw e;
     }
@@ -282,12 +291,12 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
   }
 
   if (!(await vaultAvailable())) {
-    const err = new Error('This browser cannot store signing keys (IndexedDB/WebCrypto unavailable).');
+    const err = new Error(tr('Deze browser kan geen ondertekensleutels bewaren (IndexedDB of WebCrypto ontbreekt).', 'This browser cannot store signing keys (IndexedDB/WebCrypto unavailable).'));
     err.code = 'vault_unavailable';
     throw err;
   }
   if (!(typeof PublicKeyCredential !== 'undefined' && navigator.credentials && navigator.credentials.get)) {
-    const err = new Error('This browser does not support passkeys, so it cannot set up signing.');
+    const err = new Error(tr('Deze browser ondersteunt geen passkeys en kan ondertekenen daarom niet instellen.', 'This browser does not support passkeys, so it cannot set up signing.'));
     err.code = 'no_webauthn';
     throw err;
   }
@@ -301,13 +310,13 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
   const pk_hash = toHex(sha3_256(kp.publicKey));
   try {
     // 2) Step-up challenge over THIS account's passkeys.
-    say('Setting up signing with your passkey…');
+    say(tr('Ondertekenen instellen met uw passkey…', 'Setting up signing with your passkey…'));
     let opt;
     try {
       opt = await _postJSON('/api/user/account/signing-key/step-up/options', {});
     } catch (e) {
       if (e && e.status === 409 && e.data && e.data.error === 'no_passkey') {
-        const err = new Error('Add a passkey to your account first, then you can sign with it.');
+        const err = new Error(tr('Voeg eerst een passkey toe aan uw account. Daarna kunt u ermee ondertekenen.', 'Add a passkey to your account first, then you can sign with it.'));
         err.code = 'no_passkey';
         throw err;
       }
@@ -318,7 +327,7 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
     // 3) ONE WebAuthn get(): server challenge + per-wrap PRF eval salt. The
     //    platform offers the account's sign-in passkey from allowCredentials.
     const prfSalt = crypto.getRandomValues(new Uint8Array(16));
-    say('Confirm with Face ID / Touch ID / your security key…');
+    say(tr('Bevestig met Face ID, Touch ID of uw beveiligingssleutel…', 'Confirm with Face ID / Touch ID / your security key…'));
     const allowList = (opt.options.allowCredentials || []);
     // Build BOTH PRF shapes with one shared salt: a per-credential evalByCredential
     // map (keyed by each passkey's base64url id, which Chromium needs when several
@@ -350,7 +359,7 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
       // The authenticator/provider engaged but could not complete a PRF assertion
       // (e.g. a passkey manager like Proton Pass that implements passkeys but not
       // the PRF extension). Signal the caller to fall back to a TOTP ephemeral key.
-      const err = new Error('Your passkey provider can’t do the PRF unlock that one-tap signing needs.');
+      const err = new Error(tr('Uw passkey-aanbieder ondersteunt de PRF-ontgrendeling niet die ondertekenen met één tik nodig heeft.', 'Your passkey provider can’t do the PRF unlock that one-tap signing needs.'));
       err.code = 'prf_unsupported'; err.cause = e;
       throw err;
     }
@@ -358,7 +367,7 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
     if (!prfFirst) {
       // The assertion succeeded but produced no PRF result — same outcome: this
       // passkey can't be a one-tap signing key. The caller falls back to TOTP.
-      const err = new Error('This passkey doesn’t support the PRF extension that one-tap signing needs.');
+      const err = new Error(tr('Deze passkey ondersteunt de PRF-extensie niet die ondertekenen met één tik nodig heeft.', 'This passkey doesn’t support the PRF extension that one-tap signing needs.'));
       err.code = 'prf_unsupported';
       throw err;
     }
@@ -375,7 +384,7 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
 
     // 5) Bind the PUBLIC key to the account: the admin verifies the step-up
     //    assertion, then the relay records the pubkey (TOTP-free attested route).
-    say('Linking your signing key to your account…');
+    say(tr('Uw ondertekensleutel wordt aan uw account gekoppeld…', 'Linking your signing key to your account…'));
     await _postJSON('/api/user/account/signing-key/step-up/bind', {
       flowId: opt.flowId,
       response: _serializeAssertion(cred),
@@ -405,7 +414,7 @@ export async function enrolEphemeralSigningKeyWithTotp({ label, totp, onStatus }
   const say = (m) => { try { if (onStatus) onStatus(m); } catch { /* status is best-effort */ } };
   const code = String(totp == null ? '' : totp).trim();
   if (!/^\d{6}$/.test(code)) {
-    const err = new Error('Enter the 6-digit code from your authenticator app.');
+    const err = new Error(tr('Vul de 6-cijferige code uit uw authenticator-app in.', 'Enter the 6-digit code from your authenticator app.'));
     err.code = 'totp_required';
     throw err;
   }
@@ -419,7 +428,7 @@ export async function enrolEphemeralSigningKeyWithTotp({ label, totp, onStatus }
   const pk_hash = toHex(sha3_256(kp.publicKey));
 
   // Bind the PUBLIC key to the account, gated by the TOTP code (relay verifies it).
-  say('Linking your signing key to your account…');
+  say(tr('Uw ondertekensleutel wordt aan uw account gekoppeld…', 'Linking your signing key to your account…'));
   let enrolRes = null;
   try {
     enrolRes = await _postJSON('/api/user/account/signing-key', { pk_b64, label: label || 'Signing key', totp: code });
@@ -428,9 +437,9 @@ export async function enrolEphemeralSigningKeyWithTotp({ label, totp, onStatus }
     const errCode = (e && e.data && e.data.error) || '';
     // Relay gates the TOTP enrol: 403 invalid_totp (wrong code) / 403 no_totp_setup
     // (account has no authenticator), 400 totp_required (malformed — caught above).
-    if (errCode === 'no_totp_setup') { const err = new Error('Set up an authenticator app on your account first, then sign with its code.'); err.code = 'totp_unavailable'; throw err; }
-    if (errCode === 'invalid_totp' || e.status === 403 || e.status === 401) { const err = new Error('That authenticator code didn’t match. Try the current 6-digit code.'); err.code = 'totp_invalid'; throw err; }
-    if (e && (e.status === 400 || e.status === 409) && /totp/i.test(errCode)) { const err = new Error('That authenticator code didn’t match. Try the current 6-digit code.'); err.code = 'totp_invalid'; throw err; }
+    if (errCode === 'no_totp_setup') { const err = new Error(tr('Stel eerst een authenticator-app in op uw account en onderteken daarna met de code.', 'Set up an authenticator app on your account first, then sign with its code.')); err.code = 'totp_unavailable'; throw err; }
+    if (errCode === 'invalid_totp' || e.status === 403 || e.status === 401) { const err = new Error(tr('Die authenticatorcode klopt niet. Probeer de huidige 6-cijferige code.', 'That authenticator code didn’t match. Try the current 6-digit code.')); err.code = 'totp_invalid'; throw err; }
+    if (e && (e.status === 400 || e.status === 409) && /totp/i.test(errCode)) { const err = new Error(tr('Die authenticatorcode klopt niet. Probeer de huidige 6-cijferige code.', 'That authenticator code didn’t match. Try the current 6-digit code.')); err.code = 'totp_invalid'; throw err; }
     // Anything else. This used to be a bare `throw e`, which put the wire's own
     // words in front of the customer: _postJSON below builds its message out of
     // the relay's error field or 'http_' + status, and a dropped connection

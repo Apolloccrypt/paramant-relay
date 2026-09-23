@@ -47,11 +47,11 @@
         '<div class="sector-name">' + s.label + '</div>' +
         '<div class="dot checking" id="dot-' + s.id + '"></div>' +
       '</div>' +
-      '<div class="card-status" id="status-' + s.id + '">Checking&hellip;</div>' +
+      '<div class="card-status" id="status-' + s.id + '">Controleren&hellip;</div>' +
       '<div class="meta-row">' +
-        '<div class="meta-item">version <span id="ver-' + s.id + '">&mdash;</span></div>' +
-        '<div class="meta-item">latency <span id="ms-' + s.id + '">&mdash;</span></div>' +
-        '<div class="meta-item">uptime 24h <span id="up-' + s.id + '">&mdash;</span></div>' +
+        '<div class="meta-item">versie <span id="ver-' + s.id + '">&mdash;</span></div>' +
+        '<div class="meta-item">vertraging <span id="ms-' + s.id + '">&mdash;</span></div>' +
+        '<div class="meta-item">beschikbaarheid 24 u <span id="up-' + s.id + '">&mdash;</span></div>' +
       '</div>' +
       '<div class="sector-url"><a href="' + s.url + '/health" target="_blank" rel="noopener">' + s.host + '/health</a></div>';
     grid.appendChild(card);
@@ -67,7 +67,7 @@
     card.className    = 'sector-card ' + (state === 'ok' ? 'ok' : state === 'checking' ? '' : 'degraded');
     dot.className     = 'dot ' + state;
     statusEl.className = 'card-status ' + (state === 'ok' ? 'ok' : state === 'checking' ? '' : 'degraded');
-    statusEl.textContent = state === 'ok' ? 'Operational' : state === 'checking' ? 'Checking\u2026' : 'Degraded';
+    statusEl.textContent = state === 'ok' ? 'Operationeel' : state === 'checking' ? 'Controleren\u2026' : 'Verstoord';
 
     if (data && data.version) verEl.textContent = 'v' + data.version;
     if (ms !== undefined) msEl.textContent = ms + 'ms';
@@ -84,13 +84,13 @@
     var text = document.getElementById('overallText');
     if (!anyChecked) {
       el.className = 'overall checking'; dot.className = 'dot-large checking';
-      text.textContent = 'Checking all sectors\u2026';
+      text.textContent = 'Alle sectoren worden gecontroleerd\u2026';
     } else if (allOk) {
       el.className = 'overall ok'; dot.className = 'dot-large ok';
-      text.textContent = 'All systems operational';
+      text.textContent = 'Alle systemen operationeel';
     } else {
       el.className = 'overall degraded'; dot.className = 'dot-large degraded';
-      text.textContent = 'One or more sectors degraded';
+      text.textContent = 'Een of meer sectoren verstoord';
     }
   }
 
@@ -125,7 +125,7 @@
             setOverall(allOk, true);
             var now = new Date();
             document.getElementById('lastChecked').textContent =
-              'Last checked: ' + now.toLocaleTimeString() + ' \u2014 next check in 30s';
+              'Laatst gecontroleerd: ' + now.toLocaleTimeString('nl-NL') + ' · volgende controle over 30 s';
           }
         });
     });

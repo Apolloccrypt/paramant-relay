@@ -12,6 +12,9 @@ const IV_BYTES = 12;
 const MAX_META_BYTES = 4096;
 const DOMAIN = 'paramant/parasign/document/v1';
 
+// Dutch by default; the English copy of the page (lang="en") gets English.
+const L = (nl, en) => (typeof document !== 'undefined' && document.documentElement && document.documentElement.lang === 'en' ? en : nl);
+
 function concat(parts) {
   let total = 0;
   for (const p of parts) total += p.length;
@@ -31,7 +34,7 @@ function fromB64url(value) {
   const s = String(value || '').replace(/-/g, '+').replace(/_/g, '/');
   let bin;
   try { bin = atob(s + '='.repeat((4 - (s.length % 4)) % 4)); }
-  catch { throw new Error('The document key is malformed.'); }
+  catch { throw new Error(L('De sleutel van het document is onleesbaar.', 'The document key is malformed.')); }
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
@@ -54,7 +57,7 @@ function hex(bytes) {
 }
 
 export function documentKeyFragment(keyBytes) {
-  if (!(keyBytes instanceof Uint8Array) || keyBytes.length !== KEY_BYTES) throw new Error('Document key must be 32 bytes.');
+  if (!(keyBytes instanceof Uint8Array) || keyBytes.length !== KEY_BYTES) throw new Error(L('De sleutel van het document moet 32 bytes zijn.', 'Document key must be 32 bytes.'));
   return '#doc=v1.' + b64url(keyBytes);
 }
 
@@ -64,13 +67,13 @@ export function parseDocumentKeyFragment(fragment) {
   const value = params.get('doc') || '';
   if (!value.startsWith('v1.')) return null;
   const key = fromB64url(value.slice(3));
-  if (key.length !== KEY_BYTES) throw new Error('The document key has the wrong length.');
+  if (key.length !== KEY_BYTES) throw new Error(L('De sleutel van het document heeft de verkeerde lengte.', 'The document key has the wrong length.'));
   return key;
 }
 
 export async function encryptDocumentCapsule({ bytes, filename, mime, envelopeId, docHash }) {
-  if (!(bytes instanceof Uint8Array) || bytes.length === 0) throw new Error('Document bytes are required.');
-  if (!/^[0-9a-f]{64}$/.test(String(docHash || ''))) throw new Error('Document hash is invalid.');
+  if (!(bytes instanceof Uint8Array) || bytes.length === 0) throw new Error(L('Het document ontbreekt.', 'Document bytes are required.'));
+  if (!/^[0-9a-f]{64}$/.test(String(docHash || ''))) throw new Error(L('De hash van het document is ongeldig.', 'Document hash is invalid.'));
   const keyBytes = crypto.getRandomValues(new Uint8Array(KEY_BYTES));
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
   const metaBytes = new TextEncoder().encode(JSON.stringify({
@@ -80,7 +83,7 @@ export async function encryptDocumentCapsule({ bytes, filename, mime, envelopeId
     size: bytes.length,
     doc_hash: docHash,
   }));
-  if (metaBytes.length > MAX_META_BYTES) throw new Error('Document metadata is too large.');
+  if (metaBytes.length > MAX_META_BYTES) throw new Error(L('De gegevens bij het document zijn te groot.', 'Document metadata is too large.'));
   const plain = concat([u32be(metaBytes.length), metaBytes, bytes]);
   let encrypted;
   try {
@@ -97,11 +100,11 @@ export async function encryptDocumentCapsule({ bytes, filename, mime, envelopeId
 }
 
 export async function decryptDocumentCapsule({ capsule, fragment, envelopeId, docHash }) {
-  if (!(capsule instanceof Uint8Array) || capsule.length < MAGIC.length + 1 + IV_BYTES + 16) throw new Error('The encrypted document capsule is truncated.');
-  for (let i = 0; i < MAGIC.length; i++) if (capsule[i] !== MAGIC[i]) throw new Error('The encrypted document capsule has an unknown format.');
-  if (capsule[MAGIC.length] !== VERSION) throw new Error('This encrypted document capsule version is not supported.');
+  if (!(capsule instanceof Uint8Array) || capsule.length < MAGIC.length + 1 + IV_BYTES + 16) throw new Error(L('Het versleutelde document is afgekapt.', 'The encrypted document capsule is truncated.'));
+  for (let i = 0; i < MAGIC.length; i++) if (capsule[i] !== MAGIC[i]) throw new Error(L('Het versleutelde document heeft een onbekend formaat.', 'The encrypted document capsule has an unknown format.'));
+  if (capsule[MAGIC.length] !== VERSION) throw new Error(L('Deze versie van het versleutelde document wordt niet ondersteund.', 'This encrypted document capsule version is not supported.'));
   const keyBytes = parseDocumentKeyFragment(fragment);
-  if (!keyBytes) throw new Error('This signing link has no document decryption key.');
+  if (!keyBytes) throw new Error(L('Deze link om te ondertekenen bevat geen sleutel om het document te openen.', 'This signing link has no document decryption key.'));
   const ivOff = MAGIC.length + 1;
   const iv = capsule.slice(ivOff, ivOff + IV_BYTES);
   const ciphertext = capsule.slice(ivOff + IV_BYTES);
@@ -110,19 +113,19 @@ export async function decryptDocumentCapsule({ capsule, fragment, envelopeId, do
     const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['decrypt']);
     plain = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: aad(envelopeId, docHash) }, key, ciphertext));
   } catch {
-    throw new Error('The encrypted document could not be decrypted. The link may be incomplete or altered.');
+    throw new Error(L('Het versleutelde document kon niet worden geopend. De link is misschien onvolledig of gewijzigd.', 'The encrypted document could not be decrypted. The link may be incomplete or altered.'));
   } finally {
     keyBytes.fill(0);
   }
   try {
-    if (plain.length < 4) throw new Error('The decrypted document header is truncated.');
+    if (plain.length < 4) throw new Error(L('Het begin van het geopende document is afgekapt.', 'The decrypted document header is truncated.'));
     const metaLen = new DataView(plain.buffer, plain.byteOffset, plain.byteLength).getUint32(0, false);
-    if (metaLen < 2 || metaLen > MAX_META_BYTES || plain.length < 4 + metaLen) throw new Error('The decrypted document metadata is invalid.');
+    if (metaLen < 2 || metaLen > MAX_META_BYTES || plain.length < 4 + metaLen) throw new Error(L('De gegevens bij het geopende document zijn ongeldig.', 'The decrypted document metadata is invalid.'));
     let meta;
     try { meta = JSON.parse(new TextDecoder().decode(plain.slice(4, 4 + metaLen))); }
-    catch { throw new Error('The decrypted document metadata is invalid.'); }
+    catch { throw new Error(L('De gegevens bij het geopende document zijn ongeldig.', 'The decrypted document metadata is invalid.')); }
     const documentBytes = plain.slice(4 + metaLen);
-    if (meta.version !== VERSION || meta.doc_hash !== docHash || meta.size !== documentBytes.length) throw new Error('The encrypted document metadata does not match this signing request.');
+    if (meta.version !== VERSION || meta.doc_hash !== docHash || meta.size !== documentBytes.length) throw new Error(L('De gegevens bij het versleutelde document passen niet bij dit verzoek.', 'The encrypted document metadata does not match this signing request.'));
     return {
       bytes: documentBytes,
       filename: String(meta.filename || 'document').slice(0, 200),

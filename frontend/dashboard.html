@@ -1,17 +1,20 @@
 <!doctype html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#15191C;color:#EAE2CE}html[data-theme="dark"]{color-scheme:dark}@media (prefers-color-scheme:dark){html[data-theme="auto"],html[data-theme="auto"] body{background:#15191C;color:#EAE2CE}html[data-theme="auto"]{color-scheme:dark}}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Your dashboard · Paramant</title>
+<title>Uw overzicht · Paramant</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="canonical" href="https://paramant.app/dashboard">
-<meta name="description" content="Sign in to your Paramant dashboard.">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/dashboard">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/dashboard">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/dashboard">
+<meta name="description" content="Log in op uw Paramant-overzicht.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://relay.paramant.app">
 <link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/nav.css?v=27">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <link rel="stylesheet" href="/parapear.css?v=4">
 <noscript><meta http-equiv="refresh" content="0;url=/auth/login?next=/dashboard"></noscript>
@@ -444,10 +447,10 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 <script src="/js/theme.js?v=5"></script>
 <!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
      Blocking and above every other script, so it exists before any renderer runs. -->
-<script src="/js/format-date.js?v=1"></script>
+<script src="/js/format-date.js?v=2"></script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 
 <!-- Canonical site chrome (same nav + mobile drawer that every page uses).
      Account content starts hidden below and is revealed only after the
@@ -456,33 +459,36 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
-    <li><a href="/security" class="nav-link">Security</a></li>
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/docs" class="nav-link">Docs</a></li>
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/dashboard" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/dashboard" hreflang="en" lang="en">EN</a></div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
-  <a href="/security" class="nav-mobile-standalone">Security</a>
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/dashboard" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/dashboard" hreflang="en" lang="en">EN</a></span>
 </div>
 
 
@@ -494,7 +500,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
        the real thing arrives. Lighthouse measured CLS 0.236 with the old
        centred spinner. -->
   <div id="dh-loading" class="pa-loading" aria-busy="true">
-    <p class="pa-sr-only">Checking your session.</p>
+    <p class="pa-sr-only">Uw sessie wordt gecontroleerd.</p>
     <div class="dh-skel-page" aria-hidden="true">
       <div class="dh-skel-hero">
         <div>
@@ -524,33 +530,33 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
   <div id="dh-root" hidden>
     <header class="dh-hero" aria-labelledby="dh-h1">
       <div>
-        <h1 id="dh-h1">Important documents, under control.</h1>
-        <p class="dh-mission">ParaSign gets a document signed. ParaSend sends a file that deletes itself after reading. Both run on servers in Germany.</p>
+        <h1 id="dh-h1">Belangrijke documenten, onder controle.</h1>
+        <p class="dh-mission">Met Ondertekenen laat u een document tekenen. Met Versturen stuurt u een bestand dat zichzelf wist na het lezen. Beide draaien op servers in Duitsland.</p>
       </div>
       <span class="dh-plan"><strong data-dh="plan-strong">--</strong><span>plan</span></span>
     </header>
 
-    <section class="dh-start" aria-label="Start a document workflow">
-      <a class="dh-start-card primary" href="/sign?mode=invite" aria-label="Request signatures">
+    <section class="dh-start" aria-label="Begin met een document">
+      <a class="dh-start-card primary" href="/sign?mode=invite" aria-label="Handtekeningen vragen">
         <span class="dh-start-icon" aria-hidden="true">&#9993;</span>
-        <span class="dh-start-kicker">ParaSign</span>
-        <h2>Request signatures</h2>
-        <p>Send a secure document, invite the right people and follow every signature. They sign with the link from that email, after signing in to the account it was addressed to.</p>
-        <span class="dh-start-link">Start a request &rarr;</span>
+        <span class="dh-start-kicker">Ondertekenen</span>
+        <h2>Handtekeningen vragen</h2>
+        <p>Stuur een beveiligd document, nodig de juiste mensen uit en volg elke handtekening. Zij tekenen via de link in die e-mail, nadat ze zijn ingelogd op het account waaraan hij gericht is.</p>
+        <span class="dh-start-link">Verzoek starten &rarr;</span>
       </a>
-      <a class="dh-start-card" href="/parashare" aria-label="Send a file securely">
+      <a class="dh-start-card" href="/parashare" aria-label="Een bestand veilig versturen">
         <span class="dh-start-icon" aria-hidden="true">&uarr;</span>
-        <span class="dh-start-kicker">ParaSend</span>
-        <h2>Send a file that disappears</h2>
-        <p>The file is encrypted in your browser before it leaves. The recipient gets one link, and the web app deletes the file after the first read. No signature workflow attached.</p>
-        <span class="dh-start-link">Send a file &rarr;</span>
+        <span class="dh-start-kicker">Versturen</span>
+        <h2>Een bestand dat verdwijnt</h2>
+        <p>Het bestand wordt in uw browser versleuteld voordat het vertrekt. De ontvanger krijgt één link, en de webapp wist het bestand na de eerste keer openen. Er hoort geen ondertekening bij.</p>
+        <span class="dh-start-link">Bestand versturen &rarr;</span>
       </a>
-      <a class="dh-start-card" href="/sign?mode=alone" aria-label="Sign a document yourself">
+      <a class="dh-start-card" href="/sign?mode=alone" aria-label="Zelf een document ondertekenen">
         <span class="dh-start-icon" aria-hidden="true">&#9998;</span>
-        <span class="dh-start-kicker">ParaSign</span>
-        <h2>Sign it yourself</h2>
-        <p>Add your signature and download the result immediately.</p>
-        <span class="dh-start-link">Open signing &rarr;</span>
+        <span class="dh-start-kicker">Ondertekenen</span>
+        <h2>Zelf ondertekenen</h2>
+        <p>Zet uw handtekening en download het resultaat meteen.</p>
+        <span class="dh-start-link">Ondertekenen openen &rarr;</span>
       </a>
     </section>
 
@@ -558,13 +564,13 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
          uses: this is the Community plan, it is a gift and not a trial, and the
          business plans are what pays for it. Shown by dashboard.js only while
          the account is on a free plan, so a paying customer is never sold to. -->
-    <aside class="dh-community" id="dh-community" aria-label="Your plan" hidden>
+    <aside class="dh-community" id="dh-community" aria-label="Uw plan" hidden>
       <div>
         <p class="dh-community-kicker">Community &middot; &euro;0</p>
-        <p class="dh-community-lede">You are on the Community plan and it stays free. The business plans pay for the servers and keep it that way.</p>
-        <p class="dh-community-adds">They raise 2 signatures a month to 100 or 1,000, keep links open longer, keep a record of what you sent, give you support with a name on it, and an audit trail you can export and hand over.</p>
+        <p class="dh-community-lede">U zit op het Community-plan en dat blijft gratis. De zakelijke plannen betalen de servers en houden het zo.</p>
+        <p class="dh-community-adds">Zij brengen 2 handtekeningen per maand naar 100 of 1.000, houden links langer open, bewaren een overzicht van wat u verstuurde, geven u ondersteuning van een vast persoon, en een audittrail die u kunt exporteren en overdragen.</p>
       </div>
-      <a class="dh-community-cta" href="/pricing">See the business plans &rarr;</a>
+      <a class="dh-community-cta" href="/pricing">Zakelijke plannen bekijken &rarr;</a>
     </aside>
 
     <!-- Where Mollie sends the buyer back to (/dashboard?billing=return). The
@@ -574,7 +580,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
          that still reads Community and says nothing about the money. Shown by
          dashboard.js only when the query parameter is there. No link to
          /pricing: the sale already happened. -->
-    <aside class="dh-paid" id="dh-billing-return" aria-label="Payment" role="status" hidden>
+    <aside class="dh-paid" id="dh-billing-return" aria-label="Betaling" role="status" hidden>
       <p class="dh-paid-kicker" data-dh="return-kicker">--</p>
       <p class="dh-paid-lede" data-dh="return-lede">--</p>
     </aside>
@@ -585,7 +591,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
          that changes anything. -->
     <div class="plan-term-warn" id="dh-term-warn" role="status" hidden>
       <p class="plan-term-warn-text" data-dh="term-warn">--</p>
-      <a class="plan-term-warn-cta" href="/pricing">Renew</a>
+      <a class="plan-term-warn-cta" href="/pricing">Verlengen</a>
     </div>
     <!-- The same fact in one line, shown whenever a term end is on record and
          not only while it is close: before it, the day the plan stops; after
@@ -596,27 +602,27 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     <!-- What a paying customer bought, in the words /pricing sells it in. Shown
          by dashboard.js only on Firm, Business or Enterprise, and it carries no
          link to a higher tier: someone who already pays is not a lead. -->
-    <aside class="dh-paid" id="dh-plan-paid" aria-label="Your plan" hidden>
-      <p class="dh-paid-kicker"><span data-dh="paid-name">--</span> plan &middot; active</p>
+    <aside class="dh-paid" id="dh-plan-paid" aria-label="Uw plan" hidden>
+      <p class="dh-paid-kicker"><span data-dh="paid-name">--</span>-plan &middot; actief</p>
       <p class="dh-paid-lede" data-dh="paid-includes">--</p>
-      <p class="dh-paid-foot">Your plan and the day your term ends are under <a href="/account#billing-section">Plan &amp; billing</a>.</p>
+      <p class="dh-paid-foot">Uw plan en de dag waarop uw termijn afloopt staan onder <a href="/account#billing-section">Plan en betaling</a>.</p>
     </aside>
 
     <!-- One-time question: shown by dashboard.js only while /api/user/me returns
          usage_purpose: null. Answering or skipping posts to
          /api/user/usage-purpose and hides it for good (server-side, per account). -->
-    <aside class="dh-purpose" id="dh-purpose" aria-label="One quick question" hidden>
-      <span class="dh-purpose-kicker">One quick question</span>
-      <h2>What do you use Paramant for?</h2>
-      <p class="dh-purpose-sub">One tap, asked once. It helps us build the right things first.</p>
+    <aside class="dh-purpose" id="dh-purpose" aria-label="Eén korte vraag" hidden>
+      <span class="dh-purpose-kicker">Eén korte vraag</span>
+      <h2>Waarvoor gebruikt u Paramant?</h2>
+      <p class="dh-purpose-sub">Eén tik, we vragen het één keer. Zo bouwen we eerst de goede dingen.</p>
       <div class="dh-purpose-opts">
-        <button type="button" class="dh-purpose-opt" data-pa-purpose="personal"><strong>Personal use</strong><span>My own files and documents.</span></button>
-        <button type="button" class="dh-purpose-opt" data-pa-purpose="organisation"><strong>For my organisation</strong><span>My company, practice or team.</span></button>
-        <button type="button" class="dh-purpose-opt" data-pa-purpose="client_management"><strong>I manage this for clients</strong><span>IT service provider / MSP.</span></button>
-        <button type="button" class="dh-purpose-opt" data-pa-purpose="research_journalism"><strong>Research or journalism</strong><span>Sources, evidence, publications.</span></button>
+        <button type="button" class="dh-purpose-opt" data-pa-purpose="personal"><strong>Privégebruik</strong><span>Mijn eigen bestanden en documenten.</span></button>
+        <button type="button" class="dh-purpose-opt" data-pa-purpose="organisation"><strong>Voor mijn organisatie</strong><span>Mijn bedrijf, praktijk of team.</span></button>
+        <button type="button" class="dh-purpose-opt" data-pa-purpose="client_management"><strong>Ik beheer dit voor klanten</strong><span>IT-dienstverlener of MSP.</span></button>
+        <button type="button" class="dh-purpose-opt" data-pa-purpose="research_journalism"><strong>Onderzoek of journalistiek</strong><span>Bronnen, bewijs, publicaties.</span></button>
       </div>
       <div class="dh-purpose-foot">
-        <button type="button" class="dh-modal-dismiss" data-pa-purpose="skipped">Skip</button>
+        <button type="button" class="dh-modal-dismiss" data-pa-purpose="skipped">Overslaan</button>
         <span class="dh-purpose-note" id="dh-purpose-note" hidden></span>
       </div>
     </aside>
@@ -627,10 +633,10 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     <section class="dh-workspace dh-inbox" id="dh-inbox" aria-labelledby="dh-inbox-title" hidden>
       <div class="dh-workspace-head">
         <div>
-          <h2 id="dh-inbox-title">Waiting for your signature</h2>
-          <p>Documents other people sent you. Each one opens from the personal link in its invitation email.</p>
+          <h2 id="dh-inbox-title">Wacht op uw handtekening</h2>
+          <p>Documenten die anderen u stuurden. Elk document opent via de persoonlijke link in de uitnodigingsmail.</p>
         </div>
-        <button class="dh-refresh" type="button" id="dh-inbox-refresh">Refresh</button>
+        <button class="dh-refresh" type="button" id="dh-inbox-refresh">Vernieuwen</button>
       </div>
       <div class="dh-inbox-list" id="dh-inbox-list" aria-live="polite"></div>
     </section>
@@ -643,10 +649,10 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     <section class="dh-workspace" id="dh-sends-section" aria-labelledby="dh-sends-title" hidden>
       <div class="dh-workspace-head">
         <div>
-          <h2 id="dh-sends-title">Files you sent</h2>
-          <p>Who has collected, and who has not yet.</p>
+          <h2 id="dh-sends-title">Bestanden die u verstuurde</h2>
+          <p>Wie heeft opgehaald, en wie nog niet.</p>
         </div>
-        <button class="dh-refresh" type="button" id="dh-sends-refresh">Refresh</button>
+        <button class="dh-refresh" type="button" id="dh-sends-refresh">Vernieuwen</button>
       </div>
       <div class="dh-documents" id="dh-sends" aria-live="polite"></div>
     </section>
@@ -654,35 +660,35 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     <section class="dh-workspace" aria-labelledby="dh-documents-title">
       <div class="dh-workspace-head">
         <div>
-          <h2 id="dh-documents-title">Open documents</h2>
-          <p>Every signing request you started, and exactly how far each one is.</p>
+          <h2 id="dh-documents-title">Lopende documenten</h2>
+          <p>Elk ondertekenverzoek dat u startte, en precies hoe ver elk verzoek is.</p>
         </div>
-        <button class="dh-refresh" type="button" id="dh-documents-refresh">Refresh</button>
+        <button class="dh-refresh" type="button" id="dh-documents-refresh">Vernieuwen</button>
       </div>
-      <div class="dh-filters" role="group" aria-label="Filter documents">
-        <button class="dh-filter" type="button" data-doc-filter="open" aria-pressed="true">Open <span data-doc-count="open">0</span></button>
-        <button class="dh-filter" type="button" data-doc-filter="completed" aria-pressed="false">Completed <span data-doc-count="completed">0</span></button>
-        <button class="dh-filter" type="button" data-doc-filter="cancelled" aria-pressed="false">Cancelled <span data-doc-count="cancelled">0</span></button>
-        <button class="dh-filter" type="button" data-doc-filter="all" aria-pressed="false">All <span data-doc-count="all">0</span></button>
+      <div class="dh-filters" role="group" aria-label="Documenten filteren">
+        <button class="dh-filter" type="button" data-doc-filter="open" aria-pressed="true">Lopend <span data-doc-count="open">0</span></button>
+        <button class="dh-filter" type="button" data-doc-filter="completed" aria-pressed="false">Afgerond <span data-doc-count="completed">0</span></button>
+        <button class="dh-filter" type="button" data-doc-filter="cancelled" aria-pressed="false">Geannuleerd <span data-doc-count="cancelled">0</span></button>
+        <button class="dh-filter" type="button" data-doc-filter="all" aria-pressed="false">Alle <span data-doc-count="all">0</span></button>
       </div>
       <div class="dh-documents" id="dh-documents" aria-live="polite" aria-busy="true">
         <!-- Loading state. Three rows in the shape of a register row, so the
              list does not jump when the real data lands. The screen reader
              hears the sentence, not the placeholder. -->
-        <p class="pa-sr-only">Loading your documents. Reading status from your account.</p>
+        <p class="pa-sr-only">Uw documenten worden geladen. De status wordt uit uw account gelezen.</p>
         <div class="dh-skel-row" aria-hidden="true"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
         <div class="dh-skel-row" aria-hidden="true"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
         <div class="dh-skel-row" aria-hidden="true"><div><div class="dh-skel s-name"></div><div class="dh-skel s-ref"></div></div><div class="s-progress"><div class="dh-skel s-num"></div><div class="dh-skel s-bar"></div></div><div class="dh-skel s-chip"></div></div>
       </div>
       <div class="dh-invites">
         <span class="dh-invites-icon" aria-hidden="true">&#9993;</span>
-        <div><strong>Looking for a request sent to you?</strong><span>Requests waiting for your signature are listed above. Each one opens from the personal link in its invitation email, and your account is checked before the encrypted document opens.</span></div>
+        <div><strong>Zoekt u een verzoek dat u kreeg?</strong><span>Verzoeken die op uw handtekening wachten staan hierboven. Elk verzoek opent via de persoonlijke link in de uitnodigingsmail, en uw account wordt gecontroleerd voordat het versleutelde document opent.</span></div>
       </div>
     </section>
 
     <div class="dh-doc-dialog" id="dh-document-dialog" role="dialog" aria-modal="true" aria-labelledby="dh-document-dialog-title" hidden>
       <div class="dh-doc-dialog-panel">
-        <div class="dh-doc-dialog-head"><h2 id="dh-document-dialog-title">Document</h2><button class="dh-doc-close" type="button" data-pa-action="document-close" aria-label="Close">&times;</button></div>
+        <div class="dh-doc-dialog-head"><h2 id="dh-document-dialog-title">Document</h2><button class="dh-doc-close" type="button" data-pa-action="document-close" aria-label="Sluiten">&times;</button></div>
         <div class="dh-doc-dialog-body" id="dh-document-dialog-body"></div>
       </div>
     </div>
@@ -691,64 +697,64 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
          this. Each answer links to the page that carries the proof, so nothing
          here is a claim this file has to be trusted on. -->
     <section class="dh-ask" aria-labelledby="dh-ask-title">
-      <h2 id="dh-ask-title">Questions people ask before they trust this</h2>
+      <h2 id="dh-ask-title">Vragen die mensen stellen voordat ze dit vertrouwen</h2>
       <dl class="dh-ask-list">
         <div class="dh-ask-item">
-          <dt>What does it cost?</dt>
+          <dt>Wat kost het?</dt>
           <!-- Two products used to be two prices, and this answer named only
                the cheaper one, so /help and this page quoted two numbers at one
                customer. Firm ended that: one plan, one payment, both products.
                The amount is on /pricing and pinned to
                relay/lib/billing-catalog.js by relay/test/pricing-page.test.js,
                so it cannot move here on its own. -->
-          <dd>Community is free forever, with no card. ParaSign and ParaSend together start at &euro;29 a month excl. btw, which is Firm: one payment for both. <a href="/pricing">See the plans</a></dd>
+          <dd>Community is altijd gratis, zonder betaalkaart. Ondertekenen en Versturen samen beginnen bij &euro;29 per maand excl. btw, dat is Firm: één betaling voor beide. <a href="/pricing">Plannen bekijken</a></dd>
         </div>
         <div class="dh-ask-item">
-          <dt>Who can read what I send?</dt>
-          <dd>Files are encrypted in your browser, and the relay runs on Hetzner in Nuremberg, Germany. <a href="/security">Read how</a></dd>
+          <dt>Wie kan lezen wat ik verstuur?</dt>
+          <dd>Bestanden worden in uw browser versleuteld, en de relay draait bij Hetzner in Neurenberg, Duitsland. <a href="/security">Lees hoe</a></dd>
         </div>
         <div class="dh-ask-item">
-          <dt>Can the other side check a signature?</dt>
-          <dd>Signed documents verify without an account. Older envelope formats need the relay. <a href="/verify">Try the verifier</a></dd>
+          <dt>Kan de andere partij een handtekening controleren?</dt>
+          <dd>Ondertekende documenten zijn te controleren zonder account. Oudere envelopformaten hebben de relay nodig. <a href="/verify">Probeer de controle</a></dd>
         </div>
       </dl>
-      <p class="dh-ask-foot">Anything else is answered in the <a href="/help">help centre</a>.</p>
+      <p class="dh-ask-foot">Andere vragen beantwoorden we in het <a href="/help">hulpcentrum</a>.</p>
     </section>
 
-    <nav class="dh-quiet-links" aria-label="Other document actions">
-      <a href="/verify">Verify a signed document</a>
-      <a href="/get">Open a secure delivery</a>
-      <a href="/vault">Protect a file with a passphrase</a>
-      <a href="/developer">Developer settings</a>
+    <nav class="dh-quiet-links" aria-label="Andere documentacties">
+      <a href="/verify">Een ondertekend document controleren</a>
+      <a href="/get">Een beveiligde zending openen</a>
+      <a href="/vault">Een bestand beveiligen met een wachtzin</a>
+      <a href="/developer">Ontwikkelaarsinstellingen</a>
     </nav>
 
-    <details class="dh-acct" aria-label="Account details">
+    <details class="dh-acct" aria-label="Accountgegevens">
       <summary class="dh-acct-head" id="dh-acct-toggle">
-        <h2>Manage account</h2>
+        <h2>Account beheren</h2>
         <span class="dh-acct-chev" aria-hidden="true">&rsaquo;</span>
       </summary>
       <div class="dh-acct-body">
         <div class="dh-acct-grid">
           <div class="dh-acct-cell"><div class="dh-acct-lbl">Plan</div><div class="dh-acct-val" data-dh="plan">--</div></div>
-          <div class="dh-acct-cell"><div class="dh-acct-lbl">Email</div><div class="dh-acct-val mono" data-dh="email-full">--</div></div>
-          <div class="dh-acct-cell"><div class="dh-acct-lbl">Member since</div><div class="dh-acct-val" data-dh="created">--</div></div>
-          <div class="dh-acct-cell"><div class="dh-acct-lbl">Backup codes left</div><div class="dh-acct-val" data-dh="backup">--</div></div>
-          <div class="dh-acct-cell"><div class="dh-acct-lbl">Session expires</div><div class="dh-acct-val mono" data-dh="session">--</div></div>
+          <div class="dh-acct-cell"><div class="dh-acct-lbl">E-mailadres</div><div class="dh-acct-val mono" data-dh="email-full">--</div></div>
+          <div class="dh-acct-cell"><div class="dh-acct-lbl">Lid sinds</div><div class="dh-acct-val" data-dh="created">--</div></div>
+          <div class="dh-acct-cell"><div class="dh-acct-lbl">Back-upcodes over</div><div class="dh-acct-val" data-dh="backup">--</div></div>
+          <div class="dh-acct-cell"><div class="dh-acct-lbl">Sessie verloopt</div><div class="dh-acct-val mono" data-dh="session">--</div></div>
         </div>
         <div class="dh-acct-actions">
-          <a class="dh-btn" href="/account">Account &amp; security</a>
-          <a class="dh-btn" href="/pricing">Plan &amp; billing</a>
-          <a class="dh-btn" href="/developer">Developer settings</a>
-          <button type="button" class="dh-btn" data-pa-action="refresh">Refresh</button>
-          <button type="button" class="dh-btn warn" data-pa-action="signout">Sign out</button>
+          <a class="dh-btn" href="/account">Account en beveiliging</a>
+          <a class="dh-btn" href="/pricing">Plan en betaling</a>
+          <a class="dh-btn" href="/developer">Ontwikkelaarsinstellingen</a>
+          <button type="button" class="dh-btn" data-pa-action="refresh">Vernieuwen</button>
+          <button type="button" class="dh-btn warn" data-pa-action="signout">Uitloggen</button>
         </div>
       </div>
     </details>
   </div>
 
   <div id="dh-error" class="pa-loading" hidden>
-    Could not load your dashboard.
-    <a class="pa-err-link" href="/auth/login?next=%2Fdashboard">Sign in again</a>
+    Uw overzicht kon niet worden geladen.
+    <a class="pa-err-link" href="/auth/login?next=%2Fdashboard">Opnieuw inloggen</a>
     <div id="dh-error-detail" style="margin-top:8px;font-size:12px;color:var(--ink-dim)"></div>
   </div>
 </main>
@@ -758,44 +764,45 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 <div id="dh-passkey-modal" class="dh-modal" hidden role="dialog" aria-modal="true" aria-labelledby="dh-pm-title">
   <div class="dh-modal-card">
     <img class="dh-modal-img" src="/assets/parapear/parapear-point.png" alt="" aria-hidden="true" decoding="async" width="72" height="72">
-    <h2 id="dh-pm-title">Finish setting up your account</h2>
-    <p class="dh-modal-sub">A couple of one-time steps make signing in faster and let you sign documents.</p>
+    <h2 id="dh-pm-title">Maak uw account af</h2>
+    <p class="dh-modal-sub">Met een paar eenmalige stappen logt u sneller in en kunt u documenten ondertekenen.</p>
     <div id="dh-pm-items"></div>
-    <button type="button" class="dh-modal-dismiss" id="dh-pm-dismiss">Maybe later</button>
+    <button type="button" class="dh-modal-dismiss" id="dh-pm-dismiss">Later</button>
   </div>
 </div>
 
+<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/dashboard" hreflang="en" lang="en">This page in English</a></p>
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Company</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/about">About</a>
-          <a href="/changelog">Changelog</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/privacy">Privacy Policy</a>
-          <a href="/dpa">Data Processing Agreement</a>
-          <a href="/terms">Terms of Service</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/license">License</a>
+          <a href="/license">Licentie</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=10" defer></script>
-<script src="/js/dashboard.js?v=16" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
+<script src="/js/dashboard.js?v=17" defer></script>
 </body>
 </html>

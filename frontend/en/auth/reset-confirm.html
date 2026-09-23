@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#15191C;color:#EAE2CE}html[data-theme="dark"]{color-scheme:dark}@media (prefers-color-scheme:dark){html[data-theme="auto"],html[data-theme="auto"] body{background:#15191C;color:#EAE2CE}html[data-theme="auto"]{color-scheme:dark}}</style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Confirm authenticator reset · Paramant</title>
+<link rel="canonical" href="https://paramant.app/en/auth/reset-confirm">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/auth/reset-confirm">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/auth/reset-confirm">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/auth/reset-confirm">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/design-system.css?v=31">
+<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<style>
+/* Same compact phone rhythm as /auth/backup: existing tokens only,
+   design-system.css untouched. */
+@media (max-width: 600px) {
+  .section-lg { padding-top: var(--space-5); padding-bottom: var(--space-3); }
+  .section { padding: var(--space-5) 0; border-top: none; }
+}
+</style>
+<style>
+  .warning-box {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: var(--warn-ink);
+    padding: 12px 16px;
+    font-size: 14px;
+    margin: 16px 0;
+    border-radius: 4px;
+  }
+</style>
+<meta name="theme-color" content="#FFFFFF">
+<link rel="stylesheet" href="/app-2026.css?v=9">
+<script src="/js/theme.js?v=5"></script>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/security" class="nav-link">Security</a></li>
+    <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/en/docs" class="nav-link">Docs</a></li>
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/auth/login" class="nav-signin">Sign in</a>
+    <a href="/en/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/auth/reset-confirm" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/auth/reset-confirm" hreflang="en" lang="en" aria-current="true">EN</a></div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/security" class="nav-mobile-standalone">Security</a>
+  <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/auth/reset-confirm" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/auth/reset-confirm" hreflang="en" lang="en" aria-current="true">EN</a></span>
+</div>
+
+<main class="container-sm">
+
+<section class="section-lg">
+  <div class="eyebrow"><span class="bar"></span>authenticator reset</div>
+  <h1>Confirm this <em>reset</em>.</h1>
+</section>
+
+<section class="section">
+  <div id="initial-view">
+    <p class="lede">You get two emails, one after the other. This page confirms that it is you. The next mail carries the link that links a new authenticator app.</p>
+    <p>Splitting it in two is the point: someone who briefly had your mailbox open cannot finish the reset, because the second link is only sent after this confirmation and has to be opened as well.</p>
+
+    <div class="warning-box">
+      Only confirm if you asked for this reset yourself. If you did not, close this page. Nothing changes and your current authenticator keeps working.
+    </div>
+
+    <button id="confirm-btn" class="btn btn-primary mt-3">
+      Yes, reset my authenticator
+    </button>
+
+    <div id="error" class="error mt-3" role="alert" aria-live="assertive"></div>
+  </div>
+
+  <div id="success-view" style="display:none">
+    <p class="lede" style="color:var(--ok-ink)">Confirmed. The second email, the one with the setup link, is on its way.</p>
+    <p>Look for a mail from noreply@paramant.app with a setup link. Open it, scan the QR code, and your new authenticator app is linked.</p>
+    <p style="margin-top:8px">Delete the old Paramant entry in your authenticator app first. Its codes no longer work.</p>
+    <p class="footer-text mt-4"><a href="/en/auth/login">Return to sign in</a></p>
+  </div>
+
+  <div id="expired-view" style="display:none">
+    <p class="lede is-bad">This confirmation link no longer works.</p>
+    <p>Confirmation links last 60 minutes, so nobody can act on an old mail. Ask for a new one and start again.</p>
+    <p class="footer-text mt-4">
+      <a href="/en/auth/request-reset">Request a new reset link</a>
+    </p>
+  </div>
+
+  <p class="small mt-4" style="color:var(--ink-dim)">
+    Paramant is a product of <strong>Paramantis Solutions B.V.</strong>, Harderwijk,
+    the Netherlands. <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>
+  </p>
+</section>
+</main>
+
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
+<script src="/js/auth-reset-confirm.js?v=4"></script>
+<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/auth/reset-confirm" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
+<footer class="legal-strip">
+  <a href="/en/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/en/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/en/terms">Terms of Service</a>
+</footer>
+</body>
+</html>

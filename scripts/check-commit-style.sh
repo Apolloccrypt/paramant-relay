@@ -49,6 +49,9 @@ ATTRIB="${_a1} ${_a2}|${_a3}-${_a4}"
 EMDASH_EXEMPT_PATHS='^(LICENSE|deploy/LICENSE)$'
 # Bestand met een gemarkeerd letterlijk licentieblok, en de twee markeringen.
 VERBATIM_FILE='frontend/license.html'
+# De Engelse kopie onder /en (sinds 23-09-2026) herhaalt hetzelfde gemarkeerde
+# blok woord voor woord en valt onder dezelfde vrijstelling, per regelnummer.
+VERBATIM_FILES='^frontend/(en/)?license\.html$'
 VERBATIM_START='LICENCE-VERBATIM-START'
 VERBATIM_END='LICENCE-VERBATIM-END'
 
@@ -154,7 +157,7 @@ scan_added() {
       '+++ '*)
         file="${line#+++ }"; file="${file#b/}"
         vstart=0; vend=0
-        if [ "$file" = "$VERBATIM_FILE" ]; then
+        if printf '%s' "$file" | grep -qE "$VERBATIM_FILES"; then
           range="$(verbatim_range "$c:$file" || true)"
           if [ -n "$range" ]; then vstart="${range%% *}"; vend="${range##* }"; fi
         fi

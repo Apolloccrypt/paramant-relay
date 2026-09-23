@@ -44,6 +44,8 @@ http.createServer((req, res) => {
   // its token from location.pathname.
   let staticPath = urlPath;
   if (/^\/auth\/setup\/[^/]+\/?$/.test(urlPath)) staticPath = '/auth/setup.html';
+  // The English copy of the same page (23-09-2026) takes the same token.
+  if (/^\/en\/auth\/setup\/[^/]+\/?$/.test(urlPath)) staticPath = '/en/auth/setup.html';
 
   if (maybeServeStatic(req, res, staticPath)) return;
   res.writeHead(404, { 'Content-Type': 'text/plain' });

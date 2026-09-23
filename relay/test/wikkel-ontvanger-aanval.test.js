@@ -193,7 +193,7 @@ test('een gestolen token haalt niets op, maar sluit de ontvanger wel buiten', as
   });
   assert.equal(r1.status, 200);
   await new Promise((r) => setTimeout(r, 200));
-  const codeMail = post.find((p) => /code to open the file/i.test(p.subject || ''));
+  const codeMail = post.find((p) => /controlecode om het bestand te openen/i.test(p.subject || ''));
   assert.ok(codeMail, 'geen codemail');
   assert.equal((codeMail.to || [])[0], 'e@extern.test',
     'de code ging naar de dief in plaats van naar de ontvanger');

@@ -367,3 +367,16 @@ test('the owner is not part of what a sender looks at', async () => {
   assert.ok(!raw.includes('acct-geheim'),
     'a field that travels to a browser is a field that can end up elsewhere');
 });
+
+test('de taal van de verzendpagina gaat mee naar de code en de herinnering', async () => {
+  const { sends } = maakStore();
+  const en = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+                                  sealed: sealedVoor(DRIE), sender: { naam: 'Acme', taal: 'en' } });
+  assert.equal((await sends.reinvite(en.id, 'bob@example.org')).lang, 'en');
+  assert.equal((await sends.requestPickup(en.tokens['anna@example.org'])).lang, 'en');
+
+  const geen = await sends.create({ plan: 'business', blob: INHOUD, addresses: DRIE,
+                                    sealed: sealedVoor(DRIE), sender: { naam: 'Acme', taal: 'fr' } });
+  assert.equal((await sends.reinvite(geen.id, 'bob@example.org')).lang, '',
+    'een onbekende taal wordt geen taal: dan krijgt de ontvanger beide');
+});

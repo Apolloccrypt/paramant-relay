@@ -146,7 +146,7 @@ async function haalCode(relay, token, adres) {
   if (r.status !== 200) throw new Error('code aanvragen faalde: ' + r.status);
   for (let i = 0; i < 60; i++) {
     const mail = relay.post.slice(voor).find(
-      (p) => /code to open the file/i.test(p.subject || '') && (p.to || []).includes(adres));
+      (p) => /controlecode om het bestand te openen/i.test(p.subject || '') && (p.to || []).includes(adres));
     if (mail) {
       const code = (String(mail.text).match(/\b(\d{6})\b/) || [])[1];
       if (code) return code;

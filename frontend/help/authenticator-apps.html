@@ -1,23 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Authenticator apps · Paramant Help</title>
+<title>Authenticator-apps · Hulp bij Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<meta name="twitter:description" content="Every standard authenticator app works with Paramant, including Google Authenticator. For the strongest setup, use a SHA-256 app such as Authy or 1Password.">
-<meta name="twitter:title" content="Authenticator apps · Paramant Help">
+<meta name="twitter:description" content="Elke gangbare authenticator-app werkt met Paramant, ook Google Authenticator. Het sterkst is een app met SHA-256, zoals Authy of 1Password.">
+<meta name="twitter:title" content="Authenticator-apps · Hulp bij Paramant">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:image" content="https://paramant.app/og-image.png">
-<meta property="og:title" content="Authenticator apps · Paramant Help">
-<meta property="og:description" content="Every standard authenticator app works with Paramant, including Google Authenticator. For the strongest setup, use a SHA-256 app such as Authy or 1Password.">
+<meta property="og:title" content="Authenticator-apps · Hulp bij Paramant">
+<meta property="og:description" content="Elke gangbare authenticator-app werkt met Paramant, ook Google Authenticator. Het sterkst is een app met SHA-256, zoals Authy of 1Password.">
 <meta property="og:url" content="https://paramant.app/help/authenticator-apps">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Paramant">
 <link rel="canonical" href="https://paramant.app/help/authenticator-apps">
-<meta name="description" content="Every standard authenticator app works with Paramant, including Google Authenticator. For the strongest setup, use a SHA-256 app such as Authy or 1Password.">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/help/authenticator-apps">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/help/authenticator-apps">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/help/authenticator-apps">
+<meta name="description" content="Elke gangbare authenticator-app werkt met Paramant, ook Google Authenticator. Het sterkst is een app met SHA-256, zoals Authy of 1Password.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -59,7 +62,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 }
 </style>
 <link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/nav.css?v=27">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 .nav-help {
@@ -131,15 +134,15 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       "@type": "WebPage",
       "@id": "https://paramant.app/help/authenticator-apps#webpage",
       "url": "https://paramant.app/help/authenticator-apps",
-      "name": "Authenticator apps · Paramant Help",
+      "name": "Authenticator-apps · Hulp bij Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "en",
-      "description": "Every standard authenticator app works with Paramant, including Google Authenticator. For the strongest setup, use a SHA-256 app such as Authy or 1Password."
+      "inLanguage": "nl",
+      "description": "Elke gangbare authenticator-app werkt met Paramant, ook Google Authenticator. Het sterkst is een app met SHA-256, zoals Authy of 1Password."
     },
     {
       "@type": "BreadcrumbList",
@@ -160,7 +163,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         {
           "@type": "ListItem",
           "position": 3,
-          "name": "Authenticator apps"
+          "name": "Authenticator-apps"
         }
       ]
     },
@@ -199,115 +202,115 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </head>
 <body>
 
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
-    <li><a href="/security" class="nav-link">Security</a></li>
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/docs" class="nav-link">Docs</a></li>
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/authenticator-apps" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/authenticator-apps" hreflang="en" lang="en">EN</a></div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
-  <a href="/security" class="nav-mobile-standalone">Security</a>
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/authenticator-apps" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/authenticator-apps" hreflang="en" lang="en">EN</a></span>
 </div>
-  <div class="nav-mobile-cta">
-    <a href="/help" class="nav-help-mobile nav-mobile-standalone">HELP</a>
-    <a href="/auth/login" class="btn btn-ghost-dark">Sign in</a>
-    <a href="/signup" class="btn btn-lime">Create account</a>
-  </div>
-
-<main>
+<main id="main-content" tabindex="-1">
 
   <div class="breadcrumb">
-    <a href="/help">Help</a>
+    <a href="/help">Hulp</a>
     <span>/</span>
-    Authenticator apps
+    Authenticator-apps
   </div>
 
-  <h1>Authenticator <em>apps</em></h1>
-  <p class="lead">Every standard authenticator app works with Paramant. A SHA-256 app gives you the strongest setup.</p>
+  <h1>Authenticator-<em>apps</em></h1>
+  <p class="lead">Elke gangbare authenticator-app werkt met Paramant. Een app met SHA-256 is het sterkst.</p>
 
-  <h2>Why we recommend SHA-256</h2>
-  <p>Paramant's relay accepts both SHA-256 and SHA-1 TOTP codes, so every standard authenticator app works. We recommend SHA-256 because it keeps the MFA layer on the same cryptographic standard as the rest of the transport, which is built around post-quantum key exchange and FIPS 203 primitives. HMAC-SHA1 is not broken and RFC 6238 uses it as the default, so a SHA-1 app is perfectly safe to use. SHA-256 is simply the stronger, more consistent choice.</p>
+  <h2>Waarom we SHA-256 aanraden</h2>
+  <p>De relay van Paramant accepteert codes met SHA-256 en met SHA-1, dus elke gangbare authenticator-app werkt. We raden SHA-256 aan omdat de tweede inlogstap dan dezelfde cryptografische standaard volgt als de rest van het transport, dat is gebouwd op post-quantum sleuteluitwisseling en FIPS 203-bouwstenen. HMAC-SHA1 is niet gekraakt en RFC 6238 gebruikt het als standaard, dus een app met SHA-1 is gewoon veilig. SHA-256 is alleen de sterkere en consequentere keuze.</p>
 
-  <h2>Recommended apps (SHA-256)</h2>
-  <p>Authy, 1Password, Aegis (Android, open source), Raivo (iOS, open source), Bitwarden, Ente Auth (iOS and Android, open source), and 2FAS all support SHA-256 TOTP. Any of these will work with the QR code shown on the setup page and give you the strongest setup.</p>
-  <div class="tip"><p>Not sure which to pick? Aegis on Android and Raivo on iOS are open source, store codes locally, and have no cloud dependency. 1Password and Bitwarden are good choices if you already use a password manager.</p></div>
+  <h2>Aanbevolen apps (SHA-256)</h2>
+  <p>Authy, 1Password, Aegis (Android, open source), Raivo (iOS, open source), Bitwarden, Ente Auth (iOS en Android, open source) en 2FAS ondersteunen allemaal SHA-256 voor TOTP. Elk van deze apps werkt met de QR-code op de instelpagina en geeft u de sterkste instelling.</p>
+  <div class="tip"><p>Twijfelt u welke u kiest? Aegis op Android en Raivo op iOS zijn open source, bewaren codes op het toestel zelf en hebben geen cloud nodig. 1Password en Bitwarden zijn een goede keuze als u al een wachtwoordbeheerder gebruikt.</p></div>
 
-  <h2>Also works (SHA-1)</h2>
-  <p>Google Authenticator, Microsoft Authenticator, and the authenticator built into iCloud Keychain use SHA-1 TOTP. Paramant accepts SHA-1 codes, so these apps work fine. For the strongest setup we still recommend one of the SHA-256 apps above.</p>
-  <div class="tip"><p>Already using Google Authenticator? It keeps working. Switching to a SHA-256 app such as Raivo or Aegis is a small upgrade, not a requirement.</p></div>
+  <h2>Werkt ook (SHA-1)</h2>
+  <p>Google Authenticator, Microsoft Authenticator en de authenticator in iCloud-sleutelhanger gebruiken SHA-1 voor TOTP. Paramant accepteert codes met SHA-1, dus deze apps werken prima. Voor de sterkste instelling raden we toch een van de SHA-256-apps hierboven aan.</p>
+  <div class="tip"><p>Gebruikt u al Google Authenticator? Die blijft werken. Overstappen op een SHA-256-app zoals Raivo of Aegis is een kleine verbetering, geen verplichting.</p></div>
 
-  <h2>Upgrading to a SHA-256 app</h2>
-  <p>Google Authenticator works with Paramant. For the strongest setup you can keep it for your other services and add a SHA-256 app (Aegis on Android, Raivo on iOS) specifically for Paramant. Having multiple authenticator apps on one device is supported and common.</p>
+  <h2>Overstappen op een SHA-256-app</h2>
+  <p>Google Authenticator werkt met Paramant. Voor de sterkste instelling kunt u die houden voor uw andere diensten en een SHA-256-app (Aegis op Android, Raivo op iOS) speciaal voor Paramant toevoegen. Meerdere authenticator-apps op één toestel kan gewoon en is heel gebruikelijk.</p>
 
   <hr class="divider">
 
-  <h2 style="margin-top:0">Related</h2>
+  <h2 style="margin-top:0">Zie ook</h2>
   <div class="next-steps">
     <a href="/auth/setup" class="next-step-card">
-      <h3>Set up authenticator</h3>
-      <p>Scan the QR code and confirm your first code.</p>
+      <h3>Authenticator-app instellen</h3>
+      <p>Scan de QR-code en bevestig uw eerste code.</p>
     </a>
     <a href="/security" class="next-step-card">
-      <h3>Security overview</h3>
-      <p>Full cryptographic posture and protocol details.</p>
+      <h3>Overzicht beveiliging</h3>
+      <p>De volledige cryptografie en de details van het protocol.</p>
     </a>
   </div>
 
 </main>
+
+<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/help/authenticator-apps" hreflang="en" lang="en">This page in English</a></p>
 
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Company</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/about">About</a>
-          <a href="/changelog">Changelog</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/privacy">Privacy Policy</a>
-          <a href="/dpa">Data Processing Agreement</a>
-          <a href="/terms">Terms of Service</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/license">License</a>
+          <a href="/license">Licentie</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=10" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
 </body>
 </html>

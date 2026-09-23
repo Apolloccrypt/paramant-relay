@@ -131,7 +131,7 @@ async function walkToTheEnd(page, mode) {
 }
 
 // ── the three workflows, signed out ──────────────────────────────────────────
-for (const [mode, label] of [['alone', 'Sign in to sign'], ['cosign', 'Sign in to sign'], ['invite', 'Sign in to send']]) {
+for (const [mode, label] of [['alone', 'Inloggen om te ondertekenen'], ['cosign', 'Inloggen om te ondertekenen'], ['invite', 'Inloggen om te versturen']]) {
   const { page, calls } = await openSign(false);
   await page.locator('#ds-signedout:not([hidden])').waitFor({ timeout: 15000 });
   const button = await walkToTheEnd(page, mode);
@@ -144,7 +144,7 @@ for (const [mode, label] of [['alone', 'Sign in to sign'], ['cosign', 'Sign in t
     await page.locator('#ds-signedout').isVisible(), '#ds-signedout');
   const hint = await textOf(page, mode === 'invite' ? '#ds-recipients-hint' : '#ds-sign-signin-hint');
   ok(`${mode}: and the last step says the prepared file does not travel`,
-    /has not been uploaded/i.test(hint), hint);
+    /is niet geüpload/i.test(hint), hint);
 
   // The gate proper: nothing on the whole route asked for anything that needs
   // an account. No 401 was raised, because no request was made that could.
@@ -182,7 +182,7 @@ for (const mode of ['alone', 'cosign', 'invite']) {
   const button = await walkToTheEnd(page, mode);
   const buttonText = await textOf(page, button);
   ok(`${mode}: signed in, the last button is the real one`,
-    buttonText.trim() === (mode === 'invite' ? 'Send for signature' : 'Sign this document'), buttonText);
+    buttonText.trim() === (mode === 'invite' ? 'Versturen om te laten tekenen' : 'Dit document ondertekenen'), buttonText);
   if (mode !== 'invite') {
     ok(`${mode}: signed in, no sign-in hint on the last step`,
       await page.locator('#ds-sign-signin-hint').count() === 1

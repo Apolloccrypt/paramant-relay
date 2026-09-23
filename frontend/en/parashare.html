@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#15191C;color:#EAE2CE}html[data-theme="dark"]{color-scheme:dark}@media (prefers-color-scheme:dark){html[data-theme="auto"],html[data-theme="auto"] body{background:#15191C;color:#EAE2CE}html[data-theme="auto"]{color-scheme:dark}}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Encrypted file transfer · Paramant</title>
+<meta property="og:site_name" content="Paramant">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<link rel="stylesheet" href="/design-system.css?v=31">
+<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<link rel="stylesheet" href="/parapear.css?v=4">
+<style>
+/* Page: parashare, transfer UI */
+
+.step{display:none;animation:fadeIn .2s var(--ease-sharp)}
+.step.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+main{max-width:660px;margin:0 auto;padding:clamp(24px,5vh,44px) 24px 48px;position:relative;z-index:10}
+h1{font-size:clamp(26px,5vw,38px);font-weight:600;letter-spacing:-.028em;line-height:1.08;margin-bottom:10px;color:var(--ink-1)}
+.sub{font-size:15px;color:var(--ink-2);margin-bottom:28px;line-height:1.62;max-width:58ch}
+.hero-block{border:1px solid var(--line);border-radius:var(--r-2);padding:24px 28px;margin-bottom:36px}
+
+/* Stepper at the top of the flow -- gives the user a "you are here" sense */
+.ps-stepper{list-style:none;margin:0 0 28px;padding:0;display:flex;gap:0;position:relative}
+.ps-step{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;min-width:0}
+/* The ring is the state. It was a --surface disc inside a --line-2 ring,
+   which measures 1.07:1 and 1.6:1 on the night: a step indicator nobody
+   can see is not an indicator. The disc is gone and the ring carries it at
+   3.8:1, which is what WCAG 2.1 SC 1.4.11 asks of a state. */
+.ps-step-dot{width:10px;height:10px;border-radius:50%;background:transparent;border:1.5px solid rgba(var(--tint), .45);transition:background var(--d-2) var(--e-standard),border-color var(--d-2) var(--e-standard),transform var(--d-2) var(--e-standard);position:relative;z-index:2}
+.ps-step.active .ps-step-dot{background:var(--accent);border-color:var(--accent);transform:scale(1.2);box-shadow:0 0 0 4px var(--accent-soft)}
+.ps-step.done .ps-step-dot{background:var(--sig-done);border-color:var(--sig-done)}
+.ps-step-label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);text-align:center;line-height:1.3;transition:color var(--d-2) var(--e-standard)}
+.ps-step.active .ps-step-label{color:var(--ink-1)}
+.ps-step.done .ps-step-label{color:var(--ink-2)}
+.ps-step:not(:last-child)::after{content:"";position:absolute;top:4.5px;left:calc(50% + 8px);right:calc(-50% + 8px);height:1px;background:var(--line-2);z-index:1;transition:background var(--d-2) var(--e-standard)}
+.ps-step.done:not(:last-child)::after{background:var(--sig-done)}
+@media (max-width:560px){.ps-step-label{font-size:9px;letter-spacing:.06em}.ps-stepper{gap:2px}}
+
+/* The two ways to send, offered before anything else on the page. A koper who
+   wants to mail a payslip to somebody who is not at a desk right now used to
+   read the live-handshake note, conclude the product could not do it, and
+   leave. Both stands are named in plain words, and the second one says what it
+   costs: the sealed file waits on our server. */
+.ps-mode{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:26px}
+@media (max-width:640px){.ps-mode{grid-template-columns:1fr}}
+.ps-mode-card{display:flex;flex-direction:column;gap:6px;text-align:left;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-1);background:var(--surface);color:var(--ink-2);font:inherit;cursor:pointer;transition:border-color var(--d-2) var(--e-standard),background var(--d-2) var(--e-standard)}
+.ps-mode-card:hover{border-color:var(--line-2)}
+.ps-mode-card[aria-checked="true"]{border-color:var(--accent);background:var(--surface-sunk);box-shadow:inset 2px 0 0 var(--accent)}
+.ps-mode-alias{color:var(--ink-3);font-weight:400}
+.ps-mode-title{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.ps-mode-card[aria-checked="true"] .ps-mode-title{color:var(--ink-1)}
+.ps-mode-body{font-size:13px;line-height:1.6;color:var(--ink-2)}
+
+/* The links this browser session has minted. Not a receipt list: the relay
+   issues no signed delivery receipt on the /v2/dl path, so each row says what
+   GET /v2/dl/:token/info says plus this page's own clock, and the note under
+   the list says exactly that rather than dressing a status up as proof. */
+.ps-links{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.ps-link-row{border:1px solid var(--line);border-radius:var(--r-1);padding:12px 14px;background:var(--surface-sunk)}
+.ps-link-name{font-size:13.5px;font-weight:600;color:var(--ink-1);word-break:break-all}
+.ps-link-url{font-family:var(--mono);font-size:11px;color:var(--ink-2);word-break:break-all;margin-top:6px;line-height:1.55}
+.ps-link-meta{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--ink-3);margin-top:7px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.ps-link-state{font-weight:600}
+.ps-link-state.is-waiting{color:var(--sig-wait)}
+.ps-link-state.is-delivered{color:var(--sig-done)}
+.ps-link-state.is-expired{color:var(--ink-3)}
+/* Inside an end screen the copy button is not the loud one. Exactly one filled
+   button is on the screen and it is "Send another file"; the row's own copy
+   button and the status refresh sit a step quieter so the eye has one place to
+   land. */
+/* The hero sells the product to somebody who has not started yet. On an end
+   screen it is a screenful of pitch above the answer, so it goes with the
+   chooser and the stage bar. parashare.page.js stamps the class. */
+body.ps-ended .page-hero{display:none}
+.done-state .ps-link-row{text-align:left}
+.done-state .ps-link-url{margin-top:6px;margin-bottom:10px}
+.done-state .ps-copy{background:transparent;color:var(--ink-1);border-color:var(--line-2)}
+.done-state .ps-copy:hover{background:transparent;border-color:var(--ink-1)}
+.done-state .ps-copy.is-copied{background:transparent;border-color:var(--mark);color:var(--mark)}
+.done-state #ps-link-refresh{margin-top:12px;font-weight:400}
+
+/* Inline along-the-way guide -- explains what is happening at each step */
+.ps-guide{font-family:var(--sans);font-size:13.5px;line-height:1.62;color:var(--ink-2);padding:13px 15px;border:1px solid var(--line);border-left:2px solid var(--mark);background:var(--surface-sunk);margin-bottom:18px;border-radius:0 var(--r-1) var(--r-1) 0}
+.ps-guide strong{color:var(--ink-1);font-weight:600}
+.ps-guide .ps-guide-kicker{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:5px;font-weight:600}
+
+/* The credential comes from the session and from nowhere else, so the slim row
+   is the DEFAULT state of step 1 and the manual card is the exception. It used
+   to be the other way round: the card was the default and the slim row appeared
+   only after a key had been fetched, which is why a signed-in sender was shown
+   an empty "API key" box and typed one in by hand. #step-setup carries
+   .manual-key only when the user asks for the box (the Change link, or the way
+   out on the error banner), which is the self-host / paste-a-key path. */
+.ps-key-slim{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;border:1px solid var(--line);border-radius:var(--r-1);background:var(--surface-sunk);margin-bottom:16px;font-family:var(--mono);font-size:11px;color:var(--ink-3);flex-wrap:wrap}
+.ps-key-slim[hidden]{display:none}
+.ps-key-slim .ps-key-status{display:inline-flex;align-items:center;gap:8px}
+.ps-key-slim .ps-key-status::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--sig-done);flex-shrink:0}
+/* Amber while the fetch is in flight: the row must not claim a key it does not
+   have yet. It turns green in applySlimApiKeyView, once the key is really in. */
+.ps-key-slim.is-loading .ps-key-status::before{background:var(--sig-wait)}
+.ps-key-slim .ps-key-mask{color:var(--ink-1);font-weight:600}
+.ps-key-mask[hidden]{display:none}
+/* Not scoped to the slim row: the same control is the way out on the error
+   banner, and there it has to look like an action too. */
+.ps-key-change{background:transparent;border:none;min-height:var(--tap);padding:4px 6px;color:var(--accent);font:inherit;font-size:11px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;letter-spacing:.04em}
+.ps-key-change:hover{color:var(--accent-hov)}
+.ps-key-card{display:none}
+#step-setup.manual-key .ps-key-card{display:block}
+#step-setup.manual-key .ps-key-slim{display:none}
+
+/* One alert style, used by both places on this page where something can fail
+   in front of the user: the account session that will not start, and the relay
+   connection that drops while step 2 is waiting. Each says what happened, what
+   the file is doing meanwhile, and offers the one action that helps. */
+.ps-alert{display:none;flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:16px;padding:12px 14px;border:1px solid var(--line-2);border-left:3px solid var(--sig-stop);border-radius:var(--r-1);background:var(--sig-stop-bg);font:13px/1.62 var(--sans);color:var(--ink-1)}
+.ps-alert.is-shown{display:flex}
+.ps-alert p{margin:0}
+.ps-alert-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+/* The primary action is the one that actually works on paramant.app: sign in
+   again. Typing a key by hand only helps a self-hosted relay, so it sits next
+   to it as a link with that said out loud. */
+.ps-alert-primary{display:inline-flex;align-items:center;min-height:var(--tap);padding:9px 16px;border:1px solid var(--accent);border-radius:var(--r-1);background:var(--accent);color:var(--accent-ink);font:600 13px/1 var(--sans);text-decoration:none}
+.ps-alert-primary:hover{background:var(--accent-hov);border-color:var(--accent-hov)}
+.ps-alert-primary:focus-visible{outline:none;box-shadow:var(--ring)}
+.ps-alert-note{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--ink-3)}
+/* The note belongs to the secondary action and to nothing else, so it is
+   stacked under it rather than left to wrap under both buttons. */
+.ps-alert-secondary{display:inline-flex;flex-direction:column;align-items:flex-start;gap:0}
+.ps-alert .ps-key-change{padding-left:0;font-family:var(--mono)}
+
+/* Said before the sender starts, not discovered on step 2: this is a live
+   handshake and the other person has to be there for it. */
+.ps-live-note{margin:0 0 16px;padding:11px 14px;border:1px solid var(--line-2);border-left:3px solid var(--mark);border-radius:0 var(--r-1) var(--r-1) 0;background:var(--surface-sunk);font:14px/1.6 var(--sans);color:var(--ink-1)}
+
+/* The jargon lives here instead of in the flow. A sender who wants ML-KEM-768
+   can open it; a sender who wants to send a file never has to read it. */
+.ps-how{margin:0 0 18px;border:1px solid var(--line);border-radius:var(--r-1);background:var(--surface)}
+.ps-how summary{cursor:pointer;display:flex;align-items:center;min-height:var(--tap);padding:11px 14px;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);list-style:none}
+.ps-how summary::-webkit-details-marker{display:none}
+.ps-how summary::after{content:" +";color:var(--ink-3)}
+.ps-how[open] summary::after{content:" \2013";color:var(--ink-3)}
+.ps-how summary:focus-visible{outline:none;box-shadow:var(--ring)}
+.ps-how-body{padding:0 14px 14px;font:13.5px/1.62 var(--sans);color:var(--ink-2)}
+.ps-how-body p{margin:0 0 10px}
+.ps-how-body p:last-child{margin-bottom:0}
+
+/* design-system.css puts 32px of padding on every .card; here the padding
+   belongs to .card-head and .card-body, so it is reset. */
+.card{border:1px solid var(--line);border-radius:var(--r-2);background:var(--surface);box-shadow:var(--sh-1);overflow:hidden;margin-bottom:14px;padding:0}
+.card-head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.card-head-title{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+/* Section 3 of the direction: the beacon only beats where something is really
+   being measured. A card head is a section marker, so its dot is a static
+   colour swatch. design-system.css v4 puts status-pulse and a navy ring on
+   every .dot, and both are reset here. The one live beacon on this screen is
+   #waiting-dot, which beats for as long as the relay is really waiting. */
+.dot{width:6px;height:6px;border-radius:50%;background:var(--sig-done);flex:0 0 auto;border:0;animation:none}
+.dot.red{background:var(--sig-stop)}
+.dot.amber{background:var(--sig-wait)}
+#waiting-dot{animation:status-pulse 2.4s var(--e-standard) infinite}
+.card-body{padding:18px}
+
+input[type=text],input[type=password],input[type=file]{width:100%;min-height:var(--tap);background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-1);color:var(--ink-1);padding:11px 13px;font-family:var(--mono);font-size:13px;outline:none;margin-bottom:10px;transition:border-color var(--d-1) var(--e-standard)}
+input[type=text]:hover,input[type=password]:hover,input[type=file]:hover,select:hover{border-color:var(--ink-3)}
+input:focus{border-color:var(--accent);box-shadow:var(--ring)}
+input[type=file]{cursor:pointer}
+select{width:100%;min-height:var(--tap);background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-1);color:var(--ink-1);padding:11px 13px;font-family:var(--mono);font-size:13px;outline:none;margin-bottom:10px;cursor:pointer;transition:border-color var(--d-1) var(--e-standard)}
+select:focus{border-color:var(--accent);box-shadow:var(--ring)}
+
+.btn{width:100%;min-height:var(--tap);padding:12px 18px;background:var(--accent);color:var(--accent-ink);border:1px solid var(--accent);border-radius:var(--r-1);font-family:var(--sans);font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;cursor:pointer;margin-top:8px;transition:background var(--d-1) var(--e-standard),border-color var(--d-1) var(--e-standard)}
+.btn:hover{background:var(--accent-hov);border-color:var(--accent-hov);opacity:1}
+.btn:focus-visible{outline:none;box-shadow:var(--ring)}
+.btn:disabled{background:var(--surface-sunk);border-color:var(--line-2);color:var(--ink-3);cursor:not-allowed;opacity:1}
+.btn-outline{background:transparent;color:var(--ink-1);border:1px solid var(--line-2)}
+.btn-outline:hover{background:var(--line-ghost);border-color:var(--ink-3)}
+.btn-green{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn-red{background:transparent;color:var(--sig-stop);border:1px solid var(--sig-stop-line)}
+.btn-red:hover{background:var(--sig-stop-bg);border-color:var(--sig-stop);color:var(--sig-stop)}
+
+.fingerprint{font-family:var(--mono);font-size:clamp(17px,4vw,22px);font-weight:600;letter-spacing:.1em;color:var(--ink-1);text-align:center;padding:20px;background:var(--surface-sunk);border:1px solid var(--line);border-radius:var(--r-1);margin:16px 0;word-break:break-all}
+.status-line{font-size:13px;line-height:1.6;color:var(--ink-2);padding:8px 0;display:flex;align-items:center;gap:8px}
+.status-line.ok{color:var(--sig-done)}
+.status-line.err{color:var(--sig-stop)}
+.share-box{flex:1 1 240px;min-width:0;background:var(--surface-sunk);border:1px solid var(--line);border-radius:var(--r-1);padding:12px 13px;font-family:var(--mono);font-size:12.5px;color:var(--ink-1);word-break:break-all;line-height:1.6;margin:0}
+.ps-linkrow{display:flex;flex-wrap:wrap;align-items:stretch;gap:10px;margin:12px 0 8px}
+/* One thing big in view after sending: the link, with a real 44px copy target
+   next to it instead of a click-anywhere box nobody sees. */
+.ps-copy{flex:0 0 auto;min-height:var(--tap);padding:0 18px;border:1px solid var(--accent);border-radius:var(--r-1);background:var(--accent);color:var(--accent-ink);font:600 14px/1 var(--sans);cursor:pointer;transition:background var(--d-1) var(--e-standard),border-color var(--d-1) var(--e-standard)}
+.ps-copy:hover{background:var(--accent-hov);border-color:var(--accent-hov)}
+.ps-copy:focus-visible{outline:none;box-shadow:var(--ring)}
+.ps-copy.is-copied{background:var(--mark);border-color:var(--mark);color:var(--mark-on)}
+.ps-meta{margin:0 0 6px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;line-height:1.6;color:var(--ink-3)}
+.ps-dim{color:var(--ink-3)}
+.ps-progress-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.ps-progress-head .status-line{padding-bottom:6px}
+.ps-pct{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink-1);font-variant-numeric:tabular-nums}
+/* Burn-on-read is not a fault, so it never gets the fault colour. */
+.ps-caution{display:flex;gap:9px;align-items:flex-start;margin:0 0 12px;padding:11px 13px;border:1px solid var(--line-2);border-left:3px solid var(--sig-wait);border-radius:var(--r-1);background:var(--sig-wait-bg);font:12.5px/1.6 var(--sans);color:var(--ink-1)}
+.ps-caution::before{content:"!";flex:0 0 auto;width:16px;height:16px;margin-top:1px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--sig-wait);border-radius:50%;font:700 10px/1 var(--mono);color:var(--sig-wait)}
+
+.share-box:hover{border-color:var(--line-2)}
+
+/* Step 2 can fail with its card still on screen. A beating beacon, "Waiting for
+   receiver", a link that connects to nothing and a blue Copy link are four
+   offers a dead session cannot honour, and they sat directly under the alarm
+   that said the session was gone. So the card goes with the alarm: greyed out,
+   marked aria-disabled, its copy button switched off and nothing in it takeable.
+   The one live control is the alarm's own "Open the session again", which sits
+   above the card and is untouched by this. */
+.card.is-stale{opacity:.5;pointer-events:none}
+.card.is-stale .ps-copy{cursor:not-allowed}
+#ps-session-card.is-stale #waiting-dot{background:var(--ink-3);animation:none}
+.progress-bar-wrap{background:var(--line-2);border:0;border-radius:var(--r-0);height:3px;overflow:hidden;margin:4px 0 12px}
+.progress-bar{height:100%;background:var(--accent);width:0%;transition:width var(--d-3) var(--e-standard)}
+.label{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ink-3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px;display:block}
+.tag{display:inline-block;font-family:var(--mono);font-size:11px;padding:4px 9px;border:1px solid var(--line-2);border-radius:var(--r-0);color:var(--ink-2);margin-right:4px;margin-top:4px}
+.tag.green{border-color:var(--line-2);border-left:2px solid var(--mark);color:var(--ink-1)}
+.warn{border:1px solid var(--line-2);border-left:3px solid var(--sig-wait);border-radius:var(--r-1);color:var(--ink-1);background:var(--sig-wait-bg);padding:12px 14px;font-size:13px;line-height:1.62;margin:12px 0}
+
+/* === Globe HUD (hidden by default; Ctrl+G to open) === */
+#globe-overlay{position:fixed;inset:0;z-index:0;background:#060c10;display:none}
+/* Ctrl+G hid main and showed nothing: toggleGlobe() adds .globe-fullscreen, and
+   until 6 September 2026 no rule turned the overlay itself back on, so the
+   shortcut left a blank page over a canvas of zero by zero. The scene was
+   built on every load and could not be reached from any of them. */
+#globe-overlay.globe-fullscreen{display:block;z-index:9000}
+#globe-overlay .hud-top,
+#globe-overlay .hud-bot,
+#globe-overlay .hc,
+#globe-overlay .hud-panel,
+#globe-overlay #globe-loading{display:none!important}
+#globe-overlay.globe-fullscreen .hud-top,
+#globe-overlay.globe-fullscreen .hud-bot,
+#globe-overlay.globe-fullscreen .hc,
+#globe-overlay.globe-fullscreen .hud-panel,
+#globe-overlay.globe-fullscreen #globe-loading{display:flex!important}
+#globe-overlay.globe-fullscreen .hud-panel{display:block!important}
+#globe-overlay.globe-fullscreen #globe-loading{display:flex!important}
+/* The ring is what you look at while the globe builds, so it has to be able to
+   leave. It could not: initGlobe() hid it with an inline display:none, and the
+   rule above is !important, which beats an inline declaration that is not. It
+   never showed because the globe was already built before anyone opened the
+   overlay. Now that it builds on the first open, the ring is on screen for
+   real, and this is how it goes away. */
+#globe-overlay.globe-fullscreen.globe-ready #globe-loading{display:none!important}
+
+#globe-overlay::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:20;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,
+  rgba(29, 78, 216, .018) 3px,rgba(29, 78, 216, .018) 4px)}
+#globe-overlay::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:19;
+  background:radial-gradient(ellipse 80% 80% at 50% 50%,transparent 35%,#000 100%)}
+
+#globe-canvas-wrap{position:absolute;inset:0;z-index:1}
+#globe-canvas-wrap canvas{display:block;width:100%!important;height:100%!important}
+
+.hc{position:absolute;width:56px;height:56px;border-color:var(--lime);border-style:solid;
+  opacity:.55;z-index:25;transition:opacity .3s}
+.hc:hover{opacity:.9}
+.hc-tl{top:16px;left:16px;border-width:2px 0 0 2px}
+.hc-tr{top:16px;right:16px;border-width:2px 2px 0 0}
+.hc-bl{bottom:16px;left:16px;border-width:0 0 2px 2px}
+.hc-br{bottom:16px;right:16px;border-width:0 2px 2px 0}
+
+.hud-top{position:absolute;top:0;left:0;right:0;height:52px;z-index:30;
+  display:flex;align-items:center;justify-content:space-between;padding:0 24px;
+  border-bottom:1px solid var(--ink-ghost);
+  background:linear-gradient(to bottom,rgba(0,0,0,.9),transparent)}
+.hud-logo{font-size:12px;font-weight:700;letter-spacing:.14em;color:var(--lime)}
+.hud-center{font-size:10px;letter-spacing:.22em;color:rgba(29, 78, 216, .5);text-transform:uppercase}
+.hud-close-btn{background:none;border:1px solid rgba(29, 78, 216, .3);color:rgba(29, 78, 216, .8);
+  padding:5px 14px;font-family:inherit;font-size:10px;letter-spacing:.1em;cursor:pointer;
+  text-transform:uppercase;transition:all .2s}
+.hud-close-btn:hover{border-color:var(--lime);color:var(--lime)}
+
+.hud-bot{position:absolute;bottom:0;left:0;right:0;height:48px;z-index:30;
+  display:flex;align-items:center;justify-content:center;gap:40px;padding:0 24px;
+  border-top:1px solid rgba(29, 78, 216, .12);
+  background:linear-gradient(to top,rgba(0,0,0,.9),transparent)}
+.hud-stat{display:flex;flex-direction:column;align-items:center;gap:2px}
+.hud-stat-lbl{font-size:8px;letter-spacing:.16em;color:rgba(29, 78, 216, .4);text-transform:uppercase}
+.hud-stat-val{font-size:11px;color:var(--lime);letter-spacing:.06em}
+.hud-stat-val.amber{color:var(--lime)}
+
+.hud-panel{position:absolute;z-index:30;background:rgba(0,0,0,.85);
+  border:1px solid var(--ink-ghost);padding:14px 16px;min-width:200px;
+  backdrop-filter:blur(6px)}
+.hud-panel-title{font-size:8px;letter-spacing:.2em;color:var(--ink-dim);
+  text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;
+  border-bottom:1px solid rgba(29, 78, 216, .12)}
+.hud-panel-row{font-size:10px;color:rgba(29, 78, 216, .8);padding:4px 0;
+  display:flex;justify-content:space-between;gap:16px;letter-spacing:.04em}
+.hud-panel-row .val{color:var(--lime)}
+
+#hud-left{left:20px;top:50%;transform:translateY(-50%)}
+#hud-right{right:20px;top:50%;transform:translateY(-50%)}
+
+.hud-session{font-size:10px;color:var(--ink);padding:5px 0;
+  border-bottom:1px solid rgba(29, 78, 216, .08);display:flex;align-items:center;gap:8px}
+.hud-session:last-child{border:none}
+.hud-dot{width:5px;height:5px;background:var(--lime);flex-shrink:0;
+  animation:blink 2s ease-in-out infinite}
+.hud-dot.amber{background:var(--ink-dim)}
+@keyframes blink{0%,100%{opacity:.5}50%{opacity:1}}
+
+@keyframes globeSpin{to{transform:rotate(360deg)}}
+#globe-loading{position:absolute;inset:0;z-index:5;display:flex;align-items:center;
+  justify-content:center;flex-direction:column;gap:16px;color:rgba(29, 78, 216, .6);
+  font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+#globe-loading-ring{width:64px;height:64px;border:2px solid var(--ink-ghost);
+  border-top-color:var(--lime);animation:globeSpin .8s linear infinite}
+
+@media(max-width:640px){
+  main{padding:24px 16px 44px}
+  .ps-copy{flex:1 1 100%}
+  .hero-block{padding:18px 16px}
+  h1{font-size:20px}
+  .fingerprint{font-size:18px;letter-spacing:.08em}
+}
+</style>
+<meta name="description" content="Hand a file over live with hybrid post-quantum encryption, or send a link whose key never reaches us. It lives in memory only and burns after one download.">
+<meta name="robots" content="noindex, nofollow">
+<!-- Gated by nginx (auth_request /api/user/check), so a crawler can only
+     ever see the 302 to /auth/login, a path robots.txt disallows. Saying
+     noindex here is the honest version of what the server already does. -->
+<meta property="og:title" content="Encrypted file transfer · Paramant">
+<meta property="og:description" content="Hand a file over live with hybrid post-quantum encryption, or send a link whose key never reaches us. It lives in memory only and burns after one download. No account needed to receive.">
+<meta property="og:url" content="https://paramant.app/en/parashare">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Encrypted file transfer · Paramant">
+<meta name="twitter:description" content="Hand a file over live with hybrid post-quantum encryption, or send a link whose key never reaches us. It lives in memory only and burns after one download. No account needed to receive.">
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<link rel="canonical" href="https://paramant.app/en/parashare">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/parashare">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/parashare">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/parashare">
+<style>
+.nav-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-family: IBM Plex Mono, monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+  text-decoration: none;
+  border: 1px solid var(--ink-hair);
+  transition: all 140ms ease;
+  margin-right: 12px;
+}
+.nav-help::before {
+  content: "?";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--ink-dim);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-dim);
+  font-family: Inter, sans-serif;
+  line-height: 1;
+}
+.nav-help:hover {
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(29, 78, 216, 0.08);
+}
+.nav-help:hover::before {
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
+}
+.nav-help:focus-visible {
+  outline: 2px solid var(--ochre);
+  outline-offset: 2px;
+}
+.nav-help-mobile {
+  display: block;
+  padding: 12px 20px;
+  font-family: IBM Plex Mono, monospace;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ink-hair);
+}
+.nav-help-mobile:hover {
+  color: var(--ink);
+  background: rgba(29, 78, 216, 0.08);
+}
+@media (max-width: 900px) {
+  .nav-help { display: none; }
+}
+</style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/en/parashare#webpage",
+      "url": "https://paramant.app/en/parashare",
+      "name": "Encrypted file transfer · Paramant",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "en",
+      "description": "Hand a file over live with hybrid post-quantum encryption, or send a link whose key never reaches us. It lives in memory only and burns after one download."
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://paramant.app/en/parashare#software",
+      "name": "Paramant",
+      "applicationCategory": "SecurityApplication",
+      "operatingSystem": "Web browser",
+      "url": "https://paramant.app/en/parashare",
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      }
+    }
+  ]
+}
+</script>
+<meta name="theme-color" content="#FFFFFF">
+<link rel="stylesheet" href="/app-2026.css?v=9">
+<link rel="stylesheet" href="/done-state.css?v=1">
+<script src="/js/theme.js?v=5"></script>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<nav class="nav">
+  <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/security" class="nav-link">Security</a></li>
+    <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/en/docs" class="nav-link">Docs</a></li>
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/auth/login" class="nav-signin">Sign in</a>
+    <a href="/en/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/parashare" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/parashare" hreflang="en" lang="en" aria-current="true">EN</a></div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/security" class="nav-mobile-standalone">Security</a>
+  <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/parashare" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/parashare" hreflang="en" lang="en" aria-current="true">EN</a></span>
+</div>
+<section class="page-hero">
+<div class="page-hero-inner">
+  <span class="eyebrow">PARASEND</span>
+  <h1>Send a file that deletes itself</h1>
+  <p class="lede">Pick a file and send a one-time link. The file is locked in your own browser before it leaves, so nobody in between can open it, and that includes us.</p>
+</div>
+</section>
+
+<main id="main-content" style="position:relative;z-index:10">
+
+<!-- Two stands, chosen before anything else. The Send-a-link sentence carries
+     no times in the markup on purpose: the hours per plan are tiers.js
+     view_ttl_ms and are written in by parashare.page.js from the plan API
+     (GET /v2/check-key), so a tier change cannot leave a stale hour on the
+     page. Until that answer arrives the sentence says only what is true of
+     every plan. -->
+<div class="ps-mode" id="ps-mode" role="radiogroup" aria-label="How do you want to send this file">
+  <button type="button" class="ps-mode-card" id="ps-mode-live" role="radio" aria-checked="true" data-click="chooseModeLive">
+    <span class="ps-mode-title">Together, now</span>
+    <span class="ps-mode-body">You are both at your screen. Up to 500 MB, and nothing is ever stored.</span>
+  </button>
+  <button type="button" class="ps-mode-card" id="ps-mode-link" role="radio" aria-checked="false" data-click="chooseModeLink">
+    <!-- Twee namen, met opzet. "They open it later" is wat een mens leest;
+         "Send a link" is hoe /parasend, /pricing en /vs deze stand noemen, en
+         een koper die daarop afkomt moet hem hier terugvinden. -->
+    <span class="ps-mode-title">They open it later <span class="ps-mode-alias">&middot; Send a link</span></span>
+    <span class="ps-mode-body">They pick it up when it suits them. <span id="ps-mode-link-ttl">It waits until the link expires, then it is gone.</span></span>
+  </button>
+</div>
+
+<!-- One line under the cards that says what the CHOSEN stand actually means.
+     It was removed as a duplicate of the card text, and that was wrong twice:
+     the cards never carried the promise that matters on the link stand (the
+     other person does not have to be online), and the size differs per stand
+     in a way a card subtitle cannot hold. -->
+
+<!-- Stepper -- visible above the active step, updates as you move through -->
+<ol class="ps-stepper" id="ps-stepper" aria-label="Sending progress">
+  <li class="ps-step active" data-step-key="setup">
+    <span class="ps-step-dot" aria-hidden="true"></span>
+    <span class="ps-step-label">1 &middot; Setup</span>
+  </li>
+  <li class="ps-step" data-step-key="share">
+    <span class="ps-step-dot" aria-hidden="true"></span>
+    <span class="ps-step-label">2 &middot; Share</span>
+  </li>
+  <li class="ps-step" data-step-key="verify">
+    <span class="ps-step-dot" aria-hidden="true"></span>
+    <span class="ps-step-label">3 &middot; Compare</span>
+  </li>
+  <li class="ps-step" data-step-key="encrypt">
+    <span class="ps-step-dot" aria-hidden="true"></span>
+    <span class="ps-step-label">4 &middot; Encrypt</span>
+  </li>
+  <li class="ps-step" data-step-key="done">
+    <span class="ps-step-dot" aria-hidden="true"></span>
+    <span class="ps-step-label">5 &middot; Done</span>
+  </li>
+</ol>
+
+<!-- STEP 1: Setup -->
+<div class="step active" id="step-setup">
+
+<p class="ps-live-note" id="ps-live-note">The person you send to has to be online while you send; you confirm a short code together. Up to 500 MB, and nothing is ever stored.</p>
+
+  <div class="ps-key-slim is-loading" id="ps-key-slim" aria-label="Account session">
+    <span class="ps-key-status"><span id="ps-key-slim-label">Starting your account session</span> <span class="ps-key-mask" id="ps-key-mask" hidden></span></span>
+    <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Change</button>
+  </div>
+
+  <div class="ps-alert" id="ps-key-error" role="alert">
+    <p>Your account session could not be started. Sign in again; if it keeps happening, mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
+    <div class="ps-alert-actions">
+      <a class="ps-alert-primary" href="/auth/login">Sign in again</a>
+      <span class="ps-alert-secondary">
+        <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Use a key by hand</button>
+        <span class="ps-alert-note">for self-hosted relays</span>
+      </span>
+    </div>
+  </div>
+
+  <div class="card ps-key-card">
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Your API key</div></div>
+    <div class="card-body">
+      <label class="label" for="api-key">API key</label>
+      <input type="password" id="api-key" placeholder="pgp_..." autocomplete="off" data-input="onKeyInput">
+      <div class="status-line" id="key-status">Enter your API key to continue</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">File</div></div>
+    <div class="card-body">
+      <label class="label" for="file-input">Choose a file (or several)</label>
+      <input type="file" id="file-input" multiple data-change="onFileSelect">
+      <p class="ps-meta">Pick more than one and they travel as a single package.</p>
+      <div class="status-line" id="file-status">No file selected</div>
+      <div id="vault-list" style="margin-top:8px;display:none"></div>
+    </div>
+  </div>
+
+  <!-- Named recipients. Optional on purpose: leaving it empty keeps the old
+       behaviour, one link that burns on first read, which is right for handing
+       something to one person. Filling it in turns the send into one file with
+       a personal link per person and an overview of who collected.
+
+       Addresses are split here, in the browser, on newlines, commas and
+       semicolons, because the relay refuses a field with a comma in it. That
+       refusal is deliberate: a comma inside one address used to count as one
+       recipient and reach two mailboxes sharing a single link. So the splitting
+       happens where a person pastes, and what leaves is a real list. -->
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Who is it for</div></div>
+    <div class="card-body">
+      <label class="label" for="recipients-input">Email addresses (optional)</label>
+      <textarea id="recipients-input" rows="3" spellcheck="false" autocomplete="off"
+                placeholder="anna@example.org&#10;bob@example.org"
+                style="width:100%;padding:11px 12px;border:1px solid var(--line,#dfe4e7);border-radius:8px;background:transparent;color:inherit;font:400 14px/1.5 inherit;resize:vertical"
+                data-input="onRecipientsInput"></textarea>
+      <p class="ps-meta" id="recipients-status">Leave empty for one link that opens once.
+         Fill it in and everyone gets their own link, and you see who collected.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Deletes itself</div></div>
+    <div class="card-body">
+      <label class="label" for="ttl-select">Link expires after</label>
+      <select id="ttl-select">
+        <option value="30000">30 seconds</option>
+        <option value="300000">5 minutes</option>
+        <option value="3600000" selected>1 hour</option>
+        <option value="86400000">24 hours</option>
+      </select>
+      <p class="ps-meta" id="ttl-status">When the link runs out we destroy the file, picked up or not.</p>
+    </div>
+  </div>
+
+  <button class="btn" id="btn-create-session" disabled data-click="createSession">Create secure session &rarr;</button>
+
+  <details class="ps-how">
+    <summary>How this works</summary>
+    <div class="ps-how-body">
+      <p>Your receiver's browser makes a fresh pair of keys and sends us only the public half. Your browser locks the file for that public half and uploads the locked version. We hold no key, so what sits on our relay cannot be opened by us or by anyone who takes it from us.</p>
+      <p>The short code you compare is built from the receiver's public keys, and both browsers work it out on their own. If anything had swapped those keys along the way, the two codes would not match. That is why you read the code to each other on a channel we do not run, such as a phone call.</p>
+      <p>For the reader who wants the names: the two stands do not use the same ones. Handing over live is a <strong>hybrid</strong> key exchange: ML-KEM-768 and ECDH P-256 run side by side and both shared secrets go through HKDF-SHA256 into one AES-256-GCM key, so an attacker who breaks either one on its own still has nothing. Sending a link does no key exchange at all: your browser makes a fresh AES-256-GCM key, puts it after the <code>#</code> in the link, and a fragment is never sent to a server. That means the link <em>is</em> the key, so whoever can read the channel you send it over can read the file.</p>
+      <p>Neither stand signs the file. The signatures here are the relay's own, on the transparency log and on the receipt it issues. Signing a document with ML-DSA-65 is what ParaSign does, not what sending does. The locked file is stored with an expiry and is destroyed when the link runs out or once the download link has been spent.</p>
+    </div>
+  </details>
+
+  <!-- A sector that will not answer used to leave this button quietly disabled
+       with no reason given. It now reports itself here, at the moment of the
+       press. -->
+  <div class="status-line" id="create-status" role="status"></div>
+</div>
+
+<!-- STEP 2: Waiting for receiver -->
+<div class="step" id="step-waiting">
+  <h2 class="paramant-h1">Share this link</h2>
+  <p class="sub">Send the link to your receiver any way you like. Keep this page open: the moment they open it, a short code appears here and the two of you compare it.</p>
+  <div class="ps-guide">
+    <span class="ps-guide-kicker">Step 2 of 5 &middot; Share</span>
+    <strong>The link says where to connect, and nothing else.</strong> No key, no file, no file name. Your receiver has to open it while you are still on this page.
+  </div>
+
+  <div class="ps-alert" id="ps-link-error" role="alert">
+    <p id="ps-link-error-text">The connection dropped before your receiver arrived. Nothing was uploaded and your file is still here in this browser.</p>
+    <div class="ps-alert-actions">
+      <button type="button" class="ps-alert-primary" data-click="reopenSession">Open the session again</button>
+      <span class="ps-alert-note">this makes a fresh link</span>
+    </div>
+  </div>
+
+  <div class="card" id="ps-session-card">
+    <div class="card-head"><div class="dot amber" id="waiting-dot"></div><div class="card-head-title" id="waiting-title">Waiting for receiver...</div></div>
+    <div class="card-body">
+      <span class="label">One-time session link</span>
+      <div class="ps-linkrow">
+      <div class="share-box" id="session-link" data-click="copyLink">&mdash;</div>
+      <button type="button" class="ps-copy" id="ps-copy-btn" data-click="copyLink">Copy link</button>
+      </div>
+      <p class="ps-meta" id="ps-link-meta">The link carries no key and no file name. It only says where to connect.</p>
+      <div class="status-line" id="waiting-status">Send this link, and wait here for your receiver to open it</div>
+    </div>
+  </div>
+
+  <div class="card" id="fp-card" style="display:none">
+    <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title">Compare this code together</div></div>
+    <div class="card-body">
+      <p class="status-line" style="margin-bottom:6px">Call or message your receiver on a <strong>different channel</strong> (phone, Signal) and read the code below to each other. Both screens have to show the same one.</p>
+      <p class="ps-caution">If the codes differ, stop here. A tampered relay can hand you the wrong key, and comparing the code on a channel we do not run is what catches it.</p>
+      <div class="fingerprint" id="fp-display">&mdash;</div>
+      <div id="fp-seen-before" style="display:none;font-size:10px;color:var(--cobalt);margin:-4px 0 10px;text-align:center;font-family:var(--mono)">✓ Same code as the last time you sent to this person</div>
+      <div id="fp-new-device" style="display:none;font-size:10px;color:var(--cobalt);margin:-4px 0 10px;text-align:center">◈ First time with this receiver. Compare with extra care.</div>
+      <div style="display:flex;justify-content:center;margin:12px 0 4px">
+        <canvas id="fp-qr" style="display:none;border:4px solid var(--line-2)"></canvas>
+      </div>
+      <p style="font-size:10px;color:var(--ink-dim);text-align:center;margin-bottom:10px" id="fp-qr-label">Your receiver can scan this instead of reading it out</p>
+      <label style="display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-size:11px;cursor:pointer;user-select:none">
+        <input type="checkbox" id="fp-confirm-check" data-change="fpConfirmToggle" style="width:14px;height:14px;accent-color:var(--cobalt)">
+        We compared the code on a different channel and it matched
+      </label>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-green" id="fp-confirm-btn" data-click="confirmFingerprint" disabled>✓ Codes match, send the file</button>
+        <button class="btn btn-red btn-outline" data-click="rejectFingerprint">✗ Codes differ, stop</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 3: Encrypting & uploading -->
+<div class="step" id="step-encrypting">
+  <h2 class="paramant-h1">Locking and sending</h2>
+  <!-- The waiting screen is the one place where a sender has nothing to do but
+       read, and it used to spend that attention on ML-KEM-768 and ECDH P-256.
+       Somebody sending a patient file wants one sentence, not a cipher suite.
+       The names are still here, one click down, for the reader who wants them. -->
+  <p class="sub">Your file is being locked on this device. We only ever receive the locked version, never the file itself and never the key.</p>
+  <details class="ps-how">
+    <summary>The names, for who wants them</summary>
+    <p>This all happens in your browser. ML-KEM-768 and ECDH P-256 together wrap a
+       fresh AES-256-GCM key for the receiver, then ciphertext-only flows to the
+       relay. The relay signs the entry it makes in the public log; the file
+       itself carries no signature.</p>
+  </details>
+
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Upload progress</div></div>
+    <div class="card-body">
+      <div class="ps-progress-head">
+        <span class="status-line" id="enc-status">Initializing...</span>
+        <span class="ps-pct" id="enc-pct" aria-live="polite">0%</span>
+      </div>
+      <div class="progress-bar-wrap" role="progressbar" id="enc-progress-track" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-bar" id="enc-progress"></div></div>
+      <div class="status-line ps-dim" id="enc-detail"></div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 4: Done -->
+<!-- Thunderbird FileLink download mode, shown when ?t=&n=&c=&r= + #k= are present -->
+<div class="step" id="step-tb-download">
+  <h2 class="paramant-h1" id="tb-dl-title">Downloading…</h2>
+  <p class="sub" id="tb-dl-sub">Decrypting file. The key never left your browser.</p>
+  <div class="card">
+    <div class="card-head"><div class="dot" id="tb-dl-dot"></div><div class="card-head-title">Secure FileLink Download</div></div>
+    <div class="card-body">
+      <div class="status-line" id="tb-dl-status">Fetching encrypted chunks…</div>
+      <div class="progress-bar-wrap" style="margin-top:12px"><div class="progress-bar" id="tb-dl-bar"></div></div>
+      <div style="margin-top:16px;display:flex;gap:4px;flex-wrap:wrap">
+        <span class="tag green">AES-256-GCM</span>
+        <span class="tag green">Key in URL fragment, the relay never saw it</span>
+        <span class="tag green">Burn-on-read</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SEND A LINK: sealing and uploading. Its own step and not a shared one with
+     the live hand-over, for two reasons. The copy differs: there is no
+     receiver's public key here to wrap a session key for, so the sentence next
+     to the bar has to say what really happens. And tests/ui-truthfulness.test.mjs
+     pins that exactly one path reaches #step-encrypting, because the live
+     promise "the receiver has to be online" holds only while confirmFingerprint
+     is the single door into it. This stand walks its own door. -->
+<div class="step" id="step-sealing">
+  <h2 class="paramant-h1">Sealing &amp; uploading</h2>
+  <p class="sub">Your browser locks the file under a fresh AES-256-GCM key, then uploads the locked bytes. The key stays here and goes into the link, after the #, where no server ever sees it.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Upload progress</div></div>
+    <div class="card-body">
+      <div class="ps-progress-head">
+        <span class="status-line" id="seal-status">Starting...</span>
+        <span class="ps-pct" id="seal-pct" aria-live="polite">0%</span>
+      </div>
+      <div class="progress-bar-wrap" role="progressbar" id="seal-progress-track" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-bar" id="seal-progress"></div></div>
+    </div>
+  </div>
+  <button type="button" class="btn btn-outline" id="seal-back" data-click="backToSetup" hidden>Back</button>
+</div>
+
+<!-- The recipient list does not fit the plan. Asked before anything is sealed
+     or uploaded (POST /v2/sends/precheck), so nothing was spent. -->
+<div class="step" id="step-over-limit">
+  <h2 class="paramant-h1">Too many people for this plan</h2>
+  <p class="sub" id="over-limit-line"></p>
+  <a class="btn" href="/pricing">See plans</a>
+  <button type="button" class="btn btn-outline" data-click="backToSetup">Back</button>
+</div>
+
+<!-- SEND A LINK: the link is ready. Reached only from the Send-a-link stand;
+     the live stand never shows this step. -->
+<div class="step" id="step-link">
+  <div class="done-state">
+    <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
+    <h2 class="done-title">Your link is ready.</h2>
+    <p class="done-line" id="ps-link-line">Send it any way you like. We are holding the sealed file for you and we cannot open it.</p>
+
+    <div class="done-payload">
+      <ul class="ps-links" id="ps-link-list"></ul>
+      <button type="button" class="ps-copy" id="ps-link-refresh" data-click="refreshSentLinks">Check again</button>
+    </div>
+
+    <div class="done-actions">
+      <button class="btn done-primary" data-click="reload">Send another file</button>
+      <button type="button" class="done-quiet" id="ps-link-receipt" hidden>Keep the receipt</button>
+    </div>
+
+    <details class="done-details">
+      <summary>What made this safe</summary>
+      <div class="done-details-body">
+        <p>Your browser locked the file before it left this device, under a key it made here and nowhere else (<code>AES-256-GCM</code>). The key sits in the link after the <code>#</code>, and a browser never puts that part on the wire, so we are holding bytes we have no way to open.</p>
+        <p>The link works once. The first finished download wipes the file from our server, and if nobody comes it is destroyed when it runs out.</p>
+        <p><strong>Keep the receipt</strong> saves the entry this file made in our public log, which anyone can check at <a href="/ct-log">the log</a>: the entry, where it sits in the tree, and the signed tree head. It is proof that we took the sealed file in, not proof that somebody came for it.</p>
+        <p id="ps-link-receipt-note">There is no signed delivery receipt for a link download: the relay signs one for the API download path and not for this one. The status on each link above is this page reading the link's own state against its own clock.</p>
+      </div>
+    </details>
+  </div>
+</div>
+
+<div class="step" id="step-done">
+  <div class="done-state">
+    <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
+    <h2 class="done-title" id="done-title">Sent to the other side.</h2>
+    <p class="done-line" id="done-status">Your file is on its way.</p>
+
+    <div class="done-payload"></div>
+
+    <div class="done-actions">
+      <button class="btn done-primary" data-click="reload">Send another file</button>
+      <button type="button" class="done-quiet" id="done-receipt" hidden>Keep the receipt</button>
+    </div>
+
+    <details class="done-details">
+      <summary>What made this safe</summary>
+      <div class="done-details-body">
+        <p>The lock was made in your browser, not on our server. Your file was sealed for the other person's own key before it left this device: a hybrid key exchange, <code>ML-KEM-768</code> alongside <code>ECDH P-256</code>, with both shared secrets derived into one <code>AES-256-GCM</code> key. Breaking one of the two on its own gets an attacker nowhere, which is why the classical half is still in there.</p>
+        <p>The short code you read out to each other is worked out by both browsers from the other side's public keys. Two screens showing the same code means nobody swapped a key in between, and that is the whole reason we ask you to compare it somewhere we do not run.</p>
+        <p>We are holding a sealed copy and never held the key, so it is not ours to open. It is wiped the moment the other side takes it, and destroyed on its own clock if that never happens.</p>
+        <p><strong>Keep the receipt</strong> saves the entry this transfer made in our public log, which anyone can check at <a href="/ct-log">the log</a>: the entry, where it sits in the tree, and the signed tree head.</p>
+      </div>
+    </details>
+  </div>
+</div>
+
+</main>
+<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/parashare" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
+
+<!-- Globe HUD overlay -->
+<div id="globe-overlay" role="dialog" aria-label="Globe HUD">
+  <!-- Corners -->
+  <div class="hc hc-tl"></div>
+  <div class="hc hc-tr"></div>
+  <div class="hc hc-bl"></div>
+  <div class="hc hc-br"></div>
+
+  <!-- Top bar -->
+  <div class="hud-top">
+    <div class="hud-logo">⬡ PARAMANT // GHOST PIPE</div>
+    <div class="hud-center">Secure Transfer Network · EU/DE Jurisdiction</div>
+    
+  </div>
+
+  <!-- Globe canvas -->
+  <div id="globe-canvas-wrap"></div>
+
+  <!-- Loading state -->
+  <div id="globe-loading">
+    <div id="globe-loading-ring"></div>
+    <span>Initializing secure globe...</span>
+  </div>
+
+  <!-- Left panel: active sessions -->
+  <div class="hud-panel" id="hud-left">
+    <div class="hud-panel-title">Active Sessions</div>
+    <div id="hud-sessions"><div class="hud-session"><span class="hud-dot amber"></span>Scanning relay...</div></div>
+  </div>
+
+  <!-- Right panel: location + transfer -->
+  <div class="hud-panel" id="hud-right">
+    <div class="hud-panel-title">Node Info</div>
+    <div class="hud-panel-row"><span>Location</span><span class="val" id="hud-loc">Locating...</span></div>
+    <div class="hud-panel-row"><span>Relay</span><span class="val ok">EU/DE · Online</span></div>
+    <div class="hud-panel-row"><span>Protocol</span><span class="val">Ghost Pipe v2</span></div>
+    <div class="hud-panel-row"><span>Encryption</span><span class="val">ML-KEM-768 + ECDH P-256</span></div>
+    <div class="hud-panel-row"><span>Blobs in flight</span><span class="val" id="hud-blobs">&mdash;</span></div>
+  </div>
+
+  <!-- Bottom bar -->
+  <div class="hud-bot">
+    <div class="hud-stat"><span class="hud-stat-lbl">Relay</span><span class="hud-stat-val ok">EU/DE · Online</span></div>
+    <div class="hud-stat"><span class="hud-stat-lbl">Jurisdiction</span><span class="hud-stat-val">GDPR · No US CLOUD Act</span></div>
+    <div class="hud-stat"><span class="hud-stat-lbl">Session</span><span class="hud-stat-val" id="hud-session-stat">&mdash;</span></div>
+    <div class="hud-stat"><span class="hud-stat-lbl">Uptime</span><span class="hud-stat-val" id="hud-uptime">&mdash;</span></div>
+  </div>
+</div>
+
+<script src="/vendor/qrcode.min.js?v=1"></script>
+<script type="module" src="/js/parashare.inline1.js?v=3"></script>
+<script src="/js/delegate.js?v=1" defer></script>
+<script src="/js/quota-upgrade.js?v=6" defer></script>
+<!-- One sentence for "we broke it, here is what to do", shared with the signer.
+     Plain script, above the page code that reads window.paramantErrors. -->
+<script src="/js/error-message.js?v=2" defer></script>
+<!-- v5, not v4. #396 shipped a v4 of this file and so did the commit below it;
+     two different contents under one immutable url is exactly what the ?v= is
+     there to prevent, and check-cache-bust cannot see it because both sides
+     agree on the number. -->
+<!-- One date format for the whole site (#424). The Send-a-link stand prints
+     an expiry moment, and a slashed locale date next to "24 hours on Firm"
+     is the exact ambiguity that file exists to kill. -->
+<script src="/js/format-date.js?v=2" defer></script>
+<script src="/js/done-state.js?v=1" defer></script>
+<script src="/js/handshake-meta.js?v=1" defer></script>
+<script src="/js/send-wrap.js?v=1" defer></script>
+<script src="/js/parashare.page.js?v=18" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid footer-slim">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="/en/about">About</a>
+          <a href="/en/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Legal</div>
+        <div class="footer-links">
+          <a href="/en/privacy">Privacy Policy</a>
+          <a href="/en/dpa">Data Processing Agreement</a>
+          <a href="/en/terms">Terms of Service</a>
+          <a href="/en/sla">SLA</a>
+          <a href="/en/license">License</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

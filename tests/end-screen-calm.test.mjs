@@ -43,8 +43,8 @@ const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const MIME = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.html': 'text/html',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.wasm': 'application/wasm',
   '.json': 'application/json', '.ico': 'image/x-icon' };
-const ALIAS = { '/': '/index.html', '/parashare': '/parashare.html', '/get': '/get.html',
-  '/ontvang': '/ontvang.html', '/sign': '/sign.html' };
+const ALIAS = { '/': '/index.html', '/parashare': '/parashare.html', '/en/parashare': '/en/parashare.html', '/get': '/get.html', '/en/get': '/en/get.html',
+  '/ontvang': '/ontvang.html', '/en/ontvang': '/en/ontvang.html', '/sign': '/sign.html' };
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
@@ -195,22 +195,30 @@ async function stubSender(page) {
     body: JSON.stringify({ ok: true, enc_meta: null, file_size: 0, ttl_left_s: 3600, used: false }) }));
 }
 
+// Both languages: /parashare is Dutch, and the English text it carried before
+// lives on at /en/parashare with the same pins.
+for (const P of [
+  { path: '/en/parashare', once: /Works once, until \d{1,2} \w+ \d{4}, \d{2}:\d{2} UTC/,
+    canNow: /can now download/i, compared: /compared the code with/ },
+  { path: '/parashare', once: /Werkt één keer, tot \d{1,2} \w+ \d{4}, \d{2}:\d{2} UTC/,
+    canNow: /can now download|kan nu downloaden|kan het nu downloaden/i, compared: /met wie u de controlecode vergeleek/ },
+]) {
 {
   const page = await browser.newPage({ viewport: PHONE });
   await stubSender(page);
-  await page.goto(`${ORIGIN}/parashare`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${ORIGIN}${P.path}`, { waitUntil: 'domcontentloaded' });
   await page.locator('#ps-mode-link').click();
   await page.locator('#file-input').setInputFiles({ name: 'loonstrook-2026-09.pdf', mimeType: 'application/pdf',
     buffer: Buffer.from(Array.from({ length: 777 }, (_, i) => (i * 37 + 11) % 256)) });
   await page.waitForFunction(() => !document.getElementById('btn-create-session').disabled, null, { timeout: 20000 });
   await page.locator('#btn-create-session').click();
   await page.waitForSelector('#step-link.active', { timeout: 30000 });
-  const text = await audit(page, '/parashare Send a link', '#step-link');
-  ok('/parashare Send a link: the two stands and the stage bar are gone',
+  const text = await audit(page, P.path + ' Send a link', '#step-link');
+  ok(P.path + ' Send a link: the two stands and the stage bar are gone',
     !(await page.locator('#ps-mode').isVisible()) && !(await page.locator('#ps-stepper').isVisible()));
-  ok('/parashare Send a link: one line says how often it opens and when it stops',
-    /Works once, until \d{1,2} \w+ \d{4}, \d{2}:\d{2} UTC/.test(text), text.slice(0, 200));
-  ok('/parashare Send a link: the receipt is offered as a quiet line',
+  ok(P.path + ' Send a link: one line says how often it opens and when it stops',
+    P.once.test(text), text.slice(0, 200));
+  ok(P.path + ' Send a link: the receipt is offered as a quiet line',
     await page.locator('#ps-link-receipt').isVisible());
   await page.close();
 }
@@ -229,7 +237,7 @@ async function stubSender(page) {
         body: JSON.stringify({ kyber_pub: 'ab'.repeat(64), ecdh_pub: 'cd'.repeat(32) }) })
     : r.fulfill({ status: 404, body: '' }));
   await page.route('https://health.paramant.app/v2/pubkey', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }));
-  await page.goto(`${ORIGIN}/parashare`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${ORIGIN}${P.path}`, { waitUntil: 'domcontentloaded' });
   await page.locator('#file-input').setInputFiles({ name: 'IMG_4276.jpeg', mimeType: 'image/jpeg',
     buffer: Buffer.from(Array.from({ length: 2048 }, (_, i) => (i * 13 + 7) % 256)) });
   await page.waitForFunction(() => !document.getElementById('btn-create-session').disabled, null, { timeout: 20000 });
@@ -241,39 +249,51 @@ async function stubSender(page) {
   await page.locator('#fp-confirm-check').check();
   await page.locator('#fp-confirm-btn').click();
   await page.waitForSelector('#step-done.active', { timeout: 40000 });
-  const text = await audit(page, '/parashare live hand-over', '#step-done');
-  ok('/parashare live hand-over: the two stands and the stage bar are gone',
+  const text = await audit(page, P.path + ' live hand-over', '#step-done');
+  ok(P.path + ' live hand-over: the two stands and the stage bar are gone',
     !(await page.locator('#ps-mode').isVisible()) && !(await page.locator('#ps-stepper').isVisible()));
   // The screen a sender reaches by handing a file over cannot tell them the
   // file is now downloadable: that is the OTHER stand's sentence, and it was on
   // this screen until 4 September 2026.
-  ok('/parashare live hand-over: it does not read the sender the link stand\'s promise',
-    !/can now download/i.test(text), text.slice(0, 200));
-  ok('/parashare live hand-over: it names the file and who it went to',
-    /IMG_4276\.jpeg/.test(text) && /compared the code with/.test(text), text.slice(0, 200));
-  ok('/parashare live hand-over: the receipt is offered as a quiet line',
+  ok(P.path + ' live hand-over: it does not read the sender the link stand\'s promise',
+    !P.canNow.test(text), text.slice(0, 200));
+  ok(P.path + ' live hand-over: it names the file and who it went to',
+    /IMG_4276\.jpeg/.test(text) && P.compared.test(text), text.slice(0, 200));
+  ok(P.path + ' live hand-over: the receipt is offered as a quiet line',
     await page.locator('#done-receipt').isVisible());
   await page.close();
 }
+}
+
+// The receiving pages speak Dutch on their own path and keep the original
+// English under /en, and both are held to the same calm end screen.
+const GLANGS = [
+  { pre: '', saved: /staat op uw apparaat/, gone: /voorgoed vernietigd/, have: /U hebt het bestand\./,
+    onePage: /1 pagina/, openHere: /is hier geopend in dit tabblad/, save: 'Opslaan' },
+  { pre: '/en', saved: /is saved on your device/, gone: /permanently destroyed/, have: /You have the file\./,
+    onePage: /1 page/, openHere: /is open here in this tab/, save: 'Save' },
+];
 
 // ── /get, received through a link ───────────────────────────────────────────
-{
-  const FILE_NAME = 'loonstrook-2026-09.pdf';
-  const fileBytes = Buffer.from(Array.from({ length: 1777 }, (_, i) => (i * 37 + 11) % 256));
-  const { ct, frag } = await sealForGet(FILE_NAME, fileBytes);
+for (const G of GLANGS) {
+  {
+    const FILE_NAME = 'loonstrook-2026-09.pdf';
+    const fileBytes = Buffer.from(Array.from({ length: 1777 }, (_, i) => (i * 37 + 11) % 256));
+    const { ct, frag } = await sealForGet(FILE_NAME, fileBytes);
 
-  const ctx = await browser.newContext({ viewport: PHONE, acceptDownloads: true });
-  const page = await ctx.newPage();
-  await page.route('https://health.paramant.app/v2/dl/**/get', (r) =>
-    r.fulfill({ status: 200, contentType: 'application/octet-stream', body: ct }));
-  const dl = page.waitForEvent('download', { timeout: 30000 });
-  await page.goto(`${ORIGIN}/get?t=${'a'.repeat(48)}&r=health#${frag}`, { waitUntil: 'domcontentloaded' });
-  await dl;
-  await page.waitForSelector('#step-done.active', { timeout: 20000 });
-  const text = await audit(page, '/get', '#step-done');
-  ok('/get: it says the file is here and that our copy is gone',
-    /is saved on your device/.test(text) && /permanently destroyed/.test(text), text.slice(0, 200));
-  await ctx.close();
+    const ctx = await browser.newContext({ viewport: PHONE, acceptDownloads: true });
+    const page = await ctx.newPage();
+    await page.route('https://health.paramant.app/v2/dl/**/get', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/octet-stream', body: ct }));
+    const dl = page.waitForEvent('download', { timeout: 30000 });
+    await page.goto(`${ORIGIN}${G.pre}/get?t=${'a'.repeat(48)}&r=health#${frag}`, { waitUntil: 'domcontentloaded' });
+    await dl;
+    await page.waitForSelector('#step-done.active', { timeout: 20000 });
+    const text = await audit(page, G.pre + '/get', '#step-done');
+    ok(G.pre + '/get: it says the file is here and that our copy is gone',
+      G.saved.test(text) && G.gone.test(text), text.slice(0, 200));
+    await ctx.close();
+  }
 }
 
 // ── /get, and the file is a PDF ─────────────────────────────────────────────
@@ -284,78 +304,82 @@ async function stubSender(page) {
 // three badges reading Decrypted locally / Relay copy burned / Rendered in
 // browser, and two buttons of equal weight. It is the same end screen as the
 // rest now, with the document itself in the payload slot.
-{
-  const FILE_NAME = 'loonstrook-2026-09.pdf';
-  const { ct, frag } = await sealForGet(FILE_NAME, minimalPdf('Loonstrook september 2026'));
+for (const G of GLANGS) {
+  {
+    const FILE_NAME = 'loonstrook-2026-09.pdf';
+    const { ct, frag } = await sealForGet(FILE_NAME, minimalPdf('Loonstrook september 2026'));
 
-  const ctx = await browser.newContext({ viewport: PHONE, acceptDownloads: true });
-  const page = await ctx.newPage();
-  await page.route('https://health.paramant.app/v2/dl/**/get', (r) =>
-    r.fulfill({ status: 200, contentType: 'application/octet-stream', body: ct }));
-  await page.goto(`${ORIGIN}/get?t=${'a'.repeat(48)}&r=health#${frag}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#step-done.active', { timeout: 40000 });
-  await page.locator('#step-done .done-payload canvas').first().waitFor({ timeout: 40000 });
-  const text = await audit(page, '/get PDF', '#step-done');
-  ok('/get PDF: the fifth end screen is gone', (await page.locator('#step-preview').count()) === 0);
-  ok('/get PDF: it uses the same heading as every other arrival',
-    /You have the file\./.test(text), text.slice(0, 220));
-  ok('/get PDF: it names the document and claims no save that has not happened',
-    text.includes(FILE_NAME) && /1 page/.test(text) && /is open here in this tab/.test(text) &&
-    !/is saved on your device/.test(text), text.slice(0, 260));
-  ok('/get PDF: it says our copy is gone', /permanently destroyed/.test(text), text.slice(0, 260));
-  ok('/get PDF: the badges are gone', (await page.locator('#step-done .tag').count()) === 0);
-  ok('/get PDF: the document itself is on the screen',
-    (await page.locator('#step-done .done-payload canvas').count()) === 1);
-  ok('/get PDF: the one loud button is the save',
-    (await page.locator('#done-save').textContent()).trim() === 'Save');
+    const ctx = await browser.newContext({ viewport: PHONE, acceptDownloads: true });
+    const page = await ctx.newPage();
+    await page.route('https://health.paramant.app/v2/dl/**/get', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/octet-stream', body: ct }));
+    await page.goto(`${ORIGIN}${G.pre}/get?t=${'a'.repeat(48)}&r=health#${frag}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#step-done.active', { timeout: 40000 });
+    await page.locator('#step-done .done-payload canvas').first().waitFor({ timeout: 40000 });
+    const text = await audit(page, G.pre + '/get PDF', '#step-done');
+    ok(G.pre + '/get PDF: the fifth end screen is gone', (await page.locator('#step-preview').count()) === 0);
+    ok(G.pre + '/get PDF: it uses the same heading as every other arrival',
+      G.have.test(text), text.slice(0, 220));
+    ok(G.pre + '/get PDF: it names the document and claims no save that has not happened',
+      text.includes(FILE_NAME) && G.onePage.test(text) && G.openHere.test(text) &&
+      !G.saved.test(text), text.slice(0, 260));
+    ok(G.pre + '/get PDF: it says our copy is gone', G.gone.test(text), text.slice(0, 260));
+    ok(G.pre + '/get PDF: the badges are gone', (await page.locator('#step-done .tag').count()) === 0);
+    ok(G.pre + '/get PDF: the document itself is on the screen',
+      (await page.locator('#step-done .done-payload canvas').count()) === 1);
+    ok(G.pre + '/get PDF: the one loud button is the save',
+      (await page.locator('#done-save').textContent()).trim() === G.save);
 
-  // And it does what it says: the original bytes, under the original name.
-  const [saved] = await Promise.all([
-    page.waitForEvent('download', { timeout: 20000 }),
-    page.locator('#done-save').click(),
-  ]);
-  ok('/get PDF: Save hands the document over under its own name',
-    saved.suggestedFilename() === FILE_NAME, saved.suggestedFilename());
-  await ctx.close();
+    // And it does what it says: the original bytes, under the original name.
+    const [saved] = await Promise.all([
+      page.waitForEvent('download', { timeout: 20000 }),
+      page.locator('#done-save').click(),
+    ]);
+    ok(G.pre + '/get PDF: Save hands the document over under its own name',
+      saved.suggestedFilename() === FILE_NAME, saved.suggestedFilename());
+    await ctx.close();
+  }
 }
 
 // ── /ontvang, live receive ──────────────────────────────────────────────────
-{
-  const meta = Buffer.from(JSON.stringify({ file_id: 'abc', file_name: 'IMG_4276.jpeg' }));
-  const mlen = Buffer.alloc(4); mlen.writeUInt32BE(meta.length, 0);
-  const PLAIN = Array.from(Buffer.concat([Buffer.from([0x50, 0x52, 0x53, 0x48]), mlen, meta,
-    Buffer.from(Array.from({ length: 4096 }, (_, i) => (i * 13 + 7) % 256))]));
-  const S = 'inv_' + '0'.repeat(32);
+for (const G of GLANGS) {
+  {
+    const meta = Buffer.from(JSON.stringify({ file_id: 'abc', file_name: 'IMG_4276.jpeg' }));
+    const mlen = Buffer.alloc(4); mlen.writeUInt32BE(meta.length, 0);
+    const PLAIN = Array.from(Buffer.concat([Buffer.from([0x50, 0x52, 0x53, 0x48]), mlen, meta,
+      Buffer.from(Array.from({ length: 4096 }, (_, i) => (i * 13 + 7) % 256))]));
+    const S = 'inv_' + '0'.repeat(32);
 
-  const ctx = await browser.newContext({ viewport: PHONE, acceptDownloads: true });
-  const page = await ctx.newPage();
-  await page.addInitScript((plain) => {
-    const stub = { initCrypto: async () => {}, encryptBlob: async () => new Uint8Array(),
-      decryptBlob: async () => new Uint8Array(plain) };
-    Object.defineProperty(window, '_cryptoBridge', { get: () => stub, set: () => {}, configurable: true });
-    Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true });
-  }, PLAIN);
-  let ready = false;
-  await page.route('https://relay.paramant.app/**', (r) => r.abort());
-  await page.route(`https://health.paramant.app/v2/pubkey/${S}_ready`, (r) => ready
-    ? r.fulfill({ status: 200, contentType: 'application/json',
-        body: JSON.stringify({ ecdh_pub: 'tok_' + 'c'.repeat(44), kyber_pub: '1|3600000' }) })
-    : r.fulfill({ status: 404, body: '' }));
-  await page.route('https://health.paramant.app/v2/pubkey', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }));
-  await page.route('https://health.paramant.app/v2/dl/**/get', (r) => r.fulfill({ status: 200,
-    contentType: 'application/octet-stream', headers: { 'X-Hash': 'deadbeefcafe01234567890abcdef' },
-    body: Buffer.from([1, 2, 3]) }));
-  const dl = page.waitForEvent('download', { timeout: 40000 }).catch(() => null);
-  await page.goto(`${ORIGIN}/ontvang?s=${S}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => /^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/.test((document.getElementById('fp-display')?.textContent || '').trim()),
-    null, { timeout: 40000, polling: 250 });
-  ready = true;
-  await page.waitForSelector('#step-done.active', { timeout: 40000 });
-  await dl;
-  const text = await audit(page, '/ontvang', '#step-done');
-  ok('/ontvang: it says the file is here and that our copy is gone',
-    /is saved on your device/.test(text) && /permanently destroyed/.test(text), text.slice(0, 200));
-  await ctx.close();
+    const ctx = await browser.newContext({ viewport: PHONE, acceptDownloads: true });
+    const page = await ctx.newPage();
+    await page.addInitScript((plain) => {
+      const stub = { initCrypto: async () => {}, encryptBlob: async () => new Uint8Array(),
+        decryptBlob: async () => new Uint8Array(plain) };
+      Object.defineProperty(window, '_cryptoBridge', { get: () => stub, set: () => {}, configurable: true });
+      Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true });
+    }, PLAIN);
+    let ready = false;
+    await page.route('https://relay.paramant.app/**', (r) => r.abort());
+    await page.route(`https://health.paramant.app/v2/pubkey/${S}_ready`, (r) => ready
+      ? r.fulfill({ status: 200, contentType: 'application/json',
+          body: JSON.stringify({ ecdh_pub: 'tok_' + 'c'.repeat(44), kyber_pub: '1|3600000' }) })
+      : r.fulfill({ status: 404, body: '' }));
+    await page.route('https://health.paramant.app/v2/pubkey', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }));
+    await page.route('https://health.paramant.app/v2/dl/**/get', (r) => r.fulfill({ status: 200,
+      contentType: 'application/octet-stream', headers: { 'X-Hash': 'deadbeefcafe01234567890abcdef' },
+      body: Buffer.from([1, 2, 3]) }));
+    const dl = page.waitForEvent('download', { timeout: 40000 }).catch(() => null);
+    await page.goto(`${ORIGIN}${G.pre}/ontvang?s=${S}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => /^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/.test((document.getElementById('fp-display')?.textContent || '').trim()),
+      null, { timeout: 40000, polling: 250 });
+    ready = true;
+    await page.waitForSelector('#step-done.active', { timeout: 40000 });
+    await dl;
+    const text = await audit(page, G.pre + '/ontvang', '#step-done');
+    ok(G.pre + '/ontvang: it says the file is here and that our copy is gone',
+      G.saved.test(text) && G.gone.test(text), text.slice(0, 200));
+    await ctx.close();
+  }
 }
 
 // ── /sign, both endings ─────────────────────────────────────────────────────
@@ -430,7 +454,7 @@ async function pickPdf(page, name) {
   // deliberately not in it, so the sender has one more thing to do and has to
   // be told. See admin/lib/email-templates.js for why the key stays here.
   ok('/sign invitations sent: it says what is true now, in words',
-    /Notified\. Now send them the links\./.test(text) && /carries no key/.test(text),
+    /Bericht verstuurd\. Stuur nu de links\./.test(text) && /bevat geen sleutel/.test(text),
     text.slice(0, 200));
   await page.close();
 }
@@ -456,7 +480,7 @@ async function pickPdf(page, name) {
   const text = await audit(page, '/sign signed yourself', '#step-done');
   ok('/sign signed yourself: the stage bar is gone', !(await page.locator('#ds-stepper').isVisible()));
   ok('/sign signed yourself: it says to keep both files, without naming a scheme',
-    /Save both files now/.test(text), text.slice(0, 200));
+    /Bewaar nu beide bestanden/.test(text), text.slice(0, 200));
   await page.close();
 }
 

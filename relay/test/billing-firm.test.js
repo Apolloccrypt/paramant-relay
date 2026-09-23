@@ -343,15 +343,17 @@ async function main() {
   {
     const at = Date.parse('2026-10-06T10:00:00.000Z');
     const warn = planExpiry.expiryMail({ product: 'parasign', tier: 'pro', paidUntil: at, kind: 'warn', bundle: 'firm' });
-    assert.strictEqual(warn.subject, 'Your Paramant Firm plan (ParaSign Pro and ParaSend Pro) ends on 6 October 2026');
+    assert.strictEqual(warn.subject, 'Uw Paramant Firm-plan (Ondertekenen Pro en Versturen Pro) loopt af op 6 oktober 2026 / Your Paramant Firm plan (ParaSign Pro and ParaSend Pro) ends on 6 October 2026');
+    assert.ok(warn.text.includes('Er wordt niets automatisch afgeschreven.'));
     assert.ok(warn.text.includes('nothing is charged automatically'));
     const ended = planExpiry.expiryMail({ product: 'parasend', tier: 'pro', paidUntil: at, kind: 'ended', bundle: 'firm' });
-    assert.strictEqual(ended.subject, 'Your Paramant Firm plan (ParaSign Pro and ParaSend Pro) has ended');
+    assert.strictEqual(ended.subject, 'Uw Paramant Firm-plan (Ondertekenen Pro en Versturen Pro) is afgelopen / Your Paramant Firm plan (ParaSign Pro and ParaSend Pro) has ended');
+    assert.ok(ended.text.includes('Uw account staat nu op Community.'));
     assert.ok(ended.text.includes('now on Community'));
     // Without a bundle the mail is exactly the one it has always been.
     assert.strictEqual(
       planExpiry.expiryMail({ product: 'parasign', tier: 'pro', paidUntil: at, kind: 'ended' }).subject,
-      'Your ParaSign Pro has ended',
+      'Uw Ondertekenen Pro is afgelopen / Your ParaSign Pro has ended',
     );
     ok('the expiry mail names Firm and both products, and is unchanged for everyone else');
 

@@ -1,28 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="UTF-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#15191C;color:#EAE2CE}html[data-theme="dark"]{color-scheme:dark}@media (prefers-color-scheme:dark){html[data-theme="auto"],html[data-theme="auto"] body{background:#15191C;color:#EAE2CE}html[data-theme="auto"]{color-scheme:dark}}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sign in · Paramant</title>
+<title>Inloggen · Paramant</title>
 <link rel="canonical" href="https://paramant.app/auth/login">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/auth/login">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/auth/login">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/auth/login">
 <meta name="robots" content="noindex, nofollow">
-<meta name="description" content="Sign in to your Paramant account with a passkey or a 6-digit code from your authenticator app. No password to type.">
-<meta property="og:title" content="Sign in to Paramant">
-<meta property="og:description" content="Sign in to your Paramant account with a passkey or a 6-digit code from your authenticator app.">
+<meta name="description" content="Log in op uw Paramant-account met een passkey of een code van 6 cijfers uit uw authenticator-app. U typt geen wachtwoord.">
+<meta property="og:title" content="Inloggen bij Paramant">
+<meta property="og:description" content="Log in op uw Paramant-account met een passkey of een code van 6 cijfers uit uw authenticator-app.">
 <meta property="og:url" content="https://paramant.app/auth/login">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Sign in to Paramant">
-<meta name="twitter:description" content="Sign in to your Paramant account with a passkey or a 6-digit code from your authenticator app.">
+<meta name="twitter:title" content="Inloggen bij Paramant">
+<meta name="twitter:description" content="Log in op uw Paramant-account met een passkey of een code van 6 cijfers uit uw authenticator-app.">
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/nav.css?v=27">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 /* Compact auth layout — existing design tokens only; design-system.css untouched. */
@@ -50,7 +53,7 @@
 <script src="/js/theme.js?v=5"></script>
 <!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
      Blocking and above every other script, so it exists before any renderer runs. -->
-<script src="/js/format-date.js?v=1"></script>
+<script src="/js/format-date.js?v=2"></script>
 </head>
 <body>
 
@@ -58,94 +61,98 @@
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
-    <li><a href="/security" class="nav-link">Security</a></li>
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/docs" class="nav-link">Docs</a></li>
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/auth/login" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/auth/login" hreflang="en" lang="en">EN</a></div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
-  <a href="/security" class="nav-mobile-standalone">Security</a>
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/auth/login" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/auth/login" hreflang="en" lang="en">EN</a></span>
 </div>
 
 <main class="auth-wrap">
 
 <div class="auth-head">
-  <div class="eyebrow"><span class="bar"></span>sign in</div>
-  <h1>Welcome <em>back</em>.</h1>
-  <p class="auth-sub">No password to type: sign in with your passkey, or with a 6-digit code from your authenticator app.</p>
+  <div class="eyebrow"><span class="bar"></span>inloggen</div>
+  <h1>Welkom <em>terug</em>.</h1>
+  <p class="auth-sub">Geen wachtwoord nodig: log in met uw passkey, of met een code van 6 cijfers uit uw authenticator-app.</p>
 </div>
 
 <div id="error" class="error auth-alert" role="alert" aria-live="assertive"></div>
 
 <form id="login-form" class="form-card auth-card" novalidate>
-  <label for="email">Email address</label>
+  <label for="email">E-mailadres</label>
   <input type="email" id="email" name="email" required autocomplete="username" autofocus>
 
   <div class="auth-choice">
-    <button type="button" class="btn btn-primary" id="passkey-login-btn">Sign in with a passkey</button>
-    <button type="button" class="btn btn-secondary" id="show-code-btn" aria-expanded="false" aria-controls="code-fields">Use a 6-digit code instead</button>
+    <button type="button" class="btn btn-primary" id="passkey-login-btn">Inloggen met een passkey</button>
+    <button type="button" class="btn btn-secondary" id="show-code-btn" aria-expanded="false" aria-controls="code-fields">Liever een code van 6 cijfers</button>
   </div>
-  <p class="auth-hint">Your device asks for Face ID, Touch ID, Windows Hello or a security key. The key stays on the device.</p>
+  <p class="auth-hint">Uw apparaat vraagt om Face ID, Touch ID, Windows Hello of een beveiligingssleutel. De sleutel blijft op het apparaat.</p>
   <div id="code-fields" hidden>
-    <label for="totp" class="mt-3">6-digit code from your authenticator app</label>
+    <label for="totp" class="mt-3">Code van 6 cijfers uit uw authenticator-app</label>
     <input type="text" id="totp" name="totp" inputmode="numeric"
            pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
            placeholder="&bull; &bull; &bull; &bull; &bull; &bull;">
-    <button type="submit" class="btn btn-primary mt-3" id="submit-btn">Sign in</button>
+    <button type="submit" class="btn btn-primary mt-3" id="submit-btn">Inloggen</button>
   </div>
 
   <p id="passkey-login-status" class="small" aria-live="polite" style="margin:8px 0 0"></p>
 
   <div class="auth-altline">
-    <button type="button" class="auth-link" id="passkey-crossdevice-btn">My passkey is on another device</button>
+    <button type="button" class="auth-link" id="passkey-crossdevice-btn">Mijn passkey staat op een ander apparaat</button>
   </div>
 </form>
 
 <div id="sha1-notice" class="auth-note" hidden role="note">
-  <p><strong>You are signed in.</strong> Your authenticator app still sends SHA-1 codes. They work, and a SHA-256 app such as Raivo (iOS) or Aegis (Android) is stronger. <a href="/help/authenticator-apps">See which apps do this</a>.</p>
-  <a href="#" class="btn btn-primary mt-3" id="sha1-continue">Continue to your account</a>
+  <p><strong>U bent ingelogd.</strong> Uw authenticator-app maakt nog SHA-1-codes. Die werken, maar een SHA-256-app zoals Raivo (iOS) of Aegis (Android) is sterker. <a href="/help/authenticator-apps">Bekijk welke apps dat doen</a>.</p>
+  <a href="#" class="btn btn-primary mt-3" id="sha1-continue">Verder naar uw account</a>
 </div>
 
 <p class="footer-text auth-foot">
-  Lost your authenticator app? <a href="/auth/backup">Sign in with a backup code</a><br>
-  Backup codes gone too? <a href="/auth/request-reset">Email me a new setup link</a><br>
-  No account yet? <a href="/signup">Create one</a>
+  Authenticator-app kwijt? <a href="/auth/backup">Inloggen met een back-upcode</a><br>
+  Back-upcodes ook kwijt? <a href="/auth/request-reset">Stuur mij een nieuwe instellink</a><br>
+  Nog geen account? <a href="/signup">Account maken</a>
 </p>
 
 <p class="small" style="color:var(--ink-dim);text-align:center;margin-top:24px">
-  Paramant is a product of <strong>Paramantis Solutions B.V.</strong>, Harderwijk,
-  the Netherlands. <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>
+  Paramant is een product van <strong>Paramantis Solutions B.V.</strong>, Harderwijk,
+  Nederland. <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>
 </p>
 </main>
 
 <script src="/js/pow-captcha.js?v=1"></script>
-<script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=10" defer></script>
-<script src="/js/auth-login.js?v=3"></script>
-<script type="module" src="/js/passkey.js?v=5"></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
+<script src="/js/auth-login.js?v=4"></script>
+<script type="module" src="/js/passkey.js?v=6"></script>
 
+<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/auth/login" hreflang="en" lang="en">This page in English</a></p>
 <footer class="legal-strip">
-  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/terms">Terms of Service</a>
+  <a href="/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/dpa">Verwerkersovereenkomst</a><span class="legal-sep">&middot;</span><a href="/terms">Voorwaarden</a>
 </footer>
 </body>
 </html>

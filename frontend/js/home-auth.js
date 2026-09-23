@@ -62,6 +62,12 @@
 (function () {
   'use strict';
 
+  // One file, both languages: Dutch by default, English only on a page that
+  // says <html lang="en"> (frontend/en/index.html). Dates already follow the
+  // same attribute through window.paramantDate (js/format-date.js).
+  var EN = document.documentElement.lang === 'en';
+  function tr(nl, en) { return EN ? en : nl; }
+
   var out = document.querySelector('[data-home="out"]');
   var inn = document.querySelector('[data-home="in"]');
   if (!out || !inn) return;
@@ -97,10 +103,10 @@
     return Number(doc.signed_count || 0) > 0 ? 'in_progress' : 'waiting';
   }
   var STATE_WORD = {
-    waiting: 'Waiting',
-    in_progress: 'In progress',
-    completed: 'Completed',
-    cancelled: 'Cancelled'
+    waiting: tr('Wacht', 'Waiting'),
+    in_progress: tr('Bezig', 'In progress'),
+    completed: tr('Afgerond', 'Completed'),
+    cancelled: tr('Geannuleerd', 'Cancelled')
   };
   var STATE_DOT = {
     waiting: 'wait',
@@ -121,9 +127,9 @@
     var open = parties.filter(function (p) { return p.status !== 'signed'; });
     var named = open.map(function (p) { return String(p.label || '').trim(); }).filter(Boolean);
     if (!named.length) return '';
-    if (named.length === 1) return 'Waiting on ' + named[0];
-    if (named.length === 2) return 'Waiting on ' + named[0] + ' and ' + named[1];
-    return 'Waiting on ' + named[0] + ' and ' + (named.length - 1) + ' others';
+    if (named.length === 1) return tr('Wacht op ', 'Waiting on ') + named[0];
+    if (named.length === 2) return tr('Wacht op ', 'Waiting on ') + named[0] + tr(' en ', ' and ') + named[1];
+    return tr('Wacht op ', 'Waiting on ') + named[0] + tr(' en ', ' and ') + (named.length - 1) + tr(' anderen', ' others');
   }
 
   function row(doc, meta, tail, dot) {
@@ -138,7 +144,7 @@
     main.className = 'hw-row-main';
     var name = document.createElement('span');
     name.className = 'hw-name';
-    name.textContent = doc.original_filename || 'Signing request';
+    name.textContent = doc.original_filename || tr('Ondertekenverzoek', 'Signing request');
     name.title = name.textContent;
     main.appendChild(name);
     if (meta) {
@@ -253,14 +259,14 @@
       var label = termLabel(term);
       if (term.ended) {
         return label
-          ? { name: label, rest: ' ended on ' + day(term.at) + '. You are on Community now.', renew: true }
-          : { name: 'Community', rest: ', free for good. Your paid term ended on ' + day(term.at) + '.', renew: true };
+          ? { name: label, rest: tr(' is afgelopen op ', ' ended on ') + day(term.at) + tr('. U zit nu op Community.', '. You are on Community now.'), renew: true }
+          : { name: 'Community', rest: tr(', gratis, voor altijd. Uw betaalde periode is afgelopen op ', ', free for good. Your paid term ended on ') + day(term.at) + '.', renew: true };
       }
-      if (label) return { name: label, rest: ', ends on ' + day(term.at) + ', nothing renews automatically.', renew: term.warn };
+      if (label) return { name: label, rest: tr(', loopt af op ', ', ends on ') + day(term.at) + tr('. Er wordt niets automatisch verlengd.', ', nothing renews automatically.'), renew: term.warn };
     }
     var id = normalisePlan(d.current_plan);
-    if (id === 'community') return { name: 'Community', rest: ', free for good.', renew: false };
-    return { name: PLAN_NAMES[id], rest: ', with no term recorded. Nothing renews automatically.', renew: false };
+    if (id === 'community') return { name: 'Community', rest: tr(', gratis, voor altijd.', ', free for good.'), renew: false };
+    return { name: PLAN_NAMES[id], rest: tr(', zonder vastgelegde looptijd. Er wordt niets automatisch verlengd.', ', with no term recorded. Nothing renews automatically.'), renew: false };
   }
 
   // ── The one big reading ────────────────────────────────────────────────────
@@ -295,8 +301,8 @@
     // is new; the card underneath already says so in words.
     var items = [];
     if (docs && docs.length) {
-      items.push(['Documents', String(docs.length)]);
-      items.push(['Completed', String(done.length)]);
+      items.push([tr('Documenten', 'Documents'), String(docs.length)]);
+      items.push([tr('Afgerond', 'Completed'), String(done.length)]);
     }
 
     if (inbox && inbox.length) {
@@ -306,17 +312,17 @@
         return (!best || t < best.t) ? { t: t } : best;
       }, null);
       show(quiet, false);
-      words(kicker, 'For you');
+      words(kicker, tr('Voor u', 'For you'));
       words(num, String(inbox.length));
       show(of, false);
-      words(cap, inbox.length === 1 ? 'document is waiting for your signature' : 'documents are waiting for your signature');
-      words(sub, earliest ? 'The first one arrived on ' + day(earliest.t) + '.' : 'Sent to you by someone else.');
+      words(cap, inbox.length === 1 ? tr('document wacht op uw handtekening', 'document is waiting for your signature') : tr('documenten wachten op uw handtekening', 'documents are waiting for your signature'));
+      words(sub, earliest ? tr('Het eerste kwam binnen op ', 'The first one arrived on ') + day(earliest.t) + '.' : tr('Door iemand anders naar u gestuurd.', 'Sent to you by someone else.'));
       show(read, true); show(cap, true); show(sub, true);
       // The account's own open requests move down into the strip: still worth a
       // glance, no longer the headline, and never a second big number arguing
       // with the first.
-      if (open && open.length) items.push(['Your open requests', String(open.length)]);
-      if (capped) items.push(['Signatures left', left + ' of ' + limit]);
+      if (open && open.length) items.push([tr('Uw open verzoeken', 'Your open requests'), String(open.length)]);
+      if (capped) items.push([tr('Handtekeningen over', 'Signatures left'), left + tr(' van ', ' of ') + limit]);
       strip(pick('hw-strip'), items);
       return;
     }
@@ -328,31 +334,31 @@
         return (!best || t < best.t) ? { t: t, doc: d } : best;
       }, null);
       show(quiet, false);
-      words(kicker, 'Still open');
+      words(kicker, tr('Nog open', 'Still open'));
       words(num, String(open.length));
       show(of, false);
-      words(cap, open.length === 1 ? 'request is waiting on a signature' : 'requests are waiting on a signature');
-      words(sub, oldest ? 'The oldest went out on ' + day(oldest.t) + '.' : 'Sent from this account.');
+      words(cap, open.length === 1 ? tr('verzoek wacht op een handtekening', 'request is waiting on a signature') : tr('verzoeken wachten op een handtekening', 'requests are waiting on a signature'));
+      words(sub, oldest ? tr('Het oudste ging weg op ', 'The oldest went out on ') + day(oldest.t) + '.' : tr('Verstuurd vanaf dit account.', 'Sent from this account.'));
       show(read, true); show(cap, true); show(sub, true);
-      if (capped) items.push(['Signatures left', left + ' of ' + limit]);
+      if (capped) items.push([tr('Handtekeningen over', 'Signatures left'), left + tr(' van ', ' of ') + limit]);
       strip(pick('hw-strip'), items);
       return;
     }
 
     if (quota) {
       show(quiet, false);
-      words(kicker, 'This month');
+      words(kicker, tr('Deze maand', 'This month'));
       if (capped) {
         words(num, String(left));
-        words(of, 'of ' + limit);
+        words(of, tr('van ', 'of ') + limit);
         show(of, true);
-        words(cap, left === 1 ? 'signature left this month' : 'signatures left this month');
+        words(cap, left === 1 ? tr('handtekening over deze maand', 'signature left this month') : tr('handtekeningen over deze maand', 'signatures left this month'));
       } else {
         words(num, String(used));
         show(of, false);
-        words(cap, used === 1 ? 'signature this month' : 'signatures this month');
+        words(cap, used === 1 ? tr('handtekening deze maand', 'signature this month') : tr('handtekeningen deze maand', 'signatures this month'));
       }
-      words(sub, 'The count resets on ' + day(resetDate()) + '.');
+      words(sub, tr('De teller begint opnieuw op ', 'The count resets on ') + day(resetDate()) + '.');
       show(read, true); show(cap, true); show(sub, true);
       if (docs && docs.length) items.push(['Open', String(open ? open.length : 0)]);
       strip(pick('hw-strip'), items);
@@ -361,7 +367,7 @@
 
     // Neither route answered. One line, no number, no raw error.
     show(read, false); show(cap, false); show(sub, false);
-    words(kicker, 'Your account');
+    words(kicker, tr('Uw account', 'Your account'));
     show(quiet, true);
     strip(pick('hw-strip'), items);
   }
@@ -397,7 +403,7 @@
     main.className = 'hw-row-main';
     var name = document.createElement('span');
     name.className = 'hw-name';
-    name.textContent = doc.document || 'Signing request';
+    name.textContent = doc.document || tr('Ondertekenverzoek', 'Signing request');
     name.title = name.textContent;
     main.appendChild(name);
 
@@ -406,8 +412,8 @@
     var from = String(doc.sender || '').trim();
     var when = day(doc.sent_at);
     var bits = [];
-    if (from) bits.push('From ' + from);
-    if (when) bits.push(from ? 'sent ' + when : 'Sent ' + when);
+    if (from) bits.push(tr('Van ', 'From ') + from);
+    if (when) bits.push(from ? tr('verstuurd ', 'sent ') + when : tr('Verstuurd ', 'Sent ') + when);
     if (bits.length) {
       var meta = document.createElement('span');
       meta.className = 'hw-meta';
@@ -419,7 +425,7 @@
     var act = document.createElement('button');
     act.type = 'button';
     act.className = 'hw-act';
-    act.textContent = 'Send me the link again';
+    act.textContent = tr('Stuur mij de link opnieuw', 'Send me the link again');
     act.setAttribute('data-hw-resend', String(doc.id || ''));
     li.appendChild(act);
     return li;
@@ -431,7 +437,7 @@
   function resend(button, id) {
     if (!id || button.disabled) return;
     button.disabled = true;
-    button.textContent = 'Sending';
+    button.textContent = tr('Bezig met versturen', 'Sending');
     fetch('/api/user/parasign/inbox/' + encodeURIComponent(id) + '/resend', {
       method: 'POST',
       credentials: 'include',
@@ -447,11 +453,11 @@
     }).then(function (body) {
       // The address comes back from the server and is the reader's own. Saying
       // it out loud is the whole point: it is the one place the mail can go.
-      button.textContent = body && body.sent_to ? 'Sent to ' + body.sent_to : 'Sent';
+      button.textContent = body && body.sent_to ? tr('Verstuurd naar ', 'Sent to ') + body.sent_to : tr('Verstuurd', 'Sent');
     }).catch(function (err) {
       button.textContent = err.message === 'rate_limited'
-        ? 'Already sent, try again in an hour'
-        : 'Could not send, try again later';
+        ? tr('Al verstuurd, probeer het over een uur opnieuw', 'Already sent, try again in an hour')
+        : tr('Versturen lukte niet, probeer het later opnieuw', 'Could not send, try again later');
       // A rate limit is not a fault to retry into; anything else may be.
       if (err.message !== 'rate_limited') button.disabled = false;
     });
@@ -496,8 +502,8 @@
         var signed = Math.max(0, Math.min(total, Number(doc.signed_count || 0)));
         var who = pending(doc);
         var when = day(doc.created_at);
-        var meta = who ? (when ? who + ' · sent ' + when : who) : (when ? 'Sent ' + when : '');
-        return row(doc, meta, total ? signed + ' of ' + total : '', STATE_DOT[stateOf(doc)]);
+        var meta = who ? (when ? who + tr(' · verstuurd ', ' · sent ') + when : who) : (when ? tr('Verstuurd ', 'Sent ') + when : '');
+        return row(doc, meta, total ? signed + tr(' van ', ' of ') + total : '', STATE_DOT[stateOf(doc)]);
       }));
     }
     show(waiting, open.length > 0);

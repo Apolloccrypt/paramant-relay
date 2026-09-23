@@ -43,7 +43,7 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fron
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const SHOTS = process.env.PARAMANT_HOME_IN_SCREENSHOT_DIR || '';
 const MIME = { '.js':'text/javascript', '.css':'text/css', '.html':'text/html', '.svg':'image/svg+xml', '.png':'image/png', '.woff2':'font/woff2', '.json':'application/json', '.ico':'image/x-icon' };
-const aliases = { '/':'/index.html', '/dashboard':'/dashboard.html', '/sign':'/sign.html', '/parashare':'/parashare.html', '/pricing':'/pricing.html' };
+const aliases = { '/':'/index.html', '/en':'/en/index.html', '/en/':'/en/index.html', '/dashboard':'/dashboard.html', '/sign':'/sign.html', '/parashare':'/parashare.html', '/pricing':'/pricing.html' };
 
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
@@ -61,12 +61,14 @@ const ORIGIN = `http://localhost:${server.address().port}`;
 const browser = await chromium.launch({ headless:true, ...(EXE ? { executablePath:EXE } : {}) });
 
 const checks = [];
-function ok(name, condition, detail='') { checks.push({ name, pass:!!condition, detail:String(detail) }); }
+function okAll(name, condition, detail='') { checks.push({ name, pass:!!condition, detail:String(detail) }); }
 
 // The one notation the site shows a reader, rebuilt here rather than imported,
 // so a bug in js/format-date.js cannot make this test agree with it.
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const day = (v) => { const d = new Date(v); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
+// Dutch on / and English on /en, each in its own month names.
+const MONTHS_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTHS_NL = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
+const dayIn = (months) => (v) => { const d = new Date(v); return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
 const inDays = (n) => new Date(Date.now() + n * 86400000).toISOString();
 const agoDays = (n) => new Date(Date.now() - n * 86400000).toISOString();
 
@@ -116,7 +118,7 @@ const billingPro       = { current_plan:'community', plan_parasign:'pro', plan_p
 // here so the interaction case below can read it after the page is gone.
 let resendCalls = 0;
 
-async function openHome({ documents, overview, billing, inbox = inboxNone, down = false, resend = null }) {
+async function openHome(home, { documents, overview, billing, inbox = inboxNone, down = false, resend = null }) {
   const page = await browser.newPage({ viewport:{ width:390, height:844 } });
   await page.route('**/api/user/session/verify', (r) => r.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({ authenticated:true, email:'mickbr@example.com' }) }));
   const answer = (payload) => (r) => (down
@@ -135,7 +137,7 @@ async function openHome({ documents, overview, billing, inbox = inboxNone, down 
   await page.route('**/api/user/documents', answer(documents));
   await page.route('**/api/user/dashboard/overview', answer(overview));
   await page.route('**/api/user/billing/status', answer(billing));
-  await page.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
+  await page.goto(ORIGIN + home, { waitUntil:'domcontentloaded' });
   await page.locator('[data-home="in"]:not([hidden])').waitFor();
   // The workbench is filled by four fetches that resolve after the swap, so
   // wait for the state each case is actually about rather than for a timer.
@@ -213,14 +215,53 @@ const states = [
   { key:'inbox',  title:'documents waiting for you', args:{ documents:documentsOpen, overview:overviewCommunity, billing:billingCommunity, inbox:inboxWaiting } },
 ];
 
+// Every reader-facing string the checks below read, once per language. The
+// Dutch ones are copied from js/home-auth.js and index.html, the English ones
+// from the English side of js/home-auth.js and en/index.html.
+const LANGS = [
+  { key:'en', home:'/en', day:dayIn(MONTHS_EN),
+    waitingCap:/requests are waiting on a signature/, oldest:'The oldest went out on ',
+    waitingOn2:'Waiting on Anna Bakker and Joris de Wit', waitingOn1:'Waiting on Joris de Wit', zeroOf2:'0 of 2', oneOf2:'1 of 2',
+    completed:'Completed', stripLeft:/SIGNATURES LEFT 2 of 2/i, planFree:'Community, free for good.',
+    of100:'of 100', of2:'of 2', leftCap:'signatures left this month',
+    resets:/^The count resets on \d+ [A-Z][a-z]+ \d{4}\.$/,
+    planPaid:(end) => `Firm, ends on ${end}, nothing renews automatically.`,
+    nothingYet:/Nothing here yet\./, underMinute:/both take under a minute/,
+    notLoading:/not loading right now/,
+    inboxCap:'documents are waiting for your signature', firstArrived:'The first one arrived on ',
+    from:'From notary@example.com', sent:'sent ',
+    resendLabel:'Send me the link again', ownOpen:/YOUR OPEN REQUESTS 2/i,
+    inviteNote:/opens from the personal link in its invitation email/, noWayIn:/open|view|sign now/i,
+    oldParagraph:/Pick up an open request/,
+    sentDone:/Sent/, sentTo:'Sent to mickbr@example.com', capped:/again in an hour/ },
+  { key:'nl', home:'/', day:dayIn(MONTHS_NL),
+    waitingCap:/verzoeken wachten op een handtekening/, oldest:'Het oudste ging weg op ',
+    waitingOn2:'Wacht op Anna Bakker en Joris de Wit', waitingOn1:'Wacht op Joris de Wit', zeroOf2:'0 van 2', oneOf2:'1 van 2',
+    completed:'Afgerond', stripLeft:/HANDTEKENINGEN OVER 2 van 2/i, planFree:'Community, gratis, voor altijd.',
+    of100:'van 100', of2:'van 2', leftCap:'handtekeningen over deze maand',
+    resets:/^De teller begint opnieuw op \d+ [a-z]+ \d{4}\.$/,
+    planPaid:(end) => `Firm, loopt af op ${end}. Er wordt niets automatisch verlengd.`,
+    nothingYet:/Hier staat nog niets\./, underMinute:/Beide kosten minder dan een minuut/,
+    notLoading:/laden nu niet/,
+    inboxCap:'documenten wachten op uw handtekening', firstArrived:'Het eerste kwam binnen op ',
+    from:'Van notary@example.com', sent:'verstuurd ',
+    resendLabel:'Stuur mij de link opnieuw', ownOpen:/UW OPEN VERZOEKEN 2/i,
+    inviteNote:/opent via de persoonlijke link in de uitnodigingsmail/, noWayIn:/open|view|sign now|bekijk|nu tekenen|onderteken nu/i,
+    oldParagraph:/Pick up an open request/,
+    sentDone:/Verstuurd/, sentTo:'Verstuurd naar mickbr@example.com', capped:/over een uur opnieuw/ },
+];
+
+for (const L of LANGS) {
+const day = L.day;
+const ok = (name, condition, detail='') => okAll(`[${L.key}] ${name}`, condition, detail);
 const seen = {};
 for (const state of states) {
-  const page = await openHome(state.args);
+  const page = await openHome(L.home, state.args);
   const m = await measure(page);
   seen[state.key] = m;
   if (SHOTS) {
     fs.mkdirSync(SHOTS, { recursive:true });
-    await stableScreenshot(page, { path:path.join(SHOTS, `home-in-${state.key}-390.png`), fullPage:true });
+    await stableScreenshot(page, { path:path.join(SHOTS, `home-in-${L.key}-${state.key}-390.png`), fullPage:true });
   }
   ok(`${state.title}: the reader is never left with three buttons over a hole`, m.gap <= 120, `gap ${m.gap}px, cards ${m.cards}`);
   ok(`${state.title}: the words are the reader's, not the relay's`, !JARGON.test(m.text), (m.text.match(JARGON) || [''])[0]);
@@ -231,14 +272,14 @@ for (const state of states) {
 // 1. Open requests. Two of the three mocked documents are open, so the figure
 // is 2, both of them are listed, and the oldest one is named by date.
 ok('open requests: the figure is the number of open requests in the API', seen.open.num === '2' && seen.open.of === '', `${seen.open.num} ${seen.open.of}`);
-ok('open requests: the line under the figure says what the 2 are', /requests are waiting on a signature/.test(seen.open.cap), seen.open.cap);
-ok('open requests: the oldest one is dated in the one notation', seen.open.sub === `The oldest went out on ${day(OPEN_OLDEST)}.`, seen.open.sub);
+ok('open requests: the line under the figure says what the 2 are', L.waitingCap.test(seen.open.cap), seen.open.cap);
+ok('open requests: the oldest one is dated in the one notation', seen.open.sub === `${L.oldest}${day(OPEN_OLDEST)}.`, seen.open.sub);
 ok('open requests: both open documents are listed with who they wait on', seen.open.waiting && seen.open.waitingRows.length === 2
   && seen.open.waitingRows[0].includes('Engagement letter Bakker.pdf')
-  && seen.open.waitingRows[0].includes('Waiting on Anna Bakker and Joris de Wit')
-  && seen.open.waitingRows[0].includes('0 of 2')
-  && seen.open.waitingRows[1].includes('Waiting on Joris de Wit')
-  && seen.open.waitingRows[1].includes('1 of 2'), JSON.stringify(seen.open.waitingRows));
+  && seen.open.waitingRows[0].includes(L.waitingOn2)
+  && seen.open.waitingRows[0].includes(L.zeroOf2)
+  && seen.open.waitingRows[1].includes(L.waitingOn1)
+  && seen.open.waitingRows[1].includes(L.oneOf2), JSON.stringify(seen.open.waitingRows));
 // Recent shows what is NOT already in the card above it. Three mocked
 // documents, two of them open and listed as open, leaves exactly the finished
 // one here. A homepage that printed the same file name twice on one screen
@@ -247,35 +288,35 @@ ok('open requests: both open documents are listed with who they wait on', seen.o
 ok('open requests: recent lists what the waiting card does not, with a state and a date', seen.open.recent
   && seen.open.recentRows.length === 1
   && seen.open.recentRows[0].includes('Annual accounts 2025.pdf')
-  && seen.open.recentRows[0].includes('Completed'), JSON.stringify(seen.open.recentRows));
+  && seen.open.recentRows[0].includes(L.completed), JSON.stringify(seen.open.recentRows));
 ok('open requests: no document is printed twice on one screen', new Set(
   [...seen.open.waitingRows, ...seen.open.recentRows].map((r) => r.split('\n')[0])).size
   === seen.open.waitingRows.length + seen.open.recentRows.length, JSON.stringify([seen.open.waitingRows, seen.open.recentRows]));
-ok('open requests: the month balance is still readable, in the strip', /SIGNATURES LEFT 2 of 2/i.test(seen.open.strip), seen.open.strip);
-ok('open requests: a free account is told the plan is free and is not sold to', seen.open.plan === 'Community, free for good.' && !seen.open.renew, seen.open.plan);
+ok('open requests: the month balance is still readable, in the strip', L.stripLeft.test(seen.open.strip), seen.open.strip);
+ok('open requests: a free account is told the plan is free and is not sold to', seen.open.plan === L.planFree && !seen.open.renew, seen.open.plan);
 ok('open requests: nothing is empty, so no empty card', !seen.open.empty, String(seen.open.empty));
 
 // 2. Nothing open. The figure falls back to the month's signature balance,
 // which is the number the buyer review of 5 September found nowhere on the site
 // while /api/user/dashboard/overview already had it.
-ok('recent only: the figure is the signatures left this month, from the API', seen.recent.num === '97' && seen.recent.of === 'of 100', `${seen.recent.num} ${seen.recent.of}`);
-ok('recent only: the figure is named in plain words', seen.recent.cap === 'signatures left this month', seen.recent.cap);
-ok('recent only: the reader is told when the count starts again', /^The count resets on \d+ [A-Z][a-z]+ \d{4}\.$/.test(seen.recent.sub), seen.recent.sub);
+ok('recent only: the figure is the signatures left this month, from the API', seen.recent.num === '97' && seen.recent.of === L.of100, `${seen.recent.num} ${seen.recent.of}`);
+ok('recent only: the figure is named in plain words', seen.recent.cap === L.leftCap, seen.recent.cap);
+ok('recent only: the reader is told when the count starts again', L.resets.test(seen.recent.sub), seen.recent.sub);
 ok('recent only: nothing is open, so the waiting card is not drawn', !seen.recent.waiting && seen.recent.recent && seen.recent.recentRows.length === 3, JSON.stringify(seen.recent.recentRows));
 // "Firm", not "ParaSign Firm": the stored tier is per product because the
 // entitlement layer is, but the plan that grants it is one payment for both
 // products, so a product prefix would name a plan that is not sold and would
 // tell a Firm customer that half of what he bought runs out by itself.
 // ParaSign Business, which IS sold on its own, keeps its prefix.
-ok('recent only: a paid term names its end and says nothing renews', seen.recent.plan === `Firm, ends on ${day(PRO_ENDS)}, nothing renews automatically.`, seen.recent.plan);
+ok('recent only: a paid term names its end and says nothing renews', seen.recent.plan === L.planPaid(day(PRO_ENDS)), seen.recent.plan);
 ok('recent only: a term 29 days out does not shout Renew yet', !seen.recent.renew, String(seen.recent.renew));
 
 // 3. A new account. Not a hole: one card, its own object, two ways out, and the
 // month balance above it, so the first screen is full and deliberate.
-ok('a new account: the figure is the full monthly allowance', seen.empty.num === '2' && seen.empty.of === 'of 2', `${seen.empty.num} ${seen.empty.of}`);
+ok('a new account: the figure is the full monthly allowance', seen.empty.num === '2' && seen.empty.of === L.of2, `${seen.empty.num} ${seen.empty.of}`);
 ok('a new account: one friendly card takes the place of the two lists', seen.empty.empty && !seen.empty.waiting && !seen.empty.recent, JSON.stringify([seen.empty.empty, seen.empty.waiting, seen.empty.recent]));
 ok('a new account: no strip of zeros where a reading would go', seen.empty.strip === '', seen.empty.strip);
-ok('a new account: the card says both first steps and how long they take', /Nothing here yet\./.test(seen.empty.text) && /both take under a minute/.test(seen.empty.text), '');
+ok('a new account: the card says both first steps and how long they take', L.nothingYet.test(seen.empty.text) && L.underMinute.test(seen.empty.text), '');
 // The card carries Start signing and Send securely. Drawing the same two again
 // eight lines lower is the page-of-buttons this change exists to end, so the
 // row underneath is taken away in this one state and Documents stays in the
@@ -288,7 +329,7 @@ ok('every other state keeps the three actions on screen', seen.open.buttons.leng
 // 4. Every route down. A calm line, no number invented, no raw error, and the
 // page keeps its shape.
 ok('every route down: no figure is invented', seen.down.quiet && seen.down.cap === '' && seen.down.of === '', JSON.stringify([seen.down.quiet, seen.down.cap]));
-ok('every route down: the reader gets a sentence, not a status code', /not loading right now/.test(seen.down.text) && !/error|failed|500/i.test(seen.down.text), '');
+ok('every route down: the reader gets a sentence, not a status code', L.notLoading.test(seen.down.text) && !/error|failed|500/i.test(seen.down.text), '');
 ok('every route down: no half-filled cards are left behind', !seen.down.waiting && !seen.down.recent && !seen.down.empty && !seen.down.inbox && seen.down.plan === '', JSON.stringify([seen.down.waiting, seen.down.recent, seen.down.empty, seen.down.inbox, seen.down.plan]));
 
 // 5. Documents waiting for the READER. Until the party index existed this page
@@ -297,43 +338,44 @@ ok('every route down: no half-filled cards are left behind', !seen.down.waiting 
 // own requests are waiting on somebody else; the figure has to be the first
 // number, because it is the only one the reader can act on.
 ok('waiting for you: the figure counts what waits on the reader, not what the account sent', seen.inbox.num === '2' && seen.inbox.of === '', `${seen.inbox.num} ${seen.inbox.of}`);
-ok('waiting for you: the line says whose signature it is waiting for', seen.inbox.cap === 'documents are waiting for your signature', seen.inbox.cap);
-ok('waiting for you: the first one is dated in the one notation', seen.inbox.sub === `The first one arrived on ${day(INBOX_FIRST)}.`, seen.inbox.sub);
+ok('waiting for you: the line says whose signature it is waiting for', seen.inbox.cap === L.inboxCap, seen.inbox.cap);
+ok('waiting for you: the first one is dated in the one notation', seen.inbox.sub === `${L.firstArrived}${day(INBOX_FIRST)}.`, seen.inbox.sub);
 ok('waiting for you: both are listed, each named by its sender and its date', seen.inbox.inbox
   && seen.inbox.inboxRows.length === 2
   && seen.inbox.inboxRows[0].includes('Shareholder agreement.pdf')
-  && seen.inbox.inboxRows[0].includes('From notary@example.com')
-  && seen.inbox.inboxRows[0].includes(`sent ${day(INBOX_FIRST)}`)
+  && seen.inbox.inboxRows[0].includes(L.from)
+  && seen.inbox.inboxRows[0].includes(`${L.sent}${day(INBOX_FIRST)}`)
   && seen.inbox.inboxRows[1].includes('Supplier terms 2026.pdf'), JSON.stringify(seen.inbox.inboxRows));
 ok('waiting for you: every row offers the one thing this page can do', seen.inbox.inboxActs.length === 2
-  && seen.inbox.inboxActs.every((t) => t === 'Send me the link again'), JSON.stringify(seen.inbox.inboxActs));
+  && seen.inbox.inboxActs.every((t) => t === L.resendLabel), JSON.stringify(seen.inbox.inboxActs));
 ok('waiting for you: that button is a real tap target on a phone', seen.inbox.actHeight >= 44, `${seen.inbox.actHeight}px`);
 // The account's own open requests do not disappear; they stop being the
 // headline. Two big numbers arguing on one screen is the fault this ordering
 // exists to avoid.
-ok('waiting for you: the account own open requests move into the strip, not away', /YOUR OPEN REQUESTS 2/i.test(seen.inbox.strip) && seen.inbox.waiting, seen.inbox.strip);
+ok('waiting for you: the account own open requests move into the strip, not away', L.ownOpen.test(seen.inbox.strip) && seen.inbox.waiting, seen.inbox.strip);
 // The card can say a document is waiting. It cannot open one: the route hands
 // back no invite token, so a link here would be a promise the page cannot keep.
-ok('waiting for you: the card promises no way in that it does not have', /opens from the personal link in its invitation email/.test(seen.inbox.text)
-  && seen.inbox.inboxRows.every((r) => !/open|view|sign now/i.test(r)), JSON.stringify(seen.inbox.inboxRows));
+ok('waiting for you: the card promises no way in that it does not have', L.inviteNote.test(seen.inbox.text)
+  && seen.inbox.inboxRows.every((r) => !L.noWayIn.test(r)), JSON.stringify(seen.inbox.inboxRows));
 
 // And the paragraph that used to sit above the buttons is gone in every state.
 // It described the three buttons in prose, one line above the three buttons.
-ok('the hero no longer explains its own buttons in a paragraph', !/Pick up an open request/.test(seen.open.text + seen.empty.text), '');
+ok('the hero no longer explains its own buttons in a paragraph', !L.oldParagraph.test(seen.open.text + seen.empty.text), '');
 
+resendCalls = 0;
 // 6. Pressing the button. One request, and the answer stays on the button and
 // names the address the mail went to, which is the reader's own and the only
 // one it could have gone to.
 {
-  const page = await openHome({
+  const page = await openHome(L.home, {
     documents:documentsNone, overview:overviewCommunity, billing:billingCommunity, inbox:inboxWaiting,
     resend:{ status:200, body:{ ok:true, sent_to:'mickbr@example.com' } },
   });
   await page.locator('[data-hw-inbox-list] [data-hw-resend]').first().click();
-  await page.waitForFunction(() => /Sent/.test(document.querySelector('[data-hw-inbox-list] [data-hw-resend]').textContent));
+  await page.waitForFunction((re) => new RegExp(re).test(document.querySelector('[data-hw-inbox-list] [data-hw-resend]').textContent), L.sentDone.source);
   const label = await page.locator('[data-hw-inbox-list] [data-hw-resend]').first().textContent();
   ok('send me the link again: one press, one request, and it says where it went',
-    resendCalls === 1 && label.trim() === 'Sent to mickbr@example.com', `${resendCalls} calls, "${label}"`);
+    resendCalls === 1 && label.trim() === L.sentTo, `${resendCalls} calls, "${label}"`);
   await page.close();
 }
 
@@ -342,16 +384,18 @@ ok('the hero no longer explains its own buttons in a paragraph', !/Pick up an op
 // happened rather than left pressing a button that looks unchanged.
 {
   resendCalls = 0;
-  const page = await openHome({
+  const page = await openHome(L.home, {
     documents:documentsNone, overview:overviewCommunity, billing:billingCommunity, inbox:inboxWaiting,
     resend:{ status:429, body:{ error:'rate_limited' } },
   });
   await page.locator('[data-hw-inbox-list] [data-hw-resend]').first().click();
-  await page.waitForFunction(() => /again in an hour/.test(document.querySelector('[data-hw-inbox-list] [data-hw-resend]').textContent));
+  await page.waitForFunction((re) => new RegExp(re).test(document.querySelector('[data-hw-inbox-list] [data-hw-resend]').textContent), L.capped.source);
   const m = await measure(page);
   ok('send me the link again: a capped resend is a sentence, not a status code',
     !/429|rate_limited|error/i.test(m.text), (m.text.match(/429|rate_limited|error/i) || [''])[0]);
   await page.close();
+}
+
 }
 
 await browser.close();

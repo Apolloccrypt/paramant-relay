@@ -183,6 +183,7 @@ function startServer() {
   const server = http.createServer((req, res) => {
     let name = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     if (name === '/verify') name = '/verify.html';
+    if (name === '/en/verify') name = '/en/verify.html';
     const file = path.join(ROOT, name);
     if (!file.startsWith(ROOT)) { res.writeHead(403); return res.end(); }
     fs.readFile(file, (err, body) => {
@@ -198,10 +199,12 @@ const server = await startServer();
 const ORIGIN = 'http://127.0.0.1:' + server.address().port;
 const browser = await chromium.launch({ headless: true, ...(EXE ? { executablePath: EXE } : {}) });
 
-async function openVerify() {
+// The English sentences below are pinned on /en/verify; the Dutch page at
+// /verify runs the same script and gets its own test at the end.
+async function openVerify(route = '/en/verify') {
   const context = await browser.newContext();
   const page = await context.newPage();
-  await page.goto(ORIGIN + '/verify', { waitUntil: 'load' });
+  await page.goto(ORIGIN + route, { waitUntil: 'load' });
   await page.waitForFunction(() => !!document.getElementById('rv-check'));
   return { context, page };
 }
@@ -325,6 +328,36 @@ test('the pinned keys are the keys the relays publish', { skip: !process.env.FLE
     assert.equal(body.public_key, a.key, a.host + ' publishes a different key than the one pinned here');
     assert.equal(body.pk_hash, a.fingerprint, a.host + ' publishes a different fingerprint');
   }
+});
+
+test('NL: /verify kiest de sleutel van de eigen relay en noemt een onbekende relay onbekend', async () => {
+  const fleet = buildFleetReceipts();
+  const { context, page } = await openVerify('/verify');
+  await page.click('#tab-receipt');
+  for (const c of fleet) {
+    const anchor = anchorByHost(c.host);
+    await page.fill('#rv-input', Buffer.from(JSON.stringify(c.receipt)).toString('base64url'));
+    await page.click('#rv-check');
+    await page.waitForSelector('#rv-result .rv-checks li');
+    const text = await page.textContent('#rv-result');
+    assert.ok(text.includes(anchor.fingerprint.slice(0, 16)),
+      c.host + ': the Dutch page checked the receipt against some other relay’s key');
+    assert.equal(text.includes('Het is ondertekend door de Paramant-relay,'), false,
+      c.host + ': the Dutch page named relay.paramant.app as the signer of a receipt it never signed');
+  }
+  const stranger = JSON.parse(JSON.stringify(fleet[0].receipt));
+  stranger.relay_id = 'https://relay.someone-else.example';
+  stranger.inclusion_proof.sth.relay_id = stranger.relay_id;
+  await page.fill('#rv-input', Buffer.from(JSON.stringify(stranger)).toString('base64url'));
+  await page.click('#rv-check');
+  await page.waitForSelector('#rv-result .ps-banner');
+  const text = await page.textContent('#rv-result');
+  assert.doesNotMatch(text, /Vertrouw dit ontvangstbewijs niet/, 'a receipt from an unrecognised relay was called a forgery');
+  assert.match(text, /Deze pagina kent deze relay niet/);
+  assert.match(text, /relay\.someone-else\.example/);
+  assert.match(text, /De handtekening is niet gecontroleerd, omdat deze pagina deze relay niet kent/);
+  assert.match(text, /Het ontvangstbewijs gaat over dit bestand en geen ander/);
+  await context.close();
 });
 
 test.after(async () => {

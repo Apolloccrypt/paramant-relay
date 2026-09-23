@@ -405,8 +405,8 @@ test('wat de ontvanger te horen krijgt, wacht wel op de bezorging', () => {
   // ophaalcode en de herinnering. Alle drie leiden tot een zin op het scherm
   // of in een antwoord die beweert dat er post onderweg is, dus alle drie
   // moeten op de provider wachten.
-  for (const anker of ['sent you a file', 'Your code to open the file',
-                       'a file is still waiting']) {
+  for (const anker of ['heeft u een bestand gestuurd', 'Uw controlecode om het bestand te openen',
+                       'er staat nog een bestand voor u klaar']) {
     const i = RELAY_SRC.indexOf(anker);
     assert.ok(i > 0, 'mail niet gevonden: ' + anker);
     const voor = RELAY_SRC.slice(Math.max(0, i - 900), i);

@@ -150,19 +150,31 @@ test('1. de kassa rekent het bedrag af dat op de knop staat', async () => {
 test('2. de vier schermen zeggen na de betaling hetzelfde', async () => {
   // Deze vier spraken elkaar tegen: dat is de reden dat poort 6 bestaat.
   const thuis = await schermtekst(S.pageK, '/');
+  const thuisEn = await schermtekst(S.pageK, '/en/');
   const account = await schermtekst(S.pageK, '/account');
   const dashboard = await schermtekst(S.pageK, '/dashboard');
 
-  assert.match(thuis, new RegExp(`${FIRM_SIGNS} of ${FIRM_SIGNS} signatures left`),
+  // / is Nederlands, /en de Engelse homepage; beide moeten het zeggen.
+  assert.match(thuis, new RegExp(`${FIRM_SIGNS} van ${FIRM_SIGNS} handtekeningen over deze maand`),
     'de ingelogde homepage toont de gekochte limiet niet');
-  assert.doesNotMatch(thuis, /Community, free for good/,
+  assert.doesNotMatch(thuis, /Community, gratis, voor altijd/,
     'de homepage noemt een betalend account nog Community');
+  assert.match(thuisEn, new RegExp(`${FIRM_SIGNS} of ${FIRM_SIGNS} signatures left`),
+    'de Engelse ingelogde homepage toont de gekochte limiet niet');
+  assert.doesNotMatch(thuisEn, /Community, free for good/,
+    'de Engelse homepage noemt een betalend account nog Community');
   assert.match(account, /FIRM PLAN/, '/account noemt het plan niet Firm');
   assert.match(dashboard, /FIRM PLAN/, '/dashboard noemt het plan niet Firm');
   // De termijn staat op beide schermen, met dezelfde zin.
+  // /account en /dashboard zijn Nederlands sinds 23 september 2026; de Engelse
+  // kopieën onder /en houden de Engelse zin.
   for (const [naam, tekst] of [['account', account], ['dashboard', dashboard]]) {
-    assert.match(tekst, /nothing renews automatically/,
+    assert.match(tekst, /er wordt niets automatisch verlengd/,
       `${naam} zegt niet wat er aan het einde van de termijn gebeurt`);
+  }
+  for (const pad of ['/en/account', '/en/dashboard']) {
+    assert.match(await schermtekst(S.pageK, pad), /nothing renews automatically/,
+      `${pad} zegt niet wat er aan het einde van de termijn gebeurt`);
   }
 
   // En de API zegt hetzelfde als de schermen. current_plan zei 'community'
@@ -213,7 +225,9 @@ test('4. wat het plan verkoopt kan de koper ook echt gebruiken', async () => {
 
   // En de sleutel staat op zijn eigen accountpagina, niet alleen in een JSON.
   const account = await schermtekst(S.pageK, '/account');
-  assert.match(account, /ParaSign API keys/i, '/account laat de API-sleutels van het plan niet zien');
+  assert.match(account, /API-sleutels voor ParaSign/i, '/account laat de API-sleutels van het plan niet zien');
+  assert.match(await schermtekst(S.pageK, '/en/account'), /ParaSign API keys/i,
+    '/en/account laat de API-sleutels van het plan niet zien');
 });
 
 test('5. de factuur klopt, en het nummer loopt door', async () => {

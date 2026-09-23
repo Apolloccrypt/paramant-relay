@@ -19,8 +19,8 @@ const DERTIG = Array.from({ length: 30 }, (_, i) => `partner${i}@extern.test`);
 
 const BERICHT = {
   to: DERTIG,
-  subject: 'Zorggroep De Linde sent you a file',
-  text: 'Zorggroep De Linde sent you a file through Paramant.',
+  subject: 'Zorggroep De Linde heeft u een bestand gestuurd',
+  text: 'Zorggroep De Linde heeft u via Paramant een bestand gestuurd.',
 };
 
 // Telt per provider wie er post kreeg.

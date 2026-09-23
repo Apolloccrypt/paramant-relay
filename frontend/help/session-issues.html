@@ -1,23 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Session and login issues · Paramant Help</title>
+<title>Problemen met sessie en inloggen · Hulp bij Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<meta name="twitter:description" content="Fix a sign-in code your account rejects, a session that expires too soon, and clock drift. The most common Paramant login problems, with the fix for each.">
-<meta name="twitter:title" content="Session and login issues · Paramant Help">
+<meta name="twitter:description" content="Een inlogcode die wordt geweigerd, een sessie die te snel verloopt, een klok die afwijkt. De meest voorkomende inlogproblemen bij Paramant, met de oplossing.">
+<meta name="twitter:title" content="Problemen met sessie en inloggen · Hulp bij Paramant">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:image" content="https://paramant.app/og-image.png">
-<meta property="og:title" content="Session and login issues · Paramant Help">
-<meta property="og:description" content="Fix a sign-in code your account rejects, a session that expires too soon, and clock drift. The most common Paramant login problems, with the fix for each.">
+<meta property="og:title" content="Problemen met sessie en inloggen · Hulp bij Paramant">
+<meta property="og:description" content="Een inlogcode die wordt geweigerd, een sessie die te snel verloopt, een klok die afwijkt. De meest voorkomende inlogproblemen bij Paramant, met de oplossing.">
 <meta property="og:url" content="https://paramant.app/help/session-issues">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Paramant">
 <link rel="canonical" href="https://paramant.app/help/session-issues">
-<meta name="description" content="Fix a sign-in code your account rejects, a session that expires too soon, and clock drift. The most common Paramant login problems, with the fix for each.">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/help/session-issues">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/help/session-issues">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/help/session-issues">
+<meta name="description" content="Een inlogcode die wordt geweigerd, een sessie die te snel verloopt, een klok die afwijkt. De meest voorkomende inlogproblemen bij Paramant, met de oplossing.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -71,7 +74,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 }
 </style>
 <link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/nav.css?v=27">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 .nav-help {
@@ -143,15 +146,15 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       "@type": "WebPage",
       "@id": "https://paramant.app/help/session-issues#webpage",
       "url": "https://paramant.app/help/session-issues",
-      "name": "Session and login issues · Paramant Help",
+      "name": "Problemen met sessie en inloggen · Hulp bij Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "en",
-      "description": "Fix a sign-in code your account rejects, a session that expires too soon, and clock drift. The most common Paramant login problems, with the fix for each."
+      "inLanguage": "nl",
+      "description": "Een inlogcode die wordt geweigerd, een sessie die te snel verloopt, een klok die afwijkt. De meest voorkomende inlogproblemen bij Paramant, met de oplossing."
     },
     {
       "@type": "BreadcrumbList",
@@ -172,7 +175,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         {
           "@type": "ListItem",
           "position": 3,
-          "name": "Session and login issues"
+          "name": "Problemen met sessie en inloggen"
         }
       ]
     },
@@ -211,165 +214,172 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </head>
 <body>
 
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
-    <li><a href="/security" class="nav-link">Security</a></li>
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/docs" class="nav-link">Docs</a></li>
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/session-issues" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/session-issues" hreflang="en" lang="en">EN</a></div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
-  <a href="/security" class="nav-mobile-standalone">Security</a>
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
-</div><main>
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/session-issues" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/session-issues" hreflang="en" lang="en">EN</a></span>
+</div>
+<main id="main-content" tabindex="-1">
 
   <div class="breadcrumb">
-    <a href="/help">Help</a>
+    <a href="/help">Hulp</a>
     <span>/</span>
-    Session and login issues
+    Problemen met sessie en inloggen
   </div>
 
-  <h1>Session and <em>login</em> issues.</h1>
+  <h1>Problemen met sessie en <em>inloggen</em>.</h1>
 
-  <p class="lead">Most Paramant login failures have a small set of root causes. Find your error message below and follow the steps.</p>
+  <p class="lead">De meeste inlogproblemen bij Paramant hebben een handvol oorzaken. Zoek hieronder uw foutmelding op en volg de stappen.</p>
 
-  <h2>Common issues</h2>
+  <h2>Veelvoorkomende problemen</h2>
 
   <div class="issue-block">
-    <div class="issue-header">"Invalid TOTP code" — but the code looks correct</div>
+    <div class="issue-header">"Invalid TOTP code", terwijl de code goed lijkt</div>
     <div class="issue-body">
-      <p><strong>Most likely cause: clock drift.</strong> TOTP codes are time-based. If your phone clock is more than 30 seconds off from real time, every code will be rejected.</p>
-      <p>Fix on iPhone: Settings &rarr; General &rarr; Date &amp; Time &rarr; toggle <strong>Set Automatically</strong> off, then back on.<br>
-      Fix on Android: Settings &rarr; General Management &rarr; Date and Time &rarr; enable <strong>Automatic date and time</strong>.</p>
-      <p><strong>Second possibility: the code was already used.</strong> Each 30-second code can only be accepted once. Wait for the next code to appear (watch the progress ring in your authenticator app) and enter the fresh one immediately.</p>
+      <p><strong>Meest waarschijnlijke oorzaak: de klok wijkt af.</strong> TOTP-codes hangen af van de tijd. Loopt de klok van uw telefoon meer dan 30 seconden voor of achter, dan wordt elke code geweigerd.</p>
+      <p>Op een iPhone: Instellingen &rarr; Algemeen &rarr; Datum en tijd &rarr; zet <strong>Automatisch instellen</strong> uit en weer aan.<br>
+      Op Android: Instellingen &rarr; Algemeen beheer &rarr; Datum en tijd &rarr; zet <strong>Automatische datum en tijd</strong> aan.</p>
+      <p><strong>Tweede mogelijkheid: de code is al gebruikt.</strong> Elke code van 30 seconden wordt maar één keer geaccepteerd. Wacht tot de volgende code verschijnt (let op de voortgangsring in uw authenticator-app) en vul die nieuwe code meteen in.</p>
     </div>
   </div>
 
   <div class="issue-block">
     <div class="issue-header">"Invalid API key"</div>
     <div class="issue-body">
-      <p>Check that you copied the full 64-character key with no trailing spaces. In password managers, use the copy button rather than selecting manually. If you recently regenerated your key, make sure you saved the new one before closing the dashboard.</p>
-      <p>If the key was revoked: generate a new one in Dashboard &rarr; API keys.</p>
+      <p>Controleer of u de volledige sleutel van 64 tekens hebt gekopieerd, zonder spaties aan het eind. Gebruik in een wachtwoordbeheerder de kopieerknop in plaats van zelf te selecteren. Heeft u onlangs een nieuwe sleutel gemaakt, zorg dan dat u die had bewaard voordat u het dashboard sloot.</p>
+      <p>Is de sleutel ingetrokken? Maak dan een nieuwe in Dashboard &rarr; API-sleutels.</p>
     </div>
   </div>
 
   <div class="issue-block">
-    <div class="issue-header">"Session expired — sign in again"</div>
+    <div class="issue-header">"Session expired", opnieuw inloggen</div>
     <div class="issue-body">
-      <p>Sessions last <strong>1 hour</strong> from the time of login. This is by design — Paramant handles sensitive files and does not support persistent sessions. Return to <a href="/auth/login">paramant.app/auth/login</a> and authenticate again.</p>
-      <p>If you are frequently logged out mid-task, consider using the API directly from a script rather than the web dashboard, so work is not interrupted by session expiry.</p>
+      <p>Een sessie duurt <strong>1 uur</strong> vanaf het inloggen. Dat is bewust: Paramant verwerkt gevoelige bestanden en kent geen blijvende sessies. Ga terug naar <a href="/auth/login">paramant.app/auth/login</a> en log opnieuw in.</p>
+      <p>Wordt u vaak midden in uw werk uitgelogd, overweeg dan de API rechtstreeks vanuit een script te gebruiken in plaats van het webdashboard. Dan onderbreekt een verlopen sessie uw werk niet.</p>
     </div>
   </div>
 
   <div class="issue-block">
-    <div class="issue-header">Login page loads but submitting does nothing</div>
+    <div class="issue-header">De inlogpagina laadt, maar versturen doet niets</div>
     <div class="issue-body">
-      <p>This is usually a browser cookie or script issue. Try these in order:</p>
+      <p>Meestal ligt dat aan cookies of scripts in de browser. Probeer dit op volgorde:</p>
       <ol>
-        <li>Hard-refresh the page (Ctrl+Shift+R on Windows/Linux, Cmd+Shift+R on Mac).</li>
-        <li>Clear site data for paramant.app: browser settings &rarr; Privacy &rarr; Site data &rarr; search "paramant.app" &rarr; delete.</li>
-        <li>Disable browser extensions temporarily (ad blockers can interfere with form submissions).</li>
-        <li>Try a different browser or a private/incognito window.</li>
+        <li>Laad de pagina volledig opnieuw (Ctrl+Shift+R op Windows en Linux, Cmd+Shift+R op Mac).</li>
+        <li>Wis de sitegegevens van paramant.app: browserinstellingen &rarr; Privacy &rarr; Sitegegevens &rarr; zoek "paramant.app" &rarr; verwijderen.</li>
+        <li>Zet browserextensies tijdelijk uit (adblockers kunnen het versturen van formulieren verstoren).</li>
+        <li>Probeer een andere browser of een privévenster.</li>
       </ol>
     </div>
   </div>
 
   <div class="issue-block">
-    <div class="issue-header">Stuck in a redirect loop after login</div>
+    <div class="issue-header">Na het inloggen blijft de pagina doorsturen</div>
     <div class="issue-body">
-      <p>Clear cookies for paramant.app entirely. The session cookie may be corrupt. After clearing, close and reopen the browser tab before attempting login again.</p>
+      <p>Wis alle cookies van paramant.app. Misschien is het sessiecookie beschadigd. Sluit na het wissen het tabblad en open het opnieuw voordat u weer probeert in te loggen.</p>
     </div>
   </div>
 
   <div class="issue-block">
-    <div class="issue-header">"Too many login attempts"</div>
+    <div class="issue-header">"Too many login attempts" (te veel inlogpogingen)</div>
     <div class="issue-body">
-      <p>There is no account lock, so there is nothing an administrator has to unlock. Sign-ins are rate limited per internet connection instead: more than <strong>5 attempts from one IP address</strong> inside <strong>15 minutes</strong> are answered with a 429, and that counter clears itself once the fifteen minutes are up. Somebody else on your network can set it off; using another connection gets you straight back in.</p>
-      <p>Your email address cannot be rate limited shut. Failed sign-ins are counted against the address, but only failures count, a successful sign-in clears them, and past ten inside fifteen minutes the next attempt asks your browser for a second or two of work rather than turning you away. So a stranger typing your address can make signing in slower for a moment and can never make it impossible. If you are still refused after the fifteen minutes are up, email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> with your account email.</p>
+      <p>Er is geen accountblokkade, dus een beheerder hoeft niets te deblokkeren. In plaats daarvan is inloggen per internetverbinding begrensd: meer dan <strong>5 pogingen vanaf één IP-adres</strong> binnen <strong>15 minuten</strong> krijgen een 429 als antwoord, en die teller wist zichzelf na die vijftien minuten. Iemand anders op uw netwerk kan hem laten aanslaan. Via een andere verbinding komt u meteen weer binnen.</p>
+      <p>Uw e-mailadres kan niet op slot worden gezet. Mislukte pogingen worden bij het adres geteld, maar alleen mislukte pogingen tellen, een geslaagde inlog wist ze, en na tien binnen vijftien minuten vraagt de volgende poging uw browser om een seconde of twee rekenwerk in plaats van u te weigeren. Een vreemde die uw adres intypt, kan inloggen dus even trager maken, maar nooit onmogelijk. Wordt u na die vijftien minuten nog steeds geweigerd, mail dan naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> met het e-mailadres van uw account.</p>
     </div>
   </div>
 
   <hr class="divider">
 
-  <h3>Still stuck?</h3>
+  <h3>Komt u er nog niet uit?</h3>
 
   <div class="troubleshoot-item">
-    <div class="q">None of these apply and I still cannot log in.</div>
-    <div class="a">Check <a href="/status">paramant.app/status</a> for any active incidents. If status is green, email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> with your account email and a description of the exact error you see. Include a screenshot if possible.</div>
+    <div class="q">Niets hiervan past en ik kan nog steeds niet inloggen.</div>
+    <div class="a">Kijk op <a href="/status">paramant.app/status</a> of er een storing is. Staat alles op groen, mail dan naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> met het e-mailadres van uw account en een beschrijving van de precieze foutmelding. Stuur als het kan een schermafbeelding mee.</div>
   </div>
 
   <div class="troubleshoot-item">
-    <div class="q">I am locked out entirely — no TOTP and no backup codes.</div>
-    <div class="a">See <a href="/help/lost-authenticator">Lost authenticator access</a> for the full account recovery process.</div>
+    <div class="q">Ik kan er helemaal niet meer in: geen TOTP en geen back-upcodes.</div>
+    <div class="a">Zie <a href="/help/lost-authenticator">Authenticator-app kwijt</a> voor het volledige herstel van uw account.</div>
   </div>
 
   <hr class="divider">
 
-  <h3>Related</h3>
+  <h3>Zie ook</h3>
   <div class="next-steps">
     <a href="/help/lost-authenticator" class="next-step-card">
-      <h3>Lost authenticator access</h3>
-      <p>Full recovery steps when backup codes are gone too.</p>
+      <h3>Authenticator-app kwijt</h3>
+      <p>Alle stappen voor herstel als ook de back-upcodes op zijn.</p>
     </a>
     <a href="/help/backup-codes" class="next-step-card">
-      <h3>Backup codes</h3>
-      <p>Generate emergency codes before you need them.</p>
+      <h3>Back-upcodes</h3>
+      <p>Maak noodcodes voordat u ze nodig heeft.</p>
     </a>
   </div>
 
 </main>
+
+<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/help/session-issues" hreflang="en" lang="en">This page in English</a></p>
 
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Company</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/about">About</a>
-          <a href="/changelog">Changelog</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/privacy">Privacy Policy</a>
-          <a href="/dpa">Data Processing Agreement</a>
-          <a href="/terms">Terms of Service</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/license">License</a>
+          <a href="/license">Licentie</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=10" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
 </body>
 </html>

@@ -1,23 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Set up your authenticator · Paramant Help</title>
+<title>Uw authenticator-app instellen · Hulp bij Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<meta name="twitter:description" content="How to set up your authenticator app for Paramant. About 3 minutes. Any standard authenticator app works, including Google Authenticator.">
-<meta name="twitter:title" content="Set up your authenticator · Paramant Help">
+<meta name="twitter:description" content="Zo stelt u uw authenticator-app in voor Paramant. Ongeveer 3 minuten. Elke gangbare authenticator-app werkt, ook Google Authenticator.">
+<meta name="twitter:title" content="Uw authenticator-app instellen · Hulp bij Paramant">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:image" content="https://paramant.app/og-image.png">
-<meta property="og:title" content="Set up your authenticator · Paramant Help">
-<meta property="og:description" content="How to set up your authenticator app for Paramant. About 3 minutes. Any standard authenticator app works, including Google Authenticator.">
+<meta property="og:title" content="Uw authenticator-app instellen · Hulp bij Paramant">
+<meta property="og:description" content="Zo stelt u uw authenticator-app in voor Paramant. Ongeveer 3 minuten. Elke gangbare authenticator-app werkt, ook Google Authenticator.">
 <meta property="og:url" content="https://paramant.app/help/authenticator-setup">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Paramant">
 <link rel="canonical" href="https://paramant.app/help/authenticator-setup">
-<meta name="description" content="How to set up your authenticator app for Paramant. About 3 minutes. Any standard authenticator app works, including Google Authenticator.">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/help/authenticator-setup">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/help/authenticator-setup">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/help/authenticator-setup">
+<meta name="description" content="Zo stelt u uw authenticator-app in voor Paramant. Ongeveer 3 minuten. Elke gangbare authenticator-app werkt, ook Google Authenticator.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -73,7 +76,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 }
 </style>
 <link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/nav.css?v=27">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 .nav-help {
@@ -145,15 +148,15 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       "@type": "WebPage",
       "@id": "https://paramant.app/help/authenticator-setup#webpage",
       "url": "https://paramant.app/help/authenticator-setup",
-      "name": "Set up your authenticator · Paramant Help",
+      "name": "Uw authenticator-app instellen · Hulp bij Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "en",
-      "description": "How to set up your authenticator app for Paramant. About 3 minutes. Any standard authenticator app works, including Google Authenticator."
+      "inLanguage": "nl",
+      "description": "Zo stelt u uw authenticator-app in voor Paramant. Ongeveer 3 minuten. Elke gangbare authenticator-app werkt, ook Google Authenticator."
     },
     {
       "@type": "BreadcrumbList",
@@ -174,7 +177,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         {
           "@type": "ListItem",
           "position": 3,
-          "name": "Set up your authenticator"
+          "name": "Uw authenticator-app instellen"
         }
       ]
     },
@@ -213,202 +216,209 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </head>
 <body>
 
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
-    <li><a href="/security" class="nav-link">Security</a></li>
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/docs" class="nav-link">Docs</a></li>
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/authenticator-setup" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/authenticator-setup" hreflang="en" lang="en">EN</a></div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
-  <a href="/security" class="nav-mobile-standalone">Security</a>
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
-</div><main>
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/authenticator-setup" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/authenticator-setup" hreflang="en" lang="en">EN</a></span>
+</div>
+<main id="main-content" tabindex="-1">
 
   <div class="breadcrumb">
-    <a href="/help">Help</a>
+    <a href="/help">Hulp</a>
     <span>/</span>
-    Set up your authenticator
+    Uw authenticator-app instellen
   </div>
 
-  <h1>Set up your <em>authenticator</em> app.</h1>
+  <h1>Uw <em>authenticator</em>-app instellen.</h1>
 
-<p class="lead">About 3 minutes. One-time setup. Every standard authenticator app works, including Google Authenticator and Microsoft Authenticator. For the strongest setup we recommend a SHA-256 app: Raivo (iOS), Aegis (Android), 1Password, Bitwarden, Authy, Ente Auth, or 2FAS.</p>
+<p class="lead">Ongeveer 3 minuten, en u doet het maar één keer. Elke gangbare authenticator-app werkt, ook Google Authenticator en Microsoft Authenticator. Voor de sterkste instelling raden we een app met SHA-256 aan: Raivo (iOS), Aegis (Android), 1Password, Bitwarden, Authy, Ente Auth of 2FAS.</p>
 
   <div class="step">
     <div class="step-num">1</div>
     <div class="step-body">
-      <h2>Install an authenticator app</h2>
-      <p>Pick one — all are free:</p>
+      <h2>Installeer een authenticator-app</h2>
+      <p>Kies er een. Ze zijn allemaal gratis:</p>
       <ul class="app-list">
-        <li><strong>Raivo</strong><span class="tag">recommended iOS</span> — open source, iCloud backup, single-device</li>
-        <li><strong>Aegis</strong><span class="tag">recommended Android</span> — open source, encrypted local backup</li>
-        <li><strong>1Password</strong> — syncs across devices, family and team plans available</li>
-        <li><strong>Bitwarden</strong> — free, open source, works on all platforms</li>
-        <li><strong>Authy</strong> — cloud backup, multi-device</li>
-        <li><strong>Ente Auth</strong> — open source, E2E-encrypted cloud backup</li>
-        <li><strong>2FAS</strong> — iOS/Android, browser extension companion</li>
+        <li><strong>Raivo</strong><span class="tag">aanbevolen iOS</span>: open source, back-up in iCloud, op één toestel</li>
+        <li><strong>Aegis</strong><span class="tag">aanbevolen Android</span>: open source, versleutelde back-up op het toestel</li>
+        <li><strong>1Password</strong>: synchroniseert tussen toestellen, ook voor gezinnen en teams</li>
+        <li><strong>Bitwarden</strong>: gratis, open source, werkt op alle platforms</li>
+        <li><strong>Authy</strong>: back-up in de cloud, op meerdere toestellen</li>
+        <li><strong>Ente Auth</strong>: open source, end-to-end versleutelde back-up in de cloud</li>
+        <li><strong>2FAS</strong>: iOS en Android, met een bijbehorende browserextensie</li>
       </ul>
-      <p>Install on your phone before continuing.</p>
+      <p>Installeer de app op uw telefoon voordat u verdergaat.</p>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">2</div>
     <div class="step-body">
-      <h2>Open your Paramant setup link</h2>
-      <p>You received a setup link in your welcome email. It looks like:</p>
+      <h2>Open uw instellink van Paramant</h2>
+      <p>U kreeg een instellink in uw welkomstmail. Die ziet er zo uit:</p>
       <div class="code-block">https://paramant.app/auth/setup?token=XXXXXXXX</div>
-      <p>Click it on your computer. The link expires 14 days after issue.</p>
-      <div class="tip"><p>If your link has expired, request a new one at <a href="/auth/request-reset">paramant.app/auth/request-reset</a>.</p></div>
+      <p>Open de link op uw computer. De link verloopt 14 dagen na verzending.</p>
+      <div class="tip"><p>Is uw link verlopen? Vraag dan een nieuwe aan via <a href="/auth/request-reset">paramant.app/auth/request-reset</a>.</p></div>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">3</div>
     <div class="step-body">
-      <h2>Scan the QR code</h2>
-      <p>Open your authenticator app on your phone and add a new entry:</p>
+      <h2>Scan de QR-code</h2>
+      <p>Open de authenticator-app op uw telefoon en voeg een nieuw item toe:</p>
       <ul class="app-list">
-        <li><strong>Raivo (iOS)</strong> — tap + &rarr; "Scan QR Code"</li>
-        <li><strong>Aegis (Android)</strong> — tap + &rarr; "Scan a QR code"</li>
-        <li><strong>1Password</strong> — tap + &rarr; "Scan QR Code"</li>
-        <li><strong>Bitwarden</strong> — Add item &rarr; Login &rarr; Authenticator key &rarr; Scan QR</li>
-        <li><strong>Authy</strong> — tap + &rarr; "Scan QR Code"</li>
+        <li><strong>Raivo (iOS)</strong>: tik op + &rarr; "Scan QR Code"</li>
+        <li><strong>Aegis (Android)</strong>: tik op + &rarr; "Scan a QR code"</li>
+        <li><strong>1Password</strong>: tik op + &rarr; "Scan QR Code"</li>
+        <li><strong>Bitwarden</strong>: Add item &rarr; Login &rarr; Authenticator key &rarr; Scan QR</li>
+        <li><strong>Authy</strong>: tik op + &rarr; "Scan QR Code"</li>
       </ul>
-      <p>Point the camera at the QR code on paramant.app. The app shows a 6-digit code that changes every 30 seconds.</p>
+      <p>Richt de camera op de QR-code op paramant.app. De app toont een code van 6 cijfers die elke 30 seconden verandert.</p>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">4</div>
     <div class="step-body">
-      <h2>Confirm it works</h2>
-      <p>Type the current 6-digit code from your app into the paramant.app setup page. Click <strong>Confirm setup</strong>.</p>
-      <div class="warn"><p>If it says "Invalid code", check that your phone's time is set automatically (Settings &rarr; General &rarr; Date &amp; Time &rarr; Set Automatically). TOTP depends on accurate time.</p></div>
+      <h2>Controleer of het werkt</h2>
+      <p>Typ de huidige code van 6 cijfers uit uw app in op de instelpagina van paramant.app. Klik op <strong>Confirm setup</strong>.</p>
+      <div class="warn"><p>Staat er "Invalid code"? Controleer dan of de tijd op uw telefoon automatisch wordt ingesteld (Instellingen &rarr; Algemeen &rarr; Datum en tijd &rarr; Automatisch instellen). TOTP werkt alleen met de juiste tijd.</p></div>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">5</div>
     <div class="step-body">
-      <h2>Save your backup codes</h2>
-      <p>After confirming, you'll see 10 backup codes. Each can be used once if you lose access to your authenticator app.</p>
-      <p>Save them in at least one of these places:</p>
+      <h2>Bewaar uw back-upcodes</h2>
+      <p>Na het bevestigen ziet u 10 back-upcodes. Elke code kunt u één keer gebruiken als u niet meer bij uw authenticator-app kunt.</p>
+      <p>Bewaar ze op minstens een van deze plekken:</p>
       <ul class="app-list">
-        <li><strong>In your password manager</strong><span class="tag">recommended</span> — 1Password, Bitwarden, etc. as a secure note</li>
-        <li><strong>Printed copy</strong> — print and keep in a locked drawer or safe</li>
-        <li><strong>Encrypted file</strong> — password-protected ZIP or encrypted note</li>
+        <li><strong>In uw wachtwoordbeheerder</strong><span class="tag">aanbevolen</span>: 1Password, Bitwarden of vergelijkbaar, als beveiligde notitie</li>
+        <li><strong>Op papier</strong>: printen en bewaren in een afgesloten la of kluis</li>
+        <li><strong>Versleuteld bestand</strong>: een ZIP met wachtwoord of een versleutelde notitie</li>
       </ul>
-      <div class="warn"><p>Don't store backup codes in plain text files, email, unencrypted cloud notes (iCloud Notes, Google Keep), or phone camera roll.</p></div>
+      <div class="warn"><p>Bewaar back-upcodes niet in gewone tekstbestanden, in e-mail, in onversleutelde notities in de cloud (iCloud Notities, Google Keep) of in de foto&#39;s op uw telefoon.</p></div>
     </div>
   </div>
 
   <hr class="divider">
 
-  <h2 style="margin-top:0">You're done</h2>
-  <p>From now on, sign in at <a href="/auth/login">paramant.app/auth/login</a> with your email and the current 6-digit code from your app. Sessions last 1 hour.</p>
+  <h2 style="margin-top:0">Klaar</h2>
+  <p>Voortaan logt u in via <a href="/auth/login">paramant.app/auth/login</a> met uw e-mailadres en de huidige code van 6 cijfers uit uw app. Een sessie duurt 1 uur.</p>
 
   <hr class="divider">
 
-  <h3>Troubleshooting</h3>
+  <h3>Problemen oplossen</h3>
 
   <div class="troubleshoot-item">
-    <div class="q">"Invalid code" when I know it's correct</div>
+    <div class="q">"Invalid code" terwijl de code klopt</div>
     <div class="a">
-      <p>Phone time drift is the most common cause. Enable automatic time on your phone (Settings &rarr; General &rarr; Date &amp; Time &rarr; Set Automatically).</p>
-      <p>Also possible: the code was already used in the last 90 seconds. Wait 30 seconds for a fresh code and try again.</p>
+      <p>Meestal loopt de klok van uw telefoon niet gelijk. Zet de automatische tijd aan op uw telefoon (Instellingen &rarr; Algemeen &rarr; Datum en tijd &rarr; Automatisch instellen).</p>
+      <p>Het kan ook zijn dat de code in de afgelopen 90 seconden al is gebruikt. Wacht 30 seconden op een nieuwe code en probeer het opnieuw.</p>
     </div>
   </div>
 
   <div class="troubleshoot-item">
-    <div class="q">"Setup link expired"</div>
+    <div class="q">"Setup link expired" (instellink verlopen)</div>
     <div class="a">
-      <p>Request a new link at <a href="/auth/request-reset">paramant.app/auth/request-reset</a>.</p>
+      <p>Vraag een nieuwe link aan via <a href="/auth/request-reset">paramant.app/auth/request-reset</a>.</p>
     </div>
   </div>
 
   <div class="troubleshoot-item">
-    <div class="q">"All backup codes used"</div>
+    <div class="q">"All backup codes used" (alle back-upcodes gebruikt)</div>
     <div class="a">
-      <p>Contact <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> with your account details. We'll verify your identity and manually reset your authenticator setup.</p>
+      <p>Mail naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> met uw accountgegevens. We controleren wie u bent en zetten uw authenticator-app met de hand opnieuw.</p>
     </div>
   </div>
 
   <div class="troubleshoot-item">
-    <div class="q">I lost my phone / authenticator app</div>
+    <div class="q">Ik ben mijn telefoon of authenticator-app kwijt</div>
     <div class="a">
-      <p>Use one of your backup codes to sign in, then re-enroll a new authenticator app from your account settings. If you've used all backup codes, contact <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
+      <p>Log in met een van uw back-upcodes en koppel daarna een nieuwe authenticator-app via uw accountinstellingen. Heeft u alle back-upcodes gebruikt? Mail dan naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
     </div>
   </div>
 
   <hr class="divider">
 
-  <h3>Related</h3>
+  <h3>Zie ook</h3>
   <div class="next-steps">
     <a href="/help/backup-codes" class="next-step-card">
-      <h3>Backup codes</h3>
-      <p>What they are, when to use them, how to regenerate.</p>
+      <h3>Back-upcodes</h3>
+      <p>Wat ze zijn, wanneer u ze gebruikt en hoe u nieuwe maakt.</p>
     </a>
     <a href="/help/api-key-vs-totp" class="next-step-card">
-      <h3>API key or TOTP?</h3>
-      <p>When to use which authentication method.</p>
+      <h3>API-sleutel of TOTP?</h3>
+      <p>Wanneer u welke inlogmethode gebruikt.</p>
     </a>
   </div>
 
 </main>
+
+<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/help/authenticator-setup" hreflang="en" lang="en">This page in English</a></p>
 
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Company</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/about">About</a>
-          <a href="/changelog">Changelog</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/privacy">Privacy Policy</a>
-          <a href="/dpa">Data Processing Agreement</a>
-          <a href="/terms">Terms of Service</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/license">License</a>
+          <a href="/license">Licentie</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=10" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
 </body>
 </html>

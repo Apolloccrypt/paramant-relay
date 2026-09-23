@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<!-- Sticky readiness signals. Plain script in <head> on purpose: it must run
+     before every module and deferred script that signals or awaits. -->
+<script src="/js/ready.js?v=1"></script>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Receive a file · Paramant</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="/design-system.css?v=31">
+<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<link rel="stylesheet" href="/done-state.css?v=1">
+<!-- Which product path this page describes. tests/crypto-claims.test.mjs holds every
+     algorithm this page names against the code that runs on that path, instead of
+     against the codebase as a whole: naming an algorithm the product has, on a route
+     that does not run it, is the class of untrue sentence that reads as a fact. -->
+<meta name="paramant:path" content="live">
+<meta name="description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download.">
+<meta property="og:title" content="A secure file is waiting · Paramant">
+<meta property="og:description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download. Nothing is stored on the server.">
+<meta property="og:url" content="https://paramant.app/en/ontvang">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="A secure file is waiting · Paramant">
+<meta name="twitter:description" content="A secure file is waiting for you. It decrypts in your browser and burns after one download. Nothing is stored on the server.">
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<link rel="canonical" href="https://paramant.app/en/ontvang">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/ontvang">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/ontvang">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/ontvang">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bone);color:var(--ink);font-family:var(--mono);min-height:100vh}
+main{max-width:580px;margin:0 auto;padding:64px 24px}
+h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
+.sub{font-size:13px;color:var(--ink-dim);margin-bottom:40px;line-height:1.7}
+.step{display:none;animation:fadeIn .2s ease}
+.step.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.card{background:var(--bone);border:1px solid var(--ink-hair);overflow:hidden;margin-bottom:16px}
+.card-head{padding:14px 18px;border-bottom:1px solid var(--ink-hair);display:flex;align-items:center;gap:10px}
+.card-head-title{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim)}
+.dot{width:7px;height:7px;background:var(--lime);border:1px solid var(--navy);display:inline-block;animation:blink-step 2s steps(2,end) infinite}
+.dot.amber{background:rgba(245,158,11,.85)}
+.card-body{padding:20px 18px}
+.status-line{font-size:11px;color:var(--ink-dim);padding:4px 0;display:flex;align-items:center;gap:8px;line-height:1.7}
+.status-line.ok{color:var(--cobalt)}
+.status-line.err{color:rgba(196, 96, 79, 1)}
+.fingerprint{font-size:28px;font-weight:700;letter-spacing:.18em;color:var(--ink);text-align:center;padding:24px;background:var(--bone);border:1px solid var(--ink-hair);margin:16px 0}
+.fingerprint-label{font-size:11px;color:var(--ink-dim);text-align:center;margin-bottom:8px}
+.btn{width:100%;padding:11px;background:var(--cobalt);color: var(--on-ochre);border:none;font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;cursor:pointer;margin-top:8px}
+.btn:hover{opacity:.85}
+.btn:disabled{background:var(--ink-ghost);cursor:not-allowed}
+.progress-bar-wrap{background:var(--bone);border:1px solid var(--ink-hair);height:4px;overflow:hidden;margin:12px 0}
+.progress-bar{height:100%;background:var(--cobalt);width:0%;transition:width .3s}
+.tag{display:inline-block;font-size:10px;padding:3px 8px;border:1px solid var(--ink-hair);color:var(--ink-dim);margin-right:4px;margin-top:4px}
+.tag.green{border-color:var(--ink-hair);color:var(--cobalt)}
+@media(max-width:640px){
+  main{padding:32px 16px 48px}
+  h1{font-size:20px}
+  .fingerprint{font-size:20px;letter-spacing:.08em;padding:16px}
+}
+</style>
+<style>
+.nav-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-family: IBM Plex Mono, monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+  text-decoration: none;
+  border: 1px solid var(--ink-hair);
+  transition: all 140ms ease;
+  margin-right: 12px;
+}
+.nav-help::before {
+  content: "?";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--ink-dim);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-dim);
+  font-family: Inter, sans-serif;
+  line-height: 1;
+}
+.nav-help:hover {
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(29, 78, 216, 0.08);
+}
+.nav-help:hover::before {
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
+}
+.nav-help:focus-visible {
+  outline: 2px solid var(--ochre);
+  outline-offset: 2px;
+}
+.nav-help-mobile {
+  display: block;
+  padding: 12px 20px;
+  font-family: IBM Plex Mono, monospace;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ink-hair);
+}
+.nav-help-mobile:hover {
+  color: var(--ink);
+  background: rgba(29, 78, 216, 0.08);
+}
+@media (max-width: 900px) {
+  .nav-help { display: none; }
+}
+</style>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<nav class="nav">
+  <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/security" class="nav-link">Security</a></li>
+    <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/en/docs" class="nav-link">Docs</a></li>
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/auth/login" class="nav-signin">Sign in</a>
+    <a href="/en/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/ontvang" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/ontvang" hreflang="en" lang="en" aria-current="true">EN</a></div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/security" class="nav-mobile-standalone">Security</a>
+  <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/ontvang" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/ontvang" hreflang="en" lang="en" aria-current="true">EN</a></span>
+</div>
+<main id="main-content">
+
+<!-- No session in the address: nobody sent this visitor a link. A calm page,
+     not an error. -->
+<div class="step" id="step-empty">
+  <h1>Nothing to pick up yet</h1>
+  <p class="sub">This page opens by itself from the link you were sent.</p>
+  <a href="/parasend" class="btn">Send something yourself</a>
+</div>
+
+<!-- STEP 1: Generating keypair -->
+<div class="step active" id="step-keygen">
+  <h1>Secure receive</h1>
+  <p class="sub">Your browser is generating a post-quantum keypair. The private key never leaves your device. Share your fingerprint with the sender to verify the connection.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="dot amber" id="keygen-dot"></div><div class="card-head-title" id="keygen-title">Generating keypair...</div></div>
+    <div class="card-body">
+      <div class="status-line" id="keygen-status">Generating ML-KEM-768 + ECDH P-256 keypair in your browser...</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="keygen-progress" style="width:30%"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 2: Show fingerprint, wait for sender -->
+<div class="step" id="step-fingerprint">
+  <h1>Your fingerprint</h1>
+  <p class="sub">Tell the sender your fingerprint. They must confirm it matches on their screen before the file is encrypted. This prevents the relay from intercepting.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="dot" id="fp-dot"></div><div class="card-head-title" id="fp-title">Waiting for sender to verify...</div></div>
+    <div class="card-body">
+      <p class="fingerprint-label">Read this to the sender:</p>
+      <div class="fingerprint" id="fp-display">-</div>
+      <div class="status-line" id="fp-status">Connected - sender is verifying your fingerprint</div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 3: Receiving & decrypting -->
+<div class="step" id="step-receiving">
+  <h1>Receiving file...</h1>
+  <p class="sub">Downloading and decrypting with your private key. The relay never had access to the decryption key.</p>
+
+  <div class="card">
+    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Decrypting</div></div>
+    <div class="card-body">
+      <div class="status-line" id="recv-status">Downloading...</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="recv-progress"></div></div>
+      <div class="status-line" id="recv-detail" style="color:var(--ink-dim)"></div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 4: Done. The one end screen, shared with /get and /parashare: see
+     done-state.css. Small mark, one heading, one sentence, one button, and the
+     technical account folded away rather than deleted. -->
+<div class="step" id="step-done">
+  <div class="done-state">
+    <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
+    <h1 class="done-title">You have the file.</h1>
+    <p class="done-line" id="done-status">It is saved on your device. Our copy has been permanently destroyed.</p>
+
+    <div class="done-payload"></div>
+
+    <div class="done-actions">
+      <button class="btn done-primary" id="done-save" type="button" data-click="saveAgain" hidden>Save it again</button>
+      <a class="done-quiet" id="done-dashboard" href="/dashboard">Open your dashboard</a>
+    </div>
+
+    <details class="done-details">
+      <summary>What made this safe</summary>
+      <div class="done-details-body">
+        <p>Your browser made its own pair of keys when this page opened and kept the private half here, where it still is. The sender locked the file for the public half before it left their device, so what travelled was sealed for you and for nobody else (<code>ML-KEM-768</code> with <code>ECDH P-256</code> for the key exchange, <code>AES-256-GCM</code> for the file).</p>
+        <p>The short code you both read out was worked out on this side too, from your own keys. Two screens showing the same code is what tells you nobody swapped a key in between.</p>
+        <p>A transfer through this web app is read once. Each block was wiped on our side as your browser took it, and our copy is destroyed on its own clock as well if nobody ever comes for it. What our relay reported on the way is written below.</p>
+        <pre id="burn-receipt" hidden></pre>
+      </div>
+    </details>
+  </div>
+</div>
+
+<div class="step" id="step-error">
+  <h1>Transfer failed</h1>
+  <div class="card">
+    <div class="card-head"><div class="dot" style="background:rgba(196, 96, 79, 1)"></div><div class="card-head-title">Error</div></div>
+    <div class="card-body">
+      <div class="status-line err" id="error-msg">Unknown error</div>
+    </div>
+  </div>
+  <button class="btn" style="margin-top:8px" data-click="reload">Try again</button>
+</div>
+
+</main>
+<p class="lang-switch" style="max-width:580px;margin:0 auto;padding:24px 16px;font-size:14px"><a id="lang-switch-link" href="/ontvang" hreflang="nl" lang="nl" style="color:var(--ink)">Deze pagina in het Nederlands</a></p>
+
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid footer-slim">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="/en/about">About</a>
+          <a href="/en/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Legal</div>
+        <div class="footer-links">
+          <a href="/en/privacy">Privacy Policy</a>
+          <a href="/en/dpa">Data Processing Agreement</a>
+          <a href="/en/terms">Terms of Service</a>
+          <a href="/en/sla">SLA</a>
+          <a href="/en/license">License</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script type="module" src="/noble-mlkem-loader.js?v=5"></script>
+<script type="module" src="/js/ontvang.inline1.js?v=2"></script>
+<script src="/js/delegate.js?v=1" defer></script>
+<script src="/js/done-state.js?v=1" defer></script>
+<script src="/js/handshake-meta.js?v=1" defer></script>
+<script src="/js/ontvang.page.js?v=6" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
+</body>
+</html>

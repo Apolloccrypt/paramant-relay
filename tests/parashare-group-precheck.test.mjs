@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 const GP_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const GP_EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
 const GP_MIME = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.json': 'application/json' };
-const GP_ALIASES = { '/': '/index.html', '/parashare': '/parashare.html' };
+const GP_ALIASES = { '/': '/index.html', '/parashare': '/parashare.html', '/en/parashare': '/en/parashare.html' };
 
 let gpServer;
 let gpBrowser;
@@ -82,7 +82,9 @@ async function openSender(opts) {
     return r.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({ ok: true, hash: up.hash, ttl_ms: 3600000, size: 0, download_token: 'a'.repeat(48) }) });
   });
-  await page.goto(`${GP_ORIGIN}/parashare`, { waitUntil: 'domcontentloaded' });
+  // De Engelse pins hieronder gelden voor /en/parashare; de Nederlandse
+  // tests onderaan openen /parashare.
+  await page.goto(`${GP_ORIGIN}${opts.path || '/en/parashare'}`, { waitUntil: 'domcontentloaded' });
   await page.locator('#ps-mode-link').click();
   await page.locator('#file-input').setInputFiles({ name: 'doc.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(600, 7) });
   await page.waitForFunction(() => !document.getElementById('btn-create-session').disabled, null, { timeout: 15000 });
@@ -166,5 +168,50 @@ test('the live stand says that a group goes through Send a link', async () => {
   try {
     await page.locator('#ps-mode-live').click();
     assert.match(await page.textContent('#ps-live-note'), /Sending to a group\? Choose Send a link/);
+  } finally { await page.close(); }
+});
+
+// ── De Nederlandse /parashare ───────────────────────────────────────────────
+// Dezelfde weigering en dezelfde verwijzing, in de taal van de pagina.
+test('Community met twee adressen hoort het voor er iets is geüpload, in het Nederlands', async () => {
+  const { page, calls } = await openSender({
+    path: '/parashare',
+    precheck: (list) => list.length > 1
+      ? { status: 403, body: { error: 'over_limit', dimension: 'max_recipients', plan: 'community', limit: 1, asked: list.length } }
+      : { status: 200, body: { ok: true, limit: 1, count: 1 } },
+    inbound: 'ok',
+  });
+  try {
+    await page.fill('#recipients-input', 'a@example.com\nb@example.com');
+    await page.locator('#btn-create-session').click();
+    await page.waitForSelector('#step-over-limit.active', { timeout: 15000 });
+    const line = await page.textContent('#over-limit-line');
+    assert.match(line, /Uw abonnement verstuurt naar 1 ontvanger tegelijk\. U noemde er 2\./);
+    assert.equal(await page.getAttribute('#step-over-limit a.btn', 'href'), '/pricing');
+    assert.equal(calls.inbound, 0, 'er is niets geüpload');
+    assert.equal(calls.sends, 0);
+  } finally { await page.close(); }
+});
+
+test('Firm met 31 adressen noemt 30 en 31, in het Nederlands', async () => {
+  const { page, calls } = await openSender({
+    path: '/parashare',
+    precheck: (list) => ({ status: 403, body: { error: 'over_limit', dimension: 'max_recipients', plan: 'pro', limit: 30, asked: list.length } }),
+    inbound: 'ok',
+  });
+  try {
+    await page.fill('#recipients-input', Array.from({ length: 31 }, (_, i) => `p${i}@example.com`).join('\n'));
+    await page.locator('#btn-create-session').click();
+    await page.waitForSelector('#step-over-limit.active', { timeout: 15000 });
+    assert.match(await page.textContent('#over-limit-line'), /verstuurt naar 30 ontvangers tegelijk\. U noemde er 31\./);
+    assert.equal(calls.inbound, 0);
+  } finally { await page.close(); }
+});
+
+test('de live stand zegt dat een groep via Later ophalen gaat', async () => {
+  const { page } = await openSender({ path: '/parashare', precheck: () => ({ status: 200, body: { ok: true } }), inbound: 'ok' });
+  try {
+    await page.locator('#ps-mode-live').click();
+    assert.match(await page.textContent('#ps-live-note'), /Versturen naar een groep\? Kies Later ophalen/);
   } finally { await page.close(); }
 });

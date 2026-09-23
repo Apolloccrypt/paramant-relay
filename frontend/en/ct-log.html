@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Certificate transparency log · Paramant</title>
+<meta name="twitter:image" content="https://paramant.app/og-image.png">
+<meta property="og:image:height" content="630">
+<meta property="og:image:width" content="1200">
+<meta property="og:site_name" content="Paramant">
+<meta name="description" content="Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered, without seeing the payload.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0B3A6A">
+
+<link rel="stylesheet" href="/design-system.css?v=31">
+<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+<meta property="og:title" content="Certificate transparency log · Paramant">
+<meta property="og:description" content="Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered, without seeing the payload.">
+<meta property="og:url" content="https://paramant.app/en/ct-log">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://paramant.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Certificate transparency log · Paramant">
+<meta name="twitter:description" content="Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered, without seeing the payload.">
+<link rel="canonical" href="https://paramant.app/en/ct-log">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/ct-log">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/ct-log">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/ct-log">
+  <style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { min-height:100vh; }
+
+.hero { padding:56px 40px 32px; max-width:900px; }
+.hero .tag { font-size:var(--text-xs); color:var(--ink); letter-spacing:.2em; text-transform:uppercase; margin-bottom:14px; }
+.hero h1 { font-size:32px; font-weight:700; line-height:1.2; margin-bottom:14px; }
+.hero h1 span { color:var(--ink-dim); }
+.hero p { font-size:var(--text-base); color:var(--ink-dim); line-height:1.8; max-width:580px; }
+
+.notice { margin:0 40px 32px; padding:14px 20px; border:1px solid var(--ink-hair);
+  display:flex; align-items:flex-start; gap:14px; }
+.notice .body { font-size:var(--text-sm); line-height:1.7; color:var(--ink-dim); }
+.notice .body strong { color:var(--ink); display:block; margin-bottom:4px; }
+.notice code { font-size:var(--text-xs); }
+
+.stats { display:flex; gap:1px; background:var(--ink-ghost); margin:0 40px 32px; }
+.stat { flex:1; padding:20px 24px; background:var(--bone); }
+.stat .val { font-size:22px; font-weight:700; color:var(--ink); margin-bottom:4px; }
+.stat .lbl { font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.1em; text-transform:uppercase; }
+.stat .val.green { color:var(--ink); }
+.stat .val.dim { color:var(--ink-dim); font-size:var(--text-sm); margin-top:4px; word-break:break-all; }
+.stat .val.offline { color:var(--ink-dim); }
+
+.verify-section { margin:0 40px 32px; }
+.verify-section h2 { font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.12em; text-transform:uppercase; margin-bottom:12px; }
+.verify-bar { display:flex; gap:0; }
+.verify-bar input { flex:1; background:var(--bone); border:1px solid var(--ink-hair); border-right:none; color:var(--ink);
+  padding:12px 16px; font-family:inherit; font-size:var(--text-sm); outline:none; }
+.verify-bar input::placeholder { color:var(--ink-ghost); }
+.verify-bar input:focus { border-color:var(--ink); }
+.verify-bar button { background:var(--cobalt); color: var(--on-ochre); border:none; padding:12px 20px;
+  font-family:inherit; font-size:var(--text-xs); font-weight:700; letter-spacing:.08em; cursor:pointer; white-space:nowrap; }
+.verify-bar button:hover { opacity:.88; }
+.verify-result { margin-top:10px; font-size:var(--text-sm); display:none; padding:14px 16px; }
+.verify-result.found { border:1px solid var(--ink-hair); color:var(--ink); }
+.verify-result.notfound { border:1px solid var(--ink-ghost); color:var(--ink-dim); }
+.verify-result pre { margin-top:10px; color:var(--ink-dim); font-size:var(--text-xs); white-space:pre-wrap; word-break:break-all; line-height:1.7; }
+
+.search-bar { display:flex; gap:0; margin:0 40px 28px; }
+.search-bar input { flex:1; background:var(--bone); border:1px solid var(--ink-hair); border-right:none; color:var(--ink);
+  padding:12px 16px; font-family:inherit; font-size:var(--text-sm); outline:none; }
+.search-bar input::placeholder { color:var(--ink-ghost); }
+.search-bar input:focus { border-color:var(--ink); }
+.search-bar button { background:var(--cobalt); color: var(--on-ochre); border:none; padding:12px 20px;
+  font-family:inherit; font-size:var(--text-xs); font-weight:700; letter-spacing:.1em; cursor:pointer; }
+.search-bar button:hover { opacity:.88; }
+
+.type-filter { display:flex; gap:6px; margin:0 40px 20px; flex-wrap:wrap; }
+.tf { background:transparent; border:1px solid var(--ink-ghost); color:var(--ink-dim); padding:6px 14px;
+  font-family:inherit; font-size:var(--text-xs); letter-spacing:.06em; cursor:pointer; transition:border-color .1s,color .1s; }
+.tf:hover:not(.active) { border-color:var(--ink-dim); color:var(--ink); }
+.tf.active { border-color:var(--ink); color:var(--ink); }
+
+.table-wrap { margin:0 40px 40px; border:1px solid var(--ink-hair); }
+.table-head { display:grid; grid-template-columns:52px 1fr 1fr 1fr 150px; gap:0; padding:10px 16px; border-bottom:1px solid var(--ink-hair); }
+.table-head span { font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.1em; text-transform:uppercase; }
+
+.entry { display:grid; grid-template-columns:52px 1fr 1fr 1fr 150px; gap:0; padding:14px 16px;
+  border-top:1px solid var(--ink-ghost); cursor:pointer; transition:background .1s; }
+.entry:hover { background:var(--ink-ghost); }
+.entry .idx { font-size:var(--text-xs); color:var(--ink-dim); }
+.entry .hash { font-size:var(--text-xs); color:var(--ink-dim); font-family:monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.entry .hash.leaf { color:var(--ink); }
+.entry .ts { font-size:var(--text-xs); color:var(--ink-dim); }
+
+.entry-detail { display:none; padding:14px 16px 16px 68px; background:var(--bone); border-top:1px solid var(--ink-ghost); }
+.entry-detail .drow { display:flex; gap:16px; padding:4px 0; }
+.entry-detail .dkey { font-size:var(--text-xs); color:var(--ink-dim); min-width:130px; flex-shrink:0; }
+.entry-detail .dval { font-size:var(--text-xs); color:var(--ink); word-break:break-all; line-height:1.6; }
+.entry-detail .proof-chain { display:flex; flex-wrap:wrap; gap:6px; margin-top:2px; }
+.entry-detail .proof-hash { font-size:var(--text-xs); border:1px solid var(--ink-ghost); color:var(--ink-dim); padding:3px 8px; }
+
+.pagination { display:flex; align-items:center; justify-content:center; gap:16px;
+  padding:20px 40px; border-top:1px solid var(--ink-ghost); font-size:var(--text-xs); color:var(--ink-dim); }
+.pagination button { background:transparent; border:1px solid var(--ink-ghost); color:var(--ink-dim);
+  padding:6px 16px; font-family:inherit; font-size:var(--text-xs); cursor:pointer; }
+.pagination button:hover:not(:disabled) { border-color:var(--ink); color:var(--ink); }
+.pagination button:disabled { opacity:.3; cursor:default; }
+
+.loading { text-align:center; padding:60px; color:var(--ink-dim); font-size:var(--text-xs); letter-spacing:.1em; }
+.empty-state { text-align:center; padding:56px 40px; }
+.empty-state .big { font-size:32px; margin-bottom:16px; }
+.empty-state h3 { font-size:var(--text-sm); color:var(--ink); margin-bottom:10px; }
+.empty-state p { font-size:var(--text-sm); color:var(--ink-dim); max-width:480px; margin:0 auto; line-height:1.8; }
+
+.tabs { display:flex; gap:0; margin:0 40px 32px; border-bottom:1px solid var(--ink-hair); }
+.tab { background:transparent; border:none; border-bottom:2px solid transparent; color:var(--ink-dim);
+  padding:10px 20px; font-family:inherit; font-size:var(--text-sm); letter-spacing:.08em; cursor:pointer;
+  margin-bottom:-1px; transition:color .15s, border-color .15s; }
+.tab.active { color:var(--ink); border-bottom-color:var(--ink); }
+.tab:hover:not(.active) { color:var(--ink); }
+
+.relay-table-wrap { margin:0 40px 40px; border:1px solid var(--ink-hair); }
+.relay-table-head { display:grid; grid-template-columns:1fr 90px 70px 90px 160px 160px; gap:0; padding:10px 16px; border-bottom:1px solid var(--ink-hair); }
+.relay-table-head span { font-size:var(--text-xs); color:var(--ink-dim); letter-spacing:.1em; text-transform:uppercase; }
+.relay-row { display:grid; grid-template-columns:1fr 90px 70px 90px 160px 160px; gap:0; padding:14px 16px;
+  border-top:1px solid var(--ink-ghost); transition:background .1s; }
+.relay-row:hover { background:var(--ink-ghost); }
+.relay-row .url { font-size:var(--text-xs); color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.relay-row .cell { font-size:var(--text-xs); color:var(--ink-dim); }
+.relay-row .cell.green { color:var(--ink); }
+.relay-row .cell.dim { color:var(--ink-dim); font-size:var(--text-xs); }
+.relay-verified { font-size:var(--text-xs); color:var(--ink); padding:2px 6px; border:1px solid var(--ink-hair); display:inline-block; }
+
+@media(max-width:700px) {
+  .hero, .search-bar, .pagination, .notice, .verify-section { padding-left:20px; padding-right:20px; }
+  .tabs { margin-left:20px; margin-right:20px; }
+  .type-filter { margin-left:20px; margin-right:20px; }
+  .stats { flex-direction:column; gap:1px; margin:0 20px 32px; }
+  .relay-table-wrap { margin:0 20px 40px; }
+  .table-wrap { margin:0 20px 40px; }
+  .table-head, .entry { grid-template-columns:40px 1fr 130px; }
+  .table-head span:nth-child(3), .table-head span:nth-child(4),
+  .entry > *:nth-child(3), .entry > *:nth-child(4) { display:none; }
+  .relay-table-head, .relay-row { grid-template-columns:1fr 80px 70px; }
+  .relay-table-head span:nth-child(n+4), .relay-row > *:nth-child(n+4) { display:none; }
+}
+</style>
+<style>
+.nav-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-family: IBM Plex Mono, monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+  text-decoration: none;
+  border: 1px solid var(--ink-hair);
+  transition: all 140ms ease;
+  margin-right: 12px;
+}
+.nav-help::before {
+  content: "?";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--ink-dim);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-dim);
+  font-family: Inter, sans-serif;
+  line-height: 1;
+}
+.nav-help:hover {
+  color: var(--ink);
+  border-color: var(--ochre);
+  background: rgba(29, 78, 216, 0.08);
+}
+.nav-help:hover::before {
+  border-color: var(--line-2);
+  color: var(--on-ochre);
+  background: var(--ochre);
+}
+.nav-help:focus-visible {
+  outline: 2px solid var(--ochre);
+  outline-offset: 2px;
+}
+.nav-help-mobile {
+  display: block;
+  padding: 12px 20px;
+  font-family: IBM Plex Mono, monospace;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ink-hair);
+}
+.nav-help-mobile:hover {
+  color: var(--ink);
+  background: rgba(29, 78, 216, 0.08);
+}
+@media (max-width: 900px) {
+  .nav-help { display: none; }
+}
+</style>
+<script type="application/ld+json" data-paramant-seo="1">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://paramant.app/en/ct-log#webpage",
+      "url": "https://paramant.app/en/ct-log",
+      "name": "Certificate transparency log · Paramant",
+      "isPartOf": {
+        "@id": "https://paramant.app/#website"
+      },
+      "publisher": {
+        "@id": "https://paramant.app/#organization"
+      },
+      "inLanguage": "en",
+      "description": "Every public key registration is appended to a tamper-evident Merkle tree. Anyone can verify that a device was registered, without seeing the payload."
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://paramant.app/en/ct-log#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Paramant",
+          "item": "https://paramant.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "En",
+          "item": "https://paramant.app/en"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Certificate transparency log"
+        }
+      ]
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paramant.app/#organization",
+      "name": "Paramant",
+      "legalName": "Paramantis Solutions B.V.",
+      "url": "https://paramant.app/",
+      "description": "Document signing and encrypted file transfer for professional firms in the EU. Dutch company, servers in Germany.",
+      "founder": {
+        "@type": "Person",
+        "name": "Mick Beer",
+        "jobTitle": "Privacy and security researcher"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Harderwijk",
+        "addressCountry": "NL"
+      },
+      "identifier": {
+        "@type": "PropertyValue",
+        "name": "KvK",
+        "value": "42115132"
+      },
+      "email": "privacy@paramant.app",
+      "areaServed": "EU",
+      "knowsLanguage": [
+        "nl",
+        "en"
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<nav class="nav">
+  <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/security" class="nav-link">Security</a></li>
+    <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/en/docs" class="nav-link">Docs</a></li>
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/auth/login" class="nav-signin">Sign in</a>
+    <a href="/en/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/ct-log" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/ct-log" hreflang="en" lang="en" aria-current="true">EN</a></div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/security" class="nav-mobile-standalone">Security</a>
+  <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/ct-log" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/ct-log" hreflang="en" lang="en" aria-current="true">EN</a></span>
+</div>
+<main id="main-content" tabindex="-1">
+
+<div class="hero">
+  <div class="tag">Public Audit Log</div>
+  <h1>Certificate <span>Transparency</span></h1>
+  <p>Key registrations, transfers and relay announcements are all appended to one tamper-evident Merkle tree. Anyone can check that an entry is in the tree without seeing the payload, the way HTTPS certificate transparency logs work.</p>
+</div>
+
+<div class="tabs">
+  <button class="tab active" id="tab-log"    data-click="switchTab" data-tab="log">Log entries</button>
+  <button class="tab"        id="tab-relays" data-click="switchTab" data-tab="relays">Registered Relays</button>
+</div>
+
+<div id="pane-log">
+<!--
+  Which log this is, and what the count is made of.
+
+  js/ct-log.page.js reads https://health.paramant.app. That is the relay the
+  web app on this site actually sends through: parashare.page.js starts at the
+  health sector and discoverRelay() prefers it over the other three, and
+  co-sign.js and sign-flow.js name it outright. So health is the log a visitor
+  of this page has a reason to look at, and the page now says so by name.
+
+  It is not the only log. Each of the five relays we run keeps its own, and the
+  hourly self-test in .github/workflows/heartbeat.yml writes to a different one,
+  relay.paramant.app. The notice that shipped on 5 September 2026 said the
+  self-test had made most of the entries here; measured against this log that
+  was false, because the self-test never writes here at all. It was measured on
+  relay.paramant.app (891 entries, 855 of them self-test transfers) and printed
+  beside the count of this one (4771). Text and number have to be about the same
+  log, and the gate in tests/ui-truthfulness.test.mjs now holds them together by
+  reading the host out of ct-log.page.js.
+
+  What this log really is: on 5 September 2026, 3399 of its 4771 entries were
+  relay_reg, written by relay.js registerSelf() when a container announces
+  itself at boot to RELAY_PRIMARY_URL, which docker-compose.yml points at
+  relay-health for all five. In the last thousand entries, the ones this page
+  renders, it was 963 out of 1000. So the count is dominated by our own
+  containers, not by customers.
+
+  Since the 2026-09-05 review (finding 21) a re-announcement that says nothing
+  new no longer appends. An announcement carries a url, a sector, a version and
+  an edition, and a restart that changes none of them now moves a timestamp
+  instead of writing a line. That was a growth problem before it was a copy
+  problem: the route is unauthenticated by design, the log is on disk, and every
+  append signs a new head that is gossiped to every peer. The historical count
+  above stands, and the sentence in the notice no longer promises a line per
+  restart, because there will not be one.
+
+  The number is filled in from /v2/ct/log by js/ct-log.page.js instead of being
+  typed here, so it cannot go stale. With no relay reachable the sentence keeps
+  its own word "entries" and still reads correctly.
+-->
+<div class="notice" id="composition-notice">
+  <div class="body">
+    <strong>What is in this log, and whose it is</strong>
+    <span>You are looking at the log of one relay, <code>health.paramant.app</code>, the one
+    the web app on this site sends through. Each of the relays we run keeps its own log, so
+    this is not a total. Most of the <span id="composition-count">entries</span> below are not
+    transfers at all: they are our own relays announcing themselves. Every entry here is
+    something a relay said about itself, and for a long time each of them said it again on
+    every restart, which is why the number below is as large as it is. A relay that announces
+    itself and has nothing new to say no longer writes a line. Either way, the number of
+    entries is not a measure of how much the service is used.</span>
+  </div>
+</div>
+<div class="notice" id="persistence-notice">
+  <div class="body">
+    <strong>Persistent log: survives relay restarts</strong>
+    <span>Hashes are written to disk (<code>/data/ct-log.json</code>) on each registration
+    and reloaded on startup. No payload content is ever stored: only cryptographic hashes.
+    The log resets only when the relay volume is deleted.</span>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="val" id="stat-total">n/a</div>
+    <div class="lbl">Log entries</div>
+  </div>
+  <div class="stat">
+    <div class="val" id="stat-count">n/a</div>
+    <div class="lbl">Key registrations</div>
+  </div>
+  <div class="stat">
+    <div class="val" id="stat-transfers">n/a</div>
+    <div class="lbl">Transfer proofs</div>
+  </div>
+  <div class="stat">
+    <div class="val" id="stat-relayreg">n/a</div>
+    <div class="lbl">Relay announcements</div>
+  </div>
+  <div class="stat">
+    <div class="val dim" id="stat-root">n/a</div>
+    <div class="lbl">Merkle Root</div>
+  </div>
+  <div class="stat">
+    <div class="val green" id="stat-relay">n/a</div>
+    <div class="lbl">Relay</div>
+  </div>
+  <div class="stat">
+    <div class="val dim" id="stat-last">n/a</div>
+    <div class="lbl">Last Entry</div>
+  </div>
+</div>
+
+<!-- Hash Verification Tool -->
+<div class="verify-section">
+  <h2>Verify a hash</h2>
+  <div class="verify-bar">
+    <input id="verify-input" placeholder="Paste leaf_hash, device_hash or tree_hash to verify inclusion..." data-input="clearVerify">
+    <button data-click="verifyHash">VERIFY</button>
+  </div>
+  <div class="verify-result" id="verify-result"></div>
+</div>
+
+<div class="type-filter">
+  <button class="tf active" id="tf-all"      data-click="setTypeFilter" data-arg="all">All</button>
+  <button class="tf"        id="tf-relay_reg" data-click="setTypeFilter" data-arg="relay_reg">Relay reg</button>
+  <button class="tf"        id="tf-transfer"  data-click="setTypeFilter" data-arg="transfer">Transfer proofs</button>
+</div>
+
+<div class="search-bar">
+  <input id="search" placeholder="Filter entries by hash or index..." data-input="filterEntries">
+  <button data-click="filterEntries">FILTER</button>
+</div>
+
+<div class="table-wrap">
+  <div class="table-head">
+    <span>#</span>
+    <span>Leaf Hash</span>
+    <span>Tree Hash</span>
+    <span>Device Hash</span>
+    <span>Timestamp</span>
+  </div>
+  <div id="entries"><div class="loading">Loading log…</div></div>
+</div>
+
+<div class="pagination">
+  <button id="prev-btn" data-click="changePage" data-arg="-1" disabled>&#8592; Prev</button>
+  <span id="page-info">n/a</span>
+  <button id="next-btn" data-click="changePage" data-arg="1" disabled>Next &#8594;</button>
+</div>
+
+</div><!-- /pane-log -->
+
+<div id="pane-relays" style="display:none">
+  <div class="stats" id="relay-stats">
+    <div class="stat"><div class="val" id="rstat-count">n/a</div><div class="lbl">Registered Relays</div></div>
+    <div class="stat"><div class="val green" id="rstat-sectors">n/a</div><div class="lbl">Sectors</div></div>
+    <div class="stat"><div class="val dim" id="rstat-last">n/a</div><div class="lbl">Last Registration</div></div>
+  </div>
+  <div class="relay-table-wrap">
+    <div class="relay-table-head">
+      <span>URL</span><span>Sector</span><span>Version</span><span>Edition</span>
+      <span>Verified Since</span><span>Last Seen</span>
+    </div>
+    <div id="relay-entries"><div class="loading">Loading relay registry…</div></div>
+  </div>
+</div><!-- /pane-relays -->
+
+<script src="/js/delegate.js?v=1" defer></script>
+<script src="/js/ct-log.page.en.js?v=1" defer></script>
+</main>
+<footer>
+  <div class="container-lg">
+    <div class="footer-grid footer-slim">
+      <div>
+        <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
+      </div>
+      <div>
+        <div class="footer-col-label">Company</div>
+        <div class="footer-links">
+          <a href="/en/about">About</a>
+          <a href="/en/changelog">Changelog</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-label">Legal</div>
+        <div class="footer-links">
+          <a href="/en/privacy">Privacy Policy</a>
+          <a href="/en/dpa">Data Processing Agreement</a>
+          <a href="/en/terms">Terms of Service</a>
+          <a href="/en/sla">SLA</a>
+          <a href="/en/license">License</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
+</body>
+</html>

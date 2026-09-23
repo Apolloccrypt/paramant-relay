@@ -44,8 +44,13 @@ const MIME = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'tex
   '.svg': 'image/svg+xml', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon',
   '.woff2': 'font/woff2' };
 const ALIAS = {
-  '/': '/index.html', '/redeem': '/redeem.html', '/pricing': '/pricing.html',
+  '/': '/index.html', '/redeem': '/redeem.html', '/en/redeem': '/en/redeem.html', '/pricing': '/pricing.html',
   '/signup': '/signup.html', '/auth/login': '/auth/login.html', '/dashboard': '/dashboard.html',
+};
+
+const LABELS = {
+  nl: { signedOut: 'Maak een gratis account', signedIn: 'Code inwisselen' },
+  en: { signedOut: 'Create a free account', signedIn: 'Redeem code' },
 };
 
 const server = http.createServer((req, res) => {
@@ -113,7 +118,7 @@ function privileged(page) {
   return seen;
 }
 
-async function openRedeem(authenticated, { search = '', redeem = null, context = null } = {}) {
+async function openRedeem(authenticated, { search = '', redeem = null, context = null, route = '/redeem' } = {}) {
   const ctx = context || await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
   await page.route('**/api/**', (route) => json(route, {}));
@@ -123,7 +128,7 @@ async function openRedeem(authenticated, { search = '', redeem = null, context =
     json(route, { ok: true, token: 'pst_stub_token', expires_in_s: 900 }));
   if (redeem) await page.route('**/v2/billing/redeem', redeem);
   const calls = privileged(page);
-  const response = await page.goto(ORIGIN + '/redeem' + search, { waitUntil: 'domcontentloaded' });
+  const response = await page.goto(ORIGIN + route + search, { waitUntil: 'domcontentloaded' });
   await page.locator('#rd-submit:not([disabled])').waitFor({ timeout: 15000 });
   return { page, ctx, calls, response };
 }
@@ -132,7 +137,7 @@ async function messageAfterSubmit(page) {
   await page.click('#rd-submit');
   await page.waitForFunction(() => {
     const el = document.querySelector('[data-redeem-message]');
-    return el && el.textContent && !/Checking your code/.test(el.textContent);
+    return el && el.textContent && !/Checking your code|Uw code wordt gecontroleerd/.test(el.textContent);
   }, null, { timeout: 15000 });
   return (await page.textContent('[data-redeem-message]')).trim();
 }
@@ -144,7 +149,9 @@ async function messageAfterSubmit(page) {
   ok('signed out, the page says an account is needed before anything is typed',
     await page.locator('#rd-signedout').isVisible(), '#rd-signedout');
   const label = (await page.locator('#rd-submit').textContent()).trim();
-  ok('signed out, the one button says it makes an account', label === 'Create a free account', label);
+  // /redeem is Dutch since 23 September 2026; /en/redeem keeps the English words.
+  const labels = LABELS[await page.evaluate(() => document.documentElement.lang)] || {};
+  ok('signed out, the one button says it makes an account', label === labels.signedOut, label);
   ok('signed out, the button is not disabled once the session is known',
     !(await page.locator('#rd-submit').isDisabled()));
 
@@ -227,6 +234,16 @@ for (const [label, raw] of [
   await ctx.close();
 }
 
+// ── the English copy under /en/redeem keeps its English button words ──────────
+for (const authenticated of [false, true]) {
+  const { page, ctx } = await openRedeem(authenticated, { search: '?code=COFFEE', route: '/en/redeem' });
+  const lang = await page.evaluate(() => document.documentElement.lang);
+  const label = (await page.locator('#rd-submit').textContent()).trim();
+  const want = authenticated ? LABELS.en.signedIn : LABELS.en.signedOut;
+  ok(`/en/redeem ${authenticated ? 'signed in' : 'signed out'}: an English page with the English button`, lang === 'en' && label === want, `${lang}: ${label}`);
+  await ctx.close();
+}
+
 // ── signed in: the four refusals, in the relay's own words ───────────────────
 for (const refusal of REFUSALS) {
   const { page, ctx, calls } = await openRedeem(true, {
@@ -234,7 +251,8 @@ for (const refusal of REFUSALS) {
     redeem: (route) => json(route, { error: refusal.error, message: refusal.message }, refusal.status),
   });
   const label = (await page.locator('#rd-submit').textContent()).trim();
-  ok(`${refusal.name}: signed in, the button is the real one`, label === 'Redeem code', label);
+  const labels = LABELS[await page.evaluate(() => document.documentElement.lang)] || {};
+  ok(`${refusal.name}: signed in, the button is the real one`, label === labels.signedIn, label);
 
   const message = await messageAfterSubmit(page);
   ok(`${refusal.name}: the page prints the relay's sentence`, message === refusal.message, message);

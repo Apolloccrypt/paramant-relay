@@ -37,6 +37,37 @@
   const HDR_LEN = 5 + 1 + 1 + 4 + 16 + 12; // 39
   const LOCKED_CONTAINER_NAME = 'paramant-vault.prmnt';
 
+  // Visible text in both languages. /vault is Dutch, /en/vault English; the
+  // page's <html lang> picks the set, so one file serves both.
+  const LANG = (document.documentElement.lang || 'nl').slice(0, 2) === 'en' ? 'en' : 'nl';
+  const T = {
+    nl: {
+      damaged: 'Beschadigd .prmnt-bestand.',
+      notPrmnt: 'Dit is geen .prmnt-bestand.',
+      newer: 'Dit .prmnt-bestand is gemaakt met een nieuwere versie.',
+      wrongPw: 'Verkeerde wachtwoordzin, of het bestand is beschadigd.',
+      locked: 'Verzegeld. Uw .prmnt-bestand wordt gedownload. Bewaar uw wachtwoordzin goed: zonder die gaat het bestand niet open, en wij kunnen hem niet voor u herstellen.',
+      wrong: 'Er ging iets mis.',
+      locking: 'Bezig met verzegelen…',
+      opening: 'Bezig met openen…',
+      opened: 'Geopend. Uw oorspronkelijke bestand ({name}) wordt gedownload.',
+      file: 'bestand',
+    },
+    en: {
+      damaged: 'Damaged .prmnt file.',
+      notPrmnt: 'That is not a .prmnt file.',
+      newer: 'This .prmnt was made with a newer version.',
+      wrongPw: 'Wrong passphrase, or the file is damaged.',
+      locked: 'Locked. Your .prmnt file is downloading. Keep your passphrase safe: without it the file cannot be opened, and we cannot reset it for you.',
+      wrong: 'Something went wrong.',
+      locking: 'Locking…',
+      opening: 'Opening…',
+      opened: 'Opened. Your original file ({name}) is downloading.',
+      file: 'file',
+    },
+  };
+  function t(k) { return (T[LANG] && T[LANG][k]) || T.en[k] || k; }
+
   const te = new TextEncoder();
   const td = new TextDecoder();
   const $ = (id) => document.getElementById(id);
@@ -62,7 +93,7 @@
 
   function unpackPlain(buf) {
     const metaLen = new DataView(buf.buffer, buf.byteOffset, 4).getUint32(0, true);
-    if (metaLen > buf.length - 4) throw new Error('Damaged .prmnt file.');   // bounds before slice/parse
+    if (metaLen > buf.length - 4) throw new Error(t('damaged'));   // bounds before slice/parse
     const meta = JSON.parse(td.decode(buf.subarray(4, 4 + metaLen)));
     return { meta, bytes: buf.subarray(4 + metaLen) };
   }
@@ -87,20 +118,20 @@
 
   async function decryptFile(file, passphrase) {
     const buf = new Uint8Array(await file.arrayBuffer());
-    if (buf.length < HDR_LEN) throw new Error('That is not a .prmnt file.');
-    for (let i = 0; i < 5; i++) if (buf[i] !== MAGIC[i]) throw new Error('That is not a .prmnt file.');
-    if (buf[5] !== VERSION) throw new Error('This .prmnt was made with a newer version.');
+    if (buf.length < HDR_LEN) throw new Error(t('notPrmnt'));
+    for (let i = 0; i < 5; i++) if (buf[i] !== MAGIC[i]) throw new Error(t('notPrmnt'));
+    if (buf[5] !== VERSION) throw new Error(t('newer'));
     const iter = new DataView(buf.buffer, buf.byteOffset + 7, 4).getUint32(0, true);
     // iter is unauthenticated header data; clamp so a crafted/corrupt file can't drive
     // PBKDF2 to billions of rounds and freeze the tab (DoS) before the passphrase check.
-    if (iter < 1000 || iter > 1000000) throw new Error('That is not a .prmnt file.');
+    if (iter < 1000 || iter > 1000000) throw new Error(t('notPrmnt'));
     const salt = buf.subarray(11, 27), nonce = buf.subarray(27, 39), ct = buf.subarray(39);
     const key = await deriveKey(passphrase, salt, iter);
     let plain;
     try {
       plain = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce }, key, ct));
     } catch (e) {
-      throw new Error('Wrong passphrase, or the file is damaged.');
+      throw new Error(t('wrongPw'));
     }
     return unpackPlain(plain);
   }
@@ -176,14 +207,14 @@
         if (cfg.mode === 'lock') {
           const out = await encryptFile(file, pw);
           downloadBytes(out, LOCKED_CONTAINER_NAME, 'application/octet-stream');
-          setStatus(status, 'Locked. Your .prmnt file is downloading. Keep your passphrase safe: without it the file cannot be opened, and we cannot reset it for you.', 'ok');
+          setStatus(status, t('locked'), 'ok');
         } else {
           const { meta, bytes } = await decryptFile(file, pw);
           downloadBytes(bytes, meta.name || 'unlocked', meta.type);
-          setStatus(status, 'Opened. Your original file (' + (meta.name || 'file') + ') is downloading.', 'ok');
+          setStatus(status, t('opened').replace('{name}', meta.name || t('file')), 'ok');
         }
       } catch (e) {
-        setStatus(status, e.message || 'Something went wrong.', 'err');
+        setStatus(status, e.message || t('wrong'), 'err');
       }
       run.textContent = orig;
       run.disabled = false;
@@ -207,8 +238,8 @@
       return;
     }
     document.querySelectorAll('.vt-tab').forEach((t) => t.addEventListener('click', () => switchMode(t.dataset.mode)));
-    wirePanel({ mode: 'lock', drop: 'lock-drop', input: 'lock-input', info: 'lock-info', pw: 'lock-pw', pw2: 'lock-pw2', run: 'lock-run', status: 'lock-status', busy: 'Locking…' });
-    wirePanel({ mode: 'open', drop: 'open-drop', input: 'open-input', info: 'open-info', pw: 'open-pw', run: 'open-run', status: 'open-status', busy: 'Opening…' });
+    wirePanel({ mode: 'lock', drop: 'lock-drop', input: 'lock-input', info: 'lock-info', pw: 'lock-pw', pw2: 'lock-pw2', run: 'lock-run', status: 'lock-status', busy: t('locking') });
+    wirePanel({ mode: 'open', drop: 'open-drop', input: 'open-input', info: 'open-info', pw: 'open-pw', run: 'open-run', status: 'open-status', busy: t('opening') });
     switchMode('lock');
   });
 })();

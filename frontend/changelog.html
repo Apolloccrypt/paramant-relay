@@ -1,30 +1,33 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
 <style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Changelog · Paramant release history</title>
+<title>Wijzigingen · releasegeschiedenis van Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:site_name" content="Paramant">
-<meta name="description" content="Transparent Paramant release history. What changed, when, and why. Security-relevant items are always listed.">
-<meta property="og:title" content="Changelog · Paramant release history">
-<meta property="og:description" content="Transparent Paramant release history. What changed, when, and why. Security-relevant items are always listed.">
+<meta name="description" content="Openbare releasegeschiedenis van Paramant. Wat er veranderde, wanneer en waarom. Wijzigingen die de beveiliging raken staan er altijd bij.">
+<meta property="og:title" content="Wijzigingen · releasegeschiedenis van Paramant">
+<meta property="og:description" content="Openbare releasegeschiedenis van Paramant. Wat er veranderde, wanneer en waarom. Wijzigingen die de beveiliging raken staan er altijd bij.">
 <meta property="og:url" content="https://paramant.app/changelog">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://paramant.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Changelog · Paramant release history">
-<meta name="twitter:description" content="Transparent Paramant release history. What changed, when, and why. Security-relevant items are always listed.">
+<meta name="twitter:title" content="Wijzigingen · releasegeschiedenis van Paramant">
+<meta name="twitter:description" content="Openbare releasegeschiedenis van Paramant. Wat er veranderde, wanneer en waarom. Wijzigingen die de beveiliging raken staan er altijd bij.">
 <link rel="canonical" href="https://paramant.app/changelog">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/changelog">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/changelog">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/changelog">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 
 <link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/nav.css?v=27">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -64,15 +67,15 @@ footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex
       "@type": "WebPage",
       "@id": "https://paramant.app/changelog#webpage",
       "url": "https://paramant.app/changelog",
-      "name": "Changelog · Paramant release history",
+      "name": "Wijzigingen · releasegeschiedenis van Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "en",
-      "description": "Transparent Paramant release history. What changed, when, and why. Security-relevant items are always listed."
+      "inLanguage": "nl",
+      "description": "Openbare releasegeschiedenis van Paramant. Wat er veranderde, wanneer en waarom. Wijzigingen die de beveiliging raken staan er altijd bij."
     },
     {
       "@type": "Organization",
@@ -108,79 +111,82 @@ footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex
 </script>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
-    <li><a href="/security" class="nav-link">Security</a></li>
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/docs" class="nav-link">Docs</a></li>
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/changelog" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/changelog" hreflang="en" lang="en">EN</a></div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
-  <a href="/security" class="nav-mobile-standalone">Security</a>
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/changelog" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/changelog" hreflang="en" lang="en">EN</a></span>
 </div>
 
 <nav id="nav"></nav>
-<script src="/nav.js?v=15"></script>
+<script src="/nav.js?v=16"></script>
 
 <main id="main-content">
   <section class="page-hero">
   <div class="page-hero-inner">
-    <span class="eyebrow">RELEASE HISTORY</span>
-    <h1>Changelog</h1>
-    <p class="lede">Transparent release history. What changed, when, and why. Security-relevant items are always listed.</p>
+    <span class="eyebrow">RELEASEGESCHIEDENIS</span>
+    <h1>Wijzigingen</h1>
+    <p class="lede">Openbare releasegeschiedenis. Wat er veranderde, wanneer en waarom. Wijzigingen die de beveiliging raken staan er altijd bij.</p>
   </div>
 </section>
 
   <!-- ── UNRELEASED ───────────────────────────────────────────── -->
   <section class="release unreleased">
     <div class="release-header">
-      <h2>Unreleased</h2>
+      <h2>Nog niet uitgebracht</h2>
     </div>
-    <p class="release-summary">Features in active development.</p>
-    <h3>Added</h3>
+    <p class="release-summary">Functies waar nu aan gewerkt wordt.</p>
+    <h3>Toegevoegd</h3>
     <ul>
       <!-- Billing left the Planned list below, where it stood as "Mollie
            integration for billing (currently stub mode)". That has not been
            true since payments went live: relay.js POST /v2/billing/checkout
            calls Mollie unconditionally and the webhook issues the document by
            itself. Same facts as CHANGELOG.md under Unreleased. -->
-      <li>Payments through Mollie: one payment per term, no subscription and no direct debit</li>
-      <li>A numbered document per payment, issued automatically: an invoice, or a payment receipt while our VAT number is pending</li>
-      <li>A numbered credit note when money goes back, on a chargeback or a refund</li>
-      <li>Both appear on your account page and arrive by email as a PDF</li>
+      <li>Betalen via Mollie: één betaling per termijn, geen abonnement en geen automatische incasso</li>
+      <li>Per betaling automatisch een genummerd document: een factuur, of een betalingsbewijs zolang ons btw-nummer nog in aanvraag is</li>
+      <li>Een genummerde creditnota als er geld teruggaat, bij een terugboeking of een terugbetaling</li>
+      <li>Beide staan op uw accountpagina en komen als pdf per e-mail binnen</li>
     </ul>
-    <h3>Planned</h3>
+    <h3>Gepland</h3>
     <ul>
-      <li>Prometheus + Grafana monitoring via Tailscale-only access</li>
-      <li>Outlook add-in (<code>addin.paramant.app</code>): source scaffold done</li>
-      <li>Chrome Web Store public listing</li>
-      <li>Team accounts + SSO</li>
-      <li>WebAuthn / Passkey second-factor option</li>
-      <li>Admin email preview modal with per-user send actions</li>
-      <li>Public status page</li>
+      <li>Monitoring met Prometheus en Grafana, alleen bereikbaar via Tailscale</li>
+      <li>Outlook-invoegtoepassing (<code>addin.paramant.app</code>): de basis van de broncode staat</li>
+      <li>Openbare vermelding in de Chrome Web Store</li>
+      <li>Teamaccounts en SSO</li>
+      <li>WebAuthn / passkey als tweede factor</li>
+      <li>Voorbeeldvenster voor e-mails in het beheerpaneel, met verzendacties per gebruiker</li>
+      <li>Openbare statuspagina</li>
     </ul>
   </section>
 
@@ -188,49 +194,49 @@ footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex
   <section class="release">
     <div class="release-header">
       <h2>v0.9.0-beta</h2>
-      <span class="release-date">20 April 2026</span>
+      <span class="release-date">20 april 2026</span>
     </div>
-    <p class="release-summary">Admin panel hardening + email overhaul + TOTP security sprint.</p>
+    <p class="release-summary">Beheerpaneel versterkt, e-mails vernieuwd en een sprint voor TOTP-beveiliging.</p>
 
-    <h3><span class="badge badge-added">Added</span></h3>
+    <h3><span class="badge badge-added">Toegevoegd</span></h3>
     <ul>
-      <li><strong>Enterprise email templates</strong>: centralized <code>admin/lib/email-templates.js</code> with 5 dual-body (plain-text + HTML) transactional emails. Brand-consistent Paramant design. Preheader text, masked IP footer, List-Unsubscribe header, reply-to.</li>
-      <li><strong>Force TOTP per user</strong>: admin can require TOTP setup before next login; active sessions revoked immediately on enable</li>
-      <li><strong>Two-stage TOTP reset</strong>: request email → confirmation email (1h TTL) → TOTP cleared only after confirmation link clicked</li>
-      <li>Email enumeration protection on <code>/api/user/auth/request-totp-reset</code> (always returns 200)</li>
-      <li>Rich per-user email action menu with preview-before-send</li>
-      <li>Server-side pagination on Users list (<code>page</code>, <code>page_size</code>, <code>status</code>, <code>plan</code> filters)</li>
-      <li>Audit logging on all mutating admin endpoints</li>
-      <li>Global audit ZSET for O(log n) recent-events queries</li>
-      <li><code>email</code> + <code>created</code> fields on user records (new + backfilled)</li>
-      <li>API key masking in users list (first 8 + last 4 chars)</li>
-      <li>Clean JSON error responses: no HTML stack traces</li>
-      <li>WCAG AA on admin panel (ARIA, keyboard nav, skip link, focus indicators)</li>
-      <li>Admin panel documentation (<code>admin/ADMIN.md</code>)</li>
+      <li><strong>Zakelijke e-mailsjablonen</strong>: centraal in <code>admin/lib/email-templates.js</code>, met 5 transactionele e-mails in twee versies (platte tekst en HTML). Eenduidige Paramant-huisstijl. Preheader-tekst, gemaskeerd IP-adres in de voettekst, List-Unsubscribe-header, reply-to.</li>
+      <li><strong>TOTP verplichten per gebruiker</strong>: de beheerder kan TOTP verplicht stellen voor de volgende aanmelding. Actieve sessies worden bij inschakelen direct ingetrokken.</li>
+      <li><strong>TOTP-reset in twee stappen</strong>: aanvraagmail → bevestigingsmail (1 uur geldig) → TOTP wordt pas gewist nadat op de bevestigingslink is geklikt</li>
+      <li>Bescherming tegen het uitvragen van e-mailadressen op <code>/api/user/auth/request-totp-reset</code> (geeft altijd 200 terug)</li>
+      <li>Uitgebreid e-mailmenu per gebruiker, met voorbeeld vóór verzenden</li>
+      <li>Paginering aan de serverkant in de gebruikerslijst (filters <code>page</code>, <code>page_size</code>, <code>status</code>, <code>plan</code>)</li>
+      <li>Auditlog op alle beheer-endpoints die iets wijzigen</li>
+      <li>Globale audit-ZSET voor O(log n)-queries op recente gebeurtenissen</li>
+      <li>Velden <code>email</code> en <code>created</code> op gebruikersrecords (nieuw en met terugwerkende kracht aangevuld)</li>
+      <li>API-sleutels gemaskeerd in de gebruikerslijst (eerste 8 en laatste 4 tekens)</li>
+      <li>Nette JSON-foutmeldingen: geen HTML-stacktraces</li>
+      <li>WCAG AA in het beheerpaneel (ARIA, toetsenbordnavigatie, skip link, focusindicatoren)</li>
+      <li>Documentatie voor het beheerpaneel (<code>admin/ADMIN.md</code>)</li>
     </ul>
 
-    <h3><span class="badge badge-changed">Changed</span></h3>
+    <h3><span class="badge badge-changed">Gewijzigd</span></h3>
     <ul>
-      <li>From-address on all transactional emails: <code>noreply@</code> → <code>hello@paramant.app</code></li>
-      <li>TOTP reset confirmation TTL: 15 min → 60 min</li>
-      <li><code>delete_account</code> admin rate limit: 3/day → 50/day</li>
+      <li>Afzenderadres van alle transactionele e-mails: <code>noreply@</code> → <code>hello@paramant.app</code></li>
+      <li>Geldigheid van de bevestiging bij een TOTP-reset: 15 min → 60 min</li>
+      <li>Limiet voor <code>delete_account</code> in het beheerpaneel: 3 per dag → 50 per dag</li>
     </ul>
 
-    <h3><span class="badge badge-fixed">Fixed</span></h3>
+    <h3><span class="badge badge-fixed">Opgelost</span></h3>
     <ul>
-      <li>Admin panel showing <code>—</code> instead of <code>0</code> for empty stat cards</li>
-      <li>Relay dashboard showing 0h uptime</li>
-      <li>Delete-account causing "Error loading users" on next refresh</li>
-      <li>Missing <code>ADMIN_TOKEN</code> headers on internal <code>callRelay()</code> calls (all returning 401)</li>
-      <li>Modal element IDs not matching JS function references</li>
+      <li>Beheerpaneel toonde een streepje in plaats van <code>0</code> bij lege statistiekkaarten</li>
+      <li>Relay-dashboard toonde 0 uur uptime</li>
+      <li>Account verwijderen gaf bij de volgende verversing "Error loading users"</li>
+      <li>Ontbrekende <code>ADMIN_TOKEN</code>-headers bij interne <code>callRelay()</code>-aanroepen (die allemaal 401 teruggaven)</li>
+      <li>Element-ID's van vensters kwamen niet overeen met de verwijzingen in de JS-functies</li>
     </ul>
 
-    <h3><span class="badge badge-security">Security</span></h3>
+    <h3><span class="badge badge-security">Beveiliging</span></h3>
     <ul>
-      <li>TOTP reset requires inbox access: attacker with known email cannot force a reset</li>
-      <li>Rate limits on reset flow: 5/email/24h + 10/IP/1h</li>
-      <li>Error responses are JSON only: no internal paths or server info leaked</li>
-      <li>24/24 integration tests passing</li>
+      <li>Een TOTP-reset vereist toegang tot de inbox: een aanvaller die alleen het e-mailadres kent, kan geen reset afdwingen</li>
+      <li>Limieten op de reset-flow: 5 per e-mailadres per 24 uur en 10 per IP-adres per uur</li>
+      <li>Foutmeldingen zijn alleen JSON: er lekken geen interne paden of servergegevens</li>
+      <li>24 van 24 integratietests geslaagd</li>
     </ul>
   </section>
 
@@ -238,41 +244,41 @@ footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex
   <section class="release">
     <div class="release-header">
       <h2>v0.9.0-beta</h2>
-      <span class="release-date">19 April 2026</span>
+      <span class="release-date">19 april 2026</span>
     </div>
-    <p class="release-summary">Enterprise readiness sprint. Admin panel redesign + security audit.</p>
+    <p class="release-summary">Sprint om klaar te zijn voor zakelijk gebruik. Beheerpaneel opnieuw ontworpen en een beveiligingsaudit.</p>
 
-    <h3><span class="badge badge-added">Added</span></h3>
+    <h3><span class="badge badge-added">Toegevoegd</span></h3>
     <ul>
-      <li>Five-tab admin dashboard (Overview, Users, Audit, Billing, Relay): v4 Denim Edit styling</li>
-      <li>User signup flow at <code>/signup</code> with TOTP enrollment (no password)</li>
-      <li>Billing scaffold with Mollie placeholder: checkout, cancel, status, history</li>
-      <li>Chromium browser extension (dual-mode: API key + TOTP)</li>
-      <li>Wazuh SIEM agent connected via Tailscale</li>
-      <li>Security audit executed: 6-layer scope, low risk (0 critical, 0 high)</li>
+      <li>Beheerdashboard met vijf tabbladen (Overzicht, Gebruikers, Audit, Facturatie, Relay): v4 Denim Edit-stijl</li>
+      <li>Aanmelden op <code>/signup</code> met TOTP-registratie (zonder wachtwoord)</li>
+      <li>Basis voor facturatie met een Mollie-placeholder: afrekenen, opzeggen, status, geschiedenis</li>
+      <li>Browserextensie voor Chromium (twee modi: API-sleutel en TOTP)</li>
+      <li>Wazuh SIEM-agent gekoppeld via Tailscale</li>
+      <li>Beveiligingsaudit uitgevoerd: 6 lagen, laag risico (0 kritiek, 0 hoog)</li>
     </ul>
 
-    <h3><span class="badge badge-changed">Changed</span></h3>
+    <h3><span class="badge badge-changed">Gewijzigd</span></h3>
     <ul>
-      <li>GitHub Actions pinned to commit SHAs for supply-chain security</li>
-      <li>TOTP v2 rolled out to beta users; Q2 2026 banners removed</li>
-      <li>Setup flow button-gated to prevent email scanner token consumption</li>
-      <li><code>POST /api/user/auth/setup/:token</code> idempotent for provisional enrollments</li>
-      <li><code>@noble/post-quantum</code> updated to 0.6.1</li>
+      <li>GitHub Actions vastgepind op commit-SHA's, voor de veiligheid van de toeleveringsketen</li>
+      <li>TOTP v2 uitgerold naar bètagebruikers. Banners over Q2 2026 verwijderd.</li>
+      <li>De installatiestap werkt nu met een knop, zodat e-mailscanners het token niet verbruiken</li>
+      <li><code>POST /api/user/auth/setup/:token</code> idempotent voor voorlopige registraties</li>
+      <li><code>@noble/post-quantum</code> bijgewerkt naar 0.6.1</li>
     </ul>
 
-    <h3><span class="badge badge-fixed">Fixed</span></h3>
+    <h3><span class="badge badge-fixed">Opgelost</span></h3>
     <ul>
-      <li>Setup token consumed by email scanners (Gmail, Barracuda, Proofpoint)</li>
-      <li><code>INTERNAL_AUTH_TOKEN</code> missing from admin container: relay calls returning 401</li>
-      <li>Wazuh agent connectivity after UFW default-deny reboot</li>
+      <li>Installatietoken werd verbruikt door e-mailscanners (Gmail, Barracuda, Proofpoint)</li>
+      <li><code>INTERNAL_AUTH_TOKEN</code> ontbrak in de admin-container: relay-aanroepen gaven 401 terug</li>
+      <li>Verbinding van de Wazuh-agent na een herstart met UFW default-deny</li>
     </ul>
 
-    <h3><span class="badge badge-security">Security</span></h3>
+    <h3><span class="badge badge-security">Beveiliging</span></h3>
     <ul>
-      <li>Setup tokens no longer consumed by email preview scanners</li>
-      <li>Full 6-layer automated audit completed; all findings fixed same session</li>
-      <li>Load tested to 500 req/s: p95 135ms, zero errors</li>
+      <li>Installatietokens worden niet meer verbruikt door scanners die e-mails vooraf openen</li>
+      <li>Volledige geautomatiseerde audit over 6 lagen afgerond. Alle bevindingen in dezelfde sessie opgelost.</li>
+      <li>Belastingtest tot 500 req/s: p95 135 ms, geen fouten</li>
     </ul>
   </section>
 
@@ -283,31 +289,31 @@ footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex
     <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Company</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/about">About</a>
-          <a href="/changelog">Changelog</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/privacy">Privacy Policy</a>
-          <a href="/dpa">Data Processing Agreement</a>
-          <a href="/terms">Terms of Service</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/license">License</a>
+          <a href="/license">Licentie</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=10" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
 </body>
 </html>

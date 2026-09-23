@@ -599,6 +599,9 @@ test('no page names a cryptographic primitive the code behind that page does not
   // rot, because it is checked against the code on every run.
   const AWAITING_DECISION = [
     'audit-log-export: names ML-KEM-768 and ML-DSA-65 for a workflow its own steps describe as a ParaSend web app upload opened through a one-time link. Making it true needs the regulator to hold a device key, which is the convenience the page sells. Raised 5 September 2026.',
+
+    // The English text of the same page, under /en since 23 September 2026. Same claim, same decision.
+    'en/audit-log-export: the English copy of the page above, with the same two names for the same workflow. Raised 23 September 2026.',
   ];
   const expected = new Set(AWAITING_DECISION.map((line) => line.split(':')[0]));
   const unexpected = pathProblems.filter((line) => !expected.has(line.split(':')[0]));

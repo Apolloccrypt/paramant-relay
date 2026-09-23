@@ -1,23 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>API key vs TOTP · Paramant Help</title>
+<title>API-sleutel of TOTP · Hulp bij Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
-<meta name="twitter:description" content="When to use a Paramant API key and when to use a code from your authenticator app, and how the two work together on one account.">
-<meta name="twitter:title" content="API key vs TOTP · Paramant Help">
+<meta name="twitter:description" content="Wanneer u een Paramant API-sleutel gebruikt, wanneer een code uit uw authenticator-app, en hoe de twee samenwerken in één account.">
+<meta name="twitter:title" content="API-sleutel of TOTP · Hulp bij Paramant">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:height" content="630">
 <meta property="og:image:width" content="1200">
 <meta property="og:image" content="https://paramant.app/og-image.png">
-<meta property="og:title" content="API key vs TOTP · Paramant Help">
-<meta property="og:description" content="When to use a Paramant API key and when to use a code from your authenticator app, and how the two work together on one account.">
+<meta property="og:title" content="API-sleutel of TOTP · Hulp bij Paramant">
+<meta property="og:description" content="Wanneer u een Paramant API-sleutel gebruikt, wanneer een code uit uw authenticator-app, en hoe de twee samenwerken in één account.">
 <meta property="og:url" content="https://paramant.app/help/api-key-vs-totp">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Paramant">
 <link rel="canonical" href="https://paramant.app/help/api-key-vs-totp">
-<meta name="description" content="When to use a Paramant API key and when to use a code from your authenticator app, and how the two work together on one account.">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/help/api-key-vs-totp">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/help/api-key-vs-totp">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/help/api-key-vs-totp">
+<meta name="description" content="Wanneer u een Paramant API-sleutel gebruikt, wanneer een code uit uw authenticator-app, en hoe de twee samenwerken in één account.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
@@ -73,7 +76,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 }
 </style>
 <link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=26">
+<link rel="stylesheet" href="/nav.css?v=27">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <style>
 .nav-help {
@@ -145,15 +148,15 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       "@type": "WebPage",
       "@id": "https://paramant.app/help/api-key-vs-totp#webpage",
       "url": "https://paramant.app/help/api-key-vs-totp",
-      "name": "API key vs TOTP · Paramant Help",
+      "name": "API-sleutel of TOTP · Hulp bij Paramant",
       "isPartOf": {
         "@id": "https://paramant.app/#website"
       },
       "publisher": {
         "@id": "https://paramant.app/#organization"
       },
-      "inLanguage": "en",
-      "description": "When to use a Paramant API key and when to use a code from your authenticator app, and how the two work together on one account."
+      "inLanguage": "nl",
+      "description": "Wanneer u een Paramant API-sleutel gebruikt, wanneer een code uit uw authenticator-app, en hoe de twee samenwerken in één account."
     },
     {
       "@type": "BreadcrumbList",
@@ -174,7 +177,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         {
           "@type": "ListItem",
           "position": 3,
-          "name": "API key vs TOTP"
+          "name": "API-sleutel of TOTP"
         }
       ]
     },
@@ -213,167 +216,174 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </head>
 <body>
 
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 <nav class="nav">
   <a href="/" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
-    <li><a href="/security" class="nav-link">Security</a></li>
-    <li><a href="/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/docs" class="nav-link">Docs</a></li>
+    <li><a href="/parasend" class="nav-link">Versturen</a></li>
+    <li><a href="/parasign" class="nav-link">Ondertekenen</a></li>
+    <li><a href="/gereedschap" class="nav-link">Gereedschap</a></li>
+    <li><a href="/security" class="nav-link">Beveiliging</a></li>
+    <li><a href="/pricing" class="nav-link">Prijzen</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
-    <a href="/auth/login" class="nav-signin">Sign in</a>
-    <a href="/signup" class="nav-cta">Create account</a>
+    <a href="/help" class="nav-help">Hulp</a>
+    <a href="/auth/login" class="nav-signin">Inloggen</a>
+    <a href="/signup" class="nav-cta">Account maken</a>
   </div>
 
-  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/api-key-vs-totp" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/api-key-vs-totp" hreflang="en" lang="en">EN</a></div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
-  <a href="/security" class="nav-mobile-standalone">Security</a>
-  <a href="/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/docs" class="nav-mobile-standalone">Docs</a>
+  <a href="/parasend" class="nav-mobile-standalone">Versturen</a>
+  <a href="/parasign" class="nav-mobile-standalone">Ondertekenen</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Gereedschap</a>
+  <a href="/security" class="nav-mobile-standalone">Beveiliging</a>
+  <a href="/pricing" class="nav-mobile-standalone">Prijzen</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
-  <a href="/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
-</div><main>
+  <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
+  <a href="/help" class="nav-tail-link">Hulp</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/api-key-vs-totp" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/api-key-vs-totp" hreflang="en" lang="en">EN</a></span>
+</div>
+<main id="main-content" tabindex="-1">
 
   <div class="breadcrumb">
-    <a href="/help">Help</a>
+    <a href="/help">Hulp</a>
     <span>/</span>
-    API key vs TOTP
+    API-sleutel of TOTP
   </div>
 
-  <h1>API key vs <em>TOTP</em>: what's the difference?</h1>
+  <h1>API-sleutel of <em>TOTP</em>: wat is het verschil?</h1>
 
-  <p class="lead">Paramant uses two credential types for different purposes. Knowing which one you need, and when you need both, prevents most authentication problems.</p>
+  <p class="lead">Paramant gebruikt twee soorten inloggegevens, elk met een eigen doel. Weet u welke u nodig heeft, en wanneer allebei, dan voorkomt u de meeste inlogproblemen.</p>
 
-  <h2>The short version</h2>
+  <h2>In het kort</h2>
 
   <div class="compare-grid">
     <div class="compare-card">
-      <h4>API key</h4>
+      <h4>API-sleutel</h4>
       <ul>
-        <li>A static secret string, 64 hex characters</li>
-        <li>Identifies your account to the API</li>
-        <li>Does not expire automatically</li>
-        <li>Issued once, stored by you</li>
-        <li>Used by machines, scripts, and integrations</li>
+        <li>Een vaste geheime reeks van 64 hexadecimale tekens</li>
+        <li>Maakt uw account bekend bij de API</li>
+        <li>Verloopt niet vanzelf</li>
+        <li>Eenmalig uitgegeven, door u bewaard</li>
+        <li>Gebruikt door machines, scripts en koppelingen</li>
       </ul>
     </div>
     <div class="compare-card">
-      <h4>TOTP code</h4>
+      <h4>TOTP-code</h4>
       <ul>
-        <li>A 6-digit code that changes every 30 seconds</li>
-        <li>Proves you are physically present</li>
-        <li>Generated by your authenticator app</li>
-        <li>Cannot be reused or stolen from logs</li>
-        <li>Used for interactive logins to the dashboard</li>
+        <li>Een code van 6 cijfers die elke 30 seconden verandert</li>
+        <li>Bewijst dat u er zelf bij bent</li>
+        <li>Gemaakt door uw authenticator-app</li>
+        <li>Kan niet opnieuw gebruikt of uit logs gestolen worden</li>
+        <li>Gebruikt om zelf in te loggen op het dashboard</li>
       </ul>
     </div>
   </div>
 
-  <h2>When you need just the API key</h2>
+  <h2>Wanneer u alleen de API-sleutel nodig heeft</h2>
 
-  <p>Machine-to-machine calls use the API key alone. That covers IoT devices, CI pipelines and server scripts. The key goes in the <code>Authorization</code> header on every request. No TOTP code is required because the machine cannot open an authenticator app.</p>
+  <p>Verkeer tussen machines gebruikt alleen de API-sleutel. Denk aan IoT-apparaten, CI-pipelines en serverscripts. De sleutel gaat bij elk verzoek mee in de <code>Authorization</code>-header. Een TOTP-code is niet nodig, want een machine kan geen authenticator-app openen.</p>
 
-  <div class="tip"><p>Use a <strong>dedicated API key</strong> for each integration so you can revoke one without affecting the others. Create additional keys in <a href="/dashboard">Dashboard &rarr; API keys</a>.</p></div>
+  <div class="tip"><p>Gebruik voor elke koppeling een <strong>eigen API-sleutel</strong>. Dan kunt u er een intrekken zonder dat de andere last hebben. Extra sleutels maakt u in <a href="/dashboard">Dashboard &rarr; API-sleutels</a>.</p></div>
 
-  <h2>When you need both</h2>
+  <h2>Wanneer u allebei nodig heeft</h2>
 
-  <p>Signing in to the Paramant web dashboard at <a href="/auth/login">paramant.app/auth/login</a> always requires both. The flow is:</p>
+  <p>Inloggen op het webdashboard van Paramant via <a href="/auth/login">paramant.app/auth/login</a> vraagt altijd om allebei. Zo gaat het:</p>
 
   <ol style="margin:16px 0 16px 20px;display:flex;flex-direction:column;gap:10px">
-    <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Enter your email address</li>
-    <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Enter your API key (acts as your password)</li>
-    <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Enter the current 6-digit TOTP code from your authenticator app</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Vul uw e-mailadres in</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Vul uw API-sleutel in (die werkt als uw wachtwoord)</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Vul de huidige TOTP-code van 6 cijfers uit uw authenticator-app in</li>
   </ol>
 
-  <p>This two-factor approach means a leaked API key alone cannot grant dashboard access. An attacker would also need your physical authenticator device.</p>
+  <p>Door deze twee stappen geeft een uitgelekte API-sleutel alleen nog geen toegang tot het dashboard. Een aanvaller heeft dan ook het toestel met uw authenticator-app nodig.</p>
 
-  <h2>Why not just use a password?</h2>
+  <h2>Waarom geen gewoon wachtwoord?</h2>
 
-  <p>Paramant has no passwords. The API key functions as one, long, random and machine-generated, and it also serves as the credential for API calls. Combining it with TOTP gives you two-factor authentication without a separate password to manage or a password reset flow to abuse.</p>
+  <p>Paramant heeft geen wachtwoorden. De API-sleutel doet dienst als wachtwoord: lang, willekeurig en door een machine gemaakt. Dezelfde sleutel is ook uw toegang tot de API. Samen met TOTP geeft dat inloggen in twee stappen, zonder los wachtwoord om te beheren en zonder wachtwoordherstel dat misbruikt kan worden.</p>
 
-  <h2>Key rotation</h2>
+  <h2>Sleutel vervangen</h2>
 
-  <p>Rotate your API key if you suspect it has been exposed: Dashboard &rarr; API keys &rarr; <strong>Revoke</strong>, then <strong>Generate new key</strong>. Update the key in any integrations that use it. The old key stops working immediately on revocation.</p>
+  <p>Vervang uw API-sleutel als u denkt dat hij is uitgelekt: Dashboard &rarr; API-sleutels &rarr; <strong>Intrekken</strong>, daarna <strong>Nieuwe sleutel maken</strong>. Zet de nieuwe sleutel in elke koppeling die hem gebruikt. De oude sleutel werkt niet meer zodra u hem intrekt.</p>
 
-  <div class="warn"><p>Revoking your primary key while signed out of the dashboard will lock you out. Always have a secondary key, or rotate from an active session.</p></div>
-
-  <hr class="divider">
-
-  <h3>Common questions</h3>
-
-  <div class="troubleshoot-item">
-    <div class="q">Can I use my API key to call the API without TOTP?</div>
-    <div class="a">Yes. Direct API calls (upload, download, list transfers) require only the API key in the Authorization header. TOTP is only needed for the interactive web login.</div>
-  </div>
-
-  <div class="troubleshoot-item">
-    <div class="q">My API key was in a public Git commit. What do I do?</div>
-    <div class="a">Revoke it immediately from the dashboard, then generate a new one. Treat any transfers made with the old key as potentially compromised and notify your recipients if the content was sensitive.</div>
-  </div>
-
-  <div class="troubleshoot-item">
-    <div class="q">How long is an API key valid?</div>
-    <div class="a">API keys do not expire automatically. They remain valid until you revoke them. Sessions created via the web login expire after 1 hour.</div>
-  </div>
+  <div class="warn"><p>Trekt u uw hoofdsleutel in terwijl u niet bent ingelogd op het dashboard, dan sluit u zichzelf buiten. Houd altijd een tweede sleutel achter de hand, of vervang de sleutel vanuit een actieve sessie.</p></div>
 
   <hr class="divider">
 
-  <h3>Related</h3>
+  <h3>Veelgestelde vragen</h3>
+
+  <div class="troubleshoot-item">
+    <div class="q">Kan ik de API met mijn API-sleutel gebruiken zonder TOTP?</div>
+    <div class="a">Ja. Rechtstreekse API-verzoeken (uploaden, downloaden, verzendingen opvragen) hebben alleen de API-sleutel in de Authorization-header nodig. TOTP is alleen nodig als u zelf inlogt op de website.</div>
+  </div>
+
+  <div class="troubleshoot-item">
+    <div class="q">Mijn API-sleutel stond in een openbare Git-commit. Wat nu?</div>
+    <div class="a">Trek hem meteen in via het dashboard en maak een nieuwe. Beschouw verzendingen met de oude sleutel als mogelijk gelekt en laat uw ontvangers het weten als de inhoud gevoelig was.</div>
+  </div>
+
+  <div class="troubleshoot-item">
+    <div class="q">Hoe lang is een API-sleutel geldig?</div>
+    <div class="a">API-sleutels verlopen niet vanzelf. Ze blijven geldig tot u ze intrekt. Een sessie via het inloggen op de website verloopt na 1 uur.</div>
+  </div>
+
+  <hr class="divider">
+
+  <h3>Zie ook</h3>
   <div class="next-steps">
     <a href="/help/authenticator-setup" class="next-step-card">
-      <h3>Set up your authenticator</h3>
-      <p>Step-by-step guide for enrolling an authenticator app.</p>
+      <h3>Uw authenticator-app instellen</h3>
+      <p>Stap voor stap een authenticator-app koppelen.</p>
     </a>
     <a href="/help/iot-integration" class="next-step-card">
-      <h3>IoT &amp; embedded devices</h3>
-      <p>Using the API key on constrained devices with no TOTP.</p>
+      <h3>IoT en embedded apparaten</h3>
+      <p>De API-sleutel gebruiken op kleine apparaten, zonder TOTP.</p>
     </a>
   </div>
 
 </main>
+
+<p class="lang-switch" style="max-width:1100px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/en/help/api-key-vs-totp" hreflang="en" lang="en">This page in English</a></p>
 
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
       <div>
         <div class="logo" style="margin-bottom:var(--space-3)"><span class="a">Para</span><span class="b">MANT</span></div>
-        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is a product of <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, the Netherlands<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+        <p style="font-size:var(--text-xs);color:var(--ink-dim);line-height:1.8;max-width:320px">Paramant is een product van <strong>Paramantis Solutions B.V.</strong><br>Harderwijk, Nederland<br>KvK 42115132<br><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
         <p style="font-family:var(--mono);font-size:var(--text-xs);color:var(--ink-dim);margin-top:var(--space-4);line-height:1.8">BUSL-1.1 &middot; &copy; 2026 PARAMANTIS SOLUTIONS B.V.</p>
       </div>
       <div>
-        <div class="footer-col-label">Company</div>
+        <div class="footer-col-label">Bedrijf</div>
         <div class="footer-links">
-          <a href="/about">About</a>
-          <a href="/changelog">Changelog</a>
+          <a href="/about">Over Paramant</a>
+          <a href="/changelog">Wijzigingen</a>
         </div>
       </div>
       <div>
-        <div class="footer-col-label">Legal</div>
+        <div class="footer-col-label">Juridisch</div>
         <div class="footer-links">
-          <a href="/privacy">Privacy Policy</a>
-          <a href="/dpa">Data Processing Agreement</a>
-          <a href="/terms">Terms of Service</a>
+          <a href="/privacy">Privacybeleid</a>
+          <a href="/dpa">Verwerkersovereenkomst</a>
+          <a href="/terms">Voorwaarden</a>
           <a href="/sla">SLA</a>
-          <a href="/license">License</a>
+          <a href="/license">Licentie</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
 
-<script src="/nav.js?v=15" defer></script>
-<script src="/js/nav-auth.js?v=10" defer></script>
+<script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
 </body>
 </html>

@@ -149,7 +149,7 @@ ok('en het volledige adres staat er NIET',
    !(await page.content()).includes(adres), 'volledig adres lekt op de pagina');
 
 await new Promise((r) => setTimeout(r, 300));
-const codeMail = mails.find((m) => /code to open the file/i.test(m.subject || ''));
+const codeMail = mails.find((m) => /controlecode om het bestand te openen/i.test(m.subject || ''));
 ok('er is een codemail verstuurd', !!codeMail);
 const code = codeMail ? (String(codeMail.text).match(/\b(\d{6})\b/) || [])[1] : null;
 ok('met een zescijferige code erin', !!code);
@@ -159,10 +159,11 @@ await page.fill('#code', '000000');
 await page.click('#open');
 await page.waitForFunction(() => {
   const n = document.getElementById('code-say');
-  return n && /wrong|try|tries/i.test(n.textContent || '');
+  // ophalen.html is Nederlands sinds 23 september 2026: "Die code klopt niet. Nog N pogingen over."
+  return n && /klopt niet.*poging/i.test(n.textContent || '');
 }, { timeout: 10000 }).catch(() => {});
 const naFout = await page.textContent('#code-say');
-ok('een foute code geeft een leesbare melding', /wrong|tr(y|ies)/i.test(naFout || ''), naFout);
+ok('een foute code geeft een leesbare melding', /Die code klopt niet\. Nog \d+ pogingen? over\./.test(naFout || ''), naFout);
 ok('en de knop blijft bruikbaar', !(await page.isDisabled('#open')));
 
 // En dan goed.

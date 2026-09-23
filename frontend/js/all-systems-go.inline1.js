@@ -10,14 +10,14 @@
     var sub = document.getElementById('overall-sub');
     dot.className = 'asg-dot-lg asg-overall-' + overall;
     if (overall === 'green') {
-      dot.innerHTML = '&#10003;'; title.textContent = 'All systems go';
-      sub.textContent = 'Your relay ' + esc(data.version||'') + ' is healthy and ready.';
+      dot.innerHTML = '&#10003;'; title.textContent = 'Alles werkt';
+      sub.textContent = 'Uw relay ' + esc(data.version||'') + ' is gezond en klaar voor gebruik.';
     } else if (overall === 'yellow') {
-      dot.innerHTML = '!'; title.textContent = 'Up, with warnings';
-      sub.textContent = 'The relay is running; some checks need attention below.';
+      dot.innerHTML = '!'; title.textContent = 'Actief, met waarschuwingen';
+      sub.textContent = 'De relay draait. Een paar controles hieronder vragen aandacht.';
     } else {
-      dot.innerHTML = '&times;'; title.textContent = 'Attention needed';
-      sub.textContent = 'One or more checks failed. See details below.';
+      dot.innerHTML = '&times;'; title.textContent = 'Aandacht nodig';
+      sub.textContent = 'Een of meer controles zijn mislukt. Zie de details hieronder.';
     }
     var box = document.getElementById('checks');
     var checks = (data && data.checks) || [];
@@ -29,7 +29,7 @@
         '</div>';
     }).join('');
     document.getElementById('asg-meta').textContent =
-      'Relay ' + esc(data.version||'?') + ' / sector ' + esc(data.sector||'?') + ' - updated ' + new Date().toLocaleTimeString();
+      'Relay ' + esc(data.version||'?') + ' / sector ' + esc(data.sector||'?') + ' · bijgewerkt ' + new Date().toLocaleTimeString('nl-NL');
   }
 
   function poll(){
@@ -37,8 +37,8 @@
       .then(function(r){ return r.json(); })
       .then(render)
       .catch(function(){
-        document.getElementById('overall-title').textContent = 'Cannot reach the relay';
-        document.getElementById('overall-sub').textContent = 'The /v2/health/deep endpoint did not respond.';
+        document.getElementById('overall-title').textContent = 'De relay is niet bereikbaar';
+        document.getElementById('overall-sub').textContent = 'Het endpoint /v2/health/deep gaf geen antwoord.';
         document.getElementById('overall-dot').className = 'asg-dot-lg asg-overall-red';
         document.getElementById('overall-dot').innerHTML = '&times;';
       });

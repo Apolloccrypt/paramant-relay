@@ -216,4 +216,32 @@ assert.strictEqual(q.signNotice({ used: 101, included: 100 }), '',
 assert.strictEqual(q.signNotice({ used: 'x', included: 'y' }), '');
 ok('signNotice stays silent on missing fields, other plans, and mid-quota signs');
 
+
+// The Dutch pages (/sign, /co-sign, /parashare) load the same file with
+// <html lang="nl">. The same cards, the same numbers, in Dutch, and no English
+// sentence left in them.
+{
+  const nlBox = { window: {}, document: { addEventListener() {}, documentElement: { lang: 'nl' } } };
+  vm.runInNewContext(src, nlBox);
+  const qn = nlBox.window.paQuotaUpgrade;
+  const free = qn.html({ error: 'monthly_sign_quota_reached', plan: 'free', reset_date: '2026-10-01' });
+  assert(free.includes('U heeft deze maand beide handtekeningen gebruikt.'), 'nl free card: ' + free);
+  assert(free.includes(tiers.tierLimit('community', 'signs_month') + ' per maand'), 'nl free card must name the Community signs ceiling');
+  assert(free.includes(tiers.tierLimit('pro', 'signs_month') + ' handtekeningen per maand'), 'nl free card must name the Firm signs ceiling');
+  assert(free.includes(tiers.tierLimit('pro', 'transfers_month') + ' verzendingen per maand'), 'nl free card must name the Firm transfers ceiling');
+  assert(free.includes('2026-10-01'), 'nl free card must carry the reset date');
+  const legacy = qn.html({ error: 'monthly_transfer_quota_reached', plan: 'community', limit: tiers.tierLimit('community', 'transfers_month') });
+  assert(legacy.includes('Maandlimiet van Community bereikt.'), 'nl legacy card: ' + legacy);
+  assert(legacy.includes('voor ' + tiers.tierLimit('pro', 'transfers_month') + ' verzendingen per maand'), 'nl legacy card must name the rung above: ' + legacy);
+  const note2 = qn.signNotice({ used: 2, included: 2 });
+  const note100 = qn.signNotice({ used: 100, included: 100, reset_date: '2026-10-01' });
+  assert(note2.includes('tweede handtekening'), 'nl second-signature note: ' + note2);
+  assert(note100.includes('100e handtekening') && note100.includes('2026-10-01'), 'nl 100th-signature note: ' + note100);
+  for (const card of [free, legacy, note2, note100]) {
+    assert(!/\b(you|your|the|signatures|transfers|Upgrade|Maybe later|View plans|Compare plans)\b/.test(card.replace(/<[^>]+>/g, ' ')),
+      'a Dutch quota card still carries English: ' + card);
+  }
+  ok('the Dutch pages get the same quota cards, the same numbers, in Dutch');
+}
+
 console.log('quota-upgrade-render: ' + passed + ' checks passed');

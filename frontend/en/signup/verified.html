@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<style id="critical-css">html,body{background:#FFFFFF;color:#0C1B2A;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#15191C;color:#EAE2CE}html[data-theme="dark"]{color-scheme:dark}@media (prefers-color-scheme:dark){html[data-theme="auto"],html[data-theme="auto"] body{background:#15191C;color:#EAE2CE}html[data-theme="auto"]{color-scheme:dark}}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Email verified, one step left · Paramant</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="canonical" href="https://paramant.app/en/signup/verified">
+<link rel="alternate" hreflang="nl" href="https://paramant.app/signup/verified">
+<link rel="alternate" hreflang="en" href="https://paramant.app/en/signup/verified">
+<link rel="alternate" hreflang="x-default" href="https://paramant.app/signup/verified">
+  <link rel="stylesheet" href="/design-system.css?v=31">
+  <link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/relay-pulse.css?v=5">
+  <script src="/nav.js?v=16" defer></script>
+<script src="/js/nav-auth.js?v=11" defer></script>
+  <style>
+    /* Every colour here is a token from app-2026.css, so this page follows the
+       theme instead of staying light inside a dark shell. Section 5 of
+       docs/brand/design-direction.md: no half rollout. */
+    body { background: var(--paper); }
+    .vwrap { max-width: 620px; margin: 48px auto; padding: 0 20px; }
+    .vcheck {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--sig-done-bg); color: var(--sig-done);
+      border: 1px solid var(--line);
+      padding: 6px 14px; border-radius: 100px;
+      font-size: 13px; font-weight: 600;
+      margin-bottom: 24px;
+    }
+    .vcheck svg { width: 14px; height: 14px; }
+    .vtitle {
+      font-size: 30px; font-weight: 600; color: var(--ink-1);
+      margin: 0 0 16px; line-height: 1.2;
+    }
+    .vlead {
+      color: var(--ink-2); line-height: 1.6;
+      margin: 0 0 32px; font-size: 16px;
+    }
+    .next-box {
+      background: var(--accent-soft); border: 1px solid var(--line);
+      border-radius: 10px; padding: 28px; margin: 0 0 32px;
+    }
+    .next-step {
+      display: inline-block; background: var(--accent); color: var(--accent-ink);
+      border-radius: 999px; padding: 5px 14px;
+      font-weight: 700; font-size: 12px; letter-spacing: .04em;
+      text-transform: uppercase; margin-bottom: 14px;
+    }
+    .vwho {
+      color: var(--ink-3); font-size: 13px; line-height: 1.7;
+      margin: 32px 0 0;
+    }
+    .vwho a { color: var(--accent); }
+    .next-title {
+      font-size: 18px; font-weight: 600; color: var(--ink-1);
+      margin: 0 0 12px;
+    }
+    .next-msg {
+      color: var(--ink-2); line-height: 1.6;
+      margin: 0 0 14px; font-size: 15px;
+    }
+    .next-subject {
+      display: inline-block; background: var(--surface);
+      border: 1px solid var(--line-2); border-radius: 5px;
+      padding: 8px 14px;
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      font-size: 13px; color: var(--ink-1);
+      word-break: break-word;
+    }
+    .faq {
+      margin-top: 36px; padding-top: 28px;
+      border-top: 1px solid var(--line);
+    }
+    .faq h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em;
+              color: var(--ink-3); font-weight: 600; margin: 0 0 16px; }
+    .faq details { margin-bottom: 10px;
+                   border: 1px solid var(--line);
+                   border-radius: 6px; padding: 14px 18px; background: var(--surface); }
+    /* One indicator, the page's own plus. Chromium still draws its list-item
+       triangle next to it unless the marker is removed on both sides, and the
+       row is a flex line so it reads the same at every width. */
+    .faq summary { cursor: pointer; font-weight: 600; color: var(--ink-1);
+                   font-size: 14px; list-style: none;
+                   display: flex; align-items: center; gap: 12px; }
+    .faq summary::-webkit-details-marker { display: none; }
+    .faq summary::marker { content: ''; }
+    .faq summary::after { content: '+'; margin-left: auto; color: var(--ink-3);
+                          font-weight: 400; font-size: 18px; line-height: 1; }
+    .faq details[open] summary::after { content: '&minus;'; }
+    .faq p { color: var(--ink-2); line-height: 1.6;
+             margin: 10px 0 0; font-size: 14px; }
+    .faq code { background: var(--surface-sunk); padding: 2px 6px; border-radius: 3px;
+                font-size: 13px; color: var(--ink-1); }
+    .faq a { color: var(--accent); text-decoration: underline; }
+    /* A finger opens the accordion, so the row it grabs is a real target. */
+    @media (pointer: coarse) {
+      .faq summary { min-height: var(--tap); }
+    }
+  </style>
+<meta name="theme-color" content="#FFFFFF">
+<link rel="stylesheet" href="/app-2026.css?v=9">
+<script src="/js/theme.js?v=5"></script>
+</head>
+<body>
+<nav class="nav">
+  <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
+
+  <ul class="nav-links">
+    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/security" class="nav-link">Security</a></li>
+    <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
+    <li><a href="/en/docs" class="nav-link">Docs</a></li>
+  </ul>
+
+  <div class="nav-auth" id="nav-auth">
+    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/auth/login" class="nav-signin">Sign in</a>
+    <a href="/en/signup" class="nav-cta">Create account</a>
+  </div>
+
+  <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/signup/verified" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/signup/verified" hreflang="en" lang="en" aria-current="true">EN</a></div>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile" id="nav-mobile">
+  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/security" class="nav-mobile-standalone">Security</a>
+  <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
+  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
+</div>
+<div class="nav-mobile-tail" id="nav-mobile-tail">
+  <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
+  <a href="/help" class="nav-tail-link">Help</a>
+  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/signup/verified" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/signup/verified" hreflang="en" lang="en" aria-current="true">EN</a></span>
+</div>
+<main class="vwrap">
+  <div class="vcheck" aria-label="Email verified">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+    Email verified
+  </div>
+
+  <h1 class="vtitle">One step left. Open the second email.</h1>
+
+  <p class="vlead">Your address is confirmed and your account exists. Paramant has no passwords, so the last step is to link a passkey or an authenticator app, and that happens through the second mail we just sent you.</p>
+
+  <div class="next-box">
+    <div class="next-step">Do this now</div>
+    <div class="next-title">Look for this subject line</div>
+    <p class="next-msg">The mail comes from noreply@paramant.app with this subject, in Dutch. The English text is further down in the mail:</p>
+    <p class="next-subject" lang="nl">Maak uw Paramant-account af</p>
+    <p class="next-msg" style="margin-top:16px;">Open it and follow the setup link. There you choose a passkey (Face ID, Touch ID, Windows Hello) or an authenticator app, and you save your backup codes. No app yet? <strong>Google Authenticator</strong> or <strong>Microsoft Authenticator</strong> both work. Already using <strong>1Password</strong> or <strong>Bitwarden</strong>? Keep it there. Any other standard authenticator works too, and <a href="/help/authenticator-apps">the help page compares them</a>. The 6-digit codes are produced by that app, never sent by email.</p>
+  </div>
+
+  <div class="faq">
+    <h2>Frequently asked</h2>
+    <details>
+      <summary>I don't see the second email</summary>
+      <p>The mail is on its way, but we cannot promise how fast your provider delivers it. Check your spam and junk folders; the sender is <code>noreply@paramant.app</code>. Still nothing after a few minutes? <a href="/en/auth/request-reset">Ask for a new setup link</a> with the same address.</p>
+    </details>
+    <details>
+      <summary>Where's the 6-digit code in the email?</summary>
+      <p>It is not in the mail, and it never will be. The codes are produced on your phone by the authenticator app, once you have scanned the QR code in the setup mail. Any standard app works; <a href="/help/authenticator-apps">the help page compares them</a>.</p>
+    </details>
+    <details>
+      <summary>I already completed the setup</summary>
+      <p>Then you are ready. <a href="/en/auth/login">Sign in</a> with your email and either your passkey or the 6-digit code from your authenticator app.</p>
+    </details>
+  </div>
+
+  <p class="vwho">Paramant is a product of <strong>Paramantis Solutions B.V.</strong>, Harderwijk, the Netherlands. KvK 42115132. <a href="mailto:privacy@paramant.app">privacy@paramant.app</a></p>
+</main>
+<p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/signup/verified" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
+<footer class="legal-strip">
+  <a href="/en/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/en/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/en/terms">Terms of Service</a>
+</footer>
+</body>
+</html>

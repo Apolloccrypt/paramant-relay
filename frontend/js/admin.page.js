@@ -8,7 +8,7 @@ let openMenu = null;
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-function fmt(ts){if(!ts)return '—';const d=new Date(ts);return d.toLocaleDateString('nl-NL',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}
+function fmt(ts){if(!ts)return '-';const d=new Date(ts);return d.toLocaleDateString('nl-NL',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}
 function toast(msg,type=''){const el=document.createElement('div');el.className='toast'+(type?' '+type:'');el.textContent=msg;el.setAttribute('role','status');document.body.appendChild(el);requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('show')));setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),250);},3200);}
 function showErr(msg){const e=document.getElementById('l-err');e.textContent=msg;e.style.display='block'}
 
@@ -23,16 +23,16 @@ async function api(path,opts={}){
 async function doLogin(){
   const token=document.getElementById('l-token').value.trim();
   const totp=document.getElementById('l-totp').value.replace(/\D/g,'');
-  if(!token){showErr('Admin token required');return}
-  if(totp.length!==6){showErr('TOTP must be 6 digits');return}
+  if(!token){showErr('Beheertoken is verplicht');return}
+  if(totp.length!==6){showErr('De TOTP-code moet 6 cijfers hebben');return}
   const btn=document.getElementById('l-btn');
-  btn.disabled=true;btn.textContent='Signing in…';
+  btn.disabled=true;btn.textContent='Bezig met inloggen…';
   document.getElementById('l-err').style.display='none';
   const r=await fetch('/admin/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,totp})});
   const d=await r.json().catch(()=>({}));
   if(!r.ok||!d.session){
-    showErr(d.error||'Login failed — check token and TOTP');
-    btn.disabled=false;btn.textContent='Sign in';return;
+    showErr(d.error||'Inloggen mislukt. Controleer het token en de TOTP-code.');
+    btn.disabled=false;btn.textContent='Inloggen';return;
   }
   SESSION=d.session;
   sessionStorage.setItem('adm_session',SESSION);
@@ -65,10 +65,11 @@ function switchTab(tab){
   panel.classList.add('on');
   panel.removeAttribute('aria-hidden');
   location.hash='#'+tab;
-  srAnnounce('Loading '+tab+' tab');
+  srAnnounce('Tabblad '+(TAB_NAMES[tab]||tab)+' wordt geladen');
   if(!LOADED[tab]){LOADED[tab]=true;loadTab(tab);}
 }
 
+const TAB_NAMES={overview:'overzicht',users:'gebruikers',audit:'audit',billing:'betalingen',relay:'relay'};
 function srAnnounce(msg){const el=document.getElementById('sr-live');if(el)el.textContent=msg;}
 
 function loadTab(tab){
@@ -82,30 +83,30 @@ function loadTab(tab){
 /* ── Overview ────────────────────────────────────────────────────────────── */
 async function loadOverview(){
   const el=document.getElementById('tab-overview');
-  el.innerHTML='<div class="empty"><span class="sp-icon"></span>Loading…</div>';
+  el.innerHTML='<div class="empty"><span class="sp-icon"></span>Laden…</div>';
   const r=await api('/admin/overview');
-  if(!r.ok){el.innerHTML='<div class="empty">Error loading overview</div>';return}
+  if(!r.ok){el.innerHTML='<div class="empty">Het overzicht kon niet worden geladen</div>';return}
   const d=r.data;
   const st=d.stats||{};
   const dist=d.plan_distribution||{};
   const total=Object.values(dist).reduce((a,b)=>a+b,0)||1;
   el.innerHTML=
     '<div class="sg">'+
-      statCard('Signups today',st.signups_today??0)+
-      statCard('Active sessions',st.active_sessions??0)+
-      statCard('Pro upgrades today',st.pro_upgrades_today??0)+
+      statCard('Aanmeldingen vandaag',st.signups_today??0)+
+      statCard('Actieve sessies',st.active_sessions??0)+
+      statCard('Upgrades naar pro vandaag',st.pro_upgrades_today??0)+
       statCard('MRR (EUR)','€'+((st.revenue_mrr||0)/100).toFixed(0))+
     '</div>'+
-    (d.alerts&&d.alerts.length?'<div class="card"><div class="card-hdr">Alerts</div>'+d.alerts.map(a=>'<div class="banner info">'+esc(a)+'</div>').join('')+'</div>':'')+
+    (d.alerts&&d.alerts.length?'<div class="card"><div class="card-hdr">Meldingen</div>'+d.alerts.map(a=>'<div class="banner info">'+esc(a)+'</div>').join('')+'</div>':'')+
     '<div class="g2">'+
-      '<div class="card"><div class="card-hdr">Recent activity <small>last 10 events</small></div>'+
+      '<div class="card"><div class="card-hdr">Recente activiteit <small>laatste 10 gebeurtenissen</small></div>'+
         '<div class="al">'+
           (d.recent_activity&&d.recent_activity.length?
-            d.recent_activity.map(e=>'<div class="ai"><span class="t">'+fmt(e.ts).split(' ').slice(-1)[0]+'</span><span class="e">'+esc(e.event_type||'—')+'</span><span class="u">'+esc((e.user_id||'').slice(0,20))+'</span></div>').join(''):
-            '<div class="empty">No events yet</div>')+
+            d.recent_activity.map(e=>'<div class="ai"><span class="t">'+fmt(e.ts).split(' ').slice(-1)[0]+'</span><span class="e">'+esc(e.event_type||'-')+'</span><span class="u">'+esc((e.user_id||'').slice(0,20))+'</span></div>').join(''):
+            '<div class="empty">Nog geen gebeurtenissen</div>')+
         '</div>'+
       '</div>'+
-      '<div class="card"><div class="card-hdr">Plan distribution</div>'+
+      '<div class="card"><div class="card-hdr">Verdeling over abonnementen</div>'+
         planBars(dist,total)+
       '</div>'+
     '</div>';
@@ -128,9 +129,9 @@ async function loadUsers(page,pageSize){
   const el=document.getElementById('tab-users');
   if(page!==undefined)userPagination.page=page;
   if(pageSize!==undefined)userPagination.page_size=pageSize;
-  el.innerHTML='<div class="empty"><span class="sp-icon"></span>Loading users…</div>';
+  el.innerHTML='<div class="empty"><span class="sp-icon"></span>Gebruikers worden geladen…</div>';
   const r=await api('/admin/users?page='+userPagination.page+'&page_size='+userPagination.page_size);
-  if(!r.ok){el.innerHTML='<div class="empty">Error loading users</div>';return}
+  if(!r.ok){el.innerHTML='<div class="empty">De gebruikers konden niet worden geladen</div>';return}
   allUsers=r.data.users||[];
   const counts=r.data.counts||{};
   if(r.data.pagination)Object.assign(userPagination,r.data.pagination);
@@ -140,26 +141,26 @@ async function loadUsers(page,pageSize){
 function renderUsers(el,users,counts){
   const pg=userPagination;
   el.innerHTML=
-    '<div class="card"><div class="card-hdr">Users <small>'+counts.total+' total · '+counts.active+' active · page '+pg.page+'/'+pg.total_pages+'</small>'+
-      '<button class="btn" data-click="showNewKeyModal">+ New key</button>'+
+    '<div class="card"><div class="card-hdr">Gebruikers <small>'+counts.total+' totaal · '+counts.active+' actief · pagina '+pg.page+'/'+pg.total_pages+'</small>'+
+      '<button class="btn" data-click="showNewKeyModal">+ Nieuwe sleutel</button>'+
     '</div>'+
     '<div class="fb">'+
-      '<label for="u-search" class="sr-only">Search users</label>'+
-      '<input id="u-search" placeholder="Search email or label…" data-input="filterUsers" style="width:220px">'+
-      '<select id="u-plan" aria-label="Filter by plan" data-change="filterUsers"><option value="">All plans</option><option>community</option><option>pro</option><option>enterprise</option><option>trial</option></select>'+
-      '<select id="u-totp" aria-label="Filter by TOTP" data-change="filterUsers"><option value="">Any TOTP</option><option value="active">Active</option><option value="pending">Pending</option><option value="none">None</option></select>'+
-      '<select id="u-status" aria-label="Filter by status" data-change="filterUsers"><option value="">All status</option><option value="active">Active</option><option value="revoked">Revoked</option></select>'+
+      '<label for="u-search" class="sr-only">Gebruikers zoeken</label>'+
+      '<input id="u-search" placeholder="Zoek op e-mail of label…" data-input="filterUsers" style="width:220px">'+
+      '<select id="u-plan" aria-label="Filteren op abonnement" data-change="filterUsers"><option value="">Alle abonnementen</option><option>community</option><option>pro</option><option>enterprise</option><option>trial</option></select>'+
+      '<select id="u-totp" aria-label="Filteren op TOTP" data-change="filterUsers"><option value="">Elke TOTP-stand</option><option value="active">Actief</option><option value="pending">In afwachting</option><option value="none">Geen</option></select>'+
+      '<select id="u-status" aria-label="Filteren op status" data-change="filterUsers"><option value="">Elke status</option><option value="active">Actief</option><option value="revoked">Ingetrokken</option></select>'+
     '</div>'+
     '<div id="u-table-wrap">'+usersTable(users)+'</div>'+
-    '<div class="pag" aria-label="Pagination">'+
-      '<button data-click="usersPage" data-page="'+(pg.page-1)+'" '+(pg.has_prev?'':'disabled')+' aria-label="Previous page">&#8592; Prev</button>'+
-      '<span class="pag-info">Page '+pg.page+' of '+pg.total_pages+' ('+pg.total_items+' users)</span>'+
-      '<button data-click="usersPage" data-page="'+(pg.page+1)+'" '+(pg.has_next?'':'disabled')+' aria-label="Next page">Next &#8594;</button>'+
-      '<select aria-label="Rows per page" data-change="usersPageSize">'+
-        '<option value="25" '+(pg.page_size==25?'selected':'')+'>25/page</option>'+
-        '<option value="50" '+(pg.page_size==50?'selected':'')+'>50/page</option>'+
-        '<option value="100" '+(pg.page_size==100?'selected':'')+'>100/page</option>'+
-        '<option value="200" '+(pg.page_size==200?'selected':'')+'>200/page</option>'+
+    '<div class="pag" aria-label="Paginering">'+
+      '<button data-click="usersPage" data-page="'+(pg.page-1)+'" '+(pg.has_prev?'':'disabled')+' aria-label="Vorige pagina">&#8592; Vorige</button>'+
+      '<span class="pag-info">Pagina '+pg.page+' van '+pg.total_pages+' ('+pg.total_items+' gebruikers)</span>'+
+      '<button data-click="usersPage" data-page="'+(pg.page+1)+'" '+(pg.has_next?'':'disabled')+' aria-label="Volgende pagina">Volgende &#8594;</button>'+
+      '<select aria-label="Rijen per pagina" data-change="usersPageSize">'+
+        '<option value="25" '+(pg.page_size==25?'selected':'')+'>25 per pagina</option>'+
+        '<option value="50" '+(pg.page_size==50?'selected':'')+'>50 per pagina</option>'+
+        '<option value="100" '+(pg.page_size==100?'selected':'')+'>100 per pagina</option>'+
+        '<option value="200" '+(pg.page_size==200?'selected':'')+'>200 per pagina</option>'+
       '</select>'+
     '</div>'+
     '</div>';
@@ -181,41 +182,41 @@ function filterUsers(){
 
 // Usage-purpose survey answer (dashboard question). 'organisation' and
 // 'client_management' are the sales-relevant ones, so they get the accent.
-const PURPOSE_LABELS={personal:'Personal use',organisation:'Organisation',client_management:'Manages for clients',research_journalism:'Research/journalism',skipped:'Skipped'};
+const PURPOSE_LABELS={personal:'Persoonlijk gebruik',organisation:'Organisatie',client_management:'Beheert voor klanten',research_journalism:'Onderzoek/journalistiek',skipped:'Overgeslagen'};
 function purposeLine(u){
   if(!u.usage_purpose)return '';
   const hot=u.usage_purpose==='organisation'||u.usage_purpose==='client_management';
-  return '<div class="mono" style="font-size:11px;color:'+(hot?'var(--ochre);font-weight:600':'var(--ink-dim)')+'" title="Usage purpose ('+esc(u.usage_purpose_at?u.usage_purpose_at.split('T')[0]:'')+')">use: '+esc(PURPOSE_LABELS[u.usage_purpose]||u.usage_purpose)+'</div>';
+  return '<div class="mono" style="font-size:11px;color:'+(hot?'var(--ochre);font-weight:600':'var(--ink-dim)')+'" title="Doel van gebruik ('+esc(u.usage_purpose_at?u.usage_purpose_at.split('T')[0]:'')+')">gebruik: '+esc(PURPOSE_LABELS[u.usage_purpose]||u.usage_purpose)+'</div>';
 }
 function usersTable(users){
-  if(!users.length)return '<div class="empty">No users match filters</div>';
-  return '<table class="tbl" role="table" aria-label="Users list"><caption class="sr-only">List of Paramant users</caption><thead><tr role="row"><th scope="col">Email / Label</th><th scope="col">Plan</th><th scope="col">TOTP</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody>'+
+  if(!users.length)return '<div class="empty">Geen gebruikers die aan de filters voldoen</div>';
+  return '<table class="tbl" role="table" aria-label="Lijst met gebruikers"><caption class="sr-only">Lijst met gebruikers van Paramant</caption><thead><tr role="row"><th scope="col">E-mail / label</th><th scope="col">Abonnement</th><th scope="col">TOTP</th><th scope="col">Status</th><th scope="col">Aangemaakt</th><th scope="col"><span class="sr-only">Acties</span></th></tr></thead><tbody>'+
     users.map((u,i)=>{
       const ki=esc(u.key_id||u.key),em=esc(u.email||''),pl=esc(u.plan||'community');
       const hasE=!!u.email,hasTotp=hasE&&u.totp_status!=='none',isRevoked=!u.active;
       return '<tr>'+
-        '<td><div>'+esc(u.email||'—')+'</div>'+(u.label?'<div class="mono" style="font-size:11px;color:#475569">'+esc(u.label)+'</div>':'')+
+        '<td><div>'+esc(u.email||'-')+'</div>'+(u.label?'<div class="mono" style="font-size:11px;color:#475569">'+esc(u.label)+'</div>':'')+
         purposeLine(u)+'</td>'+
         '<td><span class="badge '+esc(u.plan||'community')+'">'+esc(u.plan||'community')+'</span></td>'+
         '<td>'+totpBadge(u)+'</td>'+
-        '<td><span class="chip '+(u.active?'active':'revoked')+'">'+(u.active?'active':'revoked')+'</span></td>'+
-        '<td class="mono" style="font-size:11px;color:#475569">'+(u.created?u.created.split('T')[0]:'—')+'</td>'+
+        '<td><span class="chip '+(u.active?'active':'revoked')+'">'+(u.active?'actief':'ingetrokken')+'</span></td>'+
+        '<td class="mono" style="font-size:11px;color:#475569">'+(u.created?u.created.split('T')[0]:'-')+'</td>'+
         '<td><div class="amw">'+
           '<button class="amb" aria-haspopup="menu" aria-expanded="false" data-click="toggleMenu" data-menu="m'+i+'">···</button>'+
           '<div class="am" role="menu" id="m'+i+'" data-key="'+ki+'" data-email="'+em+'" data-plan="'+pl+'" data-label="'+esc(u.label||'')+'" data-created="'+esc(u.created||'')+'" data-totp-req="'+(u.totp_required?'true':'false')+'">'+
-            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="details">View details</button>'+
-            '<div class="ag-lbl">Email</div>'+
-            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="welcome"'+(hasE?'':' disabled')+'>Send welcome</button>'+
-            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="setup"'+(hasE?'':' disabled')+'>Send TOTP setup link</button>'+
-            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="reset-totp"'+(hasTotp?'':' disabled')+'>Send TOTP reset</button>'+
+            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="details">Gegevens bekijken</button>'+
+            '<div class="ag-lbl">E-mail</div>'+
+            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="welcome"'+(hasE?'':' disabled')+'>Welkomstmail sturen</button>'+
+            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="setup"'+(hasE?'':' disabled')+'>Link voor TOTP-instelling sturen</button>'+
+            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="reset-totp"'+(hasTotp?'':' disabled')+'>TOTP-reset sturen</button>'+
             '<div class="ag-lbl">Account</div>'+
-            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="plan">Change plan</button>'+
-            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="revoke-sessions">Revoke sessions</button>'+
-            '<div class="ag-lbl">Security</div>'+
-            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="force-totp">'+(u.totp_required?'Remove TOTP requirement':'Require TOTP')+'</button>'+
-'<div class="ag-lbl danger">Destructive</div>'+
-            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="disable" class="danger"'+(isRevoked?' disabled':'')+'>Disable key</button>'+
-            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="delete" class="danger">Deactivate account</button>'+
+            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="plan">Abonnement wijzigen</button>'+
+            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="revoke-sessions">Sessies intrekken</button>'+
+            '<div class="ag-lbl">Beveiliging</div>'+
+            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="force-totp">'+(u.totp_required?'TOTP-verplichting opheffen':'TOTP verplicht stellen')+'</button>'+
+'<div class="ag-lbl danger">Onomkeerbaar</div>'+
+            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="disable" class="danger"'+(isRevoked?' disabled':'')+'>Sleutel uitschakelen</button>'+
+            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="delete" class="danger">Account deactiveren</button>'+
           '</div>'+
         '</div></td>'+
       '</tr>';
@@ -275,9 +276,9 @@ function uAction(action,btn){
     case 'reset-totp': openEmailPreviewModal('reset-confirm',key,email); break;
     case 'plan':    openChangePlanModal(key,email,plan); break;
     case 'revoke-sessions':
-      if(!confirm('Revoke all sessions for '+(email||key.slice(0,20)+'…')+'?'))return;
+      if(!confirm('Alle sessies van '+(email||key.slice(0,20)+'…')+' intrekken?'))return;
       api('/admin/revoke-sessions',{method:'POST',body:JSON.stringify({key})}).then(r=>{
-        toast(r.ok?'Sessions revoked ('+(r.data?.revoked||0)+')':'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+        toast(r.ok?'Sessies ingetrokken ('+(r.data?.revoked||0)+')':'Mislukt: '+(r.data?.error||'onbekend'),r.ok?'ok':'err');
       });
       break;
     case 'disable': openDisableKeyModal(key,email); break;
@@ -288,13 +289,13 @@ function showNewKeyModal(){
   const o=document.createElement('div');
   o.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(12, 15, 17, .72);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px';
   o.innerHTML='<div style="background:var(--bone-2);border:1.5px solid var(--line);padding:28px;max-width:480px;width:100%;color:var(--ink)">'+
-    '<div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px">Create new API key</div>'+
+    '<div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:16px">Nieuwe API-sleutel maken</div>'+
     '<label class="l-lbl">Label</label><input id="nk-l" class="l-inp" placeholder="acme-corp"><br>'+
-    '<label class="l-lbl">Plan</label><select id="nk-p" class="l-inp"><option value="community">community</option><option value="pro" selected>pro</option><option value="enterprise">enterprise</option><option value="trial">trial</option></select><br>'+
-    '<label class="l-lbl">Email (optional)</label><input id="nk-e" class="l-inp" type="email" placeholder="client@example.com"><br>'+
+    '<label class="l-lbl">Abonnement</label><select id="nk-p" class="l-inp"><option value="community">community</option><option value="pro" selected>pro</option><option value="enterprise">enterprise</option><option value="trial">trial</option></select><br>'+
+    '<label class="l-lbl">E-mail (optioneel)</label><input id="nk-e" class="l-inp" type="email" placeholder="client@example.com"><br>'+
     '<div style="display:flex;gap:10px;margin-top:8px">'+
-    '<button data-click="doCreateKey" class="btn" style="flex:1">Create key</button>'+
-    '<button onclick="this.closest(\'[data-modal]\').remove()" class="btn out">Cancel</button>'+
+    '<button data-click="doCreateKey" class="btn" style="flex:1">Sleutel maken</button>'+
+    '<button onclick="this.closest(\'[data-modal]\').remove()" class="btn out">Annuleren</button>'+
     '</div><div id="nk-res" style="margin-top:12px;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace"></div></div>';
   o.dataset.modal='1';
   o.addEventListener('click',e=>{if(e.target===o)o.remove();});
@@ -305,40 +306,40 @@ async function doCreateKey(){
   const label=document.getElementById('nk-l').value.trim();
   const plan=document.getElementById('nk-p').value;
   const email=document.getElementById('nk-e').value.trim();
-  if(!label){toast('Label required','err');return}
+  if(!label){toast('Label is verplicht','err');return}
   const r=await api('/keys/all',{method:'POST',body:JSON.stringify({label,plan,email})});
   const res=document.getElementById('nk-res');
   if(r.ok&&r.data?.created?.length){
-    const key=r.data.created[0]?.key||'(see response)';
+    const key=r.data.created[0]?.key||'(zie het antwoord)';
     res.innerHTML='<div style="background:var(--card-2);border:1px solid var(--line);padding:12px;word-break:break-all;color:var(--ochre)">'+esc(key)+'</div>'+
-      '<div style="color:#059669;margin-top:6px">Key created. Save it — shown once.</div>';
+      '<div style="color:#059669;margin-top:6px">Sleutel gemaakt. Bewaar hem nu: u ziet hem maar één keer.</div>';
     LOADED.users=false;
   }else{
-    res.innerHTML='<div style="color:var(--brick-ink)">Failed: '+esc(r.data?.failed?.[0]?.error||r.data?.error||'unknown')+'</div>';
+    res.innerHTML='<div style="color:var(--brick-ink)">Mislukt: '+esc(r.data?.failed?.[0]?.error||r.data?.error||'onbekend')+'</div>';
   }
 }
 
 /* ── Audit ───────────────────────────────────────────────────────────────── */
 async function loadAudit(){
   const el=document.getElementById('tab-audit');
-  el.innerHTML='<div class="empty"><span class="sp-icon"></span>Loading audit log…</div>';
+  el.innerHTML='<div class="empty"><span class="sp-icon"></span>Auditlog wordt geladen…</div>';
   renderAuditShell(el);
   fetchAudit();
 }
 
 function renderAuditShell(el){
-  el.innerHTML='<div class="card"><div class="card-hdr">Audit log</div>'+
+  el.innerHTML='<div class="card"><div class="card-hdr">Auditlog</div>'+
     '<div class="fb">'+
-      '<select id="a-event"><option value="">All events</option>'+
+      '<select id="a-event" aria-label="Filteren op gebeurtenis"><option value="">Alle gebeurtenissen</option>'+
         ['signup','login','logout','setup_totp','activate_totp','revoke_session','plan_changed','delete_account'].map(e=>'<option>'+e+'</option>').join('')+
       '</select>'+
-      '<input id="a-user" placeholder="User key prefix…" style="width:200px">'+
-      '<select id="a-since"><option value="">All time</option><option value="1">Last hour</option><option value="24">Last 24h</option><option value="168">Last 7d</option></select>'+
+      '<input id="a-user" placeholder="Begin van de gebruikerssleutel…" style="width:200px">'+
+      '<select id="a-since" aria-label="Periode"><option value="">Altijd</option><option value="1">Laatste uur</option><option value="24">Laatste 24 uur</option><option value="168">Laatste 7 dagen</option></select>'+
       '<div class="sp"></div>'+
-      '<button class="btn out" data-click="exportAuditCSV">Export CSV</button>'+
-      '<button class="btn" data-click="fetchAudit">Refresh</button>'+
+      '<button class="btn out" data-click="exportAuditCSV">CSV exporteren</button>'+
+      '<button class="btn" data-click="fetchAudit">Vernieuwen</button>'+
     '</div>'+
-    '<div id="a-results"><div class="empty"><span class="sp-icon"></span>Loading…</div></div>'+
+    '<div id="a-results"><div class="empty"><span class="sp-icon"></span>Laden…</div></div>'+
     '</div>';
 }
 
@@ -353,15 +354,15 @@ async function fetchAudit(){
   const r=await api('/admin/audit?'+params);
   const el=document.getElementById('a-results');
   if(!el)return;
-  if(!r.ok){el.innerHTML='<div class="empty">Error loading audit log</div>';return}
+  if(!r.ok){el.innerHTML='<div class="empty">De auditlog kon niet worden geladen</div>';return}
   const events=r.data.events||[];
-  if(!events.length){el.innerHTML='<div class="empty">No audit events match filters</div>';return}
-  el.innerHTML='<table class="tbl"><thead><tr><th>Timestamp</th><th>Event</th><th>User</th><th>Details</th></tr></thead><tbody>'+
+  if(!events.length){el.innerHTML='<div class="empty">Geen auditgebeurtenissen die aan de filters voldoen</div>';return}
+  el.innerHTML='<table class="tbl"><thead><tr><th>Tijdstip</th><th>Gebeurtenis</th><th>Gebruiker</th><th>Details</th></tr></thead><tbody>'+
     events.map(e=>'<tr>'+
-      '<td class="mono" style="font-size:11px;white-space:nowrap">'+esc(e.ts?new Date(e.ts).toISOString().replace('T',' ').slice(0,19):'—')+'</td>'+
-      '<td><span class="chip active">'+esc(e.event_type||'—')+'</span></td>'+
+      '<td class="mono" style="font-size:11px;white-space:nowrap">'+esc(e.ts?new Date(e.ts).toISOString().replace('T',' ').slice(0,19):'-')+'</td>'+
+      '<td><span class="chip active">'+esc(e.event_type||'-')+'</span></td>'+
       '<td class="mono" style="font-size:11px;color:#475569">'+esc((e.user_id||'').slice(0,20))+'</td>'+
-      '<td><details><summary style="cursor:pointer;font-size:11px;color:var(--ink-dim)">show</summary><pre style="font-size:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin-top:4px;color:var(--ink-2);white-space:pre-wrap">'+esc(JSON.stringify(e.metadata||{},null,2))+'</pre></details></td>'+
+      '<td><details><summary style="cursor:pointer;font-size:11px;color:var(--ink-dim)">tonen</summary><pre style="font-size:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin-top:4px;color:var(--ink-2);white-space:pre-wrap">'+esc(JSON.stringify(e.metadata||{},null,2))+'</pre></details></td>'+
     '</tr>').join('')+'</tbody></table>';
 }
 
@@ -382,9 +383,9 @@ function exportAuditCSV(){
 /* ── Billing ─────────────────────────────────────────────────────────────── */
 async function loadBilling(){
   const el=document.getElementById('tab-billing');
-  el.innerHTML='<div class="empty"><span class="sp-icon"></span>Loading…</div>';
+  el.innerHTML='<div class="empty"><span class="sp-icon"></span>Laden…</div>';
   const r=await api('/admin/billing');
-  if(!r.ok){el.innerHTML='<div class="empty">Error loading billing</div>';return}
+  if(!r.ok){el.innerHTML='<div class="empty">De betalingen konden niet worden geladen</div>';return}
   const d=r.data;
   const dist=d.plan_distribution||{};
   const total=Object.values(dist).reduce((a,b)=>a+b,0)||1;
@@ -399,16 +400,16 @@ async function loadBilling(){
        admin container), and it is corrected rather than deleted because
        tests/ui-truthfulness.test.mjs reads it by name, and because a wrong
        copy left lying next to a right one is how the wrong one comes back. */
-    '<div class="banner info" role="status"><strong>Billing</strong> Mollie payments are live: one payment per term, no subscription and no direct debit. A numbered invoice or credit note is issued automatically from the payment webhook. This tab shows plan distribution and admin plan changes, not payments or revenue.</div>'+
-      '<div class="card"><div class="card-hdr">Recent plan changes <small>'+( d.recent_checkouts?.length||0)+' events</small></div>'+
+    '<div class="banner info" role="status"><strong>Betalingen</strong> Mollie-betalingen zijn live: één betaling per termijn, geen doorlopend abonnement en geen automatische incasso. Een genummerde factuur of creditnota wordt automatisch gemaakt vanuit de betaalwebhook. Dit tabblad toont de verdeling over abonnementen en de wijzigingen die een beheerder maakte, geen betalingen of omzet.</div>'+
+      '<div class="card"><div class="card-hdr">Recente wijzigingen van abonnement <small>'+( d.recent_checkouts?.length||0)+' gebeurtenissen</small></div>'+
         (d.recent_checkouts&&d.recent_checkouts.length?
-          '<table class="tbl"><thead><tr><th>Time</th><th>User</th><th>Event</th></tr></thead><tbody>'+
+          '<table class="tbl"><thead><tr><th>Tijd</th><th>Gebruiker</th><th>Gebeurtenis</th></tr></thead><tbody>'+
           d.recent_checkouts.map(e=>'<tr>'+
-            '<td class="mono" style="font-size:11px">'+esc(e.ts?new Date(e.ts).toISOString().slice(0,10):'—')+'</td>'+
+            '<td class="mono" style="font-size:11px">'+esc(e.ts?new Date(e.ts).toISOString().slice(0,10):'-')+'</td>'+
             '<td class="mono" style="font-size:11px;color:#475569">'+esc((e.user_id||'').slice(0,16))+'</td>'+
-            '<td>'+esc(e.event_type||'—')+'</td>'+
+            '<td>'+esc(e.event_type||'-')+'</td>'+
           '</tr>').join('')+'</tbody></table>':
-          '<div class="empty">No plan changes recorded yet</div>')+
+          '<div class="empty">Nog geen wijzigingen van abonnement vastgelegd</div>')+
       '</div>'+
       renderCouponsShell()+
     '</div>';
@@ -424,18 +425,18 @@ async function loadBilling(){
    customers get different answers for the same code. Withdraw it and make
    another. */
 function renderCouponsShell(){
-  return '<div class="card"><div class="card-hdr">Gift codes <small>a term given, no payment, no invoice</small></div>'+
+  return '<div class="card"><div class="card-hdr">Cadeaucodes <small>een gegeven termijn, geen betaling, geen factuur</small></div>'+
     '<div class="fb">'+
-      '<input id="c-code" placeholder="CODE" style="width:160px;text-transform:uppercase">'+
-      '<input id="c-max" type="number" min="1" value="100" style="width:90px" title="Maximum redemptions">'+
-      '<input id="c-days" type="number" min="1" value="90" style="width:90px" title="Days granted">'+
-      '<input id="c-until" type="date" style="width:150px" title="Valid until">'+
+      '<input id="c-code" placeholder="CODE" aria-label="Code" style="width:160px;text-transform:uppercase">'+
+      '<input id="c-max" type="number" min="1" value="100" style="width:90px" title="Maximaal aantal keer inwisselen" aria-label="Maximaal aantal keer inwisselen">'+
+      '<input id="c-days" type="number" min="1" value="90" style="width:90px" title="Aantal dagen" aria-label="Aantal dagen">'+
+      '<input id="c-until" type="date" style="width:150px" title="Geldig tot" aria-label="Geldig tot">'+
       '<div class="sp"></div>'+
-      '<button class="btn" data-click="doCreateCoupon">Create code</button>'+
-      '<button class="btn out" data-click="fetchCoupons">Refresh</button>'+
+      '<button class="btn" data-click="doCreateCoupon">Code maken</button>'+
+      '<button class="btn out" data-click="fetchCoupons">Vernieuwen</button>'+
     '</div>'+
     '<div id="c-msg" style="font-size:12px;margin-bottom:8px"></div>'+
-    '<div id="c-results"><div class="empty"><span class="sp-icon"></span>Loading…</div></div>'+
+    '<div id="c-results"><div class="empty"><span class="sp-icon"></span>Laden…</div></div>'+
   '</div>';
 }
 
@@ -443,17 +444,17 @@ async function fetchCoupons(){
   const el=document.getElementById('c-results');
   if(!el)return;
   const r=await api('/admin/coupons');
-  if(!r.ok){el.innerHTML='<div class="empty">Error loading gift codes</div>';return}
+  if(!r.ok){el.innerHTML='<div class="empty">De cadeaucodes konden niet worden geladen</div>';return}
   const list=(r.data&&r.data.coupons)||[];
-  if(!list.length){el.innerHTML='<div class="empty">No gift codes yet</div>';return}
-  el.innerHTML='<table class="tbl"><thead><tr><th>Code</th><th>Gives</th><th>Used</th><th>Valid until</th><th>Status</th><th></th></tr></thead><tbody>'+
+  if(!list.length){el.innerHTML='<div class="empty">Nog geen cadeaucodes</div>';return}
+  el.innerHTML='<table class="tbl"><thead><tr><th>Code</th><th>Geeft</th><th>Gebruikt</th><th>Geldig tot</th><th>Status</th><th></th></tr></thead><tbody>'+
     list.map(c=>'<tr>'+
       '<td class="mono">'+esc(c.code)+'</td>'+
       '<td style="font-size:12px">'+esc(c.describes||'')+'</td>'+
       '<td class="mono">'+esc(c.used+' / '+c.max_redemptions)+'</td>'+
-      '<td style="font-size:12px">'+esc(c.valid_until?c.valid_until.slice(0,10):'no end date')+'</td>'+
-      '<td>'+(c.revoked_at?'<span class="chip">withdrawn</span>':(c.remaining>0?'<span class="chip active">open</span>':'<span class="chip">used up</span>'))+'</td>'+
-      '<td>'+(c.revoked_at?'':'<button class="btn out" data-click="doRevokeCoupon" data-code="'+esc(c.code)+'">Withdraw</button>')+'</td>'+
+      '<td style="font-size:12px">'+esc(c.valid_until?c.valid_until.slice(0,10):'geen einddatum')+'</td>'+
+      '<td>'+(c.revoked_at?'<span class="chip">ingetrokken</span>':(c.remaining>0?'<span class="chip active">open</span>':'<span class="chip">op</span>'))+'</td>'+
+      '<td>'+(c.revoked_at?'':'<button class="btn out" data-click="doRevokeCoupon" data-code="'+esc(c.code)+'">Intrekken</button>')+'</td>'+
     '</tr>').join('')+'</tbody></table>';
 }
 
@@ -463,7 +464,7 @@ async function doCreateCoupon(){
   const days=parseInt(document.getElementById('c-days')?.value||'0',10);
   const until=document.getElementById('c-until')?.value||'';
   const msg=document.getElementById('c-msg');
-  if(!code){if(msg){msg.style.color='var(--brick-ink)';msg.textContent='Enter a code.';}return}
+  if(!code){if(msg){msg.style.color='var(--brick-ink)';msg.textContent='Vul een code in.';}return}
   /* Both products on Pro is the campaign this shipped for. The relay validates
      every field again; nothing here is trusted. */
   const body={code:code,max_redemptions:max,grants:[
@@ -475,8 +476,8 @@ async function doCreateCoupon(){
   if(msg){
     msg.style.color=r.ok?'#059669':'var(--brick-ink)';
     msg.textContent=r.ok
-      ?('Created '+code+': '+((r.data&&r.data.coupon&&r.data.coupon.describes)||'')+', '+max+' redemptions.')
-      :('Failed: '+((r.data&&r.data.error)||'unknown'));
+      ?(code+' gemaakt: '+((r.data&&r.data.coupon&&r.data.coupon.describes)||'')+', '+max+' keer in te wisselen.')
+      :('Mislukt: '+((r.data&&r.data.error)||'onbekend'));
   }
   if(r.ok){document.getElementById('c-code').value='';fetchCoupons();}
 }
@@ -489,8 +490,8 @@ async function doRevokeCoupon(el){
   if(msg){
     msg.style.color=r.ok?'#059669':'var(--brick-ink)';
     msg.textContent=r.ok
-      ?(code+' withdrawn. Codes already redeemed keep their term.')
-      :('Failed: '+((r.data&&r.data.error)||'unknown'));
+      ?(code+' ingetrokken. Wie de code al inwisselde, houdt de termijn.')
+      :('Mislukt: '+((r.data&&r.data.error)||'onbekend'));
   }
   if(r.ok)fetchCoupons();
 }
@@ -498,7 +499,7 @@ async function doRevokeCoupon(el){
 /* ── Relay ───────────────────────────────────────────────────────────────── */
 async function loadRelay(){
   const el=document.getElementById('tab-relay');
-  el.innerHTML='<div class="empty"><span class="sp-icon"></span>Loading relay data…</div>';
+  el.innerHTML='<div class="empty"><span class="sp-icon"></span>Relaygegevens worden geladen…</div>';
   renderRelayShell(el);
   fetchRelay();
   clearInterval(REFRESH.relay);
@@ -508,10 +509,10 @@ async function loadRelay(){
 function renderRelayShell(el){
   el.innerHTML=
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
-      '<div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#475569">Relay health — auto-refreshes every 10s</div>'+
-      '<button class="btn out" data-click="fetchRelay">Refresh now</button>'+
+      '<div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#475569">Stand van de relays, ververst elke 10 s</div>'+
+      '<button class="btn out" data-click="fetchRelay">Nu vernieuwen</button>'+
     '</div>'+
-    '<div id="r-strip" class="rs"><div class="ri loading"><div class="ri-name">health</div><div class="ri-det">loading…</div></div><div class="ri loading"><div class="ri-name">legal</div><div class="ri-det">loading…</div></div><div class="ri loading"><div class="ri-name">finance</div><div class="ri-det">loading…</div></div><div class="ri loading"><div class="ri-name">iot</div><div class="ri-det">loading…</div></div></div>'+
+    '<div id="r-strip" class="rs"><div class="ri loading"><div class="ri-name">health</div><div class="ri-det">laden…</div></div><div class="ri loading"><div class="ri-name">legal</div><div class="ri-det">laden…</div></div><div class="ri loading"><div class="ri-name">finance</div><div class="ri-det">laden…</div></div><div class="ri loading"><div class="ri-name">iot</div><div class="ri-det">laden…</div></div></div>'+
     '<div id="r-cards" class="g2"></div>';
 }
 
@@ -524,7 +525,7 @@ async function fetchRelay(){
     const ok=!s.error;
     return '<div class="ri'+(ok?'':' offline')+'">'+
       '<div class="ri-name">'+esc(name)+'</div>'+
-      '<div class="ri-det">'+(ok?'v'+esc(s.version||'?')+' · up '+Math.floor((s.uptime_s||0)/3600)+'h':esc(s.error))+'</div>'+
+      '<div class="ri-det">'+(ok?'v'+esc(s.version||'?')+' · draait '+Math.floor((s.uptime_s||0)/3600)+' u':esc(s.error))+'</div>'+
     '</div>';
   }).join('');
   const cards=document.getElementById('r-cards');
@@ -533,12 +534,12 @@ async function fetchRelay(){
     const st=s.stats||{};
     return '<div class="card"><div class="card-hdr">'+esc(name)+' relay<small>v'+esc(s.version||'?')+'</small></div>'+
       '<table class="tbl"><tbody>'+
-        [['Uptime',Math.floor((s.uptime_s||0)/3600)+'h '+Math.floor(((s.uptime_s||0)%3600)/60)+'m'],
-         ['Protocol',s.protocol||'—'],
-         ['Blobs in flight',s.blobs||0],
-         ['Inbound processed',st.inbound||0],
-         ['Burned',st.burned||0],
-         ['Webhooks sent',st.webhooks_sent||0],
+        [['Draait',Math.floor((s.uptime_s||0)/3600)+' u '+Math.floor(((s.uptime_s||0)%3600)/60)+' min'],
+         ['Protocol',s.protocol||'-'],
+         ['Blobs onderweg',s.blobs||0],
+         ['Inkomend verwerkt',st.inbound||0],
+         ['Vernietigd',st.burned||0],
+         ['Webhooks verstuurd',st.webhooks_sent||0],
         ].map(([k,v])=>'<tr><td style="color:#475569;font-size:12px">'+esc(k)+'</td><td class="mono">'+esc(v)+'</td></tr>').join('')+
       '</tbody></table></div>';
   }).join('');
@@ -553,17 +554,18 @@ function epTab(tab,btn){
   const t=document.getElementById('ep-text'),h=document.getElementById('ep-html');
   if(tab==='text'){t.style.display='';h.style.display='none';}else{t.style.display='none';h.style.display='';}
 }
+const EMAIL_TYPES={'welcome':'welkomstmail','setup':'TOTP-instelling','reset-confirm':'TOTP-reset'};
 async function openEmailPreviewModal(type,key,email){
   const epMap={'welcome':'/admin/send-welcome','setup':'/admin/resend-setup','reset-confirm':'/admin/reset-totp'};
   _ms.email={type,key,email,ep:epMap[type]};
-  document.getElementById('mo-email-title').textContent='Preview: '+type+(email?' → '+email:'');
-  document.getElementById('ep-subj').textContent='Loading…';
+  document.getElementById('mo-email-title').textContent='Voorbeeld: '+(EMAIL_TYPES[type]||type)+(email?' → '+email:'');
+  document.getElementById('ep-subj').textContent='Laden…';
   document.getElementById('ep-text').textContent='';
   document.getElementById('ep-html').removeAttribute('srcdoc');
   document.getElementById('ep-send-btn').disabled=true;
   openModal('mo-email');
   const r=await api('/admin/preview-email',{method:'POST',body:JSON.stringify({type,key})});
-  if(!r.ok){document.getElementById('ep-subj').textContent='Preview failed: '+(r.data?.error||'unknown');return;}
+  if(!r.ok){document.getElementById('ep-subj').textContent='Voorbeeld mislukt: '+(r.data?.error||'onbekend');return;}
   const d=r.data;
   document.getElementById('ep-subj').textContent=d.subject||'';
   document.getElementById('ep-text').textContent=d.text||'';
@@ -573,13 +575,13 @@ async function openEmailPreviewModal(type,key,email){
 }
 async function doSendEmail(){
   const {type,key,email,ep}=_ms.email||{};if(!ep)return;
-  document.getElementById('ep-send-btn').disabled=true;document.getElementById('ep-send-btn').textContent='Sending…';
+  document.getElementById('ep-send-btn').disabled=true;document.getElementById('ep-send-btn').textContent='Bezig met versturen…';
   const body={key};
   if(type==='reset-confirm')body.mode='request';
   if(type==='setup'){body.user_id=key;body.email=email;}
   const r=await api(ep,{method:'POST',body:JSON.stringify(body)});
-  closeModal('mo-email');document.getElementById('ep-send-btn').textContent='Send email →';
-  toast(r.ok?'Email sent':'Send failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+  closeModal('mo-email');document.getElementById('ep-send-btn').textContent='E-mail versturen →';
+  toast(r.ok?'E-mail verstuurd':'Versturen mislukt: '+(r.data?.error||'onbekend'),r.ok?'ok':'err');
 }
 function openChangePlanModal(key,email,currentPlan){
   _ms.plan={key,email};
@@ -594,7 +596,7 @@ async function doChangePlan(){
   document.getElementById('cp-btn').disabled=true;
   const r=await api('/admin/change-plan',{method:'POST',body:JSON.stringify({key,new_plan,notify})});
   closeModal('mo-plan');document.getElementById('cp-btn').disabled=false;
-  toast(r.ok?'Plan → '+new_plan:'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+  toast(r.ok?'Abonnement → '+new_plan:'Mislukt: '+(r.data?.error||'onbekend'),r.ok?'ok':'err');
   if(r.ok){LOADED.users=false;loadUsers();}
 }
 function openDisableKeyModal(key,email){
@@ -609,7 +611,7 @@ async function doDisableKey(){
   document.getElementById('dk-btn').disabled=true;
   const r=await api('/admin/disable-key',{method:'POST',body:JSON.stringify({key,reason,notify})});
   closeModal('mo-disable');document.getElementById('dk-btn').disabled=false;
-  toast(r.ok?'Key disabled':'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+  toast(r.ok?'Sleutel uitgeschakeld':'Mislukt: '+(r.data?.error||'onbekend'),r.ok?'ok':'err');
   if(r.ok){LOADED.users=false;loadUsers();}
 }
 function openDeleteAccountModal(key,email){
@@ -622,11 +624,11 @@ function openDeleteAccountModal(key,email){
   var _dLabel = _mm && _mm.dataset.label || '';
   var _dPlan = _mm && _mm.dataset.plan || 'community';
   var _dCreated = _mm && _mm.dataset.created || '';
-  document.getElementById('da-email').textContent = email || '(no email on file)';
-  document.getElementById('da-label').textContent = _dLabel || '(no label)';
+  document.getElementById('da-email').textContent = email || '(geen e-mailadres bekend)';
+  document.getElementById('da-label').textContent = _dLabel || '(geen label)';
   var _planEl = document.getElementById('da-plan');
   _planEl.textContent = _dPlan; _planEl.className = 'badge '+_dPlan;
-  document.getElementById('da-created').textContent = _dCreated ? (_dCreated.split('T')[0]+' ('+ _relTime(_dCreated) +')') : '—';
+  document.getElementById('da-created').textContent = _dCreated ? (_dCreated.split('T')[0]+' ('+ _relTime(_dCreated) +')') : '-';
   var _recent = _dCreated && (Date.now() - new Date(_dCreated).getTime()) < 24*3600*1000;
   document.getElementById('da-recent-warn').style.display = _recent ? 'block' : 'none';
   openModal('mo-delete');setTimeout(()=>document.getElementById('da-confirm').focus(),50);
@@ -634,10 +636,10 @@ function openDeleteAccountModal(key,email){
 function _relTime(iso){
   if(!iso) return '';
   var ms = Date.now() - new Date(iso).getTime();
-  if(ms < 60000) return 'just now';
-  if(ms < 3600000) return Math.round(ms/60000)+' min ago';
-  if(ms < 86400000) return Math.round(ms/3600000)+' h ago';
-  return Math.round(ms/86400000)+' d ago';
+  if(ms < 60000) return 'zojuist';
+  if(ms < 3600000) return Math.round(ms/60000)+' min geleden';
+  if(ms < 86400000) return Math.round(ms/3600000)+' uur geleden';
+  return Math.round(ms/86400000)+' dagen geleden';
 }
 async function doDeleteAccount(){
   const {key}=_ms.del||{};if(!key)return;
@@ -646,28 +648,28 @@ async function doDeleteAccount(){
   document.getElementById('da-btn').disabled=true;
   const r=await api('/admin/delete-account',{method:'POST',body:JSON.stringify({key,confirm:'DELETE',notify})});
   closeModal('mo-delete');
-  toast(r.ok?'Account deactivated':'Failed: '+(r.data?.error||'unknown'),r.ok?'ok':'err');
+  toast(r.ok?'Account gedeactiveerd':'Mislukt: '+(r.data?.error||'onbekend'),r.ok?'ok':'err');
   if(r.ok){LOADED.users=false;setTimeout(loadUsers,800);}
 }
 async function openUserDetailsModal(key){
   openModal('mo-details');
-  document.getElementById('mo-details-body').innerHTML='<div class="empty"><span class="sp-icon"></span>Loading…</div>';
+  document.getElementById('mo-details-body').innerHTML='<div class="empty"><span class="sp-icon"></span>Laden…</div>';
   const r=await api('/admin/user-details/'+key);
-  if(!r.ok){document.getElementById('mo-details-body').innerHTML='<div class="empty">Error: '+(r.data?.error||'unknown')+'</div>';return;}
+  if(!r.ok){document.getElementById('mo-details-body').innerHTML='<div class="empty">Fout: '+(r.data?.error||'onbekend')+'</div>';return;}
   const d=r.data;
   document.getElementById('mo-details-body').innerHTML=
     '<div class="g2" style="margin-bottom:16px">'+
-      '<div><div class="sc-lbl">Email</div><div class="mono" style="font-size:12px">'+(d.email||'—')+'</div></div>'+
-      '<div><div class="sc-lbl">Plan</div><span class="badge '+(d.plan||'community')+'">'+(d.plan||'community')+'</span></div>'+
-      '<div><div class="sc-lbl">TOTP</div><span class="chip '+(d.totp_status||'none')+'">'+(d.totp_status||'none')+'</span></div>'+
-      '<div><div class="sc-lbl">Sessions</div><div class="sc-val" style="font-size:20px">'+(d.active_sessions||0)+'</div></div>'+
-      '<div><div class="sc-lbl">Status</div><span class="chip '+(d.active?'active':'revoked')+'">'+(d.active?'active':'revoked')+'</span></div>'+
-      '<div><div class="sc-lbl">Created</div><div class="mono" style="font-size:11px">'+(d.created?d.created.split('T')[0]:'—')+'</div></div>'+
+      '<div><div class="sc-lbl">E-mail</div><div class="mono" style="font-size:12px">'+(d.email||'-')+'</div></div>'+
+      '<div><div class="sc-lbl">Abonnement</div><span class="badge '+(d.plan||'community')+'">'+(d.plan||'community')+'</span></div>'+
+      '<div><div class="sc-lbl">TOTP</div><span class="chip '+(d.totp_status||'none')+'">'+(TOTP_NAMES[d.totp_status||'none']||d.totp_status)+'</span></div>'+
+      '<div><div class="sc-lbl">Sessies</div><div class="sc-val" style="font-size:20px">'+(d.active_sessions||0)+'</div></div>'+
+      '<div><div class="sc-lbl">Status</div><span class="chip '+(d.active?'active':'revoked')+'">'+(d.active?'actief':'ingetrokken')+'</span></div>'+
+      '<div><div class="sc-lbl">Aangemaakt</div><div class="mono" style="font-size:11px">'+(d.created?d.created.split('T')[0]:'-')+'</div></div>'+
     '</div>'+
-    '<div class="card-hdr" style="margin-bottom:8px">Recent audit</div>'+
+    '<div class="card-hdr" style="margin-bottom:8px">Recente audit</div>'+
     '<div class="al">'+(d.audit_events&&d.audit_events.length?
-      d.audit_events.slice(0,10).map(e=>'<div class="ai"><span class="t" style="font-size:10px">'+(e.ts?new Date(e.ts).toISOString().slice(11,19):'—')+'</span><span class="e" style="font-size:11px">'+esc(e.event_type||'—')+'</span></div>').join(''):
-      '<div class="empty" style="padding:12px">No events</div>')+
+      d.audit_events.slice(0,10).map(e=>'<div class="ai"><span class="t" style="font-size:10px">'+(e.ts?new Date(e.ts).toISOString().slice(11,19):'-')+'</span><span class="e" style="font-size:11px">'+esc(e.event_type||'-')+'</span></div>').join(''):
+      '<div class="empty" style="padding:12px">Geen gebeurtenissen</div>')+
     '</div>';
 }
 
@@ -689,20 +691,21 @@ if(SESSION){
   }).catch(()=>{SESSION='';sessionStorage.removeItem('adm_session');});
 }
 
+const TOTP_NAMES={active:'actief',pending:'in afwachting',none:'geen'};
 function totpBadge(u){
   const req=u.totp_required,st=u.totp_status;
-  if(req&&st!=='active')return '<span class="chip required-missing">⚠ required</span>';
-  if(req&&st==='active')return '<span class="chip required-ok">🔒 active</span>';
-  return '<span class="chip '+esc(st)+'">'+esc(st)+'</span>';
+  if(req&&st!=='active')return '<span class="chip required-missing">verplicht, ontbreekt</span>';
+  if(req&&st==='active')return '<span class="chip required-ok">verplicht, actief</span>';
+  return '<span class="chip '+esc(st)+'">'+esc(TOTP_NAMES[st]||st)+'</span>';
 }
 function openForceTotpModal(key,email,currentlyRequired){
   _ms.forceTotp={key,email,removing:currentlyRequired};
-  document.getElementById('mo-force-totp-title').textContent=(currentlyRequired?'Remove TOTP requirement':'Require TOTP')+(email?' — '+email:'');
+  document.getElementById('mo-force-totp-title').textContent=(currentlyRequired?'TOTP-verplichting opheffen':'TOTP verplicht stellen')+(email?': '+email:'');
   document.getElementById('mo-force-totp-body').innerHTML=currentlyRequired
-    ?'<p style="font-size:13px;color:#475569;margin:0">Remove the TOTP requirement. The user can log in without TOTP, or keep using their existing authenticator.</p>'
-    :'<p style="font-size:13px;color:#475569;margin:0 0 10px">Forces this user to set up TOTP before their next login.</p><ul style="font-size:13px;color:#475569;margin:0 0 14px;padding-left:18px"><li>Active sessions will be revoked immediately</li><li>A setup email will be sent automatically</li><li>Login is blocked until setup is complete</li></ul><div class="mc"><label>Reason (optional, for audit log)</label><input type="text" id="ft-reason" placeholder="e.g. policy enforcement"></div>';
+    ?'<p style="font-size:13px;color:#475569;margin:0">De TOTP-verplichting vervalt. De gebruiker kan inloggen zonder TOTP, of zijn bestaande authenticator blijven gebruiken.</p>'
+    :'<p style="font-size:13px;color:#475569;margin:0 0 10px">Deze gebruiker moet TOTP instellen voor de volgende keer inloggen.</p><ul style="font-size:13px;color:#475569;margin:0 0 14px;padding-left:18px"><li>Actieve sessies worden direct ingetrokken</li><li>Er gaat automatisch een e-mail met de instelling uit</li><li>Inloggen is geblokkeerd tot de instelling klaar is</li></ul><div class="mc"><label>Reden (optioneel, voor de auditlog)</label><input type="text" id="ft-reason" placeholder="bijv. beleid"></div>';
   const btn=document.getElementById('ft-btn');
-  btn.textContent=currentlyRequired?'Remove requirement':'Require TOTP';
+  btn.textContent=currentlyRequired?'Verplichting opheffen':'TOTP verplicht stellen';
   btn.className='btn '+(currentlyRequired?'':'pri');
   btn.disabled=false;
   openModal('mo-force-totp');
@@ -717,9 +720,9 @@ async function doForceTotpRequirement(){
   closeModal('mo-force-totp');btn.disabled=false;
   if(r.ok){
     const d=r.data;
-    const msg=required?'TOTP required. Sessions revoked: '+(d.sessions_revoked||0)+(d.setup_email_sent?'. Setup email sent.':'.'):'TOTP requirement removed.';
+    const msg=required?'TOTP is verplicht. Sessies ingetrokken: '+(d.sessions_revoked||0)+(d.setup_email_sent?'. E-mail met de instelling verstuurd.':'.'):'TOTP-verplichting opgeheven.';
     toast(msg,'ok');LOADED.users=false;setTimeout(loadUsers,500);
-  } else { toast('Failed: '+(r.data?.error||'unknown'),'err'); }
+  } else { toast('Mislukt: '+(r.data?.error||'onbekend'),'err'); }
 }
 
 

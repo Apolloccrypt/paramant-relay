@@ -134,7 +134,7 @@ test('een bestand van 12 MB naar 25 mensen, en er komt er een ophalen', async ()
 
   // ── 5. Wat er in de bus valt ────────────────────────────────────────────
   await new Promise((r) => setTimeout(r, 200));   // de log loopt iets achter
-  const uitnodigingen = post.filter((p) => /sent you a file/.test(p.subject || ''));
+  const uitnodigingen = post.filter((p) => /heeft u een bestand gestuurd/.test(p.subject || ''));
   assert.equal(uitnodigingen.length, 25, 'een mail per persoon, nooit een cc');
 
   const voorEen = uitnodigingen.find((p) => (p.to || []).includes(adressen[0]));
@@ -161,7 +161,7 @@ test('een bestand van 12 MB naar 25 mensen, en er komt er een ophalen', async ()
   assert.match(cj.sent_to || '', /\*/, 'het adres komt gemaskeerd terug, niet voluit');
 
   await new Promise((r) => setTimeout(r, 200));
-  const codeMail = post.find((p) => /code to open the file/i.test(p.subject || ''));
+  const codeMail = post.find((p) => /controlecode om het bestand te openen/i.test(p.subject || ''));
   assert.ok(codeMail, 'er kwam geen codemail');
   assert.equal((codeMail.to || [])[0], adressen[0],
     'de code gaat naar het postvak van de uitnodiging, en nergens anders heen');
