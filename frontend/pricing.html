@@ -205,6 +205,21 @@
 .free{padding:var(--space-3) 0;margin:0 0 var(--space-3);border-bottom:1px solid var(--ink-hair)}
 .free-amt{font-size:var(--text-base);color:var(--ink);line-height:1.6;margin:0 0 var(--space-2)}
 .free-why{font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)}
+/* On a phone the offer, its button and the Community line share one screen of
+   844px (tests/pricing-fold.test.mjs). The kicker repeats the heading under
+   it, so it goes; the rest only tightens. */
+@media(max-width:640px){
+  .pr-first{padding-top:var(--space-4) !important}
+  .pr-first h1{margin-bottom:var(--space-2) !important}
+  .pr-what{font-size:var(--text-base);line-height:1.5;margin-bottom:var(--space-3)}
+  .offer{padding:var(--space-3) var(--space-4)}
+  .offer .offer-kicker{display:none}
+  .offer-btw{margin-bottom:var(--space-2)}
+  .offer-what{line-height:1.5;margin-bottom:var(--space-3)}
+  .offer-btn{padding:10px 14px}
+  .offer-year,.offer-more{margin-top:var(--space-2)}
+  .free{padding-top:var(--space-2)}
+}
 .pr-company{font-size:var(--text-sm);color:var(--ink-dim);line-height:1.6;margin:0 0 var(--space-3)}
 .pr-block{border-top:1px solid var(--ink-hair);padding:var(--space-6) 0 0;margin:var(--space-6) 0 0}
 .pr-block p{font-size:var(--text-base);color:var(--ink);line-height:1.7;margin:0 0 var(--space-3)}
@@ -259,7 +274,7 @@
      door tests/site-claims.test.mjs en relay/test/pricing-page.test.js aan
      vastgepind. -->
 <main id="main-content" tabindex="-1">
-<section style="padding:var(--space-6) 0 var(--space-7)">
+<section class="pr-first" style="padding:var(--space-6) 0 var(--space-7)">
   <div class="container-md">
     <h1 class="paramant-h2" style="margin-bottom:var(--space-3)">Prijzen</h1>
     <p class="pr-what">Documenten laten tekenen en bestanden versturen die zichzelf wissen na het lezen.</p>
