@@ -198,6 +198,17 @@ function preloadPdfLibs() {
   loadScriptOnce(PDFLIB_SRC, false);
 }
 
+// And once the page has painted, in idle time: the first screen stays light,
+// but by the time someone has picked a file the libraries are already here.
+// Loading them only on the pick made the step after it wait for 2 MB, which
+// sign-e2e caught on 2026-09-23.
+(function preloadWhenIdle() {
+  const go = () => preloadPdfLibs();
+  const idle = () => ('requestIdleCallback' in window) ? requestIdleCallback(go, { timeout: 2000 }) : setTimeout(go, 200);
+  if (document.readyState === 'complete') idle();
+  else window.addEventListener('load', idle, { once: true });
+})();
+
 async function waitForPdfjs() {
   // Sticky signal, so it does not matter whether the loader module ran before
   // or after this file. See js/ready.js.
