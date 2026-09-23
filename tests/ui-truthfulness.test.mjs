@@ -2360,21 +2360,21 @@ console.log('ui-truthfulness: the rules page is Our rules on /rules, with /parar
     'theme.js must not send the choice anywhere; /account and /privacy both say it stays in the browser');
 
   const accountEn = read('frontend/en/account.html');
-  assert.match(accountEn, /Light is the default and it stays light until you change it here/,
-    '/en/account must say that light is the default, because app-2026.css makes it so');
-  assert.match(accountEn, /kept in this\s+browser only/,
+  assert.match(accountEn, /Without a choice the site follows your system/,
+    '/en/account must say that no choice follows the system, because theme.js makes it so');
+  assert.match(accountEn, /kept in this browser only/,
     '/en/account must say the choice never leaves the browser');
-  assert.match(accountEn, /The public pages stay light\./,
-    '/en/account promises the marketing pages stay light; tests/app-theme.test.mjs measures that');
-  assert.match(account, /Licht is de standaard en blijft zo tot u het hier wijzigt/,
-    '/account must say that light is the default, because app-2026.css makes it so');
+  assert.match(accountEn, /applies to every page/,
+    '/en/account promises the choice holds on every page; tests/app-theme.test.mjs measures that');
+  assert.match(account, /Zonder keuze volgt de site uw systeem/,
+    '/account must say that no choice follows the system, because theme.js makes it so');
   assert.match(account, /alleen in deze\s+browser bewaard/,
     '/account must say the choice never leaves the browser');
-  assert.match(account, /De openbare pagina's blijven licht\./,
-    '/account promises the marketing pages stay light; tests/app-theme.test.mjs measures that');
+  assert.match(account, /geldt voor elke pagina/,
+    '/account promises the choice holds on every page; tests/app-theme.test.mjs measures that');
 })();
 
-console.log('ui-truthfulness: the appearance switch says only what theme.js and app-2026.css do');
+console.log('ui-truthfulness: the appearance switch says only what theme.js and design-system.css do');
 
 // ── /parashare says up front that this is a live handshake ──────────────────
 // A buyer reached step 2 before finding out that the other person has to be at

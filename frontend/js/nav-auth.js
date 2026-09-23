@@ -96,9 +96,10 @@
     // does go: it is not an action you still need. Help lands in the same place
     // as it does signed out, one tap under the drawer, 48px tall.
     var tail = document.getElementById('nav-mobile-tail');
-    // The language switch apply-nav.py stamps into the strip stays with it.
+    // The language and theme switches apply-nav.py stamps into the strip stay
+    // with it (one .nav-prefs row; a page stamped before it has .nav-lang).
     if (tail) {
-      var langSwitch = tail.querySelector('.nav-lang');
+      var langSwitch = tail.querySelector('.nav-prefs') || tail.querySelector('.nav-lang');
       tail.innerHTML = '<a href="/help" class="nav-tail-link">' + (DUTCH ? 'Hulp' : 'Help') + '</a>';
       if (langSwitch) tail.appendChild(langSwitch);
     }

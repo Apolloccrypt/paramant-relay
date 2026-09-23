@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}</style>
+<style id="critical-css">html,body{background:#FFFFFF;color:#0B3A6A;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}body{min-height:100vh}.skip-link{position:absolute;top:-200px;left:0;z-index:10000}.skip-link:focus{top:0}[hidden]{display:none !important}img,svg{max-width:100%;display:block}html[data-theme="dark"],html[data-theme="dark"] body{background:#0E141B;color:#E6EDF5}html[data-theme="dark"]{color-scheme:dark}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Privacybeleid · Paramant</title>
 <meta name="twitter:image" content="https://paramant.app/og-image.png">
@@ -29,8 +29,8 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0B3A6A">
 
-<link rel="stylesheet" href="/design-system.css?v=31">
-<link rel="stylesheet" href="/nav.css?v=27">
+<link rel="stylesheet" href="/design-system.css?v=32">
+<link rel="stylesheet" href="/nav.css?v=28">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
   <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -166,6 +166,7 @@ footer a{color:var(--ink);text-decoration:none}
   ]
 }
 </script>
+<script src="/js/theme.js?v=6"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Naar de inhoud</a>
@@ -188,6 +189,7 @@ footer a{color:var(--ink);text-decoration:none}
   </div>
 
   <div class="nav-lang" role="group" aria-label="Taal / Language"><a href="/privacy" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/privacy" hreflang="en" lang="en">EN</a></div>
+  <button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button>
 
   <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu openen" aria-expanded="false">
     <span></span><span></span><span></span>
@@ -203,7 +205,7 @@ footer a{color:var(--ink);text-decoration:none}
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/auth/login" class="nav-tail-btn">Inloggen</a>
   <a href="/help" class="nav-tail-link">Hulp</a>
-  <span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/privacy" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/privacy" hreflang="en" lang="en">EN</a></span>
+  <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/privacy" hreflang="nl" lang="nl" aria-current="true">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/privacy" hreflang="en" lang="en">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Thema" aria-pressed="false" title="Licht of donker"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main id="main-content" tabindex="-1">
 
@@ -275,7 +277,7 @@ footer a{color:var(--ink);text-decoration:none}
 <li><strong>Geziene vingerafdrukken van ondertekensleutels</strong> (<code>paramant_fp_&hellip;</code>): een markering per ondertekensleutel die u al te zien kreeg, zodat een bekende sleutel niet als nieuw wordt gemarkeerd</li>
 <li><strong>Weggeklikte melding over het instellen van de sleutel</strong> (<code>paramant.keysetup.dismissed.v1</code>): dat u de banner over de ondertekensleutel op uw dashboard hebt gesloten</li>
 <li><strong>Een cadeaucode die u nog niet hebt gebruikt</strong> (<code>paramant.redeem.code</code>): de code die u op <a href="/redeem">/redeem</a> typte voordat u een account had. Een code geeft op zichzelf niets en is nergens een sleutel toe; hij wordt alleen bewaard zodat het aanmaken van een account, dat wordt afgerond via een link in uw e-mail, u de code niet kost. Hij wordt verwijderd zodra de code is gebruikt.</li>
-<li><strong>Weergave</strong> (<code>paramant.theme.v1</code>): of u de app-schermen uw systeem wilt laten volgen, licht wilt houden of donker wilt maken. Zonder deze instelling is het licht. Er wordt niets naar ons gestuurd; de keuze staat alleen in deze browser en op dit apparaat.</li>
+<li><strong>Weergave</strong> (<code>paramant.theme.v1</code>): of u de site uw systeem wilt laten volgen, licht wilt houden of donker wilt maken, gekozen op /account of met de zon en maan in de menubalk. Zonder deze instelling volgt de site uw systeem. Er wordt niets naar ons gestuurd; de keuze staat alleen in deze browser en op dit apparaat.</li>
 <li><strong>Passkey- / WebAuthn-inloggegevens</strong>: de privésleutel van uw passkey wordt aangemaakt en bewaard door uw apparaat of wachtwoordbeheerder. PARAMANT slaat alleen de <em>publieke</em> sleutel op, aan de serverkant; de privésleutel verlaat uw apparaat nooit.</li>
 <li><strong>Ondertekenkluis van Ondertekenen</strong> (IndexedDB): als u documenten ondertekent, wordt uw post-kwantum ondertekensleutel (ML-DSA-65) aangemaakt en bewaard in de IndexedDB van uw browser, versleuteld met uw passkey (WebAuthn-PRF &rarr; HKDF &rarr; AES-256-GCM) of, als uw passkeyprovider dat niet kan, met een wachtwoordzin (PBKDF2 &rarr; AES-256-GCM). De privésleutel verlaat uw apparaat nooit; alleen de publieke helft wordt aan uw account gekoppeld.</li>
 </ul>
@@ -364,6 +366,6 @@ footer a{color:var(--ink);text-decoration:none}
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=11" defer></script>
+<script src="/js/nav-auth.js?v=12" defer></script>
 </body>
 </html>
