@@ -108,10 +108,8 @@ const MAAND = '(januari|februari|maart|april|mei|juni|juli|augustus|september|ok
 const LANGS = [
   {
     tag: 'en', sendPath: '/en/parashare', getPrefix: '/en', markupFile: 'en/parashare.html',
-    ttl: [/1 hour on Community/, /24 hours on Firm/, /7 days on Enterprise/],
-    wiped: /wiped after the first download/,
-    planInMarkup: /on Community|on Firm|on Pro|on Enterprise/,
-    notOnline: /does not have to be online/,
+    limit: /A link stays open for up to 24 hours\./,
+    planInMarkup: /\d+ (hours?|days?) on (Community|Firm|Pro|Enterprise)|up to \d+ (hours?|days?)/,
     until: new RegExp('until \\d{1,2} ' + MONTH + ' \\d{4}, \\d{2}:\\d{2} UTC'),
     worksOnce: /Works once/, waiting: /Waiting for the receiver/,
     noReceipt: /no signed delivery receipt/i,
@@ -120,10 +118,8 @@ const LANGS = [
   },
   {
     tag: 'nl', sendPath: '/parashare', getPrefix: '', markupFile: 'parashare.html',
-    ttl: [/1 uur bij Community/, /24 uur bij Firm/, /7 dagen bij Enterprise/],
-    wiped: /na de eerste download gewist/,
-    planInMarkup: /on Community|on Firm|on Pro|on Enterprise|bij Community|bij Firm|bij Pro|bij Enterprise/,
-    notOnline: /hoeft niet online te zijn/,
+    limit: /Een link blijft maximaal 24 uur open\./,
+    planInMarkup: /\d+ (uur|dagen) bij (Community|Firm|Pro|Enterprise)|maximaal \d+ (uur|dagen)/,
     // The Dutch page writes the month in Dutch: format-date.js reads <html lang>.
     until: new RegExp('tot \\d{1,2} ' + MAAND + ' \\d{4}, \\d{2}:\\d{2} UTC'),
     worksOnce: /Werkt één keer/, waiting: /Wacht op de ontvanger/,
@@ -142,45 +138,29 @@ await sender.goto(`${ORIGIN}${L.sendPath}`, { waitUntil: 'domcontentloaded' });
 // The chooser is on the page before anything is picked, which is the whole
 // complaint this feature answers: the buyer must not have to reach step 2 to
 // find out which stands exist.
-ok(L.tag + ': ' + 'the chooser offers both stands above step 1',
-  await sender.locator('#ps-mode-live').isVisible() && await sender.locator('#ps-mode-link').isVisible());
-ok(L.tag + ': ' + 'the live stand is the one selected on arrival',
-  await sender.locator('#ps-mode-live').getAttribute('aria-checked') === 'true');
+ok(L.tag + ': ' + 'the chooser offers both choices above step 1',
+  await sender.locator('#ps-mode-link').isVisible() && await sender.locator('#ps-mode-group').isVisible());
+// Since 24 September 2026 the link is the default: "To one person", with
+// Extra safe (the live hand-over) unticked.
+ok(L.tag + ': ' + '"To one person" is the choice selected on arrival, as a link',
+  await sender.locator('#ps-mode-link').getAttribute('aria-checked') === 'true'
+  && !(await sender.isChecked('#ps-extra-safe')));
 
-// The times in the Send-a-link sentence come from the plan API, not from the
-// markup. The stub answered with the tiers.js rows; the page must have written
-// them in. A page that still shows the plan-free fallback sentence here is a
-// page that would show a stale hour after a tier change.
-await sender.waitForFunction(() => /Community/.test(document.getElementById('ps-mode-link-ttl').textContent), null, { timeout: 15000 });
-const ttlSentence = await sender.locator('#ps-mode-link-ttl').textContent();
-// 24 hours belongs to the tiers.js row 'pro', and the sentence says "on Firm".
-// Both halves are deliberate. The served table is keyed by ENTITLEMENT TIER;
-// the sentence names the PLAN a reader can buy, and since 6 September 2026 the
-// plan that grants that row is Firm. Writing "24 hours on Pro" here would hang
-// a real number on a plan that is on no price table, which is the same untruth
-// site-claims block 40 sweeps the static pages for. What a buyer needs to know
-// is what he gets for his money, and 24 hours is what Firm gives him: the same
-// figure the Firm card prints on /pricing as "24 hour link expiry".
-ok(L.tag + ': ' + 'the chooser names the per-plan link lifetimes from the plan API',
-  L.ttl.every((re) => re.test(ttlSentence)),
-  ttlSentence);
-ok(L.tag + ': ' + 'the chooser says the file is wiped after the first download',
-  L.wiped.test(ttlSentence), ttlSentence);
+// The expiry in the limit line comes from the plan API, not from the markup.
+// The stub answered with link_ttl_ms for a Firm account (the tiers.js 'pro'
+// row, 24 hours); the page must have written that in. Until the answer
+// arrives the line is hidden rather than guessed.
+await sender.waitForSelector('#ps-plan:not([hidden])', { timeout: 15000 });
+const limitLine = await sender.locator('#ps-limit').textContent();
+ok(L.tag + ': ' + 'the limit line names the expiry this plan really gets, from the plan API',
+  L.limit.test(limitLine), limitLine);
 // No hour written into the markup a visitor sees. Developer comments are
-// stripped first: this checks the page, not the file, and the comment above the
-// chooser explains the rule by quoting it.
+// stripped first: this checks the page, not the file.
 const markup = fs.readFileSync(path.join(ROOT, L.markupFile), 'utf8').replace(/<!--[\s\S]*?-->/g, ' ');
-ok(L.tag + ': ' + 'no per-plan link lifetime is hardcoded in the chooser markup',
+ok(L.tag + ': ' + 'no per-plan link lifetime is hardcoded in the markup',
   !L.planInMarkup.test(markup),
   'the times must come from tiers.js through the plan API, never from the page');
-
-await sender.locator('#ps-mode-link').click();
-ok(L.tag + ': ' + 'choosing Send a link switches the stand',
-  await sender.locator('#ps-mode-link').getAttribute('aria-checked') === 'true'
-  && await sender.locator('#ps-mode-live').getAttribute('aria-checked') === 'false');
-ok(L.tag + ': ' + 'the live-handshake promise is withdrawn on the Send-a-link stand',
-  L.notOnline.test(await sender.locator('#ps-live-note').textContent()));
-ok(L.tag + ': ' + 'the live stepper is hidden on the Send-a-link stand',
+ok(L.tag + ': ' + 'the live stepper is hidden on the link',
   !(await sender.locator('#ps-stepper').isVisible()));
 
 await sender.locator('#file-input').setInputFiles({

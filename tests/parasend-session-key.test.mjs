@@ -150,6 +150,10 @@ function runPage({ keyResponses, sectorOk = true, relayStatus = null, lang = 'en
         const spec = keyResponses[Math.min(keyTurn++, keyResponses.length - 1)];
         return respond(spec);
       }
+      // "Signed in as ...": the page asks the same session check the
+      // navigation asks. Not a relay call, so it is not counted as one; it
+      // answers "not signed in" here so the row keeps its plain sentence.
+      if (String(url).endsWith('/api/user/session/verify')) return respond({ status: 200, body: {} });
       const headers = (opts && opts.headers) || {};
       calls.relay.push({ url: String(url), method: (opts && opts.method) || 'GET', headers });
       calls.sector += 1;
@@ -217,10 +221,14 @@ test('a 200 from /api/user/parasend/token gives the slim row, a usable button, a
   const slim = run.getElementById('ps-key-slim');
   assert.equal(slim.hidden, false, 'the slim row is shown');
   assert.equal(slim.classList.contains('is-loading'), false, 'the slim row stops claiming to be loading');
-  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'Using your account');
-  assert.equal(run.getElementById('ps-key-mask').hidden, false, 'the masked credential is shown next to the label');
-  assert.match(run.getElementById('ps-key-mask').textContent, /^pst_.*\.\.\..{4}$/,
-    'the row shows a masked session token, and it says pst_ because that is what the page is holding');
+  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'You are signed in');
+  // Since 24 September 2026 the token is not on screen at all, not even
+  // masked: "pst_1e99...c811" next to "Change" read like a fault code to the
+  // owner. The row says who is signed in; the credential stays in memory.
+  for (const [id, el] of run.elements) {
+    assert.ok(!String(el.textContent || '').includes('pst_') && !String(el.innerHTML || '').includes('pst_'),
+      `#${id} puts the session token on screen; the sender is told who is signed in, never the credential`);
+  }
   assert.equal(run.getElementById('step-setup').classList.contains('manual-key'), false,
     'the manual card stays closed: #step-setup only carries .manual-key when the user asks for the box');
   assert.equal(run.getElementById('ps-key-error').classList.contains('is-shown'), false, 'no banner on the happy path');
@@ -481,9 +489,9 @@ test('a relay connection that drops before the receiver arrives says so, and off
 // for someone who wants to send a file. Verified by sabotage: put any of the
 // four words back into the flow, or drop the panel, and this fails by word.
 test('steps 1 and 2 are written for the sender, with the jargon moved into "How this works"', () => {
-  assert.match(PS_HTML, /<h1>Send a file that deletes itself<\/h1>/,
+  assert.match(PS_HTML, /<h1>Send a file safely<\/h1>/,
     'the heading says what the tool does for the reader, not what it is made of');
-  assert.match(PS_HTML, /<details class="ps-how">[\s\S]*?<summary>How this works<\/summary>/,
+  assert.match(PS_HTML, /<details class="ps-how">[\s\S]*?<summary>How does this work\?<\/summary>/,
     'the technical account must still be on the page, one click away');
   // Both names, inside the panel. This used to be a 400-character window
   // between them, which is a proxy for "in the same panel" that breaks the
@@ -496,7 +504,7 @@ test('steps 1 and 2 are written for the sender, with the jargon moved into "How 
     assert.ok(howPanel[1].includes(name),
       `the panel must keep the real names: moving the jargon may not mean losing ${name}`);
   }
-  assert.match(PS_HTML, /Choose a file \(or several\)/,
+  assert.match(PS_HTML, /<span class="ps-drop-btn" id="ps-drop-btn">Choose a file<\/span>/,
     'the file label must ask for a file, not announce vault mode');
 
   // The flow itself, steps 1 and 2 only, with the panel cut out.
@@ -672,7 +680,7 @@ test('de Nederlandse /parashare zegt hetzelfde, in het Nederlands', async () => 
   assert.match(banner, /class="ps-alert-primary" href="\/auth\/login">Opnieuw inloggen</, 'opnieuw inloggen is de hoofdactie');
   assert.match(banner, /data-click="expandApiKeyCard">Een sleutel met de hand invoeren</, 'de uitweg met de hand blijft bereikbaar');
   assert.match(banner, /voor een eigen relay/, 'en zegt voor wie die uitweg is');
-  assert.match(PS_HTML_NL, /<details class="ps-how">[\s\S]*?<summary>Hoe dit werkt<\/summary>/, 'de techniek staat een klik verder');
+  assert.match(PS_HTML_NL, /<details class="ps-how">[\s\S]*?<summary>Hoe werkt dit\?<\/summary>/, 'de techniek staat een klik verder');
   const howPanel = /<details class="ps-how">([\s\S]*?)<\/details>/.exec(PS_HTML_NL);
   for (const name of ['ML-KEM-768', 'ML-DSA-65', 'AES-256-GCM']) {
     assert.ok(howPanel && howPanel[1].includes(name), `het paneel houdt de echte naam ${name}`);
@@ -688,7 +696,7 @@ test('de Nederlandse /parashare zegt hetzelfde, in het Nederlands', async () => 
   assert.match(PS_HTML_NL, /<span class="ps-step-label">3 &middot; Vergelijken<\/span>/, 'de stepper noemt dezelfde stap zo');
 
   const run = await loadPage({ keyResponses: [ok200], lang: 'nl' });
-  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'Uw account wordt gebruikt');
+  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'U bent ingelogd');
   const leeg = await loadPage({ keyResponses: [{ status: 500, body: {} }], lang: 'nl' });
   evalIn(leeg, 'expandApiKeyCard()');
   assert.equal(leeg.getElementById('key-status').textContent, 'Vul uw API-sleutel in om verder te gaan',

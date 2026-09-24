@@ -5697,16 +5697,30 @@ async function handleRelayRequest(req, res) {
     // Enterprise" to a reader who is on none of them yet. Business stays in
     // the payload because it is a real server-side ceiling; it is not a
     // ParaSend plan, so the page does not name it.
+    //
+    // `max_recipients` and its table follow the same rule for the other
+    // question the page asks before a file is picked: may this account send to
+    // a group, and to how many. It is the number POST /v2/sends/precheck and
+    // POST /v2/sends hold the list to (checkRecipients on the ParaSend tier),
+    // so the page cannot show a ceiling the send will not honour.
+    const _psLim = parasendLimitsOf(kd);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({
       valid: !!(kd?.active),
       plan: kd?.plan || null,
-      link_ttl_ms: parasendLimitsOf(kd).limits.view_ttl_ms,
+      link_ttl_ms: _psLim.limits.view_ttl_ms,
       link_ttl_ms_by_plan: {
         community:  tiers.tierLimit('community',  'view_ttl_ms'),
         pro:        tiers.tierLimit('pro',        'view_ttl_ms'),
         business:   tiers.tierLimit('business',   'view_ttl_ms'),
         enterprise: tiers.tierLimit('enterprise', 'view_ttl_ms'),
+      },
+      max_recipients: tiers.tierLimitNum(_psLim.tier, 'max_recipients'),
+      max_recipients_by_plan: {
+        community:  tiers.tierLimitNum('community',  'max_recipients'),
+        pro:        tiers.tierLimitNum('pro',        'max_recipients'),
+        business:   tiers.tierLimitNum('business',   'max_recipients'),
+        enterprise: tiers.tierLimitNum('enterprise', 'max_recipients'),
       },
     }));
   }

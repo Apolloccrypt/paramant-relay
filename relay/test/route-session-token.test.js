@@ -115,6 +115,10 @@ const CHECK_KEY_COMMUNITY = {
   link_ttl_ms_by_plan: {
     community: 3_600_000, pro: 86_400_000, business: 604_800_000, enterprise: 604_800_000,
   },
+  // The recipient ceiling, the same tiers.js max_recipients rows that
+  // POST /v2/sends/precheck holds a list to. As public as the hours above.
+  max_recipients: 1,
+  max_recipients_by_plan: { community: 1, pro: 30, business: 30, enterprise: 30 },
 };
 
 // A fresh blob every time: the store is keyed on the sha256 and rejects a

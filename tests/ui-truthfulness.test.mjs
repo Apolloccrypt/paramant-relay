@@ -2395,55 +2395,36 @@ console.log('ui-truthfulness: the appearance switch says only what theme.js and 
   const parashareEn = read('frontend/en/parashare.html');
   const psJs = read('frontend/js/parashare.page.js');
 
-  assert.match(parashareEn, /The person you send to has to be online while you send; you confirm a short code together\./,
-    '/en/parashare must say above step 1 that the receiver has to be there; a sender should not discover a live handshake on step 2');
-  assert.match(parashareEn, /id="ps-mode-live"[^>]*aria-checked="true"/,
-    '/en/parashare: the live stand must be the one selected on arrival');
-  assert.match(psJs, /does not have to be online/,
-    'the English "Send a link" stand must say the receiver does not have to be online; that is the whole reason it exists');
+  // Since 24 September 2026 the page opens on "To one person" with a plain
+  // link, and the live hand-over is a tick box under it, "Extra safe". The
+  // promise that belongs above step 1 is now the label of that box: the other
+  // person has to be reachable now, and the two of you check a short code. It
+  // must stand inside #step-setup and above the file picker, the box must be
+  // unticked on arrival (the link is the default, and a sender who ticks
+  // nothing must not read a promise about a live wait), and the page must
+  // really derive the live stand from that box and nothing else.
+  // Sabotage: drop the label, pre-tick the box, or let sendMode go live
+  // without extraSafe, and this goes red.
+  const LIVE_EN = /<strong>Extra safe<\/strong>: the other person is available right now\. You check a short code together, and nothing is stored\./;
+  const LIVE_NL = /<strong>Extra veilig<\/strong>: de ontvanger is nu bereikbaar\. U controleert samen een korte code, en er wordt niets bewaard\./;
+  for (const [naam, html, zin, box] of [['/en/parashare', parashareEn, LIVE_EN, 'Extra safe'], ['/parashare', parashare, LIVE_NL, 'Extra veilig']]) {
+    assert.match(html, zin, `${naam} must say, on the Extra safe box, that the other person has to be there now and that you check a code together`);
+    assert.match(html, /<input type="checkbox" id="ps-extra-safe"(?![^>]*checked)[^>]*>/,
+      `${naam}: Extra safe must be unticked on arrival; the plain link is the default`);
+    assert.match(html, /id="ps-mode-link"[^>]*aria-checked="true"/,
+      `${naam}: "To one person" must be the choice selected on arrival`);
+    assert.match(html, /id="ps-mode-group"[^>]*aria-checked="false"/,
+      `${naam}: "To several people" must not be pre-selected`);
+    const setupAt = html.indexOf('id="step-setup"');
+    const noteAt = html.indexOf(`<strong>${box}</strong>`);
+    const kiezerAt = html.indexOf('id="file-input"');
+    assert.ok(setupAt > 0 && noteAt > setupAt && kiezerAt > noteAt,
+      `${naam}: the Extra safe promise must stand inside #step-setup and above the file picker`);
+  }
+  assert.match(psJs, /sendMode = \(audience === 'one' && extraSafe\) \? 'live' : 'link';/,
+    'the live stand must follow from the Extra safe box and nothing else; otherwise the page can wait for a receiver nobody told to be there');
   assert.match(parashareEn, /Compare this code together/,
     '/en/parashare: the card where the two of you compare must be named after what it asks you to do');
-  {
-    const setupAt = parashareEn.indexOf('id="step-setup"');
-    const noteAt = parashareEn.indexOf('The person you send to has to be online');
-    const kiezerAt = parashareEn.indexOf('id="file-input"');
-    assert.ok(setupAt > 0 && noteAt > setupAt && kiezerAt > noteAt,
-      '/en/parashare: the sentence must stand inside #step-setup and above the file picker');
-  }
-
-  assert.match(parashare, /De ontvanger moet online zijn terwijl u verstuurt\. U controleert samen een korte controlecode\./,
-    '/parashare must say above step 1 that the receiver has to be there; a sender should not discover a live handshake on step 2');
-
-  // The sentence above became a sentence about ONE of two stands the moment
-  // /parashare grew "Send a link", so it may only be shown while that stand is
-  // chosen. Three things have to hold together or the page starts lying in one
-  // direction or the other: the chooser exists and offers both, the live
-  // sentence is the DEFAULT (the live stand is the one selected on arrival, so
-  // a sender who chooses nothing reads the promise that is true of what he is
-  // about to do), and the sentence is really swapped when the other stand is
-  // picked rather than left standing over a flow it does not describe.
-  // Sabotage: delete either mode card, flip aria-checked to the link card, or
-  // take the swap out of setSendMode, and this goes red.
-  assert.match(parashare, /id="ps-mode-live"[^>]*aria-checked="true"/,
-    'the live stand must be the one selected on arrival: it is the stand the sentence above step 1 describes');
-  assert.match(parashare, /id="ps-mode-link"[^>]*aria-checked="false"/,
-    'the "Send a link" stand must not be pre-selected while the live sentence stands above step 1');
-  assert.match(psJs, /note\.textContent = \(sendMode === 'link'\)/,
-    'setSendMode no longer swaps the live-handshake sentence; choosing "Send a link" would leave a promise on screen that that stand does not keep');
-  assert.match(psJs, /hoeft niet online te zijn/,
-    'the "Send a link" stand must say the receiver does not have to be online; that is the whole reason it exists');
-  // Above step 1 means above it, not somewhere on the page: the sentence has to
-  // sit before the step-1 guide inside #step-setup.
-  const setupAt = parashare.indexOf('id="step-setup"');
-  const noteAt = parashare.indexOf('De ontvanger moet online zijn');
-  // De bovengrens was "Step 1 of 5", en die tekst is weg: de stepper telde
-  // stappen mee die in de link-stand niet bestaan, en werd weggehaald toen dat
-  // scherm te vol bleek. De eis eronder is niet veranderd -- de zin moet boven
-  // de bestandskiezer staan, want daar leest een afzender voordat hij kiest --
-  // dus die is nu aan de bestandskiezer zelf gehangen.
-  const kiezerAt = parashare.indexOf('id="file-input"');
-  assert.ok(setupAt > 0 && noteAt > setupAt && kiezerAt > noteAt,
-    'the sentence must stand inside #step-setup and above the step-1 guide, which is where a sender reads before choosing a file');
 
   // Claim 1: sending really does wait for the other person. createSession goes
   // to the waiting step and opens the socket, and nothing else advances.

@@ -3061,10 +3061,14 @@ test('the two legal facts are stated with their limits, and never as a promise',
 //   the receiver needs no account -> /get reads that fragment and spends the
 //                                   one-time download token
 test('the pages before the button say the ParaSend web app is a live handshake, and say what is not', () => {
-  const SENTENCE = 'In the web app you and the receiver are both online and compare a short code, and the file is handed over live. Sending to someone who is not online right now needs the API, the SDK, or the Send a link mode in the web app.';
+  // Rewritten on 24 September 2026, when /parashare made the link the default
+  // and the live hand-over the Extra safe tick box. The two plain phrases this
+  // block exists for ("both online", "compare a short code") stay, now about
+  // the stand that really does both.
+  const SENTENCE = 'In the web app you send a link that the other person opens when it suits them, to one person or, with Firm, to several people at once. With Extra safe you and the receiver are both online and compare a short code, and the file is handed over live. You can also send with the API or the SDK.';
   // /parasend is Nederlands sinds 23 september 2026 en draagt dezelfde zin in
   // het Nederlands, met de standnamen die /parashare toont.
-  const SENTENCE_NL = 'Bij ‘Samen, nu’ zijn u en de ontvanger allebei online en vergelijkt u een korte controlecode. Is de ontvanger niet online, kies dan ‘Later ophalen’ in de webapp, of gebruik de API of SDK.';
+  const SENTENCE_NL = 'In de webapp stuurt u een link die de ontvanger opent wanneer het uitkomt, naar één persoon of, met Firm, naar meerdere mensen tegelijk. Met ‘Extra veilig’ zijn u en de ontvanger allebei online en vergelijkt u een korte controlecode. U kunt ook versturen met de API of SDK.';
   const sentenceOf = (slug) => (slug === 'parasend' ? SENTENCE_NL : SENTENCE);
   const THREE = ['en/index', 'en/parasend', 'parasend', 'en/pricing'];
 
@@ -3078,11 +3082,11 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
   assert.ok(/short code|sas|safety number|compare/i.test(share) && /controlecode|vergelijk/i.test(share),
     'the ParaSend web app no longer derives a code for the two sides to compare; the sentence promises one');
   assert.match(read('frontend/en/parashare.html'),
-    /The person you send to has to be online while you send; you confirm a short code together\./,
-    '/en/parashare step 1 no longer carries the sentence the three pages before it now summarise');
+    /<strong>Extra safe<\/strong>: the other person is available right now\. You check a short code together/,
+    '/en/parashare step 1 no longer carries the Extra safe promise the pages before it now summarise');
   assert.match(read('frontend/parashare.html'),
-    /De ontvanger moet online zijn terwijl u verstuurt\. U controleert samen een korte controlecode\./,
-    '/parashare step 1 no longer carries the sentence the three pages before it now summarise');
+    /<strong>Extra veilig<\/strong>: de ontvanger is nu bereikbaar\. U controleert samen een korte code/,
+    '/parashare step 1 no longer carries the Extra veilig promise the pages before it now summarise');
 
   // Half two. There IS an asynchronous route, it is the API, and it holds the
   // sealed file against a deadline rather than a live peer.
@@ -3110,10 +3114,10 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
     '/parashare no longer offers the "Send a link" stand that the three pages send a buyer to');
   assert.match(read('frontend/en/parashare.html'), /data-click="chooseModeLink"/,
     '/en/parashare no longer offers the "Send a link" stand that the three pages send a buyer to');
-  assert.ok(visible(read('frontend/en/parashare.html')).includes('Send a link'),
-    '/en/parashare must name the stand in the same words the three pages use, or the buyer arrives and cannot find it');
-  assert.ok(visible(read('frontend/parashare.html')).includes('Later ophalen'),
-    '/parashare must name the stand in the same words the three pages use, or the buyer arrives and cannot find it');
+  assert.ok(visible(read('frontend/en/parashare.html')).includes('Extra safe'),
+    '/en/parashare must name Extra safe in the same words the pages before it use, or the buyer arrives and cannot find it');
+  assert.ok(visible(read('frontend/parashare.html')).includes('Extra veilig'),
+    '/parashare must name Extra veilig in the same words the pages before it use, or the buyer arrives and cannot find it');
   assert.match(share, /function createLink\(/,
     'the "Send a link" stand has no flow behind it; the tail of the sentence promises one');
   assert.match(share, /\/v2\/inbound/,
