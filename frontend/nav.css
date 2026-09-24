@@ -473,7 +473,7 @@ body.nav-locked .nav {
 /* ════════════════════════════════════════
    RESPONSIVE
    ════════════════════════════════════════ */
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .meta-bar { display: none; }
   nav.nav {
     padding: 0 16px;
@@ -850,13 +850,18 @@ nav.nav .nav-menu-divider { height: 1px; background: var(--ink-hair); margin: va
    Last block in the file on purpose: it overrides the rules above it, which
    have the same specificity, and CSS settles a tie by order.
 
-   The hamburger appears below 1024px, but the crowding it was hiding is a
+   The hamburger appears below 1280px (it was 1024px until 2026-09-24: the
+   signed-in Dutch bar needs about 1350px at full padding, so between 1024 and
+   1350 the theme switch and the account button were pushed past the right
+   edge, which is exactly where a zoomed desktop window lives). From 1280 to
+   1439 the bar tightens instead, see the block below. The crowding the
+   hamburger hides is still a
    phone problem, not a tablet one: at 820px five elements have room to
    breathe, at 390px they had 60px of slack between them and the button ended
    up against the hamburger. So the bar sheds its two text links at 700px, not
-   at 1024px. A tablet keeps Help and Sign in where they were.
+   at 1280px. A tablet keeps Help and Sign in where they were.
    ════════════════════════════════════════ */
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   nav.nav .nav-auth { gap: var(--space-3); }
   nav.nav .nav-cta,
   nav.nav .nav-user-trigger,
@@ -978,4 +983,19 @@ nav.nav .nav-menu-divider { height: 1px; background: var(--ink-hair); margin: va
 }
 @media (max-width: 700px) {
   nav.nav .nav-theme { display: none; }
+}
+
+/* ════════════════════════════════════════
+   TIGHT BAR  (1280 to 1439px)
+   The widest bar, signed in and in Dutch, is six workspace links, the account
+   button, NL | EN and the theme switch: about 1350px at the roomy padding. The
+   step to the hamburger sits at 1280, so from there up to 1439 the bar gives
+   back its own air (side padding, the gap, the padding inside each link)
+   instead of pushing its last items past the edge.
+   tests/responsive-overflow.test.mjs measures it at every width.
+   ════════════════════════════════════════ */
+@media (min-width: 1280px) and (max-width: 1439px) {
+  nav.nav { padding: 0 24px; gap: var(--space-3); }
+  nav.nav .nav-link { padding: 0 var(--space-2); }
+  nav.nav .nav-link::after { left: var(--space-2); right: var(--space-2); }
 }

@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **119 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **187 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **189 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -159,6 +159,8 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `PLAYWRIGHT_CHROMIUM_PATH` | `scripts/shot-dashboard.mjs`, `scripts/ui-contrast-sweep.mjs` en 35 meer | geen | pad naar de browser voor elke Playwright-test |
 | `RECEIPT_SHOTS_DIR` | `tests/receipt-verify.test.mjs` | `''` | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
 | `RELAY_URL` | `scripts/dev-local-proxy.js` | `'http://127.0.0.1:3001'` | waar de dev-proxy de relay zoekt |
+| `ROF_JSON` | `tests/responsive-overflow.test.mjs` | geen | pad waar de overloopmeting elke bevinding als JSON neerzet, voor een telling voor en na; leeg betekent geen bestand |
+| `ROF_POOL` | `tests/responsive-overflow.test.mjs` | `6` | hoeveel pagina's de overloopmeting tegelijk open heeft |
 | `SHOT_LABEL` | `scripts/shot-dashboard.mjs` | geen | label onder een schermafdruk |
 | `TMPDIR` | `tests/parasend-send-a-link.test.mjs` | `'/tmp'` | werkdir voor een tijdelijk bestand in de test |
 
