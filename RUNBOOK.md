@@ -289,28 +289,44 @@ preparation") or `uitgefaseerd` (gone, with the date in `tot`).
    variables that part is skipped with a message; CI has no key, so it skips
    there too. A skip is not a pass.
 
-### Example: mail from Resend to Lettermint
+### Switching mail from Resend to Lettermint
 
-Lettermint is a Dutch transactional mail provider (lettermint.co). The code
-does not know it yet, so this switch starts in the code:
+Lettermint B.V. (Zwolle, the Netherlands, KvK 99337711) is wired into
+`relay/lib/mail.js` as `lettermint` and heads the preference list
+(`lettermint, mailjet, scaleway, resend`). It sits in `partners.json` as
+`in-code-niet-actief` until the steps below are done. With `MAIL_PROVIDER`
+empty, **putting the token in the production `.env` is the switch**, so do the
+DNS part of step 1 first.
 
-1. Add a `lettermint` sender to `relay/lib/mail.js` (`PROVIDERS`, the key
-   names, the request), with its tests. Add its key to `docker-compose.yml`.
-   Add a party `lettermint` to `partners.json` with status
-   `in-code-niet-actief`, `code_keuze` pointing at `relay/lib/mail.js`, and
-   remove it from `overwogen`. The test now fails until that is consistent.
-2. After the contract: the key into the production `.env`, and `MAIL_PROVIDER`
-   stays empty so the code picks the carrier whose keys are present, or set it
-   to `lettermint` explicitly.
-3. `partners.json`: `lettermint` to `actief` with `sinds`; `resend` to
-   `uitgefaseerd` with `tot`, and while `RESEND_API_KEY` is still on the server
-   list it under `dode_resten` with an `opruimen_voor` date. The test goes red
-   on that date if the key is still there.
-4. The site: the Resend line out of `/privacy` and `/dpa` (both languages),
-   Lettermint in with its legal name and country, and every sentence the test
-   flags ("gaat nu nog via Resend Inc. in de Verenigde Staten" and its English
-   twin on home, /security, /press, /rules, /parasend, /parasign, /help).
-5. Remove `RESEND_API_KEY` from the server, then its `dode_resten` line.
+1. **[server]** Back up `/opt/paramant-relay/.env`, then add
+   `LETTERMINT_API_TOKEN=lm_...` (the project token). Leave `MAIL_PROVIDER`
+   empty, or set it to `lettermint`. Optional: `LETTERMINT_ROUTE=<slug>` if the
+   project has more than one route. Before this, add Lettermint's SPF include
+   and DKIM records for the sending domain in DNS and confirm they resolve;
+   with DMARC on quarantine an unsigned sender lands in spam.
+2. **[server]** Deploy (`deploy/deploy-3.1.sh`). At boot the relay logs its
+   mail diagnosis: `provider` must read `lettermint`, `gereed` true.
+3. **[server]** Test mail through the same code path:
+
+   ```bash
+   # token read from a file, never on the command line
+   node scripts/mail-proef.mjs you@example.org /path/to/lettermint.token
+   ```
+
+   Expect HTTP 202 and a `message_id`, and check the mail actually arrived
+   (headers: DKIM pass for the Paramant domain).
+4. **[repo]** `deploy/partners.json`: `lettermint` to `actief` with `sinds`;
+   `resend` either to `uitgefaseerd` with `tot` (its key under `dode_resten`
+   with `opruimen_voor` while `RESEND_API_KEY` is still on the server), or kept
+   `actief` as fallback with `MAIL_FALLBACK_PROVIDER=resend` in the prod
+   `.env`. Then `cp deploy/partners.json frontend/partners.json` and run
+   `node --test tests/partners.test.mjs`: it names every page (/privacy, /dpa,
+   home, /security, ...) that still says Resend or omits Lettermint. The site
+   follows the test.
+5. **[DNS]** Once Resend is gone (no key, no fallback): remove
+   `include:amazonses.com` from the SPF record of the sending domain
+   (amazonses.com is Resend's carrier), then `RESEND_API_KEY` from the server
+   and its `dode_resten` line.
 
 ### Naming a non-active party on the site
 
