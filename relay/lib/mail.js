@@ -18,6 +18,12 @@
 //
 // PROVIDERS. Every one speaks plain HTTPS+JSON, so there is no new dependency
 // and no SMTP library in a codebase that has to stay auditable.
+//   lettermint  Lettermint B.V., Zwolle, the Netherlands (KvK 99337711, per
+//             their terms and DPA at lettermint.co/dpa). Dutch company; mail
+//             data runs on UpCloud in the Netherlands with backups at OVH in
+//             Germany (lettermint.co/subprocessors, seen 2026-09-24). No
+//             card-before-mandate wall like Scaleway, and an account that can
+//             actually be opened, which is why it heads the preference list.
 //   mailjet   THE ONE WE USE. Mailjet SAS, Paris, owned by Sinch AB of Sweden:
 //             European company, European parent, no US entity anywhere in the
 //             chain and therefore nothing for the CLOUD Act to reach. Their own
@@ -51,7 +57,7 @@
 // Choosing one is MAIL_PROVIDER. Anything unknown falls back to dryrun rather
 // than silently picking a provider the operator did not ask for.
 
-const PROVIDERS = ['mailjet', 'scaleway', 'resend', 'dryrun'];
+const PROVIDERS = ['lettermint', 'mailjet', 'scaleway', 'resend', 'dryrun'];
 
 // WELKE DRAGER, ALS NIEMAND HET ZEGT. Deze standaard stond op 'mailjet' vanaf
 // het moment dat Mailjet de eerste keus werd, en dat is een val: productie
@@ -60,11 +66,11 @@ const PROVIDERS = ['mailjet', 'scaleway', 'resend', 'dryrun'];
 // uitnodiging, geen ophaalcode, en pas zichtbaar als een klant belt.
 //
 // Een standaard hoort te kiezen wat er WERKT. De volgorde is de voorkeur
-// (Mailjet boven Scaleway boven Resend), maar alleen onder de dragers waarvan
+// (Lettermint boven Mailjet boven Scaleway boven Resend), maar alleen onder de dragers waarvan
 // de sleutels er ook echt zijn. Staat MAIL_PROVIDER wel gezet, dan wint die,
 // ook als zijn sleutels ontbreken: dan is de stilte een expliciete keuze en
 // zegt diagnose() waarom.
-const VOORKEUR = ['mailjet', 'scaleway', 'resend'];
+const VOORKEUR = ['lettermint', 'mailjet', 'scaleway', 'resend'];
 
 function kiesDrager(env, kandidaat) {
   const gezet = String(env.MAIL_PROVIDER || '').trim().toLowerCase();
@@ -78,6 +84,7 @@ function config(env) {
   // gereedVoor() leest uit een cfg, en die maken we hier juist. Dus eerst de
   // sleutels, dan de keuze, dan het geheel.
   const sleutels = {
+    lettermintToken: env.LETTERMINT_API_TOKEN || '',
     mailjetKey: env.MAILJET_API_KEY || '',
     mailjetSecret: env.MAILJET_SECRET_KEY || '',
     scalewayKey: env.SCALEWAY_SECRET_KEY || '',
@@ -96,6 +103,10 @@ function config(env) {
       const n = String(env.MAIL_FALLBACK_PROVIDER || '').trim().toLowerCase();
       return PROVIDERS.includes(n) ? n : '';
     })(),
+    lettermintToken: env.LETTERMINT_API_TOKEN || '',
+    // A Lettermint project can have several routes (transactional, broadcast).
+    // Empty means the project's default route.
+    lettermintRoute: String(env.LETTERMINT_ROUTE || '').trim(),
     mailjetKey: env.MAILJET_API_KEY || '',
     mailjetSecret: env.MAILJET_SECRET_KEY || '',
     scalewayKey: env.SCALEWAY_SECRET_KEY || '',
@@ -132,6 +143,61 @@ function normaliseer(msg) {
     replyTo: (msg && (msg.replyTo || msg.reply_to)) || null,
     headers: (msg && msg.headers) || null,
   };
+}
+
+// Lettermint Sending API. POST https://api.lettermint.co/v1/send with the
+// project token in x-lettermint-token; 202 with { message_id, status } on
+// acceptance, 422 with { message, errors } on a validation error. Shape per
+// their OpenAPI schema (lettermint.co/docs/api-reference/sending, 0.0.1).
+//
+// ONE CALL PER ADDRESS, for the same reason as Mailjet below: several entries
+// in one `to` means those people see each other. Each call reports how many
+// went out before it, so a refusal halfway is a partial delivery and the
+// fallback does not mail the first ones twice.
+const LETTERMINT_WEIGERT = ['suppressed', 'failed', 'blocked', 'policy_rejected', 'hard_bounced', 'canceled'];
+
+async function viaLettermint(m, cfg, fetchImpl) {
+  if (!cfg.lettermintToken) return { ok: false, provider: 'lettermint', reason: 'not_configured' };
+  const ids = [];
+  for (const adres of m.to) {
+    const resp = await fetchImpl('https://api.lettermint.co/v1/send', {
+      method: 'POST',
+      headers: { 'x-lettermint-token': cfg.lettermintToken, 'Content-Type': 'application/json',
+                 Accept: 'application/json' },
+      body: JSON.stringify({
+        route: cfg.lettermintRoute || undefined,
+        from: m.from || cfg.from,
+        to: [adres],
+        cc: m.cc.length ? m.cc : undefined,
+        reply_to: m.replyTo ? [].concat(m.replyTo) : undefined,
+        subject: m.subject,
+        html: m.html || undefined,
+        text: m.text || stripHtml(m.html) || undefined,
+        headers: m.headers || undefined,
+        attachments: m.attachments.length
+          ? m.attachments.map(a => ({
+              filename: a.filename,
+              content: a.content,
+              content_type: a.type || undefined,
+            }))
+          : undefined,
+      }),
+    });
+    if (!resp || !resp.ok) {
+      const body = resp && resp.text ? await resp.text().catch(() => '') : '';
+      return { ok: false, provider: 'lettermint', reason: 'http_' + ((resp && resp.status) || 0),
+               detail: String(body).slice(0, 200), count: ids.length };
+    }
+    let uit = null;
+    try { uit = resp.json ? await resp.json() : null; } catch (e) { uit = null; }
+    const status = uit && uit.status ? String(uit.status) : '';
+    if (LETTERMINT_WEIGERT.includes(status)) {
+      return { ok: false, provider: 'lettermint', reason: 'rejected',
+               detail: ('status ' + status).slice(0, 200), count: ids.length };
+    }
+    ids.push((uit && uit.message_id) || null);
+  }
+  return { ok: true, provider: 'lettermint', count: m.to.length, message_ids: ids };
 }
 
 // Mailjet Send API v3.1. POST https://api.mailjet.com/v3.1/send with HTTP Basic
@@ -447,6 +513,7 @@ async function stuur(msg, opts) {
 // from the primary path.
 async function viaProvider(naam, m, cfg, fetchImpl, logImpl) {
   try {
+    if (naam === 'lettermint') return await viaLettermint(m, cfg, fetchImpl);
     if (naam === 'mailjet') return await viaMailjet(m, cfg, fetchImpl);
     if (naam === 'scaleway') return await viaScaleway(m, cfg, fetchImpl);
     if (naam === 'resend') return await viaResend(m, cfg, fetchImpl);
@@ -460,6 +527,7 @@ async function viaProvider(naam, m, cfg, fetchImpl, logImpl) {
 // Whether a named carrier has what it needs, against an already-built config.
 function gereedVoor(naam, cfg) {
   if (naam === 'dryrun') return true;
+  if (naam === 'lettermint') return Boolean(cfg.lettermintToken);
   if (naam === 'mailjet') return Boolean(cfg.mailjetKey && cfg.mailjetSecret);
   if (naam === 'scaleway') return Boolean(cfg.scalewayKey && cfg.scalewayProject);
   if (naam === 'resend') return Boolean(cfg.resendKey);

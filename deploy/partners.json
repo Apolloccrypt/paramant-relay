@@ -6,7 +6,7 @@
     "Een naam van een niet-actieve partij mag op de site alleen binnen een element met data-partner-context=\"<id> <reden>\" (reden: voorwaardelijk, historie, gepland, geen-partij). Zo is elke uitzondering zichtbaar in de html en in de diff.",
     "Geen waarden van sleutels, alleen namen. Juridische naam, land en moederbedrijf alleen met bron; anders null en 'onbekend' in bronnen."
   ],
-  "gewijzigd": "2026-09-23",
+  "gewijzigd": "2026-09-24",
   "statussen": {
     "actief": { "nl": "Actief", "en": "Active" },
     "in-code-niet-actief": { "nl": "In voorbereiding", "en": "In preparation" },
@@ -649,6 +649,78 @@
       }
     },
     {
+      "id": "lettermint",
+      "naam": "Lettermint B.V.",
+      "handelsnaam": "Lettermint",
+      "site_namen": [
+        "\\bLettermint\\b"
+      ],
+      "rol": "mail",
+      "land": {
+        "nl": "Nederland",
+        "en": "Netherlands",
+        "code": "NL"
+      },
+      "moederbedrijf": null,
+      "moederbedrijf_land": null,
+      "gegevens": {
+        "nl": "Zou dezelfde gegevens krijgen als Resend nu: adres, onderwerp, bericht met link.",
+        "en": "Would receive what Resend receives now: address, subject, message with link."
+      },
+      "nooit": {
+        "nl": "Documenten, bestanden of sleutels.",
+        "en": "Documents, files or keys."
+      },
+      "subverwerker": true,
+      "status": "in-code-niet-actief",
+      "sinds": null,
+      "tot": null,
+      "sleutels": [
+        "LETTERMINT_API_TOKEN"
+      ],
+      "sleutels_optioneel": [
+        "LETTERMINT_ROUTE"
+      ],
+      "ci_geheimen": [],
+      "dode_resten": [],
+      "dpa_url": "https://lettermint.co/dpa",
+      "hosts": [
+        "api.lettermint.co"
+      ],
+      "code": [
+        "relay/lib/mail.js"
+      ],
+      "code_keuze": {
+        "module": "relay/lib/mail.js",
+        "naam_in_code": "lettermint"
+      },
+      "onderaannemers": [
+        {
+          "naam": "UpCloud",
+          "zekerheid": "bevestigd",
+          "bron": "lettermint.co/subprocessors (gezien 2026-09-24): cloudprovider, e-maildata, Nederland"
+        },
+        {
+          "naam": "OVH Cloud",
+          "zekerheid": "bevestigd",
+          "bron": "lettermint.co/subprocessors (gezien 2026-09-24): back-ups, e-maildata, Duitsland"
+        },
+        {
+          "naam": "Postmastery",
+          "zekerheid": "bevestigd",
+          "bron": "lettermint.co/subprocessors (gezien 2026-09-24): deliverability-monitoring, e-maildata, Nederland"
+        }
+      ],
+      "bronnen": {
+        "naam": "lettermint.co/terms-of-service art. 1.1.13 en lettermint.co/dpa: \"Lettermint B.V.\", KvK 99337711, Willemsvaart 16 B, 8019 AB Zwolle; gezien 2026-09-24",
+        "land": "lettermint.co/dpa: \"incorporated under the laws of the Netherlands\"",
+        "moederbedrijf": "onbekend",
+        "status": "in voorbereiding: code en compose kennen LETTERMINT_API_TOKEN (2026-09-24), prod-.env nog niet; omschakelen per RUNBOOK.md",
+        "sinds": "n.v.t., nog niet actief",
+        "dpa_url": "lettermint.co/dpa, gezien 2026-09-24"
+      }
+    },
+    {
       "id": "stripe",
       "naam": null,
       "handelsnaam": "Stripe",
@@ -848,7 +920,6 @@
     }
   ],
   "overwogen": [
-    { "id": "lettermint", "naam": "Lettermint", "site_namen": ["\\bLettermint\\b"], "bron": "RUNBOOK.md, voorbeeld van omschakelen; nooit gecontracteerd" },
     { "id": "brevo", "naam": "Brevo", "site_namen": ["\\bBrevo\\b"], "bron": "tests/mail-provider-site.test.mjs (PR #500) sloot hem uit; nooit gebruikt" },
     { "id": "flowmailer", "naam": "Flowmailer", "site_namen": ["\\bFlowmailer\\b"], "bron": "idem" }
   ],

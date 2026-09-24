@@ -50,7 +50,7 @@ x-relay-env: &relay-env
   RAM_LIMIT_MB: "${RAM_LIMIT_MB:-1024}"
   LOG_LEVEL: "${LOG_LEVEL:-info}"
   # ── Who carries the mail ────────────────────────────────────────────────
-  # MAIL_PROVIDER picks one of: mailjet, scaleway, resend, dryrun. Empty means
+  # MAIL_PROVIDER picks one of: lettermint, mailjet, scaleway, resend, dryrun. Empty means
   # the first carrier whose keys are present (relay/lib/mail.js, VOORKEUR).
   # Anything MISSPELLED falls back to dryrun and delivers nothing, so the relay
   # logs mail_misconfigured at boot rather than letting that run quietly; check
@@ -79,6 +79,8 @@ x-relay-env: &relay-env
   # set it there and here together.
   MAIL_FALLBACK_PROVIDER: "${MAIL_FALLBACK_PROVIDER:-}"
   MAIL_FROM: "${MAIL_FROM:-PARAMANT <noreply@paramant.app>}"
+  LETTERMINT_API_TOKEN: "${LETTERMINT_API_TOKEN:-}"
+  LETTERMINT_ROUTE: "${LETTERMINT_ROUTE:-}"
   MAILJET_API_KEY: "${MAILJET_API_KEY:-}"
   MAILJET_SECRET_KEY: "${MAILJET_SECRET_KEY:-}"
   SCALEWAY_SECRET_KEY: "${SCALEWAY_SECRET_KEY:-}"
@@ -378,6 +380,8 @@ services:
       MAIL_PROVIDER: "${MAIL_PROVIDER:-}"
       MAIL_FALLBACK_PROVIDER: "${MAIL_FALLBACK_PROVIDER:-}"
       MAIL_FROM: "${MAIL_FROM:-PARAMANT <noreply@paramant.app>}"
+      LETTERMINT_API_TOKEN: "${LETTERMINT_API_TOKEN:-}"
+      LETTERMINT_ROUTE: "${LETTERMINT_ROUTE:-}"
       MAILJET_API_KEY: "${MAILJET_API_KEY:-}"
       MAILJET_SECRET_KEY: "${MAILJET_SECRET_KEY:-}"
       SCALEWAY_SECRET_KEY: "${SCALEWAY_SECRET_KEY:-}"
