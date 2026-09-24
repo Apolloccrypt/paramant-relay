@@ -114,9 +114,12 @@ for (const route of ['/account', '/pricing', '/dashboard']) {
   const before = asked.filter((u) => u === KEY_URL).length;
 
   await page.locator('#acct-advanced > summary').click();
-  // The placeholder the HTML ships with, written as an escape: the style guard
-  // bans the literal character from added lines.
-  await page.waitForFunction(() => document.getElementById('api-key').textContent.trim() !== '\u2014');
+  // Wait for the thing itself: the key request going out and its answer landing.
+  // Waiting for the text to leave the placeholder broke on 2026-09-23, when the
+  // placeholder changed from an em-dash to "-" and the wait ended before any
+  // request was made.
+  const placeholder = await page.locator('#api-key').evaluate((node) => node.textContent.trim());
+  await page.waitForFunction((ph) => document.getElementById('api-key').textContent.trim() !== ph, placeholder);
   const after = asked.filter((u) => u === KEY_URL).length;
   ok('opening the fold is what asks for the key, exactly once', before === 0 && after === 1, `${before} -> ${after}`);
 
