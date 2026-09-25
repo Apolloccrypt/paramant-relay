@@ -441,12 +441,14 @@ async function seedIndex(redis, records) {
     if (!rec || !accountId) continue;
     seen++;
     for (const product of entitlements.PRODUCTS) {
-      const tier = rec[entitlements.PRODUCT_PLAN_FIELD[product]];
-      const paidUntil = rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[product]];
-      if (!paidUntil) continue;
+      // The day the product falls to its floor, and what was bought for it.
+      // With a Business month over a Pro year that is the end of the year: the
+      // end of the month is not an end the customer has to act on.
+      const last = entitlements.finalTermOf(rec, product);
+      if (!last) continue;
       const r = await upsertExpiry(redis, {
-        accountId, product, tier, paidUntil, email: rec.email,
-        bundle: rec[entitlements.PRODUCT_BUNDLE_FIELD[product]] || null,
+        accountId, product, tier: last.tier, paidUntil: last.paidUntil, email: rec.email,
+        bundle: last.bundle || null,
       });
       if (r.indexed) indexed++;
     }

@@ -243,10 +243,24 @@ function parseAccountFields(rawKey) {
   // relay wrote paid_until to users.json correctly and then dropped it on the
   // way back in. Only set when present, so "no period on file" stays absent
   // (never expired) rather than becoming an explicit null.
+  //
+  // The same drop, a field further on: the bundle that bought the period. It
+  // was written to users.json and never read back, so after every restart a
+  // Firm customer's term was two anonymous Pro terms again, and the expiry
+  // sweep sent him two mails about plans he never bought under those names
+  // instead of one about Firm (betaaltest 25-09, R9). It travels with the
+  // period, on the same only-when-present rule. And so do the terms of a
+  // product that holds more than one tier (entitlements.PRODUCT_TERMS_FIELD):
+  // left behind here, the Pro year under a Business month would be gone after
+  // the next deploy.
   const out = { account_id, is_primary, scope, legacy_revealable, parasign, plan_parasend, plan_parasign, usage_purpose, usage_purpose_at };
   for (const product of entitlements.PRODUCTS) {
     const f = entitlements.PRODUCT_PAID_UNTIL_FIELD[product];
     if (rawKey[f] != null) out[f] = rawKey[f];
+    const b = entitlements.PRODUCT_BUNDLE_FIELD[product];
+    if (rawKey[b] != null && rawKey[b] !== '') out[b] = rawKey[b];
+    const t = entitlements.PRODUCT_TERMS_FIELD[product];
+    if (rawKey[t] && typeof rawKey[t] === 'object' && !Array.isArray(rawKey[t])) out[t] = rawKey[t];
   }
   // The same fault, one layer down. The billing webhook writes the Mollie
   // customer, the subscription per line, the payment that made it, and the
@@ -432,10 +446,14 @@ function buildParasignKeyRecord({ accountId, plan, email, label, test, randomHex
   // record's tiers; absent, we fall back to deriving from the legacy plan.
   const normParasign = entitlements.normaliseParasignTier(planParasign || entitlements.derivePlanParasign(normPlan, true));
   const normParasend = entitlements.normaliseParasendTier(planParasend || entitlements.derivePlanParasend(normPlan));
+  // The per-product tiers start at the floor and are written below by
+  // applyProductTier, tier and period together. Written here first, the tier
+  // would already be a term without an end, and a dated grant never shortens a
+  // term (entitlements.applyProductTier), so the period would not stick.
   const rec = {
     plan: normPlan,
-    plan_parasign: normParasign,
-    plan_parasend: normParasend,
+    plan_parasign: entitlements.floorTierOf('parasign'),
+    plan_parasend: entitlements.floorTierOf('parasend'),
     label: (typeof label === 'string' ? label.slice(0, 128) : '') || 'parasign-api',
     email: email || '',
     active: true,
@@ -449,7 +467,7 @@ function buildParasignKeyRecord({ accountId, plan, email, label, test, randomHex
   // users.json persisted entry (subset the loader re-hydrates via parseAccountFields).
   const usersEntry = {
     key, plan: rec.plan, label: rec.label, email: rec.email, active: true, created,
-    plan_parasign: normParasign, plan_parasend: normParasend,
+    plan_parasign: rec.plan_parasign, plan_parasend: rec.plan_parasend,
     account_id: accountId, is_primary: false, scope: 'parasign', parasign: true, product: 'parasign',
   };
   // The paid PERIOD travels with the inherited tier, onto BOTH the live record
@@ -460,9 +478,10 @@ function buildParasignKeyRecord({ accountId, plan, email, label, test, randomHex
   // the shape that reached disk. Both issuance paths run through here
   // (POST /v2/user/parasign-keys, self-serve, and the admin mint), so this is
   // the one place it has to be right.
-  // applyProductTier is the shared field rule: undefined leaves the field alone,
-  // and landing on a floor tier clears any period, so a lapsed grant is minted
-  // as a plain floor key with no stale date on it.
+  // applyProductTier is the shared field rule: a date is the end of the term,
+  // no date is a tier without an end (what an account with no recorded period
+  // has), and landing on a floor tier clears any period, so a lapsed grant is
+  // minted as a plain floor key with no stale date on it.
   for (const [product, tier, until] of [
     ['parasign', normParasign, paidUntilParasign],
     ['parasend', normParasend, paidUntilParasend],

@@ -1892,6 +1892,35 @@ function senderLabelOf(accountId) {
 // Pro account kept hitting the 2-signature free wall. Merge both, taking the
 // HIGHEST per-product tier any key of the account carries so a stale free key
 // can never hold a paid account down.
+// What the admin projections (/v2/admin/keys and the key reveal) show for one
+// product of one key record, read at the moment of the request:
+//   plan        the tier that runs NOW (or the one on file when none runs).
+//               The stored pair says what was on top when it was written; a
+//               Business month that ended yesterday still sits there, while the
+//               Pro year under it is what every gate grants today.
+//   paid_until  the day this product's paid access ends: the last of its
+//               terms, or null when one has no end. That is the day every
+//               screen means when it says "your plan ends on", followed by "and
+//               falls back to Community". With a Business month over a Pro year
+//               the end of the month is not that day.
+// Every screen in admin/ is built on this projection, so it has to say what the
+// gates say. A record with one term reads exactly as before; a record from
+// before per-product plans keeps the no-downgrade derivation from its legacy
+// plan.
+function _termView(v, product) {
+  const planField = entitlements.PRODUCT_PLAN_FIELD[product];
+  if (!v || !v[planField]) {
+    return {
+      tier: product === 'parasign' ? entitlements.derivePlanParasign(v && v.plan, v && v.parasign) : entitlements.derivePlanParasend(v && v.plan),
+      paidUntil: (v && v[entitlements.PRODUCT_PAID_UNTIL_FIELD[product]]) || null,
+    };
+  }
+  const now = entitlements.currentTermOf(v, product);
+  if (entitlements.termsOf(v, product).length === 0) return { tier: now.tier, paidUntil: now.paidUntil };
+  const last = entitlements.finalTermOf(v, product);
+  return { tier: now.tier, paidUntil: last ? last.paidUntil : null };
+}
+
 function entitlementRecordOf(accountId) {
   if (!accountId) return null;
   const acct = accounts.get(accountId);
@@ -2688,13 +2717,36 @@ function grantParasignOnPaidPlan(accountId) {
 // paidUntil travels with the tier: a Date (or ISO string) sets the period this
 // grant is paid for, null clears it, and undefined leaves whatever is on record
 // alone. That last case keeps every admin grant behaving exactly as before.
-function setProductPlan(accountId, product, tier, paidUntil, bundle) {
+//
+// A GRANT NEVER LOWERS A RUNNING HIGHER TIER. With a date (the webhook, a gift
+// code) that holds by construction: a product keeps a term per tier and a
+// dated write sets the term of its own tier and no other
+// (entitlements.applyProductTier), so a Pro payment on a Business account adds
+// a Pro term under the Business one. Until 2026-09-25 it wrote Pro over the
+// Business term here, on this relay only: the others refuse a lower grant from
+// redis, so the fleet then disagreed about what the customer had (R3).
+//
+// Without a date (an admin grant) the running term moves to the new tier, so
+// a lower tier would lower it. That happens only when the caller says so
+// (opts.downgrade), and then the term keeps its end date; otherwise this
+// answers lower_than_running and changes nothing. The floor tier is not a
+// grant: a chargeback, a refund and an admin taking a plan back still land.
+function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
   if (!accountId || (product !== 'parasend' && product !== 'parasign')) return { ok: false, reason: 'bad_args' };
   const norm = product === 'parasign'
     ? entitlements.normaliseParasignTier(tier)
     : entitlements.normaliseParasendTier(tier);
   const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
   if (members.size === 0) return { ok: false, reason: 'no_keys' };
+  if (paidUntil === undefined && norm !== entitlements.floorTierOf(product) && !(opts && opts.downgrade)) {
+    const running = entitlements.effectiveProductTier(entitlementRecordOf(accountId), product);
+    if (entitlements.termRelation(product, norm, running.tier) === 'higher_running') {
+      return {
+        ok: false, reason: 'lower_than_running', product, tier: norm,
+        running: { tier: running.tier, paidUntil: running.paidUntil ? new Date(running.paidUntil).toISOString() : null },
+      };
+    }
+  }
   let changed = 0;
   for (const m of members) {
     const mv = apiKeys.get(m);
@@ -2787,22 +2839,22 @@ function _hydrateSharedGrant(accountId, grant, revoked) {
   const moved = grant ? sharedGrants.applyTo(merged, grant) : sharedGrants.applyRevocation(merged);
   if (moved.length === 0) return [];
   for (const product of moved) {
-    const tier = merged[entitlements.PRODUCT_PLAN_FIELD[product]];
-    const paidUntil = merged[entitlements.PRODUCT_PAID_UNTIL_FIELD[product]] || null;
-    const bundle = merged[entitlements.PRODUCT_BUNDLE_FIELD[product]] || null;
+    // The decision was taken on `merged`; every store gets exactly that, every
+    // term included, so a Pro year that came in under a Business month is on
+    // this container's keys, summary and users.json too.
     for (const m of members) {
       const mv = apiKeys.get(m);
-      if (mv) entitlements.applyProductTier(mv, product, tier, paidUntil, bundle);
+      if (mv) entitlements.copyProductGrant(mv, merged, product);
     }
     const acct = accounts.get(accountId);
     if (acct) {
-      entitlements.applyProductTier(acct, product, tier, paidUntil, bundle);
+      entitlements.copyProductGrant(acct, merged, product);
       acct.plan_updated = new Date().toISOString();
     }
     _mutateUsersJson(ud => {
       for (const entry of ud.api_keys) {
         if ((entry.account_id || entry.key) === accountId) {
-          entitlements.applyProductTier(entry, product, tier, paidUntil, bundle);
+          entitlements.copyProductGrant(entry, merged, product);
           entry.plan_updated = new Date().toISOString();
         }
       }
@@ -2885,12 +2937,16 @@ function _indexAccountExpiry(accountId, product) {
   for (const m of members) { const mv = apiKeys.get(m); if (mv && mv.email) { email = mv.email; break; } }
   const products = product ? [product] : entitlements.PRODUCTS;
   for (const prod of products) {
+    // The day the product falls to its floor (the last term to end), not the
+    // end of whichever term happens to be on top: a Business month over a Pro
+    // year warns about the end of the year.
+    const last = entitlements.finalTermOf(rec, prod);
     planExpiry.upsertExpiry(redisClient, {
       accountId,
       product: prod,
-      tier: rec[entitlements.PRODUCT_PLAN_FIELD[prod]],
-      paidUntil: rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[prod]] || null,
-      bundle: rec[entitlements.PRODUCT_BUNDLE_FIELD[prod]] || null,
+      tier: last ? last.tier : rec[entitlements.PRODUCT_PLAN_FIELD[prod]],
+      paidUntil: last ? last.paidUntil : null,
+      bundle: last ? last.bundle : null,
       email,
     }).catch(e => log('warn', 'plan_expiry_index_failed', { product: prod, err: e.message }));
   }
@@ -3410,10 +3466,13 @@ function mintParasignKey(accountId, opts = {}) {
   // grant. An ALREADY expired grant is minted as the floor tier with no period
   // at all (effectiveProductTier reports it as expired), so a lapsed account
   // does not get a stale date on a fresh key either.
+  // The end is the end of the term that grants (effectiveProductTier), not
+  // the stored date: with a Pro year under a Business month that has ended, the
+  // stored date is the month's, and a Pro key with it would be born lapsed.
   const _effGrant = (product) => {
     if (eff[entitlements.PRODUCT_PLAN_FIELD[product]] == null) return {};
     const g = entitlements.effectiveProductTier(eff, product);
-    return { tier: g.tier, paidUntil: g.expired ? null : eff[entitlements.PRODUCT_PAID_UNTIL_FIELD[product]] };
+    return { tier: g.tier, paidUntil: g.expired || g.paidUntil === null ? null : new Date(g.paidUntil).toISOString() };
   };
   const _pg = _effGrant('parasign');
   const _ps = _effGrant('parasend');
@@ -6694,6 +6753,15 @@ async function handleRelayRequest(req, res) {
     }
     const prevCount = apiKeys.size;
 
+    // Wait for this process's own writes first. A change (set-product-plan,
+    // a grant, a hydration) answers before its _mutateUsersJson has reached the
+    // disk, and the admin calls this route straight after the change. Read
+    // earlier, the old file comes back in and puts the old tier back in
+    // memory, while the new file lands a moment later: memory and disk then
+    // disagree, and the union merge of the next reseed writes the old tier back
+    // to disk as well (review of #515, round 2). The queue never rejects.
+    await _usersWriteQueue;
+
     // Read with retry — handle transient mid-write reads from concurrent _mutateUsersJson.
     let parsed = null;
     let parseErr = null;
@@ -8276,14 +8344,15 @@ async function handleRelayRequest(req, res) {
     // GET /v2/admin/keys/reveal/:account_id. key_masked is always present so
     // browser-facing list views can render rows without ever holding a secret.
     const reveal = query.reveal === '1' || query.reveal === 'true';
-    const keys = [...apiKeys.entries()].map(([k, v]) => ({
+    const keys = [...apiKeys.entries()].map(([k, v]) => ({ v, sign: _termView(v, 'parasign'), send: _termView(v, 'parasend'), k })).map(({ k, v, sign, send }) => ({
       key: reveal ? k : maskKey(k), key_masked: maskKey(k), plan: v.plan, label: v.label, email: v.email || null, active: v.active, over_limit: v.over_limit || false,
       kid: v.kid || null, account_id: v.account_id || k, is_primary: !!v.is_primary, scope: v.scope || 'full', parasign: !!v.parasign, created: v.created || null,
-      // Per-product truth for the admin panel: the stored per-product tier, or a
-      // no-downgrade derivation from the legacy plan for un-migrated records
-      // (mirrors getEntitlements' fallback) so an operator never sees a blank.
-      plan_parasign: v.plan_parasign || entitlements.derivePlanParasign(v.plan, v.parasign),
-      plan_parasend: v.plan_parasend || entitlements.derivePlanParasend(v.plan),
+      // Per-product truth for the admin panel: the term that runs now (see
+      // _termView), or a no-downgrade derivation from the legacy plan for
+      // un-migrated records (mirrors getEntitlements' fallback) so an operator
+      // never sees a blank.
+      plan_parasign: sign.tier,
+      plan_parasend: send.tier,
       // The period the tier was paid for. WITHOUT this the tier above is the
       // whole story a reader gets, and "no period" is read everywhere as "never
       // expires" (entitlements.effectiveProductTier, and the same rule mirrored
@@ -8291,8 +8360,8 @@ async function handleRelayRequest(req, res) {
       // in admin/ is built on this projection, so leaving it out made a lapsed
       // account render as "Pro, active" long after the relay's own gates had
       // floored it to free. The date is on the record; it just never left.
-      paid_until_parasign: v[entitlements.PRODUCT_PAID_UNTIL_FIELD.parasign] || null,
-      paid_until_parasend: v[entitlements.PRODUCT_PAID_UNTIL_FIELD.parasend] || null,
+      paid_until_parasign: sign.paidUntil,
+      paid_until_parasend: send.paidUntil,
       // Is there a collection standing behind this account. The account page
       // told every customer auto_renews:false because nothing on this
       // projection could say otherwise, and with BILLING_MODE set that is the
@@ -8321,14 +8390,16 @@ async function handleRelayRequest(req, res) {
     if (!entry) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'key_not_found' })); }
     const [k, v] = entry;
     log('info', 'admin_key_revealed', { account: String(v.account_id || k).slice(0, 12), kid: v.kid || null });
+    const sign = _termView(v, 'parasign');
+    const send = _termView(v, 'parasend');
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, key: k, key_masked: maskKey(k), kid: v.kid || null,
       account_id: v.account_id || k, plan: v.plan, label: v.label, email: v.email || null,
       active: v.active, is_primary: !!v.is_primary, scope: v.scope || 'full', parasign: !!v.parasign, created: v.created || null,
-      plan_parasign: v.plan_parasign || entitlements.derivePlanParasign(v.plan, v.parasign),
-      plan_parasend: v.plan_parasend || entitlements.derivePlanParasend(v.plan),
-      paid_until_parasign: v[entitlements.PRODUCT_PAID_UNTIL_FIELD.parasign] || null,
-      paid_until_parasend: v[entitlements.PRODUCT_PAID_UNTIL_FIELD.parasend] || null,
+      plan_parasign: sign.tier,
+      plan_parasend: send.tier,
+      paid_until_parasign: sign.paidUntil,
+      paid_until_parasend: send.paidUntil,
       usage_purpose: v.usage_purpose || null, usage_purpose_at: v.usage_purpose_at || null }));/*MARK:parasign_reveal*/
   }
 
@@ -8679,8 +8750,39 @@ async function handleRelayRequest(req, res) {
     let body;
     try { body = JSON.parse((await readBody(req, 2048)).toString() || '{}'); }
     catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_json' })); }
-    const order = billingCatalog.resolveOrder({ product: body.product, plan: body.plan, interval: body.interval });
+    // resolveSale, not resolveOrder: the checkout sells what the site sells
+    // (billing-catalog ON_SALE) and nothing else. The legacy Pro rows still
+    // resolve for the webhook, where the money has already moved (R8).
+    const order = billingCatalog.resolveSale({ product: body.product, plan: body.plan, interval: body.interval });
     if (order.error) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: order.error })); }
+    // No second plan NEXT TO a running other plan. Nothing would be lost any
+    // more: a product holds a term per tier, the highest running one is what
+    // the customer gets, and the one under it takes over when it ends (the
+    // webhook and entitlements.applyProductTier). But the weeks the two
+    // overlap would be paid twice, and nobody sets out to do that. Renewing a
+    // tier that already holds a running term is fine, also when a higher tier
+    // runs above it, and so is a first purchase. Changing plans goes by mail.
+    // Two tabs, or a payment link, can still get past this; that money is
+    // granted in full and loses nothing (tests/rang-en-kassa.test.mjs).
+    {
+      const rec = entitlementRecordOf(accountId);
+      for (const g of order.grants) {
+        if (entitlements.hasRunningTerm(rec, g.product, g.tier)) continue;
+        const running = entitlements.effectiveProductTier(rec, g.product);
+        if (running.tier === entitlements.floorTierOf(g.product)) continue;
+        const until = running.paidUntil ? planExpiry.formatDate(running.paidUntil) : null;
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        return res.end(J({
+          error: 'other_plan_running',
+          product: g.product,
+          running: running.tier,
+          paid_until: running.paidUntil ? new Date(running.paidUntil).toISOString() : null,
+          message: `You already have ${planExpiry.planLabel(g.product, running.tier)}${until ? ` until ${until}` : ''}. `
+            + `${billingCatalog.orderLabel(order)} would run alongside it and you would pay twice for the same weeks, so no payment was started. `
+            + 'To change plans, mail privacy@paramant.app.',
+        }));
+      }
+    }
     const stance = mollie.billingStance();
     const mode = stance.mode;
     const origin = process.env.PARASIGN_PUBLIC_ORIGIN || 'https://paramant.app';
@@ -8799,10 +8901,11 @@ async function handleRelayRequest(req, res) {
       setProductPlan,
       // Lets a renewal extend from where the paid period ends instead of from
       // the day the money landed, so paying early never costs the buyer days.
-      currentPaidUntil: async (accountId, product) => {
-        const rec = accounts.get(accountId);
-        return (rec && rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[product]]) || null;
-      },
+      // Per TIER: a renewal of Pro extends the Pro term from its own end, also
+      // when a Business month runs above it, and a Business month starts from
+      // the end of an earlier Business term or from now, never from the end of
+      // a Pro year (R2).
+      currentTermEnd: async (accountId, product, tier) => entitlements.termEndOf(entitlementRecordOf(accountId), product, tier),
       // Redis holds the marker, but redis is a cache here and users.json is the
       // record. When redis is down or has been flushed, isProcessed used to
       // answer 'no' and the grant ran a second time -- and since a grant extends
@@ -9049,9 +9152,27 @@ async function handleRelayRequest(req, res) {
     // on /account and a needless second entry in the expiry index.
     const at = new Date();
     const granted = [];
+    const kept = [];
     let failure = null;
     for (const g of claim.grants) {
-      const current = rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[g.product]] || null;
+      // A gift adds a term of its own tier, like a payment does, with one
+      // exception: nothing under a HIGHER tier that is running. Until
+      // 2026-09-25 a Business customer who typed in a Pro code landed on Pro,
+      // on relay-main only, while every screen went on showing Business
+      // (betaaltest R3). A Pro term under the Business one would lower nothing
+      // any more, but it would be a gift that starts ticking while it can not
+      // be used, and the answer would have to explain that. So the product
+      // keeps what it has, and the answer says so. A higher gift over a lower
+      // paid term is fine now: the lower term stays under it and takes over
+      // when the gift ends. A term with no end has nothing to add to.
+      const running = entitlements.effectiveProductTier(rec, g.product, at.getTime());
+      const rel = entitlements.termRelation(g.product, g.tier, running.tier);
+      if (rel === 'higher_running' || (rel === 'same' && running.paidUntil === null)) {
+        kept.push({ product: g.product, tier: running.tier, ends: running.paidUntil ? new Date(running.paidUntil).toISOString() : null });
+        continue;
+      }
+      // Added to the end of this tier's own term, never to another tier's.
+      const current = entitlements.termEndOf(rec, g.product, g.tier);
       const ends = coupon.grantEnd(current, at, g.days);
       let out;
       // null, not undefined: a gift is not a Firm purchase, so any bundle
@@ -9070,14 +9191,24 @@ async function handleRelayRequest(req, res) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'grant_failed', message: coupon.MESSAGES.grant_failed }));
     }
+    if (granted.length === 0) {
+      // Nothing to add anywhere. The seat goes back, so the code is not spent
+      // on an account it did nothing for.
+      await coupon.release(redisClient, claim.code, accountId);
+      log('info', 'coupon_refused', { account: String(accountId).slice(0, 12), reason: 'nothing_to_add',
+        kept: kept.map((k) => `${k.product}:${k.tier}`).join(',') });
+      res.writeHead(409, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'nothing_to_add', kept, message: coupon.nothingToAddMessage(kept) }));
+    }
 
     // The line on /account. Written after the term is really on the account, so
     // a row here always has a term behind it, and written to its own store
     // because no invoice series may hold a document for a thing that was given.
+    // It names what was given, not everything the code could have given.
     const redeemedAt = at.toISOString();
     await billingHistory.recordGift(redisClient, accountId, {
       code: claim.code,
-      label: coupon.historyLabel(claim.code, claim.grants),
+      label: coupon.historyLabel(claim.code, granted),
       grants: granted,
       redeemed_at: redeemedAt,
     });
@@ -9100,15 +9231,17 @@ async function handleRelayRequest(req, res) {
     log('info', 'coupon_redeemed', {
       account: String(accountId).slice(0, 12), code: claim.code, used: claim.used,
       products: granted.map((g) => `${g.product}:${g.tier}`).join(','),
+      ...(kept.length ? { kept: kept.map((k) => `${k.product}:${k.tier}`).join(',') } : {}),
     });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({
       ok: true,
       code: claim.code,
       granted,
+      ...(kept.length ? { kept } : {}),
       // The sentence the page prints. Built here so the mail, the history line
       // and the page all name the same plans and the same dates.
-      message: coupon.successMessage(granted),
+      message: coupon.successMessage(granted, kept),
     }));
   }
 
@@ -9241,7 +9374,13 @@ async function handleRelayRequest(req, res) {
     // that is the day the plan he cancelled stops being whole. Reading
     // PRODUCT_PAID_UNTIL_FIELD['firm'] answered null and told a Firm customer
     // who had just cancelled that he had nothing left.
-    const _untilOf = (p) => (_rec && _rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[p]]) || null;
+    // Per product the day it falls to its floor, the last of its terms: with a
+    // Pro year under a Business month, what the buyer keeps runs to the end of
+    // the year, not to the end of the month on top.
+    const _untilOf = (p) => {
+      const last = entitlements.finalTermOf(_rec, p);
+      return last ? last.paidUntil : ((_rec && _rec[entitlements.PRODUCT_PAID_UNTIL_FIELD[p]]) || null);
+    };
     const _forDate = product || (results.find((r) => r.result === 'cancelled') || {}).product || 'firm';
     const _covered = (billingCatalog.BUNDLES[_forDate] || { grants: [{ product: _forDate }] }).grants
       .map((g) => _untilOf(g.product)).filter(Boolean).sort();
@@ -9267,6 +9406,10 @@ async function handleRelayRequest(req, res) {
       // or lower a product tier; that is intentional, not a silent migration.
       _rec.plan_parasend = entitlements.derivePlanParasend(plan);
       _rec.plan_parasign = entitlements.derivePlanParasign(plan, _rec.parasign);
+      // The per-tier terms go with it: this route sets one tier per product
+      // and has always meant exactly that, down included. A Business month
+      // left in terms_parasign would outrank the Pro it just wrote.
+      for (const f of Object.values(entitlements.PRODUCT_TERMS_FIELD)) delete _rec[f];
       // Keep the account's plan in step so the per-account cap re-evaluates.
       const _aid = _rec.account_id;
       if (_aid && accounts.has(_aid)) accounts.get(_aid).plan = plan;
@@ -9274,7 +9417,10 @@ async function handleRelayRequest(req, res) {
       if (PARASIGN_PAID_PLANS.has(plan)) grantParasignOnPaidPlan(_aid || key); /*MARK:parasign_billing_autograt*/
       _mutateUsersJson(ud => {
         const entry = ud.api_keys.find(k => k.key === key);
-        if (entry) { entry.plan = plan; entry.plan_parasend = _rec.plan_parasend; entry.plan_parasign = _rec.plan_parasign; entry.plan_updated = new Date().toISOString(); }
+        if (entry) {
+          entry.plan = plan; entry.plan_parasend = _rec.plan_parasend; entry.plan_parasign = _rec.plan_parasign; entry.plan_updated = new Date().toISOString();
+          for (const f of Object.values(entitlements.PRODUCT_TERMS_FIELD)) delete entry[f];
+        }
         ud.updated = new Date().toISOString();
       }).catch(e => log('warn', 'plan_update_persist_failed', { err: e.message }));
       applyKeyLimitEnforcement();
@@ -9286,15 +9432,16 @@ async function handleRelayRequest(req, res) {
   // Fine-grained sibling of /v2/admin/keys/update-plan: moves ONE product's tier
   // (plan_parasign OR plan_parasend) on the target key's account and leaves the
   // unified `plan` AND the other product untouched. Same internal-auth gate as
-  // update-plan. Body { key, product, tier }. An unknown product, or a tier that
-  // is not on that product's ladder, is rejected 400 (never silently floored to
-  // the base tier). Delegates the account fan-out + users.json persistence to
-  // setProductPlan - the exact block the Mollie webhook uses - so there is one
-  // per-product entitlement path, not a second copy.
+  // update-plan. Body { key, product, tier, downgrade? }. An unknown product, or
+  // a tier that is not on that product's ladder, is rejected 400 (never
+  // silently floored to the base tier). Delegates the account fan-out +
+  // users.json persistence to setProductPlan - the exact block the Mollie
+  // webhook uses - so there is one per-product entitlement path, not a second
+  // copy.
   if (path === '/v2/admin/keys/set-product-plan' && req.method === 'POST') {
     if (!_internalOk()) return _internalReject();
     try {
-      const { key, product, tier } = JSON.parse((await readBody(req, 1024)).toString());
+      const { key, product, tier, downgrade } = JSON.parse((await readBody(req, 1024)).toString());
       if (!key) { res.writeHead(400); return res.end(J({ error: 'invalid_params' })); }
       const v = entitlements.validateProductPlan(product, tier);
       if (!v.ok) { res.writeHead(400); return res.end(J({ error: v.error })); }
@@ -9303,10 +9450,30 @@ async function handleRelayRequest(req, res) {
       // EXPLICITLY does not set the unified `plan` and does not touch the other
       // product; setProductPlan writes only plan_<product> (+ the parasign access
       // flag on a paid parasign tier).
-      const out = setProductPlan(accountId, v.product, v.tier);
+      //
+      // A grant never lowers a running higher tier by accident: a Pro grant on
+      // a customer who paid for Business would take away what he bought. 409,
+      // with what is running and the two ways on. `downgrade: true` moves the
+      // running term to the lower tier WITH ITS END DATE (a customer who asked
+      // for Pro instead of Business keeps the time he paid for). The floor
+      // tier is a revoke, not a grant, and still lands. Until 2026-09-25 this
+      // answer said "set free first", and whoever did that and then granted
+      // Pro handed out ParaSign Pro without an end date (review of #515).
+      const out = setProductPlan(accountId, v.product, v.tier, undefined, undefined, { downgrade: downgrade === true });
+      if (!out.ok && out.reason === 'lower_than_running') {
+        const until = out.running && out.running.paidUntil ? planExpiry.formatDate(out.running.paidUntil) : null;
+        res.writeHead(409);
+        return res.end(J({
+          error: 'lower_than_running', product: v.product, tier: v.tier, running: out.running,
+          message: `This account has ${planExpiry.planLabel(v.product, out.running.tier)}${until ? ` until ${until}` : ''}. `
+            + 'A grant never lowers a running plan by accident. '
+            + `To move this term to ${planExpiry.planLabel(v.product, v.tier)} and keep its end date, send the same request with downgrade: true. `
+            + `To take the plan away, set ${entitlements.floorTierOf(v.product)}.`,
+        }));
+      }
       if (!out.ok) { res.writeHead(422); return res.end(J({ error: out.reason || 'not_applied' })); }
-      try { auditAppend(key, 'admin_product_plan_changed', { product: v.product, tier: out.tier, keys: out.keys }); } catch {}
-      log('info', 'admin_product_plan_changed', { account: String(accountId).slice(0, 12), product: v.product, tier: out.tier, keys: out.keys, changed: out.changed });
+      try { auditAppend(key, 'admin_product_plan_changed', { product: v.product, tier: out.tier, keys: out.keys, ...(downgrade === true ? { downgrade: true } : {}) }); } catch {}
+      log('info', 'admin_product_plan_changed', { account: String(accountId).slice(0, 12), product: v.product, tier: out.tier, keys: out.keys, changed: out.changed, downgrade: downgrade === true });
       res.writeHead(200); return res.end(J({ ok: true, key, product: v.product, tier: out.tier }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }

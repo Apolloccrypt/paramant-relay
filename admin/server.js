@@ -4220,13 +4220,13 @@ async function mutatePlanFleet(endpoint, body) {
   const run = sectors => eachSector(sectors, async s => {
     const response = await callRelay(endpoint, body, 'POST', s);
     let responseBody = null; try { responseBody = await response.json(); } catch {}
-    return { status: response.status, ok: response.ok, error: responseBody?.error || null };
+    return { status: response.status, ok: response.ok, error: responseBody?.error || null, message: responseBody?.message || null };
   });
   const initial = await run(Object.keys(SECTORS));
   const retrySectors = Object.entries(initial).filter(([, r]) => !r?.ok).map(([s]) => s);
   const retried = retrySectors.length ? await run(retrySectors) : {};
   const results = { ...initial, ...retried };
-  return { results, retried: retrySectors, failed: Object.entries(results).filter(([, r]) => !r?.ok).map(([s, r]) => ({ sector: s, status: r?.status || null, error: r?.error || 'sector_unreachable' })) };
+  return { results, retried: retrySectors, failed: Object.entries(results).filter(([, r]) => !r?.ok).map(([s, r]) => ({ sector: s, status: r?.status || null, error: r?.error || 'sector_unreachable', message: r?.message || null })) };
 }
 
 async function readEntitlementsFleet(accountId) {
@@ -4340,7 +4340,10 @@ api.post('/admin/change-plan', authMiddleware, async (req, res) => {
 // product's ladder is rejected 400. Optional notify uses the per-product mail
 // (productPlanChangeEmail), which carries no billing note at all.
 api.post('/admin/set-product-plan', authMiddleware, async (req, res) => {
-  const { key, product, tier, notify = false } = req.body || {};
+  // downgrade: the relay moves a running higher term down to this tier only
+  // when asked, and then keeps its end date (relay.js set-product-plan). The
+  // panel asks the operator first; nothing else sends it.
+  const { key, product, tier, notify = false, downgrade = false } = req.body || {};
   const LADDERS = { parasign: ['free', 'pro', 'business', 'enterprise'], parasend: ['community', 'pro', 'enterprise'] };
   if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
   if (!LADDERS[product]) return res.status(400).json({ error: 'invalid_product', valid: Object.keys(LADDERS) });
@@ -4348,7 +4351,15 @@ api.post('/admin/set-product-plan', authMiddleware, async (req, res) => {
   if (!await checkAdminRl('set_product_plan', 'admin', 20)) return res.status(429).json({ error: 'rate_limited' });
   try {
     const meta = await getAdminKeyMeta(key);
-    const mutation = await mutatePlanFleet('/v2/admin/keys/set-product-plan', { key, product, tier });
+    const mutation = await mutatePlanFleet('/v2/admin/keys/set-product-plan', { key, product, tier, ...(downgrade === true ? { downgrade: true } : {}) });
+    // Every sector said no for the same reason: a grant never lowers a running
+    // higher plan (relay.js setProductPlan). Nothing moved anywhere, so the
+    // fleet is consistent and this is a refusal, not a partial failure. The
+    // floor tier is a revoke and is never refused this way.
+    const sectorCount = Object.keys(SECTORS).length;
+    if (mutation.failed.length === sectorCount && mutation.failed.every(f => f.status === 409 && f.error === 'lower_than_running')) {
+      return res.status(409).json({ ok: false, error: 'lower_than_running', message: mutation.failed[0].message, key, product, tier, failed_sectors: mutation.failed, sector_count: sectorCount });
+    }
     await Promise.allSettled(Object.keys(SECTORS).map(s => relayFetch(s, '/v2/reload-users', 'POST', {}, false, ADMIN_TOKEN)));
     const readBack = await readEntitlementsFleet(meta.account_id);
     const mismatched = verifyEntitlementsFleet(readBack, { [product]: tier });
