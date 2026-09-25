@@ -31,6 +31,13 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   lying turns the gate red.
 
 ### Fixed
+- **A ParaSign API key kept working after a chargeback, a refund or the end of
+  the paid term.** The mint route already refused a new `psk_` key in those
+  cases, but the `/v1` router only asked whether the key carried the `parasign`
+  scope, and a key carries that for life. It now also asks the account, on every
+  call, with the same rule the mint route uses; the answer when the account no
+  longer holds ParaSign is 403 `parasign_not_entitled`.
+  `relay/test/route-v1-entitlement.test.js` drives both cases on a booted relay.
 - **An envelope number was enough to get the mail addresses of everyone who had
   signed it.** `GET /v2/envelopes/:id` is public on purpose, because a recipient
   is an outside party with no key, but it answered with the same object the

@@ -14,6 +14,10 @@ internal `/v2` envelope machinery in `relay/envelope.js`).
   `Authorization: Bearer psk_live_...` (production) or `psk_test_...` (sandbox).
 - The key must carry the `parasign` scope (enabled per key/account; part of the
   Pro plan). Mint keys in the developer dashboard.
+- The account behind the key must still hold ParaSign, checked on every call
+  with the same rule that decides whether it may mint a key. A key stops working
+  when the paid term ends or after a refund or chargeback, and works again once
+  the account is entitled again.
 
 Auth failures:
 
@@ -22,6 +26,7 @@ Auth failures:
 | No / malformed Bearer, or not a `psk_` key | 401 | `unauthorized` |
 | Key unknown or revoked (`active:false`) | 401 | `unauthorized` |
 | Key valid but missing the `parasign` scope | 403 | `forbidden_scope` |
+| Key valid, but the account no longer holds ParaSign | 403 | `parasign_not_entitled` |
 
 ## Authorization model (who may read what)
 

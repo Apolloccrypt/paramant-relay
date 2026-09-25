@@ -67,6 +67,9 @@ function makeDeps(over = {}) {
     authHeader: over.authHeader,
     publicOrigin: 'https://paramant.app',
     apiKeys,
+    // The account behind every key here pays; the checks below that are about
+    // the account entitlement override this.
+    parasignEntitled: () => true,
     envStore: Object.assign({
       async getForReceipt() { return env; },
       async isParticipantToken() { return -1; },
@@ -115,6 +118,41 @@ async function main() {
     assert.strictEqual(d.res.statusCode, 403, 'no scope -> 403');
     assert.strictEqual(d.res.json().error, 'forbidden_scope');
     ok('valid key without parasign scope -> 403 forbidden_scope');
+  }
+
+  // ── ENTITLEMENT: the account behind a scoped key must still hold ParaSign ────
+  {
+    // A scoped, active key on an account that no longer pays (chargeback,
+    // refund, lapsed term). The key is fine; the account is not.
+    let asked = null;
+    const d = makeDeps({ authHeader: bearer(OWNER_KEY),
+                         deps: { parasignEntitled: (token, rec) => { asked = { token, rec }; return false; } } });
+    await api.route(d);
+    assert.strictEqual(d.res.statusCode, 403, 'account without entitlement -> 403');
+    assert.strictEqual(d.res.json().error, 'parasign_not_entitled');
+    assert.strictEqual(asked.token, OWNER_KEY, 'the gate is asked about the presented key');
+    assert.strictEqual(asked.rec.account_id, 'acct_owner', 'and gets its record, which names the account');
+    ok('scoped key on an account without the entitlement -> 403 parasign_not_entitled');
+  }
+  {
+    // The same refusal for every /v1 route, a POST as much as a read.
+    const d = makeDeps({ method: 'POST', path: '/v1/envelopes', authHeader: bearer(OWNER_KEY),
+                         deps: { parasignEntitled: async () => false } });
+    await api.route(d);
+    assert.strictEqual(d.res.statusCode, 403, 'create without entitlement -> 403');
+    assert.strictEqual(d.res.json().error, 'parasign_not_entitled');
+    ok('create on an account without the entitlement -> 403 parasign_not_entitled');
+  }
+  {
+    // Fails closed: a router wired without the gate lets nobody in. Anything
+    // other than a literal true is a no.
+    for (const gate of [undefined, null, () => 'yes', () => 1]) {
+      const d = makeDeps({ authHeader: bearer(OWNER_KEY), deps: { parasignEntitled: gate } });
+      await api.route(d);
+      assert.strictEqual(d.res.statusCode, 403, `gate ${String(gate)} -> 403`);
+      assert.strictEqual(d.res.json().error, 'parasign_not_entitled');
+    }
+    ok('no entitlement gate wired, or a non-boolean answer -> 403 (fails closed)');
   }
 
   // ── AUTHORIZATION: receipt (owner OR participant), no-existence-leak ─────────

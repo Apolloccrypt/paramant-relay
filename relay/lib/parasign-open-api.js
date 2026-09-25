@@ -15,7 +15,8 @@
 //     with the same TTL as the envelope, so a restart no longer loses documents.
 //
 // Status of the surface (honest labelling):
-//   FUNCTIONAL: auth (Bearer psk_ + parasign scope), POST /v1/envelopes
+//   FUNCTIONAL: auth (Bearer psk_ + parasign scope + the account's ParaSign
+//     entitlement, asked on every call), POST /v1/envelopes
 //     (create + hash + durable blob store + webhook_url validation +
 //     envelope.sent webhook + psk_test_ sandbox auto-signer), GET /v1/envelopes/:id
 //     (status + external status mapping), POST /v1/envelopes/:id/void
@@ -57,12 +58,35 @@ function resolveStore(deps) {
 // accepted representations so this survives the reserved-single-scope enum in
 // lib/keys-table.js without forcing a schema migration:
 //   rec.scope === 'parasign'  |  rec.parasign === true  |  rec.scopes[] has it.
+// This says what the KEY is. Whether the account behind it may still use the
+// API is asked separately, by accountEntitled() below.
 function hasParaSignScope(rec) {
   if (!rec) return false;
   if (rec.scope === 'parasign') return true;
   if (rec.parasign === true) return true;
   if (Array.isArray(rec.scopes) && rec.scopes.includes('parasign')) return true;
   return false;
+}
+
+// ── Entitlement (account) ─────────────────────────────────────────────────────
+// A psk_ key carries scope 'parasign' for as long as it exists. The right it was
+// minted under does not: a chargeback or a refund floors the account and clears
+// the `parasign` flag on every member key, and a paid term runs out. Neither can
+// take the scope off a key, so a router that asked only the key kept every key
+// working after the money went back (finding R1 of 2026-09-25: three new
+// envelopes, 201 each, after a chargeback).
+//
+// So every call also asks the ACCOUNT, with the same rule POST
+// /v2/user/parasign-keys applies before it mints a key
+// (keys-table.accountHasParasignEntitlement over the account's member records).
+// relay.js injects it as deps.parasignEntitled(token, rec), because the member
+// records live there and this module owns no state.
+//
+// Fails CLOSED: a router wired without the gate lets nobody in, rather than
+// quietly letting everyone in.
+async function accountEntitled(deps, token, rec) {
+  if (typeof deps.parasignEntitled !== 'function') return false;
+  return (await deps.parasignEntitled(token, rec)) === true;
 }
 
 // Constant-time compare of two equal-length hex strings (SHA3-256 fingerprints).
@@ -231,18 +255,23 @@ function authenticateBearer(authHeader, apiKeys) {
 
 // ── main router ───────────────────────────────────────────────────────────────
 // deps: { req, res, method, path, query, clientIp, authHeader, publicOrigin,
-//         apiKeys, envStore, envCreateRateOk, safeHttpsRequest, canonicalJSON,
-//         sigEngine, relayIdentity, readBody, J, log }
+//         apiKeys, parasignEntitled, envStore, envCreateRateOk, safeHttpsRequest,
+//         canonicalJSON, sigEngine, relayIdentity, readBody, J, log }
 async function route(deps) {
   const { res, method, path, query, apiKeys, envStore, J } = deps;
 
-  // 1) AUTH - Bearer psk_live_/psk_test_ (authenticateBearer) + parasign scope.
+  // 1) AUTH - Bearer psk_live_/psk_test_ (authenticateBearer) + parasign scope
+  //    + the account's ParaSign entitlement, on every call.
   const auth = authenticateBearer(deps.authHeader, apiKeys);
   if (!auth.ok) return errRes(res, auth.code, auth.error, auth.message, J);
   const { token, mode, rec } = auth;
   if (!hasParaSignScope(rec)) {
     return errRes(res, 403, 'forbidden_scope',
       'This key lacks the "parasign" scope. Enable ParaSign for this key/account. / Deze sleutel mist de scope "parasign". Activeer ParaSign voor deze sleutel/dit account.', J);
+  }
+  if (!(await accountEntitled(deps, token, rec))) {
+    return errRes(res, 403, 'parasign_not_entitled',
+      'This account is not entitled to the ParaSign API. Upgrade to a paid plan or ask an admin to enable ParaSign. / Dit account heeft geen toegang tot de ParaSign-API. Kies een betaald plan of vraag een beheerder ParaSign aan te zetten.', J);
   }
 
   // Sub-path after /v1/envelopes ...
