@@ -16,6 +16,7 @@
 
 const catalog = require('./billing-catalog');
 const creditNote = require('./credit-note');
+const entitlements = require('./entitlements');
 const invoice = require('./invoice');
 const vat = require('./vat');
 
@@ -106,12 +107,16 @@ function keepLonger(candidate, currentPaidUntil) {
 
 // deps: {
 //   setProductPlan(accountId, product, tier) -> { ok, ... }  (sync or async)
+//   currentPaidUntil(accountId, product) -> date | null      (async; optional)
+//   currentTier(accountId, product) -> tier running now      (async; optional)
 //   isProcessed(paymentId) -> boolean                        (async; optional)
 //   markProcessed(paymentId, value) -> void                  (async; optional)
 // }
-// Returns { result, level, account, product, tier, reason }.
+// Returns { result, level, account, product, tier, reason }, and on a grant
+// also grants, kept and replaced (see the paid branch).
 //   result: 'granted' | 'revoked' | 'refused' | 'ignored'
-//   level:  log level; 'error' marks the "paid but got nothing" alert cases.
+//   level:  log level; 'error' marks the "paid but got nothing" alert cases,
+//           'warn' on a grant marks one that may have cost the buyer time.
 async function processPayment(payment, deps) {
   const d = deps || {};
   const status = payment && payment.status;
@@ -200,12 +205,24 @@ async function processPayment(payment, deps) {
     //
     // One anchor for the whole order, so a bundle writes ONE term across the
     // products it covers instead of two dates that drift apart on every renewal.
+    //
+    // The anchor only counts a running term of the SAME tier (entitlements
+    // .termRelation). Until 2026-09-25 it counted any term, so a Business month
+    // bought over a Firm year started at the end of that year: thirteen months
+    // of Business for the price of one (betaaltest R2). And a higher tier that
+    // is still running is not written over at all (R3). Without a currentTier
+    // dependency the relation is unknown and the old answer, 'same', stands;
+    // the relay always wires it.
     const now = d.now instanceof Date ? d.now : new Date();
-    const currents = [];
+    const lines = [];
     for (const g of order.grants) {
-      currents.push(typeof d.currentPaidUntil === 'function' ? await d.currentPaidUntil(accountId, g.product) : null);
+      const current = typeof d.currentPaidUntil === 'function' ? await d.currentPaidUntil(accountId, g.product) : null;
+      const running = typeof d.currentTier === 'function' ? await d.currentTier(accountId, g.product) : undefined;
+      const relation = running === undefined ? 'same' : entitlements.termRelation(g.product, g.tier, running);
+      lines.push({ g, current, running, relation });
     }
-    const paidUntil = periodEnd(bundleExtendFrom(currents, now), interval);
+    const writes = lines.filter((l) => l.relation !== 'higher_running');
+    const paidUntil = periodEnd(bundleExtendFrom(writes.map((l) => (l.relation === 'same' ? l.current : null)), now), interval);
     if (!paidUntil) {
       return { result: 'refused', level: 'error', account: accountId, product, reason: `no_period_for_interval:${interval}` };
     }
@@ -214,10 +231,39 @@ async function processPayment(payment, deps) {
     // call and never touches a product this order does not name, so a ParaSign
     // Business holder buying nothing keeps what he has. `bundle` is passed on so
     // the expiry index can tell the customer what he actually bought.
+    //
+    // What the payment cannot be written as is written down instead: `kept` is
+    // a higher tier left standing, `replaced` a lower paid term that a higher
+    // one takes over from today. A product holds one tier and one date, so
+    // either can cost the buyer time he paid for when the other term ends
+    // later. The checkout refuses both up front; this is money that came in
+    // another way (a payment link, an older subscription, two tabs at once),
+    // and the warn level is what makes somebody look at it.
+    const ms = (v) => {
+      if (v === null || v === undefined || v === '') return null;
+      const t = new Date(v).getTime();
+      return Number.isNaN(t) ? null : t;
+    };
     const granted = [];
-    for (let i = 0; i < order.grants.length; i++) {
-      const g = order.grants[i];
-      const until = keepLonger(paidUntil, currents[i]);
+    const kept = [];
+    const replaced = [];
+    let review = false;
+    for (const l of lines) {
+      const g = l.g;
+      const end = ms(l.current);
+      const endIso = end === null ? null : new Date(end).toISOString();
+      if (l.relation === 'higher_running') {
+        kept.push({ product: g.product, tier: l.running, paidUntil: endIso });
+        if (end !== null && end < paidUntil.getTime()) review = true;
+        continue;
+      }
+      // keepLonger only within the SAME tier: a renewal never shortens a term,
+      // and a higher tier never inherits the end date of a lower one.
+      const until = l.relation === 'same' ? keepLonger(paidUntil, l.current) : paidUntil;
+      if (l.relation === 'lower_running') {
+        replaced.push({ product: g.product, tier: l.running, paidUntil: endIso });
+        if (end === null || end > until.getTime()) review = true;
+      }
       let set;
       try { set = await d.setProductPlan(accountId, g.product, g.tier, until, order.bundle || null); }
       catch (e) { set = { ok: false, reason: e.message }; }
@@ -231,12 +277,20 @@ async function processPayment(payment, deps) {
       granted.push({ product: g.product, tier: g.tier, paidUntil: until.toISOString() });
     }
     if (typeof d.markProcessed === 'function') { try { await d.markProcessed(payment.id, 'granted'); } catch { /* best effort */ } }
+    const notes = [
+      ...kept.map((k) => `kept ${k.product}:${k.tier}${k.paidUntil ? ` until ${k.paidUntil.slice(0, 10)}` : ''}`),
+      ...replaced.map((r) => `replaced ${r.product}:${r.tier}${r.paidUntil ? ` until ${r.paidUntil.slice(0, 10)}` : ''}`),
+    ];
+    if (review) notes.push('review: the buyer may lose paid time');
     return {
-      result: 'granted', level: 'info', account: accountId, product, tier: order.tier,
+      result: 'granted', level: review ? 'warn' : 'info', account: accountId, product, tier: order.tier,
       bundle: order.bundle || null,
       grants: granted,
+      kept,
+      replaced,
       paidUntil: paidUntil.toISOString(),
-      reason: `${granted.map((g) => `${g.product}->${g.tier}`).join(' + ')} until ${paidUntil.toISOString().slice(0, 10)}`,
+      reason: `${granted.map((g) => `${g.product}->${g.tier}`).join(' + ') || 'nothing written'} until ${paidUntil.toISOString().slice(0, 10)}`
+        + (notes.length ? `; ${notes.join('; ')}` : ''),
     };
   }
 

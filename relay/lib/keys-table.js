@@ -243,10 +243,19 @@ function parseAccountFields(rawKey) {
   // relay wrote paid_until to users.json correctly and then dropped it on the
   // way back in. Only set when present, so "no period on file" stays absent
   // (never expired) rather than becoming an explicit null.
+  //
+  // The same drop, a field further on: the bundle that bought the period. It
+  // was written to users.json and never read back, so after every restart a
+  // Firm customer's term was two anonymous Pro terms again, and the expiry
+  // sweep sent him two mails about plans he never bought under those names
+  // instead of one about Firm (betaaltest 25-09, R9). It travels with the
+  // period, on the same only-when-present rule.
   const out = { account_id, is_primary, scope, legacy_revealable, parasign, plan_parasend, plan_parasign, usage_purpose, usage_purpose_at };
   for (const product of entitlements.PRODUCTS) {
     const f = entitlements.PRODUCT_PAID_UNTIL_FIELD[product];
     if (rawKey[f] != null) out[f] = rawKey[f];
+    const b = entitlements.PRODUCT_BUNDLE_FIELD[product];
+    if (rawKey[b] != null && rawKey[b] !== '') out[b] = rawKey[b];
   }
   // The same fault, one layer down. The billing webhook writes the Mollie
   // customer, the subscription per line, the payment that made it, and the

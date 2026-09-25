@@ -69,6 +69,10 @@ for (const b of buttons) {
     'checkout button falls back to a static Mollie link (no metadata, unattributable): ' + b.href);
   assert(b.href.startsWith('/auth/login'),
     'no-JS fallback must be sign-in, got ' + b.href + ' for ' + b.product + '/' + b.plan + '/' + b.interval);
+  // Every button, not only the variants below: a button the checkout refuses
+  // is a price the site shows and nobody can pay.
+  assert(!catalog.resolveSale(b).error,
+    'the checkout refuses a button on the page: ' + b.product + '/' + b.plan + '/' + b.interval);
 }
 ok('no-JS fallback on every button is sign-in, never a metadata-less payment link');
 
@@ -76,9 +80,11 @@ for (const v of VARIANTS) {
   const btn = buttons.find(b => b.product === v.product && b.plan === v.plan && b.interval === v.interval);
   assert(btn, 'missing button for ' + v.product + '/' + v.plan + '/' + v.interval);
 
-  // The triple must resolve in the server-side catalog...
-  const order = catalog.resolveOrder(btn);
-  assert(!order.error, 'catalog rejects ' + v.product + '/' + v.plan + '/' + v.interval + ': ' + order.error);
+  // The triple must be something the CHECKOUT sells: in the catalog and on
+  // sale (resolveSale, the check POST /v2/billing/checkout makes). resolveOrder
+  // alone also resolves the legacy Pro rows the checkout refuses.
+  const order = catalog.resolveSale(btn);
+  assert(!order.error, 'the checkout refuses ' + v.product + '/' + v.plan + '/' + v.interval + ': ' + order.error);
 
   // ...and the catalog (= link) amount must be exactly the shown price + 21% btw.
   const incl = (v.excl * 1.21).toFixed(2);
@@ -973,7 +979,7 @@ ok('the compliance bullet on /parasend carries its own limit');
     'the Dutch /pricing sells Firm, monthly and yearly, and nothing else');
   for (const b of buys) {
     assert(b.href.startsWith('/auth/login'), 'no-JS fallback on the Dutch page must be sign-in, got ' + b.href);
-    assert(!catalog.resolveOrder(b).error, 'catalog rejects ' + b.product + '/' + b.plan + '/' + b.interval);
+    assert(!catalog.resolveSale(b).error, 'the checkout refuses ' + b.product + '/' + b.plan + '/' + b.interval);
   }
   assert(/class="btn btn-primary/.test(buys[0].rest), 'the monthly Firm button is the primary action');
   const visibleNl = htmlNl.replace(/<!--[\s\S]*?-->/g, '').replace(/<script[\s\S]*?<\/script>/gi, '');

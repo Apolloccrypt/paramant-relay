@@ -174,6 +174,48 @@ function effectiveProductTier(rec, product, now) {
   return { tier: stored, expired: false, paidUntil };
 }
 
+// ── One rule for every writer of a paid term ────────────────────────────────
+// A payment, a gift code and an admin grant all end in setProductPlan, and
+// until 2026-09-25 none of them looked at what was already running. A Firm
+// payment, or a code for Pro, put a customer who had paid for ParaSign
+// Business back on Pro, and only on the relay that took the request: the
+// others refuse a lower grant from redis (mergeProductGrantInto below), so the
+// fleet then disagreed about what he had. And a Firm-year customer who paid
+// for one Business month got thirteen, because the month was added to the end
+// of his year (betaaltest 25-09, R2 and R3).
+//
+// So every writer first asks how the tier it is about to write relates to the
+// tier that is RUNNING on that product now (a lapsed term runs at the floor):
+//   'none'            nothing paid is running: a new term starts now
+//   'same'            the same tier is running: the new term follows its end,
+//                     so a renewal paid early loses no days
+//   'higher_running'  a HIGHER tier is running, and no grant ever lowers it
+//   'lower_running'   a lower paid tier is running. A higher term may not
+//                     inherit its end date: it starts now, or not at all.
+// What a writer does with the last two is its own call (relay.js: the checkout
+// refuses both, the webhook keeps a higher tier and starts a higher one now, a
+// gift code only adds to the same tier). What none of them may do is lower a
+// running higher tier, or stretch a higher tier over a lower tier's term.
+function tierRank(product, tier) {
+  if (product === 'parasign') return PARASIGN_TIERS.indexOf(normaliseParasignTier(tier));
+  return PARASEND_LADDER.indexOf(normaliseParasendTier(tier));
+}
+
+function termRelation(product, tier, runningTier) {
+  const running = product === 'parasign' ? normaliseParasignTier(runningTier) : normaliseParasendTier(runningTier);
+  if (running === floorTierOf(product)) return 'none';
+  const next = tierRank(product, tier);
+  const now = tierRank(product, running);
+  if (next === now) return 'same';
+  return next < now ? 'higher_running' : 'lower_running';
+}
+
+// The same question asked of a record, through effectiveProductTier, so a
+// lapsed period counts as the floor exactly as every gate counts it.
+function termRelationOf(rec, product, tier, now) {
+  return termRelation(product, tier, effectiveProductTier(rec, product, now).tier);
+}
+
 // ── Admin per-product grant primitives ───────────────────────────────────────
 // These back the fine-grained admin path (POST /v2/admin/keys/set-product-plan)
 // so exactly ONE product's tier moves, with the unified `plan` and the other
@@ -535,6 +577,8 @@ module.exports = {
   validateProductPlan,
   applyProductTier,
   effectiveProductTier,
+  termRelation,
+  termRelationOf,
   getEntitlements,
   mergeAccountRecord,
   mergeProductGrantInto,

@@ -4220,13 +4220,13 @@ async function mutatePlanFleet(endpoint, body) {
   const run = sectors => eachSector(sectors, async s => {
     const response = await callRelay(endpoint, body, 'POST', s);
     let responseBody = null; try { responseBody = await response.json(); } catch {}
-    return { status: response.status, ok: response.ok, error: responseBody?.error || null };
+    return { status: response.status, ok: response.ok, error: responseBody?.error || null, message: responseBody?.message || null };
   });
   const initial = await run(Object.keys(SECTORS));
   const retrySectors = Object.entries(initial).filter(([, r]) => !r?.ok).map(([s]) => s);
   const retried = retrySectors.length ? await run(retrySectors) : {};
   const results = { ...initial, ...retried };
-  return { results, retried: retrySectors, failed: Object.entries(results).filter(([, r]) => !r?.ok).map(([s, r]) => ({ sector: s, status: r?.status || null, error: r?.error || 'sector_unreachable' })) };
+  return { results, retried: retrySectors, failed: Object.entries(results).filter(([, r]) => !r?.ok).map(([s, r]) => ({ sector: s, status: r?.status || null, error: r?.error || 'sector_unreachable', message: r?.message || null })) };
 }
 
 async function readEntitlementsFleet(accountId) {
@@ -4349,6 +4349,14 @@ api.post('/admin/set-product-plan', authMiddleware, async (req, res) => {
   try {
     const meta = await getAdminKeyMeta(key);
     const mutation = await mutatePlanFleet('/v2/admin/keys/set-product-plan', { key, product, tier });
+    // Every sector said no for the same reason: a grant never lowers a running
+    // higher plan (relay.js setProductPlan). Nothing moved anywhere, so the
+    // fleet is consistent and this is a refusal, not a partial failure. The
+    // floor tier is a revoke and is never refused this way.
+    const sectorCount = Object.keys(SECTORS).length;
+    if (mutation.failed.length === sectorCount && mutation.failed.every(f => f.status === 409 && f.error === 'lower_than_running')) {
+      return res.status(409).json({ ok: false, error: 'lower_than_running', message: mutation.failed[0].message, key, product, tier, failed_sectors: mutation.failed, sector_count: sectorCount });
+    }
     await Promise.allSettled(Object.keys(SECTORS).map(s => relayFetch(s, '/v2/reload-users', 'POST', {}, false, ADMIN_TOKEN)));
     const readBack = await readEntitlementsFleet(meta.account_id);
     const mismatched = verifyEntitlementsFleet(readBack, { [product]: tier });

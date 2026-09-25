@@ -730,6 +730,8 @@ async function doSetProductPlan(){
   const label=(product==='parasign'?'ParaSign':'ParaSend')+' → '+tier;
   showEntitlementReadback(r.data);
   const failed=(r.data?.failed_sectors||[]).map(x=>x.sector).join(', ');
+  // A refusal is not a partial failure: every sector said no and nothing moved.
+  if(r.data?.error==='lower_than_running'){toast(r.data.message||'Refused: a grant never lowers a running higher plan','warn');return;}
   toast(r.data?.ok?label+' · measured on all sectors':'WARNING partial failure'+(failed?': '+failed:''),r.data?.ok?'ok':'warn');
   if(r.data?.ok){LOADED.users=false;loadUsers();}
 }
