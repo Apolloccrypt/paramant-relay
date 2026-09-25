@@ -15,10 +15,21 @@
 #                                              that is already deployed
 #   bash deploy/deploy-3.1.sh --dry-run        print every remote and gated
 #                                              command instead of running it
+#   bash deploy/deploy-3.1.sh --seller-vat     also write BILLING_SELLER_VAT
+#                                              in step 1e: from this deploy on
+#                                              VAT invoices and reverse charge
 #
 # Flags combine with --dry-run: --dry-run --preflight-only, --dry-run
 # --rollback <TS>, --dry-run --verify-only. The three run modes are mutually
-# exclusive.
+# exclusive. --seller-vat combines with a full run, --preflight-only and
+# --verify-only, never with --rollback.
+#
+# --seller-vat is a decision, not a default. Without it step 1e writes the
+# seller's name, address and KvK number and leaves the btw-id alone, so every
+# document stays a payment receipt and nothing is reverse charged. With it 1e
+# also writes the btw-id, and from the recreate in phase 4 on every new
+# document is a VAT invoice and a business in another EU country can pay
+# without VAT (#517). Tell the bookkeeper before, not after.
 #
 # --verify-only exists for a deploy that did its work and then died in the
 # checks. It gates on the server already being deployed (checkout on
@@ -34,8 +45,11 @@
 #
 # Secrets: this script never prints a key value. Environment variables are
 # reported as "empty" or "set, prefix <first 5 chars>", which is the shape the
-# runbook's own step 1 uses. No remote block runs under set -x, and no read of
-# .env is ever written to stdout.
+# runbook's own step 1 uses. The four seller variables are not even given a
+# prefix: they are reported as empty, match or differs against the public
+# details. No remote block runs under set -x, and no read of .env is ever
+# written to stdout. --dry-run is the exception by design: it prints the remote
+# blocks themselves, and the 1e block holds the four public seller details.
 #
 # Everything the script prints also lands in deploy/logs/deploy-3.1-<TS>.log.
 
@@ -188,6 +202,7 @@ SSH_SHOWN="ssh -i <prod-key> -o BatchMode=yes -o IdentitiesOnly=yes $PROD_HOST"
 DRY_RUN=0
 PREFLIGHT_ONLY=0
 VERIFY_ONLY=0
+SELLER_VAT_GO=0
 ROLLBACK_TS=""
 REMOTE_OUT=""
 REMOTE_RC=0
@@ -397,6 +412,81 @@ remote_nginx() {
   remote "$@" < <(printf '%s\n%s\n' "$NGINX_RESOLVE_SNIPPET" "$body")
 }
 
+# ------------------------------------------------------- the seller (#517) --
+#
+# One definition of the seller's public details and of how a value is compared,
+# shared by steps 1b, 1e and 6j. remote_seller prepends it to a block, the way
+# remote_nginx prepends resolve_conf_slots, so the server runs exactly this text
+# and tests/deploy-3.1-dryrun.test.sh runs it too.
+#
+# A value is compared on its letters and digits only, in lower case, and the
+# address without a closing country line: "Paramantis Solutions BV" and
+# "Meerkoetmeen 47, 3844XM Harderwijk" match, a different value never does. The
+# output of every function here is empty, match or differs, or a count. Never a
+# value.
+seller_snippet() {
+  cat <<'SELLER'
+SELLER_VARS="BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK BILLING_SELLER_VAT"
+# The public details of Paramantis Solutions B.V., as the .env line each
+# variable gets. VIES holds the same name and address for this btw-id (checked
+# 2026-09-25). The address is in double quotes: docker compose turns \n inside
+# double quotes into a line break.
+seller_line() {
+  case "$1" in
+    BILLING_SELLER_NAME)    printf '%s' 'BILLING_SELLER_NAME="Paramantis Solutions B.V."' ;;
+    BILLING_SELLER_ADDRESS) printf '%s' 'BILLING_SELLER_ADDRESS="Meerkoetmeen 47\n3844 XM Harderwijk\nNetherlands"' ;;
+    BILLING_SELLER_KVK)     printf '%s' 'BILLING_SELLER_KVK=42115132' ;;
+    BILLING_SELLER_VAT)     printf '%s' 'BILLING_SELLER_VAT=NL869798017B01' ;;
+  esac
+}
+seller_canon() {  # variable, value -> letters and digits, lower case
+  local s
+  s="$(printf '%s' "$2" | sed 's/\\n/ /g' | tr '[:upper:]' '[:lower:]')"
+  if [ "$1" = BILLING_SELLER_ADDRESS ]; then
+    s="$(printf '%s' "$s" | sed -E 's/[[:space:],]*(the[[:space:]]+)?(netherlands|nederland)[[:space:]"]*$//')"
+  fi
+  printf '%s' "$s" | LC_ALL=C tr -cd 'a-z0-9'
+}
+seller_expected() {  # variable -> the canonical form of the public value
+  seller_canon "$1" "$(seller_line "$1" | sed 's/^[A-Z_]*=//')"
+}
+# Lines that hold a value, as docker compose reads .env: an optional "export ",
+# blanks and quotes around the value allowed. X= and X="" hold none.
+seller_isset() {  # variable -> a count
+  grep -cE "^(export[[:space:]]+)?$1=[[:space:]]*[\"']?[[:space:]]*[^\"'[:space:]]" .env || true
+}
+# empty, match or differs, for the LAST line of a variable, which is the one
+# docker compose uses.
+seller_state() {  # variable
+  local canon_env
+  if [ "$(seller_isset "$1")" -eq 0 ]; then echo empty; return 0; fi
+  canon_env="$(seller_canon "$1" "$(sed -nE "s/^(export[[:space:]]+)?$1=//p" .env | tail -1)")"
+  if [ "$canon_env" = "$(seller_expected "$1")" ]; then echo match; else echo differs; fi
+}
+# The same comparison inside a relay, on its own environment and through its
+# own lib/invoice.js: the state of each variable, the kind of document it would
+# issue and the number of lines in the address. The expected forms travel in
+# as SELLER_EXPECT_*, so this snippet is still the only place they come from.
+SELLER_JS='const {env:e}=process;const canon=(k,v)=>{let s=String(v||"").replace(/\\n/g," ").toLowerCase();if(k==="BILLING_SELLER_ADDRESS")s=s.replace(/[\s,]*(the\s+)?(netherlands|nederland)[\s"]*$/,"");return s.replace(/[^a-z0-9]/g,"");};const st=(k)=>{const v=String(e[k]||"").trim();if(!v)return "empty";return canon(k,v)===String(e["SELLER_EXPECT_"+k]||"")?"match":"differs";};let kind="unknown",lines=0;try{const i=require("./lib/invoice");const s=i.sellerFromEnv(e);kind=i.documentKind(s);lines=String(s.address||"").split("\n").filter((l)=>l.trim()).length;}catch(x){kind="unreadable";}console.log("name="+st("BILLING_SELLER_NAME")+" address="+st("BILLING_SELLER_ADDRESS")+" kvk="+st("BILLING_SELLER_KVK")+" vat="+st("BILLING_SELLER_VAT")+" kind="+kind+" address_lines="+lines);'
+seller_probe() {  # service -> one line, from inside that relay
+  docker compose exec -T \
+    -e SELLER_EXPECT_BILLING_SELLER_NAME="$(seller_expected BILLING_SELLER_NAME)" \
+    -e SELLER_EXPECT_BILLING_SELLER_ADDRESS="$(seller_expected BILLING_SELLER_ADDRESS)" \
+    -e SELLER_EXPECT_BILLING_SELLER_KVK="$(seller_expected BILLING_SELLER_KVK)" \
+    -e SELLER_EXPECT_BILLING_SELLER_VAT="$(seller_expected BILLING_SELLER_VAT)" \
+    "$1" node -e "$SELLER_JS" </dev/null 2>/dev/null || echo unreadable
+}
+SELLER
+}
+
+# remote_seller: remote(), with the seller snippet above already defined in the
+# body. Same shape as remote_nginx, and for the same reason not a pipeline.
+remote_seller() {
+  local body
+  body="$(cat)"
+  remote "$@" < <(printf '%s\n%s\n' "$(seller_snippet)" "$body")
+}
+
 # expect: assert against the output of the last remote call. Skipped, loudly,
 # under --dry-run, because there was no measurement to judge.
 expect() {
@@ -505,6 +595,87 @@ expect_min() {
   printf '%s' "$got" | grep -qE '^[0-9]+$' || die "$what -- $field is '$got', not a number"
   [ "$got" -ge "$min" ] || die "$what -- $field is $got, expected at least $min"
   ok "$what ($field = $got)"
+}
+
+# expect_lines: exactly <count> lines of the last remote output match. A
+# positive count, so a line in a shape nobody expected cannot pass by not
+# matching a forbidden pattern.
+expect_lines() {
+  local pattern="$1" want="$2" what="$3" got
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '  SKIP  assert (dry-run): %s   [%s lines match /%s/]\n' "$what" "$want" "$pattern"
+    return 0
+  fi
+  got="$(printf '%s\n' "$REMOTE_OUT" | grep -cE -- "$pattern" || true)"
+  [ "$got" = "$want" ] || die "$what -- $got line(s) match /$pattern/, expected $want"
+  ok "$what ($got of $want)"
+}
+
+# -------------------------------------------------- the seller, judged --
+#
+# The two judgements of the seller steps, on REMOTE_OUT. Functions of their own
+# so tests/deploy-3.1-dryrun.test.sh can hand them a made-up server answer and
+# see them stop.
+
+# Step 1e. A line that differs from the public details, or a btw-id already in
+# .env without --seller-vat, stops a real run before anything else happens; the
+# block itself wrote nothing in both cases.
+judge_seller_details() {
+  local refused
+  refused="$(printf '%s\n' "$REMOTE_OUT" | sed -n 's/^refuse differs://p' | head -1)"
+  if [ -n "$refused" ]; then
+    if [ "$PREFLIGHT_ONLY" -eq 1 ]; then
+      warn "a seller line in .env differs from the public details:${refused}. A full run stops here."
+    else
+      die "a seller line in .env differs from the public details:${refused}. Nothing was written. Correct or remove the line by hand (DEPLOY-3.1.md, 'Invoices: the four seller variables'), then run again."
+    fi
+    return 0
+  fi
+  if printf '%s\n' "$REMOTE_OUT" | grep -q '^refuse vat without --seller-vat'; then
+    if [ "$PREFLIGHT_ONLY" -eq 1 ]; then
+      warn "BILLING_SELLER_VAT is already in .env: a full run without --seller-vat stops here"
+    else
+      die "BILLING_SELLER_VAT is already in .env, so this deploy would issue VAT invoices and reverse charge. Run again with --seller-vat to confirm that, or take the line out. Nothing was written."
+    fi
+    return 0
+  fi
+  if [ "$PREFLIGHT_ONLY" -eq 1 ]; then
+    if [ "$DRY_RUN" -eq 0 ] && printf '%s\n' "$REMOTE_OUT" | grep -q 'action REPORT ONLY'; then
+      warn "a seller variable is missing; a full run will write it. Preflight wrote nothing."
+    else
+      ok "seller details state reported, nothing written"
+    fi
+    return 0
+  fi
+  local sv
+  for sv in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK; do
+    expect_count "after $sv" match "$sv in .env matches the public details"
+    expect_count "after $sv lines" 1 "$sv is in .env exactly once"
+  done
+  if [ "$SELLER_VAT_GO" -eq 1 ]; then
+    expect_count "after BILLING_SELLER_VAT" match "BILLING_SELLER_VAT in .env matches the public btw-id"
+    expect_count "after BILLING_SELLER_VAT lines" 1 "BILLING_SELLER_VAT is in .env exactly once"
+    warn "--seller-vat: from the recreate in phase 4 on every new document is a VAT invoice, and a business in another EU country with a valid VAT number pays without VAT (reverse charge). Tell the bookkeeper."
+  else
+    expect_count "after BILLING_SELLER_VAT" empty "BILLING_SELLER_VAT stays empty without --seller-vat"
+    expect_count "after BILLING_SELLER_VAT lines" 0 "no BILLING_SELLER_VAT line in .env"
+    note "no --seller-vat: the btw-id stays out of .env, every document stays a payment receipt, nothing is reverse charged"
+  fi
+}
+
+# Step 6j. Five relays, each answering in exactly the expected shape: a positive
+# count, not the absence of a bad word.
+judge_seller_known() {
+  expect_min "compose seller vars declared" 5 "the rendered compose passes BILLING_SELLER_* to the five relays"
+  expect_not '^seller relay-[a-z]+ +unreadable' "every relay answered the seller question"
+  expect_not '^seller relay-[a-z]+ .*=differs' "no relay holds a seller value that differs from the public details"
+  if [ "$SELLER_VAT_GO" -eq 1 ]; then
+    expect_lines '^seller relay-[a-z]+ +name=match address=match kvk=match vat=match kind=invoice address_lines=[2-9]$' 5 \
+      "all five relays know the seller and issue VAT invoices (--seller-vat)"
+  else
+    expect_lines '^seller relay-[a-z]+ +name=match address=match kvk=match vat=empty kind=receipt address_lines=[2-9]$' 5 \
+      "all five relays know the seller, hold no btw-id and issue payment receipts (no --seller-vat)"
+  fi
 }
 
 # ------------------------------------------------ the starting commit gate --
@@ -618,7 +789,7 @@ sanity_verdict() {
 # --------------------------------------------------------- argument handling --
 
 usage() {
-  sed -n '2,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -627,6 +798,7 @@ while [ $# -gt 0 ]; do
     --preflight-only) PREFLIGHT_ONLY=1; shift ;;
     --verify-only)    VERIFY_ONLY=1; shift ;;
     --dry-run)        DRY_RUN=1; shift ;;
+    --seller-vat)     SELLER_VAT_GO=1; shift ;;
     --rollback)       [ $# -ge 2 ] || { echo "--rollback needs a <TS>" >&2; exit 2; }
                       ROLLBACK_TS="$2"; shift 2 ;;
     -h|--help)        usage 0 ;;
@@ -640,6 +812,10 @@ if [ -n "$ROLLBACK_TS" ] && [ "$PREFLIGHT_ONLY" -eq 1 ]; then
 fi
 if [ "$VERIFY_ONLY" -eq 1 ] && { [ -n "$ROLLBACK_TS" ] || [ "$PREFLIGHT_ONLY" -eq 1 ]; }; then
   echo "--verify-only is its own run; do not combine it with --rollback or --preflight-only" >&2
+  exit 2
+fi
+if [ -n "$ROLLBACK_TS" ] && [ "$SELLER_VAT_GO" -eq 1 ]; then
+  echo "--seller-vat decides what a deploy writes; a rollback writes nothing new. Leave it out" >&2
   exit 2
 fi
 if [ -n "$ROLLBACK_TS" ] && ! printf '%s' "$ROLLBACK_TS" | grep -qE '^[0-9]{8}-[0-9]{4}$'; then
@@ -769,9 +945,9 @@ phase_0() {
 phase_1() {
   if [ "$PREFLIGHT_ONLY" -eq 1 ]; then
     phase 1 "Layout and environment (server, read-only)" "Step 1, without the writes"
-    note "--preflight-only: steps 1c and 1d only report. Nothing is written."
+    note "--preflight-only: steps 1c, 1d and 1e only report. Nothing is written."
   else
-    phase 1 "Layout and environment (server, read-only plus two env writes)" "Step 1"
+    phase 1 "Layout and environment (server, read-only plus the env writes of 1c, 1d and 1e)" "Step 1"
   fi
 
   step "1a. checkout, compose project and container health"
@@ -869,24 +1045,23 @@ for v in BILLING_MODE MOLLIE_API_KEY MOLLIE_TEST_API_KEY INTERNAL_AUTH_TOKEN ADM
     "v=\$(printenv $v); if [ -z \"\$v\" ]; then echo empty; else echo \"set, prefix \$(printf %s \"\$v\" | cut -c1-5)\"; fi" \
     </dev/null 2>/dev/null || echo "unreadable"
 done
-
-# The seller on every invoice (#517). Set or empty, not even a prefix. Two
-# places, because a docker-compose.yml from before #517 never passed these to
-# a relay: the running container, and the .env the next recreate reads.
-for v in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK BILLING_SELLER_VAT; do
-  c="$(docker compose exec -T relay-main sh -c "if [ -n \"\$(printenv $v)\" ]; then echo set; else echo empty; fi" \
-    </dev/null 2>/dev/null || echo unreadable)"
-  # A count, not a read: the value never reaches a variable.
-  lines="$(grep -cE "^${v}=[\"']?[^\"'[:space:]]" .env 2>/dev/null || true)"
-  if [ "${lines:-0}" -gt 0 ]; then f=set; else f=empty; fi
-  printf 'seller %-24s container %s, .env %s\n' "$v" "$c" "$f"
-done
 EOF
 
   expect 'env BILLING_MODE +empty' \
     "BILLING_MODE is empty in the running relay, so the recurring layer stays off"
   expect 'env MOLLIE_API_KEY +set, prefix live_' \
     "MOLLIE_API_KEY is set with a live_ prefix, unchanged since 08-08"
+
+  # The seller (#517): empty, match or differs against the public details, in
+  # .env and in relay-main. No value and no prefix.
+  remote_seller "seller presence" "$COMPOSE_DIR" <<'EOF'
+set -euo pipefail
+cd "$1"
+for v in $SELLER_VARS; do
+  printf 'seller env %-24s %s\n' "$v" "$(seller_state "$v")"
+done
+printf 'seller relay-main %s\n' "$(seller_probe relay-main)"
+EOF
 
   local envmode="write"
   [ "$PREFLIGHT_ONLY" -eq 1 ] && envmode="report"
@@ -970,69 +1145,67 @@ EOF
     fi
   fi
 
-  step "1e. BILLING_SELLER_* (${envmode}: the seller on every invoice, and the condition for reverse charge)"
+  local vatmode="nogo"
+  [ "$SELLER_VAT_GO" -eq 1 ] && vatmode="go"
+  step "1e. BILLING_SELLER_* (${envmode}, btw-id: ${vatmode}): the seller on every invoice"
   note "the public details of Paramantis Solutions B.V., the same ones VIES holds for its"
-  note "btw-id (checked 2026-09-25). A line that is already set in .env wins and is left"
-  note "alone. The output names the variable and what happened to it, never the value."
-  remote "seller details" "$COMPOSE_DIR" "$envmode" <<'EOF'
+  note "btw-id (checked 2026-09-25). A line that already matches is left alone; a line"
+  note "that differs stops the run before anything is written. The btw-id is written"
+  note "only with --seller-vat. Output: the variable and its state, never the value."
+  remote_seller "seller details" "$COMPOSE_DIR" "$envmode" "$vatmode" "$TS" "$BACKUP_DIR" <<'EOF'
 set -euo pipefail
 cd "$1"
-MODE="$2"
-# The line each variable gets when it is missing. The address is in double
-# quotes: docker compose turns \n inside double quotes into a line break, and
-# the relay prints each line of the address as its own line.
-wanted() {
-  case "$1" in
-    BILLING_SELLER_NAME)    printf '%s' 'BILLING_SELLER_NAME="Paramantis Solutions B.V."' ;;
-    BILLING_SELLER_ADDRESS) printf '%s' 'BILLING_SELLER_ADDRESS="Meerkoetmeen 47\n3844 XM Harderwijk\nNetherlands"' ;;
-    BILLING_SELLER_KVK)     printf '%s' 'BILLING_SELLER_KVK=42115132' ;;
-    BILLING_SELLER_VAT)     printf '%s' 'BILLING_SELLER_VAT=NL869798017B01' ;;
-  esac
-}
-# Set means something other than quotes and blanks after the = sign:
-# BILLING_SELLER_VAT= and BILLING_SELLER_VAT="" are both empty.
-isset() { grep -cE "^$1=[\"']?[^\"'[:space:]]" .env || true; }
-backed_up=0
-for v in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK BILLING_SELLER_VAT; do
-  before="$(isset "$v")"
-  echo "before $v lines = $before"
-  if [ "$before" -eq 0 ]; then
-    if [ "$MODE" = report ]; then
-      echo "action REPORT ONLY: $v is not set and a full run would set it"
-    else
-      if [ "$backed_up" -eq 0 ]; then
-        cp -a .env ".env.bak-before-seller-$(date +%Y%m%d-%H%M%S)"
-        backed_up=1
-      fi
-      sed -i "/^$v=/d" .env
-      # A .env whose last line has no newline would swallow the new line.
-      [ -z "$(tail -c1 .env)" ] || printf '\n' >> .env
-      printf '%s\n' "$(wanted "$v")" >> .env
-      chmod 600 .env
-      echo "action SET $v"
-    fi
-  else
-    echo "action none, $v was already set"
+MODE="$2"; VATMODE="$3"; TS="$4"; BK="$5"
+# Look first, decide, then write: a refusal writes nothing at all.
+refuse=""
+for v in $SELLER_VARS; do
+  st="$(seller_state "$v")"
+  echo "before $v = $st"
+  [ "$st" = differs ] && refuse="$refuse $v"
+done
+if [ -n "$refuse" ]; then
+  echo "refuse differs:$refuse"
+  exit 0
+fi
+if [ "$VATMODE" != go ] && [ "$(seller_state BILLING_SELLER_VAT)" = match ]; then
+  echo "refuse vat without --seller-vat: BILLING_SELLER_VAT is already in .env"
+  exit 0
+fi
+todo=""
+for v in $SELLER_VARS; do
+  [ "$v" = BILLING_SELLER_VAT ] && [ "$VATMODE" != go ] && continue
+  [ "$(seller_state "$v")" = empty ] && todo="$todo $v"
+done
+if [ -n "$todo" ] && [ "$MODE" != report ]; then
+  # The .env as it was before 1e, under this run's TS: --rollback <TS> puts
+  # this one back, so a rollback takes the seller lines out again.
+  cp -a .env "$BK/.env-pre-seller-$TS"
+  chmod 600 "$BK/.env-pre-seller-$TS"
+  echo "backup .env-pre-seller-$TS bytes = $(stat -c%s "$BK/.env-pre-seller-$TS")"
+fi
+for v in $todo; do
+  if [ "$MODE" = report ]; then
+    echo "action REPORT ONLY: $v is not set and a full run would write it"
+    continue
   fi
-  echo "after $v lines = $(isset "$v")"
+  sed -i -E "/^(export[[:space:]]+)?$v=/d" .env
+  # A .env whose last line has no newline would swallow the new line.
+  [ -z "$(tail -c1 .env)" ] || printf '\n' >> .env
+  printf '%s\n' "$(seller_line "$v")" >> .env
+  chmod 600 .env
+  echo "action SET $v"
+done
+if [ "$VATMODE" != go ]; then
+  echo "action none, BILLING_SELLER_VAT left empty: payment receipts, no reverse charge (no --seller-vat)"
+elif [ "$MODE" != report ] && printf '%s\n' "$todo" | grep -q BILLING_SELLER_VAT; then
+  echo "action SET BILLING_SELLER_VAT: from the recreate on, VAT invoices and reverse charge"
+fi
+for v in $SELLER_VARS; do
+  echo "after $v = $(seller_state "$v")"
+  echo "after $v lines = $(seller_isset "$v")"
 done
 EOF
-
-  if [ "$PREFLIGHT_ONLY" -eq 1 ]; then
-    if [ "$DRY_RUN" -eq 0 ] && printf '%s\n' "$REMOTE_OUT" | grep -q 'action REPORT ONLY'; then
-      warn "a BILLING_SELLER_* variable is missing; a full run will set it. Preflight wrote nothing."
-    else
-      ok "seller details state reported, nothing written"
-    fi
-  else
-    local sv
-    for sv in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK BILLING_SELLER_VAT; do
-      expect_count "after $sv lines" 1 "$sv present exactly once in .env"
-    done
-    if [ "$DRY_RUN" -eq 0 ] && printf '%s\n' "$REMOTE_OUT" | grep -q 'action SET BILLING_SELLER_VAT'; then
-      warn "BILLING_SELLER_VAT was written to .env. With a docker-compose.yml that passes it (#517) every new document is a VAT invoice and reverse charge to EU businesses starts; tell the bookkeeper"
-    fi
-  fi
+  judge_seller_details
 }
 
 # =============================================================== PHASE 2 =====
@@ -2635,32 +2808,19 @@ EOF
   expect_not '"recurring":true' "every relay still reports recurring:false"
 
   step "6j. the relays know the seller (BILLING_SELLER_*), values never printed"
-  remote "seller known" "$COMPOSE_DIR" <<'EOF'
+  remote_seller "seller known" "$COMPOSE_DIR" <<'EOF'
 set -euo pipefail
 cd "$1"
-# Before #517 docker-compose.yml did not pass these to a relay at all.
-echo "compose seller vars declared = $(docker compose config 2>/dev/null | grep -c 'BILLING_SELLER_VAT:' || true)"
-# Asked of the relay's own code: the function the invoice path calls, and what
-# it makes of the environment. Set or empty, the kind of document, and how many
-# lines the address has; never a value.
-js='const {env:e}=process;const n=(k)=>(String(e[k]||"").trim()?"set":"empty");let kind="unknown",lines=0;try{const i=require("./lib/invoice");const s=i.sellerFromEnv(e);kind=i.documentKind(s);lines=String(s.address||"").split("\n").filter((l)=>l.trim()).length;}catch(x){kind="unreadable";}console.log("name="+n("BILLING_SELLER_NAME")+" address="+n("BILLING_SELLER_ADDRESS")+" kvk="+n("BILLING_SELLER_KVK")+" vat="+n("BILLING_SELLER_VAT")+" kind="+kind+" address_lines="+lines)'
+# A compose that cannot render is a stop, not a zero: the checks below would
+# have nothing to stand on.
+rendered="$(docker compose config 2>/dev/null)" || { echo "FATAL docker compose config failed"; exit 1; }
+echo "compose seller vars declared = $(printf '%s\n' "$rendered" | grep -c 'BILLING_SELLER_VAT:' || true)"
+unset rendered
 for svc in relay-main relay-health relay-finance relay-legal relay-iot; do
-  printf 'seller %-14s ' "$svc"
-  docker compose exec -T "$svc" node -e "$js" </dev/null 2>/dev/null || echo "unreadable"
+  printf 'seller %-14s %s\n' "$svc" "$(seller_probe "$svc")"
 done
 EOF
-  local declared=""
-  [ "$DRY_RUN" -eq 1 ] || declared="$(remote_field 'compose seller vars declared')"
-  if [ "$DRY_RUN" -eq 0 ] && [ "${declared:-0}" = 0 ]; then
-    warn "this commit's docker-compose.yml does not pass BILLING_SELLER_* to the relays (it does from #517 on): documents stay payment receipts, and the seller is not checked"
-  else
-    expect_not 'seller relay-[a-z]+ +unreadable' "every relay answered the seller question"
-    expect_not 'seller relay-[a-z]+ .*=empty' "name, address, KvK and btw-id reach all five relays"
-    expect_not 'seller relay-[a-z]+ .*kind=(receipt|unknown|unreadable)' \
-      "every relay issues a VAT invoice, not a payment receipt"
-    expect_not 'seller relay-[a-z]+ .*address_lines=[01]$' \
-      "the address arrives as separate lines, not as one line with a literal backslash-n"
-  fi
+  judge_seller_known
 }
 
 # =============================================================== PHASE V =====
@@ -2892,7 +3052,15 @@ M="$BK/rollback-images-$TS.txt"
 
 echo "before .env bytes = $(stat -c%s .env)"
 cp -a .env ".env.bak-rollback-$TS"
-cp "$BK/.env-pre-3.1-$TS" .env
+# The .env from before step 1e, when 1e wrote anything in that run: phase 2b
+# saved .env after phase 1, with the seller lines already in it.
+if [ -f "$BK/.env-pre-seller-$TS" ]; then
+  echo "env source = pre-seller"
+  cp "$BK/.env-pre-seller-$TS" .env
+else
+  echo "env source = pre-3.1"
+  cp "$BK/.env-pre-3.1-$TS" .env
+fi
 chmod 600 .env
 echo "after .env bytes = $(stat -c%s .env)"
 

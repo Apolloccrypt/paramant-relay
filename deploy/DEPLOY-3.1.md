@@ -239,11 +239,11 @@ for v in BILLING_MODE MOLLIE_API_KEY MOLLIE_TEST_API_KEY INTERNAL_AUTH_TOKEN ADM
 done
 grep -c '^INTERNAL_AUTH_TOKEN=' .env
 
-# The seller (#517): set or empty, in the relay and in .env. Not even a prefix.
+# The seller (#517): how many lines of .env hold a value. deploy-3.1.sh step 1b
+# goes further and reports each one, in .env and in relay-main, as empty, match
+# or differs against the public details. Never a value, not even a prefix.
 for v in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK BILLING_SELLER_VAT; do
-  printf '%-24s container ' "$v"
-  docker compose exec -T relay-main sh -c "if [ -n \"\$(printenv $v)\" ]; then echo set; else echo empty; fi" </dev/null
-  printf '%-24s .env lines %s\n' "$v" "$(grep -cE "^$v=[\"']?[^\"'[:space:]]" .env)"
+  printf '%-24s .env lines %s\n' "$v" "$(grep -cE "^(export[[:space:]]+)?$v=[[:space:]]*[\"']?[[:space:]]*[^\"'[:space:]]" .env)"
 done
 ```
 
@@ -293,7 +293,8 @@ What has to be true before step 2:
 | `BILLING_MODE` | the recurring layer | **empty**. Do not set it in this deploy. |
 | `MOLLIE_API_KEY` | one-off checkout, as since 08-08 | set, `live_` prefix, unchanged |
 | `PARASIGN_CANARY_KEY` | the hourly ParaSign canary in `product-heartbeat.yml` | not a relay variable: a GitHub Actions secret holding a `psk_test_` key with the parasign scope. See step 7. |
-| `BILLING_SELLER_NAME`, `_ADDRESS`, `_KVK`, `_VAT` | the seller on every invoice, and `_VAT` decides whether a paid customer gets an invoice or a receipt, and whether reverse charge to an EU business can happen at all (#517) | set, in `.env`. The script's step 1e writes the public details of Paramantis Solutions B.V. when a line is missing, after a backup. See "Invoices: the four seller variables" below. |
+| `BILLING_SELLER_NAME`, `_ADDRESS`, `_KVK` | the seller on every document (#517) | set, in `.env`, matching the public details. Step 1e writes a missing one, after a backup. |
+| `BILLING_SELLER_VAT` | whether a paid customer gets a VAT invoice or a payment receipt, and whether reverse charge to an EU business can happen at all (#517) | **a decision.** Empty unless the deploy runs with `--seller-vat`; then step 1e writes it. See "Invoices: the four seller variables" below. |
 
 If `INTERNAL_AUTH_TOKEN` is empty: generate one (`openssl rand -hex 32`), add
 `INTERNAL_AUTH_TOKEN=...` to `/opt/paramant-relay/.env`, and know that the
@@ -320,21 +321,37 @@ name and address for that btw-id (checked 2026-09-25). They reach a relay only
 through the `x-relay-env` block of `docker-compose.yml`, and that block passes
 them from #517 on. Before that, a value in `.env` was never seen by any relay.
 
-`deploy/deploy-3.1.sh` step 1e writes them, the way 1c and 1d write theirs:
+`deploy/deploy-3.1.sh` step 1e writes them, the way 1c and 1d write theirs,
+with one difference: **the btw-id is a decision, not a default.**
 
-- a line that is already set wins and is left alone, byte for byte;
-- a missing line, or one that is set to nothing (`BILLING_SELLER_VAT=` or
-  `BILLING_SELLER_VAT=""`), is replaced by the line in the table, after one
-  backup `.env.bak-before-seller-<timestamp>` next to `.env`;
-- the address goes in double quotes, because docker compose turns `\n` inside
-  double quotes into a line break (checked with `docker compose config`);
-- `.env` stays mode 600;
-- the output names the variable and what happened to it, never the value;
-- under `--preflight-only` the step only reports what a full run would write.
-
-When 1e writes `BILLING_SELLER_VAT`, the run warns: with a `docker-compose.yml`
-that passes it, every new document is a VAT invoice and reverse charge to EU
-businesses starts. Tell the bookkeeper before the deploy, not after.
+- Without `--seller-vat` 1e writes the name, the address and the KvK number
+  and leaves `BILLING_SELLER_VAT` alone. Every document stays a payment
+  receipt and nothing is reverse charged, and the run says so.
+- With `--seller-vat` (`bash deploy/deploy-3.1.sh --seller-vat`) 1e writes the
+  btw-id too, and the run says in so many words that from the recreate in
+  phase 4 on every new document is a VAT invoice and a business in another EU
+  country with a valid VAT number pays without VAT. Tell the bookkeeper
+  before the deploy, not after.
+- A btw-id that is already in `.env` without `--seller-vat` stops the run:
+  either confirm it with the flag or take the line out.
+- Every existing seller line is compared with the public details on its
+  letters and digits: `Paramantis Solutions BV`, an `export ` in front, blanks
+  or quotes around the value, and `Meerkoetmeen 47, 3844XM Harderwijk` on one
+  line all match. A line that differs stops the run before anything is
+  written; correct it or remove it by hand. A matching line is left alone,
+  byte for byte.
+- A missing line, or one set to nothing (`BILLING_SELLER_VAT=` or
+  `BILLING_SELLER_VAT=""`), gets the line in the table. Before the first write
+  1e copies `.env` to `/home/paramant/backups/.env-pre-seller-<TS>`, mode 600,
+  under the run's own TS. That copy is what `--rollback <TS>` puts back.
+- The address goes in double quotes, because docker compose turns `\n` inside
+  double quotes into a line break (checked with `docker compose config`).
+  `lib/invoice.js` reads an unquoted `\n` as a line break as well.
+- `.env` stays mode 600. Under `--preflight-only` the step only reports.
+- In a real run the output names the variable and its state (empty, match or
+  differs) and what happened to it, never the value. `--dry-run` prints the
+  script's remote blocks themselves, and the 1e block holds the four public
+  details.
 
 `BILLING_SELLER_VAT` is the one that matters. A document without the supplier's
 VAT identification number is not an invoice, and a customer who files it cannot
@@ -353,17 +370,18 @@ an invoice is a record of what was sent, not a template that reprints.
 
 Step 6j verifies it after the deploy, without printing a value. It asks each
 of the five relays, through the relay's own `lib/invoice.js`, what it makes of
-its environment:
+its environment, compared with the same public details:
 
 ```
-seller relay-main     name=set address=set kvk=set vat=set kind=invoice address_lines=3
+seller relay-main     name=match address=match kvk=match vat=match kind=invoice address_lines=3
 ```
 
-and stops the run if a relay does not answer, if a variable is empty, if the
-document would be a payment receipt, or if the address arrives as one line
-(a literal `\n`). A deploy of a commit whose `docker-compose.yml` does not pass
-the variables yet (before #517) gets a warning instead of a stop: the relays
-cannot know the seller, and the documents stay payment receipts.
+It counts: exactly five relays have to answer in exactly that shape, with
+`vat=match kind=invoice` after a `--seller-vat` run and `vat=empty
+kind=receipt` after any other. Anything else stops the run: a relay that does
+not answer, a value that differs, a sixth answer, or an address without any
+line breaks at all. A `docker compose config` that fails, or a compose that
+does not pass the four variables to the relays, is a stop too, not a skip.
 
 and, once a real payment has come in, that the log line says `result:"issued"`:
 
@@ -1108,7 +1126,44 @@ bash deploy/deploy-3.1.sh --rollback 20260902-1830
 
 That reads the manifest of step 2, retags the saved images, recreates the
 containers without rebuilding, restores `.env`, the nginx confs and the
-docroot, and re-runs the smoke tests. By hand, on the server, the equivalent
+docroot, and re-runs the smoke tests. The `.env` it restores is the copy from
+before step 1e (`.env-pre-seller-$TS`) when 1e wrote anything in that run, and
+the step 2b copy (`.env-pre-3.1-$TS`) otherwise; the output says which.
+
+### Taking the seller back out
+
+The step 2b copy was made after step 1, so it already holds whatever 1e
+wrote. That is why the rollback prefers `.env-pre-seller-$TS`: it is the same
+file minus the seller lines of that run. The rollback does not touch git, the
+checkout stays on main, and main's `docker-compose.yml` passes whatever `.env`
+holds, so the file is what decides.
+
+By hand, on the server, everything 1e wrote in run `$TS`:
+
+```bash
+cd /opt/paramant-relay
+cp -a .env .env.bak-before-seller-rollback-$(date +%Y%m%d-%H%M)
+cp -a /home/paramant/backups/.env-pre-seller-$TS .env && chmod 600 .env
+docker compose up -d --no-deps --force-recreate relay-main relay-health relay-finance relay-legal relay-iot
+```
+
+Only the btw-id, so documents go back to payment receipts and reverse charge
+stops, while the name, the address and the KvK number stay:
+
+```bash
+cd /opt/paramant-relay
+cp -a .env .env.bak-before-seller-rollback-$(date +%Y%m%d-%H%M)
+sed -i -E '/^(export[[:space:]]+)?BILLING_SELLER_VAT=/d' .env && chmod 600 .env
+docker compose up -d --no-deps --force-recreate relay-main relay-health relay-finance relay-legal relay-iot
+```
+
+Then run `bash deploy/deploy-3.1.sh --verify-only` (without `--seller-vat`): 6j
+has to count five relays with `vat=empty kind=receipt`.
+
+What a rollback does not undo: every invoice issued in between stays an
+invoice with its number, and every payment that was reverse charged stays
+reverse charged, with its VIES proof. Documents are never rewritten. The
+bookkeeper has to know which numbers were issued in that window. By hand, on the server, the equivalent
 is the 3.0.0 script, which asks before it restores `.env`:
 
 ```bash

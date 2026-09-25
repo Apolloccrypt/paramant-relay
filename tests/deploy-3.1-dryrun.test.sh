@@ -49,13 +49,18 @@ check_lacks() { # file, pattern, name
 extract_snippet() {
   sed -n "/^NGINX_RESOLVE_SNIPPET=/,/^RESOLVER\$/p" "$SCRIPT" | sed '1d;$d'
 }
+# The seller snippet (#517), which remote_seller prepends to its blocks.
+extract_seller_snippet() {
+  sed -n "/^  cat <<'SELLER'\$/,/^SELLER\$/p" "$SCRIPT" | sed '1d;$d'
+}
 extract_remote() {
   local label="$1" line kind
-  line="$(grep -nE "^  remote(_nginx)? \"$label\"" "$SCRIPT" | head -1)"
+  line="$(grep -nE "^  remote(_nginx|_seller)? \"$label\"" "$SCRIPT" | head -1)"
   [ -n "$line" ] || return 1
   kind="$(printf '%s' "$line" | sed -E 's/^[0-9]+:[[:space:]]*([a-z_]+).*/\1/')"
   [ "$kind" = remote_nginx ] && extract_snippet
-  sed -n "/^  remote\(_nginx\)\? \"$label\"/,/^EOF\$/p" "$SCRIPT" | sed '1d;$d'
+  [ "$kind" = remote_seller ] && extract_seller_snippet
+  sed -n "/^  remote\(_nginx\|_seller\)\? \"$label\"/,/^EOF\$/p" "$SCRIPT" | sed '1d;$d'
 }
 
 # resolve_conf_slots() is the function the script sends to the server. It is
@@ -1533,7 +1538,7 @@ fi
 
 # And no remote call anywhere may be piped into again. Comment lines are left
 # out: the wrapper writes down the spelling that caused this, on purpose.
-PIPED="$(grep -nE '\|[[:space:]]*remote(_soft|_nginx)?[[:space:]]+"' "$SCRIPT" \
+PIPED="$(grep -nE '\|[[:space:]]*remote(_soft|_nginx|_seller)?[[:space:]]+"' "$SCRIPT" \
          | grep -vE '^[0-9]+:[[:space:]]*#' || true)"
 if [ -n "$PIPED" ]; then
   fail "a remote call is piped into, which puts it in a subshell and loses REMOTE_OUT"
@@ -1800,9 +1805,9 @@ STDIN_AWK="$(cat <<'AWKPROG'
     re = "(^|[;&(`]|[[:space:]]|[$][(])" cmd "([[:space:]]+-[^[:space:]]+)*[[:space:]]*($|[;&)`>])"
     return (seg ~ re)
   }
-  /^  remote(_soft|_nginx)? ".*<<\047EOF\047$/ {
+  /^  remote(_soft|_nginx|_seller)? ".*<<\047EOF\047$/ {
     inb = 1; lbl = $0
-    sub(/^  remote(_soft|_nginx)? "/, "", lbl); sub(/".*$/, "", lbl)
+    sub(/^  remote(_soft|_nginx|_seller)? "/, "", lbl); sub(/".*$/, "", lbl)
     ln = 0; n = 0; delete body; delete bln
     next
   }
@@ -1877,11 +1882,11 @@ fi
 # extraction silently lost half of them, and losing the block that holds the
 # bug is exactly how this check would go quiet. Adding or removing a remote
 # block is a deliberate act, so updating this number is part of it.
-SCAN_BLOCKS="$(grep -cE "^  remote(_soft|_nginx)? \".*<<'EOF'\$" "$SCRIPT" || true)"
-if [ "$SCAN_BLOCKS" = "28" ]; then
-  pass "the scan walked all 28 remote blocks"
+SCAN_BLOCKS="$(grep -cE "^  remote(_soft|_nginx|_seller)? \".*<<'EOF'\$" "$SCRIPT" || true)"
+if [ "$SCAN_BLOCKS" = "29" ]; then
+  pass "the scan walked all 29 remote blocks"
 else
-  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 28; update the number here on purpose"
+  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 29; update the number here on purpose"
 fi
 
 # And the three commands that actually read stdin are still there, guarded.
@@ -3129,131 +3134,333 @@ check_lacks "$SCRIPT" '(^|[^-])cat[[:space:]]+[^|;]*\.env([^.a-zA-Z]|$)' \
 
 # ------------------------------------------------------------- 6q. seller --
 echo ""
-echo "6q. The seller details (#517): written when missing, never printed, checked after"
+echo "6q. The seller details (#517): a decision, compared and never printed, undone by --rollback"
 # From #517 on docker-compose.yml passes BILLING_SELLER_* to the relays, and
 # BILLING_SELLER_VAT decides whether a paid customer gets a VAT invoice and
-# whether reverse charge to an EU business can happen at all. Step 1e writes
-# the four public details of the seller into .env when a line is missing, the
-# way 1c and 1d write theirs, and 6j asks every relay what it made of them.
-check_has "$FULL" 'seller %-24s container %s, \.env %s' \
-  "1b reports the four seller variables as set or empty, in the container and in .env, no prefix"
-check_has "$FULL" '\[step\] 1e\. BILLING_SELLER_\* \(write' "phase 1 has a step that writes the seller details"
-check_has "$PRE"  '\[step\] 1e\. BILLING_SELLER_\* \(report' "--preflight-only runs that step in report mode"
-check_has "$FULL" '\[step\] 6j\. the relays know the seller' "phase 6 asks every relay whether it knows the seller"
-check_has "$FULL" 'compose seller vars declared' "6j first asks the rendered compose whether the variables reach a relay at all"
+# whether reverse charge to an EU business can happen at all. So the btw-id is
+# written only with --seller-vat, a value that differs from the public details
+# stops the run, the checks compare instead of print, and --rollback puts the
+# .env from before step 1e back. Every block below is the real one, extracted
+# from the script and run against fixtures, with docker faked and node running
+# the relay's own lib/invoice.js.
+SVO="$WORK/sellervat.txt"
+( cd "$ROOT" && bash "$SCRIPT" --dry-run --seller-vat >"$SVO" 2>&1 ); SVO_RC=$?
+[ "$SVO_RC" -eq 0 ] && pass "--dry-run --seller-vat exits 0" || fail "--dry-run --seller-vat exits $SVO_RC"
+( cd "$ROOT" && bash "$SCRIPT" --dry-run --rollback 20260101-0000 --seller-vat >/dev/null 2>&1 ); RBSV_RC=$?
+[ "$RBSV_RC" -eq 2 ] && pass "--seller-vat is refused next to --rollback" || fail "--rollback with --seller-vat exits $RBSV_RC, expected 2"
+check_has "$FULL" '\[step\] 1e\. BILLING_SELLER_\* \(write, btw-id: nogo\)' "without --seller-vat step 1e runs with the btw-id held back"
+check_has "$SVO"  '\[step\] 1e\. BILLING_SELLER_\* \(write, btw-id: go\)'   "with --seller-vat step 1e may write the btw-id"
+check_has "$SVO"  'every new document is a VAT invoice'                     "with --seller-vat the run says in so many words that invoices and reverse charge start"
+check_lacks "$FULL" 'every new document is a VAT invoice'                   "without --seller-vat the run never says so"
+check_has "$PRE"  '\[step\] 1e\. BILLING_SELLER_\* \(report, btw-id: nogo\)' "--preflight-only runs 1e in report mode"
+check_has "$FULL" '\[step\] 6j\. the relays know the seller'                "phase 6 asks every relay whether it knows the seller"
+check_has "$FULL" "seller env %-24s %s"                                     "1b reports the seller in .env as empty, match or differs"
+check_has "$SCRIPT" 'echo "env source = pre-seller"'                     "the rollback names which .env it put back"
 
-S1E="$WORK/s1e"
-mkdir -p "$S1E"
-extract_remote "seller details" > "$S1E/1e.sh"
-if [ -s "$S1E/1e.sh" ]; then
-  pass "the 1e remote block could be extracted from the script"
-else
-  fail "could not extract the 1e remote block from the script"
-fi
-extract_remote "seller known" > "$S1E/6j.sh"
-if [ -s "$S1E/6j.sh" ] && grep -qF 'console.log("name="+n("BILLING_SELLER_NAME")' "$S1E/6j.sh"; then
-  pass "6j prints set or empty per variable, the kind of document and the number of address lines, no value"
-else
-  fail "the 6j block could not be extracted, or it no longer prints presence only"
-fi
+extract_fn() {  # name: one function of the script, as written
+  awk -v n="$1" '
+    !f && index($0, n "() {") == 1 { f = 1; print; if ($0 ~ /}[[:space:]]*$/) exit; next }
+    f { print; if ($0 ~ /^}$/) exit }
+  ' "$SCRIPT"
+}
 
-SELLER_LINES='BILLING_SELLER_NAME="Paramantis Solutions B.V."
+S6Q="$WORK/s6q"
+mkdir -p "$S6Q/bk" "$S6Q/fakebin"
+for label in "seller details" "seller known" "seller presence" "rollback images and env"; do
+  f="$S6Q/$(printf '%s' "$label" | tr ' ' '_').sh"
+  extract_remote "$label" > "$f"
+  if [ -s "$f" ]; then pass "the '$label' block could be extracted"; else fail "could not extract the '$label' block"; fi
+done
+SNIP="$S6Q/snippet.sh"
+extract_seller_snippet > "$SNIP"
+[ -s "$SNIP" ] && pass "the seller snippet could be extracted" || fail "could not extract the seller snippet"
+
+PUBLIC_VALUES='Harderwijk|Meerkoetmeen|NL869798017B01|869798017|42115132|Paramantis'
+PLACEHOLDER_VALUES='NL000099998B57|000099998|00000000|Example Street|Acme'
+
+echo ""
+echo "6q-1. The comparison: formatting is not a difference, another value is"
+state_of() {  # env file content, variable -> empty | match | differs
+  local d; d="$(mktemp -d "$S6Q/state.XXXX")"
+  printf '%s\n' "$1" > "$d/.env"
+  ( cd "$d" && . "$SNIP" && seller_state "$2" )
+}
+while IFS='|' read -r want var line; do
+  [ -n "$var" ] || continue
+  got="$(state_of "$line" "$var")"
+  if [ "$got" = "$want" ]; then pass "$want: $line"; else fail "$line is $got, expected $want"; fi
+done <<'CASES'
+match|BILLING_SELLER_NAME|BILLING_SELLER_NAME="Paramantis Solutions B.V."
+match|BILLING_SELLER_NAME|BILLING_SELLER_NAME=Paramantis Solutions BV
+match|BILLING_SELLER_ADDRESS|BILLING_SELLER_ADDRESS="Meerkoetmeen 47\n3844 XM Harderwijk\nNetherlands"
+match|BILLING_SELLER_ADDRESS|BILLING_SELLER_ADDRESS="Meerkoetmeen 47, 3844XM Harderwijk"
+match|BILLING_SELLER_ADDRESS|BILLING_SELLER_ADDRESS= " Meerkoetmeen 47\n3844 XM Harderwijk\nNederland"
+match|BILLING_SELLER_KVK|export BILLING_SELLER_KVK=42115132
+match|BILLING_SELLER_VAT|BILLING_SELLER_VAT=nl869798017b01
+match|BILLING_SELLER_VAT|export BILLING_SELLER_VAT= "NL869798017B01"
+differs|BILLING_SELLER_VAT|BILLING_SELLER_VAT=NL000099998B57
+differs|BILLING_SELLER_KVK|BILLING_SELLER_KVK=00000000
+differs|BILLING_SELLER_ADDRESS|BILLING_SELLER_ADDRESS="Street 1\n1234 AB City\nNetherlands"
+differs|BILLING_SELLER_NAME|BILLING_SELLER_NAME="Acme B.V."
+empty|BILLING_SELLER_VAT|BILLING_SELLER_VAT=
+empty|BILLING_SELLER_VAT|BILLING_SELLER_VAT=""
+empty|BILLING_SELLER_VAT|ADMIN_TOKEN=aaaa
+CASES
+got="$(state_of "$(printf 'BILLING_SELLER_VAT=NL000099998B57\nBILLING_SELLER_VAT=NL869798017B01')" BILLING_SELLER_VAT)"
+[ "$got" = match ] && pass "with two lines the last one counts, as docker compose reads it" || fail "two lines: $got, expected match"
+
+echo ""
+echo "6q-2. Step 1e without --seller-vat: name, address and KvK, never the btw-id"
+run_1e() {  # dir, mode, vatmode -> output; the run's TS is fixed
+  ( bash "$S6Q/seller_details.sh" "$1" "$2" "$3" 20260925-1200 "$S6Q/bk" </dev/null 2>&1 )
+}
+fresh_bk() { rm -rf "$S6Q/bk"; mkdir -p "$S6Q/bk"; }
+make_env() {  # dir, content (printf format)
+  rm -rf "$1"; mkdir -p "$1"
+  # shellcheck disable=SC2059
+  printf "$2" > "$1/.env"; chmod 640 "$1/.env"; cp -p "$1/.env" "$1.orig"
+}
+fresh_bk
+make_env "$S6Q/nogo" 'ADMIN_TOKEN=aaaa\nMOLLIE_API_KEY=live_bbbb'
+OUT="$(run_1e "$S6Q/nogo" write nogo)"
+for v in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK; do
+  printf '%s\n' "$OUT" | grep -qx "after $v = match" && printf '%s\n' "$OUT" | grep -qx "after $v lines = 1" \
+    && pass "$v written once and matching" || fail "$v was not written once and matching"
+done
+if printf '%s\n' "$OUT" | grep -qx 'after BILLING_SELLER_VAT = empty' && ! grep -q 'BILLING_SELLER_VAT' "$S6Q/nogo/.env"; then
+  pass "the btw-id stays out of .env: payment receipts, no reverse charge"
+else
+  fail "without --seller-vat the btw-id reached .env"
+fi
+printf '%s\n' "$OUT" | grep -q 'left empty: payment receipts, no reverse charge' && pass "the output says the btw-id was left out, and what that means" \
+  || fail "the output does not say the btw-id was left out"
+grep -qx 'MOLLIE_API_KEY=live_bbbb' "$S6Q/nogo/.env" && pass "a last line without a newline is still its own line" || fail "the last line of .env was damaged"
+BK1="$S6Q/bk/.env-pre-seller-20260925-1200"
+if [ -f "$BK1" ] && cmp -s "$BK1" "$S6Q/nogo.orig" && [ "$(stat -c %a "$BK1")" = 600 ]; then
+  pass "the .env from before 1e is kept under the run's TS, byte for byte, mode 600"
+else
+  fail "no 600 backup of the pre-1e .env under the run's TS"
+fi
+[ "$(stat -c %a "$S6Q/nogo/.env")" = 600 ] && pass ".env is 600 afterwards" || fail ".env is not 600 afterwards"
+printf '%s\n' "$OUT" | grep -qE "$PUBLIC_VALUES" && fail "1e printed a seller value" || pass "1e prints states and actions, never a value"
+
+echo ""
+echo "6q-3. Step 1e with --seller-vat: all four, and it says what starts"
+fresh_bk
+make_env "$S6Q/go" 'ADMIN_TOKEN=aaaa\nBILLING_SELLER_VAT=\n'
+OUT="$(run_1e "$S6Q/go" write go)"
+printf '%s\n' "$OUT" | grep -qx 'after BILLING_SELLER_VAT = match' && [ "$(grep -c '^BILLING_SELLER_VAT=' "$S6Q/go/.env")" -eq 1 ] \
+  && pass "the empty BILLING_SELLER_VAT= line is replaced by the btw-id, one line" || fail "the btw-id was not written as one line"
+printf '%s\n' "$OUT" | grep -q 'action SET BILLING_SELLER_VAT: from the recreate on, VAT invoices and reverse charge' \
+  && pass "the block says that VAT invoices and reverse charge start" || fail "the block does not say what the btw-id starts"
+lines_ok=0
+while IFS= read -r want; do grep -qxF -- "$want" "$S6Q/go/.env" && lines_ok=$((lines_ok + 1)); done <<'LINES'
+BILLING_SELLER_NAME="Paramantis Solutions B.V."
 BILLING_SELLER_ADDRESS="Meerkoetmeen 47\n3844 XM Harderwijk\nNetherlands"
 BILLING_SELLER_KVK=42115132
-BILLING_SELLER_VAT=NL869798017B01'
+BILLING_SELLER_VAT=NL869798017B01
+LINES
+[ "$lines_ok" -eq 4 ] && pass "the four lines are the public details, the address in double quotes" || fail "$lines_ok of the four lines are as expected"
 
 echo ""
-echo "6q-1. A .env without the seller: all four written, once, after a backup"
-mkdir -p "$S1E/missing"
-# No newline after the last line, and an empty BILLING_SELLER_VAT= left over:
-# both are what a hand-edited .env looks like.
-printf 'ADMIN_TOKEN=aaaa\nBILLING_SELLER_VAT=\nMOLLIE_API_KEY=live_bbbb' > "$S1E/missing/.env"
-cp "$S1E/missing/.env" "$S1E/missing.orig"
-OUT_Q1="$(bash "$S1E/1e.sh" "$S1E/missing" write </dev/null 2>&1)"; RC_Q1=$?
-[ "$RC_Q1" -eq 0 ] && pass "1e runs through on a .env without the seller" || fail "1e exited $RC_Q1 on a .env without the seller"
-for v in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK BILLING_SELLER_VAT; do
-  if printf '%s\n' "$OUT_Q1" | grep -qx "after $v lines = 1"; then
-    pass "$v is set exactly once afterwards"
+echo "6q-4. A line that is already there"
+fresh_bk
+make_env "$S6Q/same" 'export BILLING_SELLER_NAME="Paramantis Solutions B.V."\nBILLING_SELLER_ADDRESS= "Meerkoetmeen 47, 3844XM Harderwijk"\nBILLING_SELLER_KVK=42115132\nBILLING_SELLER_VAT=NL869798017B01\n'
+OUT="$(run_1e "$S6Q/same" write go)"
+if cmp -s "$S6Q/same/.env" "$S6Q/same.orig" && [ ! -e "$S6Q/bk/.env-pre-seller-20260925-1200" ]; then
+  pass "matching lines, export and a leading blank included, are left alone byte for byte, no backup"
+else
+  fail "1e rewrote a .env whose seller lines already matched"
+fi
+OUT="$(run_1e "$S6Q/same" write nogo)"
+if printf '%s\n' "$OUT" | grep -q '^refuse vat without --seller-vat' && cmp -s "$S6Q/same/.env" "$S6Q/same.orig"; then
+  pass "a btw-id already in .env without --seller-vat is refused, and nothing is written"
+else
+  fail "a btw-id already in .env went through without --seller-vat"
+fi
+for mode in go nogo; do
+  fresh_bk
+  make_env "$S6Q/differs" 'BILLING_SELLER_KVK=00000000\nBILLING_SELLER_VAT=NL000099998B57\n'
+  OUT="$(run_1e "$S6Q/differs" write "$mode")"
+  if printf '%s\n' "$OUT" | grep -qx 'refuse differs: BILLING_SELLER_KVK BILLING_SELLER_VAT' \
+     && cmp -s "$S6Q/differs/.env" "$S6Q/differs.orig" && [ ! -e "$S6Q/bk/.env-pre-seller-20260925-1200" ]; then
+    pass "($mode) a wrong old line is refused by name, nothing is written, no backup"
   else
-    fail "$v is not set exactly once afterwards"
+    fail "($mode) a wrong old line was not refused, or something was written"
   fi
+  printf '%s\n' "$OUT" | grep -qE "$PLACEHOLDER_VALUES" && fail "($mode) the refusal printed the wrong value" || pass "($mode) the refusal names the variable, not its value"
 done
-missing_lines=0
-while IFS= read -r want; do
-  grep -qxF -- "$want" "$S1E/missing/.env" || missing_lines=$((missing_lines + 1))
-done <<< "$SELLER_LINES"
-[ "$missing_lines" -eq 0 ] && pass "the four lines are the public details, the address in double quotes with \\n between its lines" \
-  || fail "$missing_lines of the four seller lines are not in .env as written"
-if grep -qx 'MOLLIE_API_KEY=live_bbbb' "$S1E/missing/.env" && grep -qx 'ADMIN_TOKEN=aaaa' "$S1E/missing/.env"; then
-  pass "the lines that were there are intact, the last one too although it had no newline"
+
+echo ""
+echo "6q-5. --preflight-only reports and writes nothing"
+fresh_bk
+make_env "$S6Q/report" 'ADMIN_TOKEN=aaaa\n'
+OUT="$(run_1e "$S6Q/report" report nogo)"
+if cmp -s "$S6Q/report/.env" "$S6Q/report.orig" && [ ! -e "$S6Q/bk/.env-pre-seller-20260925-1200" ] \
+   && [ "$(printf '%s\n' "$OUT" | grep -c 'action REPORT ONLY')" -eq 3 ]; then
+  pass "report mode names the three it would write, and writes nothing"
 else
-  fail "an existing line of .env was damaged"
-fi
-if grep -qx 'BILLING_SELLER_VAT=' "$S1E/missing/.env"; then
-  fail "the empty BILLING_SELLER_VAT= line is still there next to the new one"
-else
-  pass "the empty BILLING_SELLER_VAT= line was replaced, not kept beside the new one"
-fi
-bak="$(ls "$S1E/missing"/.env.bak-before-seller-* 2>/dev/null | head -1)"
-if [ -n "$bak" ] && cmp -s "$bak" "$S1E/missing.orig"; then
-  pass "a backup of the .env as it was is next to it"
-else
-  fail "no backup of the original .env before the write"
-fi
-[ "$(stat -c %a "$S1E/missing/.env" 2>/dev/null)" = 600 ] && pass ".env is 600 afterwards" || fail ".env is not 600 afterwards"
-if printf '%s\n' "$OUT_Q1" | grep -qE 'Harderwijk|Meerkoetmeen|NL869798017B01|42115132|Paramantis'; then
-  fail "1e printed a seller value"
-else
-  pass "1e names the variables and what it did, never a value"
+  fail "report mode wrote, or did not report the three missing variables"
 fi
 
 echo ""
-echo "6q-2. A .env that already has all four: left alone, byte for byte"
-mkdir -p "$S1E/present"
-printf 'BILLING_SELLER_NAME="Acme B.V."\nBILLING_SELLER_ADDRESS="Example Street 1\\n1234 AB Example City"\nBILLING_SELLER_KVK=00000000\nBILLING_SELLER_VAT=NL000099998B01\n' > "$S1E/present/.env"
-cp "$S1E/present/.env" "$S1E/present.orig"
-OUT_Q2="$(bash "$S1E/1e.sh" "$S1E/present" write </dev/null 2>&1)"; RC_Q2=$?
-if [ "$RC_Q2" -eq 0 ] && cmp -s "$S1E/present/.env" "$S1E/present.orig"; then
-  pass "a seller line that is already set wins, and .env is unchanged"
-else
-  fail "1e changed a .env that already carried the seller (exit $RC_Q2)"
-fi
-[ "$(printf '%s\n' "$OUT_Q2" | grep -c '^action none')" -eq 4 ] && pass "all four report action none" \
-  || fail "not every variable reported action none"
-ls "$S1E/present"/.env.bak-before-seller-* >/dev/null 2>&1 && fail "a backup was made although nothing was written" \
-  || pass "no backup when nothing is written"
+echo "6q-6. The judgements, handed a made-up server answer"
+# ok, note, warn and die as the script defines them, minus the log file.
+JLIB="$S6Q/judges.sh"
+{
+  echo 'ok()   { printf "  OK    %s\n" "$*"; }'
+  echo 'note() { printf "  note  %s\n" "$*"; }'
+  echo 'warn() { printf "  WARN  %s\n" "$*"; }'
+  echo 'die()  { printf "  STOP  %s\n" "$*"; exit 1; }'
+  for fn in remote_field expect expect_not expect_count expect_min expect_lines judge_seller_details judge_seller_known; do
+    extract_fn "$fn"
+  done
+} > "$JLIB"
+for fn in judge_seller_details judge_seller_known expect_lines; do
+  grep -q "^$fn() {" "$JLIB" && pass "$fn could be extracted" || fail "$fn could not be extracted"
+done
+judge() {  # function, vatgo, preflight, server answer -> the verdict line(s)
+  ( DRY_RUN=0; SELLER_VAT_GO="$2"; PREFLIGHT_ONLY="$3"; REMOTE_OUT="$4"
+    # shellcheck source=/dev/null
+    . "$JLIB"; "$1" && echo "VERDICT go" ) 2>&1 | tail -3
+}
+stops() { printf '%s\n' "$1" | grep -q 'STOP' && ! printf '%s\n' "$1" | grep -q 'VERDICT go'; }
+DET_NOGO='after BILLING_SELLER_NAME = match
+after BILLING_SELLER_NAME lines = 1
+after BILLING_SELLER_ADDRESS = match
+after BILLING_SELLER_ADDRESS lines = 1
+after BILLING_SELLER_KVK = match
+after BILLING_SELLER_KVK lines = 1
+after BILLING_SELLER_VAT = empty
+after BILLING_SELLER_VAT lines = 0'
+DET_GO="$(printf '%s\n' "$DET_NOGO" | sed 's/^after BILLING_SELLER_VAT = empty$/after BILLING_SELLER_VAT = match/; s/^after BILLING_SELLER_VAT lines = 0$/after BILLING_SELLER_VAT lines = 1/')"
+v="$(judge judge_seller_details 0 0 "$DET_NOGO")"; stops "$v" && fail "1e: a clean answer without --seller-vat stopped: $v" || pass "1e: a clean answer without --seller-vat goes on"
+v="$(judge judge_seller_details 1 0 "$DET_GO")";   stops "$v" && fail "1e: a clean answer with --seller-vat stopped: $v" || pass "1e: a clean answer with --seller-vat goes on"
+v="$(judge judge_seller_details 0 0 "$(printf '%s\n' "$DET_NOGO" | sed 's/^after BILLING_SELLER_KVK lines = 1$/after BILLING_SELLER_KVK lines = 2/')")"
+stops "$v" && pass "1e: a variable twice in .env stops the run" || fail "1e: a variable twice in .env went through"
+v="$(judge judge_seller_details 1 0 "$DET_NOGO")"; stops "$v" && pass "1e: --seller-vat with the btw-id still empty stops the run" || fail "1e: --seller-vat without a btw-id went through"
+v="$(judge judge_seller_details 0 0 "$DET_GO")";   stops "$v" && pass "1e: a btw-id in .env without --seller-vat stops the run" || fail "1e: a btw-id without --seller-vat went through"
+v="$(judge judge_seller_details 1 0 'refuse differs: BILLING_SELLER_VAT')"; stops "$v" && pass "1e: a refusal for a wrong line stops a full run" || fail "1e: a refusal for a wrong line went through"
+v="$(judge judge_seller_details 1 1 'refuse differs: BILLING_SELLER_VAT')"; printf '%s\n' "$v" | grep -q 'WARN' && ! stops "$v" && pass "1e: in preflight the same refusal is a warning" || fail "1e: preflight did not warn about a wrong line"
+v="$(judge judge_seller_details 0 0 'refuse vat without --seller-vat: BILLING_SELLER_VAT is already in .env')"; stops "$v" && pass "1e: a btw-id already in .env without --seller-vat stops the run" || fail "1e: that refusal went through"
+
+KNOWN_GO="compose seller vars declared = 5"
+KNOWN_NOGO="compose seller vars declared = 5"
+for r in relay-main relay-health relay-finance relay-legal relay-iot; do
+  KNOWN_GO="$KNOWN_GO
+$(printf 'seller %-14s name=match address=match kvk=match vat=match kind=invoice address_lines=3' "$r")"
+  KNOWN_NOGO="$KNOWN_NOGO
+$(printf 'seller %-14s name=match address=match kvk=match vat=empty kind=receipt address_lines=3' "$r")"
+done
+v="$(judge judge_seller_known 1 0 "$KNOWN_GO")";   stops "$v" && fail "6j: five good invoice lines stopped: $v" || pass "6j: five relays issuing invoices, with --seller-vat, go on"
+v="$(judge judge_seller_known 0 0 "$KNOWN_NOGO")"; stops "$v" && fail "6j: five good receipt lines stopped: $v" || pass "6j: five relays issuing receipts, without --seller-vat, go on"
+v="$(judge judge_seller_known 0 0 "$KNOWN_GO")";   stops "$v" && pass "6j: invoices without --seller-vat stop the run" || fail "6j: invoices without --seller-vat went through"
+v="$(judge judge_seller_known 1 0 "$KNOWN_NOGO")"; stops "$v" && pass "6j: receipts with --seller-vat stop the run" || fail "6j: receipts with --seller-vat went through"
+v="$(judge judge_seller_known 1 0 "$(printf '%s\n' "$KNOWN_GO" | sed 's/^compose seller vars declared = 5$/compose seller vars declared = 0/')")"
+stops "$v" && pass "6j: a compose that does not pass the variables stops, it does not warn and skip" || fail "6j: a compose without the variables went through"
+v="$(judge judge_seller_known 1 0 "$(printf '%s\n' "$KNOWN_GO" | sed '/relay-iot/d')")"
+stops "$v" && pass "6j: four relays out of five stop the run" || fail "6j: four relays went through"
+v="$(judge judge_seller_known 1 0 "$(printf '%s\n' "$KNOWN_GO" | sed '/relay-legal/s/vat=match/vat=differs/')")"
+stops "$v" && pass "6j: one relay with a btw-id that differs stops the run" || fail "6j: a differing btw-id went through"
+v="$(judge judge_seller_known 1 0 "$(printf '%s\n' "$KNOWN_GO" | sed '/relay-health/s/name=match/name=differs/')")"
+stops "$v" && pass "6j: one relay with a name that differs stops the run" || fail "6j: a differing name went through"
+v="$(judge judge_seller_known 1 0 "$(printf '%s\n' "$KNOWN_GO" | sed '/relay-main/s/address_lines=3/address_lines=1/')")"
+stops "$v" && pass "6j: an address on one line stops the run" || fail "6j: an address on one line went through"
+v="$(judge judge_seller_known 1 0 "$(printf '%s\n' "$KNOWN_GO" | sed '/relay-finance/s/name=.*$/unreadable/')")"
+stops "$v" && pass "6j: a relay that does not answer stops the run" || fail "6j: a silent relay went through"
+v="$(judge judge_seller_known 1 0 "$KNOWN_GO
+seller relay-extra     name=match address=match kvk=match vat=match kind=invoice address_lines=3")"
+stops "$v" && pass "6j: a sixth answer is not five" || fail "6j: six answers went through as five"
 
 echo ""
-echo "6q-3. An empty value is not a value"
-mkdir -p "$S1E/empty"
-printf 'BILLING_SELLER_NAME=""\nBILLING_SELLER_ADDRESS="Example Street 1\\n1234 AB Example City"\nBILLING_SELLER_KVK=00000000\nBILLING_SELLER_VAT=NL000099998B01\n' > "$S1E/empty/.env"
-OUT_Q3="$(bash "$S1E/1e.sh" "$S1E/empty" write </dev/null 2>&1)"
-if printf '%s\n' "$OUT_Q3" | grep -qx 'action SET BILLING_SELLER_NAME' \
-   && [ "$(grep -c '^BILLING_SELLER_NAME=' "$S1E/empty/.env")" -eq 1 ] \
-   && grep -qx 'BILLING_SELLER_NAME="Paramantis Solutions B.V."' "$S1E/empty/.env"; then
-  pass 'BILLING_SELLER_NAME="" counts as missing and is replaced by one real line'
+echo "6q-7. The real 1b and 6j blocks, with docker faked and the relay's own lib/invoice.js"
+if ! command -v node >/dev/null 2>&1; then
+  fail "node is needed to run the relay's lib/invoice.js for 6q-7; install it"
 else
-  fail 'BILLING_SELLER_NAME="" was not treated as missing, or left two lines'
+  cat > "$S6Q/fakebin/docker" <<'FAKE'
+#!/usr/bin/env bash
+# docker for the seller blocks and the rollback: exec runs the command here,
+# in the relay directory, with the -e variables added; config renders five
+# relays; ps, inspect, tag and up answer what phase 8b needs.
+if [ "$1" = compose ] && [ "$2" = config ]; then
+  [ "${FAKE_CONFIG_FAIL:-0}" = 1 ] && exit 1
+  for i in 1 2 3 4 5; do printf '      BILLING_SELLER_VAT: x%s\n' "$i"; done
+  exit 0
 fi
-if [ "$(printf '%s\n' "$OUT_Q3" | grep -c '^action SET')" -eq 1 ]; then
-  pass "the three variables that were set are left alone"
-else
-  fail "1e wrote more than the one missing variable"
+if [ "$1" = compose ] && [ "$2" = exec ]; then
+  shift 2
+  [ "${1:-}" = -T ] && shift
+  while [ "${1:-}" = -e ]; do export "$2"; shift 2; done
+  shift
+  cd "$FAKE_RELAY_DIR" && exec "$@"
+fi
+if [ "$1" = compose ] && [ "$2" = ps ]; then echo "cid-$4"; exit 0; fi
+if [ "$1" = compose ] && [ "$2" = up ]; then exit 0; fi
+if [ "$1" = inspect ]; then echo "sha256:fake"; exit 0; fi
+if [ "$1" = tag ]; then exit 0; fi
+exit 1
+FAKE
+  chmod +x "$S6Q/fakebin/docker"
+  in_relays() {  # name, address, kvk, vat, then the block and its arguments
+    local n="$1" a="$2" k="$3" t="$4"; shift 4
+    env PATH="$S6Q/fakebin:$PATH" FAKE_RELAY_DIR="$ROOT/relay" \
+      BILLING_SELLER_NAME="$n" BILLING_SELLER_ADDRESS="$a" BILLING_SELLER_KVK="$k" BILLING_SELLER_VAT="$t" \
+      bash "$@" </dev/null 2>&1
+  }
+  ADDR_LINES="$(printf 'Meerkoetmeen 47\n3844 XM Harderwijk\nNetherlands')"
+  make_env "$S6Q/env6j" 'BILLING_SELLER_NAME="Paramantis Solutions B.V."\nBILLING_SELLER_ADDRESS="Meerkoetmeen 47\\n3844 XM Harderwijk\\nNetherlands"\nBILLING_SELLER_KVK=42115132\nBILLING_SELLER_VAT=NL869798017B01\n'
+  OUT="$(in_relays "Paramantis Solutions B.V." "$ADDR_LINES" 42115132 NL869798017B01 "$S6Q/seller_known.sh" "$S6Q/env6j")"
+  [ "$(printf '%s\n' "$OUT" | grep -cE '^seller relay-[a-z]+ +name=match address=match kvk=match vat=match kind=invoice address_lines=3$')" -eq 5 ] \
+    && pass "6j: five relays with the public details answer match, invoice, three address lines" || fail "6j did not answer match for the public details: $(printf '%s' "$OUT" | head -3)"
+  printf '%s\n' "$OUT" | grep -qE "$PUBLIC_VALUES" && fail "6j printed a seller value" || pass "6j prints no seller value"
+  OUT="$(in_relays "Acme B.V." "$(printf 'Example Street 1\n1234 AB Example City')" 00000000 NL000099998B57 "$S6Q/seller_known.sh" "$S6Q/env6j")"
+  [ "$(printf '%s\n' "$OUT" | grep -cE '^seller relay-[a-z]+ +name=differs address=differs kvk=differs vat=differs kind=invoice')" -eq 5 ] \
+    && pass "6j: placeholder values answer differs, every one" || fail "6j did not see the placeholders as different"
+  printf '%s\n' "$OUT" | grep -qE "$PLACEHOLDER_VALUES" && fail "6j printed a placeholder value" || pass "6j prints no placeholder value either"
+  OUT="$(in_relays "Paramantis Solutions B.V." "$ADDR_LINES" 42115132 "" "$S6Q/seller_known.sh" "$S6Q/env6j")"
+  [ "$(printf '%s\n' "$OUT" | grep -cE 'vat=empty kind=receipt')" -eq 5 ] && pass "6j: no btw-id means empty and a payment receipt" || fail "6j: no btw-id did not read as a receipt"
+  if FAKE_CONFIG_FAIL=1 in_relays x x x x "$S6Q/seller_known.sh" "$S6Q/env6j" >/dev/null; then
+    fail "6j went on while docker compose config failed"
+  else
+    pass "6j stops when docker compose config fails"
+  fi
+  OUT="$(in_relays "Paramantis Solutions B.V." "$ADDR_LINES" 42115132 NL869798017B01 "$S6Q/seller_presence.sh" "$S6Q/env6j")"
+  [ "$(printf '%s\n' "$OUT" | grep -cE '^seller env BILLING_SELLER_[A-Z]+ +match$')" -eq 4 ] && printf '%s\n' "$OUT" | grep -qE '^seller relay-main name=match' \
+    && pass "1b: .env and relay-main both answer match" || fail "1b did not report match: $(printf '%s' "$OUT" | head -3)"
+  printf '%s\n' "$OUT" | grep -qE "$PUBLIC_VALUES" && fail "1b printed a seller value" || pass "1b prints no seller value"
+  make_env "$S6Q/env1b" 'BILLING_SELLER_KVK=00000000\nBILLING_SELLER_VAT=NL000099998B57\n'
+  OUT="$(in_relays "Acme B.V." x 00000000 NL000099998B57 "$S6Q/seller_presence.sh" "$S6Q/env1b")"
+  printf '%s\n' "$OUT" | grep -qE '^seller env BILLING_SELLER_VAT +differs$' && pass "1b: a wrong btw-id in .env reads differs" || fail "1b did not see the wrong btw-id"
+  printf '%s\n' "$OUT" | grep -qE "$PLACEHOLDER_VALUES" && fail "1b printed a placeholder value" || pass "1b prints no placeholder value either"
 fi
 
 echo ""
-echo "6q-4. --preflight-only reports and writes nothing"
-mkdir -p "$S1E/report"
-printf 'ADMIN_TOKEN=aaaa\n' > "$S1E/report/.env"
-cp "$S1E/report/.env" "$S1E/report.orig"
-OUT_Q4="$(bash "$S1E/1e.sh" "$S1E/report" report </dev/null 2>&1)"
-if cmp -s "$S1E/report/.env" "$S1E/report.orig" && ! ls "$S1E/report"/.env.bak-before-seller-* >/dev/null 2>&1; then
-  pass "report mode leaves .env byte for byte and makes no backup"
+echo "6q-8. --rollback puts back the .env from before step 1e"
+RBQ="$S6Q/rb"
+rollback_fixture() {  # with a pre-seller backup? yes|no
+  rm -rf "$RBQ"; mkdir -p "$RBQ/c" "$RBQ/bk"
+  printf 'ADMIN_TOKEN=aaaa\nBILLING_SELLER_VAT=NL869798017B01\n' > "$RBQ/c/.env"
+  printf 'ADMIN_TOKEN=aaaa\nBILLING_SELLER_VAT=NL869798017B01\n' > "$RBQ/bk/.env-pre-3.1-20260925-1200"
+  [ "$1" = yes ] && printf 'ADMIN_TOKEN=aaaa\n' > "$RBQ/bk/.env-pre-seller-20260925-1200"
+  for svc in relay-main relay-health relay-finance relay-legal relay-iot admin; do
+    printf '%s|paramant/%s:3.1.0|paramant-rollback/%s:20260925-1200\n' "$svc" "$svc" "$svc"
+  done > "$RBQ/bk/rollback-images-20260925-1200.txt"
+}
+rollback_fixture yes
+OUT="$(env PATH="$S6Q/fakebin:$PATH" bash "$S6Q/rollback_images_and_env.sh" "$RBQ/c" 20260925-1200 "$RBQ/bk" </dev/null 2>&1)"
+if printf '%s\n' "$OUT" | grep -qx 'env source = pre-seller' && cmp -s "$RBQ/c/.env" "$RBQ/bk/.env-pre-seller-20260925-1200"; then
+  pass "with a pre-1e backup the rollback restores that one: the seller lines of the run go"
 else
-  fail "report mode wrote to .env"
+  fail "the rollback did not restore the pre-1e .env: $(printf '%s' "$OUT" | grep 'env source' || echo none)"
 fi
-[ "$(printf '%s\n' "$OUT_Q4" | grep -c 'action REPORT ONLY')" -eq 4 ] && pass "report mode names each of the four missing variables" \
-  || fail "report mode did not report the four missing variables"
+rollback_fixture no
+OUT="$(env PATH="$S6Q/fakebin:$PATH" bash "$S6Q/rollback_images_and_env.sh" "$RBQ/c" 20260925-1200 "$RBQ/bk" </dev/null 2>&1)"
+if printf '%s\n' "$OUT" | grep -qx 'env source = pre-3.1' && cmp -s "$RBQ/c/.env" "$RBQ/bk/.env-pre-3.1-20260925-1200"; then
+  pass "without one it restores the phase 2b backup, as before"
+else
+  fail "without a pre-1e backup the rollback did not fall back to the 2b backup"
+fi
+printf '%s\n' "$OUT" | grep -qx 'after recreated services = 6' && pass "the faked rollback still recreated all six" || fail "the faked rollback did not recreate six services"
 
 # ------------------------------------------------------------------- 8. safe --
 echo ""
