@@ -85,6 +85,9 @@ function baseDeps(over = {}) {
     req: {}, res: mockRes(), method: 'GET', path: '/v1/envelopes/AAAAAAAAAAAAAAAAAAAAAA',
     query: {}, clientIp: '203.0.113.5', authHeader: '',
     publicOrigin: 'https://sign.example',
+    // The account behind every key here pays. The refusal when it does not is
+    // pinned in relay/test/parasign-open-api.test.js and route-v1-entitlement.
+    parasignEntitled: () => true,
     apiKeys: new Map(), envStore: fakeStore(), envCreateRateOk: () => true,
     safeHttpsRequest: async () => ({ status: 200, body: Buffer.from('%PDF-1.7 x') }),
     canonicalJSON, sigEngine, relayIdentity,

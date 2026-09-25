@@ -170,9 +170,12 @@ function parasignGrantLive(rec, now) {
 
 // The ACCOUNT-level grant, which is narrower than the key-level one above and
 // has to stay narrower. A psk_ key carries scope 'parasign' for its whole life:
-// that is what the key IS, and it is a perfectly good reason to let the key
-// through the /v1 door at whatever tier it holds. It is not a reason to let the
-// ACCOUNT mint another one.
+// that is what the key IS. It is not a reason to let the ACCOUNT mint another
+// one, and since 2026-09-25 it is not enough to create a /v1 envelope either:
+// the router asks this same account-level question before every new envelope
+// (relay.js parasignApiEntitled), because a key that answered for itself kept
+// creating them after a chargeback and after a lapsed term. Reading, fetching
+// the evidence of and voiding the account's own earlier envelopes stay open.
 //
 // Measured on 2026-09-06 by tests/koper-hele-weg.test.mjs, which is the only
 // test in the repo that walks the whole purchase and then charges it back: with
