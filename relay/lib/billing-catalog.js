@@ -155,9 +155,11 @@ function resolveOrder({ product, plan, interval } = {}) {
 
 // Amount equality by integer cents, so '18.15' == '18.150' and formatting noise
 // never lets a mismatched amount through. NaN (unparseable) is never equal.
+// Digits past the cents are accepted only when they are zeros: '35.091' is not
+// 35.09, and reading it as such would grant a plan for an amount nobody set.
 function amountsEqual(a, b) {
   const cents = (s) => {
-    const m = /^(\d+)\.(\d{2})\d*$/.exec(String(s).trim());
+    const m = /^(\d+)\.(\d{2})0*$/.exec(String(s).trim());
     return m ? (parseInt(m[1], 10) * 100 + parseInt(m[2], 10)) : NaN;
   };
   const ca = cents(a), cb = cents(b);

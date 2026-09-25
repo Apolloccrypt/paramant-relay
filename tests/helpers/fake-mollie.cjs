@@ -28,7 +28,20 @@ function create(opts = {}) {
   const subscriptions = new Map();
   const mandates = new Map(); // customerId -> [mandate]
   const webhookCalls = [];
+  // Every API call as it arrived: what was asked, with which kind of key (the
+  // prefix only, never the key) and with which Idempotency-Key. Lets a test
+  // prove that a key was never sent, not just that nothing came of it.
+  const requests = [];
   let failWebhook = false;
+  // Faults on order (/_ctl/fail): the next `times` API calls whose method and
+  // path match answer `status` instead, the way a Mollie that is briefly down
+  // does. A test can then walk the exact path a real outage takes.
+  const faults = [];
+  // A gate (/_ctl/barrier) that holds matching API calls until `count` of them
+  // are waiting, or until timeoutMs, and then answers them all at once. Without
+  // it "thirty webhooks at the same time" depends on how fast the machine is;
+  // with it the thirty answers land in the relay together, every time.
+  let barrier = null;
 
   const json = (res, status, obj) => {
     const b = JSON.stringify(obj);
@@ -71,6 +84,25 @@ function create(opts = {}) {
     const url = new URL(req.url, `http://127.0.0.1`);
     const p = url.pathname;
     const m = req.method;
+    if (p.startsWith('/v2/')) {
+      const auth = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+      requests.push({
+        method: m, path: p, keyPrefix: auth.slice(0, 5),
+        idempotencyKey: req.headers['idempotency-key'] || null,
+      });
+      const fault = faults.find((f) => f.times > 0 && f.method === m && new RegExp(f.match).test(p));
+      if (fault) {
+        fault.times--;
+        return json(res, fault.status, { status: fault.status, title: 'Injected', detail: `fault on ${m} ${p}` });
+      }
+      if (barrier && barrier.method === m && new RegExp(barrier.match).test(p)) {
+        const gate = barrier;
+        await new Promise((resolve) => {
+          gate.waiting.push(resolve);
+          if (gate.waiting.length >= gate.count) gate.open();
+        });
+      }
+    }
 
     // ---- API half -----------------------------------------------------------
     if (p === '/v2/payments' && m === 'POST') {
@@ -119,7 +151,10 @@ function create(opts = {}) {
     }
     if ((mm = p.match(/^\/v2\/customers\/([^/]+)\/subscriptions\/([^/]+)$/)) && m === 'DELETE') {
       const s = subscriptions.get(decodeURIComponent(mm[2]));
-      if (!s) return json(res, 404, { status: 404, title: 'Not Found' });
+      // As strict as Mollie: a subscription lives under its own customer, and
+      // asked for under another one it does not exist. This fake used to
+      // cancel it anyway, which hid every cancel sent to the wrong customer.
+      if (!s || s.customerId !== decodeURIComponent(mm[1])) return json(res, 404, { status: 404, title: 'Not Found' });
       s.status = 'canceled';
       s.canceledAt = new Date().toISOString();
       return json(res, 200, s);
@@ -190,6 +225,21 @@ function create(opts = {}) {
         return json(res, 200, payment);
       }
       if (p === '/_ctl/webhook-off') { failWebhook = !!body.off; return json(res, 200, { failWebhook }); }
+      if (p === '/_ctl/fail') {
+        faults.push({ method: body.method || 'GET', match: body.match || '.', status: body.status || 503, times: body.times || 1 });
+        return json(res, 200, { faults: faults.length });
+      }
+      if (p === '/_ctl/barrier') {
+        const gate = { method: body.method || 'GET', match: body.match || '.', count: body.count || 2, waiting: [] };
+        gate.open = () => {
+          if (barrier === gate) barrier = null;
+          clearTimeout(gate.timer);
+          for (const release of gate.waiting.splice(0)) release();
+        };
+        gate.timer = setTimeout(gate.open, body.timeoutMs || 5000);
+        barrier = gate;
+        return json(res, 200, { barrier: true });
+      }
       return json(res, 404, { error: 'unknown_control' });
     }
 
@@ -197,7 +247,7 @@ function create(opts = {}) {
   });
 
   return {
-    server, payments, customers, subscriptions, webhookCalls,
+    server, payments, customers, subscriptions, webhookCalls, requests,
     async listen() {
       await new Promise((r) => server.listen(0, '127.0.0.1', r));
       selfOrigin = `http://127.0.0.1:${server.address().port}`;

@@ -22,8 +22,53 @@ function billingMode() {
   return 'live';
 }
 
-function apiKeyFor(mode) {
+// The prefix Mollie gives each kind of key. A key is only ever used in the mode
+// its prefix names: a live_ key in MOLLIE_TEST_API_KEY would have taken real
+// money while every log said "test", and a test_ key in MOLLIE_API_KEY would
+// have granted paid plans against payments that never happen. Both used to be
+// accepted without a word, because only the deploy script looked at a prefix.
+const KEY_PREFIX = Object.freeze({ live: 'live_', test: 'test_' });
+
+function rawKeyFor(mode) {
   return (mode === 'test' ? process.env.MOLLIE_TEST_API_KEY : process.env.MOLLIE_API_KEY) || '';
+}
+
+// The key for this mode, or '' when there is none or its prefix belongs to the
+// other mode. '' is the existing "no key" path: every Mollie call then throws
+// mollie_key_missing, a checkout answers 502 and a webhook 503 so Mollie tries
+// again, and nothing is billed against the wrong account.
+function apiKeyFor(mode) {
+  const key = rawKeyFor(mode);
+  if (!key) return '';
+  return key.startsWith(KEY_PREFIX[mode === 'test' ? 'test' : 'live']) ? key : '';
+}
+
+// What is wrong with the billing configuration, for the boot log. Never the key
+// itself: at most the five characters of a known prefix. An empty list is the
+// normal case, and it is what production (BILLING_MODE empty, a live_ key)
+// produces.
+function configProblems() {
+  const problems = [];
+  const raw = process.env.BILLING_MODE || '';
+  const m = raw.toLowerCase();
+  // A typo such as BILLING_MODE=prod used to vanish: it counted as "not set",
+  // and the boot line even said so. It still falls back to the inferred
+  // one-off stance, because that is the safe one, but it says so as an error.
+  if (raw && m !== 'test' && m !== 'live') {
+    // Shown only when it looks like a mode someone mistyped; anything else (a
+    // key pasted into the wrong variable, say) stays out of the log.
+    problems.push({ code: 'billing_mode_unknown', detail: /^[A-Za-z]{1,12}$/.test(raw) ? raw : '(hidden)' });
+  }
+  const prefixOf = (k) => (k.startsWith(KEY_PREFIX.live) || k.startsWith(KEY_PREFIX.test) ? k.slice(0, 5) : null);
+  const live = process.env.MOLLIE_API_KEY || '';
+  const test = process.env.MOLLIE_TEST_API_KEY || '';
+  if (live && !live.startsWith(KEY_PREFIX.live)) {
+    problems.push({ code: 'live_key_wrong_prefix', detail: prefixOf(live) });
+  }
+  if (test && !test.startsWith(KEY_PREFIX.test)) {
+    problems.push({ code: 'test_key_wrong_prefix', detail: prefixOf(test) });
+  }
+  return problems;
 }
 
 // The stance this deployment bills in: which Mollie account (mode) and whether
@@ -54,14 +99,15 @@ function billingStance() {
   };
 }
 
-function _request(method, path, apiKey, bodyObj) {
+function _request(method, path, apiKey, bodyObj, extraHeaders) {
   return new Promise((resolve, reject) => {
     const body = bodyObj ? JSON.stringify(bodyObj) : null;
     const req = https.request({
       host: MOLLIE_HOST, port: 443, method, path,
       headers: Object.assign(
         { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'application/json' },
-        body ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } : {}),
+        body ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } : {},
+        extraHeaders || {}),
       timeout: 8000,
     }, (res) => {
       const chunks = [];
@@ -153,10 +199,17 @@ function mollieInterval(interval) {
 // immediately and charges twice for the same month. So the subscription starts
 // on the day the paid period ends, which is exactly the paid_until the webhook
 // just computed.
-async function createSubscription(mode, customerId, payload) {
+//
+// opts.idempotencyKey is sent as Mollie's Idempotency-Key header, so the same
+// request made twice within Mollie's window for it (one hour) returns the
+// subscription the first one made instead of a second one that collects again
+// every month. That covers a retry of this call; it does not cover a process
+// that died before making a second call at all.
+async function createSubscription(mode, customerId, payload, opts) {
   const key = apiKeyFor(mode);
   if (!key) throw new Error(`mollie_key_missing:${mode}`);
-  const r = await _request('POST', `/v2/customers/${encodeURIComponent(customerId)}/subscriptions`, key, payload);
+  const idem = opts && opts.idempotencyKey ? { 'Idempotency-Key': String(opts.idempotencyKey) } : null;
+  const r = await _request('POST', `/v2/customers/${encodeURIComponent(customerId)}/subscriptions`, key, payload, idem);
   if (r.status !== 201) { const e = new Error('mollie_subscription_failed'); e.status = r.status; e.body = r.body; throw e; }
   return r.body;
 }
@@ -171,15 +224,19 @@ async function cancelSubscription(mode, customerId, subscriptionId) {
     'DELETE',
     `/v2/customers/${encodeURIComponent(customerId)}/subscriptions/${encodeURIComponent(subscriptionId)}`,
     key, null);
-  // 200 is the cancel; 404 means it is already gone, which is the same outcome.
-  if (r.status !== 200 && r.status !== 404) {
-    const e = new Error('mollie_cancel_failed'); e.status = r.status; e.body = r.body; throw e;
+  // 200 is the cancel. A 404 is thrown with its status, not taken as success:
+  // Mollie answers 404 both for a subscription that is gone and for one asked
+  // for under the wrong customer, and only the caller knows which customer it
+  // used (billing-recurring.stopSubscription decides).
+  if (r.status !== 200) {
+    const e = new Error(r.status === 404 ? 'mollie_cancel_not_found' : 'mollie_cancel_failed');
+    e.status = r.status; e.body = r.body; throw e;
   }
   return r.body || { status: 'canceled' };
 }
 
 module.exports = {
-  MOLLIE_HOST, billingMode, billingStance, apiKeyFor, createPayment, getPayment,
+  MOLLIE_HOST, KEY_PREFIX, billingMode, billingStance, apiKeyFor, configProblems, createPayment, getPayment,
   createCustomer, getCustomer, validMandates, mollieInterval,
   createSubscription, cancelSubscription,
 };

@@ -2934,6 +2934,162 @@ function _billingRecordOf(accountId) {
   return accounts.get(accountId) || null;
 }
 
+// Every change to a subscription pointer goes through here, so three things
+// stay one: the pointer, the payment that created it (which tells a new
+// purchase from the same payment arriving twice), and the shared renewals hash
+// that the paid-term reminder reads on whichever container holds its lock.
+async function _saveSubscriptionPointer(accountId, product, id, meta) {
+  _setMolliePointer(accountId, billingRecurring.subscriptionFieldOf(product), id);
+  _setMolliePointer(accountId, billingRecurring.subscriptionPaymentFieldOf(product),
+    id ? ((meta && meta.paymentId) || null) : null);
+  // The customer the subscription hangs under, so a cancel or a replacement
+  // asks Mollie under that one and not under whatever customer the account
+  // holds by then.
+  _setMolliePointer(accountId, billingRecurring.subscriptionCustomerFieldOf(product),
+    id ? ((meta && meta.customerId) || null) : null);
+  if (!redisClient || !redisClient.isReady) return;
+  try {
+    if (id) await billingRecurring.recordRenewal(redisClient, accountId, product, Object.assign({}, meta || {}, { subscriptionId: id }));
+    else await billingRecurring.forgetRenewal(redisClient, accountId, product);
+  } catch (e) {
+    log('warn', 'billing_renewal_marker_failed', { account: String(accountId).slice(0, 12), product, err: e.message });
+  }
+}
+
+// The subscription pointers this container holds, one per account and line,
+// for the boot seed of the renewals hash.
+function* _subscriptionPointers() {
+  const seen = new Set();
+  for (const [key, rec] of apiKeys) {
+    const accountId = (rec && rec.account_id) || key;
+    if (seen.has(accountId)) continue;
+    seen.add(accountId);
+    for (const line of Object.keys(billingRecurring.PRODUCT_SUBSCRIPTION_FIELD)) {
+      const subscriptionId = rec && rec[billingRecurring.subscriptionFieldOf(line)];
+      if (subscriptionId) yield { accountId, line, subscriptionId };
+    }
+  }
+}
+
+// One webhook at a time per account. Checking "already processed" is a read,
+// not a claim: ten webhooks for one first payment used to pass it together,
+// grant twice and create two Mollie subscriptions, so two collections a month.
+// The claim is redis SET NX, shared by every container, with a map in this
+// process for when redis is down. Whoever does not get it answers 503 and
+// Mollie comes back later, by which time the payment reads as processed. Both
+// halves expire after BILLING_LOCK_TTL_S, so a handler that dies halfway can
+// hold an account up for a minute and never longer.
+const BILLING_LOCK_TTL_S = 60;
+const _billingBusy = new Map(); // lock key -> { until (epoch ms), token }, this process
+
+// Delete the lock only while it is still ours, in one step. A GET and then a
+// DEL could delete a lock that expired in between and was taken by another
+// container, which would then run unguarded next to a third.
+const BILLING_LOCK_RELEASE_LUA = `if redis.call('get', KEYS[1]) == ARGV[1] then
+  return redis.call('del', KEYS[1])
+end
+return 0`;
+
+async function _claimBillingLock(key) {
+  const now = Date.now();
+  const held = _billingBusy.get(key);
+  if (held && held.until > now) return null;
+  const token = crypto.randomBytes(12).toString('hex');
+  _billingBusy.set(key, { until: now + BILLING_LOCK_TTL_S * 1000, token });
+  const redisKey = `paramant:billing:lock:${key}`;
+  let shared = false;
+  if (redisClient && redisClient.isReady) {
+    let got = false;
+    try { got = (await redisClient.set(redisKey, token, { NX: true, EX: BILLING_LOCK_TTL_S })) === 'OK'; }
+    catch (e) { log('warn', 'billing_lock_failed', { err: e.message }); }
+    if (!got) {
+      if ((_billingBusy.get(key) || {}).token === token) _billingBusy.delete(key);
+      return null;
+    }
+    shared = true;
+  }
+  return {
+    async release() {
+      if ((_billingBusy.get(key) || {}).token === token) _billingBusy.delete(key);
+      if (!shared || !redisClient || !redisClient.isReady) return;
+      try { await redisClient.eval(BILLING_LOCK_RELEASE_LUA, { keys: [redisKey], arguments: [token] }); }
+      catch { /* the EX is the backstop */ }
+    },
+  };
+}
+
+// The cancellation admin scheduled, for every key of the account: the marker
+// is keyed on the session's user id (admin/server.js, /user/billing/cancel),
+// which is one of the account's keys. Best effort: a marker left behind hides
+// a button, it moves no money.
+async function _clearScheduledCancel(accountId) {
+  if (!accountId || !redisClient || !redisClient.isReady) return;
+  const members = accountKeys.get(accountId) || new Set();
+  const keys = [...new Set([accountId, ...members])].map((k) => `paramant:user:plan_cancel_at:${k}`);
+  try {
+    const removed = await redisClient.del(keys);
+    if (removed) log('info', 'billing_cancel_marker_cleared', { account: String(accountId).slice(0, 12) });
+  } catch (e) {
+    log('warn', 'billing_cancel_marker_failed', { account: String(accountId).slice(0, 12), err: e.message });
+  }
+}
+
+// A collection the subscription tried and did not get. Nothing is granted for
+// it, and before this the customer heard nothing: the next thing he got was the
+// reminder that his plan was ending, promising that nothing is ever charged
+// automatically.
+//
+// Only for the subscription that is on file now: a collection of one that was
+// since replaced or stopped concerns a subscription the customer no longer
+// has, and his current one runs fine. And one mail per subscription per paid
+// period, not per payment: Mollie tries a failed collection again, each try is
+// a new payment, and a mail per try would be a mail a day. Reserved in redis
+// before it is sent and given back when it did not leave, like the reminders.
+async function _noticeFailedCollection(payment) {
+  const md = (payment && payment.metadata) || {};
+  const accountId = md.accountId;
+  if (!accountId) return;
+  const rec = _billingRecordOf(accountId);
+  const line = billingRecurring.currentLineOf(rec, payment.subscriptionId);
+  const order = billingCatalog.resolveOrder({ product: md.product, plan: md.plan, interval: md.interval });
+  const ent = entitlementRecordOf(accountId) || {};
+  const paidUntil = ((order && order.grants) || [])
+    .map((g) => ent[entitlements.PRODUCT_PAID_UNTIL_FIELD[g.product]])
+    .filter(Boolean).sort()[0] || null;
+  const email = (rec && rec.email) || (accounts.get(accountId) || {}).email || '';
+  const trail = {
+    payment_id: payment.id, account: String(accountId).slice(0, 12), product: md.product,
+    status: payment.status, paid_until: paidUntil, subscription_id: payment.subscriptionId || null,
+  };
+  if (!line) {
+    log('info', 'billing_collection_failed', { ...trail, mailed: false, reason: 'not_the_current_subscription' });
+    return;
+  }
+  const msg = billingRecurring.failedCollectionMail({
+    order, paidUntil, now: new Date(), amount: payment.amount,
+    siteUrl: process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL,
+  });
+  if (!email || !msg) {
+    log('warn', 'billing_collection_failed', { ...trail, mailed: false, reason: !email ? 'no_address' : 'unknown_plan' });
+    return;
+  }
+  const key = `paramant:billing:collection_failed:${payment.subscriptionId}:${paidUntil || 'none'}`;
+  if (redisClient && redisClient.isReady) {
+    let reserved = 'OK';
+    try { reserved = await redisClient.set(key, String(Date.now()), { NX: true, EX: 400 * 86400 }); }
+    catch { reserved = 'OK'; }
+    if (reserved !== 'OK') { log('info', 'billing_collection_failed', { ...trail, mailed: false, reason: 'already_told' }); return; }
+  }
+  const sent = mailLater({
+    to: email, from: 'PARAMANT <billing@paramant.app>',
+    subject: msg.subject, text: msg.text, html: msg.html,
+  });
+  if (!sent && redisClient && redisClient.isReady) {
+    try { await redisClient.del(key); } catch { /* the next webhook tries again */ }
+  }
+  log('warn', 'billing_collection_failed', { ...trail, mailed: !!sent });
+}
+
 // ── Billing profile: the customer half of an invoice ─────────────────────────
 // Three optional fields the account owner fills in himself (company name,
 // address, VAT id).
@@ -8552,6 +8708,11 @@ async function handleRelayRequest(req, res) {
       });
       if (cust.result === 'failed') {
         log('error', 'billing_customer_failed', { account: String(accountId).slice(0, 12), err: cust.reason, status: cust.status });
+      } else if (cust.result === 'reused_unverified') {
+        // Mollie could not confirm the stored customer for a reason other than
+        // "gone". It is kept rather than replaced: a new customer here is what
+        // left a running subscription under a customer nobody asked for any more.
+        log('warn', 'billing_customer_unverified', { account: String(accountId).slice(0, 12), err: cust.reason, status: cust.status });
       }
       const customerId = cust.customerId;
       const payment = await mollie.createPayment(mode, Object.assign({
@@ -8606,6 +8767,23 @@ async function handleRelayRequest(req, res) {
       }
       res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'fetch_failed' }));
     }
+    // One webhook at a time per account (see _claimBillingLock). Per account and
+    // not per payment: two different purchases handled at once would each find
+    // no subscription on file and each create one.
+    const _lockOf = (payment && payment.metadata && payment.metadata.accountId)
+      ? `acct:${String(payment.metadata.accountId).slice(0, 128)}` : `pay:${paymentId}`;
+    const _lock = await _claimBillingLock(_lockOf);
+    if (!_lock) {
+      log('warn', 'billing_webhook_busy', { payment_id: paymentId });
+      res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '5' });
+      return res.end(J({ error: 'busy' }));
+    }
+    // Everything from here to the billing_webhook log line runs under the lock,
+    // and the finally after it gives the lock back whatever happens in between:
+    // an exception in the paperwork used to hold the account on 503 for the
+    // whole TTL. The block is deliberately not indented one step further, so
+    // this route's diff stays readable next to the other changes to it.
+    try {
     const _rok = () => !!(redisClient && redisClient.isReady);
     const _idemKey = (id) => `paramant:billing:done:${id}`;
     // The payment id that bought the period currently on file, per product.
@@ -8672,17 +8850,49 @@ async function handleRelayRequest(req, res) {
         mode,
         webhookUrl: `${process.env.PARASIGN_PUBLIC_ORIGIN || 'https://paramant.app'}/v2/billing/webhook`,
         getAccount: (aid) => _billingRecordOf(aid),
-        saveSubscription: (aid, product, id) => _setMolliePointer(aid, billingRecurring.subscriptionFieldOf(product), id),
+        saveSubscription: _saveSubscriptionPointer,
         mollie,
       });
       if (sub.result !== 'skipped') {
         log(sub.level || 'info', 'billing_subscription', {
           payment_id: paymentId, account: String(outcome.account).slice(0, 12),
           product: outcome.product, result: sub.result, reason: sub.reason,
-          subscription_id: sub.subscriptionId, start_date: sub.startDate,
+          subscription_id: sub.subscriptionId, start_date: sub.startDate, replaced: sub.replaced,
+        });
+      }
+      // A new purchase after a cancellation. The account page hides its cancel
+      // button while paramant:user:plan_cancel_at:<key> is set (admin writes it
+      // on cancel and nothing ever cleared it), so after buying again there was
+      // a subscription running and no button to stop it, while the renewal mail
+      // points the customer at that very button. A collection by the running
+      // subscription is not a new purchase and leaves the marker alone.
+      if (!billingRecurring.isRecurringPayment(payment)) await _clearScheduledCancel(outcome.account);
+    }
+    // Money taken back stops the collecting too. The revoke above floored the
+    // plan, but the subscription kept running: the next collection charged the
+    // customer who had just asked for his money back, and gave him the plan
+    // again. Only the subscription that belongs to this payment (its purchase
+    // or one of its collections): a refund of an old purchase must not stop the
+    // subscription a later purchase made. Not gated on stance.recurring, since
+    // stopping a collection is always safe; with BILLING_MODE empty no account
+    // holds a subscription and this calls nobody.
+    if (outcome.result === 'revoked') {
+      const stopped = await billingRecurring.cancelOnRevoke(payment, outcome, {
+        mode,
+        getAccount: (aid) => _billingRecordOf(aid),
+        saveSubscription: _saveSubscriptionPointer,
+        mollie,
+      });
+      for (const s of stopped) {
+        if (s.result === 'noop') continue;
+        log(s.level || 'info', 'billing_subscription_revoked', {
+          payment_id: paymentId, account: String(outcome.account).slice(0, 12),
+          line: s.line, result: s.result, reason: s.reason,
         });
       }
     }
+    // A collection that did not go through: tell the customer, once.
+    if (billingRecurring.isFailedCollection(payment)) await _noticeFailedCollection(payment);
     // The paperwork. A grant is money received, and money received without a
     // document is what this whole branch is about: no number, no VAT split, no
     // record to hand a bookkeeper. Runs AFTER the grant and can never undo it.
@@ -8728,6 +8938,9 @@ async function handleRelayRequest(req, res) {
       result: outcome.result, account: outcome.account ? String(outcome.account).slice(0, 12) : undefined,
       product: outcome.product, reason: outcome.reason,
     });
+    } finally {
+      await _lock.release();
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true }));
   }
 
@@ -9007,7 +9220,7 @@ async function handleRelayRequest(req, res) {
       out = await billingRecurring.cancelForProduct(accountId, p, {
         mode,
         getAccount: (aid) => _billingRecordOf(aid),
-        saveSubscription: (aid, pp, id) => _setMolliePointer(aid, billingRecurring.subscriptionFieldOf(pp), id),
+        saveSubscription: _saveSubscriptionPointer,
         mollie,
       });
       results.push({ product: p, result: out.result, reason: out.reason });
@@ -10433,7 +10646,18 @@ planExpiry.startPlanExpiryPlanner({
   sendEmail: ({ to, subject, text, html }) => mailLater({ to, subject, text, html }),
   log,
   siteUrl: process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL,
-  seed: () => planExpiry.seedIndex(redisClient, accountsWithTerms()),
+  // What the reminder may promise: a term that a subscription will collect for
+  // gets "renews on <date> for <amount>", never "nothing is charged".
+  renewalOf: (aid, product, bundle) => billingRecurring.renewalFor(redisClient, aid, product, bundle),
+  // With BILLING_MODE set a plan is a subscription, so a term that ends
+  // without one (the customer cancelled) must not be explained as "every plan
+  // here is a one-off payment". Empty, as in production, it still is.
+  recurring: mollie.billingStance().recurring,
+  seed: async () => {
+    const s = await planExpiry.seedIndex(redisClient, accountsWithTerms());
+    const r = await billingRecurring.seedRenewals(redisClient, _subscriptionPointers());
+    return Object.assign({}, s, r.seeded ? { renewals_seeded: r.seeded } : {});
+  },
   ...(Number.isFinite(_expiryBootDelay) ? { bootDelayMs: _expiryBootDelay } : {}),
 });
 
@@ -10557,16 +10781,32 @@ server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   // customers, mandates and subscriptions. warn, not info, when it is inferred:
   // it is a legitimate stance, but one nobody has decided on yet, and the
   // decision belongs in .env at deploy time, not in a key prefix.
+  //
+  // And what is wrong on top of that: a BILLING_MODE nobody recognises, or a key
+  // whose prefix belongs to the other mode. The key is refused (apiKeyFor gives
+  // '' for it), the unknown mode falls back to the inferred one-off stance, and
+  // both are errors here with a line each, so neither can pass for normal.
   {
     const _bs = mollie.billingStance();
     const _bk = mollie.apiKeyFor(_bs.mode);
-    log(!_bk ? 'error' : (_bs.recurring ? 'info' : 'warn'), 'billing_config', {
+    const _bp = mollie.configProblems();
+    const _odd = _bp.find((p) => p.code === 'billing_mode_unknown');
+    log(!_bk || _bp.length ? 'error' : (_bs.recurring ? 'info' : 'warn'), 'billing_config', {
       mode: _bs.mode, mode_source: _bs.source, recurring: _bs.recurring,
       key_present: !!_bk, key_prefix: _bk ? _bk.slice(0, 5) : null,
       stance: _bs.recurring
         ? `${_bs.mode}: one-off payments plus customers, mandates and subscriptions (BILLING_MODE=${_bs.mode})`
-        : `${_bs.mode}: one-off payments only, no customers or subscriptions (BILLING_MODE not set)`,
+        : `${_bs.mode}: one-off payments only, no customers or subscriptions (${_odd
+          ? `BILLING_MODE=${_odd.detail} not recognised, treated as not set`
+          : 'BILLING_MODE not set'})`,
+      ...(_bp.length ? { problems: _bp.map((p) => p.code) } : {}),
     });
+    const _effect = {
+      billing_mode_unknown: 'treated as not set: one-off payments only, no customers, mandates or subscriptions',
+      live_key_wrong_prefix: 'MOLLIE_API_KEY is not used: live mode takes only a live_ key',
+      test_key_wrong_prefix: 'MOLLIE_TEST_API_KEY is not used: test mode takes only a test_ key',
+    };
+    for (const p of _bp) log('error', 'billing_config_refused', { problem: p.code, detail: p.detail, effect: _effect[p.code] });
   }
   // Register to the relay registry after a short delay to let the server fully bind
   if (relayIdentity && RELAY_SELF_URL) setTimeout(registerSelf, 500);

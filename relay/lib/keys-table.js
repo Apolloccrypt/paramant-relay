@@ -10,6 +10,7 @@
 // Pure module: no I/O, no globals. Unit-tested in test/keys-table.test.js.
 const crypto = require('crypto');
 const entitlements = require('./entitlements'); // per-product plan derivation
+const billingRecurring = require('./billing-recurring'); // the Mollie pointer fields
 
 // The scopes a v2 API key can carry. ENFORCED, by requireScope() and
 // scopeActionFor() below, which relay.js calls once per request. Kept as an
@@ -246,6 +247,20 @@ function parseAccountFields(rawKey) {
   for (const product of entitlements.PRODUCTS) {
     const f = entitlements.PRODUCT_PAID_UNTIL_FIELD[product];
     if (rawKey[f] != null) out[f] = rawKey[f];
+  }
+  // The same fault, one layer down. The billing webhook writes the Mollie
+  // customer, the subscription per line, the payment that made it, and the
+  // payment that bought each product's period (relay.js _setMolliePointer), and
+  // none of them came back in. After a restart the cancel button found no
+  // subscription while Mollie kept collecting, a new purchase opened a second
+  // subscription beside the first, and the webhook's idempotency guard that is
+  // meant to outlive redis (paid_by_<product>) did not outlive the process.
+  for (const f of billingRecurring.POINTER_FIELDS) {
+    if (rawKey[f] != null && rawKey[f] !== '') out[f] = rawKey[f];
+  }
+  for (const product of entitlements.PRODUCTS) {
+    const f = `paid_by_${product}`;
+    if (rawKey[f] != null && rawKey[f] !== '') out[f] = rawKey[f];
   }
   return out;
 }
