@@ -1899,6 +1899,26 @@ function entitlementRecordOf(accountId) {
   return entitlements.mergeAccountRecord(acct, [...members].map(m => apiKeys.get(m)));
 }
 
+// May this account start new ParaSign API work? One answer for both doors: POST
+// /v2/user/parasign-keys asks it before it mints a psk_ key, and the /v1 router
+// asks it before every new envelope such a key creates (injected there as
+// parasignEntitled). The rule is keys-table.accountHasParasignEntitlement: a live
+// grant on any member key, or a legacy plan that includes ParaSign. Reading,
+// fetching the evidence of and voiding the account's own earlier envelopes do
+// not ask it, so a customer keeps the proof of what was already signed.
+//
+// The /v1 router used to ask only whether the KEY carried the parasign scope,
+// and a psk_ key carries it for life. A chargeback or a lapsed term therefore
+// shut the mint door and left every key minted before it creating envelopes
+// (finding R1 of the payment-flow test of 2026-09-25).
+function parasignApiEntitled(accountId) {
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  const memberRecords = [...members].map(k => apiKeys.get(k)).filter(Boolean);
+  const acct = accounts.get(accountId);
+  const plan = (acct && acct.plan) || (apiKeys.get(accountId) && apiKeys.get(accountId).plan) || 'community';
+  return keysTable.accountHasParasignEntitlement(memberRecords, plan);
+}
+
 // EVERY ParaSend ceiling a request is held to, off the product axis and nowhere
 // else. Reading `keyData.plan` for a limit is the fault this function exists to
 // end: the Mollie webhook upgrades an account through setProductPlan ->
@@ -3873,6 +3893,10 @@ async function handleRelayRequest(req, res) {
       authHeader: req.headers['authorization'] || '',
       publicOrigin: _publicOrigin,
       apiKeys,
+      // The ACCOUNT's right to start new work, asked before every new envelope
+      // and not only when a key is minted: the scope on a psk_ key outlives a
+      // chargeback and a lapsed term, the account's entitlement does not.
+      parasignEntitled: (key) => parasignApiEntitled(acctOf(key)),
       envStore: _envStore(),
       store: _parasignStore(),
       stamp: parasignStamp,
@@ -5640,11 +5664,7 @@ async function handleRelayRequest(req, res) {
       const user_id = (d.user_id || "").toString();
       if (!user_id) { res.writeHead(400); return res.end(J({ error: "missing_user_id" })); }
       const accountId = acctOf(user_id);
-      const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
-      const memberRecords = [...members].map(k => apiKeys.get(k)).filter(Boolean);
-      const acct = accounts.get(accountId);
-      const plan = (acct && acct.plan) || (apiKeys.get(accountId) && apiKeys.get(accountId).plan) || "community";
-      if (!keysTable.accountHasParasignEntitlement(memberRecords, plan)) {
+      if (!parasignApiEntitled(accountId)) {
         res.writeHead(403, { "Content-Type": "application/json" });
         return res.end(J({ error: "parasign_not_entitled", message: "This account is not entitled to the ParaSign API. Upgrade to a paid plan or ask an admin to enable ParaSign. / Dit account heeft geen toegang tot de ParaSign-API. Kies een betaald plan of vraag een beheerder ParaSign aan te zetten." }));
       }
