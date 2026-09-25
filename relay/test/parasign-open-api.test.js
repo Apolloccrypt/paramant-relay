@@ -120,39 +120,69 @@ async function main() {
     ok('valid key without parasign scope -> 403 forbidden_scope');
   }
 
-  // ── ENTITLEMENT: the account behind a scoped key must still hold ParaSign ────
+  // ── ENTITLEMENT: new work needs an account that still holds ParaSign ────────
+  // A scoped, active key on an account that no longer pays (chargeback, refund,
+  // lapsed term). The key is fine. The account may not start new work, and it
+  // keeps what it already has.
   {
-    // A scoped, active key on an account that no longer pays (chargeback,
-    // refund, lapsed term). The key is fine; the account is not.
     let asked = null;
-    const d = makeDeps({ authHeader: bearer(OWNER_KEY),
-                         deps: { parasignEntitled: (token, rec) => { asked = { token, rec }; return false; } } });
-    await api.route(d);
-    assert.strictEqual(d.res.statusCode, 403, 'account without entitlement -> 403');
-    assert.strictEqual(d.res.json().error, 'parasign_not_entitled');
-    assert.strictEqual(asked.token, OWNER_KEY, 'the gate is asked about the presented key');
-    assert.strictEqual(asked.rec.account_id, 'acct_owner', 'and gets its record, which names the account');
-    ok('scoped key on an account without the entitlement -> 403 parasign_not_entitled');
-  }
-  {
-    // The same refusal for every /v1 route, a POST as much as a read.
     const d = makeDeps({ method: 'POST', path: '/v1/envelopes', authHeader: bearer(OWNER_KEY),
-                         deps: { parasignEntitled: async () => false } });
+                         deps: { parasignEntitled: (token, rec) => { asked = { token, rec }; return false; } } });
     await api.route(d);
     assert.strictEqual(d.res.statusCode, 403, 'create without entitlement -> 403');
     assert.strictEqual(d.res.json().error, 'parasign_not_entitled');
+    assert.strictEqual(asked.token, OWNER_KEY, 'the gate is asked about the presented key');
+    assert.strictEqual(asked.rec.account_id, 'acct_owner', 'and gets its record, which names the account');
     ok('create on an account without the entitlement -> 403 parasign_not_entitled');
   }
   {
-    // Fails closed: a router wired without the gate lets nobody in. Anything
+    // Its own earlier envelopes: read, evidence and void answer as they do for a
+    // paying account, and the gate is not even asked.
+    let asked = 0;
+    const counting = { parasignEntitled: () => { asked++; return false; } };
+    const status = makeDeps({ authHeader: bearer(OWNER_KEY), deps: counting });
+    await api.route(status);
+    assert.strictEqual(status.res.statusCode, 200, 'own status without entitlement -> 200');
+    assert.strictEqual(status.res.json().signers[0].name, 'A. Jansen', 'and still the owner view');
+    const receipt = makeDeps({ path: '/v1/envelopes/envCompleted0000000001/receipt',
+                               authHeader: bearer(OWNER_KEY), deps: counting });
+    await api.route(receipt);
+    assert.strictEqual(receipt.res.statusCode, 200, 'own receipt without entitlement -> 200');
+    assert.strictEqual(receipt.res.json().type, 'parasign-envelope-receipt');
+    const voided = makeDeps({ method: 'POST', path: '/v1/envelopes/envCompleted0000000001/void',
+                              authHeader: bearer(OWNER_KEY), env: Object.assign(completedEnv(), { status: 'sent' }),
+                              deps: counting });
+    await api.route(voided);
+    assert.strictEqual(voided.res.statusCode, 200, 'own void without entitlement -> 200');
+    assert.strictEqual(voided.res.json().status, 'void');
+    assert.strictEqual(asked, 0, 'reading, evidence and void never ask the entitlement gate');
+    ok('without the entitlement the owner still reads, fetches the receipt of and voids its own envelopes');
+  }
+  {
+    // And only its own: the per-envelope owner checks are unchanged.
+    const unentitled = { parasignEntitled: async () => false };
+    const receipt = makeDeps({ path: '/v1/envelopes/envCompleted0000000001/receipt',
+                               authHeader: bearer(OTHER_KEY), deps: unentitled });
+    await api.route(receipt);
+    assert.strictEqual(receipt.res.statusCode, 404, 'a stranger without entitlement -> 404 on the receipt');
+    const voided = makeDeps({ method: 'POST', path: '/v1/envelopes/envCompleted0000000001/void',
+                              authHeader: bearer(OTHER_KEY), env: Object.assign(completedEnv(), { status: 'sent' }),
+                              deps: unentitled });
+    await api.route(voided);
+    assert.strictEqual(voided.res.statusCode, 404, 'a stranger without entitlement -> 404 on void');
+    ok('without the entitlement a key still gets nothing of another account (owner checks unchanged)');
+  }
+  {
+    // Fails closed: a router wired without the gate creates nothing. Anything
     // other than a literal true is a no.
     for (const gate of [undefined, null, () => 'yes', () => 1]) {
-      const d = makeDeps({ authHeader: bearer(OWNER_KEY), deps: { parasignEntitled: gate } });
+      const d = makeDeps({ method: 'POST', path: '/v1/envelopes', authHeader: bearer(OWNER_KEY),
+                           deps: { parasignEntitled: gate } });
       await api.route(d);
       assert.strictEqual(d.res.statusCode, 403, `gate ${String(gate)} -> 403`);
       assert.strictEqual(d.res.json().error, 'parasign_not_entitled');
     }
-    ok('no entitlement gate wired, or a non-boolean answer -> 403 (fails closed)');
+    ok('no entitlement gate wired, or a non-boolean answer -> create refused (fails closed)');
   }
 
   // ── AUTHORIZATION: receipt (owner OR participant), no-existence-leak ─────────
