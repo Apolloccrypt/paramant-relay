@@ -581,10 +581,25 @@ test('the users.json write is atomic: no temp file is left behind and the file a
     });
     assert.strictEqual(r.status, 200, r.text);
   }
-  await new Promise((r) => setTimeout(r, 400));
+  // The route answers before the queued write lands, so a fixed wait here was a
+  // guess about the queue, and on a loaded runner (the flaky watch, 2026-09-25)
+  // it guessed short. A fourth write on another field is the signal instead:
+  // the queue is one chain, first in first out, so once that write is on disk
+  // the three before it are too. Every read on the way has to parse, which is
+  // the atomic half of the claim.
+  const fourth = await srv.post('/v2/admin/keys/set-product-plan', {
+    headers: BOTH, body: { key: 'pgp_a1', product: 'parasign', tier: 'pro' },
+  });
+  assert.strictEqual(fourth.status, 200, fourth.text);
+  const deadline = Date.now() + 5000;
+  let parsed = srv.readUsersFile();
+  while (((parsed.api_keys || [])[0] || {}).plan_parasign !== 'pro' && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 25));
+    parsed = srv.readUsersFile();
+  }
+  assert.strictEqual(parsed.api_keys[0].plan_parasign, 'pro', 'the fourth write never reached the disk');
   const leftovers = fs.readdirSync(srv.dir).filter((f) => f.includes('users.json.tmp'));
   assert.deepStrictEqual(leftovers, [], `temp files were left behind: ${leftovers.join(', ')}`);
-  const parsed = srv.readUsersFile();
   assert.ok(Array.isArray(parsed.api_keys) && parsed.api_keys.length === 1);
   assert.strictEqual(parsed.api_keys[0].plan_parasend, 'pro', 'the last write wins and the queue kept the order');
   srv.stop();
