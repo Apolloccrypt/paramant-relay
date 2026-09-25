@@ -442,6 +442,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <meta name="theme-color" content="#FFFFFF">
 <link rel="stylesheet" href="/app-2026.css?v=10">
 <link rel="stylesheet" href="/done-state.css?v=1">
+<link rel="stylesheet" href="/parashare.css?v=2">
 <script src="/js/theme.js?v=6"></script>
 </head>
 <body>
@@ -484,49 +485,41 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 </div>
 <section class="page-hero">
 <div class="page-hero-inner">
-  <span class="eyebrow">PARASEND</span>
-  <h1>Send a file that deletes itself</h1>
-  <p class="lede">Pick a file and send a one-time link. The file is locked in your own browser before it leaves, so nobody in between can open it, and that includes us.</p>
+  <h1>Send a file safely</h1>
+  <p class="lede">Only the person you send it to can open it. We cannot open it either.</p>
 </div>
 </section>
 
 <main id="main-content" style="position:relative;z-index:10">
 
-<!-- Two stands, chosen before anything else. The Send-a-link sentence carries
-     no times in the markup on purpose: the hours per plan are tiers.js
-     view_ttl_ms and are written in by parashare.page.js from the plan API
-     (GET /v2/check-key), so a tier change cannot leave a stale hour on the
-     page. Until that answer arrives the sentence says only what is true of
-     every plan. -->
-<div class="ps-mode" id="ps-mode" role="radiogroup" aria-label="How do you want to send this file">
-  <button type="button" class="ps-mode-card" id="ps-mode-live" role="radio" aria-checked="true" data-click="chooseModeLive">
-    <span class="ps-mode-title">Together, now</span>
-    <span class="ps-mode-body">You are both at your screen. Up to 500 MB, and nothing is ever stored.</span>
+<!-- Two choices, in the sender's words: who is it for. The live hand-over
+     with a code to compare is no longer a main choice but a tick box under
+     "To one person" (Extra safe). No numbers in the markup: the number of
+     people and the hours per plan come from GET /v2/check-key (tiers.js) and
+     parashare.page.js writes them in. -->
+<div class="ps-mode" id="ps-mode" role="radiogroup" aria-label="Who is the file for">
+  <button type="button" class="ps-mode-card" id="ps-mode-link" role="radio" aria-checked="true" data-click="chooseModeLink">
+    <svg class="ps-mode-icon" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true" focusable="false"><circle cx="15" cy="13" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 32c1-6 5.2-9.5 10-9.5s9 3.5 10 9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="25" y="8" width="11" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M25.5 8.8l5 4 5-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+    <span class="ps-mode-title">To one person</span>
+    <span class="ps-mode-body">You get a link and pass it on yourself. They open it whenever it suits them.</span>
   </button>
-  <button type="button" class="ps-mode-card" id="ps-mode-link" role="radio" aria-checked="false" data-click="chooseModeLink">
-    <!-- Twee namen, met opzet. "They open it later" is wat een mens leest;
-         "Send a link" is hoe /parasend, /pricing en /vs deze stand noemen, en
-         een koper die daarop afkomt moet hem hier terugvinden. -->
-    <span class="ps-mode-title">They open it later <span class="ps-mode-alias">&middot; Send a link</span></span>
-    <span class="ps-mode-body">They pick it up when it suits them. <span id="ps-mode-link-ttl">It waits until the link expires, then it is gone.</span></span>
+  <button type="button" class="ps-mode-card" id="ps-mode-group" role="radio" aria-checked="false" data-click="chooseModeGroup">
+    <svg class="ps-mode-icon" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true" focusable="false"><circle cx="20" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 31c.9-5.4 4.6-8.5 9-8.5s8.1 3.1 9 8.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="8.5" cy="16" r="3.8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2 31c.6-4 3-6.4 6.5-6.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="31.5" cy="16" r="3.8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M38 31c-.6-4-3-6.4-6.5-6.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    <span class="ps-mode-title">To several people <span class="ps-mode-lock" id="ps-mode-group-lock" hidden><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><rect x="3" y="7" width="10" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>With Firm</span></span>
+    <span class="ps-mode-body" id="ps-mode-group-body">Everyone gets their own link by email. You see who has opened it.</span>
   </button>
 </div>
 
-<!-- One line under the cards that says what the CHOSEN stand actually means.
-     It was removed as a duplicate of the card text, and that was wrong twice:
-     the cards never carried the promise that matters on the link stand (the
-     other person does not have to be online), and the size differs per stand
-     in a way a card subtitle cannot hold. -->
-
-<!-- Stepper -- visible above the active step, updates as you move through -->
+<!-- The steps of Extra safe. Shown only while that box is ticked: the plain
+     link and the group do not walk these steps. -->
 <ol class="ps-stepper" id="ps-stepper" aria-label="Sending progress">
   <li class="ps-step active" data-step-key="setup">
     <span class="ps-step-dot" aria-hidden="true"></span>
-    <span class="ps-step-label">1 &middot; Setup</span>
+    <span class="ps-step-label">1 &middot; Get ready</span>
   </li>
   <li class="ps-step" data-step-key="share">
     <span class="ps-step-dot" aria-hidden="true"></span>
-    <span class="ps-step-label">2 &middot; Share</span>
+    <span class="ps-step-label">2 &middot; Share the link</span>
   </li>
   <li class="ps-step" data-step-key="verify">
     <span class="ps-step-dot" aria-hidden="true"></span>
@@ -534,7 +527,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   </li>
   <li class="ps-step" data-step-key="encrypt">
     <span class="ps-step-dot" aria-hidden="true"></span>
-    <span class="ps-step-label">4 &middot; Encrypt</span>
+    <span class="ps-step-label">4 &middot; Send</span>
   </li>
   <li class="ps-step" data-step-key="done">
     <span class="ps-step-dot" aria-hidden="true"></span>
@@ -545,11 +538,18 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <!-- STEP 1: Setup -->
 <div class="step active" id="step-setup">
 
-<p class="ps-live-note" id="ps-live-note">The person you send to has to be online while you send; you confirm a short code together. Up to 500 MB, and nothing is ever stored.</p>
+  <!-- What your plan lets you do, in one line, from the plan info. For
+       Community, quietly underneath, what Firm adds, with one button. -->
+  <div class="ps-plan" id="ps-plan" hidden>
+    <p class="ps-limit" id="ps-limit" aria-live="polite"></p>
+    <div class="ps-upsell" id="ps-upsell" hidden>
+      <p class="ps-upsell-line" id="ps-upsell-line"></p>
+      <a class="ps-upsell-btn" id="ps-upsell-btn" href="/en/pricing">See Firm</a>
+    </div>
+  </div>
 
-  <div class="ps-key-slim is-loading" id="ps-key-slim" aria-label="Account session">
-    <span class="ps-key-status"><span id="ps-key-slim-label">Starting your account session</span> <span class="ps-key-mask" id="ps-key-mask" hidden></span></span>
-    <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Change</button>
+  <div class="ps-key-slim is-loading" id="ps-key-slim" aria-label="Account">
+    <span class="ps-key-status"><span id="ps-key-slim-label">Getting your account</span></span>
   </div>
 
   <div class="ps-alert" id="ps-key-error" role="alert">
@@ -564,7 +564,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   </div>
 
   <div class="card ps-key-card">
-    <div class="card-head"><div class="dot"></div><div class="card-head-title">Your API key</div></div>
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Key for your own server</div></div>
     <div class="card-body">
       <label class="label" for="api-key">API key</label>
       <input type="password" id="api-key" placeholder="pgp_..." autocomplete="off" data-input="onKeyInput">
@@ -572,70 +572,84 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">File</div></div>
-    <div class="card-body">
-      <label class="label" for="file-input">Choose a file (or several)</label>
-      <input type="file" id="file-input" multiple data-change="onFileSelect">
-      <p class="ps-meta">Pick more than one and they travel as a single package.</p>
-      <div class="status-line" id="file-status">No file selected</div>
-      <div id="vault-list" style="margin-top:8px;display:none"></div>
-    </div>
+  <!-- Extra safe: the live hand-over. Only under "To one person". -->
+  <label class="ps-safe" id="ps-safe" for="ps-extra-safe">
+    <input type="checkbox" id="ps-extra-safe" data-change="toggleExtraSafe">
+    <span class="ps-safe-text"><strong>Extra safe</strong>: the other person is available right now. You check a short code together, and nothing is stored.</span>
+  </label>
+
+  <div class="ps-field" id="ps-file-field">
+    <span class="ps-field-label" id="file-label">File</span>
+    <label class="ps-drop" id="ps-drop" for="file-input">
+      <input type="file" id="file-input" class="ps-sr" multiple data-change="onFileSelect" aria-describedby="file-status ps-drop-hint">
+      <svg class="ps-drop-icon" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true" focusable="false"><path d="M8 3.5h11l6 6v19H8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M19 3.5v6h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path class="ps-drop-mark" d="M12.5 19.5l3 3 5.5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="ps-drop-btn" id="ps-drop-btn">Choose a file</span>
+      <span class="ps-drop-hint" id="ps-drop-hint">or drag it here. Several files travel together as one package.</span>
+    </label>
+    <div class="status-line" id="file-status" aria-live="polite">No file chosen yet</div>
+    <div id="vault-list" style="margin-top:8px;display:none"></div>
   </div>
 
-  <!-- Named recipients. Optional on purpose: leaving it empty keeps the old
-       behaviour, one link that burns on first read, which is right for handing
-       something to one person. Filling it in turns the send into one file with
-       a personal link per person and an overview of who collected.
-
-       Addresses are split here, in the browser, on newlines, commas and
-       semicolons, because the relay refuses a field with a comma in it. That
-       refusal is deliberate: a comma inside one address used to count as one
-       recipient and reach two mailboxes sharing a single link. So the splitting
-       happens where a person pastes, and what leaves is a real list. -->
-  <div class="card">
-    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Who is it for</div></div>
-    <div class="card-body">
-      <label class="label" for="recipients-input">Email addresses (optional)</label>
-      <textarea id="recipients-input" rows="3" spellcheck="false" autocomplete="off"
-                placeholder="anna@example.org&#10;bob@example.org"
-                style="width:100%;padding:11px 12px;border:1px solid var(--line,#dfe4e7);border-radius:8px;background:transparent;color:inherit;font:400 14px/1.5 inherit;resize:vertical"
-                data-input="onRecipientsInput"></textarea>
-      <p class="ps-meta" id="recipients-status">Leave empty for one link that opens once.
-         Fill it in and everyone gets their own link, and you see who has picked it up.</p>
-    </div>
+  <!-- To one person: an address may be given, it does not have to be. Empty
+       is the plain link you pass on yourself; filled in, we mail a link. -->
+  <div class="ps-field" id="ps-one-field">
+    <label class="ps-field-label" for="recipient-one">Their email address <span class="ps-opt">(optional)</span></label>
+    <input type="email" id="recipient-one" class="ps-input" autocomplete="off" spellcheck="false" placeholder="name@example.org" data-input="onRecipientsInput" aria-describedby="recipient-one-status">
+    <p class="ps-meta" id="recipient-one-status">Leave it empty and you pass the link on yourself. Fill it in and we email them their own link, and you see whether it was opened.</p>
   </div>
 
-  <div class="card">
-    <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Deletes itself</div></div>
-    <div class="card-body">
-      <label class="label" for="ttl-select">Link expires after</label>
-      <select id="ttl-select">
-        <option value="30000">30 seconds</option>
-        <option value="300000">5 minutes</option>
-        <option value="3600000" selected>1 hour</option>
-        <option value="86400000">24 hours</option>
-      </select>
-      <p class="ps-meta" id="ttl-status">When the link runs out we destroy the file, picked up or not.</p>
+  <!-- To several people. Addresses are split here, in the browser, on
+       newlines, commas and semicolons: the relay refuses a field with a comma
+       in it on purpose, because a comma inside one address once gave two
+       mailboxes one link. So what leaves is a real list. -->
+  <div class="ps-field" id="ps-group-field" hidden>
+    <label class="ps-field-label" for="recipients-input">Email addresses</label>
+    <textarea id="recipients-input" class="ps-input" rows="5" spellcheck="false" autocomplete="off"
+              placeholder="anna@example.org&#10;bob@example.org"
+              data-input="onRecipientsInput" aria-describedby="recipients-status recipients-bad"></textarea>
+    <div class="ps-count-row">
+      <p class="ps-meta" id="recipients-status">Paste a list, or put the addresses on separate lines or with a comma between them.</p>
+      <span class="ps-count" id="ps-count" aria-live="polite"></span>
     </div>
+    <p class="ps-bad" id="recipients-bad" hidden></p>
   </div>
 
-  <button class="btn" id="btn-create-session" disabled data-click="createSession">Create secure session &rarr;</button>
+  <!-- Group locked (Community): no form that gets stuck, a calm sentence.
+       The button sits in the block at the top. -->
+  <p class="ps-locked" id="ps-group-locked" hidden>Sending to several people at once comes with Firm. On your plan you send to one person.</p>
 
-  <details class="ps-how">
-    <summary>How this works</summary>
-    <div class="ps-how-body">
-      <p>Your receiver's browser makes a fresh pair of keys and sends us only the public half. Your browser locks the file for that public half and uploads the locked version. We hold no key, so what sits on our relay cannot be opened by us or by anyone who takes it from us.</p>
-      <p>The short code you compare is built from the receiver's public keys, and both browsers work it out on their own. If anything had swapped those keys along the way, the two codes would not match. That is why you read the code to each other on a channel we do not run, such as a phone call.</p>
-      <p>For readers who want the technical names: the two modes use different ones. Handing over live is a <strong>hybrid</strong> key exchange: ML-KEM-768 and ECDH P-256 run side by side and both shared secrets go through HKDF-SHA256 into one AES-256-GCM key, so an attacker who breaks either one on its own still has nothing. Sending a link does no key exchange at all: your browser makes a fresh AES-256-GCM key, puts it after the <code>#</code> in the link, and a fragment is never sent to a server. That means the link <em>is</em> the key, so whoever can read the channel you send it over can read the file.</p>
-      <p>Neither mode signs the file. The signatures here are the relay's own, on the transparency log and on the receipt it issues. Signing a document with ML-DSA-65 is what ParaSign does, not what sending does. The locked file is stored with an expiry and is destroyed when the link runs out or once the download link has been spent.</p>
-    </div>
-  </details>
+  <div class="ps-field" id="ps-ttl-field">
+    <label class="ps-field-label" for="ttl-select">How long does the link stay open?</label>
+    <select id="ttl-select">
+      <option value="30000">30 seconds</option>
+      <option value="300000">5 minutes</option>
+      <option value="3600000" selected>1 hour</option>
+      <option value="86400000">24 hours</option>
+      <option value="604800000">7 days</option>
+    </select>
+    <p class="ps-meta" id="ttl-status">After that the file is gone, even if nobody opened it.</p>
+  </div>
+
+  <button class="btn ps-go" id="btn-create-session" disabled data-click="createSession" aria-describedby="ps-go-why">Send</button>
+  <p class="ps-go-why" id="ps-go-why">Choose a file first.</p>
 
   <!-- A sector that will not answer used to leave this button quietly disabled
        with no reason given. It now reports itself here, at the moment of the
        press. -->
   <div class="status-line" id="create-status" role="status"></div>
+
+  <details class="ps-how">
+    <summary>How does this work?</summary>
+    <div class="ps-how-body">
+      <p>Your file is locked in your own browser before it leaves. Only the person you send it to can unlock it. We keep only the locked version and cannot open it, and neither can anyone who takes it from us.</p>
+      <p>With a link, the key is inside the link itself, after the # sign. A browser never sends that part to a server. So whoever has the link can open the file. Send it only to the person it is for.</p>
+      <p>With several people, everyone gets their own link by email. Before the file opens, each of them confirms their email address with a code. Your dashboard shows who has opened it.</p>
+      <p>With Extra safe, the other person's browser makes its own lock. You read a short code to each other, for example on the phone. If both screens show the same code, nobody swapped anything along the way.</p>
+      <p>For readers who want the technical names: Extra safe is a <strong>hybrid</strong> key exchange. ML-KEM-768 and ECDH P-256 run side by side and both shared secrets go through HKDF-SHA256 into one AES-256-GCM key, so an attacker who breaks either one on its own still has nothing. A link does no key exchange: your browser makes a fresh AES-256-GCM key and puts it after the <code>#</code> in the link. The link <em>is</em> the key.</p>
+      <p>Neither mode signs the file. The signatures here are the relay's own, on the transparency log and on the receipt it issues. Signing a document with ML-DSA-65 is what ParaSign does, not what sending does. The locked file is stored with an expiry and is destroyed when the link runs out or once it has been picked up.</p>
+      <p>Running your own server? <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Enter a key</button></p>
+    </div>
+  </details>
 </div>
 
 <!-- STEP 2: Waiting for receiver -->
@@ -643,7 +657,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   <h2 class="paramant-h1">Share this link</h2>
   <p class="sub">Send the link to your receiver any way you like. Keep this page open: the moment they open it, a short code appears here and the two of you compare it.</p>
   <div class="ps-guide">
-    <span class="ps-guide-kicker">Step 2 of 5 &middot; Share</span>
+    <span class="ps-guide-kicker">Step 2 of 5</span>
     <strong>The link says where to connect, and nothing else.</strong> No key, no file, no file name. Your receiver has to open it while you are still on this page.
   </div>
 
@@ -658,7 +672,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   <div class="card" id="ps-session-card">
     <div class="card-head"><div class="dot amber" id="waiting-dot"></div><div class="card-head-title" id="waiting-title">Waiting for receiver...</div></div>
     <div class="card-body">
-      <span class="label">One-time session link</span>
+      <span class="label">Link for the other person</span>
       <div class="ps-linkrow">
       <div class="share-box" id="session-link" data-click="copyLink">-</div>
       <button type="button" class="ps-copy" id="ps-copy-btn" data-click="copyLink">Copy link</button>
@@ -694,7 +708,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 
 <!-- STEP 3: Encrypting & uploading -->
 <div class="step" id="step-encrypting">
-  <h2 class="paramant-h1">Locking and sending</h2>
+  <h2 class="paramant-h1">Sending</h2>
   <!-- The waiting screen is the one place where a sender has nothing to do but
        read, and it used to spend that attention on ML-KEM-768 and ECDH P-256.
        Somebody sending a patient file wants one sentence, not a cipher suite.
@@ -748,8 +762,8 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
      promise "the receiver has to be online" holds only while confirmFingerprint
      is the single door into it. This stand walks its own door. -->
 <div class="step" id="step-sealing">
-  <h2 class="paramant-h1">Sealing and uploading</h2>
-  <p class="sub">Your browser locks the file under a fresh AES-256-GCM key, then uploads the locked bytes. The key stays here and goes into the link, after the #, where no server ever sees it.</p>
+  <h2 class="paramant-h1">Sending</h2>
+  <p class="sub">Your browser locks the file and then sends us only the locked version. The key stays here and goes into the link, after the # sign, where no server sees it.</p>
 
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Upload progress</div></div>
@@ -898,7 +912,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <script src="/js/done-state.js?v=1" defer></script>
 <script src="/js/handshake-meta.js?v=1" defer></script>
 <script src="/js/send-wrap.js?v=1" defer></script>
-<script src="/js/parashare.page.js?v=19" defer></script>
+<script src="/js/parashare.page.js?v=20" defer></script>
 <script src="/nav.js?v=16" defer></script>
 <script src="/js/nav-auth.js?v=12" defer></script>
 <footer>

@@ -1,0 +1,144 @@
+/* /parashare and /en/parashare, the send page. Loaded after the page's own
+   <style> block, so what is here wins at equal specificity.
+
+   Two rules run through this file. Plain labels are plain text: no monospace,
+   no capitals, no letter-spacing, because a practice manager reads words and
+   not a terminal. And movement only where it tells the sender something: the
+   file was taken, the counter moved. prefers-reduced-motion takes the
+   movement away and leaves every state in place. */
+
+/* ── Plain labels ─────────────────────────────────────────────────────────── */
+.ps-step-label,
+.card-head-title,
+.label,
+.ps-guide .ps-guide-kicker,
+.ps-alert-note,
+.ps-meta,
+.ps-key-slim,
+.ps-how summary,
+.ps-link-meta{font-family:var(--sans);text-transform:none;letter-spacing:0}
+.ps-step-label{font-size:12px;font-weight:500}
+.card-head-title{font-size:14px;font-weight:600;color:var(--ink-1)}
+.label{font-size:14px;font-weight:600;color:var(--ink-1)}
+.ps-guide .ps-guide-kicker{font-size:13px;color:var(--ink-2)}
+.ps-alert-note{font-size:13px;color:var(--ink-2)}
+.ps-meta{font-size:13.5px;line-height:1.55;color:var(--ink-2)}
+.ps-how summary{font-size:15px;font-weight:600;color:var(--ink-1)}
+.ps-how summary::after{margin-left:6px}
+@media (max-width:560px){.ps-step-label{font-size:11px}}
+
+/* ── The two choices ──────────────────────────────────────────────────────── */
+.ps-mode{grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px}
+@media (max-width:640px){.ps-mode{grid-template-columns:1fr 1fr;gap:10px}}
+.ps-mode-card{position:relative;gap:8px;padding:16px;border:1.5px solid var(--line-2);border-radius:var(--r-2);min-height:100%;color:var(--ink-2)}
+.ps-mode-card:hover{border-color:var(--ink-3)}
+.ps-mode-card:focus-visible{outline:none;box-shadow:var(--ring)}
+.ps-mode-card[aria-checked="true"]{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 1px var(--accent)}
+.ps-mode-card:disabled{cursor:not-allowed;opacity:.6}
+.ps-mode-icon{width:36px;height:36px;color:var(--ink-2)}
+.ps-mode-card[aria-checked="true"] .ps-mode-icon{color:var(--accent)}
+.ps-mode-title{font-family:var(--sans);font-size:16px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink-1);line-height:1.3}
+.ps-mode-card[aria-checked="true"] .ps-mode-title{color:var(--ink-1)}
+.ps-mode-body{font-size:14px;line-height:1.5;color:var(--ink-2)}
+.ps-mode-lock{display:inline-flex;align-items:center;gap:4px;margin-left:4px;padding:1px 7px;border:1px solid var(--line-2);border-radius:999px;font-size:12px;font-weight:500;color:var(--ink-2);vertical-align:2px;white-space:nowrap}
+.ps-mode-lock svg{display:inline-block;width:12px;height:12px}
+.ps-mode-lock[hidden]{display:none}
+/* A check in the chosen card's corner: the choice is seen, not only coloured. */
+.ps-mode-card[aria-checked="true"]::after{content:"";position:absolute;top:12px;right:12px;width:18px;height:18px;border-radius:50%;background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.2l2.6 2.6L12 5.4' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat}
+@media (max-width:420px){
+  .ps-mode-card{padding:14px 12px}
+  .ps-mode-title{font-size:15px}
+  .ps-mode-body{font-size:13.5px}
+}
+
+/* ── What the plan gives ──────────────────────────────────────────────────── */
+.ps-plan{margin:0 0 18px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-1);background:var(--surface-sunk)}
+.ps-plan[hidden]{display:none}
+.ps-limit{margin:0;font-size:15px;line-height:1.55;color:var(--ink-1)}
+.ps-upsell{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.ps-upsell[hidden]{display:none}
+.ps-upsell-line{margin:0;flex:1 1 240px;font-size:14px;line-height:1.55;color:var(--ink-2)}
+.ps-upsell-btn{display:inline-flex;align-items:center;min-height:var(--tap);padding:0 16px;border:1px solid var(--line-2);border-radius:var(--r-1);background:var(--surface);color:var(--ink-1);font:600 14px/1 var(--sans);text-decoration:none}
+.ps-upsell-btn:hover{border-color:var(--ink-1)}
+.ps-upsell-btn:focus-visible{outline:none;box-shadow:var(--ring)}
+
+/* ── Account row: who you are, never a token ─────────────────────────────── */
+.ps-key-slim{font-size:13.5px;color:var(--ink-2);padding:0;border:0;background:transparent;margin:0 0 16px;min-height:0}
+.ps-key-slim .ps-key-status{gap:8px}
+
+/* ── Fields ───────────────────────────────────────────────────────────────── */
+.ps-field{margin:0 0 20px}
+.ps-field[hidden]{display:none}
+.ps-field-label{display:block;margin:0 0 8px;font:600 15px/1.4 var(--sans);color:var(--ink-1)}
+.ps-opt{font-weight:400;color:var(--ink-2)}
+.ps-input,
+#step-setup select{width:100%;min-height:var(--tap);margin:0 0 8px;padding:11px 13px;border:1px solid var(--line-2);border-radius:var(--r-1);background:var(--surface);color:var(--ink-1);font:400 15px/1.5 var(--sans);outline:none}
+textarea.ps-input{resize:vertical;min-height:120px}
+.ps-input:hover,#step-setup select:hover{border-color:var(--ink-3)}
+.ps-input:focus,#step-setup select:focus{border-color:var(--accent);box-shadow:var(--ring)}
+.ps-input::placeholder{color:var(--ink-3);opacity:1}
+.ps-input[aria-invalid="true"]{border-color:var(--sig-stop)}
+
+/* Extra safe, the live hand-over, as a tick box under "To one person". */
+.ps-safe{display:flex;gap:12px;align-items:flex-start;margin:0 0 20px;padding:13px 14px;border:1px solid var(--line-2);border-radius:var(--r-1);background:var(--surface);cursor:pointer;font-size:14.5px;line-height:1.55;color:var(--ink-2)}
+.ps-safe[hidden]{display:none}
+.ps-safe strong{color:var(--ink-1)}
+/* A 22px box to see and a 44px square to hit: the box is drawn as a
+   background so the control itself keeps the size a thumb needs. */
+.ps-safe input{flex:0 0 auto;-webkit-appearance:none;appearance:none;width:44px;height:44px;margin:-11px -8px -11px -11px;border:0;background:transparent;cursor:pointer;position:relative}
+.ps-safe input::before{content:"";position:absolute;left:11px;top:11px;width:22px;height:22px;box-sizing:border-box;border:2px solid var(--ink-2);border-radius:5px;background:transparent}
+.ps-safe input:checked::before{border-color:var(--accent);background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.3l2.8 2.8L12.5 5' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/16px no-repeat}
+.ps-safe input:focus-visible{outline:none}
+.ps-safe:has(input:checked){border-color:var(--accent)}
+.ps-safe:focus-within{box-shadow:var(--ring)}
+
+/* The file picker: one big Dutch button with a drop zone. The native input is
+   out of sight but still in the tab order and in the accessibility tree, and
+   its label is the whole zone. */
+/* The native input lies over the whole zone, invisible: a tap anywhere is a
+   tap on the real control (44px and more), and a file dropped on it lands in
+   it natively. Its own "Browse..." text is never seen. */
+.ps-drop .ps-sr{position:absolute !important;inset:0 !important;width:100% !important;height:100% !important;min-height:0 !important;margin:0 !important;padding:0 !important;border:0 !important;opacity:0 !important;cursor:pointer;z-index:2;font-size:0}
+.ps-drop{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:148px;padding:20px 16px;border:2px dashed var(--line-2);border-radius:var(--r-2);background:var(--surface);text-align:center;cursor:pointer;transition:border-color var(--d-1) var(--e-standard),background var(--d-1) var(--e-standard)}
+.ps-drop:hover{border-color:var(--ink-3)}
+.ps-drop:focus-within{border-color:var(--accent);box-shadow:var(--ring)}
+.ps-drop.is-over{border-color:var(--accent);background:var(--surface-sunk)}
+.ps-drop.has-file{border-style:solid;border-color:var(--sig-done)}
+.ps-drop-icon{width:32px;height:32px;color:var(--ink-2)}
+.ps-drop-mark{opacity:0}
+.ps-drop.has-file .ps-drop-icon{color:var(--sig-done)}
+.ps-drop.has-file .ps-drop-mark{opacity:1}
+.ps-drop-btn{display:inline-flex;align-items:center;justify-content:center;min-height:var(--tap);padding:0 22px;border-radius:var(--r-1);background:var(--accent);color:var(--accent-ink);font:600 16px/1 var(--sans)}
+.ps-drop.has-file .ps-drop-btn{background:transparent;color:var(--ink-1);border:1px solid var(--line-2)}
+.ps-drop-hint{font-size:13.5px;line-height:1.5;color:var(--ink-2);max-width:36ch}
+#file-status{font-size:14.5px;color:var(--ink-1);padding:10px 0 0;word-break:break-word}
+#file-status.ok{color:var(--ink-1)}
+
+/* The list, the counter and the addresses that do not work. */
+.ps-count-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.ps-count-row .ps-meta{flex:1 1 auto;margin:0}
+.ps-count{flex:0 0 auto;font:600 15px/1.4 var(--sans);font-variant-numeric:tabular-nums;color:var(--ink-1);white-space:nowrap}
+.ps-count.is-over{color:var(--sig-stop)}
+.ps-bad{margin:8px 0 0;padding:10px 12px;border-left:3px solid var(--sig-stop);background:var(--sig-stop-bg);border-radius:0 var(--r-1) var(--r-1) 0;font-size:14px;line-height:1.55;color:var(--ink-1);word-break:break-word}
+.ps-bad[hidden]{display:none}
+.ps-bad b{color:var(--sig-stop);font-weight:600}
+.ps-locked{margin:0 0 20px;font-size:15px;line-height:1.55;color:var(--ink-1)}
+.ps-locked[hidden]{display:none}
+
+/* ── The one button, and why it waits ─────────────────────────────────────── */
+.ps-go{min-height:52px;font-size:16px;margin-top:4px}
+.ps-go:disabled{background:var(--surface-sunk);border:1px dashed var(--line-2);color:var(--ink-2)}
+.ps-go-why{margin:8px 0 0;font-size:14px;line-height:1.5;color:var(--ink-2);text-align:center}
+.ps-go-why:empty{display:none}
+#step-setup .ps-how{margin-top:26px}
+
+/* ── Movement that says something ─────────────────────────────────────────── */
+@keyframes ps-take{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.15);opacity:1}100%{transform:scale(1)}}
+@keyframes ps-bump{0%{transform:translateY(-3px);opacity:.4}100%{transform:none;opacity:1}}
+.ps-drop.just-taken .ps-drop-icon{animation:ps-take .38s var(--e-standard, ease-out)}
+.ps-count.bump{animation:ps-bump .22s ease-out}
+.ps-go.is-sending{opacity:.85}
+@media (prefers-reduced-motion: reduce){
+  .ps-drop.just-taken .ps-drop-icon,.ps-count.bump{animation:none}
+  .ps-drop,.ps-mode-card{transition:none}
+}

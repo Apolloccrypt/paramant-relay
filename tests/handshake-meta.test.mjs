@@ -210,6 +210,8 @@ let senderTtlMs = null;               // the ttl the sender had in hand
 
   const one = await senderCtx.newPage();
   await one.goto(`${ORIGIN}/parashare`, { waitUntil: 'domcontentloaded' });
+  // The live hand-over is the Extra veilig box since 24 September 2026.
+  await one.locator('#ps-extra-safe').check();
   await one.locator('#file-input').setInputFiles({ name: FILE_NAME, mimeType: 'image/jpeg',
     buffer: Buffer.from(Array.from({ length: 2048 }, (_, i) => (i * 13 + 7) % 256)) });
   await one.waitForFunction(() => !document.getElementById('btn-create-session').disabled, null, { timeout: 20000 });
@@ -233,6 +235,8 @@ let senderTtlMs = null;               // the ttl the sender had in hand
   receiverThere = false;
   const many = await senderCtx.newPage();
   await many.goto(`${ORIGIN}/parashare`, { waitUntil: 'domcontentloaded' });
+  // The live hand-over is the Extra veilig box since 24 September 2026.
+  await many.locator('#ps-extra-safe').check();
   await many.locator('#file-input').setInputFiles(VAULT_NAMES.map((name, i) => ({
     name, mimeType: 'application/pdf',
     buffer: Buffer.from(Array.from({ length: 1024 }, (_, j) => (j * 7 + i) % 256)) })));
