@@ -44,8 +44,14 @@ let S;
 // R9 gebruikt het account van de kassatest opnieuw, dat nog niets kocht.
 const A = {};
 
+// De relays laden naast de nagebouwde Mollie ook traag-schrijven: zolang de
+// admintoets een vlagbestand naast users.json zet, landt elke schrijfactie
+// naar dat bestand pas een halve seconde later. Zonder vlag verandert er niets.
+const HELPERS = new URL('./helpers/', import.meta.url).pathname;
+const RELAY_PRELOAD = `--require ${HELPERS}mollie-intercept.cjs --require ${HELPERS}traag-schrijven.cjs`;
+
 test.before(async () => {
-  S = await stack.start();
+  S = await stack.start({ relayEnv: { NODE_OPTIONS: RELAY_PRELOAD } });
   A.kassa = await account('kassa');
   A.firmJaar = await account('firm-jaar');
   A.businessFirm = await account('business-firm');
@@ -236,7 +242,21 @@ test('R3: via de admin wordt Business niet stil verlaagd, en uitdrukkelijk verla
   // Zoals de admin het doet: via admin/server.js, die het naar elke relay stuurt.
   const sid = 'rang-' + crypto.randomBytes(8).toString('hex');
   await S.redis.set(`paramant:admin:session:${sid}`, '1', { EX: 600 });
-  const admin = (body) => http(S.adminPort, '/api/admin/set-product-plan', { method: 'POST', headers: { 'X-Session': sid }, body });
+  // De admin stuurt de wijziging naar elke relay en roept daarna meteen
+  // /v2/reload-users aan. De relay antwoordt al voor zijn schrijfactie naar
+  // users.json klaar is, dus een reload die daar niet op wacht leest het oude
+  // bestand en zet de oude stand terug (review #515, ronde 2). Hier landt elke
+  // schrijfactie een halve seconde te laat (tests/helpers/traag-schrijven.cjs),
+  // zodat die race er zonder de fix elke keer is, en geen trekking.
+  const vlaggen = [S.usersFile, S.healthUsersFile].map((f) => `${f}.traag`);
+  const admin = async (body) => {
+    for (const v of vlaggen) fs.writeFileSync(v, '500');
+    try {
+      return await http(S.adminPort, '/api/admin/set-product-plan', { method: 'POST', headers: { 'X-Session': sid }, body });
+    } finally {
+      for (const v of vlaggen) fs.rmSync(v, { force: true });
+    }
+  };
 
   const stil = await admin({ key: acc.key, product: 'parasign', tier: 'pro' });
   assert.equal(stil.status, 409, `Pro over Business via de admin: ${stil.status} ${stil.text}`);
@@ -247,13 +267,21 @@ test('R3: via de admin wordt Business niet stil verlaagd, en uitdrukkelijk verla
   assert.deepEqual(await beide(acc.key), biz, 'een weigering verandert niets');
 
   const omlaag = await admin({ key: acc.key, product: 'parasign', tier: 'pro', downgrade: true });
-  assert.equal(omlaag.status, 200, `uitdrukkelijk verlagen: ${omlaag.status} ${omlaag.text}`);
+  assert.equal(omlaag.status, 200, `uitdrukkelijk verlagen, en elke relay leest daarna het nieuwe bestand: ${omlaag.status} ${omlaag.text}`);
+  assert.deepEqual(omlaag.json.verification_failed, [], 'geen relay bleef op de oude stand staan');
   const pro = await beide(acc.key);
   assert.equal(pro.ondertekenen, 'pro');
   assert.equal(pro.ondertekenenTot, biz.ondertekenenTot, 'verlagen houdt de einddatum, en wordt geen Pro zonder einde');
 
   const weg = await admin({ key: acc.key, product: 'parasign', tier: 'free' });
   assert.equal(weg.status, 200, `intrekken: ${weg.status} ${weg.text}`);
+  assert.equal((await beide(acc.key)).ondertekenen, 'free');
+  // En wat op schijf staat, is wat in het geheugen staat: een herlaad later
+  // verandert op geen van beide relays nog iets.
+  for (const port of [S.relayPort, S.healthPort]) {
+    const r = await http(port, '/v2/reload-users', { method: 'POST', headers: { 'X-Api-Key': S.adminToken } });
+    assert.equal(r.status, 200, `herladen op ${port}: ${r.status} ${r.text}`);
+  }
   assert.equal((await beide(acc.key)).ondertekenen, 'free');
 });
 

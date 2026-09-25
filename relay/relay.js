@@ -6753,6 +6753,15 @@ async function handleRelayRequest(req, res) {
     }
     const prevCount = apiKeys.size;
 
+    // Wait for this process's own writes first. A change (set-product-plan,
+    // a grant, a hydration) answers before its _mutateUsersJson has reached the
+    // disk, and the admin calls this route straight after the change. Read
+    // earlier, the old file comes back in and puts the old tier back in
+    // memory, while the new file lands a moment later: memory and disk then
+    // disagree, and the union merge of the next reseed writes the old tier back
+    // to disk as well (review of #515, round 2). The queue never rejects.
+    await _usersWriteQueue;
+
     // Read with retry — handle transient mid-write reads from concurrent _mutateUsersJson.
     let parsed = null;
     let parseErr = null;
