@@ -38,18 +38,22 @@ const SELLER = {
 
 // What the fake VIES answers, per VAT number, in the shapes the real service
 // uses (checked against its test service on 2026-09-25): 200 with valid true or
-// false, and 200 with errorWrappers when a member state cannot be reached.
+// false, and 200 with errorWrappers when a member state cannot be reached. A
+// valid answer carries the name and address VIES holds, and a consultation
+// number of its own per question, so parallel runs never share a proof.
 const VAT = {
   nl: 'NL000099997B01',
   eu: 'BE0999000001',
   invalid: 'DE999000002',
   down: 'FR99999000003',
 };
-const vies = { calls: [] };
+const vies = { calls: [], override: new Map(), n: 0 };
 function viesAnswer(q) {
   const id = `${q.countryCode}${q.vatNumber}`;
-  if (id === VAT.eu) return { countryCode: q.countryCode, vatNumber: q.vatNumber, requestDate: new Date().toISOString(), valid: true, requestIdentifier: 'WAPIAAAAWZ0000001', name: '---', address: '---' };
-  if (id === VAT.invalid) return { countryCode: q.countryCode, vatNumber: q.vatNumber, requestDate: new Date().toISOString(), valid: false, requestIdentifier: '', name: '---', address: '---' };
+  const mode = vies.override.get(id) || (id === VAT.eu ? 'valid' : id === VAT.invalid ? 'invalid' : 'down');
+  const base = { countryCode: q.countryCode, vatNumber: q.vatNumber, requestDate: new Date().toISOString() };
+  if (mode === 'valid') return { ...base, valid: true, requestIdentifier: `WAPI-${RUN}-${++vies.n}`, name: 'ACME BE SRL', address: 'EXAMPLE STREET 2\n1000 EXAMPLE CITY' };
+  if (mode === 'invalid') return { ...base, valid: false, requestIdentifier: '', name: '---', address: '---' };
   return { actionSucceed: false, errorWrappers: [{ error: 'MS_UNAVAILABLE' }] };
 }
 const viesServer = http.createServer((req, res) => {
@@ -210,8 +214,21 @@ test('an EU business with a valid VAT number pays the net amount, and the invoic
   assert.strictEqual(asked[0].path, '/taxation_customs/vies/rest-api/check-vat-number');
   assert.strictEqual(asked[0].body.requesterMemberStateCode, 'NL', 'the seller asks as itself');
   assert.strictEqual(asked[0].body.requesterNumber, '000099998B01');
+  assert.match(p.metadata.vatConsultation, /^WAPI-/, 'the consultation number rides on the payment');
 
-  await payAndNotify(p.id);
+  // The proof, kept before the payment existed: what VIES said, and what the
+  // account said at that moment.
+  const proof = JSON.parse(await redis.get(`paramant:billing:vat:proof:${p.metadata.vatConsultation}`));
+  assert.strictEqual(proof.vat_id, VAT.eu);
+  assert.strictEqual(proof.name, 'ACME BE SRL');
+  assert.strictEqual(proof.address, 'EXAMPLE STREET 2\n1000 EXAMPLE CITY');
+  assert.strictEqual(proof.account_company, 'Acme BE SRL');
+
+  // Review probe R1: VIES changes its mind between the checkout and the
+  // webhook. What was charged decides, and VIES is not asked again.
+  vies.override.set(VAT.eu, 'invalid');
+  try { await payAndNotify(p.id); } finally { vies.override.delete(VAT.eu); }
+  assert.strictEqual(viesCallsFor(VAT.eu).length, 1, 'the webhook does not ask VIES again');
   const [inv] = await invoices('eu');
   assert.ok(inv, 'an invoice was issued');
   assert.strictEqual(inv.kind, 'invoice');
@@ -219,6 +236,10 @@ test('an EU business with a valid VAT number pays the net amount, and the invoic
   assert.strictEqual(inv.amount_net, '29.00');
   assert.strictEqual(inv.amount_vat, '0.00');
   assert.strictEqual(inv.amount_gross, '29.00', 'the invoice total is what the buyer paid');
+  const stored = JSON.parse(await redis.get(`paramant:billing:invoice:doc:${inv.number}`));
+  assert.strictEqual(stored.vat_check.consultation, p.metadata.vatConsultation);
+  assert.strictEqual(stored.vat_check.name, 'ACME BE SRL', 'the invoice keeps the name VIES gave');
+  assert.strictEqual(stored.vat_check.address, 'EXAMPLE STREET 2\n1000 EXAMPLE CITY');
 
   const pdf = await srv.get(`/v2/billing/invoices/${inv.number}.pdf`, as('eu'));
   assert.strictEqual(pdf.status, 200);
@@ -309,5 +330,32 @@ test('an invoice issued before a reverse-charged one keeps its number and its VA
   assert.strictEqual(old.number, before21.number);
   assert.strictEqual(old.vat_rate, 21);
   assert.strictEqual(await redis.get(`paramant:billing:invoice:doc:${old.number}`), stored, 'the stored record is untouched');
+  did();
+});
+
+test("somebody else's valid number: without a name and an address, or under another name, 21%", async (t) => {
+  if (!srv) return t.skip('no redis');
+  const acct = acctOf('down').slice(0, 12);
+  const before = viesCallsFor(VAT.eu).length;
+  // Review probe R2: nothing on the account but a number that is valid for
+  // somebody else.
+  await srv.post('/v2/billing/profile', { ...as('down'), body: { company: '', address: '', vat: VAT.eu } });
+  const bare = await checkout('down');
+  assert.strictEqual(bare.amount.value, '35.09', 'the safe side: Dutch VAT');
+  assert.strictEqual(bare.metadata.vat, undefined);
+  assert.strictEqual(viesCallsFor(VAT.eu).length, before, 'no name and no address, so VIES is not even asked');
+  assert.ok(logLines().some((l) => l.msg === 'billing_vat' && l.account === acct && l.reason === 'incomplete_profile' && l.level === 'warn'));
+
+  // A name and an address, but not the company VIES holds for that number.
+  await srv.post('/v2/billing/profile', { ...as('down'), body: { company: 'Globex SRL', address: 'Example Street 9\n1000 Example City\nBelgium', vat: VAT.eu } });
+  const other = await checkout('down');
+  assert.strictEqual(other.amount.value, '35.09');
+  assert.strictEqual(other.metadata.vat, undefined);
+  assert.strictEqual(viesCallsFor(VAT.eu).length, before + 1, 'VIES was asked this time');
+  const line = logLines().find((l) => l.msg === 'billing_vat' && l.account === acct && l.reason === 'name_mismatch');
+  assert.ok(line, 'a billing_vat line with reason name_mismatch');
+  assert.strictEqual(line.level, 'warn');
+  const raw = JSON.stringify(line);
+  assert.ok(!raw.includes(VAT.eu.slice(2)) && !raw.includes('Globex') && !raw.includes('ACME'), 'no number and no name in the log');
   did();
 });

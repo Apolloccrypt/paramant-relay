@@ -12,6 +12,7 @@
 const { test, after } = require('node:test');
 const assert = require('assert');
 const fs = require('fs');
+const http = require('http');
 const path = require('path');
 const vat = require('../lib/vat');
 const invoice = require('../lib/invoice');
@@ -22,6 +23,7 @@ const billingMail = require('../lib/billing-mail');
 const creditNote = require('../lib/credit-note');
 const moneybird = require('../lib/moneybird');
 const catalog = require('../lib/billing-catalog');
+const exporter = require('../lib/billing-export');
 const { summary } = require('./_requires');
 
 let checks = 0;
@@ -50,7 +52,13 @@ function fakeCheck(answer) {
   check.calls = calls;
   return check;
 }
-const VALID = { result: 'valid', requestDate: '2026-09-25T10:00:01Z', requestIdentifier: 'WAPIAAAAWZ0000001' };
+const VALID = {
+  result: 'valid', requestDate: '2026-09-25T10:00:01Z', requestIdentifier: 'WAPIAAAAWZ0000001',
+  countryCode: 'BE', name: 'ACME BE SRL', address: 'EXAMPLE STREET 2\n1000 EXAMPLE CITY',
+};
+// The account as it stands at the checkout: name and address filled in, the
+// address in the country the VAT number is from.
+const ACME = { buyerCompany: 'Acme BE SRL', buyerAddress: 'Example Street 2\n1000 Example City\nBelgium' };
 
 // The commands lib/invoice.js, lib/credit-note.js and lib/moneybird.js call,
 // with the semantics that matter (SET NX, INCR from 1, negative lRange).
@@ -150,7 +158,7 @@ test('without the seller VAT number there is no reverse charge and no VIES call'
 
 test('a number VIES confirms is reverse charged, and the seller asks as itself', async () => {
   const check = fakeCheck(VALID);
-  const t = await vat.decide({ buyerVat: 'be 0999.000.001', sellerVat: SELLER_VAT, now: NOW }, { check });
+  const t = await vat.decide({ buyerVat: 'be 0999.000.001', sellerVat: SELLER_VAT, now: NOW, ...ACME }, { check });
   assert.deepStrictEqual(check.calls, [{
     countryCode: 'BE', vatNumber: '0999000001',
     requesterMemberStateCode: 'NL', requesterNumber: '000099998B01',
@@ -161,32 +169,145 @@ test('a number VIES confirms is reverse charged, and the seller asks as itself',
   assert.strictEqual(t.country, 'BE');
   assert.strictEqual(t.checkedAt, VALID.requestDate);
   assert.strictEqual(t.consultation, VALID.requestIdentifier);
+  assert.strictEqual(t.viesName, VALID.name, 'what VIES holds for the number is kept');
+  assert.strictEqual(t.viesAddress, VALID.address);
   assert.strictEqual(vat.chargeAmount(catalog.resolveOrder(FIRM), t), '29.00');
   did();
 });
 
 test('VIES saying invalid, or not answering, is 21% and a warning', async () => {
-  const invalid = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT }, { check: fakeCheck({ result: 'invalid', detail: 'not_valid' }) });
+  const invalid = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT, ...ACME }, { check: fakeCheck({ result: 'invalid', detail: 'not_valid' }) });
   assert.strictEqual(invalid.treatment, 'standard');
   assert.strictEqual(invalid.reason, 'vies_invalid');
   assert.strictEqual(invalid.level, 'warn');
   assert.strictEqual(invalid.country, 'BE');
 
-  const down = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT }, { check: fakeCheck({ result: 'unavailable', detail: 'MS_UNAVAILABLE' }) });
+  const down = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT, ...ACME }, { check: fakeCheck({ result: 'unavailable', detail: 'MS_UNAVAILABLE' }) });
   assert.strictEqual(down.treatment, 'standard');
   assert.strictEqual(down.reason, 'vies_unavailable');
   assert.strictEqual(down.level, 'warn');
   assert.strictEqual(down.detail, 'MS_UNAVAILABLE');
 
-  const threw = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT }, { check: fakeCheck(new Error('socket hang up')) });
+  const threw = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT, ...ACME }, { check: fakeCheck(new Error('socket hang up')) });
   assert.strictEqual(threw.treatment, 'standard');
   assert.strictEqual(threw.reason, 'vies_unavailable');
 
   // VIES refusing OUR number as the requester means the seller VAT number on
   // every invoice is suspect: louder than a buyer's number failing.
-  const refusedUs = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT }, { check: fakeCheck({ result: 'unavailable', detail: 'INVALID_REQUESTER_INFO' }) });
+  const refusedUs = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT, ...ACME }, { check: fakeCheck({ result: 'unavailable', detail: 'INVALID_REQUESTER_INFO' }) });
   assert.strictEqual(refusedUs.treatment, 'standard');
   assert.strictEqual(refusedUs.level, 'error');
+  did();
+});
+
+test('a number alone is not enough: without a company name and an address it is 21%, and VIES is not asked', async () => {
+  // Review probe R2: an account with nothing but somebody else's valid number.
+  const check = fakeCheck(VALID);
+  for (const who of [{}, { buyerCompany: 'Acme BE SRL' }, { buyerAddress: ACME.buyerAddress }, { buyerCompany: '  ', buyerAddress: ' ' }]) {
+    const t = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT, ...who }, { check });
+    assert.strictEqual(t.treatment, 'standard', JSON.stringify(who));
+    assert.strictEqual(t.reason, 'incomplete_profile');
+    assert.strictEqual(t.level, 'warn');
+    assert.strictEqual(vat.chargeAmount(catalog.resolveOrder(FIRM), t), '35.09');
+  }
+  assert.strictEqual(check.calls.length, 0);
+  did();
+});
+
+test('VIES naming another company or country, or the address naming another country, is 21%', async () => {
+  const decideWith = (answer, who = ACME) => vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT, ...who }, { check: fakeCheck(answer) });
+
+  const other = await decideWith({ ...VALID, name: 'GLOBEX NV' });
+  assert.strictEqual(other.treatment, 'standard');
+  assert.strictEqual(other.reason, 'name_mismatch');
+  assert.strictEqual(other.level, 'warn');
+  assert.ok(!JSON.stringify(other).includes('GLOBEX') && !JSON.stringify(other).includes('0999000001'), 'no name and no number in what gets logged');
+
+  const elsewhere = await decideWith({ ...VALID, countryCode: 'DE' });
+  assert.strictEqual(elsewhere.reason, 'country_mismatch');
+
+  const check = fakeCheck(VALID);
+  const dutchAddress = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT, buyerCompany: 'Acme BE SRL', buyerAddress: 'Example Road 1\n1011 AA Example City\nNederland' }, { check });
+  assert.strictEqual(dutchAddress.reason, 'country_mismatch');
+  assert.strictEqual(dutchAddress.detail, 'address_NL');
+  assert.strictEqual(check.calls.length, 0, 'an address in another country is refused before VIES is asked');
+
+  // Not a clear difference, so reverse charged: VIES keeps the name to itself,
+  // or writes it differently, or the address names no country at all.
+  assert.strictEqual((await decideWith({ ...VALID, name: '---', address: '---' })).treatment, 'reverse_charge');
+  assert.strictEqual((await decideWith({ ...VALID, name: 'ACME' })).treatment, 'reverse_charge');
+  assert.strictEqual((await decideWith(VALID, { buyerCompany: 'Acme', buyerAddress: 'Example Street 2, 1000 Example City, Belgique' })).treatment, 'reverse_charge');
+  assert.strictEqual((await decideWith(VALID, { buyerCompany: 'Acme BE', buyerAddress: 'Example Street 2\n1000 Example City' })).treatment, 'reverse_charge');
+  did();
+});
+
+test('a valid answer without a consultation number is not accepted in silence: 21% and a warning', async () => {
+  for (const requestIdentifier of ['', '  ', undefined]) {
+    const t = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT, ...ACME }, { check: fakeCheck({ ...VALID, requestIdentifier }) });
+    assert.strictEqual(t.treatment, 'standard');
+    assert.strictEqual(t.reason, 'vies_no_consultation');
+    assert.strictEqual(t.level, 'warn');
+  }
+  did();
+});
+
+test('the VIES request gives up after its timeout, and that is a 21% sale', async () => {
+  assert.strictEqual(vat.VIES_TIMEOUT_MS, 6000);
+  let asked = null;
+  await vat.checkVies({ countryCode: 'BE', vatNumber: '0999000001' }, { request: async (req) => { asked = req; return { status: 200, body: { valid: false } }; } });
+  assert.strictEqual(asked.timeoutMs, 6000, 'the relay asks with the six-second limit');
+
+  // The real request function, pointed at a local server that takes the
+  // question and never answers. Only the port and the transport differ from
+  // what the relay does; the timeout code is the one that runs in production.
+  const silent = http.createServer(() => { /* never answers */ });
+  await new Promise((r) => silent.listen(0, '127.0.0.1', r));
+  const started = Date.now();
+  try {
+    await assert.rejects(
+      vat.httpsJson({ host: '127.0.0.1', port: silent.address().port, transport: http, path: '/x', body: {}, timeoutMs: 150 }),
+      /vies_timeout/);
+    assert.ok(Date.now() - started < 3000, 'gave up at the limit, not after it');
+    const out = await vat.checkVies({ countryCode: 'BE', vatNumber: '0999000001' }, {
+      request: (req) => vat.httpsJson({ ...req, host: '127.0.0.1', port: silent.address().port, transport: http, timeoutMs: 150 }),
+    });
+    assert.strictEqual(out.result, 'unavailable');
+    assert.match(out.detail, /vies_timeout/);
+  } finally {
+    silent.closeAllConnections();
+    await new Promise((r) => silent.close(r));
+  }
+  const t = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT, ...ACME }, { check: fakeCheck({ result: 'unavailable', detail: 'request_failed:vies_timeout' }) });
+  assert.strictEqual(t.treatment, 'standard');
+  assert.strictEqual(t.reason, 'vies_unavailable');
+  did();
+});
+
+test('the proof is kept under the consultation number and reaches the invoice', async () => {
+  const redis = fakeRedis();
+  const t = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT, now: NOW, ...ACME }, { check: fakeCheck(VALID) });
+  assert.deepStrictEqual(await vat.saveProof(t, redis, { accountId: 'acct_demo', company: ACME.buyerCompany, address: ACME.buyerAddress }), { ok: true });
+  const proof = JSON.parse(await redis.get(vat.PROOF_KEY(VALID.requestIdentifier)));
+  assert.deepStrictEqual(proof, {
+    source: 'VIES', consultation: VALID.requestIdentifier, checked_at: VALID.requestDate,
+    vat_id: EU_VAT, country: 'BE', name: VALID.name, address: VALID.address,
+    account_id: 'acct_demo', account_company: ACME.buyerCompany, account_address: ACME.buyerAddress,
+  });
+  assert.deepStrictEqual(await vat.loadProof(VALID.requestIdentifier, redis), proof);
+  assert.strictEqual((await vat.saveProof({ ...t, consultation: '' }, redis)).ok, false, 'no consultation number, nothing to keep it under');
+  assert.strictEqual((await vat.saveProof(t, null)).ok, false, 'no store, no proof');
+  assert.strictEqual(await vat.loadProof('../../etc', redis), null);
+
+  // The webhook's half: terms from the payment, name and address from the proof.
+  const md = vat.metadataOf(t);
+  const terms = Object.assign(vat.termsFromMetadata(md), { viesName: proof.name, viesAddress: proof.address });
+  const out = await invoice.issueDocument({
+    payment: paymentOf('tr_proof', '29.00', md),
+    order: Object.assign({ accountId: 'acct_demo' }, catalog.resolveOrder(FIRM)),
+    seller: SELLER, buyer: { email: 'office@example.test', company: ACME.buyerCompany, address: ACME.buyerAddress, vat: EU_VAT },
+    now: NOW, vat: terms,
+  }, redis);
+  assert.deepStrictEqual(out.record.vat_check, { source: 'VIES', checked_at: VALID.requestDate, consultation: VALID.requestIdentifier, name: VALID.name, address: VALID.address });
   did();
 });
 
@@ -215,19 +336,29 @@ test('the VIES answer is read from its body, not from its status code', async ()
 
 // ── the amount and the marker ────────────────────────────────────────────────
 
-test('every catalog price is charged net under reverse charge, split exactly as the invoice splits it', async () => {
+test('every catalog price is charged at its fixed net amount under reverse charge', async () => {
+  // Written out by hand, not computed: gross / 1.21, each one checked to come
+  // out whole. A price change or a rounding change has to be made here too.
+  const NET = {
+    'parasend/pro/monthly': '15.00', 'parasend/pro/yearly': '150.00',
+    'parasign/pro/monthly': '49.00', 'parasign/pro/yearly': '499.00',
+    'parasign/business/monthly': '299.00', 'parasign/business/yearly': '2990.00',
+    'firm/firm/monthly': '29.00', 'firm/firm/yearly': '290.00',
+  };
+  const seen = [];
   for (const [product, plans] of Object.entries(catalog.CATALOG)) {
     for (const [plan, intervals] of Object.entries(plans)) {
       for (const interval of Object.keys(intervals)) {
+        const key = `${product}/${plan}/${interval}`;
+        seen.push(key);
         const order = catalog.resolveOrder({ product, plan, interval });
-        const net = vat.chargeAmount(order, RC_TERMS);
-        const split = invoice.splitVat(order.amount, 21);
-        assert.strictEqual(net, invoice.money(split.net_cents), `${product}/${plan}/${interval}`);
+        assert.strictEqual(vat.chargeAmount(order, RC_TERMS), NET[key], key);
         assert.strictEqual(vat.chargeAmount(order, { treatment: 'standard' }), order.amount);
         assert.strictEqual(vat.chargeAmount(order, undefined), order.amount);
       }
     }
   }
+  assert.deepStrictEqual(seen.sort(), Object.keys(NET).sort(), 'every price in the catalog has its net written here');
   did();
 });
 
@@ -295,7 +426,7 @@ test('a reverse-charged invoice: 0%, no VAT, the confirmed number, in the one se
   assert.strictEqual(rc.vat_treatment, 'reverse_charge');
   assert.strictEqual(rc.buyer.vat, EU_VAT, 'the number VIES confirmed, not the spelling in the profile');
   assert.strictEqual(rc.buyer.country, 'BE');
-  assert.deepStrictEqual(rc.vat_check, { source: 'VIES', checked_at: VALID.requestDate, consultation: VALID.requestIdentifier });
+  assert.deepStrictEqual(rc.vat_check, { source: 'VIES', checked_at: VALID.requestDate, consultation: VALID.requestIdentifier, name: '', address: '' });
   assert.strictEqual(rc.seller.vat, SELLER_VAT);
 
   for (const std of [a.record, c.record]) {
@@ -371,6 +502,53 @@ test('Moneybird does not book a reverse-charged document at a guessed rate', asy
   assert.strictEqual(out.reason, 'reverse_charge_not_mapped');
   assert.strictEqual(calls.length, 0);
   assert.ok(lines.some((l) => l.level === 'warn' && l.event === 'moneybird_skipped'));
+  did();
+});
+
+test('ensureSubscription hands the terms of the first payment to the renewal', async () => {
+  // The wiring itself, not only the payload builder: a subscription created
+  // after a reverse-charged first payment collects net and carries the marker.
+  const created = [];
+  const mollie = {
+    mollieInterval: (i) => (i === 'monthly' ? '1 month' : '12 months'),
+    validMandates: async () => [{ id: 'mdt_demo', status: 'valid' }],
+    createSubscription: async (mode, customerId, payload) => { created.push(payload); return { id: 'sub_demo' }; },
+  };
+  const first = Object.assign(paymentOf('tr_first', '29.00', vat.metadataOf(RC_TERMS)), { sequenceType: 'first', customerId: 'cst_demo' });
+  const out = await recurring.ensureSubscription(first,
+    { account: 'acct_demo', product: 'firm', paidUntil: '2026-10-25T10:00:00Z' },
+    { recurring: true, mode: 'test', webhookUrl: 'https://paramant.app/v2/billing/webhook', mollie, getAccount: async () => ({}), saveSubscription: async () => {}, now: NOW });
+  assert.strictEqual(out.result, 'created', out.reason);
+  assert.deepStrictEqual(created[0].amount, { currency: 'EUR', value: '29.00' });
+  assert.strictEqual(created[0].metadata.vat, 'reverse_charge');
+  assert.strictEqual(created[0].metadata.vatConsultation, VALID.requestIdentifier);
+  did();
+});
+
+test('the export carries the treatment, the country and the consultation number for the ICP return', async () => {
+  assert.deepStrictEqual(exporter.COLUMNS.slice(-3), ['vat_treatment', 'customer_country', 'vat_consultation']);
+  const redis = fakeRedis();
+  const rc = (await issue(redis, paymentOf('tr_exp_rc', '29.00', vat.metadataOf(RC_TERMS)))).record;
+  const std = (await issue(redis, paymentOf('tr_exp_std', '35.09'), { email: 'private@example.test' })).record;
+  const r = exporter.rowOf(rc);
+  assert.strictEqual(r.vat_treatment, 'reverse_charge');
+  assert.strictEqual(r.customer_country, 'BE');
+  assert.strictEqual(r.vat_consultation, VALID.requestIdentifier);
+  assert.strictEqual(r.customer_vat, EU_VAT);
+  assert.strictEqual(r.vat_rate, '0');
+  const s21 = exporter.rowOf(std);
+  assert.deepStrictEqual([s21.vat_treatment, s21.customer_country, s21.vat_consultation], ['standard', '', '']);
+  const csv = exporter.toCsv([r, s21]).replace(/^\uFEFF/, '').split('\r\n');
+  assert.ok(csv[0].endsWith(';vat_treatment;customer_country;vat_consultation'));
+  assert.ok(csv[1].endsWith(`;reverse_charge;BE;${VALID.requestIdentifier}`));
+  did();
+});
+
+test('an unquoted \\n in the seller address is a line break, as a quoted one is', () => {
+  // docker compose passes BILLING_SELLER_ADDRESS=Street 1\\nCity through as a
+  // backslash and an n; the PDF splits on a real line break.
+  assert.strictEqual(invoice.sellerFromEnv({ BILLING_SELLER_ADDRESS: 'Example Street 1\\n1234 AB Example City' }).address, 'Example Street 1\n1234 AB Example City');
+  assert.strictEqual(invoice.sellerFromEnv({ BILLING_SELLER_ADDRESS: 'Example Street 1\n1234 AB Example City' }).address, 'Example Street 1\n1234 AB Example City');
   did();
 });
 

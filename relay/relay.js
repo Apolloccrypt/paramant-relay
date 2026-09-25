@@ -2962,16 +2962,27 @@ async function _billingBuyerOf(accountId) {
 }
 
 // The VAT terms of one checkout (lib/vat.js): 21%, or reverse charged for a
-// business in another EU member state whose VAT number VIES confirms now.
-// Never throws and never blocks the sale: anything that goes wrong is a 21%
-// sale and a log line. The log names the country and the reason, never the
-// number itself. A buyer without a VAT number is the ordinary case and gets no
-// line of its own.
+// business in another EU member state whose VAT number, name and country VIES
+// confirms now. Never throws and never blocks the sale: anything that goes
+// wrong is a 21% sale and a log line. The log names the country and the
+// reason, never the number or a name. A buyer without a VAT number is the
+// ordinary case and gets no line of its own.
+//
+// Reverse charged only once the proof is stored: what VIES answered, under
+// its consultation number, before the payment that points at it exists.
 async function _vatTermsForCheckout(accountId) {
   let terms;
   try {
     const buyer = await _billingBuyerOf(accountId);
-    terms = await vatMod.decide({ buyerVat: buyer.vat, sellerVat: invoiceMod.sellerFromEnv(process.env).vat });
+    terms = await vatMod.decide({
+      buyerVat: buyer.vat, buyerCompany: buyer.company, buyerAddress: buyer.address,
+      sellerVat: invoiceMod.sellerFromEnv(process.env).vat,
+    });
+    if (vatMod.isReverseCharge(terms)) {
+      const redis = (redisClient && redisClient.isReady) ? redisClient : null;
+      const saved = await vatMod.saveProof(terms, redis, { accountId, company: buyer.company, address: buyer.address });
+      if (!saved.ok) terms = { treatment: 'standard', reason: 'proof_unsaved', level: 'warn', country: terms.country, detail: saved.reason };
+    }
   } catch (e) {
     terms = { treatment: 'standard', reason: 'vat_check_failed', level: 'warn', detail: e.message };
   }
@@ -3001,6 +3012,15 @@ async function _issueInvoiceForPayment(payment, outcome) {
     const order = billingCatalog.resolveOrder({ product: md.product, plan: md.plan, interval: md.interval });
     if (order.error) return;
     const seller = invoiceMod.sellerFromEnv(process.env);
+    // The terms the payment was sold under, from its own metadata: what the
+    // buyer was charged decides what the document says. A reverse-charged one
+    // also gets the name and address VIES gave at the checkout.
+    const vatTerms = vatMod.termsFromMetadata(md);
+    if (vatMod.isReverseCharge(vatTerms)) {
+      const proof = await vatMod.loadProof(vatTerms.consultation, (redisClient && redisClient.isReady) ? redisClient : null);
+      if (proof) Object.assign(vatTerms, { viesName: proof.name || '', viesAddress: proof.address || '' });
+      else log('warn', 'billing_vat_proof_missing', { payment_id: payment.id, country: vatTerms.country });
+    }
     if (!seller.vat && !_sellerVatWarned) {
       _sellerVatWarned = true;
       log('warn', 'billing_invoice_no_vat_number', {
@@ -3015,9 +3035,7 @@ async function _issueInvoiceForPayment(payment, outcome) {
       seller,
       buyer: await _billingBuyerOf(md.accountId),
       periodEnd: outcome && outcome.paidUntil,
-      // The terms the payment was sold under, from its own metadata: what the
-      // buyer was charged decides what the document says.
-      vat: vatMod.termsFromMetadata(md),
+      vat: vatTerms,
     }, redis);
 
     if (out.result !== 'issued') {

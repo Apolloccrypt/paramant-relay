@@ -56,8 +56,11 @@
 //     number VIES confirmed, and the mention "Btw verlegd" / "VAT reverse
 //     charged" on the PDF and in the mail. Every other document is 21%, as
 //     before.
-//   - VAT-MOSS / OSS for private buyers in other member states. They pay 21%
-//     Dutch VAT, as every catalog price includes.
+//   - OSS for private buyers in other member states. They pay 21% Dutch VAT,
+//     as every catalog price includes, which holds only while such sales stay
+//     under the EU-wide threshold of EUR 10,000 a year (Directive art. 59c).
+//   - businesses outside the EU. They are charged 21% as well, which is a
+//     known gap and not the rule: issue #519.
 
 const catalog = require('./billing-catalog');
 
@@ -103,7 +106,10 @@ function sellerFromEnv(envIn) {
   const env = envIn || process.env;
   return {
     name:    (env.BILLING_SELLER_NAME || 'Paramantis Solutions B.V.').trim(),
-    address: (env.BILLING_SELLER_ADDRESS || '').trim(),
+    // "\n" between lines, as deploy/.env.example says. docker compose passes an
+    // unquoted "\n" through as a backslash and an n, so both are read as a line
+    // break here; otherwise the PDF prints the two characters.
+    address: (env.BILLING_SELLER_ADDRESS || '').replace(/\\n/g, '\n').trim(),
     kvk:     (env.BILLING_SELLER_KVK || '42115132').trim(),
     vat:     (env.BILLING_SELLER_VAT || '').trim(),
   };
@@ -229,7 +235,12 @@ function buildRecord({ number, kind, seller, buyer, order, payment, split, now, 
   // keeps exactly the shape it always had.
   if (isReverseCharged(vat)) {
     record.vat_treatment = 'reverse_charge';
-    record.vat_check = { source: 'VIES', checked_at: vat.checkedAt || '', consultation: vat.consultation || '' };
+    // The proof: when VIES was asked, its consultation number, and the name and
+    // address it holds for the number (lib/vat.js keeps the full record).
+    record.vat_check = {
+      source: 'VIES', checked_at: vat.checkedAt || '', consultation: vat.consultation || '',
+      name: vat.viesName || '', address: vat.viesAddress || '',
+    };
     record.buyer.vat = vat.vatId;
     record.buyer.country = vat.country || '';
   }
