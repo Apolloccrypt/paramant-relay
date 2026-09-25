@@ -238,6 +238,13 @@ for v in BILLING_MODE MOLLIE_API_KEY MOLLIE_TEST_API_KEY INTERNAL_AUTH_TOKEN ADM
   docker compose exec -T relay-main sh -c "v=\$(printenv $v); if [ -z \"\$v\" ]; then echo empty; else echo set, prefix \$(echo \$v | cut -c1-5); fi"
 done
 grep -c '^INTERNAL_AUTH_TOKEN=' .env
+
+# The seller (#517): set or empty, in the relay and in .env. Not even a prefix.
+for v in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK BILLING_SELLER_VAT; do
+  printf '%-24s container ' "$v"
+  docker compose exec -T relay-main sh -c "if [ -n \"\$(printenv $v)\" ]; then echo set; else echo empty; fi" </dev/null
+  printf '%-24s .env lines %s\n' "$v" "$(grep -cE "^$v=[\"']?[^\"'[:space:]]" .env)"
+done
 ```
 
 ### Which commit do we expect here
@@ -286,8 +293,7 @@ What has to be true before step 2:
 | `BILLING_MODE` | the recurring layer | **empty**. Do not set it in this deploy. |
 | `MOLLIE_API_KEY` | one-off checkout, as since 08-08 | set, `live_` prefix, unchanged |
 | `PARASIGN_CANARY_KEY` | the hourly ParaSign canary in `product-heartbeat.yml` | not a relay variable: a GitHub Actions secret holding a `psk_test_` key with the parasign scope. See step 7. |
-| `BILLING_SELLER_ADDRESS` | the supplier address on every invoice | set, with `\n` between lines. Empty prints an empty address block, which makes the document invalid under Wet OB art. 35a. |
-| `BILLING_SELLER_VAT` | whether a paid customer gets an invoice or a receipt | **not known yet.** Leave empty until the btw-id is on file. See below. |
+| `BILLING_SELLER_NAME`, `_ADDRESS`, `_KVK`, `_VAT` | the seller on every invoice, and `_VAT` decides whether a paid customer gets an invoice or a receipt, and whether reverse charge to an EU business can happen at all (#517) | set, in `.env`. The script's step 1e writes the public details of Paramantis Solutions B.V. when a line is missing, after a backup. See "Invoices: the four seller variables" below. |
 
 If `INTERNAL_AUTH_TOKEN` is empty: generate one (`openssl rand -hex 32`), add
 `INTERNAL_AUTH_TOKEN=...` to `/opt/paramant-relay/.env`, and know that the
@@ -302,12 +308,33 @@ payment. The number comes from a redis counter per calendar year
 retention is seven years, and the PDF is mailed to the account address through
 the existing Resend key. Nothing about the payment path itself changes.
 
-| variable | default | what it does |
-|---|---|---|
-| `BILLING_SELLER_NAME` | `Paramantis Solutions B.V.` | the name on the document |
-| `BILLING_SELLER_ADDRESS` | empty | the address block; `\n` separates lines |
-| `BILLING_SELLER_KVK` | `42115132` | printed in the footer (Handelsregisterwet art. 25) |
-| `BILLING_SELLER_VAT` | empty | the btw-id; **decides what the document is** |
+| variable | default in the code | what step 1e writes when it is missing | what it does |
+|---|---|---|---|
+| `BILLING_SELLER_NAME` | `Paramantis Solutions B.V.` | `"Paramantis Solutions B.V."` | the name on the document |
+| `BILLING_SELLER_ADDRESS` | empty | `"Meerkoetmeen 47\n3844 XM Harderwijk\nNetherlands"` | the address block; `\n` separates lines |
+| `BILLING_SELLER_KVK` | `42115132` | `42115132` | printed in the footer (Handelsregisterwet art. 25) |
+| `BILLING_SELLER_VAT` | empty | `NL869798017B01` | the btw-id; **decides what the document is** |
+
+These are the public details of Paramantis Solutions B.V.: VIES holds the same
+name and address for that btw-id (checked 2026-09-25). They reach a relay only
+through the `x-relay-env` block of `docker-compose.yml`, and that block passes
+them from #517 on. Before that, a value in `.env` was never seen by any relay.
+
+`deploy/deploy-3.1.sh` step 1e writes them, the way 1c and 1d write theirs:
+
+- a line that is already set wins and is left alone, byte for byte;
+- a missing line, or one that is set to nothing (`BILLING_SELLER_VAT=` or
+  `BILLING_SELLER_VAT=""`), is replaced by the line in the table, after one
+  backup `.env.bak-before-seller-<timestamp>` next to `.env`;
+- the address goes in double quotes, because docker compose turns `\n` inside
+  double quotes into a line break (checked with `docker compose config`);
+- `.env` stays mode 600;
+- the output names the variable and what happened to it, never the value;
+- under `--preflight-only` the step only reports what a full run would write.
+
+When 1e writes `BILLING_SELLER_VAT`, the run warns: with a `docker-compose.yml`
+that passes it, every new document is a VAT invoice and reverse charge to EU
+businesses starts. Tell the bookkeeper before the deploy, not after.
 
 `BILLING_SELLER_VAT` is the one that matters. A document without the supplier's
 VAT identification number is not an invoice, and a customer who files it cannot
@@ -324,11 +351,19 @@ Set the variable and every document issued after the restart is a full VAT
 invoice. Documents already issued keep the form they were issued in on purpose:
 an invoice is a record of what was sent, not a template that reprints.
 
-Verify after the deploy, on any relay container:
+Step 6j verifies it after the deploy, without printing a value. It asks each
+of the five relays, through the relay's own `lib/invoice.js`, what it makes of
+its environment:
 
 ```
-docker compose exec relay-main printenv | grep BILLING_SELLER
+seller relay-main     name=set address=set kvk=set vat=set kind=invoice address_lines=3
 ```
+
+and stops the run if a relay does not answer, if a variable is empty, if the
+document would be a payment receipt, or if the address arrives as one line
+(a literal `\n`). A deploy of a commit whose `docker-compose.yml` does not pass
+the variables yet (before #517) gets a warning instead of a stop: the relays
+cannot know the seller, and the documents stay payment receipts.
 
 and, once a real payment has come in, that the log line says `result:"issued"`:
 

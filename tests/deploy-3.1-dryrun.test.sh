@@ -1878,10 +1878,10 @@ fi
 # bug is exactly how this check would go quiet. Adding or removing a remote
 # block is a deliberate act, so updating this number is part of it.
 SCAN_BLOCKS="$(grep -cE "^  remote(_soft|_nginx)? \".*<<'EOF'\$" "$SCRIPT" || true)"
-if [ "$SCAN_BLOCKS" = "26" ]; then
-  pass "the scan walked all 26 remote blocks"
+if [ "$SCAN_BLOCKS" = "28" ]; then
+  pass "the scan walked all 28 remote blocks"
 else
-  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 26; update the number here on purpose"
+  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 28; update the number here on purpose"
 fi
 
 # And the three commands that actually read stdin are still there, guarded.
@@ -3126,6 +3126,134 @@ else
 fi
 check_lacks "$SCRIPT" '(^|[^-])cat[[:space:]]+[^|;]*\.env([^.a-zA-Z]|$)' \
   "the source never cats .env"
+
+# ------------------------------------------------------------- 6q. seller --
+echo ""
+echo "6q. The seller details (#517): written when missing, never printed, checked after"
+# From #517 on docker-compose.yml passes BILLING_SELLER_* to the relays, and
+# BILLING_SELLER_VAT decides whether a paid customer gets a VAT invoice and
+# whether reverse charge to an EU business can happen at all. Step 1e writes
+# the four public details of the seller into .env when a line is missing, the
+# way 1c and 1d write theirs, and 6j asks every relay what it made of them.
+check_has "$FULL" 'seller %-24s container %s, \.env %s' \
+  "1b reports the four seller variables as set or empty, in the container and in .env, no prefix"
+check_has "$FULL" '\[step\] 1e\. BILLING_SELLER_\* \(write' "phase 1 has a step that writes the seller details"
+check_has "$PRE"  '\[step\] 1e\. BILLING_SELLER_\* \(report' "--preflight-only runs that step in report mode"
+check_has "$FULL" '\[step\] 6j\. the relays know the seller' "phase 6 asks every relay whether it knows the seller"
+check_has "$FULL" 'compose seller vars declared' "6j first asks the rendered compose whether the variables reach a relay at all"
+
+S1E="$WORK/s1e"
+mkdir -p "$S1E"
+extract_remote "seller details" > "$S1E/1e.sh"
+if [ -s "$S1E/1e.sh" ]; then
+  pass "the 1e remote block could be extracted from the script"
+else
+  fail "could not extract the 1e remote block from the script"
+fi
+extract_remote "seller known" > "$S1E/6j.sh"
+if [ -s "$S1E/6j.sh" ] && grep -qF 'console.log("name="+n("BILLING_SELLER_NAME")' "$S1E/6j.sh"; then
+  pass "6j prints set or empty per variable, the kind of document and the number of address lines, no value"
+else
+  fail "the 6j block could not be extracted, or it no longer prints presence only"
+fi
+
+SELLER_LINES='BILLING_SELLER_NAME="Paramantis Solutions B.V."
+BILLING_SELLER_ADDRESS="Meerkoetmeen 47\n3844 XM Harderwijk\nNetherlands"
+BILLING_SELLER_KVK=42115132
+BILLING_SELLER_VAT=NL869798017B01'
+
+echo ""
+echo "6q-1. A .env without the seller: all four written, once, after a backup"
+mkdir -p "$S1E/missing"
+# No newline after the last line, and an empty BILLING_SELLER_VAT= left over:
+# both are what a hand-edited .env looks like.
+printf 'ADMIN_TOKEN=aaaa\nBILLING_SELLER_VAT=\nMOLLIE_API_KEY=live_bbbb' > "$S1E/missing/.env"
+cp "$S1E/missing/.env" "$S1E/missing.orig"
+OUT_Q1="$(bash "$S1E/1e.sh" "$S1E/missing" write </dev/null 2>&1)"; RC_Q1=$?
+[ "$RC_Q1" -eq 0 ] && pass "1e runs through on a .env without the seller" || fail "1e exited $RC_Q1 on a .env without the seller"
+for v in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK BILLING_SELLER_VAT; do
+  if printf '%s\n' "$OUT_Q1" | grep -qx "after $v lines = 1"; then
+    pass "$v is set exactly once afterwards"
+  else
+    fail "$v is not set exactly once afterwards"
+  fi
+done
+missing_lines=0
+while IFS= read -r want; do
+  grep -qxF -- "$want" "$S1E/missing/.env" || missing_lines=$((missing_lines + 1))
+done <<< "$SELLER_LINES"
+[ "$missing_lines" -eq 0 ] && pass "the four lines are the public details, the address in double quotes with \\n between its lines" \
+  || fail "$missing_lines of the four seller lines are not in .env as written"
+if grep -qx 'MOLLIE_API_KEY=live_bbbb' "$S1E/missing/.env" && grep -qx 'ADMIN_TOKEN=aaaa' "$S1E/missing/.env"; then
+  pass "the lines that were there are intact, the last one too although it had no newline"
+else
+  fail "an existing line of .env was damaged"
+fi
+if grep -qx 'BILLING_SELLER_VAT=' "$S1E/missing/.env"; then
+  fail "the empty BILLING_SELLER_VAT= line is still there next to the new one"
+else
+  pass "the empty BILLING_SELLER_VAT= line was replaced, not kept beside the new one"
+fi
+bak="$(ls "$S1E/missing"/.env.bak-before-seller-* 2>/dev/null | head -1)"
+if [ -n "$bak" ] && cmp -s "$bak" "$S1E/missing.orig"; then
+  pass "a backup of the .env as it was is next to it"
+else
+  fail "no backup of the original .env before the write"
+fi
+[ "$(stat -c %a "$S1E/missing/.env" 2>/dev/null)" = 600 ] && pass ".env is 600 afterwards" || fail ".env is not 600 afterwards"
+if printf '%s\n' "$OUT_Q1" | grep -qE 'Harderwijk|Meerkoetmeen|NL869798017B01|42115132|Paramantis'; then
+  fail "1e printed a seller value"
+else
+  pass "1e names the variables and what it did, never a value"
+fi
+
+echo ""
+echo "6q-2. A .env that already has all four: left alone, byte for byte"
+mkdir -p "$S1E/present"
+printf 'BILLING_SELLER_NAME="Acme B.V."\nBILLING_SELLER_ADDRESS="Example Street 1\\n1234 AB Example City"\nBILLING_SELLER_KVK=00000000\nBILLING_SELLER_VAT=NL000099998B01\n' > "$S1E/present/.env"
+cp "$S1E/present/.env" "$S1E/present.orig"
+OUT_Q2="$(bash "$S1E/1e.sh" "$S1E/present" write </dev/null 2>&1)"; RC_Q2=$?
+if [ "$RC_Q2" -eq 0 ] && cmp -s "$S1E/present/.env" "$S1E/present.orig"; then
+  pass "a seller line that is already set wins, and .env is unchanged"
+else
+  fail "1e changed a .env that already carried the seller (exit $RC_Q2)"
+fi
+[ "$(printf '%s\n' "$OUT_Q2" | grep -c '^action none')" -eq 4 ] && pass "all four report action none" \
+  || fail "not every variable reported action none"
+ls "$S1E/present"/.env.bak-before-seller-* >/dev/null 2>&1 && fail "a backup was made although nothing was written" \
+  || pass "no backup when nothing is written"
+
+echo ""
+echo "6q-3. An empty value is not a value"
+mkdir -p "$S1E/empty"
+printf 'BILLING_SELLER_NAME=""\nBILLING_SELLER_ADDRESS="Example Street 1\\n1234 AB Example City"\nBILLING_SELLER_KVK=00000000\nBILLING_SELLER_VAT=NL000099998B01\n' > "$S1E/empty/.env"
+OUT_Q3="$(bash "$S1E/1e.sh" "$S1E/empty" write </dev/null 2>&1)"
+if printf '%s\n' "$OUT_Q3" | grep -qx 'action SET BILLING_SELLER_NAME' \
+   && [ "$(grep -c '^BILLING_SELLER_NAME=' "$S1E/empty/.env")" -eq 1 ] \
+   && grep -qx 'BILLING_SELLER_NAME="Paramantis Solutions B.V."' "$S1E/empty/.env"; then
+  pass 'BILLING_SELLER_NAME="" counts as missing and is replaced by one real line'
+else
+  fail 'BILLING_SELLER_NAME="" was not treated as missing, or left two lines'
+fi
+if [ "$(printf '%s\n' "$OUT_Q3" | grep -c '^action SET')" -eq 1 ]; then
+  pass "the three variables that were set are left alone"
+else
+  fail "1e wrote more than the one missing variable"
+fi
+
+echo ""
+echo "6q-4. --preflight-only reports and writes nothing"
+mkdir -p "$S1E/report"
+printf 'ADMIN_TOKEN=aaaa\n' > "$S1E/report/.env"
+cp "$S1E/report/.env" "$S1E/report.orig"
+OUT_Q4="$(bash "$S1E/1e.sh" "$S1E/report" report </dev/null 2>&1)"
+if cmp -s "$S1E/report/.env" "$S1E/report.orig" && ! ls "$S1E/report"/.env.bak-before-seller-* >/dev/null 2>&1; then
+  pass "report mode leaves .env byte for byte and makes no backup"
+else
+  fail "report mode wrote to .env"
+fi
+[ "$(printf '%s\n' "$OUT_Q4" | grep -c 'action REPORT ONLY')" -eq 4 ] && pass "report mode names each of the four missing variables" \
+  || fail "report mode did not report the four missing variables"
 
 # ------------------------------------------------------------------- 8. safe --
 echo ""

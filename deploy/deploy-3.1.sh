@@ -869,6 +869,18 @@ for v in BILLING_MODE MOLLIE_API_KEY MOLLIE_TEST_API_KEY INTERNAL_AUTH_TOKEN ADM
     "v=\$(printenv $v); if [ -z \"\$v\" ]; then echo empty; else echo \"set, prefix \$(printf %s \"\$v\" | cut -c1-5)\"; fi" \
     </dev/null 2>/dev/null || echo "unreadable"
 done
+
+# The seller on every invoice (#517). Set or empty, not even a prefix. Two
+# places, because a docker-compose.yml from before #517 never passed these to
+# a relay: the running container, and the .env the next recreate reads.
+for v in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK BILLING_SELLER_VAT; do
+  c="$(docker compose exec -T relay-main sh -c "if [ -n \"\$(printenv $v)\" ]; then echo set; else echo empty; fi" \
+    </dev/null 2>/dev/null || echo unreadable)"
+  # A count, not a read: the value never reaches a variable.
+  lines="$(grep -cE "^${v}=[\"']?[^\"'[:space:]]" .env 2>/dev/null || true)"
+  if [ "${lines:-0}" -gt 0 ]; then f=set; else f=empty; fi
+  printf 'seller %-24s container %s, .env %s\n' "$v" "$c" "$f"
+done
 EOF
 
   expect 'env BILLING_MODE +empty' \
@@ -955,6 +967,70 @@ EOF
       "PARAMANT_INLINE_RECEIPT_HEADER=1 present exactly once in .env"
     if [ "$DRY_RUN" -eq 0 ] && printf '%s\n' "$REMOTE_OUT" | grep -q 'action SET PARAMANT_INLINE'; then
       warn "the deprecated inline receipt header was switched on; remove it once paramant-sdk 3.3.0 reaches PyPI (one line in .env plus a recreate)"
+    fi
+  fi
+
+  step "1e. BILLING_SELLER_* (${envmode}: the seller on every invoice, and the condition for reverse charge)"
+  note "the public details of Paramantis Solutions B.V., the same ones VIES holds for its"
+  note "btw-id (checked 2026-09-25). A line that is already set in .env wins and is left"
+  note "alone. The output names the variable and what happened to it, never the value."
+  remote "seller details" "$COMPOSE_DIR" "$envmode" <<'EOF'
+set -euo pipefail
+cd "$1"
+MODE="$2"
+# The line each variable gets when it is missing. The address is in double
+# quotes: docker compose turns \n inside double quotes into a line break, and
+# the relay prints each line of the address as its own line.
+wanted() {
+  case "$1" in
+    BILLING_SELLER_NAME)    printf '%s' 'BILLING_SELLER_NAME="Paramantis Solutions B.V."' ;;
+    BILLING_SELLER_ADDRESS) printf '%s' 'BILLING_SELLER_ADDRESS="Meerkoetmeen 47\n3844 XM Harderwijk\nNetherlands"' ;;
+    BILLING_SELLER_KVK)     printf '%s' 'BILLING_SELLER_KVK=42115132' ;;
+    BILLING_SELLER_VAT)     printf '%s' 'BILLING_SELLER_VAT=NL869798017B01' ;;
+  esac
+}
+# Set means something other than quotes and blanks after the = sign:
+# BILLING_SELLER_VAT= and BILLING_SELLER_VAT="" are both empty.
+isset() { grep -cE "^$1=[\"']?[^\"'[:space:]]" .env || true; }
+backed_up=0
+for v in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK BILLING_SELLER_VAT; do
+  before="$(isset "$v")"
+  echo "before $v lines = $before"
+  if [ "$before" -eq 0 ]; then
+    if [ "$MODE" = report ]; then
+      echo "action REPORT ONLY: $v is not set and a full run would set it"
+    else
+      if [ "$backed_up" -eq 0 ]; then
+        cp -a .env ".env.bak-before-seller-$(date +%Y%m%d-%H%M%S)"
+        backed_up=1
+      fi
+      sed -i "/^$v=/d" .env
+      # A .env whose last line has no newline would swallow the new line.
+      [ -z "$(tail -c1 .env)" ] || printf '\n' >> .env
+      printf '%s\n' "$(wanted "$v")" >> .env
+      chmod 600 .env
+      echo "action SET $v"
+    fi
+  else
+    echo "action none, $v was already set"
+  fi
+  echo "after $v lines = $(isset "$v")"
+done
+EOF
+
+  if [ "$PREFLIGHT_ONLY" -eq 1 ]; then
+    if [ "$DRY_RUN" -eq 0 ] && printf '%s\n' "$REMOTE_OUT" | grep -q 'action REPORT ONLY'; then
+      warn "a BILLING_SELLER_* variable is missing; a full run will set it. Preflight wrote nothing."
+    else
+      ok "seller details state reported, nothing written"
+    fi
+  else
+    local sv
+    for sv in BILLING_SELLER_NAME BILLING_SELLER_ADDRESS BILLING_SELLER_KVK BILLING_SELLER_VAT; do
+      expect_count "after $sv lines" 1 "$sv present exactly once in .env"
+    done
+    if [ "$DRY_RUN" -eq 0 ] && printf '%s\n' "$REMOTE_OUT" | grep -q 'action SET BILLING_SELLER_VAT'; then
+      warn "BILLING_SELLER_VAT was written to .env. With a docker-compose.yml that passes it (#517) every new document is a VAT invoice and reverse charge to EU businesses starts; tell the bookkeeper"
     fi
   fi
 }
@@ -2557,6 +2633,34 @@ for svc in relay-main relay-health relay-finance relay-legal relay-iot; do
 done
 EOF
   expect_not '"recurring":true' "every relay still reports recurring:false"
+
+  step "6j. the relays know the seller (BILLING_SELLER_*), values never printed"
+  remote "seller known" "$COMPOSE_DIR" <<'EOF'
+set -euo pipefail
+cd "$1"
+# Before #517 docker-compose.yml did not pass these to a relay at all.
+echo "compose seller vars declared = $(docker compose config 2>/dev/null | grep -c 'BILLING_SELLER_VAT:' || true)"
+# Asked of the relay's own code: the function the invoice path calls, and what
+# it makes of the environment. Set or empty, the kind of document, and how many
+# lines the address has; never a value.
+js='const {env:e}=process;const n=(k)=>(String(e[k]||"").trim()?"set":"empty");let kind="unknown",lines=0;try{const i=require("./lib/invoice");const s=i.sellerFromEnv(e);kind=i.documentKind(s);lines=String(s.address||"").split("\n").filter((l)=>l.trim()).length;}catch(x){kind="unreadable";}console.log("name="+n("BILLING_SELLER_NAME")+" address="+n("BILLING_SELLER_ADDRESS")+" kvk="+n("BILLING_SELLER_KVK")+" vat="+n("BILLING_SELLER_VAT")+" kind="+kind+" address_lines="+lines)'
+for svc in relay-main relay-health relay-finance relay-legal relay-iot; do
+  printf 'seller %-14s ' "$svc"
+  docker compose exec -T "$svc" node -e "$js" </dev/null 2>/dev/null || echo "unreadable"
+done
+EOF
+  local declared=""
+  [ "$DRY_RUN" -eq 1 ] || declared="$(remote_field 'compose seller vars declared')"
+  if [ "$DRY_RUN" -eq 0 ] && [ "${declared:-0}" = 0 ]; then
+    warn "this commit's docker-compose.yml does not pass BILLING_SELLER_* to the relays (it does from #517 on): documents stay payment receipts, and the seller is not checked"
+  else
+    expect_not 'seller relay-[a-z]+ +unreadable' "every relay answered the seller question"
+    expect_not 'seller relay-[a-z]+ .*=empty' "name, address, KvK and btw-id reach all five relays"
+    expect_not 'seller relay-[a-z]+ .*kind=(receipt|unknown|unreadable)' \
+      "every relay issues a VAT invoice, not a payment receipt"
+    expect_not 'seller relay-[a-z]+ .*address_lines=[01]$' \
+      "the address arrives as separate lines, not as one line with a literal backslash-n"
+  fi
 }
 
 # =============================================================== PHASE V =====
