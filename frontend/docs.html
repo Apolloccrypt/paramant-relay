@@ -675,6 +675,10 @@ curl "https://paramant.app/v2/parasign/audit-export?format=csv" \
     <p>Na een geslaagde betaling stuurt Mollie de gebruiker terug naar <code>/dashboard?billing=return</code> en roept de webhook hieronder aan. Het account krijgt zijn rechten via de webhook, nooit via de doorverwijzing.</p>
     <pre><span class="cm"># 400 unknown product / plan / interval, or bad JSON</span>
 { "error": "unknown_plan" }        <span class="cm"># also: unknown_product, unknown_interval, bad_json</span>
+<span class="cm"># 400 a plan the site does not sell (the separate Pro plans)</span>
+{ "error": "not_on_sale" }
+<span class="cm"># 409 another plan is running on that product; changing plans goes by mail</span>
+{ "error": "other_plan_running", "running": "business", "paid_until": "...", "message": "..." }
 <span class="cm"># 401 no / invalid key</span>
 { "error": "unauthorized" }
 <span class="cm"># 502 the payment provider call failed</span>

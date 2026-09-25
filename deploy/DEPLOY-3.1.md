@@ -102,6 +102,14 @@ The three stances, pinned by `relay/test/billing-stance.test.js` and
 An explicit mode without its key boots at `error` and no checkout works, which
 is the existing `mollie_key_missing` contract.
 
+A key whose prefix belongs to the other mode (a `live_` value in
+`MOLLIE_TEST_API_KEY`, a `test_` value in `MOLLIE_API_KEY`) is refused as if it
+were absent, and a `BILLING_MODE` other than `live` or `test` (a typo such as
+`prod`) falls back to the empty stance. Both boot at `error`, with a `problems`
+list on the `billing_config` line and one `billing_config_refused` line each.
+The production stance above is unchanged by this. Pinned by
+`relay/test/incasso-latent.test.js`.
+
 So: **leave `BILLING_MODE` empty for this deploy.** Turning the recurring
 layer on is a separate decision, taken when there is a Mollie test key to
 prove it against first. That is step 3 in the vault's order (deny, then

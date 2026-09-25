@@ -408,21 +408,47 @@ const MESSAGES = Object.freeze({
   exhausted: 'That code has been fully claimed. It has run out.',
   no_redis: 'We cannot check codes right now. Please try again in a minute.',
   grant_failed: 'We could not add the term to your account. Nothing was changed, please try again.',
+  nothing_to_add: 'This code adds nothing to what you already have, so it was not used.',
 });
 
 function messageFor(error) {
   return MESSAGES[error] || MESSAGES.unknown;
 }
 
-// The sentence the browser prints on success: what was given, and until when.
-function successMessage(grants) {
+function joinPlans(parts) {
+  return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
+// What a code left alone because the account already holds something a gift
+// may not replace (POST /v2/billing/redeem: a gift only adds to the same tier
+// or fills an empty product). "ParaSign Business until 25 October 2026".
+function keptPhrase(kept) {
+  const list = Array.isArray(kept) ? kept : [];
+  if (list.length === 0) return '';
+  return joinPlans(list.map((k) => {
+    const date = k.ends ? planExpiry.formatDate(k.ends) : null;
+    return `${planExpiry.planLabel(k.product, k.tier)}${date ? ` until ${date}` : ''}`;
+  }));
+}
+
+// The sentence the browser prints on success: what was given, and until when,
+// and what the account keeps. Before 2026-09-25 a Business customer who typed
+// in a Pro code was told "You now have ParaSign Pro", and that was the truth
+// on one relay and a lie on the others (betaaltest R3).
+function successMessage(grants, kept) {
   const list = Array.isArray(grants) ? grants : [];
   if (list.length === 0) return 'Your code is redeemed.';
-  const parts = list.map((g) => `${planExpiry.planLabel(g.product, g.tier)} until ${planExpiry.formatDate(g.ends)}`);
-  const joined = parts.length === 1
-    ? parts[0]
-    : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
-  return `Your code is redeemed. You now have ${joined}. Nothing was charged.`;
+  const joined = joinPlans(list.map((g) => `${planExpiry.planLabel(g.product, g.tier)} until ${planExpiry.formatDate(g.ends)}`));
+  const keep = keptPhrase(kept);
+  return `Your code is redeemed. You now have ${joined}.${keep ? ` You keep ${keep}.` : ''} Nothing was charged.`;
+}
+
+// The refusal when a code would add nothing at all. The seat is given back, so
+// the code is not spent on an account it did nothing for.
+function nothingToAddMessage(kept) {
+  const keep = keptPhrase(kept);
+  if (!keep) return MESSAGES.nothing_to_add;
+  return `This code adds nothing to what you already have (${keep}), so it was not used.`;
 }
 
 module.exports = {
@@ -432,5 +458,5 @@ module.exports = {
   normaliseCode, humanDuration, humanDurationNl, describeGrants, describeGrantsNl, historyLabel,
   validateGrants, validateMax, validateValidUntil,
   createCoupon, getCoupon, listCoupons, revokeCoupon, redemptionsOf,
-  claim, release, grantEnd, redeemMail, messageFor, successMessage,
+  claim, release, grantEnd, redeemMail, messageFor, successMessage, nothingToAddMessage,
 };

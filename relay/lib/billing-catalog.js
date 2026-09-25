@@ -84,8 +84,10 @@ function orderLabel(order) {
   return planLabel(order.product, order.tier || order.plan);
 }
 
-// What /pricing actually sells today. The two `pro` rows are NOT here and are
-// still in CATALOG on purpose: an existing ParaSign Pro or ParaSend Pro customer
+// What the site sells today (the buttons on /pricing and /en/pricing, pinned
+// to this list by relay/test/pricing-page.test.js), and therefore the only
+// thing the checkout sells (resolveSale). The two `pro` rows are NOT here and
+// are still in CATALOG on purpose: an existing ParaSign Pro or ParaSend Pro customer
 // keeps his entitlement and his paid_until, an outstanding renewal link still
 // resolves, and a Mollie subscription created before Firm carries
 // {product:'parasign', plan:'pro'} in its metadata and must still grant when it
@@ -98,6 +100,20 @@ const ON_SALE = Object.freeze([
 
 function isOnSale(product, plan) {
   return ON_SALE.some((o) => o.product === product && o.plan === plan);
+}
+
+// What the CHECKOUT may sell: a resolvable order that is also on sale. Until
+// 2026-09-25 the checkout asked resolveOrder alone, so anyone calling the API,
+// or editing a button attribute in the browser, could still buy ParaSign Pro
+// or ParaSend Pro on its own: plans no page sells, that the docs say are no
+// longer sold, and that every screen then called Firm while the other product
+// stayed free (betaaltest 25-09, R8). The webhook keeps asking resolveOrder:
+// money that has already moved for a legacy plan must still grant.
+function resolveSale(req) {
+  const order = resolveOrder(req);
+  if (order.error) return order;
+  if (!isOnSale(order.product, order.plan)) return { error: 'not_on_sale' };
+  return order;
 }
 
 function isBundle(product) {
@@ -155,9 +171,11 @@ function resolveOrder({ product, plan, interval } = {}) {
 
 // Amount equality by integer cents, so '18.15' == '18.150' and formatting noise
 // never lets a mismatched amount through. NaN (unparseable) is never equal.
+// Digits past the cents are accepted only when they are zeros: '35.091' is not
+// 35.09, and reading it as such would grant a plan for an amount nobody set.
 function amountsEqual(a, b) {
   const cents = (s) => {
-    const m = /^(\d+)\.(\d{2})\d*$/.exec(String(s).trim());
+    const m = /^(\d+)\.(\d{2})0*$/.exec(String(s).trim());
     return m ? (parseInt(m[1], 10) * 100 + parseInt(m[2], 10)) : NaN;
   };
   const ca = cents(a), cb = cents(b);
@@ -165,7 +183,7 @@ function amountsEqual(a, b) {
 }
 
 module.exports = {
-  CATALOG, PRODUCTS, SELLABLE, INTERVALS, BUNDLES, ON_SALE, isOnSale,
+  CATALOG, PRODUCTS, SELLABLE, INTERVALS, BUNDLES, ON_SALE, isOnSale, resolveSale,
   PRODUCT_LABEL, TIER_LABEL, planLabel, orderLabel,
   isBundle, grantedTier, grantsOf, floorTier, priceOf, resolveOrder, amountsEqual,
 };
