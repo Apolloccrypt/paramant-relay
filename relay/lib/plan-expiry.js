@@ -66,6 +66,13 @@ const WARN_WINDOW_MS = WARN_DAYS * DAY_MS;
 // long enough that a mail saying so is news about nothing.
 const ENDED_GRACE_MS = 7 * DAY_MS;
 
+// A term that renews by itself (a Mollie subscription collects on the day it
+// ends) gets its "it has ended" mail only when the collection has had time to
+// land: a card is paid in seconds, a SEPA direct debit takes days. A renewal
+// that lands moves paid_until on, and then no mail is owed at all. Shorter than
+// ENDED_GRACE_MS, so a renewal that never comes still gets its mail.
+const RENEWAL_HOLD_MS = 5 * DAY_MS;
+
 // When a finished period is dropped from the index. Well past ENDED_GRACE_MS,
 // so a pruned entry is never one that still had a mail owing.
 const PRUNE_AFTER_MS = 30 * DAY_MS;
@@ -210,13 +217,19 @@ function bilingualText(nl, en) {
 // being told when it stops and that nothing happens to his card unless he says
 // so. That last half is the point: on a one-off payment "your plan ends" reads
 // as a threat of a charge unless it says otherwise.
-function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle }) {
+//
+// `renewal` is set when a subscription will collect for this term (see
+// billing-recurring.renewalFor). Then "nothing is charged automatically" is
+// false, and the mail says what will happen instead: the date, the amount when
+// known, and where to cancel before it.
+function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle, renewal }) {
   const date = formatDate(paidUntil);
   if (!date) return null;
   const dateNl = formatDateNl(paidUntil);
   const plan = bundleLabel(bundle) || planLabel(product, tier);
   const planNl = bundleLabelNl(bundle) || planLabelNl(product, tier);
   const pricing = `${String(siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, '')}/pricing`;
+  if (renewal) return renewalMail({ kind, plan, planNl, date, dateNl, siteUrl, renewal, pricing });
   if (kind === 'ended') {
     const subjectNl = `Uw ${planNl} is afgelopen`;
     const subjectEn = `Your ${plan} has ended`;
@@ -268,6 +281,73 @@ function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle }) {
     subject: bilingualSubject(subjectNl, subjectEn),
     text: bilingualText(textNl, text),
     html: htmlBody([[subjectNl, textNl], [subjectEn, text]], pricing),
+  };
+}
+
+const PERIOD_NL = Object.freeze({ monthly: 'een maand', yearly: 'een jaar' });
+const PERIOD_EN = Object.freeze({ monthly: 'a month', yearly: 'a year' });
+
+// The two mails for a term that a subscription will renew. Neither may say that
+// nothing is charged: the warning says what will be collected and when, and the
+// "ended" mail (sent only after RENEWAL_HOLD_MS, see runSweep) says the renewal
+// has not come in, and that it still counts if it does.
+function renewalMail({ kind, plan, planNl, date, dateNl, siteUrl, renewal, pricing }) {
+  const base = String(siteUrl || DEFAULT_SITE_URL).replace(/\/+$/, '');
+  const account = `${base}/account`;
+  const money = renewal.amount ? `${renewal.currency || 'EUR'} ${renewal.amount}` : null;
+  const periodNl = PERIOD_NL[renewal.interval] || null;
+  const periodEn = PERIOD_EN[renewal.interval] || null;
+  if (kind === 'ended') {
+    const subjectNl = `Uw ${planNl} is afgelopen`;
+    const subjectEn = `Your ${plan} has ended`;
+    const textNl = [
+      `Uw ${planNl} liep tot ${dateNl}. De automatische verlenging is niet binnengekomen, dus uw account staat nu op ${FLOOR_NAME}.`,
+      '',
+      `Komt de betaling alsnog binnen, dan loopt uw plan vanzelf door. U kunt ook zelf opnieuw betalen: ${pricing}`,
+      '',
+      'Paramant',
+    ].join('\n');
+    const text = [
+      `Your ${plan} ran until ${date}. The automatic renewal has not come in, so your account is now on ${FLOOR_NAME}.`,
+      '',
+      `If the payment still comes in, your plan carries on by itself. You can also pay again yourself: ${pricing}`,
+      '',
+      'Paramant',
+    ].join('\n');
+    return {
+      subject: bilingualSubject(subjectNl, subjectEn),
+      text: bilingualText(textNl, text),
+      html: htmlBody([[subjectNl, textNl], [subjectEn, text]], pricing),
+    };
+  }
+  const subjectNl = `Uw ${planNl} wordt op ${dateNl} verlengd`;
+  const subjectEn = `Your ${plan} renews on ${date}`;
+  const textNl = [
+    `Uw ${planNl} loopt tot ${dateNl}.`,
+    '',
+    money && periodNl
+      ? `Op die dag wordt uw plan automatisch met ${periodNl} verlengd en wordt ${money} afgeschreven.`
+      : 'Op die dag wordt uw plan automatisch verlengd en wordt de volgende periode afgeschreven.',
+    '',
+    `Wilt u dat niet, zeg dan vóór ${dateNl} op via ${account}. Wat u al betaald hebt, houdt u tot die dag.`,
+    '',
+    'Paramant',
+  ].join('\n');
+  const text = [
+    `Your ${plan} runs until ${date}.`,
+    '',
+    money && periodEn
+      ? `On that day your plan renews automatically for ${periodEn}, and ${money} is collected.`
+      : 'On that day your plan renews automatically, and the next period is collected.',
+    '',
+    `If you do not want that, cancel before ${date} at ${account}. What you have already paid for stays yours until that day.`,
+    '',
+    'Paramant',
+  ].join('\n');
+  return {
+    subject: bilingualSubject(subjectNl, subjectEn),
+    text: bilingualText(textNl, text),
+    html: htmlBody([[subjectNl, textNl], [subjectEn, text]], account),
   };
 }
 
@@ -394,6 +474,10 @@ async function releaseLock(redis, token) {
 //              consume the marker.
 //   log        (level, event, fields)
 //   siteUrl    base for the /pricing link
+//   renewalOf  optional (accountId, product, bundle) -> renewal | null: does a
+//              subscription collect for this term? relay.js passes
+//              billing-recurring.renewalFor. Without it every term is treated as
+//              a one-off, which is what BILLING_MODE empty means.
 //
 // Returns { ran, warned, ended, skipped, missing, pruned, reason }.
 async function runSweep(deps) {
@@ -468,17 +552,36 @@ async function runSweep(deps) {
         continue;
       }
 
+      // Does a subscription collect for this term? The answer decides what the
+      // mail may promise. When it cannot be read, no mail this sweep: a wrong
+      // "nothing is charged" is worse than a mail six hours later.
+      let renewal = null;
+      if (typeof d.renewalOf === 'function') {
+        try { renewal = await d.renewalOf(accountId, product, meta.bundle || null); }
+        catch (e) {
+          log('warn', 'plan_expiry_renewal_unknown', { account: String(accountId).slice(0, 12), product, kind, err: e.message });
+          out.skipped++;
+          continue;
+        }
+      }
+      // A renewing term is not over until its collection has had time to land.
+      if (kind === 'ended' && renewal && now - at < RENEWAL_HOLD_MS) { out.skipped++; continue; }
+      // The subscription names the bundle even when the index entry lost it:
+      // a Firm renewal is one collection, so it is one mail with one amount,
+      // not a mail per product that each quote the whole price.
+      const bundle = meta.bundle || (renewal && bundleLabel(renewal.line) ? renewal.line : null);
+
       // Reserve BEFORE sending. Under the lock this only guards against a
       // repeat inside one sweep, but it is also what makes a crash between the
       // send and the write impossible to turn into a second mail. The
       // reservation is given back below when the mail did not actually leave.
       // Keyed on the BUNDLE when there is one, so the two index entries a Firm
       // term leaves behind produce ONE mail and not two about the same term.
-      const key = noticeKey(kind, accountId, meta.bundle || product, meta.paid_until);
+      const key = noticeKey(kind, accountId, bundle || product, meta.paid_until);
       const reserved = await redis.set(key, String(now), { NX: true, EX: NOTICE_TTL_S });
       if (!(reserved === 'OK' || reserved === true)) { out.skipped++; continue; }
 
-      const msg = expiryMail({ product, tier, paidUntil: at, kind, siteUrl, bundle: meta.bundle });
+      const msg = expiryMail({ product, tier, paidUntil: at, kind, siteUrl, bundle, renewal });
       let sent = false;
       try {
         sent = !!(typeof sendEmail === 'function' && await sendEmail({
@@ -502,6 +605,7 @@ async function runSweep(deps) {
       if (kind === 'ended') out.ended++; else out.warned++;
       log('info', 'plan_expiry_mail_sent', {
         account: String(accountId).slice(0, 12), product, tier, kind, paid_until: meta.paid_until,
+        renews: !!renewal,
       });
     }
   } catch (e) {
@@ -567,7 +671,7 @@ function startPlanExpiryPlanner(deps) {
 
 module.exports = {
   INDEX_ZSET, META_HASH, LOCK_KEY, NOTICE_PREFIX,
-  WARN_DAYS, WARN_WINDOW_MS, ENDED_GRACE_MS, PRUNE_AFTER_MS,
+  WARN_DAYS, WARN_WINDOW_MS, ENDED_GRACE_MS, RENEWAL_HOLD_MS, PRUNE_AFTER_MS,
   NOTICE_TTL_S, SWEEP_INTERVAL_MS, LOCK_TTL_MS, DEFAULT_SITE_URL,
   formatDate, formatDateNl, memberOf, parseMember, noticeKey, planLabel, bundleLabel, BUNDLE_LABEL, expiryMail,
   planLabelNl, bundleLabelNl, BUNDLE_LABEL_NL, bilingualSubject, bilingualText, htmlBody, MAIL_SEPARATOR,

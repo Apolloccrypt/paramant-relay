@@ -28,6 +28,10 @@ function create(opts = {}) {
   const subscriptions = new Map();
   const mandates = new Map(); // customerId -> [mandate]
   const webhookCalls = [];
+  // Every API call as it arrived: what was asked, with which kind of key (the
+  // prefix only, never the key) and with which Idempotency-Key. Lets a test
+  // prove that a key was never sent, not just that nothing came of it.
+  const requests = [];
   let failWebhook = false;
 
   const json = (res, status, obj) => {
@@ -71,6 +75,13 @@ function create(opts = {}) {
     const url = new URL(req.url, `http://127.0.0.1`);
     const p = url.pathname;
     const m = req.method;
+    if (p.startsWith('/v2/')) {
+      const auth = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+      requests.push({
+        method: m, path: p, keyPrefix: auth.slice(0, 5),
+        idempotencyKey: req.headers['idempotency-key'] || null,
+      });
+    }
 
     // ---- API half -----------------------------------------------------------
     if (p === '/v2/payments' && m === 'POST') {
@@ -197,7 +208,7 @@ function create(opts = {}) {
   });
 
   return {
-    server, payments, customers, subscriptions, webhookCalls,
+    server, payments, customers, subscriptions, webhookCalls, requests,
     async listen() {
       await new Promise((r) => server.listen(0, '127.0.0.1', r));
       selfOrigin = `http://127.0.0.1:${server.address().port}`;

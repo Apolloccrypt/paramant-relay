@@ -15,6 +15,9 @@
 
 const catalog = require('./billing-catalog');
 const vat = require('./vat');
+// Labels, dates and the bilingual mail shape, so the failed-collection mail
+// reads like the reminders a customer already gets.
+const planExpiry = require('./plan-expiry');
 
 // One Mollie customer per Paramant account, and one subscription per SOLD LINE.
 // Per line, because the ParaSign and ParaSend plans that predate Firm are
@@ -31,6 +34,37 @@ const PRODUCT_SUBSCRIPTION_FIELD = Object.freeze({
 
 function subscriptionFieldOf(product) {
   return PRODUCT_SUBSCRIPTION_FIELD[product] || null;
+}
+
+// Which payment created the subscription on file, per line. It is what tells a
+// NEW purchase (whose period ends later, so the subscription on file would
+// start one period too early) apart from the same payment arriving twice (which
+// must leave the subscription alone).
+function subscriptionPaymentFieldOf(product) {
+  const field = subscriptionFieldOf(product);
+  return field ? `${field}_payment` : null;
+}
+
+// Every field this layer writes onto an account record. users.json carries them,
+// and keys-table.parseAccountFields reads them back at boot: without that a
+// restart (every deploy) forgot which customer and which subscription an
+// account has, so the cancel button found nothing while Mollie kept collecting.
+const POINTER_FIELDS = Object.freeze([
+  CUSTOMER_FIELD,
+  ...Object.values(PRODUCT_SUBSCRIPTION_FIELD),
+  ...Object.keys(PRODUCT_SUBSCRIPTION_FIELD).map(subscriptionPaymentFieldOf),
+]);
+
+// The subscription lines that pay for any of these entitlement products: the
+// line of the product itself and every bundle that includes it. A Firm
+// subscription renews ParaSign as much as a ParaSign one does.
+function linesCovering(products) {
+  const want = new Set(products || []);
+  return Object.keys(PRODUCT_SUBSCRIPTION_FIELD).filter((line) => {
+    const bundle = catalog.BUNDLES[line];
+    const covers = bundle ? bundle.grants.map((g) => g.product) : [line];
+    return covers.some((p) => want.has(p));
+  });
 }
 
 // Mollie wants YYYY-MM-DD in its own timezone terms. The paid period ends at an
@@ -104,6 +138,16 @@ function isRecurringPayment(payment) {
   return !!(payment && payment.sequenceType === 'recurring');
 }
 
+// A collection the subscription tried and did not get. The webhook grants
+// nothing for it, which is right, but it used to answer 'ignored' and stop: the
+// customer heard nothing until his plan had already fallen back, and the
+// reminder he then got promised that nothing is ever charged automatically.
+const FAILED_COLLECTION_STATUSES = Object.freeze(['failed', 'expired', 'canceled']);
+
+function isFailedCollection(payment) {
+  return isRecurringPayment(payment) && FAILED_COLLECTION_STATUSES.includes(payment.status);
+}
+
 // The switch on this whole file. deps.recurring comes from mollie.billingStance()
 // and is only true when BILLING_MODE was set by hand. When it is false the relay
 // bills exactly as it did on 2026-08-08: a one-off payment, no customer, no
@@ -158,13 +202,17 @@ async function ensureCustomer(accountId, deps) {
 //
 // deps: {
 //   getAccount(accountId) -> record | null
-//   saveSubscription(accountId, product, subscriptionId) -> void   (async ok)
-//   mollie: { validMandates, createSubscription, mollieInterval }
+//   saveSubscription(accountId, product, subscriptionId, meta?) -> void   (async ok)
+//     meta on a create: { paymentId, amount, currency, interval, startDate };
+//     none when a pointer is cleared
+//   mollie: { validMandates, createSubscription, cancelSubscription, mollieInterval }
 //   mode, webhookUrl, recurring (from mollie.billingStance(); false = 08-08 behaviour)
 // }
 // Returns { result, reason, subscriptionId? } and NEVER throws: a failure here
 // must not undo an entitlement the buyer has already paid for. The caller logs
 // the reason; 'error' level cases are the ones where money will not come in.
+// result 'replaced' is a second purchase: the old subscription was cancelled and
+// a new one starts where the period now ends.
 async function ensureSubscription(payment, grant, deps) {
   const d = deps || {};
   const m = d.mollie || {};
@@ -183,7 +231,16 @@ async function ensureSubscription(payment, grant, deps) {
   if (!field) return { result: 'skipped', reason: 'unknown_product' };
 
   const rec = typeof d.getAccount === 'function' ? await d.getAccount(accountId) : null;
-  if (rec && rec[field]) return { result: 'skipped', reason: 'already_subscribed', subscriptionId: rec[field] };
+  const existing = (rec && rec[field]) || null;
+  if (existing) {
+    // Left alone when this very payment made it (a repeat), and when nothing
+    // says which payment did (a subscription from before that was recorded).
+    // Only a DIFFERENT purchase may replace what is on file.
+    const madeBy = rec[subscriptionPaymentFieldOf(product)] || null;
+    if (!madeBy || madeBy === (payment && payment.id)) {
+      return { result: 'skipped', reason: 'already_subscribed', subscriptionId: existing };
+    }
+  }
 
   // The customer id can come from the payment itself (the checkout put it
   // there) or from the account. The payment wins: it is what Mollie actually
@@ -219,15 +276,44 @@ async function ensureSubscription(payment, grant, deps) {
   });
   if (built.error) return { result: 'failed', level: 'error', reason: `payload:${built.error}` };
 
+  // A second purchase. The subscription on file starts on the day the OLD
+  // period ended, and this payment has just moved that end, so left alone it
+  // collects a period the buyer has already paid for. It may also be the wrong
+  // interval now (a month, then a year). Cancel it first and create the new one
+  // after: if the create then fails, nothing is collected twice, and the error
+  // level says this account will not renew by itself.
+  let replaced = null;
+  if (existing) {
+    const oldCustomer = (rec && rec[CUSTOMER_FIELD]) || customerId;
+    try { await m.cancelSubscription(d.mode, oldCustomer, existing); }
+    catch (e) { return { result: 'failed', level: 'error', reason: `replace_cancel_failed:${e.message}`, subscriptionId: existing }; }
+    try { if (typeof d.saveSubscription === 'function') await d.saveSubscription(accountId, product, null); }
+    catch (e) { return { result: 'failed', level: 'error', reason: `replace_save_failed:${e.message}` }; }
+    replaced = existing;
+  }
+
+  // One subscription per payment, also at Mollie: the same payment handled
+  // twice gets the subscription the first attempt made.
+  const idempotencyKey = payment && payment.id ? `sub-${payment.id}` : undefined;
   let sub;
-  try { sub = await m.createSubscription(d.mode, customerId, built.payload); }
-  catch (e) { return { result: 'failed', level: 'error', reason: `create_failed:${e.message}` }; }
+  try { sub = await m.createSubscription(d.mode, customerId, built.payload, { idempotencyKey }); }
+  catch (e) { return { result: 'failed', level: 'error', reason: `create_failed:${e.message}`, replaced: replaced || undefined }; }
   if (!sub || !sub.id) return { result: 'failed', level: 'error', reason: 'no_subscription_id' };
 
-  try { if (typeof d.saveSubscription === 'function') await d.saveSubscription(accountId, product, sub.id); }
+  const meta = {
+    paymentId: (payment && payment.id) || null,
+    amount: built.payload.amount.value,
+    currency: built.payload.amount.currency,
+    interval: order.interval,
+    startDate: built.payload.startDate,
+  };
+  try { if (typeof d.saveSubscription === 'function') await d.saveSubscription(accountId, product, sub.id, meta); }
   catch (e) { return { result: 'created_unsaved', level: 'error', reason: `save_failed:${e.message}`, subscriptionId: sub.id }; }
 
-  return { result: 'created', level: 'info', subscriptionId: sub.id, startDate: built.payload.startDate };
+  return {
+    result: replaced ? 'replaced' : 'created', level: 'info', subscriptionId: sub.id,
+    startDate: built.payload.startDate, replaced: replaced || undefined,
+  };
 }
 
 // Cancelling stops the NEXT collection. It must not touch paid_until: the buyer
@@ -258,8 +344,153 @@ async function cancelForProduct(accountId, product, deps) {
   return { result: 'cancelled', level: 'info', reason: 'subscription_cancelled' };
 }
 
+// After a full refund or a chargeback: stop collecting for what was just taken
+// back. The revoke floors every product of the order, but it used to leave the
+// subscription running, so the next collection charged the customer who had
+// asked for his money back, and handed him the plan again. Every line that pays
+// for a revoked product is cancelled: a ParaSign chargeback also stops a Firm
+// subscription, because that one would put ParaSign straight back.
+//
+// deps: as cancelForProduct. Returns [{ line, result, reason, level? }], one per
+// line; 'noop' for a line without a subscription, which is every line when
+// BILLING_MODE is empty, and then Mollie is never called.
+async function cancelOnRevoke(outcome, deps) {
+  if (!outcome || outcome.result !== 'revoked' || !outcome.account) return [];
+  const products = (outcome.grants || []).map((g) => g && g.product).filter(Boolean);
+  const out = [];
+  for (const line of linesCovering(products)) {
+    const r = await cancelForProduct(outcome.account, line, deps);
+    out.push(Object.assign({ line }, r));
+  }
+  return out;
+}
+
+// ── The mail for a collection that did not go through ────────────────────────
+// Amounts the way the invoice mails write them: currency, then the value.
+function moneyOf(amount) {
+  const a = amount || {};
+  return `${a.currency || 'EUR'} ${a.value || ''}`.trim();
+}
+
+// order: catalog.resolveOrder of the payment's metadata. paidUntil: the end of
+// the period already paid, which the failed collection was meant to extend.
+// amount: what Mollie tried to collect. Returns null when the order is unknown.
+function failedCollectionMail({ order, paidUntil, now, siteUrl, amount }) {
+  if (!order || order.error) return null;
+  const plan = planExpiry.bundleLabel(order.bundle) || planExpiry.planLabel(order.product, order.tier);
+  const planNl = planExpiry.bundleLabelNl(order.bundle) || planExpiry.planLabelNl(order.product, order.tier);
+  const pricing = `${String(siteUrl || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '')}/pricing`;
+  const at = paidUntil ? Date.parse(paidUntil) : NaN;
+  const nowMs = now instanceof Date ? now.getTime() : (typeof now === 'number' ? now : Date.now());
+  const running = Number.isFinite(at) && at > nowMs;
+  const money = moneyOf(amount && amount.value ? amount : { value: order.amount, currency: order.currency });
+
+  const subjectNl = `De automatische betaling voor uw ${planNl} is niet gelukt`;
+  const subjectEn = `The automatic payment for your ${plan} did not go through`;
+  const textNl = [
+    `De automatische betaling van ${money} voor uw ${planNl} is niet gelukt.`,
+    '',
+    running
+      ? `Uw plan loopt nog tot ${planExpiry.formatDateNl(at)}. Daarna gaat uw account terug naar Community, tenzij u zelf betaalt.`
+      : 'Uw plan staat daarom stil tot er betaald is.',
+    '',
+    `U kunt hier zelf betalen: ${pricing}`,
+    '',
+    'Paramant',
+  ].join('\n');
+  const textEn = [
+    `The automatic payment of ${money} for your ${plan} did not go through.`,
+    '',
+    running
+      ? `Your plan runs until ${planExpiry.formatDate(at)}. After that your account goes back to Community, unless you pay yourself.`
+      : 'Your plan is on hold until it is paid.',
+    '',
+    `You can pay yourself here: ${pricing}`,
+    '',
+    'Paramant',
+  ].join('\n');
+  return {
+    subject: planExpiry.bilingualSubject(subjectNl, subjectEn),
+    text: planExpiry.bilingualText(textNl, textEn),
+    html: planExpiry.htmlBody([[subjectNl, textNl], [subjectEn, textEn]], pricing),
+  };
+}
+
+// ── Does this line renew by itself? The answer the reminders need ─────────────
+// The pointers above live in users.json on the container that took the payment.
+// The paid-term reminder (plan-expiry) runs on whichever container holds its
+// lock, and it used to promise "nothing is charged automatically" to a customer
+// whose subscription was about to collect. So every pointer change is mirrored
+// into one shared hash, member "<accountId>|<line>", and the reminder asks it.
+const RENEWALS_HASH = 'paramant:billing:renewals';
+
+function renewalMember(accountId, line) {
+  return `${accountId}|${line}`;
+}
+
+// info: { subscriptionId, amount, currency, interval, startDate }. Unknown
+// fields are stored as null; the reminder then leaves the amount out rather
+// than guess one.
+async function recordRenewal(redis, accountId, line, info) {
+  if (!redis || !accountId || !subscriptionFieldOf(line)) return false;
+  const i = info || {};
+  await redis.hSet(RENEWALS_HASH, renewalMember(accountId, line), JSON.stringify({
+    subscription_id: i.subscriptionId || null,
+    amount: i.amount || null,
+    currency: i.currency || null,
+    interval: i.interval || null,
+    start_date: i.startDate || null,
+  }));
+  return true;
+}
+
+async function forgetRenewal(redis, accountId, line) {
+  if (!redis || !accountId || !subscriptionFieldOf(line)) return false;
+  await redis.hDel(RENEWALS_HASH, renewalMember(accountId, line));
+  return true;
+}
+
+// The renewal that covers this product for this account, or null. The line of
+// the bundle the term was bought as comes first, then every line that covers
+// the product. An entry that cannot be read still counts as a renewal: when in
+// doubt the reminder must not promise that nothing will be charged.
+async function renewalFor(redis, accountId, product, bundle) {
+  if (!redis || !accountId) return null;
+  const lines = [];
+  if (bundle && subscriptionFieldOf(bundle)) lines.push(bundle);
+  for (const line of linesCovering([product])) if (!lines.includes(line)) lines.push(line);
+  for (const line of lines) {
+    const raw = await redis.hGet(RENEWALS_HASH, renewalMember(accountId, line));
+    if (!raw) continue;
+    let parsed = null;
+    try { parsed = JSON.parse(raw); } catch { parsed = null; }
+    return Object.assign({ line }, parsed && typeof parsed === 'object' ? parsed : {});
+  }
+  return null;
+}
+
+// Once per container at boot, from the pointers it holds. Adds what the hash
+// does not know (after a redis flush, or for a subscription made before this
+// hash existed) and never overwrites or removes: a container that holds no
+// pointers must not be able to erase what the billing container wrote.
+// entries: iterable of { accountId, line, subscriptionId }.
+async function seedRenewals(redis, entries) {
+  let seeded = 0;
+  if (!redis) return { seeded };
+  for (const e of entries || []) {
+    if (!e || !e.accountId || !e.subscriptionId || !subscriptionFieldOf(e.line)) continue;
+    const added = await redis.hSetNX(RENEWALS_HASH, renewalMember(e.accountId, e.line), JSON.stringify({
+      subscription_id: e.subscriptionId, amount: null, currency: null, interval: null, start_date: null,
+    }));
+    if (added === true || added === 1) seeded++;
+  }
+  return { seeded };
+}
+
 module.exports = {
-  CUSTOMER_FIELD, PRODUCT_SUBSCRIPTION_FIELD, subscriptionFieldOf,
+  CUSTOMER_FIELD, PRODUCT_SUBSCRIPTION_FIELD, POINTER_FIELDS, subscriptionFieldOf, subscriptionPaymentFieldOf, linesCovering,
   startDateFor, subscriptionPayload, isFirstPayment, isRecurringPayment,
-  recurringAllowed, ensureCustomer, ensureSubscription, cancelForProduct,
+  FAILED_COLLECTION_STATUSES, isFailedCollection, failedCollectionMail,
+  recurringAllowed, ensureCustomer, ensureSubscription, cancelForProduct, cancelOnRevoke,
+  RENEWALS_HASH, recordRenewal, forgetRenewal, renewalFor, seedRenewals,
 };
