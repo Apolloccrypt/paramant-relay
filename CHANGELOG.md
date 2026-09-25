@@ -37,15 +37,17 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   The checkout now asks VIES about the buyer's VAT number (`relay/lib/vat.js`).
   Reverse charged only with `BILLING_SELLER_VAT` set, a number from a member
   state other than the Netherlands, a company name and an address on the
-  account, an address that names no other country, a VIES answer "valid" with a
+  account that hold a real word (not ".", "-" or "BV"), an address that names
+  no other country, a VIES answer "valid" with a
   consultation number, and no clearly different company or country in that
   answer (Implementing Regulation 282/2011 art. 18). Then the buyer is charged
   the net, the invoice says 0%, "Btw verlegd / VAT reverse charged" and both VAT
   numbers, and the terms ride on the Mollie payment so the webhook's amount
   check, every renewal and a credit note agree with what was charged. What VIES
   answered (date, consultation number, name, address) is kept under the
-  consultation number and copied onto the invoice; a checkout that cannot keep
-  it charges 21%. Everything else stays at 21%, and a buyer who entered an EU
+  consultation number and copied onto the invoice, for thirty days while the
+  checkout is unpaid and for good once its invoice exists; a checkout that
+  cannot keep it charges 21%. Everything else stays at 21%, and a buyer who entered an EU
   number and still pays 21% leaves a `billing_vat` warning with the country and
   the reason, never the number. The bookkeeping export has three new columns for
   the ICP return: `vat_treatment`, `customer_country`, `vat_consultation`.

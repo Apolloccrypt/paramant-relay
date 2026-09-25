@@ -46,13 +46,17 @@ const VAT = {
   eu: 'BE0999000001',
   invalid: 'DE999000002',
   down: 'FR99999000003',
+  // Valid, but with a consultation number the relay cannot file the proof
+  // under: the checkout that cannot keep its proof.
+  oddproof: 'BE0999000002',
 };
 const vies = { calls: [], override: new Map(), n: 0 };
 function viesAnswer(q) {
   const id = `${q.countryCode}${q.vatNumber}`;
-  const mode = vies.override.get(id) || (id === VAT.eu ? 'valid' : id === VAT.invalid ? 'invalid' : 'down');
+  const mode = vies.override.get(id) || (id === VAT.eu ? 'valid' : id === VAT.invalid ? 'invalid' : id === VAT.oddproof ? 'oddproof' : 'down');
   const base = { countryCode: q.countryCode, vatNumber: q.vatNumber, requestDate: new Date().toISOString() };
   if (mode === 'valid') return { ...base, valid: true, requestIdentifier: `WAPI-${RUN}-${++vies.n}`, name: 'ACME BE SRL', address: 'EXAMPLE STREET 2\n1000 EXAMPLE CITY' };
+  if (mode === 'oddproof') return { ...base, valid: true, requestIdentifier: 'not a consultation number', name: 'ACME BE SRL', address: 'EXAMPLE STREET 2\n1000 EXAMPLE CITY' };
   if (mode === 'invalid') return { ...base, valid: false, requestIdentifier: '', name: '---', address: '---' };
   return { actionSucceed: false, errorWrappers: [{ error: 'MS_UNAVAILABLE' }] };
 }
@@ -217,8 +221,11 @@ test('an EU business with a valid VAT number pays the net amount, and the invoic
   assert.match(p.metadata.vatConsultation, /^WAPI-/, 'the consultation number rides on the payment');
 
   // The proof, kept before the payment existed: what VIES said, and what the
-  // account said at that moment.
-  const proof = JSON.parse(await redis.get(`paramant:billing:vat:proof:${p.metadata.vatConsultation}`));
+  // account said at that moment. Thirty days while nothing is paid.
+  const proofKey = `paramant:billing:vat:proof:${p.metadata.vatConsultation}`;
+  const proof = JSON.parse(await redis.get(proofKey));
+  const unpaidTtl = await redis.ttl(proofKey);
+  assert.ok(unpaidTtl > 29 * 86400 && unpaidTtl <= 30 * 86400, `an unpaid checkout's proof expires in 30 days, ttl ${unpaidTtl}`);
   assert.strictEqual(proof.vat_id, VAT.eu);
   assert.strictEqual(proof.name, 'ACME BE SRL');
   assert.strictEqual(proof.address, 'EXAMPLE STREET 2\n1000 EXAMPLE CITY');
@@ -229,6 +236,7 @@ test('an EU business with a valid VAT number pays the net amount, and the invoic
   vies.override.set(VAT.eu, 'invalid');
   try { await payAndNotify(p.id); } finally { vies.override.delete(VAT.eu); }
   assert.strictEqual(viesCallsFor(VAT.eu).length, 1, 'the webhook does not ask VIES again');
+  assert.strictEqual(await redis.ttl(proofKey), -1, 'the invoice exists, so the proof is kept for good');
   const [inv] = await invoices('eu');
   assert.ok(inv, 'an invoice was issued');
   assert.strictEqual(inv.kind, 'invoice');
@@ -346,6 +354,13 @@ test("somebody else's valid number: without a name and an address, or under anot
   assert.strictEqual(viesCallsFor(VAT.eu).length, before, 'no name and no address, so VIES is not even asked');
   assert.ok(logLines().some((l) => l.msg === 'billing_vat' && l.account === acct && l.reason === 'incomplete_profile' && l.level === 'warn'));
 
+  // Review round 2: a dot for a name and a dot for an address is no better.
+  await srv.post('/v2/billing/profile', { ...as('down'), body: { company: '.', address: '.', vat: VAT.eu } });
+  const dots = await checkout('down');
+  assert.strictEqual(dots.amount.value, '35.09', '"." is not a company name');
+  assert.strictEqual(dots.metadata.vat, undefined);
+  assert.strictEqual(viesCallsFor(VAT.eu).length, before, 'and VIES is not asked for it');
+
   // A name and an address, but not the company VIES holds for that number.
   await srv.post('/v2/billing/profile', { ...as('down'), body: { company: 'Globex SRL', address: 'Example Street 9\n1000 Example City\nBelgium', vat: VAT.eu } });
   const other = await checkout('down');
@@ -357,5 +372,22 @@ test("somebody else's valid number: without a name and an address, or under anot
   assert.strictEqual(line.level, 'warn');
   const raw = JSON.stringify(line);
   assert.ok(!raw.includes(VAT.eu.slice(2)) && !raw.includes('Globex') && !raw.includes('ACME'), 'no number and no name in the log');
+  did();
+});
+
+test('a checkout that cannot keep its VIES proof charges 21%', async (t) => {
+  if (!srv) return t.skip('no redis');
+  // relay.js falls back when lib/vat.saveProof refuses. Here VIES answers valid
+  // with a consultation number that no proof can be filed under.
+  const acct = acctOf('invalid').slice(0, 12);
+  await srv.post('/v2/billing/profile', { ...as('invalid'), body: { company: 'Acme BE SRL', address: 'Example Street 2\n1000 Example City\nBelgium', vat: VAT.oddproof } });
+  const p = await checkout('invalid');
+  assert.strictEqual(viesCallsFor(VAT.oddproof).length, 1, 'VIES said valid');
+  assert.strictEqual(p.amount.value, '35.09', 'no proof, no reverse charge');
+  assert.strictEqual(p.metadata.vat, undefined);
+  const line = logLines().find((l) => l.msg === 'billing_vat' && l.account === acct && l.reason === 'proof_unsaved');
+  assert.ok(line, 'a billing_vat line with reason proof_unsaved');
+  assert.strictEqual(line.level, 'warn');
+  assert.ok(!JSON.stringify(line).includes(VAT.oddproof.slice(2)), 'no number in the log');
   did();
 });

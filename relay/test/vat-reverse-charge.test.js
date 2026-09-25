@@ -65,14 +65,18 @@ const ACME = { buyerCompany: 'Acme BE SRL', buyerAddress: 'Example Street 2\n100
 function fakeRedis() {
   const kv = new Map();
   const lists = new Map();
+  const ttls = new Map();
   return {
-    kv,
+    kv, ttls,
     async get(k) { return kv.has(k) ? kv.get(k) : null; },
     async set(k, v, opts) {
       if (opts && opts.NX && kv.has(k)) return null;
       kv.set(k, String(v));
+      if (opts && opts.EX) ttls.set(k, opts.EX); else ttls.delete(k);
       return 'OK';
     },
+    async persist(k) { return ttls.delete(k) ? 1 : 0; },
+    async ttl(k) { return kv.has(k) ? (ttls.has(k) ? ttls.get(k) : -1) : -2; },
     async del(k) { return kv.delete(k) ? 1 : 0; },
     async incr(k) { const n = (parseInt(kv.get(k) || '0', 10) || 0) + 1; kv.set(k, String(n)); return n; },
     async rPush(k, v) { const l = lists.get(k) || []; l.push(v); lists.set(k, l); return l.length; },
@@ -247,6 +251,60 @@ test('a valid answer without a consultation number is not accepted in silence: 2
     assert.strictEqual(t.treatment, 'standard');
     assert.strictEqual(t.reason, 'vies_no_consultation');
     assert.strictEqual(t.level, 'warn');
+  }
+  did();
+});
+
+test('".", "-", "BV" or "NV" is not a name or an address: 21%, and VIES is not asked', async () => {
+  // Review round 2: somebody else's valid number with a placeholder next to it.
+  const check = fakeCheck(VALID);
+  const cases = [];
+  for (const junk of ['.', '-', 'BV', 'NV', ' . ', 'B.V.']) {
+    cases.push({ buyerCompany: junk, buyerAddress: ACME.buyerAddress });
+    cases.push({ buyerCompany: ACME.buyerCompany, buyerAddress: junk });
+    cases.push({ buyerCompany: junk, buyerAddress: junk });
+  }
+  for (const who of cases) {
+    const t = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT, ...who }, { check });
+    assert.strictEqual(t.treatment, 'standard', JSON.stringify(who));
+    assert.strictEqual(t.reason, 'incomplete_profile', JSON.stringify(who));
+    assert.strictEqual(vat.chargeAmount(catalog.resolveOrder(FIRM), t), '35.09');
+  }
+  assert.strictEqual(check.calls.length, 0);
+  assert.strictEqual(vat.namesClearlyDiffer('.', 'ACME BE SRL'), true, 'no word never matches a name VIES gives');
+  did();
+});
+
+test('a word many companies share does not make two names the same', async () => {
+  const smith = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT, buyerCompany: 'Global Consulting', buyerAddress: ACME.buyerAddress },
+    { check: fakeCheck({ ...VALID, name: 'SMITH CONSULTING BV' }) });
+  assert.strictEqual(smith.treatment, 'standard');
+  assert.strictEqual(smith.reason, 'name_mismatch');
+  for (const [mine, theirs] of [['Global Services Group', 'SMITH SERVICES'], ['Acme Holding', 'GLOBEX HOLDING NV'], ['Acme International Trading', 'GLOBEX TRADING']]) {
+    assert.strictEqual(vat.namesClearlyDiffer(mine, theirs), true, `${mine} / ${theirs}`);
+  }
+  assert.strictEqual(vat.namesClearlyDiffer('Acme Consulting', 'ACME CONSULTING BV'), false, 'the distinctive word still matches');
+  const generic = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT, buyerCompany: 'Consulting Services BV', buyerAddress: ACME.buyerAddress }, { check: fakeCheck(VALID) });
+  assert.strictEqual(generic.reason, 'incomplete_profile', 'a name made of shared words only says nothing');
+  did();
+});
+
+test('the proof of a checkout is kept thirty days, and for good once its invoice exists', async () => {
+  assert.strictEqual(vat.PROOF_TTL_DAYS, 30);
+  const redis = fakeRedis();
+  const t = await vat.decide({ buyerVat: EU_VAT, sellerVat: SELLER_VAT, now: NOW, ...ACME }, { check: fakeCheck(VALID) });
+  assert.deepStrictEqual(await vat.saveProof(t, redis, { accountId: 'acct_demo' }), { ok: true });
+  const key = vat.PROOF_KEY(VALID.requestIdentifier);
+  assert.strictEqual(await redis.ttl(key), 30 * 86400, 'a checkout that is never paid leaves nothing behind for long');
+  assert.deepStrictEqual(await vat.keepProof(VALID.requestIdentifier, redis), { ok: true });
+  assert.strictEqual(await redis.ttl(key), -1, 'kept with the invoice');
+  assert.deepStrictEqual(await vat.keepProof(VALID.requestIdentifier, redis), { ok: true }, 'a renewal may do it again');
+  const broken = Object.assign(fakeRedis(), { async set() { throw new Error('READONLY'); } });
+  assert.strictEqual((await vat.saveProof(t, broken)).ok, false, 'a store that refuses is no proof');
+  // /privacy says the same number.
+  for (const [rel, words] of [['privacy.html', 'na 30 dagen'], ['en/privacy.html', 'after 30 days']]) {
+    const html = fs.readFileSync(path.join(__dirname, '..', '..', 'frontend', rel), 'utf8');
+    assert.ok(html.includes(words), `${rel} names the ${vat.PROOF_TTL_DAYS}-day term`);
   }
   did();
 });

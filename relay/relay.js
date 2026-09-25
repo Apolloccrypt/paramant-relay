@@ -3038,6 +3038,14 @@ async function _issueInvoiceForPayment(payment, outcome) {
       vat: vatTerms,
     }, redis);
 
+    // The invoice exists, so the VIES proof it rests on is kept as long as the
+    // invoice is: its checkout TTL goes (lib/vat.keepProof). Idempotent, so a
+    // repeat webhook or a renewal simply does it again.
+    if (vatMod.isReverseCharge(vatTerms) && (out.result === 'issued' || out.result === 'existing')) {
+      const kept = await vatMod.keepProof(vatTerms.consultation, redis);
+      if (!kept.ok) log('warn', 'billing_vat_proof_keep_failed', { payment_id: payment.id, reason: kept.reason });
+    }
+
     if (out.result !== 'issued') {
       log(out.result === 'existing' ? 'info' : 'warn', 'billing_invoice', {
         payment_id: payment.id, result: out.result, reason: out.reason, number: out.number,

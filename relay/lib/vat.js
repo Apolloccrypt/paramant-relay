@@ -36,9 +36,11 @@
 //
 // THE PROOF IS KEPT. What VIES answered (date, consultation number, and the
 // name and address it holds for the number) is stored at the checkout under the
-// consultation number, without a TTL like every other bookkeeping record, and
-// copied onto the invoice (vat_check). A checkout that cannot store it is a 21%
-// checkout.
+// consultation number, and copied onto the invoice (vat_check). A checkout that
+// cannot store it is a 21% checkout. It is stored for thirty days first: most
+// checkouts are never paid, and their proof then belongs to nothing. Once the
+// payment is in and its invoice exists, the proof loses its TTL and is kept
+// like every other bookkeeping record.
 //
 // WHERE THE DECISION LIVES AFTERWARDS. On the payment itself: the checkout puts
 // the terms in the Mollie metadata, and Mollie hands them back on every fetch.
@@ -59,6 +61,9 @@ const invoice = require('./invoice');
 // The proof of one VIES check, by its consultation number. No TTL: it is part
 // of the documents that must be kept seven years (AWR art. 52).
 const PROOF_KEY = (consultation) => `paramant:billing:vat:proof:${consultation}`;
+// How long the proof of a checkout that is never paid is kept. /privacy says
+// this number; test/vat-reverse-charge.test.js holds the two together.
+const PROOF_TTL_DAYS = 30;
 
 // Hard-coded, as lib/mollie.js hard-codes api.mollie.com: the caller never
 // supplies a URL, so there is no SSRF surface here.
@@ -168,38 +173,59 @@ async function checkVies(query, deps = {}) {
 }
 
 // ── names and countries ──────────────────────────────────────────────────────
-// Legal forms and filler words carry no identity: "Acme BE SRL" and "ACME" are
-// the same company, "Acme" and "Globex NV" are not.
+// Legal forms, filler and the words half of all company names share carry no
+// identity: "Acme BE SRL" and "ACME" are the same company, "Acme" and "Globex
+// NV" are not, and neither are "Global Consulting" and "SMITH CONSULTING BV".
 const NAME_NOISE = new Set([
+  // legal forms
   'ab', 'ad', 'ag', 'aps', 'as', 'asbl', 'ay', 'bt', 'bv', 'bvba', 'co', 'cie', 'comm',
   'commv', 'corp', 'cv', 'cvba', 'dd', 'doo', 'ead', 'eeig', 'ek', 'eood', 'eurl', 'ewiv',
   'gie', 'gmbh', 'hb', 'inc', 'kb', 'kft', 'kg', 'kkt', 'limited', 'llc', 'ltd', 'mbh',
   'nv', 'nyrt', 'ohg', 'oy', 'oyj', 'ood', 'ou', 'plc', 'sa', 'sapa', 'sarl', 'sas',
   'sasu', 'sc', 'sca', 'scrl', 'scs', 'se', 'sia', 'sl', 'sll', 'slu', 'snc', 'sp',
   'spa', 'sprl', 'spzoo', 'sro', 'srl', 'ss', 'uab', 'ug', 'vof', 'vzw', 'zoo', 'zrt',
+  // filler
   'and', 'de', 'der', 'die', 'en', 'et', 'het', 'la', 'le', 'les', 'of', 'the', 'und', 'van',
+  // words many unrelated companies share
+  'company', 'companies', 'consult', 'consultancy', 'consultants', 'consulting', 'digital',
+  'enterprise', 'enterprises', 'group', 'groep', 'groupe', 'gruppe', 'grupo', 'handel',
+  'holding', 'holdings', 'industries', 'international', 'management', 'partners',
+  'service', 'services', 'software', 'solution', 'solutions', 'systems', 'technologies',
+  'technology', 'trading',
 ]);
 
 function plain(raw) {
   return String(raw || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
+// Dots go first, so "B.V." and "S.R.L." read as the legal forms they are; a
+// single letter left on its own is not a word.
 function nameTokens(raw) {
-  return plain(raw).replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter((t) => t && !NAME_NOISE.has(t));
+  return plain(raw).replace(/\./g, '').replace(/[^a-z0-9]+/g, ' ').trim().split(' ')
+    .filter((t) => t.length > 1 && !NAME_NOISE.has(t));
+}
+
+// Whether a name or an address holds at least one word that says something:
+// not a legal form, not filler, not punctuation. ".", "-", "BV" and "NV" hold
+// none, and a number with nothing but those next to it can be anyone's.
+function hasWord(raw) {
+  return nameTokens(raw).length > 0;
 }
 
 // Whether VIES names a clearly different company than the account does. Only
 // when VIES discloses a name at all: several member states answer '---', and
-// then there is nothing to compare, which is not a difference. A name in a
-// script this cannot read is not compared either. One name containing the
-// other, or one shared word of three letters or more, is the same company;
-// nothing in common is a clear difference.
+// then there is nothing to compare, which is not a difference. A VIES name in
+// a script this cannot read is not compared either. An account name without a
+// word never matches a name VIES does give. One name containing the other, or
+// one shared word of three letters or more, is the same company; nothing in
+// common is a clear difference.
 function namesClearlyDiffer(accountName, viesName) {
   const v = String(viesName || '').trim();
   if (!v || /^-+$/.test(v)) return false;
   const a = nameTokens(accountName);
   const b = nameTokens(v);
-  if (!a.length || !b.length) return false;
+  if (!b.length) return false;
+  if (!a.length) return true;
   const ca = a.join('');
   const cb = b.join('');
   if (ca.includes(cb) || cb.includes(ca)) return false;
@@ -274,9 +300,10 @@ async function decide({ buyerVat, buyerCompany, buyerAddress, sellerVat, now }, 
 
   // Before VIES is asked anything: without a name and an address there is
   // nothing to hold its answer against, and a number alone can be anyone's.
+  // "." or "BV" is not a name, and "-" is not an address.
   const company = String(buyerCompany || '').trim();
   const address = String(buyerAddress || '').trim();
-  if (!company || !address) return standard('incomplete_profile', buyer.country, 'warn');
+  if (!hasWord(company) || !hasWord(address)) return standard('incomplete_profile', buyer.country, 'warn');
   const stated = countryInAddress(address);
   if (stated && stated !== buyer.country) return standard('country_mismatch', buyer.country, 'warn', `address_${stated}`);
 
@@ -338,11 +365,21 @@ function proofOf(terms, who = {}) {
   };
 }
 
+// At the checkout: with the thirty-day TTL.
 async function saveProof(terms, redis, who) {
   if (!isReverseCharge(terms) || !CONSULTATION_RE.test(String(terms.consultation || ''))) return { ok: false, reason: 'no_consultation' };
   if (!redis) return { ok: false, reason: 'no_redis' };
-  try { await redis.set(PROOF_KEY(terms.consultation), JSON.stringify(proofOf(terms, who))); }
+  try { await redis.set(PROOF_KEY(terms.consultation), JSON.stringify(proofOf(terms, who)), { EX: PROOF_TTL_DAYS * 86400 }); }
   catch (e) { return { ok: false, reason: `store_failed:${e.message}` }; }
+  return { ok: true };
+}
+
+// Once the invoice exists: the TTL goes, and the proof is kept with it.
+// Idempotent, so every renewal may call it again.
+async function keepProof(consultation, redis) {
+  if (!redis || !CONSULTATION_RE.test(String(consultation || ''))) return { ok: false, reason: 'no_consultation' };
+  try { await redis.persist(PROOF_KEY(consultation)); }
+  catch (e) { return { ok: false, reason: `persist_failed:${e.message}` }; }
   return { ok: true };
 }
 
@@ -392,8 +429,8 @@ function termsFromMetadata(md) {
 }
 
 module.exports = {
-  VIES_HOST, VIES_PATH, VIES_TIMEOUT_MS, EU_PREFIXES, REVERSE_CHARGE, PROOF_KEY,
+  VIES_HOST, VIES_PATH, VIES_TIMEOUT_MS, EU_PREFIXES, REVERSE_CHARGE, PROOF_KEY, PROOF_TTL_DAYS,
   parseVatId, isReverseCharge, httpsJson, checkVies, decide,
-  namesClearlyDiffer, countryInAddress, saveProof, loadProof,
+  hasWord, namesClearlyDiffer, countryInAddress, saveProof, keepProof, loadProof,
   chargeAmount, metadataOf, termsFromMetadata,
 };
