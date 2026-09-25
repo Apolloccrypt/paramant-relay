@@ -168,6 +168,7 @@ const parasignAuditExport = require('./lib/parasign-audit-export'); // GET /v2/p
 const transferNotify   = require('./lib/transfer-notify');   // ParaSend Pro upload/download mail
 const invoiceMod       = require('./lib/invoice');            // invoice numbering, records and VAT split
 const invoicePdf       = require('./lib/invoice-pdf');        // one-page PDF writer, no dependency
+const vatMod           = require('./lib/vat');                // 21% or reverse charged, VIES check at checkout
 const creditNote       = require('./lib/credit-note');        // credit notes (CN series) for money that goes back
 const billingMail      = require('./lib/billing-mail');       // bilingual (NL, then EN) text of the invoice and credit-note mails
 const billingHistory   = require('./lib/billing-history');    // one chronological list, derived from the records
@@ -2960,6 +2961,29 @@ async function _billingBuyerOf(accountId) {
   return buyer;
 }
 
+// The VAT terms of one checkout (lib/vat.js): 21%, or reverse charged for a
+// business in another EU member state whose VAT number VIES confirms now.
+// Never throws and never blocks the sale: anything that goes wrong is a 21%
+// sale and a log line. The log names the country and the reason, never the
+// number itself. A buyer without a VAT number is the ordinary case and gets no
+// line of its own.
+async function _vatTermsForCheckout(accountId) {
+  let terms;
+  try {
+    const buyer = await _billingBuyerOf(accountId);
+    terms = await vatMod.decide({ buyerVat: buyer.vat, sellerVat: invoiceMod.sellerFromEnv(process.env).vat });
+  } catch (e) {
+    terms = { treatment: 'standard', reason: 'vat_check_failed', level: 'warn', detail: e.message };
+  }
+  if (terms.reason !== 'no_vat_id') {
+    log(terms.level || 'info', 'billing_vat', {
+      account: String(accountId).slice(0, 12), treatment: terms.treatment, reason: terms.reason,
+      country: terms.country, detail: terms.detail,
+    });
+  }
+  return terms;
+}
+
 // One warning per process, not one per payment: a missing BILLING_SELLER_VAT is
 // a configuration fact, and repeating it on every sale would bury the log line
 // that means something.
@@ -2991,6 +3015,9 @@ async function _issueInvoiceForPayment(payment, outcome) {
       seller,
       buyer: await _billingBuyerOf(md.accountId),
       periodEnd: outcome && outcome.paidUntil,
+      // The terms the payment was sold under, from its own metadata: what the
+      // buyer was charged decides what the document says.
+      vat: vatMod.termsFromMetadata(md),
     }, redis);
 
     if (out.result !== 'issued') {
@@ -8455,6 +8482,10 @@ async function handleRelayRequest(req, res) {
     const stance = mollie.billingStance();
     const mode = stance.mode;
     const origin = process.env.PARASIGN_PUBLIC_ORIGIN || 'https://paramant.app';
+    // The VAT: 21% as every catalog price includes, unless reverse charged.
+    // Decided once, here, and carried on the payment (lib/vat.js), so the
+    // webhook's amount check, the invoice and every renewal agree with it.
+    const vatTerms = await _vatTermsForCheckout(accountId);
     try {
       // A Mollie customer, and a payment marked as the FIRST of a series. Both
       // are required before Mollie will create a mandate, and without a mandate
@@ -8478,14 +8509,16 @@ async function handleRelayRequest(req, res) {
       }
       const customerId = cust.customerId;
       const payment = await mollie.createPayment(mode, Object.assign({
-        amount: { currency: order.currency, value: order.amount },
+        amount: { currency: order.currency, value: vatMod.chargeAmount(order, vatTerms) },
         description: `Paramant ${billingCatalog.orderLabel(order)} (${order.interval})`,
         redirectUrl: `${origin}/dashboard?billing=return`,
         webhookUrl: `${origin}/v2/billing/webhook`,
-        metadata: { accountId, product: order.product, plan: order.plan, interval: order.interval },
+        // A reverse-charged sale adds its terms (lib/vat.metadataOf); a 21%
+        // sale adds nothing, so its payload is what it always was.
+        metadata: { accountId, product: order.product, plan: order.plan, interval: order.interval, ...vatMod.metadataOf(vatTerms) },
       }, customerId ? { customerId, sequenceType: 'first' } : {}));
       const checkoutUrl = payment && payment._links && payment._links.checkout && payment._links.checkout.href;
-      log('info', 'billing_checkout_created', { account: String(accountId).slice(0, 12), product: order.product, plan: order.plan, interval: order.interval, payment_id: payment && payment.id, mode, recurring: !!customerId });
+      log('info', 'billing_checkout_created', { account: String(accountId).slice(0, 12), product: order.product, plan: order.plan, interval: order.interval, payment_id: payment && payment.id, mode, recurring: !!customerId, vat: vatTerms.treatment });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, payment_id: payment && payment.id, checkout_url: checkoutUrl, mode }));
     } catch (e) {

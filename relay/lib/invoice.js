@@ -49,14 +49,28 @@
 //     lib/credit-note.js. What stays here is recordReversal, the marker that
 //     says an invoice was credited IN FULL, so a reader of the invoice alone
 //     is not misled.
-//   - reverse charge / VAT-MOSS. Every catalog price is 21% Dutch VAT and that
-//     is what was actually charged, so that is what the document states. An
-//     EU customer outside NL with a VAT number is charged the same 21% today;
-//     changing that is a pricing decision, not a formatting one.
+//   - deciding whether a sale is reverse charged. lib/vat.js decides that at
+//     the checkout and the terms travel on the payment; this module only
+//     writes down what the payment says. A reverse-charged document carries
+//     0% and no VAT amount, `vat_treatment: 'reverse_charge'`, the buyer VAT
+//     number VIES confirmed, and the mention "Btw verlegd" / "VAT reverse
+//     charged" on the PDF and in the mail. Every other document is 21%, as
+//     before.
+//   - VAT-MOSS / OSS for private buyers in other member states. They pay 21%
+//     Dutch VAT, as every catalog price includes.
 
 const catalog = require('./billing-catalog');
 
 const CATALOG_VAT_RATE = 21;
+
+// The mention a reverse-charged document carries, in the two languages the
+// documents speak. Kept here with the other fixed sentences of a document.
+const REVERSE_CHARGE_NL = 'Btw verlegd';
+const REVERSE_CHARGE_EN = 'VAT reverse charged';
+
+function isReverseCharged(vatTerms) {
+  return !!(vatTerms && vatTerms.treatment === 'reverse_charge' && vatTerms.vatId);
+}
 
 // ── redis key shapes ─────────────────────────────────────────────────────────
 // None of these ever get a TTL. Dutch bookkeeping retention is seven years
@@ -175,9 +189,9 @@ function describe(order) {
   return `Paramant ${label}, ${interval} plan`;
 }
 
-function buildRecord({ number, kind, seller, buyer, order, payment, split, now, periodEnd }) {
+function buildRecord({ number, kind, seller, buyer, order, payment, split, now, periodEnd, vat }) {
   const issued = now instanceof Date ? now : new Date();
-  return {
+  const record = {
     number,
     kind,
     title: documentTitle(kind),
@@ -209,6 +223,17 @@ function buildRecord({ number, kind, seller, buyer, order, payment, split, now, 
       vat: buyer.vat || '',
     },
   };
+  // Reverse charged: the buyer VAT number is the one VIES confirmed at the
+  // checkout, normalised, not whatever the profile says by the time the webhook
+  // runs. Only these documents get the extra fields, so every other record
+  // keeps exactly the shape it always had.
+  if (isReverseCharged(vat)) {
+    record.vat_treatment = 'reverse_charge';
+    record.vat_check = { source: 'VIES', checked_at: vat.checkedAt || '', consultation: vat.consultation || '' };
+    record.buyer.vat = vat.vatId;
+    record.buyer.country = vat.country || '';
+  }
+  return record;
 }
 
 // The line the document carries when the account never filled in company
@@ -231,7 +256,7 @@ function buyerIsComplete(buyer) {
 //   'existing'    this payment already has one; record is that one
 //   'deferred'    another attempt holds the claim right now; try again later
 //   'unavailable' no redis; nothing was written
-async function issueDocument({ payment, order, seller, buyer, now, periodEnd }, redis) {
+async function issueDocument({ payment, order, seller, buyer, now, periodEnd, vat }, redis) {
   if (!redis) return { result: 'unavailable', reason: 'no_redis' };
   if (!payment || !payment.id) return { result: 'unavailable', reason: 'no_payment' };
 
@@ -275,11 +300,13 @@ async function issueDocument({ payment, order, seller, buyer, now, periodEnd }, 
   catch (e) { return { result: 'unavailable', reason: `seq_failed:${e.message}` }; }
   const number = formatNumber(year, seq);
 
-  const split = splitVat(payment.amount && payment.amount.value, CATALOG_VAT_RATE);
+  // `vat` is the terms the payment was sold under (lib/vat.termsFromMetadata).
+  // Reverse charged means the amount paid was the net, so it splits at 0%.
+  const split = splitVat(payment.amount && payment.amount.value, isReverseCharged(vat) ? 0 : CATALOG_VAT_RATE);
   if (!split) return { result: 'unavailable', reason: 'bad_amount' };
 
   const kind = documentKind(seller);
-  const record = buildRecord({ number, kind, seller, buyer, order, payment, split, now: issued, periodEnd });
+  const record = buildRecord({ number, kind, seller, buyer, order, payment, split, now: issued, periodEnd, vat });
 
   // Step 3: the record first, then the claim, then the lists. In that order a
   // crash leaves at worst a document nobody has indexed yet, never a claim
@@ -367,6 +394,7 @@ async function recordForPayment(paymentId, redis) {
 
 module.exports = {
   CATALOG_VAT_RATE, K, BUYER_HINT, RECEIPT_NOTE, PENDING_TAKEOVER_MS,
+  REVERSE_CHARGE_NL, REVERSE_CHARGE_EN, isReverseCharged,
   sellerFromEnv, documentKind, documentTitle, buyerIsComplete,
   centsOf, money, splitVat, formatNumber, parseNumber, parseDocumentNumber,
   describe, buildRecord,

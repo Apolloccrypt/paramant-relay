@@ -14,6 +14,7 @@
 // function here exists to make that impossible to get wrong by accident.
 
 const catalog = require('./billing-catalog');
+const vat = require('./vat');
 
 // One Mollie customer per Paramant account, and one subscription per SOLD LINE.
 // Per line, because the ParaSign and ParaSend plans that predate Firm are
@@ -59,7 +60,10 @@ function startDateFor(paidUntil, now) {
 // a subscription, so a caller can refuse to create one rather than create a
 // wrong one. There is no default startDate on purpose: a missing paid_until is
 // an error, never "start today".
-function subscriptionPayload({ order, paidUntil, accountId, webhookUrl, mollieInterval, now }) {
+// vatTerms: the terms the first payment was sold under (lib/vat.js). A
+// reverse-charged buyer is collected the net every period, and the marker rides
+// along in the metadata so each renewal is checked and invoiced the same way.
+function subscriptionPayload({ order, paidUntil, accountId, webhookUrl, mollieInterval, now, vatTerms }) {
   if (!order || order.error) return { error: 'bad_order' };
   const interval = mollieInterval(order.interval);
   if (!interval) return { error: `no_interval:${order.interval}` };
@@ -69,7 +73,7 @@ function subscriptionPayload({ order, paidUntil, accountId, webhookUrl, mollieIn
 
   return {
     payload: {
-      amount: { currency: order.currency, value: order.amount },
+      amount: { currency: order.currency, value: vat.chargeAmount(order, vatTerms) },
       interval,
       startDate,
       description: `Paramant ${catalog.orderLabel(order)} (${order.interval})`,
@@ -78,12 +82,12 @@ function subscriptionPayload({ order, paidUntil, accountId, webhookUrl, mollieIn
       // carries the subscription's metadata, not the first payment's, so
       // leaving this out would make every renewal land as 'missing_metadata'
       // and grant nothing: the customer would be charged and get nothing.
-      metadata: {
+      metadata: Object.assign({
         accountId,
         product: order.product,
         plan: order.plan,
         interval: order.interval,
-      },
+      }, vat.metadataOf(vatTerms)),
     },
   };
 }
@@ -211,6 +215,7 @@ async function ensureSubscription(payment, grant, deps) {
     webhookUrl: d.webhookUrl,
     mollieInterval: m.mollieInterval,
     now: d.now,
+    vatTerms: vat.termsFromMetadata(payment && payment.metadata),
   });
   if (built.error) return { result: 'failed', level: 'error', reason: `payload:${built.error}` };
 

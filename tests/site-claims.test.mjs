@@ -1961,9 +1961,14 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
     `the checkout payload now sends ${fields.join(', ')}; the /dpa data column has to say so`);
   const meta = /metadata:\s*\{([^}]*)\}/.exec(payload);
   assert.ok(meta, 'the checkout payload must still carry a metadata object');
-  const metaKeys = meta[1].split(',').map((k) => k.split(':')[0].trim()).filter(Boolean);
+  const metaEntries = meta[1].split(',').map((k) => k.split(':')[0].trim()).filter(Boolean);
+  const metaKeys = metaEntries.filter((k) => !k.startsWith('...'));
   assert.deepEqual(metaKeys, ['accountId', 'product', 'plan', 'interval'],
     `the payment metadata is now ${metaKeys.join(', ')}; the /dpa and /privacy columns name the old set`);
+  // The one spread: a reverse-charged sale adds its VAT terms (relay/lib/vat.js).
+  // Anything else spread into the payload would reach Mollie unnamed.
+  assert.deepEqual(metaEntries.filter((k) => k.startsWith('...')), ['...vatMod.metadataOf(vatTerms)'],
+    'the checkout metadata spreads in something other than the VAT terms; the /dpa and /privacy columns do not name it');
   assert.ok(!/email/i.test(payload),
     'the checkout payload now carries an email field; /dpa and /privacy say no email address is sent');
 
@@ -1975,9 +1980,15 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
   assert.match(rec, /email:\s*\(rec && rec\.email\)/,
     'the customer record no longer sends the account email; rewrite the Mollie rows rather than delete this line');
 
+  // What that spread adds, asked of the module rather than copied: the pages
+  // have to name these keys, and only for a reverse-charged sale.
+  const { createRequire } = await import('node:module');
+  const vatLib = createRequire(import.meta.url)(path.join(ROOT, 'relay/lib/vat.js'));
+  assert.deepEqual(vatLib.metadataOf({ treatment: 'standard' }), {}, 'a 21% sale must add nothing to the Mollie metadata');
+  const vatKeys = Object.keys(vatLib.metadataOf({ treatment: 'reverse_charge', vatId: 'BE0999000001', country: 'BE' }));
+
   // The stance itself, called rather than pattern-matched: an unset
   // BILLING_MODE with a live key is production today, and it is one-off only.
-  const { createRequire } = await import('node:module');
   const mollieLib = createRequire(import.meta.url)(path.join(ROOT, 'relay/lib/mollie.js'));
   const savedEnv = { BILLING_MODE: process.env.BILLING_MODE, MOLLIE_API_KEY: process.env.MOLLIE_API_KEY, MOLLIE_TEST_API_KEY: process.env.MOLLIE_TEST_API_KEY };
   try {
@@ -2000,9 +2011,13 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
     'dpa (nl): the Mollie data column must name the amount and the description');
   assert.ok(dpaNl.includes('Er wordt geen e-mailadres verstuurd zolang terugkerende betaling uit staat'),
     'dpa (nl): the Mollie data column must say no email address is sent');
+  assert.ok(dpaNl.includes(`Alleen bij verlegde btw komen daar het btw-nummer van het bedrijf en het bewijs van de controle bij: ${vatKeys.join(', ')}`),
+    `dpa (nl): the Mollie data column must name the keys a reverse-charged sale adds (${vatKeys.join(', ')})`);
   const privNl = visible(page('privacy'));
   assert.ok(privNl.includes(`betaalmetadata (${metaKeys.join(', ')})`),
     'privacy (nl): the Mollie entry must name the same metadata keys');
+  assert.ok(privNl.includes(`Alleen bij verlegde btw komen daar het btw-nummer van het bedrijf en het bewijs van de controle bij (${vatKeys.join(', ')})`),
+    'privacy (nl): the Mollie entry must name the keys a reverse-charged sale adds');
   assert.ok(privNl.includes('Elke betaling is eenmalig, voor de termijn die u koopt; er zijn geen abonnementen'),
     'privacy (nl): the Mollie entry must describe one-off payments only');
   const termsNl = visible(page('terms'));
@@ -2024,9 +2039,13 @@ test('the Mollie row on /dpa is the payload relay.js sends, and the stance the p
   assert.ok(dpaPage.includes('No email address is sent while recurring billing is off'),
     'dpa: the Mollie data column must say no email address is sent, because the payload carries none');
 
+  assert.ok(dpaPage.includes(`Only when the VAT is reverse charged are the business's VAT number and the proof of the check added: ${vatKeys.join(', ')}`),
+    `dpa: the Mollie data column must name the keys a reverse-charged sale adds (${vatKeys.join(', ')})`);
   const privPage = visible(page('en/privacy'));
   assert.ok(privPage.includes(`payment metadata (${metaKeys.join(', ')})`),
     'privacy: the Mollie entry must name the same metadata keys');
+  assert.ok(privPage.includes(`Only when the VAT is reverse charged are the business's VAT number and the proof of the check added (${vatKeys.join(', ')})`),
+    'privacy: the Mollie entry must name the keys a reverse-charged sale adds');
   assert.ok(privPage.includes('Every payment is a one-off for the term you buy; there are no subscriptions'),
     'privacy: the Mollie entry must describe the stance the code takes, which is one-off payments only');
   const termsPage = visible(page('en/terms'));

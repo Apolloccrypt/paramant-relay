@@ -17,6 +17,7 @@
 const catalog = require('./billing-catalog');
 const creditNote = require('./credit-note');
 const invoice = require('./invoice');
+const vat = require('./vat');
 
 // ── has any money gone back, and was it all of it ────────────────────────────
 // The document layer (credit-note.js) and this layer must agree about what
@@ -180,13 +181,16 @@ async function processPayment(payment, deps) {
   }
 
   if (status === 'paid') {
-    // Rule 2: the amount + currency actually paid must match the catalog.
+    // Rule 2: the amount + currency actually paid must match the catalog. A
+    // reverse-charged sale (lib/vat.js; the marker is on the payment, set by
+    // our own checkout) was charged the catalog price without the VAT.
     const paid = payment.amount && payment.amount.value;
     const cur = payment.amount && payment.amount.currency;
-    if (cur !== order.currency || !catalog.amountsEqual(paid, order.amount)) {
+    const expected = vat.chargeAmount(order, vat.termsFromMetadata(md));
+    if (cur !== order.currency || !catalog.amountsEqual(paid, expected)) {
       return {
         result: 'refused', level: 'error', account: accountId, product,
-        reason: `amount_mismatch paid=${paid}/${cur} expected=${order.amount}/${order.currency}`,
+        reason: `amount_mismatch paid=${paid}/${cur} expected=${expected}/${order.currency}`,
       };
     }
     // The period this payment bought. Without it the grant never ends: Mollie is

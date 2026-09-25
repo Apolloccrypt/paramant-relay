@@ -22,6 +22,8 @@
 // bytes, which is what the test that checks the legally required fields does,
 // and what anyone debugging a customer's document a year from now will do.
 
+const { REVERSE_CHARGE_NL, REVERSE_CHARGE_EN } = require('./invoice');
+
 const PAGE = { width: 595.28, height: 841.89 };   // A4 in points
 const MARGIN = 56;                                 // ~20mm
 const FONTS = { regular: 'F1', bold: 'F2', mono: 'F3' };
@@ -268,10 +270,22 @@ function render(record, opts = {}) {
     doc.text(v, right, y, { font: FONTS.mono, size: bold ? 11 : 10, align: 'right' });
     y += bold ? 18 : 14;
   };
+  const reverseCharged = record.vat_treatment === 'reverse_charge';
   total('Subtotal excl. VAT', `${cur} ${record.amount_net}`, false);
-  total(`VAT ${record.vat_rate}%`, `${cur} ${record.amount_vat}`, false);
+  total(reverseCharged ? 'VAT' : `VAT ${record.vat_rate}%`, `${cur} ${record.amount_vat}`, false);
   total(isCredit ? 'Total credited' : 'Total', `${cur} ${record.amount_gross}`, true);
   y += 6;
+  // Reverse charge: the mention the law asks for, in both languages, with both
+  // VAT numbers next to it so nobody has to look for them (Directive
+  // 2006/112/EC art. 226; Wet OB art. 35a). The customer accounts for the VAT.
+  if (reverseCharged) {
+    doc.text(`${REVERSE_CHARGE_NL} / ${REVERSE_CHARGE_EN}`, right, y, { font: FONTS.bold, size: 10, align: 'right' });
+    y += 14;
+    doc.text(`Customer VAT ${buyer.vat || '-'} - Supplier VAT ${seller.vat || '-'}`, right, y, { size: 9, align: 'right', grey: 0.35 });
+    y += 12;
+    doc.text('VAT to be accounted for by the customer (Article 196, Directive 2006/112/EC).', right, y, { size: 9, align: 'right', grey: 0.35 });
+    y += 18;
+  }
   // What the reader owes, in one line, and it is never "nothing to do here".
   // On a credit note the money has already moved back, by the same route it
   // came in, and saying so is what stops a support mail.

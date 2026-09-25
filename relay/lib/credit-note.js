@@ -140,7 +140,7 @@ function describe(original) {
 function buildRecord({ number, original, amounts, reason, payment, now, partial }) {
   const issued = now instanceof Date ? now : new Date();
   const forInvoice = original.kind === 'invoice';
-  return {
+  const record = {
     number,
     kind: 'credit_note',
     series: 'CN',
@@ -169,6 +169,11 @@ function buildRecord({ number, original, amounts, reason, payment, now, partial 
     seller: Object.assign({}, original.seller),
     buyer: Object.assign({}, original.buyer),
   };
+  // A credit note for a reverse-charged invoice is reverse charged too, and
+  // says so in the same words (lib/invoice.js). Other records keep their shape.
+  if (original.vat_treatment) record.vat_treatment = original.vat_treatment;
+  if (original.vat_check) record.vat_check = Object.assign({}, original.vat_check);
+  return record;
 }
 
 // ── what has already been given back ─────────────────────────────────────────

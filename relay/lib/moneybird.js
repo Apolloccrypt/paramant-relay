@@ -416,6 +416,7 @@ function invoicePayload({ record, contactId, taxRateId }) {
 //   { result: 'pushed',   id }        it is in Moneybird now
 //   { result: 'existing', id }        it already was; nothing was sent
 //   { result: 'disabled' }            no token or no administration id
+//   { result: 'skipped', reason }     reverse charged: booked by hand, see below
 //   { result: 'failed', reason, permanent, retry_at }   queued for the sweep
 async function pushDocument(deps) {
   const d = deps || {};
@@ -451,6 +452,19 @@ async function pushDocument(deps) {
     } catch { /* the caller's copy is still a document */ }
   }
   if (record.moneybird_id) return { result: 'existing', id: String(record.moneybird_id) };
+
+  // Reverse charged (lib/vat.js): not pushed, on purpose. Such a document
+  // belongs on the administration's own reverse-charge rate, and there is no
+  // percentage to find that rate by: a 0% lookup can land on any zero rate
+  // (export, exempt, reverse charged), and no rate at all makes Moneybird apply
+  // its default 21% to a net amount. Either would put it in the wrong box of
+  // the VAT return. So it is left out, said once, and booked by hand; it is in
+  // the bookkeeping export like every other document.
+  if (record.vat_treatment === 'reverse_charge') {
+    await clearPending({ redis, number: record.number });
+    log('warn', 'moneybird_skipped', { number: record.number, reason: 'reverse_charge_not_mapped' });
+    return { result: 'skipped', reason: 'reverse_charge_not_mapped' };
+  }
 
   try {
     const contact = await ensureContact({ cfg, buyer: record.buyer, redis, http });

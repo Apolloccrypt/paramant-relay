@@ -31,6 +31,21 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   lying turns the gate red.
 
 ### Fixed
+- **A business in another EU country paid 21% Dutch VAT.** A service to a
+  business established in another member state is taxed where that business
+  is, and the VAT is reverse charged (Directive 2006/112/EC art. 44 and 196).
+  The checkout now asks VIES about the buyer's VAT number (`relay/lib/vat.js`).
+  Valid, from a member state other than the Netherlands, and with
+  `BILLING_SELLER_VAT` set: the buyer is charged the net, the invoice says 0%,
+  "Btw verlegd / VAT reverse charged" and both VAT numbers, and the terms ride on
+  the Mollie payment so the webhook's amount check, every renewal and a credit
+  note agree with what was charged. A Dutch business, a private buyer, a number
+  VIES calls invalid and a VIES that does not answer all stay at 21%, and the
+  last two leave a `billing_vat` warning that names the country, not the number.
+  Invoices already issued and the numbering are untouched. `docker-compose.yml`
+  did not pass the four `BILLING_SELLER_*` variables to the relays at all; it
+  does now. Moneybird, still off, does not book a reverse-charged document at a
+  guessed rate. VIES is in `deploy/partners.json`, on /privacy and on /dpa.
 - **An envelope number was enough to get the mail addresses of everyone who had
   signed it.** `GET /v2/envelopes/:id` is public on purpose, because a recipient
   is an outside party with no key, but it answered with the same object the
