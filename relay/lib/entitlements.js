@@ -137,6 +137,30 @@ const PRODUCT_BUNDLE_FIELD = Object.freeze({
   parasign: 'bundle_parasign',
 });
 
+// Every paid term a product holds, ONE PER TIER, when it holds more than one.
+// { "pro": { "until": ISO, "bundle": "firm" }, "business": { "until": ISO } },
+// with until null for a term without an end.
+//
+// Why a product needs more than one. A customer who pays for a Firm year and
+// for one Business month (two tabs, a payment link, an older subscription) has
+// paid for both, and one tier with one date cannot hold that: the Business
+// month either took the end date of the year (thirteen months of Business,
+// betaaltest R2), or replaced the year (eleven paid months of Pro gone, review
+// of #515). With a term per tier, the tier a gate sees is simply the highest one
+// whose term still runs; when the Business month ends the account is on Pro
+// until the end of the year, and nobody has to repair anything.
+//
+// The field is written only while a product holds two or more terms. With one
+// term the pair above (plan_<p>, paid_until_<p>, bundle_<p>) says everything,
+// exactly as it did before this field existed, so every users.json on disk
+// today reads as it always has and a record with one term is written byte for
+// byte the same. With two or more, that pair still holds the term a reader
+// should see: the one running, and it is rewritten on every write.
+const PRODUCT_TERMS_FIELD = Object.freeze({
+  parasend: 'terms_parasend',
+  parasign: 'terms_parasign',
+});
+
 // The tier a product falls back to when a paid period runs out. Mirrors
 // billing-catalog.floorTier; kept here too so the entitlement layer can answer
 // without importing the billing layer (the dependency runs the other way).
@@ -153,25 +177,173 @@ function parsePaidUntil(value) {
   return Number.isNaN(t) ? null : t;
 }
 
-// The tier an account ACTUALLY has right now, which is the stored tier unless
-// its paid period has passed. Read paths should use this instead of reading
-// PRODUCT_PLAN_FIELD directly, so an expired subscription stops granting even
-// if no webhook, cron or admin ever came along to write the downgrade.
-// Returns { tier, expired, paidUntil }.
+function _normTier(product, tier) {
+  return product === 'parasign' ? normaliseParasignTier(tier) : normaliseParasendTier(tier);
+}
+
+// A stored terms value: the object users.json holds, or the JSON string the
+// shared redis row carries. Anything else is no terms at all.
+function _termsObject(raw) {
+  let v = raw;
+  if (!v) return null;
+  if (typeof v === 'string') { try { v = JSON.parse(v); } catch { return null; } }
+  return (v && typeof v === 'object' && !Array.isArray(v)) ? v : null;
+}
+
+// Every paid term one product holds, as [{ tier, until, bundle }], `until` in
+// epoch ms or null for a term without an end. The stored pair always counts as
+// one of them, so a record from before terms existed (one tier, one
+// paid_until) is one term, and a writer that set only the pair is honoured.
+//
+// A FLOOR TIER ON FILE MEANS NO PAID TERM, whatever else the record carries.
+// Every path that takes a plan away writes the floor, including the ones that
+// predate this field (update-plan), and the floor has always won.
+function termsOf(rec, product) {
+  const planField = PRODUCT_PLAN_FIELD[product];
+  if (!rec || !planField) return [];
+  const floor = floorTierOf(product);
+  const head = _normTier(product, rec[planField]);
+  if (head === floor) return [];
+  const byTier = new Map();
+  const add = (tier, until, bundle) => {
+    if (_normTier(product, tier) !== tier || tier === floor) return;
+    // Unparseable reads as no end, on the no-silent-downgrade rule above.
+    const u = parsePaidUntil(until);
+    const b = bundle ? String(bundle) : null;
+    const prev = byTier.get(tier);
+    // Two answers for one tier: the later end wins, and the bundle that bought
+    // it travels with it.
+    if (!prev || (prev.until !== null && (u === null || u > prev.until))) byTier.set(tier, { tier, until: u, bundle: b });
+  };
+  const stored = _termsObject(rec[PRODUCT_TERMS_FIELD[product]]);
+  if (stored) for (const [tier, v] of Object.entries(stored)) add(tier, v && v.until, v && v.bundle);
+  add(head, rec[PRODUCT_PAID_UNTIL_FIELD[product]], rec[PRODUCT_BUNDLE_FIELD[product]]);
+  return [...byTier.values()];
+}
+
+const _running = (t, at) => t.until === null || at < t.until;
+
+// The term a gate grants: the highest tier whose term still runs.
+function _pickRunning(product, terms, at) {
+  let best = null;
+  for (const t of terms) {
+    if (!_running(t, at)) continue;
+    if (!best || tierRank(product, t.tier) > tierRank(product, best.tier)) best = t;
+  }
+  return best;
+}
+
+// The term to show when none runs: the highest tier on file, which is what the
+// stored pair has always said about a lapsed account.
+function _pickOnFile(product, terms) {
+  let best = null;
+  for (const t of terms) if (!best || tierRank(product, t.tier) > tierRank(product, best.tier)) best = t;
+  return best;
+}
+
+const _iso = (ms) => (ms === null ? null : new Date(ms).toISOString());
+
+// The tier an account ACTUALLY has right now: the highest paid tier whose term
+// still runs, or the floor once none does. Read paths should use this instead
+// of reading PRODUCT_PLAN_FIELD directly, so an expired subscription stops
+// granting even if no webhook, cron or admin ever came along to write the
+// downgrade, and a Business month that ends drops the account to the Pro year
+// underneath it rather than to the floor.
+// Returns { tier, expired, paidUntil } (paidUntil in epoch ms: the end of the
+// term that grants, or of the last one once they have all run out).
 function effectiveProductTier(rec, product, now) {
   const field = PRODUCT_PLAN_FIELD[product];
   if (!rec || !field) return { tier: floorTierOf(product), expired: false, paidUntil: null };
-  const stored = product === 'parasign'
-    ? normaliseParasignTier(rec[field])
-    : normaliseParasendTier(rec[field]);
   const floor = floorTierOf(product);
-  const paidUntil = parsePaidUntil(rec[PRODUCT_PAID_UNTIL_FIELD[product]]);
+  const terms = termsOf(rec, product);
   // A floor tier can not expire, and no recorded period means no expiry to
   // enforce (free accounts, and every account from before billing existed).
-  if (stored === floor || paidUntil === null) return { tier: stored, expired: false, paidUntil };
+  if (terms.length === 0) return { tier: floor, expired: false, paidUntil: parsePaidUntil(rec[PRODUCT_PAID_UNTIL_FIELD[product]]) };
   const at = typeof now === 'number' ? now : Date.now();
-  if (at >= paidUntil) return { tier: floor, expired: true, paidUntil };
-  return { tier: stored, expired: false, paidUntil };
+  const run = _pickRunning(product, terms, at);
+  if (run) return { tier: run.tier, expired: false, paidUntil: run.until };
+  let last = null;
+  for (const t of terms) if (last === null || t.until > last) last = t.until;
+  return { tier: floor, expired: true, paidUntil: last };
+}
+
+// What a reader is shown for one product now: the running term, or when none
+// runs the one on file. { tier, paidUntil (ISO or null), bundle }. The stored
+// pair says the same thing at the moment it was written; this says it at the
+// moment it is read, so a screen shows the Pro year the day after a Business
+// month ends, and not a Business plan that has ended.
+function currentTermOf(rec, product, now) {
+  const terms = termsOf(rec, product);
+  if (terms.length === 0) {
+    return { tier: floorTierOf(product), paidUntil: (rec && rec[PRODUCT_PAID_UNTIL_FIELD[product]]) || null, bundle: null };
+  }
+  const at = typeof now === 'number' ? now : Date.now();
+  const t = _pickRunning(product, terms, at) || _pickOnFile(product, terms);
+  return { tier: t.tier, paidUntil: _iso(t.until), bundle: t.bundle };
+}
+
+// The term that ends last: the day this product falls to its floor, and what
+// was bought for it. null when a term has no end, or nothing is paid. The
+// expiry mail is about this day and no other: the end of a Business month with
+// a Pro year under it is not the end of anything the customer has to act on.
+function finalTermOf(rec, product) {
+  const terms = termsOf(rec, product);
+  if (terms.length === 0 || terms.some((t) => t.until === null)) return null;
+  let last = terms[0];
+  for (const t of terms) {
+    if (t.until > last.until || (t.until === last.until && tierRank(product, t.tier) > tierRank(product, last.tier))) last = t;
+  }
+  return { tier: last.tier, paidUntil: _iso(last.until), bundle: last.bundle };
+}
+
+// The end of ONE tier's term on this product (ISO), or null when that tier
+// holds no term or one without an end. What a renewal of that tier extends.
+function termEndOf(rec, product, tier) {
+  const t = termsOf(rec, product).find((x) => x.tier === _normTier(product, tier));
+  return t ? _iso(t.until) : null;
+}
+
+// Does this tier hold a term that is still running on this product.
+function hasRunningTerm(rec, product, tier, now) {
+  const at = typeof now === 'number' ? now : Date.now();
+  return termsOf(rec, product).some((t) => t.tier === _normTier(product, tier) && _running(t, at));
+}
+
+// Write a product's terms back onto a record. The stored pair holds the term a
+// reader should see (the running one, else the one on file); the full list is
+// written only when there is more than one, and lapsed terms are dropped once
+// a running one is left, because they carry no time. Returns whether a field
+// changed.
+function _storeTerms(rec, product, terms, at) {
+  const planField = PRODUCT_PLAN_FIELD[product];
+  const untilField = PRODUCT_PAID_UNTIL_FIELD[product];
+  const bundleField = PRODUCT_BUNDLE_FIELD[product];
+  const termsField = PRODUCT_TERMS_FIELD[product];
+  const snap = () => JSON.stringify([rec[planField], rec[untilField], rec[bundleField], rec[termsField]]);
+  const before = snap();
+  let keep = terms;
+  if (keep.some((t) => _running(t, at))) keep = keep.filter((t) => _running(t, at));
+  if (keep.length === 0) {
+    rec[planField] = floorTierOf(product);
+    delete rec[untilField];
+    delete rec[bundleField];
+    delete rec[termsField];
+    return snap() !== before;
+  }
+  const head = _pickRunning(product, keep, at) || _pickOnFile(product, keep);
+  rec[planField] = head.tier;
+  if (head.until === null) delete rec[untilField]; else rec[untilField] = _iso(head.until);
+  if (head.bundle) rec[bundleField] = head.bundle; else delete rec[bundleField];
+  if (keep.length > 1) {
+    const out = {};
+    for (const t of [...keep].sort((a, b) => tierRank(product, a.tier) - tierRank(product, b.tier))) {
+      out[t.tier] = t.bundle ? { until: _iso(t.until), bundle: t.bundle } : { until: _iso(t.until) };
+    }
+    rec[termsField] = out;
+  } else {
+    delete rec[termsField];
+  }
+  return snap() !== before;
 }
 
 // ── One rule for every writer of a paid term ────────────────────────────────
@@ -184,18 +356,21 @@ function effectiveProductTier(rec, product, now) {
 // for one Business month got thirteen, because the month was added to the end
 // of his year (betaaltest 25-09, R2 and R3).
 //
-// So every writer first asks how the tier it is about to write relates to the
-// tier that is RUNNING on that product now (a lapsed term runs at the floor):
-//   'none'            nothing paid is running: a new term starts now
-//   'same'            the same tier is running: the new term follows its end,
-//                     so a renewal paid early loses no days
-//   'higher_running'  a HIGHER tier is running, and no grant ever lowers it
-//   'lower_running'   a lower paid tier is running. A higher term may not
-//                     inherit its end date: it starts now, or not at all.
-// What a writer does with the last two is its own call (relay.js: the checkout
-// refuses both, the webhook keeps a higher tier and starts a higher one now, a
-// gift code only adds to the same tier). What none of them may do is lower a
-// running higher tier, or stretch a higher tier over a lower tier's term.
+// The data answers most of it now: a product holds a term per tier
+// (PRODUCT_TERMS_FIELD), a dated grant writes the term of ITS tier and no
+// other, and the tier a gate sees is the highest one still running. So a
+// payment can not lower anything, and a renewal extends its own tier from its
+// own end. What is left for a writer to decide is a policy, and this is the
+// question it asks: how does the tier it is about to write relate to the tier
+// RUNNING on that product now (a lapsed term runs at the floor):
+//   'none'            nothing paid is running
+//   'same'            the same tier is running
+//   'higher_running'  a HIGHER tier is running
+//   'lower_running'   a lower paid tier is running
+// relay.js: the checkout sells no second plan next to a running one (renewing
+// a tier that holds a term is fine), a gift code adds nothing under a higher
+// tier, and an admin grant lowers a running tier only when asked to explicitly,
+// and then keeps its end date.
 function tierRank(product, tier) {
   if (product === 'parasign') return PARASIGN_TIERS.indexOf(normaliseParasignTier(tier));
   return PARASEND_LADDER.indexOf(normaliseParasendTier(tier));
@@ -234,53 +409,108 @@ function validateProductPlan(product, tier) {
   return { ok: true, product, tier };
 }
 
+// The `parasign` ACCESS flag follows the tier on file. The flag is what
+// keys-table.accountHasParasignEntitlement reads to decide whether an account
+// may mint /v1 API keys, and it used to be set on a grant and never cleared,
+// so a chargeback or a lapsed term left the ParaSign API entitlement standing
+// for good: the money went back and the key kept working. Only cleared when
+// the tier ACTUALLY MOVED DOWN to free, so re-applying free to an account that
+// already sits there leaves an operator's explicit grant alone.
+function _followAccessFlag(rec, product, beforeTier) {
+  const out = { parasignGranted: false, parasignRevoked: false };
+  if (product !== 'parasign') return out;
+  const after = normaliseParasignTier(rec[PRODUCT_PLAN_FIELD.parasign]);
+  if (after !== 'free' && rec.parasign !== true) { rec.parasign = true; out.parasignGranted = true; }
+  if (after === 'free' && normaliseParasignTier(beforeTier) !== 'free' && rec.parasign === true) {
+    delete rec.parasign; out.parasignRevoked = true;
+  }
+  return out;
+}
+
 // Apply ONE product's tier to a single account/key record IN PLACE and report
-// what moved. This is the field-level mutation shared by billing's
-// setProductPlan (relay.js): it writes only PRODUCT_PLAN_FIELD[product], flips
-// the `parasign` ACCESS flag on when parasign lands on a paid (non-free) tier,
-// and NEVER touches the other product's field or the unified `plan`. `tier` is
-// normalised (idempotent), so passing an already-normalised value is safe.
-// Returns { field, tier, changed, parasignGranted }; `changed` reflects the
-// plan-field move only (an already-set access flag is not a plan change).
-function applyProductTier(rec, product, tier, paidUntil, bundle) {
+// what moved. This is the field-level mutation behind setProductPlan
+// (relay.js): it writes only this product's fields, keeps the `parasign`
+// access flag with the tier, and NEVER touches the other product or the unified
+// `plan`. Three ways in, told apart by `paidUntil`:
+//
+//   the floor tier     every term on this product goes: a revoke, a refund, an
+//                      admin taking a plan back
+//   a date, or null    the term of THIS tier ends then (null: no end). The terms
+//                      of other tiers are not touched, so this can not lower
+//                      what a gate sees. It never shortens this tier's own term
+//                      either: only the floor takes paid time away.
+//   undefined          an admin grant, which names no date. The running term
+//                      moves to this tier WITH ITS END DATE: up, or down (the
+//                      relay only asks for down explicitly). A tier that
+//                      already holds a term is left as it is, and with nothing
+//                      running this is the grant an admin has always made,
+//                      without an end.
+//
+// `bundle` travels with a dated term (undefined leaves it alone, null clears
+// it). opts.now moves the clock, for tests.
+// Returns { field, tier, changed, parasignGranted, parasignRevoked, paidUntil,
+// bundle }, the last two being what the stored pair says afterwards.
+function applyProductTier(rec, product, tier, paidUntil, bundle, opts) {
   const field = PRODUCT_PLAN_FIELD[product];
-  const norm = product === 'parasign' ? normaliseParasignTier(tier) : normaliseParasendTier(tier);
-  let changed = false;
-  if (rec[field] !== norm) { rec[field] = norm; changed = true; }
-  let parasignGranted = false;
-  if (product === 'parasign' && norm !== 'free' && rec.parasign !== true) { rec.parasign = true; parasignGranted = true; }
-  // ...and the flag goes with the tier when the tier goes. The flag is what
-  // keys-table.accountHasParasignEntitlement reads to decide whether an account
-  // may mint /v1 API keys, and it used to be set on a grant and never cleared,
-  // so a chargeback or a lapsed term left the ParaSign API entitlement standing
-  // for good: the money went back and the key kept working. Only cleared when
-  // the tier ACTUALLY MOVED DOWN to free, so re-applying free to an account
-  // that already sits there leaves an operator's explicit grant alone.
-  let parasignRevoked = false;
-  if (product === 'parasign' && norm === 'free' && changed && rec.parasign === true) {
-    delete rec.parasign; parasignRevoked = true;
+  const norm = _normTier(product, tier);
+  const at = (opts && typeof opts.now === 'number') ? opts.now : Date.now();
+  const beforeTier = rec[field];
+  let terms = [];
+  if (norm !== floorTierOf(product)) {
+    terms = termsOf(rec, product);
+    const own = terms.find((t) => t.tier === norm);
+    if (paidUntil !== undefined) {
+      const u = paidUntil === null ? null : parsePaidUntil(new Date(paidUntil).toISOString());
+      if (!own) terms.push({ tier: norm, until: u, bundle: bundle ? String(bundle) : null });
+      else {
+        if (own.until !== null && (u === null || u > own.until)) own.until = u;
+        if (bundle !== undefined) own.bundle = bundle ? String(bundle) : null;
+      }
+    } else {
+      const run = _pickRunning(product, terms, at);
+      const rank = tierRank(product, norm);
+      if (!run) {
+        if (!own) terms = [{ tier: norm, until: null, bundle: null }];
+      } else if (tierRank(product, run.tier) > rank) {
+        // Down: every term above this tier folds into it, and the latest end
+        // among them (and its own) is the end it keeps. Nothing paid for is
+        // lost, and nothing becomes a term without an end that had one.
+        const above = terms.filter((t) => tierRank(product, t.tier) > rank);
+        let u = own ? own.until : undefined;
+        for (const t of above) {
+          if (!_running(t, at)) continue;
+          if (u === undefined || (u !== null && (t.until === null || t.until > u))) u = t.until;
+        }
+        terms = terms.filter((t) => tierRank(product, t.tier) < rank);
+        terms.push({ tier: norm, until: u === undefined ? null : u, bundle: own && own.until === u ? own.bundle : null });
+      } else if (tierRank(product, run.tier) < rank) {
+        // Up: the running term becomes this tier, with the same end (a term
+        // this tier still has on file has lapsed, or it would be the one
+        // running). Its bundle does not come along: a term moved to another
+        // tier is no longer what the bundle sold.
+        terms = terms.filter((t) => t !== run && t.tier !== norm);
+        terms.push({ tier: norm, until: run.until, bundle: null });
+      }
+    }
   }
-  // The paid period travels with the tier it paid for. Landing on the floor
-  // clears it, so a revoked or lapsed account carries no stale date; passing
-  // undefined leaves whatever is there alone, which keeps every existing caller
-  // (admin grants, migrations) behaving exactly as before.
-  const untilField = PRODUCT_PAID_UNTIL_FIELD[product];
-  const bundleField = PRODUCT_BUNDLE_FIELD[product];
-  if (norm === floorTierOf(product)) {
-    if (rec[untilField] !== undefined) { delete rec[untilField]; changed = true; }
-    if (rec[bundleField] !== undefined) delete rec[bundleField];
-  } else if (paidUntil !== undefined) {
-    const iso = paidUntil === null ? null : new Date(paidUntil).toISOString();
-    if (iso === null) { if (rec[untilField] !== undefined) { delete rec[untilField]; changed = true; } }
-    else if (rec[untilField] !== iso) { rec[untilField] = iso; changed = true; }
+  const changed = _storeTerms(rec, product, terms, at);
+  return { field, tier: norm, changed, ..._followAccessFlag(rec, product, beforeTier),
+    paidUntil: rec[PRODUCT_PAID_UNTIL_FIELD[product]] || null, bundle: rec[PRODUCT_BUNDLE_FIELD[product]] || null };
+}
+
+// Put one product's grant from `source` on `target` exactly as it is: the
+// stored pair, the bundle and every term. The write half of hydration, where
+// the decision was already taken on a copy by mergeProductGrantInto (or by a
+// revocation), and five member keys must end up holding the same thing.
+function copyProductGrant(target, source, product) {
+  const beforeTier = target[PRODUCT_PLAN_FIELD[product]];
+  for (const f of [PRODUCT_PLAN_FIELD[product], PRODUCT_PAID_UNTIL_FIELD[product], PRODUCT_BUNDLE_FIELD[product], PRODUCT_TERMS_FIELD[product]]) {
+    const v = source[f];
+    if (v === undefined || v === null || v === '') { delete target[f]; continue; }
+    target[f] = f === PRODUCT_TERMS_FIELD[product] ? _termsObject(v) : v;
+    if (target[f] === null) delete target[f];
   }
-  // The bundle travels with the period, on the same undefined-means-leave-alone
-  // rule: an admin grant that names no bundle does not erase one.
-  if (norm !== floorTierOf(product) && bundle !== undefined) {
-    if (!bundle) { if (rec[bundleField] !== undefined) delete rec[bundleField]; }
-    else if (rec[bundleField] !== bundle) rec[bundleField] = bundle;
-  }
-  return { field, tier: norm, changed, parasignGranted, parasignRevoked, paidUntil: rec[untilField] || null, bundle: rec[bundleField] || null };
+  return _followAccessFlag(target, product, beforeTier);
 }
 
 // ── Migration: legacy single `plan` (+ parasign flag) -> per-product plan ─────
@@ -435,8 +665,10 @@ function getEntitlements(account, now) {
   // A record with no period is never expired, so the legacy paths above and
   // every account from before billing keep exactly the tier they had. Only a
   // tier that was paid for, with a date that has passed, falls to its floor.
-  const psTier = effectiveProductTier({ plan_parasend: psStored, [PRODUCT_PAID_UNTIL_FIELD.parasend]: acct[PRODUCT_PAID_UNTIL_FIELD.parasend] }, 'parasend', now).tier;
-  const pgTier = effectiveProductTier({ plan_parasign: pgStored, [PRODUCT_PAID_UNTIL_FIELD.parasign]: acct[PRODUCT_PAID_UNTIL_FIELD.parasign] }, 'parasign', now).tier;
+  // With every term the record holds, so a Business month that ended hands
+  // over to the Pro year under it here too.
+  const psTier = effectiveProductTier({ plan_parasend: psStored, [PRODUCT_PAID_UNTIL_FIELD.parasend]: acct[PRODUCT_PAID_UNTIL_FIELD.parasend], [PRODUCT_TERMS_FIELD.parasend]: acct[PRODUCT_TERMS_FIELD.parasend] }, 'parasend', now).tier;
+  const pgTier = effectiveProductTier({ plan_parasign: pgStored, [PRODUCT_PAID_UNTIL_FIELD.parasign]: acct[PRODUCT_PAID_UNTIL_FIELD.parasign], [PRODUCT_TERMS_FIELD.parasign]: acct[PRODUCT_TERMS_FIELD.parasign] }, 'parasign', now).tier;
   return {
     parasend: PARASEND[psTier],
     parasign: PARASIGN[pgTier],
@@ -450,55 +682,38 @@ function getEntitlements(account, now) {
 // "no recorded period" correctly means "never expires". So the two fields must
 // always travel together, here and in keys-table.rebuildKeyIndexes.
 //
-// _grantOf ranks one record's grant for a product:
-//   rank       the tier it is entitled to RIGHT NOW (a lapsed period ranks as
-//              the floor tier, so it can never outrank a live lower tier)
-//   storedRank the tier on file, which breaks a tie between two floored records
-//              so the paid history is not thrown away
-//   paidUntil  null means unbounded
-function _grantOf(rec, product, at) {
-  // The RESOLVING ladder, so a stored legacy `business` ranks where it belongs
-  // instead of falling off the list and tying with community.
-  const ladder = product === 'parasign' ? PARASIGN_TIERS : PARASEND_LADDER;
-  const norm = product === 'parasign' ? normaliseParasignTier : normaliseParasendTier;
-  return {
-    rank: ladder.indexOf(effectiveProductTier(rec, product, at).tier),
-    storedRank: ladder.indexOf(norm(rec[PRODUCT_PLAN_FIELD[product]])),
-    paidUntil: parsePaidUntil(rec[PRODUCT_PAID_UNTIL_FIELD[product]]),
-  };
-}
-
-// Does grant `a` beat grant `b`? Effective tier first, then the tier on file,
-// then the more generous period: no recorded period beats a date, and a later
-// date beats an earlier one.
-function _outranksGrant(a, b) {
-  if (a.rank !== b.rank) return a.rank > b.rank;
-  if (a.storedRank !== b.storedRank) return a.storedRank > b.storedRank;
-  if ((a.paidUntil === null) !== (b.paidUntil === null)) return a.paidUntil === null;
-  if (a.paidUntil === null) return false;
-  return a.paidUntil > b.paidUntil;
-}
-
-// Copy `source`'s grant for one product onto `target` IN PLACE when it is the
-// better of the two, tier AND period together. A source with no tier on file
-// carries no grant and is skipped. Clearing is deliberate: when the winning
-// record has no period, any period already on the target goes, or the target
-// would keep a date that belongs to a tier it no longer carries.
+// And since a product holds a term per tier, what travels is every term. Two
+// records of one account (two member keys, the accounts summary, this relay and
+// the shared redis row) are merged per TIER: a tier either record holds is
+// held, with the later of the two ends. That is what makes the Pro year under a
+// Business month survive the trip from relay-main to relay-health; picking the
+// "better" of two whole grants, as this did before, kept the Business month and
+// dropped the year. It never lowers anything either: a term only ever gets
+// longer here, and taking a term away is a revocation (shared-grants
+// applyRevocation), which has its own path.
+//
+// A source with no tier on file carries no grant and is skipped. A target with
+// no tier on file takes the source as it is.
 function mergeProductGrantInto(target, source, product, now) {
   const planField = PRODUCT_PLAN_FIELD[product];
-  const paidField = PRODUCT_PAID_UNTIL_FIELD[product];
   if (!target || !source || !planField || source[planField] == null) return target;
-  const at = typeof now === 'number' ? now : Date.now();
-  if (target[planField] != null && !_outranksGrant(_grantOf(source, product, at), _grantOf(target, product, at))) return target;
-  target[planField] = source[planField];
-  if (source[paidField] == null) delete target[paidField];
-  else target[paidField] = source[paidField];
-  // The bundle marker belongs to the period it was written with, so it travels
-  // with it or it goes; a leftover marker would name a plan the winning record
-  // never bought.
-  const bundleField = PRODUCT_BUNDLE_FIELD[product];
-  if (source[bundleField] == null) delete target[bundleField];
-  else target[bundleField] = source[bundleField];
+  if (target[planField] == null) {
+    copyProductGrant(target, source, product);
+    return target;
+  }
+  const mine = termsOf(target, product);
+  const theirs = termsOf(source, product);
+  if (theirs.length === 0) return target;
+  const byTier = new Map(mine.map((t) => [t.tier, { ...t }]));
+  let gained = false;
+  for (const t of theirs) {
+    const prev = byTier.get(t.tier);
+    if (!prev || (prev.until !== null && (t.until === null || t.until > prev.until))) { byTier.set(t.tier, { ...t }); gained = true; }
+  }
+  // Nothing the source holds beats what is on file: the target stays exactly
+  // as it is, down to how it spells a missing date.
+  if (!gained) return target;
+  _storeTerms(target, product, [...byTier.values()], typeof now === 'number' ? now : Date.now());
   return target;
 }
 
@@ -573,10 +788,17 @@ module.exports = {
   PRODUCT_PLAN_FIELD,
   PRODUCT_PAID_UNTIL_FIELD,
   PRODUCT_BUNDLE_FIELD,
+  PRODUCT_TERMS_FIELD,
   floorTierOf,
   validateProductPlan,
   applyProductTier,
+  copyProductGrant,
   effectiveProductTier,
+  termsOf,
+  termEndOf,
+  hasRunningTerm,
+  currentTermOf,
+  finalTermOf,
   termRelation,
   termRelationOf,
   getEntitlements,

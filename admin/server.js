@@ -4340,7 +4340,10 @@ api.post('/admin/change-plan', authMiddleware, async (req, res) => {
 // product's ladder is rejected 400. Optional notify uses the per-product mail
 // (productPlanChangeEmail), which carries no billing note at all.
 api.post('/admin/set-product-plan', authMiddleware, async (req, res) => {
-  const { key, product, tier, notify = false } = req.body || {};
+  // downgrade: the relay moves a running higher term down to this tier only
+  // when asked, and then keeps its end date (relay.js set-product-plan). The
+  // panel asks the operator first; nothing else sends it.
+  const { key, product, tier, notify = false, downgrade = false } = req.body || {};
   const LADDERS = { parasign: ['free', 'pro', 'business', 'enterprise'], parasend: ['community', 'pro', 'enterprise'] };
   if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
   if (!LADDERS[product]) return res.status(400).json({ error: 'invalid_product', valid: Object.keys(LADDERS) });
@@ -4348,7 +4351,7 @@ api.post('/admin/set-product-plan', authMiddleware, async (req, res) => {
   if (!await checkAdminRl('set_product_plan', 'admin', 20)) return res.status(429).json({ error: 'rate_limited' });
   try {
     const meta = await getAdminKeyMeta(key);
-    const mutation = await mutatePlanFleet('/v2/admin/keys/set-product-plan', { key, product, tier });
+    const mutation = await mutatePlanFleet('/v2/admin/keys/set-product-plan', { key, product, tier, ...(downgrade === true ? { downgrade: true } : {}) });
     // Every sector said no for the same reason: a grant never lowers a running
     // higher plan (relay.js setProductPlan). Nothing moved anywhere, so the
     // fleet is consistent and this is a refusal, not a partial failure. The

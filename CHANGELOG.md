@@ -214,23 +214,31 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the strongest evidence the heartbeat collects and it could not fire. Nothing
   already signed moves: the leaf preimage takes the raw event name, never this
   string, so no inclusion proof and no receipt changes value.
-- **A second purchase could lower what a customer had, or hand him a year he
-  did not buy.** A Firm payment or a Pro gift code put a customer who had paid
-  for ParaSign Business back on Pro, on relay-main only: the other relays refuse
-  a lower grant from redis, so the API and the screens then disagreed. A
-  Business month bought over a Firm year ran thirteen months, because it was
-  added to the end of the year. Every writer of a paid term now asks one rule
-  first (`entitlements.termRelation`): the same tier extends from its end date,
-  a new or higher tier starts now, and nothing lowers a running higher tier,
-  not a payment, not a code and not an admin grant (409 `lower_than_running`;
-  the floor tier is a revoke and still lands). The checkout sells only what the
-  site sells (`billing-catalog.resolveSale`, 400 `not_on_sale` for the old Pro
-  plans) and refuses a second plan over a running other plan (409
-  `other_plan_running`); changing plans goes by mail. And the bundle marker now
+- **A second purchase could lower what a customer had, hand him a year he did
+  not buy, or take away months he did.** A Firm payment or a Pro gift code put
+  a customer who had paid for ParaSign Business back on Pro, on relay-main only:
+  the other relays refuse a lower grant from redis, so the API and the screens
+  then disagreed. A Business month bought over a Firm year ran thirteen months,
+  because it was added to the end of the year, and the first repair of that
+  dropped the Pro year instead. A product now holds a term per tier
+  (`terms_parasign`, `terms_parasend`, written only when it holds more than
+  one, so every existing record reads and writes as before), and a gate grants
+  the highest tier whose term still runs: a Business month over a Firm year is
+  a month of Business and then Pro until the end of the year, in either order
+  of payment, on every relay and after a restart. A payment extends the term of
+  its own tier from its own end and touches no other; the shared redis row
+  carries every term; the expiry mail is about the day the product falls to
+  Community. An admin grant lowers a running plan only with `downgrade: true`,
+  and then keeps its end date (409 `lower_than_running` otherwise; the admin
+  panel asks first); taking a plan away is still setting the floor. The
+  checkout sells only what the site sells (`billing-catalog.resolveSale`, 400
+  `not_on_sale` for the old Pro plans) and no second plan next to a running one
+  (409 `other_plan_running`; renewing works). And the bundle marker now
   survives a restart, so a Firm term gets one expiry mail that says Firm
   instead of two about plans the customer never bought.
   `relay/test/rang-van-een-recht.test.js` pins the rules;
-  `tests/rang-en-kassa.test.mjs` drives them over two relays.
+  `tests/rang-en-kassa.test.mjs` drives them over two relays, through the
+  checkout with two tabs in both orders, and through the admin server.
 
 ### Added
 - **A field gate on the transparency log.** `relay/lib/ct-fields.js` declares,
