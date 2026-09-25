@@ -155,13 +155,35 @@ function webhook(id, handle = srv) {
   });
 }
 
-async function buy(a, interval = 'monthly') {
-  const id = await checkout(a, interval);
+async function buy(a, interval = 'monthly', handle = srv) {
+  const id = await checkout(a, interval, handle);
   await pay(id);
-  const r = await webhook(id);
+  const r = await webhook(id, handle);
   assert.strictEqual(r.status, 200, `webhook gaf ${r.status}: ${r.text}`);
   return id;
 }
+
+// Een account dat alleen deze test kent, voor een relay van zijn eigen.
+const account = (tag) => ({
+  key: `pgp_incasso_${tag}_${RUN}`, acct: `acct_demo_${tag}_${RUN}`, email: `${tag}-${RUN}@example.test`,
+});
+
+// Een tweede relay op dezelfde redis, fake Mollie en mailbox, met eigen
+// accounts: de eerste zit aan zijn vijf sleutels.
+async function relayWith(tag, accounts) {
+  return boot({
+    ...bootOpts, tag,
+    users: {
+      api_keys: accounts.map((a) => ({
+        key: a.key, plan: 'community', active: true, parasign: true, account_id: a.acct, email: a.email,
+      })),
+    },
+  });
+}
+
+// De klanten die Mollie voor dit account kent.
+const customersOf = (a) => [...mollie.customers.values()]
+  .filter((c) => c.metadata && c.metadata.accountId === a.acct);
 
 const subsOf = (a) => [...mollie.subscriptions.values()]
   .filter((s) => s.metadata && s.metadata.accountId === a.acct);
@@ -192,15 +214,20 @@ const dayOf = (iso) => new Date(iso).toISOString().slice(0, 10);
 
 // ── R4 ───────────────────────────────────────────────────────────────────────
 
-// Dertig tegelijk, niet tien: de race is een kwestie van timing, en op de oude
-// code gaf dertig in ongeveer de helft van de runs twee of drie abonnementen.
-// Het vaste deel is de Idempotency-Key; het geval hieronder, twee aankopen
-// tegelijk, is wel elke keer raak.
+// Dertig tegelijk, zo gelijk als het kan: de fake houdt de dertig keer ophalen
+// van de betaling vast tot ze er alle dertig zijn, en antwoordt ze dan samen.
+// Zonder die poort hing de race van de snelheid van de machine af, en bleef de
+// test ook zonder slot vaak groen. Met de poort gaf de relay zonder slot in 8 van
+// de 10 runs 2 tot 30 abonnementen. Helemaal vast is het niet: of de dertig
+// antwoorden in één ronde van de event loop landen, bepaalt de kernel. Het
+// bewijs dat het slot nodig is, staat in de test hierna, die zonder slot altijd
+// rood is.
 test('R4: dertig gelijktijdige webhooks voor één eerste betaling maken één abonnement', async (t) => {
   if (!srv) return t.skip('geen redis');
   const a = ACC.r4;
   const id = await checkout(a);
   await pay(id);
+  await ctl('/_ctl/barrier', { method: 'GET', match: `^/v2/payments/${id}$`, count: 30, timeoutMs: 5000 });
   const answers = await Promise.all(Array.from({ length: 30 }, () => webhook(id)));
   for (const r of answers) {
     assert.ok([200, 503].includes(r.status), `een webhook gaf ${r.status}: ${r.text}`);
@@ -223,10 +250,21 @@ test('R4: dertig gelijktijdige webhooks voor één eerste betaling maken één a
     && r.idempotencyKey === `sub-${id}`);
   assert.strictEqual(posts.length, 1, 'het abonnement ging niet met Idempotency-Key sub-<betaling> naar Mollie');
   did();
+  // En het slot is weer vrij: geen sleutel meer in redis die het account tot
+  // het einde van de TTL op 503 houdt.
+  assert.deepStrictEqual(await redis.keys(`paramant:billing:lock:acct:${a.acct}`), [],
+    'na de laatste webhook staat het slot van het account nog in redis');
+  did();
 });
 
-// Twee kassa's, allebei betaald, en de webhooks komen tegelijk binnen. Op een
-// eigen relay, omdat de eerste er al vijf sleutels heeft.
+// Twee kassa's, allebei betaald, en de tweede webhook komt binnen terwijl de
+// eerste nog bezig is. Dat "terwijl" is hier geen timing maar een feit: de fake
+// houdt het aanmaken van het eerste abonnement vast (tot er een tweede komt, of
+// twee seconden), en pas als de eerste daar staat te wachten, gaat de tweede
+// webhook de deur uit. Zonder slot ziet de tweede nog geen abonnement op het
+// account, maakt er ook een, en lopen er elke keer twee. Met slot krijgt hij 503
+// en komt hij terug zoals Mollie dat doet. Op een eigen relay, omdat de eerste
+// er al vijf sleutels heeft.
 test('R4: twee aankopen van één account tegelijk geven één abonnement en twee maanden', async (t) => {
   if (!srv) return t.skip('geen redis');
   const a = { key: `pgp_incasso_r4b_${RUN}`, acct: `acct_demo_r4b_${RUN}`, email: `r4b-${RUN}@example.test` };
@@ -240,7 +278,13 @@ test('R4: twee aankopen van één account tegelijk geven één abonnement en twe
     await pay(id1);
     await pay(id2);
     const ids = [id1, id2];
-    const answers = await Promise.all(ids.map((id) => webhook(id, h)));
+    const seen = mollie.requests.length;
+    await ctl('/_ctl/barrier', { method: 'POST', match: '/subscriptions$', count: 2, timeoutMs: 2000 });
+    const first = webhook(id1, h);
+    await waitFor(() => mollie.requests.slice(seen).some((q) => q.method === 'POST' && /\/subscriptions$/.test(q.path)),
+      5000, 'de eerste webhook bij het aanmaken van het abonnement');
+    const answers = [null, await webhook(id2, h)];
+    answers[0] = await first;
     // Wat 503 kreeg, stuurt Mollie later opnieuw, en alleen dat.
     for (let i = 0; i < 10 && answers.some((r) => r.status === 503); i++) {
       await new Promise((res) => setTimeout(res, 100));
@@ -320,6 +364,171 @@ test('R5/R10: na een herstart vindt opzeggen het abonnement nog', async (t) => {
   }
 });
 
+// Het deel van de herlaadfix dat productie wel raakt: paid_by_<product>, de
+// betaling die de lopende termijn kocht. Zonder redis-markering is dat het
+// enige dat een herhaalde webhook na een herstart tegenhoudt. Viel het herladen
+// weg, dan kocht één betaling na elke deploy een maand extra.
+test('herstart: dezelfde webhook na een herstart zonder redis-markering kent niets opnieuw toe', async (t) => {
+  if (!srv) return t.skip('geen redis');
+  const a = account('paidby');
+  let h = await relayWith('incasso-paidby', [a]);
+  try {
+    const id = await buy(a, 'monthly', h);
+    const pu = entitlements.PRODUCT_PAID_UNTIL_FIELD.parasign;
+    const before = await waitFor(() => recordOf(a, h)[pu], 5000, 'termijn op schijf');
+    await waitFor(() => recordOf(a, h).paid_by_parasign === id, 5000, 'paid_by op schijf');
+    await redis.del(`paramant:billing:done:${id}`);
+    h = await h.restart();
+    const r = await webhook(id, h);
+    assert.strictEqual(r.status, 200, r.text);
+    const line = logLines(h).find((j) => j.msg === 'billing_webhook' && j.payment_id === id);
+    assert.ok(line, 'geen billing_webhook-regel na de herstart');
+    assert.strictEqual(line.result, 'ignored', `na de herstart werd dezelfde betaling opnieuw ${line.result}`);
+    assert.strictEqual(line.reason, 'already_processed');
+    await new Promise((res) => setTimeout(res, 200));
+    assert.strictEqual(recordOf(a, h)[pu], before, 'de termijn schoof op door een betaling die al verwerkt was');
+    did();
+  } finally {
+    await h.stop();
+  }
+});
+
+// ── De klant bij het abonnement (review #516, punt 1) ────────────────────────
+// Opzeggen en vervangen gingen naar de klant die NU op het account staat, en
+// een 404 telde als "al weg". Die klant wisselt: bij elke fout op GET
+// /customers maakte de kassa een nieuwe. Mollie kent een abonnement alleen
+// onder zijn eigen klant (de fake nu ook), dus dan liep het oude abonnement
+// door terwijl het log "opgezegd" zei. Drie wegen daarheen, uit de review.
+test('klant: een 503 op de klant bij een tweede aankoop geeft geen tweede klant en één abonnement', async (t) => {
+  if (!srv) return t.skip('geen redis');
+  const a = account('klant503');
+  const h = await relayWith('incasso-klant503', [a]);
+  try {
+    const id1 = await buy(a, 'monthly', h);
+    const cst1 = mollie.payments.get(id1).customerId;
+    const [sub1] = activeSubsOf(a);
+    assert.ok(cst1 && sub1, 'de eerste aankoop opende geen klant en abonnement');
+    await ctl('/_ctl/fail', { method: 'GET', match: `^/v2/customers/${cst1}$`, status: 503, times: 1 });
+    await buy(a, 'monthly', h);
+    assert.strictEqual(customersOf(a).length, 1,
+      `een tijdelijke fout op de klant maakte een nieuwe klant (${customersOf(a).length} klanten)`);
+    did();
+    const active = activeSubsOf(a);
+    assert.strictEqual(active.length, 1, `na de tweede aankoop lopen er ${active.length} abonnementen`);
+    assert.strictEqual(mollie.subscriptions.get(sub1.id).status, 'canceled', 'het eerste abonnement loopt nog');
+    did();
+  } finally {
+    await h.stop();
+  }
+});
+
+test('klant: twee kassa\'s tegelijk voor een nieuwe koper geven één abonnement', async (t) => {
+  if (!srv) return t.skip('geen redis');
+  const a = account('tweekassa');
+  const h = await relayWith('incasso-tweekassa', [a]);
+  try {
+    const ids = await Promise.all([checkout(a, 'monthly', h), checkout(a, 'monthly', h)]);
+    for (const id of ids) await pay(id);
+    // Eerst de betaling van de klant die NIET op het account bleef staan: dan
+    // moet het vervangen straks een abonnement stoppen dat onder de andere
+    // klant hangt. Dat is de volgorde waarin de oude code misging.
+    const onFile = await waitFor(() => recordOf(a, h).mollie_customer_id, 5000, 'klant op schijf');
+    ids.sort((x, y) => (mollie.payments.get(x).customerId === onFile) - (mollie.payments.get(y).customerId === onFile));
+    for (const id of ids) assert.strictEqual((await webhook(id, h)).status, 200);
+    const active = activeSubsOf(a);
+    assert.strictEqual(active.length, 1, `twee kassa's tegelijk gaven ${active.length} actieve abonnementen`);
+    did();
+  } finally {
+    await h.stop();
+  }
+});
+
+test('klant: een afgebroken kassa na een 503 laat opzeggen het abonnement nog stoppen', async (t) => {
+  if (!srv) return t.skip('geen redis');
+  const a = account('afgebroken');
+  const h = await relayWith('incasso-afgebroken', [a]);
+  try {
+    const id1 = await buy(a, 'monthly', h);
+    const cst1 = mollie.payments.get(id1).customerId;
+    const [sub1] = activeSubsOf(a);
+    await ctl('/_ctl/fail', { method: 'GET', match: `^/v2/customers/${cst1}$`, status: 503, times: 1 });
+    const id2 = await checkout(a, 'monthly', h);
+    // De koper breekt af op de kassa.
+    const r = await fetch(`${mollie.origin()}/checkout/${id2}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'outcome=canceled', redirect: 'manual',
+    });
+    assert.strictEqual(r.status, 302);
+    assert.strictEqual((await webhook(id2, h)).status, 200);
+    const cancel = await h.post('/v2/billing/cancel', { headers: { 'X-Api-Key': a.key }, body: {} });
+    assert.strictEqual(cancel.status, 200, cancel.text);
+    assert.strictEqual(mollie.subscriptions.get(sub1.id).status, 'canceled',
+      `opzeggen antwoordde ${JSON.stringify(cancel.json.results)}, maar het abonnement loopt door`);
+    did();
+  } finally {
+    await h.stop();
+  }
+});
+
+// ── Terugdraaien stopt alleen het abonnement van die betaling (punt 6) ───────
+test('R5: geld terug voor een oude aankoop laat het abonnement van een latere aankoop staan', async (t) => {
+  if (!srv) return t.skip('geen redis');
+  const a = account('oudterug');
+  const h = await relayWith('incasso-oudterug', [a]);
+  try {
+    const id1 = await buy(a, 'monthly', h);
+    await buy(a, 'monthly', h);
+    const [sub2] = activeSubsOf(a);
+    assert.ok(sub2, 'na twee aankopen loopt er geen abonnement');
+    await ctl('/_ctl/refund', { id: id1 });
+    assert.strictEqual((await webhook(id1, h)).status, 200);
+    assert.strictEqual(mollie.subscriptions.get(sub2.id).status, 'active',
+      'geld terug voor de eerste aankoop stopte het abonnement van de tweede');
+    did();
+  } finally {
+    await h.stop();
+  }
+});
+
+test('R5: een terugboeking van een incasso stopt het abonnement dat die incasso deed', async (t) => {
+  if (!srv) return t.skip('geen redis');
+  const a = account('incassoterug');
+  const h = await relayWith('incasso-incassoterug', [a]);
+  try {
+    await buy(a, 'monthly', h);
+    const [sub] = activeSubsOf(a);
+    const collected = await ctl('/_ctl/recurring', { subscriptionId: sub.id });
+    assert.strictEqual((await webhook(collected.id, h)).status, 200);
+    await ctl('/_ctl/chargeback', { id: collected.id });
+    assert.strictEqual((await webhook(collected.id, h)).status, 200);
+    assert.strictEqual(mollie.subscriptions.get(sub.id).status, 'canceled',
+      'na een terugboeking van de incasso loopt het abonnement door');
+    did();
+  } finally {
+    await h.stop();
+  }
+});
+
+// ── Een nieuwe aankoop na opzeggen (punt 7) ──────────────────────────────────
+// Opzeggen zet in admin paramant:user:plan_cancel_at:<sleutel>, en zolang die
+// staat verbergt /account de opzegknop. Na een nieuwe aankoop loopt er weer
+// een abonnement, en de verlengmail wijst naar die knop.
+test('opzeggen: een nieuwe aankoop wist de geplande opzegging, zodat de knop terugkomt', async (t) => {
+  if (!srv) return t.skip('geen redis');
+  const a = account('opnieuw');
+  const h = await relayWith('incasso-opnieuw', [a]);
+  try {
+    const marker = `paramant:user:plan_cancel_at:${a.key}`;
+    await redis.set(marker, new Date(Date.now() + 86400000).toISOString());
+    await buy(a, 'monthly', h);
+    await waitFor(async () => (await redis.get(marker)) === null, 3000, 'opzegging gewist').catch(() => null);
+    assert.strictEqual(await redis.get(marker), null, 'na een nieuwe aankoop staat de geplande opzegging er nog');
+    did();
+  } finally {
+    await h.stop();
+  }
+});
+
 // ── R10 ──────────────────────────────────────────────────────────────────────
 
 test('R10: na een tweede aankoop start het abonnement op het nieuwe einde', async (t) => {
@@ -388,38 +597,118 @@ test('R10: lukt het opzeggen van het oude abonnement niet, dan komt er geen twee
   did();
 });
 
+// Opzeggen gaat naar de klant van het abonnement zelf, en een 404 telt alleen
+// als "al weg" als het die klant was. Bij de klant die toevallig op het account
+// staat zegt een 404 niets over het abonnement.
+const notFound = () => { const e = new Error('mollie_cancel_not_found'); e.status = 404; throw e; };
+const custOf = 'mollie_subscription_firm_customer';
+
+test('opzeggen: naar de klant van het abonnement, niet naar de klant op het account', async () => {
+  const used = [];
+  const { m } = recurringFakes({ cancelSubscription: async (mode, cst, sub) => { used.push(`${cst}/${sub}`); return { status: 'canceled' }; } });
+  const rec = { [field]: 'sub_1', [custOf]: 'cst_van_abonnement', mollie_customer_id: 'cst_op_account' };
+  const r = await billingRecurring.cancelForProduct('acct_demo', 'firm', {
+    mode: 'test', getAccount: async () => rec, saveSubscription: async () => {}, mollie: m,
+  });
+  assert.strictEqual(r.result, 'cancelled');
+  assert.deepStrictEqual(used, ['cst_van_abonnement/sub_1'], `opzeggen ging naar ${used.join(', ')}`);
+  did();
+});
+
+test('opzeggen: een 404 is alleen "al weg" bij de klant van het abonnement', async () => {
+  const saved = [];
+  const deps = (rec) => ({
+    mode: 'test', getAccount: async () => rec,
+    saveSubscription: async (...args) => { saved.push(args); },
+    mollie: recurringFakes({ cancelSubscription: async () => notFound() }).m,
+  });
+  const known = await billingRecurring.cancelForProduct('acct_demo', 'firm',
+    deps({ [field]: 'sub_1', [custOf]: 'cst_1', mollie_customer_id: 'cst_1' }));
+  assert.strictEqual(known.result, 'cancelled', `een 404 bij de eigen klant gaf ${known.result}`);
+  assert.strictEqual(saved.length, 1, 'de aanwijzer naar een abonnement dat weg is bleef staan');
+  saved.length = 0;
+  // Van een abonnement van voor deze wijziging is de klant niet bekend: een 404
+  // bij de klant op het account bewijst dan niets, en de aanwijzer blijft.
+  const unknown = await billingRecurring.cancelForProduct('acct_demo', 'firm',
+    deps({ [field]: 'sub_1', mollie_customer_id: 'cst_2' }));
+  assert.strictEqual(unknown.result, 'failed', `een 404 bij een andere klant gaf ${unknown.result}`);
+  assert.deepStrictEqual(saved, [], 'de aanwijzer ging weg op een 404 die niets bewijst');
+  did();
+});
+
 // ── R11 ──────────────────────────────────────────────────────────────────────
+
+// Wat Mollie een maand later doet, maar dan mislukt: een betaling van het
+// abonnement, sequenceType recurring, met deze status.
+function collectionOf(sub, status, subscriptionId = sub.id) {
+  const id = 'tr_mislukt' + crypto.randomBytes(6).toString('hex');
+  mollie.payments.set(id, {
+    resource: 'payment', id, mode: 'test', status,
+    createdAt: new Date().toISOString(), failedAt: new Date().toISOString(),
+    amount: sub.amount, description: sub.description, metadata: sub.metadata,
+    customerId: sub.customerId, sequenceType: 'recurring', subscriptionId,
+  });
+  return id;
+}
+const failMails = (a) => mailsTo(a).filter((m) => /niet gelukt/.test(String(m.subject || '')));
 
 test('R11: een mislukte incasso wordt aan de klant gemeld, één keer', async (t) => {
   if (!srv) return t.skip('geen redis');
   const a = ACC.r11;
   await buy(a);
   const [sub] = activeSubsOf(a);
-  // Wat Mollie een maand later doet, maar dan mislukt: een betaling van het
-  // abonnement, sequenceType recurring, status failed.
-  const failId = 'tr_mislukt' + crypto.randomBytes(6).toString('hex');
-  mollie.payments.set(failId, {
-    resource: 'payment', id: failId, mode: 'test', status: 'failed',
-    createdAt: new Date().toISOString(), failedAt: new Date().toISOString(),
-    amount: sub.amount, description: sub.description, metadata: sub.metadata,
-    customerId: sub.customerId, sequenceType: 'recurring', subscriptionId: sub.id,
-  });
+  const failId = collectionOf(sub, 'failed');
   const r = await webhook(failId);
   assert.strictEqual(r.status, 200);
-  const mail = await waitFor(() => mailsTo(a).find((m) => /niet gelukt/.test(String(m.subject || ''))), 5000,
-    'mail over de mislukte incasso').catch(() => null);
+  const mail = await waitFor(() => failMails(a)[0], 5000, 'mail over de mislukte incasso').catch(() => null);
   assert.ok(mail, `de klant kreeg geen mail over de mislukte incasso (mails: ${JSON.stringify(mailsTo(a).map((m) => m.subject))})`);
   did();
   assert.ok(mail.text.includes('EUR 35.09'), 'de mail noemt het bedrag niet');
-  assert.ok(mail.text.includes(`${NOWHERE}/pricing`), 'de mail zegt niet waar de klant zelf kan betalen');
   assert.ok(!/niets automatisch afgeschreven|nothing is charged automatically/.test(mail.text));
+  // Mollie probeert een mislukte incasso meestal zelf opnieuw (tot vijf keer,
+  // afhankelijk van de reden). Wie dan ook zelf betaalt, betaalt twee keer: de
+  // mail stuurt hem dus niet naar de kassa.
+  assert.match(mail.text, /probeert Mollie de betaling automatisch opnieuw/);
+  assert.match(mail.text, /Mollie tries the payment again automatically/);
+  assert.ok(!mail.text.includes(`${NOWHERE}/pricing`), 'de mail stuurt de klant naar de kassa terwijl Mollie het opnieuw probeert');
+  assert.ok(!/tenzij u zelf betaalt|unless you pay yourself|zelf betalen:|pay yourself here/.test(mail.text),
+    'de mail vraagt de klant zelf te betalen terwijl Mollie het opnieuw probeert');
   did();
   // Dezelfde melding nog eens (Mollie herhaalt bij twijfel): geen tweede mail.
-  const count = mailsTo(a).length;
   await webhook(failId);
   await new Promise((res) => setTimeout(res, 300));
-  assert.strictEqual(mailsTo(a).length, count, 'dezelfde mislukte incasso gaf een tweede mail');
+  assert.strictEqual(failMails(a).length, 1, 'dezelfde mislukte incasso gaf een tweede mail');
   did();
+  // Mollie probeert opnieuw, en ook die poging mislukt: een nieuwe betaling
+  // voor dezelfde periode. Nog steeds één mail, geen mail per poging.
+  await webhook(collectionOf(sub, 'failed'));
+  await new Promise((res) => setTimeout(res, 300));
+  assert.strictEqual(failMails(a).length, 1, 'een tweede poging voor dezelfde periode gaf een tweede mail');
+  did();
+});
+
+test('R11: geen mail bij een geannuleerde incasso, of bij een incasso van een vervangen abonnement', async (t) => {
+  if (!srv) return t.skip('geen redis');
+  const a = account('r11stil');
+  const h = await relayWith('incasso-r11stil', [a]);
+  try {
+    await buy(a, 'monthly', h);
+    const [old] = activeSubsOf(a);
+    // Geannuleerd is wat er met een lopende incasso gebeurt als het abonnement
+    // stopt of wordt vervangen. Daar is niets mislukt.
+    assert.strictEqual((await webhook(collectionOf(old, 'canceled'), h)).status, 200);
+    // Een tweede aankoop vervangt het abonnement. Een mislukte betaling van het
+    // oude hoort de klant niet te bereiken: zijn nieuwe loopt gewoon.
+    await buy(a, 'monthly', h);
+    assert.strictEqual(mollie.subscriptions.get(old.id).status, 'canceled');
+    assert.strictEqual((await webhook(collectionOf(old, 'failed'), h)).status, 200);
+    await new Promise((res) => setTimeout(res, 400));
+    assert.deepStrictEqual(failMails(a).map((m) => m.subject), [],
+      'een geannuleerde incasso of een incasso van het oude abonnement gaf een mail over een mislukte betaling');
+    did();
+  } finally {
+    await h.stop();
+  }
 });
 
 // ── R12 ──────────────────────────────────────────────────────────────────────
@@ -546,6 +835,32 @@ test('R6: de einde-mail wacht op de incasso en belooft daarna niets wat niet klo
   });
   assert.strictEqual(sent2.length, 1);
   assert.match(sent2[0].text, /Er is niets afgeschreven\./);
+  assert.match(sent2[0].text, /Elk plan is hier een eenmalige betaling/,
+    'zonder BILLING_MODE is elk plan een eenmalige betaling, en dat mag de mail blijven zeggen');
+  did();
+});
+
+// Met BILLING_MODE aan is een plan een abonnement. Wie opzegde, krijgt aan het
+// eind nog steeds "er is niets afgeschreven", maar niet meer de uitleg dat elk
+// plan hier een eenmalige betaling is: dat klopt dan niet meer.
+test('R6: met BILLING_MODE aan zegt de einde-mail niet dat elk plan een eenmalige betaling is', async () => {
+  const DAY = 86400000;
+  const now = Date.parse('2026-10-30T09:00:00.000Z');
+  const store = memRedis();
+  await planExpiry.upsertExpiry(store, {
+    accountId: 'acct_demo_opgezegd', product: 'parasign', tier: 'pro', bundle: 'firm',
+    paidUntil: new Date(now - 1 * DAY).toISOString(), email: 'opgezegd@example.test',
+  });
+  const sent = [];
+  await planExpiry.runSweep({
+    redis: store, now, siteUrl: 'https://paramant.app', renewalOf: async () => null, recurring: true,
+    sendEmail: async (m) => { sent.push(m); return true; },
+  });
+  assert.strictEqual(sent.length, 1);
+  assert.match(sent[0].text, /Er is niets afgeschreven\./);
+  assert.match(sent[0].text, /Nothing was charged\./);
+  assert.ok(!/eenmalige betaling|one-off payment/.test(sent[0].text),
+    'met BILLING_MODE aan zegt de einde-mail nog dat elk plan een eenmalige betaling is');
   did();
 });
 

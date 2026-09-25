@@ -222,7 +222,12 @@ function bilingualText(nl, en) {
 // billing-recurring.renewalFor). Then "nothing is charged automatically" is
 // false, and the mail says what will happen instead: the date, the amount when
 // known, and where to cancel before it.
-function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle, renewal }) {
+//
+// `recurring` is the billing stance (BILLING_MODE set). Then a plan is a
+// subscription, and a term that ends without one ended because the customer
+// cancelled: "every plan here is a one-off payment" is no longer true, so the
+// "ended" mail says only what is.
+function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle, renewal, recurring }) {
   const date = formatDate(paidUntil);
   if (!date) return null;
   const dateNl = formatDateNl(paidUntil);
@@ -236,7 +241,9 @@ function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle, renewal }
     const textNl = [
       `Uw ${planNl} is afgelopen op ${dateNl}. Uw account staat nu op ${FLOOR_NAME}.`,
       '',
-      'Er is niets afgeschreven. Elk plan is hier een eenmalige betaling voor de periode die u koopt. Er wordt dus niets vanzelf verlengd en niets geïncasseerd zonder dat u zelf betaalt.',
+      recurring
+        ? 'Er is niets afgeschreven. Voor dit plan liep geen automatische verlenging meer, dus er wordt ook niets meer geïncasseerd.'
+        : 'Er is niets afgeschreven. Elk plan is hier een eenmalige betaling voor de periode die u koopt. Er wordt dus niets vanzelf verlengd en niets geïncasseerd zonder dat u zelf betaalt.',
       '',
       `U kunt op elk moment een nieuwe maand of een nieuw jaar kopen: ${pricing}`,
       '',
@@ -245,7 +252,9 @@ function expiryMail({ product, tier, paidUntil, kind, siteUrl, bundle, renewal }
     const text = [
       `Your ${plan} ended on ${date}, and your account is now on ${FLOOR_NAME}.`,
       '',
-      'Nothing was charged. Every plan here is a one-off payment for the term you buy, so nothing renews by itself and nothing is collected without you.',
+      recurring
+        ? 'Nothing was charged. No automatic renewal was running for this plan any more, so nothing more will be collected.'
+        : 'Nothing was charged. Every plan here is a one-off payment for the term you buy, so nothing renews by itself and nothing is collected without you.',
       '',
       `You can buy another month or another year at any time: ${pricing}`,
       '',
@@ -478,6 +487,8 @@ async function releaseLock(redis, token) {
 //              subscription collect for this term? relay.js passes
 //              billing-recurring.renewalFor. Without it every term is treated as
 //              a one-off, which is what BILLING_MODE empty means.
+//   recurring  optional, true when BILLING_MODE is set (mollie.billingStance):
+//              the "ended" mail then stops explaining plans as one-off payments.
 //
 // Returns { ran, warned, ended, skipped, missing, pruned, reason }.
 async function runSweep(deps) {
@@ -581,7 +592,7 @@ async function runSweep(deps) {
       const reserved = await redis.set(key, String(now), { NX: true, EX: NOTICE_TTL_S });
       if (!(reserved === 'OK' || reserved === true)) { out.skipped++; continue; }
 
-      const msg = expiryMail({ product, tier, paidUntil: at, kind, siteUrl, bundle, renewal });
+      const msg = expiryMail({ product, tier, paidUntil: at, kind, siteUrl, bundle, renewal, recurring: d.recurring === true });
       let sent = false;
       try {
         sent = !!(typeof sendEmail === 'function' && await sendEmail({

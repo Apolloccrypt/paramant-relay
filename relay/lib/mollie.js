@@ -201,9 +201,10 @@ function mollieInterval(interval) {
 // just computed.
 //
 // opts.idempotencyKey is sent as Mollie's Idempotency-Key header, so the same
-// request made twice (a webhook handled twice, a retry after a timeout) returns
-// the subscription the first one made instead of a second one that collects
-// again every month.
+// request made twice within Mollie's window for it (one hour) returns the
+// subscription the first one made instead of a second one that collects again
+// every month. That covers a retry of this call; it does not cover a process
+// that died before making a second call at all.
 async function createSubscription(mode, customerId, payload, opts) {
   const key = apiKeyFor(mode);
   if (!key) throw new Error(`mollie_key_missing:${mode}`);
@@ -223,9 +224,13 @@ async function cancelSubscription(mode, customerId, subscriptionId) {
     'DELETE',
     `/v2/customers/${encodeURIComponent(customerId)}/subscriptions/${encodeURIComponent(subscriptionId)}`,
     key, null);
-  // 200 is the cancel; 404 means it is already gone, which is the same outcome.
-  if (r.status !== 200 && r.status !== 404) {
-    const e = new Error('mollie_cancel_failed'); e.status = r.status; e.body = r.body; throw e;
+  // 200 is the cancel. A 404 is thrown with its status, not taken as success:
+  // Mollie answers 404 both for a subscription that is gone and for one asked
+  // for under the wrong customer, and only the caller knows which customer it
+  // used (billing-recurring.stopSubscription decides).
+  if (r.status !== 200) {
+    const e = new Error(r.status === 404 ? 'mollie_cancel_not_found' : 'mollie_cancel_failed');
+    e.status = r.status; e.body = r.body; throw e;
   }
   return r.body || { status: 'canceled' };
 }
