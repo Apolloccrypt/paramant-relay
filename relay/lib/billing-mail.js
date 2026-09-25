@@ -35,6 +35,21 @@ const dateNl = (d) => planExpiry.formatDateNl(d) || String(d || '');
 // Drop a blank line that follows another blank line, as the mail always did.
 const squeeze = (lines) => lines.filter((l, i, a) => !(l === '' && a[i - 1] === ''));
 
+// What the total line says about VAT. A reverse-charged document has none to
+// state, only the mention and the buyer number it was reverse charged to.
+function vatNl(record) {
+  if (record.vat_treatment === 'reverse_charge') {
+    return `${invoiceMod.REVERSE_CHARGE_NL.toLowerCase()}, btw-nummer afnemer ${record.buyer.vat}`;
+  }
+  return `incl. ${record.vat_rate}% btw, ${record.currency} ${record.amount_vat}`;
+}
+function vatEn(record) {
+  if (record.vat_treatment === 'reverse_charge') {
+    return `${invoiceMod.REVERSE_CHARGE_EN}, customer VAT number ${record.buyer.vat}`;
+  }
+  return `incl. ${record.vat_rate}% VAT, ${record.currency} ${record.amount_vat}`;
+}
+
 function invoiceMail(record) {
   const isInvoice = record.kind === 'invoice';
   const enTitle = isInvoice ? 'Invoice' : 'Payment receipt';
@@ -48,7 +63,7 @@ function invoiceMail(record) {
     `${titleNl(record.title)} ${record.number}`,
     `Datum: ${dateNl(record.invoice_date)}`,
     `${record.description}`,
-    `Totaal: ${record.currency} ${record.amount_gross} (incl. ${record.vat_rate}% btw, ${record.currency} ${record.amount_vat})`,
+    `Totaal: ${record.currency} ${record.amount_gross} (${vatNl(record)})`,
     ``,
     isInvoice ? '' : noteNl(invoiceMod.RECEIPT_NOTE),
     complete ? '' : `${BUYER_HINT_NL}.`,
@@ -63,7 +78,7 @@ function invoiceMail(record) {
     `${record.title} ${record.number}`,
     `Date: ${record.invoice_date}`,
     `${record.description}`,
-    `Total: ${record.currency} ${record.amount_gross} (incl. ${record.vat_rate}% VAT, ${record.currency} ${record.amount_vat})`,
+    `Total: ${record.currency} ${record.amount_gross} (${vatEn(record)})`,
     ``,
     isInvoice ? '' : `${invoiceMod.RECEIPT_NOTE}`,
     complete ? '' : `${invoiceMod.BUYER_HINT}.`,
@@ -91,7 +106,7 @@ function creditNoteMail(record) {
     `Datum: ${dateNl(record.invoice_date)}`,
     `Creditering van factuur ${record.credit_for} van ${dateNl(record.credit_for_date)}`,
     `${record.description}`,
-    `Totaal gecrediteerd: ${record.currency} ${record.amount_gross} (incl. ${record.vat_rate}% btw, ${record.currency} ${record.amount_vat})`,
+    `Totaal gecrediteerd: ${record.currency} ${record.amount_gross} (${vatNl(record)})`,
     ``,
     record.partial ? 'Dit is een gedeeltelijke creditering. De rest van die factuur blijft staan.' : '',
     noteNl(record.note),
@@ -109,7 +124,7 @@ function creditNoteMail(record) {
     `Date: ${record.invoice_date}`,
     `Credit for invoice ${record.credit_for} of ${record.credit_for_date}`,
     `${record.description}`,
-    `Total credited: ${record.currency} ${record.amount_gross} (incl. ${record.vat_rate}% VAT, ${record.currency} ${record.amount_vat})`,
+    `Total credited: ${record.currency} ${record.amount_gross} (${vatEn(record)})`,
     ``,
     record.partial ? 'This is a partial credit. The remainder of that invoice still stands.' : '',
     record.note || '',

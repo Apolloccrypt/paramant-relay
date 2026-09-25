@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **119 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **187 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **188 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -116,6 +116,7 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `DEV_PORT` | `scripts/dev-local-proxy.js` | `'8080'` | poort van de dev-proxy |
 | `FAKE_MOLLIE_URL` | `tests/helpers/mollie-intercept.cjs` | geen | stuurt https-verkeer naar api.mollie.com door naar de nagebouwde Mollie van de koperspoort; leeg (productie) doet de preload niets |
 | `FAKE_RESEND_URL` | `tests/helpers/mollie-intercept.cjs` | geen | zelfde omleiding voor api.resend.com, zodat een test de facturen en waarschuwingsmails kan lezen die anders ongezien vertrekken |
+| `FAKE_VIES_URL` | `tests/helpers/mollie-intercept.cjs` | geen | zelfde omleiding voor ec.europa.eu, zodat een test de btw-controle bij VIES kan naspelen en nooit een echt btw-nummer navraagt |
 | `FLEET_LIVE` | `tests/verify-knows-the-fleet.test.mjs` | geen | zet de test aan die de gepinde sleutels tegen de live relays houdt; staat in geen enkele workflow, draait dus nergens |
 | `GH_TOKEN` | `scripts/guards-live.mjs` | valt terug op `GITHUB_TOKEN`, dan leeg | token waarmee de waarborgcontrole de GitHub-API leest |
 | `GITHUB_OUTPUT` | `scripts/guards-live.mjs` | geen | pad waar de waarborgcontrole zijn uitkomst voor de workflow neerlegt; ontbreekt hij, dan schrijft hij niets en meldt dat niet |
