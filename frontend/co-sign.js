@@ -288,6 +288,10 @@ async function prepareSigning() {
   // with no session to sign in first.
   __session = await loadSession();
   if (!__session) {
+    // One step at a time: .needs-login hides the review card, the disabled sign
+    // button and the authenticator panel, so signing in is the only thing on
+    // screen. It comes off the moment a session resolves.
+    document.body.classList.add('needs-login');
     setStatus('warn', L('Log in als de ontvanger aan wie deze uitnodiging is gestuurd. Kom daarna hier terug om te tekenen.', 'Sign in as the recipient this invite was sent to, then return here to sign.'));
     // Preserve the fragment: it contains the document decryption key and is not
     // sent to either Paramant or the identity provider.
@@ -295,6 +299,8 @@ async function prepareSigning() {
     showCta('<a class="btn" href="/auth/login?return=' + ret + L('">Inloggen om verder te gaan</a>', '">Sign in to continue</a>'));
     return;
   }
+  document.body.classList.remove('needs-login');
+  $('sign-cta').hidden = true;
 
   // GATE 2 — a signing key. We no longer dump a first-time recipient to /account:
   // if this device has no signing key, doSign() sets one up inline — a single
@@ -333,6 +339,10 @@ function setDeliveryStatus(kind, msg) {
   b.hidden = false;
   b.className = 'banner' + (kind ? ' ' + kind : '');
   b.textContent = msg;
+  // "Choose the document yourself" is an escape hatch, not a step. It appears
+  // only once automatic delivery has actually failed.
+  const cta = $('verify-file-cta');
+  if (cta) cta.hidden = kind !== 'err';
 }
 
 async function loadDeliveredDocument(envId, partyIndex) {

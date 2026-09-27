@@ -135,6 +135,24 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .blind-link{background:none;border:none;color:var(--ink-dim);text-decoration:underline;font-family:var(--mono);font-size:11px;cursor:pointer;padding:0}
 .blind-link:hover{color:var(--brick-ink)}
 @media(max-width:640px){main{padding:40px 16px}h1{font-size:19px}.kv{grid-template-columns:1fr}}
+/* One step at a time. Until GATE 1 passes (co-sign.js puts .needs-login on
+   <body>), an invitee can do exactly one thing: sign in. Everything that only
+   works once there is a session stays out of the way, so the page never shows
+   a disabled "sign" button under a "sign in" button, or three amber banners
+   that repeat one instruction. */
+body.needs-login #review-card,
+body.needs-login #sign-confirm,
+body.needs-login #cs-pass-panel,
+body.needs-login #review-gate,
+body.needs-login #sign-intro{display:none}
+/* Collapsed technical detail: the summary line is all an invitee sees until
+   they ask for the rest. */
+.how{border:1px solid var(--ink-hair);margin-bottom:14px;background:var(--card)}
+.how>summary{cursor:pointer;padding:10px 14px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-dim)}
+.how>summary:hover{color:var(--ink)}
+.how-body{padding:0 14px 12px;font-size:12px;line-height:1.6;color:var(--ink-dim)}
+.how-body p{margin-bottom:8px}
+.how-body p:last-child{margin-bottom:0}
 </style>
 <script src="/js/theme.js?v=6"></script>
 </head>
@@ -162,13 +180,15 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 <div class="step" id="step-cosign">
   <h1>Document medeondertekenen</h1>
-  <p class="sub">Bekijk het document dat u is gestuurd en zet uw handtekening. Het ontsleutelen en ondertekenen met ML-DSA-65 gebeurt op uw eigen apparaat. De relay krijgt versleutelde gegevens, uw publieke sleutel, de handtekening en de plek van uw velden. De leesbare inhoud van het document en uw private sleutel krijgt hij nooit.</p>
+  <p class="sub">Bekijk het document dat u is gestuurd en zet uw handtekening.</p>
 
-  <div class="disclaimer">
-    <strong>Post-quantum en zero-knowledge. Niet eIDAS-gekwalificeerd.</strong>
-    Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65. Het is geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES).
-    Vergelijk de hash hieronder met die van het bestand dat u los ontving.
-  </div>
+  <details class="how">
+    <summary>HOE DIT WERKT</summary>
+    <div class="how-body">
+      <p>Het ontsleutelen en ondertekenen met ML-DSA-65 gebeurt op uw eigen apparaat. De relay krijgt versleutelde gegevens, uw publieke sleutel, de handtekening en de plek van uw velden. De leesbare inhoud van het document en uw private sleutel krijgt hij nooit.</p>
+      <p><strong>Post-quantum en zero-knowledge. Niet eIDAS-gekwalificeerd.</strong> Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65. Het is geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES). Vergelijk de hash hieronder met die van het bestand dat u los ontving.</p>
+    </div>
+  </details>
 
   <div class="card">
     <div class="card-head"><div class="dot" id="env-status-dot"></div><div class="card-head-title" id="env-status">Status: ...</div></div>
@@ -189,12 +209,17 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
     <div class="card-body" id="parties-list"></div>
   </div>
 
-  <div class="card">
+  <div class="card" id="review-card">
     <div class="card-head"><div class="dot amber" id="review-dot"></div><div class="card-head-title">Bekijk wat u ondertekent</div></div>
     <div class="card-body">
-      <p class="sub" style="margin-bottom:12px">Het versleutelde document wordt pas opgehaald als u inlogt met het e-mailadres waarop u bent uitgenodigd. Daarna wordt het in deze browser ontsleuteld. U kunt pas ondertekenen als de SHA3-256-hash overeenkomt met het verzoek. De sleutel van het document en de leesbare inhoud krijgt de relay niet.</p>
+      <details class="how">
+        <summary>WAAR HET DOCUMENT VANDAAN KOMT</summary>
+        <div class="how-body">
+          <p>Het versleutelde document wordt in deze browser ontsleuteld. U kunt pas ondertekenen als de SHA3-256-hash overeenkomt met het verzoek. De sleutel van het document en de leesbare inhoud krijgt de relay niet.</p>
+        </div>
+      </details>
       <div class="banner" id="document-delivery-status">Het versleutelde document wordt geladen...</div>
-      <label class="file-cta" for="verify-file" id="verify-file-cta">Kies het document zelf als het niet vanzelf laadt</label>
+      <label class="file-cta" for="verify-file" id="verify-file-cta" hidden>Kies het document zelf als het niet vanzelf laadt</label>
       <input type="file" id="verify-file" hidden>
       <div class="banner" id="verify-result" hidden></div>
       <div class="requested-note" id="requested-note" hidden>
@@ -216,7 +241,12 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   <div class="card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Ondertekenen als <span id="me-label">ondertekenaar</span></div></div>
     <div class="card-body">
-      <p class="sub" style="margin-bottom:12px">U tekent met uw ondertekensleutel (ML-DSA-65). Op het moment dat u tekent, ontgrendelt u die met Face ID, Touch ID of een beveiligingssleutel. De sleutel verlaat uw apparaat nooit. De handtekening hoort bij het e-mailadres waarop u deze uitnodiging kreeg.</p>
+      <details class="how" id="sign-intro">
+        <summary>WAARMEE U TEKENT</summary>
+        <div class="how-body">
+          <p>U tekent met uw ondertekensleutel (ML-DSA-65). Op het moment dat u tekent, ontgrendelt u die met Face ID, Touch ID of een beveiligingssleutel. De sleutel verlaat uw apparaat nooit. De handtekening hoort bij het e-mailadres waarop u deze uitnodiging kreeg.</p>
+        </div>
+      </details>
       <div class="banner" id="sign-status" hidden></div>
       <div id="sign-cta" style="margin-bottom:12px" hidden></div>
       <button class="btn" id="sign-confirm" type="button" disabled>Dit document ondertekenen</button>
@@ -271,6 +301,6 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=7" defer></script>
-<script type="module" src="/co-sign.js?v=24"></script>
+<script type="module" src="/co-sign.js?v=25"></script>
 </body>
 </html>
