@@ -63,11 +63,21 @@ function toHex(u8) {
   return s;
 }
 
+// Byte-identical to normaliseAppearance() in relay/envelope.js. Manifest v2
+// adds one optional per-field flag, all_pages: the same mark, at the same
+// normalised coordinates, on every page of the document. The relay never learns
+// the page count, so a flag and not a page list is what gets signed -- and a
+// manifest capped at 8 fields could never spell out an initial on every sheet
+// of a 20-page contract. The flag is emitted only when true and the version
+// only rises to 2 when a field carries it, so every pre-v2 signature still
+// hashes to exactly the same bytes.
 export function normaliseSigningAppearance(value) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  if (source.version !== undefined && source.version !== 1) throw new Error(tr('Deze versie van de handtekeningplaatsing wordt niet ondersteund.', 'Unsupported signature appearance version.'));
+  const declared = source.version === undefined ? null : Number(source.version);
+  if (declared !== null && declared !== 1 && declared !== 2) throw new Error(tr('Deze versie van de handtekeningplaatsing wordt niet ondersteund.', 'Unsupported signature appearance version.'));
   const input = source.fields === undefined ? [] : source.fields;
   if (!Array.isArray(input) || input.length > 8) throw new Error(tr('De plaatsing van de handtekening is ongeldig.', 'Invalid signature appearance.'));
+  let anyAllPages = false;
   const fields = input.map((field) => {
     if (!field || typeof field !== 'object' || Array.isArray(field)) throw new Error(tr('Een veld van de handtekeningplaatsing is ongeldig.', 'Invalid signature appearance field.'));
     const type = String(field.type || '');
@@ -83,9 +93,17 @@ export function normaliseSigningAppearance(value) {
     if (clean.w < 0.02 || clean.h < 0.01 || clean.x + clean.w > 1.000001 || clean.y + clean.h > 1.000001) {
       throw new Error(tr('De handtekening valt buiten de pagina.', 'Signature appearance is outside the page.'));
     }
+    if (field.all_pages !== undefined) {
+      if (typeof field.all_pages !== 'boolean') throw new Error(tr('De keuze voor elke pagina is ongeldig.', 'Invalid all-pages flag.'));
+      if (field.all_pages) {
+        if (pageIndex !== 0) throw new Error(tr('Een veld op elke pagina begint op de eerste pagina.', 'An all-pages field anchors on the first page.'));
+        clean.all_pages = true;
+        anyAllPages = true;
+      }
+    }
     return clean;
   });
-  return { version: 1, fields };
+  return { version: anyAllPages ? 2 : 1, fields };
 }
 
 // Pure: one stamp placed on /sign (PDF points, bottom-left origin, exactly the

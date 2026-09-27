@@ -18,7 +18,7 @@
 // the view receipt. The signing path itself is same-origin via the admin
 // (/api/user/sign/*), bound to the logged-in invitee session.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=17';
+import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=18';
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { decryptDocumentCapsule, parseDocumentKeyFragment } from '/js/parasign-document-capsule.js?v=2';
 
@@ -219,6 +219,32 @@ function renderEnvelope() {
     saveAppearanceDraft();
     __appearanceTool = '';
     setAppearanceHelp(L('Uw zichtbare velden zijn gewist. U kunt ze opnieuw plaatsen of tekenen zonder zichtbare stempel.', 'Your visible fields were cleared. You can place them again or sign without a visible mark.'), false);
+    renderAppearanceOverlays();
+  };
+  // Ticking the box after the seal is already placed has to move that seal, not
+  // ask the signer to place it again. A repeated seal anchors on page 0.
+  const allPages = $('appearance-allpages');
+  if (allPages) allPages.onchange = () => {
+    const on = !!allPages.checked;
+    const fields = (__appearance.fields || []).map((item) => {
+      if (item.type !== 'seal') return item;
+      const next = { ...item };
+      if (on) { next.all_pages = true; next.page_index = 0; }
+      else delete next.all_pages;
+      return next;
+    });
+    if (!fields.some((item) => item.type === 'seal')) {
+      setAppearanceHelp(on
+        ? L('Kies Plaats mijn handtekening en klik op de plek. Hij komt dan op elke pagina.', 'Choose Place my signature and click a spot. It will appear on every page.')
+        : L('Kies Plaats mijn handtekening en klik op de plek.', 'Choose Place my signature and click a spot.'), true);
+      return;
+    }
+    __appearance = normaliseSigningAppearance({ version: on ? 2 : 1, fields });
+    __appearanceIsSeed = false;
+    saveAppearanceDraft();
+    setAppearanceHelp(on
+      ? L('Uw handtekening staat nu op elke pagina, op dezelfde plek.', 'Your signature now appears on every page, in the same spot.')
+      : L('Uw handtekening staat alleen op deze pagina.', 'Your signature appears on this page only.'), false);
     renderAppearanceOverlays();
   };
 }
@@ -547,19 +573,28 @@ function placeAppearanceField(event) {
   const size = __appearanceTool === 'seal' ? { w: 0.36, h: 0.105 } : { w: 0.22, h: 0.055 };
   const px = (event.clientX - rect.left) / rect.width;
   const py = (event.clientY - rect.top) / rect.height;
+  // A repeated seal anchors on page 0: its coordinates are normalised, so the
+  // click decides WHERE on a page, and the flag decides that it is every page.
+  const repeat = __appearanceTool === 'seal' && !!($('appearance-allpages') || {}).checked;
   const field = {
     type: __appearanceTool,
-    page_index: Number(page.dataset.pageIndex),
+    page_index: repeat ? 0 : Number(page.dataset.pageIndex),
     x: Math.max(0, Math.min(1 - size.w, px - size.w / 2)),
     y: Math.max(0, Math.min(1 - size.h, py - size.h / 2)),
     w: size.w,
     h: size.h,
   };
+  if (repeat) field.all_pages = true;
+  // Placing anything makes this the signer's own manifest: the seeded box was
+  // a request, and from here on every field in it was put there by the signer.
+  const fields = (__appearanceIsSeed ? [] : __appearance.fields)
+    .filter((item) => item.type !== field.type)
+    .concat(field);
+  // The version follows the fields, never the other way round: placing a date
+  // next to an already-repeating seal must not quietly drop its all_pages.
   __appearance = normaliseSigningAppearance({
-    version: 1,
-    // Placing anything makes this the signer's own manifest: the seeded box was
-    // a request, and from here on every field in it was put there by the signer.
-    fields: (__appearanceIsSeed ? [] : __appearance.fields).filter((item) => item.type !== field.type).concat(field),
+    version: fields.some((item) => item.all_pages) ? 2 : 1,
+    fields,
   });
   __appearanceIsSeed = false;
   { const note = $('requested-note'); if (note) note.hidden = true; }
@@ -611,10 +646,17 @@ function renderAppearanceOverlays() {
     const layer = page.querySelector('.appearance-layer');
     if (layer) layer.innerHTML = '';
   }
+  // A field with all_pages is one signed instruction, drawn once per page: the
+  // preview has to show every repeat, or the signer approves a manifest that
+  // marks pages they never saw marked.
   const add = (field, party, current, requested) => {
-    const page = pages.find((node) => Number(node.dataset.pageIndex) === Number(field.page_index));
-    const layer = page && page.querySelector('.appearance-layer');
-    if (layer) addAppearanceNode(layer, field, party, current, requested);
+    const targets = field.all_pages
+      ? pages
+      : pages.filter((node) => Number(node.dataset.pageIndex) === Number(field.page_index));
+    for (const page of targets) {
+      const layer = page.querySelector('.appearance-layer');
+      if (layer) addAppearanceNode(layer, field, party, current, requested);
+    }
   };
   for (const party of (__envelope?.parties || [])) {
     if (party.index === __partyIndex || party.status !== 'signed' || !party.appearance) continue;
@@ -662,27 +704,33 @@ export async function buildSignedPdf(currentResult) {
   const pages = pdf.getPages();
   for (const record of records) {
     for (const field of (record.appearance.fields || [])) {
-      const page = pages[field.page_index];
-      if (!page) continue;
-      const { width, height } = page.getSize();
-      const x = field.x * width;
-      const y = height - ((field.y + field.h) * height);
-      const w = field.w * width;
-      const h = field.h * height;
-      if (field.type === 'date') {
-        const text = safePdfText(String(record.party.signed_at || '').slice(0, 10), 10);
-        page.drawRectangle({ x, y, width: w, height: h, color: rgb(1, 1, 1), opacity: 0.94, borderColor: rgb(.22, .32, .48), borderWidth: 1 });
-        page.drawText(text, { x: x + 5, y: y + Math.max(4, h * .3), size: Math.max(7, Math.min(11, h * .32)), font: regular, color: rgb(.04, .18, .35) });
-      } else {
-        const label = safePdfText(record.party.label || L('Ondertekenaar', 'Signer'), 70);
-        const fingerprint = safePdfText(record.party.signer_pk_hash || '', 16);
-        const date = safePdfText(record.party.signed_at || '', 24);
-        page.drawRectangle({ x, y, width: w, height: h, color: rgb(1, 1, 1), opacity: 0.94, borderColor: rgb(.08, .31, .84), borderWidth: 1.4 });
-        const titleSize = Math.max(7, Math.min(11, h * .22));
-        const bodySize = Math.max(6, Math.min(9, h * .16));
-        page.drawText('PARAMANT SIGNED', { x: x + 6, y: y + h - titleSize - 5, size: titleSize, font: bold, color: rgb(.08, .31, .84) });
-        page.drawText(label, { x: x + 6, y: y + h * .38, size: bodySize, font: regular, color: rgb(.04, .18, .35), maxWidth: Math.max(20, w - 12) });
-        page.drawText((date ? date.slice(0, 10) : '') + (fingerprint ? ' · ' + fingerprint : ''), { x: x + 6, y: y + 5, size: Math.max(5, bodySize - 1), font: regular, color: rgb(.32, .42, .55), maxWidth: Math.max(20, w - 12) });
+      // all_pages repeats one signed field at the same relative spot on every
+      // page. The manifest carries the flag, not a page list, so the repeat is
+      // resolved here against the document the signer actually holds.
+      const targets = field.all_pages
+        ? pages
+        : (pages[field.page_index] ? [pages[field.page_index]] : []);
+      for (const page of targets) {
+        const { width, height } = page.getSize();
+        const x = field.x * width;
+        const y = height - ((field.y + field.h) * height);
+        const w = field.w * width;
+        const h = field.h * height;
+        if (field.type === 'date') {
+          const text = safePdfText(String(record.party.signed_at || '').slice(0, 10), 10);
+          page.drawRectangle({ x, y, width: w, height: h, color: rgb(1, 1, 1), opacity: 0.94, borderColor: rgb(.22, .32, .48), borderWidth: 1 });
+          page.drawText(text, { x: x + 5, y: y + Math.max(4, h * .3), size: Math.max(7, Math.min(11, h * .32)), font: regular, color: rgb(.04, .18, .35) });
+        } else {
+          const label = safePdfText(record.party.label || L('Ondertekenaar', 'Signer'), 70);
+          const fingerprint = safePdfText(record.party.signer_pk_hash || '', 16);
+          const date = safePdfText(record.party.signed_at || '', 24);
+          page.drawRectangle({ x, y, width: w, height: h, color: rgb(1, 1, 1), opacity: 0.94, borderColor: rgb(.08, .31, .84), borderWidth: 1.4 });
+          const titleSize = Math.max(7, Math.min(11, h * .22));
+          const bodySize = Math.max(6, Math.min(9, h * .16));
+          page.drawText('PARAMANT SIGNED', { x: x + 6, y: y + h - titleSize - 5, size: titleSize, font: bold, color: rgb(.08, .31, .84) });
+          page.drawText(label, { x: x + 6, y: y + h * .38, size: bodySize, font: regular, color: rgb(.04, .18, .35), maxWidth: Math.max(20, w - 12) });
+          page.drawText((date ? date.slice(0, 10) : '') + (fingerprint ? ' · ' + fingerprint : ''), { x: x + 6, y: y + 5, size: Math.max(5, bodySize - 1), font: regular, color: rgb(.32, .42, .55), maxWidth: Math.max(20, w - 12) });
+        }
       }
     }
   }
