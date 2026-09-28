@@ -161,14 +161,21 @@ function canonicalJSON(value) {
   return '{' + Object.keys(value).sort().map((key) => JSON.stringify(key) + ':' + canonicalJSON(value[key])).join(',') + '}';
 }
 
+// Byte-identical to normaliseAppearance() in relay/envelope.js, key order
+// included: this reproduces the bytes that were hashed into the signature, so
+// any divergence surfaces as a proof that will not verify. all_pages (manifest
+// v2, one mark repeated on every page) is emitted only when true, which is what
+// keeps every proof made before v2 verifying unchanged.
 function normaliseAppearance(value) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  let anyAllPages = false;
   const fields = Array.isArray(source.fields) ? source.fields.map((field) => {
     const clean = { type: String(field.type || ''), page_index: Number(field.page_index) };
     for (const name of ['x', 'y', 'w', 'h']) clean[name] = Math.round(Number(field[name]) * 1000000) / 1000000;
+    if (field.all_pages === true) { clean.all_pages = true; anyAllPages = true; }
     return clean;
   }) : [];
-  return { version: 1, fields };
+  return { version: anyAllPages ? 2 : 1, fields };
 }
 
 function appearanceHash(value) {
