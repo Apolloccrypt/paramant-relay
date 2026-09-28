@@ -18,7 +18,7 @@
 // the view receipt. The signing path itself is same-origin via the admin
 // (/api/user/sign/*), bound to the logged-in invitee session.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=17';
+import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=18';
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { decryptDocumentCapsule, parseDocumentKeyFragment } from '/js/parasign-document-capsule.js?v=2';
 
@@ -212,6 +212,7 @@ function renderEnvelope() {
   if (go) go.onclick = () => scrollToRequestedSpot('smooth');
   $('appearance-seal').onclick = () => armAppearanceTool('seal');
   $('appearance-date').onclick = () => armAppearanceTool('date');
+  { const ini = $('appearance-initials'); if (ini) ini.onclick = () => armAppearanceTool('initials'); }
   $('appearance-clear').onclick = () => {
     __appearance = { version: 1, fields: [] };
     __appearanceIsSeed = false;
@@ -525,6 +526,8 @@ function armAppearanceTool(type) {
   __appearanceTool = type;
   setAppearanceHelp(type === 'seal'
     ? L('Handtekening gekozen. Klik op de plek in het document waar uw gecontroleerde Paramant-stempel moet komen.', 'Signature selected. Click the PDF where your verified Paramant seal should appear.')
+    : type === 'initials'
+    ? L('Paraaf gekozen. Klik op een pagina waar uw paraaf moet komen, bijvoorbeeld rechtsonder. Hij komt op dezelfde plek op elke pagina.', 'Initials selected. Click the spot on a page where your initials should go, for example bottom right. They appear at the same spot on every page.')
     : L('Datum gekozen. Klik op de plek in het document waar de datum van ondertekening moet komen.', 'Date selected. Click the PDF where the signing date should appear.'), true);
 }
 
@@ -534,7 +537,7 @@ function placeAppearanceField(event) {
   const page = event.currentTarget;
   const rect = page.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
-  const size = __appearanceTool === 'seal' ? { w: 0.36, h: 0.105 } : { w: 0.22, h: 0.055 };
+  const size = __appearanceTool === 'seal' ? { w: 0.36, h: 0.105 } : __appearanceTool === 'initials' ? INITIALS_SIZE : { w: 0.22, h: 0.055 };
   const px = (event.clientX - rect.left) / rect.width;
   const py = (event.clientY - rect.top) / rect.height;
   const field = {
@@ -557,11 +560,30 @@ function placeAppearanceField(event) {
   __appearanceTool = '';
   setAppearanceHelp(field.type === 'seal'
     ? L('Uw stempel staat. Slepen hoeft niet: kies opnieuw Plaats mijn handtekening om hem te verplaatsen.', 'Your signature seal is placed. Drag is not needed: choose Place my signature again to move it.')
+    : field.type === 'initials'
+    ? L('Uw paraaf staat op elke pagina. Kies opnieuw Paraaf op elke pagina om hem te verplaatsen.', 'Your initials are on every page. Choose Initial every page again to move them.')
     : L('De datum staat. Kies opnieuw Plaats datum om hem te verplaatsen.', 'The signing date is placed. Choose Place date again to move it.'), false);
   renderAppearanceOverlays();
 }
 
+// A paraaf is one manifest field ('initials') drawn at the same spot on every
+// page. The letters come from the signer's name in the envelope, like the seal's
+// label does; the manifest itself carries no text.
+const INITIALS_SIZE = { w: 0.1, h: 0.045 };
+export function initialsOf(label) {
+  const base = String(label || '').split('@')[0].replace(/[._-]+/g, ' ').trim();
+  const letters = base.split(/\s+/).filter(Boolean).map((word) => word[0].toUpperCase());
+  return (letters.length ? letters.slice(0, 4).join('.') + '.' : '·');
+}
+
+// Which pages a field is drawn on: a paraaf on all of them, anything else on its own page.
+export function fieldPageIndexes(field, pageCount) {
+  if (field.type === 'initials') return Array.from({ length: pageCount }, (_, i) => i);
+  return Number(field.page_index) < pageCount ? [Number(field.page_index)] : [];
+}
+
 function appearanceText(type, party, current) {
+  if (type === 'initials') return L('Paraaf ', 'Initials ') + initialsOf(party.label);
   if (type === 'date') return current ? new Date().toISOString().slice(0, 10) : String(party.signed_at || '').slice(0, 10);
   return L('Paramant ondertekend · ', 'Paramant signed · ') + String(party.label || L('Ondertekenaar', 'Signer'));
 }
@@ -580,7 +602,7 @@ function addAppearanceNode(layer, field, party, current, requested) {
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'appearance-remove';
-    remove.setAttribute('aria-label', L(field.type === 'date' ? 'Verwijder het datumveld' : 'Verwijder het handtekeningveld', 'Remove ' + field.type + ' field'));
+    remove.setAttribute('aria-label', L(field.type === 'date' ? 'Verwijder het datumveld' : field.type === 'initials' ? 'Verwijder de paraaf' : 'Verwijder het handtekeningveld', 'Remove ' + field.type + ' field'));
     remove.textContent = '×';
     remove.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -602,9 +624,11 @@ function renderAppearanceOverlays() {
     if (layer) layer.innerHTML = '';
   }
   const add = (field, party, current, requested) => {
-    const page = pages.find((node) => Number(node.dataset.pageIndex) === Number(field.page_index));
-    const layer = page && page.querySelector('.appearance-layer');
-    if (layer) addAppearanceNode(layer, field, party, current, requested);
+    for (const index of fieldPageIndexes(field, pages.length)) {
+      const page = pages.find((node) => Number(node.dataset.pageIndex) === index);
+      const layer = page && page.querySelector('.appearance-layer');
+      if (layer) addAppearanceNode(layer, field, party, current, requested);
+    }
   };
   for (const party of (__envelope?.parties || [])) {
     if (party.index === __partyIndex || party.status !== 'signed' || !party.appearance) continue;
@@ -652,14 +676,19 @@ export async function buildSignedPdf(currentResult) {
   const pages = pdf.getPages();
   for (const record of records) {
     for (const field of (record.appearance.fields || [])) {
-      const page = pages[field.page_index];
+     for (const pageIndex of fieldPageIndexes(field, pages.length)) {
+      const page = pages[pageIndex];
       if (!page) continue;
       const { width, height } = page.getSize();
       const x = field.x * width;
       const y = height - ((field.y + field.h) * height);
       const w = field.w * width;
       const h = field.h * height;
-      if (field.type === 'date') {
+      if (field.type === 'initials') {
+        const text = safePdfText(initialsOf(record.party.label), 12);
+        page.drawRectangle({ x, y, width: w, height: h, color: rgb(1, 1, 1), opacity: 0.94, borderColor: rgb(.08, .31, .84), borderWidth: 1 });
+        page.drawText(text, { x: x + 4, y: y + Math.max(3, h * .3), size: Math.max(7, Math.min(12, h * .45)), font: bold, color: rgb(.04, .18, .35), maxWidth: Math.max(12, w - 8) });
+      } else if (field.type === 'date') {
         const text = safePdfText(String(record.party.signed_at || '').slice(0, 10), 10);
         page.drawRectangle({ x, y, width: w, height: h, color: rgb(1, 1, 1), opacity: 0.94, borderColor: rgb(.22, .32, .48), borderWidth: 1 });
         page.drawText(text, { x: x + 5, y: y + Math.max(4, h * .3), size: Math.max(7, Math.min(11, h * .32)), font: regular, color: rgb(.04, .18, .35) });
@@ -674,6 +703,7 @@ export async function buildSignedPdf(currentResult) {
         page.drawText(label, { x: x + 6, y: y + h * .38, size: bodySize, font: regular, color: rgb(.04, .18, .35), maxWidth: Math.max(20, w - 12) });
         page.drawText((date ? date.slice(0, 10) : '') + (fingerprint ? ' · ' + fingerprint : ''), { x: x + 6, y: y + 5, size: Math.max(5, bodySize - 1), font: regular, color: rgb(.32, .42, .55), maxWidth: Math.max(20, w - 12) });
       }
+     }
     }
   }
   return new Uint8Array(await pdf.save());

@@ -109,6 +109,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
    deliberately not used, and scripts/ui-contrast-sweep.mjs has them on its
    known list for that reason and no other. */
 .appearance-field{position:absolute;display:flex;align-items:center;overflow:hidden;border:2px solid #1D4ED8;background:rgba(255,255,255,.94);color:#0C1B2A;padding:5px 8px;font:600 10px/1.25 var(--sans);box-shadow:0 3px 12px rgba(0, 0, 0, .16);pointer-events:auto}
+.appearance-field.initials{justify-content:center;font-family:var(--mono);font-weight:700;padding:2px 4px}
 .appearance-field.date{border-color:#5C6A78;font-family:var(--mono);font-weight:500}
 /* The box the SENDER asked for, before the signer has touched it. It must not
    look like a signature that already exists: no name, no date, no delete
@@ -206,9 +207,10 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
         <div class="appearance-tools" role="toolbar" aria-label="Zichtbare velden van uw handtekening">
           <button class="btn btn-outline" id="appearance-seal" type="button">Plaats mijn handtekening</button>
           <button class="btn btn-outline" id="appearance-date" type="button">Plaats datum</button>
+          <button class="btn btn-outline" id="appearance-initials" type="button">Paraaf op elke pagina</button>
           <button class="btn btn-outline" id="appearance-clear" type="button">Wis mijn velden</button>
         </div>
-        <p class="appearance-help" id="appearance-help">Kies een veld en klik op de plek in het document waar het moet komen. Deze plekken vallen onder uw cryptografische handtekening.</p>
+        <p class="appearance-help" id="appearance-help">Kies een veld en klik op de plek in het document waar het moet komen. Een paraaf komt op dezelfde plek op elke pagina. Deze plekken vallen onder uw cryptografische handtekening.</p>
       </div>
     </div>
   </div>
@@ -271,6 +273,6 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=7" defer></script>
-<script type="module" src="/co-sign.js?v=24"></script>
+<script type="module" src="/co-sign.js?v=25"></script>
 </body>
 </html>

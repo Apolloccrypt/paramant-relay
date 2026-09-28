@@ -71,7 +71,8 @@ export function normaliseSigningAppearance(value) {
   const fields = input.map((field) => {
     if (!field || typeof field !== 'object' || Array.isArray(field)) throw new Error(tr('Een veld van de handtekeningplaatsing is ongeldig.', 'Invalid signature appearance field.'));
     const type = String(field.type || '');
-    if (type !== 'seal' && type !== 'date') throw new Error(tr('Het soort veld van de handtekeningplaatsing is ongeldig.', 'Invalid signature appearance field type.'));
+    // 'initials' = paraaf: one field, repeated at the same spot on every page (see relay/envelope.js).
+    if (type !== 'seal' && type !== 'date' && type !== 'initials') throw new Error(tr('Het soort veld van de handtekeningplaatsing is ongeldig.', 'Invalid signature appearance field type.'));
     const pageIndex = Number(field.page_index);
     if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex > 999) throw new Error(tr('De pagina van de handtekeningplaatsing is ongeldig.', 'Invalid signature appearance page.'));
     const clean = { type, page_index: pageIndex };

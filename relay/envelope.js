@@ -142,7 +142,11 @@ function normaliseAppearance(value) {
   const fields = input.map((field) => {
     if (!field || typeof field !== 'object' || Array.isArray(field)) throw new Error('invalid appearance field');
     const type = String(field.type || '');
-    if (type !== 'seal' && type !== 'date') throw new Error('invalid appearance type');
+    // 'initials' is a paraaf: ONE field whose spot (x, y, w, h as fractions of
+    // the page) is repeated on every page of the document. One field, not one
+    // per page, so a 40-page contract stays inside the eight-field ceiling and
+    // the manifest still says exactly what the signer agreed to.
+    if (type !== 'seal' && type !== 'date' && type !== 'initials') throw new Error('invalid appearance type');
     const pageIndex = Number(field.page_index);
     if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex > 999) throw new Error('invalid appearance page');
     const clean = { type, page_index: pageIndex };

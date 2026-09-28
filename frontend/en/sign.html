@@ -640,7 +640,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <div class="ds-modes">
       <button type="button" class="ds-mode-card primary" data-mode="invite">
         <span class="ds-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg></span>
-        <span class="ds-mode-copy"><span class="ds-mode-badge">Recommended for business</span><span class="ds-mode-t">Request signatures</span><span class="ds-mode-d">Email a secure document to one or more people and follow their progress.</span></span>
+        <span class="ds-mode-copy"><span class="ds-mode-badge">Recommended for business</span><span class="ds-mode-t">Request signatures</span><span class="ds-mode-d">Email a secure document to one or more people and follow their progress. Every signer can also initial every page.</span></span>
         <span class="ds-mode-go" aria-hidden="true">&rarr;</span>
       </button>
       <button type="button" class="ds-mode-card" data-mode="alone">
@@ -650,7 +650,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       </button>
       <button type="button" class="ds-mode-card" data-mode="cosign">
         <span class="ds-mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2"/><path d="M3 19c.5-4 2-6 5-6s4.5 2 5 6"/><path d="M14 14c3-1 5 1 6 4"/></svg></span>
-        <span class="ds-mode-copy"><span class="ds-mode-t">Sign together</span><span class="ds-mode-d">Sign first, then invite others to add their signatures.</span></span>
+        <span class="ds-mode-copy"><span class="ds-mode-t">Sign together</span><span class="ds-mode-d">Sign first, then invite others to add their signatures, each with initials on every page if you want.</span></span>
         <span class="ds-mode-go" aria-hidden="true">&rarr;</span>
       </button>
     </div>
@@ -681,6 +681,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     </div>
     <div class="ds-invite-tools" id="ds-invite-tools" hidden>
       <button class="ds-edit-btn" id="ds-invite-place" type="button">Place the signature box</button>
+      <span class="ds-edit-tip" id="ds-invite-paraaf-tip">Does every page need initials too? Each signer adds them while signing, with the Initial every page button.</span>
     </div>
     <p class="ds-edit-hint" id="ds-edit-tools-hint" hidden>This file is an image, so you can place your signature stamp only. The full editor (+ Text, + Date, highlights, notes and page management) works on PDF files: pick a PDF to use it.</p>
     <div class="ds-edit-tools" id="ds-edit-tools" hidden>
@@ -702,7 +703,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-sheet" value="sheet"> Add a separate signature sheet</label>
         <label class="ds-seal-check"><input type="radio" name="ds-seal-placement" id="ds-seal-both" value="both"> Place the seal and add the sheet</label>
       </div>
-      <label class="ds-seal-check" id="ds-allpages-label"><input type="checkbox" id="ds-allpages"> Sign every page with this signature</label>
+      <label class="ds-seal-check" id="ds-allpages-label"><input type="checkbox" id="ds-allpages"> Sign every page with this signature (initials)</label>
       <button class="ds-edit-btn" id="ds-apply-tpl" type="button" hidden>Use saved position</button>
       <span class="ds-edit-tip" id="ds-seal-tip">Repeats your seal at the same spot on every page. Position and scale are remembered for next time (never your name or signature image).</span>
     </div>
@@ -1034,6 +1035,6 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
 <script src="/js/quota-upgrade.js?v=7" defer></script>
 <script src="/js/done-state.js?v=1" defer></script>
-<script type="module" src="/sign-flow.js?v=60"></script>
+<script type="module" src="/sign-flow.js?v=61"></script>
 </body>
 </html>
