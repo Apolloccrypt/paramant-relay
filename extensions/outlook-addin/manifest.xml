@@ -36,7 +36,7 @@
     <Form xsi:type="ItemRead">
       <DesktopSettings>
         <SourceLocation DefaultValue="https://addin.paramant.app/taskpane.html"/>
-        <RequestedHeight>500</RequestedHeight>
+        <RequestedHeight>450</RequestedHeight>
       </DesktopSettings>
     </Form>
   </FormSettings>
@@ -65,11 +65,6 @@
             <OfficeTab id="TabDefault">
               <Group id="paramantGroup">
                 <Label resid="GroupLabel"/>
-                <Icon>
-                  <bt:Image size="16" resource="Icon.16"/>
-                  <bt:Image size="32" resource="Icon.32"/>
-                  <bt:Image size="80" resource="Icon.80"/>
-                </Icon>
 
                 <Control xsi:type="Button" id="paramantButton">
                   <Label resid="ButtonLabel"/>
@@ -78,9 +73,9 @@
                     <Description resid="ButtonDescription"/>
                   </Supertip>
                   <Icon>
-                    <bt:Image size="16" resource="Icon.16"/>
-                    <bt:Image size="32" resource="Icon.32"/>
-                    <bt:Image size="80" resource="Icon.80"/>
+                    <bt:Image size="16" resid="Icon.16"/>
+                    <bt:Image size="32" resid="Icon.32"/>
+                    <bt:Image size="80" resid="Icon.80"/>
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
                     <SourceLocation resid="Taskpane.Url"/>

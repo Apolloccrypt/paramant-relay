@@ -16,6 +16,7 @@ import { sha3_256 } from '/vendor/paramant-pqc.js';
 import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp, requestedAppearanceFromStamp } from '/js/parasign-signer.js?v=18';
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=2';
+import { previewTargetWidth, viewportTargetWidth, renderGeneration } from '/js/preview-render.js?v=1';
 
 // One file, two languages. /sign is Dutch and /en/sign is the English copy of
 // the same page; both load this script, and the page's own lang attribute picks
@@ -35,6 +36,15 @@ const RELAY_PUBLIC = 'https://health.paramant.app';
 const STAMP_PDF_W = 240;
 const STAMP_PDF_H = 100;
 const MAX_PREVIEW_PAGES = 30;
+
+// Preview robustness (see js/preview-render.js). One generation per surface, so
+// a newer render of the same pane stops an older one that is still awaiting
+// pdf.js, and one layout frame before measuring a pane that just became visible.
+const docPreviewGen = renderGeneration();
+const signedPreviewGen = renderGeneration();
+function nextFrame() {
+  return new Promise((resolve) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => resolve()) : setTimeout(resolve, 0)));
+}
 // Reusable placement template: ONLY the seal's relative position + scale and the
 // sign-every-page toggle. Never the signer name or the signature image (privacy).
 const PLACEMENT_TPL_KEY = 'parasign.placement.tpl.v1';
@@ -755,7 +765,7 @@ async function renderPdfForPlacement() {
 
 // Fit-to-width base scale (the original targetWidth logic), times the zoom factor.
 function fitScaleFor(baseViewport) {
-  const targetWidth = Math.min(820, Math.floor(window.innerWidth * 0.88));
+  const targetWidth = viewportTargetWidth(window.innerWidth);
   return targetWidth / baseViewport.width;
 }
 
@@ -774,7 +784,7 @@ async function applyPlaceZoom() {
   if (placeState.isImage) {
     // Image: canvas is at natural resolution, CSS width:100% scales it; zoom =
     // set the wrap width. No re-render needed.
-    const fit = Math.min(820, Math.floor(window.innerWidth * 0.88));
+    const fit = viewportTargetWidth(window.innerWidth);
     placeState.wrap.style.width = Math.floor(fit * z) + 'px';
     reflowStampMarker();
     return;
@@ -2304,6 +2314,8 @@ function renderReviewExtra(ex, wrap, ratio, pageH) {
 async function renderDocPreview() {
   const pane = $('ds-review-doc-preview');
   if (!pane) return;
+  const ticket = docPreviewGen.start();
+  const stale = () => !docPreviewGen.current(ticket);
   pane.innerHTML = '';
   pane.classList.remove('has-pdf');
   // Force block layout: the zoom bar must never sit in a flex ROW next to the
@@ -2340,6 +2352,9 @@ async function renderDocPreview() {
     const pdfjs = await waitForPdfjs();
     const copy = new Uint8Array(state.doc.bytes);
     const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+    // Let a pane that just became visible settle before it is measured.
+    await nextFrame();
+    if (stale()) return;
     const zoomwrap = document.createElement('div');
     zoomwrap.style.cssText = 'position:relative;width:100%;transform-origin:0 0';
     pane.appendChild(zoomwrap);
@@ -2352,13 +2367,17 @@ async function renderDocPreview() {
     // seal on its page. Only the seal page gets the heavy supersample; other
     // pages render at screen resolution to keep memory sane on long documents.
     const maxPages = Math.min(pdf.numPages, MAX_PREVIEW_PAGES);
-    const targetW = Math.min(340, Math.floor(pane.clientWidth || 340));
+    // Max 340 to fit the grid cell, min 280 so a mid-transition width of 1px
+    // can never produce a blank raster.
+    const targetW = previewTargetWidth(pane.clientWidth, 340, 280);
     // Source page size for the "sign every page" relative-position math.
     const srcVp = (await pdf.getPage(state.stamp.pageIndex + 1)).getViewport({ scale: 1 });
+    if (stale()) return;
     const frX = state.stamp.x / srcVp.width, frY = state.stamp.y / srcVp.height;
     const frW = state.stamp.w / srcVp.width, frH = state.stamp.h / srcVp.height;
     for (let p = 1; p <= maxPages; p++) {
       const page = await pdf.getPage(p);
+      if (stale()) return;
       const baseViewport = page.getViewport({ scale: 1 });
       const isSealPage = (p - 1 === state.stamp.pageIndex);
       const showSeal = isSealPage || state.stampAllPages;   // every page when the toggle is on
@@ -2372,10 +2391,12 @@ async function renderDocPreview() {
       // The missing line behind the white-review bug: without an explicit CSS
       // width the supersampled canvas rendered at raw pixel size and the pane
       // showed only its blank top-left corner.
-      canvas.style.cssText = 'display:block;width:100%;height:auto';
+      canvas.style.cssText = 'display:block;width:100%;height:auto;background:#fff';
       wrap.appendChild(canvas);
       zoomwrap.appendChild(wrap);
       await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      // A newer render cleared the pane while this page was drawing: stop here.
+      if (stale()) return;
       const ratio = baseViewport.width / (wrap.getBoundingClientRect().width || targetW);   // pdf pt per displayed px
       if (showSeal) {
         // Placed page uses exact coords; repeated pages use the same relative
@@ -3469,6 +3490,8 @@ async function retryFailedInviteEmails() {
 async function renderSignedPreview() {
   const container = $('ds-signed-preview');
   if (!container) return;
+  const ticket = signedPreviewGen.start();
+  const stale = () => !signedPreviewGen.current(ticket);
   container.innerHTML = '';
   const r = state.result;
 
@@ -3486,6 +3509,7 @@ async function renderSignedPreview() {
   if (state.mode === 'image') {
     const mime = state.imageType === 'jpg' ? 'image/jpeg' : 'image/png';
     const dataUrl = await bytesToDataUrl(r.stampedBytes, mime);
+    if (stale()) return;
     const img = document.createElement('img');
     img.src = dataUrl;
     img.alt = signedDocName();
@@ -3499,14 +3523,17 @@ async function renderSignedPreview() {
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(r.stampedBytes);
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+  await nextFrame();
+  if (stale()) return;
   const firstPreviewPage = state.sealPlacement === 'sheet' ? pdf.numPages - 1 : state.stamp.pageIndex;
   const idxs = [firstPreviewPage];
   if (state.sealPlacement === 'both') idxs.push(pdf.numPages - 1);
   else if (state.sealPlacement === 'inline' && firstPreviewPage + 1 < pdf.numPages) idxs.push(firstPreviewPage + 1);
   for (const idx of idxs) {
     const page = await pdf.getPage(idx + 1);
+    if (stale()) return;
     const baseViewport = page.getViewport({ scale: 1 });
-    const targetWidth = Math.min(820, Math.floor(window.innerWidth * 0.88));
+    const targetWidth = viewportTargetWidth(window.innerWidth);
     const dpr = hiDpiScale();
     const cssScale = targetWidth / baseViewport.width;
     const viewport = page.getViewport({ scale: cssScale * dpr });
@@ -3516,8 +3543,10 @@ async function renderSignedPreview() {
     canvas.style.width = targetWidth + 'px';          // shown at CSS width -> crisp
     canvas.style.height = Math.floor(baseViewport.height * cssScale) + 'px';
     canvas.style.display = 'block';
+    canvas.style.background = '#fff';   // a dark or transparent PDF stays legible
     container.appendChild(canvas);
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    if (stale()) return;
   }
 }
 

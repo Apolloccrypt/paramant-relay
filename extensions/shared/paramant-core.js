@@ -35,6 +35,11 @@ const PRSH_MAGIC = Object.freeze([0x50, 0x52, 0x53, 0x48]); // 'PRSH'
 export const PARASHARE_BASE = 'https://paramant.app/parashare';
 export const DEFAULT_RELAY  = 'https://relay.paramant.app';
 
+// Where a user upgrades when a monthly quota is hit. Surfaced verbatim in the
+// 402 melding so both the Outlook taskpane and the Gmail/Outlook content-script
+// banner can link the same place the webapp does.
+export const UPGRADE_URL = 'https://paramant.app/pricing';
+
 // Sectored relays. An API key is valid on exactly one of these; discoverRelay() finds it.
 export const SECTOR_RELAYS = Object.freeze([
   'https://relay.paramant.app',
@@ -142,6 +147,18 @@ export class ParamantError extends Error {
   }
 }
 
+// Human, UI-ready sentence for a 402 monthly-transfer-quota rejection. The relay
+// returns { error, dimension, plan, limit }; both consumers show this string
+// verbatim (taskpane progress text / injected banner), so the translation lives
+// once in the shared core instead of leaking a bare "upload_failed" per surface.
+export function quotaReachedMessage(plan, limit) {
+  const planPart = plan ? ` on the ${plan} plan` : '';
+  const countPart = Number.isFinite(limit)
+    ? ` You have used all ${limit} monthly transfer${limit === 1 ? '' : 's'}${planPart}.`
+    : (plan ? ` You have used this month's transfer allowance${planPart}.` : '');
+  return `Monthly transfer limit reached.${countPart} Upgrade at ${UPGRADE_URL} to send more.`;
+}
+
 function sleep(ms, signal) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(new ParamantError('aborted', 'Upload cancelled'));
@@ -222,6 +239,22 @@ async function uploadPadded({ relay, apiKey, padded, meta, ttlMs, signal }) {
       const waitMs = Number.isFinite(retryAfter) ? retryAfter * 1000 : 1000 * (attempt + 1);
       await sleep(waitMs, signal);
       continue;
+    }
+
+    if (res.status === 402) {
+      // Monthly transfer quota reached (Phase 4 gate on /v2/inbound). NOT retryable:
+      // retrying only re-hits the cap. Surface a structured, human upgrade melding so
+      // the UI shows a real next step instead of a bare "upload_failed".
+      const q = await res.json().catch(() => ({}));
+      if (q.error === 'monthly_transfer_quota_reached') {
+        const e = new ParamantError('quota_reached', quotaReachedMessage(q.plan, q.limit), { status: 402 });
+        e.dimension  = q.dimension || 'transfers_month';
+        e.plan       = q.plan ?? null;
+        e.limit      = (q.limit ?? null);
+        e.upgradeUrl = UPGRADE_URL;
+        throw e;
+      }
+      throw new ParamantError('upload_failed', q.error || 'Upload failed (HTTP 402).', { status: 402 });
     }
 
     const err = await res.json().catch(() => ({}));
