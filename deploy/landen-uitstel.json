@@ -36,25 +36,25 @@
       "tak": "feat/parasign-pdf-preview",
       "stapel": "in-main-anders",
       "tot": "2026-09-30",
-      "reden": "De sign-flow.js-reparatie staat op main via PR #PRNR, met de hand geport omdat main doorliep: breedte geklemd op 280-340 en 280-820 in js/preview-render.js, een generatie per voorbeeldvlak, een frame wachten voor het meten, witte canvas. Toets: tests/preview-render.test.mjs. De plaatsingsstap had al een eigen placeRenderToken."
+      "reden": "De sign-flow.js-reparatie staat op main via PR #531, met de hand geport omdat main doorliep: breedte geklemd op 280-340 en 280-820 in js/preview-render.js, een generatie per voorbeeldvlak, een frame wachten voor het meten, witte canvas. Toets: tests/preview-render.test.mjs. De plaatsingsstap had al een eigen placeRenderToken."
     },
     {
       "tak": "feat/parasign-document-intelligence",
       "stapel": "in-main-anders",
       "tot": "2026-09-30",
-      "reden": "Zelfde boom als feat/parasign-pdf-preview; die inhoud staat op main via PR #PRNR (frontend/js/preview-render.js, tests/preview-render.test.mjs)."
+      "reden": "Zelfde boom als feat/parasign-pdf-preview; die inhoud staat op main via PR #531 (frontend/js/preview-render.js, tests/preview-render.test.mjs)."
     },
     {
       "tak": "feat/privacy-statement-v2",
       "stapel": "in-main-anders",
       "tot": "2026-09-30",
-      "reden": "De sign-flow.js-helft staat op main via PR #PRNR (zie feat/parasign-pdf-preview); de privacyhelft had main al langs een andere weg."
+      "reden": "De sign-flow.js-helft staat op main via PR #531 (zie feat/parasign-pdf-preview); de privacyhelft had main al langs een andere weg."
     },
     {
       "tak": "feat/outlook-402",
       "stapel": "in-main-anders",
       "tot": "2026-09-30",
-      "reden": "Manifestfix (resid=, geen Icon onder Group, hoogte 450) en de 402-melding in add-in en extensie staan op main via PR #PRNR, getoetst in tests/outlook-addin-402.test.mjs. Bewust niet mee: relay/test/inbound-quota-gate.test.js bouwde de 402-body zelf na in plaats van relay.js te toetsen, en addin-smoke.sh in post-deploy-verify raakt de uitrol."
+      "reden": "Manifestfix (resid=, geen Icon onder Group, hoogte 450) en de 402-melding in add-in en extensie staan op main via PR #531, getoetst in tests/outlook-addin-402.test.mjs. Bewust niet mee: relay/test/inbound-quota-gate.test.js bouwde de 402-body zelf na in plaats van relay.js te toetsen, en addin-smoke.sh in post-deploy-verify raakt de uitrol."
     },
     {
       "tak": "test/sdk-relay-conformance",
