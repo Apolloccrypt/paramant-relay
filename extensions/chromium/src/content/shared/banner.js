@@ -69,6 +69,27 @@ export function showError(message) {
   setTimeout(() => root.remove(), 5000);
 }
 
+// Like showError, but appends a clickable upgrade link. Used for the 402
+// monthly-transfer-quota case so the user gets a real next step (a link to the
+// pricing page) instead of a dead-end "upload failed". Text is written with
+// textContent; the href is a fixed https://paramant.app URL. Stays visible
+// longer than a plain error so the user can act on it.
+export function showUpgrade(message, url, ctaLabel = 'Upgrade') {
+  remove('paramant-upload-ui');
+  const root = el('div', 'paramant-upload-ui paramant-upload-error paramant-upload-upgrade');
+  root.setAttribute('role', 'alert');
+  root.append(el('span', 'paramant-upgrade-text', message));
+  if (url) {
+    const a = el('a', 'paramant-upgrade-link', ctaLabel);
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    root.append(a);
+  }
+  document.body.appendChild(root);
+  setTimeout(() => root.remove(), 12000);
+}
+
 function remove(id) {
   document.getElementById(id)?.remove();
 }
