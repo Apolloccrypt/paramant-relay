@@ -3778,3 +3778,44 @@ test('the sign-in and account pages exist in both languages and link each other'
   }
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });
+
+// ── Co-signing: no fixed order, initials on every page for every signer ──────
+// /parasign promised "Medeondertekenaars in een vaste volgorde" and the English
+// page "Co-signing with routing order", while the relay never checked it:
+// sign() in relay/envelope.js fills any party slot at any time, and the
+// create body carries no order field. A law firm that relies on that sentence
+// gets a second signature before the first. Found 27 September 2026 while
+// answering the first paying customer, who wanted two people to initial every
+// page. What is true since #528 is the opposite half: every signer, the
+// invited ones included, can repeat their mark on every page (all_pages).
+// So the pages say that, and no page may promise an order until the relay
+// enforces one. Build the order first, then lift this check.
+test('no page promises a signing order the relay does not enforce, and /parasign names initials on every page', () => {
+  const envelope = read('relay/envelope.js');
+  const enforcesOrder = /\b(signing_order|sign_order|routing_order|sequential)\b/.test(envelope);
+  assert.equal(enforcesOrder, false, 'relay/envelope.js now knows a signing order; update the /parasign card and this test together');
+  assert.match(envelope, /field\.all_pages/, 'the relay no longer accepts all_pages; /parasign promises initials on every page');
+  for (const slug of ['co-sign', 'en/co-sign']) {
+    assert.match(page(slug), /id="appearance-allpages"/, `${slug} lost the every-page checkbox the /parasign card promises`);
+  }
+
+  const flat = (slug) => visible(page(slug)).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  const must = {
+    parasign: ['Samen tekenen, met een paraaf op elke pagina', 'Er is geen vaste volgorde'],
+    'en/parasign': ['Co-signing, with initials on every page', 'There is no fixed order'],
+  };
+  const missing = [];
+  for (const [slug, phrases] of Object.entries(must)) {
+    for (const p of phrases) if (!flat(slug).includes(p)) missing.push(`${slug}: must say "${p}"`);
+  }
+  assert.deepEqual(missing, [], `\n  ${missing.join('\n  ')}\n`);
+
+  const offenders = [];
+  const promise = /\bvaste volgorde\b(?! dwingt)|\bin de volgorde waarin ze (?:onder)?tekenen\b|\brouting order\b|\bsigning order\b|\bin the order they should sign\b/i;
+  for (const slug of publicPages()) {
+    const text = flat(slug).replace(/Er is geen vaste volgorde/g, '').replace(/There is no fixed order/g, '');
+    const m = promise.exec(text);
+    if (m) offenders.push(`${slug}: "${m[0]}"`);
+  }
+  assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}\n`);
+});
