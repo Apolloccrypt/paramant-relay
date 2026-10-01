@@ -214,7 +214,7 @@ for (const P of [
   await page.locator('#btn-create-session').click();
   await page.waitForSelector('#step-link.active', { timeout: 30000 });
   const text = await audit(page, P.path + ' Send a link', '#step-link');
-  ok(P.path + ' Send a link: the two stands and the stage bar are gone',
+  ok(P.path + ' Send a link: the choices and the stage bar are gone',
     !(await page.locator('#ps-mode').isVisible()) && !(await page.locator('#ps-stepper').isVisible()));
   ok(P.path + ' Send a link: one line says how often it opens and when it stops',
     P.once.test(text), text.slice(0, 200));
@@ -238,6 +238,8 @@ for (const P of [
     : r.fulfill({ status: 404, body: '' }));
   await page.route('https://health.paramant.app/v2/pubkey', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }));
   await page.goto(`${ORIGIN}${P.path}`, { waitUntil: 'domcontentloaded' });
+  // The live hand-over is the Extra safe box since 24 September 2026.
+  await page.locator('#ps-extra-safe').check();
   await page.locator('#file-input').setInputFiles({ name: 'IMG_4276.jpeg', mimeType: 'image/jpeg',
     buffer: Buffer.from(Array.from({ length: 2048 }, (_, i) => (i * 13 + 7) % 256)) });
   await page.waitForFunction(() => !document.getElementById('btn-create-session').disabled, null, { timeout: 20000 });
@@ -250,7 +252,7 @@ for (const P of [
   await page.locator('#fp-confirm-btn').click();
   await page.waitForSelector('#step-done.active', { timeout: 40000 });
   const text = await audit(page, P.path + ' live hand-over', '#step-done');
-  ok(P.path + ' live hand-over: the two stands and the stage bar are gone',
+  ok(P.path + ' live hand-over: the choices and the stage bar are gone',
     !(await page.locator('#ps-mode').isVisible()) && !(await page.locator('#ps-stepper').isVisible()));
   // The screen a sender reaches by handing a file over cannot tell them the
   // file is now downloadable: that is the OTHER stand's sentence, and it was on
