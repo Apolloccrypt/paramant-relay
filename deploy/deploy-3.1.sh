@@ -1407,7 +1407,18 @@ cd "$1"
 echo "before images:"
 docker compose images 2>/dev/null | sed 's/^/  img /' || true
 rc=0
-docker compose build > /tmp/paramant-build.$$ 2>&1 || rc=$?
+# EEN VOOR EEN, EN DAT IS SNELLER DAN TEGELIJK. De vijf relays hebben alle vijf
+# `build: ./relay`, dus het is vijf keer dezelfde build. Parallel starten ze
+# tegelijk, kan geen van hen de laag-cache van de ander gebruiken, en compileert
+# paramant-core vijf keer naast elkaar: vijf Rust-toolchains plus liboqs die
+# tegelijk op de schijf staan. Dat liep twee keer vol op 22 en 23 september,
+# beide keren met 16 GB vrij vooraf, en beide keren was de melding "no space
+# left on device" terwijl de eindresultaten samen geen 2 GB zijn.
+#
+# Serieel bouwt de eerste alles en halen de andere vier het uit de cache. De
+# piek is een vijfde, en de vier die volgen kosten seconden in plaats van vier
+# en een halve minuut elk.
+COMPOSE_PARALLEL_LIMIT=1 docker compose build > /tmp/paramant-build.$$ 2>&1 || rc=$?
 tail -40 /tmp/paramant-build.$$
 rm -f /tmp/paramant-build.$$
 echo "build exit = $rc"
