@@ -50,6 +50,7 @@ function setupTokenValidFor() {
 }
 const { buildRecipientParties, RECIPIENT_EMAIL_RE } = require('./lib/recipient-binding');
 const { acquireSignupLock } = require('./lib/signup-lock');
+const signNotify = require('./lib/sign-notify');
 const loginRate = require('./lib/login-ratelimit');
 const { billingStubGone } = require('./lib/billing-stub');
 const { logRedacted, maskIpForLog, maskEmailForLog: maskEmail } = require('./lib/log-redact');
@@ -2006,6 +2007,12 @@ api.post("/user/envelopes", authUser, async (req, res) => {
     });
     const body = await rr.json().catch(() => ({}));
     if (rr.status !== 200) return res.status(rr.status).json({ error: body.error || "envelope_create_failed" });
+    // Someone else has to sign, so the sender wants to hear when they do
+    // (lib/sign-notify.js). Best effort: never costs the envelope.
+    if (built.parties.length > 0 && body.envelope && body.envelope.id) {
+      try { await signNotify.rememberSender(redis(), body.envelope.id, { user_id, email }); }
+      catch (e) { console.warn("[user/envelopes POST] sign-notify:", e.message); }
+    }
     return res.json(body);   // { ok, envelope: { id, party_links:[{party_index, sign_path, invite_token}], ... } }
   } catch (e) {
     console.error("[user/envelopes POST]", e.message);
@@ -2302,6 +2309,12 @@ api.post("/user/sign/submit", authUser, async (req, res) => {
     // The signature receipt. Truncating the envelope id INSIDE the metadata is
     // harmless (it is a label); truncating the key is not (it is the address).
     try { await logAuditEvent(user_id, "parasign_doc_signed", { envelope: String(act.envelope_id).slice(0, 10) + "…", party: act.party_index }); } catch {}
+    // Tell the sender, if it was somebody else who signed. Not awaited: the
+    // signer's 200 never waits on a mail provider (lib/sign-notify.js).
+    signNotify.afterSignature({
+      client: redis(), envelopeId: act.envelope_id, signerAccountId: user_id, relayBody: body,
+      sendEmail: emailTemplates.sendEmail, template: emailTemplates.signatureReceivedEmail,
+    }).then((r) => { if (r === "failed") console.warn("[sign/submit] sender notification failed"); });
     return res.json({
       ok: true,
       signed_count: body.signed_count,
