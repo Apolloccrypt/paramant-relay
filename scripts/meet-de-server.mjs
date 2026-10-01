@@ -143,16 +143,27 @@ const WACHT = Number(process.env.METING_WACHT_MS || 1500);
 // De grens meten zonder een byte te uploaden. nginx vergelijkt Content-Length
 // met client_max_body_size voordat hij de body leest, dus alleen de kop sturen
 // is genoeg: 413 betekent boven de grens, stilte betekent eronder.
-export function kopProbe(host, lengte) {
+//
+// De wachttijd loopt pas vanaf het moment dat de kop verstuurd is. Liep hij al
+// tijdens de TLS-handdruk, dan las een trage verbinding als "eronder": op
+// 2026-10-01 meldde CI daardoor dat finance.paramant.app 12M toeliet, terwijl
+// hij lokaal en in elke andere meting op 12M al 413 gaf. Een handdruk die niet
+// lukt is een fout, geen stilte.
+const HANDDRUK = Number(process.env.METING_HANDDRUK_MS || 10000);
+
+export function kopProbe(host, lengte, { port = 443, handdruk = HANDDRUK } = {}) {
   return new Promise((klaar) => {
     let af = false;
-    const gedaan = (v) => { if (!af) { af = true; klaar(v); } };
-    const s = tls.connect({ host, port: 443, servername: host, ALPNProtocols: ['http/1.1'] }, () => {
+    let t = null;
+    const gedaan = (v) => { if (!af) { af = true; clearTimeout(t); klaar(v); } };
+    const s = tls.connect({ host, port, servername: host, ALPNProtocols: ['http/1.1'] }, () => {
+      clearTimeout(t);
       s.write(`POST /__meting HTTP/1.1\r\nHost: ${host}\r\nContent-Length: ${lengte}\r\n`
-        + `Content-Type: application/octet-stream\r\nConnection: close\r\n\r\n`);
+        + `Content-Type: application/octet-stream\r\nConnection: close\r\n\r\n`,
+      () => { if (!af) t = setTimeout(() => { s.destroy(); gedaan('wacht'); }, WACHT); });
     });
     let buf = '';
-    const t = setTimeout(() => { s.destroy(); gedaan('wacht'); }, WACHT);
+    t = setTimeout(() => { s.destroy(); gedaan('fout: geen handdruk binnen ' + handdruk + ' ms'); }, handdruk);
     s.on('data', (d) => {
       buf += d;
       if (buf.includes('\r\n')) { clearTimeout(t); s.destroy(); gedaan(Number(buf.split(' ')[1])); }
