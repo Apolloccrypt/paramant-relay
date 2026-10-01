@@ -69,6 +69,7 @@ NEW_FOOTER = '''\
         <div class="footer-links">
           <a href="/about">About</a>
           <a href="/changelog">Changelog</a>
+          <a href="https://paramantis.nl/">Advice or a measurement? Paramantis</a>
         </div>
       </div>
       <div>
@@ -274,6 +275,7 @@ NEW_FOOTER_NL = '''\
         <div class="footer-links">
           <a href="/about">Over Paramant</a>
           <a href="/changelog">Wijzigingen</a>
+          <a href="https://paramantis.nl/">Advies of een meting nodig? Paramantis</a>
         </div>
       </div>
       <div>
