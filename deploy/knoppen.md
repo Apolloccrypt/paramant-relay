@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **119 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **188 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **189 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -137,7 +137,8 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `LANDEN_ROOT` | `scripts/check-landen.mjs` | de repowortel | welke repo de landingspoort meet; `tests/landen-poort.test.mjs` wijst hem hiermee naar een wegwerp-repo |
 | `LANDEN_TERMIJN_DAGEN` | `scripts/check-landen.mjs` | `7` | hoeveel dagen een tak ongeland mag blijven voordat de poort rood wordt; verzet hem niet om groen te worden, daar is `deploy/landen-uitstel.json` voor |
 | `METING_TIMEOUT_MS` | `scripts/meet-de-server.mjs` | `8000` | hoe lang een meting op productie mag duren voor hij opgeeft |
-| `METING_WACHT_MS` | `scripts/meet-de-server.mjs` | `1500` | hoe lang de grensmeting op stilte wacht; onder de grens antwoordt nginx niet maar wacht hij op een body die nooit komt, en die stilte is het signaal |
+| `METING_WACHT_MS` | `scripts/meet-de-server.mjs` | `1500` | hoe lang de grensmeting op stilte wacht, gerekend vanaf het versturen van de kop; onder de grens antwoordt nginx niet maar wacht hij op een body die nooit komt, en die stilte is het signaal |
+| `METING_HANDDRUK_MS` | `scripts/meet-de-server.mjs` | `10000` | hoe lang de grensmeting op de TLS-handdruk wacht; lukt die niet, dan is de meting een fout en geen stilte, want een trage handdruk las op 2026-10-01 als "onder de grens" |
 | `PARAMANT_API_KEY` | `scripts/prod-groep-proef.mjs` | geen | de API-sleutel waarmee de proef op de echte server een groepsverzending doet; zonder hem stopt het script meteen |
 | `PARAMANT_BASE_URL` | `scripts/heartbeat/lib.mjs`, `tests/links.test.mjs` en 1 meer | `'https://paramant.app'` | welke site de heartbeat en de linkcontrole meten |
 | `PARAMANT_COSIGN_SCREENSHOT_PATH` | `tests/cosign-document-delivery.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
