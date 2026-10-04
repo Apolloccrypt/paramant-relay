@@ -138,7 +138,7 @@ test('THE POINT: a signed-in browser gets a token, and the api-key is nowhere in
   assert.ok(!r.text.includes('pgp_'), 'nothing shaped like an api-key may leave this route');
   // Strictly less than the relay handed over: no relay internals, no expires_ms
   // the page has no use for, no ok flag it does not read.
-  assert.deepStrictEqual(Object.keys(r.json).sort(), ['expires_in_s', 'token']);
+  assert.deepStrictEqual(Object.keys(r.json).sort(), ['expires_in_s', 'sector', 'token']);
   assert.match(r.headers['cache-control'] || '', /no-store/,
     'a bearer credential must not be cached by a proxy or a back button');
   did();
@@ -187,7 +187,7 @@ test('the app route mints with purpose app, and the browser never chooses that w
   const r = await mintApp(await session());
   assert.strictEqual(r.status, 200, r.text);
   assert.strictEqual(r.json.token, MINTED);
-  assert.deepStrictEqual(Object.keys(r.json).sort(), ['expires_in_s', 'token'],
+  assert.deepStrictEqual(Object.keys(r.json).sort(), ['expires_in_s', 'sector', 'token'],
     'the app route answers exactly what the ParaSend one does: a token and its life, nothing else');
   assert.ok(!r.text.includes('pgp_'), 'nothing shaped like an api-key may leave this route either');
 
@@ -290,5 +290,25 @@ test('the reveal route still exists: the manual way out is not collateral damage
   assert.strictEqual(r.status, 200, r.text);
   assert.strictEqual(r.json.api_key, ACCOUNT_KEY);
   assert.strictEqual(r.json.revealable, true);
+  did();
+});
+
+// SENDNAME-03-A: an account that exists on one sector only got a 401 from
+// health and could not start /parashare. The mint moves on to the sector that
+// knows the key and says which one it was.
+test('a key only the legal relay knows still gets a token, from legal', async (t) => {
+  if (!redis) return t.skip('no redis');
+  const st = relayState();
+  st.mintReply = () => ({ status: 401, body: { error: 'unknown key' } });
+  const healthStub = await stubRelay(st);
+  const legalState = relayState();
+  const legal = await stubRelay(legalState);
+  const two = await boot({ redisUrl: process.env.REDIS_URL || DEFAULT_REDIS, relay: healthStub, internalToken: INTERNAL,
+    env: { RELAY_HEALTH: healthStub.base, RELAY_MAIN: 'http://127.0.0.1:1', RELAY_LEGAL: legal.base, RELAY_FINANCE: 'http://127.0.0.1:1', RELAY_IOT: 'http://127.0.0.1:1' } });
+  const r = await two.post('/api/user/parasend/token', { headers: await session() });
+  assert.strictEqual(r.status, 200, r.text);
+  assert.strictEqual(r.json.sector, 'legal');
+  assert.strictEqual(r.json.token, MINTED);
+  await two.stop();
   did();
 });

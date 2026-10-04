@@ -2482,6 +2482,11 @@ const sthIngestIpRequests = new Map(); // ip → [timestamps] for /v2/sth/ingest
 const relayRegisterIpRequests = new Map(); // ip → [timestamps] for /v2/relays/register (unauthenticated)
 // Team rate limit tracking
 const teamRateLimits = new Map(); // team_id → { count, resetAt }
+// Streaming manifests of live inv_ hand-overs: inv id -> { owner, total, tokens, meta, expires }.
+const invManifests = new Map();
+const INV_MANIFEST_TTL_MS = 60 * 60 * 1000;
+const INV_MANIFEST_MAX = 5000;
+setInterval(() => { const now = Date.now(); for (const [k, m] of invManifests) if (now > m.expires) invManifests.delete(k); }, 60000).unref();
 
 // Eviction sweep for the limiter maps that lacked one (the other limiters already
 // self-evict). Without this they grow unbounded — slow memory/audit creep,
@@ -7713,6 +7718,51 @@ async function handleRelayRequest(req, res) {
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
+  // ── The streaming manifest for a live hand-over ("Samen nu", inv_) ─────────
+  // The pss_ manifest below needs a pss_ session; the web page's live
+  // hand-over runs on an inv_ rendezvous, so every block it announced got 404
+  // (and 403 first: the route was not in the pst_ token's scope), and the
+  // receiver's keyless read got 401. Streaming was off in practice and the
+  // relay held the whole file in RAM until `_ready` (SENDNAME-29-K).
+  // Same rules as the inv_ pubkey slot it hangs off: writing needs the
+  // sender's credential and the first writer owns it; reading needs only the
+  // inv_ id, which is the capability, and the tokens it lists are useless
+  // without the receiver's private key.
+  const invMfm = path.match(/^\/v2\/session\/(inv_[a-zA-Z0-9]{32})\/manifest$/);
+  if (invMfm && req.method === 'GET') {
+    const m = invManifests.get(invMfm[1]);
+    if (!m || Date.now() > m.expires) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true, total: 0, chunks: [], complete: false })); }
+    const chunks = [...m.tokens.entries()].sort((a, b) => a[0] - b[0]).map(([index, token]) => ({ index, token }));
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(J({ ok: true, total: m.total, meta: m.meta, chunks, complete: chunks.length === m.total }));
+  }
+  if (invMfm && req.method === 'POST') {
+    if (!keyData?.active) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Valid API key required' })); }
+    let d;
+    try { d = JSON.parse((await readBody(req, 8192)).toString()); }
+    catch (e) { res.writeHead(400); return res.end(J({ error: 'bad_request' })); }
+    const idx = Number(d.index); const total = Number(d.total_chunks);
+    const token = typeof d.token === 'string' ? d.token : '';
+    if (!Number.isInteger(idx) || idx < 0 || idx > 100000) { res.writeHead(400); return res.end(J({ error: 'index must be a non-negative integer' })); }
+    if (!Number.isInteger(total) || total < 1 || total > 100000) { res.writeHead(400); return res.end(J({ error: 'total_chunks must be a positive integer' })); }
+    if (idx >= total) { res.writeHead(400); return res.end(J({ error: 'index must be below total_chunks' })); }
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(token)) { res.writeHead(400); return res.end(J({ error: 'token must be a download token' })); }
+    const owner = acctOf(apiKey);
+    let m = invManifests.get(invMfm[1]);
+    if (m && Date.now() > m.expires) { invManifests.delete(invMfm[1]); m = null; }
+    if (!m) {
+      if (invManifests.size >= INV_MANIFEST_MAX) { res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' }); return res.end(J({ error: 'busy' })); }
+      m = { owner, total, tokens: new Map(), meta: null, expires: Date.now() + INV_MANIFEST_TTL_MS };
+      invManifests.set(invMfm[1], m);
+    }
+    if (m.owner !== owner) { res.writeHead(403); return res.end(J({ error: 'This hand-over belongs to a different account' })); }
+    if (m.total !== total) { res.writeHead(409); return res.end(J({ error: 'total_chunks changed mid-transfer' })); }
+    if (!m.tokens.has(idx)) m.tokens.set(idx, token);
+    if (typeof d.meta === 'string' && d.meta.length <= 2048 && !m.meta) m.meta = d.meta;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, have: m.tokens.size, total }));
+  }
+
   // ── GET /v2/pubkey/:device ───────────────────────────────────────────────────
   const pkm = path.match(/^\/v2\/pubkey\/([^/]+)$/);
   if (pkm && req.method === 'GET') {
@@ -10556,11 +10606,11 @@ async function handleRelayRequest(req, res) {
   if (path === '/v2/team/devices' && req.method === 'GET') {
     const kd = apiKeys.get(apiKey);
     if (!kd?.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
-    const teamId = kd.team_id;
-    if (!teamId) { res.writeHead(200); return res.end(J({ team_id: null, devices: [], message: 'Losse sleutel, geen team' })); }
+    // The team IS the account (see /v2/team/add-device): every key of it.
+    const teamId = kd.account_id || apiKey;
     const devices = [];
     apiKeys.forEach((v, k) => {
-      if (v.team_id === teamId) devices.push({ label: v.label, plan: v.plan, active: v.active, key_preview: k.slice(0,12)+'...' });
+      if ((v.account_id || k) === teamId && v.active !== false) devices.push({ label: v.label, plan: v.plan, active: v.active, key_preview: k.slice(0,12)+'...' });
     });
     res.writeHead(200); return res.end(J({ team_id: teamId, devices, count: devices.length }));
   }
@@ -10588,11 +10638,21 @@ async function handleRelayRequest(req, res) {
   // teaches the loader about team_id, this must not be the shape that lands.
   // Bound to the PARENT account, scope inherited, capped, persisted, and 32
   // bytes like every other key in the file. key-mint-gate.test.js holds it here.
+  //
+  // MADE TO WORK, 2026-10-04 (SENDNAME-43). docs.html promises "add a device to
+  // the team (Firm or higher)" and there was no way to get a team at all. The
+  // team is now the ACCOUNT: a Firm-or-higher account adds a device key that
+  // belongs to that same account, shares its plan and its monthly buckets (the
+  // gates meter account_id), and counts against the account's key cap. No
+  // separate team object, nothing a loader can drop.
   if (path === '/v2/team/add-device' && req.method === 'POST') {
     const kd = apiKeys.get(apiKey);
     if (!kd?.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
-    if (!kd.team_id) { res.writeHead(403); return res.end(J({ error: 'Geen team. Daarvoor is Pro nodig.' })); }
-    if (kd.plan === 'dev') { res.writeHead(403); return res.end(J({ error: 'Team keys vereisen Pro of Enterprise' })); }
+    if (!tierGate.isParasendProPlus(entitlementRecordOf(kd.account_id || apiKey) || kd)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'tier_upgrade_required', feature: 'team_devices', message: 'Apparaten aan het team toevoegen kan vanaf Firm.', message_en: 'Adding devices to the team requires Firm or higher.' }));
+    }
+    kd.team_id = kd.account_id || apiKey;
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.label) { res.writeHead(400); return res.end(J({ error: 'label verplicht' })); }
@@ -10616,11 +10676,19 @@ async function handleRelayRequest(req, res) {
       const kid = keysTable.assignKid(kidIndex, newKey, log);
       apiKeys.get(newKey).kid = kid;
       kidIndex.set(kid, newKey);
-      _mutateUsersJson(ud => {
-        ud.api_keys.push({ key: newKey, plan: kd.plan, label, email, active: true, created, account_id, is_primary: false, scope, team_id: kd.team_id });
-        ud.updated = new Date().toISOString();
-      }).then(() => log('info', 'team_device_added', { label, team: kd.team_id, account: String(account_id).slice(0, 12), persisted: true }))
-        .catch(we => log('warn', 'key_persist_failed', { err: we.message, label }));
+      try {
+        await _mutateUsersJson(ud => {
+          ud.api_keys.push({ key: newKey, plan: kd.plan, label, email, active: true, created, account_id, is_primary: false, scope, team_id: kd.team_id });
+          ud.updated = new Date().toISOString();
+        });
+        log('info', 'team_device_added', { label, team: kd.team_id, account: String(account_id).slice(0, 12), persisted: true });
+      } catch (we) {
+        apiKeys.delete(newKey); kidIndex.delete(kid);
+        const ak = accountKeys.get(account_id); if (ak) ak.delete(newKey);
+        log('error', 'key_persist_failed', { err: we.message, label, persisted: false });
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'key_not_persisted' }));
+      }
       applyKeyLimitEnforcement();
       res.writeHead(201); return res.end(J({ ok: true, key: newKey, kid, account_id, label, team_id: kd.team_id }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }

@@ -3121,18 +3121,39 @@ async function mintSessionToken(req, res, purpose, label) {
   const key = proxyApiKey(req.userSession);
   if (!key) return res.status(403).json({ error: "no_account_key" });
   try {
-    const rr = await fetch(`${SECTORS.health}/v2/session-token`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Internal-Auth": INTERNAL_TOKEN,
-        "X-Api-Key": key,
-        ...clientIpForward.headers(),
-      },
-      body: JSON.stringify({ purpose }),
-      signal: AbortSignal.timeout(10000),
-    });
-    const body = await rr.json().catch(() => ({ error: "bad_relay_response" }));
+    // Health first, as before; then the other sectors. An account that lives
+    // on one sector only (legal, say) got a 401 from health and the page said
+    // "your account session could not start" (SENDNAME-03-A). Only a 401
+    // (that relay does not know the key) moves on; any other answer is the
+    // answer. The sector that minted is returned, because the token only
+    // resolves on a relay that knows the key.
+    const order = ["health", ...Object.keys(SECTORS).filter((s) => s !== "health")];
+    let rr = null; let body = null; let mintedAt = null;
+    for (const sector of order) {
+      if (!SECTORS[sector]) continue;
+      let r2, b2;
+      try {
+        r2 = await fetch(`${SECTORS[sector]}/v2/session-token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Internal-Auth": INTERNAL_TOKEN,
+            "X-Api-Key": key,
+            ...clientIpForward.headers(),
+          },
+          body: JSON.stringify({ purpose }),
+          signal: AbortSignal.timeout(10000),
+        });
+        b2 = await r2.json().catch(() => ({ error: "bad_relay_response" }));
+      } catch (e) {
+        // The first sector failing is the outage it always was; a fallback
+        // sector that cannot be reached just is not the answer.
+        if (sector === "health") throw e;
+        continue;
+      }
+      if (!rr || r2.status !== 401) { rr = r2; body = b2; mintedAt = sector; }
+      if (r2.status !== 401) break;
+    }
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
     if (rr.status !== 200 || !body.token) {
       // The relay's status is passed through so the page can tell an outage
@@ -3141,7 +3162,7 @@ async function mintSessionToken(req, res, purpose, label) {
       // relaying it would put relay internals on a page anyone can open.
       return res.status(rr.status === 200 ? 502 : rr.status).json({ error: "token_unavailable" });
     }
-    return res.json({ token: body.token, expires_in_s: body.expires_in_s });
+    return res.json({ token: body.token, expires_in_s: body.expires_in_s, sector: mintedAt });
   } catch (err) {
     console.error(label, err.message);
     return res.status(502).json({ error: "relay_unreachable" });

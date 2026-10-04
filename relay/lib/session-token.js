@@ -36,7 +36,17 @@ const PREFIX = 'pst_';
 // turning the mint route into an unbounded credential factory. The index is
 // pruned before the cap is believed, so nobody is refused because of tokens
 // redis has already expired.
-const MAX_LIVE_PER_ACCOUNT = 20;
+//
+// Two hundred, not twenty (SENDNAME-01-K). Plans are sold per organisation,
+// not per user, so one account is a whole office: twenty people opening
+// /parashare a couple of times in a quarter of an hour hit the old twenty and
+// saw "your account session could not start". Two hundred live fifteen-minute
+// tokens is still a hard ceiling on a credential factory. SESSION_TOKEN_MAX_LIVE
+// sets it per deployment.
+const MAX_LIVE_PER_ACCOUNT = (() => {
+  const n = parseInt(process.env.SESSION_TOKEN_MAX_LIVE || '200', 10);
+  return Number.isFinite(n) && n > 0 ? n : 200;
+})();
 // 32 bytes of CSPRNG, hex. The shape is pinned here rather than guessed at the
 // call sites, so a malformed Authorization header is refused before it ever
 // reaches the store.
@@ -118,6 +128,10 @@ const SCOPE = [
   // Same page, the step before the upload; without it every signed-in sender
   // got 403 session_token_out_of_scope and could not send to anyone by name.
   { method: 'POST', path: '/v2/sends/precheck' },
+  // Announcing each block of a live hand-over as it lands, so the receiver can
+  // take it straight away instead of the relay holding the whole file
+  // (SENDNAME-29-K: every announce got 403 here).
+  { method: 'POST', re: /^\/v2\/session\/inv_[a-zA-Z0-9]{32}\/manifest$/ },
 ];
 
 // ── The second purpose: the signed-in app pages ──────────────────────────────
