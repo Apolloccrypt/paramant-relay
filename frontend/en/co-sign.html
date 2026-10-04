@@ -121,6 +121,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
    control, a dashed outline and its own words. It becomes a real placed field
    the moment the signer chooses Place my signature. */
 .appearance-field.requested{border:2px dashed #1D4ED8;background:rgba(29,78,216,.06);box-shadow:none;color:#1D4ED8;font-weight:600;justify-content:center;text-align:center;pointer-events:none}
+.appearance-field.over-text{border-color:#B42318;outline:2px solid #B42318;outline-offset:1px}
 .appearance-field.prior{border-style:solid;background:rgba(239,246,255,.92);pointer-events:none}
 .appearance-field.has-remove{padding-right:26px}
 .appearance-remove{position:absolute;top:1px;right:2px;width:20px;height:20px;border:0;background:#1D4ED8;color:#FFFFFF;font:700 13px/1 var(--sans);cursor:pointer}
@@ -233,8 +234,8 @@ body.needs-login #sign-intro{display:none}
   <details class="how">
     <summary>HOW THIS WORKS</summary>
     <div class="how-body">
-      <p>Decryption and ML-DSA-65 signing happen locally. The relay receives ciphertext, your public key, the resulting signature and signed field coordinates, never document plaintext or your private key.</p>
-      <p><strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong> A ParaSign signature is a Simple Electronic Signature (SES): an ML-DSA-65 cryptographic attestation, not a notarised legal signature under eIDAS or any qualified-trust regime (QES). Verify the document hash below against the file you received separately.</p>
+      <p>Decryption and signing happen on your own device. The relay receives ciphertext, your public key, the resulting signature and signed field coordinates, never document plaintext or your private key.</p>
+      <p><strong>Post-quantum, zero-knowledge. Not eIDAS-qualified.</strong> A ParaSign signature is a Simple Electronic Signature (SES): a post-quantum cryptographic signature (ML-DSA-65), not a notarised legal signature under eIDAS or any qualified-trust regime (QES). Verify the document hash below against the file you received separately.</p>
     </div>
   </details>
 
@@ -319,7 +320,7 @@ body.needs-login #sign-intro{display:none}
       <details class="how" id="sign-intro">
         <summary>WHAT YOU SIGN WITH</summary>
         <div class="how-body">
-          <p>You sign with your signing key (ML-DSA-65). It opens with Face ID / Touch ID / a security key at the moment you sign, and it is never exported. The signature is bound to the email address this invite was sent to.</p>
+          <p>You sign with a signing key on your own device. With a passkey you confirm with Face ID, Touch ID or a security key. Without one you confirm with the 6-digit code from your authenticator app. The key never leaves your device. The signature is bound to the email address this invite was sent to.</p>
         </div>
       </details>
       <div class="banner" id="sign-status" hidden></div>
@@ -383,6 +384,6 @@ body.needs-login #sign-intro{display:none}
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=7" defer></script>
-<script type="module" src="/co-sign.js?v=32"></script>
+<script type="module" src="/co-sign.js?v=33"></script>
 </body>
 </html>

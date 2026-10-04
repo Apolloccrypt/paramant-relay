@@ -142,7 +142,7 @@ const readsBeforeNoKey = documentReads;
 await page.goto(base, { waitUntil: 'domcontentloaded' });
 await waitForDeliveryResult();
 state = await page.evaluate(() => ({ delivery: document.querySelector('#document-delivery-status')?.textContent, manual: document.querySelector('#verify-file-cta')?.textContent }));
-ok('older link without key gives an actionable manual fallback', /zit geen sleutel/i.test(state.delivery) && /zelf/i.test(state.manual), JSON.stringify(state));
+ok('older link without key gives an actionable manual fallback', /sleutel, ontbreekt/i.test(state.delivery) && /zelf/i.test(state.manual), JSON.stringify(state));
 ok('missing fragment does not fetch undecryptable ciphertext', documentReads === readsBeforeNoKey, documentReads);
 
 const anonPage = await browser.newPage({ viewport: { width: 390, height: 844 } });

@@ -121,6 +121,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
    control, a dashed outline and its own words. It becomes a real placed field
    the moment the signer chooses Place my signature. */
 .appearance-field.requested{border:2px dashed #1D4ED8;background:rgba(29,78,216,.06);box-shadow:none;color:#1D4ED8;font-weight:600;justify-content:center;text-align:center;pointer-events:none}
+.appearance-field.over-text{border-color:#B42318;outline:2px solid #B42318;outline-offset:1px}
 .appearance-field.prior{border-style:solid;background:rgba(239,246,255,.92);pointer-events:none}
 .appearance-field.has-remove{padding-right:26px}
 .appearance-remove{position:absolute;top:1px;right:2px;width:20px;height:20px;border:0;background:#1D4ED8;color:#FFFFFF;font:700 13px/1 var(--sans);cursor:pointer}
@@ -233,8 +234,8 @@ body.needs-login #sign-intro{display:none}
   <details class="how">
     <summary>HOE DIT WERKT</summary>
     <div class="how-body">
-      <p>Het ontsleutelen en ondertekenen met ML-DSA-65 gebeurt op uw eigen apparaat. De relay krijgt versleutelde gegevens, uw publieke sleutel, de handtekening en de plek van uw velden. De leesbare inhoud van het document en uw private sleutel krijgt hij nooit.</p>
-      <p><strong>Post-quantum en zero-knowledge. Niet eIDAS-gekwalificeerd.</strong> Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65. Het is geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES). Vergelijk de hash hieronder met die van het bestand dat u los ontving.</p>
+      <p>Het ontsleutelen en ondertekenen gebeurt op uw eigen apparaat. De relay krijgt versleutelde gegevens, uw publieke sleutel, de handtekening en de plek van uw velden. De leesbare inhoud van het document en uw private sleutel krijgt hij nooit.</p>
+      <p><strong>Post-quantum en zero-knowledge. Niet eIDAS-gekwalificeerd.</strong> Een handtekening met ParaSign is een Simple Electronic Signature (SES): een post-quantum cryptografische handtekening (ML-DSA-65). Het is geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES). Vergelijk de hash hieronder met die van het bestand dat u los ontving.</p>
     </div>
   </details>
 
@@ -319,7 +320,7 @@ body.needs-login #sign-intro{display:none}
       <details class="how" id="sign-intro">
         <summary>WAARMEE U TEKENT</summary>
         <div class="how-body">
-          <p>U tekent met uw ondertekensleutel (ML-DSA-65). Op het moment dat u tekent, ontgrendelt u die met Face ID, Touch ID of een beveiligingssleutel. De sleutel verlaat uw apparaat nooit. De handtekening hoort bij het e-mailadres waarop u deze uitnodiging kreeg.</p>
+          <p>U tekent met een ondertekensleutel op uw eigen apparaat. Heeft u een passkey, dan bevestigt u met Face ID, Touch ID of een beveiligingssleutel. Zonder passkey bevestigt u met de code van 6 cijfers uit uw authenticator-app. De sleutel verlaat uw apparaat nooit. De handtekening hoort bij het e-mailadres waarop u deze uitnodiging kreeg.</p>
         </div>
       </details>
       <div class="banner" id="sign-status" hidden></div>
@@ -383,6 +384,6 @@ body.needs-login #sign-intro{display:none}
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=7" defer></script>
-<script type="module" src="/co-sign.js?v=32"></script>
+<script type="module" src="/co-sign.js?v=33"></script>
 </body>
 </html>

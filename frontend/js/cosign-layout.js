@@ -341,13 +341,51 @@ export function paraafSpotsForParties({ pages, textBoxesPerPage, count, avoid })
     if (picked.length === n) return out(picked, w, h);
   }
   // Nothing fits free of text even at the smallest size (text from edge to
-  // edge): the least covered spots, still never on top of each other.
+  // edge): the least covered spots, still never on top of each other. This
+  // is never silent (PDF sweep B1, 2026-10-04): the result carries
+  // `covered: true`, and both /sign and /co-sign name the pages where a
+  // paraaf now lies over text (paraafCoveredPages).
   const s = PARAAF_SCALES[PARAAF_SCALES.length - 1];
   const w = PARAAF_FR.w * s, h = PARAAF_FR.h * s;
   const all = paraafCandidates(w, h).map((c) => ({ ...c, cover: cover(c.x, c.y, w, h) }));
   const picked = choose(all, w, h, (c, p) => c.cover * 1000 + cost(c, p, w, h));
   while (picked.length < n) picked.push(picked[picked.length - 1] || homeOf(w, h));
-  return out(picked, w, h);
+  const res = out(picked, w, h);
+  res.covered = true;
+  return res;
+}
+
+// The pages (0-based) on which a paraaf box lies over text or ink. spot: a
+// fraction box with y from the top (one shared spot for every page, as an
+// all_pages field is drawn); pages and textBoxesPerPage as for
+// paraafSpotsForParties. A page whose text could not be read (null) is not
+// counted: it is unknown, and the caller says nothing it cannot back.
+export function paraafCoveredPages({ spot, pages, textBoxesPerPage }) {
+  const out = [];
+  if (!spot || ![spot.x, spot.y, spot.w, spot.h].every(Number.isFinite)) return out;
+  const list = Array.isArray(pages) ? pages : [];
+  list.forEach((pg, i) => {
+    const boxes = Array.isArray(textBoxesPerPage) ? textBoxesPerPage[i] : null;
+    if (!Array.isArray(boxes) || !(pg && pg.width > 0 && pg.height > 0)) return;
+    const fr = textBoxesToFractions(boxes, pg.width, pg.height) || [];
+    if (fr.some((t) => [t.x, t.y, t.w, t.h].every(Number.isFinite) && overlapArea(spot, t) > 0)) out.push(i);
+  });
+  return out;
+}
+
+// "pagina 2, 3 en 5" / "pages 2, 3 and 5": 0-based indexes, at most `max`
+// named before "and N more".
+export function pageListText(indexes, en, max = 6) {
+  const nums = (indexes || []).map((i) => i + 1);
+  if (!nums.length) return '';
+  const word = en ? (nums.length === 1 ? 'page ' : 'pages ') : (nums.length === 1 ? 'pagina ' : "pagina's ");
+  const and = en ? ' and ' : ' en ';
+  if (nums.length > max) {
+    const shown = nums.slice(0, max).join(', ');
+    return word + shown + and + (nums.length - max) + (en ? ' more' : ' andere');
+  }
+  if (nums.length === 1) return word + nums[0];
+  return word + nums.slice(0, -1).join(', ') + and + nums[nums.length - 1];
 }
 
 // Everything one party is asked for: a signature on `signPage` and, when the
@@ -389,6 +427,15 @@ export function requestsForParties({ anchor, signPage, count, withParaaf, pages,
   const out = [];
   for (let i = 0; i < n; i++) {
     out.push(partyRequest({ index: i, count: n, signPage, anchor, paraafSpot: spots ? spots[i] : null, withParaaf: !!withParaaf }));
+  }
+  // Not part of any manifest: which pages, if any, have a paraaf over text
+  // because no margin was free (paraafSpotsForParties' last resort).
+  if (spots && spots.covered) {
+    const pagesOver = new Set();
+    for (const sp of spots) for (const i of paraafCoveredPages({ spot: sp, pages, textBoxesPerPage })) pagesOver.add(i);
+    out.paraafCoveredPages = [...pagesOver].sort((a, b) => a - b);
+  } else {
+    out.paraafCoveredPages = [];
   }
   return out;
 }
