@@ -17,7 +17,7 @@
 // Units: page fractions 0..1 with y measured from the TOP, the convention of the
 // signed appearance manifest (relay/envelope.js normaliseAppearance).
 
-import { pickSharedSpot } from './paraaf-place.js?v=1';
+import { pickSharedSpot } from './paraaf-place.js?v=2';
 
 // A signature box: wide enough for a written name and a caption under it.
 export const SIGNATURE_FR = { w: 0.3, h: 0.085 };

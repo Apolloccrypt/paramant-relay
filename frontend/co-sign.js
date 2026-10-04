@@ -29,9 +29,9 @@ import { sha3_256 } from '/vendor/paramant-pqc.js';
 import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=19';
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { decryptDocumentCapsule, parseDocumentKeyFragment, documentKeyFragment } from '/js/parasign-document-capsule.js?v=2';
-import { pickSharedSpot, textBoxesFromItems, initialsFrom } from '/js/paraaf-place.js?v=1';
-import { PARAAF_FR, signatureGrid, partySignatureSpot, partyParaafSpot, textBoxesToFractions, strokesToInk } from '/js/cosign-layout.js?v=1';
-import { sealInk, openInk, joinKey, parseKeyShareFragment } from '/js/parasign-ink.js?v=1';
+import { pickSharedSpot, textBoxesFromItems, initialsFrom, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=2';
+import { PARAAF_FR, signatureGrid, partySignatureSpot, partyParaafSpot, textBoxesToFractions, strokesToInk } from '/js/cosign-layout.js?v=2';
+import { sealInk, openInk, joinKey, parseKeyShareFragment } from '/js/parasign-ink.js?v=2';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
 
@@ -664,11 +664,23 @@ async function verifyAndRenderDocument(buf, source) {
 }
 
 // ---------- where this party signs, when it has not decided itself ----------
+// Every spot on this page is a fraction of the page as pdf.js SHOWS it (its
+// view: the visible box, turned by /Rotate). pdf.js hands the text in the PDF's
+// own space, so the boxes go through the same view mapping as /sign
+// (js/paraaf-place.js) before they are judged; on a turned or cropped page the
+// free place under the text was otherwise computed on the wrong axis.
+function geomOfPdfjsPage(page) {
+  return { view: Array.from(page.view), rotate: normaliseRotation(page.rotate) };
+}
+function viewTextBoxes(page, items) {
+  return userBoxesToView(textBoxesFromItems(items), geomOfPdfjsPage(page));
+}
+
 async function textBoxesOfPage(pageIndex) {
   try {
     const page = await __previewPdf.getPage(pageIndex + 1);
     const vp = page.getViewport({ scale: 1 });
-    return textBoxesToFractions(textBoxesFromItems((await page.getTextContent()).items), vp.width, vp.height);
+    return textBoxesToFractions(viewTextBoxes(page, (await page.getTextContent()).items), vp.width, vp.height);
   } catch { return null; }
 }
 
@@ -684,7 +696,7 @@ async function sharedParaafCorner() {
       const page = await pdf.getPage(i);
       const vp = page.getViewport({ scale: 1 });
       pages.push({ width: vp.width, height: vp.height });
-      try { boxes.push(textBoxesFromItems((await page.getTextContent()).items)); }
+      try { boxes.push(viewTextBoxes(page, (await page.getTextContent()).items)); }
       catch { boxes.push(null); }
     }
   } catch { /* fall through: bottom right */ }
@@ -1117,8 +1129,29 @@ export async function buildSignedPdf(currentResult) {
   return renderPdfWithRecords(records);
 }
 
+// The view geometry of every page, as pdf.js showed it in the preview; a page
+// pdf.js did not read falls back to pdf-lib's boxes under the same rule
+// (geomFromBoxes), the way /sign does it.
+async function pageGeoms(pdfLibPages) {
+  const out = [];
+  for (let i = 0; i < pdfLibPages.length; i++) {
+    let g = null;
+    if (__previewPdf && i < __previewPdf.numPages) {
+      try { g = geomOfPdfjsPage(await __previewPdf.getPage(i + 1)); } catch { g = null; }
+    }
+    if (!g) {
+      const pg = pdfLibPages[i];
+      const box = (b) => { try { const r = b(); return [r.x, r.y, r.x + r.width, r.y + r.height]; } catch { return null; } };
+      let rot = 0; try { rot = pg.getRotation().angle; } catch { /* unturned */ }
+      g = geomFromBoxes(box(() => pg.getMediaBox()), box(() => pg.getCropBox()), rot);
+    }
+    out.push(g);
+  }
+  return out;
+}
+
 async function renderPdfWithRecords(records) {
-  const { PDFDocument, StandardFonts, rgb, LineCapStyle } = window.PDFLib;
+  const { PDFDocument, StandardFonts, rgb, LineCapStyle, pushGraphicsState, popGraphicsState, concatTransformationMatrix } = window.PDFLib;
   const pdf = await PDFDocument.load(__documentBytes, { ignoreEncryption: false });
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const script = await pdf.embedFont(StandardFonts.TimesRomanItalic);
@@ -1126,6 +1159,18 @@ async function renderPdfWithRecords(records) {
   const capColor = rgb(0.05, 0.11, 0.2);
   const dimColor = rgb(0.35, 0.42, 0.5);
   const pages = pdf.getPages();
+  // Every field is a fraction of the page as the signer SAW it (pdf.js view:
+  // the visible box turned by /Rotate). On a turned or cropped page that view
+  // is mapped onto the PDF's own space with one matrix, and everything (the
+  // signature, the paraaf, the drawn ink, the caption) is drawn upright in it.
+  // An ordinary page is the identity and is drawn exactly as before.
+  const geoms = await pageGeoms(pages);
+  const inView = (page, fn) => {
+    const g = geoms[pages.indexOf(page)];
+    if (!g || isIdentityGeom(g)) { fn(page); return; }
+    page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...viewToUserMatrix(g)));
+    try { fn(page); } finally { page.pushOperators(popGraphicsState()); }
+  };
 
   const drawInk = (page, ink, box, fallbackText) => {
     if (ink && ink.kind === 'draw') {
@@ -1153,32 +1198,35 @@ async function renderPdfWithRecords(records) {
       // page. A page this document does not have moves to the last page, as
       // the preview showed it, instead of vanishing.
       const targets = field.all_pages ? pages : [pages[Math.min(field.page_index, pages.length - 1)]];
-      for (const page of targets) {
-        if (!page) continue;
-        const { width, height } = page.getSize();
-        const x = field.x * width;
-        const y = height - ((field.y + field.h) * height);
-        const w = field.w * width;
-        const h = field.h * height;
-        if (field.type === 'date') {
-          const text = pdfSafe(regular, isoDay(record.party.signed_at), 10);
-          page.drawText(text, { x: x + 2, y: y + Math.max(2, h * 0.25), size: Math.max(7, Math.min(11, h * 0.6)), font: regular, color: capColor });
-        } else if (field.all_pages) {
-          // The paraaf: initials (or the drawn mark, small) over a hairline.
-          const ink = record.ink && record.ink.kind === 'draw' ? record.ink : { kind: 'type', text: initialsFrom((record.ink && record.ink.text) || partyName(record.party)) || '·' };
-          drawInk(page, ink, { x, y: y + h * 0.18, w, h: h * 0.8 }, '·');
-          page.drawLine({ start: { x: x + w * 0.08, y: y + h * 0.16 }, end: { x: x + w * 0.92, y: y + h * 0.16 }, thickness: 0.4, color: inkColor, opacity: 0.5 });
-        } else {
-          // The signature: handwriting on top, a line, and under it who and when.
-          drawInk(page, record.ink, { x: x + 2, y: y + h * 0.4, w: w - 4, h: h * 0.58 }, partyName(record.party));
-          page.drawLine({ start: { x, y: y + h * 0.37 }, end: { x: x + w, y: y + h * 0.37 }, thickness: 0.6, color: capColor, opacity: 0.55 });
-          const capSize = Math.max(5, Math.min(8, h * 0.15));
-          const cap = pdfSafe(regular, captionFor(record.party, record.party.signed_at), 90);
-          page.drawText(cap, { x, y: y + h * 0.37 - capSize - 1.5, size: fitSize(regular, cap, w, capSize, 4), font: regular, color: capColor });
-          const fp = String(record.party.signer_pk_hash || '').slice(0, 8);
-          const proof = 'Paramant ParaSign' + (fp ? ' · PQ ' + fp : '');
-          page.drawText(proof, { x, y: y + 1, size: Math.max(4, capSize - 1.5), font: regular, color: dimColor });
-        }
+      for (const target of targets) {
+        if (!target) continue;
+        inView(target, (page) => {
+          const g = geoms[pages.indexOf(page)];
+          const { width, height } = g ? viewSize(g) : page.getSize();
+          const x = field.x * width;
+          const y = height - ((field.y + field.h) * height);
+          const w = field.w * width;
+          const h = field.h * height;
+          if (field.type === 'date') {
+            const text = pdfSafe(regular, isoDay(record.party.signed_at), 10);
+            page.drawText(text, { x: x + 2, y: y + Math.max(2, h * 0.25), size: Math.max(7, Math.min(11, h * 0.6)), font: regular, color: capColor });
+          } else if (field.all_pages) {
+            // The paraaf: initials (or the drawn mark, small) over a hairline.
+            const ink = record.ink && record.ink.kind === 'draw' ? record.ink : { kind: 'type', text: initialsFrom((record.ink && record.ink.text) || partyName(record.party)) || '·' };
+            drawInk(page, ink, { x, y: y + h * 0.18, w, h: h * 0.8 }, '·');
+            page.drawLine({ start: { x: x + w * 0.08, y: y + h * 0.16 }, end: { x: x + w * 0.92, y: y + h * 0.16 }, thickness: 0.4, color: inkColor, opacity: 0.5 });
+          } else {
+            // The signature: handwriting on top, a line, and under it who and when.
+            drawInk(page, record.ink, { x: x + 2, y: y + h * 0.4, w: w - 4, h: h * 0.58 }, partyName(record.party));
+            page.drawLine({ start: { x, y: y + h * 0.37 }, end: { x: x + w, y: y + h * 0.37 }, thickness: 0.6, color: capColor, opacity: 0.55 });
+            const capSize = Math.max(5, Math.min(8, h * 0.15));
+            const cap = pdfSafe(regular, captionFor(record.party, record.party.signed_at), 90);
+            page.drawText(cap, { x, y: y + h * 0.37 - capSize - 1.5, size: fitSize(regular, cap, w, capSize, 4), font: regular, color: capColor });
+            const fp = String(record.party.signer_pk_hash || '').slice(0, 8);
+            const proof = 'Paramant ParaSign' + (fp ? ' · PQ ' + fp : '');
+            page.drawText(proof, { x, y: y + 1, size: Math.max(4, capSize - 1.5), font: regular, color: dimColor });
+          }
+        });
       }
     }
   }
