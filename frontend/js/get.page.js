@@ -29,6 +29,7 @@ const T = {
       unknown: { title: 'Deze link werkt niet meer.', sub: 'Hij is verlopen, al gebruikt of nooit uitgegeven. Vraag de afzender om het bestand opnieuw te sturen.' },
     },
     tooShort: 'Het ontsleutelde bestand is te kort.',
+    sizeBad: (got, want) => 'Dit bestand is bij het versturen niet goed ingepakt: er kwam ' + got + ' binnen, de afzender verstuurde ' + want + '. Er is niets opgeslagen en niets gewist. Vraag de afzender om het opnieuw te sturen.',
     headerBad: 'De kop van het ontsleutelde bestand is beschadigd.',
     opening: 'Het document wordt geopend...',
     done: 'Klaar.',
@@ -69,6 +70,7 @@ const T = {
       unknown: { title: 'This link no longer works.', sub: 'It has expired, was already used, or was never issued. Ask the sender to send the file again.' },
     },
     tooShort: 'Decrypted payload too short',
+    sizeBad: (got, want) => 'This file was not packed properly when it was sent: ' + got + ' arrived, the sender sent ' + want + '. Nothing was saved and nothing was deleted. Ask the sender to send it again.',
     headerBad: 'Decrypted payload header corrupt',
     opening: 'Opening the document...',
     done: 'Done.',
@@ -155,9 +157,11 @@ function fromB64url(s) {
   } catch { return null; }
 }
 
+// A Dutch page writes a decimal comma: "39,1 KB", not "39.1 KB" (fase 1, P04).
 function formatSize(n) {
-  if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
-  if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
+  const one = (x) => { const v = x.toFixed(1); return LANG === 'nl' ? v.replace('.', ',') : v; };
+  if (n >= 1048576) return one(n / 1048576) + ' MB';
+  if (n >= 1024) return one(n / 1024) + ' KB';
   return n + ' B';
 }
 
@@ -409,7 +413,11 @@ async function init() {
     size += Number(j.file_size) || 0;
     if (Number.isFinite(j.ttl_left_s)) ttlLeft = Math.min(ttlLeft, j.ttl_left_s);
   }
-  if (meta) meta.textContent = t('readyMeta')(size ? formatSize(size) : '', ttlLeft);
+  // A FileLink blob is padded to a fixed 5 MB block, so /info's size is the
+  // padding, not the file: a 2 MB pdf showed "Grootte 5.0 MB" (fase 1, EXT-16-A).
+  // The real size is inside the seal; before the download there is none to show.
+  const shownSize = LINK.kind === 'filelink' ? '' : (size ? formatSize(size) : '');
+  if (meta) meta.textContent = t('readyMeta')(shownSize, ttlLeft);
   if (btn) btn.disabled = false;
 }
 
@@ -532,6 +540,7 @@ async function startDownload() {
     // and then nothing has been spent.
     let filename;
     let fileData;
+    let sizeMismatch = null;
     try {
       if (LINK.kind === 'webapp') {
         const aesKey = await crypto.subtle.importKey('raw', LINK.rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
@@ -545,8 +554,12 @@ async function startDownload() {
       } else {
         const chunks = [];
         let metaName = null;
+        let sealedSize = null;
+        let chunkMismatch = false;
         for (let i = 0; i < blobs.length; i++) {
           const { data, meta } = await tbDecryptChunk(blobs[i], LINK.rawKeys[i]);
+          if (meta && Number.isFinite(meta.file_size) && sealedSize === null) sealedSize = meta.file_size;
+          if (meta && Number.isFinite(meta.chunk_size) && meta.chunk_size !== data.length) chunkMismatch = true;
           // The extension core writes file_name; older senders wrote name.
           // Read from inside the seal, so the link needs no &n= (hertest T4-9).
           const mn = meta && (typeof meta.file_name === 'string' ? meta.file_name : meta.name);
@@ -558,10 +571,22 @@ async function startDownload() {
         let off = 0;
         for (const c of chunks) { fileData.set(c, off); off += c.length; }
         filename = metaName || LINK.name || 'download';
+        // The seal says how big the file was. A sender that sealed fewer bytes
+        // than that (the browser extension up to 1.0.1 sealed every attachment
+        // as 0 bytes, fase 1 EXT-13-A) must not end in "U hebt het bestand"
+        // with an empty file on disk. Nothing is burned: the claim goes back.
+        if (chunkMismatch || (sealedSize !== null && sealedSize !== total)) {
+          sizeMismatch = { got: total, want: sealedSize };
+        }
       }
     } catch {
       releaseAll(tokens);
       showError(t('decFail'));
+      return;
+    }
+    if (sizeMismatch) {
+      releaseAll(tokens);
+      showError(t('sizeBad')(formatSize(sizeMismatch.got), formatSize(sizeMismatch.want ?? 0)));
       return;
     }
 

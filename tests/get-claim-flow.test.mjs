@@ -289,3 +289,38 @@ for (const [label, entry] of [
     await ctx.close();
   });
 }
+
+// Fase 1, EXT-16-A: the browser extension up to 1.0.1 sealed every attachment
+// as 0 bytes while the seal still said the real size. The receiver got an empty
+// file under "U hebt het bestand", and the one-time link was spent on it. The
+// page now compares what it opened with the size in the seal, burns nothing on
+// a mismatch, and says so. The ready screen also stopped showing the 5 MB
+// padding of a FileLink block as the file's size.
+test('EXT-16-A: a FileLink that holds fewer bytes than its seal says is refused, and nothing is burned', async () => {
+  const core = await import('../extensions/shared/paramant-core.js');
+  const { padded, rawKey } = await core.encryptChunk(new Uint8Array(0), { file_id: core.randomFileId(), file_name: 'rapport.pdf', file_size: 2097155, chunk_index: 0, total_chunks: 1, chunk_size: 0 });
+  const token = await upload(Buffer.from(padded));
+  const url = core.buildShareUrl({ tokens: [token], chunks: 1, relay: 'https://legal.paramant.app', keys: [b64url(rawKey)] }).replace('https://paramant.app', GCF_ORIGIN);
+  const { ctx, calls } = await receiverContext();
+  const page = await ctx.newPage();
+  await page.goto(url);
+  await page.waitForFunction(() => !document.getElementById('ready-btn').disabled, null, { timeout: 10000 });
+  assert.doesNotMatch(await page.locator('#ready-meta').innerText(), /5[,.]0 MB/, 'the ready screen shows the padding as the size');
+  await page.click('#ready-btn');
+  await page.waitForSelector('#step-error.active', { timeout: 20000 });
+  assert.match(await page.locator('#error-msg').innerText(), /niet goed ingepakt.*niets gewist/s);
+  assert.ok(!calls.some((c) => /\/ack$/.test(c)), 'an empty file was confirmed and burned');
+  await page.waitForTimeout(300);
+  assert.equal((await info(token)).status, 200);
+  await ctx.close();
+});
+
+test('P04: a Dutch /get writes sizes with a decimal comma', async () => {
+  const link = await webappLink('komma.bin', crypto.randomBytes(40_000));
+  const { ctx } = await receiverContext();
+  const page = await ctx.newPage();
+  await page.goto(link.url);
+  await page.waitForFunction(() => /Grootte/.test(document.getElementById('ready-meta').textContent), null, { timeout: 10000 });
+  assert.match(await page.locator('#ready-meta').innerText(), /Grootte \d+,\d KB/);
+  await ctx.close();
+});

@@ -1,4 +1,5 @@
 import { getSettings, setSettings, clearHistory, TTL_OPTIONS } from '../shared/settings.js';
+import { isReceivableRelay, SELF_HOST_UNSUPPORTED } from '../../../shared/paramant-core.js';
 
 const TTL_LABELS = { ttl_1h: '1 hour', ttl_6h: '6 hours', ttl_24h: '24 hours', ttl_3d: '3 days', ttl_7d: '7 days' };
 const t = (key, fallback) => chrome.i18n.getMessage(key) || fallback || key;
@@ -57,6 +58,11 @@ async function init() {
     const v = relayInput.value.trim();
     if (v && !/^https:\/\/[^\s]+$/i.test(v)) {
       relayInput.setCustomValidity('Enter a full https:// URL');
+      relayInput.reportValidity();
+      return;
+    }
+    if (v && !isReceivableRelay(v)) {
+      relayInput.setCustomValidity(t('opt_relay_selfhost', SELF_HOST_UNSUPPORTED));
       relayInput.reportValidity();
       return;
     }

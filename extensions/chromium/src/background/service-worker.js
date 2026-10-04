@@ -9,7 +9,7 @@
 import {
   getCapabilities, loginWithApiKey, loginWithTotp, verifySession, logout, getUploadCredentials,
 } from './auth-client.js';
-import { sealAndUploadChunk, buildShareUrl, chunkCount, randomFileId } from '../../../shared/paramant-core.js';
+import { sealAndUploadChunk, buildShareUrl, chunkCount, randomFileId, decodeChunkMessage, isReceivableRelay, SELF_HOST_UNSUPPORTED } from '../../../shared/paramant-core.js';
 import { getSettings, addHistory } from '../shared/settings.js';
 
 // ── Message router ────────────────────────────────────────────────────────────────
@@ -60,8 +60,11 @@ async function openPopup() {
 const transfers = new Map();
 
 async function transferBegin(msg) {
-  const creds = await getUploadCredentials();
+  let creds;
+  try { creds = await getUploadCredentials(); }
+  catch (err) { return { ok: false, error: String(err?.message || err) }; }
   if (!creds) return { ok: false, error: 'not_authenticated' };
+  if (!isReceivableRelay(creds.relay)) return { ok: false, error: SELF_HOST_UNSUPPORTED };
 
   const { ttl_ms } = await getSettings();
   const size  = msg.file?.size ?? 0;
@@ -71,7 +74,7 @@ async function transferBegin(msg) {
   transfers.set(id, {
     tokens: [], keys: [], fileId: randomFileId(),
     name: msg.file?.name || 'attachment', size, total,
-    relay: creds.relay, apikey: creds.apikey,
+    relay: creds.relay, apikey: creds.apikey || null, bearer: creds.bearer || null,
     ttlMs: ttl_ms, effTtlMs: ttl_ms,
   });
   return { ok: true, transferId: id, totalChunks: total };
@@ -81,9 +84,18 @@ async function transferChunk(msg) {
   const st = transfers.get(msg.transferId);
   if (!st) return { ok: false, error: 'unknown_transfer' };
   try {
-    const chunkU8 = new Uint8Array(msg.bytes);
+    // The chunk arrives as base64 and its length is checked against what this
+    // index must hold: a wrong-sized chunk is refused here, never sealed.
+    const chunkU8 = decodeChunkMessage(msg.b64, st.size, msg.index);
+    // A TOTP session's token lives fifteen minutes; a large file can outlast one.
+    // getUploadCredentials hands back the cached token or a fresh one.
+    if (st.bearer) {
+      const fresh = await getUploadCredentials();
+      if (!fresh?.bearer) throw new Error('not_authenticated');
+      st.bearer = fresh.bearer;
+    }
     const res = await sealAndUploadChunk({
-      relay: st.relay, apiKey: st.apikey, chunkU8, ttlMs: st.ttlMs,
+      relay: st.relay, apiKey: st.apikey, bearer: st.bearer, chunkU8, ttlMs: st.ttlMs,
       fileMeta:  { file_id: st.fileId, file_name: st.name, file_size: st.size, chunk_index: msg.index, total_chunks: st.total, chunk_size: chunkU8.length },
       relayMeta: { device_id: 'paramant-gmail', file_id: st.fileId, chunk_index: msg.index, total_chunks: st.total },
     });
