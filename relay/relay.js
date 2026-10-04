@@ -11343,6 +11343,7 @@ async function handleRelayRequest(req, res) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, envelope: env, sign_message_recipe: recipeFor(env.recipe_version, env.binding_mode) }));
     } catch (e) {
+      if (redisOutage503(e, res)) return;   // a frozen store is a 503, not a 500 (sweep-chaos 10)
       res.writeHead(500, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'internal' }));
     }
@@ -11388,8 +11389,10 @@ async function handleRelayRequest(req, res) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true }));
     } catch (e) {
+      if (redisOutage503(e, res)) return;
+      // Fixed text, never the internal error message (sweep-chaos 10).
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: e.message }));
+      return res.end(J({ error: 'view_failed' }));
     }
   }
 
