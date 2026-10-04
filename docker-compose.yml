@@ -118,6 +118,12 @@ x-relay-env: &relay-env
   REDIS_URL: "${RELAY_REDIS_URL}"
   ENABLE_USER_TOTP: "${ENABLE_USER_TOTP:-false}"
   INTERNAL_AUTH_TOKEN: "${INTERNAL_AUTH_TOKEN:-}"
+  # This relay's public URLs, for self-hosts. RELAY_SELF_URL_<SECTOR> (per
+  # service below) is what signed tree heads and receipts name as relay_id;
+  # left at its default a self-host claimed to be a paramant.app host
+  # (SELF-19). PARASIGN_PUBLIC_ORIGIN is the site that checkout returns to and
+  # the payment webhook is sent to; empty means https://paramant.app.
+  PARASIGN_PUBLIC_ORIGIN: "${PARASIGN_PUBLIC_ORIGIN:-}"
   # ParaSend delivery receipts (#342). The relay reads these by name, so they
   # need a line here: .env only substitutes ${VAR} into this file, there is no
   # env_file, and a variable that is not listed never reaches a container.
@@ -156,7 +162,7 @@ services:
     environment:
       <<: *relay-env
       SECTOR: "relay"
-      RELAY_SELF_URL: "https://relay.paramant.app"
+      RELAY_SELF_URL: "${RELAY_SELF_URL_MAIN:-https://relay.paramant.app}"
       RELAY_PRIMARY_URL: "http://relay-health:3000"
     ports:
       - "127.0.0.1:3000:3000"
@@ -191,7 +197,7 @@ services:
     environment:
       <<: *relay-env
       SECTOR: "health"
-      RELAY_SELF_URL: "https://health.paramant.app"
+      RELAY_SELF_URL: "${RELAY_SELF_URL_HEALTH:-https://health.paramant.app}"
       RELAY_PRIMARY_URL: "http://localhost:3000"
       # Below the 8g cap above, and it has to be. relay.js refuses an upload when
       # rss + BLOB_SIZE_MB * (inFlight + 1) > RAM_LIMIT_MB + RAM_RESERVE_MB, and
@@ -230,7 +236,7 @@ services:
     environment:
       <<: *relay-env
       SECTOR: "finance"
-      RELAY_SELF_URL: "https://finance.paramant.app"
+      RELAY_SELF_URL: "${RELAY_SELF_URL_FINANCE:-https://finance.paramant.app}"
       RELAY_PRIMARY_URL: "http://relay-health:3000"
     ports:
       - "127.0.0.1:3002:3000"
@@ -258,7 +264,7 @@ services:
     environment:
       <<: *relay-env
       SECTOR: "legal"
-      RELAY_SELF_URL: "https://legal.paramant.app"
+      RELAY_SELF_URL: "${RELAY_SELF_URL_LEGAL:-https://legal.paramant.app}"
       RELAY_PRIMARY_URL: "http://relay-health:3000"
     ports:
       - "127.0.0.1:3003:3000"
@@ -287,7 +293,7 @@ services:
       <<: *relay-env
       SECTOR: "iot"
       RELAY_MODE: "${IOT_RELAY_MODE:-iot}"
-      RELAY_SELF_URL: "https://iot.paramant.app"
+      RELAY_SELF_URL: "${RELAY_SELF_URL_IOT:-https://iot.paramant.app}"
       RELAY_PRIMARY_URL: "http://relay-health:3000"
     ports:
       - "127.0.0.1:3004:3000"

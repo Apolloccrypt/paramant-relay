@@ -11926,6 +11926,16 @@ async function registerSelf() {
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────
+// Without RELAY_SELF_URL every signed tree head and receipt names
+// <sector>.paramant.app as relay_id, so a self-host's proofs claim a Paramant
+// host. Said at boot rather than discovered in a proof (SELF-19-C).
+if (!RELAY_SELF_URL) {
+  log('warn', 'relay_self_url_unset', {
+    relay_id: SECTOR + '.paramant.app',
+    hint: 'Set RELAY_SELF_URL (RELAY_SELF_URL_<SECTOR> in docker-compose.yml) to this relay\'s own public URL; '
+        + 'until then signed heads and receipts name a paramant.app host.',
+  });
+}
 loadUsers();
 _initSetupToken();
 loadTrialKeys();
