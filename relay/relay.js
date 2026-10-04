@@ -3054,24 +3054,49 @@ let _usersWriteQueue = Promise.resolve();
 // Atomic write: tmp + rename eliminates the O_TRUNC window where a concurrent
 // reader sees an empty file mid-write. Combined with the sanity check in
 // /v2/reload-users this prevents the apiKeys-wipe race on plan_change.
+//
+// fsync before the rename, so a power cut cannot leave a renamed but empty
+// file. The directory is created when missing.
 async function _atomicWriteUsers(data) {
-  const tmp = `${USERS_FILE}.tmp.${process.pid}.${Date.now()}`;
-  await fs.promises.writeFile(tmp, JSON.stringify(data, null, 2));
-  await fs.promises.rename(tmp, USERS_FILE);
+  await fs.promises.mkdir(nodePath.dirname(nodePath.resolve(USERS_FILE)), { recursive: true });
+  const tmp = `${USERS_FILE}.tmp.${process.pid}.${Date.now()}.${crypto.randomBytes(3).toString('hex')}`;
+  const fh = await fs.promises.open(tmp, 'w', 0o600);
+  try {
+    await fh.writeFile(JSON.stringify(data, null, 2));
+    await fh.sync();
+  } finally { await fh.close(); }
+  try { await fs.promises.rename(tmp, USERS_FILE); }
+  catch (e) { await fs.promises.unlink(tmp).catch(() => {}); throw e; }
+}
+// The returned promise REJECTS when the write fails, so a caller's
+// `.then(() => log(..., persisted: true))` only runs when it is true. It used
+// to resolve either way: on a fresh relay users.json did not exist, every
+// write failed with ENOENT, and the log still said persisted:true. The queue
+// itself never stays rejected, so one failure does not block the next write.
+function _queueUsersWrite(job) {
+  const run = _usersWriteQueue.then(job);
+  _usersWriteQueue = run.catch(e => log('error', 'users_write_error', { err: e.message, file: USERS_FILE }));
+  return run;
 }
 function _writeUsersJson(data) {
-  _usersWriteQueue = _usersWriteQueue.then(() => _atomicWriteUsers(data))
-    .catch(e => log('warn', 'users_write_error', { err: e.message }));
-  return _usersWriteQueue;
+  return _queueUsersWrite(() => _atomicWriteUsers(data));
 }
 function _mutateUsersJson(fn) {
-  _usersWriteQueue = _usersWriteQueue.then(async () => {
-    const raw = await fs.promises.readFile(USERS_FILE, 'utf8');
-    const data = JSON.parse(raw);
+  return _queueUsersWrite(async () => {
+    let data;
+    try {
+      data = JSON.parse(await fs.promises.readFile(USERS_FILE, 'utf8'));
+    } catch (e) {
+      // Missing is a fresh relay: start empty. Unreadable or corrupt is not
+      // ours to overwrite; refuse, loudly.
+      if (e.code !== 'ENOENT') throw e;
+      data = { api_keys: [] };
+    }
+    if (!data || typeof data !== 'object') throw new Error('users.json is not an object');
+    if (!Array.isArray(data.api_keys)) data.api_keys = [];
     fn(data);
     await _atomicWriteUsers(data);
-  }).catch(e => log('warn', 'users_write_error', { err: e.message }));
-  return _usersWriteQueue;
+  });
 }
 
 // ── Billing auto-grant: paid Pro plan → parasign entitlement ──────────────
@@ -3902,6 +3927,33 @@ function keyCapReject(err, res) {
   return true;
 }
 
+// ── One-time setup token (first-run wizard) ──────────────────────────────
+// /v2/setup/apply used to be open to anyone while the relay had no keys. The
+// token is made once, printed in the relay log and written next to users.json
+// (mode 0600), so only someone with the logs or the volume can finish setup.
+// PARAMANT_SETUP_TOKEN pins it from the environment instead.
+const SETUP_TOKEN_FILE = nodePath.join(nodePath.dirname(nodePath.resolve(USERS_FILE)), 'setup-token');
+let _setupTokenValue = null;
+function _setupToken() { return process.env.PARAMANT_SETUP_TOKEN || _setupTokenValue; }
+function _initSetupToken() {
+  if (process.env.PARAMANT_SETUP_TOKEN) return;
+  if (apiKeys.size > 0 && process.env.SETUP_MODE !== 'true') return;
+  try { _setupTokenValue = fs.readFileSync(SETUP_TOKEN_FILE, 'utf8').trim() || null; } catch {}
+  if (!_setupTokenValue) {
+    _setupTokenValue = 'pst_' + crypto.randomBytes(24).toString('hex');
+    try { fs.writeFileSync(SETUP_TOKEN_FILE, _setupTokenValue + '\n', { mode: 0o600 }); }
+    catch (e) { log('warn', 'setup_token_file_not_written', { err: e.message, file: SETUP_TOKEN_FILE }); }
+  }
+  log('info', 'setup_token', {
+    token: _setupTokenValue, file: SETUP_TOKEN_FILE,
+    hint: 'First-run setup: open /setup and paste this token. It stops working once setup is done.',
+  });
+}
+function _setupTokenConsumed() {
+  _setupTokenValue = null;
+  try { fs.unlinkSync(SETUP_TOKEN_FILE); } catch {}
+}
+
 function loadUsers() {
   if (process.env.USERS_JSON) {
     try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",email:k.email||"",active:true,created:k.created||null,...keysTable.parseAccountFields(k)}); }); keysTable.rebuildKeyIndexes(apiKeys,accounts,accountKeys,kidIndex,log); rebuildApiKeyHashIndex(); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
@@ -3922,7 +3974,28 @@ function loadUsers() {
     keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log);
     rebuildApiKeyHashIndex();
     log('info', 'users_loaded', { count: apiKeys.size, sector: SECTOR });
-  } catch(e) { log('warn', 'no_users_file'); }
+  } catch(e) {
+    if (e.code === 'ENOENT') {
+      // A fresh relay: create the file now, so the first key minted through
+      // the API or the setup wizard has somewhere to land. Before this the
+      // file never existed, every persist failed, and a restart dropped every
+      // key made since boot (the setup admin key included).
+      try {
+        fs.mkdirSync(nodePath.dirname(nodePath.resolve(USERS_FILE)), { recursive: true });
+        const tmp = `${USERS_FILE}.tmp.${process.pid}.init`;
+        fs.writeFileSync(tmp, JSON.stringify({ api_keys: [], updated: new Date().toISOString() }, null, 2), { mode: 0o600 });
+        fs.renameSync(tmp, USERS_FILE);
+        log('info', 'users_file_created', { file: USERS_FILE });
+      } catch (ce) {
+        log('error', 'users_file_not_writable', {
+          err: ce.message, file: USERS_FILE,
+          hint: 'Keys made through the API will not survive a restart. Point USERS_FILE at a writable volume.',
+        });
+      }
+    } else {
+      log('error', 'users_file_unreadable', { err: e.message, file: USERS_FILE });
+    }
+  }
 }
 
 function loadTrialKeys() {
@@ -4688,6 +4761,14 @@ async function handleRelayRequest(req, res) {
   function _setupModeOn() {
     return apiKeys.size === 0 || process.env.SETUP_MODE === 'true';
   }
+  function _setupAuthorized(rq) {
+    const given = String(rq.headers['x-setup-token'] || '');
+    const adminGiven = String(rq.headers['x-admin-token'] || '');
+    const eq = (a, b) => a.length > 0 && b.length > 0 && a.length === b.length
+      && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+    const tok = _setupToken();
+    return (tok && eq(given, tok)) || (eq(adminGiven, process.env.ADMIN_TOKEN || ''));
+  }
 
   // GET /v2/setup/check -- is the relay in first-time setup mode?
   if (req.method === 'GET' && path === '/v2/setup/check') {
@@ -4728,6 +4809,14 @@ async function handleRelayRequest(req, res) {
     if (!_setupModeOn()) {
       res.writeHead(409, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Setup is already complete on this relay.' }));
+    }
+    // Not anonymous. A fresh relay is reachable before its operator gets to
+    // it, and whoever posted here first walked off with an enterprise key.
+    // The operator proves ownership with the one-time setup token the relay
+    // printed in its log and wrote next to users.json, or with ADMIN_TOKEN.
+    if (!_setupAuthorized(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'setup_token_required', detail: 'Send the setup token from the relay log (or the file ' + nodePath.basename(SETUP_TOKEN_FILE) + ' next to users.json) in the X-Setup-Token header.' }));
     }
     try {
       const body = JSON.parse((await readBody(req, 16384)).toString());
@@ -4793,13 +4882,24 @@ async function handleRelayRequest(req, res) {
       };
       const adminKey = mint('enterprise', 'setup-admin', adminEmail);
       const firstUserKey = firstUser ? mint(firstUser.plan, firstUser.label, firstUser.email) : null;
-      await _mutateUsersJson(d => {
-        d.api_keys = d.api_keys || [];
-        const now = new Date().toISOString();
-        d.api_keys.push({ key: adminKey, plan: 'enterprise', label: 'setup-admin', email: adminEmail, active: true, created: now, is_admin: true });
-        if (firstUserKey) d.api_keys.push({ key: firstUserKey, plan: firstUser.plan, label: firstUser.label, email: firstUser.email, active: true, created: now });
-        d.updated = now;
-      }).catch(we => log('warn', 'setup_persist_failed', { err: we.message }));
+      try {
+        await _mutateUsersJson(d => {
+          d.api_keys = d.api_keys || [];
+          const now = new Date().toISOString();
+          d.api_keys.push({ key: adminKey, plan: 'enterprise', label: 'setup-admin', email: adminEmail, active: true, created: now, is_admin: true });
+          if (firstUserKey) d.api_keys.push({ key: firstUserKey, plan: firstUser.plan, label: firstUser.label, email: firstUser.email, active: true, created: now });
+          d.updated = now;
+        });
+      } catch (we) {
+        // Not on disk means gone at the next restart, and the wizard open
+        // again for whoever comes first. Take the keys back and say so.
+        apiKeys.delete(adminKey);
+        if (firstUserKey) apiKeys.delete(firstUserKey);
+        log('error', 'setup_persist_failed', { err: we.message, file: USERS_FILE });
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'setup_not_persisted', detail: 'users.json could not be written (' + (we.code || we.message) + '). Make USERS_FILE writable and try again.' }));
+      }
+      _setupTokenConsumed();
 
       // -- write .env (atomic temp+rename, back up existing) --
       const envPath = process.env.SETUP_ENV_FILE || nodePath.join(process.cwd(), '.env');
@@ -8959,6 +9059,7 @@ async function handleRelayRequest(req, res) {
 
       const created = new Date().toISOString();
       apiKeys.set(newKey, { plan, label, email, active: true, account_id, is_primary, scope, created });
+      const accountWasNew = !accounts.has(account_id);
       if (!accounts.has(account_id)) accounts.set(account_id, { account_id, plan, email, primary_api_key: null, label });
       if (is_primary || !accounts.get(account_id).primary_api_key) accounts.get(account_id).primary_api_key = newKey;
       if (!accountKeys.has(account_id)) accountKeys.set(account_id, new Set());
@@ -8967,11 +9068,26 @@ async function handleRelayRequest(req, res) {
       apiKeys.get(newKey).kid = kid;
       kidIndex.set(kid, newKey);
 
-      _mutateUsersJson(ud => {
-        ud.api_keys.push({ key: newKey, plan, label, email, active: true, created, account_id, is_primary, scope });
-        ud.updated = new Date().toISOString();
-      }).then(() => log('info', 'key_created_via_admin', { label, plan, account: String(account_id).slice(0, 12), persisted: true }))
-        .catch(we => log('warn', 'key_persist_failed', { err: we.message, label }));
+      // Awaited: a key that is not on disk is gone at the next restart, so the
+      // caller must not be told it exists. On failure the in-memory key is
+      // taken back and the answer says why.
+      try {
+        await _mutateUsersJson(ud => {
+          ud.api_keys.push({ key: newKey, plan, label, email, active: true, created, account_id, is_primary, scope });
+          ud.updated = new Date().toISOString();
+        });
+        log('info', 'key_created_via_admin', { label, plan, account: String(account_id).slice(0, 12), persisted: true });
+      } catch (we) {
+        apiKeys.delete(newKey);
+        kidIndex.delete(kid);
+        const ak = accountKeys.get(account_id);
+        if (ak) { ak.delete(newKey); if (ak.size === 0) accountKeys.delete(account_id); }
+        if (accountWasNew) accounts.delete(account_id);
+        else if (accounts.get(account_id) && accounts.get(account_id).primary_api_key === newKey) accounts.get(account_id).primary_api_key = null;
+        log('error', 'key_persist_failed', { err: we.message, label, persisted: false });
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'key_not_persisted', detail: 'users.json could not be written; the key was not created.' }));
+      }
       applyKeyLimitEnforcement();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, key: newKey, kid, account_id, plan, label }));
@@ -11498,6 +11614,7 @@ async function registerSelf() {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 loadUsers();
+_initSetupToken();
 loadTrialKeys();
 checkLicense();
 loadOrCreateRelayIdentity();
