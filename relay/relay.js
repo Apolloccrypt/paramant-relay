@@ -10679,6 +10679,10 @@ async function handleRelayRequest(req, res) {
         const _psign  = entitlements.getEntitlements(keyData).parasign;
         const _sLimit = _psign.quotas.signs_month;
         const _sGate  = await quota.gateSign(redisClient, keyData.account_id, _sLimit, log);
+        if (_sGate.unavailable) {
+          res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' });
+          return res.end(J({ error: 'sign_quota_unavailable', message: 'Signatures cannot be counted right now. Nothing was signed; try again in a minute.' }));
+        }
         if (!_sGate.allowed) {
           // The tier that DECIDED, as on the transfer gate: the unified plan
           // does not move on a ParaSign purchase either, so reporting it here
@@ -10793,7 +10797,41 @@ async function handleRelayRequest(req, res) {
       // thirty (tester report A9). It is the account's ParaSign entitlement now,
       // parasignEntitlementOf, the same reading the signs gate makes. ParaSign
       // calls its floor 'free', which tiers.normalisePlan reads as community.
-      const _planForParties = parasignEntitlementOf(acctOf(apiKey), apiKeys.get(apiKey)).tier;
+      const _psEnt = parasignEntitlementOf(acctOf(apiKey), apiKeys.get(apiKey));
+      const _planForParties = _psEnt.tier;
+      // THE SENDER PAYS FOR EVERY SIGNATURE ON IT, so he has to have room for
+      // all of them before the request goes out. Nothing was checked here: a
+      // free sender (2 a month) could send to twenty people, a Firm sender at
+      // 98 of 100 to five, and parties 3 to 5 then hit a refusal they could do
+      // nothing about (sweep-acct finding 7). Room = included - signed this
+      // month - still unsigned on his open requests.
+      const _sLimit = _psEnt.quotas.signs_month;
+      // After the party cap, which store.create enforces with its own message:
+      // a request that is too big for any plan says so, not "no room".
+      const _partyCap = Math.min(envelopeMod.MAX_PARTIES, tiers.tierLimitNum(_planForParties, 'max_parties') || envelopeMod.MAX_PARTIES);
+      if (Number.isFinite(_sLimit) && parties.length > 0 && parties.length <= _partyCap) {
+        let _used = 0, _pending = 0;
+        try {
+          const u = await quota.readUsage(redisClient, acctOf(apiKey));
+          _used = Number.isFinite(u.signs_this_month) ? u.signs_this_month : 0;
+          const open = await store.listAccountEnvelopes(acctOf(apiKey), { limit: 500 });
+          const _nowMs = Date.now();
+          for (const e of open) if (e && e.status !== 'complete' && e.status !== 'void' && !e.voided_at && !e.completed_at && !(e.expires_at && Date.parse(e.expires_at) < _nowMs)) _pending += Math.max(0, (e.party_count || 0) - (e.signed_count || 0));
+        } catch (qe) {
+          if (redisOutage503(qe, res)) return;
+          res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' });
+          return res.end(J({ error: 'sign_quota_unavailable' }));
+        }
+        const _room = Math.max(0, _sLimit - _used - _pending);
+        if (parties.length > _room) {
+          log('info', 'envelope_quota_insufficient', { account: String(acctOf(apiKey)).slice(0, 12), parties: parties.length, room: _room, used: _used, pending: _pending, limit: _sLimit });
+          res.writeHead(402, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'sign_quota_insufficient', needed: parties.length, room: _room,
+            used: _used, pending: _pending, limit: _sLimit, plan: _psEnt.tier, reset_date: quota.nextResetDate(),
+            message: `This request needs ${parties.length} signature(s) and your plan has room for ${_room} this month (${_used} signed, ${_pending} still open on other requests, ${_sLimit} included).`,
+            message_nl: `Dit verzoek vraagt ${parties.length} handtekening(en) en uw plan heeft deze maand nog ruimte voor ${_room} (${_used} getekend, ${_pending} nog open op andere verzoeken, ${_sLimit} inbegrepen).` }));
+        }
+      }
       const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, accountId: acctOf(apiKey), docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays, bindingMode: d.binding_mode, recipeVersion: d.recipe_version, requestedAppearance: d.requested_appearance, plan: _planForParties });
       log('info', 'envelope_created', { id: out.id, parties: out.party_count, binding_mode: out.binding_mode });
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -11224,7 +11262,14 @@ async function handleRelayRequest(req, res) {
       // still meters the signer, the account resolved above.
       // Compared through acctOf, so a key that belongs to the owner's account is
       // the owner, and solo signing keeps metering the very id it metered before.
-      const billedToSender = !!ownerAccountId && acctOf(ownerAccountId) !== acctOf(accountId);
+      //
+      // A signer WITHOUT an account (open mode, no claimed account) is not the
+      // sender either. accountId fell back to the owner for him, so this used
+      // to read "same account", and he got monthly_sign_quota_reached with the
+      // sender's plan, limit and usage, while the sender heard nothing. Only a
+      // claimed account that IS the owner's is the sender signing.
+      const _senderSigns = !!claimedAccountId && !!ownerAccountId && acctOf(claimedAccountId) === acctOf(ownerAccountId);
+      const billedToSender = !!ownerAccountId && !_senderSigns;
       const meterAccountId = billedToSender ? ownerAccountId : accountId;
       const _signerPlan = (accounts.get(meterAccountId) && accounts.get(meterAccountId).plan)
         || (apiKeys.get(meterAccountId) && apiKeys.get(meterAccountId).plan) || 'community';
@@ -11243,7 +11288,18 @@ async function handleRelayRequest(req, res) {
       // entitlementRecordOf merges the accounts summary with the per-product
       // plans on the account's keys; reading `accounts` alone hid paid upgrades.
       const _signEnt = parasignEntitlementOf(meterAccountId, { plan: _signerPlan });
-      const _signIncluded = _signEnt.quotas.signs_month;
+      let _signIncluded = _signEnt.quotas.signs_month;
+      // The sender's plan lapsed while this request was open: his signers are
+      // held to the tier he had when he sent it, which the create route checked
+      // had room for every party. Never lower than what he has now.
+      if (billedToSender) {
+        let _tierAtCreate = '';
+        try { _tierAtCreate = await store.senderTier(id); } catch { _tierAtCreate = ''; }
+        if (_tierAtCreate) {
+          const _thenLimit = entitlements.signsQuota({ plan_parasign: _tierAtCreate });
+          if (Number.isFinite(_signIncluded) && (!Number.isFinite(_thenLimit) || _thenLimit > _signIncluded)) _signIncluded = _thenLimit;
+        }
+      }
       let _signUsed = null;      // count this month, feeds the 200 quota field
       let _signReserved = false; // this request took a slot and owes a release if the signature does not land
       // No `accountId &&` here on purpose: the account is resolved above and an
@@ -11265,8 +11321,16 @@ async function handleRelayRequest(req, res) {
       // Lua enforces the same comparison, and quota-gate.test.js holds the two to
       // each other at the boundary so the /v1 create gate cannot drift from this
       // one.
+      // One hold per party slot, so a retry after a failed store write is not
+      // charged a second time (quota.GATE_SIGN_LUA).
+      const _holdKey = `paramant:quota:signhold:${id}:${pi}`;
       if (Number.isFinite(_signIncluded)) {
-        const _g = await quota.gateSign(redisClient, meterAccountId, _signIncluded, log);
+        const _g = await quota.gateSign(redisClient, meterAccountId, _signIncluded, log, { holdKey: _holdKey });
+        if (_g.unavailable) {
+          res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' });
+          return res.end(J({ error: 'sign_quota_unavailable', message: 'Signatures cannot be counted right now. Nothing was signed; try again in a minute.',
+            message_nl: 'Handtekeningen kunnen nu niet geteld worden. Er is niets ondertekend; probeer het over een minuut opnieuw.' }));
+        }
         if (!_g.allowed) {
           log('info', 'quota_sign_declined', { account: String(meterAccountId).slice(0, 12), plan: _signEnt.tier, reason: 'quota', limit: _signIncluded, used: _g.used, billed_to: billedToSender ? 'sender' : 'signer' });
           res.writeHead(402, { 'Content-Type': 'application/json' });
@@ -11291,17 +11355,26 @@ async function handleRelayRequest(req, res) {
         if (Number.isFinite(_g.used)) _signUsed = _g.used;
       }
 
-      const out = await store.sign(id, pi, signerPub, sig, {
-        internalTrusted,
-        verifiedEmailHash,
-        inviteToken,
-        appearance: d.appearance,
-        ink: d.ink,
-      });
+      let out;
+      try {
+        out = await store.sign(id, pi, signerPub, sig, {
+          internalTrusted,
+          verifiedEmailHash,
+          inviteToken,
+          appearance: d.appearance,
+          ink: d.ink,
+        });
+      } catch (se) {
+        // The store write failed (a redis outage mid-request). Give the unit
+        // back if redis lets us; if it does not, the hold on this slot makes
+        // the retry free instead of a second charge.
+        if (_signReserved) await quota.releaseSign(redisClient, meterAccountId, log, { holdKey: _holdKey });
+        throw se;
+      }
       if (!out.ok) {
         // The slot was taken before the store had its say. The signature did not
         // land, so the month does not owe it.
-        if (_signReserved) await quota.releaseSign(redisClient, meterAccountId, log);
+        if (_signReserved) await quota.releaseSign(redisClient, meterAccountId, log, { holdKey: _holdKey });
         const code = out.code === 'not_found' ? 404
           : (out.code === 'bad_signature' || out.code === 'invalid_appearance' || out.code === 'invalid_ink') ? 400
           : (out.code === 'closed' || out.code === 'voided' || out.code === 'invite_expired') ? 410

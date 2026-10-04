@@ -161,13 +161,68 @@ test('SOLO: the owner signing his own envelope counts on his own month, as befor
   assert.strictEqual(r.status, 200, r.text);
   assert.deepStrictEqual({ used: r.json.quota.used, included: r.json.quota.included }, { used: 1, included: 2 }, 'solo signing must keep its own quota field');
   assert.strictEqual(await used(FREE_ACCT), 1);
-  // And the free cap still bites on his own envelopes.
+  // And the free cap still bites on his own envelopes: a request that needs a
+  // signature his month has no room for is refused when he makes it, not
+  // when somebody signs it (sweep-acct finding 7).
   await rc.set(signKey(FREE_ACCT), '2');
   const env2 = await createEnvelope(FREE, [{ label: 'Me' }]);
-  const r2 = await adminSign(env2, 0, signer, FREE);
-  assert.strictEqual(r2.status, 402);
-  assert.strictEqual(r2.json.error, 'monthly_sign_quota_reached', 'solo over the cap is the ordinary upgrade moment');
+  assert.strictEqual(env2.r.status, 402);
+  assert.strictEqual(env2.r.json.error, 'sign_quota_insufficient', 'over the cap is refused at create');
+  assert.strictEqual(env2.r.json.room, 0);
   await rc.del(signKey(FREE_ACCT));
+  did();
+});
+
+test('CREATE ROOM: a request needs room for every signature before it goes out', async () => {
+  if (!ready()) return;
+  await rc.del(signKey(FREE_ACCT));
+  const three = await createEnvelope(FREE, [{ label: 'A' }, { label: 'B' }, { label: 'C' }]);
+  assert.strictEqual(three.r.status, 402, three.r.text);
+  assert.strictEqual(three.r.json.error, 'sign_quota_insufficient');
+  assert.strictEqual(three.r.json.room, 2);
+  const two = await createEnvelope(FREE, [{ label: 'A' }, { label: 'B' }]);
+  assert.strictEqual(two.r.status, 200, two.r.text);
+  const one = await createEnvelope(FREE, [{ label: 'C' }]);
+  assert.strictEqual(one.r.status, 402, 'two signatures are still open on the first request');
+  assert.strictEqual(one.r.json.pending, 2);
+  did();
+});
+
+test('OPEN SIGNER: a signer without an account hears it is the sender\'s month, not his', async () => {
+  if (!ready()) return;
+  await rc.del(signKey(FIRM_ACCT));
+  const env = await createEnvelope(FIRM, [{ label: 'Client' }]);
+  assert.strictEqual(env.r.status, 200, env.r.text);
+  await rc.set(signKey(FIRM_ACCT), '100');
+  const kp = eng.generateKeyPair();
+  const signer = { pubB64: Buffer.from(kp.publicKey).toString('base64'), kp };
+  const r = await srv.post(`/v2/envelopes/${env.id}/sign`, {
+    headers: { 'X-Real-IP': nextIp() },
+    body: { party_index: 0, signer_public_key: signer.pubB64, signature: sigFor(signer, env.id, env.docHash, 0), token: env.tokens[0] },
+  });
+  assert.strictEqual(r.status, 402, r.text);
+  assert.strictEqual(r.json.error, 'sender_sign_quota_reached');
+  assert.ok(!('limit' in r.json) && !('plan' in r.json), 'the sender\'s numbers went to an anonymous signer');
+  await rc.del(signKey(FIRM_ACCT));
+  did();
+});
+
+test('LAPSE: a sender whose plan lapses after sending keeps his signers signing', async () => {
+  if (!ready()) return;
+  await rc.del(signKey(BIZ_ACCT));
+  const env = await createEnvelope(BIZ, [{ label: 'Client' }]);
+  assert.strictEqual(env.r.status, 200, env.r.text);
+  const down = await srv.post('/v2/admin/keys/set-product-plan', { headers: { 'X-Admin-Token': ADMIN, Authorization: `Bearer ${ADMIN}`, 'X-Internal-Auth': INTERNAL },
+    body: { key: BIZ, product: 'parasign', tier: 'free', downgrade: true } });
+  assert.ok(down.status < 300, `downgrade: ${down.status} ${down.text}`);
+  await rc.set(signKey(BIZ_ACCT), '5');   // over the free two, well under business
+  const signer = await enrolledSigner(FREE);
+  const r = await adminSign(env, 0, signer, FREE);
+  assert.strictEqual(r.status, 200, `held to the lapsed free tier: ${r.status} ${r.text}`);
+  await rc.del(signKey(BIZ_ACCT));
+  const back = await srv.post('/v2/admin/keys/set-product-plan', { headers: { 'X-Admin-Token': ADMIN, Authorization: `Bearer ${ADMIN}`, 'X-Internal-Auth': INTERNAL },
+    body: { key: BIZ, product: 'parasign', tier: 'business' } });
+  assert.ok(back.status < 300, `restore: ${back.status} ${back.text}`);
   did();
 });
 
