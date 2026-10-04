@@ -5298,14 +5298,14 @@ async function handleRelayRequest(req, res) {
       // that throw happens in writeHead on the pickup route -- after the token
       // is claimed. The recipient got a 500 and then already_collected on every
       // retry: a file destroyed by its own name.
-      const naamRuw = (veiligeBestandsnaam(input.filename)
-        // GEEN LINK. Regeleinden waren er al uit, maar honderdtwintig tekens
-        // vrije tekst met een URL erin is nog steeds een eigen regel in de mail
-        // van iemand die geen klant is, en elke mailclient maakt hem klikbaar.
-        // Gemeten met een bestandsnaam die "PARAMANT SUPPORT: uw account
-        // verloopt, bevestig hier: <link>" droeg: die kwam er zo uit, boven
-        // onze eigen link, dertig keer.
-        ) || (taal === 'en' ? 'a file' : 'een bestand');
+      // GEEN LINK. Regeleinden waren er al uit, maar honderdtwintig tekens
+      // vrije tekst met een URL erin is nog steeds een eigen regel in de mail
+      // van iemand die geen klant is, en elke mailclient maakt hem klikbaar.
+      // Gemeten met een bestandsnaam die "PARAMANT SUPPORT: uw account
+      // verloopt, bevestig hier: <link>" droeg: die kwam er zo uit, boven
+      // onze eigen link, dertig keer. De opschoning staat in
+      // veiligeBestandsnaam, gedeeld met de codemail (hertest T4-10).
+      const naamRuw = (String(veiligeBestandsnaam(input.filename))) || (taal === 'en' ? 'a file' : 'een bestand');
       const naam = escHtml(naamRuw);
       // The human above the mail. Thirty people who are not our customers get
       // this, and a message with no sender in it reads as phishing no matter
