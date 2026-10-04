@@ -134,3 +134,42 @@ test('server.js remembers the sender on create and tells them after a submit, wi
   assert.match(submit[0], /\n    signNotify\.afterSignature\(\{[\s\S]*?signerAccountId: user_id, relayBody: body/);
   assert.doesNotMatch(submit[0], /await signNotify\.afterSignature/, 'the signer\'s 200 must not wait on a mail provider');
 });
+
+// Since 2026-10-04: "Iedereen heeft getekend" opens the finished document.
+// The link carries an opaque reference, still never the envelope id, and
+// only the sending account's session turns it back into the envelope.
+test('completion links to the result through a reference only the sender can resolve', async (t) => {
+  if (!rc) return t.skip('redis declared absent');
+  const id = envId('res');
+  await signNotify.rememberSender(rc, id, SENDER);
+  const mail = capture();
+  const out = await signNotify.afterSignature({
+    client: rc, envelopeId: id, signerAccountId: COSIGNER,
+    relayBody: { signed_count: 2, party_count: 2, status: 'complete' },
+    sendEmail: mail.sendEmail, template: emailTemplates.signatureReceivedEmail, baseUrl: 'https://paramant.app',
+  });
+  assert.equal(out, 'sent');
+  const msg = mail.sent[0].msg;
+  const m = msg.text.match(/https:\/\/paramant\.app\/co-sign\?result=([A-Za-z0-9_-]{43})/);
+  assert.ok(m, 'the button opens the result page');
+  for (const part of [msg.subject, msg.text, msg.html]) assert.ok(!part.includes(id), 'still no envelope id in the mail');
+  assert.equal(await signNotify.resolveResult(rc, m[1], SENDER.user_id), id, 'the sender resolves it');
+  assert.equal(await signNotify.resolveResult(rc, m[1], COSIGNER), null, 'another account does not');
+  assert.equal(await signNotify.resolveResult(rc, 'x'.repeat(43), SENDER.user_id), null, 'an unknown reference does not');
+  const ttl = await rc.ttl(signNotify.RESULT_PREFIX + m[1]);
+  assert.ok(ttl > 29 * 86400 && ttl <= 30 * 86400, 'it lives as long as the envelope record');
+  await rc.del(signNotify.RESULT_PREFIX + m[1]);
+});
+
+test('a refusal mails the sender once, without names or the envelope id, and forgets', async (t) => {
+  if (!rc) return t.skip('redis declared absent');
+  const id = envId('dec');
+  await signNotify.rememberSender(rc, id, SENDER);
+  const mail = capture();
+  assert.equal(await signNotify.afterDecline({ client: rc, envelopeId: id, sendEmail: mail.sendEmail, template: emailTemplates.signatureDeclinedEmail }), 'sent');
+  assert.equal(mail.sent[0].to, SENDER.email.toLowerCase());
+  assert.match(mail.sent[0].msg.subject, /^Verzoek geweigerd \/ Request declined$/);
+  for (const part of [mail.sent[0].msg.text, mail.sent[0].msg.html]) assert.ok(!part.includes(id));
+  assert.equal(await rc.get(signNotify.KEY_PREFIX + id), null, 'the record is gone');
+  assert.equal(await signNotify.afterDecline({ client: rc, envelopeId: id, sendEmail: mail.sendEmail, template: emailTemplates.signatureDeclinedEmail }), 'skipped', 'and a second refusal mails nobody');
+});
