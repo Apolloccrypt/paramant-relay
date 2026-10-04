@@ -2217,8 +2217,37 @@ const MAX_ENVELOPE_PARTIES = 30;
 // POST /api/user/envelopes/:id/document (authUser) -- forward an opaque,
 // browser-encrypted document capsule to the envelope's relay. application/octet-
 // stream deliberately bypasses the global JSON parser and gets a narrow limit.
-api.post("/user/envelopes/:id/document", authUser,
-  express.raw({ type: "application/octet-stream", limit: "6mb" }), async (req, res) => {
+// THE DOCUMENT IS PART OF THE REQUEST. The page makes the envelope first and
+// uploads the document after, so a document that was refused (over the 5 MB
+// capsule limit, sweep-pdf B4) left a request with its parties and no document
+// at all, while the sender read "could not be created, try again" and the
+// retry could never work. A refused upload now withdraws that envelope, and
+// every size refusal is one code, document_too_large, with the limit beside it.
+const DOC_CAPSULE_MAX = parseInt(process.env.MAX_BLOB || '5242880', 10);
+async function withdrawEmptyEnvelope(req, id, why) {
+  try {
+    await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": proxyApiKey(req.userSession) },
+      body: "{}", signal: AbortSignal.timeout(10000),
+    });
+    console.warn(`[user/envelopes document POST] withdrew ${id.slice(0, 10)}... after ${why}`);
+  } catch (e) { console.error("[user/envelopes document POST] withdraw failed:", e.message); }
+}
+const _docRaw = express.raw({ type: "application/octet-stream", limit: DOC_CAPSULE_MAX + 8192 });
+function docBody(req, res, next) {
+  _docRaw(req, res, async (err) => {
+    if (!err) return next();
+    const id = (req.params.id || "").toString();
+    if (err.type === 'entity.too.large') {
+      if (/^[A-Za-z0-9_-]{20,64}$/.test(id)) await withdrawEmptyEnvelope(req, id, 'document_too_large');
+      return res.status(413).json({ error: "document_too_large", max_bytes: DOC_CAPSULE_MAX, max_mb: Math.floor(DOC_CAPSULE_MAX / 1048576), envelope_withdrawn: true });
+    }
+    return next(err);
+  });
+}
+
+api.post("/user/envelopes/:id/document", authUser, docBody, async (req, res) => {
     const id = (req.params.id || "").toString();
     if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return res.status(400).json({ error: "invalid_envelope_id" });
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: "document_capsule_required" });
@@ -2239,7 +2268,14 @@ api.post("/user/envelopes/:id/document", authUser,
         signal: AbortSignal.timeout(30000),
       });
       const body = await rr.json().catch(() => ({}));
-      if (!rr.ok) return res.status(rr.status).json({ error: body.error || "document_upload_failed", max_bytes: body.max_bytes });
+      if (!rr.ok) {
+        // A refusal that a retry cannot fix withdraws the empty request; a
+        // transient one (429, 5xx) leaves it for the retry.
+        const final = rr.status === 413 || rr.status === 400;
+        if (final) await withdrawEmptyEnvelope(req, id, body.error || `http_${rr.status}`);
+        return res.status(rr.status).json({ error: rr.status === 413 ? "document_too_large" : (body.error || "document_upload_failed"),
+          max_bytes: body.max_bytes || (rr.status === 413 ? DOC_CAPSULE_MAX : undefined), ...(final ? { envelope_withdrawn: true } : {}) });
+      }
       return res.json(body);
     } catch (e) {
       console.error("[user/envelopes document POST]", e.message);
@@ -2260,6 +2296,14 @@ api.get("/user/envelopes/:id/document", authUser, async (req, res) => {
   const emailHash = partyEmailHashAdmin(req.userSession.email);
   try {
     const partyView = await callRelay(`/v2/envelopes/${encodeURIComponent(id)}?p=${partyIndex}&t=${encodeURIComponent(token)}`, null, "GET");
+    // A relay 429 is "too many requests, try again", not "this document does
+    // not exist". It was turned into 404 and the signer read that the document
+    // was unavailable while it was there all along (sweep-pdf).
+    if (partyView.status === 429) {
+      const ra = partyView.headers.get('retry-after') || '60';
+      res.setHeader('Retry-After', ra);
+      return res.status(429).json({ error: "rate_limited", retry_after_s: Number(ra) || 60 });
+    }
     if (!partyView.ok) return res.status(partyView.status === 410 ? 410 : 404).json({ error: "invitation_not_found" });
     const env = (await partyView.json()).envelope;
     if (!env?.party || !emailHash || env.party.email_hash !== emailHash) return res.status(403).json({ error: "recipient_mismatch" });
@@ -2270,6 +2314,7 @@ api.get("/user/envelopes/:id/document", authUser, async (req, res) => {
     });
     if (!rr.ok) {
       const body = await rr.json().catch(() => ({}));
+      if (rr.status === 429) res.setHeader('Retry-After', rr.headers.get('retry-after') || '60');
       return res.status(rr.status).json({ error: body.error || "document_download_failed" });
     }
     res.setHeader("Content-Type", "application/octet-stream");
@@ -3617,7 +3662,10 @@ api.post("/user/parasign/inbox/:id/resend", authUser, async (req, res) => {
   }
   // The address is echoed so the page can say where it went, and it is the
   // reader's own: it came out of their session, not out of the envelope.
-  return res.json({ ok: true, sent_to: email });
+  // sender_notified: the resent link opens the request, not the document (the
+  // key half is not on any server); the sender has been asked for the full
+  // link (COSIGN-46). The page can say so.
+  return res.json({ ok: true, sent_to: email, opens_document: false, sender_notified: !!invite.sender_notified });
 });
 
 // ── Account-bound signing identity (proxies to relay /v2/user/signing-key) ──

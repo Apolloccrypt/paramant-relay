@@ -156,6 +156,9 @@ test('resend hands the stored invite token to the trusted admin, and mints nothi
   assert.strictEqual(r.json.sender, SENDER_EMAIL, 'and names the sender for the mail');
   assert.strictEqual(await rc.hGet('env:' + env0.id, 'p0_invite_token'), stored,
     'the stored token is unchanged: a resend mints no new capability');
+  // COSIGN-46: the resent link cannot open the document (its key half is on no
+  // server), so the sender is asked for the full link.
+  assert.strictEqual(r.json.sender_notified, true, 'the sender is told a signer asked for the link again');
   did();
 });
 

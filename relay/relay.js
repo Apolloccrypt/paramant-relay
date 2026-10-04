@@ -2268,6 +2268,38 @@ async function notifySenderQuota(envelopeId, accountId) {
   return !!(r && r.ok);
 }
 
+// A signer asked for the invitation again. The resent mail can only open the
+// request (no document key half reaches a server); the full link is the
+// sender's. Tell the sender, at most once an hour per envelope.
+async function notifySenderLinkRequested(envelopeId, accountId, partyLabel) {
+  const to = senderLabelOf(accountId);
+  if (!to || !redisClient || !redisClient.isReady) return false;
+  const k = 'paramant:sign:link-request:' + crypto.createHash('sha256').update(String(envelopeId)).digest('hex').slice(0, 32);
+  const first = await redisClient.set(k, '1', { NX: true, EX: 3600 });
+  if (first !== 'OK') return true; // told already within the hour
+  const who = veiligeBestandsnaam(partyLabel || '') || 'Een ondertekenaar';
+  const whoEn = veiligeBestandsnaam(partyLabel || '') || 'A signer';
+  const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
+  const r = await mailer.stuur({
+    to,
+    subject: 'Een ondertekenaar vraagt de link opnieuw',
+    text: tweetaligTekst('nl',
+      `${who} vroeg de uitnodiging om te ondertekenen opnieuw aan. De opnieuw verstuurde link opent alleen het verzoek, niet het document: de sleutel die het document opent zit alleen in de volledige link die u bij het versturen kreeg, en die bewaren wij niet.`
+      + '\n\nStuur de ondertekenaar de volledige link opnieuw, uit uw dashboard of uit uw eigen verzonden bericht.'
+      + '\n\n' + base + '/dashboard',
+      `${whoEn} asked for the signing invitation again. The resent link opens the request, not the document: the key that opens the document is only in the full link you got when you sent it, and we do not keep it.`
+      + '\n\nSend the signer the full link again, from your dashboard or from your own sent message.'),
+    html: tweetaligHtml('nl',
+      `<p>${escHtml(who)} vroeg de uitnodiging om te ondertekenen opnieuw aan. De opnieuw verstuurde link opent alleen het verzoek, niet het document: de sleutel die het document opent zit alleen in de volledige link die u bij het versturen kreeg, en die bewaren wij niet.</p>`
+      + '<p>Stuur de ondertekenaar de volledige link opnieuw, uit uw dashboard of uit uw eigen verzonden bericht.</p>'
+      + '<p><a href="' + base + '/dashboard">Naar uw dashboard</a></p>',
+      `<p>${escHtml(whoEn)} asked for the signing invitation again. The resent link opens the request, not the document: the key that opens the document is only in the full link you got when you sent it, and we do not keep it.</p>`
+      + '<p>Send the signer the full link again, from your dashboard or from your own sent message.</p>'),
+  });
+  log('info', 'sender_link_request_notice', { delivered: !!(r && r.ok) });
+  return !!(r && r.ok);
+}
+
 function senderLabelOf(accountId) {
   if (!accountId) return '';
   const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
@@ -5991,9 +6023,15 @@ async function handleRelayRequest(req, res) {
       // on you any more". A caller who is not the party learns nothing, not even
       // that the id exists.
       if (!invite) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+      // The resent link opens the REQUEST, never the document: the key half
+      // that opens it lives only in the link the sender's browser built and
+      // must not reach a server that also holds the other half (COSIGN-46).
+      // The safe way back is the sender, so the sender is told, once an hour.
+      const senderNotified = await notifySenderLinkRequested(parasignResendMatch[1], invite.sender_account_id, invite.party_label).catch(() => false);
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' });
       return res.end(J({
         ok: true,
+        sender_notified: !!senderNotified,
         party_index: invite.party_index,
         party_label: invite.party_label,
         invite_token: invite.invite_token,

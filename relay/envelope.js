@@ -739,6 +739,34 @@ class EnvelopeStore {
   // handler has confirmed the caller owns (creator_api_hash) or participates in
   // (valid invite token) this envelope. getRedacted stays the public, redacted
   // view and is intentionally left untouched.
+  // The events of one envelope, for the account's audit export: when it was
+  // made, viewed, signed, declined, withdrawn, completed. Hashes and times
+  // only, never the document. Separate from getForReceipt on purpose, so the
+  // .psign recipe and its bytes are untouched.
+  async auditTimeline(id) {
+    if (!this.available()) throw new Error('redis unavailable');
+    const h = await this.redis.hGetAll('env:' + id);
+    if (!h || !h.doc_hash) return null;
+    const n = parseInt(h.party_count, 10) || 0;
+    const parties = [];
+    for (let i = 0; i < n; i++) {
+      parties.push({
+        index: i,
+        label: h['p' + i + '_label'] || null,
+        viewed_at: h['p' + i + '_viewed_at'] || null,
+        signed_at: h['p' + i + '_signed_at'] || null,
+        declined_at: h['p' + i + '_declined_at'] || null,
+      });
+    }
+    return {
+      id, doc_hash: h.doc_hash, status: h.status || 'open',
+      created_at: h.created_at || null, completed_at: h.completed_at || null,
+      voided_at: h.voided_at || null,
+      void_reason: h.status === 'void' ? (h.void_reason === 'declined' ? 'declined' : 'cancelled') : null,
+      parties,
+    };
+  }
+
   async getForReceipt(id) {
     if (!this.available()) throw new Error('redis unavailable');
     const key = 'env:' + id;
