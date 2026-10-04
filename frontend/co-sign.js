@@ -21,6 +21,7 @@ import { sha3_256 } from '/vendor/paramant-pqc.js';
 import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=18';
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { decryptDocumentCapsule, parseDocumentKeyFragment } from '/js/parasign-document-capsule.js?v=2';
+import { pickSharedSpot, textBoxesFromItems } from '/js/paraaf-place.js?v=1';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
 
@@ -88,6 +89,14 @@ let __appearance = { version: 1, fields: [] };
 // moment the signer places, moves or clears anything.
 let __appearanceIsSeed = false;
 let __signedPdfBytes = null;
+// The pdf.js document of the preview, kept so "repeat on every page" can read
+// the text layer and put the paraaf in a margin corner that is free.
+let __previewPdf = null;
+// The seal as it was before "repeat on every page" moved it to the margin, so
+// unticking puts it back where the signer had it.
+let __sealBeforeAllPages = null;
+// A repeated seal is a paraaf: small, in the margin. Page fractions.
+const PARAAF_FR = { w: 0.2, h: 0.05 };
 
 function appearanceDraftKey() {
   return __envelope ? 'paramant.cosign.appearance.v1:' + __envelope.id + ':' + __partyIndex : '';
@@ -221,30 +230,43 @@ function renderEnvelope() {
     setAppearanceHelp(L('Uw zichtbare velden zijn gewist. U kunt ze opnieuw plaatsen of tekenen zonder zichtbare stempel.', 'Your visible fields were cleared. You can place them again or sign without a visible mark.'), false);
     renderAppearanceOverlays();
   };
-  // Ticking the box after the seal is already placed has to move that seal, not
-  // ask the signer to place it again. A repeated seal anchors on page 0.
+  // Ticking the box makes the seal a paraaf: small, in a margin corner that is
+  // free of text on the most pages, at once, without a second click. The
+  // manifest is unchanged in kind: one seal field with all_pages, the same
+  // normalised spot on every page. Only the default spot and size changed: the
+  // signer's spot on one page used to be repeated over the text of the others.
   const allPages = $('appearance-allpages');
-  if (allPages) allPages.onchange = () => {
+  if (allPages) allPages.onchange = async () => {
     const on = !!allPages.checked;
-    const fields = (__appearance.fields || []).map((item) => {
-      if (item.type !== 'seal') return item;
-      const next = { ...item };
-      if (on) { next.all_pages = true; next.page_index = 0; }
-      else delete next.all_pages;
-      return next;
-    });
-    if (!fields.some((item) => item.type === 'seal')) {
+    if (!__documentBytes || !isPdfBytes(__documentBytes) || !__hashMatches) {
       setAppearanceHelp(on
-        ? L('Kies Plaats mijn handtekening en klik op de plek. Hij komt dan op elke pagina.', 'Choose Place my signature and click a spot. It will appear on every page.')
+        ? L('Open eerst het document. Daarna komt er een kleine paraaf in de marge van elke pagina.', 'Open the document first. Then small initials go in the margin of every page.')
         : L('Kies Plaats mijn handtekening en klik op de plek.', 'Choose Place my signature and click a spot.'), true);
       return;
     }
-    __appearance = normaliseSigningAppearance({ version: on ? 2 : 1, fields });
+    const current = (__appearanceIsSeed ? [] : (__appearance.fields || []));
+    let fields;
+    if (on) {
+      const prior = current.find((item) => item.type === 'seal');
+      __sealBeforeAllPages = prior && !prior.all_pages ? { ...prior } : null;
+      const spot = await sharedParaafSpot();
+      if (!allPages.checked) return;   // unticked while the text layer was read
+      const seal = { type: 'seal', page_index: 0, x: spot.x, y: spot.y, w: spot.w, h: spot.h, all_pages: true };
+      fields = current.filter((item) => item.type !== 'seal').concat(seal);
+    } else {
+      fields = current.filter((item) => item.type !== 'seal' || !item.all_pages);
+      if (__sealBeforeAllPages) fields = fields.concat(__sealBeforeAllPages);
+      __sealBeforeAllPages = null;
+    }
+    __appearance = normaliseSigningAppearance({ version: fields.some((item) => item.all_pages) ? 2 : 1, fields });
     __appearanceIsSeed = false;
+    { const note = $('requested-note'); if (note) note.hidden = true; }
     saveAppearanceDraft();
     setAppearanceHelp(on
-      ? L('Uw handtekening staat nu op elke pagina, op dezelfde plek.', 'Your signature now appears on every page, in the same spot.')
-      : L('Uw handtekening staat alleen op deze pagina.', 'Your signature appears on this page only.'), false);
+      ? L('Op elke pagina staat nu een kleine paraaf in de marge, op een plek zonder tekst. Kies Plaats mijn handtekening om hem te verplaatsen.', 'Every page now has small initials in the margin, on a spot without text. Choose Place my signature to move them.')
+      : (fields.some((item) => item.type === 'seal')
+        ? L('Uw handtekening staat alleen op deze pagina.', 'Your signature appears on this page only.')
+        : L('Kies Plaats mijn handtekening en klik op de plek.', 'Choose Place my signature and click a spot.')), false);
     renderAppearanceOverlays();
   };
 }
@@ -476,10 +498,30 @@ async function renderDocPreview(bytes) {
   }
 }
 
+// The margin corner for a repeated seal, read from the text layer of the
+// previewed pages. One spot for all pages (the manifest has one), so the corner
+// free on the most pages wins; no readable text means bottom right.
+async function sharedParaafSpot() {
+  const pages = [], boxes = [];
+  try {
+    const pdf = __previewPdf;
+    const n = pdf ? Math.min(pdf.numPages, MAX_PREVIEW_PAGES) : 0;
+    for (let i = 1; i <= n; i++) {
+      const page = await pdf.getPage(i);
+      const vp = page.getViewport({ scale: 1 });
+      pages.push({ width: vp.width, height: vp.height });
+      try { boxes.push(textBoxesFromItems((await page.getTextContent()).items)); }
+      catch { boxes.push(null); }
+    }
+  } catch { /* fall through: bottom right */ }
+  return pickSharedSpot(pages, pages.length ? boxes : null, PARAAF_FR.w, PARAAF_FR.h);
+}
+
 async function renderPdfPreview(bytes, host) {
   const pdfjs = await waitForPdfjs();
   const copy = new Uint8Array(bytes);   // pdf.js detaches the buffer it is handed
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
+  __previewPdf = pdf;
   host.innerHTML = '';
   const maxPages = Math.min(pdf.numPages, MAX_PREVIEW_PAGES);
   // Supersample at devicePixelRatio (capped at 3) so the recipient's preview is
@@ -570,12 +612,13 @@ function placeAppearanceField(event) {
   const page = event.currentTarget;
   const rect = page.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
-  const size = __appearanceTool === 'seal' ? { w: 0.36, h: 0.105 } : { w: 0.22, h: 0.055 };
-  const px = (event.clientX - rect.left) / rect.width;
-  const py = (event.clientY - rect.top) / rect.height;
   // A repeated seal anchors on page 0: its coordinates are normalised, so the
   // click decides WHERE on a page, and the flag decides that it is every page.
+  // Repeated, it is a paraaf, so it keeps the small size.
   const repeat = __appearanceTool === 'seal' && !!($('appearance-allpages') || {}).checked;
+  const size = __appearanceTool === 'seal' ? (repeat ? PARAAF_FR : { w: 0.36, h: 0.105 }) : { w: 0.22, h: 0.055 };
+  const px = (event.clientX - rect.left) / rect.width;
+  const py = (event.clientY - rect.top) / rect.height;
   const field = {
     type: __appearanceTool,
     page_index: repeat ? 0 : Number(page.dataset.pageIndex),
@@ -613,7 +656,8 @@ function appearanceText(type, party, current) {
 
 function addAppearanceNode(layer, field, party, current, requested) {
   const node = document.createElement('div');
-  node.className = 'appearance-field ' + field.type + (requested ? ' requested' : current ? '' : ' prior');
+  node.className = 'appearance-field ' + field.type + (requested ? ' requested' : current ? '' : ' prior')
+    + (field.type === 'seal' && field.h <= 0.06 ? ' compact' : '');
   node.style.left = (field.x * 100) + '%';
   node.style.top = (field.y * 100) + '%';
   node.style.width = (field.w * 100) + '%';
