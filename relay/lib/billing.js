@@ -110,7 +110,10 @@ function keepLonger(candidate, currentPaidUntil) {
 //   currentPaidUntil(accountId, product) -> date | null      (async; optional,
 //                                  the one-date-per-product fallback)
 //   isProcessed(paymentId) -> boolean                        (async; optional)
-//   markProcessed(paymentId, value) -> void                  (async; optional)
+//   markProcessed(paymentId, value, { grants }) -> void      (async; optional)
+//   periodOf(paymentId) -> [{ product, tier, from, until }]  (async; optional,
+//                                  what a payment bought; a revoke takes back
+//                                  only that)
 // }
 // Returns { result, level, account, product, tier, reason }, and on a grant
 // also grants and paidUntil.
@@ -157,9 +160,31 @@ async function processPayment(payment, deps) {
     // EVERY product the order bought goes back to its floor. A bundle that
     // granted two entitlements and revoked one would leave the customer holding
     // half a plan he has taken the money back for.
+    //
+    // UNLESS WE KNOW WHAT THIS PAYMENT BOUGHT. A chargeback on month 2 used to
+    // floor the product and clear paid_until, so the paid month 1 went with it
+    // while its invoice stood without a credit note. When the ledger has the
+    // period this payment bought (deps.periodOf), only that period comes off
+    // the end of the same tier's term; what is left is what was paid for by
+    // other payments. Without it (payments settled before the ledger existed)
+    // the old rule stands: floor.
     const revoked = [];
+    let periods = null;
+    if (typeof d.periodOf === 'function') { try { periods = await d.periodOf(payment.id); } catch { periods = null; } }
+    const nowR = d.now instanceof Date ? d.now : new Date();
     for (const g of order.grants) {
       const floor = catalog.floorTier(g.product);
+      const per = Array.isArray(periods) ? periods.find((p) => p && p.product === g.product && p.tier === g.tier) : null;
+      let cur = null;
+      if (per && typeof d.currentTermEnd === 'function') { try { cur = await d.currentTermEnd(accountId, g.product, g.tier); } catch { cur = null; } }
+      const span = per ? (new Date(per.until).getTime() - new Date(per.from).getTime()) : NaN;
+      const curMs = cur ? new Date(cur).getTime() : NaN;
+      if (per && Number.isFinite(span) && span > 0 && Number.isFinite(curMs)) {
+        const left = new Date(Math.max(curMs - span, nowR.getTime()));
+        try { await d.setProductPlan(accountId, g.product, g.tier, left, order.bundle || null, { shorten: true }); } catch { /* logged by caller */ }
+        revoked.push({ product: g.product, tier: left.getTime() > nowR.getTime() ? g.tier : floor, paidUntil: left.toISOString(), partial: true });
+        continue;
+      }
       // null clears the period along with the tier: money reclaimed leaves no
       // paid time on record.
       try { await d.setProductPlan(accountId, g.product, floor, null, null); } catch { /* logged by caller via reason */ }
@@ -254,7 +279,11 @@ async function processPayment(payment, deps) {
       }
       granted.push({ product: g.product, tier: g.tier, paidUntil: until.toISOString() });
     }
-    if (typeof d.markProcessed === 'function') { try { await d.markProcessed(payment.id, 'granted'); } catch { /* best effort */ } }
+    // The period this payment bought, per product, so a later chargeback can
+    // take back exactly this and nothing paid before it.
+    const anchor = bundleExtendFrom(currents, now);
+    const bought = order.grants.map((g) => ({ product: g.product, tier: g.tier, from: anchor.toISOString(), until: paidUntil.toISOString() }));
+    if (typeof d.markProcessed === 'function') { try { await d.markProcessed(payment.id, 'granted', { grants: bought }); } catch { /* best effort */ } }
     return {
       result: 'granted', level: 'info', account: accountId, product, tier: order.tier,
       bundle: order.bundle || null,

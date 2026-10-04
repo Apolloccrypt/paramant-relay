@@ -3122,6 +3122,12 @@ function grantParasignOnPaidPlan(accountId) {
   return { ok: true, keys: members.size, changed };
 }
 
+// ── Billing ledger: every settled Mollie payment id, durable ──────────────
+const { BillingLedger } = require('./lib/billing-ledger');
+const BILLING_LEDGER_FILE = process.env.BILLING_LEDGER_FILE
+  || nodePath.join(nodePath.dirname(nodePath.resolve(USERS_FILE)), 'billing-processed.jsonl');
+const billingLedger = new BillingLedger(BILLING_LEDGER_FILE, log).load();
+
 // ── Per-product entitlement setter (billing) ──────────────────────────────
 // Set ONE product's plan (plan_parasign OR plan_parasend) for an account,
 // independently of the other product, then persist. This is what the Mollie
@@ -3162,13 +3168,17 @@ function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
       };
     }
   }
+  // shorten: a reversal taking back one paid period (lib/billing revoke).
+  // It must also travel to the other containers, whose merge only ever keeps
+  // the longer term, so the shared row is published as a replacement.
+  const _applyOpts = (opts && opts.shorten) ? { shorten: true } : undefined;
   let changed = 0;
   for (const m of members) {
     const mv = apiKeys.get(m);
     if (!mv) continue;
     // Single field-level rule (writes only this product's field + the parasign
     // access flag; never the other product or the unified `plan`).
-    if (entitlements.applyProductTier(mv, product, norm, paidUntil, bundle).changed) changed++;
+    if (entitlements.applyProductTier(mv, product, norm, paidUntil, bundle, _applyOpts).changed) changed++;
   }
   // Mirror onto the accounts summary too. Readers that only hold an account_id
   // (the ParaSign web sign gate among them) resolve through entitlementRecordOf,
@@ -3176,7 +3186,7 @@ function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
   // outvote a paid grant on any future read path either.
   const _acct = accounts.get(accountId);
   if (_acct) {
-    entitlements.applyProductTier(_acct, product, norm, paidUntil, bundle);
+    entitlements.applyProductTier(_acct, product, norm, paidUntil, bundle, _applyOpts);
     _acct.plan_updated = new Date().toISOString();
   }
   // paidUntil is passed on to the DISK write as well. Without it the period
@@ -3187,7 +3197,7 @@ function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
   _mutateUsersJson(ud => {
     for (const entry of ud.api_keys) {
       if ((entry.account_id || entry.key) === accountId) {
-        entitlements.applyProductTier(entry, product, norm, paidUntil, bundle);
+        entitlements.applyProductTier(entry, product, norm, paidUntil, bundle, _applyOpts);
         entry.plan_updated = new Date().toISOString();
       }
     }
@@ -3206,7 +3216,7 @@ function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
   // which is where both customer grant paths land -- the Mollie webhook and
   // POST /v2/billing/redeem -- while every screen and the ParaSign signature
   // gate are served off relay-health by the admin plane. See lib/shared-grants.
-  _publishSharedGrant(accountId);
+  _publishSharedGrant(accountId, _applyOpts ? { replace: true } : undefined);
   return { ok: true, product, tier: norm, keys: members.size, changed };
 }
 
@@ -3216,11 +3226,17 @@ function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
 // as _indexAccountExpiry does, so a grant that left one product alone publishes
 // what is really on file for both. Fire-and-forget: a redis outage may delay the
 // other containers, never the grant itself.
-function _publishSharedGrant(accountId) {
+function _publishSharedGrant(accountId, popts) {
   if (!redisClient || !redisClient.isReady || !accountId) return;
   const rec = entitlementRecordOf(accountId);
   if (!rec) return;
-  Promise.resolve(sharedGrants.publish(redisClient, accountId, rec))
+  Promise.resolve(sharedGrants.publish(redisClient, accountId, rec, popts))
+    .then((r) => {
+      // Remember the replacement we wrote ourselves, so our own subscriber
+      // does not apply it a second time.
+      if (r && r.ok && r.replacedAt) _markGrantReplaced(accountId, r.replacedAt);
+      return r;
+    })
     .then((r) => {
       if (!r || r.ok) return;
       log('warn', 'shared_grant_publish_failed', { account: String(accountId).slice(0, 12), err: r.error });
@@ -3244,14 +3260,45 @@ function _publishSharedGrant(accountId) {
 // this account has no paid term at all. That is the ONE downgrade this path
 // applies, and it exists because the container that took the money back is not
 // the container the customer's screens are served from.
-function _hydrateSharedGrant(accountId, grant, revoked) {
+// The newest shared-row replacement this container has applied, per account.
+// In memory and on the key records (grant_replaced_at), so a restart does not
+// re-apply an old replacement over a newer grant.
+function _grantReplacedAt(accountId) {
+  const rec = entitlementRecordOf(accountId);
+  return (rec && rec.grant_replaced_at) || '';
+}
+function _markGrantReplaced(accountId, at) {
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  for (const m of members) { const mv = apiKeys.get(m); if (mv) mv.grant_replaced_at = at; }
+  const acct = accounts.get(accountId);
+  if (acct) acct.grant_replaced_at = at;
+  _mutateUsersJson(ud => {
+    for (const entry of ud.api_keys) if ((entry.account_id || entry.key) === accountId) entry.grant_replaced_at = at;
+  }).catch(we => log('warn', 'shared_grant_persist_failed', { err: we.message }));
+}
+
+function _hydrateSharedGrant(accountId, grant, revoked, replacedAt) {
   if (!accountId || (!grant && !revoked)) return [];
   const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
   if (members.size === 0) return [];
   // Decide once, against the account's best current grant, so five member keys
   // do not each answer the question differently.
   const merged = { ...(entitlementRecordOf(accountId) || {}) };
-  const moved = grant ? sharedGrants.applyTo(merged, grant) : sharedGrants.applyRevocation(merged);
+  let moved;
+  if (grant && replacedAt && replacedAt > _grantReplacedAt(accountId)) {
+    // A replacement (a reversal that shortened a term): the row is the fact,
+    // copied as it is. A merge would keep this container's longer term, which
+    // is the month the customer took his money back for.
+    moved = [];
+    for (const product of entitlements.PRODUCTS) {
+      const before = JSON.stringify(entitlements.termsOf(merged, product));
+      entitlements.copyProductGrant(merged, grant, product);
+      if (JSON.stringify(entitlements.termsOf(merged, product)) !== before) moved.push(product);
+    }
+    _markGrantReplaced(accountId, replacedAt);
+  } else {
+    moved = grant ? sharedGrants.applyTo(merged, grant) : sharedGrants.applyRevocation(merged);
+  }
   if (moved.length === 0) return [];
   for (const product of moved) {
     // The decision was taken on `merged`; every store gets exactly that, every
@@ -3286,7 +3333,7 @@ async function _pullSharedGrant(accountId) {
   if (!redisClient || !redisClient.isReady || !accountId) return [];
   const row = await sharedGrants.readRow(redisClient, accountId);
   if (!row) return [];
-  return _hydrateSharedGrant(accountId, row.grant, !!row.revokedAt);
+  return _hydrateSharedGrant(accountId, row.grant, !!row.revokedAt, row.replacedAt);
 }
 
 // One reconciliation pass, both directions, over the accounts that have a term.
@@ -3333,7 +3380,7 @@ async function _reseedSharedGrants() {
   // longer be handing out.
   let hydrated = 0;
   for (const [accountId, row] of shared) {
-    if (_hydrateSharedGrant(accountId, row.grant, !!row.revokedAt).length) hydrated++;
+    if (_hydrateSharedGrant(accountId, row.grant, !!row.revokedAt, row.replacedAt).length) hydrated++;
   }
   return hydrated;
 }
@@ -9676,6 +9723,11 @@ async function handleRelayRequest(req, res) {
       // the account record carries the payment id that bought its current
       // period, and that answer survives anything redis does.
       isProcessed: async (id) => {
+        // The ledger first: it holds EVERY payment id ever settled, on disk,
+        // and it is what stops a replay of an old tr_ after the redis marker
+        // is gone and paid_by_<product> has moved on to a newer payment.
+        const led = billingLedger.status(id);
+        if (led) return led;
         if (_rok()) {
           try { const v = await redisClient.get(_idemKey(id)); if (v) return v; } catch { /* fall through to disk */ }
         }
@@ -9684,8 +9736,12 @@ async function handleRelayRequest(req, res) {
         for (const p of entitlements.PRODUCTS) if (rec[_paidByField(p)] === id) return 'granted';
         return false;
       },
-      markProcessed: async (id, val) => {
+      periodOf: async (id) => { const r = billingLedger.get(id); return r && Array.isArray(r.grants) ? r.grants : null; },
+      markProcessed: async (id, val, extra) => {
         const md = payment.metadata || {};
+        // Durable, awaited, and first. A failure here is logged at error level
+        // by the ledger; the redis marker and paid_by below still apply.
+        try { await billingLedger.record(id, String(val), extra); } catch { /* logged in the ledger */ }
         // Persist first: this is the half that has to outlive a restart.
         // Every product this payment granted, so a Firm payment is remembered on
         // both halves. Reading only md.product would leave the parasend side
@@ -9700,7 +9756,9 @@ async function handleRelayRequest(req, res) {
           }
         }
         if (!_rok()) return;
-        try { await redisClient.set(_idemKey(id), String(val), { EX: 60 * 86400 }); } catch { /* best effort */ }
+        // No TTL any more: the 60-day expiry is what made an old payment
+        // grantable again. The ledger is the record; this is the fast path.
+        try { await redisClient.set(_idemKey(id), String(val)); } catch { /* best effort */ }
       },
     });
     // The collecting half. A grant only says what this payment bought; without

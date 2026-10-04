@@ -276,6 +276,10 @@ function parseAccountFields(rawKey) {
     const f = `paid_by_${product}`;
     if (rawKey[f] != null && rawKey[f] !== '') out[f] = rawKey[f];
   }
+  // The newest shared-grant replacement this container applied (a reversal
+  // that shortened a term). Without it a restart would apply that old row
+  // again, over any grant that came after it.
+  if (typeof rawKey.grant_replaced_at === 'string' && rawKey.grant_replaced_at) out.grant_replaced_at = rawKey.grant_replaced_at;
   return out;
 }
 

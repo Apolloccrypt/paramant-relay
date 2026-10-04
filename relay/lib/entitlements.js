@@ -464,6 +464,10 @@ function applyProductTier(rec, product, tier, paidUntil, bundle, opts) {
       if (!own) terms.push({ tier: norm, until: u, bundle: bundle ? String(bundle) : null });
       else {
         if (own.until !== null && (u === null || u > own.until)) own.until = u;
+        // A dated write only ever lengthens, except when the caller is taking
+        // back a period that was paid for and then reversed (a chargeback on
+        // one month of several): then it sets the end it is given.
+        else if (opts && opts.shorten && u !== null && (own.until === null || u < own.until)) own.until = u;
         if (bundle !== undefined) own.bundle = bundle ? String(bundle) : null;
       }
     } else {
