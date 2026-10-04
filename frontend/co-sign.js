@@ -1347,6 +1347,11 @@ function wireResultCard({ proofUrl }) {
     proof.hidden = !proofUrl;
     if (proofUrl) proof.href = proofUrl;
   }
+  const orig = $('result-download-original');
+  if (orig) {
+    orig.hidden = !__documentBytes;
+    orig.onclick = () => { if (__documentBytes) downloadBytes(__documentBytes, String(__envelope.original_filename || (fileBase() + '.pdf')), isPdfBytes(__documentBytes) ? 'application/pdf' : 'application/octet-stream'); };
+  }
   if (note) {
     note.hidden = false;
     note.textContent = complete
@@ -1548,6 +1553,15 @@ async function doSign() {
       download.textContent = data.status === 'complete' ? L('Download het getekende document (pdf)', 'Download the signed document (pdf)') : L('Download de pdf met de handtekeningen tot nu toe', 'Download the pdf with the signatures so far');
       if (note) note.hidden = false;
       download.onclick = () => downloadBytes(__signedPdfBytes, fileBase() + (data.status === 'complete' ? L('-getekend.pdf', '-signed.pdf') : L('-deels-getekend.pdf', '-partly-signed.pdf')), 'application/pdf');
+    }
+    // The original as well: the stamped pdf never turns green on /verify, the
+    // original with the .psign does, and the invitee never had it as a file
+    // (retest A8/T5-7).
+    const orig = $('done-download-original');
+    if (orig && __documentBytes) {
+      orig.hidden = false;
+      const name = String(__envelope.original_filename || (fileBase() + '.pdf'));
+      orig.onclick = () => downloadBytes(__documentBytes, name, isPdfBytes(__documentBytes) ? 'application/pdf' : 'application/octet-stream');
     }
     const proof = $('done-download-proof');
     const proofWait = $('done-proof-wait');

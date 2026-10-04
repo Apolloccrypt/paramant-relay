@@ -70,6 +70,9 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .btn:hover{opacity:.85}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .btn-outline{background:transparent;color:var(--ink);border:1px solid var(--ink-hair)}
+/* A long button label wraps inside the button on a phone instead of running
+   135px past it (retest T2-B4). */
+.btn{white-space:normal;overflow-wrap:anywhere;line-height:1.35}
 .btn-outline:hover{color:var(--cobalt);border-color:var(--cobalt)}
 .banner{padding:10px 14px;font-size:12px;border:1px solid var(--ink-hair);background:var(--bone-2);margin-bottom:14px;line-height:1.5}
 .banner.ok{border-color:var(--cobalt);color:var(--cobalt);background:rgba(var(--tint), 0.04)}
@@ -291,6 +294,7 @@ body.needs-login #sign-intro{display:none}
     <div class="card-body">
       <button class="btn" id="result-download-pdf" type="button" hidden></button>
       <a class="btn btn-outline" id="result-download-proof" href="#" hidden>Download the proof (.psign)</a>
+      <button class="btn btn-outline" id="result-download-original" type="button" hidden style="margin-top:8px">Download the original document</button>
       <p class="review-gate result-note" id="result-note" hidden></p>
     </div>
   </div>
@@ -340,12 +344,11 @@ body.needs-login #sign-intro{display:none}
       </dl>
       <div style="margin-top:14px">
         <span class="tag green">Signed locally</span>
-        <span class="tag green">ML-DSA-65</span>
-        <span class="tag green">Zero-knowledge</span>
       </div>
       <button class="btn" id="done-download-pdf" type="button" hidden style="margin-top:14px">Download PDF copy with visible marks</button>
       <a class="btn btn-outline" id="done-download-proof" href="#" hidden style="margin-top:8px">Download final .psign proof</a>
-      <p class="review-gate" id="done-download-note" hidden>This is a readable copy with the signatures so far. The proof (.psign) belongs with the original document and shows who signed where.</p>
+      <button class="btn btn-outline" id="done-download-original" type="button" hidden style="margin-top:8px">Download the original document</button>
+      <p class="review-gate" id="done-download-note" hidden>The PDF with signatures is a readable copy. The proof (.psign) belongs with the original document: to check it, open the original together with the .psign file on /verify.</p>
       <p class="review-gate" id="done-proof-wait" hidden>The final .psign proof becomes available after every invited signer has signed.</p>
     </div>
   </div>
