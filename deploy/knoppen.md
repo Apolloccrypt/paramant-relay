@@ -75,7 +75,7 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `nginx-selfhost.conf` | de kopie in de wortel: geen bodygrens, `inbound` 10r/m | `deploy/nginx-selfhost.conf`: 35M, `inbound` 5r/m | **ja, twee bestanden met dezelfde naam** |
 | `install.sh` | de kopie in de wortel, 535 regels | `frontend/install.sh`, 466 regels, dit is de kopie die op paramant.app staat | **ja, 111 regels verschil** |
 | admin-paneel JS | `admin/public/app.js`, 895 regels | `frontend/js/admin.page.js`, 742 regels | **ja, 343 regels verschil** |
-| versie | `deploy/deploy-3.1.sh:121` `3.1.0` | `install.sh:24` `v3.0.0`, `.env.example` `v3.0.0` | **ja** |
+| versie | `deploy/deploy-3.1.sh:121` `3.1.0` | `install.sh:24` `v3.1.0`, `deploy/.env.example` `v3.1.0` | nee (frontend/install.sh en install-pi.sh nog wel) |
 | standaardwaarden | `admin/lib/config-schema.js` (25 sleutels) | `deploy/.env.example` | **ja, drie**, zie de tabel afwijkingen |
 | MFA-vertraging 10 / 300000 | `relay/lib/auth-throttle.js:24,26` | `admin/lib/login-ratelimit.js:150-152` | nee, gepind door `tests/redis-deadline-parity.test.mjs` |
 | tarieftabel | `relay/lib/tiers.js` | `frontend/js/quota-upgrade.js:54-57` | nee, gepind door `relay/test/quota-upgrade-render.test.js` |
@@ -288,7 +288,7 @@ deze regels doorbreken.
 | `deploy/nginx/addin.paramant.app.conf` | `proxy_read_timeout` | `afwezig` |
 | `deploy/nginx/addin.paramant.app.conf` | `client_body_timeout` | `afwezig` |
 | `deploy/nginx/snippets/paramant-limit-req.conf` | `client_max_body_size` | `afwezig` |
-| `deploy/nginx/snippets/paramant-limit-req.conf` | `limit_req_zone` | `$binary_remote_addr zone=relay_auth:10m rate=10r/m / $binary_remote_addr zone=user_session:10m rate=300r/m / $binary_remote_addr zone=api:10m rate=60r/m / $binary_remote_addr zone=relay_inbound:10m rate=5r/m / $binary_remote_addr zone=relay_outbound:10m rate=60r/m / $binary_remote_addr zone=relay_trial:1m rate=3r/m` |
+| `deploy/nginx/snippets/paramant-limit-req.conf` | `limit_req_zone` | `$binary_remote_addr zone=relay_auth:10m rate=10r/m / $user_session_key zone=user_session:10m rate=300r/m / $binary_remote_addr zone=api:10m rate=60r/m / $binary_remote_addr zone=relay_inbound:10m rate=5r/m / $binary_remote_addr zone=relay_outbound:10m rate=60r/m / $binary_remote_addr zone=relay_trial:1m rate=3r/m` |
 | `deploy/nginx/snippets/paramant-limit-req.conf` | `limit_conn` | `afwezig` |
 | `deploy/nginx/snippets/paramant-limit-req.conf` | `proxy_read_timeout` | `afwezig` |
 | `deploy/nginx/snippets/paramant-limit-req.conf` | `client_body_timeout` | `afwezig` |
@@ -338,7 +338,7 @@ controle valt om.
 | `frontend/crypto-bridge.js` | `WASM_SHA256` | `30f1ae35` | integriteitspin op de wasm-module; verandert bij elke herbouw |
 | `deploy/deploy-3.1.sh` | `EXPECT_VERSION` | `3.1.0` | welke versie de deploy verwacht aan te treffen; niet instelbaar |
 | `deploy/deploy-3.1.sh` | `EXPECT_PROD_COMMIT` | `41501bb` | de startcommit uit het draaiboek |
-| `install.sh` | `PARAMANT_VERSION` | `v3.0.0` | welke tag de zelf-installateur kloont; een minor achter op de deploy |
+| `install.sh` | `PARAMANT_VERSION` | `v3.1.0` | welke tag de zelf-installateur kloont; gelijk met de deploy (de tag v3.1.0 moet bij de release bestaan) |
 
 ## Afwijkingen die mogen blijven staan
 

@@ -36,12 +36,13 @@ const fails = (host) => (srv.log().match(new RegExp(`webhook_fail[^\\n]*${host}`
 const downloadMails = () => (srv.log().match(/mail_dryrun[^\n]*was downloaded/g) || []).length;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-test('webhook without a secret gets one; a short one is refused', async () => {
+test('webhook without a secret gets one, handed back once; a given secret is not echoed', async () => {
   const r = await srv.post('/v2/webhook', { headers: H, body: { device_id: 'dev1', url: 'https://hooks-dl.example.invalid/x' } });
   assert.strictEqual(r.status, 200, r.text);
   assert.match(r.json.secret || '', /^whsec_[0-9a-f]{48}$/);
-  const short = await srv.post('/v2/webhook', { headers: H, body: { device_id: 'dev1', url: 'https://hooks-dl.example.invalid/y', secret: 'abc' } });
-  assert.strictEqual(short.status, 400);
+  const own = await srv.post('/v2/webhook', { headers: H, body: { device_id: 'dev9', url: 'https://hooks-dl.example.invalid/y', secret: 'my-own-secret-value' } });
+  assert.strictEqual(own.status, 200);
+  assert.strictEqual(own.json.secret, undefined);
   checks++;
 });
 

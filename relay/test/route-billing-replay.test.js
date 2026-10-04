@@ -74,7 +74,7 @@ async function hook(id) {
   assert.strictEqual(h.status, 200, h.text);
 }
 async function paidUntil(key = KEY) {
-  await new Promise((r) => setTimeout(r, 150)); // users.json write is queued
+  await new Promise((r) => setTimeout(r, 400)); // users.json write is queued behind the answer
   const rec = srv.readUsersFile().api_keys.find((k) => k.key === key);
   return { tier: rec.plan_parasign, until: rec[PAID] ? new Date(rec[PAID]).getTime() : null };
 }
@@ -121,7 +121,13 @@ test('upgrade Firm -> ParaSign Business is self-service and pauses the Pro term'
   const firm = await paidUntil(KEY2);
   assert.strictEqual(firm.tier, 'pro');
   await buy(KEY2, { product: 'parasign', plan: 'business', interval: 'monthly' });
-  const rec = srv.readUsersFile().api_keys.find((k) => k.key === KEY2);
+  // users.json is written behind the answer; wait for the write under load.
+  let rec = null;
+  for (let i = 0; i < 40; i++) {
+    rec = srv.readUsersFile().api_keys.find((k) => k.key === KEY2);
+    if (rec && rec.terms_parasign && rec.terms_parasign.pro && new Date(rec.terms_parasign.pro.until).getTime() - firm.until > 25 * DAY) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
   assert.strictEqual(rec.plan_parasign, 'business', 'Business runs on top');
   const proEnd = new Date(rec.terms_parasign.pro.until).getTime();
   assert.ok(proEnd - firm.until > 25 * DAY, 'the Pro month under Business is paused, not lost');

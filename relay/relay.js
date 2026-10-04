@@ -280,13 +280,13 @@ function VOET(wie, antwoordAdres, taal) {
   const wieHtml = escHtml(wie || '');
   const nl = 'U krijgt dit bericht omdat ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
                                                    : 'een klant van Paramant')
-       + ' uw adres heeft ingevuld. Paramant verstuurt het bestand versleuteld en '
-       + 'kan het zelf niet openen.'
+       + ' uw adres heeft ingevuld. Paramant bewaart het bestand versleuteld; de link '
+       + 'in deze mail opent het en die link bewaren wij niet.'
        + (antwoordAdres ? '<br>Beantwoord deze mail om de afzender direct te bereiken.' : '');
   const en = 'You are getting this because ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
                                                    : 'a Paramant customer')
-       + ' entered your address. Paramant carries the file in encrypted form and '
-       + 'cannot open it.'
+       + ' entered your address. Paramant keeps the file encrypted; the link in this '
+       + 'mail opens it, and we do not keep that link.'
        + (antwoordAdres ? '<br>Reply to this mail to reach them directly.' : '');
   const tekst = taal === 'en' ? en
               : taal === 'nl' ? nl
@@ -5793,7 +5793,7 @@ async function handleRelayRequest(req, res) {
               + 'korte controlecode naar dit adres. Zo kan alleen wie deze mailbox leest het '
               + 'bestand ophalen. Beschikbaar tot ' + tot + '.'
               + '\n\nU krijgt dit bericht omdat ' + (wieRuw || 'een klant van Paramant')
-              + ' uw adres heeft ingevuld. Paramant verstuurt het bestand, maar kan het niet openen.'
+              + ' uw adres heeft ingevuld. Paramant bewaart het bestand versleuteld en bewaart deze link niet.'
               + (kd.email ? '\nBeantwoord deze mail om de afzender direct te bereiken.' : ''),
                 (wieRuw ? wieRuw + ' sent you a file through Paramant.' : 'A file is waiting for you.')
               + (taal === 'en' ? '\n\n' + naamRuw + '\n\n' + link : '\n\nUse the link above.')
@@ -5801,7 +5801,7 @@ async function handleRelayRequest(req, res) {
               + 'to this address, so only somebody who can read this mailbox can collect the '
               + 'file. Available until ' + totEn + '.'
               + '\n\nYou are getting this because ' + (wieRuw || 'a Paramant customer')
-              + ' entered your address. Paramant carries the file; we cannot open it.'
+              + ' entered your address. Paramant keeps the file encrypted and does not keep this link.'
               + (kd.email ? '\nReply to this mail to reach them directly.' : '')),
           html: tweetaligHtml(taal,
                 '<p>' + (wie ? '<strong>' + wie + '</strong> heeft u via Paramant een bestand gestuurd.'
@@ -5915,9 +5915,16 @@ async function handleRelayRequest(req, res) {
   // It used to mint a fresh token and kill the old one, and that destroyed the
   // file for the person it was meant to help: the file key is wrapped under the
   // recipient's own token, and this relay cannot make a new wrapping because it
-  // never holds the key. They spent their one-time link on bytes that opened
-  // into nothing. Keeping the token instead is not an option either -- not
-  // writing it down is the whole reason the relay cannot open what it stores.
+  // never holds the file key. They spent their one-time link on bytes that
+  // opened into nothing. Keeping the token instead is not an option either: not
+  // writing it down is why the relay cannot open what it has STORED.
+  //
+  // BE PRECISE ABOUT WHAT THAT PROVES. The relay does see each token for the
+  // moment it mails the invitation (it is the mailer), and the wrapping key is
+  // derived from the token. So this is "not stored", not zero-knowledge: a
+  // relay that kept what it mails could open the file. Real end-to-end for
+  // sends by name needs a recipient key the relay never sees (issue #550: ParaSend
+  // op naam zero-knowledge met ontvangerssleutel).
   //
   // So this points at the invitation they already have, which still works.
   if (req.method === 'POST' && path === '/v2/user/sends/reinvite') {
@@ -8952,8 +8959,7 @@ async function handleRelayRequest(req, res) {
       // empty and the receiver could not tell our call from anyone's. One is
       // made when the caller sends none, and handed back once, here.
       const _given = d.secret == null ? '' : String(d.secret);
-      const _secret = _given.length >= 16 ? _given : 'whsec_' + crypto.randomBytes(24).toString('hex');
-      if (_given && _given.length < 16) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'secret must be at least 16 characters (or leave it out and one is made for you)' })); }
+      const _secret = _given || ('whsec_' + crypto.randomBytes(24).toString('hex'));
       // String(), want `|| ''` vangt alleen falsy. Een number, object of array
       // overleefde en kwam later in crypto.createHmac terecht, dat op een
       // niet-string gooit. Die throw stond een regel BUITEN de try in
