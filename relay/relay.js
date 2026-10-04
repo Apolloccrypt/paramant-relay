@@ -1581,6 +1581,25 @@ function _alGemeld(account, fileId) {
   _gemeldeBestanden.set(k, now + 3_600_000);
   return false;
 }
+// The download event, for every way a blob leaves: the link (claim + ack, or
+// the claimless GET) and GET /v2/outbound. /parasend and /pricing sell
+// "webhooks and mail on upload and download"; until now the download webhook
+// never existed and the download mail fired only on the API route, not when a
+// receiver used the link (SEND-33/34). One file mails once, like the upload.
+function _notifyDownloaded(entry, hash, opts) {
+  if (!entry) return;
+  try {
+    const ownerKd = entry.apiKey ? apiKeys.get(entry.apiKey) : null;
+    const once = entry.file_id ? !_alGemeld(entry.account_id, 'dl:' + entry.file_id) : true;
+    if (once && !(opts && opts.skipMail)) {
+      transferNotify.maybeNotify({ keyData: ownerKd, event: 'download', hashPrefix: hash, bytes: entry.size || 0, sendEmail: mailLater });
+    }
+    if (entry.device_id && entry.apiKey) {
+      pushWebhooks(entry.apiKey, entry.device_id, 'blob_downloaded', { hash, size: entry.size || 0, via: (opts && opts.via) || 'link' }).catch(() => {});
+    }
+  } catch (e) { log('warn', 'download_notify_failed', { err: e.message }); }
+}
+
 // A download in claim mode (?claim=) is only burned when the receiver's page
 // confirms it decrypted the file (POST /v2/dl/:token/ack). Until then the blob
 // stays, so an interrupted or slow download, or a key with one wrong character,
@@ -1672,6 +1691,12 @@ setInterval(() => {
 
 // Known link-preview bots — serve safe HTML placeholder, never trigger burn
 const PRELOAD_BOTS = /WhatsApp|Telegram(?:Bot)?|Slackbot|Discordbot|facebookexternalhit|Twitterbot|LinkedInBot|Googlebot|bingbot|YandexBot|DuckDuckBot|ia_archiver|python-requests|python-urllib|Go-http-client/i;
+// The download itself (/v2/dl/:token/get) is what an SDK or a script calls:
+// docs/api.md shows it with curl and Python. Blocking python-requests and
+// Go-http-client there answered 403 to exactly those clients (fase 1). Link
+// PREVIEWERS never call /get, they fetch the page above; they stay blocked
+// here too, in case one follows the button.
+const PREVIEW_BOTS = /WhatsApp|Telegram(?:Bot)?|Slackbot|Discordbot|facebookexternalhit|Twitterbot|LinkedInBot|Googlebot|bingbot|YandexBot|DuckDuckBot|ia_archiver/i;
 
 const DL_CONFIRM_JS = `'use strict';
 (function () {
@@ -2095,11 +2120,22 @@ function ramStats() {
 //      in that the budget does not model -- a 5 MiB blob arrives base64'd inside
 //      a JSON body, so it is roughly 19 MB of transient buffers before it
 //      becomes a 5 MiB Buffer.
+//
+// THE SECOND QUESTION IS ANSWERED FROM OUR OWN BYTES NOW, not from RSS. RSS
+// does not come back down after a burst: glibc and V8 keep the freed pages for
+// reuse, so after one peak of fifty 5 MB uploads RSS stayed at ~1.1 GB with
+// 15 MB of blobs held, and this gate answered 503 to every upload from then on
+// (sweep-chaos 7, SENDNAME-09-RAM). Memory the allocator keeps is memory the
+// next upload reuses, so it is not a reason to refuse. What is modelled is
+// what this process is asked to hold: the blobs it keeps plus, for every
+// upload in flight and the one asking, the ~4x transient a base64 JSON body
+// costs on the way in. The sum still has to fit under RAM_LIMIT_MB +
+// RAM_RESERVE_MB, which scripts/check-guards.mjs holds below the cgroup limit.
 function ramOk() {
-  const { rssMB } = ramStats();
   const wouldHold = blobBytesHeld + (inFlightInbound + 1) * MAX_BLOB;
   if (wouldHold > BLOB_BUDGET_BYTES) return false;
-  if (rssMB + Math.ceil(((inFlightInbound + 1) * MAX_BLOB * 4) / 1048576) > RAM_LIMIT_MB + RAM_RESERVE_MB) return false;
+  const modelled = blobBytesHeld + (inFlightInbound + 1) * MAX_BLOB * 4;
+  if (modelled > (RAM_LIMIT_MB + RAM_RESERVE_MB) * 1048576) return false;
   return true;
 }
 
@@ -5595,6 +5631,16 @@ async function handleRelayRequest(req, res) {
         // "your plan allows 25" while the 25 was megabytes and the number
         // beside it was 27263003 bytes. A sender reading that would go and
         // delete recipients from a list that was never the problem.
+        if (made.reason === 'store_full') {
+          // Not the sender's fault and not his plan: every open send together
+          // has reached what the store may hold. A 503 he can retry, with the
+          // reason in words.
+          log('warn', 'send_refused', { reason: 'store_full', limit_mb: made.limit });
+          res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '900' });
+          return res.end(J({ error: 'send_store_full', retry_after_s: 900,
+            message: 'Too many large sends are open right now. Nothing was sent; try again later or send a smaller file.',
+            message_nl: 'Er staan nu te veel grote verzendingen open. Er is niets verstuurd; probeer het later opnieuw of verstuur een kleiner bestand.' }));
+        }
         const _dim = made.dimension
           || (made.reason === 'too_large' ? 'send_max_mb' : 'max_recipients');
         const status = made.reason === 'over_limit' ? 403
@@ -7191,7 +7237,7 @@ async function handleRelayRequest(req, res) {
     const token = dlgm[1];
     const ua = req.headers['user-agent'] || '';
     const claim = typeof query.claim === 'string' && DL_CLAIM_RE.test(query.claim) ? query.claim : null;
-    if (PRELOAD_BOTS.test(ua)) {
+    if (PREVIEW_BOTS.test(ua)) {
       res.writeHead(403); return res.end(J({ error: 'Automated clients not permitted' }));
     }
     const gone = (reason, status) => claim ? dlGoneJson(res, reason) : dlGoneHtml(res, reason, status);
@@ -7291,6 +7337,7 @@ async function handleRelayRequest(req, res) {
     // on this side of TCP; only a claimed download with an ack (?claim=, the
     // web page and the relay's own confirm page) is exact.
     res.on('finish', () => {
+      _notifyDownloaded(entry, blobHash, { via: 'link' });
       dlBurn(token, td, 'downloaded');
       blobDrop(blobHash);
       try { blob.fill(0); } catch {}
@@ -7393,6 +7440,7 @@ async function handleRelayRequest(req, res) {
       return res.end(J({ ok: false, error: 'This download was not claimed with that id', reason: 'not_claimed' }));
     }
     td.acked_by = claim;
+    _notifyDownloaded(blobStore.get(td.hash), td.hash, { via: 'link' });
     dlBurn(token, td, 'downloaded');
     blobDrop(td.hash);
     log('info', 'dl_token_used', { token: token.slice(0,8), hash: td.hash.slice(0,16), mode: 'ack' });
@@ -8460,6 +8508,10 @@ async function handleRelayRequest(req, res) {
       const ctEntry = ctAppendTransfer(hash, SECTOR);
       blobPut(hash, { blob, ts: Date.now(), ttl, size: blob.length,
         account_id: acctOf(apiKey),
+        // For the download event (webhook + mail): which device's hooks, and
+        // which file a block belongs to so one file mails once.
+        device_id: (meta && typeof meta.device_id === 'string') ? meta.device_id.slice(0, 128) : null,
+        file_id: (meta && meta.file_id) ? String(meta.file_id).slice(0, 128) : null,
         sig_valid: sigResult.valid, apiKey, max_views: maxViews, views_remaining: maxViews, pw_hash,
         sector: SECTOR,
         ct_entry: {
@@ -8613,10 +8665,7 @@ async function handleRelayRequest(req, res) {
       { hash: outm[1].slice(0,16), views_left: entry.views_remaining });
     // ParaSend Pro download notification. Notify the transfer OWNER (the uploader),
     // whose key is on the blob entry — not the downloader. No-op below Pro+ / no key.
-    {
-      const _ownerKd = entry.apiKey ? apiKeys.get(entry.apiKey) : null;
-      transferNotify.maybeNotify({ keyData: _ownerKd, event: 'download', hashPrefix: outm[1], bytes: blob.length, sendEmail: mailLater });
-    }
+    _notifyDownloaded(entry, outm[1], { via: 'api' });
 
     // ── Build signed delivery receipt ────────────────────────────────────────
     let receiptHeader = null;
@@ -8738,6 +8787,12 @@ async function handleRelayRequest(req, res) {
       if (!isSsrfSafeUrl(d.url)) { res.writeHead(400); return res.end(J({ error: 'url must be a valid public HTTPS URL (private/loopback addresses not allowed)' })); }
       const k = `${d.device_id}:${acctOf(apiKey)}`;
       if (!webhooks.has(k)) webhooks.set(k, []);
+      // Every webhook is signed. Without a secret X-Paramant-Sig went out
+      // empty and the receiver could not tell our call from anyone's. One is
+      // made when the caller sends none, and handed back once, here.
+      const _given = d.secret == null ? '' : String(d.secret);
+      const _secret = _given.length >= 16 ? _given : 'whsec_' + crypto.randomBytes(24).toString('hex');
+      if (_given && _given.length < 16) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'secret must be at least 16 characters (or leave it out and one is made for you)' })); }
       // String(), want `|| ''` vangt alleen falsy. Een number, object of array
       // overleefde en kwam later in crypto.createHmac terecht, dat op een
       // niet-string gooit. Die throw stond een regel BUITEN de try in
@@ -8746,10 +8801,10 @@ async function handleRelayRequest(req, res) {
       // rejection met emergencyZeroAndExit -- alle blobs van ALLE klanten op
       // nul en afsluiten. Een enkel JSON-veld van een betalende klant legde de
       // relay om voor iedereen, telkens opnieuw, want de registratie bleef staan.
-      webhooks.get(k).push({ url: d.url, secret: String(d.secret == null ? '' : d.secret) });
+      webhooks.get(k).push({ url: d.url, secret: _secret });
       log('info', 'webhook_registered', { device: d.device_id });
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true }));
+      return res.end(J({ ok: true, events: ['blob_ready', 'blob_downloaded'], ...(_given ? {} : { secret: _secret }) }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
