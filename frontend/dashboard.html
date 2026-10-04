@@ -40,6 +40,10 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 .pa-spinner { display: inline-block; width: 15px; height: 15px; border: 2px solid var(--line-2); border-top-color: var(--accent); border-radius: 50%; animation: pa-spin .8s linear infinite; vertical-align: -2px; margin-right: 10px; }
 @keyframes pa-spin { to { transform: rotate(360deg); } }
 .pa-err-link { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.dh-records-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; }
+.dh-records-row > div { flex-basis: 100%; }
+.dh-records-label { font-family: var(--mono); font-size: var(--text-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+#dh-error .dh-btn { margin: 10px 8px 0 0; }
 #dh-error { border: 1px solid var(--line-2); border-left: 3px solid var(--sig-stop); border-radius: var(--r-1); background: var(--sig-stop-bg); padding: 16px 18px; color: var(--ink-1); }
 
 /* ── Hero: who you are and which plan pays for it ──────────────────────────── */
@@ -637,7 +641,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
           <h2 id="dh-inbox-title">Wacht op uw handtekening</h2>
           <p>Documenten die anderen u stuurden. Elk document opent via de persoonlijke link in de uitnodigingsmail.</p>
         </div>
-        <button class="dh-refresh" type="button" id="dh-inbox-refresh">Vernieuwen</button>
+        <button class="dh-refresh" type="button" id="dh-inbox-refresh" data-pa-action="inbox-refresh">Vernieuwen</button>
       </div>
       <div class="dh-inbox-list" id="dh-inbox-list" aria-live="polite"></div>
     </section>
@@ -653,7 +657,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
           <h2 id="dh-sends-title">Bestanden die u verstuurde</h2>
           <p>Wie heeft opgehaald, en wie nog niet.</p>
         </div>
-        <button class="dh-refresh" type="button" id="dh-sends-refresh">Vernieuwen</button>
+        <button class="dh-refresh" type="button" id="dh-sends-refresh" data-pa-action="sends-refresh">Vernieuwen</button>
       </div>
       <div class="dh-documents" id="dh-sends" aria-live="polite"></div>
     </section>
@@ -664,7 +668,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
           <h2 id="dh-documents-title">Lopende documenten</h2>
           <p>Elk ondertekenverzoek dat u startte, en precies hoe ver elk verzoek is.</p>
         </div>
-        <button class="dh-refresh" type="button" id="dh-documents-refresh">Vernieuwen</button>
+        <button class="dh-refresh" type="button" id="dh-documents-refresh" data-pa-action="documents-refresh">Vernieuwen</button>
       </div>
       <div class="dh-filters" role="group" aria-label="Documenten filteren">
         <button class="dh-filter" type="button" data-doc-filter="open" aria-pressed="true">Lopend <span data-doc-count="open">0</span></button>
@@ -697,6 +701,29 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     <!-- The three questions someone asks before he puts a real contract through
          this. Each answer links to the page that carries the proof, so nothing
          here is a claim this file has to be trusted on. -->
+    <!-- Verzendgeschiedenis (Firm en hoger) en de ParaSign-audit-export
+         (Business en hoger). Weggevallen in c10723bd terwijl de pagina de export
+         bleef beloven (fase 1, VERIFY-36-A). Getoond door dashboard.js op een
+         betaald plan; js/dashboard-history.js haalt pas iets op bij een klik. -->
+    <section class="dh-workspace" id="dh-records" aria-labelledby="dh-records-title" hidden>
+      <div class="dh-workspace-head">
+        <div>
+          <h2 id="dh-records-title">Geschiedenis en audit-export</h2>
+          <p>Uw verzendgeschiedenis (Firm en hoger) en het ondertekenspoor als bestand (Business en hoger).</p>
+        </div>
+      </div>
+      <div class="dh-records-row">
+        <button class="dh-btn" type="button" id="dh-hist-load">Geschiedenis tonen</button>
+        <div id="dh-hist-body" aria-live="polite"></div>
+      </div>
+      <div class="dh-records-row">
+        <span class="dh-records-label">Audit-export</span>
+        <button class="dh-btn" type="button" id="dh-export-csv">CSV downloaden</button>
+        <button class="dh-btn" type="button" id="dh-export-json">JSON downloaden</button>
+        <div id="dh-export-body" aria-live="polite"></div>
+      </div>
+    </section>
+
     <section class="dh-ask" aria-labelledby="dh-ask-title">
       <h2 id="dh-ask-title">Wat mensen vragen voordat ze erop vertrouwen</h2>
       <dl class="dh-ask-list">
@@ -716,7 +743,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
         </div>
         <div class="dh-ask-item">
           <dt>Kan de andere partij een handtekening controleren?</dt>
-          <dd>Ondertekende documenten zijn te controleren zonder account. Oudere envelopformaten hebben de relay nodig. <a href="/verify">Probeer de controle</a></dd>
+          <dd>Ondertekende documenten zijn te controleren zonder account. Oudere bewijsbestanden worden nog op onze server gecontroleerd. <a href="/verify">Probeer de controle</a></dd>
         </div>
       </dl>
       <p class="dh-ask-foot">Andere vragen beantwoorden we in het <a href="/help">hulpcentrum</a>.</p>
@@ -753,9 +780,10 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     </details>
   </div>
 
-  <div id="dh-error" class="pa-loading" hidden>
-    Uw overzicht kon niet worden geladen.
-    <a class="pa-err-link" href="/auth/login?next=%2Fdashboard">Opnieuw inloggen</a>
+  <div id="dh-error" class="pa-loading" hidden role="alert">
+    <span id="dh-error-text">Uw overzicht kon niet worden geladen.</span>
+    <button type="button" class="dh-btn" id="dh-error-retry">Opnieuw proberen</button>
+    <a class="pa-err-link" id="dh-error-login" href="/auth/login?next=%2Fdashboard" hidden>Opnieuw inloggen</a>
     <div id="dh-error-detail" style="margin-top:8px;font-size:12px;color:var(--ink-dim)"></div>
   </div>
 </main>
@@ -805,6 +833,8 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 
 <script src="/nav.js?v=16" defer></script>
 <script src="/js/nav-auth.js?v=14" defer></script>
-<script src="/js/dashboard.js?v=21" defer></script>
+<script src="/js/app-session-token.js?v=1" defer></script>
+<script src="/js/dashboard-history.js?v=2" defer></script>
+<script src="/js/dashboard.js?v=22" defer></script>
 </body>
 </html>

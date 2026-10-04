@@ -39,10 +39,13 @@ export function buildLinkHtml({ url, filename, expiresAt, format = 'block', t })
   const href = escapeHtml(safeUrl(url));
   const meta = fillEscaped(tr('link_meta'), { expiry: formatExpiry(expiresAt) });
 
+  // 'plain' is for a receiver whose mail client shows no HTML. The link text is
+  // the URL itself, so it survives a conversion to plain text; a file name as
+  // link text vanished there and left no link at all (fase 1, EXT-08-A).
   if (format === 'plain') {
     return (
       `<div style="font-family:Arial,sans-serif;font-size:13px;margin:8px 0">` +
-        `🔒 <a href="${href}" style="color:#1D4ED8;font-weight:600;text-decoration:none">${name}</a> ` +
+        `&#128274; ${name}: <a href="${href}" style="color:#1D4ED8">${href}</a> ` +
         `<span style="color:#6B7280;font-size:11px">(${meta})</span>` +
       `</div>`
     );

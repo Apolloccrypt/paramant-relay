@@ -55,6 +55,14 @@ export const SECTOR_RELAYS = Object.freeze([
   'https://iot.paramant.app',
 ]);
 
+// The receiver opens every link on paramant.app/get, and that page fetches only
+// from the relays above. A link to any other relay cannot be opened there
+// (fase 1, EXT-09-A), so the integrations upload to these relays only.
+export function isReceivableRelay(url) {
+  return SECTOR_RELAYS.includes(String(url || '').replace(/\/+$/, ''));
+}
+export const SELF_HOST_UNSUPPORTED = 'A self-hosted relay is not supported here yet: the receiver opens the link on paramant.app, which only fetches from Paramant relays. Clear the relay setting in the options.';
+
 const UPLOAD_TIMEOUT_MS = 120_000;
 const MAX_UPLOAD_RETRIES = 4;     // for 503 (capacity) / 429 (rate)
 const MAX_HASH_RETRIES   = 3;     // for the (astronomically rare) 409 hash collision
@@ -81,6 +89,45 @@ export function toBase64(u8) {
     binary += String.fromCharCode.apply(null, u8.subarray(i, i + WINDOW));
   }
   return btoa(binary);
+}
+
+export function fromBase64(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+// ── Chunks across the extension message boundary ────────────────────────────────
+//
+// chrome.runtime.sendMessage serialises its message as JSON. An ArrayBuffer or a
+// Uint8Array does not survive that: it arrives as {} and new Uint8Array({}) is
+// zero bytes long. Until 2026-10-04 every attachment sent through Gmail or
+// Outlook web was sealed and uploaded as an empty file while the sender saw
+// "Encrypted link inserted" (fase 1, EXT-13-A). So a chunk crosses the boundary
+// as a base64 string, and the receiving side checks the decoded length against
+// the length that chunk must have. A chunk of the wrong size is refused, never
+// sealed: an upload that fails loudly beats a link to an empty file.
+
+export function expectedChunkLength(fileSize, index) {
+  const start = index * CHUNK_PLAIN;
+  return Math.max(0, Math.min(CHUNK_PLAIN, fileSize - start));
+}
+
+export function encodeChunkMessage(bytes) {
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  return toBase64(u8);
+}
+
+export function decodeChunkMessage(b64, fileSize, index) {
+  if (typeof b64 !== 'string') {
+    throw new ParamantError('chunk_unreadable', 'The file could not be read. Please try again.');
+  }
+  const u8 = fromBase64(b64);
+  if (u8.length !== expectedChunkLength(fileSize, index)) {
+    throw new ParamantError('chunk_size_mismatch', 'The file could not be read whole. Nothing was sent. Please try again.');
+  }
+  return u8;
 }
 
 // URL-safe base64 (RFC 4648 §5), no padding — used for the key fragment.
@@ -181,9 +228,14 @@ export async function checkKey(relay, apiKey, signal) {
     headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' },
     signal: signal ?? AbortSignal.timeout(8000),
   });
+  // A 429 says nothing about the key. Reporting it as valid:false told a
+  // customer with a good key "Invalid API key" (fase 1, EXT-19-A, SEND-03-A).
+  if (res.status === 429) return { valid: false, plan: null, rateLimited: true };
   if (!res.ok) return { valid: false, plan: null };
   return res.json();
 }
+
+export const RATE_LIMITED_MESSAGE = 'Too many sign-in attempts from this network. Wait a minute and try again.';
 
 // Race check-key across the sectored relays and return the one that accepts the key.
 // Callers should cache the result per key to avoid repeating the fan-out every transfer.
@@ -196,20 +248,34 @@ export async function discoverRelay(apiKey, preferred) {
         headers: { 'X-Api-Key': apiKey },
         signal: AbortSignal.timeout(5000),
       });
+      if (r.status === 429) throw new Error('rate_limited');
       const d = await r.json();
       if (!d.valid) throw new Error('invalid');
       return url;
     })
   );
   const found = results.find(r => r.status === 'fulfilled');
-  return found ? found.value : DEFAULT_RELAY;
+  if (found) return found.value;
+  // No sector said yes. If one of them only said "slow down", the key may well
+  // be good: say that, instead of falling through to a verdict on the key.
+  if (results.some(r => r.status === 'rejected' && r.reason?.message === 'rate_limited')) {
+    throw new ParamantError('rate_limited', RATE_LIMITED_MESSAGE, { status: 429, retryable: true });
+  }
+  return DEFAULT_RELAY;
 }
 
 // ── Upload one padded blob ──────────────────────────────────────────────────────
 // Retries on 503 (relay at capacity) and 429 (rate/trial), honouring Retry-After.
 // Returns { token, effectiveTtlMs }.
 
-async function uploadPadded({ relay, apiKey, padded, meta, ttlMs, signal }) {
+// Exactly one credential: an API key (X-Api-Key) or a ParaSend session token
+// (Authorization: Bearer pst_...), which is what a signed-in account without a
+// key on this device uses.
+function authHeaders(apiKey, bearer) {
+  return bearer ? { Authorization: `Bearer ${bearer}` } : { 'X-Api-Key': apiKey };
+}
+
+async function uploadPadded({ relay, apiKey, bearer, padded, meta, ttlMs, signal }) {
   const hash = await sha256hex(padded);
   const body = JSON.stringify({ hash, payload: toBase64(padded), ttl_ms: ttlMs, meta });
 
@@ -218,7 +284,7 @@ async function uploadPadded({ relay, apiKey, padded, meta, ttlMs, signal }) {
     try {
       res = await fetch(`${relay}/v2/inbound`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
+        headers: { 'Content-Type': 'application/json', ...authHeaders(apiKey, bearer) },
         body,
         signal: signal ?? AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
       });
@@ -270,11 +336,11 @@ async function uploadPadded({ relay, apiKey, padded, meta, ttlMs, signal }) {
 
 // Encrypt + upload a single chunk, transparently re-encrypting on the rare 409.
 // Returns { token, key, effectiveTtlMs }. Used by both consumers.
-export async function sealAndUploadChunk({ relay, apiKey, chunkU8, fileMeta, relayMeta, ttlMs, signal }) {
+export async function sealAndUploadChunk({ relay, apiKey, bearer, chunkU8, fileMeta, relayMeta, ttlMs, signal }) {
   for (let hashAttempt = 0; ; hashAttempt++) {
     const { padded, rawKey } = await encryptChunk(chunkU8, fileMeta);
     try {
-      const { token, effectiveTtlMs } = await uploadPadded({ relay, apiKey, padded, meta: relayMeta, ttlMs, signal });
+      const { token, effectiveTtlMs } = await uploadPadded({ relay, apiKey, bearer, padded, meta: relayMeta, ttlMs, signal });
       return { token, key: urlSafeKey(rawKey), effectiveTtlMs };
     } catch (e) {
       if (e.code === 'hash_collision' && hashAttempt < MAX_HASH_RETRIES) continue;

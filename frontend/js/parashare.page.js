@@ -15,16 +15,17 @@ const T = {
     receiverConnected: 'Receiver connected',
     receiverWaits: 'Your receiver is waiting for you to compare the code',
     validPlan: (plan, sector) => `✓ Valid, plan: ${plan}${sector}`,
-    accountNoSector: 'This account is not active on any relay sector',
+    accountNoSector: 'This account is not active on any of our servers. Mail privacy@paramant.app and we will look into it.',
     keyInvalid: 'Invalid or revoked key',
-    noSectorAnswered: 'No relay sector answered. Check your connection and press Create secure session again.',
-    sectorUnreachable: 'Could not reach a relay sector. You can still continue.',
+    noSectorAnswered: 'Our server did not answer. Check your connection and press Create secure session again.',
+    tooManyChecks: 'Too many checks from this network just now. Wait a minute and reload the page. Your key is not the problem.',
+    sectorUnreachable: 'Could not reach our server. You can still continue.',
     enterKey: 'Enter your API key to continue',
     notAKey: 'That does not look like a key. It starts with pgp_.',
     noFile: 'No file selected',
     filesPackage: (n) => n + ' files, each sealed on its own',
     sendingPart: (name, i, n) => 'Sending ' + name + ', part ' + i + ' of ' + n + '...',
-    lookingSector: 'Looking for a relay sector...',
+    lookingSector: 'Connecting...',
     waitingOpen: 'Waiting for your receiver to open the link...',
     receiverClosed: 'Your receiver closed the link',
     receiverClosedLong: 'Your receiver closed the link before you compared the code. Nothing was uploaded and your file is still here in this browser.',
@@ -37,7 +38,7 @@ const T = {
       + '. Each one gets their own link and a code to this address.',
     xOfY: (a, b) => a + ' of ' + b,
     testModeTitle: 'Not sent: test mode',
-    testModeLead: (n) => 'This relay delivers no mail (test mode). The file is stored for ' + n + (n === 1 ? ' recipient' : ' recipients') + ', but no invitation went out.',
+    testModeLead: (n) => 'This server delivers no mail (test mode). The file is stored for ' + n + (n === 1 ? ' recipient' : ' recipients') + ', but no invitation went out.',
     testModeNote: 'Ask the administrator to set up a mail provider (MAIL_PROVIDER), then send again.',
     sentTitle: 'Sent',
     invitesLead: (aantal) => aantal + ' invitations are on their way. Everyone got their own link.',
@@ -134,16 +135,17 @@ const T = {
     receiverConnected: 'Ontvanger verbonden',
     receiverWaits: 'De ontvanger wacht tot u de controlecode vergelijkt',
     validPlan: (plan, sector) => `✓ Geldig, abonnement: ${plan}${sector}`,
-    accountNoSector: 'Dit account is op geen enkele relay actief',
+    accountNoSector: 'Dit account is op geen van onze servers actief. Mail privacy@paramant.app, dan zoeken we het uit.',
     keyInvalid: 'Ongeldige of ingetrokken sleutel',
-    noSectorAnswered: 'Geen relay gaf antwoord. Controleer uw verbinding en druk opnieuw op Veilige sessie starten.',
-    sectorUnreachable: 'Geen relay bereikbaar. U kunt wel verder.',
+    noSectorAnswered: 'Onze server gaf geen antwoord. Controleer uw verbinding en druk opnieuw op Veilige sessie starten.',
+    tooManyChecks: 'Even te veel controles vanaf dit netwerk. Wacht een minuut en laad de pagina opnieuw. Aan uw sleutel ligt het niet.',
+    sectorUnreachable: 'Onze server is niet bereikbaar. U kunt wel verder.',
     enterKey: 'Vul uw API-sleutel in om verder te gaan',
     notAKey: 'Dat lijkt geen sleutel. Een sleutel begint met pgp_.',
     noFile: 'Geen bestand gekozen',
     filesPackage: (n) => n + ' bestanden, elk apart verzegeld',
     sendingPart: (name, i, n) => name + ' wordt verstuurd, deel ' + i + ' van ' + n + '...',
-    lookingSector: 'Relay zoeken...',
+    lookingSector: 'Verbinding maken...',
     waitingOpen: 'Wachten tot de ontvanger de link opent...',
     receiverClosed: 'De ontvanger heeft de link gesloten',
     receiverClosedLong: 'De ontvanger sloot de link voordat u de controlecode vergeleek. Er is niets geüpload en uw bestand staat nog hier in deze browser.',
@@ -156,7 +158,7 @@ const T = {
       + '. Iedere ontvanger krijgt een eigen link en een controlecode op dit adres.',
     xOfY: (a, b) => a + ' van ' + b,
     testModeTitle: 'Niet verstuurd: testmodus',
-    testModeLead: (n) => 'Deze relay bezorgt geen mail (testmodus). Het bestand staat klaar voor ' + n + (n === 1 ? ' ontvanger' : ' ontvangers') + ', maar er is geen uitnodiging verstuurd.',
+    testModeLead: (n) => 'Deze server bezorgt geen mail (testmodus). Het bestand staat klaar voor ' + n + (n === 1 ? ' ontvanger' : ' ontvangers') + ', maar er is geen uitnodiging verstuurd.',
     testModeNote: 'Vraag de beheerder een mailprovider in te stellen (MAIL_PROVIDER) en verstuur het daarna opnieuw.',
     sentTitle: 'Verstuurd',
     invitesLead: (aantal) => aantal + ' uitnodigingen zijn onderweg. Iedere ontvanger kreeg een eigen link.',
@@ -340,7 +342,21 @@ function $(id) { return document.getElementById(id); }
 // retry failed the same way. Now the deadline scales with the block: two
 // minutes, or as long as the body takes at 16 KB/s, whichever is longer. If it
 // still runs out, or the line drops, the sender is told it is the connection.
-function postInbound(bodyStr) {
+// A 503 from /v2/inbound is the relay's memory guard saying "not now", with a
+// Retry-After. It stored nothing, so the same block may go again. Until
+// 2026-10-04 the first 503 broke a 24 MB send at 36% with "Er ging aan onze
+// kant iets mis" (fase 1, SENDNAME-09-RAM). Three more tries, at most 30 s apart.
+const INBOUND_503_RETRIES = 3;
+async function postInbound(bodyStr) {
+  for (let attempt = 0; ; attempt++) {
+    const r = await postInboundOnce(bodyStr);
+    if (r.status !== 503 || attempt >= INBOUND_503_RETRIES) return r;
+    const ra = parseInt(r.headers.get('Retry-After') || '', 10);
+    const waitS = Math.min(30, Number.isFinite(ra) && ra > 0 ? ra : 2 * (attempt + 1));
+    await new Promise((res) => setTimeout(res, waitS * 1000));
+  }
+}
+function postInboundOnce(bodyStr) {
   const ms = Math.max(120000, Math.ceil(bodyStr.length / 16384) * 1000);
   return relayFetch(RELAY_API + '/v2/inbound', {
     method: 'POST',
@@ -739,6 +755,10 @@ async function discoverRelay() {
       const r = await relayFetch(`${url}/v2/check-key`, {
         signal: AbortSignal.timeout(5000)
       });
+      // A 429 is "slow down", not an answer about the key. Read as valid:false
+      // it told a customer with a good key "Ongeldige of ingetrokken sleutel"
+      // (fase 1, P04 bij SEND-03-A).
+      if (r.status === 429) { const e = new Error('rate_limited'); e.rateLimited = true; throw e; }
       const d = await r.json();
       return {
         sector, url, plan: d.plan, valid: !!d.valid,
@@ -748,9 +768,12 @@ async function discoverRelay() {
   );
   const answered = results.filter(r => r.status === 'fulfilled').map(r => r.value);
   const valid = answered.filter(a => a.valid);
+  const rateLimited = results.some(r => r.status === 'rejected' && r.reason && r.reason.rateLimited);
   return {
-    // Every sector that spoke said no. That is a verdict on the key.
-    rejected: answered.length > 0 && valid.length === 0,
+    rateLimited,
+    // Every sector that spoke said no, and none of them only said "slow down":
+    // the one that holds the key may be the one that was busy.
+    rejected: answered.length > 0 && valid.length === 0 && !rateLimited,
     // Prefer health; otherwise first sector that responded
     found: valid.find(v => v.sector === 'health') || valid[0] || null
   };
@@ -781,6 +804,9 @@ async function discoverAndReport() {
     applyPlanTtls(d.found);
     const sectorLabel = d.found.sector !== 'health' ? ` · ${d.found.sector}` : '';
     setStatus('key-status', t('validPlan')(d.found.plan, sectorLabel), 'ok');
+  } else if (d.rateLimited) {
+    relayError = t('tooManyChecks');
+    setStatus('key-status', t('tooManyChecks'), 'err');
   } else if (d.rejected) {
     // A sector answered and said no. On the session path that is a verdict on
     // the account, not on anything the sender typed, so it is not called a bad
@@ -833,20 +859,38 @@ function setCreateStatus(msg, cls) {
   el.className = 'status-line' + (cls ? ' ' + cls : '');
 }
 
+// Bytes into something a person reads, decimal comma on the Dutch page. The
+// status line used to say "(0.0 MB)" for a 40 KB payslip (fase 1, P04).
+function humanSize(n) {
+  const one = (x) => { const v = x.toFixed(1); return LANG === 'en' ? v : v.replace('.', ','); };
+  if (n >= 1048576) return one(n / 1048576) + ' MB';
+  if (n >= 1024) return one(n / 1024) + ' KB';
+  return n + ' B';
+}
+
 function onFileSelect() {
   const files = $('file-input').files;
   selectedFile = files[0] || null;
   if (!files.length) { setStatus('file-status', t('noFile')); $('vault-list').style.display='none'; updateBtn(); return; }
   if (files.length === 1) {
-    setStatus('file-status', '✓ ' + files[0].name + ' (' + (files[0].size/1024/1024).toFixed(1) + ' MB)', 'ok');
+    setStatus('file-status', '✓ ' + files[0].name + ' (' + humanSize(files[0].size) + ')', 'ok');
     $('vault-list').style.display = 'none';
   } else {
     setStatus('file-status', '✓ ' + t('filesPackage')(files.length), 'ok');
     const vl = $('vault-list');
     vl.style.display = 'block';
-    vl.innerHTML = [...files].map(f =>
-      '<div style="font-size:10px;color:var(--ink-2);padding:2px 0;font-family:var(--mono)">' + f.name + ' <span style="color:var(--ink-dim)">(' + (f.size/1024/1024).toFixed(1) + ' MB)</span></div>'
-    ).join('');
+    // Nodes, not innerHTML: a file name is text, whatever characters it has.
+    vl.textContent = '';
+    [...files].forEach((f) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'font-size:10px;color:var(--ink-2);padding:2px 0;font-family:var(--mono)';
+      row.textContent = f.name + ' ';
+      const sz = document.createElement('span');
+      sz.style.color = 'var(--ink-dim)';
+      sz.textContent = '(' + humanSize(f.size) + ')';
+      row.appendChild(sz);
+      vl.appendChild(row);
+    });
   }
   updateBtn();
 }
@@ -1030,6 +1074,11 @@ function onRecipientsInput() {
 // at 100 percent with one line of text: no confirmation, no way onward, and no
 // idea whether the invitations had gone out.
 function toonVerzending(verzending, naam) {
+  // The live block on step-done describes a hand-over with a check code and a
+  // key we never hold. That is not this path: show the honest one instead.
+  const live = $('done-details-live'), named = $('done-details-named');
+  if (live) live.hidden = true;
+  if (named) named.hidden = false;
   // A relay without a mail provider (test mode) accepts the invitations and
   // delivers none. Say that, not "sent to 2 of 2" (hertest L6).
   if (verzending && verzending.mail_test_mode) {
@@ -1050,8 +1099,8 @@ function toonVerzending(verzending, naam) {
       title: t('sentTitle'),
       lead: t('invitesLead')(aantal),
       note: t('invitesNote'),
-      actions: [{ label: t('openDashboard'), href: '/dashboard' },
-                { label: t('sendAnother'), href: LANG === 'en' ? '/en/parashare' : '/parashare' }],
+      // "Nog een bestand versturen" is already the primary button of step-done.
+      actions: [{ label: t('openDashboard'), href: LANG === 'en' ? '/en/dashboard' : '/dashboard' }],
     });
   }
   showStep('step-done');
@@ -1380,6 +1429,23 @@ async function confirmFingerprint() {
       $('enc-status').className = 'status-line err';
     }
   }
+}
+
+// The receiver never heard a rejection: it has no API key, so no WebSocket
+// ticket and no socket, and waited ten minutes behind its code (fase 1,
+// SENDNAME-28-A). What it does poll is the `_ready` slot. A rejection fills
+// that slot with a record no real send can make, zero blocks and an all-zero
+// token, within the grammar relay/lib/handshake-record.js allows. The slot is
+// first-write-wins, so the session is spent either way; the sender starts a
+// fresh one.
+const REJECT_READY = { kyber_pub: 'file|0|0', ecdh_pub: '0'.repeat(48) };
+function announceRejection() {
+  if (!sessionToken) return;
+  relayFetch(RELAY_API + '/v2/pubkey', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ device_id: sessionToken + '_ready', ...REJECT_READY }),
+  }).catch(() => {});
 }
 
 // ── Send a link ──────────────────────────────────────────────────────────────
@@ -1742,8 +1808,11 @@ async function createLink() {
       const sealed = {};
       for (const adres of ontvangers) {
         const token = paramantSendWrap.newToken();
-        // Wrapped here, in this browser. The relay receives the wrapping and
-        // the hash of the token, never the token and never the key.
+        // Wrapped here, in this browser. NOT zero-knowledge: the relay receives
+        // the token together with the wrapping, because it mails the token to
+        // the recipient in the invitation link. While it holds both it could
+        // unwrap the key. The end screen says so (done-details-named); a real
+        // recipient key for this path is issue #550.
         sealed[adres.toLowerCase()] = {
           token,
           wrapped_key: await paramantSendWrap.wrap(token, geheim),
@@ -1905,7 +1974,8 @@ async function refreshSentLinks() {
 }
 
 function rejectFingerprint() {
-  ws.close();
+  announceRejection();
+  try { if (ws) ws.close(); } catch (_) { /* already closed */ }
   showStep('step-setup');
   setStatus('key-status', t('fpMismatch'), 'err');
 }

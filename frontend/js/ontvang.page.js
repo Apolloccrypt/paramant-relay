@@ -24,6 +24,7 @@ const T = {
     fpOkTitle: 'Controlecode bevestigd. Bestand komt binnen...',
     fpOkStatus: 'De afzender heeft de controlecode bevestigd. Het bestand wordt voor u verzegeld.',
     peerLeft: 'De verbinding met de afzender is verbroken.',
+    senderRejected: 'De afzender zag een andere controlecode dan u en is gestopt. Er is niets verstuurd en niets ontvangen. Vraag de afzender om een nieuwe link.',
     senderGone: 'De afzender heeft deze sessie niet afgemaakt: er kwam in tien minuten geen bestand. Er is niets ontvangen en niets gewist. Is de afzender er nog, druk dan op Opnieuw proberen; anders vraagt u om een nieuwe link.',
     keygenFail: 'Sleutels maken is mislukt: ',
     dlChunk: (i, n) => `Deel ${i} van ${n} wordt gedownload...`,
@@ -53,6 +54,7 @@ const T = {
     fpOkTitle: 'Fingerprint confirmed - receiving file...',
     fpOkStatus: 'Sender confirmed fingerprint - file is being encrypted for you',
     peerLeft: 'Sender disconnected',
+    senderRejected: 'The sender saw a different check code from yours and stopped. Nothing was sent and nothing was received. Ask the sender for a new link.',
     senderGone: 'The sender did not finish this session: no file arrived in ten minutes. Nothing was received and nothing was deleted. If the sender is still there, press Try again; otherwise ask for a new link.',
     keygenFail: 'Keypair generation failed: ',
     dlChunk: (i, n) => `Downloading chunk ${i}/${n}...`,
@@ -365,6 +367,17 @@ async function init() {
         });
         if (r.ok) {
           const d = await r.json();
+          // The sender compared the codes and said no (see REJECT_READY in
+          // parashare.page.js): zero blocks, an all-zero token.
+          if (d.kyber_pub === 'file|0|0' && /^0{48}$/.test(d.ecdh_pub || '')) {
+            if (_transferClaimed) return;
+            _transferClaimed = true;
+            clearInterval(pollTransfer);
+            clearInterval(pollManifest);
+            try { if (ws) ws.close(); } catch (_) { /* already closed */ }
+            showError(t('senderRejected'));
+            return;
+          }
           if (d.ecdh_pub && d.kyber_pub) {
             if (_transferClaimed) return;
             _transferClaimed = true;
@@ -605,7 +618,7 @@ let savedFile = null;
     const dash = $('done-dashboard');
     if (dash && d && d.authenticated) {
       const en = /^en\b/i.test(document.documentElement.lang || '');
-      dash.setAttribute('href', '/dashboard');
+      dash.setAttribute('href', en ? '/en/dashboard' : '/dashboard');
       dash.textContent = en ? 'Open your dashboard' : 'Naar uw overzicht';
     }
   } catch { /* stays the link to the site */ }
@@ -640,8 +653,10 @@ function renderBurnReceipt(burnedHashes) {
 
 // Bytes into something a person reads. Same rounding as /get.
 function formatSize(n) {
-  if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
-  if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
+  const nl = !/^en\b/i.test(document.documentElement.lang || '');
+  const one = (x) => { const v = x.toFixed(1); return nl ? v.replace('.', ',') : v; };
+  if (n >= 1024 * 1024) return one(n / 1024 / 1024) + ' MB';
+  if (n >= 1024) return one(n / 1024) + ' KB';
   return n + ' B';
 }
 

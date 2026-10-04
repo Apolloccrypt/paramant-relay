@@ -324,7 +324,7 @@ test('a sector that will not answer leaves the button live and reports itself at
 
   await evalIn(run, 'createSession()');
   const status = run.getElementById('create-status');
-  assert.match(status.textContent, /No relay sector answered/, 'pressing the button states the sector failure');
+  assert.match(status.textContent, /Our server did not answer/, 'pressing the button states the sector failure');
   assert.equal(status.className, 'status-line err');
   assert.equal(run.getElementById('session-link').textContent, '', 'and no session is created on a dead sector');
 });

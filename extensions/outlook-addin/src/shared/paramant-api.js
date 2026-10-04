@@ -6,11 +6,10 @@
 // (AES-256-GCM, key in the URL fragment), uploads, and returns a burn-on-read link that the
 // paramant.app/get receiver already understands.
 
-import { discoverRelay, checkKey, encryptAndUpload, DEFAULT_RELAY } from '../../../shared/paramant-core.js';
+import { discoverRelay, checkKey, encryptAndUpload, DEFAULT_RELAY, RATE_LIMITED_MESSAGE } from '../../../shared/paramant-core.js';
 import { setAuth, getAuth, clearAuth } from './state.js';
 import { getAttachmentContent } from './office-helpers.js';
 
-const ADMIN_BASE = 'https://paramant.app/api/user';
 const SESSION_HOURS = 8;
 
 // ── Capabilities ──────────────────────────────────────────────────────────────────
@@ -30,38 +29,26 @@ export async function loginWithApiKey(apikey) {
   if (!key) return { success: false, message: 'Enter your API key.' };
   try {
     const relay = await discoverRelay(key);
-    const { valid, plan } = await checkKey(relay, key);
+    const { valid, plan, rateLimited } = await checkKey(relay, key);
+    if (rateLimited) return { success: false, message: RATE_LIMITED_MESSAGE };
     if (!valid) return { success: false, message: 'Invalid API key.' };
 
     const until = Date.now() + SESSION_HOURS * 60 * 60 * 1000;
     setAuth({ mode: 'apikey', apikey: key, plan: plan || null, relay, until });
     return { success: true, mode: 'apikey', plan: plan || null, relay, expires_at: new Date(until).toISOString() };
-  } catch {
+  } catch (err) {
+    if (err?.code === 'rate_limited') return { success: false, message: RATE_LIMITED_MESSAGE };
     return { success: false, message: 'Network error. Check your connection.' };
   }
 }
 
-// ── TOTP auth (dormant until the relay enables it) ──────────────────────────────────
-export async function loginWithTotp(email, totp) {
-  let res;
-  try {
-    res = await fetch(`${ADMIN_BASE}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, totp }),
-      credentials: 'include',
-    });
-  } catch {
-    return { success: false, message: 'Network error. Check your connection.' };
-  }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    return { success: false, message: err.message || 'Invalid email or code.' };
-  }
-  const data = await res.json();
-  setAuth({ mode: 'totp', email: data.email, until: new Date(data.session_expires_at).getTime() });
-  return { success: true, mode: 'totp', email: data.email };
-}
+// ── No email + code sign-in here ─────────────────────────────────────────────────────
+// The pane runs on addin.paramant.app. paramant.app answers a sign-in from that
+// origin without CORS headers, so a POST /api/user/login from here never gets an
+// answer the pane may read ("Network error", fase 1, EXT-20-A), and a session
+// would still hold no API key to upload with. Until the account server accepts
+// this origin, the pane offers the API key only. A TOTP session left over from an
+// older build is cleared below.
 
 // ── Session ──────────────────────────────────────────────────────────────────────────
 export async function verifySession() {
@@ -72,21 +59,11 @@ export async function verifySession() {
   if (auth.mode === 'apikey') {
     return { authenticated: true, mode: 'apikey', plan: auth.plan || null, expires_at: new Date(auth.until).toISOString() };
   }
-  if (auth.mode === 'totp') {
-    try {
-      const res = await fetch(`${ADMIN_BASE}/session/verify`, { credentials: 'include' });
-      if (!res.ok) { clearAuth(); return { authenticated: false }; }
-      return await res.json();
-    } catch { return { authenticated: false }; }
-  }
+  clearAuth();
   return { authenticated: false };
 }
 
 export async function logout() {
-  const auth = getAuth();
-  if (auth?.mode === 'totp') {
-    try { await fetch(`${ADMIN_BASE}/logout`, { method: 'POST', credentials: 'include' }); } catch {}
-  }
   clearAuth();
 }
 
