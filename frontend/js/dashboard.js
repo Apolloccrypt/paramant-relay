@@ -571,7 +571,16 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     return state === filter;
   }
 
-  function documentLabel(state) {
+  // A request a signer refused is "Geweigerd" with the name, not "Geannuleerd":
+  // the mail tells the sender "in uw documenten ziet u wie" (acceptance r2, 2).
+  function declinedBy(doc) {
+    var parties = doc && Array.isArray(doc.parties) ? doc.parties : [];
+    for (var i = 0; i < parties.length; i++) if (parties[i] && parties[i].status === 'declined') return parties[i];
+    return null;
+  }
+  function documentLabel(state, doc) {
+    var d = state === 'cancelled' ? declinedBy(doc) : null;
+    if (d) return nlEn('Geweigerd door ', 'Declined by ') + (d.label || (nlEn('ondertekenaar ', 'signer ') + (Number(d.index || 0) + 1)));
     return ({
       waiting: nlEn('Wacht op handtekeningen', 'Waiting for signatures'),
       in_progress: nlEn('Bezig', 'In progress'),
@@ -639,7 +648,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         (reference ? ' <span class="dh-doc-ref" title="' + esc(reference) + nlEn('">· Kenmerk ', '">· Ref ') + esc(reference) + '</span>' : '') +
         '</span></div>' +
         '<div class="dh-document-progress"><span>' + signed + nlEn(' van ', ' of ') + total + nlEn(' getekend</span><div class="dh-progress" aria-label="', ' signed</span><div class="dh-progress" aria-label="') + signed + nlEn(' van ', ' of ') + total + nlEn(' getekend"><i style="width:', ' signed"><i style="width:') + pct + '%"></i></div></div>' +
-        '<div class="dh-status ' + state + '">' + documentLabel(state) + '</div>' +
+        '<div class="dh-status ' + state + '">' + esc(documentLabel(state, doc)) + '</div>' +
         '</button>';
     }).join('');
   }
@@ -735,10 +744,12 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     title.textContent = doc.original_filename || nlEn('Ondertekenverzoek', 'Signing request');
     var parties = Array.isArray(doc.parties) ? doc.parties : [];
     var partyText = parties.length ? parties.map(function (p) {
-      return esc(p.label || (nlEn('Ondertekenaar ', 'Signer ') + (Number(p.index || 0) + 1))) + ': ' + esc(p.status === 'signed' ? nlEn('getekend', 'signed') : p.status === 'viewed' ? nlEn('geopend', 'opened') : nlEn('wacht', 'waiting'));
+      return esc(p.label || (nlEn('Ondertekenaar ', 'Signer ') + (Number(p.index || 0) + 1))) + ': ' + esc(p.status === 'signed' ? nlEn('getekend', 'signed') : p.status === 'declined' ? nlEn('geweigerd', 'declined') : p.status === 'viewed' ? nlEn('geopend', 'opened') : nlEn('wacht', 'waiting'));
     }).join('<br>') : signed + nlEn(' van ', ' of ') + total + nlEn(' getekend', ' signed');
     var help = state === 'completed'
       ? nlEn('De relay bewaart het cryptografische bewijs, geen leesbare kopie van uw document. De complete pdf met alle handtekeningen maakt deze browser: op het apparaat waarmee u verstuurde opent hij meteen, elders kiest u uw originele bestand. Controleren doet u later met het originele document en het .psign-bewijs.', 'The relay keeps the cryptographic proof, not a plaintext copy of your document. This browser builds the complete PDF with every signature: on the device you sent from it opens straight away, elsewhere you choose your original file. To verify later, use the original document and the .psign proof.')
+      : state === 'cancelled' && declinedBy(doc)
+        ? nlEn('Een ondertekenaar heeft geweigerd te tekenen. Daarmee is dit verzoek gestopt; niemand kan er nog op tekenen. Wilt u het opnieuw proberen, stuur dan een nieuw verzoek.', 'A signer declined to sign, so this request has stopped and nobody can sign it any more. To try again, send a new request.')
       : state === 'cancelled'
         ? nlEn('Dit verzoek is gesloten. Gezette handtekeningen blijven in het auditlog, maar niemand kan nog tekenen.', 'This request is closed. Existing signatures remain in the audit record, but nobody can add another signature.')
         : nlEn('Dit verzoek loopt nog. Paramant bewaart het afgeleverde document versleuteld. Het leesbare document en de sleutel zijn niet terug te halen via het relay-overzicht.', 'This request is still open. Paramant stores the delivered document encrypted. The plaintext document and its key are not recoverable from the relay dashboard.');
@@ -750,7 +761,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     if (state === 'waiting' || state === 'in_progress') actions += '<button class="dh-btn danger" type="button" data-pa-action="document-cancel" data-document-id="' + esc(doc.id) + nlEn('">Verzoek annuleren</button>', '">Cancel request</button>');
     actions += nlEn('<a class="dh-btn" href="/verify">Een document controleren</a>', '<a class="dh-btn" href="/verify">Verify a document</a>');
     body.innerHTML = '<dl class="dh-doc-kv">' +
-      '<dt>Status</dt><dd>' + esc(documentLabel(state)) + '</dd>' +
+      '<dt>Status</dt><dd>' + esc(documentLabel(state, doc)) + '</dd>' +
       nlEn('<dt>Kenmerk</dt><dd>', '<dt>Reference</dt><dd>') + esc(doc.id || '') + '</dd>' +
       nlEn('<dt>Gemaakt</dt><dd>', '<dt>Created</dt><dd>') + esc(fmtDate(doc.created_at)) + '</dd>' +
       nlEn('<dt>Verloopt</dt><dd>', '<dt>Expires</dt><dd>') + esc(fmtDate(doc.expires_at)) + '</dd>' +

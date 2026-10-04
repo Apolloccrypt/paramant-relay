@@ -112,7 +112,8 @@ const LANGS = [
     wiped: /wiped after the first download/,
     planInMarkup: /on Community|on Firm|on Pro|on Enterprise/,
     notOnline: /does not have to be online/,
-    until: new RegExp('until \\d{1,2} ' + MONTH + ' \\d{4}, \\d{2}:\\d{2} UTC'),
+    // Local time with the zone named, as the mail says it (hertest r2 T4-L4).
+    until: new RegExp('until \\d{1,2} ' + MONTH + ' \\d{4} at \\d{2}:\\d{2}( \\([^)]+\\))?'),
     worksOnce: /Works once/, waiting: /Waiting for the receiver/,
     noReceipt: /no signed delivery receipt/i,
     gone: /permanently destroyed/i,
@@ -125,7 +126,7 @@ const LANGS = [
     planInMarkup: /on Community|on Firm|on Pro|on Enterprise|bij Community|bij Firm|bij Pro|bij Enterprise/,
     notOnline: /hoeft niet online te zijn/,
     // The Dutch page writes the month in Dutch: format-date.js reads <html lang>.
-    until: new RegExp('tot \\d{1,2} ' + MAAND + ' \\d{4}, \\d{2}:\\d{2} UTC'),
+    until: new RegExp('tot \\d{1,2} ' + MAAND + ' \\d{4} om \\d{2}:\\d{2}( \\([^)]+\\))?'),
     worksOnce: /Werkt één keer/, waiting: /Wacht op de ontvanger/,
     noReceipt: /geen ondertekend ontvangstbewijs/i,
     gone: /voorgoed vernietigd/i,

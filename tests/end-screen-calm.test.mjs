@@ -198,9 +198,9 @@ async function stubSender(page) {
 // Both languages: /parashare is Dutch, and the English text it carried before
 // lives on at /en/parashare with the same pins.
 for (const P of [
-  { path: '/en/parashare', once: /Works once, until \d{1,2} \w+ \d{4}, \d{2}:\d{2} UTC/,
+  { path: '/en/parashare', once: /Works once, until \d{1,2} \w+ \d{4} at \d{2}:\d{2}( \([^)]+\))?/,
     canNow: /can now download/i, compared: /compared the code with/ },
-  { path: '/parashare', once: /Werkt één keer, tot \d{1,2} \w+ \d{4}, \d{2}:\d{2} UTC/,
+  { path: '/parashare', once: /Werkt één keer, tot \d{1,2} \w+ \d{4} om \d{2}:\d{2}( \([^)]+\))?/,
     canNow: /can now download|kan nu downloaden|kan het nu downloaden/i, compared: /met wie u de controlecode vergeleek/ },
 ]) {
 {

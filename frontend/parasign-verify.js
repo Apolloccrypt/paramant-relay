@@ -43,6 +43,8 @@ const T = {
     missingMpId: 'multiparty.envelope_id ontbreekt',
     missingSignedHash: 'de hash van het ondertekende document ontbreekt (stamped_hash of document_hash)',
     hashMismatch: 'documenthash klopt niet: dit document is niet het document dat is ondertekend',
+    originalFile: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>Dit is het bestand van vóór het ondertekenen. Controleer met de ondertekende versie.</strong> De handtekening in het .psign-bestand klopt, maar geldt voor de versie met de zegel erop ({name}). Volgens het bewijs is dit het bestand waaruit die versie is gemaakt. Kies het ondertekende bestand om de handtekening te controleren.</div>',
+    partyNamesHead: 'Namen zoals de afzender ze opgaf (niet gecontroleerd; de handtekeningen zelf zijn wel gecontroleerd):',
     hashIsOriginal: 'Dit is het bestand van voor het ondertekenen. De handtekening geldt voor de ondertekende versie met de zegel erop ({name}). Kies dat bestand.',
     missingSignerPk: 'signer_public_key ontbreekt',
     missingEmailHash: 'party_email_hash ontbreekt (het ondertekende bericht is offline niet na te bouwen)',
@@ -118,6 +120,8 @@ const T = {
     missingMpId: 'missing multiparty.envelope_id',
     missingSignedHash: 'missing signed document hash (stamped_hash or document_hash)',
     hashMismatch: 'document hash mismatch: this document does not match the one that was signed',
+    originalFile: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>This is the file as it was before signing. Check with the signed version.</strong> The signature in the .psign file is correct, but it covers the version with the seal on it ({name}). According to the proof, this is the file that version was made from. Choose the signed file to check the signature.</div>',
+    partyNamesHead: 'Names as the sender entered them (not checked; the signatures themselves were checked):',
     hashIsOriginal: 'This is the file as it was before signing. The signature covers the signed version with the seal on it ({name}). Choose that file.',
     missingSignerPk: 'missing signer_public_key',
     missingEmailHash: 'missing party_email_hash (cannot reconstruct the signed message offline)',
@@ -387,10 +391,12 @@ function verifyV3Client(docHashHex) {
   // pdf/image sign the stamped document; other documents sign document_hash.
   const signedHash = env.stamped_hash || env.document_hash;
   if (!signedHash) errors.push(t('missingSignedHash'));
+  let isOriginal = false;
   if (docHashHex && signedHash && signedHash !== docHashHex) {
     // A pdf or image signs its stamped version. The file it was made from has
     // original_hash; recognise it and name the file that does verify.
     if (env.stamped_hash && env.original_hash === docHashHex) {
+      isOriginal = true;
       errors.push(t('hashIsOriginal', { name: String(env.stamped_filename || 'signed-…') }));
     } else {
       errors.push(t('hashMismatch'));
@@ -408,7 +414,11 @@ function verifyV3Client(docHashHex) {
     } catch { errors.push(t('appearanceInvalid')); }
   }
 
-  if (errors.length === 0) {
+  // The original next to its proof: the signature is still checked (it covers
+  // the stamped version, not this file), so the page can say "right pair, wrong
+  // file" in orange, the way the co-sign copy is treated (acceptance r2, 5).
+  let sigOk = false;
+  if (errors.length === 0 || (isOriginal && errors.length === 1)) {
     try {
       const msg = buildDocSignMessage(
         String(mp.envelope_id),
@@ -420,13 +430,14 @@ function verifyV3Client(docHashHex) {
         env.appearance,
       );
       const ok = ml_dsa65.verify(fromB64(env.signer_public_key), msg, fromB64(env.signature || ''));
-      if (!ok) errors.push(t('signerInvalid'));
+      if (!ok) errors.push(t('signerInvalid')); else sigOk = true;
     } catch { errors.push(t('signerError')); }
   }
   if (env.expires_at && new Date(env.expires_at) < new Date()) {
     errors.push(t('expired', { v: env.expires_at }));
   }
-  return { valid: errors.length === 0, errors };
+  const originalOnly = isOriginal && sigOk && errors.length === 1;
+  return { valid: errors.length === 0, errors, originalOnly };
 }
 
 function verifyMultiClient(docHashHex) {
@@ -702,10 +713,12 @@ async function renderResult(r) {
   const solo = r.valid && isV3 && !isMulti && envelope;
   const fpBad = solo && claimFingerprintBad(envelope);
   const banner = !r.valid
-    ? (r.copyOnly ? t('stampedCopy', { hash: esc(String(r.docHash || '').slice(0, 16)) }) : t('invalid'))
+    ? (r.copyOnly ? t('stampedCopy', { hash: esc(String(r.docHash || '').slice(0, 16)) })
+      : r.originalOnly ? t('originalFile', { name: esc(String((envelope && envelope.stamped_filename) || 'signed-…')) })
+      : t('invalid'))
     : r.test ? t('validTest') : fpBad ? t('fpTampered') : solo ? t('soloChecked') : t('valid');
   out.push(banner);
-  if (r.errors && r.errors.length && !r.copyOnly) {
+  if (r.errors && r.errors.length && !r.copyOnly && !r.originalOnly) {
     out.push('<ul style="margin-top:var(--space-3)">');
     r.errors.forEach(e => out.push('<li class="ps-help">' + esc(e) + '</li>'));
     out.push('</ul>');
@@ -720,7 +733,10 @@ async function renderResult(r) {
       const vars = { name, host: esc(a.host), fp: esc(String(a.fingerprint).slice(0, 16)), when: esc(a.retired_at || '') };
       out.push(a.retired_at ? t('notaryByRetired', vars) : t('notaryBy', vars));
     }
-    if (r.valid && !isMulti) out.push(v3ScopeHtml(envelope));
+    if ((r.valid || r.originalOnly) && !isMulti) out.push(v3ScopeHtml(envelope));
+    // The names in a multi-party proof are labels the sender typed: shown,
+    // and said for what they are (acceptance r2, 5).
+    if ((r.valid || r.copyOnly) && isMulti) out.push(partyNamesHtml(envelope));
   } else {
     const idx = envelope && envelope.notary && envelope.notary.ct_log_index;
     if (idx != null) out.push(t('ctIndex', { idx: esc(String(idx)) }));
@@ -757,6 +773,14 @@ async function renderResult(r) {
       $('vf-result').innerHTML = out.join('') + (attr.html || '');
     });
   }
+}
+
+function partyNamesHtml(env) {
+  const parties = Array.isArray(env && env.parties) ? env.parties : [];
+  const named = parties.filter((p) => p && p.label);
+  if (!named.length) return '';
+  return '<p class="ps-help">' + esc(t('partyNamesHead')) + '</p><ul>' +
+    named.map((p) => '<li class="ps-help">' + esc(String(p.label)) + (p.signed_at ? ' (' + esc(String(p.signed_at).slice(0, 10)) + ')' : '') + '</li>').join('') + '</ul>';
 }
 
 // The signer fingerprint written in a v3 solo proof, against the key that

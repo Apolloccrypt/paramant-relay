@@ -1421,12 +1421,10 @@ async function totpAccountLocked(userId) {
 }
 async function totpAccountFailed(userId) {
   const k = `paramant:user:totpfail:${userId}`;
-  const n = await redisClient.incr(k);
-  if (n === 1) await redisClient.expire(k, TOTP_FAIL_WINDOW_S);
+  const n = await redisCounter.incrInWindow(redisClient, k, TOTP_FAIL_WINDOW_S);
   if (n >= TOTP_ACCOUNT_FREE) {
     const ms = Math.min(TOTP_LOCK_MAX_MS, TOTP_LOCK_BASE_MS * 2 ** (n - TOTP_ACCOUNT_FREE));
     await redisClient.set(`paramant:user:totplock:${userId}`, '1', { PX: ms });
-    await redisClient.expire(k, Math.max(TOTP_FAIL_WINDOW_S, Math.ceil(ms / 1000)));
     return ms;
   }
   return 0;
@@ -2098,6 +2096,36 @@ function accountVan(userId) {
 // Returns '' when the account cannot be named. The caller then says so rather
 // than dropping a document somebody is waiting on: an unnamed sender is a worse
 // row, an invisible request is a worse product.
+// A signature on the sender's envelope was refused because the SENDER's
+// monthly signatures are used up. Mail the sender (not the signer), at most
+// once a day per envelope. No account numbers, no envelope id in the mail.
+async function notifySenderQuota(envelopeId, accountId) {
+  const to = senderLabelOf(accountId);
+  if (!to || !redisClient || !redisClient.isReady) return false;
+  const k = 'paramant:sign:quota-notice:' + crypto.createHash('sha256').update(String(envelopeId)).digest('hex').slice(0, 32);
+  const first = await redisClient.set(k, '1', { NX: true, EX: 86400 });
+  if (first !== 'OK') return false;
+  const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
+  const r = await mailer.stuur({
+    to,
+    subject: 'Een ondertekenaar wacht op uw tegoed',
+    text: tweetaligTekst('nl',
+      'Iemand probeerde een document te tekenen dat u ter ondertekening verstuurde, maar uw handtekeningen voor deze maand zijn op. De handtekening is niet gezet; het verzoek blijft openstaan.'
+      + '\n\nVerhoog uw plan of wacht tot volgende maand; daarna kan de ondertekenaar met dezelfde link tekenen.'
+      + '\n\n' + base + '/pricing',
+      'Someone tried to sign a document you sent for signing, but your signatures for this month are used up. The signature was not recorded; the request stays open.'
+      + '\n\nUpgrade your plan or wait until next month; then the signer can sign with the same link.'),
+    html: tweetaligHtml('nl',
+      '<p>Iemand probeerde een document te tekenen dat u ter ondertekening verstuurde, maar uw handtekeningen voor deze maand zijn op. De handtekening is niet gezet; het verzoek blijft openstaan.</p>'
+      + '<p>Verhoog uw plan of wacht tot volgende maand; daarna kan de ondertekenaar met dezelfde link tekenen.</p>'
+      + '<p><a href="' + base + '/pricing">Plannen bekijken</a></p>',
+      '<p>Someone tried to sign a document you sent for signing, but your signatures for this month are used up. The signature was not recorded; the request stays open.</p>'
+      + '<p>Upgrade your plan or wait until next month; then the signer can sign with the same link.</p>'),
+  });
+  log('info', 'sender_quota_notice', { delivered: !!(r && r.ok) });
+  return !!(r && r.ok);
+}
+
 function senderLabelOf(accountId) {
   if (!accountId) return '';
   const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
@@ -10898,6 +10926,11 @@ async function handleRelayRequest(req, res) {
           log('info', 'quota_sign_declined', { account: String(meterAccountId).slice(0, 12), plan: _signEnt.tier, reason: 'quota', limit: _signIncluded, used: _g.used, billed_to: billedToSender ? 'sender' : 'signer' });
           res.writeHead(402, { 'Content-Type': 'application/json' });
           if (billedToSender) {
+            // The sender hears it too, once a day per envelope: the signer's
+            // page says "the sender has been told", and until now nobody told
+            // them (acceptance r2, 6). Fire-and-forget: the signer's answer
+            // never waits on a mail provider.
+            notifySenderQuota(id, meterAccountId).catch(() => {});
             // The invitee did nothing wrong and has nothing to buy: it is the
             // sender's month that is full. No upgrade pitch, no numbers from the
             // sender's account, just what happened and who can fix it.

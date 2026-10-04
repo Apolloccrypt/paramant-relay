@@ -163,6 +163,9 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .ink-style legend{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);padding:0 4px}
 .ink-style .ink-choice{display:flex;align-items:center;gap:8px;font-size:13px;min-height:36px;cursor:pointer}
 .ink-name{margin-top:6px;font-family:"Times New Roman",Times,serif;font-style:italic;font-size:20px;color:#1D4ED8;background:#FFFFFF}
+/* A name the pdf writes upright in Noto Sans (letters outside Times Italic) is shown upright too. */
+@font-face{font-family:"ParaSign Noto";src:url(/vendor/fonts/NotoSans-ParaSign.ttf?v=1) format("truetype");font-display:swap}
+.appearance-field .ink.ink-sans,.ink-name.ink-sans{font-family:"ParaSign Noto","Noto Sans",var(--sans),sans-serif;font-style:normal}
 .ink-pad{display:block;width:100%;height:130px;margin-top:6px;border:1px dashed var(--ink-hair);background:#FFFFFF;touch-action:none;cursor:crosshair}
 .ink-style .btn{width:auto;margin-top:8px}
 .cta-note{font-size:12px;line-height:1.6;color:var(--ink-dim);margin-top:10px}
@@ -380,6 +383,6 @@ body.needs-login #sign-intro{display:none}
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=7" defer></script>
-<script type="module" src="/co-sign.js?v=31"></script>
+<script type="module" src="/co-sign.js?v=32"></script>
 </body>
 </html>

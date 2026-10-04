@@ -54,7 +54,17 @@ const L = (nl, en) => (EN ? en : nl);
 function $(id) { return document.getElementById(id); }
 function showStep(id) { document.querySelectorAll('.step').forEach((s) => s.classList.remove('active')); $(id).classList.add('active'); }
 
-function showError(m) { $('error-msg').textContent = m; showStep('step-error'); }
+// kind 'busy': a rate limit, so the head says "wait", not "the link is
+// invalid or expired" (acceptance r2, 4).
+function showError(m, kind) {
+  $('error-msg').textContent = m;
+  const step = $('step-error');
+  const h = step && step.querySelector('h1'), sub = step && step.querySelector('.sub');
+  if (step && !step.dataset.h1) { step.dataset.h1 = h ? h.textContent : ''; step.dataset.sub = sub ? sub.textContent : ''; }
+  if (h) h.textContent = kind === 'busy' ? L('Even te druk', 'Busy for a moment') : kind === 'fault' ? L('Even een storing', 'A fault for a moment') : step.dataset.h1;
+  if (sub) sub.textContent = kind === 'busy' ? L('De link is in orde. Er kwamen even te veel verzoeken tegelijk binnen.', 'The link is fine. Too many requests came in at once.') : kind === 'fault' ? L('De link is in orde. Het ligt aan ons.', 'The link is fine. The fault is ours.') : step.dataset.sub;
+  showStep('step-error');
+}
 function toHex(u8) { let s = ''; for (let i = 0; i < u8.length; i++) s += u8[i].toString(16).padStart(2, '0'); return s; }
 function toB64(u8) { let s = ''; for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]); return btoa(s); }
 function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -216,6 +226,21 @@ function closedExplanation(state) {
   return '';
 }
 
+// The same moments, said to the SENDER on their own status page: they are the
+// one who would send a new request, so "ask the sender" was wrong there
+// (acceptance r2, 2). A refusal names who refused, as the mail promises.
+function ownerClosedExplanation(state, env) {
+  if (state === 'declined') {
+    const d = (env && Array.isArray(env.parties) ? env.parties : []).find((p) => p && p.status === 'declined');
+    const who = d ? (d.label || L('ondertekenaar ', 'signer ') + (Number(d.index || 0) + 1)) : L('een ondertekenaar', 'a signer');
+    const when = d && d.declined_at ? L(' op ', ' on ') + humanDate(d.declined_at) : '';
+    return L('Geweigerd door ', 'Declined by ') + who + when + L('. Daarmee is dit verzoek gestopt en kan niemand er nog op tekenen. Wilt u het opnieuw proberen, stuur dan een nieuw verzoek.', '. This request has stopped and nobody can sign it any more. To try again, send a new request.');
+  }
+  if (state === 'cancelled') return L('U hebt dit verzoek ingetrokken. Niemand kan er nog op tekenen.', 'You withdrew this request. Nobody can sign it any more.');
+  if (state === 'expired') return L('De termijn om te tekenen is voorbij. Wilt u het opnieuw proberen, stuur dan een nieuw verzoek.', 'The signing period has ended. To try again, send a new request.');
+  return '';
+}
+
 // ---------- boot ----------
 async function init() {
   const params = new URLSearchParams(location.search);
@@ -243,8 +268,8 @@ async function init() {
     const partyQuery = '?p=' + encodeURIComponent(partyIndex) + '&t=' + encodeURIComponent(__inviteToken);
     const r = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(envId) + partyQuery);
     if (r.status === 404) return showError(L('Dit verzoek bestaat niet, is verlopen of is al gebruikt.', 'This request does not exist, has expired, or was already used.'));
-    if (r.status === 429) return showError(L('Te veel verzoeken vanaf dit adres. Probeer het over een minuut opnieuw.', 'Too many requests from this address. Try again in a minute.'));
-    if (!r.ok) return showError(L('Het verzoek kon nu niet worden opgehaald door een storing bij ons. Er is niets mis met uw link. Probeer het over een paar minuten opnieuw.', 'The request could not be fetched right now because of a fault on our side. Nothing is wrong with your link. Please try again in a few minutes.'));
+    if (r.status === 429) return showError(L('Te veel verzoeken vanaf dit adres. Probeer het over een minuut opnieuw.', 'Too many requests from this address. Try again in a minute.'), 'busy');
+    if (!r.ok) return showError(L('Het verzoek kon nu niet worden opgehaald door een storing bij ons. Er is niets mis met uw link. Probeer het over een paar minuten opnieuw.', 'The request could not be fetched right now because of a fault on our side. Nothing is wrong with your link. Please try again in a few minutes.'), 'fault');
     const data = await r.json();
     __envelope = data.envelope;
     if (__partyIndex >= __envelope.party_count) return showError(L('Deze link verwijst naar een ondertekenaar die niet in dit verzoek staat.', 'This link points to a signer who is not part of this request.'));
@@ -362,6 +387,19 @@ function renderEnvelope() {
   wireInkControls(me);
 }
 
+// The characters the PDF standard fonts (WinAnsi) can write: Latin-1 plus the
+// few extra WinAnsi glyphs. Anything else goes through Noto Sans in the pdf.
+const WINANSI_EXTRA = '\u20ac\u201a\u0192\u201e\u2026\u2020\u2021\u02c6\u2030\u0160\u2039\u0152\u017d\u2018\u2019\u201c\u201d\u2022\u2013\u2014\u02dc\u2122\u0161\u203a\u0153\u017e\u0178';
+function inStdItalic(text) {
+  for (const ch of String(text || '')) {
+    const c = ch.codePointAt(0);
+    if ((c >= 0x20 && c <= 0x7e) || (c >= 0xa0 && c <= 0xff)) continue;
+    if (WINANSI_EXTRA.includes(ch)) continue;
+    return false;
+  }
+  return true;
+}
+
 // ---------- the signer's own handwriting ----------
 function wireInkControls(me) {
   const nameInput = $('ink-name');
@@ -369,6 +407,7 @@ function wireInkControls(me) {
   const setTyped = () => {
     const text = (nameInput && nameInput.value || '').trim() || me.label || '';
     __ink = text ? { kind: 'type', text } : null;
+    if (nameInput) nameInput.classList.toggle('ink-sans', !inStdItalic(text));
     renderAppearanceOverlays();
   };
   const radios = document.querySelectorAll('input[name="ink-style"]');
@@ -1154,6 +1193,10 @@ function addAppearanceNode(layer, field, party, current, requested) {
     } else {
       mark.textContent = ink.text;
     }
+    // The pdf writes a typed name in Times Italic only when every character
+    // is in that font; "Ayşe Yılmaz" comes out upright in Noto Sans. The screen
+    // shows the same, not a cursive the pdf will not have (acceptance r2, 7).
+    if (ink.kind !== 'draw' && !inStdItalic(paraaf ? (initialsFrom(ink.text || partyName(party)) || '') : ink.text)) mark.classList.add('ink-sans');
     // A long name shrinks to fit the width instead of running out of the box.
     if (ink.kind !== 'draw') mark.style.setProperty('--len', String(Math.max(4, (paraaf ? (initialsFrom(ink.text) || '·') : ink.text).length)));
     node.appendChild(mark);
@@ -1555,7 +1598,15 @@ async function initOwner(resultRef, ownerId) {
     const state = envelopeState(__envelope);
     setStatus(state === 'complete' ? 'ok' : state === 'open' ? '' : 'err', state === 'complete'
       ? L('Iedereen heeft getekend. Download hieronder het complete document en het bewijs.', 'Everyone has signed. Download the complete document and the proof below.')
-      : (closedExplanation(state) || L('Nog niet iedereen heeft getekend.', 'Not everyone has signed yet.')));
+      : (ownerClosedExplanation(state, __envelope) || L('Nog niet iedereen heeft getekend.', 'Not everyone has signed yet.')));
+    // A stopped request has nothing to open or download: no red "choose the
+    // original" with a button that leads nowhere, and no fetch that only
+    // answers 410 (acceptance r2, 2).
+    if (state === 'declined' || state === 'cancelled' || state === 'expired') {
+      setDeliveryStatus('', L('Dit verzoek is gestopt. Er komt geen getekend document en geen bewijs.', 'This request has stopped. There will be no signed document and no proof.'));
+      const rc = $('result-card'); if (rc) rc.hidden = true;
+      return;
+    }
     // The whole key was kept on this device when the request was sent. On
     // another device the sender opens their own original file instead.
     const fragment = ownerKeyFragment(envId, state, __envelope);
@@ -1746,7 +1797,7 @@ async function doSign() {
     // sender_sign_quota_reached): nothing for the signer to buy, so no upgrade
     // pitch, just what is going on and who can fix it.
     if (e && e.status === 402 && e.data && e.data.error === 'sender_sign_quota_reached') {
-      setStatus('err', L('Het tegoed van de afzender voor deze maand is op. Uw handtekening is niet gezet. Laat de afzender weten dat het verzoek daarop wacht.', 'The sender has used up this month\'s allowance. Your signature was not recorded. Let the sender know the request is waiting on it.'));
+      setStatus('err', L('Het tegoed van de afzender voor deze maand is op. Uw handtekening is niet gezet. De afzender krijgt daar een e-mail over; u kunt later met dezelfde link tekenen.', 'The sender has used up this month\'s allowance. Your signature was not recorded. The sender gets an email about it; you can sign later with the same link.'));
       $('sign-confirm').disabled = false;
       return;
     }

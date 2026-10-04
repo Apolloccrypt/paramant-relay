@@ -257,7 +257,7 @@ main.acct input::placeholder { color: var(--ink-3); }
     <div class="acct-block">
       <h3>Authenticator app</h3>
       <p>Connected. Your app shows a new 6-digit code every 30 seconds.</p>
-      <details class="small"><summary>Technical details</summary><p class="small">TOTP per RFC 6238, with SHA-256, a 30-second step and 6 digits.</p></details>
+      <details class="small"><summary style="padding:12px 0;cursor:pointer">Technical details</summary><p class="small">TOTP per RFC 6238, with SHA-256, a 30-second step and 6 digits.</p></details>
       <button type="button" class="btn btn-secondary btn-small" id="reset-totp">Set up a new authenticator</button>
       <p class="small mt-2">Your current authenticator codes stop working. You then scan a new QR code.</p>
     </div>

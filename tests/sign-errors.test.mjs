@@ -243,7 +243,7 @@ test("402 sender_sign_quota_reached: the sender's allowance, no upgrade pitch", 
   await readyOnePage(page);
   await clickPage(page, 0, 0.5, 0.8);
   const res = await signAndDownload(page);
-  assert.match(res.error, /Het tegoed van de afzender voor deze maand is op; de afzender is op de hoogte\./);
+  assert.match(res.error, /Het tegoed van de afzender voor deze maand is op; de afzender krijgt daar een e-mail over\./);
   assert.equal(await page.locator('#ds-sign-status a').count(), 0, 'no upgrade link');
   await page.context().close();
 });

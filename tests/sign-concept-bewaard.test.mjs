@@ -67,6 +67,8 @@ await page.locator('#ds-pdf-canvas-list .ds-page-wrap[data-page-index="1"] canva
 await page.waitForTimeout(400);
 await page.locator('#ds-pdf-canvas-list .ds-page-wrap[data-page-index="1"]').click({ position: { x: 200, y: 300 } });
 const before = await page.evaluate(() => { const m = document.querySelector('.ds-stamp-marker'); const w = m.closest('.ds-page-wrap'); return { page: w.dataset.pageIndex, left: m.style.left, top: m.style.top }; });
+// The paraaf, required for everyone (acceptance r2, 3: it came back OFF).
+await page.locator('#ds-invite-paraaf').check();
 await page.locator('#ds-place-continue').click();
 await page.locator('#step-recipients:not([hidden])').waitFor({ timeout: 20000 });
 await page.locator('#ds-add-recipient').click();
@@ -114,6 +116,11 @@ const restored = await page.evaluate(() => ({
   hint: document.getElementById('ds-recipients-hint')?.textContent || '',
   marker: (() => { const m = document.querySelector('.ds-stamp-marker'); if (!m) return null; const w = m.closest('.ds-page-wrap'); return { page: w.dataset.pageIndex, left: m.style.left, top: m.style.top }; })(),
 }));
+// Back to Place: the paraaf box is still on, and no solo paraaf preview.
+await page.locator('#ds-recipients-back').click();
+await page.locator('#step-place:not([hidden])').waitFor({ timeout: 10000 });
+await page.waitForTimeout(800);
+const backOnPlace = await page.evaluate(() => ({ paraaf: document.getElementById('ds-invite-paraaf').checked, ghosts: document.querySelectorAll('.ds-stamp-ghost').length }));
 const left = await page.evaluate(() => new Promise((resolve) => {
   const r = indexedDB.open('paramant-sign-draft');
   r.onsuccess = () => { try { const g = r.result.transaction('kv').objectStore('kv').get('current'); g.onsuccess = () => resolve(!!g.result); g.onerror = () => resolve(false); } catch { resolve(false); } };
@@ -170,6 +177,11 @@ test('na het inloggen staan document, plek, ontvangers en bericht weer klaar', (
   assert.ok(restored.marker, 'de plek voor de handtekening staat er weer');
   assert.equal(restored.marker.page, before.page, 'op dezelfde pagina');
   assert.match(restored.hint, /Welkom terug/);
+});
+
+test('na Terug staat "paraaf verplicht" nog aan, zonder solo-paraafvoorbeeld', () => {
+  assert.equal(backOnPlace.paraaf, true);
+  assert.equal(backOnPlace.ghosts, 0);
 });
 
 test('het concept is weg zodra het is teruggezet', () => {

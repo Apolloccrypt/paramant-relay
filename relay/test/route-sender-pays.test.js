@@ -61,7 +61,8 @@ before(async () => {
         { key: BIZ, plan: 'community', plan_parasign: 'business', active: true, email: 'biz@example.test', account_id: BIZ_ACCT },
       ],
     },
-    env: { REDIS_URL: process.env.REDIS_URL || DEFAULT_REDIS, ADMIN_TOKEN: ADMIN, INTERNAL_AUTH_TOKEN: INTERNAL },
+    env: { REDIS_URL: process.env.REDIS_URL || DEFAULT_REDIS, ADMIN_TOKEN: ADMIN, INTERNAL_AUTH_TOKEN: INTERNAL, MAIL_PROVIDER: 'dryrun' },
+    captureLog: true,
   });
 });
 
@@ -134,6 +135,18 @@ test('SENDER PAYS: a full sender month stops the signature, and says it is the s
   assert.ok(/afzender/.test(r.json.message), 'the refusal must say whose month is full');
   assert.strictEqual(await used(FREE_ACCT), 0, 'a refused signature was charged to the signer');
   assert.strictEqual(await used(FIRM_ACCT), 100, 'a refused signature still took a slot');
+  // Acceptance r2, 6: the signer's page says the sender is told; now the sender
+  // really gets a mail, once a day per envelope, to the sender's address.
+  await new Promise((res) => setTimeout(res, 400));
+  const log1 = srv.log();
+  const mails = (log1.match(/mail_dryrun[^\n]*firm@example\.test/g) || []).length;
+  assert.ok(mails >= 1, 'no mail to the sender: ' + log1.slice(-1500));
+  assert.ok(!/mail_dryrun[^\n]*free@example\.test/.test(log1), 'the signer got the sender\'s mail');
+  const again = await adminSign(env, 0, signer, FREE);
+  assert.strictEqual(again.status, 402);
+  await new Promise((res) => setTimeout(res, 400));
+  const mails2 = (srv.log().match(/mail_dryrun[^\n]*firm@example\.test/g) || []).length;
+  assert.strictEqual(mails2, mails, 'a second try the same day mails again');
   await rc.del(signKey(FIRM_ACCT));
   did();
 });

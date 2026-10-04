@@ -102,6 +102,13 @@ test('b+d. /co-sign: het kruisje dekt de getypte naam niet af, en de naam komt z
   // not as "Ay?e Y?lmaz".
   await page.locator('#ink-name').fill('Ayşe Yılmaz');
   await page.locator('#ink-name').dispatchEvent('input');
+  // Acceptance r2, 7: the screen shows the name the way the pdf writes it
+  // (upright Noto Sans for letters Times Italic does not have), not cursive serif.
+  await page.waitForTimeout(200);
+  const shown = await page.evaluate(() => {
+    const ink = document.querySelector('.appearance-field .ink');
+    return ink ? getComputedStyle(ink).fontStyle : null;
+  });
   const pdfText = await page.evaluate(async () => {
     const mod = await import(document.querySelector('script[src*="co-sign.js"]').getAttribute('src'));
     const out = await mod.buildSignedPdf({ appearance: window.__cosignDebug.appearance(), signed_at: '2026-10-04T12:00:00.000Z' });
@@ -112,6 +119,7 @@ test('b+d. /co-sign: het kruisje dekt de getypte naam niet af, en de naam komt z
   });
   await page.close();
   assert.match(pdfText, /Ayşe Yılmaz/, 'de naam staat zoals getypt in de pdf: ' + pdfText.slice(0, 200));
+  assert.equal(shown, 'normal', 'op het scherm rechtop, zoals in de pdf (niet cursief)');
   assert.ok(r, 'er staat een handtekeningveld met een kruisje');
   assert.equal(r.overlap, false, `het kruisje ligt over "${r.text}"`);
 });

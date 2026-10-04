@@ -142,6 +142,8 @@ for (const o of outcomes) {
     if (!run.valid.test(result)) throw new Error(where + result);
     if (!run.offline.test(result)) throw new Error(where + 'offline result missing');
     if (!run.pinned.test(result)) throw new Error(where + 'pinned relay not named: ' + result);
+    // Acceptance r2, 5: the names, as the sender entered them, labelled unchecked.
+    if (!/Signer Demo/.test(result) || !/niet gecontroleerd|not checked/.test(result)) throw new Error(where + 'party names not shown as unchecked: ' + result);
     if (!/\bok\b/.test(banner) || mark !== '✓') throw new Error(where + 'valid verdict lacks the green check: ' + banner + ' ' + mark);
   }
   if (kind === 'forged') {

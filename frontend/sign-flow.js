@@ -507,7 +507,7 @@ function limitMessage(e) {
   if (!e) return null;
   const code = (e.data && e.data.error) || e.message || '';
   if (e.status === 402 && code === 'sender_sign_quota_reached') {
-    return L('Het tegoed van de afzender voor deze maand is op; de afzender is op de hoogte.', "The sender's signing allowance for this month is used up; the sender has been told.");
+    return L('Het tegoed van de afzender voor deze maand is op; de afzender krijgt daar een e-mail over.', "The sender's signing allowance for this month is used up; the sender gets an email about it.");
   }
   if (e.status === 429 || code === 'http_429' || code === 'too_many_requests') {
     // Retry-After as the relay and admin put it in the body (the header is not
@@ -1229,6 +1229,9 @@ function placeStepHidden() {
 function reflowGhostStamps() {
   if (placeStepHidden()) return;   // a hidden page measures 0 wide; redrawn on entry
   document.querySelectorAll('.ds-stamp-ghost').forEach(el => el.remove());
+  // In the invite flow nothing of the requester's is stamped: no solo paraaf
+  // preview there (acceptance r2, 3).
+  if (state.signingMode === 'invite') return;
   if (!state.stampAllPages || !state.stamp || !placeState || placeState.isImage || !state.doc) return;
   if (!hasInlineSeal()) return;
   const textBoxes = textBoxesIfReady(state.doc.bytes);
@@ -1311,6 +1314,9 @@ function applyPlacementTemplate() {
 function setStampAllPages(on, save = true) {
   state.stampAllPages = !!on;
   const cb = $('ds-allpages'); if (cb) cb.checked = state.stampAllPages;
+  // The invite flow has its own box ("Paraaf verplicht voor iedereen"); a
+  // restored draft set only the solo one (acceptance r2, 3).
+  const inv = $('ds-invite-paraaf'); if (inv) inv.checked = state.signingMode === 'invite' && state.stampAllPages;
   reflowGhostStamps();
   if (save) savePlacementTemplate();
 }
@@ -2152,6 +2158,7 @@ function onPlaceClick(e) {
   $('ds-place-hint').textContent = isImage
     ? L('Stempel op de afbeelding geplaatst. Klik op een andere plek om hem te verplaatsen.', 'Stamp placed on the image. Click another spot to move it.')
     : L('Stempel op pagina ', 'Stamp on page ') + (wrap._pdfPage.index + 1) + L('. Klik op een andere plek om hem te verplaatsen.', '. Click another spot to move it.');
+  if (!isImage) checkSoloStampCover().catch(() => {});
 }
 
 function renderStampMarker(wrap, left, top, w, h) {
@@ -2187,6 +2194,80 @@ function commitStampFromMarker(marker, wrap) {
   }
   reflowGhostStamps();          // drag/resize moved the seal: follow with the ghosts
   savePlacementTemplate();      // and keep the reusable template in sync
+  scheduleSoloCoverCheck();
+}
+
+// ── Solo: the stamp over the text (acceptance r2, 1) ─────────────────────────
+// /co-sign never signs over text, but a solo signer could drop the stamp on
+// the last articles of a contract without a word. Now the hint says so and
+// offers the two ways out co-sign has: a free spot on this page, or a
+// separate signature sheet. It warns, it does not block: it is the signer's
+// own document.
+const SOLO_COVER_LIMIT = 0.15;
+function stampTextCover(st, boxes) {
+  if (!st || !Array.isArray(boxes)) return 0;
+  let area = 0;
+  for (const t of boxes) {
+    const w = Math.min(st.x + st.w, t.x + t.w) - Math.max(st.x, t.x);
+    const h = Math.min(st.y + st.h, t.y + t.h) - Math.max(st.y, t.y);
+    if (w > 0 && h > 0) area += w * h;
+  }
+  return area / (st.w * st.h);
+}
+// The free spot nearest to where the stamp is now, same size, nothing of the
+// text under it (3 pt room). PDF points, bottom-left origin. null if none.
+function nearestFreeStampSpot(st, boxes, page) {
+  if (!st || !page) return null;
+  const pad = 3, step = 6;
+  const padded = (boxes || []).map((t) => ({ x: t.x - pad, y: t.y - pad, w: t.w + 2 * pad, h: t.h + 2 * pad }));
+  const free = (x, y) => !padded.some((t) => x < t.x + t.w && t.x < x + st.w && y < t.y + t.h && t.y < y + st.h);
+  const cx = st.x + st.w / 2, cy = st.y + st.h / 2;
+  let best = null;
+  for (let y = 8; y + st.h <= page.height - 8; y += step) {
+    for (let x = 8; x + st.w <= page.width - 8; x += step) {
+      if (!free(x, y)) continue;
+      const d = Math.hypot(x + st.w / 2 - cx, y + st.h / 2 - cy);
+      if (!best || d < best.d) best = { x, y, d };
+    }
+  }
+  return best ? { x: best.x, y: best.y } : null;
+}
+let _soloCoverTimer = 0;
+function scheduleSoloCoverCheck() {
+  clearTimeout(_soloCoverTimer);
+  _soloCoverTimer = setTimeout(() => { checkSoloStampCover().catch(() => {}); }, 250);
+}
+async function checkSoloStampCover() {
+  if (state.signingMode === 'invite' || state.mode !== 'pdf' || !state.stamp || state.stamp.isImage || !hasInlineSeal()) return;
+  const all = await loadTextBoxes(state.doc.bytes);
+  const st = state.stamp;
+  const boxes = all && all[st.pageIndex];
+  if (!Array.isArray(boxes) || stampTextCover(st, boxes) <= SOLO_COVER_LIMIT) return;
+  if (state.stamp !== st) return;   // moved again in the meantime
+  const hint = $('ds-place-hint');
+  if (!hint) return;
+  hint.textContent = L('Deze handtekening staat op de tekst van pagina ', 'This signature sits on the text of page ') + (st.pageIndex + 1)
+    + L('. Kies een vrije plek of een apart handtekeningblad, zodat de tekst leesbaar blijft. ', '. Pick a free spot or a separate signature sheet, so the text stays readable. ');
+  hint.dataset.cover = '1';
+  const page = state.stampPage || null;
+  const spot = nearestFreeStampSpot(st, boxes, page);
+  if (spot) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn btn-secondary btn-small'; b.id = 'ds-cover-free';
+    b.textContent = L('Zet hem op een vrije plek', 'Move it to a free spot');
+    b.addEventListener('click', () => {
+      state.stamp = { ...state.stamp, x: spot.x, y: spot.y };
+      reflowStampMarker(); reflowGhostStamps(); savePlacementTemplate();
+      delete hint.dataset.cover;
+      setPlaceHint(L('Stempel op pagina ', 'Stamp on page ') + (state.stamp.pageIndex + 1) + L(', op een vrije plek. Klik op een andere plek om hem te verplaatsen.', ', on a free spot. Click another spot to move it.'));
+    });
+    hint.append(b, ' ');
+  }
+  const sheet = document.createElement('button');
+  sheet.type = 'button'; sheet.className = 'btn btn-secondary btn-small'; sheet.id = 'ds-cover-sheet';
+  sheet.textContent = L('Gebruik een handtekeningblad', 'Use a signature sheet');
+  sheet.addEventListener('click', () => { delete hint.dataset.cover; setSealPlacement('sheet'); });
+  hint.append(sheet);
 }
 
 // A bottom-right corner grip that scales the seal uniformly (keeps its aspect
@@ -4291,7 +4372,7 @@ function wireNav() {
     if (rErr) { showRecipientsHint(rErr, true); return; }
     if (state.signingMode === 'invite') {
       if (state.recipients.length === 0) { showRecipientsHint(L('Voeg minstens één persoon toe om dit naar te sturen.', 'Add at least one person to send this to.'), true); return; }
-      sendForSignature();
+      sendAfterAllowanceCheck();
     } else {
       setActive('step-identity');
     }
@@ -4478,9 +4559,11 @@ async function restoreDraft(draft) {
     state.stampPage = m.stampPage ? { ...m.stampPage } : state.stampPage;
     if (m.sealPlacement) state.sealPlacement = m.sealPlacement;
     reflowStampMarker();
-    setStampAllPages(!!m.stampAllPages, false);
     $('ds-place-continue').disabled = false;
   }
+  // The paraaf choice comes back too, also without a box (an invite may ask
+  // for the paraaf without pointing at a spot).
+  if (state.mode === 'pdf') setStampAllPages(!!m.stampAllPages, false);
   state.recipients = Array.isArray(m.recipients) ? m.recipients.map((r) => ({ label: r.label || '', email: r.email || '' })) : [];
   state.inviteSubject = m.inviteSubject || '';
   state.inviteMessage = m.inviteMessage || '';
@@ -4598,6 +4681,39 @@ function applySignedOut() {
 // (js/sign-draft.js, the bytes encrypted, wiped after two hours or once sent),
 // and /sign?herstel=1 puts it all back after the sign-in. sessionStorage could
 // not: a scanned contract is megabytes and it holds about 5MB per origin.
+// Every signature on an invitation counts on the SENDER's month. A sender
+// with too little left could send, and the signer stranded on "the sender's
+// allowance is used up" (acceptance r2, 6). So: look first, say it, and send
+// only on a second, deliberate click. Unknown (no answer, unlimited): send.
+let _allowanceAcked = '';
+async function senderSignsLeft() {
+  try {
+    const r = await fetch('/api/user/dashboard/overview', { credentials: 'include', cache: 'no-store' });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const cap = d && d.quota && d.quota.caps ? d.quota.caps.signs : null;
+    const used = Number(d && d.quota && d.quota.signs) || 0;
+    return typeof cap === 'number' && Number.isFinite(cap) ? Math.max(0, cap - used) : null;
+  } catch { return null; }
+}
+async function sendAfterAllowanceCheck() {
+  const need = state.recipients.length;
+  const key = String(need);
+  if (_allowanceAcked !== key) {
+    const left = await senderSignsLeft();
+    if (left !== null && left < need) {
+      _allowanceAcked = key;
+      showRecipientsHint(L('Uw tegoed is bijna of helemaal op: u hebt deze maand nog ', 'Your allowance is (almost) used up: you have ') + left
+        + L(left === 1 ? ' handtekening over' : ' handtekeningen over', left === 1 ? ' signature left this month' : ' signatures left this month')
+        + L(', en dit verzoek vraagt er ', ', and this request needs ') + need
+        + L('. Elke handtekening telt op uw tegoed. Wie geen plek meer heeft, kan pas tekenen als u uw plan verhoogt of na het begin van de volgende maand. Klik nogmaals op Versturen om toch te versturen, of bekijk de plannen op /pricing.', '. Every signature counts on your allowance. Anyone past it can only sign once you upgrade or after the start of next month. Click Send again to send anyway, or see the plans on /pricing.'), true);
+      return;
+    }
+  }
+  _allowanceAcked = '';
+  sendForSignature();
+}
+
 function applySessionToSendButton() {
   const cont = $('ds-recipients-continue');
   if (!cont) return;
