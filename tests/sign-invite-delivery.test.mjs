@@ -137,15 +137,26 @@ await page.locator('#step-done:not([hidden])').waitFor({ timeout: 15000 });
 const firstInvite = invitationCalls[0]?.invitations?.[0];
 const firstUrl = firstInvite ? new URL(firstInvite.invite_url) : null;
 ok('document is uploaded once as an encrypted capsule', documentUploads.length === 1 && documentUploads[0].body?.subarray(0, 4).toString() === 'PSDC', JSON.stringify({ count: documentUploads.length, magic: documentUploads[0]?.body?.subarray(0, 4).toString() }));
-// The email is the notice; the key is not in it. The browser cuts the fragment
-// off before the invitation is posted, so the document key never reaches our
-// own server and can never be forwarded to a mail provider outside the EU.
-// What the sender is given instead is the complete link, on the screen, to pass
-// on over a channel they choose.
-ok('the posted invitation carries no document key', firstUrl && firstUrl.hash === '' && !firstInvite.invite_url.includes('#'), firstInvite?.invite_url);
+// The email never carries the document key. Since 2026-10-04 it carries HALF
+// of a split key ('#ks='): the other half went to the relay with the capsule
+// and is released only to the signed-in invitee. Each half alone is random;
+// together (xor) they are exactly the key in the sender's own complete link.
+const b64u = (v) => Buffer.from(String(v || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+const shareA = /^#ks=v1\.([A-Za-z0-9_-]{43})$/.exec(firstUrl?.hash || '');
+const shareB = documentUploads[0]?.headers?.['x-document-key-share'] || '';
+ok('the posted invitation carries a key share, never the key', !!shareA && !firstInvite.invite_url.includes('doc='), firstInvite?.invite_url);
+ok('the other share goes to the relay with the capsule, not in the mail', /^[A-Za-z0-9_-]{43}$/.test(shareB) && shareB !== shareA?.[1], shareB);
 ok('the posted invitation still names the request itself', firstUrl?.pathname === '/co-sign' && firstUrl?.searchParams.get('env') === ENV_ID && /^t{43}$/.test(firstUrl?.searchParams.get('t') || ''), firstUrl?.href);
-ok('the sender is shown the complete link, key and all', /#doc=v1\.[A-Za-z0-9_-]{43}$/.test((await page.locator('.ds-pl-url').first().getAttribute('title')) || ''), await page.locator('.ds-pl-url').first().getAttribute('title'));
-ok('the screen says the sender has to hand that link over', /stuur nu de links|stuur iedereen hieronder de eigen link|de link nog van u nodig|de sleutel zit in de link/i.test(await page.locator('#step-done').innerText()), await page.locator('#step-done').innerText().then((t) => t.slice(0, 220)));
+const fullLink = (await page.locator('.ds-pl-url').first().getAttribute('title')) || '';
+ok('the sender is shown the complete link, key and all', /#doc=v1\.[A-Za-z0-9_-]{43}$/.test(fullLink), fullLink);
+{
+  const whole = b64u(/#doc=v1\.([A-Za-z0-9_-]{43})$/.exec(fullLink)?.[1]);
+  const a = b64u(shareA?.[1]), b = b64u(shareB);
+  const joined = Buffer.alloc(32); for (let i = 0; i < 32; i++) joined[i] = a[i] ^ b[i];
+  ok('the two shares together are exactly the document key', whole.length === 32 && joined.equals(whole), whole.length);
+}
+// This run has a failed mail: whoever did not get one still needs the link.
+ok('the screen says a signer without a delivered mail needs the link', /eigen link van u nodig|stuur de persoonlijke links hieronder zelf/i.test(await page.locator('#step-done').innerText()), await page.locator('#step-done').innerText().then((t) => t.slice(0, 220)));
 ok('email invitation is bound to the intended party and address', firstInvite?.party_index === 0 && firstInvite?.email === 'signer@example.com', JSON.stringify(firstInvite));
 ok('partial email failure is not shown as success', /niet elk bericht is bezorgd/i.test(await page.locator('#ds-success-banner').innerText()), await page.locator('#ds-success-banner').innerText());
 ok('failed email offers a retry', await page.locator('#ds-invite-retry').isVisible(), await page.locator('#ds-invite-retry').innerText());

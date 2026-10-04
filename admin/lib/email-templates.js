@@ -933,16 +933,24 @@ ${BASE_URL}`;
 // handled in readable form. The recipient reads the name once the link has
 // opened the document in their own browser.
 //
-// This is why the function takes neither a documentName nor a flag for whether
-// the link carries a key: there is one kind of invitation mail now, and it is
-// the one that can be posted abroad without contradicting the site.
+// SINCE 2026-10-04: HALF A KEY, NEVER A KEY. A link that only named the request
+// meant the invitee could not see the document without a second link from the
+// sender, and a customer's counterparty then signed blind or gave up. So the
+// sender's browser splits the document key in two: A xor B = K. The mail link
+// carries A ('#ks=v1.<43>'), the relay keeps B next to the ciphertext and
+// releases it only to the invited mailbox after it signs in. The mail provider
+// holds A and no ciphertext; the relay holds B and the ciphertext; neither can
+// open the document, and the site's promise that no US party holds a key
+// stays true. A whole key ('#doc=') is still cut off below, whatever happens
+// upstream.
 function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt, subject, message, envelopeId, partyIndex, lang }) {
   // The last gate before the mail provider, and the one that holds even when
-  // the two in front of it are wrong. The browser cuts the fragment off before
-  // it posts the invitation, and the invitations endpoint refuses a link that
-  // still has one; this cuts it again. A key arriving here is a bug upstream,
-  // and an outgoing mail is the worst possible place to discover it.
-  const noticeUrl = String(inviteUrl || '').split('#')[0];
+  // the two in front of it are wrong. Only a key SHARE survives; any other
+  // fragment (a whole '#doc=' key above all) is cut off here, again.
+  const [beforeHash, fragment] = String(inviteUrl || '').split('#');
+  const share = /^ks=v1\.[A-Za-z0-9_-]{43}$/.test(fragment || '') ? '#' + fragment : '';
+  const noticeUrl = beforeHash + share;
+  const opensDocument = !!share;
   // Dutch first with the English underneath, because the sender does not know
   // which language the recipient reads. A caller that does know passes
   // lang 'nl' or 'en' and gets that one language only.
@@ -957,8 +965,10 @@ function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt,
       greeting: recipientLabel ? `Beste ${recipientLabel},` : 'Beste,',
       sender: senderLabel || 'Een Paramant-gebruiker',
       asks: 'heeft u gevraagd een document te bekijken en te ondertekenen.',
-      carries: 'Deze link opent het verzoek. Hij opent het document niet. De sleutel die het document opent staat bewust niet in deze e-mail. Vraag de afzender om de volledige link, of open het bestand als u al een kopie hebt.',
-      open: 'Open het verzoek',
+      carries: opensDocument
+        ? 'De link opent het document in uw browser zodra u bent ingelogd. U ziet het document, zet uw paraaf en handtekening en bent klaar. Zonder inloggen opent de link niets.'
+        : 'Deze link opent het verzoek. Hij opent het document niet. De sleutel die het document opent staat bewust niet in deze e-mail. Vraag de afzender om de volledige link, of open het bestand als u al een kopie hebt.',
+      open: opensDocument ? 'Open het document' : 'Open het verzoek',
       fromSender: 'Bericht van de afzender:',
       signIn: 'Log in met het e-mailadres waarop u bent uitgenodigd. Stuur de link niet door.',
       closes: `Ondertekenen kan tot ${expiryTs || '7 dagen na het aanmaken'}.`,
@@ -969,8 +979,10 @@ function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt,
       greeting: recipientLabel ? `Hi ${recipientLabel},` : 'Hi,',
       sender: senderLabel || 'A Paramant user',
       asks: 'has asked you to review and sign a document.',
-      carries: 'This link opens the request. It does not open the document. The key that unlocks it is deliberately not in this email, so ask the sender for their complete link, or open the file if you already have a copy.',
-      open: 'Open the request',
+      carries: opensDocument
+        ? 'The link opens the document in your browser once you have signed in. You see the document, add your initials and signature, and you are done. Without signing in the link opens nothing.'
+        : 'This link opens the request. It does not open the document. The key that unlocks it is deliberately not in this email, so ask the sender for their complete link, or open the file if you already have a copy.',
+      open: opensDocument ? 'Open the document' : 'Open the request',
       fromSender: 'Message from the sender:',
       signIn: 'Sign in with this invited email address. Do not forward the link.',
       closes: `Signing closes at ${expiryTs || '7 days after creation'}.`,
@@ -1016,17 +1028,24 @@ ${BASE_URL}`;
 // behind the link shows both to the one person entitled to them. Dutch first
 // with the English underneath, like the invitation: the sender's language is
 // not stored with the envelope.
-function signatureReceivedEmail({ signedCount, partyCount, complete, envelopeId }) {
+//
+// When everyone has signed, the button opens the finished document itself
+// (resultUrl, an opaque one-off reference from lib/sign-notify.js, never the
+// envelope id). Without one it falls back to the dashboard.
+function signatureReceivedEmail({ signedCount, partyCount, complete, envelopeId, resultUrl }) {
   const n = Math.max(0, parseInt(signedCount, 10) || 0);
   const m = Math.max(1, parseInt(partyCount, 10) || 1);
-  const dashUrl = `${BASE_URL}/dashboard`;
+  const safeResult = complete && /^https:\/\/[^\s#]+\/co-sign\?result=[A-Za-z0-9_-]{43}$/.test(String(resultUrl || '')) ? String(resultUrl) : '';
+  const dashUrl = safeResult || `${BASE_URL}/dashboard`;
   const heeft = n === 1 ? 'heeft' : 'hebben';
   const has = n === 1 ? 'has' : 'have';
   const W = {
     nl: complete ? {
       heading: 'Iedereen heeft getekend',
       line: `Uw document is ondertekend door alle ${m} ondertekenaars.`,
-      next: 'Het getekende document en het bewijs staan bij uw documenten.',
+      next: safeResult
+        ? 'Open het getekende document met alle handtekeningen en download het bewijs. Log in met dit account; de link werkt 30 dagen.'
+        : 'Het getekende document en het bewijs staan bij uw documenten.',
       pre: 'Uw document is door iedereen ondertekend.',
       subject: 'Iedereen heeft getekend',
     } : {
@@ -1039,7 +1058,9 @@ function signatureReceivedEmail({ signedCount, partyCount, complete, envelopeId 
     en: complete ? {
       heading: 'Everyone has signed',
       line: `Your document has been signed by all ${m} signers.`,
-      next: 'The signed document and its proof are with your documents.',
+      next: safeResult
+        ? 'Open the signed document with every signature and download the proof. Sign in with this account; the link works for 30 days.'
+        : 'The signed document and its proof are with your documents.',
       pre: 'Your document has been signed by everyone.',
       subject: 'Everyone has signed',
     } : {
@@ -1050,7 +1071,9 @@ function signatureReceivedEmail({ signedCount, partyCount, complete, envelopeId 
       subject: `Someone signed (${n} of ${m})`,
     },
   };
-  const open = { nl: 'Naar mijn documenten', en: 'Go to my documents' };
+  const open = safeResult
+    ? { nl: 'Open het getekende document', en: 'Open the signed document' }
+    : { nl: 'Naar mijn documenten', en: 'Go to my documents' };
   const textBlock = (l) => `${W[l].heading}
 
 ${W[l].line}
@@ -1072,6 +1095,40 @@ ${BASE_URL}`;
     'nl');
   return {
     ...wrap(text, html, { refId: 'signed-' + refIdHash(`${envelopeId}:${n}`) }),
+    subject: `${W.nl.subject} / ${W.en.subject}`,
+  };
+}
+
+// To the sender, when an invited party refused to sign. The request is then
+// over for everybody. No names, no file name, no envelope id (the same rule as
+// signatureReceivedEmail); the dashboard shows who.
+function signatureDeclinedEmail({ envelopeId }) {
+  const dashUrl = `${BASE_URL}/dashboard`;
+  const W = {
+    nl: { heading: 'Er is geweigerd', line: 'Een ondertekenaar heeft uw verzoek om te ondertekenen geweigerd. Het verzoek is daarmee gestopt; niemand kan er nog op tekenen.', next: 'In uw documenten ziet u wie. Wilt u het opnieuw proberen, stuur dan een nieuw verzoek.', open: 'Naar mijn documenten', subject: 'Verzoek geweigerd' },
+    en: { heading: 'A signer declined', line: 'A signer declined your signature request. The request has stopped; nobody can sign it any more.', next: 'Your documents show who. To try again, send a new request.', open: 'Go to my documents', subject: 'Request declined' },
+  };
+  const textBlock = (l) => `${W[l].heading}
+
+${W[l].line}
+${W[l].next}
+
+${W[l].open}:
+${dashUrl}`;
+  const text = `${textBlock('nl')}\n\n---\n\n${textBlock('en')}
+
+Paramant
+${BASE_URL}`;
+  const htmlBlock = (l, first) => `
+    <h1 style="margin:${first ? '0' : '32px'} 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">${escHtml(W[l].heading)}</h1>
+    <p style="margin:0 0 16px 0;line-height:1.6;">${escHtml(W[l].line)}</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">${escHtml(W[l].next)}</p>
+    ${btn(dashUrl, escHtml(W[l].open))}`;
+  const html = htmlShell(`${W.nl.line} ${W.en.line}`,
+    htmlBlock('nl', true) + '\n    <hr style="margin:32px 0 0 0;border:0;border-top:1px solid #E2E8F0;">' + htmlBlock('en', false),
+    'nl');
+  return {
+    ...wrap(text, html, { refId: 'declined-' + refIdHash(String(envelopeId)) }),
     subject: `${W.nl.subject} / ${W.en.subject}`,
   };
 }
@@ -1114,6 +1171,7 @@ module.exports = {
   parasignOnboardingEmail, /*MARK:parasign_export*/
   signingInviteEmail,
   signatureReceivedEmail,
+  signatureDeclinedEmail,
   billingConfirmationEmail,
   productPlanChangeEmail,
   billingCancellationEmail,

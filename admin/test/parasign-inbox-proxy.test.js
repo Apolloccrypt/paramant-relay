@@ -123,8 +123,11 @@ test('the invitations endpoint refuses a link that still carries a key', () => {
   // one. The browser strips it, this refuses it, the template cuts it again.
   const invitations = adminSource.match(/api\.post\("\/user\/envelopes\/:id\/invitations"[\s\S]*?\n\}\);/);
   assert.ok(invitations, 'the invitations route exists');
-  assert.match(invitations[0], /if \(inviteUrl\.hash !== ""\) \{[\s\S]{0,120}?invite_url_carries_key/,
-    'a fragment is a refusal, not something to clean up quietly');
+  // Since 2026-10-04 one fragment passes: '#ks=v1.<43>', HALF of a split key
+  // whose other half only the signed-in invitee gets from the relay. Every
+  // other fragment, a whole '#doc=' key first of all, is still a refusal.
+  assert.match(invitations[0], /if \(inviteUrl\.hash !== "" && !\/\^#ks=v1\\\.\[A-Za-z0-9_-\]\{43\}\$\/\.test\(inviteUrl\.hash\)\) \{[\s\S]{0,120}?invite_url_carries_key/,
+    'a fragment other than a key share is a refusal, not something to clean up quietly');
   assert.doesNotMatch(invitations[0], /doc=v1/,
     'the route no longer requires the key it must never forward');
   assert.doesNotMatch(invitations[0], /documentName/,

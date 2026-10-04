@@ -97,6 +97,10 @@ export function normaliseSigningAppearance(value) {
       if (typeof field.all_pages !== 'boolean') throw new Error(tr('De keuze voor elke pagina is ongeldig.', 'Invalid all-pages flag.'));
       if (field.all_pages) {
         if (pageIndex !== 0) throw new Error(tr('Een veld op elke pagina begint op de eerste pagina.', 'An all-pages field anchors on the first page.'));
+        // Same rule as the relay (relay/envelope.js): a manifest that repeats a
+        // mark must say it is version 2. Accepting it here and having the relay
+        // refuse it later was a signature made for nothing (tester report B5).
+        if (declared !== 2) throw new Error(tr('Een veld op elke pagina vraagt versie 2 van de plaatsing.', 'all_pages requires appearance version 2.'));
         clean.all_pages = true;
         anyAllPages = true;
       }
@@ -512,9 +516,14 @@ async function _postJSON(url, body) {
 // Create the envelope. Self-sign/co-sign include the requester as party 0;
 // request-signatures sets includeRequester=false and contains recipients only.
 export function createSigningEnvelope({ docHash, recipients, originalFilename, signerLabel, creatorPublicKey, includeRequester = true, requestedAppearance }) {
+  // A recipient may carry the spot the sender asked THAT party to sign at.
+  // Normalised here like the envelope-wide box; a request, never signed.
+  const list = (recipients || []).map((r) => (r && r.requested_appearance)
+    ? { ...r, requested_appearance: normaliseSigningAppearance(r.requested_appearance) }
+    : r);
   const body = {
     doc_hash: docHash,
-    recipients: recipients || [],
+    recipients: list,
     original_filename: originalFilename,
     signer_label: signerLabel,
     creator_public_key: creatorPublicKey,
@@ -534,6 +543,8 @@ export function requestSignActivation({ envelopeId, partyIndex, docHash, inviteT
 }
 // Submit the signature; the admin consumes the activation atomically + forwards
 // to the relay. Returns { ok, signed_count, party_count, status }.
-export function submitSignature({ activationId, signerPublicKey, signature, appearance }) {
-  return _postJSON('/api/user/sign/submit', { activation_id: activationId, signer_public_key: signerPublicKey, signature, appearance });
+// `ink` (optional): the visible handwriting, already encrypted in the browser
+// (js/parasign-ink.js). Presentation only; it is not part of the signed message.
+export function submitSignature({ activationId, signerPublicKey, signature, appearance, ink }) {
+  return _postJSON('/api/user/sign/submit', { activation_id: activationId, signer_public_key: signerPublicKey, signature, appearance, ...(ink ? { ink } : {}) });
 }

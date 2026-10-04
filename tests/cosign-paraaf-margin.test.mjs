@@ -70,7 +70,7 @@ await page.route('**/api/user/account', (route) => route.fulfill({ status: 200, 
 await page.goto(`${ORIGIN}/co-sign?env=${ENV_ID}&p=0&t=${TOKEN}${fixture.fragment}`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => document.querySelectorAll('.doc-page[data-page-index]').length === 2 && !document.querySelector('#sign-confirm')?.disabled, null, { timeout: 20000 });
 await page.locator('#appearance-allpages').check();
-await page.waitForFunction(() => document.querySelectorAll('.appearance-field.seal').length === 2, null, { timeout: 10000 });
+await page.waitForFunction(() => document.querySelectorAll('.appearance-field.seal.paraaf').length === 2, null, { timeout: 10000 });
 
 const r = await page.evaluate(async (srcBytes) => {
   const raw = Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.getItem(sessionStorage.key(i))).find((v) => v && v.includes('"fields"'));
@@ -91,10 +91,14 @@ const r = await page.evaluate(async (srcBytes) => {
 
 const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
-test('ticking the box makes one small repeated seal in the bottom-right margin', () => {
+// Since 2026-10-04 the paraaf is ADDED next to the signature (a contract asks
+// for initials on every sheet and a signature on the last), so the manifest
+// holds two seals: the signature on one page and the repeated paraaf.
+test('ticking the box adds one small repeated paraaf in the bottom-right margin, next to the signature', () => {
   const seals = r.appearance.fields.filter((f) => f.type === 'seal');
-  assert.equal(seals.length, 1);
-  const s = seals[0];
+  assert.equal(seals.length, 2);
+  assert.equal(seals.filter((f) => !f.all_pages).length, 1, 'the signature stays');
+  const s = seals.find((f) => f.all_pages);
   assert.equal(s.all_pages, true);
   assert.equal(s.page_index, 0);
   assert.equal(r.appearance.version, 2);
@@ -108,7 +112,12 @@ test('the baked repeated seal does not overlap the text on any page', () => {
   for (let i = 0; i < 2; i++) {
     const srcStrs = new Set(r.src[i].map((b) => b.str));
     const added = r.out[i].filter((b) => !srcStrs.has(b.str));
-    assert.ok(added.some((b) => /PARAMANT SIGNED/.test(b.str)), `page ${i + 1} has the mark`);
-    for (const a of added) for (const t of r.src[i]) assert.ok(!overlaps(a, t), `page ${i + 1}: "${a.str}" overlaps "${t.str.slice(0, 20)}"`);
+    assert.ok(added.some((b) => /S\.G\.P\./.test(b.str)), `page ${i + 1} has the paraaf with initials`);
+    assert.ok(!added.some((b) => /PARAMANT SIGNED/.test(b.str)), 'no English frame text any more');
+    // The paraaf is what this suite is about. (The fixture is text from top to
+    // bottom, so the suggested signature spot has no free place to go; it is a
+    // suggestion the signer moves, and js/cosign-layout.js picks the least
+    // covered spot, tested in tests/cosign-layout.test.mjs.)
+    for (const a of added.filter((b) => /S\.G\.P\./.test(b.str))) for (const t of r.src[i]) assert.ok(!overlaps(a, t), `page ${i + 1}: "${a.str}" overlaps "${t.str.slice(0, 20)}"`);
   }
 });

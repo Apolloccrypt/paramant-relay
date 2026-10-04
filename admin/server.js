@@ -2020,6 +2020,12 @@ api.post("/user/envelopes", authUser, async (req, res) => {
   }
 });
 
+// The most signers one document can carry, and the same number the relay
+// enforces (relay/envelope.js MAX_PARTIES). The plan decides below that, at the
+// relay's create; these routes used to stop at twenty on their own, so party
+// 21 to 30 of a paid envelope could not open, be invited or fetch the proof.
+const MAX_ENVELOPE_PARTIES = 30;
+
 // POST /api/user/envelopes/:id/document (authUser) -- forward an opaque,
 // browser-encrypted document capsule to the envelope's relay. application/octet-
 // stream deliberately bypasses the global JSON parser and gets a narrow limit.
@@ -2037,6 +2043,9 @@ api.post("/user/envelopes/:id/document", authUser,
           "Content-Type": "application/octet-stream",
           "X-Capsule-Sha256": capsuleSha256,
           "X-Api-Key": proxyApiKey(req.userSession),
+          // Half of a split document key (see relay putDocumentCapsule); the
+          // other half only ever travels in the invitation link.
+          ...(/^[A-Za-z0-9_-]{43}$/.test((req.headers["x-document-key-share"] || "").toString()) ? { "X-Document-Key-Share": req.headers["x-document-key-share"].toString() } : {}),
         },
         body: req.body,
         signal: AbortSignal.timeout(30000),
@@ -2057,7 +2066,7 @@ api.get("/user/envelopes/:id/document", authUser, async (req, res) => {
   const id = (req.params.id || "").toString();
   const partyIndex = Number(req.query.p);
   const token = (req.query.t || "").toString();
-  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= 20 || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= MAX_ENVELOPE_PARTIES || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
     return res.status(400).json({ error: "invalid_invitation" });
   }
   const emailHash = partyEmailHashAdmin(req.userSession.email);
@@ -2079,6 +2088,8 @@ api.get("/user/envelopes/:id/document", authUser, async (req, res) => {
     res.setHeader("Cache-Control", "private, no-store");
     const capsuleHash = rr.headers.get("x-capsule-sha256");
     if (capsuleHash) res.setHeader("X-Capsule-Sha256", capsuleHash);
+    const keyShare = rr.headers.get("x-document-key-share");
+    if (keyShare && /^[A-Za-z0-9_-]{43}$/.test(keyShare)) res.setHeader("X-Document-Key-Share", keyShare);
     return res.send(Buffer.from(await rr.arrayBuffer()));
   } catch (error) {
     return res.status(502).json({ error: error.name === "TimeoutError" ? "relay_timeout" : "relay_unreachable" });
@@ -2091,7 +2102,7 @@ api.get("/user/envelopes/:id/receipt", authUser, async (req, res) => {
   const id = (req.params.id || "").toString();
   const partyIndex = Number(req.query.p);
   const token = (req.query.t || "").toString();
-  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= 20 || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= MAX_ENVELOPE_PARTIES || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
     return res.status(400).json({ error: "invalid_invitation" });
   }
   const emailHash = partyEmailHashAdmin(req.userSession.email);
@@ -2113,14 +2124,15 @@ api.get("/user/envelopes/:id/receipt", authUser, async (req, res) => {
 });
 
 // POST /api/user/envelopes/:id/invitations -- optional convenience delivery.
-// The document stays encrypted, but email delivery necessarily processes the
-// complete personal URL, including its fragment key. The UI states this before
-// sending and keeps manual link sharing as the zero-knowledge alternative.
+// The mailed link carries at most half of a split document key ('#ks='); the
+// other half is released by the relay only to the signed-in invitee, so the
+// link opens the document for that person and for nobody who merely reads the
+// mail.
 api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
   const id = (req.params.id || "").toString();
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return res.status(400).json({ error: "invalid_envelope_id" });
   const invitations = Array.isArray(req.body?.invitations) ? req.body.invitations : [];
-  if (invitations.length < 1 || invitations.length > 20) return res.status(400).json({ error: "invalid_invitations" });
+  if (invitations.length < 1 || invitations.length > MAX_ENVELOPE_PARTIES) return res.status(400).json({ error: "invalid_invitations" });
   const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
   if (!(await webauthn.rateHit(redis(), `invite:ip:${ip}`, 40, 3600))) return res.status(429).json({ error: "rate_limited" });
   if (!(await webauthn.rateHit(redis(), `invite:acct:${webauthn.scopeHash(req.userSession.user_id)}`, 60, 3600))) return res.status(429).json({ error: "rate_limited" });
@@ -2144,7 +2156,7 @@ api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
     const label = (item?.label || "").toString().trim().slice(0, 80);
     const inviteUrlText = (item?.invite_url || "").toString().trim();
     const partyIndex = Number(item?.party_index);
-    if (!RECIPIENT_EMAIL_RE.test(email) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= 20 || inviteUrlText.length > 2048) {
+    if (!RECIPIENT_EMAIL_RE.test(email) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= MAX_ENVELOPE_PARTIES || inviteUrlText.length > 2048) {
       return res.status(400).json({ error: "invalid_invitation" });
     }
     let inviteUrl;
@@ -2158,7 +2170,13 @@ api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
     // key would still have passed through this process and any log on the way.
     // The mail carries the notice, the sender passes the opening link on over a
     // channel they choose. Nothing past this check has ever held a key.
-    if (inviteUrl.hash !== "") {
+    //
+    // One fragment is allowed, and it is not a key: '#ks=v1.<43>' is HALF of a
+    // split document key. The other half sits on the relay and is released only
+    // to the invited mailbox after it signs in, so the mail provider, holding
+    // this half and no ciphertext, can open nothing. A '#doc=' fragment is the
+    // whole key and is still refused, as is anything else after the '#'.
+    if (inviteUrl.hash !== "" && !/^#ks=v1\.[A-Za-z0-9_-]{43}$/.test(inviteUrl.hash)) {
       return res.status(400).json({ error: "invite_url_carries_key" });
     }
     if (inviteUrl.origin !== siteOrigin || inviteUrl.pathname !== "/co-sign" || inviteUrl.searchParams.get("env") !== id || Number(inviteUrl.searchParams.get("p")) !== partyIndex || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
@@ -2173,7 +2191,7 @@ api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
       return res.status(502).json({ error: "relay_unreachable" });
     }
     if (!env?.party || env.party.email_hash !== partyEmailHashAdmin(email)) return res.status(400).json({ error: "recipient_mismatch" });
-    checked.push({ email, label, inviteUrl: inviteUrl.href, partyIndex, env });
+    checked.push({ email, label, inviteUrl: inviteUrl.href, partyIndex, env, opensDocument: inviteUrl.hash !== "" });
   }
 
   const subject = (req.body?.subject || "").toString().trim().slice(0, 140);
@@ -2196,6 +2214,7 @@ api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
         envelopeId: id,
         partyIndex: item.partyIndex,
         lang,
+        opensDocument: item.opensDocument,
       }));
       return { party_index: item.partyIndex, ok: true };
     } catch {
@@ -2204,6 +2223,72 @@ api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
   }));
   const failed = results.filter((item) => !item.ok).map((item) => item.party_index);
   return res.status(failed.length ? 207 : 200).json({ ok: failed.length === 0, partial_failure: failed.length > 0, failed_party_indexes: failed, results });
+});
+
+// POST /api/user/envelopes/:id/decline -- the invited party says no. Same two
+// credentials as opening the document: the invite token and the signed-in
+// mailbox. The relay ends the request for everyone; the sender gets a mail
+// (no names, no file name) and sees the refusal on the request.
+api.post("/user/envelopes/:id/decline", authUser, async (req, res) => {
+  const id = (req.params.id || "").toString();
+  const partyIndex = Number(req.body?.party_index);
+  const token = (req.body?.token || "").toString();
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id) || !Number.isInteger(partyIndex) || partyIndex < 0 || partyIndex >= MAX_ENVELOPE_PARTIES || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
+    return res.status(400).json({ error: "invalid_invitation" });
+  }
+  const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+  if (!(await webauthn.rateHit(redis(), `decline:ip:${ip}`, 20, 900))) return res.status(429).json({ error: "rate_limited" });
+  const emailHash = partyEmailHashAdmin(req.userSession.email);
+  if (!emailHash) return res.status(403).json({ error: "recipient_mismatch" });
+  try {
+    const r = await callRelay(`/v2/envelopes/${encodeURIComponent(id)}/decline`, { party_index: partyIndex, token, verified_email_hash: emailHash }, "POST");
+    const body = await r.json().catch(() => ({}));
+    if (r.status !== 200) return res.status(r.status === 403 ? 403 : r.status === 404 ? 404 : 409).json({ error: body.error || "decline_failed" });
+    if (!body.idempotent) {
+      signNotify.afterDecline({ client: redis(), envelopeId: id, sendEmail: emailTemplates.sendEmail, template: emailTemplates.signatureDeclinedEmail })
+        .then((out) => { if (out === "failed") console.warn("[envelopes/decline] sender notification failed"); });
+    }
+    try { await logAuditEvent(req.userSession.user_id, "parasign_doc_declined", { envelope: id.slice(0, 10) + "…", party: partyIndex }); } catch {}
+    return res.json({ ok: true, status: "void", declined_at: body.declined_at || null });
+  } catch {
+    return res.status(502).json({ error: "relay_unreachable" });
+  }
+});
+
+// GET /api/user/envelopes/:id/owner-view and /owner-document -- the sender's
+// result page. Ownership is checked by the relay against the session's own key.
+// (Two plain routes: Express 5 has no regex parameters.)
+async function proxyOwnerRead(req, res, part) {
+  const id = (req.params.id || "").toString();
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return res.status(400).json({ error: "invalid_envelope_id" });
+  try {
+    const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/${part}`, {
+      headers: { "X-Api-Key": proxyApiKey(req.userSession) },
+      signal: AbortSignal.timeout(30000),
+    });
+    res.status(rr.status);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("Content-Type", rr.headers.get("content-type") || "application/json");
+    return res.send(Buffer.from(await rr.arrayBuffer()));
+  } catch (error) {
+    return res.status(502).json({ error: error.name === "TimeoutError" ? "relay_timeout" : "relay_unreachable" });
+  }
+}
+api.get("/user/envelopes/:id/owner-view", authUser, (req, res) => proxyOwnerRead(req, res, "owner-view"));
+api.get("/user/envelopes/:id/owner-document", authUser, (req, res) => proxyOwnerRead(req, res, "owner-document"));
+
+// GET /api/user/results/:ref -- the link in "Iedereen heeft getekend". The mail
+// carries an opaque reference, never the envelope id (lib/sign-notify.js); this
+// turns it back into the id, for the account that sent the request only.
+api.get("/user/results/:ref", authUser, async (req, res) => {
+  const ref = (req.params.ref || "").toString();
+  try {
+    const id = await signNotify.resolveResult(redis(), ref, req.userSession.user_id);
+    if (!id) return res.status(404).json({ error: "result_not_found" });
+    return res.json({ ok: true, envelope_id: id });
+  } catch {
+    return res.status(503).json({ error: "store_unavailable" });
+  }
 });
 
 // ── Per-document signing activation (R018: per-document PRF activation) ───────
@@ -2244,9 +2329,16 @@ api.post("/user/sign/activation", authUser, async (req, res) => {
   let env;
   try {
     const r = await callRelay(`/v2/envelopes/${encodeURIComponent(envelope_id)}?p=${party_index}&t=${encodeURIComponent(invite_token)}`, null, "GET");
+    // A busy relay is not a wrong mailbox: a 429 used to come back as 403 and
+    // the page then said "this invitation belongs to another address".
+    if (r.status === 429) return res.status(429).json({ error: "rate_limited" });
     if (r.status !== 200) return res.status(403).json({ error: "not_authorized" });
     env = (await r.json()).envelope;
   } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }
+  // A withdrawn, refused or finished request is not signable. Said here, before
+  // the client runs the passkey step, and with the real reason.
+  if (env && env.status === "void") return res.status(410).json({ error: env.void_reason === "declined" ? "declined" : "voided" });
+  if (env && env.status === "complete") return res.status(409).json({ error: "already_complete" });
   const sessionEmailHash = partyEmailHashAdmin(email);
   if (!env || env.doc_hash !== doc_hash) return res.status(403).json({ error: "doc_hash_mismatch" });
   if (!env.party || !sessionEmailHash || env.party.email_hash !== sessionEmailHash) return res.status(403).json({ error: "not_authorized" });
@@ -2265,7 +2357,12 @@ api.post("/user/sign/activation", authUser, async (req, res) => {
 // POST /api/user/sign/submit (authUser) — ATOMIC CONSUME + forward to relay sign.
 api.post("/user/sign/submit", authUser, async (req, res) => {
   const { user_id } = req.userSession;
-  const { activation_id, signer_public_key, signature, appearance } = req.body || {};
+  const { activation_id, signer_public_key, signature, appearance, ink } = req.body || {};
+  // The visible handwriting, encrypted in the browser with a key derived from
+  // the document key: opaque here and at the relay. Bounded, never parsed.
+  if (ink !== undefined && ink !== null && ink !== "" && (typeof ink !== "string" || ink.length > 43692 || !/^[A-Za-z0-9_-]+$/.test(ink))) {
+    return res.status(400).json({ error: "invalid_ink" });
+  }
   if (!activation_id || typeof activation_id !== "string") return res.status(400).json({ error: "activation_id_required" });
   if (!signer_public_key || !signature) return res.status(400).json({ error: "signature_required" });
   let appearanceSize = 0;
@@ -2295,6 +2392,7 @@ api.post("/user/sign/submit", authUser, async (req, res) => {
     const r = await callRelay(`/v2/envelopes/${encodeURIComponent(act.envelope_id)}/sign`, {
       party_index: act.party_index, signer_public_key, signature, verified_email_hash: act.email_hash,
       appearance,
+      ...(ink ? { ink } : {}),
       // Crypto M1: the account this activation was issued to, so the relay can
       // pin the submitted key to that account's enrolled signing keys.
       account_id: act.account_id,
@@ -2314,6 +2412,7 @@ api.post("/user/sign/submit", authUser, async (req, res) => {
     signNotify.afterSignature({
       client: redis(), envelopeId: act.envelope_id, signerAccountId: user_id, relayBody: body,
       sendEmail: emailTemplates.sendEmail, template: emailTemplates.signatureReceivedEmail,
+      baseUrl: emailTemplates.BASE_URL,
     }).then((r) => { if (r === "failed") console.warn("[sign/submit] sender notification failed"); });
     return res.json({
       ok: true,
