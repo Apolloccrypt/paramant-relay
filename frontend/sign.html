@@ -184,6 +184,18 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
    gets a single-row toolbar instead of the 160px editor and the 247px seal
    panel. That is what keeps the PDF above the fold on a 390px phone. */
 .ds-invite-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+/* On a phone the document comes first (retest T5-12c: it started a full screen
+   below the fold). The extra tools fold behind one button; the paraaf choice
+   stays in view. */
+.ds-more-tools{display:none;margin-bottom:10px}
+@media (max-width:640px){
+  .ds-more-tools{display:inline-flex}
+  .ds-more-tools[hidden]{display:none}
+  #step-place:not(.tools-open) #ds-edit-tools,
+  #step-place:not(.tools-open) .ds-seal-choice,
+  #step-place:not(.tools-open) #ds-seal-tip,
+  #step-place:not(.tools-open) #ds-zoom{display:none !important}
+}
 .ds-edit-label{font-size:12px;color:var(--ink-dim);font-weight:600}
 .ds-edit-btn{font:inherit;font-size:12.5px;min-height:34px;padding:6px 13px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-1);border-radius:var(--r-1);cursor:pointer;line-height:1.4;font-weight:500}
 .ds-edit-btn:hover{border-color:var(--ink-3);background:var(--line-ghost)}
@@ -678,6 +690,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       <button id="ds-zoom-in" type="button" aria-label="Inzoomen">+</button>
       <button id="ds-zoom-fit" type="button">Passend</button>
     </div>
+    <button class="ds-edit-btn ds-more-tools" id="ds-more-tools" type="button" aria-expanded="false" aria-controls="ds-edit-tools">Tekst, datum en meer</button>
     <div class="ds-invite-tools" id="ds-invite-tools" hidden>
       <button class="ds-edit-btn" id="ds-invite-place" type="button">Plaats het handtekeningvak</button>
       <label class="ds-seal-check" id="ds-invite-paraaf-label"><input type="checkbox" id="ds-invite-paraaf"> Paraaf op elke pagina, verplicht voor iedereen</label>
@@ -710,7 +723,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <div class="ds-page-nav" id="ds-page-nav" hidden>
       <button id="ds-page-nav-prev" type="button" aria-label="Vorige pagina">&#8593;</button>
       <span id="ds-page-nav-label"></span>
-      <input id="ds-page-nav-jump" type="number" min="1" aria-label="Ga naar pagina">
+      <input id="ds-page-nav-jump" type="number" min="1" aria-label="Ga naar pagina" placeholder="nr.">
       <button id="ds-page-nav-next" type="button" aria-label="Volgende pagina">&#8595;</button>
     </div>
     <!-- The sticky action bar belongs to the document, not to the whole step:

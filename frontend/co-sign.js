@@ -66,7 +66,14 @@ function humanDate(iso) {
   try { return new Date(t).toLocaleDateString(EN ? 'en-GB' : 'nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }); }
   catch { return new Date(t).toISOString().slice(0, 10); }
 }
-function isoDay(iso) { return String(iso || '').slice(0, 10); }
+// The day in the reader's own time zone, as YYYY-MM-DD (a UTC slice put a
+// signature made at 00:30 in Amsterdam on the day before).
+function isoDay(iso) {
+  const t = Date.parse(iso || '');
+  if (!Number.isFinite(t)) return String(iso || '').slice(0, 10);
+  const d = new Date(t);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
 
 // CSP here allows img-src 'self' data: (no blob:), so image previews go through a
 // data: URL. PDFs render to <canvas> via the self-hosted pdf.js (worker-src 'self').
@@ -1067,7 +1074,7 @@ function addAppearanceNode(layer, field, party, current, requested) {
   } else if (field.type === 'date') {
     const lbl = document.createElement('span');
     lbl.className = 'lbl';
-    lbl.textContent = current ? new Date().toISOString().slice(0, 10) : isoDay(party.signed_at);
+    lbl.textContent = current ? isoDay(new Date().toISOString()) : isoDay(party.signed_at);
     node.appendChild(lbl);
   } else {
     const ink = inkFor(party, current);
@@ -1091,7 +1098,9 @@ function addAppearanceNode(layer, field, party, current, requested) {
       node.appendChild(cap);
     }
   }
-  if (current && !requested) {
+  if (current && !requested && !(paraaf && __requiredParaaf)) {
+    // The × gets room of its own, so it never covers the name (retest T5-12b).
+    node.classList.add('has-remove');
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'appearance-remove';

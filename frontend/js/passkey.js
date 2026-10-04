@@ -163,6 +163,7 @@ function wireSetupPasskey() {
   // Passkey-specific success UI (own ids; the TOTP success section is untouched).
   function showRecoveryCodes(codes) {
     document.querySelectorAll('section[id^="state-"]').forEach((s) => s.classList.add('hidden'));
+    { const intro = document.getElementById('setup-intro'); if (intro) intro.classList.add('hidden'); }   // no "step 3 of 5" above the codes
     const section = document.getElementById('state-passkey-success');
     const grid = document.getElementById('passkey-backup-codes');
     if (!section || !grid) { window.location = nlEn('/dashboard', '/en/dashboard'); return; }

@@ -44,6 +44,16 @@ const RELAY_PUBLIC = 'https://health.paramant.app';
 // a thin line, and the signer can still drag the corner to make it larger.
 const STAMP_PDF_W = 170;
 const STAMP_PDF_H = 70;
+// The date as the signer reads it: local time, no UTC 'Z' (retest T5-11).
+// The .psign keeps the exact ISO time; only what is drawn or shown is local.
+function localStamp(iso, withTime = true) {
+  const d = iso ? new Date(iso) : new Date();
+  if (isNaN(d.getTime())) return String(iso || '');
+  const p2 = (n) => String(n).padStart(2, '0');
+  const day = d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+  return withTime ? day + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()) : day;
+}
+
 const MAX_PREVIEW_PAGES = 30;   // the review preview (step 4)
 // The Place step shows every page up to 300, the same cap as /co-sign: a
 // sender with a 35-page contract could not point at page 31 (retest T2-B1).
@@ -997,6 +1007,16 @@ async function renderPdfForPlacement() {
   // Seal tools (sign-every-page toggle + reuse-saved-position) are PDF-only,
   // and in invite mode there is no seal of the requester's to configure.
   { const st = $('ds-seal-tools'); if (st) st.hidden = inviteMode; }
+  {
+    const more = $('ds-more-tools');
+    if (more) {
+      more.hidden = inviteMode;
+      more.onclick = () => {
+        const open = $('step-place').classList.toggle('tools-open');
+        more.setAttribute('aria-expanded', open ? 'true' : 'false');
+      };
+    }
+  }
   { const cb = $('ds-allpages'); if (cb) cb.checked = !!state.stampAllPages; }
   { const radio = $('ds-seal-' + state.sealPlacement); if (radio) radio.checked = true; }
   refreshApplyTplBtn();
@@ -2977,7 +2997,7 @@ function stampMockupHtml() {
     );
   }
   const name = (state.signer.name || 'Signer').slice(0, 40);
-  const dateStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  const dateStr = localStamp(null);
   const fp = state.signer.fingerprint ? state.signer.fingerprint.slice(0, 8) : 'pending';
   let mid = '';
   if (state.signer.sigStyle !== 'typed' && state.signer.sigImageDataUrl) {
@@ -3005,7 +3025,7 @@ function stampMockupHtml() {
 function paraafMockupHtml() {
   // Before the identity step there is no name yet: say what goes here.
   const initials = initialsFrom(state.signer.name) || L('Paraaf', 'Initials');
-  const dateStr = new Date().toISOString().slice(0, 10);
+  const dateStr = localStamp(null, false);
   const fp = state.signer.fingerprint ? state.signer.fingerprint.slice(0, 8) : '';
   return (
     `<span class="ds-pf-initials">${escapeHtml(initials)}</span>` +
@@ -3043,7 +3063,7 @@ async function buildStampedImage(origBytes, stamp, signerName, dateStr, fingerpr
     });
   }
 
-  drawStampOnCanvas(ctx, stamp, signerName, dateStr, fingerprint8, sigImg);
+  drawStampOnCanvas(ctx, stamp, signerName, localStamp(dateStr), fingerprint8, sigImg);
 
   return await new Promise((resolve, reject) => {
     canvas.toBlob(async (blob) => {
@@ -3251,9 +3271,10 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
   const courier = (Array.isArray(state.extras) && state.extras.length) ? await pdfDoc.embedFont(PDFLib.StandardFonts.Courier) : null;
   const kit = makeTextKit(PDFLib, pdfDoc, { regular: font, bold: fontBold, italic: fontItal, mono: courier || font });
   const initials = initialsFrom(signerName) || '?';
-  const footer = paraafFooter(dateStr, fingerprint8);
+  const shownDate = localStamp(dateStr);
+  const footer = paraafFooter(localStamp(dateStr, false), fingerprint8);
   const safeDocName = String(state.doc && state.doc.name || 'document').replace(/[\r\n\t]/g, ' ');
-  await kit.prepare([signerName, initials, footer, dateStr, safeDocName,
+  await kit.prepare([signerName, initials, footer, dateStr, shownDate, safeDocName,
     ...((state.extras || []).map((ex) => ex && ex.text).filter(Boolean))]);
   // Every position the signer made is in VIEW space (the page as pdf.js shows
   // it). On a turned or cropped page, map that onto the PDF's own space with
@@ -3323,9 +3344,9 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
     const row1Y = box.y + footerH - sName - 1.5 * k;
     const nameW = kit.width(signerName, sName, 'bold');
     await kit.draw(pg, signerName, { x: box.x + padX, y: row1Y, size: sName, role: 'bold', color: navy });
-    const dateW = kit.width(dateStr, sDate);
+    const dateW = kit.width(shownDate, sDate);
     if (padX + nameW + 6 * k + dateW + padX <= box.w) {
-      await kit.draw(pg, dateStr, { x: box.x + box.w - dateW - padX, y: row1Y, size: sDate, color: dim });
+      await kit.draw(pg, shownDate, { x: box.x + box.w - dateW - padX, y: row1Y, size: sDate, color: dim });
     }
     const cryptoLine = 'ML-DSA-65 (FIPS 204)  -  PQ ' + fingerprint8;
     if (font.widthOfTextAtSize(cryptoLine, sCrypto) + padX * 2 <= box.w) {
@@ -3368,7 +3389,7 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
       ['Bronbestand', 'Source file', safeDocName],
       ["Pagina's bron", 'Source pages', String(pages.length)],
       ['SHA3-256 bron', 'Source SHA3-256', sourceHash],
-      ['Ondertekend op', 'Signed at', dateStr],
+      ['Ondertekend op', 'Signed at', shownDate],
     ];
     let y = 692;
     for (const [label, labelEn, value] of fields) {

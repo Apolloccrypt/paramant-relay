@@ -119,6 +119,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
    the moment the signer chooses Place my signature. */
 .appearance-field.requested{border:2px dashed #1D4ED8;background:rgba(29,78,216,.06);box-shadow:none;color:#1D4ED8;font-weight:600;justify-content:center;text-align:center;pointer-events:none}
 .appearance-field.prior{border-style:solid;background:rgba(239,246,255,.92);pointer-events:none}
+.appearance-field.has-remove{padding-right:26px}
 .appearance-remove{position:absolute;top:1px;right:2px;width:20px;height:20px;border:0;background:#1D4ED8;color:#FFFFFF;font:700 13px/1 var(--sans);cursor:pointer}
 .appearance-tools{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
 .appearance-tools .btn{width:auto;min-width:120px}
@@ -235,13 +236,20 @@ body.needs-login #sign-intro{display:none}
     <div class="card-head"><div class="dot" id="env-status-dot"></div><div class="card-head-title" id="env-status">...</div></div>
     <div class="card-body">
       <dl class="kv">
-        <dt>Envelope id</dt><dd id="env-id">-</dd>
-        <dt>Document SHA3-256</dt><dd id="env-hash">-</dd>
-        <dt>Filename hint</dt><dd id="env-filename">-</dd>
+        <dt>File name</dt><dd id="env-filename">-</dd>
         <dt>Created</dt><dd id="env-created">-</dd>
         <dt>Signing closes</dt><dd id="env-expires">-</dd>
         <dt>Progress</dt><dd id="env-progress">-</dd>
       </dl>
+      <details class="how" style="margin:12px 0 0">
+        <summary>Technical details</summary>
+        <div class="how-body">
+          <dl class="kv">
+            <dt>Request id</dt><dd id="env-id">-</dd>
+            <dt>Document fingerprint (SHA3-256)</dt><dd id="env-hash">-</dd>
+          </dl>
+        </div>
+      </details>
     </div>
   </div>
 
@@ -337,11 +345,18 @@ body.needs-login #sign-intro{display:none}
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Result</div></div>
     <div class="card-body">
       <dl class="kv">
-        <dt>Envelope</dt><dd id="done-env-id">-</dd>
         <dt>Status</dt><dd id="done-status">-</dd>
         <dt>Progress</dt><dd id="done-progress">-</dd>
-        <dt>Your key fingerprint</dt><dd id="done-pk">-</dd>
       </dl>
+      <details class="how" style="margin:12px 0 0">
+        <summary>Technical details</summary>
+        <div class="how-body">
+          <dl class="kv">
+            <dt>Request</dt><dd id="done-env-id">-</dd>
+            <dt>Your key fingerprint</dt><dd id="done-pk">-</dd>
+          </dl>
+        </div>
+      </details>
       <div style="margin-top:14px">
         <span class="tag green">Signed locally</span>
       </div>
