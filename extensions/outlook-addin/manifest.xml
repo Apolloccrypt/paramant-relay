@@ -7,7 +7,7 @@
   xsi:type="MailApp">
 
   <Id>1344993b-490a-4d8a-969e-c5f819ffba25</Id>
-  <Version>1.0.0</Version>
+  <Version>1.0.1</Version>
   <ProviderName>Paramant</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Paramant"/>

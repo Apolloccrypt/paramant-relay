@@ -129,7 +129,9 @@ describe('encryptChunk → parashare receiver', () => {
 describe('buildShareUrl', () => {
   it('matches the ?t&n&c&r#k= shape and parses back', () => {
     const url = buildShareUrl({ tokens: ['t1', 't2'], name: 'a b €.pdf', chunks: 2, relay: 'https://legal.paramant.app', keys: ['k1', 'k2'] });
-    expect(url.startsWith('https://paramant.app/parashare?')).toBe(true);
+    // The public receiving page, never the sender's /parashare behind the login.
+    expect(url.startsWith('https://paramant.app/get?')).toBe(true);
+    expect(url).not.toMatch(/\/parashare/);
     const [base, frag] = url.split('#');
     expect(frag).toBe('k=k1,k2');
     const sp = new URLSearchParams(base.split('?')[1]);

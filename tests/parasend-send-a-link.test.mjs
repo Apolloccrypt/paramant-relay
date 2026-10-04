@@ -244,7 +244,9 @@ ok(L.tag + ': ' + 'a copy button sits on the row', await sender.locator('#ps-lin
 const receiverCtx = await browser.newContext({ acceptDownloads: true });
 const receiver = await receiverCtx.newPage();
 let dlServed = 0;
-await receiver.route('https://health.paramant.app/v2/dl/**/get', async (route) => {
+// A regex, not a glob: the page asks .../get?claim=<id>, and a glob is matched
+// against the whole URL, query included.
+await receiver.route(/^https:\/\/health\.paramant\.app\/v2\/dl\/[^/]+\/get(\?|$)/, async (route) => {
   dlServed++;
   if (dlServed > 1) {
     return route.fulfill({ status: 410, contentType: 'text/html', body: '<h1>burned</h1>' });
@@ -252,9 +254,21 @@ await receiver.route('https://health.paramant.app/v2/dl/**/get', async (route) =
   await route.fulfill({ status: 200, contentType: 'application/octet-stream', body: sentBytes });
 });
 
+// Since 2026-10-04 /get asks /info first, fetches only after the receiver
+// presses the button, and confirms the download afterwards (ack). A mail
+// scanner that opens the link therefore spends nothing.
+let acked = 0;
+await receiver.route('https://health.paramant.app/v2/dl/**/info', (route) => route.fulfill({
+  status: 200, contentType: 'application/json',
+  body: JSON.stringify({ ok: true, enc_meta: null, file_size: sentBytes.length, ttl_left_s: 3600, used: false }) }));
+await receiver.route(/https:\/\/health\.paramant\.app\/v2\/dl\/.*\/ack$/, (route) => { acked++;
+  return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"burned":true}' }); });
 const receiveUrl = ORIGIN + L.getPrefix + shownLink.slice(shownLink.indexOf('/get'));
 const downloadPromise = receiver.waitForEvent('download', { timeout: 30000 });
 await receiver.goto(receiveUrl, { waitUntil: 'domcontentloaded' });
+await receiver.waitForSelector('#step-ready.active #ready-btn:not([disabled])', { timeout: 15000 });
+ok(L.tag + ': ' + 'nothing is fetched before the receiver presses the button', dlServed === 0);
+await receiver.click('#ready-btn');
 const download = await downloadPromise;
 const saved = path.join(process.env.TMPDIR || '/tmp', 'parasend-link-' + process.pid + '.bin');
 await download.saveAs(saved);
@@ -262,6 +276,7 @@ const back = fs.readFileSync(saved);
 fs.unlinkSync(saved);
 
 ok(L.tag + ': ' + 'the receiver needs no account: the link opens straight onto the file', dlServed === 1);
+ok(L.tag + ': ' + 'the page confirms the download once it has the file', acked === 1, 'acks: ' + acked);
 ok(L.tag + ': ' + 'the saved file has the sender\'s name back', download.suggestedFilename() === FILE_NAME, download.suggestedFilename());
 ok(L.tag + ': ' + 'the file comes back byte for byte', Buffer.compare(back, Buffer.from(PAYLOAD_BYTES)) === 0,
   `got ${back.length} bytes, sent ${PAYLOAD_BYTES.length}`);
@@ -272,8 +287,10 @@ ok(L.tag + ': ' + 'the receiver is told the relay copy is gone',
 
 // ── The second open ──────────────────────────────────────────────────────────
 const second = await receiverCtx.newPage();
-await second.route('https://health.paramant.app/v2/dl/**/get', (route) =>
+await second.route(/^https:\/\/health\.paramant\.app\/v2\/dl\/[^/]+\/get(\?|$)/, (route) =>
   route.fulfill({ status: 410, contentType: 'text/html', body: '<h1>burned</h1>' }));
+await second.route('https://health.paramant.app/v2/dl/**/info', (route) => route.fulfill({ status: 404,
+  contentType: 'application/json', body: '{"ok":false,"reason":"downloaded"}' }));
 await second.goto(receiveUrl, { waitUntil: 'domcontentloaded' });
 await second.waitForSelector('#step-burned.active', { timeout: 15000 });
 const burned = (await second.locator('#step-burned').textContent()).replace(/\s+/g, ' ');

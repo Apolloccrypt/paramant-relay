@@ -198,6 +198,19 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   </div>
 </div>
 
+<!-- A link: nothing is fetched until the receiver presses the button, so a
+     mail scanner that opens the link spends nothing. -->
+<div class="step" id="step-ready">
+  <h1>A secure file is waiting for you</h1>
+  <p class="sub">The file is only fetched when you press the button. It then opens in your browser. Paramant never has the key.</p>
+  <div class="card">
+    <div class="card-body">
+      <div class="status-line" id="ready-meta"></div>
+      <button class="btn" id="ready-btn" type="button" data-click="startDownload" disabled>Download the file</button>
+    </div>
+  </div>
+</div>
+
 <!-- Downloading + decrypting -->
 <div class="step active" id="step-loading">
   <h1>Your file is on its way</h1>
@@ -233,7 +246,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
       <summary>What made this safe</summary>
       <div class="done-details-body">
         <p>The file was decrypted here, in your browser. The file arrived sealed and was opened with the key that sat in the link after the <code>#</code>, which is the part of a link a browser never sends to a server (<code>AES-256-GCM</code>).</p>
-        <p>A link from this web app opens once. The copy on our side was wiped as your browser took it, so the link will not open a second time.</p>
+        <p>A link from this web app opens once. The copy on our side was wiped once your browser had the whole file and could open it, so an interrupted download costs you nothing, and the link will not open a second time.</p>
         <p>The file name travelled inside the sealed bytes rather than beside them, so it was never something we could read either.</p>
         <p id="done-pdf-note" hidden>The pages above were drawn by this browser out of the file itself. Nothing was sent anywhere to draw them, and nothing of the document stays behind when you close this tab.</p>
       </div>
@@ -243,9 +256,9 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 <!-- Burned / already used -->
 <div class="step" id="step-burned">
-  <span class="burned-icon" style="margin-top:16px">&#x1F525;</span>
-  <p class="burned-msg">This file has already been downloaded and burned.</p>
-  <p class="burned-sub">Paramant links are single-use. Once downloaded, the file is permanently deleted from the relay.</p>
+  <span class="burned-icon" id="burned-icon" style="margin-top:16px">&#x1F525;</span>
+  <p class="burned-msg" id="burned-msg">This file has already been downloaded and burned.</p>
+  <p class="burned-sub" id="burned-sub">Paramant links are single-use. Once downloaded, the file is permanently deleted from the relay.</p>
   <a href="/dashboard" class="btn btn-outline" style="max-width:280px;margin:24px auto 0">Open your dashboard</a>
 </div>
 
@@ -259,11 +272,12 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <!-- Error -->
 <div class="step" id="step-error">
   <h1>Something went wrong</h1>
-  <p class="sub">The link may have expired or been used already, or it is not valid.</p>
+  <p class="sub">Below is what happened and what you can do.</p>
   <div class="card">
     <div class="card-head"><div class="dot red"></div><div class="card-head-title">Error</div></div>
     <div class="card-body">
       <div class="status-line err" id="error-msg"></div>
+      <button class="btn" id="error-retry" type="button" data-click="retryDownload" hidden>Try again</button>
     </div>
   </div>
   <a href="/dashboard" class="btn btn-outline">Open your dashboard</a>
@@ -305,6 +319,6 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/js/delegate.js?v=1" defer></script>
 <script src="/js/done-state.js?v=1" defer></script>
-<script src="/js/get.page.js?v=6" defer></script>
+<script src="/js/get.page.js?v=7" defer></script>
 </body>
 </html>

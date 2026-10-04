@@ -14,7 +14,20 @@ const T = {
     dlFail: (st) => 'Downloaden is mislukt (HTTP ' + st + ').',
     decTitle: 'Ontsleutelen...',
     decStatus: 'Het bestand wordt ontsleuteld...',
-    decFail: 'Ontsleutelen is mislukt. De link is misschien beschadigd of aangepast.',
+    decFail: 'De sleutel in de link past niet op dit bestand. De link is onderweg beschadigd of niet helemaal gekopieerd. Er is niets gewist: open de link opnieuw, precies zoals u hem kreeg.',
+    checking: 'Even kijken of het bestand er nog is...',
+    readyMeta: (size, ttl) => [size ? 'Grootte ' + size : '', Number.isFinite(ttl) ? 'nog ' + leftNl(ttl) + ' beschikbaar' : ''].filter(Boolean).join(', ') + (size || Number.isFinite(ttl) ? '.' : ''),
+    busy: 'Dit bestand wordt op dit moment al gedownload, misschien in een ander tabblad. Probeer het over een paar minuten opnieuw.',
+    stalled: 'De verbinding viel een minuut stil en de download is gestopt. Er is niets gewist: probeer het opnieuw.',
+    netFail: 'De download kwam niet helemaal binnen. Er is niets gewist: probeer het opnieuw.',
+    gone: {
+      downloaded: { title: 'Dit bestand is al gedownload en daarna gewist.', sub: 'Een link van Paramant werkt maar één keer. Na de download is het bestand voorgoed van onze server verwijderd. Was u dat niet zelf, neem dan contact op met de afzender.' },
+      expired: { title: 'Deze link is verlopen.', sub: 'Het bestand is niet gedownload. Het stond maar een beperkte tijd klaar en is nu van onze server verwijderd. Vraag de afzender om het opnieuw te sturen.' },
+      lost: { title: 'Dit bestand is niet meer beschikbaar.', sub: 'Het is niet gedownload. Onze server is herstart of het bestand is verwijderd voordat u het kon ophalen. Vraag de afzender om het opnieuw te sturen. Onze excuses.' },
+      withdrawn: { title: 'De afzender heeft dit bestand ingetrokken.', sub: 'Het staat niet meer op onze server. Neem contact op met de afzender als u het toch nodig hebt.' },
+      exhausted: { title: 'Deze link is te vaak geprobeerd.', sub: 'Na vijf pogingen zonder geslaagde download is het bestand voor de zekerheid gewist. Vraag de afzender om het opnieuw te sturen.' },
+      unknown: { title: 'Deze link werkt niet meer.', sub: 'Hij is verlopen, al gebruikt of nooit uitgegeven. Vraag de afzender om het bestand opnieuw te sturen.' },
+    },
     tooShort: 'Het ontsleutelde bestand is te kort.',
     headerBad: 'De kop van het ontsleutelde bestand is beschadigd.',
     opening: 'Het document wordt geopend...',
@@ -41,7 +54,20 @@ const T = {
     dlFail: (st) => 'Download failed: HTTP ' + st,
     decTitle: 'Decrypting...',
     decStatus: 'Decrypting with AES-256-GCM...',
-    decFail: 'Decryption failed. The link may be corrupted or tampered with.',
+    decFail: 'The key in the link does not fit this file. The link was damaged on the way or not copied whole. Nothing was deleted: open the link again exactly as you received it.',
+    checking: 'Checking the file is still there...',
+    readyMeta: (size, ttl) => [size ? 'Size ' + size : '', Number.isFinite(ttl) ? 'available for ' + leftEn(ttl) : ''].filter(Boolean).join(', ') + (size || Number.isFinite(ttl) ? '.' : ''),
+    busy: 'This file is being downloaded right now, perhaps in another tab. Try again in a few minutes.',
+    stalled: 'The connection went quiet for a minute and the download stopped. Nothing was deleted: try again.',
+    netFail: 'The download did not arrive in full. Nothing was deleted: try again.',
+    gone: {
+      downloaded: { title: 'This file has already been downloaded and burned.', sub: 'Paramant links are single-use. Once downloaded, the file is permanently deleted from the relay. If that was not you, contact the sender.' },
+      expired: { title: 'This link has expired.', sub: 'The file was not downloaded. It was only available for a limited time and has now been removed from our server. Ask the sender to send it again.' },
+      lost: { title: 'This file is no longer available.', sub: 'It was not downloaded. Our server restarted or the file was removed before you could fetch it. Ask the sender to send it again. Our apologies.' },
+      withdrawn: { title: 'The sender withdrew this file.', sub: 'It is no longer on our server. Contact the sender if you still need it.' },
+      exhausted: { title: 'This link was tried too often.', sub: 'After five attempts without a completed download the file was deleted to be safe. Ask the sender to send it again.' },
+      unknown: { title: 'This link no longer works.', sub: 'It has expired, was already used, or was never issued. Ask the sender to send the file again.' },
+    },
     tooShort: 'Decrypted payload too short',
     headerBad: 'Decrypted payload header corrupt',
     opening: 'Opening the document...',
@@ -60,19 +86,16 @@ const T = {
   },
 };
 function t(k) { return T[LANG][k]; }
+function leftNl(s) { return s >= 86400 ? Math.round(s / 86400) + (Math.round(s / 86400) === 1 ? ' dag' : ' dagen') : s >= 3600 ? Math.round(s / 3600) + ' uur' : Math.max(1, Math.round(s / 60)) + ' min'; }
+function leftEn(s) { return s >= 86400 ? Math.round(s / 86400) + (Math.round(s / 86400) === 1 ? ' day' : ' days') : s >= 3600 ? Math.round(s / 3600) + (Math.round(s / 3600) === 1 ? ' hour' : ' hours') : Math.max(1, Math.round(s / 60)) + ' min'; }
 
 // The language switch keeps the whole address, the key after # included, so
 // it never travels anywhere but this browser.
 function langSwitch() {
   const a = document.getElementById('lang-switch-link');
   if (!a) return;
-  // With a one-time link in the address the file is fetched on arrival, so a
-  // second load in the other language would find it already gone. The switch
-  // is only offered on the bare page.
-  if (new URLSearchParams(location.search).get('t')) {
-    (a.closest('.lang-switch') || a).hidden = true;
-    return;
-  }
+  // Nothing is fetched before the receiver clicks, so switching language with
+  // a one-time link in the address costs nothing: the other page asks again.
   const p = location.pathname;
   const naar = LANG === 'en' ? (p.replace(/^\/en(?=\/|$)/, '') || '/') : '/en' + p;
   a.href = naar + location.search + location.hash;
@@ -245,144 +268,353 @@ function goReceive() {
   }
 }
 
-async function init() {
-  const params = new URLSearchParams(location.search);
-  const token = params.get('t');
-  const fragment = location.hash.slice(1);
-  const RELAY = RELAY_SECTORS[params.get('r')] || DEFAULT_RELAY;
+// ── Reading the link ─────────────────────────────────────────────────────────
+//
+// Two link shapes arrive here.
+//   web app:   /get?t=<48 hex>&r=<sector>#<key+iv, base64url, 44 bytes>
+//   add-in and browser extension ("FileLink"):
+//              /get?t=T1,T2&n=NAME&c=N&r=<relay url>#k=K1,K2
+// The second shape used to point at /parashare, which sits behind the login,
+// so a receiver without an account never reached the file. nginx now sends
+// every such /parashare link here, query intact; the fragment survives that
+// redirect because the Location carries none of its own.
+const FILELINK_RELAYS = new Set([
+  'https://relay.paramant.app',
+  'https://health.paramant.app',
+  'https://legal.paramant.app',
+  'https://finance.paramant.app',
+  'https://iot.paramant.app',
+]);
 
-  if (!token && !fragment) {
-    showStep('step-enter');
-    return;
+function parseLink() {
+  const params = new URLSearchParams(location.search);
+  const tParam = params.get('t');
+  const hash = location.hash.slice(1);
+  if (!tParam && !hash) return { kind: 'none' };
+  if (hash.startsWith('k=')) {
+    // FileLink. Every part has to be whole, or nothing is fetched.
+    const tokens = (tParam || '').split(',');
+    const keys = hash.slice(2).split(',');
+    let relay = (params.get('r') || '').replace(/\/+$/, '');
+    if (!relay) relay = 'https://relay.paramant.app';
+    if (!FILELINK_RELAYS.has(relay)) return { kind: 'invalid' };
+    if (!tokens.length || tokens.length !== keys.length) return { kind: 'invalid' };
+    if (!tokens.every((x) => TOKEN_RE.test(x))) return { kind: 'invalid' };
+    const rawKeys = keys.map(fromB64url);
+    if (!rawKeys.every((k) => k && k.length === 32)) return { kind: 'invalid' };
+    return { kind: 'filelink', relay, tokens, rawKeys, name: params.get('n') || 'download' };
   }
+  if (!tParam || !hash || !TOKEN_RE.test(tParam)) return { kind: 'invalid' };
+  // Decode key+iv from fragment (44 bytes: first 32 = AES key, next 12 = IV)
+  const keyIv = fromB64url(hash);
+  if (!keyIv || keyIv.length < 44) return { kind: 'invalid' };
+  return {
+    kind: 'webapp',
+    relay: RELAY_SECTORS[params.get('r')] || DEFAULT_RELAY,
+    tokens: [tParam],
+    rawKey: keyIv.slice(0, 32),
+    iv: keyIv.slice(32, 44),
+  };
+}
+
+// ── Nothing is fetched without the receiver's click ──────────────────────────
+//
+// Mail scanners (Safe Links, Mimecast, Proofpoint) open links in a real browser
+// and run its JavaScript. When this page fetched on arrival, the scanner spent
+// the one-time link and the receiver found it gone. So arrival only asks
+// /info, which burns nothing, and the download waits for the button.
+//
+// The download itself is claimed (?claim=), not burned: the relay keeps the
+// file until this page has decrypted it and says so (POST .../ack). A broken
+// line, a slow line or a key with one wrong character costs nothing; the page
+// gives the claim back (.../release) and the link still works.
+let LINK = null;
+let busyDownloading = false;
+// One claim id per tab and link. Kept in sessionStorage so a reload in the
+// same tab after a broken download is still the same claimant, and is not
+// told to wait for its own lease to run out.
+const CLAIM = (() => {
+  const key = 'paramant-dl-claim:' + (new URLSearchParams(location.search).get('t') || '').slice(0, 48);
+  try {
+    const kept = sessionStorage.getItem(key);
+    if (kept && /^[a-f0-9]{32}$/.test(kept)) return kept;
+  } catch { /* storage refused: a fresh id is fine */ }
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  const id = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+  try { sessionStorage.setItem(key, id); } catch { /* idem */ }
+  return id;
+})();
+
+function showGone(reason) {
+  const g = (T[LANG].gone[reason]) || T[LANG].gone.unknown;
+  document.getElementById('burned-msg').textContent = g.title;
+  document.getElementById('burned-sub').textContent = g.sub;
+  const icon = document.getElementById('burned-icon');
+  if (icon) icon.hidden = reason !== 'downloaded' && reason !== 'exhausted';
+  document.getElementById('step-burned').dataset.reason = reason;
+  showStep('step-burned');
+}
+
+async function reasonOf(r) {
+  try { const j = await r.json(); return (j && j.reason) || 'unknown'; } catch { return 'unknown'; }
+}
+
+async function init() {
+  LINK = parseLink();
+  if (LINK.kind === 'none') { showStep('step-enter'); return; }
   // A missing half, a token of the wrong shape or a key that is too short all
   // mean the same to the receiver: the link did not arrive whole.
-  if (!token || !fragment || !TOKEN_RE.test(token)) {
-    showInvalid();
-    return;
-  }
+  if (LINK.kind === 'invalid') { showInvalid(); return; }
 
-  // Decode key+iv from fragment (44 bytes: first 32 = AES key, next 12 = IV)
-  const keyIv = fromB64url(fragment);
-  if (!keyIv || keyIv.length < 44) {
-    showInvalid();
-    return;
+  showStep('step-ready');
+  const meta = document.getElementById('ready-meta');
+  const btn = document.getElementById('ready-btn');
+  if (meta) meta.textContent = t('checking');
+  // /info burns nothing. It tells the receiver up front when there is nothing
+  // to fetch any more, and why, instead of after a click.
+  let size = 0;
+  let ttlLeft = Infinity;
+  for (const token of LINK.tokens) {
+    let r;
+    try { r = await fetch(LINK.relay + '/v2/dl/' + token + '/info', { cache: 'no-store' }); }
+    catch { if (meta) meta.textContent = ''; if (btn) btn.disabled = false; return; }
+    if (r.status === 404 || r.status === 410) { showGone(await reasonOf(r)); return; }
+    if (r.status === 400 || r.status === 401) { showInvalid(); return; }
+    if (!r.ok) { if (meta) meta.textContent = ''; if (btn) btn.disabled = false; return; }
+    const j = await r.json().catch(() => ({}));
+    size += Number(j.file_size) || 0;
+    if (Number.isFinite(j.ttl_left_s)) ttlLeft = Math.min(ttlLeft, j.ttl_left_s);
   }
-  const rawKey = keyIv.slice(0, 32);
-  const iv = keyIv.slice(32, 44);
+  if (meta) meta.textContent = t('readyMeta')(size ? formatSize(size) : '', ttlLeft);
+  if (btn) btn.disabled = false;
+}
 
+// Fetch one sealed blob. No deadline on the whole download, only on silence:
+// a large file on a slow line may take minutes, a line that stops sending for
+// a minute is broken.
+const STALL_MS = 60000;
+async function fetchSealed(token, onProgress) {
+  const ctrl = new AbortController();
+  let timer = null;
+  const arm = () => { clearTimeout(timer); timer = setTimeout(() => ctrl.abort(), STALL_MS); };
+  arm();
   try {
-    setTitle(t('importTitle'));
-    setStatus(t('importStatus'), 10);
-    const aesKey = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
+    const r = await fetch(LINK.relay + '/v2/dl/' + token + '/get' + '?claim=' + CLAIM, { signal: ctrl.signal, cache: 'no-store' });
+    if (!r.ok) return { status: r.status, reason: await reasonOf(r) };
+    const total = Number(r.headers.get('Content-Length')) || 0;
+    if (!r.body || !r.body.getReader) return { status: 200, bytes: new Uint8Array(await r.arrayBuffer()) };
+    const reader = r.body.getReader();
+    const parts = [];
+    let got = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      arm();
+      parts.push(value);
+      got += value.length;
+      if (total) onProgress(Math.min(1, got / total));
+    }
+    if (total && got !== total) return { status: 0, reason: 'short' };
+    const out = new Uint8Array(got);
+    let off = 0;
+    for (const p of parts) { out.set(p, off); off += p.length; }
+    return { status: 200, bytes: out };
+  } catch (e) {
+    return { status: 0, reason: ctrl.signal.aborted ? 'stalled' : 'network' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
+function post(token, what) {
+  return fetch(LINK.relay + '/v2/dl/' + token + '/' + what, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ claim: CLAIM }),
+    cache: 'no-store',
+  });
+}
+function releaseAll(tokens) {
+  for (const tk of tokens) post(tk, 'release').catch(() => {});
+}
+async function ackAll(tokens) {
+  for (const tk of tokens) {
+    for (let i = 0; i < 3; i++) {
+      try { const r = await post(tk, 'ack'); if (r.ok || r.status === 404 || r.status === 410) break; }
+      catch { /* try again */ }
+      await new Promise((res) => setTimeout(res, 800 * (i + 1)));
+    }
+  }
+}
+
+function retryable(msg) {
+  showError(msg);
+  const again = document.getElementById('error-retry');
+  if (again) again.hidden = false;
+}
+
+async function tbDecryptChunk(blob, rawKey) {
+  // packet: 0x02 | nonce(12) | ctLen(4 BE) | ciphertext ; then random padding
+  if (blob.length < 17 || blob[0] !== 0x02) throw new Error('packet');
+  const nonce = blob.slice(1, 13);
+  const ctLen = new DataView(blob.buffer, blob.byteOffset + 13, 4).getUint32(0, false);
+  if (17 + ctLen > blob.length) throw new Error('packet');
+  const ct = blob.slice(17, 17 + ctLen);
+  const symKey = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
+  const plain = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce }, symKey, ct));
+  // 'PRSH' | metaLen(4 BE) | metaJSON | chunkData
+  if (plain[0] !== 0x50 || plain[1] !== 0x52 || plain[2] !== 0x53 || plain[3] !== 0x48) throw new Error('magic');
+  const metaLen = new DataView(plain.buffer, 4, 4).getUint32(0, false);
+  let meta = null;
+  try { meta = JSON.parse(new TextDecoder().decode(plain.slice(8, 8 + metaLen))); } catch { meta = null; }
+  return { data: plain.slice(8 + metaLen), meta };
+}
+
+async function startDownload() {
+  if (!LINK || busyDownloading) return;
+  busyDownloading = true;
+  const tokens = LINK.tokens;
+  const errRetry = document.getElementById('error-retry');
+  if (errRetry) errRetry.hidden = true;
+  try {
+    showStep('step-loading');
     setTitle(t('dlTitle'));
-    setStatus(t('dlStatus'), 30);
+    setStatus(t('dlStatus'), 0);
 
-    const r = await fetch(RELAY + '/v2/dl/' + token + '/get', {
-      signal: AbortSignal.timeout(60000),
-    });
-
-    if (r.status === 410 || r.status === 404) {
-      showStep('step-burned');
-      return;
-    }
-    if (r.status === 400 || r.status === 401) {
-      showInvalid();
-      return;
-    }
-    if (!r.ok) {
-      throw new Error(t('dlFail')(r.status));
+    const blobs = [];
+    for (let i = 0; i < tokens.length; i++) {
+      const got = await fetchSealed(tokens[i], (f) => {
+        setStatus(t('dlStatus'), Math.max(1, Math.round(((i + f) / tokens.length) * 80)));
+      });
+      if (got.status !== 200) {
+        releaseAll(tokens);
+        if (got.status === 404 || got.status === 410) { showGone(got.reason); return; }
+        if (got.status === 409) { retryable(t('busy')); return; }
+        if (got.status === 400 || got.status === 401) { showInvalid(); return; }
+        if (got.reason === 'stalled') { retryable(t('stalled')); return; }
+        if (got.reason === 'network' || got.reason === 'short') { retryable(t('netFail')); return; }
+        retryable(t('dlFail')(got.status));
+        return;
+      }
+      blobs.push(got.bytes);
     }
 
     setTitle(t('decTitle'));
-    setStatus(t('decStatus'), 65);
+    setStatus(t('decStatus'), 85);
 
-    const ciphertext = await r.arrayBuffer();
-    let plaintext;
+    // Decrypt everything BEFORE the relay is told to burn. AES-GCM checks every
+    // byte against its tag, so a wrong key or a damaged download fails here,
+    // and then nothing has been spent.
+    let filename;
+    let fileData;
     try {
-      plaintext = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, ciphertext));
+      if (LINK.kind === 'webapp') {
+        const aesKey = await crypto.subtle.importKey('raw', LINK.rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
+        const plaintext = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: LINK.iv }, aesKey, blobs[0]));
+        // Parse header: [uint32-LE nameLen][nameBytes][fileBytes]
+        if (plaintext.length < 4) throw new Error('short');
+        const nameLen = new DataView(plaintext.buffer).getUint32(0, true);
+        if (plaintext.length < 4 + nameLen) throw new Error('header');
+        filename = new TextDecoder().decode(plaintext.slice(4, 4 + nameLen)) || 'download';
+        fileData = plaintext.slice(4 + nameLen);
+      } else {
+        const chunks = [];
+        let metaName = null;
+        for (let i = 0; i < blobs.length; i++) {
+          const { data, meta } = await tbDecryptChunk(blobs[i], LINK.rawKeys[i]);
+          if (!metaName && meta && typeof meta.name === 'string') metaName = meta.name;
+          chunks.push(data);
+        }
+        const total = chunks.reduce((n, c) => n + c.length, 0);
+        fileData = new Uint8Array(total);
+        let off = 0;
+        for (const c of chunks) { fileData.set(c, off); off += c.length; }
+        filename = metaName || LINK.name || 'download';
+      }
     } catch {
+      releaseAll(tokens);
       showError(t('decFail'));
       return;
     }
 
-    // Parse header: [uint32-LE nameLen][nameBytes][fileBytes]
-    if (plaintext.length < 4) throw new Error(t('tooShort'));
-    const nameLen = new DataView(plaintext.buffer).getUint32(0, true);
-    if (plaintext.length < 4 + nameLen) throw new Error(t('headerBad'));
-    const filename = new TextDecoder().decode(plaintext.slice(4, 4 + nameLen)) || 'download';
-    const fileData = plaintext.slice(4 + nameLen);
-
-    // Detect PDF via magic bytes (%PDF). No header schema change required.
-    const isPdf = fileData.length >= 4 &&
-                  fileData[0] === 0x25 && fileData[1] === 0x50 &&
-                  fileData[2] === 0x44 && fileData[3] === 0x46;
-
-    if (isPdf) {
-      setStatus(t('opening'), 90);
-      try {
-        const preview = await renderPdfPreview(fileData);
-        setStatus(t('done'), 100);
-        // Same heading and same shape as every other ending. The sentence says
-        // what is true of THIS branch: nothing has been written to disk yet,
-        // and the link is already spent, so saving is the one thing left to do.
-        const pageCount = t('pages')(preview.pages, preview.shown);
-        window.paramantDone.fill('step-done', {
-          title: t('haveFile'),
-          line: t('pdfLine')(filename, pageCount, formatSize(fileData.length)),
-        });
-        window.paramantDone.payload('step-done', preview.node);
-        const note = document.getElementById('done-pdf-note');
-        if (note) note.hidden = false;
-        // One loud button, and on this branch it is the save that has not
-        // happened yet. The bytes are deliberately NOT dropped when the tab
-        // goes to the background: the document is on the screen, and a reader
-        // who comes back to it has to still be able to save it.
-        savedFile = { name: filename, bytes: fileData, mime: 'application/pdf' };
-        const saveBtn = document.getElementById('done-save');
-        if (saveBtn) saveBtn.textContent = t('save');
-        showStep('step-done');
-        return;
-      } catch (e) {
-        // Fall through to the plain save if the document will not open.
-        setStatus(t('pdfFallback'), 95);
-      }
-    }
-
-    setStatus(t('saving'), 90);
-
-    // Trigger browser download (non-PDF path, or PDF preview fallback)
-    const blob = new Blob([fileData]);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
-
-    setStatus(t('done'), 100);
-
-    // The end screen. One sentence in ordinary words; the algorithm names live
-    // in the folded <details> next to it, not on the reader's face.
-    window.paramantDone.fill('step-done', {
-      title: t('haveFile'),
-      line: t('savedLine')(filename, formatSize(fileData.length)),
-    });
-    // A browser can refuse or a person can dismiss a save dialog, and the bytes
-    // are then unreachable for good: the link is spent and will not open again.
-    // So the one primary button on this screen offers the save a second time.
-    // The bytes are held for exactly as long as this tab is in front of
-    // somebody, and dropped the moment it is not, which is the same bargain
-    // /ontvang already makes on its own done screen.
-    savedFile = { name: filename, bytes: fileData };
-    document.addEventListener('visibilitychange', dropSavedFile);
-    showStep('step-done');
-
+    // The file is whole and opened. Only now is the relay copy burned.
+    await ackAll(tokens);
+    await deliver(filename, fileData);
   } catch (e) {
+    releaseAll(tokens);
     showError(e.message || t('unknown'));
+  } finally {
+    busyDownloading = false;
   }
+}
+
+async function deliver(filename, fileData) {
+  // Detect PDF via magic bytes (%PDF). No header schema change required.
+  const isPdf = fileData.length >= 4 &&
+                fileData[0] === 0x25 && fileData[1] === 0x50 &&
+                fileData[2] === 0x44 && fileData[3] === 0x46;
+
+  if (isPdf) {
+    setStatus(t('opening'), 90);
+    try {
+      const preview = await renderPdfPreview(fileData);
+      setStatus(t('done'), 100);
+      // Same heading and same shape as every other ending. The sentence says
+      // what is true of THIS branch: nothing has been written to disk yet,
+      // and the link is already spent, so saving is the one thing left to do.
+      const pageCount = t('pages')(preview.pages, preview.shown);
+      window.paramantDone.fill('step-done', {
+        title: t('haveFile'),
+        line: t('pdfLine')(filename, pageCount, formatSize(fileData.length)),
+      });
+      window.paramantDone.payload('step-done', preview.node);
+      const note = document.getElementById('done-pdf-note');
+      if (note) note.hidden = false;
+      // One loud button, and on this branch it is the save that has not
+      // happened yet. The bytes are deliberately NOT dropped when the tab
+      // goes to the background: the document is on the screen, and a reader
+      // who comes back to it has to still be able to save it.
+      savedFile = { name: filename, bytes: fileData, mime: 'application/pdf' };
+      const saveBtn = document.getElementById('done-save');
+      if (saveBtn) saveBtn.textContent = t('save');
+      showStep('step-done');
+      return;
+    } catch (e) {
+      // Fall through to the plain save if the document will not open.
+      setStatus(t('pdfFallback'), 95);
+    }
+  }
+
+  setStatus(t('saving'), 90);
+
+  // Trigger browser download (non-PDF path, or PDF preview fallback)
+  const blob = new Blob([fileData]);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
+
+  setStatus(t('done'), 100);
+
+  // The end screen. One sentence in ordinary words; the algorithm names live
+  // in the folded <details> next to it, not on the reader's face.
+  window.paramantDone.fill('step-done', {
+    title: t('haveFile'),
+    line: t('savedLine')(filename, formatSize(fileData.length)),
+  });
+  // A browser can refuse or a person can dismiss a save dialog, and the bytes
+  // are then unreachable for good: the link is spent and will not open again.
+  // So the one primary button on this screen offers the save a second time.
+  // The bytes are held for exactly as long as this tab is in front of
+  // somebody, and dropped the moment it is not, which is the same bargain
+  // /ontvang already makes on its own done screen.
+  savedFile = { name: filename, bytes: fileData };
+  document.addEventListener('visibilitychange', dropSavedFile);
+  showStep('step-done');
+
 }
 
 // The file this tab may still hand over a second time, and the rule for
@@ -410,3 +642,5 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 });
 act('click','saveAgain',()=>saveAgain());
+act('click','startDownload',()=>startDownload());
+act('click','retryDownload',()=>startDownload());

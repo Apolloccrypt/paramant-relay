@@ -274,6 +274,23 @@ const GLANGS = [
     onePage: /1 page/, openHere: /is open here in this tab/, save: 'Save' },
 ];
 
+// /get fetches nothing before the receiver presses the button (2026-10-04), and
+// confirms the download afterwards. The probe and the confirmation are stubbed
+// here so no request leaves the machine; the button is pressed like a person.
+// A regex, not a glob: the page asks .../get?claim=<id>, and a glob is matched
+// against the whole URL, query included.
+const DL_GET_RE = /^https:\/\/health\.paramant\.app\/v2\/dl\/[^/]+\/get(\?|$)/;
+async function stubDlSides(page) {
+  await page.route('https://health.paramant.app/v2/dl/**/info', (r) => r.fulfill({ status: 200,
+    contentType: 'application/json', body: JSON.stringify({ ok: true, file_size: 2000, ttl_left_s: 3600, used: false }) }));
+  await page.route(/https:\/\/health\.paramant\.app\/v2\/dl\/.*\/(ack|release)$/, (r) => r.fulfill({ status: 200,
+    contentType: 'application/json', body: '{"ok":true,"burned":true}' }));
+}
+async function pressDownload(page) {
+  await page.waitForSelector('#step-ready.active #ready-btn:not([disabled])', { timeout: 20000 });
+  await page.click('#ready-btn');
+}
+
 // ── /get, received through a link ───────────────────────────────────────────
 for (const G of GLANGS) {
   {
@@ -283,10 +300,12 @@ for (const G of GLANGS) {
 
     const ctx = await browser.newContext({ viewport: PHONE, acceptDownloads: true });
     const page = await ctx.newPage();
-    await page.route('https://health.paramant.app/v2/dl/**/get', (r) =>
+    await page.route(DL_GET_RE, (r) =>
       r.fulfill({ status: 200, contentType: 'application/octet-stream', body: ct }));
+    await stubDlSides(page);
     const dl = page.waitForEvent('download', { timeout: 30000 });
     await page.goto(`${ORIGIN}${G.pre}/get?t=${'a'.repeat(48)}&r=health#${frag}`, { waitUntil: 'domcontentloaded' });
+    await pressDownload(page);
     await dl;
     await page.waitForSelector('#step-done.active', { timeout: 20000 });
     const text = await audit(page, G.pre + '/get', '#step-done');
@@ -311,9 +330,11 @@ for (const G of GLANGS) {
 
     const ctx = await browser.newContext({ viewport: PHONE, acceptDownloads: true });
     const page = await ctx.newPage();
-    await page.route('https://health.paramant.app/v2/dl/**/get', (r) =>
+    await page.route(DL_GET_RE, (r) =>
       r.fulfill({ status: 200, contentType: 'application/octet-stream', body: ct }));
+    await stubDlSides(page);
     await page.goto(`${ORIGIN}${G.pre}/get?t=${'a'.repeat(48)}&r=health#${frag}`, { waitUntil: 'domcontentloaded' });
+    await pressDownload(page);
     await page.waitForSelector('#step-done.active', { timeout: 40000 });
     await page.locator('#step-done .done-payload canvas').first().waitFor({ timeout: 40000 });
     const text = await audit(page, G.pre + '/get PDF', '#step-done');
