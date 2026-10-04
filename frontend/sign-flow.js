@@ -44,7 +44,12 @@ const RELAY_PUBLIC = 'https://health.paramant.app';
 // a thin line, and the signer can still drag the corner to make it larger.
 const STAMP_PDF_W = 170;
 const STAMP_PDF_H = 70;
-const MAX_PREVIEW_PAGES = 30;
+const MAX_PREVIEW_PAGES = 30;   // the review preview (step 4)
+// The Place step shows every page up to 300, the same cap as /co-sign: a
+// sender with a 35-page contract could not point at page 31 (retest T2-B1).
+// The first 30 render straight away, the rest as they scroll near.
+const MAX_PLACE_PAGES = 300;
+const EAGER_PLACE_PAGES = 30;
 
 // Preview robustness (see js/preview-render.js). One generation per surface, so
 // a newer render of the same pane stops an older one that is still awaiting
@@ -1015,7 +1020,7 @@ async function renderPdfForPlacement() {
 
   const container = $('ds-pdf-canvas-list');
   container.innerHTML = '';
-  const maxPages = Math.min(pdf.numPages, MAX_PREVIEW_PAGES);
+  const maxPages = Math.min(pdf.numPages, MAX_PLACE_PAGES);
   const pages = [];
   for (let i = 1; i <= maxPages; i++) {
     const page = await pdf.getPage(i);
@@ -1025,6 +1030,11 @@ async function renderPdfForPlacement() {
     wrap.dataset.pageIndex = String(i - 1);
     wrap._pdfPage = { width: baseViewport.width, height: baseViewport.height, index: i - 1 };
     const canvas = document.createElement('canvas');
+    // The page has its final shape before a pixel is drawn: a canvas at its
+    // 300x150 default made a 40-page document jump by thousands of pixels
+    // while it rendered, under the signer's finger (retest T1-12).
+    canvas.style.aspectRatio = baseViewport.width + ' / ' + baseViewport.height;
+    wrap.style.width = Math.floor(baseViewport.width * fitScaleFor(baseViewport)) + 'px';
     wrap.appendChild(canvas);
     wrap.appendChild(buildPageBar(i - 1));
     container.appendChild(wrap);
@@ -1078,23 +1088,60 @@ async function applyPlaceZoom() {
     return;
   }
   const token = ++placeRenderToken;
+  // Every page gets its final size first, so nothing below moves while the
+  // pages render (T1-12).
+  for (const p of placeState.pages) {
+    p.wrap.style.width = Math.floor(p.baseViewport.width * fitScaleFor(p.baseViewport) * z) + 'px';
+    p.renderedZoom = null;
+  }
   // Render at devicePixelRatio so the backing store has real pixels behind every
   // CSS pixel. The canvas is shown at the CSS width (wrap width + canvas{width:100%}),
   // but drawn at cssWidth*dpr, so it stays razor sharp on HiDPI/retina screens.
-  const dpr = hiDpiScale();
-  for (const p of placeState.pages) {
-    const cssScale = fitScaleFor(p.baseViewport) * z;
-    const cssW = Math.floor(p.baseViewport.width * cssScale);
-    p.wrap.style.width = cssW + 'px';                 // CSS size drives layout + coords
-    if (p.task) { try { p.task.cancel(); } catch (e) {} }
-    // backing store = cssW * dpr, within the canvas cap (see renderPageCapped)
-    try { await renderPageCapped(p.page, p.canvas, cssScale * dpr, (t) => { p.task = t; }); }
-    catch (e) { if (e && e.name === 'RenderingCancelledException') return; }
+  const eager = placeState.pages.slice(0, EAGER_PLACE_PAGES);
+  for (const p of eager) {
+    if (!(await renderPlacePage(p))) return;
     if (token !== placeRenderToken) return;   // a newer zoom superseded this pass
   }
+  observeLazyPlacePages();
   reflowStampMarker();
   reflowExtras();                             // text/date objects follow the new scale too
   reflowGhostStamps();                        // repeated-seal ghosts on the other pages
+}
+
+// One page of the Place step at the current zoom. False when a newer render
+// cancelled it. A long document draws at no more than 1.5x, to keep memory
+// in bounds on a phone.
+async function renderPlacePage(p) {
+  const z = placeState.zoom;
+  const cssScale = fitScaleFor(p.baseViewport) * z;
+  const dpr = placeState.pages.length > EAGER_PLACE_PAGES ? Math.min(1.5, hiDpiScale()) : hiDpiScale();
+  if (p.task) { try { p.task.cancel(); } catch (e) {} }
+  // backing store = cssW * dpr, within the canvas cap (see renderPageCapped)
+  try { await renderPageCapped(p.page, p.canvas, cssScale * dpr, (t) => { p.task = t; }); }
+  catch (e) { if (e && e.name === 'RenderingCancelledException') return false; }
+  p.renderedZoom = z;
+  return true;
+}
+
+// Pages past the first 30 render when they come near the screen, one at a time.
+let _lazyPlaceObserver = null;
+let _lazyPlaceChain = Promise.resolve();
+function observeLazyPlacePages() {
+  if (_lazyPlaceObserver) { try { _lazyPlaceObserver.disconnect(); } catch (e) { /* gone */ } _lazyPlaceObserver = null; }
+  if (!placeState || !placeState.pages || placeState.pages.length <= EAGER_PLACE_PAGES || typeof IntersectionObserver === 'undefined') return;
+  const byWrap = new Map(placeState.pages.map((p) => [p.wrap, p]));
+  _lazyPlaceObserver = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      const p = byWrap.get(e.target);
+      if (!p || p.renderedZoom === placeState.zoom) continue;
+      _lazyPlaceChain = _lazyPlaceChain.then(async () => {
+        if (!placeState || p.renderedZoom === placeState.zoom) return;
+        try { await renderPlacePage(p); } catch (err) { /* the page stays blank-shaped; the note says so */ }
+      });
+    }
+  }, { root: null, rootMargin: '1500px 0px' });
+  placeState.pages.slice(EAGER_PLACE_PAGES).forEach((p) => _lazyPlaceObserver.observe(p.wrap));
 }
 
 // Sign-every-page preview: the paraaf on every page OTHER than the one the seal
