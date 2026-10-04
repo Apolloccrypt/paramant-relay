@@ -41,9 +41,13 @@ let gcfBrowser;
 let GCF_ORIGIN;
 
 before(async () => {
-  gcfStack = await startRelay({
-    env: { USERS_JSON: JSON.stringify({ api_keys: [{ key: GCF_KEY, active: true, plan: 'pro', account_id: 'acct_gcf', email: 'gcf@example.test' }] }) },
-  });
+  // PARAMANT_TEST_RELAY: a relay already running on the host (with GCF_KEY), for
+  // a WebKit run in the Playwright container, which cannot load relay.js.
+  gcfStack = process.env.PARAMANT_TEST_RELAY
+    ? { basis: process.env.PARAMANT_TEST_RELAY, stop() {} }
+    : await startRelay({
+      env: { USERS_JSON: JSON.stringify({ api_keys: [{ key: GCF_KEY, active: true, plan: 'pro', account_id: 'acct_gcf', email: 'gcf@example.test' }] }) },
+    });
   gcfServer = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
     // What deploy/nginx-paramant-live.conf does in front of the login gate: a

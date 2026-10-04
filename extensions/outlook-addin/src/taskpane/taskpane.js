@@ -126,13 +126,9 @@ async function refreshAttachments() {
 // said every original was removed (fase 1, EXT-21-A).
 async function encryptCurrent() {
   const now = await fileAttachments();
-  if (!sameList(now, shown)) {
-    await refreshAttachments();
-    const text = document.getElementById('progress-text');
-    document.getElementById('encrypt-progress').classList.remove('hidden');
-    text.textContent = 'The attachments changed. Check the list and click Encrypt again.';
-    return;
-  }
+  // Show what is really going to be encrypted before it starts.
+  if (!sameList(now, shown)) await refreshAttachments();
+  if (!now.length) return;
   await encryptAll(now);
 }
 

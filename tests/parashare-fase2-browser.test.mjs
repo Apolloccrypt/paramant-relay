@@ -31,7 +31,11 @@ let pfBrowser;
 let PF_ORIGIN;
 
 before(async () => {
-  pfStack = await startRelay({ env: { USERS_JSON: JSON.stringify({ api_keys: [{ key: 'pgp_pf_suite_key', active: true, plan: 'pro', account_id: 'acct_pf' }] }) } });
+  // PARAMANT_TEST_RELAY: a relay already running on the host, for a WebKit run
+  // in the Playwright container (~/bin/pw-webkit.sh), which cannot load relay.js.
+  pfStack = process.env.PARAMANT_TEST_RELAY
+    ? { basis: process.env.PARAMANT_TEST_RELAY, stop() {} }
+    : await startRelay({ env: { USERS_JSON: JSON.stringify({ api_keys: [{ key: 'pgp_pf_suite_key', active: true, plan: 'pro', account_id: 'acct_pf' }] }) } });
   pfServer = http.createServer((req, res) => {
     const u = new URL(req.url, 'http://localhost');
     const file = path.join(PF_ROOT, PF_ALIAS[u.pathname] || u.pathname);
