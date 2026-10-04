@@ -1812,7 +1812,7 @@ async function createLink() {
         // the token together with the wrapping, because it mails the token to
         // the recipient in the invitation link. While it holds both it could
         // unwrap the key. The end screen says so (done-details-named); a real
-        // recipient key for this path is a later project.
+        // recipient key for this path is issue #550.
         sealed[adres.toLowerCase()] = {
           token,
           wrapped_key: await paramantSendWrap.wrap(token, geheim),
