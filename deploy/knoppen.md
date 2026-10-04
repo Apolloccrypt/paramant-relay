@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **120 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **192 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **193 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -158,6 +158,7 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `PARAMANT_SIGN_SHOT_DIR` | `tests/sign-geometry.test.mjs`, `tests/sign-errors.test.mjs` | geen | pad waar een test de getekende pagina's als PNG en PDF neerzet; leeg betekent geen afdruk |
 | `PARAMANT_SIGN_SCREENSHOT_PATH` | `tests/sign-invite-delivery.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
 | `PARAMANT_SWEEP_PROGRESS` | `scripts/ui-contrast-sweep.mjs` | geen | voortgangsregels tijdens de contrastveger |
+| `PARAMANT_TEST_RELAY` | `tests/get-claim-flow.test.mjs`, `tests/parashare-fase2-browser.test.mjs` | geen | adres van een relay die al draait, voor de WebKit-ronde in de Playwright-container (die relay.js niet kan laden); leeg betekent: de suite start er zelf een |
 | `PARTNERS_PROD_NAMEN` | `tests/partners.test.mjs` | geen | pad naar een bestand met de sleutelnamen van de prod-.env (een per regel); alternatief voor `PARTNERS_PROD_SSH`. Zonder beide wordt de productiehelft overgeslagen met een melding |
 | `PARTNERS_PROD_SSH` | `tests/partners.test.mjs` | geen | ssh-doel (root@server) waarvandaan de test met `cut -d= -f1` alleen de sleutelnamen van `/opt/paramant-relay/.env` leest. Zonder: productiehelft overgeslagen, geen groen |
 | `PARTNERS_PROD_SSH_KEY` | `tests/partners.test.mjs` | geen, ssh kiest zelf | de ssh-sleutel voor `PARTNERS_PROD_SSH` |
