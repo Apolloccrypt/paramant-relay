@@ -121,7 +121,11 @@ test('an ordinary signed-in page load stays under the /api/user/ limit', () => {
   // address), must fit, and the old 9-request /account load with ample room.
   assert.ok(gen.burst + 1 >= 2 * seen.length, `burst ${gen.burst} is too small for ${seen.length} distinct calls x2`);
   assert.ok(SNIPPET.user_session && SNIPPET.user_session.perMin >= 120, 'user_session refills at 120 a minute or more');
-  assert.equal(SNIPPET.user_session.key, '$binary_remote_addr', 'user_session stays per IP');
+  // Per signed-in session since sweep-chaos 6 (an office behind one NAT
+  // address ran out at ~17 people); the address is the fallback without a cookie.
+  assert.equal(SNIPPET.user_session.key, '$user_session_key', 'user_session is keyed per session');
+  const snippetText = read('deploy/nginx/snippets/paramant-limit-req.conf');
+  assert.match(snippetText, /map \$cookie_paramant_user_session \$user_session_key \{[^}]*""\s+\$binary_remote_addr;[^}]*default\s+\$cookie_paramant_user_session;/, 'the session key falls back to the address');
 });
 
 test('every /api/user/ block strips the internal headers and sets the client address', () => {
@@ -145,4 +149,19 @@ test('the self-host conf splits /admin/ the same way', () => {
   for (const uri of ['/admin/api/auth/login', ...LOGIN_DOORS.map((d) => d.replace('/api/user/', '/admin/api/user/'))]) {
     assert.equal(resolve(locs, uri).zone, 'auth', `${uri} must stay in the self-host auth zone`);
   }
+});
+
+// sweep-chaos 6: the :8081 health block set X-Real-IP $remote_addr without
+// set_real_ip_from, so behind Caddy every visitor was 127.0.0.1 and the
+// relay's per-IP limits were one bucket for everybody.
+test('every local server block that forwards X-Real-IP first takes the real address from Caddy', () => {
+  const live = read('deploy/nginx-paramant-live.conf');
+  const blocks = live.split(/\nserver \{/).slice(1);
+  const wrong = [];
+  for (const b of blocks) {
+    const listen = (/listen\s+(\S+);/.exec(b) || [])[1] || '?';
+    if (!/proxy_set_header X-Real-IP \$remote_addr;/.test(b)) continue;
+    if (!/set_real_ip_from 127\.0\.0\.1;/.test(b) || !/real_ip_header X-Forwarded-For;/.test(b)) wrong.push(listen);
+  }
+  assert.deepEqual(wrong, [], `these blocks forward 127.0.0.1 as the client: ${wrong.join(', ')}`);
 });

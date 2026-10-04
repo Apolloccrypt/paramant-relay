@@ -7,6 +7,7 @@ const pow = require('./lib/pow-captcha');
 const publicPlans = require('./lib/public-plans');
 const inviteText = require('./lib/invite-text');
 const { uaLabel } = require('./lib/ua-label');
+const idempotency = require('./lib/idempotency');
 const http    = require('http');
 const crypto  = require('crypto');
 const path    = require('path');
@@ -717,6 +718,21 @@ async function findUserByEmail(email) {
   return keys.find(k => k.email && k.email.toLowerCase() === lower && k.active !== false) || null;
 }
 
+// findUserByEmail answers null both for "no such account" and for "the relay
+// did not answer", so a page that reads it during an outage tells a signed-in
+// customer he has no plan, no name and no key (the "everything looks logged
+// out" of sweep-chaos 5). The account pages use this one, which throws on a
+// relay failure so the route can answer 503 instead.
+async function findUserByEmailStrict(email) {
+  const lower = String(email || '').toLowerCase();
+  let r;
+  try { r = await relayFetch("health", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN); }
+  catch (e) { const err = new Error('relay_unavailable'); err.code = 'relay_unavailable'; throw err; }
+  if (r.status !== 200) { const err = new Error('relay_unavailable'); err.code = 'relay_unavailable'; throw err; }
+  const keys = r.body?.keys || [];
+  return keys.find(k => k.email && k.email.toLowerCase() === lower && k.active !== false) || null;
+}
+
 // Find API key entry by its key id (reverse of findUserByEmail). Used by the
 // usernameless/discoverable passkey login to resolve the email for the session
 // record after identity has been proven by the credential. Same source/cost as
@@ -1021,10 +1037,15 @@ api.post("/user/signup", async (req, res) => {
     // pending token so the caller can retry the signup form. Per-email rate
     // limit still applies, but a single Resend hiccup will not surface as a
     // 500 to the user.
+    // On a mail failure the pending signup is KEPT and the mail is queued for
+    // another try (mailRetry below). It used to be deleted: during a mail
+    // provider outage every signup vanished, the form said "check your inbox",
+    // nothing ever arrived, and a second try was blocked by the rate limit
+    // (sweep-chaos, mail-fail). The token still expires after 24 hours.
     setImmediate(() => {
       sendVerificationEmail(norm, verifyToken, ip).catch(err => {
-        console.error("[signup] verification email failed:", err.message);
-        redis().del(`paramant:signup:pending:${verifyToken}`).catch(() => {});
+        console.error("[signup] verification email failed, queued for retry:", err.message);
+        mailRetry.queue({ kind: "verify", email: norm, token: verifyToken, ip }).catch(() => {});
       });
     });
     logRedacted('log', `[signup] pending signup for ${maskEmail(norm)} from ${maskIpForLog(ip)}`);
@@ -1033,6 +1054,55 @@ api.post("/user/signup", async (req, res) => {
   // Identical response shape and timing in both branches.
   res.json({ success: true, message: "verification_email_sent" });
 });
+
+// ── Mail retry for signup mails ──────────────────────────────────────────────
+// A small durable queue in redis: one hash per job, one sorted set by next
+// attempt. Every minute the due jobs are tried again, with backoff (1, 2, 4 ..
+// 60 minutes) for as long as the token they carry is alive (24 hours). A job
+// whose token is gone is dropped: there is nothing left to mail.
+const mailRetry = (() => {
+  const Z = "paramant:mailretry:due";
+  const H = (id) => `paramant:mailretry:job:${id}`;
+  async function queue(job) {
+    const id = crypto.createHash("sha256").update(`${job.kind}|${job.token}`).digest("hex").slice(0, 32);
+    const rec = { ...job, tries: 0, first: Date.now() };
+    await redis().set(H(id), JSON.stringify(rec), { EX: 86400 });
+    await redis().zAdd(Z, { score: Date.now() + 60_000, value: id });
+    return id;
+  }
+  async function tokenAlive(job) {
+    if (job.kind === "verify") return !!(await redis().get(`paramant:signup:pending:${job.token}`));
+    if (job.kind === "setup") return !!(await redis().get(`paramant:user:setup_token:${job.token}`));
+    return false;
+  }
+  async function runOnce(now = Date.now()) {
+    let due = [];
+    try { due = await redis().zRangeByScore(Z, 0, now, { LIMIT: { offset: 0, count: 50 } }); } catch { return 0; }
+    let sent = 0;
+    for (const id of due) {
+      const raw = await redis().get(H(id)).catch(() => null);
+      const job = raw ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : null;
+      if (!job || !(await tokenAlive(job).catch(() => false))) { await redis().zRem(Z, id).catch(() => {}); await redis().del(H(id)).catch(() => {}); continue; }
+      try {
+        if (job.kind === "verify") await sendVerificationEmail(job.email, job.token, job.ip || "unknown");
+        else await sendSetupEmail(job.email, job.token);
+        await redis().zRem(Z, id).catch(() => {}); await redis().del(H(id)).catch(() => {});
+        sent++;
+        console.log(`[mail-retry] ${job.kind} mail delivered on try ${job.tries + 2} to ${maskEmail(job.email)}`);
+      } catch (e) {
+        job.tries = (job.tries || 0) + 1;
+        const wait = Math.min(60, 2 ** Math.min(job.tries, 6)) * 60_000;
+        await redis().set(H(id), JSON.stringify(job), { KEEPTTL: true }).catch(() => {});
+        await redis().zAdd(Z, { score: now + wait, value: id }).catch(() => {});
+      }
+    }
+    return sent;
+  }
+  return { queue, runOnce };
+})();
+if (process.env.NODE_ENV !== "test" || process.env.MAIL_RETRY_INTERVAL_MS) {
+  setInterval(() => { mailRetry.runOnce().catch(() => {}); }, parseInt(process.env.MAIL_RETRY_INTERVAL_MS || "60000", 10)).unref();
+}
 
 // GET /api/user/signup/verify/:token — stage 2: create account after email click
 api.get("/user/signup/verify/:token", async (req, res) => {
@@ -1127,8 +1197,10 @@ api.get("/user/signup/verify/:token", async (req, res) => {
     try {
       await sendSetupEmail(email, setupToken);
     } catch (err) {
-      console.error("[signup/verify] setup email failed:", err.message);
-      // Account exists, don't undo — they can contact support
+      // Account exists, don't undo. The setup mail is queued and retried
+      // instead of leaving the customer with an account and no way in.
+      console.error("[signup/verify] setup email failed, queued for retry:", err.message);
+      mailRetry.queue({ kind: "setup", email, token: setupToken }).catch(() => {});
     }
 
     // Mark this token as consumed so later re-clicks (refresh/back/double-tap) route back to /signup/verified instead of error.
@@ -2006,7 +2078,8 @@ api.delete("/user/account/webauthn/credentials/:credId", authUser, async (req, r
 // goes through the per-document activation gate (R018: every signature is a
 // passkey-PRF activation; no separate weaker self-sign route). The relay is
 // reached with the session's own pgp_ key as X-Api-Key.
-api.post("/user/envelopes", authUser, async (req, res) => {
+// Idempotent: a double click on "send" made two envelopes (sweep-chaos).
+api.post("/user/envelopes", authUser, idempotency.middleware({ redis: () => redis(), scope: "env-create" }), async (req, res) => {
   const { user_id, email } = req.userSession;
   const ip = req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
   if (!(await webauthn.rateHit(redis(), `env:ip:${ip}`, 30, 900))) return res.status(429).json({ error: "rate_limited" });
@@ -2174,7 +2247,8 @@ api.get("/user/envelopes/:id/receipt", authUser, async (req, res) => {
 // other half is released by the relay only to the signed-in invitee, so the
 // link opens the document for that person and for nobody who merely reads the
 // mail.
-api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
+// Idempotent: a double click mailed every party twice.
+api.post("/user/envelopes/:id/invitations", authUser, idempotency.middleware({ redis: () => redis(), scope: "env-invite" }), async (req, res) => {
   const id = (req.params.id || "").toString();
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) return res.status(400).json({ error: "invalid_envelope_id" });
   const invitations = Array.isArray(req.body?.invitations) ? req.body.invitations : [];
@@ -2638,7 +2712,12 @@ api.get("/user/session/verify", async (req, res) => {
   const token = parseCookies(req).paramant_user_session;
   if (!token) return res.json({ authenticated: false });
   const key = `paramant:user:session:${token}`;
-  const raw = await redis().get(key);
+  // A session store that does not answer is not "signed out". It used to
+  // throw out of this handler (500) and every page read that as logged out
+  // (sweep-chaos 5); now it says 503 and authenticated: null, unknown.
+  let raw;
+  try { raw = await redis().get(key); }
+  catch (e) { return res.status(503).json({ authenticated: null, error: "session_store_unavailable" }); }
   if (!raw) return res.json({ authenticated: false });
   let s;
   try { s = JSON.parse(raw); } catch { return res.json({ authenticated: false }); }
@@ -2741,7 +2820,7 @@ function planNameOf(fields) {
 api.get("/user/me", authUser, async (req, res) => {
   try {
     const { user_id, email } = req.userSession;
-    const user = await findUserByEmail(email);
+    const user = await findUserByEmailStrict(email);
     const backupCount = await redis()
       .sCard(`paramant:user:backup_codes:${user_id}`)
       .catch(() => 0);
@@ -3024,7 +3103,7 @@ api.get("/user/sign-draft-key", authUser, async (req, res) => {
 api.get("/user/account", authUser, async (req, res) => {
   try {
     const { user_id, email } = req.userSession;
-    const user = await findUserByEmail(email);
+    const user = await findUserByEmailStrict(email);
     const backupCount = await redis().sCard(`paramant:user:backup_codes:${user_id}`).catch(() => 0);
 
     // The account screen's session list. It used to SCAN the whole keyspace and
