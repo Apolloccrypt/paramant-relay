@@ -26,13 +26,13 @@
 // The manifest itself did not change: type, page and coordinates, hashed byte
 // for byte as before (relay/envelope.js normaliseAppearance).
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=19';
+import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=20';
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { vaultDelete } from '/vendor/vault.js?v=5';
 import { decryptDocumentCapsule, parseDocumentKeyFragment, documentKeyFragment } from '/js/parasign-document-capsule.js?v=2';
 import { textBoxesFromItems, initialsFrom, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=2';
-import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParties, textBoxesToFractions, strokesToInk } from '/js/cosign-layout.js?v=2';
-import { sealInk, openInk, joinKey, parseKeyShareFragment } from '/js/parasign-ink.js?v=2';
+import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParties, textBoxesToFractions, strokesToInk } from '/js/cosign-layout.js?v=3';
+import { sealInk, openInk, joinKey, parseKeyShareFragment } from '/js/parasign-ink.js?v=3';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
 
