@@ -529,6 +529,33 @@ https://paramant.app`;
   };
 }
 
+// ── 5b. KEY DISABLED ──────────────────────────────────────────────────────────
+// What disable-key mails. It used to send the cancellation mail above ("your
+// plan ends on ..., your API key continues to work") on the very moment the key
+// stopped working (ADMIN-24). This one says what happened.
+function keyDisabledEmail({ disabledAt }) {
+  const preheader = 'Your Paramant API key has been disabled.';
+  const text = `Hi,
+
+Your Paramant API key was disabled on ${disabledAt}. It no longer works
+on any Paramant relay, as of now.
+
+Files you sent before are not affected. If you did not expect this,
+reply to this email and we will look into it.
+
+Paramant
+https://paramant.app`;
+  const html = htmlShell(preheader, `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Your API key has been disabled</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Your Paramant API key was disabled on <strong>${disabledAt}</strong>. It no longer works on any Paramant relay, as of now.</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">Files you sent before are not affected. If you did not expect this, reply to this email and we will look into it.</p>
+  `);
+  return {
+    ...wrap(text, html, { refId: 'disabled-' + Date.now() }),
+    subject: 'Your Paramant API key has been disabled',
+  };
+}
+
 // ── 6. ACCOUNT DELETION ───────────────────────────────────────────────────────
 // This mail used to say that account records were retained and that erasure was
 // a separate request to privacy@. That was true while deletion only revoked the
@@ -1178,6 +1205,7 @@ module.exports = {
   billingConfirmationEmail,
   productPlanChangeEmail,
   billingCancellationEmail,
+  keyDisabledEmail,
   accountDeletionEmail,
   sendEmail,
   FROM_ADDR,

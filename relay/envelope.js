@@ -514,6 +514,11 @@ class EnvelopeStore {
       // The creating account. Written for provenance + so a later re-backfill can
       // resolve the account directly from the record, without a key reverse-map.
       account_id: (accountId || '').toString().slice(0, 200),
+      // The sender's ParaSign tier when the request was made. The sender pays
+      // for every signature on it, and the create route checked he had room
+      // for all of them then; a plan that lapses while the request is open
+      // must not leave his signers with a refusal (sweep-acct finding 7).
+      sender_tier: (plan || '').toString().slice(0, 32),
       original_filename: (originalFilename || '').toString().slice(0, 200),
       party_count: String(parties.length),
       signed_count: '0',
@@ -684,6 +689,12 @@ class EnvelopeStore {
   // signature on this envelope", so no request field can steer the meter.
   // Returns null when no such envelope exists (the caller keeps that a 404) and
   // '' for a record written before account_id was stored.
+  // The sender's ParaSign tier at create(), or '' for older records.
+  async senderTier(id) {
+    if (!this.available()) throw new Error('redis unavailable');
+    return (await this.redis.hGet('env:' + id, 'sender_tier')) || '';
+  }
+
   async ownerAccountId(id) {
     if (!this.available()) throw new Error('redis unavailable');
     const h = await this.redis.hGetAll('env:' + id);
@@ -728,6 +739,34 @@ class EnvelopeStore {
   // handler has confirmed the caller owns (creator_api_hash) or participates in
   // (valid invite token) this envelope. getRedacted stays the public, redacted
   // view and is intentionally left untouched.
+  // The events of one envelope, for the account's audit export: when it was
+  // made, viewed, signed, declined, withdrawn, completed. Hashes and times
+  // only, never the document. Separate from getForReceipt on purpose, so the
+  // .psign recipe and its bytes are untouched.
+  async auditTimeline(id) {
+    if (!this.available()) throw new Error('redis unavailable');
+    const h = await this.redis.hGetAll('env:' + id);
+    if (!h || !h.doc_hash) return null;
+    const n = parseInt(h.party_count, 10) || 0;
+    const parties = [];
+    for (let i = 0; i < n; i++) {
+      parties.push({
+        index: i,
+        label: h['p' + i + '_label'] || null,
+        viewed_at: h['p' + i + '_viewed_at'] || null,
+        signed_at: h['p' + i + '_signed_at'] || null,
+        declined_at: h['p' + i + '_declined_at'] || null,
+      });
+    }
+    return {
+      id, doc_hash: h.doc_hash, status: h.status || 'open',
+      created_at: h.created_at || null, completed_at: h.completed_at || null,
+      voided_at: h.voided_at || null,
+      void_reason: h.status === 'void' ? (h.void_reason === 'declined' ? 'declined' : 'cancelled') : null,
+      parties,
+    };
+  }
+
   async getForReceipt(id) {
     if (!this.available()) throw new Error('redis unavailable');
     const key = 'env:' + id;

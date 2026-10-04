@@ -314,14 +314,48 @@ async function route(deps) {
 async function createEnvelope(deps, apiKey, mode, rec) {
   const { res, apiKeys, envStore, envCreateRateOk, readBody, J, publicOrigin } = deps;
   const store = resolveStore(deps);
-  // envCreateRateOk is now the fleet-wide (redis-backed) limiter, so await it.
-  if (!(await envCreateRateOk(apiKey))) {
-    return jsonRes(res, 429, { error: 'rate_limited', message: 'Envelope create quota exceeded (50/hour/key).' }, J, { 'Retry-After': '3600' });
-  }
 
   let d;
   try { d = JSON.parse((await readBody(deps.req, MAX_PDF_BYTES + 1_000_000)).toString()); }
   catch (e) { return errRes(res, 400, 'bad_json', 'Body is not valid JSON.', J); }
+  if (!d || typeof d !== 'object') return errRes(res, 400, 'bad_json', 'Body must be a JSON object.', J);
+
+  // IDEMPOTENCY-KEY (sweep-api A5). A retry after a timeout used to make a
+  // second envelope with fresh sign_urls. The same key from the same API key
+  // within 24 hours gets the first answer back, from the encrypted store.
+  const idemRaw = String((deps.req && deps.req.headers && deps.req.headers['idempotency-key']) || '').trim();
+  let idemKey = null;
+  if (idemRaw) {
+    if (!/^[A-Za-z0-9_.:-]{8,128}$/.test(idemRaw)) return errRes(res, 400, 'invalid_idempotency_key', 'Idempotency-Key must be 8-128 characters of A-Z a-z 0-9 _ . : -', J);
+    idemKey = 'idem:' + crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 32) + ':' + idemRaw;
+    try {
+      const prev = store && typeof store.getMeta === 'function' ? await store.getMeta(idemKey) : null;
+      if (prev && prev.status && prev.body) return jsonRes(res, prev.status, prev.body, J, { 'Idempotent-Replay': 'true' });
+    } catch (e) { /* no store: run as a first request */ }
+  }
+
+  // SHAPE FIRST, then the hourly quota (sweep-api A6): fifty malformed
+  // requests used to spend the whole hour's quota and the real create got 429.
+  const doc0 = d.document || {};
+  if (doc0.content_base64 && doc0.url) return errRes(res, 400, 'ambiguous_document', 'Provide exactly one of document.content_base64 and document.url.', J);
+  if (d.binding_mode !== undefined && d.binding_mode !== 'email' && d.binding_mode !== 'open') {
+    return errRes(res, 400, 'invalid_binding_mode', 'binding_mode must be "email" or "open".', J);
+  }
+  const signers0 = Array.isArray(d.signers) ? d.signers : [];
+  if (signers0.length === 0) return errRes(res, 400, 'missing_signers', 'At least one signer is required.', J);
+  // With email binding every slot is bound to a mailbox; a signer without a
+  // valid address made an envelope that could never complete, answered 201
+  // (sweep-api A4).
+  if (d.binding_mode !== 'open') {
+    const bad = signers0.findIndex((s) => !s || typeof s.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.email.trim()) || s.email.length > 254);
+    if (bad !== -1) return jsonRes(res, 400, { error: 'invalid_signer_email', signer_index: bad, message: 'Every signer needs a valid email address with binding_mode "email".' }, J);
+  }
+
+  // envCreateRateOk is now the fleet-wide (redis-backed) limiter, so await it.
+  if (!(await envCreateRateOk(apiKey))) {
+    const left = 3600 - Math.floor((Date.now() % 3600000) / 1000);
+    return jsonRes(res, 429, { error: 'rate_limited', message: 'Envelope create quota exceeded (50/hour/key).', retry_after_s: left }, J, { 'Retry-After': String(left) });
+  }
 
   // 1) obtain PDF bytes (base64 or HTTPS url via the SSRF-guarded fetcher).
   let pdf = null;
@@ -463,7 +497,7 @@ async function createEnvelope(deps, apiKey, mode, rec) {
         : `sandbox auto-signer unavailable (${(sandbox && sandbox.error) || 'no signing engine'}); test envelope behaves like a live one`)
     : undefined;
 
-  return jsonRes(res, 201, {
+  const created = {
     id: out.id,
     status: finalStatus,
     mode,
@@ -478,7 +512,11 @@ async function createEnvelope(deps, apiKey, mode, rec) {
       ? { signed_pdf: `/v1/envelopes/${out.id}/document`, receipt: `/v1/envelopes/${out.id}/receipt` }
       : null,
     _sandbox_note: sandboxNote,
-  }, J);
+  };
+  if (idemKey && store && typeof store.putMeta === 'function') {
+    try { await store.putMeta(idemKey, { status: 201, body: created }, 24 * 3600 * 1000); } catch (e) { /* replay protection is best effort */ }
+  }
+  return jsonRes(res, 201, created, J);
 }
 
 // ── Sandbox auto-signer (psk_test_) ───────────────────────────────────────────

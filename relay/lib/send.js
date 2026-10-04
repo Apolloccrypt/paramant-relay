@@ -80,6 +80,18 @@ const SEND_MAX_MB = (() => {
 })();
 const SEND_MAX_BYTES = SEND_MAX_MB * 1048576;
 
+// THE TOTAL, across every send that is open at once. The arithmetic above
+// says 150 MB of real bytes for all of them together, and nothing enforced
+// it: there was a ceiling per send and none over the lot (sweep-chaos 4).
+// Seven 25 MB sends filled redis, and from then on log-ins, signatures and
+// envelopes all answered 503 until the sends expired, up to seven days.
+const SEND_TOTAL_MB = (() => {
+  const n = parseInt(process.env.SEND_TOTAL_MB || '150', 10);
+  return Number.isFinite(n) && n > 0 ? n : 150;
+})();
+const SEND_TOTAL_BYTES = SEND_TOTAL_MB * 1048576;
+const BUDGET_KEY = 'send-budget:v1';
+
 // The two ceilings that survive a new code.
 //
 // code_tries is per code and resets with every fresh one, which is right for
@@ -235,6 +247,36 @@ function createSendStore({ store, log, now }) {
     return nu;
   }
 
+  // The open-sends ledger: id -> { s: bytes, x: expires_at }. Expired rows
+  // fall out on every read, so a send that ran out frees its share without a
+  // sweeper; a send whose file is dropped early releases it at once.
+  async function budgetReserve(id, size, expiresAt) {
+    return opVolgorde(BUDGET_KEY, async () => {
+      const meta = (await store.getMeta(BUDGET_KEY)) || {};
+      const e = meta.e && typeof meta.e === 'object' ? meta.e : {};
+      const nu = clock();
+      let sum = 0;
+      for (const [k, v] of Object.entries(e)) {
+        if (!v || !(v.x > nu)) { delete e[k]; continue; }
+        sum += Number(v.s) || 0;
+      }
+      if (sum + size > SEND_TOTAL_BYTES) return { ok: false, used: sum };
+      e[id] = { s: size, x: expiresAt };
+      await store.putMeta(BUDGET_KEY, { e }, 8 * 86400 * 1000);
+      return { ok: true, used: sum + size };
+    });
+  }
+  async function budgetRelease(id) {
+    try {
+      await opVolgorde(BUDGET_KEY, async () => {
+        const meta = (await store.getMeta(BUDGET_KEY)) || {};
+        if (!meta.e || !meta.e[id]) return;
+        delete meta.e[id];
+        await store.putMeta(BUDGET_KEY, { e: meta.e }, 8 * 86400 * 1000);
+      });
+    } catch (e) { if (log) log('warn', 'send_budget_release_failed', { id, err: e && e.message }); }
+  }
+
   async function readSend(id) {
     if (typeof id !== 'string' || !id) return null;
     const meta = await store.getMeta(id);
@@ -336,10 +378,17 @@ function createSendStore({ store, log, now }) {
       // written send used to leave the file in the store under an id nobody
       // knew, for as long as a week, and the sender got a 500 that said
       // nothing about it.
+      const room = await budgetReserve(id, blob.length, created + ttl);
+      if (!room.ok) {
+        for (const k of geclaimd) { try { await store.delMeta(k); } catch (e) {} }
+        if (log) log('warn', 'send_store_full', { id, used_mb: Math.round(room.used / 1048576), total_mb: SEND_TOTAL_MB });
+        return { ok: false, reason: 'store_full', limit: SEND_TOTAL_MB };
+      }
       try {
         await store.putBlob(id, blob, ttl);
         await writeSend(id, send, ttl);
       } catch (err) {
+        await budgetRelease(id);
         try { await store.delBlob(id); } catch (e) {}
         for (const k of geclaimd) { try { await store.delMeta(k); } catch (e) {} }
         if (log) log('error', 'send_create_rolled_back', { id, err: err && err.message });
@@ -593,6 +642,7 @@ function createSendStore({ store, log, now }) {
           return { ok: true, kept: true, reason: 'collection_in_flight' };
         }
         await store.delBlob(id);
+        await budgetRelease(id);
         if (log) log('info', 'send_drained', { id });
         return { ok: true, dropped: true };
       });
@@ -689,7 +739,7 @@ function createSendStore({ store, log, now }) {
       // file right there destroys it under a collector whose bytes are still
       // on the wire: they get 'expired' with hours left on their window, and
       // the sender sees them waiting on a file that no longer exists.
-      if (settled && !_verseClaim(send.records)) await store.delBlob(id);
+      if (settled && !_verseClaim(send.records)) { await store.delBlob(id); await budgetRelease(id); }
       return { ok: true, settled };
     },
 
@@ -727,4 +777,4 @@ function createSendStore({ store, log, now }) {
 
 module.exports = { createSendStore, newSendId, tokenIndexId, accountIndexId,
                    maskEmail, CODE_TTL_MS, CODE_TRIES, CODE_DIGITS, MAX_REMINDERS, MAX_CODE_REQUESTS, MAX_WRONG_TOTAL, COUNTER_WINDOW_MS,
-                   SEND_MAX_MB, SEND_MAX_BYTES };
+                   SEND_MAX_MB, SEND_MAX_BYTES, SEND_TOTAL_MB, SEND_TOTAL_BYTES };

@@ -280,13 +280,13 @@ function VOET(wie, antwoordAdres, taal) {
   const wieHtml = escHtml(wie || '');
   const nl = 'U krijgt dit bericht omdat ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
                                                    : 'een klant van Paramant')
-       + ' uw adres heeft ingevuld. Paramant verstuurt het bestand versleuteld en '
-       + 'kan het zelf niet openen.'
+       + ' uw adres heeft ingevuld. Paramant bewaart het bestand versleuteld; de link '
+       + 'in deze mail opent het en die link bewaren wij niet.'
        + (antwoordAdres ? '<br>Beantwoord deze mail om de afzender direct te bereiken.' : '');
   const en = 'You are getting this because ' + (wieHtml ? '<strong>' + wieHtml + '</strong>'
                                                    : 'a Paramant customer')
-       + ' entered your address. Paramant carries the file in encrypted form and '
-       + 'cannot open it.'
+       + ' entered your address. Paramant keeps the file encrypted; the link in this '
+       + 'mail opens it, and we do not keep that link.'
        + (antwoordAdres ? '<br>Reply to this mail to reach them directly.' : '');
   const tekst = taal === 'en' ? en
               : taal === 'nl' ? nl
@@ -491,6 +491,12 @@ const CT_MAX = 10000;
 // pruned index return null instead of the wrong entry.
 const { CtWindow, reindexEntries } = require('./lib/ct-window');
 const ctWindow = new CtWindow(CT_MAX);
+// The Merkle tree itself covers the WHOLE log, not the window (lib/ct-tree).
+// The window only bounds how many full entries (ts, type, stored proof) stay in
+// memory; every leaf hash stays, so tree_size, roots, audit paths and
+// consistency proofs keep working past CT_MAX and after a rotation.
+const { CtMerkle } = require('./lib/ct-tree');
+const ctTree = new CtMerkle();
 // Where the transparency log lives on disk.
 //
 // This used to be `process.env.CT_FILE || null`: opt-in, RAM-only unless a
@@ -521,6 +527,10 @@ const CT_FILE = process.env.CT_FILE !== undefined
   ? (process.env.CT_FILE || null)   // explicit, empty means RAM-only on purpose
   : _ctFileDefault();
 const CT_MAX_SIZE = parseInt(process.env.CT_MAX_SIZE || String(100 * 1024 * 1024)); // 100 MB default
+// Compact leaf file next to CT_FILE: 32 raw bytes per leaf, append-only and
+// never rotated. CT_FILE rotates at CT_MAX_SIZE; this is what lets a restart
+// after a rotation rebuild the full tree (32 MB per million entries).
+const CT_LEAVES_FILE = CT_FILE ? CT_FILE + '.leaves' : null;
 
 // Set the moment a shutdown starts, and never cleared. Both append logs check
 // it before taking another line out of their queue, so from that point the exit
@@ -530,7 +540,8 @@ let _shuttingDown = false;
 
 // Fix 8: async CT write stream with queued writes and log rotation
 let _ctStream    = null;
-let _ctWriteQueue = [];
+let _ctLeafStream = null;
+let _ctWriteQueue = [];   // [{ line, leaf }]
 let _ctDraining  = false;
 
 function _ctOpenStream() {
@@ -542,6 +553,10 @@ function _ctOpenStream() {
     fs.mkdirSync(nodePath.dirname(CT_FILE), { recursive: true });
     _ctStream = fs.createWriteStream(CT_FILE, { flags: 'a' });
     _ctStream.on('error', e => log('warn', 'ct_stream_error', { err: e.message }));
+    if (!_ctLeafStream) {
+      _ctLeafStream = fs.createWriteStream(CT_LEAVES_FILE, { flags: 'a' });
+      _ctLeafStream.on('error', e => log('warn', 'ct_leaf_stream_error', { err: e.message }));
+    }
   } catch (e) {
     log('error', 'ct_log_not_persisted', {
       err: e.message, file: CT_FILE,
@@ -558,20 +573,61 @@ async function _ctRotate() {
     const stat = await fs.promises.stat(CT_FILE).catch(() => null);
     if (!stat || stat.size < CT_MAX_SIZE) return;
     if (_ctStream) { await new Promise(r => _ctStream.end(r)); _ctStream = null; }
-    await fs.promises.rename(CT_FILE, CT_FILE + '.1').catch(() => {});
+    // Numbered, never overwritten. This used to rename to CT_FILE + '.1' every
+    // time, so the second rotation destroyed the first one's entries, and the
+    // startup read only CT_FILE: after rotation plus restart the tree came
+    // back with a handful of leaves and the relay refused every next head.
+    // The leaf file is what rebuilds the tree now; the numbered parts keep the
+    // full entries for anyone who needs them.
+    const target = _ctNextRotatedName();
+    await fs.promises.rename(CT_FILE, target).catch(e => log('warn', 'ct_rotate_rename_failed', { err: e.message }));
     _ctOpenStream();
-    log('info', 'ct_log_rotated', { file: CT_FILE });
+    log('info', 'ct_log_rotated', { file: CT_FILE, archived_as: target });
   } catch(e) { log('warn', 'ct_rotate_error', { err: e.message }); }
+}
+
+// The rotated parts of CT_FILE, oldest first: CT_FILE.1, CT_FILE.2, ...
+function _ctRotatedFiles() {
+  if (!CT_FILE) return [];
+  const dir = nodePath.dirname(CT_FILE);
+  const base = nodePath.basename(CT_FILE) + '.';
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch { return []; }
+  return names
+    .filter(n => n.startsWith(base) && /^\d+$/.test(n.slice(base.length)))
+    .map(n => ({ n: parseInt(n.slice(base.length), 10), file: nodePath.join(dir, n) }))
+    .sort((a, b) => a.n - b.n)
+    .map(x => x.file);
+}
+
+function _ctNextRotatedName() {
+  const parts = _ctRotatedFiles();
+  const last = parts.length ? parseInt(parts[parts.length - 1].slice(CT_FILE.length + 1), 10) : 0;
+  return CT_FILE + '.' + (last + 1);
 }
 
 async function _ctDrain() {
   if (_ctDraining || !_ctStream) return;
   _ctDraining = true;
   while (_ctWriteQueue.length > 0 && !_shuttingDown) {
-    const line = _ctWriteQueue.shift();
-    await new Promise((resolve, reject) => {
-      _ctStream.write(line, err => err ? reject(err) : resolve());
-    }).catch(e => log('warn', 'ct_write_error', { err: e.message }));
+    const item = _ctWriteQueue.shift();
+    // Both writes are handed to their streams in the SAME tick and only then
+    // awaited. Awaiting the leaf before writing the line left a gap in which a
+    // shutdown could end the streams; the line then hit "write after end",
+    // that error destroyed the stream, and every line still buffered in it was
+    // lost (route-ct-exit-durability: 10 of 40 on disk). The leaf goes first
+    // into its stream; a leaf with no line costs one entry's details after a
+    // crash, an entry with no leaf is recovered from CT_FILE at the next start.
+    const writes = [];
+    if (_ctLeafStream && item.leaf) {
+      writes.push(new Promise((resolve, reject) => {
+        _ctLeafStream.write(item.leaf, err => err ? reject(err) : resolve());
+      }).catch(e => log('warn', 'ct_leaf_write_error', { err: e.message })));
+    }
+    writes.push(new Promise((resolve, reject) => {
+      _ctStream.write(item.line, err => err ? reject(err) : resolve());
+    }).catch(e => log('warn', 'ct_write_error', { err: e.message })));
+    await Promise.all(writes);
   }
   _ctDraining = false;
   // Check rotation after draining. Not during a shutdown: rotation ends the
@@ -581,7 +637,7 @@ async function _ctDrain() {
 
 function ctWrite(entry) {
   if (!CT_FILE || !_ctStream || _shuttingDown) return;
-  _ctWriteQueue.push(JSON.stringify(entry) + '\n');
+  _ctWriteQueue.push({ line: JSON.stringify(entry) + '\n', leaf: Buffer.from(entry.leaf_hash, 'hex') });
   setImmediate(_ctDrain);
 }
 
@@ -590,27 +646,39 @@ function ctWrite(entry) {
 // them to reach the fd.
 function _flushCtOnExit() {
   if (!_ctStream || _ctWriteQueue.length === 0) return;
-  for (const line of _ctWriteQueue) { try { _ctStream.write(line); } catch {} }
+  for (const item of _ctWriteQueue) {
+    if (_ctLeafStream && item.leaf) { try { _ctLeafStream.write(item.leaf); } catch {} }
+    try { _ctStream.write(item.line); } catch {}
+  }
   _ctWriteQueue = [];
 }
 
+// Parse one CT_FILE (or rotated part) into an oldest-first entry list.
+function _ctReadEntries(file) {
+  const lines = fs.readFileSync(file, 'utf8').split('\n').filter(l => l.trim());
+  const loaded = [];
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line);
+      if (Array.isArray(parsed)) {
+        for (const entry of parsed) {
+          if (entry && typeof entry === 'object' && !Array.isArray(entry)) loaded.push(entry);
+        }
+      } else {
+        loaded.push(parsed);
+      }
+    } catch {}
+  }
+  return loaded;
+}
+
+const _isLeafHex = (h) => typeof h === 'string' && /^[0-9a-f]{64}$/i.test(h);
+
 // Load persisted CT log on startup (sync read only at startup, not on hot path)
 if (CT_FILE) {
+  let loaded = [];
   try {
-    const lines = fs.readFileSync(CT_FILE, 'utf8').split('\n').filter(l => l.trim());
-    const loaded = [];
-    for (const line of lines) {
-      try {
-        const parsed = JSON.parse(line);
-        if (Array.isArray(parsed)) {
-          for (const entry of parsed) {
-            if (entry && typeof entry === 'object' && !Array.isArray(entry)) loaded.push(entry);
-          }
-        } else {
-          loaded.push(parsed);
-        }
-      } catch {}
-    }
+    loaded = _ctReadEntries(CT_FILE);
     // One-shot, idempotent recount of the stored index field (2026-09). The
     // public log had five entries whose persisted .index was stale after an
     // April rebuild: positions 42..46 carried indices 4..8, so /v2/ct/log
@@ -633,11 +701,83 @@ if (CT_FILE) {
         log('warn', 'ct_log_reindex_write_failed', { err: e.message, file: CT_FILE });
       }
     }
-    ctWindow.load(loaded);
-    if (ctWindow.windowLength) log('info', 'ct_log_loaded', { entries: ctWindow.windowLength, file: CT_FILE });
   } catch (e) {
     if (e.code !== 'ENOENT') log('warn', 'ct_log_load_failed', { err: e.message });
   }
+
+  // Rebuild the full tree. Source of truth is the leaf file; whatever it is
+  // missing (a relay upgrading from the window code has none, a crash can lose
+  // its tail) is recovered from the entries in CT_FILE and, for indices older
+  // than CT_FILE's first entry, from the rotated parts.
+  let leafBuf = Buffer.alloc(0);
+  try { leafBuf = fs.readFileSync(CT_LEAVES_FILE); }
+  catch (e) { if (e.code !== 'ENOENT') log('warn', 'ct_leaves_load_failed', { err: e.message }); }
+  const leafCount = Math.floor(leafBuf.length / 32);
+  for (let i = 0; i < leafCount; i++) ctTree.append(leafBuf.toString('hex', i * 32, (i + 1) * 32));
+  if (leafBuf.length % 32) log('warn', 'ct_leaves_partial_tail', { bytes: leafBuf.length % 32 });
+
+  const firstIdx = loaded.length ? loaded[0].index : 0;
+  const wantSize = loaded.length ? firstIdx + loaded.length : 0;
+  const recovered = [];
+  if (ctTree.size < wantSize) {
+    if (ctTree.size < firstIdx) {
+      // Older leaves live only in the rotated parts.
+      const byIndex = new Map();
+      for (const part of _ctRotatedFiles()) {
+        try {
+          const ents = _ctReadEntries(part);
+          reindexEntries(ents);
+          for (const e of ents) if (Number.isInteger(e.index) && e.index >= ctTree.size && e.index < firstIdx) byIndex.set(e.index, e.leaf_hash);
+        } catch (e) { log('warn', 'ct_rotated_read_failed', { file: part, err: e.message }); }
+      }
+      while (ctTree.size < firstIdx && _isLeafHex(byIndex.get(ctTree.size))) {
+        const h = byIndex.get(ctTree.size); ctTree.append(h); recovered.push(h);
+      }
+    }
+    if (ctTree.size >= firstIdx) {
+      for (let p = ctTree.size - firstIdx; p < loaded.length; p++) {
+        const h = loaded[p].leaf_hash;
+        if (!_isLeafHex(h)) break;
+        ctTree.append(h); recovered.push(h);
+      }
+    }
+  }
+  if (recovered.length) {
+    try { fs.appendFileSync(CT_LEAVES_FILE, Buffer.concat(recovered.map(h => Buffer.from(h, 'hex'))), { flag: 'a' }); }
+    catch (e) { log('warn', 'ct_leaves_recover_write_failed', { err: e.message }); }
+    log('info', 'ct_leaves_recovered', { leaves: recovered.length, tree_size: ctTree.size });
+  }
+
+  if (ctTree.size === wantSize) {
+    ctWindow.load(loaded);
+    // Self-check: the newest entry must say the same root the tree now has.
+    const last = ctWindow.last();
+    if (last && last.tree_hash && last.tree_hash !== ctTree.root()) {
+      log('error', 'ct_tree_root_mismatch', {
+        tree_size: ctTree.size, entry_root: String(last.tree_hash).slice(0, 16) + '…',
+        tree_root: ctTree.root().slice(0, 16) + '…',
+        hint: 'The leaf file and CT_FILE disagree. Restore both from the same backup.',
+      });
+    }
+  } else if (ctTree.size > wantSize) {
+    // Leaves made it to disk, entry lines did not (crash between the two).
+    // The tree is complete; only those entries' details are gone, so the
+    // window restarts empty at the tree size rather than with a gap in it.
+    ctWindow.load([]);
+    ctWindow.base = ctTree.size;
+    log('warn', 'ct_entries_behind_leaves', { tree_size: ctTree.size, entries_through: wantSize });
+  } else {
+    // Leaves are missing that nothing on disk can give back. Carry on from what
+    // is whole; produceSth will refuse to sign a size below one already signed,
+    // and /v2/sth says so, which is the honest outcome of lost data.
+    ctWindow.load([]);
+    ctWindow.base = ctTree.size;
+    log('error', 'ct_tree_incomplete', {
+      tree_size: ctTree.size, expected: wantSize,
+      hint: 'Leaves are missing from both the leaf file and the CT_FILE parts. Restore them from backup.',
+    });
+  }
+  if (ctTree.size) log('info', 'ct_log_loaded', { entries: ctWindow.windowLength, tree_size: ctTree.size, file: CT_FILE });
   _ctOpenStream();
 }
 
@@ -817,7 +957,7 @@ function ctLeafHash(deviceIdHash, pubKeyHex, ts) {
 }
 
 // CT-log hash primitives live in ./lib/ct-hash (pure, unit-tested there).
-const { ctNodeHash, ctTreeHash, ctInclusionProof, blobLeafHash } = require('./lib/ct-hash');
+const { ctNodeHash, blobLeafHash } = require('./lib/ct-hash');
 
 // The field gate. Every name that reaches a log entry, a leaf preimage or an
 // entry type is declared in ./lib/ct-fields, and relay/test/ct-fields.test.js
@@ -908,6 +1048,19 @@ function canonicalJSON(obj) {
   return '{' + Object.keys(obj).sort().map(k => JSON.stringify(k) + ':' + canonicalJSON(obj[k])).join(',') + '}';
 }
 
+// Put a new leaf into the full tree and hand back what its entry carries: the
+// index it sits at, the root of the tree it completes, and its audit path in
+// that tree. O(log n): the old code rebuilt the window's tree twice per append
+// (130-240 ms at 10 000 entries, synchronously on the request thread).
+function ctStage(leaf_hash) {
+  const index = ctTree.size;
+  if (index !== ctWindow.nextIndex()) {
+    throw new Error(`ct: tree size ${index} != window next index ${ctWindow.nextIndex()}`);
+  }
+  ctTree.append(leaf_hash);
+  return { index, tree_hash: ctTree.root(), proof: ctTree.inclusionProof(index, index + 1) };
+}
+
 // Every ctAppend* below takes its index from ctWindow.nextIndex(), which is
 // base + window length: the position the new leaf is about to occupy. The
 // value is stored on the entry as a convenience for the response it goes into,
@@ -918,15 +1071,12 @@ function ctAppend(deviceId, pubKeyHex, apiKey) {
   const ts = new Date().toISOString();
   const deviceIdHash = crypto.createHash('sha3-256').update(deviceId + apiKey.slice(0,8)).digest('hex');
   const leaf_hash = ctLeafHash(deviceIdHash, pubKeyHex, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1); // real audit path at the new leaf position
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('key_reg', { index, leaf_hash, tree_hash, device_hash: deviceIdHash, ts, proof });
   ctWindow.append(entry);
   // Fix 8: async write via stream queue instead of appendFileSync
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -938,10 +1088,7 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
   const urlSectorHash = crypto.createHash('sha3-256').update(relayUrl + '|' + sector).digest('hex');
   // ctLeafHash(deviceIdHash, pubKeyHex, ts) — reuse with urlSectorHash as identity, pkHash as key
   const leaf_hash = ctLeafHash(urlSectorHash, pkHash, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('relay_reg', {
     index, type: 'relay_reg', leaf_hash, tree_hash,
     device_hash: pkHash,          // reused field — relay public key hash
@@ -953,7 +1100,7 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
   ctWindow.append(entry);
   // Fix 8: async write via stream queue
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -964,17 +1111,14 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
 function ctAppendTransfer(blobHash, sector) {
   const ts = new Date().toISOString();
   const leaf_hash = blobLeafHash(blobHash, sector, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('transfer', {
     index, type: 'transfer', leaf_hash, tree_hash,
     blob_hash: blobHash, sector, ts, proof
   });
   ctWindow.append(entry);
   ctWrite(entry);
-  const sth = produceSth(allEntries.length, entry.tree_hash);
+  const sth = produceSth(ctTree.size, entry.tree_hash);
   return { ...entry, sth };
 }
 
@@ -985,17 +1129,14 @@ function ctAppendTransfer(blobHash, sector) {
 function ctAppendParasign(documentHashHex, signerPkHash) {
   const ts = new Date().toISOString();
   const leaf_hash = ctLeafHash(signerPkHash, documentHashHex, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('parasign', {
     index, type: 'parasign', leaf_hash, tree_hash,
     document_hash: documentHashHex, signer_pk_hash: signerPkHash, ts, proof
   });
   ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -1026,17 +1167,14 @@ function ctAppendEnvelope(eventType, envelopeId, payload) {
     .update(eventType).update('|').update(envelopeId).update('|')
     .update(JSON.stringify(gatedPayload)).digest('hex');
   const leaf_hash = ctLeafHash(envelopeId, valueHash, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('envelope', {
     index, type, leaf_hash, tree_hash,
     envelope_id: envelopeId, payload: gatedPayload, ts, proof
   });
   ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -1055,17 +1193,14 @@ function ctAppendSigningPkEvent(eventType, userId, signerPkHash) {
   const ts = new Date().toISOString();
   const userIdHash = crypto.createHash('sha3-256').update(String(userId)).digest('hex');
   const leaf_hash = ctLeafHash(userIdHash, signerPkHash, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('signing_pk', {
     index, type: eventType, leaf_hash, tree_hash,
     user_id_hash: userIdHash, signer_pk_hash: signerPkHash, ts, proof
   });
   ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -1269,35 +1404,12 @@ async function broadcastSTH(sth) {
 
 // ── RFC 6962 consistency proof ─────────────────────────────────────────────────
 // Proves the tree at toSize is an append-only extension of the tree at fromSize.
-function _merkleRootOf(leafHashes) {
-  if (leafHashes.length === 0) return '0'.repeat(64);
-  let h = [...leafHashes];
-  while (h.length > 1) {
-    const next = [];
-    for (let i = 0; i < h.length; i += 2)
-      next.push(i + 1 < h.length ? ctNodeHash(h[i], h[i + 1]) : h[i]);
-    h = next;
-  }
-  return h[0];
-}
-
-function _subproof(m, nodes, b) {
-  const n = nodes.length;
-  if (m === n) return b ? [] : [_merkleRootOf(nodes)];
-  let k = 1;
-  while (k * 2 < n) k *= 2; // k = largest power of 2 strictly less than n
-  if (m <= k) return _subproof(m, nodes.slice(0, k), b).concat([_merkleRootOf(nodes.slice(k))]);
-  return [_merkleRootOf(nodes.slice(0, k))].concat(_subproof(m - k, nodes.slice(k), false));
-}
-
-// Consistency proof over the retained window. fromSize/toSize are leaf counts
-// within the in-memory tree (0 ≤ from ≤ to ≤ windowLength); entries pruned past
-// the CT_MAX window cannot participate.
+// Over the FULL tree (lib/ct-tree): any 0 <= from <= to <= tree size works, also
+// for sizes whose entries have left the in-memory window. The old window
+// version put MTH(left) before the subproof and started with b=false, so none
+// of its proofs verified against a standard RFC 9162 verifier.
 function ctConsistencyProof(fromSize, toSize) {
-  if (fromSize < 0 || toSize < fromSize || toSize > ctWindow.windowLength) return null;
-  if (fromSize === 0 || fromSize === toSize) return [];
-  const leaves = ctWindow.entries.slice(0, toSize).map(e => e.leaf_hash);
-  return _subproof(fromSize, leaves, fromSize === leaves.length);
+  return ctTree.consistencyProof(fromSize, toSize);
 }
 
 // ── Fingerprint — out-of-band key verification ────────────────────────────────
@@ -1350,7 +1462,7 @@ function renderPrometheus() {
   // signing a second history, and a relay that has refused to sign has stopped
   // producing heads entirely. Both were invisible before: the first showed as
   // nothing at all, the second as a log that simply went quiet.
-  for(const [k,v] of [['blobs_in_flight',blobStore.size],['pubkeys',pubkeys.size],['edition',EDITION==='licensed'?1:0],['did_registry',didRegistry.size],['ct_log',ctWindow.size],['ct_log_persisted',CT_FILE?1:0],['ct_log_forked',ctLogForked?1:0],['uptime_s',Math.floor(process.uptime())],['heap_bytes',process.memoryUsage().heapUsed]]){
+  for(const [k,v] of [['blobs_in_flight',blobStore.size],['pubkeys',pubkeys.size],['edition',EDITION==='licensed'?1:0],['did_registry',didRegistry.size],['ct_log',ctTree.size],['ct_log_persisted',CT_FILE?1:0],['ct_log_forked',ctLogForked?1:0],['uptime_s',Math.floor(process.uptime())],['heap_bytes',process.memoryUsage().heapUsed]]){
     L.push(`# TYPE paramant_${k} gauge`);
     L.push(`paramant_${k}{sector="${SECTOR}"} ${v}`);
   }
@@ -1475,6 +1587,25 @@ function _alGemeld(account, fileId) {
   _gemeldeBestanden.set(k, now + 3_600_000);
   return false;
 }
+// The download event, for every way a blob leaves: the link (claim + ack, or
+// the claimless GET) and GET /v2/outbound. /parasend and /pricing sell
+// "webhooks and mail on upload and download"; until now the download webhook
+// never existed and the download mail fired only on the API route, not when a
+// receiver used the link (SEND-33/34). One file mails once, like the upload.
+function _notifyDownloaded(entry, hash, opts) {
+  if (!entry) return;
+  try {
+    const ownerKd = entry.apiKey ? apiKeys.get(entry.apiKey) : null;
+    const once = entry.file_id ? !_alGemeld(entry.account_id, 'dl:' + entry.file_id) : true;
+    if (once && !(opts && opts.skipMail)) {
+      transferNotify.maybeNotify({ keyData: ownerKd, event: 'download', hashPrefix: hash, bytes: entry.size || 0, sendEmail: mailLater, lang: entry.lang || '' });
+    }
+    if (entry.device_id && entry.apiKey) {
+      pushWebhooks(entry.apiKey, entry.device_id, 'blob_downloaded', { hash, size: entry.size || 0, via: (opts && opts.via) || 'link' }).catch(() => {});
+    }
+  } catch (e) { log('warn', 'download_notify_failed', { err: e.message }); }
+}
+
 // A download in claim mode (?claim=) is only burned when the receiver's page
 // confirms it decrypted the file (POST /v2/dl/:token/ack). Until then the blob
 // stays, so an interrupted or slow download, or a key with one wrong character,
@@ -1566,6 +1697,12 @@ setInterval(() => {
 
 // Known link-preview bots — serve safe HTML placeholder, never trigger burn
 const PRELOAD_BOTS = /WhatsApp|Telegram(?:Bot)?|Slackbot|Discordbot|facebookexternalhit|Twitterbot|LinkedInBot|Googlebot|bingbot|YandexBot|DuckDuckBot|ia_archiver|python-requests|python-urllib|Go-http-client/i;
+// The download itself (/v2/dl/:token/get) is what an SDK or a script calls:
+// docs/api.md shows it with curl and Python. Blocking python-requests and
+// Go-http-client there answered 403 to exactly those clients (fase 1). Link
+// PREVIEWERS never call /get, they fetch the page above; they stay blocked
+// here too, in case one follows the button.
+const PREVIEW_BOTS = /WhatsApp|Telegram(?:Bot)?|Slackbot|Discordbot|facebookexternalhit|Twitterbot|LinkedInBot|Googlebot|bingbot|YandexBot|DuckDuckBot|ia_archiver/i;
 
 const DL_CONFIRM_JS = `'use strict';
 (function () {
@@ -1989,11 +2126,22 @@ function ramStats() {
 //      in that the budget does not model -- a 5 MiB blob arrives base64'd inside
 //      a JSON body, so it is roughly 19 MB of transient buffers before it
 //      becomes a 5 MiB Buffer.
+//
+// THE SECOND QUESTION IS ANSWERED FROM OUR OWN BYTES NOW, not from RSS. RSS
+// does not come back down after a burst: glibc and V8 keep the freed pages for
+// reuse, so after one peak of fifty 5 MB uploads RSS stayed at ~1.1 GB with
+// 15 MB of blobs held, and this gate answered 503 to every upload from then on
+// (sweep-chaos 7, SENDNAME-09-RAM). Memory the allocator keeps is memory the
+// next upload reuses, so it is not a reason to refuse. What is modelled is
+// what this process is asked to hold: the blobs it keeps plus, for every
+// upload in flight and the one asking, the ~4x transient a base64 JSON body
+// costs on the way in. The sum still has to fit under RAM_LIMIT_MB +
+// RAM_RESERVE_MB, which scripts/check-guards.mjs holds below the cgroup limit.
 function ramOk() {
-  const { rssMB } = ramStats();
   const wouldHold = blobBytesHeld + (inFlightInbound + 1) * MAX_BLOB;
   if (wouldHold > BLOB_BUDGET_BYTES) return false;
-  if (rssMB + Math.ceil(((inFlightInbound + 1) * MAX_BLOB * 4) / 1048576) > RAM_LIMIT_MB + RAM_RESERVE_MB) return false;
+  const modelled = blobBytesHeld + (inFlightInbound + 1) * MAX_BLOB * 4;
+  if (modelled > (RAM_LIMIT_MB + RAM_RESERVE_MB) * 1048576) return false;
   return true;
 }
 
@@ -2123,6 +2271,38 @@ async function notifySenderQuota(envelopeId, accountId) {
       + '<p>Upgrade your plan or wait until next month; then the signer can sign with the same link.</p>'),
   });
   log('info', 'sender_quota_notice', { delivered: !!(r && r.ok) });
+  return !!(r && r.ok);
+}
+
+// A signer asked for the invitation again. The resent mail can only open the
+// request (no document key half reaches a server); the full link is the
+// sender's. Tell the sender, at most once an hour per envelope.
+async function notifySenderLinkRequested(envelopeId, accountId, partyLabel) {
+  const to = senderLabelOf(accountId);
+  if (!to || !redisClient || !redisClient.isReady) return false;
+  const k = 'paramant:sign:link-request:' + crypto.createHash('sha256').update(String(envelopeId)).digest('hex').slice(0, 32);
+  const first = await redisClient.set(k, '1', { NX: true, EX: 3600 });
+  if (first !== 'OK') return true; // told already within the hour
+  const who = veiligeBestandsnaam(partyLabel || '') || 'Een ondertekenaar';
+  const whoEn = veiligeBestandsnaam(partyLabel || '') || 'A signer';
+  const base = String(process.env.SITE_URL || planExpiry.DEFAULT_SITE_URL).replace(/\/+$/, '');
+  const r = await mailer.stuur({
+    to,
+    subject: 'Een ondertekenaar vraagt de link opnieuw',
+    text: tweetaligTekst('nl',
+      `${who} vroeg de uitnodiging om te ondertekenen opnieuw aan. De opnieuw verstuurde link opent alleen het verzoek, niet het document: de sleutel die het document opent zit alleen in de volledige link die u bij het versturen kreeg, en die bewaren wij niet.`
+      + '\n\nStuur de ondertekenaar de volledige link opnieuw, uit uw dashboard of uit uw eigen verzonden bericht.'
+      + '\n\n' + base + '/dashboard',
+      `${whoEn} asked for the signing invitation again. The resent link opens the request, not the document: the key that opens the document is only in the full link you got when you sent it, and we do not keep it.`
+      + '\n\nSend the signer the full link again, from your dashboard or from your own sent message.'),
+    html: tweetaligHtml('nl',
+      `<p>${escHtml(who)} vroeg de uitnodiging om te ondertekenen opnieuw aan. De opnieuw verstuurde link opent alleen het verzoek, niet het document: de sleutel die het document opent zit alleen in de volledige link die u bij het versturen kreeg, en die bewaren wij niet.</p>`
+      + '<p>Stuur de ondertekenaar de volledige link opnieuw, uit uw dashboard of uit uw eigen verzonden bericht.</p>'
+      + '<p><a href="' + base + '/dashboard">Naar uw dashboard</a></p>',
+      `<p>${escHtml(whoEn)} asked for the signing invitation again. The resent link opens the request, not the document: the key that opens the document is only in the full link you got when you sent it, and we do not keep it.</p>`
+      + '<p>Send the signer the full link again, from your dashboard or from your own sent message.</p>'),
+  });
+  log('info', 'sender_link_request_notice', { delivered: !!(r && r.ok) });
   return !!(r && r.ok);
 }
 
@@ -2340,6 +2520,12 @@ const sthIngestIpRequests = new Map(); // ip → [timestamps] for /v2/sth/ingest
 const relayRegisterIpRequests = new Map(); // ip → [timestamps] for /v2/relays/register (unauthenticated)
 // Team rate limit tracking
 const teamRateLimits = new Map(); // team_id → { count, resetAt }
+// Streaming manifests of live inv_ hand-overs: inv id -> { owner, total, tokens, meta, expires }.
+const invManifests = new Map();
+const invRejections = new Map(); // inv id -> expires (ms)
+const INV_MANIFEST_TTL_MS = 60 * 60 * 1000;
+const INV_MANIFEST_MAX = 5000;
+setInterval(() => { const now = Date.now(); for (const [k, m] of invManifests) if (now > m.expires) invManifests.delete(k); }, 60000).unref();
 
 // Eviction sweep for the limiter maps that lacked one (the other limiters already
 // self-evict). Without this they grow unbounded — slow memory/audit creep,
@@ -2948,24 +3134,49 @@ let _usersWriteQueue = Promise.resolve();
 // Atomic write: tmp + rename eliminates the O_TRUNC window where a concurrent
 // reader sees an empty file mid-write. Combined with the sanity check in
 // /v2/reload-users this prevents the apiKeys-wipe race on plan_change.
+//
+// fsync before the rename, so a power cut cannot leave a renamed but empty
+// file. The directory is created when missing.
 async function _atomicWriteUsers(data) {
-  const tmp = `${USERS_FILE}.tmp.${process.pid}.${Date.now()}`;
-  await fs.promises.writeFile(tmp, JSON.stringify(data, null, 2));
-  await fs.promises.rename(tmp, USERS_FILE);
+  await fs.promises.mkdir(nodePath.dirname(nodePath.resolve(USERS_FILE)), { recursive: true });
+  const tmp = `${USERS_FILE}.tmp.${process.pid}.${Date.now()}.${crypto.randomBytes(3).toString('hex')}`;
+  const fh = await fs.promises.open(tmp, 'w', 0o600);
+  try {
+    await fh.writeFile(JSON.stringify(data, null, 2));
+    await fh.sync();
+  } finally { await fh.close(); }
+  try { await fs.promises.rename(tmp, USERS_FILE); }
+  catch (e) { await fs.promises.unlink(tmp).catch(() => {}); throw e; }
+}
+// The returned promise REJECTS when the write fails, so a caller's
+// `.then(() => log(..., persisted: true))` only runs when it is true. It used
+// to resolve either way: on a fresh relay users.json did not exist, every
+// write failed with ENOENT, and the log still said persisted:true. The queue
+// itself never stays rejected, so one failure does not block the next write.
+function _queueUsersWrite(job) {
+  const run = _usersWriteQueue.then(job);
+  _usersWriteQueue = run.catch(e => log('error', 'users_write_error', { err: e.message, file: USERS_FILE }));
+  return run;
 }
 function _writeUsersJson(data) {
-  _usersWriteQueue = _usersWriteQueue.then(() => _atomicWriteUsers(data))
-    .catch(e => log('warn', 'users_write_error', { err: e.message }));
-  return _usersWriteQueue;
+  return _queueUsersWrite(() => _atomicWriteUsers(data));
 }
 function _mutateUsersJson(fn) {
-  _usersWriteQueue = _usersWriteQueue.then(async () => {
-    const raw = await fs.promises.readFile(USERS_FILE, 'utf8');
-    const data = JSON.parse(raw);
+  return _queueUsersWrite(async () => {
+    let data;
+    try {
+      data = JSON.parse(await fs.promises.readFile(USERS_FILE, 'utf8'));
+    } catch (e) {
+      // Missing is a fresh relay: start empty. Unreadable or corrupt is not
+      // ours to overwrite; refuse, loudly.
+      if (e.code !== 'ENOENT') throw e;
+      data = { api_keys: [] };
+    }
+    if (!data || typeof data !== 'object') throw new Error('users.json is not an object');
+    if (!Array.isArray(data.api_keys)) data.api_keys = [];
     fn(data);
     await _atomicWriteUsers(data);
-  }).catch(e => log('warn', 'users_write_error', { err: e.message }));
-  return _usersWriteQueue;
+  });
 }
 
 // ── Billing auto-grant: paid Pro plan → parasign entitlement ──────────────
@@ -2990,6 +3201,12 @@ function grantParasignOnPaidPlan(accountId) {
     .catch(we => log('warn', 'parasign_persist_failed', { err: we.message }));
   return { ok: true, keys: members.size, changed };
 }
+
+// ── Billing ledger: every settled Mollie payment id, durable ──────────────
+const { BillingLedger } = require('./lib/billing-ledger');
+const BILLING_LEDGER_FILE = process.env.BILLING_LEDGER_FILE
+  || nodePath.join(nodePath.dirname(nodePath.resolve(USERS_FILE)), 'billing-processed.jsonl');
+const billingLedger = new BillingLedger(BILLING_LEDGER_FILE, log).load();
 
 // ── Per-product entitlement setter (billing) ──────────────────────────────
 // Set ONE product's plan (plan_parasign OR plan_parasend) for an account,
@@ -3031,13 +3248,17 @@ function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
       };
     }
   }
+  // shorten: a reversal taking back one paid period (lib/billing revoke).
+  // It must also travel to the other containers, whose merge only ever keeps
+  // the longer term, so the shared row is published as a replacement.
+  const _applyOpts = (opts && opts.shorten) ? { shorten: true } : undefined;
   let changed = 0;
   for (const m of members) {
     const mv = apiKeys.get(m);
     if (!mv) continue;
     // Single field-level rule (writes only this product's field + the parasign
     // access flag; never the other product or the unified `plan`).
-    if (entitlements.applyProductTier(mv, product, norm, paidUntil, bundle).changed) changed++;
+    if (entitlements.applyProductTier(mv, product, norm, paidUntil, bundle, _applyOpts).changed) changed++;
   }
   // Mirror onto the accounts summary too. Readers that only hold an account_id
   // (the ParaSign web sign gate among them) resolve through entitlementRecordOf,
@@ -3045,7 +3266,7 @@ function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
   // outvote a paid grant on any future read path either.
   const _acct = accounts.get(accountId);
   if (_acct) {
-    entitlements.applyProductTier(_acct, product, norm, paidUntil, bundle);
+    entitlements.applyProductTier(_acct, product, norm, paidUntil, bundle, _applyOpts);
     _acct.plan_updated = new Date().toISOString();
   }
   // paidUntil is passed on to the DISK write as well. Without it the period
@@ -3056,7 +3277,7 @@ function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
   _mutateUsersJson(ud => {
     for (const entry of ud.api_keys) {
       if ((entry.account_id || entry.key) === accountId) {
-        entitlements.applyProductTier(entry, product, norm, paidUntil, bundle);
+        entitlements.applyProductTier(entry, product, norm, paidUntil, bundle, _applyOpts);
         entry.plan_updated = new Date().toISOString();
       }
     }
@@ -3075,7 +3296,7 @@ function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
   // which is where both customer grant paths land -- the Mollie webhook and
   // POST /v2/billing/redeem -- while every screen and the ParaSign signature
   // gate are served off relay-health by the admin plane. See lib/shared-grants.
-  _publishSharedGrant(accountId);
+  _publishSharedGrant(accountId, _applyOpts ? { replace: true } : undefined);
   return { ok: true, product, tier: norm, keys: members.size, changed };
 }
 
@@ -3085,11 +3306,17 @@ function setProductPlan(accountId, product, tier, paidUntil, bundle, opts) {
 // as _indexAccountExpiry does, so a grant that left one product alone publishes
 // what is really on file for both. Fire-and-forget: a redis outage may delay the
 // other containers, never the grant itself.
-function _publishSharedGrant(accountId) {
+function _publishSharedGrant(accountId, popts) {
   if (!redisClient || !redisClient.isReady || !accountId) return;
   const rec = entitlementRecordOf(accountId);
   if (!rec) return;
-  Promise.resolve(sharedGrants.publish(redisClient, accountId, rec))
+  Promise.resolve(sharedGrants.publish(redisClient, accountId, rec, popts))
+    .then((r) => {
+      // Remember the replacement we wrote ourselves, so our own subscriber
+      // does not apply it a second time.
+      if (r && r.ok && r.replacedAt) _markGrantReplaced(accountId, r.replacedAt);
+      return r;
+    })
     .then((r) => {
       if (!r || r.ok) return;
       log('warn', 'shared_grant_publish_failed', { account: String(accountId).slice(0, 12), err: r.error });
@@ -3113,14 +3340,45 @@ function _publishSharedGrant(accountId) {
 // this account has no paid term at all. That is the ONE downgrade this path
 // applies, and it exists because the container that took the money back is not
 // the container the customer's screens are served from.
-function _hydrateSharedGrant(accountId, grant, revoked) {
+// The newest shared-row replacement this container has applied, per account.
+// In memory and on the key records (grant_replaced_at), so a restart does not
+// re-apply an old replacement over a newer grant.
+function _grantReplacedAt(accountId) {
+  const rec = entitlementRecordOf(accountId);
+  return (rec && rec.grant_replaced_at) || '';
+}
+function _markGrantReplaced(accountId, at) {
+  const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
+  for (const m of members) { const mv = apiKeys.get(m); if (mv) mv.grant_replaced_at = at; }
+  const acct = accounts.get(accountId);
+  if (acct) acct.grant_replaced_at = at;
+  _mutateUsersJson(ud => {
+    for (const entry of ud.api_keys) if ((entry.account_id || entry.key) === accountId) entry.grant_replaced_at = at;
+  }).catch(we => log('warn', 'shared_grant_persist_failed', { err: we.message }));
+}
+
+function _hydrateSharedGrant(accountId, grant, revoked, replacedAt) {
   if (!accountId || (!grant && !revoked)) return [];
   const members = accountKeys.get(accountId) || (apiKeys.has(accountId) ? new Set([accountId]) : new Set());
   if (members.size === 0) return [];
   // Decide once, against the account's best current grant, so five member keys
   // do not each answer the question differently.
   const merged = { ...(entitlementRecordOf(accountId) || {}) };
-  const moved = grant ? sharedGrants.applyTo(merged, grant) : sharedGrants.applyRevocation(merged);
+  let moved;
+  if (grant && replacedAt && replacedAt > _grantReplacedAt(accountId)) {
+    // A replacement (a reversal that shortened a term): the row is the fact,
+    // copied as it is. A merge would keep this container's longer term, which
+    // is the month the customer took his money back for.
+    moved = [];
+    for (const product of entitlements.PRODUCTS) {
+      const before = JSON.stringify(entitlements.termsOf(merged, product));
+      entitlements.copyProductGrant(merged, grant, product);
+      if (JSON.stringify(entitlements.termsOf(merged, product)) !== before) moved.push(product);
+    }
+    _markGrantReplaced(accountId, replacedAt);
+  } else {
+    moved = grant ? sharedGrants.applyTo(merged, grant) : sharedGrants.applyRevocation(merged);
+  }
   if (moved.length === 0) return [];
   for (const product of moved) {
     // The decision was taken on `merged`; every store gets exactly that, every
@@ -3155,7 +3413,7 @@ async function _pullSharedGrant(accountId) {
   if (!redisClient || !redisClient.isReady || !accountId) return [];
   const row = await sharedGrants.readRow(redisClient, accountId);
   if (!row) return [];
-  return _hydrateSharedGrant(accountId, row.grant, !!row.revokedAt);
+  return _hydrateSharedGrant(accountId, row.grant, !!row.revokedAt, row.replacedAt);
 }
 
 // One reconciliation pass, both directions, over the accounts that have a term.
@@ -3202,7 +3460,7 @@ async function _reseedSharedGrants() {
   // longer be handing out.
   let hydrated = 0;
   for (const [accountId, row] of shared) {
-    if (_hydrateSharedGrant(accountId, row.grant, !!row.revokedAt).length) hydrated++;
+    if (_hydrateSharedGrant(accountId, row.grant, !!row.revokedAt, row.replacedAt).length) hydrated++;
   }
   return hydrated;
 }
@@ -3722,8 +3980,7 @@ function mintParasignKey(accountId, opts = {}) {
   // atomic in the event loop, the same property the /v2/admin/keys mint relies
   // on. Throws rather than answering, because the two callers own their own
   // response shape; both map `code` to a 402.
-  const _capPlan = tiers.normalisePlan((acct && acct.plan) || plan);
-  const _cap = ACCOUNT_KEY_LIMIT[_capPlan] ?? ACCOUNT_KEY_LIMIT.community;
+  const { plan: _capPlan, cap: _cap } = accountKeyCap(accountId, (acct && acct.plan) || plan);
   const _active = [...(accountKeys.get(accountId) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
   if (_active >= _cap) {
     const e = new Error(`Account key limit reached (${_cap} keys on the ${_capPlan} plan).`);
@@ -3796,6 +4053,33 @@ function keyCapReject(err, res) {
   return true;
 }
 
+// ── One-time setup token (first-run wizard) ──────────────────────────────
+// /v2/setup/apply used to be open to anyone while the relay had no keys. The
+// token is made once, printed in the relay log and written next to users.json
+// (mode 0600), so only someone with the logs or the volume can finish setup.
+// PARAMANT_SETUP_TOKEN pins it from the environment instead.
+const SETUP_TOKEN_FILE = nodePath.join(nodePath.dirname(nodePath.resolve(USERS_FILE)), 'setup-token');
+let _setupTokenValue = null;
+function _setupToken() { return process.env.PARAMANT_SETUP_TOKEN || _setupTokenValue; }
+function _initSetupToken() {
+  if (process.env.PARAMANT_SETUP_TOKEN) return;
+  if (apiKeys.size > 0 && process.env.SETUP_MODE !== 'true') return;
+  try { _setupTokenValue = fs.readFileSync(SETUP_TOKEN_FILE, 'utf8').trim() || null; } catch {}
+  if (!_setupTokenValue) {
+    _setupTokenValue = 'pst_' + crypto.randomBytes(24).toString('hex');
+    try { fs.writeFileSync(SETUP_TOKEN_FILE, _setupTokenValue + '\n', { mode: 0o600 }); }
+    catch (e) { log('warn', 'setup_token_file_not_written', { err: e.message, file: SETUP_TOKEN_FILE }); }
+  }
+  log('info', 'setup_token', {
+    token: _setupTokenValue, file: SETUP_TOKEN_FILE,
+    hint: 'First-run setup: open /setup and paste this token. It stops working once setup is done.',
+  });
+}
+function _setupTokenConsumed() {
+  _setupTokenValue = null;
+  try { fs.unlinkSync(SETUP_TOKEN_FILE); } catch {}
+}
+
 function loadUsers() {
   if (process.env.USERS_JSON) {
     try { const d = JSON.parse(process.env.USERS_JSON); (d.api_keys||[]).forEach(k => { if(k.active) apiKeys.set(k.key,{plan:k.plan,label:k.label||"",email:k.email||"",active:true,created:k.created||null,...keysTable.parseAccountFields(k)}); }); keysTable.rebuildKeyIndexes(apiKeys,accounts,accountKeys,kidIndex,log); rebuildApiKeyHashIndex(); log("info","users_loaded",{count:apiKeys.size,source:"env"}); return; } catch(e) { log("error","users_json_parse",{err:e.message}); }
@@ -3816,7 +4100,28 @@ function loadUsers() {
     keysTable.rebuildKeyIndexes(apiKeys, accounts, accountKeys, kidIndex, log);
     rebuildApiKeyHashIndex();
     log('info', 'users_loaded', { count: apiKeys.size, sector: SECTOR });
-  } catch(e) { log('warn', 'no_users_file'); }
+  } catch(e) {
+    if (e.code === 'ENOENT') {
+      // A fresh relay: create the file now, so the first key minted through
+      // the API or the setup wizard has somewhere to land. Before this the
+      // file never existed, every persist failed, and a restart dropped every
+      // key made since boot (the setup admin key included).
+      try {
+        fs.mkdirSync(nodePath.dirname(nodePath.resolve(USERS_FILE)), { recursive: true });
+        const tmp = `${USERS_FILE}.tmp.${process.pid}.init`;
+        fs.writeFileSync(tmp, JSON.stringify({ api_keys: [], updated: new Date().toISOString() }, null, 2), { mode: 0o600 });
+        fs.renameSync(tmp, USERS_FILE);
+        log('info', 'users_file_created', { file: USERS_FILE });
+      } catch (ce) {
+        log('error', 'users_file_not_writable', {
+          err: ce.message, file: USERS_FILE,
+          hint: 'Keys made through the API will not survive a restart. Point USERS_FILE at a writable volume.',
+        });
+      }
+    } else {
+      log('error', 'users_file_unreadable', { err: e.message, file: USERS_FILE });
+    }
+  }
 }
 
 function loadTrialKeys() {
@@ -3941,8 +4246,23 @@ async function safeHttpsRequest(urlStr, opts = {}) {
 }
 
 // ── Webhook push ──────────────────────────────────────────────────────────────
+// Webhook registrations live in redis too (API-26-K): the in-memory map was
+// lost on every restart and not shared between the sector relays, so a
+// registration silently stopped working after a deploy. Memory is the cache.
+const _webhookRedisKey = (k) => 'paramant:webhooks:' + crypto.createHash('sha256').update(k).digest('hex').slice(0, 40);
+async function _webhooksFor(k) {
+  const mem = webhooks.get(k);
+  if (mem && mem.length) return mem;
+  if (!redisClient || !redisClient.isReady) return mem || [];
+  try {
+    const raw = await redisClient.lRange(_webhookRedisKey(k), 0, 19);
+    const list = raw.map((x) => { try { return JSON.parse(x); } catch { return null; } }).filter((h) => h && typeof h.url === 'string');
+    if (list.length) webhooks.set(k, list);
+    return list;
+  } catch { return mem || []; }
+}
 async function pushWebhooks(apiKey, deviceId, event, data) {
-  const hooks = webhooks.get(`${deviceId}:${acctOf(apiKey)}`) || [];
+  const hooks = await _webhooksFor(`${deviceId}:${acctOf(apiKey)}`);
   for (const hook of hooks) {
     const payload = J({ event, device_id: deviceId, ts: new Date().toISOString(), ...data });
     try {
@@ -4119,14 +4439,11 @@ function ctAppendEvent(eventType, did, payload) {
     .update(eventType).update('|').update(did).update('|')
     .update(JSON.stringify(gatedPayload)).digest('hex');
   const leaf_hash = ctLeafHash(did, valueHash, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('did_event', { index, type: eventType, leaf_hash, tree_hash, did, payload: gatedPayload, ts, proof });
   ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -4163,7 +4480,19 @@ if (_static.serveFrontend) log('info', 'static_serving_enabled', { root: _static
 //
 // Redis unreachable is 503 (the service could not answer, the caller did
 // nothing wrong); anything else is 500.
+// Requests in flight, for the drain on SIGTERM (see _onExitSignal).
+let _inFlightRequests = 0;
+let _draining = false;
 const server = http.createServer((req, res) => {
+  if (_draining) {
+    // Shutting down: tell the client to come back rather than half-handle it.
+    res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '2', 'Connection': 'close' });
+    return res.end(J({ error: 'restarting', retry_after_s: 2 }));
+  }
+  _inFlightRequests++;
+  let done = false;
+  const finish = () => { if (!done) { done = true; _inFlightRequests--; } };
+  res.on('finish', finish); res.on('close', finish);
   handleRelayRequest(req, res).catch((err) => relayRequestFailed(req, res, err));
 });
 
@@ -4585,6 +4914,14 @@ async function handleRelayRequest(req, res) {
   function _setupModeOn() {
     return apiKeys.size === 0 || process.env.SETUP_MODE === 'true';
   }
+  function _setupAuthorized(rq) {
+    const given = String(rq.headers['x-setup-token'] || '');
+    const adminGiven = String(rq.headers['x-admin-token'] || '');
+    const eq = (a, b) => a.length > 0 && b.length > 0 && a.length === b.length
+      && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+    const tok = _setupToken();
+    return (tok && eq(given, tok)) || (eq(adminGiven, process.env.ADMIN_TOKEN || ''));
+  }
 
   // GET /v2/setup/check -- is the relay in first-time setup mode?
   if (req.method === 'GET' && path === '/v2/setup/check') {
@@ -4625,6 +4962,14 @@ async function handleRelayRequest(req, res) {
     if (!_setupModeOn()) {
       res.writeHead(409, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Setup is already complete on this relay.' }));
+    }
+    // Not anonymous. A fresh relay is reachable before its operator gets to
+    // it, and whoever posted here first walked off with an enterprise key.
+    // The operator proves ownership with the one-time setup token the relay
+    // printed in its log and wrote next to users.json, or with ADMIN_TOKEN.
+    if (!_setupAuthorized(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'setup_token_required', detail: 'Send the setup token from the relay log (or the file ' + nodePath.basename(SETUP_TOKEN_FILE) + ' next to users.json) in the X-Setup-Token header.' }));
     }
     try {
       const body = JSON.parse((await readBody(req, 16384)).toString());
@@ -4690,13 +5035,24 @@ async function handleRelayRequest(req, res) {
       };
       const adminKey = mint('enterprise', 'setup-admin', adminEmail);
       const firstUserKey = firstUser ? mint(firstUser.plan, firstUser.label, firstUser.email) : null;
-      await _mutateUsersJson(d => {
-        d.api_keys = d.api_keys || [];
-        const now = new Date().toISOString();
-        d.api_keys.push({ key: adminKey, plan: 'enterprise', label: 'setup-admin', email: adminEmail, active: true, created: now, is_admin: true });
-        if (firstUserKey) d.api_keys.push({ key: firstUserKey, plan: firstUser.plan, label: firstUser.label, email: firstUser.email, active: true, created: now });
-        d.updated = now;
-      }).catch(we => log('warn', 'setup_persist_failed', { err: we.message }));
+      try {
+        await _mutateUsersJson(d => {
+          d.api_keys = d.api_keys || [];
+          const now = new Date().toISOString();
+          d.api_keys.push({ key: adminKey, plan: 'enterprise', label: 'setup-admin', email: adminEmail, active: true, created: now, is_admin: true });
+          if (firstUserKey) d.api_keys.push({ key: firstUserKey, plan: firstUser.plan, label: firstUser.label, email: firstUser.email, active: true, created: now });
+          d.updated = now;
+        });
+      } catch (we) {
+        // Not on disk means gone at the next restart, and the wizard open
+        // again for whoever comes first. Take the keys back and say so.
+        apiKeys.delete(adminKey);
+        if (firstUserKey) apiKeys.delete(firstUserKey);
+        log('error', 'setup_persist_failed', { err: we.message, file: USERS_FILE });
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'setup_not_persisted', detail: 'users.json could not be written (' + (we.code || we.message) + '). Make USERS_FILE writable and try again.' }));
+      }
+      _setupTokenConsumed();
 
       // -- write .env (atomic temp+rename, back up existing) --
       const envPath = process.env.SETUP_ENV_FILE || nodePath.join(process.cwd(), '.env');
@@ -5345,6 +5701,16 @@ async function handleRelayRequest(req, res) {
         // "your plan allows 25" while the 25 was megabytes and the number
         // beside it was 27263003 bytes. A sender reading that would go and
         // delete recipients from a list that was never the problem.
+        if (made.reason === 'store_full') {
+          // Not the sender's fault and not his plan: every open send together
+          // has reached what the store may hold. A 503 he can retry, with the
+          // reason in words.
+          log('warn', 'send_refused', { reason: 'store_full', limit_mb: made.limit });
+          res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '900' });
+          return res.end(J({ error: 'send_store_full', retry_after_s: 900,
+            message: 'Too many large sends are open right now. Nothing was sent; try again later or send a smaller file.',
+            message_nl: 'Er staan nu te veel grote verzendingen open. Er is niets verstuurd; probeer het later opnieuw of verstuur een kleiner bestand.' }));
+        }
         const _dim = made.dimension
           || (made.reason === 'too_large' ? 'send_max_mb' : 'max_recipients');
         const status = made.reason === 'over_limit' ? 403
@@ -5427,7 +5793,7 @@ async function handleRelayRequest(req, res) {
               + 'korte controlecode naar dit adres. Zo kan alleen wie deze mailbox leest het '
               + 'bestand ophalen. Beschikbaar tot ' + tot + '.'
               + '\n\nU krijgt dit bericht omdat ' + (wieRuw || 'een klant van Paramant')
-              + ' uw adres heeft ingevuld. Paramant verstuurt het bestand, maar kan het niet openen.'
+              + ' uw adres heeft ingevuld. Paramant bewaart het bestand versleuteld en bewaart deze link niet.'
               + (kd.email ? '\nBeantwoord deze mail om de afzender direct te bereiken.' : ''),
                 (wieRuw ? wieRuw + ' sent you a file through Paramant.' : 'A file is waiting for you.')
               + (taal === 'en' ? '\n\n' + naamRuw + '\n\n' + link : '\n\nUse the link above.')
@@ -5435,7 +5801,7 @@ async function handleRelayRequest(req, res) {
               + 'to this address, so only somebody who can read this mailbox can collect the '
               + 'file. Available until ' + totEn + '.'
               + '\n\nYou are getting this because ' + (wieRuw || 'a Paramant customer')
-              + ' entered your address. Paramant carries the file; we cannot open it.'
+              + ' entered your address. Paramant keeps the file encrypted and does not keep this link.'
               + (kd.email ? '\nReply to this mail to reach them directly.' : '')),
           html: tweetaligHtml(taal,
                 '<p>' + (wie ? '<strong>' + wie + '</strong> heeft u via Paramant een bestand gestuurd.'
@@ -5549,9 +5915,16 @@ async function handleRelayRequest(req, res) {
   // It used to mint a fresh token and kill the old one, and that destroyed the
   // file for the person it was meant to help: the file key is wrapped under the
   // recipient's own token, and this relay cannot make a new wrapping because it
-  // never holds the key. They spent their one-time link on bytes that opened
-  // into nothing. Keeping the token instead is not an option either -- not
-  // writing it down is the whole reason the relay cannot open what it stores.
+  // never holds the file key. They spent their one-time link on bytes that
+  // opened into nothing. Keeping the token instead is not an option either: not
+  // writing it down is why the relay cannot open what it has STORED.
+  //
+  // BE PRECISE ABOUT WHAT THAT PROVES. The relay does see each token for the
+  // moment it mails the invitation (it is the mailer), and the wrapping key is
+  // derived from the token. So this is "not stored", not zero-knowledge: a
+  // relay that kept what it mails could open the file. Real end-to-end for
+  // sends by name needs a recipient key the relay never sees (issue #550: ParaSend
+  // op naam zero-knowledge met ontvangerssleutel).
   //
   // So this points at the invitation they already have, which still works.
   if (req.method === 'POST' && path === '/v2/user/sends/reinvite') {
@@ -5691,9 +6064,15 @@ async function handleRelayRequest(req, res) {
       // on you any more". A caller who is not the party learns nothing, not even
       // that the id exists.
       if (!invite) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+      // The resent link opens the REQUEST, never the document: the key half
+      // that opens it lives only in the link the sender's browser built and
+      // must not reach a server that also holds the other half (COSIGN-46).
+      // The safe way back is the sender, so the sender is told, once an hour.
+      const senderNotified = await notifySenderLinkRequested(parasignResendMatch[1], invite.sender_account_id, invite.party_label).catch(() => false);
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' });
       return res.end(J({
         ok: true,
+        sender_notified: !!senderNotified,
         party_index: invite.party_index,
         party_label: invite.party_label,
         invite_token: invite.invite_token,
@@ -6506,13 +6885,13 @@ async function handleRelayRequest(req, res) {
     // log. Every projection that leaves this process goes through ctCoarseTs;
     // the full ts stays in the stored entry and in the receipt.
     const last50 = ctWindow.recentPage(50);
-    const root   = ctWindow.last() ? ctWindow.last().tree_hash : '0'.repeat(64);
+    const root   = ctTree.root();
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
     return res.end(J({
       relay_id: relayIdentity ? relayIdentity.pk_hash : null,
       sector:   SECTOR,
       version:  VERSION,
-      tree_size: ctWindow.size,
+      tree_size: ctTree.size,
       root,
       entries: last50.entries.map((e, i) => ({
         i:    last50.start_index + i,
@@ -6526,8 +6905,12 @@ async function handleRelayRequest(req, res) {
 
   // ── GET /v2/ct/log + /v2/ct/proof — publiek, geen auth ──────────────────────
   if (path === '/v2/ct/log') {
-    const limit = Math.min(parseInt(query.limit || '100'), 1000);
-    const from  = parseInt(query.from || '0');
+    // Clamped (limit=-1 used to return the whole window, limit=abc nothing),
+    // and `offset` accepted as the docs call it (API-31-B).
+    const _lim = parseInt(query.limit || '100', 10);
+    const limit = Number.isFinite(_lim) ? Math.max(1, Math.min(_lim, 1000)) : 100;
+    const _from = parseInt(query.from !== undefined ? query.from : (query.offset || '0'), 10);
+    const from  = Number.isFinite(_from) && _from >= 0 ? _from : 0;
     // Privacy: the public log projection deliberately omits device_hash and
     // coarsens timestamps to the hour. device_hash is a stable, deterministic
     // function of a participant public key, so publishing it unauthenticated
@@ -6545,7 +6928,7 @@ async function handleRelayRequest(req, res) {
     const pageR = ctWindow.page(from, limit);
     const entries = pageR.entries.map((e, i) => ({ index: pageR.start_index + i, type: e.type, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, ts: ctCoarseTs(e.ts) }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, size: ctWindow.size, root: ctWindow.last() ? ctWindow.last().tree_hash : '0'.repeat(64), entries }));
+    return res.end(J({ ok: true, size: ctTree.size, root: ctTree.root(), entries }));
   }
   const ctpm0 = path.match(/^\/v2\/ct\/proof\/(\d+)$/);
   const ctpq0 = (!ctpm0 && path === '/v2/ct/proof') ? query.index : null;
@@ -6555,7 +6938,16 @@ async function handleRelayRequest(req, res) {
     // this route never consulted the stored index field and was already right
     // while the listing was wrong. The echoed `index` is the requested one.
     const entry = ctWindow.get(idx);
-    if (!entry) { res.writeHead(404); return res.end(J({ error: 'Index not found' })); }
+    if (!entry) {
+      // Aged out of the in-memory window but still in the tree: the leaf, its
+      // root and its audit path are all still exact. The full timestamp is not
+      // kept for pruned entries, so ts is null rather than invented.
+      if (Number.isInteger(idx) && idx >= 0 && idx < ctTree.size) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ ok: true, index: idx, leaf_hash: ctTree.leaf(idx), tree_hash: ctTree.root(idx + 1), proof: ctTree.inclusionProof(idx, idx + 1), ts: null, pruned: true }));
+      }
+      res.writeHead(404); return res.end(J({ error: 'Index not found' }));
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, index: idx, leaf_hash: entry.leaf_hash, tree_hash: entry.tree_hash, proof: entry.proof, ts: ctCoarseTs(entry.ts) }));
   }
@@ -6823,14 +7215,14 @@ async function handleRelayRequest(req, res) {
   // ── GET /v2/sth/consistency — RFC 6962 consistency proof ──────────────────────
   if (path === '/v2/sth/consistency' && req.method === 'GET') {
     const fromSize = parseInt(query.from);
-    const toSize   = query.to !== undefined ? parseInt(query.to) : ctWindow.windowLength;
+    const toSize   = query.to !== undefined ? parseInt(query.to) : ctTree.size;
     if (isNaN(fromSize) || isNaN(toSize)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Query params required: from=<integer> (and optionally to=<integer>)' }));
     }
-    if (fromSize < 0 || toSize < fromSize || toSize > ctWindow.windowLength) {
+    if (fromSize < 0 || toSize < fromSize || toSize > ctTree.size) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: `Invalid range: 0 ≤ from (${fromSize}) ≤ to (${toSize}) ≤ window size (${ctWindow.windowLength})` }));
+      return res.end(J({ error: `Invalid range: 0 ≤ from (${fromSize}) ≤ to (${toSize}) ≤ tree size (${ctTree.size})` }));
     }
     const proof = ctConsistencyProof(fromSize, toSize);
     if (proof === null) { res.writeHead(500); return res.end(J({ error: 'Could not compute proof' })); }
@@ -6932,7 +7324,7 @@ async function handleRelayRequest(req, res) {
     const token = dlgm[1];
     const ua = req.headers['user-agent'] || '';
     const claim = typeof query.claim === 'string' && DL_CLAIM_RE.test(query.claim) ? query.claim : null;
-    if (PRELOAD_BOTS.test(ua)) {
+    if (PREVIEW_BOTS.test(ua)) {
       res.writeHead(403); return res.end(J({ error: 'Automated clients not permitted' }));
     }
     const gone = (reason, status) => claim ? dlGoneJson(res, reason) : dlGoneHtml(res, reason, status);
@@ -7032,6 +7424,7 @@ async function handleRelayRequest(req, res) {
     // on this side of TCP; only a claimed download with an ack (?claim=, the
     // web page and the relay's own confirm page) is exact.
     res.on('finish', () => {
+      _notifyDownloaded(entry, blobHash, { via: 'link' });
       dlBurn(token, td, 'downloaded');
       blobDrop(blobHash);
       try { blob.fill(0); } catch {}
@@ -7134,6 +7527,7 @@ async function handleRelayRequest(req, res) {
       return res.end(J({ ok: false, error: 'This download was not claimed with that id', reason: 'not_claimed' }));
     }
     td.acked_by = claim;
+    _notifyDownloaded(blobStore.get(td.hash), td.hash, { via: 'link' });
     dlBurn(token, td, 'downloaded');
     blobDrop(td.hash);
     log('info', 'dl_token_used', { token: token.slice(0,8), hash: td.hash.slice(0,16), mode: 'ack' });
@@ -7304,7 +7698,15 @@ async function handleRelayRequest(req, res) {
   if (path === '/v2/pubkey' && req.method === 'POST') {
     try {
       const d = JSON.parse((await readBody(req, 65536)).toString());
-      if (!d.device_id || !d.ecdh_pub) { res.writeHead(400); return res.end(J({ error: 'device_id and ecdh_pub required' })); }
+      // A PURE post-quantum registration is valid too: sdk-js 3.3 (wire format
+      // v1, ML-KEM only) sends kem_pub/kyber_pub and no ecdh_pub, and every
+      // registerPubkeys() from it answered 400 (sweep-api finding 5). The
+      // browser's hybrid handshake and the inv_ rendezvous still need ecdh_pub.
+      if (d && !d.ecdh_pub && !d.kyber_pub && typeof d.kem_pub === 'string') d.kyber_pub = d.kem_pub;
+      const _pqOnly = !!(d && !d.ecdh_pub && typeof d.kyber_pub === 'string' && /^[0-9a-fA-F]{64,8192}$/.test(d.kyber_pub));
+      if (!d.device_id || (!d.ecdh_pub && !_pqOnly)) { res.writeHead(400); return res.end(J({ error: 'device_id and ecdh_pub (or, for a post-quantum-only key, kem_pub) required' })); }
+      if (_pqOnly && typeof d.device_id === 'string' && /^inv_/.test(d.device_id)) { res.writeHead(400); return res.end(J({ error: 'the inv_ rendezvous needs ecdh_pub' })); }
+      if (_pqOnly) d.ecdh_pub = '';
       // M3: reject oversized device_id to prevent memory exhaustion / map-key attacks
       if (typeof d.device_id !== 'string' || d.device_id.length > 256) { res.writeHead(400); return res.end(J({ error: 'device_id must be a string of at most 256 characters' })); }
       if (INVITE_RE.test(d.device_id)) {
@@ -7385,8 +7787,8 @@ async function handleRelayRequest(req, res) {
         }
       }
       const ttl = _pubkeyTtl[plan] ?? _pubkeyTtl.free;
-      const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
-      const attestResult = verifyAttestation(d.ecdh_pub, d.device_id, d.attestation || null);
+      const ctEntry = ctAppend(d.device_id, d.ecdh_pub || d.kyber_pub, apiKey);
+      const attestResult = verifyAttestation(d.ecdh_pub || d.kyber_pub, d.device_id, d.attestation || null);
       const existingPubkey = pubkeys.get(_pkSlot);
       if (existingPubkey && (!existingPubkey.expires || Date.now() < existingPubkey.expires)) {
         res.writeHead(409); return res.end(J({ error: 'Pubkey already registered for this session: first registration wins' }));
@@ -7404,6 +7806,72 @@ async function handleRelayRequest(req, res) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, fingerprint: fp, dsa_supported: !!mlDsa, ct_index: ctEntry.index, ct_tree_hash: ctEntry.tree_hash, attested: attestResult.valid, attestation_method: attestResult.method || null }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
+  }
+
+  // ── The streaming manifest for a live hand-over ("Samen nu", inv_) ─────────
+  // The pss_ manifest below needs a pss_ session; the web page's live
+  // hand-over runs on an inv_ rendezvous, so every block it announced got 404
+  // (and 403 first: the route was not in the pst_ token's scope), and the
+  // receiver's keyless read got 401. Streaming was off in practice and the
+  // relay held the whole file in RAM until `_ready` (SENDNAME-29-K).
+  // Same rules as the inv_ pubkey slot it hangs off: writing needs the
+  // sender's credential and the first writer owns it; reading needs only the
+  // inv_ id, which is the capability, and the tokens it lists are useless
+  // without the receiver's private key.
+  // POST /v2/session/inv_<id>/reject -- the sender compared the fingerprint
+  // and said no. The receiver used to keep waiting on "read this code to the
+  // sender" until the ten-minute limit (SENDNAME-28-A); the stopgap was an
+  // empty `_ready` record. This is the honest signal: the inv_ id is marked
+  // rejected, and the receiver's next read of the `_ready` slot or of the
+  // manifest answers 410 handover_rejected. Sender's credential required, the
+  // same one that registered nothing on the inv_ slot: only the side that
+  // compares fingerprints can say no.
+  const invRejm = path.match(/^\/v2\/session\/(inv_[a-zA-Z0-9]{32})\/reject$/);
+  if (invRejm && req.method === 'POST') {
+    if (!keyData?.active) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Valid API key required' })); }
+    if (invRejections.size >= INV_MANIFEST_MAX) for (const [k, t] of invRejections) if (Date.now() > t) invRejections.delete(k);
+    invRejections.set(invRejm[1], Date.now() + INV_MANIFEST_TTL_MS);
+    invManifests.delete(invRejm[1]);
+    log('info', 'handover_rejected', { inv: invRejm[1].slice(0, 8) });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, rejected: true }));
+  }
+  const _invRejected = (inv) => { const t = invRejections.get(inv); if (!t) return false; if (Date.now() > t) { invRejections.delete(inv); return false; } return true; };
+
+  const invMfm = path.match(/^\/v2\/session\/(inv_[a-zA-Z0-9]{32})\/manifest$/);
+  if (invMfm && req.method === 'GET') {
+    if (_invRejected(invMfm[1])) { res.writeHead(410, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'handover_rejected' })); }
+    const m = invManifests.get(invMfm[1]);
+    if (!m || Date.now() > m.expires) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true, total: 0, chunks: [], complete: false })); }
+    const chunks = [...m.tokens.entries()].sort((a, b) => a[0] - b[0]).map(([index, token]) => ({ index, token }));
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(J({ ok: true, total: m.total, meta: m.meta, chunks, complete: chunks.length === m.total }));
+  }
+  if (invMfm && req.method === 'POST') {
+    if (!keyData?.active) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Valid API key required' })); }
+    let d;
+    try { d = JSON.parse((await readBody(req, 8192)).toString()); }
+    catch (e) { res.writeHead(400); return res.end(J({ error: 'bad_request' })); }
+    const idx = Number(d.index); const total = Number(d.total_chunks);
+    const token = typeof d.token === 'string' ? d.token : '';
+    if (!Number.isInteger(idx) || idx < 0 || idx > 100000) { res.writeHead(400); return res.end(J({ error: 'index must be a non-negative integer' })); }
+    if (!Number.isInteger(total) || total < 1 || total > 100000) { res.writeHead(400); return res.end(J({ error: 'total_chunks must be a positive integer' })); }
+    if (idx >= total) { res.writeHead(400); return res.end(J({ error: 'index must be below total_chunks' })); }
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(token)) { res.writeHead(400); return res.end(J({ error: 'token must be a download token' })); }
+    const owner = acctOf(apiKey);
+    let m = invManifests.get(invMfm[1]);
+    if (m && Date.now() > m.expires) { invManifests.delete(invMfm[1]); m = null; }
+    if (!m) {
+      if (invManifests.size >= INV_MANIFEST_MAX) { res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' }); return res.end(J({ error: 'busy' })); }
+      m = { owner, total, tokens: new Map(), meta: null, expires: Date.now() + INV_MANIFEST_TTL_MS };
+      invManifests.set(invMfm[1], m);
+    }
+    if (m.owner !== owner) { res.writeHead(403); return res.end(J({ error: 'This hand-over belongs to a different account' })); }
+    if (m.total !== total) { res.writeHead(409); return res.end(J({ error: 'total_chunks changed mid-transfer' })); }
+    if (!m.tokens.has(idx)) m.tokens.set(idx, token);
+    if (typeof d.meta === 'string' && d.meta.length <= 2048 && !m.meta) m.meta = d.meta;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, have: m.tokens.size, total }));
   }
 
   // ── GET /v2/pubkey/:device ───────────────────────────────────────────────────
@@ -7425,6 +7893,12 @@ async function handleRelayRequest(req, res) {
     if (!INVITE_RE.test(deviceId) && !keyData?.active) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
+    }
+    // A rejected hand-over (POST /v2/session/inv_<id>/reject): the receiver
+    // polling the `_ready` slot learns it now instead of at the time limit.
+    if (INVITE_RE.test(deviceId) && _invRejected(deviceId.replace(/_ready$/, ''))) {
+      res.writeHead(410, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'handover_rejected' }));
     }
     // Invite sessions: stored and retrieved without API key
     const _pkKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${acctOf(apiKey)}`;
@@ -8201,6 +8675,11 @@ async function handleRelayRequest(req, res) {
       const ctEntry = ctAppendTransfer(hash, SECTOR);
       blobPut(hash, { blob, ts: Date.now(), ttl, size: blob.length,
         account_id: acctOf(apiKey),
+        // For the download event (webhook + mail): which device's hooks, and
+        // which file a block belongs to so one file mails once.
+        device_id: (meta && typeof meta.device_id === 'string') ? meta.device_id.slice(0, 128) : null,
+        file_id: (meta && meta.file_id) ? String(meta.file_id).slice(0, 128) : null,
+        lang: (meta && (meta.lang === 'nl' || meta.lang === 'en')) ? meta.lang : '',
         sig_valid: sigResult.valid, apiKey, max_views: maxViews, views_remaining: maxViews, pw_hash,
         sector: SECTOR,
         ct_entry: {
@@ -8236,7 +8715,7 @@ async function handleRelayRequest(req, res) {
       // Remembered in memory as well, so it holds without redis (the quota
       // gate fails open there and cannot say "already counted").
       if (!_volgblok && !_alGemeld(acctOf(apiKey), meta && meta.file_id)) {
-        transferNotify.maybeNotify({ keyData, event: 'upload', hashPrefix: hash, bytes: blob.length, sendEmail: mailLater });
+        transferNotify.maybeNotify({ keyData, event: 'upload', hashPrefix: hash, bytes: blob.length, sendEmail: mailLater, lang: (meta && (meta.lang === 'nl' || meta.lang === 'en')) ? meta.lang : '' });
       }
 
       // (Transfer already counted by the quota gate above, before storage.)
@@ -8354,10 +8833,7 @@ async function handleRelayRequest(req, res) {
       { hash: outm[1].slice(0,16), views_left: entry.views_remaining });
     // ParaSend Pro download notification. Notify the transfer OWNER (the uploader),
     // whose key is on the blob entry — not the downloader. No-op below Pro+ / no key.
-    {
-      const _ownerKd = entry.apiKey ? apiKeys.get(entry.apiKey) : null;
-      transferNotify.maybeNotify({ keyData: _ownerKd, event: 'download', hashPrefix: outm[1], bytes: blob.length, sendEmail: mailLater });
-    }
+    _notifyDownloaded(entry, outm[1], { via: 'api' });
 
     // ── Build signed delivery receipt ────────────────────────────────────────
     let receiptHeader = null;
@@ -8379,7 +8855,7 @@ async function handleRelayRequest(req, res) {
         retrieved_at:           Date.now(),
         sector:                 entry.sector || SECTOR,
         relay_id:               RELAY_SELF_URL || (SECTOR + '.paramant.app'),
-        tree_size_at_retrieval: ctWindow.size,
+        tree_size_at_retrieval: ctTree.size,
         inclusion_proof:        inclusionProof,
         burn_confirmed:         burned,
       };
@@ -8479,6 +8955,11 @@ async function handleRelayRequest(req, res) {
       if (!isSsrfSafeUrl(d.url)) { res.writeHead(400); return res.end(J({ error: 'url must be a valid public HTTPS URL (private/loopback addresses not allowed)' })); }
       const k = `${d.device_id}:${acctOf(apiKey)}`;
       if (!webhooks.has(k)) webhooks.set(k, []);
+      // Every webhook is signed. Without a secret X-Paramant-Sig went out
+      // empty and the receiver could not tell our call from anyone's. One is
+      // made when the caller sends none, and handed back once, here.
+      const _given = d.secret == null ? '' : String(d.secret);
+      const _secret = _given || ('whsec_' + crypto.randomBytes(24).toString('hex'));
       // String(), want `|| ''` vangt alleen falsy. Een number, object of array
       // overleefde en kwam later in crypto.createHmac terecht, dat op een
       // niet-string gooit. Die throw stond een regel BUITEN de try in
@@ -8487,10 +8968,17 @@ async function handleRelayRequest(req, res) {
       // rejection met emergencyZeroAndExit -- alle blobs van ALLE klanten op
       // nul en afsluiten. Een enkel JSON-veld van een betalende klant legde de
       // relay om voor iedereen, telkens opnieuw, want de registratie bleef staan.
-      webhooks.get(k).push({ url: d.url, secret: String(d.secret == null ? '' : d.secret) });
+      webhooks.get(k).push({ url: d.url, secret: _secret });
+      if (redisClient && redisClient.isReady) {
+        try {
+          const rk = _webhookRedisKey(k);
+          await redisClient.rPush(rk, JSON.stringify({ url: d.url, secret: _secret }));
+          await redisClient.lTrim(rk, -20, -1);
+        } catch (we) { log('warn', 'webhook_persist_failed', { err: we.message }); }
+      }
       log('info', 'webhook_registered', { device: d.device_id });
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(J({ ok: true }));
+      return res.end(J({ ok: true, events: ['blob_ready', 'blob_downloaded'], ...(_given ? {} : { secret: _secret }) }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
   }
 
@@ -8825,8 +9313,7 @@ async function handleRelayRequest(req, res) {
 
       // Per-account cap (and the self-host relay-total cap) — checked atomically
       // with the insert below.
-      const acctPlan = tiers.normalisePlan((accounts.get(account_id) && accounts.get(account_id).plan) || plan);
-      const acctCap = ACCOUNT_KEY_LIMIT[acctPlan] ?? ACCOUNT_KEY_LIMIT.community;
+      const { plan: acctPlan, cap: acctCap } = accountKeyCap(account_id, (accounts.get(account_id) && accounts.get(account_id).plan) || plan);
       const acctActive = [...(accountKeys.get(account_id) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
       if (acctActive >= acctCap) {
         res.writeHead(402, { 'Content-Type': 'application/json' });
@@ -8847,6 +9334,7 @@ async function handleRelayRequest(req, res) {
 
       const created = new Date().toISOString();
       apiKeys.set(newKey, { plan, label, email, active: true, account_id, is_primary, scope, created });
+      const accountWasNew = !accounts.has(account_id);
       if (!accounts.has(account_id)) accounts.set(account_id, { account_id, plan, email, primary_api_key: null, label });
       if (is_primary || !accounts.get(account_id).primary_api_key) accounts.get(account_id).primary_api_key = newKey;
       if (!accountKeys.has(account_id)) accountKeys.set(account_id, new Set());
@@ -8855,11 +9343,26 @@ async function handleRelayRequest(req, res) {
       apiKeys.get(newKey).kid = kid;
       kidIndex.set(kid, newKey);
 
-      _mutateUsersJson(ud => {
-        ud.api_keys.push({ key: newKey, plan, label, email, active: true, created, account_id, is_primary, scope });
-        ud.updated = new Date().toISOString();
-      }).then(() => log('info', 'key_created_via_admin', { label, plan, account: String(account_id).slice(0, 12), persisted: true }))
-        .catch(we => log('warn', 'key_persist_failed', { err: we.message, label }));
+      // Awaited: a key that is not on disk is gone at the next restart, so the
+      // caller must not be told it exists. On failure the in-memory key is
+      // taken back and the answer says why.
+      try {
+        await _mutateUsersJson(ud => {
+          ud.api_keys.push({ key: newKey, plan, label, email, active: true, created, account_id, is_primary, scope });
+          ud.updated = new Date().toISOString();
+        });
+        log('info', 'key_created_via_admin', { label, plan, account: String(account_id).slice(0, 12), persisted: true });
+      } catch (we) {
+        apiKeys.delete(newKey);
+        kidIndex.delete(kid);
+        const ak = accountKeys.get(account_id);
+        if (ak) { ak.delete(newKey); if (ak.size === 0) accountKeys.delete(account_id); }
+        if (accountWasNew) accounts.delete(account_id);
+        else if (accounts.get(account_id) && accounts.get(account_id).primary_api_key === newKey) accounts.get(account_id).primary_api_key = null;
+        log('error', 'key_persist_failed', { err: we.message, label, persisted: false });
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'key_not_persisted', detail: 'users.json could not be written; the key was not created.' }));
+      }
       applyKeyLimitEnforcement();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, key: newKey, kid, account_id, plan, label }));
@@ -9305,6 +9808,12 @@ async function handleRelayRequest(req, res) {
         if (entitlements.hasRunningTerm(rec, g.product, g.tier)) continue;
         const running = entitlements.effectiveProductTier(rec, g.product);
         if (running.tier === entitlements.floorTierOf(g.product)) continue;
+        // An upgrade is self-service, as /pricing says ("upgrade when you
+        // outgrow"): the higher tier runs on top and the lower term is paused
+        // for exactly the span bought (webhook pauseLowerTerms), so no week is
+        // paid twice. Only a step DOWN next to a running higher tier still
+        // goes by mail.
+        if (entitlements.termRelation(g.product, g.tier, running.tier) === 'lower_running') continue;
         const until = running.paidUntil ? planExpiry.formatDate(running.paidUntil) : null;
         res.writeHead(409, { 'Content-Type': 'application/json' });
         return res.end(J({
@@ -9448,6 +9957,11 @@ async function handleRelayRequest(req, res) {
       // the account record carries the payment id that bought its current
       // period, and that answer survives anything redis does.
       isProcessed: async (id) => {
+        // The ledger first: it holds EVERY payment id ever settled, on disk,
+        // and it is what stops a replay of an old tr_ after the redis marker
+        // is gone and paid_by_<product> has moved on to a newer payment.
+        const led = billingLedger.status(id);
+        if (led) return led;
         if (_rok()) {
           try { const v = await redisClient.get(_idemKey(id)); if (v) return v; } catch { /* fall through to disk */ }
         }
@@ -9456,8 +9970,29 @@ async function handleRelayRequest(req, res) {
         for (const p of entitlements.PRODUCTS) if (rec[_paidByField(p)] === id) return 'granted';
         return false;
       },
-      markProcessed: async (id, val) => {
+      periodOf: async (id) => { const r = billingLedger.get(id); return r && Array.isArray(r.grants) ? r.grants : null; },
+      // An upgrade pauses the lower terms of the same product (lib/billing):
+      // their end moves out by the span the higher tier just bought.
+      pauseLowerTerms: async (accountId, product, tier, spanMs) => {
+        if (!(spanMs > 0)) return [];
+        const rec = entitlementRecordOf(accountId);
+        const nowMs = Date.now();
+        const moved = [];
+        for (const t of entitlements.termsOf(rec, product)) {
+          if (t.until === null || t.tier === entitlements.floorTierOf(product)) continue;
+          if (entitlements.termRelation(product, t.tier, tier) !== 'higher_running') continue;
+          const end = new Date(t.until).getTime();
+          if (!(end > nowMs)) continue;
+          const r = setProductPlan(accountId, product, t.tier, new Date(end + spanMs), t.bundle || null);
+          if (r && r.ok) moved.push({ tier: t.tier, by: spanMs });
+        }
+        return moved;
+      },
+      markProcessed: async (id, val, extra) => {
         const md = payment.metadata || {};
+        // Durable, awaited, and first. A failure here is logged at error level
+        // by the ledger; the redis marker and paid_by below still apply.
+        try { await billingLedger.record(id, String(val), extra); } catch { /* logged in the ledger */ }
         // Persist first: this is the half that has to outlive a restart.
         // Every product this payment granted, so a Firm payment is remembered on
         // both halves. Reading only md.product would leave the parasend side
@@ -9472,7 +10007,9 @@ async function handleRelayRequest(req, res) {
           }
         }
         if (!_rok()) return;
-        try { await redisClient.set(_idemKey(id), String(val), { EX: 60 * 86400 }); } catch { /* best effort */ }
+        // No TTL any more: the 60-day expiry is what made an old payment
+        // grantable again. The ledger is the record; this is the fast path.
+        try { await redisClient.set(_idemKey(id), String(val)); } catch { /* best effort */ }
       },
     });
     // The collecting half. A grant only says what this payment bought; without
@@ -10192,11 +10729,11 @@ async function handleRelayRequest(req, res) {
   if (path === '/v2/team/devices' && req.method === 'GET') {
     const kd = apiKeys.get(apiKey);
     if (!kd?.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
-    const teamId = kd.team_id;
-    if (!teamId) { res.writeHead(200); return res.end(J({ team_id: null, devices: [], message: 'Losse sleutel, geen team' })); }
+    // The team IS the account (see /v2/team/add-device): every key of it.
+    const teamId = kd.account_id || apiKey;
     const devices = [];
     apiKeys.forEach((v, k) => {
-      if (v.team_id === teamId) devices.push({ label: v.label, plan: v.plan, active: v.active, key_preview: k.slice(0,12)+'...' });
+      if ((v.account_id || k) === teamId && v.active !== false) devices.push({ label: v.label, plan: v.plan, active: v.active, key_preview: k.slice(0,12)+'...' });
     });
     res.writeHead(200); return res.end(J({ team_id: teamId, devices, count: devices.length }));
   }
@@ -10224,11 +10761,21 @@ async function handleRelayRequest(req, res) {
   // teaches the loader about team_id, this must not be the shape that lands.
   // Bound to the PARENT account, scope inherited, capped, persisted, and 32
   // bytes like every other key in the file. key-mint-gate.test.js holds it here.
+  //
+  // MADE TO WORK, 2026-10-04 (SENDNAME-43). docs.html promises "add a device to
+  // the team (Firm or higher)" and there was no way to get a team at all. The
+  // team is now the ACCOUNT: a Firm-or-higher account adds a device key that
+  // belongs to that same account, shares its plan and its monthly buckets (the
+  // gates meter account_id), and counts against the account's key cap. No
+  // separate team object, nothing a loader can drop.
   if (path === '/v2/team/add-device' && req.method === 'POST') {
     const kd = apiKeys.get(apiKey);
     if (!kd?.active) { res.writeHead(401); return res.end(J({ error: 'unauthorized' })); }
-    if (!kd.team_id) { res.writeHead(403); return res.end(J({ error: 'Geen team. Daarvoor is Pro nodig.' })); }
-    if (kd.plan === 'dev') { res.writeHead(403); return res.end(J({ error: 'Team keys vereisen Pro of Enterprise' })); }
+    if (!tierGate.isParasendProPlus(entitlementRecordOf(kd.account_id || apiKey) || kd)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'tier_upgrade_required', feature: 'team_devices', message: 'Apparaten aan het team toevoegen kan vanaf Firm.', message_en: 'Adding devices to the team requires Firm or higher.' }));
+    }
+    kd.team_id = kd.account_id || apiKey;
     try {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.label) { res.writeHead(400); return res.end(J({ error: 'label verplicht' })); }
@@ -10236,8 +10783,7 @@ async function handleRelayRequest(req, res) {
       const account_id = kd.account_id || apiKey;
       const scope = keysTable.VALID_SCOPES.has(kd.scope) ? kd.scope : 'full';
       const email = kd.email || '';
-      const capPlan = tiers.normalisePlan(kd.plan);
-      const cap = ACCOUNT_KEY_LIMIT[capPlan] ?? ACCOUNT_KEY_LIMIT.community;
+      const { plan: capPlan, cap } = accountKeyCap(account_id, kd.plan);
       const active = [...(accountKeys.get(account_id) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
       if (active >= cap) {
         res.writeHead(402, { 'Content-Type': 'application/json' });
@@ -10252,11 +10798,19 @@ async function handleRelayRequest(req, res) {
       const kid = keysTable.assignKid(kidIndex, newKey, log);
       apiKeys.get(newKey).kid = kid;
       kidIndex.set(kid, newKey);
-      _mutateUsersJson(ud => {
-        ud.api_keys.push({ key: newKey, plan: kd.plan, label, email, active: true, created, account_id, is_primary: false, scope, team_id: kd.team_id });
-        ud.updated = new Date().toISOString();
-      }).then(() => log('info', 'team_device_added', { label, team: kd.team_id, account: String(account_id).slice(0, 12), persisted: true }))
-        .catch(we => log('warn', 'key_persist_failed', { err: we.message, label }));
+      try {
+        await _mutateUsersJson(ud => {
+          ud.api_keys.push({ key: newKey, plan: kd.plan, label, email, active: true, created, account_id, is_primary: false, scope, team_id: kd.team_id });
+          ud.updated = new Date().toISOString();
+        });
+        log('info', 'team_device_added', { label, team: kd.team_id, account: String(account_id).slice(0, 12), persisted: true });
+      } catch (we) {
+        apiKeys.delete(newKey); kidIndex.delete(kid);
+        const ak = accountKeys.get(account_id); if (ak) ak.delete(newKey);
+        log('error', 'key_persist_failed', { err: we.message, label, persisted: false });
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'key_not_persisted' }));
+      }
       applyKeyLimitEnforcement();
       res.writeHead(201); return res.end(J({ ok: true, key: newKey, kid, account_id, label, team_id: kd.team_id }));
     } catch(e) { res.writeHead(400); return res.end(J({ error: e.message })); }
@@ -10370,6 +10924,10 @@ async function handleRelayRequest(req, res) {
         const _psign  = entitlements.getEntitlements(keyData).parasign;
         const _sLimit = _psign.quotas.signs_month;
         const _sGate  = await quota.gateSign(redisClient, keyData.account_id, _sLimit, log);
+        if (_sGate.unavailable) {
+          res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' });
+          return res.end(J({ error: 'sign_quota_unavailable', message: 'Signatures cannot be counted right now. Nothing was signed; try again in a minute.' }));
+        }
         if (!_sGate.allowed) {
           // The tier that DECIDED, as on the transfer gate: the unified plan
           // does not move on a ParaSign purchase either, so reporting it here
@@ -10425,6 +10983,42 @@ async function handleRelayRequest(req, res) {
     return _envStore._inst;
   }
 
+  // POST /v2/admin/envelopes/void-account -- withdraw every open envelope of an
+  // account (internal; admin plane calls it when a customer deletes his
+  // account). Before this a deleted account's envelopes stayed signable, the
+  // signatures were counted on the deactivated account, and "everyone signed"
+  // went to the erased address (sweep-acct finding 5).
+  if (path === '/v2/admin/envelopes/void-account' && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
+    let d;
+    try { d = JSON.parse((await readBody(req, 1024)).toString() || '{}'); }
+    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_json' })); }
+    let accountId = typeof d.account_id === 'string' ? d.account_id : '';
+    if (!accountId && typeof d.key === 'string' && d.key) {
+      const kd = apiKeys.get(d.key);
+      accountId = (kd && kd.account_id) || d.key;
+    }
+    if (!accountId) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'account_id or key required' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'envelopes_unavailable' })); }
+    let voided = 0, done = 0;
+    try {
+      const ids = await store.listAccountEnvelopeIds(accountId, { limit: 100000 });
+      for (const id of ids) {
+        const out = await store.voidEnvelope(id, 'The sender deleted the account');
+        if (out.ok && out.code === 'void') voided++;
+        else if (out.code === 'already_complete') done++;
+      }
+      log('info', 'envelopes_voided_for_account', { account: accountId.slice(0, 12), voided, completed: done, total: ids.length });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, voided, completed: done, total: ids.length }));
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'void_failed' }));
+    }
+  }
+
   // POST /v2/envelopes -- create a new envelope.
   if (path === '/v2/envelopes' && req.method === 'POST') {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
@@ -10448,7 +11042,41 @@ async function handleRelayRequest(req, res) {
       // thirty (tester report A9). It is the account's ParaSign entitlement now,
       // parasignEntitlementOf, the same reading the signs gate makes. ParaSign
       // calls its floor 'free', which tiers.normalisePlan reads as community.
-      const _planForParties = parasignEntitlementOf(acctOf(apiKey), apiKeys.get(apiKey)).tier;
+      const _psEnt = parasignEntitlementOf(acctOf(apiKey), apiKeys.get(apiKey));
+      const _planForParties = _psEnt.tier;
+      // THE SENDER PAYS FOR EVERY SIGNATURE ON IT, so he has to have room for
+      // all of them before the request goes out. Nothing was checked here: a
+      // free sender (2 a month) could send to twenty people, a Firm sender at
+      // 98 of 100 to five, and parties 3 to 5 then hit a refusal they could do
+      // nothing about (sweep-acct finding 7). Room = included - signed this
+      // month - still unsigned on his open requests.
+      const _sLimit = _psEnt.quotas.signs_month;
+      // After the party cap, which store.create enforces with its own message:
+      // a request that is too big for any plan says so, not "no room".
+      const _partyCap = Math.min(envelopeMod.MAX_PARTIES, tiers.tierLimitNum(_planForParties, 'max_parties') || envelopeMod.MAX_PARTIES);
+      if (Number.isFinite(_sLimit) && parties.length > 0 && parties.length <= _partyCap) {
+        let _used = 0, _pending = 0;
+        try {
+          const u = await quota.readUsage(redisClient, acctOf(apiKey));
+          _used = Number.isFinite(u.signs_this_month) ? u.signs_this_month : 0;
+          const open = await store.listAccountEnvelopes(acctOf(apiKey), { limit: 500 });
+          const _nowMs = Date.now();
+          for (const e of open) if (e && e.status !== 'complete' && e.status !== 'void' && !e.voided_at && !e.completed_at && !(e.expires_at && Date.parse(e.expires_at) < _nowMs)) _pending += Math.max(0, (e.party_count || 0) - (e.signed_count || 0));
+        } catch (qe) {
+          if (redisOutage503(qe, res)) return;
+          res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' });
+          return res.end(J({ error: 'sign_quota_unavailable' }));
+        }
+        const _room = Math.max(0, _sLimit - _used - _pending);
+        if (parties.length > _room) {
+          log('info', 'envelope_quota_insufficient', { account: String(acctOf(apiKey)).slice(0, 12), parties: parties.length, room: _room, used: _used, pending: _pending, limit: _sLimit });
+          res.writeHead(402, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'sign_quota_insufficient', needed: parties.length, room: _room,
+            used: _used, pending: _pending, limit: _sLimit, plan: _psEnt.tier, reset_date: quota.nextResetDate(),
+            message: `This request needs ${parties.length} signature(s) and your plan has room for ${_room} this month (${_used} signed, ${_pending} still open on other requests, ${_sLimit} included).`,
+            message_nl: `Dit verzoek vraagt ${parties.length} handtekening(en) en uw plan heeft deze maand nog ruimte voor ${_room} (${_used} getekend, ${_pending} nog open op andere verzoeken, ${_sLimit} inbegrepen).` }));
+        }
+      }
       const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, accountId: acctOf(apiKey), docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays, bindingMode: d.binding_mode, recipeVersion: d.recipe_version, requestedAppearance: d.requested_appearance, plan: _planForParties });
       log('info', 'envelope_created', { id: out.id, parties: out.party_count, binding_mode: out.binding_mode });
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -10721,6 +11349,7 @@ async function handleRelayRequest(req, res) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, envelope: env, sign_message_recipe: recipeFor(env.recipe_version, env.binding_mode) }));
     } catch (e) {
+      if (redisOutage503(e, res)) return;   // a frozen store is a 503, not a 500 (sweep-chaos 10)
       res.writeHead(500, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'internal' }));
     }
@@ -10766,8 +11395,10 @@ async function handleRelayRequest(req, res) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true }));
     } catch (e) {
+      if (redisOutage503(e, res)) return;
+      // Fixed text, never the internal error message (sweep-chaos 10).
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: e.message }));
+      return res.end(J({ error: 'view_failed' }));
     }
   }
 
@@ -10879,7 +11510,14 @@ async function handleRelayRequest(req, res) {
       // still meters the signer, the account resolved above.
       // Compared through acctOf, so a key that belongs to the owner's account is
       // the owner, and solo signing keeps metering the very id it metered before.
-      const billedToSender = !!ownerAccountId && acctOf(ownerAccountId) !== acctOf(accountId);
+      //
+      // A signer WITHOUT an account (open mode, no claimed account) is not the
+      // sender either. accountId fell back to the owner for him, so this used
+      // to read "same account", and he got monthly_sign_quota_reached with the
+      // sender's plan, limit and usage, while the sender heard nothing. Only a
+      // claimed account that IS the owner's is the sender signing.
+      const _senderSigns = !!claimedAccountId && !!ownerAccountId && acctOf(claimedAccountId) === acctOf(ownerAccountId);
+      const billedToSender = !!ownerAccountId && !_senderSigns;
       const meterAccountId = billedToSender ? ownerAccountId : accountId;
       const _signerPlan = (accounts.get(meterAccountId) && accounts.get(meterAccountId).plan)
         || (apiKeys.get(meterAccountId) && apiKeys.get(meterAccountId).plan) || 'community';
@@ -10898,7 +11536,18 @@ async function handleRelayRequest(req, res) {
       // entitlementRecordOf merges the accounts summary with the per-product
       // plans on the account's keys; reading `accounts` alone hid paid upgrades.
       const _signEnt = parasignEntitlementOf(meterAccountId, { plan: _signerPlan });
-      const _signIncluded = _signEnt.quotas.signs_month;
+      let _signIncluded = _signEnt.quotas.signs_month;
+      // The sender's plan lapsed while this request was open: his signers are
+      // held to the tier he had when he sent it, which the create route checked
+      // had room for every party. Never lower than what he has now.
+      if (billedToSender) {
+        let _tierAtCreate = '';
+        try { _tierAtCreate = await store.senderTier(id); } catch { _tierAtCreate = ''; }
+        if (_tierAtCreate) {
+          const _thenLimit = entitlements.signsQuota({ plan_parasign: _tierAtCreate });
+          if (Number.isFinite(_signIncluded) && (!Number.isFinite(_thenLimit) || _thenLimit > _signIncluded)) _signIncluded = _thenLimit;
+        }
+      }
       let _signUsed = null;      // count this month, feeds the 200 quota field
       let _signReserved = false; // this request took a slot and owes a release if the signature does not land
       // No `accountId &&` here on purpose: the account is resolved above and an
@@ -10920,8 +11569,16 @@ async function handleRelayRequest(req, res) {
       // Lua enforces the same comparison, and quota-gate.test.js holds the two to
       // each other at the boundary so the /v1 create gate cannot drift from this
       // one.
+      // One hold per party slot, so a retry after a failed store write is not
+      // charged a second time (quota.GATE_SIGN_LUA).
+      const _holdKey = `paramant:quota:signhold:${id}:${pi}`;
       if (Number.isFinite(_signIncluded)) {
-        const _g = await quota.gateSign(redisClient, meterAccountId, _signIncluded, log);
+        const _g = await quota.gateSign(redisClient, meterAccountId, _signIncluded, log, { holdKey: _holdKey });
+        if (_g.unavailable) {
+          res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '30' });
+          return res.end(J({ error: 'sign_quota_unavailable', message: 'Signatures cannot be counted right now. Nothing was signed; try again in a minute.',
+            message_nl: 'Handtekeningen kunnen nu niet geteld worden. Er is niets ondertekend; probeer het over een minuut opnieuw.' }));
+        }
         if (!_g.allowed) {
           log('info', 'quota_sign_declined', { account: String(meterAccountId).slice(0, 12), plan: _signEnt.tier, reason: 'quota', limit: _signIncluded, used: _g.used, billed_to: billedToSender ? 'sender' : 'signer' });
           res.writeHead(402, { 'Content-Type': 'application/json' });
@@ -10946,17 +11603,26 @@ async function handleRelayRequest(req, res) {
         if (Number.isFinite(_g.used)) _signUsed = _g.used;
       }
 
-      const out = await store.sign(id, pi, signerPub, sig, {
-        internalTrusted,
-        verifiedEmailHash,
-        inviteToken,
-        appearance: d.appearance,
-        ink: d.ink,
-      });
+      let out;
+      try {
+        out = await store.sign(id, pi, signerPub, sig, {
+          internalTrusted,
+          verifiedEmailHash,
+          inviteToken,
+          appearance: d.appearance,
+          ink: d.ink,
+        });
+      } catch (se) {
+        // The store write failed (a redis outage mid-request). Give the unit
+        // back if redis lets us; if it does not, the hold on this slot makes
+        // the retry free instead of a second charge.
+        if (_signReserved) await quota.releaseSign(redisClient, meterAccountId, log, { holdKey: _holdKey });
+        throw se;
+      }
       if (!out.ok) {
         // The slot was taken before the store had its say. The signature did not
         // land, so the month does not owe it.
-        if (_signReserved) await quota.releaseSign(redisClient, meterAccountId, log);
+        if (_signReserved) await quota.releaseSign(redisClient, meterAccountId, log, { holdKey: _holdKey });
         const code = out.code === 'not_found' ? 404
           : (out.code === 'bad_signature' || out.code === 'invalid_appearance' || out.code === 'invalid_ink') ? 400
           : (out.code === 'closed' || out.code === 'voided' || out.code === 'invite_expired') ? 410
@@ -11209,8 +11875,33 @@ let LICENSE_MAX_KEYS = COMMUNITY_KEY_LIMIT; // effective limit — updated by ch
 const ACCOUNT_KEY_LIMIT = Object.freeze({
   community: Math.min(5, Math.max(3, parseInt(process.env.ACCOUNT_KEY_LIMIT_COMMUNITY || '5', 10) || 5)),
   pro: Math.max(10, parseInt(process.env.ACCOUNT_KEY_LIMIT_PRO || '100', 10) || 100),
+  // Business had no row and fell through to community's five.
+  business: Math.max(10, parseInt(process.env.ACCOUNT_KEY_LIMIT_PRO || '100', 10) || 100),
   enterprise: Math.max(10, parseInt(process.env.ACCOUNT_KEY_LIMIT_ENTERPRISE || '1000', 10) || 1000),
 });
+
+// The plan the key cap follows: the HIGHEST of the legacy unified plan and the
+// account's paid ParaSign/ParaSend tiers. A purchase moves only the product
+// tiers (setProductPlan never touches `plan`), so a paying Firm account stayed
+// "community" here and was refused its fifth key (API-10-A).
+const _CAP_RANK = ['community', 'pro', 'business', 'enterprise'];
+function accountCapPlan(accountId, legacyPlan) {
+  const cands = [tiers.normalisePlan(legacyPlan || 'community')];
+  try {
+    const rec = accountId ? entitlementRecordOf(accountId) : null;
+    if (rec) {
+      for (const product of entitlements.PRODUCTS) {
+        const t = entitlements.effectiveProductTier(rec, product).tier;
+        cands.push(tiers.normalisePlan(t === 'free' ? 'community' : t));
+      }
+    }
+  } catch { /* the legacy plan alone */ }
+  return cands.reduce((a, b) => (_CAP_RANK.indexOf(b) > _CAP_RANK.indexOf(a) ? b : a), 'community');
+}
+function accountKeyCap(accountId, legacyPlan) {
+  const p = accountCapPlan(accountId, legacyPlan);
+  return { plan: p, cap: ACCOUNT_KEY_LIMIT[p] ?? ACCOUNT_KEY_LIMIT.community };
+}
 let LICENSE_PAYLOAD  = null;                // { max_keys, expires_at, issued_to, issued_at }
 
 // ── Ed25519 base64url decoder ─────────────────────────────────────────────────
@@ -11316,6 +12007,7 @@ function applyKeyLimitEnforcement() {
   // on upgrade, mirroring the prior community-edition behaviour.
   const over = keysTable.computeOverLimit(apiKeys, accounts, accountKeys, {
     capForPlan: (p) => ACCOUNT_KEY_LIMIT[tiers.normalisePlan(p)] ?? ACCOUNT_KEY_LIMIT.community,
+    capForAccount: (accountId, p) => accountKeyCap(accountId, p).cap,
     licenseMaxKeys: LICENSE_MAX_KEYS,
     edition: EDITION,
   });
@@ -11385,7 +12077,18 @@ async function registerSelf() {
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────
+// Without RELAY_SELF_URL every signed tree head and receipt names
+// <sector>.paramant.app as relay_id, so a self-host's proofs claim a Paramant
+// host. Said at boot rather than discovered in a proof (SELF-19-C).
+if (!RELAY_SELF_URL) {
+  log('warn', 'relay_self_url_unset', {
+    relay_id: SECTOR + '.paramant.app',
+    hint: 'Set RELAY_SELF_URL (RELAY_SELF_URL_<SECTOR> in docker-compose.yml) to this relay\'s own public URL; '
+        + 'until then signed heads and receipts name a paramant.app host.',
+  });
+}
 loadUsers();
+_initSetupToken();
 loadTrialKeys();
 checkLicense();
 loadOrCreateRelayIdentity();
@@ -11394,9 +12097,10 @@ loadPeerSths();
 // Generate a startup STH if the CT log has entries but no STH was persisted.
 // Covers the case where the STH file was missing or the relay restarted after
 // new CT entries were written without a corresponding STH flush.
-if (ctWindow.windowLength > 0 && sthLog.length === 0) {
-  const last = ctWindow.last();
-  produceSth(ctWindow.windowLength, last.tree_hash);
+// tree_size is the full tree, never the window length: that confusion is what
+// froze the head at 10 001 entries.
+if (ctTree.size > 0 && sthLog.length === 0) {
+  produceSth(ctTree.size, ctTree.root());
 }
 // Periodic STH gossip — re-broadcast latest STH every 10 min to catch newly registered peers
 setInterval(() => {
@@ -11631,7 +12335,7 @@ async function _flushAppendLogsOnExit() {
   _shuttingDown = true;                 // the drains stop; this is now the only writer
   _flushCtOnExit();                     // queue -> stream
   _flushSthOnExit();
-  const streams = [_ctStream, _sthStream, ..._peerSthStreams.values()].filter(Boolean);
+  const streams = [_ctStream, _ctLeafStream, _sthStream, ..._peerSthStreams.values()].filter(Boolean);
   if (streams.length === 0) return;
   let timer = null;
   const guard = new Promise((resolve) => {
@@ -11669,9 +12373,27 @@ async function emergencyZeroAndExit(reason, code = 0) {
 // Graceful shutdown on SIGTERM (systemctl stop) and SIGINT (Ctrl+C). A second
 // signal arriving while the first is still flushing means the caller wants out
 // now, so it exits without waiting rather than starting the flush over.
+// SIGTERM DRAINS FIRST (sweep-chaos 9). A restart used to exit at once: a
+// signature being submitted at that moment got 502 after its one-time
+// activation was already spent, and the retry said "already used". Now new
+// requests get 503 Retry-After and the ones in flight get up to
+// SHUTDOWN_DRAIN_MS (default 5 s) to finish; then the blobs are zeroed and the
+// process exits as before. A second signal exits at once.
+const SHUTDOWN_DRAIN_MS = Math.max(0, Math.min(parseInt(process.env.SHUTDOWN_DRAIN_MS || '5000', 10) || 0, 30000));
 function _onExitSignal(reason) {
-  if (_shuttingDown) { process.exit(0); return; }
-  emergencyZeroAndExit(reason);
+  if (_shuttingDown || _draining) { process.exit(0); return; }
+  if (!SHUTDOWN_DRAIN_MS || _inFlightRequests <= 0) { emergencyZeroAndExit(reason); return; }
+  _draining = true;
+  log('info', 'shutdown_draining', { in_flight: _inFlightRequests, max_ms: SHUTDOWN_DRAIN_MS });
+  try { server.close(); } catch {}
+  const until = Date.now() + SHUTDOWN_DRAIN_MS;
+  const tick = setInterval(() => {
+    if (_inFlightRequests <= 0 || Date.now() > until) {
+      clearInterval(tick);
+      if (_inFlightRequests > 0) log('warn', 'shutdown_drain_timeout', { in_flight: _inFlightRequests });
+      emergencyZeroAndExit(reason);
+    }
+  }, 25);
 }
 process.on('SIGTERM', () => _onExitSignal('SIGTERM'));
 process.on('SIGINT',  () => _onExitSignal('SIGINT'));

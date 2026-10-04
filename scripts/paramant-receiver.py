@@ -4,7 +4,7 @@ PARAMANT Receiver v6.0
 Gebruik: paramant-receiver --key pgp_xxx --relay health --hash <hash> --output /tmp/
          paramant-receiver --key pgp_xxx --relay health --listen --output /tmp/
 """
-import argparse, ctypes, os, sys, json, time, hashlib, struct
+import argparse, base64, ctypes, os, sys, json, time, hashlib, struct
 import urllib.request, urllib.error
 
 VERSION = "6.0.0"
@@ -69,6 +69,18 @@ def _is_v2_browser_packet(blob: bytes) -> bool:
     # Sanity: ML-KEM-768 ciphertext is 1088 bytes
     return ct_kyber_len == 1088
 
+# The key is the 32-byte TRANSFER SECRET the sender printed (--secret or
+# PARAMANT_TRANSFER_SECRET), never the API key: the relay knows the API key.
+def transfer_secret(arg_value):
+    raw = arg_value or os.environ.get("PARAMANT_TRANSFER_SECRET", "")
+    try:
+        sec = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)) if raw else b""
+    except Exception:
+        sec = b""
+    return sec if len(sec) == 32 else None
+
+SECRET = None
+
 def decrypt(blob, key):
     aes_key = None
     # Detect browser v2 format — incompatible with CLI symmetric protocol
@@ -86,12 +98,13 @@ def decrypt(blob, key):
         from cryptography.hazmat.primitives import hashes
         salt, nonce, ct = blob[:32], blob[32:44], blob[44:]
         hkdf    = HKDF(algorithm=hashes.SHA256(), length=32, salt=salt, info=b"paramant-v6")
-        aes_key = hkdf.derive(key.encode())
+        aes_key = hkdf.derive(key)
         return AESGCM(aes_key).decrypt(nonce, ct, None)
     except ImportError:
-        return blob
+        raise RuntimeError("cryptography is niet geinstalleerd (pip install cryptography)")
     except Exception as e:
-        log(f"{Y}Decrypt mislukt: {e} — raw data{E}"); return blob
+        # No silent fallback to the raw bytes: a wrong secret is an error.
+        raise RuntimeError(f"Ontsleutelen mislukt (verkeerd transfergeheim?): {e}")
     finally:
         if aes_key: _zero(aes_key)
 
@@ -141,7 +154,7 @@ def receive_one(relay_url, key, h, output, no_decrypt):
     log(f"Ophalen: {h[:16]}...")
     blob = fetch_blob(relay_url, key, h)
     log(f"{G}Ontvangen ({len(blob):,} bytes){E}")
-    data = blob if no_decrypt else unpad(decrypt(blob, key))
+    data = blob if no_decrypt else unpad(decrypt(blob, SECRET))
     path = save(data, output, h)
     send_ack(relay_url, key, h)
     log(f"{G}Opgeslagen: {path}{E}")
@@ -214,10 +227,17 @@ def main():
     p.add_argument("--output",     default="./received")
     p.add_argument("--interval",   type=int, default=5)
     p.add_argument("--no-decrypt", action="store_true")
+    p.add_argument("--secret",     metavar="BASE64URL",
+                   help="the sender's transfer secret (or PARAMANT_TRANSFER_SECRET)")
     p.add_argument("--version",    action="version", version=f"%(prog)s {VERSION}")
     args = p.parse_args()
 
     relay_url = RELAYS[args.relay]
+    global SECRET
+    SECRET = transfer_secret(args.secret)
+    if not args.no_decrypt and not args.pickup and SECRET is None:
+        log(f"{R}Geef het transfergeheim van de afzender mee: --secret of PARAMANT_TRANSFER_SECRET (32 bytes base64url).{E}")
+        sys.exit(1)
     log(f"{B}PARAMANT Receiver v{VERSION}{E}")
     log(f"Relay: {relay_url}")
 

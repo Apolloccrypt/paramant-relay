@@ -2888,10 +2888,14 @@ test('the ParaSend credential /privacy describes is the credential the code impl
   const countRules = (from, to) => (scope.slice(scope.indexOf(from), scope.indexOf(to))
     .match(/\{ method:/g) || []).length;
   const rules = countRules('const SCOPE = [', 'const APP_SCOPE = [');
-  assert.equal(rules, 7,
-    `the relay's ParaSend allowlist now has ${rules} entries; /privacy says seven, so change the page with the code`);
-  assert.ok(priv.includes('the relay accepts it on the seven requests a transfer makes and refuses it on everything else'),
+  // Nine since 2026-10-04: announcing the blocks of a live hand-over and saying
+  // no after the fingerprint check (SENDNAME-28/29) joined the seven.
+  assert.equal(rules, 9,
+    `the relay's ParaSend allowlist now has ${rules} entries; /privacy says nine, so change the page with the code`);
+  assert.ok(priv.includes('the relay accepts it on the nine requests a transfer makes and refuses it on everything else'),
     'privacy: the storage section must state what the token can and cannot do');
+  assert.ok(privNl.includes('de relay accepteert het bij de negen verzoeken die een overdracht doet'),
+    'privacy (NL): the storage section must state the same count');
   const appRules = countRules('const APP_SCOPE = [', 'const PURPOSE_PARASEND');
   assert.equal(appRules, 5,
     `the relay's app allowlist now has ${appRules} entries; /privacy says five, so change the page with the code`);

@@ -143,7 +143,9 @@ test('storage: green, and it probes the directory USERS_FILE names', async () =>
     `disk must measure the data dir, got: ${disk.detail}`);
 
   // Nothing is left behind: the probe writes and unlinks.
-  assert.deepStrictEqual(fs.readdirSync(dataDir), [],
+  // setup-token and users.json are the relay's own files on a fresh data dir
+  // (first-run token, created users file), not probe leftovers.
+  assert.deepStrictEqual(fs.readdirSync(dataDir).filter((f) => f !== 'setup-token' && f !== 'users.json'), [],
     'the write probe must clean up after itself');
 });
 

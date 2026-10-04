@@ -32,6 +32,12 @@ const NOT_READ_BY_NODE = {
   HTTPS_PORT: 'read by deploy/preflight.sh and deploy/post-install.sh, both shell',
   ADMIN_TOTP_SECRET: 'passed to the relays by docker-compose.yml, read by nothing (see the note in the file)',
   PARAMANT_VERSION: 'which git tag the three self-host installers clone; all shell',
+  REDIS_PASSWORD: 'the redis --requirepass in docker-compose.yml; the relays get it inside RELAY_REDIS_URL',
+  RELAY_SELF_URL_MAIN: 'docker-compose.yml maps it to RELAY_SELF_URL of relay-main',
+  RELAY_SELF_URL_HEALTH: 'docker-compose.yml maps it to RELAY_SELF_URL of relay-health',
+  RELAY_SELF_URL_FINANCE: 'docker-compose.yml maps it to RELAY_SELF_URL of relay-finance',
+  RELAY_SELF_URL_LEGAL: 'docker-compose.yml maps it to RELAY_SELF_URL of relay-legal',
+  RELAY_SELF_URL_IOT: 'docker-compose.yml maps it to RELAY_SELF_URL of relay-iot',
 };
 
 // ── what the code reads ──────────────────────────────────────────────────────

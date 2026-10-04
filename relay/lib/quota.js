@@ -153,14 +153,26 @@ function signGateDecision(used, ent) {
 // KEYS[1] the monthly counter.
 // ARGV[1] the cap, ARGV[2] the counter TTL in seconds.
 // Returns { status, used } with status one of: ok | over
+//
+// KEYS[2] (optional, ARGV[3] = '1'): a HOLD for this one signature slot (one
+// party of one envelope). Set together with the count, in the same script.
+// A retry for a slot that already holds a unit is not counted again: the
+// sweep-chaos repro cut redis right after the count, the store write failed,
+// the 503 released nothing (the release could not reach redis either), and
+// the retry counted a second unit for one signature. ARGV[4] the hold TTL.
+// Returns { status, used } with status one of: ok | over | held
 const GATE_SIGN_LUA = `
 local limit = tonumber(ARGV[1])
 local cur = tonumber(redis.call('GET', KEYS[1]) or '0')
+local hasHold = ARGV[3] == '1'
+if hasHold and redis.call('EXISTS', KEYS[2]) == 1 then return {'held', tostring(cur)} end
 if cur >= limit then return {'over', tostring(cur)} end
 local n = redis.call('INCR', KEYS[1])
 if redis.call('TTL', KEYS[1]) < 0 then redis.call('EXPIRE', KEYS[1], ARGV[2]) end
+if hasHold then redis.call('SET', KEYS[2], '1', 'EX', ARGV[4]) end
 return {'ok', tostring(n)}
 `;
+const HOLD_TTL_SECONDS = 40 * 86400; // longer than any envelope stays signable
 
 // KEYS[1] the monthly counter, KEYS[2] the dedup `seen` key. When there is no
 // chunk hash the caller passes KEYS[1] again and sets ARGV[4] to '0'; nothing in
@@ -187,7 +199,9 @@ return {'ok', tostring(n)}
 // for did not happen, so the tally counts what was actually delivered. Never
 // goes below zero: a release without a matching reservation must not hand out a
 // free unit to the next caller.
+// KEYS[2] (optional, ARGV[1] = '1'): the hold that went with the unit.
 const RELEASE_LUA = `
+if ARGV[1] == '1' then redis.call('DEL', KEYS[2]) end
 local cur = tonumber(redis.call('GET', KEYS[1]) or '0')
 if cur <= 0 then return '0' end
 return tostring(redis.call('DECR', KEYS[1]))
@@ -221,21 +235,34 @@ async function gateTransfer(redisClient, accountId, chunkHash, limit, log) {
   }
 }
 
-async function gateSign(redisClient, accountId, limit, log) {
-  if (!accountId || !redisClient || !redisClient.isReady || !Number.isFinite(limit)) {
+// FAIL CLOSED for a capped plan. This used to answer allowed:true whenever
+// redis was not ready or the script threw, so during an outage (or the boot
+// window before the client connects) every signature went through uncounted
+// and a free account could sign without limit. A signature is a sold unit;
+// when it cannot be counted it is refused with `unavailable`, and the route
+// answers 503 with Retry-After. An unlimited plan (no finite cap) has nothing
+// to enforce and still passes.
+// opts.holdKey: see GATE_SIGN_LUA.
+async function gateSign(redisClient, accountId, limit, log, opts) {
+  if (!accountId || !Number.isFinite(limit)) {
     const r = await recordSign(redisClient, accountId, log);
     return { allowed: true, counted: r.counted, used: r.used, over_limit: false, error: r.error };
   }
+  if (!redisClient || !redisClient.isReady) {
+    return { allowed: false, unavailable: true, counted: false, used: null, over_limit: false, error: 'redis_not_ready' };
+  }
+  const hold = opts && opts.holdKey ? String(opts.holdKey) : null;
   try {
     const r = _gateResult(await redisClient.eval(GATE_SIGN_LUA, {
-      keys: [signsKey(accountId)],
-      arguments: [String(limit), String(MONTH_TTL_SECONDS)],
+      keys: [signsKey(accountId), hold || signsKey(accountId)],
+      arguments: [String(limit), String(MONTH_TTL_SECONDS), hold ? '1' : '0', String(HOLD_TTL_SECONDS)],
     }));
     if (r.status === 'over') return { allowed: false, counted: false, used: r.used, over_limit: true, error: null };
+    if (r.status === 'held') return { allowed: true, counted: false, held: true, used: r.used, over_limit: false, error: null };
     return { allowed: true, counted: true, used: r.used, over_limit: false, error: null };
   } catch (e) {
     if (log) log('warn', 'quota_gate_sign_failed', { account: String(accountId).slice(0, 12), err: e.message });
-    return { allowed: true, counted: false, used: null, over_limit: false, error: e.message }; // fail open
+    return { allowed: false, unavailable: true, counted: false, used: null, over_limit: false, error: e.message };
   }
 }
 
@@ -245,10 +272,11 @@ async function gateSign(redisClient, accountId, limit, log) {
 // would be charged for, so the sign route releases it. This is the same
 // reservation shape lib/coupon.js uses for a seat: claim, and release when the
 // grant that followed the claim did not happen.
-async function releaseSign(redisClient, accountId, log) {
+async function releaseSign(redisClient, accountId, log, opts) {
   if (!accountId || !redisClient || !redisClient.isReady) return { released: false, used: null };
+  const hold = opts && opts.holdKey ? String(opts.holdKey) : null;
   try {
-    const used = parseInt(String(await redisClient.eval(RELEASE_LUA, { keys: [signsKey(accountId)], arguments: [] })), 10);
+    const used = parseInt(String(await redisClient.eval(RELEASE_LUA, { keys: [signsKey(accountId), hold || signsKey(accountId)], arguments: [hold ? '1' : '0'] })), 10);
     return { released: true, used: Number.isFinite(used) ? used : null };
   } catch (e) {
     // A release that fails leaves the account one unit poorer for the month.
