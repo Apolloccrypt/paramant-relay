@@ -411,3 +411,18 @@ add it under `handmatig` in the right category with `reden`, `datum` and
 
 A new outside source also goes into `deploy/partners.json` as a party with
 role `blocklist-bron` (section 7); the test checks that.
+
+## 9. Relay identity key rotation
+
+Every relay signs receipts and multi-party proofs with its own ML-DSA-65 identity key (`RELAY_IDENTITY_FILE` on its own volume). `/verify` checks those signatures offline against the keys pinned in `frontend/js/relay-trust-anchors.js`. A relay that signs with a key that is not pinned makes every new proof it counter-signs show red. A proof signed before a rotation must keep verifying for years.
+
+The rule: the old key goes to `RETIRED_RELAY_ANCHORS` BEFORE the relay starts signing with the new one. Never delete a pin.
+
+1. Read the current key of the relay, over TLS: `curl -s https://<host>/v2/pubkey`. It must equal the pin for that host. If it does not, stop: the relay already rotated (or lost its volume), go to step 5.
+2. In one commit on a branch:
+   - move the entry for that host from `RELAY_TRUST_ANCHORS` to `RETIRED_RELAY_ANCHORS`, unchanged, plus `retired_at: 'JJJJ-MM-DD'`;
+   - leave the new pin out for now: the new key does not exist yet.
+3. Deploy that commit (frontend only). Old proofs keep verifying through the retired entry.
+4. Rotate: stop the relay, move its identity file aside (keep it, offline, with the escrow), start it. It generates a new key. Read it with `curl -s https://<host>/v2/pubkey`, add it to `RELAY_TRUST_ANCHORS` with `fingerprint` = SHA3-256 of the decoded key (`node -e "console.log(require('crypto').createHash('sha3-256').update(Buffer.from(process.argv[1],'base64')).digest('hex'))" <key>`), and deploy. Between step 4 and this deploy, new proofs from that relay show "signed by a key this page does not recognise": keep that window short.
+5. Unplanned rotation (volume lost): there is no old key to retire if it was never pinned; if it was pinned, step 2 still applies (the pin is the old key). Then pin the new key as in step 4.
+6. Check: `node deploy/check-relay-anchors.mjs` must end with "every relay serves its pinned key". `deploy/deploy-3.1.sh` runs the same check in phase 6 (step 6k), also under `--verify-only`, and stops the deploy when a relay serves a key that is not the current pin. CI runs `tests/relay-anchors-check.test.mjs`, which holds the pin file consistent (every fingerprint is the SHA3-256 of its own key, a retired entry has `retired_at` and is not also pinned) but cannot reach the relays.
