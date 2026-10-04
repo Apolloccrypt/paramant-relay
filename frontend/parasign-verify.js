@@ -53,7 +53,7 @@ const T = {
     expired: 'envelop verlopen op {v}',
     missingEnvId: 'envelope_id ontbreekt',
     missingDocHash: 'document_hash ontbreekt',
-    hashMismatchMulti: 'Dit is niet het document dat is ondertekend. De handtekeningen gelden voor het originele bestand, met SHA3-256-vingerafdruk {hash}…. De pdf met de zichtbare handtekeningen en parafen (onder elke handtekening de regel "Paramant ParaSign · PQ …") is een leesbare kopie en geeft altijd deze melding. Kies het originele bestand dat ter ondertekening is aangeboden.',
+    hashMismatchMulti: 'Dit is niet het document dat is ondertekend. De handtekeningen gelden voor het originele bestand, met SHA3-256-vingerafdruk {hash}…. De pdf met de zichtbare handtekeningen en parafen (onder elke handtekening de regel "Paramant ParaSign · PQ …") is ook niet het origineel. Kies het originele bestand dat ter ondertekening is aangeboden.',
     missingParties: 'partijen ontbreken',
     stampedCopy: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>Dit is niet het ondertekende bestand. Is het de pdf met de zichtbare handtekeningen? Controleer dan met het origineel.</strong> De handtekeningen in het .psign-bestand kloppen, maar ze gelden voor het originele document (SHA3-256-vingerafdruk {hash}…). De pdf met de handtekeningen en parafen erin, met onder elke handtekening de regel "Paramant ParaSign · PQ …", is daar een leesbare kopie van en geeft altijd deze melding. Kies het originele bestand; u kunt het downloaden op de pagina waar u tekende.</div>',
     soloChecked: '<div class="ps-banner info"><span class="ps-mark" aria-hidden="true">\u2713</span><strong>De handtekening klopt met dit document.</strong> Wie tekende, staat niet in de handtekening: de naam hieronder is niet gecontroleerd.</div>',
@@ -128,7 +128,7 @@ const T = {
     expired: 'envelope expired at {v}',
     missingEnvId: 'missing envelope_id',
     missingDocHash: 'missing document_hash',
-    hashMismatchMulti: 'This is not the document that was signed. The signatures cover the original file, with SHA3-256 fingerprint {hash}…. The PDF with the visible signatures and initials (the line "Paramant ParaSign · PQ …" under each signature) is a reading copy and always gives this message. Choose the original file that was put up for signing.',
+    hashMismatchMulti: 'This is not the document that was signed. The signatures cover the original file, with SHA3-256 fingerprint {hash}…. The PDF with the visible signatures and initials (the line "Paramant ParaSign · PQ …" under each signature) is not the original either. Choose the original file that was put up for signing.',
     missingParties: 'missing parties',
     stampedCopy: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>This is not the signed file. Is it the PDF with the visible signatures? Then check with the original.</strong> The signatures in the .psign file are correct, but they cover the original document (SHA3-256 fingerprint {hash}…). The PDF with the signatures and initials in it, with the line "Paramant ParaSign · PQ …" under each signature, is a reading copy of it and always gives this message. Choose the original file; you can download it on the page where you signed.</div>',
     soloChecked: '<div class="ps-banner info"><span class="ps-mark" aria-hidden="true">\u2713</span><strong>The signature matches this document.</strong> Who signed is not part of the signature: the name below has not been checked.</div>',
@@ -494,7 +494,13 @@ function verifyMultiClient(docHashHex) {
   const test = env.mode === 'test' || env.sandbox === true;
   // Every signature holds and only the file differs: the reader most likely
   // chose the stamped copy. That is not "INVALID" (retest A8/T5-7).
-  const copyOnly = docMismatch && errors.length === 1;
+  // Orange only when the file PROVES it is Paramant's reading copy of this
+  // very envelope and original: the marker co-sign.js writes into the stamped
+  // pdf. Any other wrong file (one byte changed, another envelope) is INVALID
+  // (hertest r2 R1).
+  const stamp = stampedMarker;
+  const provenCopy = !!(stamp && stamp.env === String(env.envelope_id || '') && stamp.doc === String(env.document_hash || ''));
+  const copyOnly = docMismatch && errors.length === 1 && provenCopy;
   return { valid: errors.length === 0, errors, anchor, test, copyOnly, docHash: env.document_hash };
 }
 
@@ -528,8 +534,18 @@ async function verify() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ document_hash: toHex(docHash), envelope }),
     });
+    // 422 is the relay's verdict "not valid" with the reasons (relay.js
+    // /v2/verify), not a fault on our side (hertest r2 R2).
+    if (res.status === 422) {
+      let body = null;
+      try { body = await res.json(); } catch { body = null; }
+      if (body && body.valid === false) {
+        await renderResult({ valid: false, errors: relayErrors(body.errors), note: null });
+        return;
+      }
+    }
     if (!res.ok && res.status !== 200) {
-      const t = await res.text();
+      const t = await res.text().catch(() => '');
       try { console.error('[paramant] /v2/verify', res.status, t.slice(0, 200)); } catch { /* no console */ }
       $('vf-result').innerHTML = '<div class="ps-banner err">' + esc(res.status === 429
           ? (LANG === 'nl' ? 'Even te veel controles tegelijk. Probeer het over een minuut opnieuw.' : 'Too many checks at once. Try again in a minute.')
@@ -542,6 +558,22 @@ async function verify() {
   } finally { $('vf-verify').disabled = false; }
 }
 
+// The relay's reasons for a 422, in the reader's words where we know them.
+function relayErrors(list) {
+  const out = [];
+  for (const raw of Array.isArray(list) ? list : []) {
+    const e = String(raw || '');
+    if (/document_hash mismatch/i.test(e)) out.push(LANG === 'nl'
+      ? 'Dit document is niet het document dat is ondertekend: de vingerafdruk klopt niet. Kies het originele bestand.'
+      : 'This document is not the one that was signed: the fingerprint does not match. Choose the original file.');
+    else if (/signature/i.test(e)) out.push(LANG === 'nl'
+      ? 'Een handtekening in het bewijs klopt niet.' : 'A signature in the proof does not hold.');
+    else out.push(e.slice(0, 200));
+  }
+  if (!out.length) out.push(LANG === 'nl' ? 'Het bewijs klopt niet met dit document.' : 'The proof does not match this document.');
+  return out;
+}
+
 // SHA3-256 of a File, read in 8 MB slices and hashed 1 MB at a time, with the
 // event loop free between pieces: the page keeps answering and shows progress,
 // and a file larger than one ArrayBuffer can hold is still hashed. Same digest
@@ -549,12 +581,51 @@ async function verify() {
 const SLICE = 8 * 1024 * 1024;
 const PIECE = 1024 * 1024;
 const breathe = () => new Promise((r) => setTimeout(r, 0));
+// The stamped-copy marker co-sign.js writes: /ParamantStampedCopy (env=..;doc=..)
+// It is looked for while hashing, so the file is read once.
+const MARKER = new TextEncoder().encode('/ParamantStampedCopy (');
+let stampedMarker = null;
+function parseMarker(bytes) {
+  // bytes start right after the marker; read up to ')' (max 200 bytes, ASCII).
+  let s = '';
+  for (let i = 0; i < bytes.length && i < 200; i++) {
+    const c = bytes[i];
+    if (c === 0x29) {
+      const m = /^env=([A-Za-z0-9_-]{1,64});doc=([0-9a-f]{64})$/.exec(s);
+      return m ? { env: m[1], doc: m[2] } : null;
+    }
+    if (c < 0x20 || c > 0x7e) return null;
+    s += String.fromCharCode(c);
+  }
+  return null;
+}
+function scanMarker(buf) {
+  const first = MARKER[0];
+  for (let i = buf.indexOf(first); i !== -1 && i <= buf.length - MARKER.length; i = buf.indexOf(first, i + 1)) {
+    let ok = true;
+    for (let k = 1; k < MARKER.length; k++) if (buf[i + k] !== MARKER[k]) { ok = false; break; }
+    if (ok) {
+      const found = parseMarker(buf.subarray(i + MARKER.length, i + MARKER.length + 200));
+      if (found) return found;
+    }
+  }
+  return null;
+}
 async function hashFileInSlices(file, onProgress) {
   const h = sha3_256.create();
   const total = file.size || 0;
   let lastPct = -1;
+  stampedMarker = null;
+  let tail = new Uint8Array(0);
   for (let off = 0; off < total; off += SLICE) {
     const buf = new Uint8Array(await file.slice(off, Math.min(total, off + SLICE)).arrayBuffer());
+    if (isMulti && !stampedMarker) {
+      // Look across the slice boundary too: keep the last 256 bytes.
+      const joined = new Uint8Array(tail.length + buf.length);
+      joined.set(tail, 0); joined.set(buf, tail.length);
+      stampedMarker = scanMarker(joined);
+      tail = buf.subarray(Math.max(0, buf.length - 256)).slice();
+    }
     for (let i = 0; i < buf.length; i += PIECE) {
       h.update(buf.subarray(i, Math.min(buf.length, i + PIECE)));
       if (total > PIECE) {

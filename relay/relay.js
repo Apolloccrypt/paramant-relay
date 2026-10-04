@@ -7446,8 +7446,11 @@ async function handleRelayRequest(req, res) {
       res.writeHead(result.valid ? 200 : 422, { 'Content-Type': 'application/json' });
       return res.end(J(out));
     } catch (e) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: e.message }));
+      // Fixed codes only: never internal error text (review r2 (e)).
+      const tooLarge = e && e.message === 'Too large';
+      const code = tooLarge ? 'too_large' : (e instanceof SyntaxError ? 'invalid_json' : 'invalid_envelope');
+      res.writeHead(tooLarge ? 413 : 400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: code }));
     }
   }
 

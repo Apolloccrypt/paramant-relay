@@ -114,8 +114,21 @@ for (const run of runs) {
   outcomes.push({ run, kind:'pinned', ...(await runOnce({ ...run, receipt:fixture.receipt, trustRelay:true })) });
   outcomes.push({ run, kind:'forged', ...(await runOnce({ ...run, receipt:fixture.receipt, trustRelay:false })) });
   outcomes.push({ run, kind:'sandbox', ...(await runOnce({ ...run, receipt:fixture.sandboxReceipt, trustRelay:true })) });
-  const stamped = [...fixture.source, ...Buffer.from('\n%stamped copy')];
+  // The reading copy co-sign.js writes carries a marker with THIS envelope
+  // and THIS original. Only that file gets the orange "check with the
+  // original"; any other wrong file is INVALID (hertest r2 R1: M7/M8 were orange).
+  const docHash = fixture.receipt.document_hash;
+  const mark = (env, doc) => Buffer.from('\n%stamped copy\n<< /ParamantStampedCopy (env=' + env + ';doc=' + doc + ') >>\n');
+  const stamped = [...fixture.source, ...mark(fixture.receipt.envelope_id, docHash)];
   outcomes.push({ run, kind:'stamped', ...(await runOnce({ ...run, receipt:fixture.receipt, doc:stamped, trustRelay:true })) });
+  const oneByte = fixture.source.slice(); oneByte[3] ^= 1;
+  outcomes.push({ run, kind:'wrongdoc', ...(await runOnce({ ...run, receipt:fixture.receipt, doc:oneByte, trustRelay:true })) });
+  const otherEnv = [...fixture.source, ...mark('env_some_other_envelope', docHash)];
+  outcomes.push({ run, kind:'wrongdoc', ...(await runOnce({ ...run, receipt:fixture.receipt, doc:otherEnv, trustRelay:true })) });
+  const otherDoc = [...fixture.source, ...mark(fixture.receipt.envelope_id, 'ab'.repeat(32))];
+  outcomes.push({ run, kind:'wrongdoc', ...(await runOnce({ ...run, receipt:fixture.receipt, doc:otherDoc, trustRelay:true })) });
+  const unmarked = [...fixture.source, ...Buffer.from('\n%stamped copy without the marker')];
+  outcomes.push({ run, kind:'wrongdoc', ...(await runOnce({ ...run, receipt:fixture.receipt, doc:unmarked, trustRelay:true })) });
 }
 
 await browser.close();
@@ -142,6 +155,10 @@ for (const o of outcomes) {
   if (kind === 'sandbox') {
     if (!run.test.test(result)) throw new Error(where + 'sandbox receipt not marked as a test: ' + result);
     if (run.valid.test(result)) throw new Error(where + 'sandbox receipt shown as a real valid signature: ' + result);
+  }
+  if (kind === 'wrongdoc') {
+    if (!run.invalid.test(result) || run.stampedHead.test(result)) throw new Error(where + 'a wrong document must be INVALID, not "the stamped copy": ' + result);
+    if (!/\berr\b/.test(banner) || mark !== '✕') throw new Error(where + 'wrong document lacks the red cross: ' + banner + ' ' + mark);
   }
   if (kind === 'stamped') {
     // Every signature holds and only the file differs: an orange "check with

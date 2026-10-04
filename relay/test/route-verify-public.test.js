@@ -49,3 +49,15 @@ test('other keyless POSTs stay closed', async () => {
   assert.strictEqual(r.status, 401);
   checks++;
 });
+
+test('a broken body gets a fixed error code, never internal error text', async () => {
+  if (!srv) return;
+  const r = await srv.post('/v2/verify', { headers: { 'X-Real-IP': '10.7.0.3', 'Content-Type': 'application/json' }, body: '{"envelope": ' });
+  assert.strictEqual(r.status, 400, r.text);
+  assert.deepStrictEqual(JSON.parse(r.text), { error: 'invalid_json' });
+  // 30k levels of nesting used to come back as "Maximum call stack size exceeded".
+  const deep = '{"envelope":' + '['.repeat(30000) + ']'.repeat(30000) + '}';
+  const r2 = await srv.post('/v2/verify', { headers: { 'X-Real-IP': '10.7.0.4', 'Content-Type': 'application/json' }, body: deep });
+  assert.ok(!/Maximum call stack|Unexpected token|in JSON at position/i.test(r2.text), r2.text.slice(0, 200));
+  checks++;
+});

@@ -1416,7 +1416,16 @@ async function renderPdfWithRecords(records) {
       }
     }
   }
-  return new Uint8Array(await pdf.save());
+  // Mark this file as Paramant's reading copy of THIS envelope and THIS
+  // original, in a plain (uncompressed) Info entry: /verify only explains a
+  // hash mismatch as "the stamped copy" when it finds exactly this marker
+  // (hertest r2 R1). The .psign and the original are untouched.
+  try {
+    const { PDFName, PDFString } = window.PDFLib;
+    pdf.getInfoDict().set(PDFName.of('ParamantStampedCopy'),
+      PDFString.of('env=' + String(__envelope.id) + ';doc=' + String(__envelope.doc_hash)));
+  } catch { /* no marker: /verify then says plainly INVALID, never "copy" */ }
+  return new Uint8Array(await pdf.save({ useObjectStreams: false }));
 }
 
 // ---------- after: the complete PDF and the proof, for whoever may have them ----------
