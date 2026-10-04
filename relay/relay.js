@@ -4240,8 +4240,23 @@ async function safeHttpsRequest(urlStr, opts = {}) {
 }
 
 // ── Webhook push ──────────────────────────────────────────────────────────────
+// Webhook registrations live in redis too (API-26-K): the in-memory map was
+// lost on every restart and not shared between the sector relays, so a
+// registration silently stopped working after a deploy. Memory is the cache.
+const _webhookRedisKey = (k) => 'paramant:webhooks:' + crypto.createHash('sha256').update(k).digest('hex').slice(0, 40);
+async function _webhooksFor(k) {
+  const mem = webhooks.get(k);
+  if (mem && mem.length) return mem;
+  if (!redisClient || !redisClient.isReady) return mem || [];
+  try {
+    const raw = await redisClient.lRange(_webhookRedisKey(k), 0, 19);
+    const list = raw.map((x) => { try { return JSON.parse(x); } catch { return null; } }).filter((h) => h && typeof h.url === 'string');
+    if (list.length) webhooks.set(k, list);
+    return list;
+  } catch { return mem || []; }
+}
 async function pushWebhooks(apiKey, deviceId, event, data) {
-  const hooks = webhooks.get(`${deviceId}:${acctOf(apiKey)}`) || [];
+  const hooks = await _webhooksFor(`${deviceId}:${acctOf(apiKey)}`);
   for (const hook of hooks) {
     const payload = J({ event, device_id: deviceId, ts: new Date().toISOString(), ...data });
     try {
@@ -6865,8 +6880,12 @@ async function handleRelayRequest(req, res) {
 
   // ── GET /v2/ct/log + /v2/ct/proof — publiek, geen auth ──────────────────────
   if (path === '/v2/ct/log') {
-    const limit = Math.min(parseInt(query.limit || '100'), 1000);
-    const from  = parseInt(query.from || '0');
+    // Clamped (limit=-1 used to return the whole window, limit=abc nothing),
+    // and `offset` accepted as the docs call it (API-31-B).
+    const _lim = parseInt(query.limit || '100', 10);
+    const limit = Number.isFinite(_lim) ? Math.max(1, Math.min(_lim, 1000)) : 100;
+    const _from = parseInt(query.from !== undefined ? query.from : (query.offset || '0'), 10);
+    const from  = Number.isFinite(_from) && _from >= 0 ? _from : 0;
     // Privacy: the public log projection deliberately omits device_hash and
     // coarsens timestamps to the hour. device_hash is a stable, deterministic
     // function of a participant public key, so publishing it unauthenticated
@@ -8926,6 +8945,13 @@ async function handleRelayRequest(req, res) {
       // nul en afsluiten. Een enkel JSON-veld van een betalende klant legde de
       // relay om voor iedereen, telkens opnieuw, want de registratie bleef staan.
       webhooks.get(k).push({ url: d.url, secret: _secret });
+      if (redisClient && redisClient.isReady) {
+        try {
+          const rk = _webhookRedisKey(k);
+          await redisClient.rPush(rk, JSON.stringify({ url: d.url, secret: _secret }));
+          await redisClient.lTrim(rk, -20, -1);
+        } catch (we) { log('warn', 'webhook_persist_failed', { err: we.message }); }
+      }
       log('info', 'webhook_registered', { device: d.device_id });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, events: ['blob_ready', 'blob_downloaded'], ...(_given ? {} : { secret: _secret }) }));
