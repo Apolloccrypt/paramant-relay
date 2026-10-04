@@ -179,6 +179,17 @@ async function processPayment(payment, deps) {
       if (per && typeof d.currentTermEnd === 'function') { try { cur = await d.currentTermEnd(accountId, g.product, g.tier); } catch { cur = null; } }
       const span = per ? (new Date(per.until).getTime() - new Date(per.from).getTime()) : NaN;
       const curMs = cur ? new Date(cur).getTime() : NaN;
+      // Undo a pause this payment caused on lower tiers of the product.
+      if (per && Array.isArray(per.paused) && typeof d.currentTermEnd === 'function') {
+        for (const pz of per.paused) {
+          let pe = null;
+          try { pe = await d.currentTermEnd(accountId, g.product, pz.tier); } catch { pe = null; }
+          const peMs = pe ? new Date(pe).getTime() : NaN;
+          if (!Number.isFinite(peMs) || !(pz.by > 0)) continue;
+          const back = new Date(Math.max(peMs - pz.by, nowR.getTime()));
+          try { await d.setProductPlan(accountId, g.product, pz.tier, back, null, { shorten: true }); } catch { /* logged by caller */ }
+        }
+      }
       if (per && Number.isFinite(span) && span > 0 && Number.isFinite(curMs)) {
         const left = new Date(Math.max(curMs - span, nowR.getTime()));
         try { await d.setProductPlan(accountId, g.product, g.tier, left, order.bundle || null, { shorten: true }); } catch { /* logged by caller */ }
@@ -283,6 +294,21 @@ async function processPayment(payment, deps) {
     // take back exactly this and nothing paid before it.
     const anchor = bundleExtendFrom(currents, now);
     const bought = order.grants.map((g) => ({ product: g.product, tier: g.tier, from: anchor.toISOString(), until: paidUntil.toISOString() }));
+    // An UPGRADE pauses what runs under it. A Firm customer who buys a month
+    // of ParaSign Business holds a ParaSign Pro term under it; without this
+    // the Pro weeks under the Business month were paid for and never used.
+    // deps.pauseLowerTerms moves the end of every lower running term of the
+    // product out by the span this payment bought, and says what it moved so
+    // a chargeback can move it back.
+    if (typeof d.pauseLowerTerms === 'function') {
+      const span = paidUntil.getTime() - anchor.getTime();
+      for (const b of bought) {
+        try {
+          const moved = await d.pauseLowerTerms(accountId, b.product, b.tier, span);
+          if (Array.isArray(moved) && moved.length) b.paused = moved;
+        } catch { /* nothing moved; the grant itself stands */ }
+      }
+    }
     if (typeof d.markProcessed === 'function') { try { await d.markProcessed(payment.id, 'granted', { grants: bought }); } catch { /* best effort */ } }
     return {
       result: 'granted', level: 'info', account: accountId, product, tier: order.tier,

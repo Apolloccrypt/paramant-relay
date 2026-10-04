@@ -9580,6 +9580,12 @@ async function handleRelayRequest(req, res) {
         if (entitlements.hasRunningTerm(rec, g.product, g.tier)) continue;
         const running = entitlements.effectiveProductTier(rec, g.product);
         if (running.tier === entitlements.floorTierOf(g.product)) continue;
+        // An upgrade is self-service, as /pricing says ("upgrade when you
+        // outgrow"): the higher tier runs on top and the lower term is paused
+        // for exactly the span bought (webhook pauseLowerTerms), so no week is
+        // paid twice. Only a step DOWN next to a running higher tier still
+        // goes by mail.
+        if (entitlements.termRelation(g.product, g.tier, running.tier) === 'lower_running') continue;
         const until = running.paidUntil ? planExpiry.formatDate(running.paidUntil) : null;
         res.writeHead(409, { 'Content-Type': 'application/json' });
         return res.end(J({
@@ -9737,6 +9743,23 @@ async function handleRelayRequest(req, res) {
         return false;
       },
       periodOf: async (id) => { const r = billingLedger.get(id); return r && Array.isArray(r.grants) ? r.grants : null; },
+      // An upgrade pauses the lower terms of the same product (lib/billing):
+      // their end moves out by the span the higher tier just bought.
+      pauseLowerTerms: async (accountId, product, tier, spanMs) => {
+        if (!(spanMs > 0)) return [];
+        const rec = entitlementRecordOf(accountId);
+        const nowMs = Date.now();
+        const moved = [];
+        for (const t of entitlements.termsOf(rec, product)) {
+          if (t.until === null || t.tier === entitlements.floorTierOf(product)) continue;
+          if (entitlements.termRelation(product, t.tier, tier) !== 'higher_running') continue;
+          const end = new Date(t.until).getTime();
+          if (!(end > nowMs)) continue;
+          const r = setProductPlan(accountId, product, t.tier, new Date(end + spanMs), t.bundle || null);
+          if (r && r.ok) moved.push({ tier: t.tier, by: spanMs });
+        }
+        return moved;
+      },
       markProcessed: async (id, val, extra) => {
         const md = payment.metadata || {};
         // Durable, awaited, and first. A failure here is logged at error level

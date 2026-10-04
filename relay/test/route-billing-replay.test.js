@@ -23,6 +23,8 @@ const INTERCEPT = path.join(__dirname, '..', '..', 'tests', 'helpers', 'mollie-i
 const RUN = `${process.pid}_${Date.now().toString(36)}`;
 const KEY = `pgp_replay_${RUN}`;
 const ACCT = `acct_demo_replay_${RUN}`;
+const KEY2 = `pgp_upgrade_${RUN}`;
+const ACCT2 = `acct_demo_upgrade_${RUN}`;
 const PAID = entitlements.PRODUCT_PAID_UNTIL_FIELD.parasign;
 const DAY = 86400000;
 
@@ -43,7 +45,10 @@ before(async () => {
   };
   srv = await boot({
     tag: 'billing-replay', usersFile: true, captureLog: true,
-    users: { api_keys: [{ key: KEY, plan: 'community', active: true, parasign: true, account_id: ACCT, email: 'replay@example.test' }] },
+    users: { api_keys: [
+      { key: KEY, plan: 'community', active: true, parasign: true, account_id: ACCT, email: 'replay@example.test' },
+      { key: KEY2, plan: 'community', active: true, parasign: true, account_id: ACCT2, email: 'upgrade@example.test' },
+    ] },
     env,
   });
 });
@@ -55,8 +60,8 @@ after(async () => {
 });
 
 const as = { headers: { 'X-Api-Key': KEY } };
-async function buy() {
-  const r = await srv.post('/v2/billing/checkout', { ...as, body: { product: 'firm', plan: 'firm', interval: 'monthly' } });
+async function buy(key = KEY, order = { product: 'firm', plan: 'firm', interval: 'monthly' }) {
+  const r = await srv.post('/v2/billing/checkout', { headers: { 'X-Api-Key': key }, body: order });
   assert.strictEqual(r.status, 200, r.text);
   const id = r.json.payment_id;
   const paid = await fetch(`${mollieOrigin}/checkout/${id}`, { method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'outcome=paid' });
@@ -68,9 +73,9 @@ async function hook(id) {
   const h = await srv.post('/v2/billing/webhook', { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `id=${id}` });
   assert.strictEqual(h.status, 200, h.text);
 }
-async function paidUntil() {
+async function paidUntil(key = KEY) {
   await new Promise((r) => setTimeout(r, 150)); // users.json write is queued
-  const rec = srv.readUsersFile().api_keys.find((k) => k.key === KEY);
+  const rec = srv.readUsersFile().api_keys.find((k) => k.key === key);
   return { tier: rec.plan_parasign, until: rec[PAID] ? new Date(rec[PAID]).getTime() : null };
 }
 async function flushMarkers() {
@@ -107,5 +112,20 @@ test('an old payment id replayed after a second purchase and a redis flush grant
   const afterCb = await paidUntil();
   assert.strictEqual(afterCb.tier, 'pro', 'month 1 is still paid for');
   assert.ok(Math.abs(afterCb.until - after1.until) < 2 * DAY, `term ends where month 1 ended (${new Date(afterCb.until).toISOString()} vs ${new Date(after1.until).toISOString()})`);
+  did();
+});
+
+test('upgrade Firm -> ParaSign Business is self-service and pauses the Pro term', async (t) => {
+  if (!srv) return t.skip('no redis');
+  await buy(KEY2);
+  const firm = await paidUntil(KEY2);
+  assert.strictEqual(firm.tier, 'pro');
+  await buy(KEY2, { product: 'parasign', plan: 'business', interval: 'monthly' });
+  const rec = srv.readUsersFile().api_keys.find((k) => k.key === KEY2);
+  assert.strictEqual(rec.plan_parasign, 'business', 'Business runs on top');
+  const proEnd = new Date(rec.terms_parasign.pro.until).getTime();
+  assert.ok(proEnd - firm.until > 25 * DAY, 'the Pro month under Business is paused, not lost');
+  const down = await srv.post('/v2/billing/checkout', { headers: { 'X-Api-Key': KEY2 }, body: { product: 'firm', plan: 'firm', interval: 'yearly' } });
+  assert.strictEqual(down.status, 200, 'renewing the Pro tier that holds a term is fine');
   did();
 });

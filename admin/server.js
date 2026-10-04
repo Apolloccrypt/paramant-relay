@@ -3780,29 +3780,7 @@ api.post("/drop/upload", async (req, res) => {
 
 // ── Billing ───────────────────────────────────────────────────────────────────
 
-const PLANS = [
-  {
-    id: 'community',
-    name: 'Community',
-    price_monthly_eur: 0,
-    price_yearly_eur: 0,
-    limits: { file_size_mb: 5, link_ttl_hours: 1, reads_per_link: 1, registered_devices: 5 },
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    price_monthly_eur: 9,
-    price_yearly_eur: 89,
-    limits: { file_size_mb: 5, link_ttl_hours: 24, reads_per_link: 10, registered_devices: 50 },
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price_monthly_eur: null,
-    price_yearly_eur: null,
-    limits: { file_size_mb: null, link_ttl_hours: 168, reads_per_link: 100, registered_devices: null },
-  },
-];
+const publicPlans = require('./lib/public-plans');
 
 // No caller since the stub checkout was hard-disabled below; the plan-change
 // route mails its own copy. Left in place, and the note is derived rather than
@@ -3815,7 +3793,7 @@ async function sendBillingConfirmation(email, plan, amount, period) {
   // perfectly configured account, and the warning in the log named a variable
   // nobody was supposed to set any more.
   if (!mailer.gereed()) { console.warn('[billing] no mail provider configured'); return; }
-  const planName = PLANS.find(p => p.id === plan)?.name || plan;
+  const planName = publicPlans.planName(plan);
   const amountStr = amount === 0 ? 'Free' : `€${amount}/${period === 'yearly' ? 'yr' : 'mo'}`;
   const msg = emailTemplates.billingConfirmationEmail({ planName, period, amountStr, noPayment: period === 'admin' });
   const res = await mailer.stuur({
@@ -3827,7 +3805,7 @@ async function sendBillingConfirmation(email, plan, amount, period) {
 
 async function sendCancellationScheduled(email, plan, cancelAt) {
   if (!mailer.gereed()) { console.warn('[billing] no mail provider configured'); return; }
-  const planName = PLANS.find(p => p.id === plan)?.name || plan;
+  const planName = publicPlans.planName(plan);
   const cancelDate = new Date(cancelAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const msg = emailTemplates.billingCancellationEmail({ planName, cancelDate });
   const res = await mailer.stuur({
@@ -3838,7 +3816,7 @@ async function sendCancellationScheduled(email, plan, cancelAt) {
 }
 
 api.get("/user/billing/plans", (req, res) => {
-  res.json({ plans: PLANS });
+  res.json({ plans: publicPlans.plans() });
 });
 
 // -- Billing stub checkout -- HARD-DISABLED 2026-07-20 ------------------------
