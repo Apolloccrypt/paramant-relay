@@ -4120,7 +4120,9 @@ function renderPartyLinks(mp) {
   // (/api/user/sign/*). The relay GET /v2/envelopes/:id is public.
   const statusLink = $('ds-envelope-status-link');
   if (statusLink) {
-    statusLink.href = RELAY_PUBLIC + '/v2/envelopes/' + mp.envelope_id;
+    // The owner's result page, not the relay's raw JSON (acceptance test
+    // 2026-10-04): who signed, and the complete PDF once everyone has.
+    statusLink.href = '/co-sign?owner=' + encodeURIComponent(mp.envelope_id);
     // The id and the machine it sits on are in the href, where a person who
     // wants them can get at them. On the face of an end screen they were two
     // pieces of plumbing in the middle of a sentence.

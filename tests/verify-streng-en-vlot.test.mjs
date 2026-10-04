@@ -112,3 +112,22 @@ test('een groot bestand houdt de pagina niet vast', async () => {
   assert.match(text, /ONGELDIG|niet het document/, 'het grote bestand is niet het ondertekende');
   assert.ok(gap < 1000, `de pagina stond ${Math.round(gap)} ms stil`);
 });
+
+test('een oud v1/v2-bewijs gaat zonder API-sleutel naar de publieke /v2/verify', async () => {
+  const page = await browser.newPage();
+  const seen = [];
+  await page.route('https://relay.paramant.app/v2/verify', (r) => { seen.push(r.request().headers()); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ valid: true, errors: [] }) }); });
+  await page.route('https://relay.paramant.app/v2/lookup-signer/**', (r) => r.fulfill({ status: 404, body: '' }));
+  await page.goto(origin + '/verify.html', { waitUntil: 'domcontentloaded' });
+  await page.locator('#vf-document').setInputFiles({ name: 'o.txt', mimeType: 'text/plain', buffer: Buffer.from('oud document') });
+  await page.locator('#vf-envelope').setInputFiles({ name: 'o.psign', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ algorithm: 'ML-DSA-65', version: 'parasign-doc-2', signer: { label: 'X', public_key: 'AAAA' }, notary: { ct_log_index: 1 } })) });
+  const enabled = await page.locator('#vf-verify').isEnabled();
+  const keyField = await page.locator('#vf-api-key').count();
+  if (enabled) await page.locator('#vf-verify').click();
+  await page.waitForFunction(() => /geldig|ONGELDIG/.test(document.querySelector('#vf-result')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
+  await page.close();
+  assert.ok(enabled, 'controleren kan zonder sleutel');
+  assert.equal(keyField, 0, 'er wordt geen API-sleutel gevraagd');
+  assert.equal(seen.length, 1, 'de relay is gevraagd');
+  assert.ok(!('x-api-key' in seen[0]), 'zonder X-Api-Key');
+});

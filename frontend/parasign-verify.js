@@ -295,14 +295,14 @@ function partyWho(party, pos) {
   return t('partyAt', { n: pos + 1 });
 }
 
-// v3 verifies keyless client-side; v1/v2 need the relay (and its API key).
+// v3 verifies keyless client-side; v1/v2 ask the relay's public /v2/verify
+// (no API key since 2026-10-04; it used to ask the reader for one, T3-12).
 function update() {
-  const apiKey = ($('vf-api-key').value || '').trim();
-  const ready = documentFile && envelope && (isV3 || apiKey);
+  const ready = documentFile && envelope;
   $('vf-verify').disabled = !ready;
 }
 
-// Hide the API-key field for keyless v3 envelopes; show it for v1/v2.
+// The note that an old v1/v2 envelope is checked by the relay.
 function syncKeyField() {
   const block = $('vf-key-block');
   if (!block) return;
@@ -525,15 +525,13 @@ async function verify() {
     }
     const res = await fetch(RELAY_URL + '/v2/verify', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Api-Key': $('vf-api-key').value.trim() },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ document_hash: toHex(docHash), envelope }),
     });
     if (!res.ok && res.status !== 200) {
       const t = await res.text();
       try { console.error('[paramant] /v2/verify', res.status, t.slice(0, 200)); } catch { /* no console */ }
-      $('vf-result').innerHTML = '<div class="ps-banner err">' + esc(res.status === 401 || res.status === 403
-        ? (LANG === 'nl' ? 'Deze API-sleutel wordt niet geaccepteerd. Controleer de sleutel, of laat het veld leeg en controleer met het originele bestand en het .psign-bestand.' : 'This API key is not accepted. Check the key, or leave the field empty and check with the original file and the .psign file.')
-        : res.status === 429
+      $('vf-result').innerHTML = '<div class="ps-banner err">' + esc(res.status === 429
           ? (LANG === 'nl' ? 'Even te veel controles tegelijk. Probeer het over een minuut opnieuw.' : 'Too many checks at once. Try again in a minute.')
           : (LANG === 'nl' ? 'De controle kon nu niet worden uitgevoerd door een storing bij ons. Probeer het zo opnieuw.' : 'The check could not run right now because of a fault on our side. Please try again shortly.')) + '</div>';
       return;
@@ -700,5 +698,4 @@ function claimFingerprintBad(env) {
 
 $('vf-document').addEventListener('change', e => onDoc(e.target.files[0]));
 $('vf-envelope').addEventListener('change', e => onEnv(e.target.files[0]));
-$('vf-api-key').addEventListener('input', update);
 $('vf-verify').addEventListener('click', verify);

@@ -84,7 +84,12 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         // soft, dismissible note before continuing; otherwise redirect as before.
         let body = null;
         try { body = await res.json(); } catch (_) { /* non-JSON, ignore */ }
-        if (body && body.totp_algorithm === 'sha1') { showSha1Notice(returnUrl); return; }
+        // The tip about an older authenticator app at most once per browser:
+        // Google Authenticator works this way and that is normal, so it is
+        // not something to read at every sign-in (acceptance test 2026-10-04).
+        let seen = false;
+        try { seen = localStorage.getItem('paramant.sha1tip.v1') === '1'; localStorage.setItem('paramant.sha1tip.v1', '1'); } catch (_) { seen = false; }
+        if (body && body.totp_algorithm === 'sha1' && !seen) { showSha1Notice(returnUrl); return; }
         window.location = returnUrl;
       } else if (res.status === 401) {
         errorDiv.textContent = nlEn('Dit e-mailadres en deze code horen niet bij elkaar. De code verandert elke 30 seconden, dus gebruik de code die uw app nu toont.', 'That email and code do not match. Codes change every 30 seconds, so use the one your app is showing right now.');
