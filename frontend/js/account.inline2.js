@@ -14,13 +14,22 @@ function fmtTs(iso) {
   return paramantDate.moment(iso, '-');
 }
 
+// A failed load in words, never "(HTTP 429)" (retest T5-1): what happened
+// and what the reader can do, by status.
+function loadFailText(status, nlWhat, enWhat) {
+  if (status === 429) return nlEn(nlWhat + ' konden even niet worden geladen: er kwamen te veel verzoeken tegelijk binnen. Ververs de pagina over een minuut.', 'Could not load ' + enWhat + ' just now: too many requests arrived at once. Refresh the page in a minute.');
+  if (status === 401 || status === 403) return nlEn('Uw sessie is verlopen. Log opnieuw in om uw ' + nlWhat.toLowerCase() + ' te zien.', 'Your session has expired. Sign in again to see your ' + enWhat + '.');
+  if (status >= 500) return nlEn(nlWhat + ' konden nu niet worden geladen door een storing bij ons. Er is niets mis met uw account. Probeer het zo opnieuw.', 'Could not load ' + enWhat + ' right now because of a fault on our side. Nothing is wrong with your account. Please try again shortly.');
+  return nlEn(nlWhat + ' konden nu niet worden geladen. Ververs de pagina om het opnieuw te proberen.', 'Could not load ' + enWhat + ' right now. Refresh the page to try again.');
+}
+
 async function loadEnrolledKeys() {
   const listEl = document.getElementById('signing-list');
   const emptyEl = document.getElementById('signing-empty');
   try {
     const res = await fetch('/api/user/account/signing-key', { credentials: 'include' });
     if (!res.ok) {
-      emptyEl.textContent = nlEn('De geregistreerde sleutels konden niet worden geladen (HTTP ', 'Could not load enrolled keys (HTTP ') + res.status + ').';
+      emptyEl.textContent = loadFailText(res.status, 'Uw ondertekensleutels', 'your signing keys');
       return;
     }
     const data = await res.json();
@@ -81,7 +90,12 @@ async function revokeKey(pkHash) {
       body: JSON.stringify({ pk_hash_sha3: pkHash, totp }),
     });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) { alert(nlEn('Intrekken mislukt: ', 'Revoke failed: ') + (body.error || ('HTTP ' + res.status))); return; }
+    if (!res.ok) {
+      alert(res.status === 429
+        ? nlEn('Intrekken lukte even niet: te veel verzoeken tegelijk. Probeer het over een minuut opnieuw.', 'Revoking did not work just now: too many requests at once. Try again in a minute.')
+        : nlEn('Intrekken is niet gelukt. Er is niets veranderd; probeer het zo opnieuw.', 'Revoking did not work. Nothing changed; please try again shortly.'));
+      return;
+    }
     await loadEnrolledKeys();
   } catch (e) { alert(nlEn('Intrekken mislukt: ', 'Revoke failed: ') + e.message); }
 }

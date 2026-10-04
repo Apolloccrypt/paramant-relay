@@ -485,7 +485,12 @@ async function verify() {
     });
     if (!res.ok && res.status !== 200) {
       const t = await res.text();
-      $('vf-result').innerHTML = '<div class="ps-banner err">Relay HTTP ' + res.status + ': ' + esc(t.slice(0, 200)) + '</div>';
+      try { console.error('[paramant] /v2/verify', res.status, t.slice(0, 200)); } catch { /* no console */ }
+      $('vf-result').innerHTML = '<div class="ps-banner err">' + esc(res.status === 401 || res.status === 403
+        ? (LANG === 'nl' ? 'Deze API-sleutel wordt niet geaccepteerd. Controleer de sleutel, of laat het veld leeg en controleer met het originele bestand en het .psign-bestand.' : 'This API key is not accepted. Check the key, or leave the field empty and check with the original file and the .psign file.')
+        : res.status === 429
+          ? (LANG === 'nl' ? 'Even te veel controles tegelijk. Probeer het over een minuut opnieuw.' : 'Too many checks at once. Try again in a minute.')
+          : (LANG === 'nl' ? 'De controle kon nu niet worden uitgevoerd door een storing bij ons. Probeer het zo opnieuw.' : 'The check could not run right now because of a fault on our side. Please try again shortly.')) + '</div>';
       return;
     }
     await renderResult(await res.json());

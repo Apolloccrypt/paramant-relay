@@ -219,7 +219,7 @@ async function init() {
     const r = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(envId) + partyQuery);
     if (r.status === 404) return showError(L('Dit verzoek bestaat niet, is verlopen of is al gebruikt.', 'This request does not exist, has expired, or was already used.'));
     if (r.status === 429) return showError(L('Te veel verzoeken vanaf dit adres. Probeer het over een minuut opnieuw.', 'Too many requests from this address. Try again in a minute.'));
-    if (!r.ok) return showError(L('De relay gaf een fout (HTTP ' + r.status + ').', 'Relay error: HTTP ' + r.status));
+    if (!r.ok) return showError(L('Het verzoek kon nu niet worden opgehaald door een storing bij ons. Er is niets mis met uw link. Probeer het over een paar minuten opnieuw.', 'The request could not be fetched right now because of a fault on our side. Nothing is wrong with your link. Please try again in a few minutes.'));
     const data = await r.json();
     __envelope = data.envelope;
     if (__partyIndex >= __envelope.party_count) return showError(L('Deze link verwijst naar een ondertekenaar die niet in dit verzoek staat.', 'This link points to a signer who is not part of this request.'));
@@ -579,7 +579,7 @@ async function fetchAndOpenCapsule(url, envId) {
   if (r.status === 404) throw new Error(L('Het versleutelde document is niet beschikbaar. Misschien is het een ouder verzoek, of is de link onvolledig.', 'The encrypted document is unavailable. It may be an older request or the link may be incomplete.'));
   if (r.status === 410) throw new Error(L('Dit verzoek of het document is verlopen. Vraag de afzender om een nieuw verzoek.', 'This signing request or its document has expired. Ask the sender for a new request.'));
   if (r.status === 429) throw new Error(L('Het is even te druk. Probeer het over een minuut opnieuw.', 'It is busy right now. Try again in a minute.'));
-  if (!r.ok) throw new Error(L('Het versleutelde document kon niet worden gedownload (HTTP ', 'The encrypted document could not be downloaded (HTTP ') + r.status + ').');
+  if (!r.ok) throw new Error(L('Het versleutelde document kon nu niet worden opgehaald door een storing bij ons. Probeer het over een paar minuten opnieuw.', 'The encrypted document could not be fetched right now because of a fault on our side. Please try again in a few minutes.'));
   let docKey;
   if (key.whole) docKey = key.whole;
   else {
