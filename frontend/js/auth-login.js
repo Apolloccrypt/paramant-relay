@@ -23,10 +23,24 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     if (errorDiv) errorDiv.classList.remove('visible');
     notice.hidden = false;
     const cont = document.getElementById('sha1-continue');
+    // Where the button goes, in words: back to the document the customer came
+    // from, not "to your account" (retest T5-5).
+    const toDoc = /^\/(en\/)?(co-sign|sign)\b/.test(dest);
     if (cont) {
       cont.setAttribute('href', dest);
+      cont.textContent = toDoc ? nlEn('Verder naar het document', 'Continue to the document') : nlEn('Verder naar uw account', 'Continue to your account');
       cont.addEventListener('click', function(ev) { ev.preventDefault(); window.location = dest; });
     }
+    // And on its own after a few seconds: the tip must never be a stop.
+    const auto = document.getElementById('sha1-auto');
+    let left = 8;
+    const say = function () { if (auto) auto.textContent = nlEn('U gaat over ' + left + ' seconden vanzelf verder.', 'Continuing on its own in ' + left + ' seconds.'); };
+    say();
+    const timer = setInterval(function () {
+      left -= 1;
+      if (left <= 0) { clearInterval(timer); window.location = dest; return; }
+      say();
+    }, 1000);
   }
 
   // One sign-in POST. `proof`, when present, is a solved proof-of-work; the

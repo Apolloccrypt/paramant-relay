@@ -129,8 +129,9 @@
 </form>
 
 <div id="sha1-notice" class="auth-note" hidden role="note">
-  <p><strong>You are signed in.</strong> Your authenticator app still sends SHA-1 codes. They work, and a SHA-256 app such as Raivo (iOS) or Aegis (Android) is stronger. <a href="/help/authenticator-apps">See which apps do this</a>.</p>
-  <a href="#" class="btn btn-primary mt-3" id="sha1-continue">Continue to your account</a>
+  <p><strong>You are signed in.</strong> A tip for later: your authenticator app uses an older way of making codes. That works fine, but some other apps protect more strongly. <a href="/help/authenticator-apps">See which apps those are</a>.</p>
+  <a href="#" class="btn btn-primary mt-3" id="sha1-continue">Continue</a>
+  <p class="auth-note-sub" id="sha1-auto" aria-live="polite"></p>
 </div>
 
 <p class="footer-text auth-foot">
