@@ -58,12 +58,14 @@ const CONFS = [
   { file: 'deploy/nginx-selfhost.conf', strict: true },
   { file: 'deploy/nginx-paramant-live.conf', strict: false },
   { file: 'deploy/nginx-paramant-public.conf', strict: false },
+  // Unused copy in the repo root (deploy/de-server.md, step 8), held to the same rule while it exists.
+  { file: 'nginx-selfhost.conf', strict: false, min: 4 },
 ];
 
-for (const { file, strict } of CONFS) {
+for (const { file, strict, min = 8 } of CONFS) {
   test(`${file}: every relay/admin location sends the client address and blanks the trust headers`, () => {
     const locs = proxyLocations(parse(read(file))).filter((l) => RELAY_OR_ADMIN.test(l.proxyPass));
-    assert.ok(locs.length >= 8, `${file}: only ${locs.length} relay-facing locations found, the parser stopped matching`);
+    assert.ok(locs.length >= min, `${file}: only ${locs.length} relay-facing locations found, the parser stopped matching`);
     const bad = locs.map((l) => [l, problems(l, { strict })]).filter(([, p]) => p.length)
       .map(([l, p]) => `  [${l.server}] ${l.label} -> ${l.proxyPass}: ${p.join('; ')}`);
     assert.deepEqual(bad, [], `headers a client can forge reach the upstream:\n${bad.join('\n')}`);
