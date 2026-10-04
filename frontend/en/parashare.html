@@ -572,12 +572,21 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     </div>
   </div>
 
+  <div class="card" id="ps-earlier" hidden>
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Your links from this session</div></div>
+    <div class="card-body">
+      <ul class="ps-links" id="ps-earlier-list"></ul>
+      <button type="button" class="ps-copy" id="ps-earlier-refresh" data-click="refreshSentLinks">Check again</button>
+      <p class="ps-meta">Kept in this tab until you close it.</p>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">File</div></div>
     <div class="card-body">
       <label class="label" for="file-input">Choose a file (or several)</label>
       <input type="file" id="file-input" multiple data-change="onFileSelect">
-      <p class="ps-meta">Pick more than one and they travel as a single package.</p>
+      <p class="ps-meta">Pick more than one and each file is sealed on its own and gets its own link.</p>
       <div class="status-line" id="file-status">No file selected</div>
       <div id="vault-list" style="margin-top:8px;display:none"></div>
     </div>
@@ -611,7 +620,6 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <div class="card-body">
       <label class="label" for="ttl-select">Link expires after</label>
       <select id="ttl-select">
-        <option value="30000">30 seconds</option>
         <option value="300000">5 minutes</option>
         <option value="3600000" selected>1 hour</option>
         <option value="86400000">24 hours</option>

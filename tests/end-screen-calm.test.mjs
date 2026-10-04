@@ -386,9 +386,13 @@ for (const G of GLANGS) {
           body: JSON.stringify({ ecdh_pub: 'tok_' + 'c'.repeat(44), kyber_pub: '1|3600000' }) })
       : r.fulfill({ status: 404, body: '' }));
     await page.route('https://health.paramant.app/v2/pubkey', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }));
-    await page.route('https://health.paramant.app/v2/dl/**/get', (r) => r.fulfill({ status: 200,
+    // Claim mode since the hertest of 04-10 (T4-3): .../get?claim=..., then an
+    // ack once the block is decrypted.
+    await page.route(/^https:\/\/health\.paramant\.app\/v2\/dl\/[^/]+\/get(\?|$)/, (r) => r.fulfill({ status: 200,
       contentType: 'application/octet-stream', headers: { 'X-Hash': 'deadbeefcafe01234567890abcdef' },
       body: Buffer.from([1, 2, 3]) }));
+    await page.route(/^https:\/\/health\.paramant\.app\/v2\/dl\/[^/]+\/(ack|release)$/, (r) => r.fulfill({ status: 200,
+      contentType: 'application/json', body: '{"ok":true,"burned":true}' }));
     const dl = page.waitForEvent('download', { timeout: 40000 }).catch(() => null);
     await page.goto(`${ORIGIN}${G.pre}/ontvang?s=${S}`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => /^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/.test((document.getElementById('fp-display')?.textContent || '').trim()),

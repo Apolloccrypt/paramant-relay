@@ -17,7 +17,7 @@ const T = {
     decFail: 'De sleutel in de link past niet op dit bestand. De link is onderweg beschadigd of niet helemaal gekopieerd. Er is niets gewist: open de link opnieuw, precies zoals u hem kreeg.',
     checking: 'Even kijken of het bestand er nog is...',
     readyMeta: (size, ttl) => [size ? 'Grootte ' + size : '', Number.isFinite(ttl) ? 'nog ' + leftNl(ttl) + ' beschikbaar' : ''].filter(Boolean).join(', ') + (size || Number.isFinite(ttl) ? '.' : ''),
-    busy: 'Dit bestand wordt op dit moment al gedownload, misschien in een ander tabblad. Probeer het over een paar minuten opnieuw.',
+    busy: 'Dit bestand wordt op dit moment al gedownload, misschien op een ander apparaat. Probeer het over een minuut opnieuw.',
     stalled: 'De verbinding viel een minuut stil en de download is gestopt. Er is niets gewist: probeer het opnieuw.',
     netFail: 'De download kwam niet helemaal binnen. Er is niets gewist: probeer het opnieuw.',
     gone: {
@@ -57,7 +57,7 @@ const T = {
     decFail: 'The key in the link does not fit this file. The link was damaged on the way or not copied whole. Nothing was deleted: open the link again exactly as you received it.',
     checking: 'Checking the file is still there...',
     readyMeta: (size, ttl) => [size ? 'Size ' + size : '', Number.isFinite(ttl) ? 'available for ' + leftEn(ttl) : ''].filter(Boolean).join(', ') + (size || Number.isFinite(ttl) ? '.' : ''),
-    busy: 'This file is being downloaded right now, perhaps in another tab. Try again in a few minutes.',
+    busy: 'This file is being downloaded right now, perhaps on another device. Try again in a minute.',
     stalled: 'The connection went quiet for a minute and the download stopped. Nothing was deleted: try again.',
     netFail: 'The download did not arrive in full. Nothing was deleted: try again.',
     gone: {
@@ -330,20 +330,44 @@ function parseLink() {
 // gives the claim back (.../release) and the link still works.
 let LINK = null;
 let busyDownloading = false;
-// One claim id per tab and link. Kept in sessionStorage so a reload in the
-// same tab after a broken download is still the same claimant, and is not
-// told to wait for its own lease to run out.
+// One claim id per browser and link. In localStorage, so a reload AND a new
+// tab of the same browser are the same claimant and are never told to wait
+// for their own lease (hertest T4: a link reopened in a new tab after a broken
+// download said "already being downloaded" for three minutes). Falls back to
+// sessionStorage, then to a fresh id. The id is not a secret: it only says
+// which of two downloads may ack, and both need the key from the fragment.
 const CLAIM = (() => {
   const key = 'paramant-dl-claim:' + (new URLSearchParams(location.search).get('t') || '').slice(0, 48);
-  try {
-    const kept = sessionStorage.getItem(key);
-    if (kept && /^[a-f0-9]{32}$/.test(kept)) return kept;
-  } catch { /* storage refused: a fresh id is fine */ }
+  for (const store of ['localStorage', 'sessionStorage']) {
+    try {
+      const kept = window[store].getItem(key);
+      if (kept && /^[a-f0-9]{32}$/.test(kept)) return kept;
+    } catch { /* storage refused: try the next */ }
+  }
   const b = crypto.getRandomValues(new Uint8Array(16));
   const id = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
-  try { sessionStorage.setItem(key, id); } catch { /* idem */ }
+  for (const store of ['localStorage', 'sessionStorage']) {
+    try { window[store].setItem(key, id); break; } catch { /* idem */ }
+  }
   return id;
 })();
+function forgetClaim() {
+  const key = 'paramant-dl-claim:' + (new URLSearchParams(location.search).get('t') || '').slice(0, 48);
+  for (const store of ['localStorage', 'sessionStorage']) { try { window[store].removeItem(key); } catch { /* fine */ } }
+}
+
+// A tab closed (or navigated away) mid-download gives its claim back at once,
+// so the receiver can open the link again straight away. sendBeacon survives
+// the unload; text/plain keeps it a simple request (no preflight). The relay
+// reads the JSON body whatever the content type.
+addEventListener('pagehide', () => {
+  if (!busyDownloading || !LINK) return;
+  for (const tk of LINK.tokens) {
+    const body = JSON.stringify({ claim: CLAIM });
+    try { if (navigator.sendBeacon && navigator.sendBeacon(LINK.relay + '/v2/dl/' + tk + '/release', body)) continue; } catch { /* fall through */ }
+    fetch(LINK.relay + '/v2/dl/' + tk + '/release', { method: 'POST', body, keepalive: true, cache: 'no-store' }).catch(() => {});
+  }
+});
 
 function showGone(reason) {
   const g = (T[LANG].gone[reason]) || T[LANG].gone.unknown;
@@ -473,6 +497,7 @@ async function tbDecryptChunk(blob, rawKey) {
 async function startDownload() {
   if (!LINK || busyDownloading) return;
   busyDownloading = true;
+  let acked = false;
   const tokens = LINK.tokens;
   const errRetry = document.getElementById('error-retry');
   if (errRetry) errRetry.hidden = true;
@@ -522,7 +547,10 @@ async function startDownload() {
         let metaName = null;
         for (let i = 0; i < blobs.length; i++) {
           const { data, meta } = await tbDecryptChunk(blobs[i], LINK.rawKeys[i]);
-          if (!metaName && meta && typeof meta.name === 'string') metaName = meta.name;
+          // The extension core writes file_name; older senders wrote name.
+          // Read from inside the seal, so the link needs no &n= (hertest T4-9).
+          const mn = meta && (typeof meta.file_name === 'string' ? meta.file_name : meta.name);
+          if (!metaName && typeof mn === 'string' && mn) metaName = mn;
           chunks.push(data);
         }
         const total = chunks.reduce((n, c) => n + c.length, 0);
@@ -539,10 +567,14 @@ async function startDownload() {
 
     // The file is whole and opened. Only now is the relay copy burned.
     await ackAll(tokens);
+    acked = true;
+    forgetClaim();
     await deliver(filename, fileData);
   } catch (e) {
-    releaseAll(tokens);
-    showError(e.message || t('unknown'));
+    // Never a raw engine message on the receiver's screen (hertest T4-L1).
+    // Before the ack nothing is spent; after it, "try again" would be untrue.
+    if (!acked) { releaseAll(tokens); showError(t('netFail')); }
+    else showError(t('unknown'));
   } finally {
     busyDownloading = false;
   }

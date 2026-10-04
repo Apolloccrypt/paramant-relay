@@ -191,6 +191,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   <p class="sub">Paste the secure link you were sent. The file decrypts in your browser. The relay never has the key.</p>
   <div class="card">
     <div class="card-body">
+      <label class="label" for="enter-link">Your one-time link</label>
       <input id="enter-link" type="text" placeholder="https://paramant.app/get?t=..." autocomplete="off" spellcheck="false" style="width:100%;padding:12px;border:1px solid var(--ink-hair);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--bone);color:var(--ink)">
       <div class="status-line err" id="enter-err" style="margin-top:8px"></div>
       <button class="btn" data-click="goReceive" style="margin-top:14px">Receive</button>
@@ -239,7 +240,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
     <div class="done-actions">
       <button class="btn done-primary" id="done-save" type="button" data-click="saveAgain">Save it again</button>
-      <a class="done-quiet" href="/dashboard">Open your dashboard</a>
+      <a class="done-quiet" href="/en">Go to paramant.app</a>
     </div>
 
     <details class="done-details">
@@ -259,7 +260,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   <span class="burned-icon" id="burned-icon" style="margin-top:16px">&#x1F525;</span>
   <p class="burned-msg" id="burned-msg">This file has already been downloaded and burned.</p>
   <p class="burned-sub" id="burned-sub">Paramant links are single-use. Once downloaded, the file is permanently deleted from the relay.</p>
-  <a href="/dashboard" class="btn btn-outline" style="max-width:280px;margin:24px auto 0">Open your dashboard</a>
+  <a href="/en" class="btn btn-outline" style="max-width:280px;margin:24px auto 0">Go to paramant.app</a>
 </div>
 
 <!-- A link that did not arrive whole: wrong token shape, no key after #. -->
@@ -280,7 +281,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
       <button class="btn" id="error-retry" type="button" data-click="retryDownload" hidden>Try again</button>
     </div>
   </div>
-  <a href="/dashboard" class="btn btn-outline">Open your dashboard</a>
+  <a href="/en" class="btn btn-outline">Go to paramant.app</a>
 </div>
 
 </main>

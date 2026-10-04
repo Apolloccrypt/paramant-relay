@@ -285,15 +285,17 @@ export async function sealAndUploadChunk({ relay, apiKey, chunkU8, fileMeta, rel
 
 // ── Share URL ───────────────────────────────────────────────────────────────────
 // Format (read by frontend/js/get.page.js, the FileLink branch):
-//   {RECEIVE_BASE}?t=T1,T2&n=NAME&c=N&r=RELAY#k=K1,K2
-
+//   {RECEIVE_BASE}?t=T1,T2&c=N&r=RELAY#k=K1,K2
+//
+// No file name in the URL (hertest T4-9). The query of a link is sent to the
+// server on every open and ends up in mail logs, proxies and scanners; the
+// promise is "only an address and a link". The name travels inside the seal
+// (fileMeta.file_name) and the receiver reads it from there. `name` is still
+// accepted so existing callers keep working; it is not used.
 export function buildShareUrl({ tokens, name, chunks, relay, keys }) {
-  // Encoded exactly like the shipping sender so the parashare receiver
-  // (which does decodeURIComponent(sp.get('n'))) reads every field back intact.
   const t = tokens.map(encodeURIComponent).join(',');
   const r = encodeURIComponent(relay);
-  const n = encodeURIComponent(name);
-  return `${RECEIVE_BASE}?t=${t}&n=${n}&c=${chunks}&r=${r}#k=${keys.join(',')}`;
+  return `${RECEIVE_BASE}?t=${t}&c=${chunks}&r=${r}#k=${keys.join(',')}`;
 }
 
 // ── High-level orchestration (whole file already in memory) ──────────────────────

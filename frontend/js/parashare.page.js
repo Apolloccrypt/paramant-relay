@@ -22,7 +22,8 @@ const T = {
     enterKey: 'Enter your API key to continue',
     notAKey: 'That does not look like a key. It starts with pgp_.',
     noFile: 'No file selected',
-    filesPackage: (n) => n + ' files, sent as a single package',
+    filesPackage: (n) => n + ' files, each sealed on its own',
+    sendingPart: (name, i, n) => 'Sending ' + name + ', part ' + i + ' of ' + n + '...',
     lookingSector: 'Looking for a relay sector...',
     waitingOpen: 'Waiting for your receiver to open the link...',
     receiverClosed: 'Your receiver closed the link',
@@ -137,7 +138,8 @@ const T = {
     enterKey: 'Vul uw API-sleutel in om verder te gaan',
     notAKey: 'Dat lijkt geen sleutel. Een sleutel begint met pgp_.',
     noFile: 'Geen bestand gekozen',
-    filesPackage: (n) => n + ' bestanden, verstuurd als één pakket',
+    filesPackage: (n) => n + ' bestanden, elk apart verzegeld',
+    sendingPart: (name, i, n) => name + ' wordt verstuurd, deel ' + i + ' van ' + n + '...',
     lookingSector: 'Relay zoeken...',
     waitingOpen: 'Wachten tot de ontvanger de link opent...',
     receiverClosed: 'De ontvanger heeft de link gesloten',
@@ -292,10 +294,32 @@ let sendMode = 'live';
 let planTtlByPlan = null, planTtlMs = 0;
 // True while a session runs (any step but step 1 and the end screens). See showStep.
 let sessionBusy = false;
-// The links this browser session has minted, newest last. Page-local on
-// purpose: the relay keeps no list of a sender's outstanding links, and
-// pretending otherwise would be a claim this build cannot keep.
+// The links this browser session has minted, newest last. The relay keeps no
+// list of a sender's outstanding links, so this browser does. In
+// sessionStorage (hertest T4-15: a reload emptied the list): it survives a
+// reload and "Nog een bestand versturen", and is gone when the tab closes. A
+// link carries its key, so it is kept no longer than the tab and never in
+// localStorage. Rows more than a day past their expiry are dropped.
 const sentLinks = [];
+const SENT_KEY = 'paramant.parashare.sentLinks.v1';
+function saveSentLinks() {
+  try {
+    sessionStorage.setItem(SENT_KEY, JSON.stringify(sentLinks.map((r) => ({
+      name: r.name, url: r.url, token: r.token, expires_ms: r.expires_ms, state: r.state,
+    }))));
+  } catch (_) { /* storage refused: the list lives as long as the page */ }
+}
+function loadSentLinks() {
+  let rows = [];
+  try { rows = JSON.parse(sessionStorage.getItem(SENT_KEY) || '[]'); } catch (_) { rows = []; }
+  if (!Array.isArray(rows)) return;
+  const cutoff = Date.now() - 86400000;
+  for (const r of rows) {
+    if (!r || typeof r.url !== 'string' || typeof r.token !== 'string' || !(Number(r.expires_ms) > cutoff)) continue;
+    sentLinks.push({ name: String(r.name || ''), url: r.url, token: r.token,
+                     expires_ms: Number(r.expires_ms), state: typeof r.state === 'string' ? r.state : 'waiting' });
+  }
+}
 
 // ── Helpers ──
 function $(id) { return document.getElementById(id); }
@@ -1094,8 +1118,11 @@ async function maakVerzending(hashes, naam, ttlMs, ontvangers, sealed) {
     headers: { 'Content-Type': 'application/json' },
     // lang: de taal van de pagina, zodat de relay de uitnodiging en de code
     // aan de ontvangers in dezelfde taal mailt als de afzender hier leest.
+    // Geen bestandsnaam (hertest T4-9): de relay en de mailer krijgen alleen
+    // adressen en de verzegelde sleutels. De naam reist alleen IN het
+    // verzegelde bestand; de ontvangstpagina haalt hem daar uit.
     body: JSON.stringify({ hashes: hashes, recipients: ontvangers, sealed: sealed,
-                           filename: naam, ttl_ms: ttlMs, lang: LANG }),
+                           ttl_ms: ttlMs, lang: LANG }),
     signal: AbortSignal.timeout(60000)
   });
   const body = await r.json().catch(function () { return {}; });
@@ -1567,6 +1594,9 @@ async function sealAndUpload(file, ttlMs, meerdereBlokken) {
     stukken.push(ct.subarray(at, Math.min(at + LINK_MAX_BLOB, ct.length)));
   }
   const hashes = [];
+  // One id for every block of this file (hertest T4-11): the relay counts one
+  // transfer and sends one notification per file_id, not one per block.
+  const fileId = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
   let eersteToken = null;
   // Het antwoord van het EERSTE blok, want dat is wat de afzender te zien
   // krijgt: de merkle-proof hangt eraan en de ttl is de gekapte waarde waar de
@@ -1576,8 +1606,7 @@ async function sealAndUpload(file, ttlMs, meerdereBlokken) {
   let eersteAntwoord = {};
   for (let i = 0; i < stukken.length; i++) {
     if (stukken.length > 1) {
-      $('seal-status').textContent = 'Sending ' + file.name + ', part '
-        + (i + 1) + ' of ' + stukken.length + '...';
+      $('seal-status').textContent = t('sendingPart')(file.name, i + 1, stukken.length);
       setSealProgress(Math.round(((i + 1) / stukken.length) * 90));
     }
     const deel = stukken[i];
@@ -1587,7 +1616,7 @@ async function sealAndUpload(file, ttlMs, meerdereBlokken) {
         hash, payload: toB64(deel), ttl_ms: ttlMs,
         // No file name and no size on the relay side: the name lives only inside
         // the sealed bytes, which is the same rule the live stand keeps.
-        meta: { device_id: 'transfer-web-link' }
+        meta: { device_id: 'transfer-web-link', file_id: fileId }
       }));
     const ud = await ur.json();
     if (window.paQuotaUpgrade && window.paQuotaUpgrade.isQuota402(ur.status, ud)) {
@@ -1664,6 +1693,8 @@ async function createLink() {
 
   showStep('step-sealing');
   setSealProgress(0);
+  // The rows of THIS send. sentLinks also holds earlier links of the session.
+  const nieuw = [];
   try {
     for (let i = 0; i < files.length; i++) {
       $('seal-status').textContent = (files.length > 1 ? t('fileNofM')(i + 1, files.length) : '') +
@@ -1675,7 +1706,7 @@ async function createLink() {
       // the file is burned when it is sitting on another sector.
       row.url = location.origin + '/get?t=' + encodeURIComponent(row.token) +
         '&r=' + encodeURIComponent(sector) + '#' + row.key;
-      sentLinks.push(row);
+      nieuw.push(row);
     }
     // ── a send to named recipients ───────────────────────────────────────
     // This is the path a sender takes when the receiver is not sitting at their
@@ -1688,7 +1719,7 @@ async function createLink() {
         throw new Error(t('oneFileOnly'));
       }
       $('seal-status').textContent = t('lockingKeys');
-      const geheim = paramantSendWrap.fromB64url(sentLinks[0].key);
+      const geheim = paramantSendWrap.fromB64url(nieuw[0].key);
       const sealed = {};
       for (const adres of ontvangers) {
         const token = paramantSendWrap.newToken();
@@ -1701,20 +1732,21 @@ async function createLink() {
       }
       $('seal-status').textContent = t('sendingInvites');
       const verzending = await maakVerzending(
-        sentLinks[0].hashes, files[0].name, ttlMs, ontvangers, sealed);
-      sentLinks.length = 0;
+        nieuw[0].hashes, files[0].name, ttlMs, ontvangers, sealed);
       setSealProgress(100);
       return toonVerzending(verzending, files[0].name);
     }
 
     setSealProgress(100);
+    sentLinks.push(...nieuw);
+    saveSentLinks();
     renderSentLinks();
     window.paramantDone.proof('step-link', {
       label: t('keepReceipt'),
       filename: 'paramant-receipt-' + new Date().toISOString().slice(0, 10) + '.json',
-      data: sentLinks.some(r => r.proof)
+      data: nieuw.some(r => r.proof)
         ? { kind: 'paramant-ct-inclusion', sent_utc: new Date().toISOString(),
-            entries: sentLinks.filter(r => r.proof).map(r => ({ file: r.name, chunk: 1, proof: r.proof })) }
+            entries: nieuw.filter(r => r.proof).map(r => ({ file: r.name, chunk: 1, proof: r.proof })) }
         : null,
     });
     showStep('step-link');
@@ -1756,7 +1788,11 @@ function linkStateLabel(row) {
 const LINK_REASON_STATE = { downloaded: 'delivered', expired: 'expired', lost: 'lost', withdrawn: 'withdrawn', exhausted: 'exhausted' };
 
 function renderSentLinks() {
-  const list = $('ps-link-list');
+  for (const id of ['ps-link-list', 'ps-earlier-list']) renderSentLinksInto($(id));
+  const earlier = $('ps-earlier');
+  if (earlier) earlier.hidden = sentLinks.length === 0;
+}
+function renderSentLinksInto(list) {
   if (!list) return;
   list.innerHTML = '';
   sentLinks.forEach((row, i) => {
@@ -1821,12 +1857,16 @@ async function copySentLink(el) {
 // route family and takes none. Sending the session token here would be widening
 // a fifteen-minute credential to a route that does not want it.
 async function refreshSentLinks() {
-  const btn = $('ps-link-refresh');
-  if (btn) { btn.disabled = true; btn.textContent = t('checking'); }
+  const btns = [$('ps-link-refresh'), $('ps-earlier-refresh')].filter(Boolean);
+  for (const btn of btns) { btn.disabled = true; btn.textContent = t('checking'); }
   for (const row of sentLinks) {
     if (row.state !== 'waiting') continue;
     try {
-      const r = await fetch(RELAY_API + '/v2/dl/' + encodeURIComponent(row.token) + '/info',
+      // The relay of the row itself: after a reload RELAY_API may not be
+      // known yet, and an account lives on one sector, named in the link.
+      let rowRelay = RELAY_API;
+      try { rowRelay = RELAY_SECTORS[new URL(row.url).searchParams.get('r')] || RELAY_API; } catch (_) { /* keep RELAY_API */ }
+      const r = await fetch(rowRelay + '/v2/dl/' + encodeURIComponent(row.token) + '/info',
         { signal: AbortSignal.timeout(8000) });
       if (r.ok) row.state = 'waiting';
       else if (r.status === 404 || r.status === 410) {
@@ -1839,8 +1879,9 @@ async function refreshSentLinks() {
       // as it was rather than reporting a delivery that may not have happened.
     }
   }
+  saveSentLinks();
   renderSentLinks();
-  if (btn) { btn.disabled = false; btn.textContent = t('checkAgain'); }
+  for (const btn of btns) { btn.disabled = false; btn.textContent = t('checkAgain'); }
 }
 
 function rejectFingerprint() {
@@ -1879,6 +1920,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // A receiving link goes to /get before the upload UI starts.
   if (forwardReceivingLink()) return;
 
+  loadSentLinks();
+  if (sentLinks.length) { renderSentLinks(); refreshSentLinks(); }
   loadSessionCredential();
 });
 

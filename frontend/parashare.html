@@ -571,12 +571,21 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     </div>
   </div>
 
+  <div class="card" id="ps-earlier" hidden>
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Uw links van deze sessie</div></div>
+    <div class="card-body">
+      <ul class="ps-links" id="ps-earlier-list"></ul>
+      <button type="button" class="ps-copy" id="ps-earlier-refresh" data-click="refreshSentLinks">Opnieuw kijken</button>
+      <p class="ps-meta">Bewaard in dit tabblad tot u het sluit.</p>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-head"><div class="dot amber"></div><div class="card-head-title">Bestand</div></div>
     <div class="card-body">
       <label class="label" for="file-input">Kies een bestand (of meerdere)</label>
       <input type="file" id="file-input" multiple data-change="onFileSelect">
-      <p class="ps-meta">Kiest u er meer dan één, dan gaan ze samen als één pakket.</p>
+      <p class="ps-meta">Kiest u er meer dan één, dan wordt elk bestand apart verzegeld en krijgt elk een eigen link.</p>
       <div class="status-line" id="file-status">Geen bestand gekozen</div>
       <div id="vault-list" style="margin-top:8px;display:none"></div>
     </div>
@@ -610,7 +619,6 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <div class="card-body">
       <label class="label" for="ttl-select">Link verloopt na</label>
       <select id="ttl-select">
-        <option value="30000">30 seconden</option>
         <option value="300000">5 minuten</option>
         <option value="3600000" selected>1 uur</option>
         <option value="86400000">24 uur</option>

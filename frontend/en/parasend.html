@@ -404,7 +404,7 @@
     <div class="check-grid">
       <div class="check-card">
         <div class="k">We never had it</div>
-        <p>AES-256-GCM with a key your browser generates. The relay only ever holds ciphertext, never the plaintext and never the key, and it holds it in RAM until its last read burns it. A web app transfer is stored in blocks of a fixed 5 MB, so a block says nothing about the size of the file. The retention row is on the <a href="/security">security page</a>.</p>
+        <p>AES-256-GCM with a key your browser generates. The relay only ever holds ciphertext, never the plaintext and never the key, and it holds it in RAM until its last read burns it. The relay does see roughly how large it is: a one-time link is not padded to a fixed size. The retention row is on the <a href="/security">security page</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">The wire format, in full</div>
