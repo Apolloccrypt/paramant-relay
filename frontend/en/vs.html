@@ -251,7 +251,7 @@
       <tbody>
         <tr>
           <td class="strong">Post-quantum encryption (ML-KEM)</td>
-          <td class="yes">ML-KEM-768 (NIST L3)</td>
+          <td class="partial">ML-KEM-768 + ECDH P-256 (hybrid, NIST L3) for the live hand-over and the SDK; a one-time link and a send to named recipients use AES-256-GCM without ML-KEM</td>
           <td class="no">None</td>
           <td class="partial">Roadmap announced 2025</td>
           <td class="no">None</td>
@@ -411,21 +411,21 @@
 
     <p>In June 2025, Zivver was acquired by Kiteworks, a California-based company that has raised $610M primarily from US investors. Zivver remains headquartered in Amsterdam, but data handling policies now operate under a US parent company structure. This introduces CLOUD Act considerations that were not present before the acquisition.</p>
 
-    <p class="dim mono" style="font-size:11px">Sources: Kiteworks press release June 17 2025; Zivver company blog; PitchBook Kiteworks profile.</p>
+    <p class="dim mono" style="font-size:11px">Sources (not linked, findable under these titles): Kiteworks press release June 17 2025; Zivver company blog; PitchBook Kiteworks profile.</p>
 
     <h3>Tresorit</h3>
     <p>Tresorit is a mature zero-knowledge cloud storage and collaboration platform. Independently audited by Ernst and Young and Computest. ISO 27001 and EAL4+ certified. Strong enterprise features including granular permission management and data residency choice across 12 EU and Swiss regions.</p>
 
     <p>Tresorit has been majority-owned by Swiss Post (Swiss state-owned postal service) since 2021. Under Swiss jurisdiction, not subject to US CLOUD Act. Tresorit operates as cloud storage with persistent files, not as a burn-on-read relay. Post-quantum cryptography is on their announced roadmap but implementation status as of April 2026 is not public.</p>
 
-    <p class="dim mono" style="font-size:11px">Sources: Swiss Post press release July 2021; Tresorit transparency report; Tresorit blog post on PQC November 2025.</p>
+    <p class="dim mono" style="font-size:11px">Sources (not linked, findable under these titles): Swiss Post press release July 2021; Tresorit transparency report; Tresorit blog post on PQC November 2025.</p>
 
     <h3>WeTransfer</h3>
     <p>WeTransfer is the category-defining file sharing tool for casual and creative use. Free tier allows 3 GB per transfer with 10 transfers per month. Pro and Ultimate tiers offer up to 300 GB transfers and unlimited storage. Excellent for video review workflows, client delivery of media assets, and one-off sends where security is not primary.</p>
 
     <p>WeTransfer uses TLS in transit and AES-256 at rest, but does not offer end-to-end encryption. WeTransfer holds the decryption keys, meaning the company has technical ability to access file content. Acquired by Italian company Bending Spoons in 2024. Headquartered in Amsterdam with Italian ownership. No CLOUD Act exposure via ownership. Not suitable for regulated sector data that requires zero-knowledge architecture.</p>
 
-    <p class="dim mono" style="font-size:11px">Sources: WeTransfer support documentation; onerep.com 2026 security review; Bending Spoons acquisition announcement.</p>
+    <p class="dim mono" style="font-size:11px">Sources (not linked, findable under these titles): WeTransfer support documentation; onerep.com 2026 security review; Bending Spoons acquisition announcement.</p>
 
     <h3>SFTP / SCP</h3>
     <p>SFTP over SSH is a mature, universally supported protocol for server-to-server file transfer. If you run your own infrastructure and control both ends of the transfer, SFTP works well and is free. Widely available on every Unix system.</p>
@@ -484,7 +484,7 @@
         <tr>
           <td class="strong">Post-quantum encryption today</td>
           <td class="cobalt-text">Paramant</td>
-          <td>ML-KEM-768 Level 3, live since this relay went into production in 2026</td>
+          <td>ML-KEM-768 Level 3, hybrid with ECDH P-256, for the live hand-over and the SDK; signing with ML-DSA-65</td>
         </tr>
         <tr>
           <td class="strong">Files that auto-destroy after receipt</td>
@@ -516,20 +516,20 @@
 
     <p style="color:var(--invert-ink);max-width:720px">Paramant does one specific job. It is a post-quantum encrypted file relay and document-signing service, with RAM-only storage, burn-on-read delivery, and public cryptographic transparency. It is not a cloud storage product, not an email plugin, and not a DLP platform.</p>
 
-    <p style="color:var(--invert-ink);max-width:720px;margin-top:16px">For organizations that need the combination of EU data sovereignty (without US ownership), post-quantum cryptography (today, not roadmap), zero-knowledge architecture (mathematically, not by policy), and the option to self-host, Paramant is presently the only option in this category.</p>
+    <p style="color:var(--invert-ink);max-width:720px;margin-top:16px">For organizations that need the combination of EU data sovereignty (without US ownership), post-quantum cryptography (today, not roadmap), encryption in the browser where a one-time link never sends the key past us, and the option to self-host, Paramant is presently the only option in this category.</p>
 
     <p style="color:var(--invert-ink);max-width:720px;margin-top:16px">For any other use case, one of the alternatives above is likely a better fit. That honesty is the point.</p>
 
     <div style="margin-top:48px;display:flex;gap:16px;flex-wrap:wrap">
-      <a href="/dashboard" class="btn btn-primary">Open your dashboard</a>
-      <a href="/security" class="btn btn-secondary-inverse">Why jurisdiction matters</a>
-      <a href="/docs" class="btn btn-secondary-inverse">Technical docs</a>
+      <a href="/en/dashboard" class="btn btn-primary">Open your dashboard</a>
+      <a href="/en/security" class="btn btn-secondary-inverse">Why jurisdiction matters</a>
+      <a href="/en/docs" class="btn btn-secondary-inverse">Technical docs</a>
     </div>
   </div>
 </section>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=13" defer></script>
+<script src="/js/nav-auth.js?v=14" defer></script>
 
 </main>
 <footer>

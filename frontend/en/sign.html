@@ -386,7 +386,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 .ds-zoom #ds-zoom-pct{font-family:var(--mono);font-size:11px;color:var(--ink-dim);min-width:42px;text-align:center}
 #ds-pdf-canvas-list{overflow:auto}
 #ds-pdf-canvas-list .ds-page-wrap{max-width:none;margin-left:auto;margin-right:auto}
-.ds-page-nav{position:sticky;top:8px;z-index:5;display:flex;align-items:center;gap:8px;width:fit-content;margin:0 auto 10px;padding:5px 12px;border:1px solid var(--ink-hair);border-radius:999px;background:rgba(var(--tint), .92);backdrop-filter:saturate(1.2) blur(2px);font:600 12px/1 Inter,sans-serif;color:var(--navy);pointer-events:none}
+.ds-page-nav{position:sticky;top:64px;z-index:5;display:flex;align-items:center;gap:8px;width:fit-content;margin:0 auto 10px;padding:5px 12px;border:1px solid var(--ink-hair);border-radius:999px;background:rgba(var(--tint), .92);backdrop-filter:saturate(1.2) blur(2px);font:600 12px/1 Inter,sans-serif;color:var(--navy);pointer-events:none}
 .ds-page-nav>*{pointer-events:auto}
 .ds-page-nav input{width:46px;text-align:center;font:inherit;border:1px solid var(--ink-hair);border-radius:6px;padding:2px 4px}
 .ds-page-nav button{border:1px solid var(--ink-hair);background:var(--card);border-radius:6px;cursor:pointer;padding:2px 8px;font:inherit}
@@ -588,7 +588,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       <li><b>Your signing key stays here</b> &middot; it is made on your device and never reaches our servers</li>
       <li><b>EU jurisdiction</b> &middot; servers in Germany, under EU law</li>
     </ul>
-    <p class="ds-headlink"><a href="/parasign">What ParaSign is, and what organisations pay &rarr;</a></p>
+    <p class="ds-headlink"><a href="/en/parasign">What ParaSign is, and what organisations pay &rarr;</a></p>
   </header>
 
   <!-- The session probe could not answer. NOT the same event as "you are not
@@ -607,8 +607,8 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <div class="ds-signedout" id="ds-signedout" role="status" hidden>
     <p class="ds-signedout-text">You are not signed in. You can prepare a document here; signing or sending it needs a free Community account.</p>
     <p class="ds-signedout-actions">
-      <a class="btn btn-secondary" href="/auth/login?next=/en/sign">Sign in</a>
-      <a class="btn btn-primary" href="/signup?next=/en/sign">Create account</a>
+      <a class="btn btn-secondary" href="/en/auth/login?next=/en/sign">Sign in</a>
+      <a class="btn btn-primary" href="/en/signup?next=/en/sign">Create account</a>
     </p>
   </div>
 
@@ -647,7 +647,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <p class="ds-sub">
       <strong>What you can do without one:</strong> open a signing request someone sent you
       and sign it with the link from that email, and
-      <a href="/verify">verify any signed document</a> against the public log. Neither needs
+      <a href="/en/verify">verify any signed document</a> against the public log. Neither needs
       an account.
     </p>
     <!-- .ds-btn was never defined in any stylesheet, so the one CTA a
@@ -656,11 +656,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
          uses, and sign-flow.js selects neither class, so nothing behavioural
          changes. -->
     <p class="ds-anon-actions">
-      <a class="btn btn-primary" href="/signup?next=/en/sign">Create an account</a>
-      <a class="btn btn-secondary" href="/auth/login?next=/en/sign">Sign in</a>
+      <a class="btn btn-primary" href="/en/signup?next=/en/sign">Create an account</a>
+      <a class="btn btn-secondary" href="/en/auth/login?next=/en/sign">Sign in</a>
     </p>
     <p class="ds-sub ds-anon-foot">
-      Community accounts sign 2 documents a month. <a href="/pricing">See what the paid tiers add</a>.
+      Community accounts sign 2 documents a month. <a href="/en/pricing">See what the paid tiers add</a>.
     </p>
   </section>
 
@@ -737,7 +737,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       </div>
       <label class="ds-seal-check" id="ds-allpages-label"><input type="checkbox" id="ds-allpages"> Sign every page with this signature (initials)</label>
       <button class="ds-edit-btn" id="ds-apply-tpl" type="button" hidden>Use saved position</button>
-      <span class="ds-edit-tip" id="ds-seal-tip">The other pages get small initials in a free corner of the margin, never over the text. Position and scale are remembered for next time (never your name or signature image).</span>
+      <span class="ds-edit-tip" id="ds-seal-tip">The other pages get small initials in a free spot in the margin. If a page has no free spot, you see that here before you sign. Position and scale are remembered for next time (never your name or signature image).</span>
     </div>
     <div class="ds-page-nav" id="ds-page-nav" hidden>
       <button id="ds-page-nav-prev" type="button" aria-label="Previous page">&#8593;</button>
@@ -888,7 +888,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       <dl class="ds-proof-dl">
         <dt>Algorithm</dt>          <dd>ML-DSA-65 (FIPS 204, post-quantum)</dd>
         <dt>Hash algorithm</dt>     <dd>SHA3-256</dd>
-        <dt>Document SHA3-256</dt>  <dd id="ds-proof-doc-hash">-</dd>
+        <dt id="ds-proof-doc-hash-label">Document SHA3-256</dt>  <dd id="ds-proof-doc-hash">-</dd>
         <dt>Signer key fingerprint</dt><dd id="ds-proof-fp">-</dd>
         <dt>Envelope version</dt>   <dd id="ds-proof-version">-</dd>
       </dl>
@@ -999,7 +999,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         <summary>What made this safe</summary>
         <div class="done-details-body">
           <p>The document was sealed in your browser before any of it left this device, and each personal link carries that one person's key after the <code>#</code>, which is the part of a link a browser never sends to a server. What sits on our side is bytes we have no way to read. The key stayed here too: the invitation email carries only a notice, so the mail provider that delivers it holds no way into the document and neither do we.</p>
-          <p>A link is bound to the address you gave it, so it opens for that signer and not for whoever else it is forwarded to. When they sign, the signature is made on their own device with a key of their own (<code>ML-DSA-65</code>) and recorded on our relay and in the public <a href="/ct-log">CT log</a>, so you can show later that it happened and when.</p>
+          <p>A link is bound to the address you gave it, so it opens for that signer and not for whoever else it is forwarded to. When they sign, the signature is made on their own device with a key of their own (<code>ML-DSA-65</code>) and recorded on our relay and in the public <a href="/en/ct-log">CT log</a>, so you can show later that it happened and when.</p>
           <p>Nobody has signed anything yet. This screen is the moment the requests went out.</p>
         </div>
       </details>
@@ -1008,7 +1008,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         <summary>What made this safe</summary>
         <div class="done-details-body">
           <p>The signature was made here, on this device, by a key that never left the browser and was unlocked by your face, your fingerprint or your security key at the moment you signed (<code>ML-DSA-65</code>, the signature scheme in FIPS 204). We hold the public half and the record of it. We never held the half that signs.</p>
-          <p>The proof file travels with the document and stands on its own. Anyone can check the pair without an account and without us: at <a href="/verify">paramant.app/verify</a>, which recomputes the document's own digest (<code>SHA3-256</code>), checks the signature against the public key inside the envelope and, when the envelope was counter-signed, checks our signature against the public <a href="/ct-log">CT log</a>. Or offline, with <code>paramant-sign verify &lt;file&gt; &lt;envelope.psign&gt;</code> from <a href="/docs#operator-scripts">paramant-sign</a>.</p>
+          <p>The proof file travels with the document and stands on its own. Anyone can check the pair without an account and without us: at <a href="/en/verify">paramant.app/verify</a>, which recomputes the document's own digest (<code>SHA3-256</code>), checks the signature against the public key inside the envelope and, for a proof with several signers, checks our counter-signature against a fixed Paramant key built into the page. That arithmetic happens in your browser; the document goes nowhere. The <code>paramant-sign</code> script cannot check this proof: it only knows the old envelopes (v1 and v2) and asks the relay for those.</p>
           <p>A green result there means three things at once: the bytes have not changed since you signed, the signature came from the holder of that key, and <span id="ds-usage-notary-line"></span></p>
 
           <div class="ds-info-card">
@@ -1063,10 +1063,10 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   </div>
 </footer>
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=13" defer></script>
+<script src="/js/nav-auth.js?v=14" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
 <script src="/js/quota-upgrade.js?v=7" defer></script>
 <script src="/js/done-state.js?v=1" defer></script>
-<script type="module" src="/sign-flow.js?v=67"></script>
+<script type="module" src="/sign-flow.js?v=69"></script>
 </body>
 </html>

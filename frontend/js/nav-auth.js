@@ -108,13 +108,19 @@
     ['Controleren', '/verify'],
     ['Instellingen', '/account']
   ] : [
-    ['Documents', '/dashboard'],
-    ['Send', '/parashare'],
-    ['Sign', '/sign'],
-    ['Lock a file', '/vault'],
-    ['Verify', '/verify'],
-    ['Settings', '/account']
+    // The English pages exist for each of these (frontend/en/), so an English
+    // reader stays English (fase 1 SITE-06).
+    ['Documents', '/en/dashboard'],
+    ['Send', '/en/parashare'],
+    ['Sign', '/en/sign'],
+    ['Lock a file', '/en/vault'],
+    ['Verify', '/en/verify'],
+    ['Settings', '/en/account']
   ];
+  // Where Help, Sign in and Create account lead, per language.
+  var R = DUTCH
+    ? { help: '/help', login: '/auth/login', signup: '/signup', dashboard: '/dashboard', account: '/account', pricing: '/pricing' }
+    : { help: '/en/help', login: '/en/auth/login', signup: '/en/signup', dashboard: '/en/dashboard', account: '/en/account', pricing: '/en/pricing' };
 
   function setNavigation(items, label) {
     var lists = document.querySelectorAll('nav.nav .nav-links');
@@ -146,9 +152,20 @@
       ? '<a href="/help" class="nav-help">Hulp</a>' +
         '<a href="/auth/login" class="nav-signin">Inloggen</a>' +
         '<a href="/signup" class="nav-cta">Account maken</a>'
-      : '<a href="/help" class="nav-help">Help</a>' +
-        '<a href="/auth/login" class="nav-signin">Sign in</a>' +
-        '<a href="/signup" class="nav-cta">Create account</a>';
+      : '<a href="' + R.help + '" class="nav-help">Help</a>' +
+        '<a href="' + R.login + '" class="nav-signin">Sign in</a>' +
+        '<a href="' + R.signup + '" class="nav-cta">Create account</a>';
+  }
+
+  // The session check itself failed (429, 5xx, no network): we do not know
+  // whether this visitor is signed in. Telling a signed-in customer "Create
+  // account" was wrong (fase 1 SITE-02-K), so offer the one link that is right
+  // either way: the account page, which sends a stranger to the login.
+  function renderUnknown() {
+    setNavigation(PUBLIC_NAV, DUTCH ? 'Hoofdmenu' : 'Primary');
+    container.innerHTML =
+      '<a href="' + R.help + '" class="nav-help">' + (DUTCH ? 'Hulp' : 'Help') + '</a>' +
+      '<a href="' + R.account + '" class="nav-signin">' + (DUTCH ? 'Mijn account' : 'My account') + '</a>';
   }
 
   function renderLoggedIn(email) {
@@ -168,7 +185,7 @@
     // with it (one .nav-prefs row; a page stamped before it has .nav-lang).
     if (tail) {
       var langSwitch = tail.querySelector('.nav-prefs') || tail.querySelector('.nav-lang');
-      tail.innerHTML = '<a href="/help" class="nav-tail-link">' + (DUTCH ? 'Hulp' : 'Help') + '</a>';
+      tail.innerHTML = '<a href="' + R.help + '" class="nav-tail-link">' + (DUTCH ? 'Hulp' : 'Help') + '</a>';
       if (langSwitch) tail.appendChild(langSwitch);
     }
     var shortEmail = email.length > 24 ? email.slice(0, 18) + '...' : email;
@@ -187,18 +204,18 @@
       plan: 'Plan &amp; billing', out: 'Sign out'
     };
     container.innerHTML =
-      '<a href="/help" class="nav-help">' + T.help + '</a>' +
+      '<a href="' + R.help + '" class="nav-help">' + T.help + '</a>' +
       '<div class="nav-user">' +
         '<button type="button" class="nav-user-trigger" aria-expanded="false">' +
           '<span class="nav-user-email"></span>' +
           '<span class="nav-user-chevron">\u25be</span>' +
         '</button>' +
         '<div class="nav-user-menu" hidden>' +
-          '<a href="/dashboard" class="nav-menu-item">' + T.docs + '</a>' +
-          '<a href="/account" class="nav-menu-item">' + T.account + '</a>' +
+          '<a href="' + R.dashboard + '" class="nav-menu-item">' + T.docs + '</a>' +
+          '<a href="' + R.account + '" class="nav-menu-item">' + T.account + '</a>' +
           '<a href="/developer" class="nav-menu-item">' + T.dev + '</a>' +
-          '<a href="/pricing" class="nav-menu-item">' + T.plan + '</a>' +
-          '<a href="/help" class="nav-menu-item">' + T.help + '</a>' +
+          '<a href="' + R.pricing + '" class="nav-menu-item">' + T.plan + '</a>' +
+          '<a href="' + R.help + '" class="nav-menu-item">' + T.help + '</a>' +
           '<div class="nav-menu-divider"></div>' +
           '<button type="button" class="nav-menu-item nav-menu-signout" id="nav-signout">' + T.out + '</button>' +
         '</div>' +
@@ -248,10 +265,20 @@
   check();
   async function check() {
     try {
-      var res = await fetch('/api/user/session/verify', {
-        credentials: 'include',
-        cache: 'no-store',
-      });
+      var res = null;
+      // A busy relay (429) or a hiccup (5xx) is not "signed out": ask again a
+      // couple of times, honouring a short Retry-After, before giving up.
+      for (var attempt = 0; attempt < 3; attempt++) {
+        res = await fetch('/api/user/session/verify', {
+          credentials: 'include',
+          cache: 'no-store',
+        });
+        if (res.status !== 429 && res.status < 500) break;
+        if (attempt === 2) break;
+        var wait = Math.min(5, Number(res.headers.get('Retry-After')) || (attempt + 1));
+        await new Promise(function(r) { setTimeout(r, wait * 1000); });
+      }
+      if (res.status === 429 || res.status >= 500) { renderUnknown(); return; }
       if (!res.ok) { renderLoggedOut(); return; }
       var data = await res.json();
       if (data.authenticated && data.email) {
@@ -261,7 +288,7 @@
         renderLoggedOut();
       }
     } catch (err) {
-      renderLoggedOut();
+      renderUnknown();
     }
   }
 })();

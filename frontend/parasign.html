@@ -243,8 +243,8 @@
         <p>Voeg iedereen toe die moet tekenen. Elke uitnodiging is gekoppeld aan precies het e-mailadres dat u invult, en het versleutelde document reist met het verzoek mee. Iedere ondertekenaar kan de eigen handtekening als paraaf op elke pagina zetten. Er is geen vaste volgorde: ieder tekent wanneer het uitkomt.</p>
       </div>
       <div class="check-card">
-        <div class="k">Elk soort bestand, via een vingerafdruk</div>
-        <p>Is het bestand geen pdf, dan ondertekent u alleen de hash: een vingerafdruk van de bytes. De ontvanger controleert dat door van hetzelfde bestand opnieuw de hash te berekenen.</p>
+        <div class="k">Beveiligde pdf, via een vingerafdruk</div>
+        <p>Is een pdf beveiligd, zodat er geen stempel in kan, dan ondertekent u alleen de hash: een vingerafdruk van de bytes. De ontvanger controleert dat door van hetzelfde bestand opnieuw de hash te berekenen. Andere bestanden dan pdf ondertekent ParaSign niet; zet uw bestand eerst om naar pdf.</p>
       </div>
       <div class="check-card">
         <div class="k">API voor ontwikkelaars vanaf Firm</div>
@@ -335,8 +335,8 @@
     <p>Om een document te ondertekenen heeft u een Paramant-account nodig, want de ondertekensleutel hoort bij dat account. Een verzoek openen dat iemand u stuurde kan zonder: wie is uitgenodigd, volgt de persoonlijke link in de e-mail.</p>
     <ol class="ps-steps">
       <li><strong><a href="/signup">Maak een gratis account</a>.</strong> Geen betaalkaart, geen tijdslimiet. Het Community-plan geeft 2 handtekeningen per maand.</li>
-      <li><strong><a href="/sign">Open ParaSign</a> en kies uw document.</strong> Een pdf krijgt een zichtbare stempel die u op elke pagina kunt zetten; andere bestanden worden via hun vingerafdruk ondertekend. Voeg zo nodig medeondertekenaars toe en teken. Uw sleutel wordt ontgrendeld met Face ID, Touch ID of een beveiligingssleutel op het moment dat u tekent, en verlaat uw apparaat nooit.</li>
-      <li><strong>Downloaden en delen.</strong> U krijgt de pdf met stempel en het .psign-bestand. Iedereen kan ze controleren op de <a href="/verify">controlepagina</a>, offline en zonder account.</li>
+      <li><strong><a href="/sign">Open ParaSign</a> en kies uw document.</strong> Een pdf krijgt een zichtbare stempel die u op elke pagina kunt zetten. ParaSign ondertekent alleen pdf; zet een ander bestand eerst om naar pdf. Voeg zo nodig medeondertekenaars toe en teken. Uw sleutel wordt ontgrendeld met Face ID, Touch ID of een beveiligingssleutel op het moment dat u tekent, en verlaat uw apparaat nooit.</li>
+      <li><strong>Downloaden en delen.</strong> U krijgt de pdf met stempel en het .psign-bestand. Iedereen kan ze controleren op de <a href="/verify">controlepagina</a>, zonder account, en bij een bewijs van nu zonder verbinding met ons.</li>
     </ol>
   </div>
 </section>
@@ -366,7 +366,7 @@
       </div>
       <div class="check-card">
         <div class="k">Controleren zonder ons</div>
-        <p>Een getekend document is te controleren zonder contact met ons. Controleer een .psign-bestand op de <a href="/verify">controlepagina</a>: geen account, geen API-sleutel, en de controle zelf maakt geen verbinding met ons. Alleen als u wilt weten bij welk account een sleutel hoort, vraagt de pagina dat, en pas als u daarop klikt.</p>
+        <p>Een getekend document is te controleren zonder contact met ons. Controleer een .psign-bestand op de <a href="/verify">controlepagina</a>: geen account, geen API-sleutel, en bij een bewijs van nu maakt de controle zelf geen verbinding met ons. Alleen een ouder bewijs (formaat v1 of v2) laat de pagina door onze relay controleren, en daarvoor stuurt ze alleen de vingerafdruk van het document en het bewijs mee. Alleen als u wilt weten bij welk account een sleutel hoort, vraagt de pagina dat, en pas als u daarop klikt.</p>
       </div>
       <div class="check-card">
         <div class="k">Code die u kunt inzien</div>
@@ -374,7 +374,7 @@
       </div>
       <div class="check-card">
         <div class="k">EU-grond, EU-recht</div>
-        <p>Hetzner in Duitsland, Bunny DNS (Sloveni&euml;). Uw bestanden gaan niet langs een Amerikaanse partij. E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten, zoals <a href="/privacy">/privacy</a> uitlegt. Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Geen Amerikaanse partij raakt een bestand of een sleutel aan. Op die pagina staan ook de subverwerkers. Regel 5 op <a href="/rules">onze regelspagina</a> zegt hetzelfde, volledig.</p>
+        <p>Hetzner in Duitsland, Bunny DNS (Sloveni&euml;). De versleutelde documenten staan alleen op onze servers in de EU. E-mail gaat nu nog via Resend in de Verenigde Staten, zoals <a href="/privacy">/privacy</a> uitlegt; we stappen over naar een Nederlandse aanbieder. Een uitnodiging om te ondertekenen bevat nooit het document, wel de helft van de documentsleutel; de andere helft geeft de relay alleen aan de ingelogde ontvanger. Op die pagina staan ook de subverwerkers. Regel 5 op <a href="/rules">onze regelspagina</a> zegt hetzelfde, volledig.</p>
       </div>
     </div>
     <div class="scope-note">
@@ -421,6 +421,6 @@
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=13" defer></script>
+<script src="/js/nav-auth.js?v=14" defer></script>
 </body>
 </html>

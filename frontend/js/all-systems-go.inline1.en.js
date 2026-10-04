@@ -32,10 +32,40 @@
       'Relay ' + esc(data.version||'?') + ' / sector ' + esc(data.sector||'?') + ' - updated ' + new Date().toLocaleTimeString();
   }
 
+  var T_UP = 'The relay is answering';
+  var T_DOWN = 'The relay does not answer on /health';
+  var T_SUB = 'The full check (storage, keys, TLS) is visible only to the operator of this relay. What anyone can see is whether the relay answers.';
+  var T_AT = ' - updated ';
+  var T_LOC = undefined;
+
+  // What anyone can measure without operator access: does /health answer.
+  // Neutral, never green: the deep checks were not run.
+  function publicOnly(){
+    return fetch('/health', { cache: 'no-store' })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .catch(function(){ return null; })
+      .then(function(h){
+        var dot = document.getElementById('overall-dot');
+        dot.className = 'asg-dot-lg asg-overall-loading';
+        dot.innerHTML = 'i';
+        document.getElementById('overall-title').textContent = h && h.ok ? T_UP : T_DOWN;
+        document.getElementById('overall-sub').textContent = T_SUB;
+        document.getElementById('checks').innerHTML = '';
+        document.getElementById('asg-meta').textContent = h && h.ok
+          ? 'Relay ' + esc(h.version||'?') + ' / sector ' + esc(h.sector||'?') + T_AT + new Date().toLocaleTimeString(T_LOC)
+          : '';
+      });
+  }
+
   function poll(){
     fetch('/v2/health/deep', { cache: 'no-store' })
-      .then(function(r){ return r.json(); })
-      .then(render)
+      .then(function(r){
+        // 401/403: the deep check is for the operator of this relay only (on
+        // our own relays it sits behind internal auth). That is not a failed
+        // check, so it must not read as one: show what is public instead.
+        if (r.status === 401 || r.status === 403) return publicOnly();
+        return r.json().then(render);
+      })
       .catch(function(){
         document.getElementById('overall-title').textContent = 'Cannot reach the relay';
         document.getElementById('overall-sub').textContent = 'The /v2/health/deep endpoint did not respond.';

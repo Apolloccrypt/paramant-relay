@@ -255,7 +255,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </div><main>
 
   <div class="breadcrumb">
-    <a href="/help">Help</a>
+    <a href="/en/help">Help</a>
     <span>/</span>
     API key vs TOTP
   </div>
@@ -293,11 +293,11 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <p>Machine-to-machine calls use the API key alone. That covers IoT devices, CI pipelines and server scripts. The key goes in the <code>Authorization</code> header on every request. No TOTP code is required because the machine cannot open an authenticator app.</p>
 
-  <div class="tip"><p>Use a <strong>dedicated API key</strong> for each integration so you can revoke one without affecting the others. Create additional keys in <a href="/dashboard">Dashboard &rarr; API keys</a>.</p></div>
+  <div class="tip"><p>Use a <strong>dedicated API key</strong> for each integration so you can revoke one without affecting the others. Create additional keys in <a href="/en/dashboard">Dashboard &rarr; API keys</a>.</p></div>
 
   <h2>When you need both</h2>
 
-  <p>Signing in to the Paramant web dashboard at <a href="/auth/login">paramant.app/auth/login</a> always needs both, in this order:</p>
+  <p>Signing in to the Paramant web dashboard at <a href="/en/auth/login">paramant.app/auth/login</a> always needs both, in this order:</p>
 
   <ol style="margin:16px 0 16px 20px;display:flex;flex-direction:column;gap:10px">
     <li style="color:var(--ink-dim);font-size:var(--text-base);line-height:1.7">Enter your email address</li>
@@ -385,6 +385,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=13" defer></script>
+<script src="/js/nav-auth.js?v=14" defer></script>
 </body>
 </html>

@@ -87,7 +87,7 @@ ok('signed out, the bar speaks English',
   await out.locator('#ds-signedout').innerText());
 const barLinks = await out.locator('#ds-signedout a').evaluateAll((nodes) => nodes.map((n) => [n.textContent.trim(), n.getAttribute('href')]));
 ok('the bar comes back to /en/sign afterwards',
-  JSON.stringify(barLinks) === JSON.stringify([['Sign in', '/auth/login?next=/en/sign'], ['Create account', '/signup?next=/en/sign']]),
+  JSON.stringify(barLinks) === JSON.stringify([['Sign in', '/en/auth/login?next=/en/sign'], ['Create account', '/en/signup?next=/en/sign']]),
   JSON.stringify(barLinks));
 await out.locator('.ds-mode-card[data-mode="invite"]').click();
 ok('the script labels the invite stepper in English',
@@ -118,7 +118,7 @@ await pickJpeg(jpeg);
 await jpeg.locator('#ds-doc-error:not([hidden])').waitFor({ timeout: 15000 });
 ok('a JPEG is refused in English',
   (await jpeg.locator('#ds-doc-error').innerText()).trim()
-    === 'This is a JPEG image, not a PDF. ParaSign signs PDF documents. Export or print your file to PDF first.',
+    === 'This is a JPEG image, not a PDF. ParaSign signs PDF only. Convert your file to PDF first: export it, or print it to PDF.',
   await jpeg.locator('#ds-doc-error').innerText());
 await jpeg.close();
 

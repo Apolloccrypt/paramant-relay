@@ -25,7 +25,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, title, org, kvk, email,
-          signed_at: new Date().toISOString(), version: '2025-01-01' })
+          signed_at: new Date().toISOString(), version: ((document.querySelector('[data-dpa-versie]') || {}).dataset || {}).dpaVersie || '' })
       });
       var d = await r.json();
       if (r.ok && d.ok) {

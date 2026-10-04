@@ -565,8 +565,20 @@
     });
   }
 
-  fetch('/api/user/session/verify', { credentials: 'include', cache: 'no-store' })
-    .then(function (r) { return r.ok ? r.json() : null; })
+  // A busy relay (429) or a hiccup (5xx) is not "signed out": ask again a
+  // couple of times before showing the signed-out pitch (fase 1 SITE-02-K).
+  function verifySession(attempt) {
+    return fetch('/api/user/session/verify', { credentials: 'include', cache: 'no-store' })
+      .then(function (r) {
+        if ((r.status === 429 || r.status >= 500) && attempt < 2) {
+          var wait = Math.min(5, Number(r.headers.get('Retry-After')) || (attempt + 1));
+          return new Promise(function (res) { setTimeout(res, wait * 1000); })
+            .then(function () { return verifySession(attempt + 1); });
+        }
+        return r.ok ? r.json() : null;
+      });
+  }
+  verifySession(0)
     .then(function (data) {
       if (!data || !data.authenticated) return;
 

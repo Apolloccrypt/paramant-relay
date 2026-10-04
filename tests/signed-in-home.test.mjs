@@ -265,7 +265,7 @@ for (const state of states) {
   }
   ok(`${state.title}: the reader is never left with three buttons over a hole`, m.gap <= 120, `gap ${m.gap}px, cards ${m.cards}`);
   ok(`${state.title}: the words are the reader's, not the relay's`, !JARGON.test(m.text), (m.text.match(JARGON) || [''])[0]);
-  ok(`${state.title}: the three actions stay, and stay in order`, JSON.stringify(m.actions) === JSON.stringify(['/dashboard','/sign','/parashare']), JSON.stringify(m.actions));
+  ok(`${state.title}: the three actions stay, and stay in order`, JSON.stringify(m.actions) === JSON.stringify(['/dashboard','/sign','/parashare'].map((h) => (L.key === 'en' ? '/en' + h : h))), JSON.stringify(m.actions));
   await page.close();
 }
 
@@ -322,7 +322,7 @@ ok('a new account: the card says both first steps and how long they take', L.not
 // row underneath is taken away in this one state and Documents stays in the
 // nav's user menu.
 ok('a new account: the two first steps are offered once, not twice', seen.empty.buttons.length === 2
-  && JSON.stringify(seen.empty.buttons) === JSON.stringify(['/sign','/parashare']), JSON.stringify(seen.empty.buttons));
+  && JSON.stringify(seen.empty.buttons) === JSON.stringify(['/sign','/parashare'].map((h) => (L.key === 'en' ? '/en' + h : h))), JSON.stringify(seen.empty.buttons));
 ok('every other state keeps the three actions on screen', seen.open.buttons.length === 3 && seen.recent.buttons.length === 3 && seen.down.buttons.length === 3,
   JSON.stringify([seen.open.buttons, seen.recent.buttons, seen.down.buttons]));
 

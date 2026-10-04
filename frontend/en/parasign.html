@@ -229,8 +229,8 @@
     <p class="ps-lede">Send a contract out for signature and get it back signed, without it passing through anyone else's cloud. Anyone can check the result later, without us.</p>
     <p class="ps-who">For legal, finance and healthcare practices in the EU that sign contracts and client documents.</p>
     <div class="ps-actions">
-      <a href="/sign" class="btn btn-primary">Sign a document &rarr;</a>
-      <a href="/pricing" class="btn btn-secondary">See pricing &rarr;</a>
+      <a href="/en/sign" class="btn btn-primary">Sign a document &rarr;</a>
+      <a href="/en/pricing" class="btn btn-secondary">See pricing &rarr;</a>
     </div>
     <p class="ps-fine">Free on the <a href="#plans">Community plan</a>: 2 signatures a month, no card, forever. Business plans from &euro;29 a month excl. btw. The person you invite signs in to the account the invitation went to.</p>
     <div class="scope-note">
@@ -255,12 +255,12 @@
         <p>Add each person who needs to sign. Every invitation is bound to the exact email address you enter, and the encrypted document travels with the request. Every signer can repeat their signature as initials on every page. There is no fixed order: each person signs when it suits them.</p>
       </div>
       <div class="check-card">
-        <div class="k">Any file type, by fingerprint</div>
-        <p>Files that are not PDFs get a hash-only attestation: you sign a fingerprint of the bytes and recipients verify by re-hashing the same file.</p>
+        <div class="k">Protected PDFs, by fingerprint</div>
+        <p>A protected PDF that cannot take a stamp gets a hash-only attestation: you sign a fingerprint of the bytes and recipients verify by re-hashing the same file. ParaSign does not sign files other than PDF; convert your file to PDF first.</p>
       </div>
       <div class="check-card">
         <div class="k">Developer API from Firm</div>
-        <p>Connect signing to your own apps and quotes with the developer API and webhooks. See the <a href="/docs#parasign-api">documentation</a>.</p>
+        <p>Connect signing to your own apps and quotes with the developer API and webhooks. See the <a href="/en/docs#parasign-api">documentation</a>.</p>
       </div>
     </div>
   </div>
@@ -279,7 +279,7 @@
       <div>
         <span class="mono-eyebrow">Community</span>
         <h3>&euro;0, forever</h3>
-        <p>No card, no clock, no trial that quietly ends. It is called <strong>Community</strong> on the <a href="/pricing">pricing page</a> too.</p>
+        <p>No card, no clock, no trial that quietly ends. It is called <strong>Community</strong> on the <a href="/en/pricing">pricing page</a> too.</p>
         <ul>
           <li>2 signatures a month</li>
           <li>No limit on receiving</li>
@@ -288,19 +288,19 @@
           <li>No card required</li>
         </ul>
         <div class="ps-actions">
-          <a href="/signup" class="btn btn-primary">Start free &rarr;</a>
+          <a href="/en/signup" class="btn btn-primary">Start free &rarr;</a>
         </div>
         <p class="ps-fine">Receiving is not metered. The tier table in relay/lib/tiers.js has no inbound or receiving dimension at all, so being invited, opening an invitation and fetching the document back are not counted against anything, on any plan. Putting your own signature on one is: that counts against the 2 a month above, whoever sent it to you.</p>
       </div>
       <div>
         <div class="k" style="font-family:var(--mono);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--navy)">Why it is free</div>
-        <p>Paramant is built by <strong>Paramantis Solutions B.V.</strong> in Harderwijk (see the <a href="/about">about page</a>). The Community plan is what the company gives back: whoever needs to sign a document without handing it to an American cloud can do that here, at no cost, with the same cryptography a paying customer gets.</p>
+        <p>Paramant is built by <strong>Paramantis Solutions B.V.</strong> in Harderwijk (see the <a href="/en/about">about page</a>). The Community plan is what the company gives back: whoever needs to sign a document without handing it to an American cloud can do that here, at no cost, with the same cryptography a paying customer gets.</p>
         <p>It is not a limited edition of the product. Community gets the same signatures, the same encryption and the same public proof log as Business. What a paid plan buys is volume, an API, support and accountability. Never security.</p>
       </div>
     </div>
 
     <h3 style="font-size:var(--text-md);margin-top:var(--space-8);color:var(--navy)">Business plans</h3>
-    <p>For firms that sign at volume, need the API, or have to answer to an auditor. Names and prices match the <a href="/pricing">pricing page</a>, where you can also check out.</p>
+    <p>For firms that sign at volume, need the API, or have to answer to an auditor. Names and prices match the <a href="/en/pricing">pricing page</a>, where you can also check out.</p>
     <div class="tier-grid">
       <div class="tier-card">
         <div class="tier-name">Firm</div>
@@ -335,7 +335,7 @@
         </ul>
       </div>
     </div>
-    <p class="ps-fine">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Firm &euro;35.09/mo or &euro;350.90/yr, Business &euro;361.79/mo or &euro;3,617.90/yr. Pricing is per organisation, not per user. Checkout and the full comparison are on the <a href="/pricing">pricing page</a>.</p>
+    <p class="ps-fine">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Firm &euro;35.09/mo or &euro;350.90/yr, Business &euro;361.79/mo or &euro;3,617.90/yr. Pricing is per organisation, not per user. Checkout and the full comparison are on the <a href="/en/pricing">pricing page</a>.</p>
   </div>
 </section>
 
@@ -346,9 +346,9 @@
     <h2 style="margin-top:var(--space-2)">Three steps to a signed document</h2>
     <p>Signing a document needs a Paramant account, because the signing key is bound to it. Opening a signing request someone sent you does not: invited signers follow the personal link in their email.</p>
     <ol class="ps-steps">
-      <li><strong><a href="/signup">Create a free account</a>.</strong> No card, no time limit. The Community plan covers 2 signatures a month.</li>
-      <li><strong><a href="/sign">Open ParaSign</a> and pick your document.</strong> PDFs get a visible signature stamp you place on any page; other file types are attested by fingerprint. Add co-signers if you need them, then sign. Your key is unlocked with Face ID, Touch ID or a security key the moment you sign, and it is never exported.</li>
-      <li><strong>Download and share.</strong> You get the stamped PDF and the .psign envelope. Anyone can check them on the <a href="/verify">verify page</a>, offline, without an account.</li>
+      <li><strong><a href="/en/signup">Create a free account</a>.</strong> No card, no time limit. The Community plan covers 2 signatures a month.</li>
+      <li><strong><a href="/en/sign">Open ParaSign</a> and pick your document.</strong> PDFs get a visible signature stamp you place on any page. ParaSign signs PDF only; convert any other file to PDF first. Add co-signers if you need them, then sign. Your key is unlocked with Face ID, Touch ID or a security key the moment you sign, and it is never exported.</li>
+      <li><strong>Download and share.</strong> You get the stamped PDF and the .psign envelope. Anyone can check them on the <a href="/en/verify">verify page</a>, without an account, and for a current proof without contacting us.</li>
     </ol>
   </div>
 </section>
@@ -362,11 +362,11 @@
     <div class="check-grid">
       <div class="check-card">
         <div class="k">ML-DSA-65 (FIPS 204)</div>
-        <p>ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay. The algorithm register on the <a href="/crypto-agility">crypto agility page</a> lists it as the loaded default.</p>
+        <p>ML-DSA-65 (FIPS 204), generated in your browser. The private key never reaches the relay. The algorithm register on the <a href="/en/crypto-agility">crypto agility page</a> lists it as the loaded default.</p>
       </div>
       <div class="check-card">
         <div class="k">You own your keys</div>
-        <p>The private key is generated on your device and never sent. We see only the public half. How that works is on the <a href="/security">security page</a>.</p>
+        <p>The private key is generated on your device and never sent. We see only the public half. How that works is on the <a href="/en/security">security page</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">SHA3-256 for non-PDF files</div>
@@ -374,19 +374,19 @@
       </div>
       <div class="check-card">
         <div class="k">Public transparency log</div>
-        <p>Every signature is entered into a public, append-only log. Inspect it on the <a href="/ct-log">CT Log</a>.</p>
+        <p>Every signature is entered into a public, append-only log. Inspect it on the <a href="/en/ct-log">CT Log</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">Verification without us</div>
-        <p>A signed document verifies without contacting us. Check a .psign envelope on the <a href="/verify">verify page</a>: no account, no API key, and the check itself makes no connection to us. Only if you want to know which account a key belongs to does the page ask, and only when you click for it.</p>
+        <p>A signed document verifies without contacting us. Check a .psign envelope on the <a href="/en/verify">verify page</a>: no account, no API key, and for a current proof the check itself makes no connection to us. Only an older proof (format v1 or v2) is checked by our relay, and for that the page sends only the document fingerprint and the proof. Only if you want to know which account a key belongs to does the page ask, and only when you click for it.</p>
       </div>
       <div class="check-card">
         <div class="k">Source-available code</div>
-        <p>The relay is source-available on <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a>. Who is behind it is on the <a href="/about">about page</a>.</p>
+        <p>The relay is source-available on <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a>. Who is behind it is on the <a href="/en/about">about page</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">EU soil, EU law</div>
-        <p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path. Email (only the email address and the invite link, never the document or a key) still goes through Resend Inc. in the United States for now, as our <a href="/privacy">privacy policy</a> sets out. That is the one exception in the chain; we are moving to a Dutch provider. No US provider touches a file or a key. The subprocessors are listed there, and rule 5 states the same claim in full on <a href="/rules">our rules page</a>.</p>
+        <p>Hetzner Germany, Bunny DNS (Slovenia). The encrypted documents sit only on our servers in the EU. Email still goes through Resend in the United States for now, as our <a href="/en/privacy">privacy policy</a> sets out; we are moving to a Dutch provider. An invitation to sign never carries the document, but it does carry half of the document key; the relay hands the other half only to the signed-in recipient. The subprocessors are listed there, and rule 5 states the same claim in full on <a href="/en/rules">our rules page</a>.</p>
       </div>
     </div>
     <div class="scope-note">
@@ -395,7 +395,7 @@
       <p><strong>What a simple signature is worth in the Netherlands.</strong> Under Dutch law an ordinary electronic signature has the same legal effect as a handwritten one, provided the method used for signing is sufficiently reliable in the light of the purpose for which it was used and all the other circumstances of the case (Dutch Civil Code, art. 3:15a, <a href="https://wetten.overheid.nl/BWBR0005291/2025-07-01" target="_blank" rel="noopener">wetten.overheid.nl BWBR0005291</a>). A qualified signature (QES) shifts the burden of proof: with a QES that reliability does not have to be shown. With a simple signature it is an open standard, and ParaSign is built to make the reliability demonstrable: every signature produces a receipt and an entry in a public log that anyone can check. This is not legal advice; ask your own counsel what your matter needs.</p>
     </div>
     <div class="ps-actions">
-      <a href="/sign" class="btn btn-primary">Sign a document &rarr;</a>
+      <a href="/en/sign" class="btn btn-primary">Sign a document &rarr;</a>
     </div>
   </div>
 </section>
@@ -433,6 +433,6 @@
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=13" defer></script>
+<script src="/js/nav-auth.js?v=14" defer></script>
 </body>
 </html>

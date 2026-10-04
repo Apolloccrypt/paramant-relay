@@ -839,8 +839,8 @@ assert.doesNotMatch(pricingVisible, /Mick Beer/,
 // /dashboard, a page nobody without an account can open.
 const freeCardCtas = [...pricingVisible.matchAll(/<div class="tier-name">Community<\/div>[\s\S]*?<a href="([^"]+)"[^>]*class="btn btn-primary"/g)].map((m) => m[1]);
 assert.ok(freeCardCtas.length >= 2, 'pricing.html must still have Community cards with a primary action');
-assert.deepEqual([...new Set(freeCardCtas)], ['/signup'],
-  `the Community cards must send a visitor to /signup, not to a page they cannot open: ${freeCardCtas.join(', ')}`);
+assert.deepEqual([...new Set(freeCardCtas)], ['/en/signup'],
+  `the Community cards must send a visitor to /en/signup (this is the English page), not to a page they cannot open: ${freeCardCtas.join(', ')}`);
 
 console.log('ui-truthfulness: /pricing says what it sells, with the number, above the tables');
 
@@ -897,7 +897,7 @@ for (const page of [docsEn, docsHtml]) {
   const docsActions = (page.match(/<div class="docs-hero-actions">[\s\S]*?<\/div>/) || [''])[0];
   assert.match(docsActions, /<a href="#quickstart" class="docs-hero-btn docs-hero-btn-primary">/,
     'the developer keeps the primary button on /docs: Quick start');
-  assert.match(docsActions, /<a href="\/pricing" class="docs-hero-btn docs-hero-btn-secondary">/,
+  assert.match(docsActions, page === docsEn ? /<a href="\/en\/pricing" class="docs-hero-btn docs-hero-btn-secondary">/ : /<a href="\/pricing" class="docs-hero-btn docs-hero-btn-secondary">/,
     'the buyer gets a real button to /pricing beside it, not only a text link');
 }
 assert.match(developerHtml, /<p class="lede">[^<]*(?:<a[^>]*>[^<]*<\/a>[^<]*)*API-toegang zit in het abonnement vanaf Firm/,
@@ -954,13 +954,16 @@ assert.doesNotMatch(helpBody, /Pay for volume, never for security/,
 // not repeated here.
 assert.match(securityHtml, /Hetzner Nuremberg, Germany/,
   'security.html must keep the server location row /help quotes');
-assert.match(homeGrid, /No US provider in the data path\. Email \(only the email address and the invite link, never the document or a key\) still goes through Resend Inc\. in the United States for now, as <a href="\/privacy">\/privacy<\/a> sets out\. That is the one exception in the chain; we are moving to a Dutch provider\./,
+// Fase 2 (SITE-34): the old line said the email carries "never ... a key".
+// For a send to named recipients the email carries the token that opens the
+// file, so the home page now says that, and /help says it shorter.
+assert.match(homeGrid, /Email still goes through Resend in the United States for now\. For a send to named recipients that email carries the link with the token/,
   'index.html is the source of the data-path wording and its Resend exception');
-assert.match(helpAnswers, /Your documents live on servers at Hetzner Nuremberg, Germany, and they sit there as ciphertext\./,
+assert.match(helpAnswers, /Your documents live on servers at Hetzner Nuremberg, Germany, and they sit there as ciphertext/,
   'help/index.html must answer where the documents live, and say they are ciphertext there');
-assert.match(helpAnswers, /no US provider is in the data path/,
-  'help/index.html must scope the claim to the data path');
-assert.match(helpAnswers, /Email \(only the email address and the invite link, never the document or a key\) still goes through Resend Inc\. in the United States for now, as <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a> sets out\./,
+assert.match(helpAnswers, /under EU law/,
+  'help/index.html must say which law the stored files sit under');
+assert.match(helpAnswers, /Email still goes through Resend in the United States for now: never the document, but the links and codes that open a file, as <a class="buyer-qa-inline" href="\/en\/privacy">\/privacy<\/a> sets out\./,
   'help/index.html must name the Resend exception in the same breath, with the /privacy link');
 assert.doesNotMatch(helpAnswers, /no US company/i,
   'help/index.html must not repeat the unqualified no-US-company row from /security');
@@ -976,7 +979,8 @@ assert.doesNotMatch(helpAnswers, /no US company/i,
 // not there.
 assert.match(homeGrid, /Generated on your device, never sent/,
   'index.html is the source of the promise that a key never reaches a server');
-assert.match(securityHtml, /relay holds only ciphertext, never keys/,
+// Fase 2 (SITE-30): the row now names its three exceptions.
+assert.match(securityHtml, /sends to named recipients and the extensions, the relay holds only ciphertext, no keys/,
   'security.html is the source of the promise that the relay holds no keys');
 // The sentence carries its exception since 5 September 2026. relay/lib/
 // parasign-store.js calls the /v1 hosted ceremony "the ONE deliberate break of
@@ -1020,7 +1024,8 @@ assert.match(helpNlAnswers, /Uw documenten staan versleuteld op servers van Hetz
   'help/index.html must answer where the documents live, and say they are ciphertext there');
 assert.match(helpNlAnswers, /bewaart nooit een privésleutel, behalve bij het gehoste ondertekenen op <code>\/v1<\/code>/,
   'help/index.html must say where the keys are not, exception included');
-assert.match(helpNlAnswers, /Alleen e-mail \(adres en link, nooit het document of een sleutel\) gaat nog via Resend Inc\. in de VS, zie <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a>\./,
+// Fase 2 (SITE-34): "nooit ... een sleutel" was onwaar voor versturen op naam.
+assert.match(helpNlAnswers, /E-mail gaat nog via Resend in de VS: nooit het document, wel de links en codes die een bestand openen, zie <a class="buyer-qa-inline" href="\/privacy">\/privacy<\/a>\./,
   'help/index.html must name the mail exception in the same breath, with the /privacy link');
 assert.doesNotMatch(helpNlHtml.slice(helpNlHtml.indexOf('</head>')), /Betaal voor volume|Pay for volume, never for security/i,
   'help/index.html must not carry the sales line anywhere in the body; it is a support page');
@@ -1090,11 +1095,15 @@ const signVisibleText = visible('frontend/sign.html');
 // Proof 1. The EU claim is about the data path, not the whole chain, and the
 // Resend exception travels with it. A page may shorten the long form on
 // /rules to this one; it may never drop the second half.
-const EU_CLAIM = 'Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path.';
+// Fase 2 (SITE-34, 2026-10-04): "No US provider in the data path" and "never
+// ... a key" were not true for a send to named recipients or an invitation to
+// sign, whose emails carry what opens the file. The claim is now about where
+// the encrypted files are, and the exception says what the email carries.
+const EU_CLAIM = 'Hetzner Germany, Bunny DNS (Slovenia). The encrypted';
 // De uitzondering, op elke pagina met dezelfde woorden: mail gaat nog via
 // Resend in de VS. Mailjet stond hier tot 23 september 2026, maar is nooit
 // aangezet; zie deploy/partners.json en tests/partners.test.mjs.
-const EU_EXCEPTION = 'Email (only the email address and the invite link, never the document or a key) still goes through Resend Inc. in the United States for now';
+const EU_EXCEPTION = 'Email still goes through Resend in the United States for now';
 const homeVisible = visible('frontend/en/index.html');
 for (const [name, text] of [['index', homeVisible], ['en/parasign', parasignEn], ['en/parasend', parasendEn]]) {
   assert.ok(text.includes(EU_CLAIM), `${name}.html lost the data-path wording of the EU claim`);
@@ -1102,15 +1111,15 @@ for (const [name, text] of [['index', homeVisible], ['en/parasign', parasignEn],
 }
 // /parasend is Nederlands sinds 23 september 2026: dezelfde claim, dezelfde
 // begrenzing tot de weg van de data, in de taal van de pagina.
-assert.ok(parasend.includes('Hetzner in Duitsland, Bunny DNS (Slovenië). Uw bestanden gaan niet langs een Amerikaanse partij.'),
+assert.ok(parasend.includes('Hetzner in Duitsland, Bunny DNS (Slovenië). De versleutelde bestanden staan alleen op onze servers in de EU.'),
   'parasend.html lost the data-path wording of the EU claim');
-assert.ok(parasend.includes('E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten'),
+assert.ok(parasend.includes('E-mail gaat nu nog via Resend in de Verenigde Staten') && parasend.includes('bevat die mail de link met het token'),
   'parasend.html states the EU claim without naming the Resend exception');
 // /parasign is Dutch since 23 September 2026. The same two halves, in the
 // wording the Dutch homepage uses for proof 1.
-assert.ok(parasign.includes('Uw bestanden gaan niet langs een Amerikaanse partij.'),
+assert.ok(parasign.includes('De versleutelde documenten staan alleen op onze servers in de EU.'),
   'parasign.html lost the data-path wording of the EU claim');
-assert.ok(parasign.includes('E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten'),
+assert.ok(parasign.includes('E-mail gaat nu nog via Resend in de Verenigde Staten') && parasign.includes('wel de helft van de documentsleutel'),
   'parasign.html states the EU claim without naming the mail exception');
 // And it may not be offered against a source that does not carry it. The
 // Jurisdiction and privacy table on /security lists Hetzner Nuremberg, the legal
@@ -1143,8 +1152,8 @@ assert.doesNotMatch(parasign, /geen Amerikaanse (partij|aanbieder|bedrijf) in de
 // window check that keeps the two together lives further down this file.
 assert.ok(!/no US company/i.test(security),
   'security.html must no longer claim "no US company", which is broader than /privacy supports');
-assert.ok(security.includes('No US provider in the data path'),
-  'security.html must carry proof 1 in the data-path wording the guide fixes');
+assert.ok(security.includes('The encrypted files sit only on our servers in the EU'),
+  'security.html must carry proof 1 in the wording of fase 2 (where the encrypted files are)');
 
 // ── "Why Dutch matters", 5 September ────────────────────────────────────────
 // Mick: "the pride in being Dutch is missing, it is too well behaved". The
@@ -1175,8 +1184,10 @@ for (const claim of [
   'Paramantis Solutions B.V., Harderwijk, KvK 42115132. Its parent is Paramantis Digital B.V., also Dutch, KvK 42114664. There is no parent company abroad.',
   'Dutch law governs the terms you agree to, and a Dutch court hears the dispute.',
   // Proof 1, in this section\u2019s own words, with the exception in the same breath.
-  'No US provider is in the data path of your files and keys.',
-  'Email (only the email address and the invite link, never the document or a key) still goes through Resend Inc. in the United States for now. That is the one exception in the chain; we are moving to a Dutch provider.',
+  // Fase 2 (SITE-34): the emails of a named send carry what opens the file.
+  'The encrypted files sit only there.',
+  'For a send to named recipients that email carries the link with the token, and the pickup code is emailed too: whoever reads both emails can open the file.',
+  'Resend, our email provider, is the one US party in the chain; we are moving to a Dutch provider.',
   // The sentence that carries the pride. It claims nothing a reader cannot check.
   'We are Dutch, and we would rather say so than hide behind a Delaware address.',
 ]) {
@@ -1504,24 +1515,23 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // Resend, a US provider. The guide (section 9.2) says that row is the one that
   // has to move to the data-path wording, and it may never be written without
   // its one exception in the same breath.
-  assert.match(securityRaw, /No US provider in the data path/,
-    'security.html must state the jurisdiction claim about the data path, not about the whole chain');
+  // Fase 2 (SITE-30/34): the claim is where the encrypted files sit, and the
+  // mail exception travels with it, now saying what the mail carries.
+  assert.match(securityRaw, /The encrypted files sit only on our servers in the EU/,
+    'security.html must state where the encrypted files are');
   assert.doesNotMatch(securityRaw, /no US company\b(?![^<]*Resend)/,
     'security.html must not claim "no US company" without naming the mail carrier beside it');
-  // "In the same breath" is the whole point of the wording, so it is measured
-  // as a window and not as "somewhere on the page": an earlier version of this
-  // check let a card drop Resend entirely, because the jurisdiction table lower
-  // down still carried the word.
+  // "In the same breath" is measured as a window, not as "somewhere on the page".
   const WINDOW = 420;
   for (const [label, html] of [['security.html', securityRaw]]) {
     let at = -1, seen = 0;
-    while ((at = html.indexOf('No US provider in the data path', at + 1)) !== -1) {
+    while ((at = html.indexOf('The encrypted files sit only on our servers in the EU', at + 1)) !== -1) {
       seen += 1;
-      assert.match(html.slice(at, at + WINDOW), /Resend Inc\. in the United States/,
-        `${label} states the data-path claim without naming the mail carrier within ${WINDOW} characters of it`);
+      assert.match(html.slice(at, at + WINDOW), /Resend in the United States/,
+        `${label} states where the files are without naming the mail carrier within ${WINDOW} characters of it`);
     }
     assert.ok(seen >= 2,
-      `${label} must carry the data-path wording in both the card and the jurisdiction row, found ${seen}`);
+      `${label} must carry the wording in both the card and the jurisdiction row, found ${seen}`);
   }
 
   // The certification limit, stated in the same voice as the proofs.
@@ -1554,7 +1564,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   assert.match(aboutHero, /Mick Beer/, 'about.html must name the founder in the hero');
   assert.match(aboutHero, /Privacy and security researcher, founder of Paramantis Solutions B\.V\./,
     'about.html must carry the founder title in the hero');
-  assert.match(aboutHero, /href="\/pricing" class="btn btn-primary"/,
+  assert.match(aboutHero, /href="\/en\/pricing" class="btn btn-primary"/,
     'about.html must offer a next step in the hero');
   // Nobody can promise ten years. The lede used to end on "the cryptography is
   // post-quantum, which is the proof that it still holds up in ten years", which
@@ -1584,9 +1594,9 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // fails here.
   const heroOf = (html) => html.slice(html.indexOf('<section class="page-hero'), html.indexOf('<main'));
   const securityHero = heroOf(securityRaw);
-  assert.match(securityHero, /href="\/pricing" class="btn btn-primary"/,
+  assert.match(securityHero, /href="\/en\/pricing" class="btn btn-primary"/,
     'security.html must offer a next step in the first screen, not only at the foot of the page');
-  assert.match(securityHero, /href="\/verify" class="btn btn-secondary"/,
+  assert.match(securityHero, /href="\/en\/verify" class="btn btn-secondary"/,
     'security.html must offer the verify step in the first screen');
   // Mick, 4 September: the founder line left this page. Who is accountable is
   // the company, where it sits and its registration, and that has to stay.
@@ -1640,7 +1650,7 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
   // /security with "an independent firm" left the suite green. Pinned on both.
   assert.match(securityRaw, /two by R\. Zwarts, one by Ryan Williams of Smart Cyber Solutions/,
     'security.html must name the auditors it credits');
-  assert.match(securityRaw, /href="\/docs#audits"/,
+  assert.match(securityRaw, /href="\/en\/docs#audits"/,
     'security.html must link the audit table that carries the counts');
   assert.doesNotMatch(securityRaw, /full audit history[^<]*<a href="\/architecture"/,
     'security.html must not send the reader to /architecture for audit material it sends back');
@@ -1718,9 +1728,9 @@ console.log('ui-truthfulness: the messaging guide claims are pinned to the pages
 
     // The hero addresses "anyone who has to check a supplier". That reader used to
     // get one text link in the middle of a paragraph as the only way onward.
-    assert.match(trustHero, /href="\/security" class="btn btn-primary"/,
+    assert.match(trustHero, new RegExp('href="' + (t.file.startsWith('en/') ? '/en' : '') + '/security" class="btn btn-primary"'),
       'trust.html must give the reviewer a real next step in the hero');
-    assert.match(trustHero, /href="\/pricing" class="btn btn-secondary"/,
+    assert.match(trustHero, new RegExp('href="' + (t.file.startsWith('en/') ? '/en' : '') + '/pricing" class="btn btn-secondary"'),
       'trust.html must offer pricing from the hero as well');
 
     // "the operator who runs the relay" was the first sentence under the hero, and

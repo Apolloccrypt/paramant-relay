@@ -667,7 +667,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">07</div>
     <h2 class="section-title">Geverifieerd versturen</h2>
-    <p class="section-desc">Elke verzending met Paramant hoort bij een account en wordt in de browser end-to-end versleuteld. De webapp Versturen voegt daar post-quantum sleuteluitwisseling, ML-DSA-65-handtekeningen van de afzender en herkomstbewijs in de CT-log aan toe. Er is geen anonieme of minder zekere variant.</p>
+    <p class="section-desc">Elke verzending met Paramant hoort bij een account en wordt in de browser versleuteld. End-to-end, zonder dat de relay ooit een sleutel kan zien, is dat bij een eenmalige link en bij Samen; bij versturen naar ontvangers op naam gaat het token dat de sleutel uitpakt één keer langs de relay om te worden gemaild (uitzondering). De webapp Versturen voegt daar post-quantum sleuteluitwisseling, ML-DSA-65-handtekeningen van de afzender en herkomstbewijs in de CT-log aan toe. Er is geen anonieme of minder zekere variant.</p>
 
     <table class="modes-table">
       <thead>
@@ -808,6 +808,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=13" defer></script>
+<script src="/js/nav-auth.js?v=14" defer></script>
 </body>
 </html>

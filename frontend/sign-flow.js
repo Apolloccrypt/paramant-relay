@@ -18,7 +18,7 @@ import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { vaultDelete } from '/vendor/vault.js?v=5';
 import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=2';
 import { previewTargetWidth, viewportTargetWidth, renderGeneration } from '/js/preview-render.js?v=1';
-import { initialsFrom, planParaafs, textBoxesFromItems, inkBoxesFromImageData, paraafFooter, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=5';
+import { initialsFrom, planParaafs, textBoxesFromItems, inkBoxesFromImageData, paraafFooter, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes, paraafInset } from '/js/paraaf-place.js?v=5';
 import { requestsForParties } from '/js/cosign-layout.js?v=4';
 import { saveDraft, loadDraft, clearDraft, loadAccountKey } from '/js/sign-draft.js?v=4';
 import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
@@ -397,9 +397,12 @@ function loadTextBoxes(bytes) {
         if (i > 1) await new Promise((r) => setTimeout(r, 0));
         try {
           const page = await pdf.getPage(i);
-          const geom = { view: Array.from(page.view), rotate: normaliseRotation(page.rotate) };
+          const geom = { view: Array.from(page.view), rotate: normaliseRotation(page.rotate), uu: validUserUnit(page.userUnit) };
           entry.geoms[i - 1] = geom;
-          let boxes = userBoxesToView(textBoxesFromItems((await page.getTextContent()).items), geom);
+          // pdf.js shows a /UserUnit page enlarged (the viewport, and so every
+          // on-screen position, is userUnit x user space); the text matrices are
+          // in plain user space. Bring the text into the viewport's units.
+          let boxes = scaleBoxes(userBoxesToView(textBoxesFromItems((await page.getTextContent()).items), geom), geom.uu);
           // A scanned page has no text to read: look at it instead, so the
           // paraaf does not land on its page number (acceptance test 2026-10-04).
           if (!boxes.length) boxes = await inkBoxesOfPage(page);
@@ -448,15 +451,107 @@ async function pageGeoms(bytes, pdfLibPages) {
     if (fromPdfjs[i]) return fromPdfjs[i];
     const box = (b) => { try { const r = b(); return [r.x, r.y, r.x + r.width, r.y + r.height]; } catch (e) { return null; } };
     let rot = 0; try { rot = pg.getRotation().angle; } catch (e) { /* unturned */ }
-    return geomFromBoxes(box(() => pg.getMediaBox()), box(() => pg.getCropBox()), rot);
+    let uu = 1;
+    try { const v = pg.node.lookup(window.PDFLib.PDFName.of('UserUnit')); uu = validUserUnit(v && v.asNumber ? v.asNumber() : 1); } catch (e) { /* 1 */ }
+    return { ...geomFromBoxes(box(() => pg.getMediaBox()), box(() => pg.getCropBox()), rot), uu };
   });
 }
+
+// ── /UserUnit (PDF 1.6): one user-space unit is userUnit/72 inch ─────────────
+// pdf.js scales the viewport by it, so every position the signer makes is in
+// "view units" = userUnit x user space; pdf-lib draws in user space. The sweep
+// of 2026-10-04 found the seal off the page (userunit-2) or missing
+// (userunit-10). js/paraaf-place.js knows nothing of it (co-sign shares that
+// module), so the scaling lives here: geom.uu next to view and rotate.
+function validUserUnit(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 && n <= 75000 ? n : 1;
+}
+function scaleBoxes(boxes, k) {
+  if (!Array.isArray(boxes) || k === 1) return boxes;
+  return boxes.map((b) => ({ x: b.x * k, y: b.y * k, w: b.w * k, h: b.h * k }));
+}
+function geomUU(g) { return g && g.uu > 0 ? g.uu : 1; }
+// The page as the signer sees it, in view units.
+function geomViewSize(g) {
+  const s = viewSize(g), k = geomUU(g);
+  return k === 1 ? s : { width: s.width * k, height: s.height * k };
+}
+// View units -> user space: first undo the userUnit, then the rotation/crop.
+function geomMatrix(g) {
+  const m = viewToUserMatrix(g), k = 1 / geomUU(g);
+  return k === 1 ? m : [m[0] * k, m[1] * k, m[2] * k, m[3] * k, m[4], m[5]];
+}
+function geomIsIdentity(g) { return geomUU(g) === 1 && isIdentityGeom(g); }
 
 // The paraaf plan for the current document: one box per page other than the
 // seal page. pages: [{width,height}] in PDF points, from whatever the caller
 // renders or bakes (pdf.js viewport in the preview, pdf-lib getSize when baking).
 function paraafPlanFor(pages, stamp, textBoxes) {
-  return planParaafs(pages, stamp.pageIndex, { w: stamp.w, h: stamp.h }, textBoxes);
+  const plan = planParaafs(pages, stamp.pageIndex, { w: stamp.w, h: stamp.h }, textBoxes);
+  // planParaafs tries the four corners at three sizes and, when none is free,
+  // returns bottom right with free:false, over the text. Nobody read that flag,
+  // so the paraaf went over the contract text without a word (PDF sweep
+  // 2026-10-04, B1: a0-contract, mini-a7, cropbox-smaller). Look further first:
+  // smaller, and anywhere along the four margin bands. Still nothing free:
+  // keep the spot, but mark it overText so the signer is told, never silently.
+  return plan.map((box) => {
+    if (box.free !== false) return box;
+    const pg = pages[box.pageIndex];
+    const boxes = Array.isArray(textBoxes) ? textBoxes[box.pageIndex] : null;
+    const better = pg && Array.isArray(boxes) ? marginBandSpot(pg.width, pg.height, box.w / 0.65, box.h / 0.65, boxes) : null;
+    return better ? { ...box, ...better, free: true, band: true } : { ...box, overText: true };
+  });
+}
+
+// A free spot for a paraaf of base size w x h on a page, looked for along the
+// margin bands (right, left, bottom, top), from full size down to 40%. Same
+// inset and the same 3 pt breathing room as js/paraaf-place.js.
+function marginBandSpot(pageW, pageH, w0, h0, boxes) {
+  const pad = 3;
+  const m = paraafInset(pageW, pageH);
+  const hits = (b) => boxes.some((t) => b.x < t.x + t.w + pad && t.x < b.x + b.w + pad && b.y < t.y + t.h + pad && t.y < b.y + b.h + pad);
+  for (const k of [1, 0.8, 0.65, 0.5, 0.4]) {
+    const w = w0 * k, h = h0 * k;
+    if (!(w > 0 && h > 0) || w > pageW - 2 * m.x || h > pageH - 2 * m.y) continue;
+    const xs = [pageW - m.x - w, m.x];
+    const ys = [m.y, pageH - m.y - h];
+    const cands = [];
+    for (const x of xs) for (let y = m.y; y <= pageH - m.y - h; y += Math.max(2, h / 2)) cands.push({ x, y });
+    for (const y of ys) for (let x = m.x; x <= pageW - m.x - w; x += Math.max(2, w / 2)) cands.push({ x, y });
+    for (const c of cands) {
+      const b = { x: c.x, y: c.y, w, h };
+      if (!hits(b)) return b;
+    }
+  }
+  return null;
+}
+
+// The pages (1-based) where the paraaf could only go over the text.
+function paraafOverTextPages(plan) {
+  return (plan || []).filter((b) => b && b.overText).map((b) => b.pageIndex + 1);
+}
+
+// Say it where the signer looks: under the placement hint, and again on the
+// review step. Empty list: the notice goes away.
+function showParaafOverTextNotice(pagesOver) {
+  for (const [anchorId, noticeId] of [['ds-place-hint', 'ds-paraaf-over-text'], ['ds-review-doc-preview', 'ds-paraaf-over-text-review']]) {
+    const anchor = $(anchorId);
+    let el = $(noticeId);
+    if (!pagesOver.length) { if (el) el.remove(); continue; }
+    if (!anchor) continue;
+    if (!el) {
+      el = document.createElement('p');
+      el.id = noticeId;
+      el.className = 'ds-banner err';
+      el.setAttribute('role', 'alert');
+      anchor.insertAdjacentElement('afterend', el);
+    }
+    const list = pagesOver.length > 8 ? pagesOver.slice(0, 8).join(', ') + ' …' : pagesOver.join(', ');
+    el.textContent = (pagesOver.length === 1 ? L('Op pagina ', 'On page ') : L("Op pagina's ", 'On pages ')) + list
+      + L(' is in de marge geen vrije plek: de paraaf komt daar over de tekst (rood omlijnd). Wilt u dat niet, zet dan "Onderteken elke pagina" uit.',
+          ' the margin has no free spot: the initials go over the text there (outlined in red). If you do not want that, switch off "Sign every page".');
+  }
 }
 
 // ====================================================================
@@ -855,6 +950,46 @@ function describeFileType(bytes, name) {
   return null;
 }
 
+// Where %PDF- starts, within the first 2048 bytes, or -1. Acrobat allows the
+// header within the first 1024 bytes; pdf.js and poppler look further, and the
+// sweep's junk-prefix file (header at 1025) opens in all of them.
+function pdfHeaderOffset(bytes) {
+  const lim = Math.min(bytes.length - 5, 2048);
+  for (let i = 0; i <= lim; i++) {
+    if (bytes[i] === 0x25 && bytes[i + 1] === 0x50 && bytes[i + 2] === 0x44 && bytes[i + 3] === 0x46 && bytes[i + 4] === 0x2D) return i;
+  }
+  return -1;
+}
+
+// True when the ASCII text occurs in bytes (no decoding of the whole file).
+function bytesContain(bytes, text) {
+  const pat = new TextEncoder().encode(text);
+  for (let i = bytes.indexOf(pat[0]); i !== -1 && i <= bytes.length - pat.length; i = bytes.indexOf(pat[0], i + 1)) {
+    let ok = true;
+    for (let k = 1; k < pat.length; k++) if (bytes[i + k] !== pat[k]) { ok = false; break; }
+    if (ok) return true;
+  }
+  return false;
+}
+
+function showExistingSignatureNotice(on) {
+  for (const [anchorId, noticeId] of [['ds-place-hint', 'ds-existing-sig'], ['ds-review-doc-preview', 'ds-existing-sig-review']]) {
+    let el = $(noticeId);
+    if (!on) { if (el) el.remove(); continue; }
+    const anchor = $(anchorId);
+    if (!anchor) continue;
+    if (!el) {
+      el = document.createElement('p');
+      el.id = noticeId;
+      el.className = 'ds-banner err';
+      el.setAttribute('role', 'alert');
+      anchor.insertAdjacentElement('afterend', el);
+    }
+    el.textContent = L('Deze pdf heeft al een digitale handtekening. Wordt hij hier ondertekend, dan slaat ParaSign het bestand opnieuw op en geldt die bestaande digitale handtekening daarna niet meer: een pdf-lezer zoals Adobe meldt dan dat het document na ondertekening is gewijzigd. De nieuwe ParaSign-handtekening en het .psign-bewijs kloppen wel.',
+      'This PDF already carries a digital signature. If it is signed here, ParaSign saves the file anew and that existing digital signature no longer holds: a PDF reader such as Adobe will report that the document was changed after signing. The new ParaSign signature and the .psign proof do hold.');
+  }
+}
+
 async function onDocChosen(file) {
   preloadPdfLibs();
   clearDocError();
@@ -869,12 +1004,14 @@ async function onDocChosen(file) {
   // state.doc, does not get named on screen and does not advance the step: the
   // visitor stays on the picker with the reason in front of him, instead of
   // three steps deep into a flow that cannot end.
-  const looksPdf = bytes.length >= 5
-    && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46 && bytes[4] === 0x2D;
+  // The header need not be at byte 0: some mail and document systems put a
+  // few hundred bytes in front, and pdf.js, poppler and mupdf open such files
+  // (PDF sweep 2026-10-04, B5: brokenxref-junkprefix, header at 1025).
+  const looksPdf = pdfHeaderOffset(bytes) >= 0;
   if (!looksPdf) {
     const what = describeFileType(bytes, file.name);
     showDocError((what ? L('Dit is ', 'This is ') + what + L(', geen pdf. ', ', not a PDF. ') : L('Dit bestand is geen pdf. ', 'This file is not a PDF. '))
-      + L('ParaSign ondertekent pdf-documenten. Exporteer of print uw bestand eerst naar pdf.', 'ParaSign signs PDF documents. Export or print your file to PDF first.'));
+      + L('ParaSign ondertekent alleen pdf. Zet uw bestand eerst om naar pdf: exporteer het, of druk het af als pdf.', 'ParaSign signs PDF only. Convert your file to PDF first: export it, or print it to PDF.'));
     return;
   }
   state.doc = { bytes, name: file.name, size: file.size };
@@ -887,7 +1024,14 @@ async function onDocChosen(file) {
   state.sealPlacement = 'inline';
   state.pdfPageCount = null;
 
-  const isPdf = bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
+  const isPdf = looksPdf;
+  // An existing digital signature (PAdES/CMS) lives in a /Sig dictionary with
+  // a /ByteRange over the exact bytes of the file. pdf-lib writes the file
+  // anew, so that signature no longer holds after ParaSign signs (sweep B3:
+  // pyhanko intact=True before, False after; Adobe then shows "changed after
+  // signing"). Said before signing, never discovered afterwards.
+  state.doc.hasDigitalSignature = isPdf && bytesContain(bytes, '/ByteRange');
+  showExistingSignatureNotice(state.doc.hasDigitalSignature);
   const mimeGuess = guessMimeFromMagic(bytes);
   const isPng = mimeGuess === 'image/png';
   const isJpg = mimeGuess === 'image/jpeg';
@@ -905,6 +1049,9 @@ async function onDocChosen(file) {
 
   const toHashOnly = (note) => {
     state.mode = 'hash';
+    // The hash route signs the fingerprint and leaves the file as it is, so an
+    // existing digital signature keeps holding: no warning here.
+    showExistingSignatureNotice(false);
     state.stamp = null;
     state.stampPage = null;
     setActive('step-hash-only');
@@ -1229,6 +1376,7 @@ function placeStepHidden() {
 function reflowGhostStamps() {
   if (placeStepHidden()) return;   // a hidden page measures 0 wide; redrawn on entry
   document.querySelectorAll('.ds-stamp-ghost').forEach(el => el.remove());
+  showParaafOverTextNotice([]);
   // In the invite flow nothing of the requester's is stamped: no solo paraaf
   // preview there (acceptance r2, 3).
   if (state.signingMode === 'invite') return;
@@ -1247,7 +1395,9 @@ function reflowGhostStamps() {
     pages.push(p ? { width: p.wrap._pdfPage.width, height: p.wrap._pdfPage.height } : { width: 1, height: 1 });
   }
   if (!pages[state.stamp.pageIndex]) return;
-  for (const box of paraafPlanFor(pages, state.stamp, textBoxes)) {
+  const ghostPlan = paraafPlanFor(pages, state.stamp, textBoxes);
+  showParaafOverTextNotice(state.stampAllPages ? paraafOverTextPages(ghostPlan) : []);
+  for (const box of ghostPlan) {
     const p = placeState.pages[box.pageIndex];
     if (!p) continue;   // past the preview cap
     const pw = p.wrap._pdfPage.width, ph = p.wrap._pdfPage.height;
@@ -1257,6 +1407,7 @@ function reflowGhostStamps() {
     g.className = 'ds-stamp-ghost ds-paraaf';
     g.style.cssText = `left:${box.x / ratio}px;top:${(ph - box.y - box.h) / ratio}px;width:${box.w / ratio}px;height:${box.h / ratio}px;font-size:${box.h / ratio}px`;
     g.innerHTML = paraafMockupHtml();
+    if (box.overText) { g.style.outline = '2px solid #b42318'; g.style.outlineOffset = '1px'; g.dataset.overText = '1'; }
     p.wrap.appendChild(g);
   }
 }
@@ -1370,7 +1521,7 @@ function updateSignatureSheetControls() {
     ? L("Voegt één laatste pagina toe met uw stempel en de gegevens van de bron. De oorspronkelijke pagina's krijgen geen stempel.", 'Adds one final page with your seal and source details. The original pages remain unstamped.')
     : withSheet
       ? L('Houdt de geplaatste stempel in het document en voegt één laatste pagina toe met de stempel en de gegevens van de bron.', 'Keeps the placed seal in the document and adds one final page with the seal and source details.')
-      : L("Op de andere pagina's komt een kleine paraaf in een vrije hoek van de marge, niet over de tekst. Positie en grootte worden onthouden voor de volgende keer (nooit uw naam of handtekening).", 'The other pages get small initials in a free corner of the margin, never over the text. Position and scale are remembered for next time (never your name or signature image).');
+      : L("Op de andere pagina's komt een kleine paraaf op een vrije plek in de marge. Is die er op een pagina niet, dan staat de paraaf daar over de tekst en ziet u dat hier in rood. Positie en grootte worden onthouden voor de volgende keer (nooit uw naam of handtekening).", 'The other pages get small initials in a free spot of the margin. Where a page has none, the initials go over the text there and you see that here in red. Position and scale are remembered for next time (never your name or signature image).');
   const hint = $('ds-place-hint');
   if (hint && sheetOnly) hint.textContent = L('Voorbeeld hieronder: pagina ', 'Preview below: page ') + ((state.pdfPageCount || 0) + 1) + L(' wordt als laatste pagina aan de pdf toegevoegd.', ' will be added as the final PDF page.');
   else if (hint && withSheet) hint.textContent = L('De geplaatste stempel blijft hier. Voorbeeld hieronder: ook pagina ', 'The placed seal stays here. Preview below: page ') + ((state.pdfPageCount || 0) + 1) + L(' wordt toegevoegd.', ' will also be added.');
@@ -1496,7 +1647,7 @@ function placeExtraAt(type, wrap, clientX, clientY) {
   } else {
     const size = Math.round(Math.max(12, Math.min(pageW, pageH) * 0.035));
     const h = extraBoxH(size);
-    const text = type === 'date' ? new Date().toISOString().slice(0, 10) : L('Tekst', 'Text');
+    const text = type === 'date' ? todayText() : L('Tekst', 'Text');
     const estimatedW = size * (type === 'date' ? 7.4 : 5);
     extra = { id: ++_extraSeq, type, pageIndex, x: Math.min(clickX, Math.max(0, pageW - estimatedW)), y: Math.max(0, pageH - clickYTop - h), size, text };
   }
@@ -1680,7 +1831,7 @@ function beginEditExtra(el, extra) {
     el.contentEditable = 'false';
     el.classList.remove('editing');
     extra.text = (el.textContent || '').replace(/\n/g, ' ').trim()
-      || (extra.type === 'date' ? new Date().toISOString().slice(0, 10) : extra.type === 'note' ? L('Notitie', 'Note') : L('Tekst', 'Text'));
+      || (extra.type === 'date' ? todayText() : extra.type === 'note' ? L('Notitie', 'Note') : L('Tekst', 'Text'));
     el.removeEventListener('blur', finish);
     el.removeEventListener('keydown', onKey);
     // Rebuild the marker so delete/resize handles + geometry are consistent.
@@ -1864,6 +2015,15 @@ function renderDrawMarker(extra) {
 
 let _pageOpBusy = false;
 
+// The date a signer drops on a page: today on the signer's own clock (not UTC,
+// which gave yesterday between 00:00 and 02:00 in the Netherlands), written the
+// Dutch way on the Dutch page (4-10-2026) and unambiguous on the English one
+// (2026-10-04). Fase 1 SIGN-21.
+function todayText(d = new Date()) {
+  const y = d.getFullYear(), m = d.getMonth() + 1, day = d.getDate();
+  return EN ? y + '-' + String(m).padStart(2, '0') + '-' + String(day).padStart(2, '0') : day + '-' + m + '-' + y;
+}
+
 function setPlaceHint(msg) {
   const h = $('ds-place-hint');
   if (h) h.textContent = msg;
@@ -1874,11 +2034,17 @@ async function runPageOp(fn) {
   _pageOpBusy = true;
   try {
     const PDFLib = await waitForPdfLib();
+    const hintEl = $('ds-place-hint');
+    const before = hintEl ? hintEl.textContent : '';
     const out = await fn(PDFLib, window.ParasignPdfOps);
+    // A hint the operation set ("the pages of x.pdf are now at the end") must
+    // survive the re-render, which writes the default hint back (fase 1 SIGN-18).
+    const opHint = hintEl && hintEl.textContent !== before ? hintEl.textContent : null;
     if (out) {
       state.doc.bytes = new Uint8Array(out);
       state.doc.size = state.doc.bytes.length;
       await renderPdfForPlacement();
+      if (opHint) setPlaceHint(opHint);
       // The seal gate: re-disable Continue when the op removed the stamp.
       $('ds-place-continue').disabled = hasInlineSeal() && !state.stamp;
     }
@@ -2747,6 +2913,12 @@ function fillReview() {
   // the key source.
   const docHashHex = toHex(sha3_256(state.doc.bytes));
   $('ds-proof-doc-hash').textContent = docHashHex;
+  // On the pdf route the signature goes on the version WITH the seal, whose
+  // hash only exists once it is baked; this is the original's (fase 1 SIGN-34).
+  const docHashLabel = $('ds-proof-doc-hash-label');
+  if (docHashLabel) docHashLabel.textContent = state.mode === 'pdf'
+    ? L('SHA3-256 van het origineel (de handtekening komt op de versie met de zegel)', 'SHA3-256 of the original (the signature goes on the version with the seal)')
+    : L('SHA3-256 van het document', 'Document SHA3-256');
   $('ds-proof-fp').textContent = L('(vingerafdruk van uw ondertekensleutel)', '(your signing key fingerprint)');   // filled async below
   $('ds-proof-version').textContent = 'parasign-doc-3 (recipe_version 3)';
 
@@ -2952,7 +3124,9 @@ async function renderDocPreview() {
         sizes.push({ width: vp.width, height: vp.height });
       }
       if (stale()) return;
-      paraafByPage = new Map(paraafPlanFor(sizes, state.stamp, textBoxes).map((b) => [b.pageIndex, b]));
+      const reviewPlan = paraafPlanFor(sizes, state.stamp, textBoxes);
+      showParaafOverTextNotice(paraafOverTextPages(reviewPlan));
+      paraafByPage = new Map(reviewPlan.map((b) => [b.pageIndex, b]));
     }
     for (let p = 1; p <= maxPages; p++) {
       const page = await pdf.getPage(p);
@@ -3311,6 +3485,37 @@ function drawStampOnCanvas(ctx, stamp, signerName, dateStr, fingerprint8, sigImg
 //      is drawn by the browser's own fonts into a sharp image of that text.
 // Every name can be signed; the bundle only grows for the document that needs it.
 
+// A PDF/A file must embed every font it uses. The seal, the paraaf and the
+// edit layer use the standard fonts (Helvetica, Times, Courier), which are not
+// embedded, so after signing the file is no longer PDF/A; it only kept saying
+// so in its XMP metadata (PDF sweep 2026-10-04, B6: pdfa1b/2b in, three
+// unembedded fonts out). The claim (pdfaid:part, conformance, amd, rev) is
+// taken out of the XMP; everything else in the metadata stays as it was.
+function dropPdfaClaim(PDFLib, pdfDoc) {
+  try {
+    const catalog = pdfDoc.catalog;
+    const ref = catalog.get(PDFLib.PDFName.of('Metadata'));
+    const stream = ref ? pdfDoc.context.lookup(ref) : null;
+    if (!stream || !(stream instanceof PDFLib.PDFStream)) return false;
+    let bytes;
+    if (stream instanceof PDFLib.PDFRawStream) bytes = PDFLib.decodePDFRawStream(stream).decode();
+    else if (typeof stream.getContents === 'function') bytes = stream.getContents();
+    else return false;
+    const xmp = new TextDecoder('utf-8').decode(bytes);
+    if (!/pdfaid:/.test(xmp)) return false;
+    const cleaned = xmp
+      .replace(/\s+pdfaid:(part|conformance|amd|rev)\s*=\s*("[^"]*"|'[^']*')/g, '')
+      .replace(/<pdfaid:(part|conformance|amd|rev)\b[^>]*\/>/g, '')
+      .replace(/<pdfaid:(part|conformance|amd|rev)\b[^>]*>[\s\S]*?<\/pdfaid:\1>/g, '');
+    if (/pdfaid:(part|conformance)/.test(cleaned)) return false;
+    const fresh = pdfDoc.context.stream(new TextEncoder().encode(cleaned), { Type: 'Metadata', Subtype: 'XML' });
+    catalog.set(PDFLib.PDFName.of('Metadata'), pdfDoc.context.register(fresh));
+    return true;
+  } catch (e) {
+    return false;   // metadata we cannot read: leave it, the signature is what counts
+  }
+}
+
 export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprint8) {
   const PDFLib = await waitForPdfLib();
   const pdfDoc = await PDFLib.PDFDocument.load(origBytes);
@@ -3335,8 +3540,8 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
     const pg = pages[pageIndex];
     if (!pg) return;
     const g = geoms[pageIndex];
-    if (!g || isIdentityGeom(g)) { await fn(pg); return; }
-    pg.pushOperators(PDFLib.pushGraphicsState(), PDFLib.concatTransformationMatrix(...viewToUserMatrix(g)));
+    if (!g || geomIsIdentity(g)) { await fn(pg); return; }
+    pg.pushOperators(PDFLib.pushGraphicsState(), PDFLib.concatTransformationMatrix(...geomMatrix(g)));
     try { await fn(pg); } finally { pg.pushOperators(PDFLib.popGraphicsState()); }
   };
   const navy  = PDFLib.rgb(0.043, 0.227, 0.416);
@@ -3489,7 +3694,7 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
     if (state.stampAllPages && pages.length > 1) {
       const textBoxes = await loadTextBoxes(origBytes);
       // View sizes, the ones the preview planned with: a turned page is wide.
-      const sizes = geoms.map(viewSize);
+      const sizes = geoms.map(geomViewSize);
       const plan = paraafPlanFor(sizes, stamp, textBoxes);
       for (const box of plan) await inView(box.pageIndex, (pg) => paintParaaf(pg, box));
       state.lastParaafPlan = plan;
@@ -3539,6 +3744,7 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
     }
   }
 
+  dropPdfaClaim(PDFLib, pdfDoc);
   return await pdfDoc.save();
 }
 

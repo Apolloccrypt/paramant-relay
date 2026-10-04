@@ -248,36 +248,36 @@ footer a{color:var(--ink);text-decoration:none}
 <h2>What we guarantee</h2>
 
 <h3>1 &middot; We never had it</h3>
-<p>Files are encrypted in your browser before they reach us. For a ParaSend transfer the relay holds only ciphertext, in RAM, and burns it after the last read the link allows: one on Community, up to 10 on Firm. We can&rsquo;t read it, can&rsquo;t leak it, and can&rsquo;t be compelled to hand over what we never had.</p>
-<p class="rule-verify"><a href="/security">verify: the relay architecture &rarr;</a></p>
+<p>Files are encrypted in your browser before they reach us. For a ParaSend transfer the relay holds only ciphertext, in RAM, and burns it after the last read the link allows: one on Community, up to 10 on Firm. We can&rsquo;t read it, can&rsquo;t leak it, and can&rsquo;t be compelled to hand over what we never had. One exception: in a send to named recipients (by email address) the token that unwraps the key passes through the relay once so it can be emailed. At that moment we could open the file, so that route is not zero-knowledge. A one-time link is.</p>
+<p class="rule-verify"><a href="/en/security">verify: the relay architecture &rarr;</a></p>
 
 <h3>2 &middot; Your browser talks only to us</h3>
 <p>No third-party requests. No Google fonts, no CDN, no analytics, no pixels, no embedded widgets. Open your network inspector on any page: every request goes to paramant.app and nowhere else.</p>
-<p class="rule-verify"><a href="/security">verify: the content-security policy we ship &rarr;</a></p>
+<p class="rule-verify"><a href="/en/security">verify: the content-security policy we ship &rarr;</a></p>
 
 <h3>3 &middot; No surveillance</h3>
 <p>No tracking cookies, no fingerprinting, no ad tech. One functional session cookie after you sign in. That is the entire list.</p>
-<p class="rule-verify"><a href="/privacy">verify: the cookie and logging list &rarr;</a></p>
+<p class="rule-verify"><a href="/en/privacy">verify: the cookie and logging list &rarr;</a></p>
 
 <h3>4 &middot; You own your keys</h3>
 <p>Keys are generated on your device and never leave it. Your passkey&rsquo;s private key is yours alone. We only ever see the public half.</p>
 <p class="rule-verify"><a href="https://github.com/Apolloccrypt/paramant-relay">verify: the key generation in the source &rarr;</a></p>
 
 <h3>5 &middot; EU soil, EU law</h3>
-<p>Hosted in Germany, owned top to bottom in the EU. No US CLOUD Act reach over your files or your keys: they never leave the EU, and they are ciphertext everywhere but your own browser. One exception we would rather name ourselves: email (only the email address and the invite link, never the document or a key) still goes through Resend Inc. in the United States for now. That is the one exception in the chain; we are moving to a Dutch provider. We would rather say that than claim a purity that is not true. See <a href="/privacy">the subprocessor list</a>.</p>
-<p class="rule-verify"><a href="/security">verify: the jurisdiction table &rarr;</a></p>
+<p>Hosted in Germany, owned top to bottom in the EU. The encrypted files never leave the EU. One exception we would rather name ourselves: email still goes through Resend in the United States for now. For a send to named recipients that email carries the link with the token, and the pickup code is emailed too: whoever reads both emails can open the file. An invitation to sign carries half of the document key; the relay hands the other half only to the signed-in recipient. Resend, our email provider, is the one US party in the chain; we are moving to a Dutch provider. We would rather say that than claim a purity that is not true. See <a href="/en/privacy">the subprocessor list</a>.</p>
+<p class="rule-verify"><a href="/en/security">verify: the jurisdiction table &rarr;</a></p>
 
 <h3>6 &middot; Quantum-ready by default</h3>
 <p>FIPS 203/204 (ML-KEM and ML-DSA) today, not &ldquo;soon&rdquo;. Harvest-now-decrypt-later is already happening; we encrypt for the decade, not the demo.</p>
-<p class="rule-verify"><a href="/crypto-agility">verify: the FIPS 203/204 parameters &rarr;</a></p>
+<p class="rule-verify"><a href="/en/crypto-agility">verify: the FIPS 203/204 parameters &rarr;</a></p>
 
 <h3>7 &middot; Honest by design</h3>
 <p>No dark patterns. When something fails, we tell you what failed and how to recover. Never a vague or misleading message to keep the UI looking tidy.</p>
-<p class="rule-verify"><a href="/changelog">verify: what we changed and admitted &rarr;</a></p>
+<p class="rule-verify"><a href="/en/changelog">verify: what we changed and admitted &rarr;</a></p>
 
 <h3>8 &middot; Verifiable, not trust-me</h3>
 <p>Open-core you can run yourself, a public Certificate Transparency log, and a relay that proves what it does. You don&rsquo;t have to trust us. You can check it.</p>
-<p class="rule-verify"><a href="/ct-log">verify: the public transparency log &rarr;</a></p>
+<p class="rule-verify"><a href="/en/ct-log">verify: the public transparency log &rarr;</a></p>
 
 <h3>9 &middot; Only what&rsquo;s required</h3>
 <p>An email to hold your account. No phone number, no IP logging beyond transit. Minimalism as a security property: data we don&rsquo;t hold can&rsquo;t be breached, subpoenaed, or sold.</p>
@@ -335,6 +335,6 @@ footer a{color:var(--ink);text-decoration:none}
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=13" defer></script>
+<script src="/js/nav-auth.js?v=14" defer></script>
 </body>
 </html>

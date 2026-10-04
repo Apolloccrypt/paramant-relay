@@ -344,8 +344,14 @@ test('the authentication numbers on the security page are the ones the code enfo
 
   const step = Number(/Math\.floor\(now \/ 1000 \/ (\d+)\)/.exec(read('relay/lib/totp.js'))[1]);
   assert.equal(step, 30);
-  assert.match(sec, /TOTP codes expire thirty seconds after issue/);
-  assert.match(secNl, /Een TOTP-code verloopt dertig seconden nadat hij is gemaakt/);
+  // Fase 2 (SITE-40): the relay accepts the step before and after
+  // (matchTotpSlot, window = 1), so "expires thirty seconds after issue" was
+  // untrue. The page now names the step and the tolerance.
+  const totpWindow = Number(/window = (\d+)/.exec(read('relay/lib/totp.js'))[1]);
+  assert.equal(totpWindow, 1, 'relay/lib/totp.js changed its tolerance; rewrite the TOTP sentence on /security');
+  assert.match(sec, /A TOTP code belongs to a thirty-second time step\. To absorb a clock that is slightly off, the server also accepts the code of the step before and after/);
+  assert.match(secNl, /Een TOTP-code hoort bij een tijdvak van dertig seconden\. Om een klok die iets afwijkt op te vangen, accepteert de server ook de code van het tijdvak ervoor en erna/);
+  assert.doesNotMatch(sec, /TOTP codes expire thirty seconds after issue/);
 
   // /auth/login: per-IP fixed window.
   const fn = srv.slice(srv.indexOf('function checkLoginRateLimit'));
@@ -439,7 +445,9 @@ test('the audit numbers on press, trust and the DPA match the audit table on /do
     }
   }
   for (const slug of ['trust', 'dpa', 'en/trust', 'en/dpa']) {
-    assert.match(page(slug), /href="\/docs#audits"/, `${slug}: the audit link must point at the table that exists`);
+    // An English page links to the English docs (tests/en-links-blijven-engels.test.mjs).
+    const want = slug.startsWith('en/') ? /href="\/en\/docs#audits"/ : /href="\/docs#audits"/;
+    assert.match(page(slug), want, `${slug}: the audit link must point at the table that exists`);
   }
 });
 
@@ -703,7 +711,9 @@ test('the IP-logging row says what the deploy configuration does and promises no
     assert.doesNotMatch(sec, /Retention:\s*\d+ days/, 'security: no retention config in deploy/, so no retention number on the page');
     assert.match(sec, /No separate retention period is promised/);
   }
-  assert.match(sec, /Not linked to transfer content/);
+  // Fase 2 (SITE-35): the edge in front of nginx does log, and /privacy says
+  // so. The row names it instead of claiming the transfer is never in a log.
+  assert.match(row, /The edge \(Caddy\) in front of nginx does write an access log/);
   // The Dutch row.
   const secNl = visible(page('security'));
   const rowNl = /IP-logging<\/td><td>(.*?)<\/td>/s.exec(page('security'))?.[1] || '';
@@ -714,7 +724,7 @@ test('the IP-logging row says what the deploy configuration does and promises no
     assert.doesNotMatch(secNl, /Bewaartermijn:\s*\d+ dagen/, 'security (nl): no retention config in deploy/, so no retention number on the page');
     assert.match(secNl, /Er wordt geen aparte bewaartermijn beloofd/);
   }
-  assert.match(secNl, /Niet gekoppeld aan de inhoud van een overdracht/);
+  assert.match(rowNl, /De edge \(Caddy\) die voor nginx staat, schrijft wel een toegangslog/);
 });
 
 // 10 ── "10 encrypted CLI tools" on the homepage is the developer catalogue.
@@ -3197,7 +3207,7 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
   // all three: the homepage card's list sits above its .prod-cta, the /parasend
   // hero line above .ps-actions, the /pricing paragraph above the tier grid.
   const before = {
-    'en/index': /class="prod-cta"><a class="hp-btn hp-btn-line" href="\/parasend"/,
+    'en/index': /class="prod-cta"><a class="hp-btn hp-btn-line" href="\/en\/parasend"/,
     parasend: /<div class="ps-actions">/,
     'en/parasend': /<div class="ps-actions">/,
     'en/pricing': /<div class="tier-grid">/,

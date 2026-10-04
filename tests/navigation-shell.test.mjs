@@ -47,7 +47,7 @@ ok('public navigation names its destinations, including the free tools', JSON.st
 // three. Three equal buttons is three decisions before the visitor knows what
 // the product is; ParaSend keeps its own call to action further down the page,
 // where it is next to the three lines that explain it.
-ok('public homepage leads with one primary action and one secondary', JSON.stringify(await publicPage.locator('[data-home="out"] .home-actions a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))) === JSON.stringify(['/sign','/pricing']), await publicPage.locator('[data-home="out"] .home-actions').innerText());
+ok('public homepage leads with one primary action and one secondary', JSON.stringify(await publicPage.locator('[data-home="out"] .home-actions a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))) === JSON.stringify(['/en/parashare','/en/sign']), await publicPage.locator('[data-home="out"] .home-actions').innerText());
 // Both product PAGES have to be reachable from the homepage, not just the two
 // apps. /parasend shipped with no inbound link anywhere on the site and
 // /parasign had exactly one, from /sign: a product page nothing links to is a
@@ -56,8 +56,8 @@ ok('public homepage leads with one primary action and one secondary', JSON.strin
 // pins the order: explain first, app second, per card.
 await (async () => {
   const ctas = await publicPage.locator('#products .prod-cta a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')));
-  ok('the homepage leads to both product pages, with the apps as the second action', JSON.stringify(ctas) === JSON.stringify(['/parasign','/sign','/parasend','/parashare']), await publicPage.locator('#products').innerText());
-  ok('the homepage still routes to ParaSend from its own section', ctas.includes('/parashare'), await publicPage.locator('#products').innerText());
+  ok('the homepage leads to both product pages, with the apps as the second action', JSON.stringify(ctas) === JSON.stringify(['/en/parasign','/en/sign','/en/parasend','/en/parashare']), await publicPage.locator('#products').innerText());
+  ok('the homepage still routes to ParaSend from its own section', ctas.includes('/en/parashare'), await publicPage.locator('#products').innerText());
 })();
 // The Dutch homepage: the same bar in Dutch, with the two outward product
 // names, re-rendered identically by js/nav-auth.js after the session check; one
