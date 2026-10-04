@@ -79,6 +79,10 @@ const EVENT_TYPES = {
     'envelope_sign',
     'envelope_complete',
     'envelope_void',
+    // A party said no (POST /v2/envelopes/:id/decline). Without this line
+    // ctRequireEventType threw inside envelope.js's try/catch and the refusal
+    // never reached the log at all.
+    'envelope_decline',
   ],
   did_event: [
     'code_manifest_published',
@@ -95,6 +99,7 @@ const PAYLOAD_FIELDS = {
   envelope_sign: ['party_index', 'signer_pk_hash', 'appearance_hash'],
   envelope_complete: ['signed_count'],
   envelope_void: ['reason_hash', 'reason_len'],
+  envelope_decline: ['party_index'],
   code_manifest_published: ['git_commit', 'file_count'],
 };
 

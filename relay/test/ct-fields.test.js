@@ -71,7 +71,7 @@ const EXTRA = {
 
 const EVENTS = {
   signing_pk: ['signing_pk_enrolled', 'signing_pk_enrolled_tofu', 'signing_pk_enrolled_attested', 'signing_pk_revoked'],
-  envelope: ['envelope_create', 'envelope_view', 'envelope_sign', 'envelope_complete', 'envelope_void'],
+  envelope: ['envelope_create', 'envelope_view', 'envelope_sign', 'envelope_complete', 'envelope_void', 'envelope_decline'],
   did_event: ['code_manifest_published'],
 };
 
@@ -87,6 +87,7 @@ const PAYLOADS = {
   // The reason is hashed and its length recorded; the text itself never enters
   // the log, which is what keeps a free-text field out of a permanent record.
   envelope_void: ['reason_hash', 'reason_len'],
+  envelope_decline: ['party_index'],
   code_manifest_published: ['git_commit', 'file_count'],
 };
 

@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **120 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **190 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **192 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -139,6 +139,7 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `METING_TIMEOUT_MS` | `scripts/meet-de-server.mjs` | `8000` | hoe lang een meting op productie mag duren voor hij opgeeft |
 | `METING_WACHT_MS` | `scripts/meet-de-server.mjs` | `1500` | hoe lang de grensmeting op stilte wacht, gerekend vanaf het versturen van de kop; onder de grens antwoordt nginx niet maar wacht hij op een body die nooit komt, en die stilte is het signaal |
 | `METING_HANDDRUK_MS` | `scripts/meet-de-server.mjs` | `10000` | hoe lang de grensmeting op de TLS-handdruk wacht; lukt die niet, dan is de meting een fout en geen stilte, want een trage handdruk las op 2026-10-01 als "onder de grens" |
+| `NODE_DEBUG` | `frontend/vendor/fontkit/fontkit.umd.min.js` | leeg | omgevingsherkenning in de gevendorde fontkit (Unicode-font voor /sign), geen Paramant-knop; in de browser bestaat hij niet |
 | `PARAMANT_API_KEY` | `scripts/prod-groep-proef.mjs` | geen | de API-sleutel waarmee de proef op de echte server een groepsverzending doet; zonder hem stopt het script meteen |
 | `PARAMANT_BASE_URL` | `scripts/heartbeat/lib.mjs`, `tests/links.test.mjs` en 1 meer | `'https://paramant.app'` | welke site de heartbeat en de linkcontrole meten |
 | `PARAMANT_COSIGN_SCREENSHOT_PATH` | `tests/cosign-document-delivery.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
@@ -154,6 +155,7 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `PARAMANT_RELAY_URL` | `scripts/heartbeat/lib.mjs` | `'https://relay.paramant.app'` | welke relay de heartbeat aanspreekt |
 | `PARAMANT_SCREENSHOT_PATH` | `tests/developer-parasign-dashboard.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
 | `PARAMANT_SETTINGS_SCREENSHOT_PATH` | `tests/navigation-shell.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
+| `PARAMANT_SIGN_SHOT_DIR` | `tests/sign-geometry.test.mjs`, `tests/sign-errors.test.mjs` | geen | pad waar een test de getekende pagina's als PNG en PDF neerzet; leeg betekent geen afdruk |
 | `PARAMANT_SIGN_SCREENSHOT_PATH` | `tests/sign-invite-delivery.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
 | `PARAMANT_SWEEP_PROGRESS` | `scripts/ui-contrast-sweep.mjs` | geen | voortgangsregels tijdens de contrastveger |
 | `PARTNERS_PROD_NAMEN` | `tests/partners.test.mjs` | geen | pad naar een bestand met de sleutelnamen van de prod-.env (een per regel); alternatief voor `PARTNERS_PROD_SSH`. Zonder beide wordt de productiehelft overgeslagen met een melding |
