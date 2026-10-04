@@ -52,7 +52,7 @@ test('a. /auth/setup: "stap 3 van 5" staat alleen bij het kiezen', async () => {
   assert.deepEqual(eyebrows, ['stap 4 van 5'], `zichtbare stapkoppen: ${eyebrows.join(' | ')}`);
 });
 
-test('b. /co-sign: het kruisje dekt de getypte naam niet af', async () => {
+test('b+d. /co-sign: het kruisje dekt de getypte naam niet af, en de naam komt zoals getypt in de pdf', async () => {
   const ENV_ID = 'env_demo_kruisjexyzabcd';
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   await page.goto(ORIGIN + '/__blank');
@@ -98,7 +98,20 @@ test('b. /co-sign: het kruisje dekt de getypte naam niet af', async () => {
     const overlap = !(t.right <= x.left || x.right <= t.left || t.bottom <= x.top || x.bottom <= t.top);
     return { overlap, text: ink.textContent };
   });
+  // D (acceptance test): a name outside WinAnsi reaches the PDF as written,
+  // not as "Ay?e Y?lmaz".
+  await page.locator('#ink-name').fill('Ayşe Yılmaz');
+  await page.locator('#ink-name').dispatchEvent('input');
+  const pdfText = await page.evaluate(async () => {
+    const mod = await import(document.querySelector('script[src*="co-sign.js"]').getAttribute('src'));
+    const out = await mod.buildSignedPdf({ appearance: window.__cosignDebug.appearance(), signed_at: '2026-10-04T12:00:00.000Z' });
+    const doc = await window.pdfjsLib.getDocument({ data: new Uint8Array(out) }).promise;
+    let text = '';
+    for (let i = 1; i <= doc.numPages; i++) text += (await (await doc.getPage(i)).getTextContent()).items.map((it) => it.str).join(' ') + ' ';
+    return text;
+  });
   await page.close();
+  assert.match(pdfText, /Ayşe Yılmaz/, 'de naam staat zoals getypt in de pdf: ' + pdfText.slice(0, 200));
   assert.ok(r, 'er staat een handtekeningveld met een kruisje');
   assert.equal(r.overlap, false, `het kruisje ligt over "${r.text}"`);
 });

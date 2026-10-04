@@ -274,3 +274,33 @@ export function geomFromBoxes(mediaBox, cropBox, rotate) {
   }
   return { view, rotate: normaliseRotation(rotate) };
 }
+
+// ── A page without a text layer (a scan) ────────────────────────────────────
+// pdf.js gives no text for a scanned page, and "no text" used to mean "free
+// everywhere": the paraaf landed on the page number of a scan (acceptance test
+// 2026-10-04). So the rendered page is looked at instead: every cell of a
+// coarse grid that holds dark pixels counts as taken, exactly like a text box.
+// data: RGBA bytes of a canvas w x h showing the whole page (view space).
+// Returns boxes in PDF points with a bottom-left origin, as textBoxesFromItems.
+export function inkBoxesFromImageData(data, w, h, pageW, pageH, cell = 4) {
+  const out = [];
+  if (!data || !(w > 0) || !(h > 0)) return out;
+  for (let cy = 0; cy < h; cy += cell) {
+    for (let cx = 0; cx < w; cx += cell) {
+      let dark = 0;
+      for (let y = cy; y < Math.min(h, cy + cell); y++) {
+        for (let x = cx; x < Math.min(w, cx + cell); x++) {
+          const o = (y * w + x) * 4;
+          // Ink: clearly darker than paper (scans are rarely pure white).
+          if (data[o + 3] > 0 && (data[o] + data[o + 1] + data[o + 2]) < 3 * 170) dark++;
+        }
+      }
+      if (dark >= 2) {
+        const x0 = (cx / w) * pageW, x1 = (Math.min(w, cx + cell) / w) * pageW;
+        const yTop = (cy / h) * pageH, yBot = (Math.min(h, cy + cell) / h) * pageH;
+        out.push({ x: x0, y: pageH - yBot, w: x1 - x0, h: yBot - yTop });
+      }
+    }
+  }
+  return out;
+}

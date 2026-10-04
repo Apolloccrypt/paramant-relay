@@ -18,9 +18,10 @@ import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { vaultDelete } from '/vendor/vault.js?v=5';
 import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=2';
 import { previewTargetWidth, viewportTargetWidth, renderGeneration } from '/js/preview-render.js?v=1';
-import { initialsFrom, planParaafs, textBoxesFromItems, paraafFooter, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=2';
+import { initialsFrom, planParaafs, textBoxesFromItems, inkBoxesFromImageData, paraafFooter, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=3';
 import { requestsForParties } from '/js/cosign-layout.js?v=3';
 import { saveDraft, loadDraft, clearDraft } from '/js/sign-draft.js?v=2';
+import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
 import { splitKey, keyShareFragment, b64url as keyB64url, fromB64url as keyFromB64url } from '/js/parasign-ink.js?v=3';
 
 // One file, two languages. /sign is Dutch and /en/sign is the English copy of
@@ -377,7 +378,11 @@ function loadTextBoxes(bytes) {
           const page = await pdf.getPage(i);
           const geom = { view: Array.from(page.view), rotate: normaliseRotation(page.rotate) };
           entry.geoms[i - 1] = geom;
-          out.push(userBoxesToView(textBoxesFromItems((await page.getTextContent()).items), geom));
+          let boxes = userBoxesToView(textBoxesFromItems((await page.getTextContent()).items), geom);
+          // A scanned page has no text to read: look at it instead, so the
+          // paraaf does not land on its page number (acceptance test 2026-10-04).
+          if (!boxes.length) boxes = await inkBoxesOfPage(page);
+          out.push(boxes);
         } catch (e) { out.push(null); }
       }
       return out;
@@ -387,6 +392,21 @@ function loadTextBoxes(bytes) {
   })().then((v) => { entry.value = v || []; return entry.value; });
   _textBoxCache = entry;
   return entry.promise;
+}
+
+// Dark pixels on a small render of the page, as boxes in view-space points
+// (js/paraaf-place.js inkBoxesFromImageData).
+async function inkBoxesOfPage(page) {
+  try {
+    const vp1 = page.getViewport({ scale: 1 });
+    const vp = page.getViewport({ scale: 360 / vp1.width });
+    const c = document.createElement('canvas');
+    c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    return inkBoxesFromImageData(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height, vp1.width, vp1.height);
+  } catch (e) { return []; }
 }
 
 // The cached boxes when they are already read, else undefined.
@@ -3159,106 +3179,6 @@ function drawStampOnCanvas(ctx, stamp, signerName, dateStr, fingerprint8, sigImg
 //   3. a script the bundled font does not cover either (Chinese, Arabic, ...)
 //      is drawn by the browser's own fonts into a sharp image of that text.
 // Every name can be signed; the bundle only grows for the document that needs it.
-const FONTKIT_SRC = '/vendor/fontkit/fontkit.umd.min.js?v=1';
-const UNICODE_FONT_SRC = '/vendor/fonts/NotoSans-ParaSign.ttf?v=1';
-
-async function waitForFontkit() {
-  if (window.fontkit) return window.fontkit;
-  loadScriptOnce(FONTKIT_SRC, false);
-  return new Promise((resolve, reject) => {
-    const start = Date.now();
-    const tick = () => {
-      if (window.fontkit) return resolve(window.fontkit);
-      if (Date.now() - start > 15000) return reject(Object.assign(new Error('fontkit failed to load'), { code: 'font_unavailable' }));
-      setTimeout(tick, 50);
-    };
-    tick();
-  });
-}
-
-function canEncode(font, s) {
-  try { font.encodeText(String(s)); return true; } catch (e) { return false; }
-}
-
-// One text writer per bake. roles: regular, bold, italic, mono. prepare() must
-// run (once, with every string the bake will write) before width()/draw().
-function makeTextKit(PDFLib, pdfDoc, std) {
-  let uni = null, uniSet = null;
-  const images = new Map();
-  const CSS = { regular: '400 {px}px sans-serif', bold: '700 {px}px sans-serif', italic: 'italic 400 {px}px serif', mono: '400 {px}px monospace' };
-  const REF = 96;   // px per 1pt-at-size-1 x 4: the fallback image is drawn at 4x
-  let measureCtx = null;
-  const ctx2d = () => measureCtx || (measureCtx = document.createElement('canvas').getContext('2d'));
-  const uniCovers = (s) => [...String(s)].every((ch) => /\s/.test(ch) || uniSet.has(ch.codePointAt(0)));
-  const route = (s, role) => {
-    const f = std[role] || std.regular;
-    if (canEncode(f, s)) return { kind: 'std', font: f };
-    if (uni && uniCovers(s)) return { kind: 'uni', font: uni };
-    return { kind: 'img' };
-  };
-  const imgWidth1 = (s, role) => {
-    const c = ctx2d();
-    c.font = CSS[role].replace('{px}', String(REF));
-    return c.measureText(String(s)).width / REF;
-  };
-  return {
-    async prepare(strings) {
-      const need = strings.filter((x) => x && !canEncode(std.regular, x));
-      if (!need.length || uni) return;
-      try {
-        const fk = await waitForFontkit();
-        const res = await fetch(UNICODE_FONT_SRC, { cache: 'force-cache' });
-        if (!res.ok) throw new Error('font http ' + res.status);
-        pdfDoc.registerFontkit(fk);
-        // Whole font, not a subset: pdf-lib's fontkit subsetter dropped and
-        // swapped glyphs of this font ("Ayşe Yılmaz" came out as "Ayse"). The
-        // font is 211 KB and only travels in a PDF that needs it.
-        uni = await pdfDoc.embedFont(new Uint8Array(await res.arrayBuffer()), { subset: false });
-        uniSet = new Set(uni.getCharacterSet());
-      } catch (e) {
-        // No font: the image fallback still writes every name, just not as text.
-        try { console.warn('[paramant] unicode font unavailable, using image text', e); } catch (_) { /* no console */ }
-        uni = null;
-      }
-    },
-    width(s, size, role = 'regular') {
-      const r = route(s, role);
-      return r.kind === 'img' ? imgWidth1(s, role) * size : r.font.widthOfTextAtSize(String(s), size);
-    },
-    async draw(pg, s, { x, y, size, role = 'regular', color, opacity }) {
-      const text = String(s);
-      const r = route(text, role);
-      if (r.kind !== 'img') {
-        const o = { x, y, size, font: r.font, color };
-        if (opacity !== undefined) o.opacity = opacity;
-        pg.drawText(text, o);
-        return;
-      }
-      const key = role + '|' + (color ? [color.red, color.green, color.blue].join(',') : '') + '|' + text;
-      let img = images.get(key);
-      if (!img) {
-        const c = document.createElement('canvas');
-        const k = c.getContext('2d');
-        const font = CSS[role].replace('{px}', String(REF));
-        k.font = font;
-        const w = Math.max(1, Math.ceil(k.measureText(text).width) + 4);
-        c.width = w; c.height = Math.ceil(REF * 1.35);
-        k.font = font;
-        k.textBaseline = 'alphabetic';
-        k.fillStyle = color ? `rgb(${Math.round(color.red * 255)},${Math.round(color.green * 255)},${Math.round(color.blue * 255)})` : '#000';
-        k.fillText(text, 0, REF * 1.05);
-        const b64 = c.toDataURL('image/png').split(',')[1];
-        const bin = Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
-        img = { embed: await pdfDoc.embedPng(bin), w: c.width / REF, h: c.height / REF };
-        images.set(key, img);
-      }
-      // Baseline at 1.05 of the reference size from the top: put it on y.
-      const o = { x, y: y - (img.h - 1.05) * size, width: img.w * size, height: img.h * size };
-      if (opacity !== undefined) o.opacity = opacity;
-      pg.drawImage(img.embed, o);
-    },
-  };
-}
 
 export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fingerprint8) {
   const PDFLib = await waitForPdfLib();

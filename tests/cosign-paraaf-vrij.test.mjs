@@ -70,3 +70,39 @@ test('dezelfde invoer geeft voor afzender en ondertekenaar dezelfde plekken', ()
   const b = paraafSpotsForParties({ pages, textBoxesPerPage: text.map((p) => p.map((x) => ({ ...x }))), count: 4 });
   assert.deepEqual(a, b);
 });
+
+// Acceptance test 2026-10-04, A and C: without a spot from the sender the
+// signatures go under the last text when there is room, else onto a signature
+// sheet after the last page; never over text, never over a paraaf.
+test('zonder plek van de afzender: handtekeningen onder de tekst, of op een handtekeningblad', () => {
+  const half = fullPage(400, { bottom: 430 }).map((b) => frac(b, A4));
+  const full = fullPage(400).map((b) => frac(b, A4));
+  for (let n = 1; n <= 5; n++) {
+    const roomy = Array.from({ length: n }, (_, i) => layout.autoSignaturePlace({ index: i, count: n, pageCount: 4, textBoxes: half }));
+    for (const p of roomy) {
+      assert.equal(p.page_index, 3, `${n} partijen: op de laatste pagina als er plek is`);
+      for (const t of half) assert.ok(!overlap(p.spot, t), `${n} partijen: handtekening over tekst ${JSON.stringify(p.spot)}`);
+    }
+    const crowded = Array.from({ length: n }, (_, i) => layout.autoSignaturePlace({ index: i, count: n, pageCount: 4, textBoxes: full }));
+    for (const p of crowded) assert.equal(p.page_index, 4, `${n} partijen: een volle laatste pagina geeft een handtekeningblad`);
+  }
+  // The sender path with "paraaf verplicht" and no box: the parafen keep clear
+  // of where the signatures will go.
+  const pages = [A4, A4, A4, A4];
+  const text = [fullPage(400), fullPage(400), fullPage(400), fullPage(400, { bottom: 430 })];
+  const reqs = requestsForParties({ anchor: null, signPage: 0, count: 3, withParaaf: true, pages, textBoxesPerPage: text });
+  const parafen = reqs.map((r) => r.fields.find((f) => f.all_pages));
+  const sigs = [0, 1, 2].map((i) => layout.autoSignaturePlace({ index: i, count: 3, pageCount: 4, textBoxes: text[3].map((b) => frac(b, A4)) }).spot);
+  for (const p of parafen) for (const s of sigs) assert.ok(!overlap(p, s), 'paraaf raakt een handtekening');
+});
+
+test('een scan zonder tekstlaag: donkere pixels tellen als tekst', async () => {
+  const { inkBoxesFromImageData } = await import('../frontend/js/paraaf-place.js');
+  const w = 100, h = 140, data = new Uint8ClampedArray(w * h * 4).fill(255);
+  // "blad 1/3" bottom right: dark pixels at x 80..95, y 130..135.
+  for (let y = 130; y < 136; y++) for (let x = 80; x < 96; x++) { const o = (y * w + x) * 4; data[o] = data[o + 1] = data[o + 2] = 20; }
+  const boxes = inkBoxesFromImageData(data, w, h, 595.28, 841.89);
+  assert.ok(boxes.length > 0);
+  const spots = layout.paraafSpotsForParties({ pages: [A4], textBoxesPerPage: [boxes], count: 2 });
+  for (const s of spots) for (const b of boxes) assert.ok(!overlap(s, frac(b, A4)), 'paraaf over het paginanummer van de scan');
+});

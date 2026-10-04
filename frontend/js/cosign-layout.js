@@ -105,6 +105,40 @@ export function freeAnchor(grid, textBoxes) {
   return best ? { x: best.x, y: best.y, w: grid.w, h: grid.h } : { x, y: 1 - EDGE - blockH, w: grid.w, h: grid.h };
 }
 
+// A free place for the whole block of signatures, or null when the page has
+// none. Unlike freeAnchor this never settles for "the least text": the
+// acceptance test of 2026-10-04 found every signature on top of the title and
+// the first articles of a last page that was text from top to bottom, because
+// the least-covered spot was the top. Searched from the bottom up (under the
+// last text first), each row from the left margin to the right, with a little
+// room kept around every line. textBoxes: fractions, y from the top.
+const TEXT_ROOM = 0.006;
+export function freeSignatureBlock(grid, textBoxes) {
+  const blockW = grid.cols * grid.w + (grid.cols - 1) * GAP_X;
+  const blockH = grid.rows * grid.h + (grid.rows - 1) * GAP_Y;
+  const boxes = (Array.isArray(textBoxes) ? textBoxes : []).map((t) => ({ x: t.x - TEXT_ROOM, y: t.y - TEXT_ROOM, w: t.w + 2 * TEXT_ROOM, h: t.h + 2 * TEXT_ROOM }));
+  for (let y = 1 - EDGE - blockH; y >= EDGE; y -= 0.005) {
+    for (let x = EDGE + 0.02; x + blockW <= 1 - EDGE + 1e-9; x += 0.02) {
+      const block = { x, y, w: blockW, h: blockH };
+      if (!boxes.some((t) => overlapArea(block, t) > 0)) return { x: round6(x), y: round6(y), w: grid.w, h: grid.h };
+    }
+  }
+  return null;
+}
+
+// Where the signatures go when nobody pointed at a spot: under the text of the
+// last page when there is room for all of them, else on a signature sheet
+// after the last page (page index = pageCount), never over text.
+// Returns { page_index, spot } for party `index`.
+export function autoSignaturePlace({ index, count, pageCount, textBoxes }) {
+  const grid = signatureGrid(count);
+  const last = Math.max(0, (Number(pageCount) || 1) - 1);
+  const free = freeSignatureBlock(grid, textBoxes);
+  if (free) return { page_index: last, spot: slotAt(blockOrigin(free, grid), grid, index) };
+  const sheetAnchor = { x: EDGE + 0.02, y: 0.16, w: grid.w, h: grid.h };
+  return { page_index: last + 1, spot: slotAt(blockOrigin(sheetAnchor, grid), grid, index) };
+}
+
 // The signature spot of party `index` out of `count`. anchor: the sender's
 // box as a fraction box, or null to find a free place (then textBoxes count).
 export function partySignatureSpot({ anchor, index, count, textBoxes }) {
@@ -309,7 +343,16 @@ export function partyRequest({ index, count, signPage, anchor, textBoxes, paraaf
 // (paraafSpotsForParties). Returns one manifest per party.
 export function requestsForParties({ anchor, signPage, count, withParaaf, pages, textBoxesPerPage }) {
   const n = Math.max(1, Math.min(30, Number(count) || 1));
-  const sigs = Array.from({ length: n }, (_, i) => partySignatureSpot({ anchor, index: i, count: n }));
+  // Without a box from the sender every party signs where /co-sign puts it
+  // (autoSignaturePlace on the last page, or the signature sheet): the parafen
+  // keep clear of exactly those spots.
+  const lastIdx = Math.max(0, (pages && pages.length ? pages.length : 1) - 1);
+  const lastBoxes = !anchor && pages && pages.length && Array.isArray(textBoxesPerPage) && textBoxesPerPage[lastIdx]
+    ? textBoxesToFractions(textBoxesPerPage[lastIdx], pages[lastIdx].width, pages[lastIdx].height) : null;
+  const sigs = anchor
+    ? Array.from({ length: n }, (_, i) => partySignatureSpot({ anchor, index: i, count: n }))
+    : Array.from({ length: n }, (_, i) => autoSignaturePlace({ index: i, count: n, pageCount: lastIdx + 1, textBoxes: lastBoxes }))
+      .filter((p) => p.page_index <= lastIdx).map((p) => p.spot);
   const spots = withParaaf
     ? paraafSpotsForParties({ pages: pages && pages.length ? pages : null, textBoxesPerPage: Array.isArray(textBoxesPerPage) ? textBoxesPerPage : null, count: n, avoid: sigs })
     : null;

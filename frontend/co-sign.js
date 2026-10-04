@@ -30,9 +30,10 @@ import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requ
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { vaultDelete } from '/vendor/vault.js?v=5';
 import { decryptDocumentCapsule, parseDocumentKeyFragment, documentKeyFragment } from '/js/parasign-document-capsule.js?v=2';
-import { textBoxesFromItems, initialsFrom, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=2';
-import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParties, textBoxesToFractions, strokesToInk } from '/js/cosign-layout.js?v=3';
+import { textBoxesFromItems, inkBoxesFromImageData, initialsFrom, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=3';
+import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParties, autoSignaturePlace, textBoxesToFractions, strokesToInk } from '/js/cosign-layout.js?v=3';
 import { sealInk, openInk, joinKey, parseKeyShareFragment } from '/js/parasign-ink.js?v=3';
+import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
 
@@ -703,11 +704,40 @@ function viewTextBoxes(page, items) {
   return userBoxesToView(textBoxesFromItems(items), geomOfPdfjsPage(page));
 }
 
+// The text of one page in view space, PDF points, bottom-left origin. A page
+// without any text (a scan) is looked at instead of read: dark pixels on a
+// small render count as text (js/paraaf-place.js inkBoxesFromImageData), so a
+// paraaf or a signature never lands on the page number of a scanned contract.
+const __pageBoxCache = new Map();
+async function boxesOfPdfjsPage(page) {
+  const key = page.pageNumber;
+  if (__pageBoxCache.has(key)) return __pageBoxCache.get(key);
+  let boxes = null;
+  try {
+    const items = (await page.getTextContent()).items;
+    boxes = viewTextBoxes(page, items);
+    if (!boxes.length) {
+      const vp1 = page.getViewport({ scale: 1 });
+      const scale = 360 / vp1.width;
+      const vp = page.getViewport({ scale });
+      const c = document.createElement('canvas');
+      c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      boxes = inkBoxesFromImageData(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height, vp1.width, vp1.height);
+    }
+  } catch { boxes = null; }
+  __pageBoxCache.set(key, boxes);
+  return boxes;
+}
+
 async function textBoxesOfPage(pageIndex) {
   try {
     const page = await __previewPdf.getPage(pageIndex + 1);
     const vp = page.getViewport({ scale: 1 });
-    return textBoxesToFractions(viewTextBoxes(page, (await page.getTextContent()).items), vp.width, vp.height);
+    const boxes = await boxesOfPdfjsPage(page);
+    return boxes ? textBoxesToFractions(boxes, vp.width, vp.height) : null;
   } catch { return null; }
 }
 
@@ -724,16 +754,27 @@ async function textOfAllPages() {
       const page = await pdf.getPage(i);
       const vp = page.getViewport({ scale: 1 });
       pages.push({ width: vp.width, height: vp.height });
-      try { boxes.push(viewTextBoxes(page, (await page.getTextContent()).items)); }
-      catch { boxes.push(null); }
+      boxes.push(await boxesOfPdfjsPage(page));
     }
   } catch { /* fall through: no text layer, bottom right */ }
   return { pages, boxes: pages.length ? boxes : null };
 }
 
-// The signature boxes of every party, as the envelope asks for them, so a
-// paraaf never covers one. Deterministic from the envelope alone.
-function signatureBoxesOfAllParties() {
+// Where party `index` signs when nobody pointed at a spot: under the text of
+// the last page if all signatures fit there free of text, else on a signature
+// sheet after the last page. The same answer for every party.
+async function autoSignatureField(index, count) {
+  const lastPage = Math.max(0, __pageSizes.length - 1);
+  const boxes = await textBoxesOfPage(lastPage);
+  const placed = autoSignaturePlace({ index, count, pageCount: __pageSizes.length, textBoxes: boxes });
+  return { type: 'seal', page_index: placed.page_index, ...placed.spot };
+}
+
+// The signature boxes of every party on the document's own pages, so a paraaf
+// never covers one (acceptance test: with three signers the third signature
+// lay over the parafen of the first two). Deterministic from the envelope and
+// the document alone.
+async function signatureBoxesOfAllParties() {
   const e = __envelope || {};
   const count = Math.max(1, Number(e.party_count) || 1);
   let req = null;
@@ -741,14 +782,16 @@ function signatureBoxesOfAllParties() {
   const sig = req && req.fields ? req.fields.find(isSignature) : null;
   const out = [];
   if (sig) for (let i = 0; i < count; i++) out.push(partySignatureSpot({ anchor: sig, index: i, count }));
-  for (const f of (__appearance && __appearance.fields) || []) if (isSignature(f)) out.push(f);
+  else for (let i = 0; i < count; i++) { const f = await autoSignatureField(i, count); if (f.page_index < __pageSizes.length) out.push(f); }
+  for (const f of (__appearance && __appearance.fields) || []) if (isSignature(f) && f.page_index < __pageSizes.length) out.push(f);
+  for (const party of (e.parties || [])) for (const f of ((party.appearance && party.appearance.fields) || [])) if (isSignature(f) && f.page_index < __pageSizes.length) out.push(f);
   return out;
 }
 
 async function paraafSpotForMe() {
   const { pages, boxes } = await textOfAllPages();
   const count = Math.max(1, Number(__envelope.party_count) || 1);
-  const spots = paraafSpotsForParties({ pages, textBoxesPerPage: boxes, count, avoid: signatureBoxesOfAllParties() });
+  const spots = paraafSpotsForParties({ pages, textBoxesPerPage: boxes, count, avoid: await signatureBoxesOfAllParties() });
   return spots[Math.max(0, Math.min(count - 1, __partyIndex))];
 }
 
@@ -762,7 +805,8 @@ function clampToPages(appearance) {
   const last = Math.max(0, __pageSizes.length - 1);
   let moved = 0;
   const fields = (appearance.fields || []).map((f) => {
-    if (f.all_pages || f.page_index <= last) return f;
+    // last + 1 is the signature sheet after the document (autoSignaturePlace).
+    if (f.all_pages || f.page_index <= last || f.page_index === last + 1) return f;
     moved = Math.max(moved, f.page_index + 1);
     return { ...f, page_index: last };
   });
@@ -798,8 +842,7 @@ async function computeSeed() {
   if (requested && e.requested_for_party) {
     const clamped = clampToPages(requested).appearance;
     if (clamped.fields.some(isSignature)) return clamped;
-    const boxes = await textBoxesOfPage(lastPage);
-    const sig = { type: 'seal', page_index: lastPage, ...partySignatureSpot({ anchor: null, index, count, textBoxes: boxes }) };
+    const sig = await autoSignatureField(index, count);
     return normaliseSigningAppearance({ version: 2, fields: [sig, ...clamped.fields] });
   }
 
@@ -815,22 +858,18 @@ async function computeSeed() {
       // The parafen are placed against the text of every page, not slid
       // along a row from one corner (with 3+ parties that row ran over text).
       const { pages, boxes } = await textOfAllPages();
-      const avoid = sig ? Array.from({ length: count }, (_, i) => partySignatureSpot({ anchor: sig, index: i, count })) : [];
+      const avoid = await signatureBoxesOfAllParties();
       const spot = pages.length
         ? paraafSpotsForParties({ pages, textBoxesPerPage: boxes, count, avoid })[index]
         : partyParaafSpot({ corner: { ...par, corner: cornerNameOf(par) }, index, count });
       fields.push({ type: 'seal', page_index: 0, x: spot.x, y: spot.y, w: spot.w, h: spot.h, all_pages: true });
     }
     if (!sig && !par) return clamped;
-    if (!sig) {
-      const boxes = await textBoxesOfPage(lastPage);
-      fields.unshift({ type: 'seal', page_index: lastPage, ...partySignatureSpot({ anchor: null, index, count, textBoxes: boxes }) });
-    }
+    if (!sig) fields.unshift(await autoSignatureField(index, count));
   } else {
     // 3. Nothing asked: a free place under the text of the last page, a slot
     //    per party so nobody lands on somebody else.
-    const boxes = await textBoxesOfPage(lastPage);
-    fields.push({ type: 'seal', page_index: lastPage, ...partySignatureSpot({ anchor: null, index, count, textBoxes: boxes }) });
+    fields.push(await autoSignatureField(index, count));
   }
   return normaliseSigningAppearance({ version: fields.some((f) => f.all_pages) ? 2 : 1, fields });
 }
@@ -1116,9 +1155,48 @@ function addAppearanceNode(layer, field, party, current, requested) {
   layer.appendChild(node);
 }
 
+// The signature sheet after the last page, shown when any signature sits on
+// it (autoSignaturePlace puts them there when the last page has no room free
+// of text). It is a page of the readable copy only: the signed document is the
+// original, unchanged.
+function sheetNeeded() {
+  const n = __pageSizes.length;
+  if (!n) return false;
+  const on = (f) => !f.all_pages && Number(f.page_index) === n;
+  if ((__appearance.fields || []).some(on)) return true;
+  return (__envelope?.parties || []).some((p) => p.status === 'signed' && p.appearance && (p.appearance.fields || []).some(on));
+}
+
+function syncSheetPreview() {
+  const host = $('doc-preview');
+  if (!host) return;
+  const existing = host.querySelector('.doc-page.sheet-page');
+  if (!sheetNeeded()) { if (existing) existing.remove(); return; }
+  if (existing) return;
+  const n = __pageSizes.length;
+  const last = __pageSizes[n - 1];
+  const lastWrap = host.querySelector('.doc-page[data-page-index="' + (n - 1) + '"]');
+  const wrap = document.createElement('div');
+  wrap.className = 'doc-page appearance-page sheet-page';
+  wrap.dataset.pageIndex = String(n);
+  if (lastWrap) wrap.style.maxWidth = lastWrap.style.maxWidth;
+  wrap.style.aspectRatio = last.width + ' / ' + last.height;
+  const head = document.createElement('div');
+  head.className = 'sheet-head';
+  head.textContent = L('Handtekeningen bij ', 'Signatures for ') + String(__envelope?.original_filename || 'document');
+  wrap.appendChild(head);
+  const layer = document.createElement('div');
+  layer.className = 'appearance-layer';
+  wrap.appendChild(layer);
+  wrap.addEventListener('click', placeAppearanceField);
+  if (lastWrap && lastWrap.nextSibling) host.insertBefore(wrap, lastWrap.nextSibling); else host.appendChild(wrap);
+}
+
 function renderAppearanceOverlays() {
+  syncSheetPreview();
   const pages = Array.from(document.querySelectorAll('#doc-preview .doc-page[data-page-index]'));
   if (!pages.length) return;
+  const docPages = pages.filter((node) => !node.classList.contains('sheet-page'));
   for (const page of pages) {
     const layer = page.querySelector('.appearance-layer');
     if (layer) layer.innerHTML = '';
@@ -1127,7 +1205,7 @@ function renderAppearanceOverlays() {
   // preview has to show every repeat.
   const add = (field, party, current, requested) => {
     const targets = field.all_pages
-      ? pages
+      ? docPages
       : pages.filter((node) => Number(node.dataset.pageIndex) === Math.min(Number(field.page_index), pages.length - 1));
     for (const page of targets) {
       const layer = page.querySelector('.appearance-layer');
@@ -1165,20 +1243,6 @@ function downloadBytes(bytes, filename, type) {
 
 // The standard PDF fonts speak WinAnsi only. A character outside it (a name
 // in Greek, a stray emoji) becomes '?' instead of failing the whole PDF.
-function pdfSafe(font, value, max) {
-  const text = String(value || '').replace(/[\r\n\t]+/g, ' ').slice(0, max || 120);
-  let out = '';
-  for (const ch of text) {
-    try { font.widthOfTextAtSize(ch, 10); out += ch; } catch { out += '?'; }
-  }
-  return out;
-}
-
-function fitSize(font, text, maxW, maxSize, minSize) {
-  let size = maxSize;
-  while (size > minSize && font.widthOfTextAtSize(text, size) > maxW) size -= 0.5;
-  return size;
-}
 
 // The complete PDF: every party that signed, each at its own spots, with its
 // own handwriting. No white box over the text any more: the ink, a hairline
@@ -1231,6 +1295,28 @@ async function renderPdfWithRecords(records) {
   const inkColor = rgb(0.114, 0.306, 0.847);     // #1D4ED8, the preview's ink
   const capColor = rgb(0.05, 0.11, 0.2);
   const dimColor = rgb(0.35, 0.42, 0.5);
+  const docPageCount = pdf.getPageCount();
+  // A signature on page index docPageCount sits on the signature sheet: one
+  // extra page at the end of this readable copy, the size of the last page.
+  const onSheet = records.some((r) => (r.appearance.fields || []).some((f) => !f.all_pages && Number(f.page_index) === docPageCount));
+  // Names in any script: Noto Sans through fontkit, as /sign does
+  // (js/pdf-text-kit.js). "Ayşe Yılmaz" used to come out as "Ay?e Y?lmaz".
+  const kit = makeTextKit(window.PDFLib, pdf, { regular, bold: regular, italic: script, mono: regular });
+  const texts = [String(__envelope.original_filename || '')];
+  for (const r of records) {
+    texts.push(partyName(r.party), captionFor(r.party, r.party.signed_at), isoDay(r.party.signed_at));
+    if (r.ink && r.ink.kind === 'type') texts.push(r.ink.text, initialsFrom(r.ink.text));
+    texts.push(initialsFrom(partyName(r.party)));
+  }
+  await kit.prepare(texts.filter(Boolean));
+  if (onSheet) {
+    const lastSize = pdf.getPage(docPageCount - 1).getSize();
+    const sheet = pdf.addPage([lastSize.width, lastSize.height]);
+    const title = L('Handtekeningen', 'Signatures');
+    await kit.draw(sheet, title, { x: lastSize.width * 0.07, y: lastSize.height * 0.93, size: 16, role: 'bold', color: capColor });
+    const sub = L('Bij: ', 'For: ') + String(__envelope.original_filename || 'document') + ' (' + docPageCount + (docPageCount === 1 ? L(' pagina', ' page') : L(" pagina's", ' pages')) + ')';
+    await kit.draw(sheet, sub.slice(0, 120), { x: lastSize.width * 0.07, y: lastSize.height * 0.93 - 18, size: 9, color: dimColor });
+  }
   const pages = pdf.getPages();
   // Every field is a fraction of the page as the signer SAW it (pdf.js view:
   // the visible box turned by /Rotate). On a turned or cropped page that view
@@ -1238,14 +1324,14 @@ async function renderPdfWithRecords(records) {
   // signature, the paraaf, the drawn ink, the caption) is drawn upright in it.
   // An ordinary page is the identity and is drawn exactly as before.
   const geoms = await pageGeoms(pages);
-  const inView = (page, fn) => {
+  const inViewAsync = async (page, fn) => {
     const g = geoms[pages.indexOf(page)];
-    if (!g || isIdentityGeom(g)) { fn(page); return; }
+    if (!g || isIdentityGeom(g)) { await fn(page); return; }
     page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...viewToUserMatrix(g)));
-    try { fn(page); } finally { page.pushOperators(popGraphicsState()); }
+    try { await fn(page); } finally { page.pushOperators(popGraphicsState()); }
   };
 
-  const drawInk = (page, ink, box, fallbackText) => {
+  const drawInk = async (page, ink, box, fallbackText) => {
     if (ink && ink.kind === 'draw') {
       const scale = Math.min(box.w / (ink.w + 16), box.h / (ink.h + 16));
       const w = ink.w * scale, h = ink.h * scale;
@@ -1259,10 +1345,15 @@ async function renderPdfWithRecords(records) {
       });
       return;
     }
-    const text = pdfSafe(script, (ink && ink.text) || fallbackText, 80);
-    const size = fitSize(script, text, box.w, Math.min(26, box.h * 0.9), 5);
-    const tw = script.widthOfTextAtSize(text, size);
-    page.drawText(text, { x: box.x + Math.max(0, (box.w - tw) / 2), y: box.y + Math.max(1, (box.h - size) / 2 + size * 0.18), size, font: script, color: inkColor });
+    const text = String((ink && ink.text) || fallbackText || '').replace(/[\r\n\t]+/g, ' ').slice(0, 80);
+    const size = kitFit(text, 'italic', box.w, Math.min(26, box.h * 0.9), 5);
+    const tw = kit.width(text, size, 'italic');
+    await kit.draw(page, text, { x: box.x + Math.max(0, (box.w - tw) / 2), y: box.y + Math.max(1, (box.h - size) / 2 + size * 0.18), size, role: 'italic', color: inkColor });
+  };
+  const kitFit = (text, role, maxW, maxSize, minSize) => {
+    let size = maxSize;
+    while (size > minSize && kit.width(text, size, role) > maxW) size -= 0.5;
+    return size;
   };
 
   for (const record of records) {
@@ -1270,10 +1361,10 @@ async function renderPdfWithRecords(records) {
       // all_pages repeats one signed field at the same relative spot on every
       // page. A page this document does not have moves to the last page, as
       // the preview showed it, instead of vanishing.
-      const targets = field.all_pages ? pages : [pages[Math.min(field.page_index, pages.length - 1)]];
+      const targets = field.all_pages ? pages.slice(0, docPageCount) : [pages[Math.min(field.page_index, pages.length - 1)]];
       for (const target of targets) {
         if (!target) continue;
-        inView(target, (page) => {
+        await inViewAsync(target, async (page) => {
           const g = geoms[pages.indexOf(page)];
           const { width, height } = g ? viewSize(g) : page.getSize();
           const x = field.x * width;
@@ -1281,20 +1372,20 @@ async function renderPdfWithRecords(records) {
           const w = field.w * width;
           const h = field.h * height;
           if (field.type === 'date') {
-            const text = pdfSafe(regular, isoDay(record.party.signed_at), 10);
-            page.drawText(text, { x: x + 2, y: y + Math.max(2, h * 0.25), size: Math.max(7, Math.min(11, h * 0.6)), font: regular, color: capColor });
+            const text = isoDay(record.party.signed_at);
+            await kit.draw(page, text, { x: x + 2, y: y + Math.max(2, h * 0.25), size: Math.max(7, Math.min(11, h * 0.6)), color: capColor });
           } else if (field.all_pages) {
             // The paraaf: initials (or the drawn mark, small) over a hairline.
             const ink = record.ink && record.ink.kind === 'draw' ? record.ink : { kind: 'type', text: initialsFrom((record.ink && record.ink.text) || partyName(record.party)) || '·' };
-            drawInk(page, ink, { x, y: y + h * 0.18, w, h: h * 0.8 }, '·');
+            await drawInk(page, ink, { x, y: y + h * 0.18, w, h: h * 0.8 }, '·');
             page.drawLine({ start: { x: x + w * 0.08, y: y + h * 0.16 }, end: { x: x + w * 0.92, y: y + h * 0.16 }, thickness: 0.4, color: inkColor, opacity: 0.5 });
           } else {
             // The signature: handwriting on top, a line, and under it who and when.
-            drawInk(page, record.ink, { x: x + 2, y: y + h * 0.4, w: w - 4, h: h * 0.58 }, partyName(record.party));
+            await drawInk(page, record.ink, { x: x + 2, y: y + h * 0.4, w: w - 4, h: h * 0.58 }, partyName(record.party));
             page.drawLine({ start: { x, y: y + h * 0.37 }, end: { x: x + w, y: y + h * 0.37 }, thickness: 0.6, color: capColor, opacity: 0.55 });
             const capSize = Math.max(5, Math.min(8, h * 0.15));
-            const cap = pdfSafe(regular, captionFor(record.party, record.party.signed_at), 90);
-            page.drawText(cap, { x, y: y + h * 0.37 - capSize - 1.5, size: fitSize(regular, cap, w, capSize, 4), font: regular, color: capColor });
+            const cap = String(captionFor(record.party, record.party.signed_at) || '').replace(/[\r\n\t]+/g, ' ').slice(0, 90);
+            await kit.draw(page, cap, { x, y: y + h * 0.37 - capSize - 1.5, size: kitFit(cap, 'regular', w, capSize, 4), color: capColor });
             const fp = String(record.party.signer_pk_hash || '').slice(0, 8);
             const proof = 'Paramant ParaSign' + (fp ? ' · PQ ' + fp : '');
             page.drawText(proof, { x, y: y + 1, size: Math.max(4, capSize - 1.5), font: regular, color: dimColor });
