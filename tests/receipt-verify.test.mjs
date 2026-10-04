@@ -192,7 +192,8 @@ test('a receipt with one character changed is refused, offline, with a reason', 
 test('the page ships the relay key it needs, so no key has to be pasted', async () => {
   const { context, page } = await offlinePage(browser, ORIGIN);
   const pinned = await page.evaluate(async () => {
-    const mod = await import('/js/relay-trust-anchors.js');
+    // The URL the page itself loads, so it comes from the module map while offline.
+    const mod = await import('/js/relay-trust-anchors.js?v=2');
     const anchor = mod.defaultAnchor();
     return { key: anchor && anchor.key, fingerprint: anchor && anchor.fingerprint, host: anchor && anchor.host };
   });

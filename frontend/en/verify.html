@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="/design-system.css?v=32">
 <link rel="stylesheet" href="/nav.css?v=28">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
-<link rel="stylesheet" href="/components-parasign.css?v=6">
+<link rel="stylesheet" href="/components-parasign.css?v=7">
 <script type="application/ld+json" data-paramant-seo="1">
 {
   "@context": "https://schema.org",
@@ -190,6 +190,7 @@
       <li>SHA3-256 of your document matches the hash inside the envelope</li>
       <li>The signer's ML-DSA-65 signature over that hash is valid</li>
       <li>The envelope has not expired</li>
+      <li>For a proof with several signers: the counter-signature was made with a key Paramant pins in this site, not with a key taken from the file itself</li>
     </ul>
     <p class="ps-help">Signatures are checked entirely in your browser. No account, no API key, and it works offline.</p>
     <p><a href="/dashboard">Open your dashboard &rarr;</a></p>
@@ -272,7 +273,7 @@
 </footer>
 <script src="/nav.js?v=16" defer></script>
 <script src="/js/nav-auth.js?v=12" defer></script>
-<script type="module" src="/parasign-verify.js?v=7"></script>
-<script type="module" src="/js/receipt-verify.js?v=3"></script>
+<script type="module" src="/parasign-verify.js?v=8"></script>
+<script type="module" src="/js/receipt-verify.js?v=4"></script>
 </body>
 </html>

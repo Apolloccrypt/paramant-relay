@@ -132,11 +132,30 @@ over the canonical JSON. Verifiable offline against the relay public key
 
 ### GET /v1/envelopes/:id/document — the signed PDF
 
-OWNER/PARTICIPANT only; `409 not_ready` until completed. **This build has no
-stamp-worker: the ORIGINAL (unstamped) PDF is returned, flagged with
-`X-ParaSign-Stamped: false`.** The cryptographic proof lives in the `.psign`,
-not in a visible stamp. If the ephemeral document store has expired the blob you
-get `404 document_gone` (see Storage caveats).
+OWNER/PARTICIPANT only; `409 not_ready` until completed. Returns a STAMPED
+reading copy (`X-ParaSign-Stamped: true`): a footer on every page plus a
+"ParaSign signature certificate" page, baked by `relay/lib/parasign-stamp.js`.
+When stamping is unavailable the ORIGINAL bytes come back with
+`X-ParaSign-Stamped: false`. The cryptographic proof lives in the `.psign`,
+not in the visible stamp. If the ephemeral document store has expired the blob
+you get `404 document_gone` (see Storage caveats).
+
+**Verifying: use the original, not the stamped copy.** Every party signed the
+SHA3-256 of the ORIGINAL bytes (`document_hash` in the receipt). The stamp is
+made after completion and its hash is in no signature, so `/verify` with the
+stamped PDF reports "not the document that was signed" and names the hash of
+the original. The certificate page prints that same hash (`Document SHA3-256`)
+and says to upload the original. Keep the PDF you created the envelope with.
+
+Protocol option, not implemented. The receipt could carry the hash of the
+stamped copy as well, inside the notary signature (for example
+`stamped_document_hash`), so `/verify` could accept the stamped PDF and say
+"stamped copy of the signed original, stamped by Paramant". Two conditions
+first: stamping has to be deterministic (pdf-lib output is not guaranteed
+byte-stable across versions) or the stamped bytes have to be produced and
+frozen before the receipt is notarised; and only receipts issued after the
+change would carry the field, so the original stays the one file that always
+verifies. Existing receipts and their bytes stay as they are.
 
 ### POST /v1/envelopes/:id/void — retract
 
@@ -163,9 +182,11 @@ Emitted in this build: `envelope.sent`, `envelope.voided`. NOT yet auto-fired
 
 ## Test mode
 
-`psk_test_` keys are accepted and behave like live, EXCEPT there is no sandbox
-auto-signer yet: a test envelope still needs a human to sign via the hosted
-page. End-to-end automated sandbox signing is planned.
+`psk_test_` keys are accepted. Test envelopes are signed automatically by a
+throwaway sandbox signer (when the relay has a signing engine; otherwise they
+behave like live ones), and their receipt carries `mode: "test"` and
+`sandbox: true` inside the notary signature. `/verify` shows such a receipt as
+a test proof, never as a real valid signature.
 
 ## Storage and privacy caveats (Model A)
 
