@@ -6,6 +6,8 @@ Ghost Pipe is a quantum-safe data conduit for OT environments. It transports sen
 
 This guide covers deploying Ghost Pipe as the IEC 62443 conduit between your OT zone (Levels 1–2) and your IT/SCADA zone (Level 3).
 
+> **Read this first: who can decrypt.** The `paramant-sender` and `paramant-receiver` scripts used in this guide derive the AES key from your `pgp_` API key (HKDF, `scripts/paramant-sender.py` `encrypt()`), and `--hybrid` is two derivations of that same key, not ML-KEM. The relay receives that API key in `X-Api-Key` on every request, so the relay operator, or anyone who sees the key, can decrypt what these scripts send. For end-to-end encryption that the relay cannot open, use the Python SDK (`paramant-sdk` on PyPI), which encapsulates an AES-256-GCM key with ML-KEM-768 against the receiver's registered public key.
+
 ---
 
 ## Architecture — Purdue Model placement
@@ -32,7 +34,7 @@ This guide covers deploying Ghost Pipe as the IEC 62443 conduit between your OT 
 │         └──────────────────────────────────┘                   │
 │                                                                 │
 │  Data enters encrypted from Level 2.                           │
-│  Data exits as ciphertext only. Relay cannot decrypt.           │
+│  Data exits as ciphertext. Who can decrypt: see note above.    │
 └─────────────────────────────────────────────────────────────────┘
 ┌─────────────────────────────────────────────────────────────────┐
 │  Level 2 — Control network                                      │
@@ -222,7 +224,7 @@ See [API reference — Device Identity](api.md#device-identity) for the full enr
 
 | IEC 62443 Requirement | How Ghost Pipe addresses it |
 |---|---|
-| SR 4.1 — Information confidentiality | ML-KEM-768 + ECDH P-256 client-side encryption. Relay never holds plaintext. |
+| SR 4.1: Information confidentiality | With the Python SDK: ML-KEM-768 + AES-256-GCM client-side encryption, the relay never holds plaintext. With `paramant-sender`/`paramant-receiver`: AES-256-GCM under a key derived from the API key, readable by the relay (see the note at the top). |
 | SR 4.2 — Use control | API key per device. `plk_` operator keys for infrastructure, `pgp_` device keys for field units. |
 | SR 3.1 — Communication integrity | AES-256-GCM AEAD authentication tag on every payload. ML-DSA-65 signed STH in CT log. |
 | SR 1.1 — Device identification | `/v2/did/register` enrollment with ed25519 device key. DID document in public CT log. |

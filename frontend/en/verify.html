@@ -187,11 +187,10 @@
     <ul>
       <li>SHA3-256 of your document matches the hash inside the envelope</li>
       <li>The signer's ML-DSA-65 signature over that hash is valid</li>
-      <li>The envelope has not expired</li>
       <li>For a proof with several signers: the counter-signature was made with a key Paramant pins in this site, not with a key taken from the file itself</li>
     </ul>
-    <p class="ps-help">Signatures are checked entirely in your browser. No account, no API key, and it works offline.</p>
-    <p><a href="/dashboard">Open your dashboard &rarr;</a></p>
+    <p class="ps-help">A current proof is checked entirely in your browser, offline too. Only an old envelope (v1 or v2) goes past the relay: then this page sends the fingerprint and the proof, never the document. No account or API key needed.</p>
+    <p><a href="/en/dashboard">Open your dashboard &rarr;</a></p>
   </aside>
   </div>
 
@@ -270,8 +269,8 @@
   </div>
 </footer>
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=13" defer></script>
-<script type="module" src="/parasign-verify.js?v=11"></script>
+<script src="/js/nav-auth.js?v=14" defer></script>
+<script type="module" src="/parasign-verify.js?v=12"></script>
 <script type="module" src="/js/receipt-verify.js?v=4"></script>
 </body>
 </html>

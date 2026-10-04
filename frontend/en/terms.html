@@ -268,13 +268,13 @@ a:hover{opacity:.8}
   <h2 id="parties">1. Who you are contracting with</h2>
   <p>PARAMANT is operated by <strong>Paramantis Solutions B.V.</strong>, established in Harderwijk, the Netherlands, registered with the Dutch Chamber of Commerce under KvK 42115132. In these terms "we", "us" and "PARAMANT" mean that company. "You" means the person or organisation using the service.</p>
   <p>These terms apply to every use of paramant.app, the relay, the dashboard, ParaSend, ParaSign, ParaShare (the ParaSend web app) and the API. They apply from the moment you create an account or use the service without one.</p>
-  <div class="note-box">These terms cover the <strong>hosted service</strong> at paramant.app. The <strong>software</strong> is licensed separately under the <a href="/license">Business Source License 1.1</a>, which permits free non-production use and, under its Additional Use Grant, free production use up to 5 active API keys per relay instance and a single self-hosted deployment, commercial use included. Running your own relay within those limits is governed by that licence, not by this document.</div>
+  <div class="note-box">These terms cover the <strong>hosted service</strong> at paramant.app. The <strong>software</strong> is licensed separately under the <a href="/en/license">Business Source License 1.1</a>, which permits free non-production use and, under its Additional Use Grant, free production use up to 5 active API keys per relay instance and a single self-hosted deployment, commercial use included. Running your own relay within those limits is governed by that licence, not by this document.</div>
 
   <h2 id="scope">2. What the service is</h2>
-  <p>PARAMANT relays encrypted data. Files and documents are encrypted in your own browser before they reach us, and the relay never holds the plaintext or the key, except in the hosted signing ceremony on our <code>/v1</code> API. In that ceremony you send us the document itself so that we can run it for you, and for the life of that envelope we hold the document and the key that seals it at rest. Transfer payloads live in RAM only and are destroyed when the last read of the link is spent or when their time to live expires, whichever comes first. A Community link has one read, which is why it burns on the first. The current time to live is one hour on Community, twenty-four hours on Firm and seven days on Enterprise.</p>
+  <p>PARAMANT relays encrypted data. As a rule, files and documents are encrypted in your own browser before they reach us, and then the relay holds neither the plaintext nor the key. There are three exceptions. First, the hosted signing ceremony on our <code>/v1</code> API: you send us the document itself so that we can run it for you, and for the life of that envelope we hold the document and the key that seals it at rest. Second, sending to named recipients (by email address): your browser wraps the key per recipient under a token, but that token passes through the relay once so it can be emailed in the invitation, and the invitation and the pickup code go through our mail provider. At that moment the relay could open the file; afterwards we keep only a hash of the token. Third, the Chromium and Outlook extensions, which still encrypt on the server for now. Transfer payloads live in RAM only and are destroyed when the last read of the link is spent or when their time to live expires, whichever comes first. A Community link has one read, which is why it burns on the first. The current time to live is one hour on Community, twenty-four hours on Firm and seven days on Enterprise.</p>
   <p>Two consequences follow from that design, and you should understand both before you rely on the service.</p>
   <p><strong>PARAMANT is not storage and not a backup.</strong> Anything you send is meant to disappear. Keep your own copy of anything you care about. We cannot recover a transfer once it has burned or expired, because there is nothing left to recover.</p>
-  <p><strong>We cannot read your data, and therefore we cannot restore it.</strong> If you lose your key or your link, the content is unrecoverable. That is not a support limitation we could lift with more effort; it is the property that makes the service worth using.</p>
+  <p><strong>Outside those exceptions we cannot read your data, and therefore we cannot restore it.</strong> If you lose your key or your link, the content is unrecoverable. That is not a support limitation we could lift with more effort; it is the property that makes the service worth using.</p>
 
   <h2 id="account">3. Your account</h2>
   <p>An account requires a working e-mail address. You are responsible for keeping your credentials and your second factor secure, and for everything that happens under your account. Tell us promptly at <a href="mailto:info@paramant.app">info@paramant.app</a> if you think your account has been compromised.</p>
@@ -283,7 +283,7 @@ a:hover{opacity:.8}
 
   <h2 id="plans">4. Plans, price and payment</h2>
   <p>The Community plan is free, has no card requirement, and stays free. Paid plans buy higher limits: longer link expiry, more reads per link through the API, more registered devices, API access and a dedicated relay. They do not buy stronger encryption: the encryption is the same on every tier.</p>
-  <p>Prices are shown on the <a href="/pricing">pricing page</a> excluding Dutch VAT (btw). Checkout charges the amount including 21% VAT. The price that applies is the one shown at the moment you subscribe.</p>
+  <p>Prices are shown on the <a href="/en/pricing">pricing page</a> excluding Dutch VAT (btw). Checkout charges the amount including 21% VAT. The price that applies is the one shown at the moment you subscribe.</p>
   <div class="note-box"><strong>State of play, honestly:</strong> checkout runs through Mollie, a Dutch payment provider; card details are entered on Mollie's own pages and PARAMANT never sees or stores them. Every checkout is a one-off payment for the term you buy. Automatic renewal is not switched on, so nothing is collected a second time without you buying again.</div>
   <p>A paid term runs for the period you choose, monthly or yearly. Because renewal is not automatic, the term simply ends and the account falls back to Community unless you buy another. We may change prices for a future term; we will tell you at least thirty days before a change takes effect.</p>
 
@@ -294,7 +294,7 @@ a:hover{opacity:.8}
   <p>Deleting your account deletes your account data. Transfers already in flight are destroyed with it.</p>
 
   <h2 id="use">6. Acceptable use</h2>
-  <p>The service is end-to-end encrypted, which means we cannot see what you send. That makes this section a matter of your responsibility rather than our filtering. You may not use PARAMANT:</p>
+  <p>What you send is encrypted. Outside the exceptions in <a href="#scope">clause 2</a> we cannot see what it is, and within those exceptions we do not look into your content either. That makes this section a matter of your responsibility rather than our filtering. You may not use PARAMANT:</p>
   <ul style="color:var(--ink-dim);margin:0 0 16px 20px;line-height:1.8">
     <li>for anything unlawful under Dutch or EU law, including distributing material depicting the sexual abuse of children, or content that incites terrorism;</li>
     <li>to infringe someone else's intellectual property or breach a duty of confidentiality you owe;</li>
@@ -303,14 +303,14 @@ a:hover{opacity:.8}
     <li>to resell the hosted service as your own, or to evade plan limits by automation or multiple accounts.</li>
   </ul>
   <p>You are responsible for having the right to send what you send, and for complying with any rules that bind you, such as professional confidentiality, export control or sector regulation.</p>
-  <p>Where a court or a competent authority orders us to act, we comply with what Dutch and EU law require of us. In practice there is very little we can hand over: outside the hosted signing ceremony described in <a href="#scope">clause 2</a> we hold ciphertext and account data, never plaintext and never keys. For an envelope still running on that ceremony we can be compelled to produce the document and the signer details it carries. We will not weaken the encryption, and we will not build a way in. If we are legally free to tell you that we received an order, we will.</p>
+  <p>Where a court or a competent authority orders us to act, we comply with what Dutch and EU law require of us. In practice there is very little we can hand over: outside the exceptions described in <a href="#scope">clause 2</a> we hold ciphertext and account data, no plaintext and no keys. For an envelope still running on that ceremony we can be compelled to produce the document and the signer details it carries. We will not weaken the encryption, and we will not build a way in. If we are legally free to tell you that we received an order, we will.</p>
 
   <h2 id="content">7. Your content, and what we cannot do with it</h2>
   <p>What you send stays yours. You grant us only the narrow, temporary permission needed to relay it: to receive an encrypted blob, hold it in memory, and hand it to the recipient. Nothing more.</p>
-  <p>We do not read, scan, mine, profile, sell or train on your content. That is not only a promise; the architecture removes the possibility. What we do process to run your account is set out in the <a href="/privacy">Privacy Policy</a>, and business customers can sign a <a href="/dpa">Data Processing Agreement</a> under Article 28 GDPR.</p>
+  <p>We do not read, scan, mine, profile, sell or train on your content. Outside the exceptions in <a href="#scope">clause 2</a> that is not only a promise; there the architecture removes the possibility. What we do process to run your account is set out in the <a href="/en/privacy">Privacy Policy</a>, and business customers can sign a <a href="/en/dpa">Data Processing Agreement</a> under Article 28 GDPR.</p>
 
   <h2 id="availability">8. Availability and support</h2>
-  <p>We aim to keep the service up, but the Community plan comes with no uptime guarantee. Committed uptime, downtime credits and support response times for paid tiers are set out in the <a href="/sla">Service Level Agreement</a>, which forms part of these terms for the plans it covers.</p>
+  <p>We aim to keep the service up, but the Community plan comes with no uptime guarantee. Committed uptime, downtime credits and support response times for paid tiers are set out in the <a href="/en/sla">Service Level Agreement</a>, which forms part of these terms for the plans it covers.</p>
   <p>We may perform maintenance and may change or discontinue features. If we discontinue something you pay for, we will give reasonable notice and refund the unused part of your term.</p>
 
   <h2 id="liability">9. Liability</h2>
@@ -323,7 +323,7 @@ a:hover{opacity:.8}
   <p>You may terminate at any time by cancelling your plan and deleting your account.</p>
 
   <h2 id="ip">11. Intellectual property</h2>
-  <p>The PARAMANT name, logo, site content and documentation belong to Paramantis Solutions B.V. The relay, dashboard and protocol are licensed under the <a href="/license">Business Source License 1.1</a>, which grants free non-production use, allows free production use within its Additional Use Grant of 5 active API keys per relay instance and a single self-hosted deployment, and converts to the Apache License 2.0 on 1 January 2029. Production use beyond those limits requires a commercial licence. Nothing in these terms transfers ownership of the software to you, and nothing in the licence gives you rights over the hosted service beyond these terms.</p>
+  <p>The PARAMANT name, logo, site content and documentation belong to Paramantis Solutions B.V. The relay, dashboard and protocol are licensed under the <a href="/en/license">Business Source License 1.1</a>, which grants free non-production use, allows free production use within its Additional Use Grant of 5 active API keys per relay instance and a single self-hosted deployment, and converts to the Apache License 2.0 on 1 January 2029. Production use beyond those limits requires a commercial licence. Nothing in these terms transfers ownership of the software to you, and nothing in the licence gives you rights over the hosted service beyond these terms.</p>
 
   <h2 id="changes">12. Changes to these terms</h2>
   <p>We may change these terms. Every version carries a number and an effective date at the top of this page. For material changes affecting paid plans we will notify account holders by e-mail at least thirty days in advance, and you may cancel before the change takes effect. Continuing to use the service after that date means you accept the new version.</p>
@@ -341,7 +341,7 @@ a:hover{opacity:.8}
     <tr><td>General and billing</td><td><a href="mailto:info@paramant.app">info@paramant.app</a></td></tr>
     <tr><td>Privacy and data requests</td><td><a href="mailto:privacy@paramant.app">privacy@paramant.app</a></td></tr>
   </table>
-  <p>Related documents: <a href="/privacy">Privacy Policy</a> &middot; <a href="/dpa">Data Processing Agreement</a> &middot; <a href="/terms">Terms of Service</a> &middot; <a href="/sla">Service Level Agreement</a> &middot; <a href="/license">License</a> &middot; <a href="/security">Security</a>.</p>
+  <p>Related documents: <a href="/en/privacy">Privacy Policy</a> &middot; <a href="/en/dpa">Data Processing Agreement</a> &middot; <a href="/en/terms">Terms of Service</a> &middot; <a href="/en/sla">Service Level Agreement</a> &middot; <a href="/en/license">License</a> &middot; <a href="/en/security">Security</a>.</p>
 </div>
 
 </main>
@@ -375,6 +375,6 @@ a:hover{opacity:.8}
   </div>
 </footer>
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=13" defer></script>
+<script src="/js/nav-auth.js?v=14" defer></script>
 </body>
 </html>

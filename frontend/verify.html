@@ -175,10 +175,9 @@
     <ul>
       <li>De SHA3-256-hash van uw document is gelijk aan de hash in de envelop</li>
       <li>De ML-DSA-65-handtekening van de ondertekenaar over die hash is geldig</li>
-      <li>De envelop is niet verlopen</li>
       <li>Bij een bewijs met meerdere ondertekenaars: de bekrachtiging is gezet met een vaste sleutel van Paramant, niet met een sleutel uit het bestand zelf</li>
     </ul>
-    <p class="ps-help">De controle gebeurt volledig in uw browser. U heeft geen account of API-sleutel nodig, en het werkt ook offline.</p>
+    <p class="ps-help">Een bewijs van nu controleert uw browser volledig zelf, ook offline. Alleen een oude envelop (v1 of v2) gaat langs de relay: dan stuurt deze pagina de vingerafdruk en het bewijs, nooit het document. U heeft geen account of API-sleutel nodig.</p>
     <p><a href="/dashboard">Naar uw dashboard &rarr;</a></p>
   </aside>
   </div>
@@ -258,8 +257,8 @@
   </div>
 </footer>
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=13" defer></script>
-<script type="module" src="/parasign-verify.js?v=11"></script>
+<script src="/js/nav-auth.js?v=14" defer></script>
+<script type="module" src="/parasign-verify.js?v=12"></script>
 <script type="module" src="/js/receipt-verify.js?v=4"></script>
 </body>
 </html>

@@ -389,7 +389,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="page-hero-inner">
     <span class="eyebrow">ARCHITECTURE</span>
     <h1>How Paramant works.<br>Shown, not told.</h1>
-    <p class="lede">A plain-language walkthrough of every step: how your file is encrypted, how it travels, why the relay cannot read it, and what happens when the link is opened. For the cryptographic specification, see <a href="/security">the security page</a>.</p>
+    <p class="lede">A plain-language walkthrough of every step: how your file is encrypted, how it travels, why the relay cannot read it, and what happens when the link is opened. For the cryptographic specification, see <a href="/en/security">the security page</a>.</p>
   </div>
 </section>
 
@@ -690,7 +690,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="arch-inner">
     <div class="section-num">07</div>
     <h2 class="section-title">Verified transfer</h2>
-    <p class="section-desc">Every Paramant transfer is account-bound and end-to-end encrypted in the browser. The ParaSend web app adds post-quantum key exchange, ML-DSA-65 sender signatures, and CT-log proof of origin. There is no anonymous or lower-assurance tier.</p>
+    <p class="section-desc">Every Paramant transfer is account-bound and encrypted in the browser. It is end-to-end, with no way for the relay to see a key, for a one-time link and for Together; in a send to named recipients the token that unwraps the key passes through the relay once so it can be emailed (the exception). The ParaSend web app adds post-quantum key exchange, ML-DSA-65 sender signatures, and CT-log proof of origin. There is no anonymous or lower-assurance tier.</p>
 
     <table class="modes-table">
       <thead>
@@ -783,7 +783,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </table>
 
     <div class="arch-takeaway">
-      <p><strong>The relay never sees plaintext, except in the hosted signing ceremony on the <code>/v1</code> API.</strong> Every client on this table encrypts before it uploads, the two extensions included. The ceremony is not a client on this table: there the relay is handed the PDF itself, because running the ceremony is what that request asked it to do. What differs is the key exchange: the SDKs and the web app bind the file to a recipient's public key, while the extensions and the browser-encrypted link put a symmetric key in the URL fragment and bind it to nobody. Anyone holding that link can open the file, so the channel you send it over is the security. See <a href="/crypto-agility#06">crypto-agility § 06</a> for the per-client wire format and migration table.</p>
+      <p><strong>The relay never sees plaintext, except in the hosted signing ceremony on the <code>/v1</code> API.</strong> Every client on this table encrypts before it uploads, the two extensions included. The ceremony is not a client on this table: there the relay is handed the PDF itself, because running the ceremony is what that request asked it to do. What differs is the key exchange: the SDKs and the web app bind the file to a recipient's public key, while the extensions and the browser-encrypted link put a symmetric key in the URL fragment and bind it to nobody. Anyone holding that link can open the file, so the channel you send it over is the security. See <a href="/en/crypto-agility#06">crypto-agility § 06</a> for the per-client wire format and migration table.</p>
     </div>
   </div>
 </section>
@@ -794,7 +794,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <span class="eyebrow" style="display:block;width:fit-content;margin:0 auto 20px;text-align:center">GOING DEEPER</span>
     <h2>The full cryptographic specification</h2>
     <p>The security page covers every algorithm, the independent audit results, key verification layers, authentication model, and responsible disclosure. Written for cryptographers and security engineers.</p>
-    <a href="/security" class="btn-arch">Read the security spec &rarr;</a>
+    <a href="/en/security" class="btn-arch">Read the security spec &rarr;</a>
   </div>
 </section>
 
@@ -831,6 +831,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=13" defer></script>
+<script src="/js/nav-auth.js?v=14" defer></script>
 </body>
 </html>

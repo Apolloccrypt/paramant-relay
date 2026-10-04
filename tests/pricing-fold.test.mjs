@@ -139,7 +139,8 @@ test('the first screen at 390px carries the amount, the audience, the company an
   const cta = await page.evaluate(() => {
     // The hero's own action, not the nav's: the nav carries a /signup link on
     // every page and would make this check pass on a page with no CTA at all.
-    const link = [...document.querySelectorAll('#main-content a[href="/signup"]')][0];
+    // The English page leads to the English signup (fase 2, SITE-03-F).
+    const link = [...document.querySelectorAll('#main-content a[href="/en/signup"]')][0];
     if (!link) return null;
     const rect = link.getBoundingClientRect();
     return { top: Math.round(rect.top + window.scrollY), bottom: Math.round(rect.bottom + window.scrollY) };

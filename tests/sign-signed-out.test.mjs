@@ -147,7 +147,7 @@ await pickJpeg(jpeg);
 await jpeg.locator('#ds-doc-error:not([hidden])').waitFor({ timeout: 15000 });
 ok('a JPEG is refused, and named',
   (await jpeg.locator('#ds-doc-error').innerText()).trim()
-    === 'Dit is een JPEG-afbeelding, geen pdf. ParaSign ondertekent pdf-documenten. Exporteer of print uw bestand eerst naar pdf.',
+    === 'Dit is een JPEG-afbeelding, geen pdf. ParaSign ondertekent alleen pdf. Zet uw bestand eerst om naar pdf: exporteer het, of druk het af als pdf.',
   await jpeg.locator('#ds-doc-error').innerText());
 ok('a refused file does not move the flow on',
   await jpeg.locator('#step-doc').isVisible()

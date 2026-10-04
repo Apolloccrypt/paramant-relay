@@ -386,7 +386,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 .ds-zoom #ds-zoom-pct{font-family:var(--mono);font-size:11px;color:var(--ink-dim);min-width:42px;text-align:center}
 #ds-pdf-canvas-list{overflow:auto}
 #ds-pdf-canvas-list .ds-page-wrap{max-width:none;margin-left:auto;margin-right:auto}
-.ds-page-nav{position:sticky;top:8px;z-index:5;display:flex;align-items:center;gap:8px;width:fit-content;margin:0 auto 10px;padding:5px 12px;border:1px solid var(--ink-hair);border-radius:999px;background:rgba(var(--tint), .92);backdrop-filter:saturate(1.2) blur(2px);font:600 12px/1 Inter,sans-serif;color:var(--navy);pointer-events:none}
+.ds-page-nav{position:sticky;top:64px;z-index:5;display:flex;align-items:center;gap:8px;width:fit-content;margin:0 auto 10px;padding:5px 12px;border:1px solid var(--ink-hair);border-radius:999px;background:rgba(var(--tint), .92);backdrop-filter:saturate(1.2) blur(2px);font:600 12px/1 Inter,sans-serif;color:var(--navy);pointer-events:none}
 .ds-page-nav>*{pointer-events:auto}
 .ds-page-nav input{width:46px;text-align:center;font:inherit;border:1px solid var(--ink-hair);border-radius:6px;padding:2px 4px}
 .ds-page-nav button{border:1px solid var(--ink-hair);background:var(--card);border-radius:6px;cursor:pointer;padding:2px 8px;font:inherit}
@@ -726,7 +726,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       </div>
       <label class="ds-seal-check" id="ds-allpages-label"><input type="checkbox" id="ds-allpages"> Onderteken elke pagina met deze handtekening (paraaf)</label>
       <button class="ds-edit-btn" id="ds-apply-tpl" type="button" hidden>Opgeslagen positie gebruiken</button>
-      <span class="ds-edit-tip" id="ds-seal-tip">Op de andere pagina's komt een kleine paraaf in een vrije hoek van de marge, niet over de tekst. Positie en grootte worden onthouden voor de volgende keer (nooit uw naam of handtekening).</span>
+      <span class="ds-edit-tip" id="ds-seal-tip">Op de andere pagina's komt een kleine paraaf in een vrije plek in de marge. Is er op een pagina geen vrije plek, dan ziet u dat hier voordat u tekent. Positie en grootte worden onthouden voor de volgende keer (nooit uw naam of handtekening).</span>
     </div>
     <div class="ds-page-nav" id="ds-page-nav" hidden>
       <button id="ds-page-nav-prev" type="button" aria-label="Vorige pagina">&#8593;</button>
@@ -877,7 +877,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       <dl class="ds-proof-dl">
         <dt>Algoritme</dt>          <dd>ML-DSA-65 (FIPS 204, post-quantum)</dd>
         <dt>Hash-algoritme</dt>     <dd>SHA3-256</dd>
-        <dt>SHA3-256 van het document</dt>  <dd id="ds-proof-doc-hash">-</dd>
+        <dt id="ds-proof-doc-hash-label">SHA3-256 van het document</dt>  <dd id="ds-proof-doc-hash">-</dd>
         <dt>Vingerafdruk sleutel ondertekenaar</dt><dd id="ds-proof-fp">-</dd>
         <dt>Versie envelop</dt>   <dd id="ds-proof-version">-</dd>
       </dl>
@@ -997,7 +997,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         <summary>Waarom dit veilig was</summary>
         <div class="done-details-body">
           <p>De handtekening is hier gemaakt, op dit apparaat, met een sleutel die de browser nooit verliet en die u op het moment van tekenen ontgrendelde met uw gezicht, uw vingerafdruk of uw beveiligingssleutel (<code>ML-DSA-65</code>, het handtekeningschema uit FIPS 204). Wij bewaren de publieke helft en de vastlegging daarvan. De helft die tekent hebben wij nooit gehad.</p>
-          <p>Het bewijsbestand hoort bij het document en staat op zichzelf. Iedereen kan het tweetal controleren, zonder account en zonder ons: op <a href="/verify">paramant.app/verify</a>, dat de eigen hash van het document opnieuw berekent (<code>SHA3-256</code>), de handtekening toetst aan de publieke sleutel in de envelop en, als de envelop is medeondertekend, onze handtekening toetst aan het openbare <a href="/ct-log">CT-logboek</a>. Of offline, met <code>paramant-sign verify &lt;file&gt; &lt;envelope.psign&gt;</code> uit <a href="/docs#operator-scripts">paramant-sign</a>.</p>
+          <p>Het bewijsbestand hoort bij het document en staat op zichzelf. Iedereen kan het tweetal controleren, zonder account en zonder ons: op <a href="/verify">paramant.app/verify</a>, dat de eigen hash van het document opnieuw berekent (<code>SHA3-256</code>), de handtekening toetst aan de publieke sleutel in de envelop en, bij een bewijs met meerdere ondertekenaars, onze bekrachtiging toetst aan een vaste sleutel van Paramant die in de pagina zit. Dat rekenen gebeurt in uw browser; het document gaat nergens heen. Het script <code>paramant-sign</code> kan dit bewijs niet controleren: het kent alleen de oude enveloppen (v1 en v2) en vraagt daarvoor de relay.</p>
           <p>Een groene uitslag daar betekent drie dingen tegelijk: de bytes zijn niet veranderd sinds u tekende, de handtekening komt van de houder van die sleutel, en <span id="ds-usage-notary-line"></span></p>
 
           <div class="ds-info-card">
@@ -1052,10 +1052,10 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   </div>
 </footer>
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=13" defer></script>
+<script src="/js/nav-auth.js?v=14" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
 <script src="/js/quota-upgrade.js?v=7" defer></script>
 <script src="/js/done-state.js?v=1" defer></script>
-<script type="module" src="/sign-flow.js?v=67"></script>
+<script type="module" src="/sign-flow.js?v=69"></script>
 </body>
 </html>

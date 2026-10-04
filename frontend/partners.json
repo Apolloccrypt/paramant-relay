@@ -198,12 +198,12 @@
       "moederbedrijf": null,
       "moederbedrijf_land": null,
       "gegevens": {
-        "nl": "Het e-mailadres van de ontvanger, het onderwerp en het bericht met de link. Bij een verzending naar genoemde ontvangers ook de bestandsnaam die de afzender koos.",
-        "en": "The recipient's email address, the subject and the message with the link. For a send to named recipients also the file name the sender chose."
+        "nl": "Het e-mailadres van de ontvanger, het onderwerp en het bericht met de link. Bij een ondertekenuitnodiging zit in die link de helft van de documentsleutel; de andere helft krijgt alleen de ingelogde ontvanger van de relay. Bij een verzending naar genoemde ontvangers ook de bestandsnaam die de afzender koos, de link met het token dat de ingepakte bestandssleutel uitpakt, en in een tweede mail de ophaalcode: samen openen die het bestand.",
+        "en": "The recipient's email address, the subject and the message with the link. For a signing invite that link carries half of the document key; only the signed-in recipient gets the other half from the relay. For a send to named recipients also the file name the sender chose, the link with the token that unwraps the wrapped file key, and in a second email the pickup code: together those open the file."
       },
       "nooit": {
-        "nl": "Het document of bestand zelf, en geen sleutel: de sleutel die het bestand opent blijft ingepakt bij ons.",
-        "en": "The document or file itself, and no key: the key that opens the file stays wrapped with us."
+        "nl": "Het document of bestand zelf.",
+        "en": "The document or file itself."
       },
       "subverwerker": true,
       "status": "actief",

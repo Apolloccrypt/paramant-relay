@@ -4,7 +4,7 @@
 // ML-DSA-65 + SHA3-256 primitives the signer used -- no relay, no API key, so
 // the counterparty (who has no Paramant account) can verify offline. v1/v2
 // envelopes carry a relay notary signature that only the relay can check, so
-// they still POST to /v2/verify (which requires an API key).
+// they still POST to /v2/verify: public, no API key, but not offline.
 import { sha3_256, ml_dsa65 } from '/vendor/paramant-pqc.js';
 // The relay keys this site ships with. A multi-party receipt is only Paramant's
 // when its notary key is one of these; the key printed inside the receipt is
@@ -57,6 +57,11 @@ const T = {
     missingDocHash: 'document_hash ontbreekt',
     hashMismatchMulti: 'Dit is niet het document dat is ondertekend. De handtekeningen gelden voor het originele bestand, met SHA3-256-vingerafdruk {hash}…. De pdf met de zichtbare handtekeningen en parafen (onder elke handtekening de regel "Paramant ParaSign · PQ …") is ook niet het origineel. Kies het originele bestand dat ter ondertekening is aangeboden.',
     missingParties: 'partijen ontbreken',
+    wrongFile: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>Dit is niet het ondertekende bestand. Controleer met het originele bestand.</strong> Het .psign-bestand is in orde, maar de handtekeningen gelden voor een ander bestand (SHA3-256-vingerafdruk {hash}…). Wat u koos, is dus niet wat er is ondertekend. Kies het originele bestand dat ter ondertekening is aangeboden en controleer opnieuw.</div>',
+    lookupFailed: '<p class="ps-help">Het opzoeken lukte nu niet; Paramant gaf geen antwoord. De controle hierboven blijft gelden. Probeer het later opnieuw.</p>',
+    lookupRetry: 'Opnieuw opzoeken',
+    qesNote: '<p class="ps-help">Volgens dit bewijs staat er in de pdf ook een gekwalificeerde handtekening (PAdES) van {provider}, certificaat <code class="mono">{fp}</code>{when}. Die tweede handtekening controleert deze pagina niet: open de ondertekende pdf in een PAdES-lezer, zoals Adobe Acrobat of de EU-validatiedienst DSS.</p>',
+    qesWhen: ', gezet op {v}',
     stampedCopy: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>Dit is niet het ondertekende bestand. Is het de pdf met de zichtbare handtekeningen? Controleer dan met het origineel.</strong> De handtekeningen in het .psign-bestand kloppen, maar ze gelden voor het originele document (SHA3-256-vingerafdruk {hash}…). De pdf met de handtekeningen en parafen erin, met onder elke handtekening de regel "Paramant ParaSign · PQ …", is daar een leesbare kopie van en geeft altijd deze melding. Kies het originele bestand; u kunt het downloaden op de pagina waar u tekende.</div>',
     soloChecked: '<div class="ps-banner info"><span class="ps-mark" aria-hidden="true">\u2713</span><strong>De handtekening klopt met dit document.</strong> Wie tekende, staat niet in de handtekening: de naam hieronder is niet gecontroleerd.</div>',
     fpTampered: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>De handtekening klopt, maar dit bestand is aangepast.</strong> De gegevens over de ondertekenaar horen niet bij de sleutel die tekende. Vertrouw de naam in dit bestand niet.</div>',
@@ -134,6 +139,11 @@ const T = {
     missingDocHash: 'missing document_hash',
     hashMismatchMulti: 'This is not the document that was signed. The signatures cover the original file, with SHA3-256 fingerprint {hash}…. The PDF with the visible signatures and initials (the line "Paramant ParaSign · PQ …" under each signature) is not the original either. Choose the original file that was put up for signing.',
     missingParties: 'missing parties',
+    wrongFile: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>This is not the signed file. Check with the original file.</strong> The .psign file is in order, but the signatures cover a different file (SHA3-256 fingerprint {hash}…). What you chose is therefore not what was signed. Choose the original file that was put up for signing and check again.</div>',
+    lookupFailed: '<p class="ps-help">The lookup did not work just now; Paramant did not answer. The check above still stands. Please try again later.</p>',
+    lookupRetry: 'Look up again',
+    qesNote: '<p class="ps-help">According to this proof, the PDF also carries a qualified signature (PAdES) from {provider}, certificate <code class="mono">{fp}</code>{when}. This page does not check that second signature: open the signed PDF in a PAdES reader, such as Adobe Acrobat or the EU validation service DSS.</p>',
+    qesWhen: ', made on {v}',
     stampedCopy: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>This is not the signed file. Is it the PDF with the visible signatures? Then check with the original.</strong> The signatures in the .psign file are correct, but they cover the original document (SHA3-256 fingerprint {hash}…). The PDF with the signatures and initials in it, with the line "Paramant ParaSign · PQ …" under each signature, is a reading copy of it and always gives this message. Choose the original file; you can download it on the page where you signed.</div>',
     soloChecked: '<div class="ps-banner info"><span class="ps-mark" aria-hidden="true">\u2713</span><strong>The signature matches this document.</strong> Who signed is not part of the signature: the name below has not been checked.</div>',
     fpTampered: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>The signature is correct, but this file has been altered.</strong> The signer details do not belong to the key that signed. Do not trust the name in this file.</div>',
@@ -177,7 +187,7 @@ const T = {
     partyScope: '<p class="ps-help"><strong>Caveat:</strong> this proof covers one signer (party {i} of {n}). Whether the other parties signed, or whether the envelope was withdrawn later, is not in this file.{counted}</p>',
     partyCounted: ' According to the file, {s} of the {n} had signed at that point (not checked).',
     envOffline: '<p class="ps-help">Envelope: <code class="mono">{id}</code> &middot; verified offline, no account needed.</p>',
-    ctIndex: '<p class="ps-help">CT log index: <a href="/ct-log">{idx}</a></p>',
+    ctIndex: '<p class="ps-help">CT log index: <a href="/en/ct-log">{idx}</a></p>',
   },
 };
 function t(k, v) {
@@ -512,7 +522,13 @@ function verifyMultiClient(docHashHex) {
   const stamp = stampedMarker;
   const provenCopy = !!(stamp && stamp.env === String(env.envelope_id || '') && stamp.doc === String(env.document_hash || ''));
   const copyOnly = docMismatch && errors.length === 1 && provenCopy;
-  return { valid: errors.length === 0, errors, anchor, test, copyOnly, docHash: env.document_hash };
+  // Every signature holds, only the file differs, and the file carries no
+  // marker of this envelope: a changed file, another envelope's file, or a
+  // reading copy stamped before the marker existed. Those cannot be told
+  // apart, so no reassurance and no green, but also no "INVALID" as if the
+  // proof were forged: the proof is fine, the file is not the signed one.
+  const wrongFile = docMismatch && errors.length === 1 && !provenCopy;
+  return { valid: errors.length === 0, errors, anchor, test, copyOnly, wrongFile, docHash: env.document_hash };
 }
 
 async function verify() {
@@ -662,7 +678,7 @@ async function lookupSignerHtml(envelope) {
     const pkHash = toHex(sha3_256(pkBytes));
     const res = await fetch(RELAY_URL + '/v2/lookup-signer/' + pkHash);
     if (res.status === 404) return { html: t('notLinked'), revoked: false };
-    if (!res.ok) return { html: '', revoked: false };
+    if (!res.ok) return { html: '', revoked: false, failed: true };
     const d = await res.json();
     if (!d.found) return { html: '', revoked: false };
     const label = d.label ? esc(d.label) : t('noLabel');
@@ -675,7 +691,21 @@ async function lookupSignerHtml(envelope) {
       html += t('enrolled', { when: esc(d.enrolled_at) });
     }
     return { html, revoked: !!d.revoked_at, found: true };
-  } catch { return { html: '', revoked: false }; }
+  } catch { return { html: '', revoked: false, failed: true }; }
+}
+
+// The qualified-signature pointer the relay puts inside the notary-signed
+// receipt (relay/lib/parasign-open-api.js, psign.qes). It is signed, so it is
+// a fact that the relay recorded one; the PAdES signature itself is in the pdf
+// and is not checked here.
+function qesHtml(env) {
+  const q = env && env.qes;
+  if (!q || typeof q !== 'object' || !q.provider || !q.certificate_fingerprint) return '';
+  return t('qesNote', {
+    provider: esc(String(q.provider)),
+    fp: esc(String(q.certificate_fingerprint).slice(0, 32)),
+    when: q.signed_at ? t('qesWhen', { v: esc(String(q.signed_at)) }) : '',
+  });
 }
 
 // What a valid v3 solo proof does and does not establish. Only the document
@@ -688,7 +718,10 @@ function v3ScopeHtml(env) {
   if (fp) out.push(t('checkedKey', { fp: esc(fp) }));
   out.push(t('unverifiedHead'));
   let any = false;
-  if (env.signer_name) { out.push(t('claimName', { v: esc(env.signer_name) })); any = true; }
+  // The pdf route keeps the typed name in coords.name, the text route in
+  // signer_name (sign-flow.js); both are free text outside the signature.
+  const claimedName = env.signer_name || (env.coords && typeof env.coords.name === 'string' ? env.coords.name : '');
+  if (claimedName) { out.push(t('claimName', { v: esc(claimedName) })); any = true; }
   if (env.signed_at) { out.push(t('claimDate', { v: esc(env.signed_at) })); any = true; }
   const claimedFp = String(env.signer_pk_fingerprint || '').toLowerCase();
   if (claimedFp && fp && !fp.startsWith(claimedFp.slice(0, 16)) ) { out.push(t('claimFpBad', { v: esc(claimedFp.slice(0, 32)) })); any = true; }
@@ -714,11 +747,12 @@ async function renderResult(r) {
   const fpBad = solo && claimFingerprintBad(envelope);
   const banner = !r.valid
     ? (r.copyOnly ? t('stampedCopy', { hash: esc(String(r.docHash || '').slice(0, 16)) })
+      : r.wrongFile ? t('wrongFile', { hash: esc(String(r.docHash || '').slice(0, 16)) })
       : r.originalOnly ? t('originalFile', { name: esc(String((envelope && envelope.stamped_filename) || 'signed-…')) })
       : t('invalid'))
     : r.test ? t('validTest') : fpBad ? t('fpTampered') : solo ? t('soloChecked') : t('valid');
   out.push(banner);
-  if (r.errors && r.errors.length && !r.copyOnly && !r.originalOnly) {
+  if (r.errors && r.errors.length && !r.copyOnly && !r.wrongFile && !r.originalOnly) {
     out.push('<ul style="margin-top:var(--space-3)">');
     r.errors.forEach(e => out.push('<li class="ps-help">' + esc(e) + '</li>'));
     out.push('</ul>');
@@ -737,6 +771,7 @@ async function renderResult(r) {
     // The names in a multi-party proof are labels the sender typed: shown,
     // and said for what they are (acceptance r2, 5).
     if ((r.valid || r.copyOnly) && isMulti) out.push(partyNamesHtml(envelope));
+    if ((r.valid || r.copyOnly) && isMulti) out.push(qesHtml(envelope));
   } else {
     const idx = envelope && envelope.notary && envelope.notary.ct_log_index;
     if (idx != null) out.push(t('ctIndex', { idx: esc(String(idx)) }));
@@ -745,7 +780,7 @@ async function renderResult(r) {
   // v1/v2 were checked by the relay already, so the account lookup rides along.
   if (r.valid && !isMulti && !isV3) {
     const attr = await lookupSignerHtml(envelope);
-    if (attr.html) $('vf-result').innerHTML = out.join('') + attr.html;
+    if (attr.html || attr.failed) $('vf-result').innerHTML = out.join('') + (attr.html || t('lookupFailed'));
     return;
   }
   // v3 solo is checked offline, and stays offline unless the reader asks: the
@@ -765,6 +800,20 @@ async function renderResult(r) {
     btn.addEventListener('click', async () => {
       btn.disabled = true;
       const attr = await lookupSignerHtml(envelope);
+      // A failed lookup (429, 500, no network) is said, and the button stays
+      // so the reader can ask again (fase 1 VERIFY-06-C: it just vanished).
+      if (attr.failed) {
+        let fail = $('vf-lookup-failed');
+        if (!fail) {
+          fail = document.createElement('div');
+          fail.id = 'vf-lookup-failed';
+          wrap.after(fail);
+        }
+        fail.innerHTML = t('lookupFailed');
+        btn.textContent = t('lookupRetry');
+        btn.disabled = false;
+        return;
+      }
       // A revoked key takes the green away: the proof has no signed time, so
       // "valid if signed before the revocation" cannot be checked. A key the
       // relay links to an account names the signer: then the green is earned.

@@ -62,7 +62,7 @@ test('the Dutch pages read Dutch and the English copies keep the English text', 
   ];
   for (const [file, phrase] of says) assert.ok(read(file).includes(phrase), `${file} must say "${phrase}"`);
   // The English copy logs in and comes back to itself, not to the Dutch page.
-  assert.match(read('frontend/en/sign.html'), /href="\/auth\/login\?next=\/en\/sign"/);
+  assert.match(read('frontend/en/sign.html'), /href="\/en\/auth\/login\?next=\/en\/sign"/);
 });
 
 // Every L( call, its two string literals, parsed the way the browser would read

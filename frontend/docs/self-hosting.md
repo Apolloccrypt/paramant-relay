@@ -151,12 +151,12 @@ All five relay containers run the **same image** (`build: ./relay`). The `SECTOR
 # On the host, with ADMIN_TOKEN exported
 export $(grep -v '^#' .env | xargs)
 
-python3 scripts/paramant-admin.py add \
+python3 deploy/paramant-admin.py add \
   --label "alice" \
   --plan pro \
   --email alice@example.com
 
-python3 scripts/paramant-admin.py sync
+python3 deploy/paramant-admin.py sync
 # ✓ health: 3 keys loaded (zero downtime)
 # ✓ legal: 3 keys loaded
 # ✓ finance: 3 keys loaded
@@ -166,14 +166,14 @@ python3 scripts/paramant-admin.py sync
 ### List all keys
 
 ```bash
-python3 scripts/paramant-admin.py list
+python3 deploy/paramant-admin.py list
 ```
 
 ### Revoke a key
 
 ```bash
-python3 scripts/paramant-admin.py revoke --key pgp_xxxxx
-python3 scripts/paramant-admin.py sync
+python3 deploy/paramant-admin.py revoke --key pgp_xxxxx
+python3 deploy/paramant-admin.py sync
 ```
 
 ### Plans
@@ -603,13 +603,13 @@ After deploying, create your first API key:
 export $(grep -v '^#' .env | xargs)
 
 # Create an enterprise key for yourself (admin)
-python3 scripts/paramant-admin.py add \
+python3 deploy/paramant-admin.py add \
   --label "admin" \
   --plan enterprise \
   --email you@example.com
 
 # Reload all relays
-python3 scripts/paramant-admin.py sync
+python3 deploy/paramant-admin.py sync
 
 # Your key is shown in the output — save it immediately
 # pgp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

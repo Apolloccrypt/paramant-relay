@@ -176,9 +176,11 @@ Set `webhook_url` at create. Events POST a JSON body with headers:
 Delivery uses the SSRF-guarded fetcher, so an internal/non-HTTPS `webhook_url`
 is accepted at create but silently never delivers. Use a public HTTPS URL.
 
-Emitted in this build: `envelope.sent`, `envelope.voided`. NOT yet auto-fired
-(poll `GET /v1/envelopes/:id` instead): `signer.completed`,
-`envelope.completed`, `envelope.declined`.
+Emitted in this build: `envelope.sent`, `signer.completed`,
+`envelope.completed`, `envelope.voided`. Not produced: `envelope.declined`.
+Each event is one delivery attempt (5 s timeout), with no retry and no
+ordering guarantee between events, so poll `GET /v1/envelopes/:id` as the
+source of truth.
 
 ## Test mode
 

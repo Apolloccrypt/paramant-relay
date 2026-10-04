@@ -66,7 +66,9 @@ const fixture = await page.evaluate(async () => {
   // relay/lib/parasign-open-api.js buildEnvelopePsign writes it.
   const { notary_signature: _drop, ...plain } = receipt;
   const sandboxReceipt = notarise({ ...plain, mode:'test', sandbox:true });
-  return { source:Array.from(source), receipt, sandboxReceipt, relayPublicKey:b64(relayKeys.publicKey) };
+  // A qualified-signature pointer, also inside the notary signature (psign.qes).
+  const qesReceipt = notarise({ ...plain, qes:{ provider:'Cleverbase', certificate_fingerprint:'9f'.repeat(32), signed_at:'2026-07-21T12:00:05.000Z' } });
+  return { source:Array.from(source), receipt, sandboxReceipt, qesReceipt, relayPublicKey:b64(relayKeys.publicKey) };
 });
 
 
@@ -104,16 +106,19 @@ async function runOnce({ url, verdict, receipt, doc, trustRelay }) {
 // The same receipt through both copies of the page: the English words on
 // /en/verify, the Dutch words on /verify. One parasign-verify.js serves both.
 const runs = [
-  { url:'/en/verify.html', verdict:/Signature valid|Signature INVALID|Test proof|This is not the signed file/, valid:/Signature valid/, invalid:/Signature INVALID/, offline:/verified offline/,
-    unknownRelay:/is not a Paramant key/, pinned:/Counter-signed by the test relay/, test:/Test proof, not a real signature/, stampedHint:/reading copy/, stampedHead:/This is not the signed file[\s\S]*check with the original/, stampedMark:/Paramant ParaSign · PQ/ },
-  { url:'/verify.html', verdict:/Handtekening geldig|Handtekening ONGELDIG|Testbewijs|Dit is niet het ondertekende bestand/, valid:/Handtekening geldig/, invalid:/Handtekening ONGELDIG/, offline:/offline gecontroleerd/,
-    unknownRelay:/is geen sleutel van Paramant/, pinned:/Bekrachtigd door de testrelay/, test:/Testbewijs, geen echte ondertekening/, stampedHint:/leesbare kopie/, stampedHead:/Dit is niet het ondertekende bestand[\s\S]*Controleer dan met het origineel/, stampedMark:/Paramant ParaSign · PQ/ },
+  { url:'/en/verify.html', verdict:/Signature valid[\s\S]*(Envelope|Counter)|Signature INVALID|Test proof|This is not the signed file/, valid:/Signature valid/, invalid:/Signature INVALID/, offline:/verified offline/,
+    unknownRelay:/is not a Paramant key/, pinned:/Counter-signed by the test relay/, test:/Test proof, not a real signature/, stampedHint:/reading copy/, stampedHead:/This is not the signed file[\s\S]*check with the original/, stampedMark:/Paramant ParaSign · PQ/,
+    wrongFile:/This is not the signed file\. Check with the original file\./, qes:/qualified signature \(PAdES\) from Cleverbase[\s\S]*does not check that second signature/ },
+  { url:'/verify.html', verdict:/Handtekening geldig[\s\S]*(Envelop|Bekrachtigd)|Handtekening ONGELDIG|Testbewijs|Dit is niet het ondertekende bestand/, valid:/Handtekening geldig/, invalid:/Handtekening ONGELDIG/, offline:/offline gecontroleerd/,
+    unknownRelay:/is geen sleutel van Paramant/, pinned:/Bekrachtigd door de testrelay/, test:/Testbewijs, geen echte ondertekening/, stampedHint:/leesbare kopie/, stampedHead:/Dit is niet het ondertekende bestand[\s\S]*Controleer dan met het origineel/, stampedMark:/Paramant ParaSign · PQ/,
+    wrongFile:/Dit is niet het ondertekende bestand\. Controleer met het originele bestand\./, qes:/gekwalificeerde handtekening \(PAdES\) van Cleverbase[\s\S]*controleert deze pagina niet/ },
 ];
 const outcomes = [];
 for (const run of runs) {
   outcomes.push({ run, kind:'pinned', ...(await runOnce({ ...run, receipt:fixture.receipt, trustRelay:true })) });
   outcomes.push({ run, kind:'forged', ...(await runOnce({ ...run, receipt:fixture.receipt, trustRelay:false })) });
   outcomes.push({ run, kind:'sandbox', ...(await runOnce({ ...run, receipt:fixture.sandboxReceipt, trustRelay:true })) });
+  outcomes.push({ run, kind:'qes', ...(await runOnce({ ...run, receipt:fixture.qesReceipt, trustRelay:true })) });
   // The reading copy co-sign.js writes carries a marker with THIS envelope
   // and THIS original. Only that file gets the orange "check with the
   // original"; any other wrong file is INVALID (hertest r2 R1: M7/M8 were orange).
@@ -159,8 +164,16 @@ for (const o of outcomes) {
     if (run.valid.test(result)) throw new Error(where + 'sandbox receipt shown as a real valid signature: ' + result);
   }
   if (kind === 'wrongdoc') {
-    if (!run.invalid.test(result) || run.stampedHead.test(result)) throw new Error(where + 'a wrong document must be INVALID, not "the stamped copy": ' + result);
+    // Fase 2: a wrong file next to a sound proof is "not the signed file, check
+    // with the original": red, never green, no reading-copy reassurance, and no
+    // "INVALID" as if the proof were forged (an old stamped copy without the
+    // marker lands here too).
+    if (!run.wrongFile.test(result)) throw new Error(where + 'a wrong document must say it is not the signed file: ' + result);
+    if (run.valid.test(result) || run.invalid.test(result) || run.stampedHead.test(result) || run.stampedHint.test(result)) throw new Error(where + 'wrong document got green, INVALID or the reading-copy text: ' + result);
     if (!/\berr\b/.test(banner) || mark !== '✕') throw new Error(where + 'wrong document lacks the red cross: ' + banner + ' ' + mark);
+  }
+  if (kind === 'qes') {
+    if (!run.valid.test(result) || !run.qes.test(result)) throw new Error(where + 'qualified-signature pointer not shown: ' + result);
   }
   if (kind === 'stamped') {
     // Every signature holds and only the file differs: an orange "check with
