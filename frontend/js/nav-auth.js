@@ -1,4 +1,72 @@
 (function() {
+  // What a signed-in customer leaves in THIS browser, and when it goes
+  // (security review r2 (a)): the /sign draft (IndexedDB paramant-sign-draft,
+  // sealed with an account key the page only holds in memory) and the whole
+  // document key K a sender keeps per envelope (localStorage
+  // paramant.cosign.key.v1:<id>, with an expiry). Both are wiped on sign-out
+  // and when another account signs in here; expired ones on any page.
+  var COSIGN_KEY = 'paramant.cosign.key.v1:';
+  var OWNER = 'paramant.local.owner';
+  function wipeDraft() {
+    try { indexedDB.deleteDatabase('paramant-sign-draft'); } catch (e) { /* no IndexedDB */ }
+  }
+  function cosignKeys() {
+    var out = [];
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(COSIGN_KEY) === 0) out.push(k); } } catch (e) { /* storage off */ }
+    return out;
+  }
+  function wipeLocal() {
+    wipeDraft();
+    cosignKeys().forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
+    try { localStorage.removeItem(OWNER); } catch (e) {}
+  }
+  window.paramantWipeLocal = wipeLocal;
+  // Expired K entries go; an old bare value (no expiry yet) gets seven days.
+  (function sweep() {
+    var now = Date.now();
+    cosignKeys().forEach(function(k) {
+      try {
+        var raw = localStorage.getItem(k) || '';
+        var rec = null;
+        try { rec = JSON.parse(raw); } catch (e) { rec = null; }
+        if (!rec || typeof rec !== 'object') { localStorage.setItem(k, JSON.stringify({ f: raw, exp: now + 7 * 864e5 })); return; }
+        if (!(now < Number(rec.exp))) localStorage.removeItem(k);
+      } catch (e) { /* storage off */ }
+    });
+    try {
+      if (!indexedDB.databases) return;
+      indexedDB.databases().then(function(list) {
+        if (!list.some(function(d) { return d.name === 'paramant-sign-draft'; })) return;
+        var r = indexedDB.open('paramant-sign-draft');
+        r.onsuccess = function() {
+          var db = r.result;
+          try {
+            var g = db.transaction('kv').objectStore('kv').get('current');
+            g.onsuccess = function() {
+              var v = g.result;
+              db.close();
+              if (v && (v.v !== 2 || !(now < v.expiresAt))) wipeDraft();
+            };
+            g.onerror = function() { db.close(); };
+          } catch (e) { db.close(); }
+        };
+      }).catch(function() {});
+    } catch (e) { /* no IndexedDB */ }
+  })();
+  // Another account signs in here: whatever the previous one left goes.
+  window.paramantNoteAccount = function(email) {
+    try {
+      if (!email || !crypto.subtle) return;
+      crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(email).trim().toLowerCase())).then(function(buf) {
+        var h = Array.from(new Uint8Array(buf)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+        var prev = null;
+        try { prev = localStorage.getItem(OWNER); } catch (e) {}
+        if (prev && prev !== h) wipeLocal();
+        try { localStorage.setItem(OWNER, h); } catch (e) {}
+      }).catch(function() {});
+    } catch (e) { /* nothing to compare */ }
+  };
+
   var container = document.getElementById('nav-auth');
   if (!container) return;
 
@@ -160,6 +228,7 @@
       try {
         await fetch('/api/user/logout', { method: 'POST', credentials: 'include' });
       } catch (err) {}
+      wipeLocal();
       try { localStorage.removeItem('paramant_api_key'); } catch (err) {} // legacy: /parashare no longer writes it, clear an old one
       if (location.pathname === '/account' || location.pathname.startsWith('/auth/')) {
         location.href = '/';
@@ -181,6 +250,7 @@
       if (!res.ok) { renderLoggedOut(); return; }
       var data = await res.json();
       if (data.authenticated && data.email) {
+        window.paramantNoteAccount(data.email);
         renderLoggedIn(data.email);
       } else {
         renderLoggedOut();

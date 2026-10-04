@@ -1428,6 +1428,32 @@ async function renderPdfWithRecords(records) {
   return new Uint8Array(await pdf.save({ useObjectStreams: false }));
 }
 
+// The whole document key K the sender kept on this device when the request
+// was sent (sign-flow.js), as { f, exp }. It is kept only while needed: a
+// voided, declined or expired request drops it, a complete one keeps it seven
+// more days for the result page, an expired entry is gone (security review r2
+// a3). Older bare values are still read once.
+function ownerKeyFragment(envId, state, env) {
+  const k = 'paramant.cosign.key.v1:' + envId;
+  let raw = '';
+  try { raw = localStorage.getItem(k) || ''; } catch { return ''; }
+  if (!raw) return '';
+  let rec;
+  try { rec = JSON.parse(raw); } catch { rec = null; }
+  if (!rec || typeof rec !== 'object') rec = { f: raw, exp: Date.now() + 7 * 864e5 };
+  const now = Date.now();
+  const drop = () => { try { localStorage.removeItem(k); } catch { /* storage off */ } };
+  if (!(now < Number(rec.exp))) { drop(); return ''; }
+  if (state === 'cancelled' || state === 'declined' || state === 'expired') { drop(); return ''; }
+  if (state === 'complete') {
+    const done = Date.parse((env && env.completed_at) || '') || now;
+    const until = Math.min(Number(rec.exp), done + 7 * 864e5);
+    if (!(now < until)) { drop(); return ''; }
+    if (until !== Number(rec.exp)) { try { localStorage.setItem(k, JSON.stringify({ f: rec.f, exp: until })); } catch { /* storage off */ } }
+  }
+  return String(rec.f || '');
+}
+
 // ---------- after: the complete PDF and the proof, for whoever may have them ----------
 function isResultMode() {
   if (__ownerMode) return true;
@@ -1527,8 +1553,7 @@ async function initOwner(resultRef, ownerId) {
       : (closedExplanation(state) || L('Nog niet iedereen heeft getekend.', 'Not everyone has signed yet.')));
     // The whole key was kept on this device when the request was sent. On
     // another device the sender opens their own original file instead.
-    let fragment = '';
-    try { fragment = localStorage.getItem('paramant.cosign.key.v1:' + envId) || ''; } catch {}
+    const fragment = ownerKeyFragment(envId, state, __envelope);
     if (fragment && parseDocumentKeyFragment(fragment)) {
       try {
         const r = await fetch('/api/user/envelopes/' + encodeURIComponent(envId) + '/owner-document', { credentials: 'include', cache: 'no-store' });

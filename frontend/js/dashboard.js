@@ -480,7 +480,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         t.disabled = true;
         fetch('/api/user/logout', { method: 'POST', credentials: 'include' })
           .catch(function () {})
-          .then(function () { location.href = '/auth/login'; });
+          .then(function () { try { if (window.paramantWipeLocal) window.paramantWipeLocal(); } catch (e) {} location.href = '/auth/login'; });
         return;
       }
       if (act === 'documents-refresh') {

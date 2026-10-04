@@ -20,7 +20,7 @@ import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=2';
 import { previewTargetWidth, viewportTargetWidth, renderGeneration } from '/js/preview-render.js?v=1';
 import { initialsFrom, planParaafs, textBoxesFromItems, inkBoxesFromImageData, paraafFooter, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=3';
 import { requestsForParties } from '/js/cosign-layout.js?v=3';
-import { saveDraft, loadDraft, clearDraft } from '/js/sign-draft.js?v=2';
+import { saveDraft, loadDraft, clearDraft, loadAccountKey } from '/js/sign-draft.js?v=3';
 import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
 import { splitKey, keyShareFragment, b64url as keyB64url, fromB64url as keyFromB64url } from '/js/parasign-ink.js?v=3';
 
@@ -676,7 +676,13 @@ async function sendForSignature() {
     state.keyShareFragment = keyShareFragment(shares.a);
     const keyShareB = keyB64url(shares.b);
     shares.a.fill(0); shares.b.fill(0);
-    try { localStorage.setItem('paramant.cosign.key.v1:' + envelope.id, encrypted.fragment); } catch { /* storage off: the sender opens the original file instead */ }
+    // Kept only as long as needed: until the request has run its course (the
+    // result page shortens it once everyone signed), wiped on sign-out or when
+    // another account signs in here (nav-auth.js; security review r2 a3).
+    try {
+      const exp = Date.now() + 31 * 864e5;
+      localStorage.setItem('paramant.cosign.key.v1:' + envelope.id, JSON.stringify({ f: encrypted.fragment, exp }));
+    } catch { /* storage off: the sender opens the original file instead */ }
     let upload;
     try {
       upload = await fetch('/api/user/envelopes/' + encodeURIComponent(envelope.id) + '/document', {
@@ -4471,6 +4477,9 @@ async function restoreDraft(draft) {
 async function offerDraftAfterSignIn() {
   await sessionKnown;
   if (sessionState !== 'in') return;
+  // The account's draft key, held in memory for a later save as well: a draft
+  // made by another account in this browser does not open with it and is wiped.
+  await loadAccountKey();
   const draft = await loadDraft();
   if (!draft) return;
   const q = new URLSearchParams(location.search);

@@ -2955,6 +2955,22 @@ api.get("/user/developer/stream", authUser, developerGate, async (req, res) => {
 });
 
 // GET /api/user/account
+// GET /api/user/sign-draft-key
+// The key that seals the /sign draft in the browser (frontend/js/sign-draft.js).
+// It is derived per ACCOUNT from a server secret and never stored next to the
+// draft: the page holds it in memory only. Another account in the same browser
+// gets another key and cannot open the draft (security review r2 (a)).
+const SIGN_DRAFT_SECRET = process.env.SIGN_DRAFT_SECRET
+  ? Buffer.from(process.env.SIGN_DRAFT_SECRET)
+  : crypto.createHmac("sha256", DECOY_SECRET).update("paramant-sign-draft-secret-v1").digest();
+api.get("/user/sign-draft-key", authUser, async (req, res) => {
+  const { user_id } = req.userSession || {};
+  if (!user_id) return res.status(401).json({ error: "unauthorized" });
+  const key = crypto.createHmac("sha256", SIGN_DRAFT_SECRET).update("sign-draft-v1:" + user_id).digest("base64url");
+  res.set("Cache-Control", "no-store");
+  res.json({ key });
+});
+
 api.get("/user/account", authUser, async (req, res) => {
   try {
     const { user_id, email } = req.userSession;

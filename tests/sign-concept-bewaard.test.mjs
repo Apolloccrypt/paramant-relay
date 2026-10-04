@@ -42,6 +42,11 @@ const page = await ctx.newPage();
 await page.route('**/api/**', (r) => json(r, 200, { ok: true }));
 await page.route('**/api/user/session/verify', (r) => json(r, 200, { authenticated: true, email: 'sandeep@example.com' }));
 await page.route('**/api/user/envelopes', (r) => json(r, 401, { error: 'unauthorized' }));
+// The account's draft key (admin/server.js GET /api/user/sign-draft-key).
+const keyA = Buffer.alloc(32, 7).toString('base64url');
+const keyB = Buffer.alloc(32, 9).toString('base64url');
+let currentKey = keyA;
+await page.route('**/api/user/sign-draft-key', (r) => json(r, 200, { key: currentKey }));
 
 await page.goto(`${ORIGIN}/sign?mode=invite`, { waitUntil: 'domcontentloaded' });
 await loadPdfLibs(page);
@@ -86,8 +91,11 @@ if (lost) {
         const g = r.result.transaction('kv').objectStore('kv').get('current');
         g.onsuccess = () => {
           const v = g.result;
-          const ct = v && v.ct ? new TextDecoder('latin1').decode(v.ct) : '';
-          resolve({ has: !!v, plainPdf: ct.includes('%PDF') || ct.includes('Samenwerkingsovereenkomst'), keyExtractable: v && v.key ? v.key.extractable : null, meta: v && v.meta });
+          const latin = (u8) => (u8 ? new TextDecoder('latin1').decode(u8) : '');
+          const all = v ? latin(v.b && v.b.ct) + latin(v.m && v.m.ct) + JSON.stringify(Object.keys(v)) : '';
+          const anyKey = v ? Object.values(v).some((x) => x && typeof x === 'object' && (x instanceof CryptoKey || x.key instanceof CryptoKey)) : null;
+          resolve({ has: !!v, plainPdf: all.includes('%PDF') || all.includes('Samenwerkingsovereenkomst'),
+            plainPeople: /sandeep|marije|samenwerking|vrijdag/i.test(all), keyStored: anyKey, meta: v && v.meta, ttlH: v ? (v.expiresAt - v.savedAt) / 3600000 : 0 });
         };
         g.onerror = () => resolve({ has: false });
       } catch { resolve({ has: false }); }
@@ -113,13 +121,45 @@ const left = await page.evaluate(() => new Promise((resolve) => {
 }));
 await ctx.close();
 
+// Another account in the same browser (shared pc): the draft does not open with
+// its key, is not put back, and is wiped (security review r2 (a)).
+const ctx2 = await browser.newContext({ viewport: { width: 1100, height: 900 } });
+const p2 = await ctx2.newPage();
+await p2.route('**/api/**', (r) => json(r, 200, { ok: true }));
+await p2.route('**/api/user/session/verify', (r) => json(r, 200, { authenticated: true, email: 'sandeep@example.com' }));
+await p2.route('**/api/user/sign-draft-key', (r) => json(r, 200, { key: currentKey }));
+await p2.goto(`${ORIGIN}/sign`, { waitUntil: 'domcontentloaded' });
+await p2.evaluate(async (k) => {
+  const m = await import('/js/sign-draft.js?v=3');
+  await m.loadAccountKey(async () => new Response(JSON.stringify({ key: k })));
+  await m.saveDraft({ docName: 'van-A.pdf', recipients: [{ label: 'Piet', email: 'piet@example.com' }] }, new TextEncoder().encode('%PDF geheim'));
+}, keyA);
+currentKey = keyB;
+await p2.goto(`${ORIGIN}/sign?herstel=1`, { waitUntil: 'domcontentloaded' });
+await p2.waitForTimeout(2500);
+const other = await p2.evaluate(() => new Promise((resolve) => {
+  const r = indexedDB.open('paramant-sign-draft');
+  r.onsuccess = () => { try { const g = r.result.transaction('kv').objectStore('kv').get('current'); g.onsuccess = () => resolve({ left: !!g.result, offered: !!document.getElementById('ds-draft-offer'), recip: [...document.querySelectorAll('[data-field="email"]')].map((i) => i.value) }); } catch { resolve({ left: false }); } };
+}));
+const expired = await p2.evaluate(async (k) => {
+  const m = await import('/js/sign-draft.js?v=3');
+  await m.loadAccountKey(async () => new Response(JSON.stringify({ key: k })));
+  await m.saveDraft({ docName: 'oud.pdf' }, new TextEncoder().encode('x'));
+  const later = Date.now() + 25 * 3600 * 1000;
+  return { has: await m.hasDraft(later), load: await m.loadDraft(later), after: await m.hasDraft() };
+}, keyB);
+await ctx2.close();
+
+
 test('een verlopen sessie biedt inloggen aan zonder dat het werk verloren gaat', () => {
   assert.ok(lost, `geen knop om in te loggen en verder te gaan; de pagina zei: ${lostText}`);
   assert.match(lostText, /verlopen/);
   assert.ok(stored && stored.has, 'het concept staat in deze browser');
   assert.equal(stored.plainPdf, false, 'het document staat niet leesbaar in IndexedDB');
-  assert.equal(stored.keyExtractable, false, 'de sleutel is niet uit te lezen');
-  assert.equal(stored.meta.recipients.length, 2);
+  assert.equal(stored.keyStored, false, 'de sleutel staat niet naast het concept');
+  assert.equal(stored.plainPeople, false, 'naam, ontvangers, e-mails en bericht staan niet leesbaar in IndexedDB');
+  assert.equal(stored.meta, undefined, 'geen onversleutelde meta');
+  assert.ok(stored.ttlH > 0 && stored.ttlH <= 24, 'het concept heeft een vervaltijd');
 });
 
 test('na het inloggen staan document, plek, ontvangers en bericht weer klaar', () => {
@@ -134,4 +174,16 @@ test('na het inloggen staan document, plek, ontvangers en bericht weer klaar', (
 
 test('het concept is weg zodra het is teruggezet', () => {
   assert.equal(left, false);
+});
+
+test('een ander account in dezelfde browser krijgt het concept niet, en het wordt gewist', () => {
+  assert.equal(other.offered, false);
+  assert.deepEqual(other.recip, []);
+  assert.equal(other.left, false, 'het concept van account A is gewist');
+});
+
+test('een concept vervalt', () => {
+  assert.equal(expired.has, false);
+  assert.equal(expired.load, null);
+  assert.equal(expired.after, false, 'een verlopen concept wordt bij het lezen gewist');
 });

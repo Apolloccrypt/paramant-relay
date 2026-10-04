@@ -278,6 +278,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
 
   document.getElementById('sign-out').addEventListener('click', async function() {
     await fetch('/api/user/logout', { method: 'POST', credentials: 'include' });
+    try { if (window.paramantWipeLocal) window.paramantWipeLocal(); } catch (e) {}
     window.location = '/';
   });
 
