@@ -198,6 +198,19 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
   </div>
 </div>
 
+<!-- A link: nothing is fetched until the receiver presses the button, so a
+     mail scanner that opens the link spends nothing. -->
+<div class="step" id="step-ready">
+  <h1>Er staat een beveiligd bestand voor u klaar</h1>
+  <p class="sub">Het bestand wordt pas opgehaald als u op de knop drukt. Daarna opent het in uw browser. Paramant heeft de sleutel nooit.</p>
+  <div class="card">
+    <div class="card-body">
+      <div class="status-line" id="ready-meta"></div>
+      <button class="btn" id="ready-btn" type="button" data-click="startDownload" disabled>Bestand downloaden</button>
+    </div>
+  </div>
+</div>
+
 <!-- Downloading + decrypting -->
 <div class="step active" id="step-loading">
   <h1>Er komt een beveiligd bestand binnen</h1>
@@ -233,7 +246,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
       <summary>Waarom dit veilig was</summary>
       <div class="done-details-body">
         <p>Het openen gebeurde hier, in uw browser. Het bestand kwam verzegeld binnen (<code>AES-256-GCM</code>) en is geopend met de sleutel die in de link achter de <code>#</code> stond. Dat deel van een link stuurt een browser nooit naar een server.</p>
-        <p>Een link uit deze webapp werkt één keer. Onze kopie is gewist zodra uw browser het bestand ophaalde.</p>
+        <p>Een link uit deze webapp werkt één keer. Onze kopie is gewist zodra uw browser het bestand helemaal binnen had en kon openen. Een onderbroken download kost u dus niets.</p>
         <p>De bestandsnaam zat in het verzegelde bestand, niet ernaast. Ook die konden wij dus nooit lezen.</p>
         <p id="done-pdf-note" hidden>Deze browser heeft de pagina's hierboven zelf uit het bestand opgebouwd. Daarvoor is niets verstuurd. Sluit u dit tabblad, dan blijft er niets van het document achter.</p>
       </div>
@@ -243,9 +256,9 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 
 <!-- Burned / already used -->
 <div class="step" id="step-burned">
-  <span class="burned-icon" style="margin-top:16px">&#x1F525;</span>
-  <p class="burned-msg">Dit bestand is al gedownload en daarna gewist.</p>
-  <p class="burned-sub">Een link van Paramant werkt maar één keer. Na de download is het bestand voorgoed van onze server verwijderd.</p>
+  <span class="burned-icon" id="burned-icon" style="margin-top:16px">&#x1F525;</span>
+  <p class="burned-msg" id="burned-msg">Dit bestand is al gedownload en daarna gewist.</p>
+  <p class="burned-sub" id="burned-sub">Een link van Paramant werkt maar één keer. Na de download is het bestand voorgoed van onze server verwijderd.</p>
   <a href="/dashboard" class="btn btn-outline" style="max-width:280px;margin:24px auto 0">Naar uw overzicht</a>
 </div>
 
@@ -259,11 +272,12 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <!-- Error -->
 <div class="step" id="step-error">
   <h1>Er ging iets mis</h1>
-  <p class="sub">De link is misschien verlopen, ongeldig of al gebruikt.</p>
+  <p class="sub">Hieronder staat wat er gebeurde en wat u kunt doen.</p>
   <div class="card">
     <div class="card-head"><div class="dot red"></div><div class="card-head-title">Fout</div></div>
     <div class="card-body">
       <div class="status-line err" id="error-msg"></div>
+      <button class="btn" id="error-retry" type="button" data-click="retryDownload" hidden>Opnieuw proberen</button>
     </div>
   </div>
   <a href="/dashboard" class="btn btn-outline">Naar uw overzicht</a>
@@ -305,6 +319,6 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/js/delegate.js?v=1" defer></script>
 <script src="/js/done-state.js?v=1" defer></script>
-<script src="/js/get.page.js?v=6" defer></script>
+<script src="/js/get.page.js?v=7" defer></script>
 </body>
 </html>

@@ -2511,8 +2511,14 @@ test('every page that promises burn-on-read says which client and which plan it 
   // at the counter. Only GET /v2/outbound/:hash, the API's own route, spends a
   // read. So the exemption those three pages get below is not a slug allowlist,
   // it stands or falls with these two lines.
-  assert.match(relaySrc, /td\.used = true;\s*blobDrop\(blobHash\);/,
+  // Since 2026-10-04 the burn goes through dlBurn() and comes in two shapes:
+  // on 'finish' for an old client, and on POST .../ack for /get, which confirms
+  // only once it has decrypted the file. Either way the blob is deleted
+  // outright and the read counter is never consulted.
+  assert.match(relaySrc, /dlBurn\(token, td, 'downloaded'\);\s*blobDrop\(blobHash\);/,
     'the /v2/dl download-token route no longer deletes the blob outright; /get, /ontvang and /parashare call a Paramant link single-use because it does');
+  assert.match(relaySrc, /dlBurn\(token, td, 'downloaded'\);\s*blobDrop\(td\.hash\);/,
+    'the /v2/dl ack no longer deletes the blob outright; /get calls a link single-use because a confirmed download does');
   assert.equal((relaySrc.match(/entry\.views_remaining = \(entry\.views_remaining \?\? 1\) - 1;/g) || []).length, 1,
     'the read counter is spent in more than one place now; the download-link pages promise single-use because only GET /v2/outbound/:hash spends a read');
 

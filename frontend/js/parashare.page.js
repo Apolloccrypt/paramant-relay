@@ -90,6 +90,12 @@ const T = {
     stateDelivered: 'Downloaded, and the file is gone',
     stateExpired: 'Expired, and the file is gone',
     stateWaiting: 'Waiting for the receiver',
+    stateLost: 'Not downloaded: our server lost the file (restart). Send it again',
+    slowUpload: 'The upload is going very slowly, so it was stopped. Your connection seems slow right now. Try again on a faster connection, or send a smaller file.',
+    netUpload: 'The upload did not arrive: the connection dropped. Check your internet and try again. If it keeps failing, mail privacy@paramant.app.',
+    stateWithdrawn: 'Withdrawn, and the file is gone',
+    stateExhausted: 'Tried too often without a download, the file is gone',
+    stateGone: 'No longer available, not known whether it was downloaded',
     worksOnce: 'Works once, until ',
     checking: 'Checking...',
     checkAgain: 'Check again',
@@ -167,7 +173,7 @@ const T = {
     notifying: 'Ontvanger op de hoogte brengen...',
     filesOnWay: (n) => n + ' bestanden zijn onderweg',
     fileOnWay: (name) => name + ' is onderweg',
-    doneTitle: 'Aangekomen bij de ontvanger.',
+    doneTitle: 'Verstuurd naar de ontvanger.',
     doneLine: (what) => what + ' naar de ontvanger met wie u de controlecode vergeleek. '
       + 'Onze kopie is verzegeld en verdwijnt zodra de ontvanger hem ophaalt.',
     keepReceipt: 'Bewijs bewaren',
@@ -199,6 +205,12 @@ const T = {
     stateDelivered: 'Opgehaald, het bestand is weg',
     stateExpired: 'Verlopen, het bestand is weg',
     stateWaiting: 'Wacht op de ontvanger',
+    stateLost: 'Niet opgehaald: onze server is het bestand kwijt (herstart). Stuur het opnieuw',
+    slowUpload: 'De upload gaat erg langzaam en is daarom gestopt. Uw verbinding lijkt nu traag. Probeer het op een snellere verbinding, of verstuur een kleiner bestand.',
+    netUpload: 'De upload kwam niet aan: de verbinding viel weg. Controleer uw internet en probeer het opnieuw. Blijft het mislukken, mail dan privacy@paramant.app.',
+    stateWithdrawn: 'Ingetrokken, het bestand is weg',
+    stateExhausted: 'Te vaak geprobeerd zonder download, het bestand is weg',
+    stateGone: 'Niet meer beschikbaar, onbekend of het is opgehaald',
     worksOnce: 'Werkt één keer, tot ',
     checking: 'Kijken...',
     checkAgain: 'Opnieuw kijken',
@@ -292,6 +304,30 @@ function $(id) { return document.getElementById(id); }
 // cannot import, so js/error-message.js is loaded above it as a plain script and
 // hangs its namespace off the global. The fallback string exists for the case
 // where that tag is missing; it is never the normal path.
+// One sealed block to the relay. The deadline used to be a flat 120 seconds,
+// and a 5 MB block (7 MB as base64) on a 0.3 Mbit/s line takes longer than
+// that, so a slow line ended in "something went wrong on our side", and every
+// retry failed the same way. Now the deadline scales with the block: two
+// minutes, or as long as the body takes at 16 KB/s, whichever is longer. If it
+// still runs out, or the line drops, the sender is told it is the connection.
+function postInbound(bodyStr) {
+  const ms = Math.max(120000, Math.ceil(bodyStr.length / 16384) * 1000);
+  return relayFetch(RELAY_API + '/v2/inbound', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: bodyStr,
+    signal: AbortSignal.timeout(ms),
+  }).catch((e) => {
+    const slow = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
+    if (slow || e instanceof TypeError) {
+      const u = new Error(t(slow ? 'slowUpload' : 'netUpload'));
+      u.voorDeGebruiker = true;
+      throw u;
+    }
+    throw e;
+  });
+}
+
 function failureText(where, e) {
   // A sentence written for the sender passes straight through. Without this
   // exception "Your plan allows 10 recipients per send. You listed 20." was
@@ -1181,16 +1217,11 @@ async function confirmFingerprint() {
         const hashBuf = await crypto.subtle.digest('SHA-256', padded);
         const hash = u8toHex(new Uint8Array(hashBuf));
 
-        const ur = await relayFetch(RELAY_API + '/v2/inbound', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const ur = await postInbound(JSON.stringify({
             hash, payload: toB64(padded), ttl_ms: ttlMs,
             // file_name omitted — filename is only in the encrypted payload (finding #4)
             meta: { device_id: 'transfer-web', chunk_index: i, total_chunks: totalChunks, file_id: fileId }
-          }),
-          signal: AbortSignal.timeout(120000)
-        });
+          }));
         const ud = await ur.json();
         // Free monthly transfer limit: keep the relay's 402 JSON on the error
         // so the catch below renders the upgrade notice instead of a raw error.
@@ -1399,6 +1430,38 @@ function applyPlanTtls(found) {
   if (note && planTtlMs) {
     note.textContent = t('ttlNote')(humanDuration(planTtlMs));
   }
+  applyTtlDefault();
+}
+
+// The picker's default follows the plan. It used to be one hour for everyone,
+// so a Firm office that mailed a link in the afternoon had a client who found
+// it expired in the evening, and Enterprise could not pick its 7 days at all.
+// Default: the plan's ceiling, but no more than 24 hours; a longer window is a
+// choice, not something a sender gets without looking. Once the sender has
+// touched the picker, the page leaves it alone.
+const TTL_DAY_MS = 86_400_000;
+const TTL_WEEK_MS = 7 * TTL_DAY_MS;
+function applyTtlDefault() {
+  const sel = $('ttl-select');
+  if (!sel || !planTtlMs) return;
+  if (!sel.dataset.watch) {
+    sel.dataset.watch = '1';
+    sel.addEventListener('change', () => { sel.dataset.touched = '1'; });
+  }
+  if (planTtlMs >= TTL_WEEK_MS && !sel.querySelector('option[value="' + TTL_WEEK_MS + '"]')) {
+    const o = document.createElement('option');
+    o.value = String(TTL_WEEK_MS);
+    o.textContent = t('days')(7);
+    sel.appendChild(o);
+  }
+  if (sel.dataset.touched) return;
+  const want = Math.min(planTtlMs, TTL_DAY_MS);
+  let best = null;
+  for (const o of sel.options) {
+    const v = Number(o.value);
+    if (v <= want && (!best || v > Number(best.value))) best = o;
+  }
+  if (best) sel.value = best.value;
 }
 
 // ── The chooser ──────────────────────────────────────────────────────────────
@@ -1520,17 +1583,12 @@ async function sealAndUpload(file, ttlMs, meerdereBlokken) {
     const deel = stukken[i];
     const hashBuf = await crypto.subtle.digest('SHA-256', deel);
     const hash = u8toHex(new Uint8Array(hashBuf));
-    const ur = await relayFetch(RELAY_API + '/v2/inbound', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const ur = await postInbound(JSON.stringify({
         hash, payload: toB64(deel), ttl_ms: ttlMs,
         // No file name and no size on the relay side: the name lives only inside
         // the sealed bytes, which is the same rule the live stand keeps.
         meta: { device_id: 'transfer-web-link' }
-      }),
-      signal: AbortSignal.timeout(120000)
-    });
+      }));
     const ud = await ur.json();
     if (window.paQuotaUpgrade && window.paQuotaUpgrade.isQuota402(ur.status, ud)) {
       const qe = new Error(ud.error); qe.quota = ud; throw qe;
@@ -1680,16 +1738,22 @@ async function createLink() {
 // receipt on the API download path (GET /v2/outbound, fetched back from
 // /v2/transfers/:id/receipt); the browser download path, GET /v2/dl/:token/get,
 // signs nothing. What is left is GET /v2/dl/:token/info, which answers 200 with
-// the time remaining while the link is live and 404 once it is "not found, used,
-// or expired" -- one status for three outcomes. This page separates the last two
-// with its own clock: a 404 before the expiry it recorded means the file was
-// taken, after it means it timed out. That is an inference, and the note under
-// the list calls it one.
+// the time remaining while the link is live and 404 once it is gone, with a
+// `reason`. "Opgehaald" is shown ONLY for reason "downloaded", which the relay
+// sets when the receiver's page confirmed a completed, decrypted download (or,
+// for an old client, when the last byte left). A 404 before the expiry used to
+// be read as "taken"; a mail scanner, a wrong key or a relay restart all
+// produced that 404, so the sender was told the file had arrived when it had not.
 function linkStateLabel(row) {
   if (row.state === 'delivered') return t('stateDelivered');
   if (row.state === 'expired')   return t('stateExpired');
+  if (row.state === 'lost')      return t('stateLost');
+  if (row.state === 'withdrawn') return t('stateWithdrawn');
+  if (row.state === 'exhausted') return t('stateExhausted');
+  if (row.state === 'gone')      return t('stateGone');
   return t('stateWaiting');
 }
+const LINK_REASON_STATE = { downloaded: 'delivered', expired: 'expired', lost: 'lost', withdrawn: 'withdrawn', exhausted: 'exhausted' };
 
 function renderSentLinks() {
   const list = $('ps-link-list');
@@ -1765,7 +1829,11 @@ async function refreshSentLinks() {
       const r = await fetch(RELAY_API + '/v2/dl/' + encodeURIComponent(row.token) + '/info',
         { signal: AbortSignal.timeout(8000) });
       if (r.ok) row.state = 'waiting';
-      else if (r.status === 404) row.state = (Date.now() < row.expires_ms) ? 'delivered' : 'expired';
+      else if (r.status === 404 || r.status === 410) {
+        const j = await r.json().catch(() => ({}));
+        row.state = LINK_REASON_STATE[j && j.reason]
+          || (Date.now() >= row.expires_ms ? 'expired' : 'gone');
+      }
     } catch (_) {
       // A check that did not arrive says nothing about the link. Leave the row
       // as it was rather than reporting a delivery that may not have happened.
@@ -1792,81 +1860,24 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && globeOpen) toggleGlobe();
 });
 
-// ── Thunderbird FileLink download — URL format: ?t=T1,T2&n=NAME&c=N&r=RELAY#k=K1,K2 ──
-// Keys travel in the fragment (never sent to server). Relay only sees download tokens.
-async function tbDecryptChunk(blobBytes, rawKeyB64url) {
-  // Decode URL-safe base64 (no padding)
-  const b64 = rawKeyB64url.replace(/-/g,'+').replace(/_/g,'/');
-  const padded64 = b64 + '=='.slice(0, (4 - b64.length % 4) % 4);
-  const rawKey = Uint8Array.from(atob(padded64), c => c.charCodeAt(0));
-  const blob = new Uint8Array(blobBytes);
-  const version = blob[0];
-  if (version !== 0x02) throw new Error('Unsupported packet version ' + version + '. This link was made by an older version.');
-  const nonce  = blob.slice(1, 13);
-  const ctLen  = new DataView(blob.buffer, 13, 4).getUint32(0, false);
-  const ct     = blob.slice(17, 17 + ctLen);
-  const symKey = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);
-  const plain  = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce }, symKey, ct));
-  // PRSH layout: magic(4) | metaLen(4) | metaJSON | chunkData
-  if (plain[0]!==0x50||plain[1]!==0x52||plain[2]!==0x53||plain[3]!==0x48) throw new Error('Invalid decrypted payload. Wrong key?');
-  const metaLen = new DataView(plain.buffer, 4, 4).getUint32(0, false);
-  const data = plain.slice(8 + metaLen);
-  return data;
-}
-
-async function tbDownload(tokensParam, name, relay, keysParam) {
-  const tokens = tokensParam.split(',');
-  const keys   = keysParam.split(',');
-  if (tokens.length !== keys.length) throw new Error('Token/key count mismatch in URL');
-  const dlStatus = $('tb-dl-status');
-  const dlBar    = $('tb-dl-bar');
-  const chunks = [];
-  for (let i = 0; i < tokens.length; i++) {
-    dlStatus.textContent = t('dlChunk')(i+1, tokens.length);
-    dlBar.style.width = Math.round((i / tokens.length) * 60) + '%';
-    const resp = await fetch(relay + '/v2/dl/' + tokens[i] + '/get');
-    if (!resp.ok) throw new Error('Download failed: HTTP ' + resp.status + ' for chunk ' + i);
-    const buf = await resp.arrayBuffer();
-    dlStatus.textContent = t('decChunk')(i+1);
-    const data = await tbDecryptChunk(buf, keys[i]);
-    chunks.push(data);
-    dlBar.style.width = Math.round(((i+1) / tokens.length) * 90) + '%';
-  }
-  // Reassemble
-  const total = chunks.reduce((n, c) => n + c.length, 0);
-  const assembled = new Uint8Array(total);
-  let off = 0;
-  for (const c of chunks) { assembled.set(c, off); off += c.length; }
-  dlBar.style.width = '100%';
-  dlStatus.className = 'status-line ok';
-  dlStatus.textContent = t('decSaving');
-  // Trigger browser download
-  const url = URL.createObjectURL(new Blob([assembled]));
-  const a = document.createElement('a');
-  a.href = url; a.download = name; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
-  $('tb-dl-title').textContent = t('downloaded');
-  $('tb-dl-sub').textContent   = t('decSaved');
-  $('tb-dl-dot').className     = 'dot';
+// ── Receiving links (add-in, extension, Thunderbird FileLink) ────────────────
+// ?t=T1,T2&n=NAME&c=N&r=RELAY#k=K1,K2 is a RECEIVING link, and receiving lives
+// on /get: public, nothing fetched before a click, nothing burned before the
+// file is decrypted. In production nginx already forwards these before the
+// login gate; this covers a self-hosted or local server that serves this page
+// without one. The fragment is passed along by hand, it never left the browser.
+function forwardReceivingLink() {
+  const sp = new URLSearchParams(location.search);
+  if (!sp.get('t') || !location.hash.startsWith('#k=')) return false;
+  const base = (document.documentElement.lang || 'nl').slice(0, 2) === 'en' ? '/en/get' : '/get';
+  location.replace(base + location.search + location.hash);
+  return true;
 }
 
 // Auto-init globe as background on load, restore saved API key
 document.addEventListener('DOMContentLoaded', () => {
-  // Thunderbird FileLink download mode — check before restoring upload UI
-  const sp = new URLSearchParams(location.search);
-  const tbTokens = sp.get('t');
-  const tbRelay  = sp.get('r');
-  const tbKeys   = location.hash.startsWith('#k=') ? location.hash.slice(3) : null;
-  if (tbTokens && tbKeys && tbRelay) {
-    showStep('step-tb-download');
-    tbDownload(tbTokens, decodeURIComponent(sp.get('n') || 'download'), decodeURIComponent(tbRelay), tbKeys)
-      .catch(e => {
-        $('tb-dl-status').className = 'status-line err';
-        $('tb-dl-status').textContent = failureText('download', e);
-        $('tb-dl-dot').className = 'dot red';
-      });
-    return;
-  }
+  // A receiving link goes to /get before the upload UI starts.
+  if (forwardReceivingLink()) return;
 
   loadSessionCredential();
 });

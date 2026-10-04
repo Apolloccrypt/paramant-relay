@@ -4,7 +4,7 @@
 //   • Chromium extension service worker (Gmail)  — calls sealAndUploadChunk() per chunk
 //   • Outlook Office.js add-in (taskpane)         — calls encryptAndUpload() on the whole file
 //
-// The output is byte-compatible with the recipient page at paramant.app/parashare
+// The output is byte-compatible with the recipient page at paramant.app/get
 // (Thunderbird FileLink download mode), so links produced here are decrypted by the
 // existing, shipping receiver without any server-side change.
 //
@@ -32,7 +32,13 @@ export const PADDED_BLOCK = 5 * 1024 * 1024;               // 5_242_880
 export const PACKET_VERSION = 0x02;
 const PRSH_MAGIC = Object.freeze([0x50, 0x52, 0x53, 0x48]); // 'PRSH'
 
-export const PARASHARE_BASE = 'https://paramant.app/parashare';
+// Where a receiver opens the link. /get is public: the receiver of a mail has
+// no Paramant account. This used to be /parashare, which is the sender's page
+// and sits behind the login, so a receiver was sent to /auth/login and never
+// reached the file. nginx forwards links already sent to /parashare?t= to /get.
+export const RECEIVE_BASE = 'https://paramant.app/get';
+/** @deprecated the old name; it now points at the public receiving page. */
+export const PARASHARE_BASE = RECEIVE_BASE;
 export const DEFAULT_RELAY  = 'https://relay.paramant.app';
 
 // Where a user upgrades when a monthly quota is hit. Surfaced verbatim in the
@@ -278,8 +284,8 @@ export async function sealAndUploadChunk({ relay, apiKey, chunkU8, fileMeta, rel
 }
 
 // ── Share URL ───────────────────────────────────────────────────────────────────
-// Format (verified against parashare.html receiver):
-//   {PARASHARE_BASE}?t=T1,T2&n=NAME&c=N&r=RELAY#k=K1,K2
+// Format (read by frontend/js/get.page.js, the FileLink branch):
+//   {RECEIVE_BASE}?t=T1,T2&n=NAME&c=N&r=RELAY#k=K1,K2
 
 export function buildShareUrl({ tokens, name, chunks, relay, keys }) {
   // Encoded exactly like the shipping sender so the parashare receiver
@@ -287,7 +293,7 @@ export function buildShareUrl({ tokens, name, chunks, relay, keys }) {
   const t = tokens.map(encodeURIComponent).join(',');
   const r = encodeURIComponent(relay);
   const n = encodeURIComponent(name);
-  return `${PARASHARE_BASE}?t=${t}&n=${n}&c=${chunks}&r=${r}#k=${keys.join(',')}`;
+  return `${RECEIVE_BASE}?t=${t}&n=${n}&c=${chunks}&r=${r}#k=${keys.join(',')}`;
 }
 
 // ── High-level orchestration (whole file already in memory) ──────────────────────

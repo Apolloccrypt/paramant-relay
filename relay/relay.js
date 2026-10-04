@@ -1392,6 +1392,85 @@ async function verifyTotpGeneric(token, secret, opts = {}) {
 // ── Download tokens — one-time public download links
 const downloadTokens = new Map(); // token -> { hash, key, expires_ms, used }
 
+// What became of a link, after the relay forgot it.
+//
+// downloadTokens and the blobs live in memory, so a relay restart, a burn or
+// the hourly sweep below all end in the same place: the token is unknown. The
+// receiver's page used to call every one of those "already downloaded", which
+// is false for an expired link and false for a link the relay lost in a
+// restart, and it sent the receiver back to a sender who believed the file had
+// arrived. So each token leaves a small record in redis: when it expires and,
+// later, whether it was downloaded or withdrawn. The key is a hash of the
+// token, never the token itself, and it holds no blob hash and no metadata.
+// It outlives the link by a week so "expired" stays answerable after expiry.
+// Without redis the answer is the honest "unknown".
+const DL_TOMB_GRACE_MS = 7 * 86_400_000;
+// A download in claim mode (?claim=) is only burned when the receiver's page
+// confirms it decrypted the file (POST /v2/dl/:token/ack). Until then the blob
+// stays, so an interrupted or slow download, or a key with one wrong character,
+// costs nothing. Two bounds keep that from turning into "readable forever":
+// one claim at a time with a lease, and at most DL_MAX_FETCHES fetches per
+// link, after which it burns as before.
+const DL_MAX_FETCHES = 5;
+const DL_CLAIM_LEASE_MS = 3 * 60_000;
+const DL_CLAIM_RE = /^[a-f0-9]{32}$/;
+function _dlRk(token) {
+  return 'dl:tok:' + crypto.createHash('sha256').update('paramant-dl:' + token).digest('hex').slice(0, 40);
+}
+function dlRemember(token, expiresMs) {
+  if (!redisClient || !redisClient.isReady) return;
+  const px = Math.max(1000, expiresMs - Date.now()) + DL_TOMB_GRACE_MS;
+  Promise.resolve(redisClient.set(_dlRk(token), J({ e: expiresMs }), { PX: px })).catch(() => {});
+}
+function dlMarkGone(token, td, how) {
+  if (!redisClient || !redisClient.isReady) return;
+  const e = (td && td.expires_ms) || Date.now();
+  const px = Math.max(1000, e - Date.now()) + DL_TOMB_GRACE_MS;
+  Promise.resolve(redisClient.set(_dlRk(token), J({ e, g: how, at: Date.now() }), { PX: px })).catch(() => {});
+}
+// One of: downloaded | expired | withdrawn | exhausted | lost | unknown.
+async function dlWhyGone(token, td) {
+  const now = Date.now();
+  if (td) {
+    if (td.used) return td.gone || 'downloaded';
+    if (now > td.expires_ms) return 'expired';
+    return 'lost'; // the token is known but its blob is not: evicted or dropped
+  }
+  if (!redisClient || !redisClient.isReady) return 'unknown';
+  try {
+    const raw = await redisClient.get(_dlRk(token));
+    if (!raw) return 'unknown';
+    const rec = JSON.parse(raw);
+    if (rec.g) return rec.g;
+    if (now > rec.e) return 'expired';
+    return 'lost'; // created, never burned, not expired: this relay restarted
+  } catch (_) { return 'unknown'; }
+}
+const DL_GONE_TEXT = {
+  downloaded: 'This file has already been downloaded and burned',
+  expired: 'Link expired',
+  withdrawn: 'The sender withdrew this file',
+  exhausted: 'This link was tried too often and has been burned',
+  lost: 'The relay no longer holds this file (it was restarted or the file was removed); ask the sender to send it again',
+  unknown: 'Link not found: expired, already used, or never issued',
+};
+function dlGoneJson(res, reason) {
+  res.writeHead(reason === 'unknown' ? 404 : 410, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+  return res.end(J({ ok: false, error: DL_GONE_TEXT[reason] || DL_GONE_TEXT.unknown, reason }));
+}
+function dlGoneHtml(res, reason, status) {
+  res.writeHead(status || (reason === 'unknown' ? 404 : 410), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+  return res.end(_dlBurnedPage(DL_GONE_TEXT[reason] || DL_GONE_TEXT.unknown));
+}
+// The one place a download token is burned, so the redis record cannot be
+// forgotten at a call site.
+function dlBurn(token, td, how) {
+  td.used = true;
+  td.gone = how || 'downloaded';
+  td.claim = null;
+  dlMarkGone(token, td, td.gone);
+}
+
 // ── DPA rate limiting — prevents spam/storage churn on the public sign-dpa endpoint
 const dpaIpRequests    = new Map(); // ip    → [timestamps]
 const dpaEmailRequests = new Map(); // email → timestamp
@@ -6601,42 +6680,88 @@ async function handleRelayRequest(req, res) {
     return res.end(_dlConfirmPage(token, td.enc_meta || null, sizeStr, ttlStr));
   }
 
-  // ── GET /v2/dl/:token/get — actual burn + download (human must click confirm)
+  // ── GET /v2/dl/:token/get: the download (human must click confirm)
+  //
+  // Two modes. Without ?claim= it is the old burn-on-read: the blob is dropped
+  // the moment Node has handed the last byte to the socket. That is what every
+  // SDK and CLI already in the field expects, so it stays exactly as it was.
+  //
+  // With ?claim=<32 hex, chosen by the client> nothing is burned here. The
+  // receiver's page fetches, decrypts and checks, and only then confirms with
+  // POST /v2/dl/:token/ack. 'finish' means "written to the kernel or to the
+  // proxy in front of us", never "arrived", so a burn on 'finish' cost the
+  // receiver the file on every slow or broken line, and a wrong key burned it
+  // before it was ever tried. See DL_MAX_FETCHES for the bound on retries.
   const dlgm = path.match(/^\/v2\/dl\/([a-f0-9]{48})\/get$/);
   if (dlgm && req.method === 'GET') {
     const token = dlgm[1];
     const ua = req.headers['user-agent'] || '';
+    const claim = typeof query.claim === 'string' && DL_CLAIM_RE.test(query.claim) ? query.claim : null;
     if (PRELOAD_BOTS.test(ua)) {
       res.writeHead(403); return res.end(J({ error: 'Automated clients not permitted' }));
     }
+    const gone = (reason, status) => claim ? dlGoneJson(res, reason) : dlGoneHtml(res, reason, status);
     const td = downloadTokens.get(token);
-    if (!td) {
-      res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-      return res.end(_dlBurnedPage('Link not found or already used'));
-    }
-    if (td.used) {
-      res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-      return res.end(_dlBurnedPage('This file has already been downloaded and burned'));
-    }
+    if (!td || td.used) return gone(await dlWhyGone(token, td), td ? 410 : 410);
     if (Date.now() > td.expires_ms) {
       downloadTokens.delete(token);
-      res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-      return res.end(_dlBurnedPage('Link expired'));
+      return gone('expired');
     }
     const entry = blobStore.get(td.hash);
     if (!entry) {
       downloadTokens.delete(token);
-      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-      return res.end(_dlBurnedPage('File not found — already burned'));
+      return gone(await dlWhyGone(token, td), 404);
     }
-    // Fix 4: block concurrent downloads before transfer starts
-    if (td.in_progress) {
+    const now = Date.now();
+    const claimHeld = td.claim && now < td.claim.until;
+    // Fix 4: block concurrent downloads before transfer starts. A claim held by
+    // somebody else counts as a download in progress too.
+    const busy = claim
+      ? (claimHeld && td.claim.id !== claim) || (td.in_progress && !(td.claim && td.claim.id === claim))
+      : (td.in_progress || claimHeld);
+    if (busy) {
+      if (claim) {
+        res.writeHead(409, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        return res.end(J({ ok: false, error: 'Download already in progress', reason: 'busy' }));
+      }
       res.writeHead(409, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
       return res.end(_dlBurnedPage('Download already in progress'));
     }
-    td.in_progress = true;
     const blobHash = td.hash;
     const blob = entry.blob;
+    if (claim) {
+      if ((td.fetches || 0) >= DL_MAX_FETCHES) {
+        dlBurn(token, td, 'exhausted');
+        blobDrop(blobHash);
+        log('warn', 'dl_token_exhausted', { token: token.slice(0,8), hash: blobHash.slice(0,16) });
+        return dlGoneJson(res, 'exhausted');
+      }
+      td.fetches = (td.fetches || 0) + 1;
+      td.claim = { id: claim, until: now + DL_CLAIM_LEASE_MS };
+      td.in_progress = true;
+      log('info', 'dl_token_claimed', { token: token.slice(0,8), hash: blobHash.slice(0,16), fetch: td.fetches });
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': 'attachment; filename="paramant-encrypted-payload"',
+        'Cache-Control': 'no-store',
+        'Content-Length': blob.length,
+        'X-Burned': 'pending-ack',
+        'X-Hash': blobHash,
+      });
+      res.on('finish', () => {
+        td.in_progress = false;
+        if (td.claim && td.claim.id === claim) td.claim.until = Date.now() + DL_CLAIM_LEASE_MS;
+      });
+      res.on('close', () => {
+        if (!res.writableFinished) {
+          td.in_progress = false;
+          if (td.claim && td.claim.id === claim) td.claim = null;
+          log('warn', 'dl_aborted_before_finish', { token: token.slice(0,8), hash: blobHash.slice(0,16), mode: 'claim' });
+        }
+      });
+      return res.end(blob);
+    }
+    td.in_progress = true;
     log('info', 'dl_token_used', { token: token.slice(0,8), hash: blobHash.slice(0,16) });
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
@@ -6648,7 +6773,7 @@ async function handleRelayRequest(req, res) {
     });
     // Fix 4: only burn blob after response has fully flushed to the client
     res.on('finish', () => {
-      td.used = true;
+      dlBurn(token, td, 'downloaded');
       blobDrop(blobHash);
       try { blob.fill(0); } catch {}
     });
@@ -6663,16 +6788,61 @@ async function handleRelayRequest(req, res) {
   }
 
   // ── GET /v2/dl/:token/info — check token zonder te branden ──────────────
+  // A gone link answers 404 as it always did (callers test for it), now with a
+  // `reason` so a page can say WHY: downloaded, expired, withdrawn, exhausted,
+  // lost (relay restart) or unknown. See dlWhyGone.
   const dlim = path.match(/^\/v2\/dl\/([a-f0-9]{48})\/info$/);
   if (dlim && req.method === 'GET') {
     const token = dlim[1];
     const td = downloadTokens.get(token);
-    if (!td || td.used || Date.now() > td.expires_ms) {
-      res.writeHead(404); return res.end(J({ ok: false, error: 'Link not found, used, or expired' }));
+    if (!td || td.used || Date.now() > td.expires_ms || !blobStore.has(td.hash)) {
+      const reason = await dlWhyGone(token, td);
+      res.writeHead(404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(J({ ok: false, error: 'Link not found, used, or expired', reason }));
     }
     const ttl_left = Math.round((td.expires_ms - Date.now()) / 1000);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, enc_meta: td.enc_meta || null, file_size: td.file_size, ttl_left_s: ttl_left, used: false }));
+  }
+
+  // ── POST /v2/dl/:token/ack and /release: the end of a claimed download ──
+  // ack:     the receiver decrypted the file. Burn it now. Idempotent for the
+  //          claim that burned it, so a retried ack after a lost answer is fine.
+  // release: the receiver could NOT decrypt (wrong key, damaged link). Give the
+  //          claim back without burning, so the right link still works.
+  const dlam = path.match(/^\/v2\/dl\/([a-f0-9]{48})\/(ack|release)$/);
+  if (dlam && req.method === 'POST') {
+    const token = dlam[1];
+    let claim = null;
+    try {
+      const b = JSON.parse((await readBody(req, 1024)).toString() || '{}');
+      if (typeof b.claim === 'string' && DL_CLAIM_RE.test(b.claim)) claim = b.claim;
+    } catch (_) { /* answered below */ }
+    if (!claim) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: false, error: 'claim (32 hex) required' }));
+    }
+    const td = downloadTokens.get(token);
+    if (dlam[2] === 'release') {
+      if (td && !td.used && td.claim && td.claim.id === claim && !td.in_progress) td.claim = null;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true }));
+    }
+    if (td && td.used && td.acked_by === claim) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, burned: true }));
+    }
+    if (!td || td.used) return dlGoneJson(res, await dlWhyGone(token, td));
+    if (!td.claim || td.claim.id !== claim) {
+      res.writeHead(409, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: false, error: 'This download was not claimed with that id', reason: 'not_claimed' }));
+    }
+    td.acked_by = claim;
+    dlBurn(token, td, 'downloaded');
+    blobDrop(td.hash);
+    log('info', 'dl_token_used', { token: token.slice(0,8), hash: td.hash.slice(0,16), mode: 'ack' });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, burned: true }));
   }
 
   // ── GET /v2/dl/<anything else>: a token that is not [a-f0-9]{48} ─────────
@@ -7097,6 +7267,7 @@ async function handleRelayRequest(req, res) {
       anonInboundIpRequests.set(ip, ipTimes);
       const dlToken = require('crypto').randomBytes(24).toString('hex');
       downloadTokens.set(dlToken, { hash, key: null, expires_ms: now + ttl, used: false, enc_meta: safeEncMeta, file_size: blob.length });
+      dlRemember(dlToken, now + ttl);
       incMetric('blobs_stored'); incMetric('bytes_in_total', blob.length);
       stats.inbound++; stats.bytes_in += blob.length;
       log('info', 'anon_blob_stored', { hash: hash.slice(0, 16), size: blob.length });
@@ -7736,6 +7907,7 @@ async function handleRelayRequest(req, res) {
         enc_meta: safeEncMeta,  // encrypted filename/metadata (ciphertext only) — finding #4 closed
         file_size: blob.length,
       });
+      dlRemember(dlToken, downloadTokens.get(dlToken).expires_ms);
       const merkleProof = {
         leaf_hash:  ctEntry.leaf_hash,
         leaf_index: ctEntry.index,
@@ -7769,7 +7941,7 @@ async function handleRelayRequest(req, res) {
     if (!entry.apiKey || entry.apiKey !== apiKey) { res.writeHead(403); return res.end(J({ error: 'Forbidden' })); }
     blobDrop(delm[1]);
     // Remove associated download token if present
-    for (const [t, d] of downloadTokens.entries()) { if (d.hash === delm[1]) { downloadTokens.delete(t); break; } }
+    for (const [t, d] of downloadTokens.entries()) { if (d.hash === delm[1]) { dlBurn(t, d, 'withdrawn'); downloadTokens.delete(t); break; } }
     auditAppend(apiKey, 'inbound_aborted', { hash: delm[1].slice(0,16)+'...' });
     log('info', 'blob_aborted', { hash: delm[1].slice(0,16) });
     res.writeHead(200, { 'Content-Type': 'application/json' });

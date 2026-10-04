@@ -4,7 +4,7 @@
 // directly (CORS allows *.paramant.app) and runs the shared core itself: the whole
 // attachment is available in memory from Office.js, so encryptAndUpload() chunks, encrypts
 // (AES-256-GCM, key in the URL fragment), uploads, and returns a burn-on-read link that the
-// paramant.app/parashare receiver already understands.
+// paramant.app/get receiver already understands.
 
 import { discoverRelay, checkKey, encryptAndUpload, DEFAULT_RELAY } from '../../../shared/paramant-core.js';
 import { setAuth, getAuth, clearAuth } from './state.js';
