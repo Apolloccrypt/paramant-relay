@@ -113,7 +113,13 @@ async function main() {
       bindingMode: 'email', recipeVersion: 5,
       requestedAppearance: { version: 1, fields: [{ type: 'seal', page_index: 2, x: 0.4200004, y: 0.61, w: 0.4, h: 0.12 }] },
     });
-    const requestedView = await store.getRedacted(requestedEnv.id);
+    // The public projection carries no position at all since the 2026-09-05
+    // review (envelope.js getRedacted): a position is about a person. Only the
+    // authorized view and the party's own view have it.
+    const publicView = await store.getRedacted(requestedEnv.id);
+    assert.strictEqual(publicView.requested_appearance, undefined, 'the public view does not carry the requested position');
+    assert.strictEqual(publicView.requested_appearance_hash, undefined, 'nor its hash');
+    const requestedView = await store.getRedacted(requestedEnv.id, { authorized: true });
     assert.deepStrictEqual(requestedView.requested_appearance, { version: 1, fields: [
       { type: 'seal', page_index: 2, x: 0.42, y: 0.61, w: 0.4, h: 0.12 },
     ] }, 'stored position is the normalized manifest');
@@ -121,6 +127,39 @@ async function main() {
     const partyOfRequested = await store.getForParty(requestedEnv.id, 0, requestedEnv.party_links[0].invite_token);
     assert.deepStrictEqual(partyOfRequested.requested_appearance, requestedView.requested_appearance, 'the invited party sees the same position');
     assert.strictEqual(requestedView.parties[0].appearance, null, 'nobody has signed, so no party appearance exists');
+    assert.strictEqual(partyOfRequested.requested_for_party, false, 'an envelope-wide box is marked as shared');
+
+    // A position PER PARTY (2026-10-04: one box for all made every signature
+    // land on the same spot). Each party reads its own; the envelope-wide box
+    // stays the fallback for a party without one.
+    const perPartyEnv = await store.create({
+      creatorApiKeyHash: crypto.createHash('sha3-256').update('psk_pp_' + rnd).digest('hex'),
+      accountId: ACCT_REQ, docHash, bindingMode: 'email', recipeVersion: 5,
+      requestedAppearance: { version: 1, fields: [{ type: 'seal', page_index: 1, x: 0.1, y: 0.8, w: 0.3, h: 0.08 }] },
+      parties: [
+        { label: 'A', email: 'a@example.com', requested_appearance: { version: 2, fields: [
+          { type: 'seal', page_index: 1, x: 0.1, y: 0.8, w: 0.3, h: 0.08 },
+          { type: 'seal', page_index: 0, x: 0.85, y: 0.94, w: 0.12, h: 0.038, all_pages: true }] } },
+        { label: 'B', email: 'b@example.com', requested_appearance: { version: 2, fields: [
+          { type: 'seal', page_index: 1, x: 0.42, y: 0.8, w: 0.3, h: 0.08 },
+          { type: 'seal', page_index: 0, x: 0.71, y: 0.94, w: 0.12, h: 0.038, all_pages: true }] } },
+        { label: 'C', email: 'c@example.com' },
+      ],
+    });
+    const viewA = await store.getForParty(perPartyEnv.id, 0, perPartyEnv.party_links[0].invite_token);
+    const viewB = await store.getForParty(perPartyEnv.id, 1, perPartyEnv.party_links[1].invite_token);
+    const viewC = await store.getForParty(perPartyEnv.id, 2, perPartyEnv.party_links[2].invite_token);
+    assert.strictEqual(viewA.requested_for_party, true);
+    assert.strictEqual(viewA.requested_appearance.fields[0].x, 0.1, 'party A reads its own box');
+    assert.strictEqual(viewB.requested_appearance.fields[0].x, 0.42, 'party B reads its own box, not A\'s');
+    assert.strictEqual(viewB.requested_appearance.fields[1].all_pages, true, 'and its own paraaf on every page');
+    assert.strictEqual(viewC.requested_for_party, false, 'a party without its own box falls back to the shared one');
+    assert.strictEqual(viewC.requested_appearance.fields[0].page_index, 1);
+    await assert.rejects(() => store.create({
+      creatorApiKeyHash: 'z'.repeat(64), accountId: ACCT_REQ, docHash, bindingMode: 'email', recipeVersion: 5,
+      parties: [{ label: 'X', email: 'x@example.com', requested_appearance: { version: 1, fields: [{ type: 'date', page_index: 0, x: 0.1, y: 0.1, w: 0.2, h: 0.05 }] } }],
+    }), /invalid requested appearance/, 'a per-party request is held to the same contract');
+    ok('every party can carry a requested position of its own');
 
     // Out of bounds is refused BEFORE an id is allocated: no half-made envelope.
     const envKeysBefore = (await rc.keys('env:*')).length;

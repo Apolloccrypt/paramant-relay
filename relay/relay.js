@@ -7115,7 +7115,7 @@ async function handleRelayRequest(req, res) {
   // and is still gated.
   const isEnvelopePublic = path.startsWith('/v2/envelopes/') && (
     req.method === 'GET' ||
-    (req.method === 'POST' && (path.endsWith('/view') || path.endsWith('/sign')))
+    (req.method === 'POST' && (path.endsWith('/view') || path.endsWith('/sign') || path.endsWith('/decline')))
   );
   // ── De ontvangerskant, en hij staat BOVEN de sleutelpoort ────────────────
   //
@@ -9937,7 +9937,17 @@ async function handleRelayRequest(req, res) {
       // The plan travels with the request now: it decides how many names may go
       // on one document. Read here rather than passed down from the quota block
       // above, whose const lives in its own scope.
-      const _planForParties = (apiKeys.get(apiKey) || {}).plan;
+      //
+      // Whichever is higher: the key's legacy plan or the account's ParaSign
+      // entitlement (plan_parasign, the field billing writes). Reading the key
+      // alone held a paying account to the free twenty (tester report A9).
+      const _keyPlan = (apiKeys.get(apiKey) || {}).plan;
+      let _planForParties = _keyPlan;
+      try {
+        const _pgTier = entitlements.getEntitlements(entitlementRecordOf(acctOf(apiKey)) || { plan: _keyPlan }).parasign.tier;
+        const _entPlan = _pgTier === 'free' ? 'community' : _pgTier;
+        if ((tiers.tierLimitNum(_entPlan, 'max_parties') || 0) > (tiers.tierLimitNum(_keyPlan, 'max_parties') || 0)) _planForParties = _entPlan;
+      } catch { /* the key plan stands */ }
       const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, accountId: acctOf(apiKey), docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays, bindingMode: d.binding_mode, recipeVersion: d.recipe_version, requestedAppearance: d.requested_appearance, plan: _planForParties });
       log('info', 'envelope_created', { id: out.id, parties: out.party_count, binding_mode: out.binding_mode });
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -9962,7 +9972,9 @@ async function handleRelayRequest(req, res) {
     try {
       const capsule = await readBody(req, maxCapsule);
       const capsuleSha256 = (req.headers['x-capsule-sha256'] || '').toString().trim().toLowerCase();
-      const out = await store.putDocumentCapsule(envDocumentMatch[1], acctOf(apiKey), capsule, capsuleSha256);
+      // Half of a split document key, never the key (see putDocumentCapsule).
+      const keyShare = (req.headers['x-document-key-share'] || '').toString().trim();
+      const out = await store.putDocumentCapsule(envDocumentMatch[1], acctOf(apiKey), capsule, capsuleSha256, keyShare);
       if (!out.ok) {
         const status = out.code === 'not_owner' ? 403 : out.code === 'hash_mismatch' ? 400 : out.code === 'expired' ? 410 : 404;
         res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -10001,11 +10013,60 @@ async function handleRelayRequest(req, res) {
         'Content-Length': out.capsule.length,
         'Cache-Control': 'private, no-store',
         'X-Capsule-Sha256': out.sha256,
+        ...(out.keyShare ? { 'X-Document-Key-Share': out.keyShare } : {}),
       });
       return res.end(out.capsule);
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'internal' }));
+    }
+  }
+
+  // GET /v2/envelopes/:id/owner-document and /owner-view -- the sending
+  // account's result page: its own ciphertext (no key share) and who signed
+  // where. Ownership is the durable account_id, as for /cancel and /receipt.
+  const envOwnerReadMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/(owner-document|owner-view)$/);
+  if (envOwnerReadMatch && req.method === 'GET') {
+    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
+    try {
+      if (envOwnerReadMatch[2] === 'owner-view') {
+        const view = await store.getOwnerView(envOwnerReadMatch[1], acctOf(apiKey));
+        if (!view) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not_found' })); }
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' });
+        return res.end(J({ ok: true, envelope: view }));
+      }
+      const out = await store.getOwnerDocumentCapsule(envOwnerReadMatch[1], acctOf(apiKey));
+      if (!out.ok) { res.writeHead(out.code === 'voided' ? 410 : 404, { 'Content-Type': 'application/json' }); return res.end(J({ error: out.code })); }
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': out.capsule.length, 'Cache-Control': 'private, no-store', 'X-Capsule-Sha256': out.sha256 });
+      return res.end(out.capsule);
+    } catch {
+      res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' }));
+    }
+  }
+
+  // POST /v2/envelopes/:id/decline -- a party refuses to sign. Internal-auth
+  // only (the admin proxy asserts the verified mailbox), plus the invite token.
+  const envDeclineMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/decline$/);
+  if (envDeclineMatch && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
+    if (!envSignRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
+    try {
+      const d = JSON.parse((await readBody(req, 4096)).toString() || '{}');
+      const out = await store.declineParty(envDeclineMatch[1], parseInt(d.party_index, 10), (d.token || '').toString(), (d.verified_email_hash || '').toString());
+      if (!out.ok) {
+        const status = out.code === 'not_found' ? 404 : out.code === 'not_authorized' ? 403 : 409;
+        res.writeHead(status, { 'Content-Type': 'application/json' }); return res.end(J({ error: out.code }));
+      }
+      log('info', 'envelope_declined', { id: envDeclineMatch[1], party_index: out.party_index });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, status: 'void', idempotent: out.code === 'idem', declined_at: out.declined_at, party_index: out.party_index }));
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_request' }));
     }
   }
 
@@ -10198,7 +10259,9 @@ async function handleRelayRequest(req, res) {
     const id = path.slice('/v2/envelopes/'.length, -'/sign'.length);
     if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
     try {
-      const d = JSON.parse((await readBody(req, 32768)).toString());
+      // 96 KiB: a signature and key (~9 KiB) plus at most 32 KiB of encrypted
+      // ink as base64url, with room to spare.
+      const d = JSON.parse((await readBody(req, 98304)).toString());
       const pi = parseInt(d.party_index, 10);
       const signerPub = (d.signer_public_key || '').toString();
       const sig = (d.signature || '').toString();
@@ -10340,13 +10403,14 @@ async function handleRelayRequest(req, res) {
         verifiedEmailHash,
         inviteToken,
         appearance: d.appearance,
+        ink: d.ink,
       });
       if (!out.ok) {
         // The slot was taken before the store had its say. The signature did not
         // land, so the month does not owe it.
         if (_signReserved) await quota.releaseSign(redisClient, accountId, log);
         const code = out.code === 'not_found' ? 404
-          : (out.code === 'bad_signature' || out.code === 'invalid_appearance') ? 400
+          : (out.code === 'bad_signature' || out.code === 'invalid_appearance' || out.code === 'invalid_ink') ? 400
           : (out.code === 'closed' || out.code === 'voided' || out.code === 'invite_expired') ? 410
           : (out.code === 'email_binding_required' || out.code === 'email_mismatch'
              || out.code === 'invite_token_required') ? 403
