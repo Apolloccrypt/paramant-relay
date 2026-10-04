@@ -1406,6 +1406,39 @@ function verifyTotp(token) {
   }
   return matched;
 }
+// Wrong TOTP codes per ACCOUNT on the signing-key routes (security review r2
+// (b)): nginx counted per address only, so a stolen session could guess from
+// many addresses. After TOTP_ACCOUNT_FREE wrong codes in an hour the account is
+// locked for 1 min, doubling with every further wrong code, up to an hour. A
+// right code clears the count. Fails closed when redis cannot answer.
+const TOTP_ACCOUNT_FREE = 5;
+const TOTP_FAIL_WINDOW_S = 3600;
+const TOTP_LOCK_BASE_MS = 60 * 1000;
+const TOTP_LOCK_MAX_MS = 60 * 60 * 1000;
+async function totpAccountLocked(userId) {
+  const ttl = await redisClient.pTTL(`paramant:user:totplock:${userId}`);
+  return ttl > 0 ? ttl : 0;
+}
+async function totpAccountFailed(userId) {
+  const k = `paramant:user:totpfail:${userId}`;
+  const n = await redisClient.incr(k);
+  if (n === 1) await redisClient.expire(k, TOTP_FAIL_WINDOW_S);
+  if (n >= TOTP_ACCOUNT_FREE) {
+    const ms = Math.min(TOTP_LOCK_MAX_MS, TOTP_LOCK_BASE_MS * 2 ** (n - TOTP_ACCOUNT_FREE));
+    await redisClient.set(`paramant:user:totplock:${userId}`, '1', { PX: ms });
+    await redisClient.expire(k, Math.max(TOTP_FAIL_WINDOW_S, Math.ceil(ms / 1000)));
+    return ms;
+  }
+  return 0;
+}
+async function totpAccountOk(userId) {
+  await redisClient.del(`paramant:user:totpfail:${userId}`);
+}
+function totpLockedReply(res, ms) {
+  res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(Math.ceil(ms / 1000)) });
+  return res.end(J({ error: 'totp_locked', retry_after: Math.ceil(ms / 1000) }));
+}
+
 async function verifyTotpGeneric(token, secret, opts = {}) {
   // Delegates to the extracted pure core; redisClient is the injected replay store.
   return totpLib.verifyTotpGeneric(token, secret, opts, redisClient);
@@ -1509,6 +1542,14 @@ function dlGoneHtml(res, reason, status) {
 }
 // The one place a download token is burned, so the redis record cannot be
 // forgotten at a call site.
+// Five claimed fetches went out and none was confirmed, and nobody holds a
+// claim now: the next opening could only burn the link without delivering.
+// /info, release and a legacy GET say so up front (hertest r2 T4, new).
+function dlExhausted(td, now = Date.now()) {
+  return !!td && !td.used && (td.fetches || 0) >= DL_MAX_FETCHES
+    && !(td.claim && now < td.claim.until) && !td.in_progress;
+}
+
 function dlBurn(token, td, how) {
   td.used = true;
   td.gone = how || 'downloaded';
@@ -5245,7 +5286,11 @@ async function handleRelayRequest(req, res) {
 
       const made = await _sendStore().create({
         plan: _tier, blob, addresses: input.recipients, sealed,
-        ttlMs: input.ttl_ms, filename: input.filename, accountId: acctOf(apiKey),
+        // The file's name is never taken from the request: the web app no
+        // longer sends it, and an old client, an API caller or a fork would
+        // otherwise still leak it to the mailer and the store. It travels
+        // inside the sealed metadata only (security review r2 (f)).
+        ttlMs: input.ttl_ms, filename: '', accountId: acctOf(apiKey),
         // From the key record, never from the request: a sender may not choose
         // whose name appears above a mail thirty strangers receive.
         sender: { naam: kd.label || '', email: kd.email || '', taal: mailTaal(input.lang) },
@@ -5305,7 +5350,7 @@ async function handleRelayRequest(req, res) {
       // verloopt, bevestig hier: <link>" droeg: die kwam er zo uit, boven
       // onze eigen link, dertig keer. De opschoning staat in
       // veiligeBestandsnaam, gedeeld met de codemail (hertest T4-10).
-      const naamRuw = (String(veiligeBestandsnaam(input.filename))) || (taal === 'en' ? 'a file' : 'een bestand');
+      const naamRuw = taal === 'en' ? 'a file' : 'een bestand';   // never the name (see create above)
       const naam = escHtml(naamRuw);
       // The human above the mail. Thirty people who are not our customers get
       // this, and a message with no sender in it reads as phishing no matter
@@ -5639,6 +5684,7 @@ async function handleRelayRequest(req, res) {
       // TOTP gate — sensitive op, prevents session-hijack pk-swap
       const totpSecret = await userTotp.getUserTotpSecret(redisClient, user_id);
       if (!totpSecret) { res.writeHead(403); return res.end(J({ error: "no_totp_setup" })); }
+      { const lockedMs = await totpAccountLocked(user_id); if (lockedMs) return totpLockedReply(res, lockedMs); }
       const totpResult = await verifyTotpGeneric(totp, totpSecret, {
         window: 1,
         replayKey: `paramant:user:replay:${user_id}`,
@@ -5648,7 +5694,13 @@ async function handleRelayRequest(req, res) {
         res.writeHead(503, { "Content-Type": "application/json" });
         return res.end(J({ error: "replay_store_unavailable" }));
       }
-      if (!totpResult.valid) { res.writeHead(403); return res.end(J({ error: "invalid_totp" })); }
+      if (!totpResult.valid) {
+        const lockMs = await totpAccountFailed(user_id);
+        log("warn", "totp_signing_key_failed", { account: String(user_id).slice(0, 12), locked_ms: lockMs });
+        if (lockMs) return totpLockedReply(res, lockMs);
+        res.writeHead(403); return res.end(J({ error: "invalid_totp" }));
+      }
+      await totpAccountOk(user_id);
       // Store (server-side pk_hash computation — never trust client)
       let result;
       try {
@@ -5717,6 +5769,7 @@ async function handleRelayRequest(req, res) {
       if (!totp || !/^\d{6}$/.test(String(totp))) { res.writeHead(400); return res.end(J({ error: "totp_required" })); }
       const totpSecret = await userTotp.getUserTotpSecret(redisClient, user_id);
       if (!totpSecret) { res.writeHead(403); return res.end(J({ error: "no_totp_setup" })); }
+      { const lockedMs = await totpAccountLocked(user_id); if (lockedMs) return totpLockedReply(res, lockedMs); }
       const totpResult = await verifyTotpGeneric(totp, totpSecret, {
         window: 1,
         replayKey: `paramant:user:replay:${user_id}`,
@@ -5726,7 +5779,13 @@ async function handleRelayRequest(req, res) {
         res.writeHead(503, { "Content-Type": "application/json" });
         return res.end(J({ error: "replay_store_unavailable" }));
       }
-      if (!totpResult.valid) { res.writeHead(403); return res.end(J({ error: "invalid_totp" })); }
+      if (!totpResult.valid) {
+        const lockMs = await totpAccountFailed(user_id);
+        log("warn", "totp_signing_key_failed", { account: String(user_id).slice(0, 12), locked_ms: lockMs });
+        if (lockMs) return totpLockedReply(res, lockMs);
+        res.writeHead(403); return res.end(J({ error: "invalid_totp" }));
+      }
+      await totpAccountOk(user_id);
       if (totpResult.algorithm === "sha1") log("info", "totp_sha1_accepted", { account: String(user_id).slice(0, 12), endpoint: "sign" });
       let result;
       try {
@@ -6871,6 +6930,7 @@ async function handleRelayRequest(req, res) {
       td.fetches = (td.fetches || 0) + 1;
       td.claim = { id: claim, until: now + DL_CLAIM_LEASE_MS };
       td.in_progress = true;
+      td.in_progress_by = claim;
       log('info', 'dl_token_claimed', { token: token.slice(0,8), hash: blobHash.slice(0,16), fetch: td.fetches });
       res.writeHead(200, {
         'Content-Type': 'application/octet-stream',
@@ -6880,9 +6940,10 @@ async function handleRelayRequest(req, res) {
         'X-Burned': 'pending-ack',
         'X-Hash': blobHash,
       });
-      // Only the write that still holds the claim may say the line is free: a
-      // released claim may already belong to the next tab, mid-download.
-      const mine = () => !td.claim || td.claim.id === claim;
+      // Only the write that started the transfer in progress may say the line
+      // is free: after a release the next download (another tab, or a legacy
+      // GET without a claim) may already be running (review r2 (d)).
+      const mine = () => td.in_progress_by === claim;
       res.on('finish', () => {
         if (mine()) td.in_progress = false;
         if (td.claim && td.claim.id === claim) td.claim.until = Date.now() + DL_CLAIM_LEASE_MS;
@@ -6896,17 +6957,36 @@ async function handleRelayRequest(req, res) {
       });
       return res.end(blob);
     }
+    if (dlExhausted(td, now)) {
+      dlBurn(token, td, 'exhausted');
+      blobDrop(blobHash);
+      return gone('exhausted');
+    }
     td.in_progress = true;
+    const legacyTag = 'legacy:' + crypto.randomBytes(8).toString('hex');
+    td.in_progress_by = legacyTag;
     log('info', 'dl_token_used', { token: token.slice(0,8), hash: blobHash.slice(0,16) });
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
       // Relay never stores plaintext filename (finding #4) — receiver SDK decrypts enc_meta to recover name
       'Content-Disposition': 'attachment; filename="paramant-encrypted-payload"',
       'Cache-Control': 'no-store',
+      'Content-Length': blob.length,
       'X-Burned': 'true',
       'X-Hash': blobHash,
+      // No proxy buffer in between: nginx would take the whole file at once
+      // and 'finish' would mean "nginx has it", not "the client has it".
+      'X-Accel-Buffering': 'no',
     });
-    // Fix 4: only burn blob after response has fully flushed to the client
+    // Burn on 'finish': Node has handed the last byte to the socket. Behind
+    // nginx that means "nginx has it"; X-Accel-Buffering above stops nginx
+    // from buffering the whole response first, so a client that stops reading
+    // holds the relay's write up instead of nginx's disk buffer. Measured
+    // (hertest r2 T4-3): directly against the relay a 5 MB download broken off
+    // after 80 KB no longer burns; through a local nginx it still did, because
+    // the socket buffers on that path swallow a few MB at once. That cannot be known
+    // on this side of TCP; only a claimed download with an ack (?claim=, the
+    // web page and the relay's own confirm page) is exact.
     res.on('finish', () => {
       dlBurn(token, td, 'downloaded');
       blobDrop(blobHash);
@@ -6915,11 +6995,26 @@ async function handleRelayRequest(req, res) {
     // Fix 4: on socket error before finish, allow retry
     res.on('close', () => {
       if (!td.used) {
-        td.in_progress = false;
+        if (td.in_progress_by === legacyTag) td.in_progress = false;
         log('warn', 'dl_aborted_before_finish', { token: token.slice(0,8), hash: blobHash.slice(0,16) });
       }
     });
-    return res.end(blob);
+    // In pieces, each one only after the socket took the last (backpressure):
+    // one res.end(blob) let 'finish' fire while a reader that had stopped
+    // after 80 KB still had megabytes to go (measured on loopback).
+    const DL_PIECE = 64 * 1024;
+    let off = 0;
+    const pump = () => {
+      while (off < blob.length) {
+        if (res.destroyed) return;
+        const end = Math.min(blob.length, off + DL_PIECE);
+        const more = res.write(blob.subarray(off, end));
+        off = end;
+        if (!more) { res.once('drain', pump); return; }
+      }
+      res.end();
+    };
+    return pump();
   }
 
   // ── GET /v2/dl/:token/info — check token zonder te branden ──────────────
@@ -6930,6 +7025,12 @@ async function handleRelayRequest(req, res) {
   if (dlim && req.method === 'GET') {
     const token = dlim[1];
     const td = downloadTokens.get(token);
+    if (dlExhausted(td) && blobStore.has(td.hash)) {
+      // Not "available": the next opening could only burn it. Say so, and
+      // burn it now, so the sender's list says it too.
+      dlBurn(token, td, 'exhausted');
+      blobDrop(td.hash);
+    }
     if (!td || td.used || Date.now() > td.expires_ms || !blobStore.has(td.hash)) {
       const reason = await dlWhyGone(token, td);
       res.writeHead(404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
@@ -6963,7 +7064,19 @@ async function handleRelayRequest(req, res) {
       // sends this from pagehide, and the response it abandons may still be
       // flushing into a proxy buffer. The claim goes back now; the old write
       // ends on its own and touches only a claim with its own id.
-      if (td && !td.used && td.claim && td.claim.id === claim) { td.claim = null; td.in_progress = false; }
+      if (td && !td.used && td.claim && td.claim.id === claim) {
+        td.claim = null;
+        if (td.in_progress_by === claim) td.in_progress = false;
+      }
+      // That was the last allowed try: burn now, so /info and the sender see
+      // it, instead of a next opening that burns without delivering.
+      if (dlExhausted(td) && blobStore.has(td.hash)) {
+        dlBurn(token, td, 'exhausted');
+        blobDrop(td.hash);
+        log('warn', 'dl_token_exhausted', { token: token.slice(0,8), hash: td.hash.slice(0,16), at: 'release' });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ ok: true, burned: true, reason: 'exhausted' }));
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true }));
     }

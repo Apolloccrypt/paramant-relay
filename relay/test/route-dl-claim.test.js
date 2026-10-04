@@ -154,8 +154,14 @@ test('retries are bounded: the sixth claimed fetch burns the link as exhausted',
   for (let i = 0; i < 5; i++) {
     const c = claimId();
     assert.equal((await claimGet(token, c)).status, 200, `fetch ${i + 1} refused`);
+    if (i < 4) assert.equal((await info(token)).status, 200, `after fetch ${i + 1} the link is still available`);
     await release(token, c);
   }
+  // Hertest r2 (T4, new): /info used to say "available" here, and the next
+  // opening burned the link without delivering. Now it says so up front.
+  const before6 = await info(token);
+  assert.equal(before6.status, 404, 'after five unconfirmed fetches /info must not say available');
+  assert.equal(before6.json.reason, 'exhausted');
   const sixth = await claimGet(token, claimId());
   assert.equal(sixth.status, 410);
   assert.equal(sixth.json.reason, 'exhausted');
@@ -163,7 +169,7 @@ test('retries are bounded: the sixth claimed fetch burns the link as exhausted',
   clDid();
 });
 
-test('the old burn-on-read path is unchanged for clients that send no claim', async (t) => {
+test('the old burn-on-read path still burns a completed download for clients that send no claim', async (t) => {
   if (!clRc) return t.skip('no redis');
   const { token, payload } = await clUpload('legacy');
   const got = await clSrv.get(`/v2/dl/${token}/get`);
@@ -174,6 +180,35 @@ test('the old burn-on-read path is unchanged for clients that send no claim', as
   const i = await info(token);
   assert.equal(i.status, 404);
   assert.equal(i.json.reason, 'downloaded');
+  clDid();
+});
+
+// Hertest r2 T4-3: a download without a claim burns on 'finish'. A reader that
+// stops while the relay is still writing leaves the link alive, and the
+// response asks nginx not to buffer it (X-Accel-Buffering: no), so behind the
+// proxy 'finish' is not "nginx has it all". (A blob that fits in the socket
+// buffers can still be handed over at once; see the comment in relay.js.)
+test('a legacy download (no claim) broken off while the relay is writing does not burn the link', async (t) => {
+  if (!clRc) return t.skip('no redis');
+  const { token, payload } = await clUpload('legacy-abort', {}, 5 * 1024 * 1024 - 4096);
+  await new Promise((resolve, reject) => {
+    const r = http.get(`${clSrv.base}/v2/dl/${token}/get`, (res) => {
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.headers['x-accel-buffering'], 'no', 'no proxy buffer may swallow the file');
+      let n = 0;
+      res.on('data', (d) => { n += d.length; if (n > 80 * 1024) { res.pause(); setTimeout(() => { r.destroy(); setTimeout(resolve, 300); }, 300); } });
+    });
+    r.on('error', () => {});
+    setTimeout(() => reject(new Error('no data')), 8000);
+  });
+  const i = await info(token);
+  assert.equal(i.status, 200, `the broken-off legacy download burned the link: ${i.text}`);
+  // A full legacy download afterwards still gets every byte, and then burns.
+  const got = await clSrv.get(`/v2/dl/${token}/get`);
+  assert.equal(got.status, 200);
+  assert.ok(got.buf.equals(payload));
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal((await info(token)).json.reason, 'downloaded');
   clDid();
 });
 

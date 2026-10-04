@@ -1754,6 +1754,7 @@ async function doSign() {
     else if (e && e.status === 409) msg = L('Deze toestemming om te ondertekenen is al gebruikt of verlopen. Laad de pagina opnieuw en probeer het nog eens.', 'That signing authorization was already used or expired. Reload the page and try again.');
     else if (e && e.code === 'cancelled') msg = L('Ondertekenen is geannuleerd. Tik op Ondertekenen als u klaar bent.', 'Signing cancelled. Tap Sign when you’re ready.');
     else if (e && (e.code === 'totp_invalid' || e.code === 'totp_required')) msg = L('Die code klopte niet. Tik op Ondertekenen en vul de huidige code van 6 cijfers in.', 'That authenticator code didn’t match. Tap Sign and enter the current 6-digit code.');
+    else if (e && e.code === 'totp_locked') msg = e.message;
     else if (e && e.code === 'totp_unavailable') msg = L('Stel eerst een authenticator-app in op uw account (Account, Tweestapsverificatie) en teken daarna met de code.', 'Set up an authenticator app on your account first (Account → Two-factor), then sign with its code.');
     // Already translated by the signer (js/error-message.js).
     else if (e && e.code === 'service_error') msg = e.message;

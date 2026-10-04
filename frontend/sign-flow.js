@@ -3712,6 +3712,7 @@ async function doSign() {
     else if (e && (e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
     else if (e && e.name === 'NotAllowedError') msg = L('De bevestiging met uw passkey is geannuleerd of verlopen. Tik nogmaals op Dit document ondertekenen.', 'Passkey confirmation was cancelled or timed out. Tap Sign now to try again.');
     else if (e && e.code === 'cancelled') msg = L('Ondertekenen geannuleerd. Tik op Dit document ondertekenen als u klaar bent.', 'Signing cancelled. Tap Sign now when you’re ready.');
+    else if (e && e.code === 'totp_locked') msg = e.message;
     else if (e && (e.code === 'totp_invalid' || e.code === 'totp_required')) msg = L('Die code uit de authenticator-app klopte niet. Tik op Dit document ondertekenen en voer de huidige code van 6 cijfers in.', 'That authenticator code didn’t match. Tap Sign now and enter the current 6-digit code.');
     else if (e && e.code === 'totp_unavailable') msg = L('Stel eerst een authenticator-app in op uw account (Account, tweestapsverificatie) en onderteken daarna met de code.', 'Set up an authenticator app on your account first (Account → Two-factor), then sign with its code.');
     // Already translated by the signer (js/error-message.js): the message on

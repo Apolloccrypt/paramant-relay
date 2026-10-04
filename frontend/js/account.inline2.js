@@ -91,7 +91,11 @@ async function revokeKey(pkHash) {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      alert(res.status === 429
+      alert(body && body.error === 'totp_locked'
+        ? nlEn('Te veel foute codes achter elkaar. Probeer het over ' + Math.max(1, Math.ceil((body.retry_after || 60) / 60)) + ' minuten opnieuw.', 'Too many wrong codes in a row. Try again in ' + Math.max(1, Math.ceil((body.retry_after || 60) / 60)) + ' minutes.')
+        : body && body.error === 'invalid_totp'
+        ? nlEn('Die code klopt niet. Er is niets veranderd.', 'That code did not match. Nothing changed.')
+        : res.status === 429
         ? nlEn('Intrekken lukte even niet: te veel verzoeken tegelijk. Probeer het over een minuut opnieuw.', 'Revoking did not work just now: too many requests at once. Try again in a minute.')
         : nlEn('Intrekken is niet gelukt. Er is niets veranderd; probeer het zo opnieuw.', 'Revoking did not work. Nothing changed; please try again shortly.'));
       return;

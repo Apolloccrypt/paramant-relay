@@ -485,6 +485,11 @@ export async function enrolEphemeralSigningKeyWithTotp({ label, totp, onStatus }
     const errCode = (e && e.data && e.data.error) || '';
     // Relay gates the TOTP enrol: 403 invalid_totp (wrong code) / 403 no_totp_setup
     // (account has no authenticator), 400 totp_required (malformed — caught above).
+    if (errCode === 'totp_locked') {
+      const min = Math.max(1, Math.ceil((Number(e.data && e.data.retry_after) || 60) / 60));
+      const err = new Error(tr('Te veel foute codes achter elkaar. Probeer het over ' + min + (min === 1 ? ' minuut' : ' minuten') + ' opnieuw.', 'Too many wrong codes in a row. Try again in ' + min + (min === 1 ? ' minute.' : ' minutes.')));
+      err.code = 'totp_locked'; throw err;
+    }
     if (errCode === 'no_totp_setup') { const err = new Error(tr('Stel eerst een authenticator-app in op uw account en onderteken daarna met de code.', 'Set up an authenticator app on your account first, then sign with its code.')); err.code = 'totp_unavailable'; throw err; }
     if (errCode === 'invalid_totp' || e.status === 403 || e.status === 401) { const err = new Error(tr('Die authenticatorcode klopt niet. Probeer de huidige 6-cijferige code.', 'That authenticator code didn’t match. Try the current 6-digit code.')); err.code = 'totp_invalid'; throw err; }
     if (e && (e.status === 400 || e.status === 409) && /totp/i.test(errCode)) { const err = new Error(tr('Die authenticatorcode klopt niet. Probeer de huidige 6-cijferige code.', 'That authenticator code didn’t match. Try the current 6-digit code.')); err.code = 'totp_invalid'; throw err; }
