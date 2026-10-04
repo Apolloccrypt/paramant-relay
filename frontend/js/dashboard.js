@@ -42,6 +42,10 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   function fmtDate(iso) {
     return paramantDate.day(iso);
   }
+  // A moment in the reader's own clock, zone named (format-date.js).
+  function fmtDateTime(iso) {
+    return paramantDate.localMoment ? paramantDate.localMoment(iso) : paramantDate.day(iso);
+  }
 
   function fmtMinutesUntil(iso) {
     if (!iso) return '--';
@@ -54,11 +58,34 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     return h + nlEn(' u ', 'h ') + (r < 10 ? '0' + r : r) + nlEn(' min', 'm');
   }
 
-  function showError(detail) {
+  // What went wrong, in words, and the way back that fits. A 429 or a 5xx says
+  // nothing about the session, so it gets "try again" and not "sign in again"
+  // (fase 1, DASH-01-K and DASH-21-A: both showed "Opnieuw inloggen HTTP 500").
+  function showError(kind) {
     hide(loading);
     hide(root);
     show(errBox);
-    if (errMsg && detail) errMsg.textContent = detail;
+    var text = document.getElementById('dh-error-text');
+    var login = document.getElementById('dh-error-login');
+    var retry = document.getElementById('dh-error-retry');
+    var says = kind === 'busy'
+      ? nlEn('Even te veel verzoeken tegelijk. Probeer het over een minuut opnieuw. U bent nog ingelogd.', 'Too many requests at once. Try again in a minute. You are still signed in.')
+      : kind === 'server'
+        ? nlEn('Uw overzicht kon niet worden geladen door een storing bij ons. Er is niets veranderd. Probeer het zo opnieuw.', 'Your overview could not be loaded because of a fault on our side. Nothing changed. Try again shortly.')
+        : nlEn('Uw overzicht kon niet worden geladen. Controleer uw verbinding en probeer het opnieuw.', 'Your overview could not be loaded. Check your connection and try again.');
+    if (text) text.textContent = says;
+    if (errMsg) errMsg.textContent = '';
+    if (login) login.hidden = true;
+    if (retry && !retry._wired) {
+      retry._wired = 1;
+      retry.addEventListener('click', function () {
+        retry.disabled = true;
+        hide(errBox);
+        show(loading);
+        start();
+        setTimeout(function () { retry.disabled = false; }, 1500);
+      });
+    }
   }
 
   // Plan names, mirroring relay/lib/tiers.js, which is the declared single
@@ -283,7 +310,13 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     // which empties that band, and the one moment a customer most needs the
     // date is the moment the band that would have carried it disappears.
     renderTerm(root, data);
+    // No date on record: hide the cell rather than print "--" (DASH-20-A).
     txt('created',      fmtDate(data.created_at));
+    var createdCell = root.querySelector('[data-dh="created"]');
+    if (createdCell && createdCell.parentNode) createdCell.parentNode.hidden = !data.created_at;
+    // History and audit export: on a paid plan only (js/dashboard-history.js).
+    var records = root.querySelector('#dh-records');
+    if (records) records.hidden = isFree;
     txt('backup',       String(data.backup_codes_remaining != null ? data.backup_codes_remaining : '--'));
     txt('session',      fmtMinutesUntil(data.session_expires_at));
 
@@ -294,7 +327,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     show(root);
     root.classList.add('dh-loaded');
 
-    checkKeySetup();
+    if (!keySetupChecked) { keySetupChecked = true; checkKeySetup(); }
     loadOperations();
     loadInbox();
     loadSends();
@@ -313,7 +346,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   // Silent when empty. An account that only signs sees the page it had before.
   var sends = [];
 
-  function loadSends() {
+  function loadSends(after) {
     var section = document.getElementById('dh-sends-section');
     var list = document.getElementById('dh-sends');
     var refresh = document.getElementById('dh-sends-refresh');
@@ -329,6 +362,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       if (!sends.length) { hide(section); return; }
       show(section);
       renderSends();
+      if (typeof after === 'function') after();
     }).catch(function () {
       // NIET verbergen. Dat was het: een lijst die niet te lezen was verdween
       // spoorloos, en dat is niet te onderscheiden van "ik heb nooit iets
@@ -357,7 +391,11 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     var list = document.getElementById('dh-sends');
     if (!list) return;
     list.innerHTML = sends.map(function (s) {
-      var naam = s.filename || nlEn('Een bestand', 'A file');
+      // The relay never gets the file name (T4-9), so rows used to read "Een
+      // bestand" one under the other. The number of people and the time of
+      // day tell sends of the same day apart (fase 1, SENDNAME-18-A).
+      var wie = s.total === 1 ? nlEn('1 ontvanger', '1 recipient') : (s.total || 0) + nlEn(' ontvangers', ' recipients');
+      var naam = s.filename || (nlEn('Bestand aan ', 'File to ') + wie);
       var deel = (s.collected || 0) + nlEn(' van ', ' of ') + (s.total || 0) + nlEn(' opgehaald', ' collected');
       var pct = s.total ? Math.round(((s.collected || 0) / s.total) * 100) : 0;
       var staat = s.status === 'expired' ? 'cancelled'
@@ -366,7 +404,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         '<button type="button" class="dh-send-open" data-pa-action="send-open" ' +
           'data-send-id="' + esc(s.id || '') + nlEn('" aria-label="Details openen van ', '" aria-label="Open details for ') + esc(naam) + '">' +
           '<div class="dh-send-name"><strong title="' + esc(naam) + '">' + esc(naam) + '</strong>' +
-          '<span>Sent ' + esc(fmtDate(s.created_at)) + '</span></div>' +
+          '<span>' + nlEn('Verstuurd ', 'Sent ') + esc(fmtDateTime(s.created_at)) + '</span></div>' +
           '<div class="dh-send-progress"><span>' + esc(deel) + '</span>' +
           '<div class="dh-progress" aria-label="' + esc(deel) + '"><i style="width:' + pct + '%"></i></div></div>' +
           '<div class="dh-status ' + staat + '">' + (s.status === 'expired' ? nlEn('Verlopen', 'Expired')
@@ -383,18 +421,23 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   // The people behind one send. Fetched when the sender opens the row rather
   // than up front: a list of twelve sends would otherwise pull twelve recipient
   // lists nobody asked for.
-  function openSend(id) {
+  // `note`, when given, is a confirmation that stays above the list until the
+  // panel closes. A reminder or a withdrawal used to say so for less than a
+  // tenth of a second: the list was redrawn and the panel shut over it (fase 1,
+  // DASH-15-A and DASH-16-A).
+  function openSend(id, note) {
     var host = document.querySelector('[data-send-people="' + cssEscape(id) + '"]');
     if (!host) return;
-    if (!host.hidden) { host.hidden = true; return; }
+    if (!host.hidden && !note) { host.hidden = true; return; }
     host.hidden = false;
-    host.innerHTML = nlEn('<span class="dh-rowsay">Ophalers worden gelezen...</span>', '<span class="dh-rowsay">Reading who has been...</span>');
+    var head = note ? '<div class="dh-rowsay done" role="status">' + esc(note) + '</div>' : '';
+    host.innerHTML = head + nlEn('<span class="dh-rowsay">Ophalers worden gelezen...</span>', '<span class="dh-rowsay">Reading who has been...</span>');
     fetch('/api/user/sends/' + encodeURIComponent(id), {
       credentials: 'include', headers: { 'Accept': 'application/json' }, cache: 'no-store'
     }).then(function (r) { return r.json(); }).then(function (body) {
       var people = (body && Array.isArray(body.recipients)) ? body.recipients : [];
-      if (!people.length) { host.innerHTML = nlEn('<span class="dh-rowsay">Deze verzending heeft geen ontvangers.</span>', '<span class="dh-rowsay">No recipients on this send.</span>'); return; }
-      host.innerHTML = people.map(function (p) {
+      if (!people.length) { host.innerHTML = head + nlEn('<span class="dh-rowsay">Deze verzending heeft geen ontvangers.</span>', '<span class="dh-rowsay">No recipients on this send.</span>'); return; }
+      host.innerHTML = head + people.map(function (p) {
         var wanneer = p.picked_up_at ? fmtDate(p.picked_up_at) : '';
         var knoppen = p.status === 'waiting'
           ? '<button type="button" class="dh-rowbtn" data-pa-action="send-remind" ' +
@@ -449,7 +492,8 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       });
     }).then(function () {
       if (row) row.innerHTML = '<span class="dh-rowsay done" role="status">' + esc(klaar) + '</span>';
-      loadSends();
+      // Fresh counts, then the same panel open again with the confirmation on top.
+      loadSends(function () { openSend(id, klaar); });
     }).catch(function (err) {
       if (row) {
         row.innerHTML = '<span class="dh-rowsay fail" role="status">' +
@@ -491,6 +535,11 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       if (act === 'inbox-refresh') {
         ev.preventDefault();
         loadInbox();
+        return;
+      }
+      if (act === 'sends-refresh') {
+        ev.preventDefault();
+        loadSends();
         return;
       }
       if (act === 'inbox-resend') {
@@ -1036,6 +1085,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   // passkey, surface a dismissible popup that links into /account. Best-effort
   // and tolerant -- we only flag something as missing when the endpoint answers
   // cleanly with an empty list, never on a fetch error (so we never false-nag).
+  var keySetupChecked = false;
   function checkKeySetup() {
     try { if (localStorage.getItem(KEYSETUP_KEY) === '1') return; } catch (_) {}
 
@@ -1084,6 +1134,11 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         try { localStorage.setItem(KEYSETUP_KEY, '1'); } catch (_) {}
       }
       if (dismissBtn) dismissBtn.addEventListener('click', dismiss);
+      // Following the link is an answer too; without this the modal came back
+      // on every visit until it was clicked away (fase 1, DASH-18-A).
+      itemsBox.addEventListener('click', function (ev) {
+        if (ev.target.closest && ev.target.closest('a.dh-pm-item')) { try { localStorage.setItem(KEYSETUP_KEY, '1'); } catch (_) {} }
+      });
       modal.addEventListener('click', function (ev) { if (ev.target === modal) dismiss(); });
       document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !modal.hidden) dismiss(); });
     });
@@ -1172,10 +1227,20 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     if (!opsPollTimer) opsPollTimer = setInterval(pull, 5000);
   }
 
-  function start(tries) {
+  // Listeners go on once. start() runs again for every poll round after a
+  // payment (refreshAccount), and each round used to add another set: one click
+  // on "Verzoek annuleren" then asked six times (fase 1, DASH-04-J).
+  var wired = false;
+  function wireOnce() {
+    if (wired) return;
+    wired = true;
     wireActions();
     wireDocumentFilters();
     wireDocumentList();
+  }
+
+  function start(tries) {
+    wireOnce();
 
     var ctrl = ('AbortController' in window) ? new AbortController() : null;
     var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, 10000) : 0;
@@ -1194,7 +1259,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
           return null;
         }
         if (!r.ok) {
-          showError('HTTP ' + r.status);
+          showError(r.status === 429 ? 'busy' : 'server');
           return null;
         }
         return r.json();
@@ -1206,7 +1271,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       })
       .catch(function () {
         if (timer) clearTimeout(timer);
-        showError(nlEn('Netwerkfout', 'Network error'));
+        showError('network');
       });
   }
 

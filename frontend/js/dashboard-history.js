@@ -20,10 +20,18 @@
  * Nothing is fetched when the page loads: the token is minted on the click that
  * needs it. tests/app-pages-no-api-key.test.mjs pins that.
  *
+ * Back on /dashboard since 2026-10-04: commit c10723bd ("Build document-focused
+ * user dashboard") dropped the markup and the script tag, while the page kept
+ * promising an exportable audit trail (fase 1, VERIFY-36-A and SENDNAME-22-A).
+ * Dutch and English: the page says which in <html lang>.
+ *
  * ASCII-only. Vanilla JS, no libraries.
  */
 (function () {
   'use strict';
+
+  var EN = /^en\b/i.test(document.documentElement.lang || '');
+  function nlEn(nl, en) { return EN ? en : nl; }
 
   var histLoad = document.getElementById('dh-hist-load');
   var histBody = document.getElementById('dh-hist-body');
@@ -43,22 +51,24 @@
     var d = new Date(ts);
     if (isNaN(d.getTime())) return String(ts).slice(0, 19);
     function p(n) { return (n < 10 ? '0' : '') + n; }
-    var mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()];
+    var mon = (EN ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+                  : ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'])[d.getMonth()];
     return d.getDate() + ' ' + mon + ' ' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
   }
   function fmtBytes(n) {
     n = Number(n) || 0;
     if (n < 1024) return n + ' B';
-    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
-    return (n / 1048576).toFixed(1) + ' MB';
+    var one = function (x) { var v = x.toFixed(1); return EN ? v : v.replace('.', ','); };
+    if (n < 1048576) return one(n / 1024) + ' KB';
+    return one(n / 1048576) + ' MB';
   }
   function statusLabel(s) {
     return ({
-      sent: 'sent',
-      aborted: 'aborted',
-      downloaded: 'downloaded',
-      downloaded_burned: 'downloaded (burned)'
-    })[s] || (s || 'event');
+      sent: nlEn('verstuurd', 'sent'),
+      aborted: nlEn('afgebroken', 'aborted'),
+      downloaded: nlEn('opgehaald', 'collected'),
+      downloaded_burned: nlEn('opgehaald en gewist', 'collected and deleted')
+    })[s] || (s || nlEn('gebeurtenis', 'event'));
   }
 
   // One relay call on an app session token. `send(token)` must return the fetch
@@ -73,13 +83,13 @@
 
   function upsell(msg, planPath) {
     return '<div class="dh-ops-dim">' + esc(msg) + '</div>' +
-      '<div style="margin-top:8px"><a class="dh-btn" href="' + (planPath || '/pricing') + '">Upgrade plan</a></div>';
+      '<div style="margin-top:8px"><a class="dh-btn" href="' + (planPath || '/pricing') + '">' + nlEn('Plannen bekijken', 'See the plans') + '</a></div>';
   }
 
   /* ---------- history ---------- */
   function renderHistory(entries) {
     if (!entries || !entries.length) {
-      histBody.innerHTML = '<div class="dh-ops-dim">No history yet. Your sends and received envelopes will appear here.</div>';
+      histBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Nog niets. Wat u verstuurt en ontvangt verschijnt hier.', 'Nothing yet. What you send and receive will appear here.') + '</div>';
       return;
     }
     histBody.innerHTML = entries.map(function (e) {
@@ -94,8 +104,8 @@
     if (!histBody) return;
     histLoad.disabled = true;
     var orig = histLoad.textContent;
-    histLoad.textContent = 'Loading...';
-    histBody.innerHTML = '<div class="dh-ops-dim">Loading your history...</div>';
+    histLoad.textContent = nlEn('Bezig...', 'Loading...');
+    histBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Uw geschiedenis wordt gelezen...', 'Reading your history...') + '</div>';
     relayCall(function (tok) {
       return fetch('/v2/user/history?limit=100', {
         headers: { Authorization: 'Bearer ' + tok, Accept: 'application/json' }, cache: 'no-store'
@@ -109,19 +119,19 @@
       if (res.status === 403) {
         // Fallback only; the relay sends its own message. Both name Firm,
         // the plan /pricing actually sells, not the tier key behind the gate.
-        histBody.innerHTML = upsell((res.body && res.body.message) ||
-          'Send history and link management require the Firm plan or higher.', '/pricing');
+        histBody.innerHTML = upsell(nlEn('De verzendgeschiedenis hoort bij Firm en hoger.', 'Send history comes with Firm and higher.'), '/pricing');
         return;
       }
       if (res.status === 401) {
-        histBody.innerHTML = '<div class="dh-ops-dim">Please sign in again to view your history.</div>';
+        histBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Uw sessie is verlopen. Log opnieuw in om uw geschiedenis te zien.', 'Your session has ended. Sign in again to see your history.') + '</div>';
         return;
       }
-      histBody.innerHTML = '<div class="dh-ops-dim">Could not load history (' +
-        esc((res.body && res.body.error) || ('HTTP ' + res.status)) + ').</div>';
+      histBody.innerHTML = '<div class="dh-ops-dim">' + (res.status === 429
+        ? nlEn('Even te veel verzoeken. Probeer het over een minuut opnieuw.', 'Too many requests just now. Try again in a minute.')
+        : nlEn('Uw geschiedenis kon nu niet worden gelezen. Er is niets veranderd. Probeer het zo opnieuw.', 'Your history could not be read just now. Nothing changed. Try again shortly.')) + '</div>';
     }).catch(function () {
       histLoad.disabled = false; histLoad.textContent = orig;
-      histBody.innerHTML = '<div class="dh-ops-dim">Network error while loading history.</div>';
+      histBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Geen verbinding. Er is niets veranderd. Probeer het opnieuw.', 'No connection. Nothing changed. Try again.') + '</div>';
     });
   }
 
@@ -140,7 +150,7 @@
     var buttons = [expCsv, expJson];
     buttons.forEach(function (b) { if (b) b.disabled = true; });
     var orig = btn.textContent;
-    btn.textContent = 'Preparing...';
+    btn.textContent = nlEn('Bezig...', 'Preparing...');
     var isCsv = format === 'csv';
     var url = isCsv ? '/v2/parasign/audit-export?format=csv' : '/v2/parasign/audit-export';
     relayCall(function (tok) {
@@ -158,25 +168,25 @@
       btn.textContent = orig;
       if (res.status === 200) {
         triggerDownload(res.blob, isCsv ? 'parasign_audit.csv' : 'parasign_audit.json');
-        expBody.innerHTML = '<div class="dh-ops-dim">Export ready. Your download has started (' +
+        expBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('De export is klaar en wordt gedownload (', 'The export is ready and downloading (') +
           (isCsv ? 'CSV' : 'JSON') + ').</div>';
         return;
       }
       if (res.status === 403) {
-        expBody.innerHTML = upsell((res.body && res.body.message) ||
-          'The ParaSign audit export requires a Business plan or higher.', '/pricing');
+        expBody.innerHTML = upsell(nlEn('De audit-export hoort bij Business en hoger.', 'The audit export comes with Business and higher.'), '/pricing');
         return;
       }
       if (res.status === 401) {
-        expBody.innerHTML = '<div class="dh-ops-dim">Please sign in again to export your audit trail.</div>';
+        expBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Uw sessie is verlopen. Log opnieuw in om te exporteren.', 'Your session has ended. Sign in again to export.') + '</div>';
         return;
       }
-      expBody.innerHTML = '<div class="dh-ops-dim">Could not build the export (' +
-        esc((res.body && res.body.error) || ('HTTP ' + res.status)) + ').</div>';
+      expBody.innerHTML = '<div class="dh-ops-dim">' + (res.status === 429
+        ? nlEn('Even te veel verzoeken. Probeer het over een minuut opnieuw.', 'Too many requests just now. Try again in a minute.')
+        : nlEn('De export kon nu niet worden gemaakt. Probeer het zo opnieuw.', 'The export could not be made just now. Try again shortly.')) + '</div>';
     }).catch(function () {
       buttons.forEach(function (b) { if (b) b.disabled = false; });
       btn.textContent = orig;
-      expBody.innerHTML = '<div class="dh-ops-dim">Network error while building the export.</div>';
+      expBody.innerHTML = '<div class="dh-ops-dim">' + nlEn('Geen verbinding. Probeer het opnieuw.', 'No connection. Try again.') + '</div>';
     });
   }
 
