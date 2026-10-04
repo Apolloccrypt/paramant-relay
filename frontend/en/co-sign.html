@@ -129,6 +129,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .requested-note{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding:10px 14px;border:1px solid var(--cobalt);background:rgba(var(--tint), .04);font-size:12px;line-height:1.5;color:var(--cobalt)}
 .requested-note .btn{width:auto;min-width:0;padding:11px 14px;flex:0 0 auto}
 .appearance-help{font-size:12px;line-height:1.55;color:var(--ink-dim)}
+.appearance-field.compact{font-size:8px;line-height:1.15;padding:2px 5px}
 .allpages{display:flex;align-items:center;gap:8px;margin:10px 0 4px;font-size:13px;cursor:pointer;min-height:44px}
 .allpages input{width:18px;height:18px;flex:0 0 auto}
 .appearance-help.active{color:var(--cobalt);font-weight:600}
@@ -236,7 +237,7 @@ body.needs-login #sign-intro{display:none}
           <button class="btn btn-outline" id="appearance-clear" type="button">Clear my fields</button>
         </div>
         <label class="allpages" id="appearance-allpages-label"><input type="checkbox" id="appearance-allpages"> Repeat on every page</label>
-        <p class="appearance-help">Places the same signature at the same spot on every page of the document: the per-page initial.</p>
+        <p class="appearance-help">Every page gets small initials in the margin, on a spot without text.</p>
         <p class="appearance-help" id="appearance-help">Choose a field, then click the page where it should appear. These positions are covered by your cryptographic signature.</p>
       </div>
     </div>
@@ -305,6 +306,6 @@ body.needs-login #sign-intro{display:none}
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=7" defer></script>
-<script type="module" src="/co-sign.js?v=26"></script>
+<script type="module" src="/co-sign.js?v=27"></script>
 </body>
 </html>

@@ -2,10 +2,10 @@
 
 Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. Nergens anders.
 
-- **119 omgevingsvariabelen** die de relay en de admin lezen staan in
+- **120 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **189 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **190 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -149,6 +149,7 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `PARAMANT_HOME_SCREENSHOT_PATH` | `tests/navigation-shell.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
 | `PARAMANT_INTERNAL_AUTH_TOKEN` | `scripts/heartbeat/surface.mjs` | `''` | zonder dit token bewijst de heartbeat alleen dat de diepe gezondheidspoort dicht zit, niet wat erachter zit; ontbreekt in de repo-secrets |
 | `PARAMANT_OPERATOR_IPS` | `scripts/access-log-visitors.mjs` | `''` | welke IP-adressen niet als bezoeker tellen in de toegangslogtelling |
+| `PARAMANT_PARAAF_SHOT_DIR` | `tests/paraaf-margin.test.mjs` | geen | pad waar een test de gebakken pagina's en het voorbeeld als PNG neerzet; leeg betekent geen afdruk |
 | `PARAMANT_PLACE_SHOT_DIR` | `tests/sign-place-toolbar.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
 | `PARAMANT_RELAY_URL` | `scripts/heartbeat/lib.mjs` | `'https://relay.paramant.app'` | welke relay de heartbeat aanspreekt |
 | `PARAMANT_SCREENSHOT_PATH` | `tests/developer-parasign-dashboard.test.mjs` | geen | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |

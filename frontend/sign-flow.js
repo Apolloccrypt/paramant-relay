@@ -17,6 +17,7 @@ import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSi
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=2';
 import { previewTargetWidth, viewportTargetWidth, renderGeneration } from '/js/preview-render.js?v=1';
+import { initialsFrom, planParaafs, textBoxesFromItems, paraafFooter } from '/js/paraaf-place.js?v=1';
 
 // One file, two languages. /sign is Dutch and /en/sign is the English copy of
 // the same page; both load this script, and the page's own lang attribute picks
@@ -65,7 +66,7 @@ const state = {
   doc:  null,            // { bytes (Uint8Array), name, size }
   stamp: null,           // PDF mode: bottom-left PDF points. Image mode: top-left image pixels.
   stampPage: null,       // { width, height } of the page state.stamp sits on, in that page's own units.
-  stampAllPages: false,  // PDF mode: repeat the seal on every page at the same relative spot.
+  stampAllPages: false,  // PDF mode: the seal on its page plus a small paraaf in a free margin corner of every other page.
   sealPlacement: 'inline', // PDF mode: inline, sheet, or both.
   pdfPageCount: null,    // PDF source page count, used to identify the appended sheet in the receipt.
   extras: [],            // PDF mode only. Types (all baked as pdf-lib vectors):
@@ -102,7 +103,7 @@ function hasInlineSeal() {
 function describePdfMode() {
   if (state.sealPlacement === 'sheet') return L('pdf met een apart handtekeningblad waarnaar wordt verwezen', 'PDF with a separate referenced signature sheet');
   const inline = state.stampAllPages
-    ? L('zichtbare stempel op elke pagina', 'visual stamp on every page')
+    ? L('zichtbare stempel op pagina ', 'visual stamp on page ') + (state.stamp.pageIndex + 1) + L(" en een paraaf op de andere pagina's", ' and initials on the other pages')
     : L('zichtbare stempel op pagina ', 'visual stamp on page ') + (state.stamp.pageIndex + 1);
   return state.sealPlacement === 'both'
     ? L('pdf met ', 'PDF with ') + inline + L(' en een apart handtekeningblad waarnaar wordt verwezen', ' and a separate referenced signature sheet')
@@ -244,6 +245,53 @@ async function waitForPdfLib() {
     };
     tick();
   });
+}
+
+// ====================================================================
+// Paraaf placement: the text layer of every page, read once per document
+// ====================================================================
+
+// The paraaf on the "other" pages goes in a free margin corner (see
+// js/paraaf-place.js). Finding a free corner needs the text positions, which
+// pdf.js gives per page. They are read ONCE per document and shared by the
+// placement preview, the review preview and the baked PDF, so all three put the
+// paraaf on the same spot. A page whose text cannot be read gets null, which
+// means bottom right (a scanned page has no text layer to avoid).
+let _textBoxCache = null;   // { bytes, promise, value }
+
+function loadTextBoxes(bytes) {
+  if (_textBoxCache && _textBoxCache.bytes === bytes) return _textBoxCache.promise;
+  const entry = { bytes, value: null, promise: null };
+  entry.promise = (async () => {
+    try {
+      const pdfjs = await waitForPdfjs();
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableAutoFetch: true, disableStream: true }).promise;
+      const out = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        try {
+          const page = await pdf.getPage(i);
+          out.push(textBoxesFromItems((await page.getTextContent()).items));
+        } catch (e) { out.push(null); }
+      }
+      return out;
+    } catch (e) {
+      return null;   // no text layer at all: every paraaf goes bottom right
+    }
+  })().then((v) => { entry.value = v || []; return entry.value; });
+  _textBoxCache = entry;
+  return entry.promise;
+}
+
+// The cached boxes when they are already read, else undefined.
+function textBoxesIfReady(bytes) {
+  return (_textBoxCache && _textBoxCache.bytes === bytes && _textBoxCache.value) || undefined;
+}
+
+// The paraaf plan for the current document: one box per page other than the
+// seal page. pages: [{width,height}] in PDF points, from whatever the caller
+// renders or bakes (pdf.js viewport in the preview, pdf-lib getSize when baking).
+function paraafPlanFor(pages, stamp, textBoxes) {
+  return planParaafs(pages, stamp.pageIndex, { w: stamp.w, h: stamp.h }, textBoxes);
 }
 
 // ====================================================================
@@ -724,6 +772,9 @@ async function renderPdfForPlacement() {
   const copy = new Uint8Array(state.doc.bytes);
   const pdf = await pdfjs.getDocument({ data: copy, disableAutoFetch: true, disableStream: true }).promise;
   state.pdfPageCount = pdf.numPages;
+  // Read the text layer now, in the background: the paraaf preview needs it the
+  // moment "sign every page" is ticked.
+  loadTextBoxes(state.doc.bytes);
 
   const container = $('ds-pdf-canvas-list');
   container.innerHTML = '';
@@ -812,28 +863,36 @@ async function applyPlaceZoom() {
   reflowGhostStamps();                        // repeated-seal ghosts on the other pages
 }
 
-// Sign-every-page ghosts: faint, non-interactive copies of the seal on every
-// page OTHER than the one it was placed on, at the same relative position. They
-// mirror exactly what buildStampedPdf bakes when state.stampAllPages is on.
+// Sign-every-page preview: the paraaf on every page OTHER than the one the seal
+// was placed on, in the free margin corner buildStampedPdf will use. Same plan
+// function, same text boxes, so the spot shown is the spot baked.
 function reflowGhostStamps() {
   document.querySelectorAll('.ds-stamp-ghost').forEach(el => el.remove());
-  if (!state.stampAllPages || !state.stamp || !placeState || placeState.isImage) return;
-  const src = placeState.pages.find(pp => pp.wrap._pdfPage.index === state.stamp.pageIndex);
-  if (!src) return;
-  const sw = src.wrap._pdfPage.width, sh = src.wrap._pdfPage.height;
-  const fx = state.stamp.x / sw, fy = state.stamp.y / sh, fw = state.stamp.w / sw, fh = state.stamp.h / sh;
-  for (const p of placeState.pages) {
-    if (p.wrap._pdfPage.index === state.stamp.pageIndex) continue;
+  if (!state.stampAllPages || !state.stamp || !placeState || placeState.isImage || !state.doc) return;
+  if (!hasInlineSeal()) return;
+  const textBoxes = textBoxesIfReady(state.doc.bytes);
+  if (textBoxes === undefined) {
+    // Not read yet: draw once the text layer is in, never a guessed spot.
+    const bytes = state.doc.bytes;
+    loadTextBoxes(bytes).then(() => { if (state.doc && state.doc.bytes === bytes) reflowGhostStamps(); });
+    return;
+  }
+  const pages = [];
+  for (let i = 0; i < (state.pdfPageCount || placeState.pages.length); i++) {
+    const p = placeState.pages[i];
+    pages.push(p ? { width: p.wrap._pdfPage.width, height: p.wrap._pdfPage.height } : { width: 1, height: 1 });
+  }
+  if (!pages[state.stamp.pageIndex]) return;
+  for (const box of paraafPlanFor(pages, state.stamp, textBoxes)) {
+    const p = placeState.pages[box.pageIndex];
+    if (!p) continue;   // past the preview cap
     const pw = p.wrap._pdfPage.width, ph = p.wrap._pdfPage.height;
     const rect = p.wrap.querySelector('canvas').getBoundingClientRect();
     const ratio = pw / rect.width;
-    const w = (fw * pw) / ratio, h = (fh * ph) / ratio;
-    const left = (fx * pw) / ratio;
-    const top = (ph - fy * ph - fh * ph) / ratio;
     const g = document.createElement('div');
-    g.className = 'ds-stamp-marker ds-stamp-ghost';
-    g.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
-    g.innerHTML = stampMockupHtml();
+    g.className = 'ds-stamp-ghost ds-paraaf';
+    g.style.cssText = `left:${box.x / ratio}px;top:${(ph - box.y - box.h) / ratio}px;width:${box.w / ratio}px;height:${box.h / ratio}px;font-size:${box.h / ratio}px`;
+    g.innerHTML = paraafMockupHtml();
     p.wrap.appendChild(g);
   }
 }
@@ -882,7 +941,7 @@ function applyPlacementTemplate() {
   setStampAllPages(!!tpl.allPages, false);   // don't re-save; we just loaded it
   $('ds-place-continue').disabled = false;
   setPlaceHint(tpl.allPages
-    ? L('Uw opgeslagen positie staat nu op elke pagina. Klik op een pagina om hem te verplaatsen.', 'Applied your saved signature position to every page. Click a page to move it.')
+    ? L("Uw opgeslagen positie is toegepast, met een paraaf op de andere pagina's. Klik op een pagina om de stempel te verplaatsen.", 'Applied your saved signature position, with initials on the other pages. Click a page to move the seal.')
     : L('Uw opgeslagen positie is toegepast. Klik op een pagina om hem te verplaatsen.', 'Applied your saved signature position. Click a page to move it.'));
 }
 
@@ -943,7 +1002,7 @@ function updateSignatureSheetControls() {
     ? L("Voegt één laatste pagina toe met uw stempel en de gegevens van de bron. De oorspronkelijke pagina's krijgen geen stempel.", 'Adds one final page with your seal and source details. The original pages remain unstamped.')
     : withSheet
       ? L('Houdt de geplaatste stempel in het document en voegt één laatste pagina toe met de stempel en de gegevens van de bron.', 'Keeps the placed seal in the document and adds one final page with the seal and source details.')
-      : L('Herhaalt uw stempel op dezelfde plek op elke pagina. Positie en grootte worden onthouden voor de volgende keer (nooit uw naam of handtekening).', 'Repeats your seal at the same spot on every page. Position and scale are remembered for next time (never your name or signature image).');
+      : L("Op de andere pagina's komt een kleine paraaf in een vrije hoek van de marge, niet over de tekst. Positie en grootte worden onthouden voor de volgende keer (nooit uw naam of handtekening).", 'The other pages get small initials in a free corner of the margin, never over the text. Position and scale are remembered for next time (never your name or signature image).');
   const hint = $('ds-place-hint');
   if (hint && sheetOnly) hint.textContent = L('Voorbeeld hieronder: pagina ', 'Preview below: page ') + ((state.pdfPageCount || 0) + 1) + L(' wordt als laatste pagina aan de pdf toegevoegd.', ' will be added as the final PDF page.');
   else if (hint && withSheet) hint.textContent = L('De geplaatste stempel blijft hier. Voorbeeld hieronder: ook pagina ', 'The placed seal stays here. Preview below: page ') + ((state.pdfPageCount || 0) + 1) + L(' wordt toegevoegd.', ' will also be added.');
@@ -2370,17 +2429,27 @@ async function renderDocPreview() {
     // Max 340 to fit the grid cell, min 280 so a mid-transition width of 1px
     // can never produce a blank raster.
     const targetW = previewTargetWidth(pane.clientWidth, 340, 280);
-    // Source page size for the "sign every page" relative-position math.
-    const srcVp = (await pdf.getPage(state.stamp.pageIndex + 1)).getViewport({ scale: 1 });
-    if (stale()) return;
-    const frX = state.stamp.x / srcVp.width, frY = state.stamp.y / srcVp.height;
-    const frW = state.stamp.w / srcVp.width, frH = state.stamp.h / srcVp.height;
+    // Sign every page: the paraaf plan for the other pages, from the same text
+    // boxes and the same function buildStampedPdf uses.
+    let paraafByPage = new Map();
+    if (state.stampAllPages) {
+      const textBoxes = await loadTextBoxes(state.doc.bytes);
+      if (stale()) return;
+      const sizes = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const vp = (await pdf.getPage(i)).getViewport({ scale: 1 });
+        sizes.push({ width: vp.width, height: vp.height });
+      }
+      if (stale()) return;
+      paraafByPage = new Map(paraafPlanFor(sizes, state.stamp, textBoxes).map((b) => [b.pageIndex, b]));
+    }
     for (let p = 1; p <= maxPages; p++) {
       const page = await pdf.getPage(p);
       if (stale()) return;
       const baseViewport = page.getViewport({ scale: 1 });
       const isSealPage = (p - 1 === state.stamp.pageIndex);
-      const showSeal = isSealPage || state.stampAllPages;   // every page when the toggle is on
+      const paraaf = isSealPage ? null : paraafByPage.get(p - 1);
+      const showSeal = isSealPage || !!paraaf;   // seal page, or a paraaf page when the toggle is on
       const superSample = showSeal ? Math.max(2.5, hiDpiScale()) : Math.min(1.5, Math.max(1, hiDpiScale()));
       const viewport = page.getViewport({ scale: (targetW / baseViewport.width) * superSample });
       const wrap = document.createElement('div');
@@ -2398,22 +2467,23 @@ async function renderDocPreview() {
       // A newer render cleared the pane while this page was drawing: stop here.
       if (stale()) return;
       const ratio = baseViewport.width / (wrap.getBoundingClientRect().width || targetW);   // pdf pt per displayed px
-      if (showSeal) {
-        // Placed page uses exact coords; repeated pages use the same relative
-        // fraction against their own size (mirrors buildStampedPdf).
-        const sx = isSealPage ? state.stamp.x : frX * baseViewport.width;
-        const sy = isSealPage ? state.stamp.y : frY * baseViewport.height;
-        const sw = isSealPage ? state.stamp.w : frW * baseViewport.width;
-        const sh = isSealPage ? state.stamp.h : frH * baseViewport.height;
-        const left = sx / ratio;
-        const top  = (baseViewport.height - sy - sh) / ratio;
+      if (isSealPage) {
+        const left = state.stamp.x / ratio;
+        const top  = (baseViewport.height - state.stamp.y - state.stamp.h) / ratio;
         const mock = document.createElement('div');
-        mock.className = 'ds-mockup-stamp' + (isSealPage ? '' : ' ds-mockup-ghost');
-        mock.style.cssText = `left:${left}px;top:${top}px;width:${sw / ratio}px;height:${sh / ratio}px`;
+        mock.className = 'ds-mockup-stamp';
+        mock.style.cssText = `left:${left}px;top:${top}px;width:${state.stamp.w / ratio}px;height:${state.stamp.h / ratio}px`;
         mock.innerHTML = stampInnerHtml();
         wrap.appendChild(mock);
-        // Only the placed page's seal is draggable; the repeated ghosts follow it.
-        if (isSealPage) makeReviewStampDraggable(mock, ratio, false, baseViewport.height, state.stamp.pageIndex);
+        // Only the placed page's seal is draggable; the paraafs are planned for it.
+        makeReviewStampDraggable(mock, ratio, false, baseViewport.height, state.stamp.pageIndex);
+      } else if (paraaf) {
+        // The paraaf exactly where buildStampedPdf bakes it.
+        const mock = document.createElement('div');
+        mock.className = 'ds-mockup-paraaf ds-paraaf';
+        mock.style.cssText = `left:${paraaf.x / ratio}px;top:${(baseViewport.height - paraaf.y - paraaf.h) / ratio}px;width:${paraaf.w / ratio}px;height:${paraaf.h / ratio}px;font-size:${paraaf.h / ratio}px`;
+        mock.innerHTML = paraafMockupHtml();
+        wrap.appendChild(mock);
       }
       for (const ex of state.extras) {
         if (ex.pageIndex !== p - 1) continue;
@@ -2514,7 +2584,7 @@ function makeReviewStampDraggable(mock, ratio, isImage, pageH, pageIndex) {
     if (isImage) state.stamp = { pageIndex: 0, x: natX, y: natYTop, w, h, isImage: true };
     else state.stamp = { pageIndex, x: natX, y: pageH - natYTop - h, w, h };
     refreshReviewProofCoords();   // QA #6: keep the proof card's coords in sync
-    // Sign-every-page: the repeated ghosts must follow the moved seal, so re-render.
+    // Sign-every-page: the paraafs are capped by the seal size, so re-render.
     if (!isImage && state.stampAllPages) renderDocPreview().catch(() => {});
   };
   mock.addEventListener('pointerup', up);
@@ -2586,6 +2656,20 @@ function stampMockupHtml() {
       `<span class="ds-sm-date">${dateStr}</span>` +
     `</div>` +
     `<div class="ds-sm-crypto">ML-DSA-65 (FIPS 204) - PQ ${fp}</div>`
+  );
+}
+
+// The on-screen paraaf: initials, then one line with date and fingerprint. Sized
+// in em against the box height (set as font-size on the box), so it scales with
+// the zoom the same way the baked vectors do. Mirrors paintParaaf below.
+function paraafMockupHtml() {
+  // Before the identity step there is no name yet: say what goes here.
+  const initials = initialsFrom(state.signer.name) || L('Paraaf', 'Initials');
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const fp = state.signer.fingerprint ? state.signer.fingerprint.slice(0, 8) : '';
+  return (
+    `<span class="ds-pf-initials">${escapeHtml(initials)}</span>` +
+    `<span class="ds-pf-foot">${escapeHtml(paraafFooter(dateStr, fp))}</span>`
   );
 }
 
@@ -2818,19 +2902,43 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
     sheet.drawText('Controleer de getekende pdf samen met het bijbehorende .psign-bestand. Latere medeondertekenaars staan in de envelop, niet op deze pagina.', { x: 54, y: 320, size: 9, font, color: dim, maxWidth: 487, lineHeight: 13 });
     sheet.drawText('Verify the signed PDF together with its .psign file. Later co-signers are recorded in the envelope, not added to this PDF page.', { x: 54, y: 288, size: 8.5, font, color: dim, maxWidth: 487, lineHeight: 12 });
   }
+  // The paraaf for "sign every page": initials and one line with date and short
+  // fingerprint, in the seal's navy, in a box planned by js/paraaf-place.js.
+  // No band, no badge: on a 38pt box those would only crowd the initials.
+  const initials = initialsFrom(signerName) || '?';
+  const footer = paraafFooter(dateStr, fingerprint8);
+  const paintParaaf = (pg, box) => {
+    pg.drawRectangle({ x: box.x, y: box.y, width: box.w, height: box.h, borderColor: navy, borderWidth: 0.8, color: white, opacity: 1 });
+    // A thin navy bar on the left edge: the house style of the seal, in small.
+    const bar = Math.max(1.5, box.w * 0.03);
+    pg.drawRectangle({ x: box.x, y: box.y, width: bar, height: box.h, color: navy });
+    const padX = bar + Math.max(2.5, box.w * 0.05);
+    const maxW = box.w - padX - Math.max(2, box.w * 0.04);
+    let sFoot = Math.max(4, box.h * 0.18);
+    while (sFoot > 4 && font.widthOfTextAtSize(footer, sFoot) > maxW) sFoot -= 0.25;
+    const footFits = font.widthOfTextAtSize(footer, sFoot) <= maxW;
+    const footY = box.y + box.h * 0.12;
+    if (footFits) pg.drawText(footer, { x: box.x + padX, y: footY, size: sFoot, font, color: dim });
+    const top = box.y + box.h - box.h * 0.1;
+    const bottom = footFits ? footY + sFoot + box.h * 0.06 : box.y + box.h * 0.12;
+    let sInit = Math.max(5, Math.min(18, (top - bottom) * 0.95));
+    while (sInit > 5 && fontItal.widthOfTextAtSize(initials, sInit) > maxW) sInit -= 0.5;
+    pg.drawText(initials, { x: box.x + padX, y: bottom + ((top - bottom) - sInit) / 2 + sInit * 0.18, size: sInit, font: fontItal, color: navy });
+  };
+
+  state.lastParaafPlan = null;
   if (hasInlineSeal()) {
-    // Stamp the placed page exactly. With "sign every page" on, stamp every other
-    // page at the same RELATIVE position/scale (robust to differing page sizes).
-    const srcSz = pages[stamp.pageIndex].getSize();
-    const fx = stamp.x / srcSz.width, fy = stamp.y / srcSz.height, fw = stamp.w / srcSz.width, fh = stamp.h / srcSz.height;
-    const targets = state.stampAllPages ? pages.map((_, i) => i) : [stamp.pageIndex];
-    for (const pi of targets) {
-      const pg = pages[pi];
-      if (!pg) continue;
-      const box = (pi === stamp.pageIndex)
-        ? { x: stamp.x, y: stamp.y, w: stamp.w, h: stamp.h }
-        : (() => { const sz = pg.getSize(); return { x: fx * sz.width, y: fy * sz.height, w: fw * sz.width, h: fh * sz.height }; })();
-      paintSeal(pg, box);
+    // The placed page gets the seal exactly where the signer put it.
+    if (pages[stamp.pageIndex]) paintSeal(pages[stamp.pageIndex], { x: stamp.x, y: stamp.y, w: stamp.w, h: stamp.h });
+    // "Sign every page": every OTHER page gets a paraaf, never a copy of the seal.
+    // A copy at the same relative spot landed on running text (customer report
+    // 2026-10-04): the signing page has a free line there, the others do not.
+    if (state.stampAllPages && pages.length > 1) {
+      const textBoxes = await loadTextBoxes(origBytes);
+      const sizes = pages.map((pg) => pg.getSize());
+      const plan = paraafPlanFor(sizes, stamp, textBoxes);
+      for (const box of plan) paintParaaf(pages[box.pageIndex], box);
+      state.lastParaafPlan = plan;
     }
   }
 
@@ -2897,6 +3005,27 @@ function wrapPdfText(font, text, size, maxW) {
   return lines.length ? lines : [''];
 }
 
+// The paraaf boxes of the last buildStampedPdf, in PDF points. Read by
+// tests/paraaf-margin.test.mjs to hold the preview and the baked PDF to the
+// same spot; the receipt reads it through paraafCoords below.
+export function lastParaafPlan() {
+  return Array.isArray(state.lastParaafPlan) ? state.lastParaafPlan.map((b) => ({ ...b })) : null;
+}
+
+// Receipt metadata for "sign every page". all_pages stays what it was (there is
+// a mark on every page), and says WHAT is on the other pages: a paraaf, with the
+// box each one got. Absent when nothing was repeated, so a receipt without the
+// toggle keeps exactly its old shape. Display only: the .psign signature covers
+// stamped_hash, never these coords.
+function paraafCoords() {
+  if (!state.stampAllPages || !Array.isArray(state.lastParaafPlan) || !state.lastParaafPlan.length) return {};
+  const r = (n) => Math.round(n * 100) / 100;
+  return {
+    other_pages: 'paraaf',
+    paraaf: state.lastParaafPlan.map((b) => ({ pageIndex: b.pageIndex, x: r(b.x), y: r(b.y), w: r(b.w), h: r(b.h) })),
+  };
+}
+
 async function doSign() {
   // STEP 2 of the two-step flow: this explicit action triggers the per-document
   // passkey-PRF activation (the Face ID / Touch ID / security-key prompt fires
@@ -2948,8 +3077,8 @@ async function doSign() {
       coords = state.mode === 'pdf' && state.sealPlacement === 'sheet'
         ? { signature_sheet: true, pageIndex: state.pdfPageCount, source_hash: origHashHex, name: state.signer.name, date: dateStr }
         : state.mode === 'pdf' && state.sealPlacement === 'both'
-          ? { signature_sheet: true, pageIndex: state.pdfPageCount, source_hash: origHashHex, inline_seal: { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, all_pages: !!state.stampAllPages }, name: state.signer.name, date: dateStr }
-          : { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: dateStr, isImage: !!state.stamp.isImage, all_pages: !!(state.mode === 'pdf' && state.stampAllPages) };
+          ? { signature_sheet: true, pageIndex: state.pdfPageCount, source_hash: origHashHex, inline_seal: { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, all_pages: !!state.stampAllPages, ...paraafCoords() }, name: state.signer.name, date: dateStr }
+          : { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: dateStr, isImage: !!state.stamp.isImage, all_pages: !!(state.mode === 'pdf' && state.stampAllPages), ...(state.mode === 'pdf' ? paraafCoords() : {}) };
       docHashForEnvelope = stampedHashHex;
     } else {
       docHashForEnvelope = toHex(sha3_256(state.doc.bytes));
