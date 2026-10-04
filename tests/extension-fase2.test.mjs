@@ -207,3 +207,31 @@ test('EXT-08-A: the plain format shows the URL itself', async () => {
   const text = html.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&');
   assert.ok(text.includes(url), 'without HTML the URL is gone: ' + text);
 });
+
+// EXT-01-A / EXT-18-A / EXT-26-A: the help pages promised a Chrome Web Store and
+// an AppSource listing that do not exist, a "Save" button, a green light with an
+// e-mail address, a 64-character key, paramant.app/get/XXXXX links, a "Choose
+// file" taskpane, and Exchange 2019. They now describe what ships.
+const popupHtml = read('extensions/chromium/src/popup/popup.html');
+const taskpaneHtml = read('extensions/outlook-addin/src/taskpane/taskpane.html');
+for (const slug of ['help/gmail-extension', 'en/help/gmail-extension', 'help/outlook-extension', 'en/help/outlook-extension']) {
+  test(`EXT-26-A: ${slug} describes the product that ships`, () => {
+    const html = read('frontend/' + slug + '.html');
+    const text = html.replace(/<[^>]+>/g, ' ');
+    assert.doesNotMatch(text, /Zoek op\s+Paramant|Search for\s+Paramant and click|Toevoegen aan Chrome|Add to Chrome/, 'promises a store listing');
+    assert.doesNotMatch(text, /paramant\.app\/get\/XXXXX|Choose file|Upload and insert link|api\.paramant\.app|groen lampje|green indicator/);
+    assert.doesNotMatch(html, /<strong>Save<\/strong>/, 'the button is "Sign in", not "Save"');
+    if (slug.includes('gmail')) {
+      assert.match(text, /Web Store/);
+      assert.match(text, /(uitgepakte extensie|unpacked)/i);
+      assert.match(popupHtml, />Sign in</);
+    } else {
+      assert.match(text, /AppSource/);
+      assert.match(text, /manifest\.xml/);
+      assert.match(text, /Mailbox 1\.8/);
+      assert.doesNotMatch(text, /Exchange (Server )?2019[^,]*: (on-premises|on-premises,)/);
+      assert.match(taskpaneHtml, /Encrypt all attachments/);
+      assert.match(text, /Encrypt all attachments/);
+    }
+  });
+}
