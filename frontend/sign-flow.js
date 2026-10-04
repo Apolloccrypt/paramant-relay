@@ -13,11 +13,13 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp, requestedAppearanceFromStamp } from '/js/parasign-signer.js?v=18';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp, requestedAppearanceFromStamp } from '/js/parasign-signer.js?v=19';
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=2';
 import { previewTargetWidth, viewportTargetWidth, renderGeneration } from '/js/preview-render.js?v=1';
 import { initialsFrom, planParaafs, textBoxesFromItems, paraafFooter } from '/js/paraaf-place.js?v=1';
+import { requestsForParties } from '/js/cosign-layout.js?v=1';
+import { splitKey, keyShareFragment, b64url as keyB64url, fromB64url as keyFromB64url } from '/js/parasign-ink.js?v=1';
 
 // One file, two languages. /sign is Dutch and /en/sign is the English copy of
 // the same page; both load this script, and the page's own lang attribute picks
@@ -352,15 +354,34 @@ function commitInviteDeliveryFromDom() {
   state.inviteMessage = ($('ds-invite-message')?.value || '').trim();
 }
 
-// The link that goes into an email is the notice, not the key. `sign_path`
-// carries the document key after the '#', and the mail leaves our infrastructure
-// through a US mail provider, so the fragment is cut off here, in the browser,
-// before the invitation is handed to our own server. The key stays on this
-// device and travels only over the channel the sender picks themselves; the
-// server refuses an invite_url that still carries a fragment, so a modified
-// client cannot put one back.
+// The link that goes into an email never carries the document key. `sign_path`
+// carries the whole key after the '#' (for links the sender passes on
+// themselves); that fragment is cut off here, in the browser. What the mail
+// gets instead is HALF of a split key ('#ks=', see js/parasign-ink.js): the
+// relay holds the other half and releases it only to the invited mailbox once
+// it is signed in. So the invitation opens the document for the invitee, and
+// the mail provider, holding one half and no ciphertext, can open nothing. The
+// server refuses any other fragment.
 function noticeUrl(signPath) {
-  return (location.origin + signPath).split('#')[0];
+  return (location.origin + signPath).split('#')[0] + (state.keyShareFragment || '');
+}
+
+// Where each party is asked to sign: the sender's box for the first party and
+// a slot of its own beside or under it for every next one, plus (with "every
+// page" on) a paraaf per party side by side in the margin. One box for all
+// parties made every signature land on the same spot (2026-10-04).
+function partyRequests(base) {
+  if (!base || !base.fields || !base.fields.length || state.mode !== 'pdf') return null;
+  const anchor = base.fields[0];
+  const pages = (placeState && Array.isArray(placeState.pages))
+    ? placeState.pages.map((p) => ({ width: p.wrap._pdfPage.width, height: p.wrap._pdfPage.height }))
+    : [];
+  try {
+    return requestsForParties({
+      anchor, signPage: anchor.page_index, count: state.recipients.length,
+      withParaaf: !!state.stampAllPages, pages, textBoxesPerPage: textBoxesIfReady(state.doc.bytes),
+    });
+  } catch { return null; }
 }
 
 async function deliverInviteEmails(partyIndexes) {
@@ -405,14 +426,16 @@ async function sendForSignature() {
   showRecipientsHint(L('Het verzoek wordt aangemaakt…', 'Creating the signing request…'), false);
   try {
     const docHashForEnvelope = toHex(sha3_256(state.doc.bytes));
-    // One requested position, identical for every party. Absent when the
-    // requester placed nothing, or when the document is not a PDF.
+    // The box the requester placed, and from it a spot of its own for every
+    // party. Absent when the requester placed nothing, or for a non-PDF. The
+    // envelope-wide box stays for readers that predate per-party spots.
     const requestedAppearance = state.mode === 'pdf'
       ? requestedAppearanceFromStamp(state.stamp, state.stampPage)
       : null;
+    const perParty = partyRequests(requestedAppearance);
     const created = await createSigningEnvelope({
       docHash: docHashForEnvelope,
-      recipients: state.recipients,
+      recipients: perParty ? state.recipients.map((r, i) => ({ ...r, requested_appearance: perParty[i] })) : state.recipients,
       originalFilename: state.doc.name,
       signerLabel: 'Requester',
       creatorPublicKey: '',   // the requester does not sign
@@ -433,6 +456,16 @@ async function sendForSignature() {
       docHash: docHashForEnvelope,
     });
     showRecipientsHint(L('Het versleutelde document wordt geüpload…', 'Uploading the encrypted document…'), false);
+    // Split the key: half B goes to the relay with the ciphertext, half A into
+    // the invitation links. The whole key stays in the sender's own links and
+    // on this device, for the sender's result page.
+    const wholeKey = keyFromB64url(String(encrypted.fragment).replace(/^#doc=v1\./, ''));
+    const shares = splitKey(wholeKey);
+    wholeKey.fill(0);
+    state.keyShareFragment = keyShareFragment(shares.a);
+    const keyShareB = keyB64url(shares.b);
+    shares.a.fill(0); shares.b.fill(0);
+    try { localStorage.setItem('paramant.cosign.key.v1:' + envelope.id, encrypted.fragment); } catch { /* storage off: the sender opens the original file instead */ }
     let upload;
     try {
       upload = await fetch('/api/user/envelopes/' + encodeURIComponent(envelope.id) + '/document', {
@@ -441,6 +474,7 @@ async function sendForSignature() {
         headers: {
           'Content-Type': 'application/octet-stream',
           'X-Capsule-Sha256': encrypted.capsuleSha256,
+          'X-Document-Key-Share': keyShareB,
         },
         body: encrypted.capsule,
       });
@@ -3486,12 +3520,12 @@ function showDoneInvite(r) {
   }
   paDone().fill('step-done', {
     title: emailPartial ? L('Niet elk bericht is verstuurd.', 'Not every notice went out.')
-         : emailOk      ? L('Bericht verstuurd. Stuur nu de links.', 'Notified. Now send them the links.')
+         : emailOk      ? L('Uitnodigingen verstuurd.', 'Invitations sent.')
          :                L('Klaar om te ondertekenen.', 'Ready for signature.'),
     line: emailPartial
       ? L('Sommige berichten zijn niet bezorgd. Probeer het hieronder opnieuw. Elke ondertekenaar heeft in elk geval de eigen link van u nodig.', 'Some notices were not delivered. Retry below. Either way each signer still needs their link from you.')
       : emailOk
-        ? L('De e-mail is alleen een bericht en bevat geen sleutel. Stuur iedereen hieronder de eigen link.', 'The email is a notice and carries no key. Send each person their link below.')
+        ? L('Iedereen kreeg een eigen link die het document opent zodra hij of zij inlogt. U hoeft niets meer te sturen. U krijgt bericht als er getekend is, en als iedereen getekend heeft een link naar het complete document.', 'Everyone received a link of their own that opens the document once they sign in. There is nothing more to send. You hear when someone signs, and when everyone has signed you get a link to the complete document.')
         : L('Elke ondertekenaar heeft hieronder een eigen link. Stuur die zoals u wilt en volg hier de voortgang.', 'Each signer has a link of their own below. Send it to them any way you like and follow progress here.'),
   });
   const preview = $('ds-signed-preview'); if (preview) preview.hidden = true;

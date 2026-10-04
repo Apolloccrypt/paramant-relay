@@ -133,6 +133,41 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .allpages{display:flex;align-items:center;gap:8px;margin:10px 0 4px;font-size:13px;cursor:pointer;min-height:44px}
 .allpages input{width:18px;height:18px;flex:0 0 auto}
 .appearance-help.active{color:var(--cobalt);font-weight:600}
+/* ── Marks on the page since 2026-10-04 ──
+   A signature sits on paper the way ink does: no white box over the text.
+   The handwriting, a hairline, and under it who and when. The signer's own
+   marks get a thin dashed outline so they read as movable; another party's
+   marks have none. Sizes follow the box (container units), so a mark scales
+   with the page exactly like the PDF it previews. Fixed colours on purpose,
+   see the document-layer note above. */
+.appearance-field{container-type:size;background:transparent;box-shadow:none;border:0;padding:0;flex-direction:column;align-items:stretch;justify-content:flex-end;color:#0C1B2A}
+.appearance-field.mine{outline:1.5px dashed #1D4ED8;outline-offset:1px;background:rgba(29,78,216,.035)}
+.appearance-field.prior{background:transparent;border:0;outline:0}
+.appearance-field .ink{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;font-family:"Times New Roman",Times,serif;font-style:italic;font-weight:400;font-size:min(42cqh,calc(190cqw / var(--len, 12)));line-height:1;color:#1D4ED8;white-space:nowrap;overflow:hidden}
+.appearance-field .ink svg{width:100%;height:100%;display:block}
+.appearance-field .cap{flex:0 0 auto;border-top:1px solid rgba(12,27,42,.55);font-family:var(--sans);font-weight:500;font-size:max(6px,15cqh);line-height:1.25;color:#0C1B2A;padding-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appearance-field.paraaf .ink{font-size:min(62cqh,calc(170cqw / var(--len, 6)));border-bottom:1px solid rgba(29,78,216,.5)}
+.appearance-field.date{border:0;font-family:var(--mono);font-weight:500;justify-content:center}
+.appearance-field.date .lbl{font-size:max(7px,55cqh)}
+.appearance-field.requested{border:2px dashed #1D4ED8;outline:0;background:rgba(29,78,216,.06);color:#1D4ED8;font-family:var(--sans);font-weight:600;line-height:1.15;justify-content:center;align-items:center;text-align:center;padding:2px 4px}
+.appearance-field.requested .lbl{font-size:max(7px,min(22cqh,9cqw))}
+.appearance-field.requested.paraaf .lbl{font-size:max(6px,min(34cqh,11cqw))}
+.ink-style{border:1px solid var(--ink-hair);padding:10px 12px;margin:12px 0;background:var(--card)}
+.ink-style legend{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);padding:0 4px}
+.ink-style .ink-choice{display:flex;align-items:center;gap:8px;font-size:13px;min-height:36px;cursor:pointer}
+.ink-name{margin-top:6px;font-family:"Times New Roman",Times,serif;font-style:italic;font-size:20px;color:#1D4ED8;background:#FFFFFF}
+.ink-pad{display:block;width:100%;height:130px;margin-top:6px;border:1px dashed var(--ink-hair);background:#FFFFFF;touch-action:none;cursor:crosshair}
+.ink-style .btn{width:auto;margin-top:8px}
+.cta-note{font-size:12px;line-height:1.6;color:var(--ink-dim);margin-top:10px}
+.cta-note a{color:var(--cobalt)}
+.gate-ok{color:var(--cobalt)}
+.decline{margin-top:16px;text-align:center}
+.party-status.declined{color:var(--brick-ink)}
+.result-note{margin-top:10px}
+#result-download-proof{margin-top:8px}
+body.result-mode #appearance-editor,body.result-mode #sign-intro,body.result-mode #decline-wrap,body.result-mode #sign-confirm,body.result-mode #review-gate{display:none}
+body.request-closed #review-card,body.request-closed #sign-confirm,body.request-closed #sign-intro,body.request-closed #review-gate,body.request-closed #decline-wrap,body.request-closed #cs-pass-panel{display:none}
+body.owner-mode #sign-card .card-head{display:none}
 .doc-preview-meta{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-dim);text-align:center;padding:8px 0;line-height:1.5}
 .review-gate{font-size:12px;color:var(--ink-dim);margin-top:10px;line-height:1.6}
 .blind-link{background:none;border:none;color:var(--ink-dim);text-decoration:underline;font-family:var(--mono);font-size:11px;cursor:pointer;padding:0}
@@ -194,14 +229,14 @@ body.needs-login #sign-intro{display:none}
   </details>
 
   <div class="card">
-    <div class="card-head"><div class="dot" id="env-status-dot"></div><div class="card-head-title" id="env-status">Status: ...</div></div>
+    <div class="card-head"><div class="dot" id="env-status-dot"></div><div class="card-head-title" id="env-status">...</div></div>
     <div class="card-body">
       <dl class="kv">
         <dt>Verzoek-id</dt><dd id="env-id">-</dd>
         <dt>Document SHA3-256</dt><dd id="env-hash">-</dd>
         <dt>Bestandsnaam</dt><dd id="env-filename">-</dd>
         <dt>Gemaakt</dt><dd id="env-created">-</dd>
-        <dt>Verloopt</dt><dd id="env-expires">-</dd>
+        <dt>Tekenen kan tot</dt><dd id="env-expires">-</dd>
         <dt>Voortgang</dt><dd id="env-progress">-</dd>
       </dl>
     </div>
@@ -231,19 +266,35 @@ body.needs-login #sign-intro{display:none}
       </div>
       <div class="doc-preview" id="doc-preview" hidden></div>
       <div id="appearance-editor" hidden>
+        <fieldset class="ink-style" id="ink-style">
+          <legend>Uw handtekening</legend>
+          <label class="ink-choice"><input type="radio" name="ink-style" value="type" checked> Typ uw naam</label>
+          <label class="ink-choice"><input type="radio" name="ink-style" value="draw"> Teken met uw vinger of muis</label>
+          <div id="ink-type-pane"><input class="input ink-name" id="ink-name" maxlength="80" autocomplete="name" aria-label="Uw naam zoals die in de handtekening komt"></div>
+          <div id="ink-draw-pane" hidden><canvas id="ink-pad" class="ink-pad" aria-label="Teken hier uw handtekening"></canvas><button class="btn btn-outline" id="ink-clear" type="button">Wis tekening</button></div>
+        </fieldset>
         <div class="appearance-tools" role="toolbar" aria-label="Zichtbare velden van uw handtekening">
           <button class="btn btn-outline" id="appearance-seal" type="button">Plaats mijn handtekening</button>
           <button class="btn btn-outline" id="appearance-date" type="button">Plaats datum</button>
           <button class="btn btn-outline" id="appearance-clear" type="button">Wis mijn velden</button>
         </div>
-        <label class="allpages" id="appearance-allpages-label"><input type="checkbox" id="appearance-allpages"> Ook op elke andere pagina</label>
-        <p class="appearance-help">Op elke pagina komt een kleine paraaf in de marge, op een plek zonder tekst.</p>
+        <label class="allpages" id="appearance-allpages-label"><input type="checkbox" id="appearance-allpages"> Paraaf op elke pagina (naast uw handtekening)</label>
+        <p class="appearance-help">Uw paraaf komt in de marge van elke pagina, naast die van de andere ondertekenaars. Niemand tekent op uw plek.</p>
         <p class="appearance-help" id="appearance-help">Kies een veld en klik op de plek in het document waar het moet komen. Deze plekken vallen onder uw cryptografische handtekening.</p>
       </div>
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="result-card" hidden>
+    <div class="card-head"><div class="dot"></div><div class="card-head-title" id="result-title">Het getekende document</div></div>
+    <div class="card-body">
+      <button class="btn" id="result-download-pdf" type="button" hidden></button>
+      <a class="btn btn-outline" id="result-download-proof" href="#" hidden>Download het bewijs (.psign)</a>
+      <p class="review-gate result-note" id="result-note" hidden></p>
+    </div>
+  </div>
+
+  <div class="card" id="sign-card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Ondertekenen als <span id="me-label">ondertekenaar</span></div></div>
     <div class="card-body">
       <details class="how" id="sign-intro">
@@ -269,13 +320,14 @@ body.needs-login #sign-intro{display:none}
         </div>
       </div>
       <div class="review-gate" id="review-gate" hidden></div>
+      <div class="decline" id="decline-wrap" hidden><button type="button" class="blind-link" id="decline-btn">Ik teken dit niet (weigeren)</button></div>
     </div>
   </div>
 </div>
 
 <div class="step" id="step-done">
   <h1>Uw handtekening is gezet</h1>
-  <p class="sub">Uw ML-DSA-65-handtekening is verstuurd. De relay heeft hem in het openbare CT-logboek gezet en de status van het verzoek bijgewerkt.</p>
+  <p class="sub">Uw handtekening is vastgelegd. Zodra iedereen heeft getekend, opent dezelfde link uit uw uitnodiging het complete document met alle handtekeningen.</p>
   <div class="card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Resultaat</div></div>
     <div class="card-body">
@@ -292,7 +344,7 @@ body.needs-login #sign-intro{display:none}
       </div>
       <button class="btn" id="done-download-pdf" type="button" hidden style="margin-top:14px">Pdf-kopie met zichtbare stempel downloaden</button>
       <a class="btn btn-outline" id="done-download-proof" href="#" hidden style="margin-top:8px">Definitief .psign-bewijs downloaden</a>
-      <p class="review-gate" id="done-download-note" hidden>Dit is een leesbare werkkopie. Het definitieve .psign-bestand bewijst het oorspronkelijke pdf-document en elke ondertekende plek. Bewaar het origineel, deze kopie en het .psign-bestand samen.</p>
+      <p class="review-gate" id="done-download-note" hidden>Dit is een leesbare kopie met de handtekeningen tot nu toe. Het bewijs (.psign) hoort bij het originele document en toont wie waar heeft getekend.</p>
       <p class="review-gate" id="done-proof-wait" hidden>Het definitieve .psign-bewijs is beschikbaar zodra iedere uitgenodigde ondertekenaar heeft getekend.</p>
     </div>
   </div>
@@ -306,6 +358,6 @@ body.needs-login #sign-intro{display:none}
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1"></script>
 <script src="/js/quota-upgrade.js?v=7" defer></script>
-<script type="module" src="/co-sign.js?v=27"></script>
+<script type="module" src="/co-sign.js?v=28"></script>
 </body>
 </html>
