@@ -289,9 +289,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-body">
       <h2>Open uw instellink van Paramant</h2>
       <p>U kreeg een instellink in uw welkomstmail. Die ziet er zo uit:</p>
-      <div class="code-block">https://paramant.app/auth/setup?token=XXXXXXXX</div>
-      <p>Open de link op uw computer. De link verloopt 14 dagen na verzending.</p>
-      <div class="tip"><p>Is uw link verlopen? Vraag dan een nieuwe aan via <a href="/auth/request-reset">paramant.app/auth/request-reset</a>.</p></div>
+      <div class="code-block">https://paramant.app/auth/setup/XXXXXXXX</div>
+      <p>Open de link op uw computer. De link werkt twee dagen na verzending. Op de eerste pagina kiest u hoe u voortaan inlogt: met een passkey op dit apparaat (<strong>Passkey instellen</strong>), of met een authenticator-app (<strong>Liever een app instellen</strong>). Deze handleiding volgt de authenticator-app.</p>
+      <div class="tip"><p>Is uw link verlopen voordat u een app koppelde? Mail dan naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> vanaf het adres van uw account, dan sturen wij een nieuwe link.</p></div>
     </div>
   </div>
 
@@ -338,7 +338,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <hr class="divider">
 
   <h2 style="margin-top:0">Klaar</h2>
-  <p>Voortaan logt u in via <a href="/auth/login">paramant.app/auth/login</a> met uw e-mailadres en de huidige code van 6 cijfers uit uw app. Een sessie duurt 1 uur.</p>
+  <p>Voortaan logt u in via <a href="/auth/login">paramant.app/auth/login</a> met uw e-mailadres en de huidige code van 6 cijfers uit uw app. Een sessie loopt af na een uur zonder activiteit, en na twaalf uur altijd.</p>
 
   <hr class="divider">
 
@@ -355,7 +355,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="troubleshoot-item">
     <div class="q">"Setup link expired" (instellink verlopen)</div>
     <div class="a">
-      <p>Vraag een nieuwe link aan via <a href="/auth/request-reset">paramant.app/auth/request-reset</a>.</p>
+      <p>Een instellink werkt twee dagen. Mail naar <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> vanaf het adres van uw account, dan sturen wij een nieuwe. Had u de app al gekoppeld en bent u hem kwijt, zie dan <a href="/help/lost-authenticator">Authenticator-app kwijt</a>.</p>
     </div>
   </div>
 

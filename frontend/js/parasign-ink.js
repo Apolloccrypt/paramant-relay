@@ -13,7 +13,7 @@
 //
 // Also the key-share arithmetic for the invitation link: A xor B = K.
 
-import { cleanInk } from './cosign-layout.js?v=4';
+import { cleanInk } from './cosign-layout.js?v=5';
 
 const DOMAIN = 'paramant/parasign/ink/v1';
 const enc = new TextEncoder();

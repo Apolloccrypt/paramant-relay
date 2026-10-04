@@ -243,6 +243,7 @@ function applyConfig() {
     })
     .then(function (res) {
       if (res.ok) {
+        if (status) { status.textContent = ''; }
         goToStep('done');
         renderDone(res);
         return;
@@ -287,7 +288,16 @@ function wire() {
     });
   });
   var domainInput = $('[name="domain"]', stepEl(2));
-  if (domainInput) { domainInput.addEventListener('blur', dnsPreflight); }
+  // While typing, not on blur: the blur came between mousedown and mouseup on
+  // Next, the DNS line changed height, the button moved away and the first
+  // click was lost (matrix ACCT-42). #dns-status also keeps its height.
+  var dnsTimer = null;
+  if (domainInput) {
+    domainInput.addEventListener('input', function () {
+      clearTimeout(dnsTimer);
+      dnsTimer = setTimeout(dnsPreflight, 600);
+    });
+  }
   var applyBtn = $('#apply');
   if (applyBtn) { applyBtn.addEventListener('click', applyConfig); }
   goToStep(1);

@@ -275,17 +275,17 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 
   <div class="issue-block">
-    <div class="issue-header">"Invalid API key"</div>
+    <div class="issue-header">A script or integration gets "Invalid API key"</div>
     <div class="issue-body">
-      <p>Check that you copied the full 64-character key with no trailing spaces. In password managers, use the copy button rather than selecting the text by hand. If you recently regenerated your key, make sure you saved the new one before closing the dashboard.</p>
-      <p>If the key was revoked: generate a new one in Dashboard &rarr; API keys.</p>
+      <p>This is about the API, not about signing in: on the website you sign in with your email address and a passkey or code, without a key. Check that the integration sends the full key (<code>pgp_</code> followed by 64 characters) in the <code>X-Api-Key</code> header, with no trailing spaces. You find the key on <a href="/en/account">Account</a> under <strong>Advanced account key</strong>.</p>
+      <p>For a <code>psk_live_</code> key for the ParaSign API, check on your account page that it is still active, and make a new one there if needed. A new account key (<code>pgp_</code>) you request at <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
     </div>
   </div>
 
   <div class="issue-block">
     <div class="issue-header">"Session expired, sign in again"</div>
     <div class="issue-body">
-      <p>Sessions last <strong>1 hour</strong> from the time of login. This is deliberate. Paramant handles sensitive files and does not keep you signed in for longer. Go back to <a href="/en/auth/login">paramant.app/auth/login</a> and sign in again.</p>
+      <p>A session ends after <strong>an hour without activity</strong>. While you are working that hour moves along, but after <strong>twelve hours</strong> every session ends, however active you were. This is deliberate: Paramant handles sensitive files and keeps no lasting sessions. Go back to <a href="/en/auth/login">paramant.app/en/auth/login</a> and sign in again.</p>
       <p>If you are often signed out halfway through a task, you could use the API from a script instead of the web dashboard, so an expiring session does not interrupt your work.</p>
     </div>
   </div>

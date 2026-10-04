@@ -2,6 +2,73 @@
 // this same script, and <html lang> says which of the two strings to show.
 function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || '') ? en : nl; }
 
+// ── A fresh second factor for actions that change the account ───────────────
+// Renewing back-up codes, a new authenticator app, deactivating the account
+// and removing a passkey ask for the current 6-digit code (or a back-up code)
+// on the server (admin freshSecondFactor). One inline panel under the button
+// that was pressed, never a browser prompt. Resolves to { totp } or
+// { backup_code }, or null when cancelled. Also used by js/passkey.js.
+function paAskSecondFactor(anchor, text, confirmLabel) {
+  return new Promise(function(resolve) {
+    var old = document.getElementById('sf-panel');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    var wrap = document.createElement('div');
+    wrap.id = 'sf-panel';
+    wrap.setAttribute('role', 'group');
+    wrap.style.cssText = 'margin-top:10px;padding:12px 14px;border:1px solid var(--ink-hair);border-radius:6px';
+    var p = document.createElement('p');
+    p.className = 'small'; p.style.margin = '0 0 8px'; p.textContent = text;
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+    var input = document.createElement('input');
+    input.type = 'text'; input.id = 'sf-code'; input.autocomplete = 'one-time-code'; input.maxLength = 20;
+    input.placeholder = nlEn('Code of back-upcode', 'Code or back-up code');
+    input.setAttribute('aria-label', nlEn('Code van 6 cijfers of een back-upcode', '6-digit code or a back-up code'));
+    input.style.maxWidth = '190px';
+    var ok = document.createElement('button');
+    ok.type = 'button'; ok.className = 'btn btn-small'; ok.id = 'sf-confirm'; ok.textContent = confirmLabel;
+    var cancel = document.createElement('button');
+    cancel.type = 'button'; cancel.className = 'btn btn-small btn-secondary'; cancel.id = 'sf-cancel'; cancel.textContent = nlEn('Annuleren', 'Cancel');
+    var err = document.createElement('p');
+    err.className = 'small'; err.id = 'sf-error'; err.style.margin = '6px 0 0'; err.hidden = true;
+    row.appendChild(input); row.appendChild(ok); row.appendChild(cancel);
+    wrap.appendChild(p); wrap.appendChild(row); wrap.appendChild(err);
+    var host = anchor && anchor.parentNode ? anchor : document.body;
+    if (host === document.body) document.body.appendChild(wrap);
+    else host.parentNode.insertBefore(wrap, host.nextSibling);
+    input.focus();
+    function done(v) { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); resolve(v); }
+    function onOk() {
+      var v = (input.value || '').trim();
+      if (/^\d{6}$/.test(v)) return done({ totp: v });
+      if (/^[A-Za-z0-9]{3,8}(-[A-Za-z0-9]{3,8}){1,3}$/.test(v)) return done({ backup_code: v.toUpperCase() });
+      err.hidden = false;
+      err.textContent = nlEn('Vul de code van 6 cijfers uit uw authenticator-app in, of een back-upcode.', 'Enter the 6-digit code from your authenticator app, or a back-up code.');
+      input.focus();
+    }
+    ok.addEventListener('click', onOk);
+    cancel.addEventListener('click', function() { done(null); });
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); onOk(); }
+      if (e.key === 'Escape') done(null);
+    });
+  });
+}
+window.paAskSecondFactor = paAskSecondFactor;
+
+// What a refused account action means, in words (admin freshSecondFactor and
+// the routes behind it). Never "nothing happens".
+function paSecondFactorError(status, body) {
+  var code = body && body.error;
+  if (code === 'invalid_second_factor' || code === 'invalid_totp') return nlEn('Die code klopt niet. Er is niets veranderd.', 'That code did not match. Nothing changed.');
+  if (code === 'second_factor_required') return nlEn('Vul eerst de code van 6 cijfers of een back-upcode in. Er is niets veranderd.', 'Enter the 6-digit code or a back-up code first. Nothing changed.');
+  if (status === 429) return nlEn('Te veel pogingen achter elkaar. Probeer het over een kwartier opnieuw. Er is niets veranderd.', 'Too many attempts in a row. Try again in fifteen minutes. Nothing changed.');
+  if (status === 401) return nlEn('Uw sessie is verlopen. Log opnieuw in en probeer het nog eens. Er is niets veranderd.', 'Your session has expired. Sign in again and retry. Nothing changed.');
+  if (status >= 500) return nlEn('Dit lukte nu niet door een storing bij ons. Er is niets veranderd. Probeer het zo opnieuw.', 'This did not work right now because of a fault on our side. Nothing changed. Please try again shortly.');
+  return nlEn('Dit is niet gelukt. Er is niets veranderd. Probeer het zo opnieuw.', 'This did not work. Nothing changed. Please try again shortly.');
+}
+window.paSecondFactorError = paSecondFactorError;
+
 (function() {
   // Plan resolution, the same shape js/dashboard.js uses, because a customer
   // who wants to know what he pays comes here rather than to the dashboard and
@@ -259,27 +326,43 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     }
   });
 
+  async function accountAction(btn, url, method, ask, confirmLabel) {
+    var factor = await paAskSecondFactor(btn, ask, confirmLabel);
+    if (!factor) return null;
+    btn.disabled = true;
+    try {
+      var res = await fetch(url, {
+        method: method,
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(factor),
+      });
+      var body = await res.json().catch(function() { return {}; });
+      if (!res.ok) { alert(paSecondFactorError(res.status, body)); return null; }
+      return body;
+    } catch (e) {
+      alert(nlEn('Paramant is niet bereikbaar. Er is niets veranderd. Controleer uw verbinding en probeer het opnieuw.', 'We could not reach Paramant. Nothing changed. Check your connection and try again.'));
+      return null;
+    } finally { btn.disabled = false; }
+  }
+
   document.getElementById('regen-backup').addEventListener('click', async function() {
-    if (!confirm(nlEn('Back-upcodes vernieuwen? De huidige codes vervallen dan.', 'Regenerate backup codes? Current codes will be invalid.'))) return;
-    const res = await fetch('/api/user/account/backup-codes/regenerate', {
-      method: 'POST',
-      credentials: 'include',
-    });
-    if (res.ok) {
-      const data = await res.json();
+    var data = await accountAction(this, '/api/user/account/backup-codes/regenerate', 'POST',
+      nlEn('Alle codes vernieuwen: de huidige back-upcodes vervallen. Bevestig met de code van 6 cijfers uit uw authenticator-app, of een back-upcode.', 'Renew all codes: the current back-up codes stop working. Confirm with the 6-digit code from your authenticator app, or a back-up code.'),
+      nlEn('Codes vernieuwen', 'Renew codes'));
+    if (data && Array.isArray(data.backup_codes)) {
       alert(nlEn('Nieuwe codes:\n\n', 'New codes:\n\n') + data.backup_codes.join('\n') + nlEn('\n\nBewaar ze nu. U ziet ze hierna niet meer.', '\n\nSave these now. They will not be shown again.'));
+      loadAccount();
     }
   });
 
   document.getElementById('reset-totp').addEventListener('click', async function() {
-    if (!confirm(nlEn('We sturen u een nieuwe instelmail. Uw huidige authenticator-app werkt dan niet meer.', 'This will send a new setup email. Your current authenticator will be invalidated.'))) return;
-    const res = await fetch('/api/user/account/totp/reset', {
-      method: 'POST',
-      credentials: 'include',
-    });
-    if (res.ok) {
+    var data = await accountAction(this, '/api/user/account/totp/reset', 'POST',
+      nlEn('We sturen u een nieuwe instelmail. Uw huidige authenticator-app werkt daarna niet meer. Bevestig met de huidige code van 6 cijfers, of een back-upcode.', 'We send you a new setup email. Your current authenticator app stops working after that. Confirm with the current 6-digit code, or a back-up code.'),
+      nlEn('Instelmail sturen', 'Send setup email'));
+    if (data) {
       alert(nlEn('De instelmail is verstuurd. Kijk in uw inbox.', 'Setup email sent. Check your inbox.'));
-      window.location = '/auth/login';
+      window.location = nlEn('/auth/login', '/en/auth/login');
     }
   });
 
@@ -301,11 +384,11 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   document.getElementById('delete-account').addEventListener('click', async function() {
     const answer = prompt(nlEn('Typ DEACTIVEREN om het deactiveren van uw account te bevestigen:', 'Type DEACTIVATE to confirm account deactivation:'));
     if (answer !== nlEn('DEACTIVEREN', 'DEACTIVATE')) return;
-    const res = await fetch('/api/user/account', {
-      method: 'DELETE',
-      credentials: 'include',
-    });
-    if (res.ok) {
+    var data = await accountAction(this, '/api/user/account', 'DELETE',
+      nlEn('Laatste stap: bevestig met de code van 6 cijfers uit uw authenticator-app, of een back-upcode.', 'Last step: confirm with the 6-digit code from your authenticator app, or a back-up code.'),
+      nlEn('Account deactiveren', 'Deactivate account'));
+    if (data) {
+      try { if (window.paramantWipeLocal) window.paramantWipeLocal(); } catch (e) {}
       alert(nlEn('Account gedeactiveerd. De sleutel werkt niet meer.', 'Account deactivated. Its key can no longer be used.'));
       window.location = '/';
     }

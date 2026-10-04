@@ -140,13 +140,14 @@ const authFirstSentence = {
   'frontend/en/auth/login.html': /No password to type: sign in with your passkey/i,
   'frontend/en/auth/setup.html': /Pick one now and add the other later/i,
   'frontend/en/auth/backup.html': /each code works\s+once and gets you in without your authenticator app/i,
-  'frontend/en/auth/request-reset.html': /if it matches an account, we send a link/i,
+  // A back-up code is required since the mailbox alone stopped being enough.
+  'frontend/en/auth/request-reset.html': /one of your back-up codes\. If they match, we send a\s+link/i,
   'frontend/en/auth/reset-confirm.html': /You get two emails, one after the other/i,
   'frontend/en/signup/verified.html': /Paramant has no passwords/i,
   'frontend/auth/login.html': /Geen wachtwoord nodig: log in met uw passkey/i,
   'frontend/auth/setup.html': /Kies er nu één en voeg de andere later toe/i,
   'frontend/auth/backup.html': /Elke code\s+werkt één keer en laat u binnen zonder uw authenticator-app/i,
-  'frontend/auth/request-reset.html': /Hoort het bij een account, dan sturen wij\s+een link/i,
+  'frontend/auth/request-reset.html': /een van uw back-upcodes\. Klopt dat, dan\s+sturen wij een link/i,
   'frontend/auth/reset-confirm.html': /U krijgt twee mails, na elkaar/i,
   'frontend/signup/verified.html': /Paramant werkt zonder wachtwoorden/i,
 };
@@ -272,12 +273,16 @@ assert.match(requestResetJs, /a confirmation email is on its way/i,
   'request-reset must say the first mail confirms the request, not that it carries the setup link');
 assert.match(requestResetJs, /valid for 60 minutes/i,
   'the confirmation token is EX 3600, so the success message must say 60 minutes');
-assert.match(requestResetJs, /that one works for 14 days/i,
-  'the 14 days belong to the second mail, the one with the setup link');
+// The setup link lives SETUP_TOKEN_TTL_S, two days since the 2026-09-05
+// review (admin/server.js); it was fourteen before that, and this page said so.
+assert.match(read('admin/server.js'), /SETUP_TOKEN_TTL_S[^\n]*2 \* 86400/,
+  'the setup link lasts two days; if that changes, change the sentence below with it');
+assert.match(requestResetJs, /that one works for two days/i,
+  'the two days belong to the second mail, the one with the setup link');
 assert.match(requestResetJs, /Die eerste mail bevestigt alleen het verzoek, en de link werkt 60 minuten/,
   'the Dutch success message must attach the 60 minutes to the first mail');
-assert.match(requestResetJs, /Die werkt 14 dagen/,
-  'and the 14 days to the second');
+assert.match(requestResetJs, /Die werkt twee dagen/,
+  'and the two days to the second');
 assert.doesNotMatch(requestResetJs, /a setup link is on its way|een instellink is onderweg/i,
   'no setup link exists until the confirmation is opened');
 

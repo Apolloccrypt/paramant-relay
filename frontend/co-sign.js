@@ -31,8 +31,8 @@ import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { vaultDelete } from '/vendor/vault.js?v=5';
 import { decryptDocumentCapsule, parseDocumentKeyFragment, documentKeyFragment } from '/js/parasign-document-capsule.js?v=2';
 import { initialsFrom, normaliseRotation, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes, pdfjsPageBoxes, scanPdfPages } from '/js/paraaf-place.js?v=5';
-import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParties, autoSignaturePlace, textBoxesToFractions, strokesToInk } from '/js/cosign-layout.js?v=4';
-import { sealInk, openInk, joinKey, parseKeyShareFragment } from '/js/parasign-ink.js?v=3';
+import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParties, autoSignaturePlace, textBoxesToFractions, strokesToInk, paraafCoveredPages, pageListText } from '/js/cosign-layout.js?v=5';
+import { sealInk, openInk, joinKey, parseKeyShareFragment } from '/js/parasign-ink.js?v=4';
 import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
@@ -201,6 +201,18 @@ function syncParaafBox() {
 // ---------- status: what a person reads at the top ----------
 // One sentence per state, in their language, and one date: the day signing
 // closes. "STATUS: VOID" and a raw ISO time told nobody anything.
+// The sender of a "Samen ondertekenen" request is stored as "<name> (you)":
+// the relay's word for party 0 when it was made. Shown to the other parties,
+// and in English on a Dutch page, it named the wrong person (matrix COSIGN-02).
+// This page says "(u)" / "(you)" itself, for whoever is looking.
+export function plainPartyLabel(label) {
+  return String(label || '').replace(/\s*\(you\)\s*$/i, '').trim();
+}
+function withPlainLabels(env) {
+  if (env && Array.isArray(env.parties)) env.parties = env.parties.map((p) => (p && typeof p.label === 'string') ? { ...p, label: plainPartyLabel(p.label) } : p);
+  return env;
+}
+
 function envelopeState(e) {
   if (!e) return 'unknown';
   if (e.status === 'complete') return 'complete';
@@ -271,7 +283,7 @@ async function init() {
     if (r.status === 429) return showError(L('Te veel verzoeken vanaf dit adres. Probeer het over een minuut opnieuw.', 'Too many requests from this address. Try again in a minute.'), 'busy');
     if (!r.ok) return showError(L('Het verzoek kon nu niet worden opgehaald door een storing bij ons. Er is niets mis met uw link. Probeer het over een paar minuten opnieuw.', 'The request could not be fetched right now because of a fault on our side. Nothing is wrong with your link. Please try again in a few minutes.'), 'fault');
     const data = await r.json();
-    __envelope = data.envelope;
+    __envelope = withPlainLabels(data.envelope);
     if (__partyIndex >= __envelope.party_count) return showError(L('Deze link verwijst naar een ondertekenaar die niet in dit verzoek staat.', 'This link points to a signer who is not part of this request.'));
 
     const state = envelopeState(__envelope);
@@ -294,6 +306,7 @@ async function init() {
     if (state === 'declined' || state === 'cancelled' || (state === 'expired' && me.status !== 'signed')) {
       return showClosed(state);
     }
+    if (__sessionFault) return showSessionFault();
     if (state === 'complete' || me.status === 'signed') {
       return showResultForParty(envId, partyIndex);
     }
@@ -379,9 +392,11 @@ function renderEnvelope() {
       fields = current.filter((f) => !isParaaf(f));
     }
     setAppearance(fields);
+    const cover = on ? await paraafCoverNote(__appearance) : '';
+    setPdfNote(cover);
     setAppearanceHelp(on
-      ? L('Op elke pagina staat nu uw paraaf in de marge, naast die van de anderen. Uw handtekening blijft op haar eigen plek.', 'Every page now has your initials in the margin, next to the others. Your signature stays where it is.')
-      : L('De paraaf op elke pagina is weg. Uw handtekening blijft staan.', 'The initials on every page are gone. Your signature stays.'), false);
+      ? (cover || L('Op elke pagina staat nu uw paraaf in de marge, naast die van de anderen. Uw handtekening blijft op haar eigen plek.', 'Every page now has your initials in the margin, next to the others. Your signature stays where it is.'))
+      : L('De paraaf op elke pagina is weg. Uw handtekening blijft staan.', 'The initials on every page are gone. Your signature stays.'), !!cover);
     renderAppearanceOverlays();
   };
   wireInkControls(me);
@@ -529,19 +544,33 @@ async function refreshEnvelopeStatus() {
   try {
     const response = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(__envelope.id)
       + '?p=' + encodeURIComponent(__partyIndex) + '&t=' + encodeURIComponent(__inviteToken), { cache: 'no-store' });
-    if (response.ok) __envelope = (await response.json()).envelope || __envelope;
+    if (response.ok) __envelope = withPlainLabels((await response.json()).envelope) || __envelope;
   } catch { /* the accepted sign result remains authoritative */ }
 }
 
+// null when nobody is signed in. A fault on our side (429, 5xx, no answer) is
+// not "signed out": it sets __sessionFault, and the page says it is us, not
+// a login it does not need (matrix COSIGN-24-C: a 503 read "Log in as the
+// recipient", with a login button that changed nothing).
+let __sessionFault = false;
 async function loadSession() {
+  __sessionFault = false;
   try {
-    const r = await fetch('/api/user/account', { credentials: 'include' });
-    if (!r.ok) return null;
+    const r = await fetch('/api/user/account', { credentials: 'include', cache: 'no-store' });
+    if (r.status === 401 || r.status === 403) return null;
+    if (!r.ok) { __sessionFault = true; return null; }
     const d = await r.json().catch(() => null);
     if (!d) return null;
     const email = d.email || (d.account && d.account.email) || '';
     return { email };
-  } catch { return null; }
+  } catch { __sessionFault = true; return null; }
+}
+
+function showSessionFault() {
+  setStatus('err', L('Wij konden niet nagaan of u bent ingelogd, door een storing bij ons. Er is niets mis met uw link of uw account. Probeer het over een paar minuten opnieuw.', 'We could not check whether you are signed in, because of a fault on our side. Nothing is wrong with your link or your account. Please try again in a few minutes.'));
+  showCta('<button class="btn" type="button" id="session-retry">' + L('Opnieuw proberen', 'Try again') + '</button>');
+  const b = $('session-retry');
+  if (b) b.onclick = () => location.reload();
 }
 
 function loginCtaHtml() {
@@ -645,7 +674,11 @@ async function fetchAndOpenCapsule(url, envId) {
   try { key = keyFromFragment(); }
   catch (e) { throw new Error(e.message); }
   if (!key) {
-    const err = new Error(L('In deze link zit geen sleutel voor het versleutelde document. Vraag de afzender om de volledige link, of kies het document hieronder zelf.', 'This link carries no key for the encrypted document. Ask the sender for the complete link, or choose the document below.'));
+    // A link without '#ks=' or '#doc=' (an older resend from the dashboard,
+    // or a link that lost its end on the way: matrix COSIGN-46). The request
+    // itself is fine; only this copy of the link cannot open the document.
+    // Say so, and give the ways that do work, in order.
+    const err = new Error(L('Deze link opent het verzoek, maar niet het document: het laatste stuk van de link, met de sleutel, ontbreekt. Dat gebeurt bij een link die opnieuw is verstuurd of onderweg is ingekort. Open de link uit uw eerste uitnodigingsmail; die opent het document wel. Heeft u die niet meer, vraag de afzender dan om een nieuwe uitnodiging. Heeft u het document al als bestand, kies het dan hieronder: wij controleren of het precies het document uit dit verzoek is.', 'This link opens the request, but not the document: the last part of the link, which holds the key, is missing. That happens with a link that was sent again or cut short on the way. Open the link from your first invitation email; that one opens the document. If you no longer have it, ask the sender for a new invitation. If you already have the document as a file, choose it below: we check that it is exactly the document of this request.'));
     err.noKey = true;
     throw err;
   }
@@ -693,6 +726,72 @@ async function loadDeliveredDocument(envId, partyIndex) {
   }
 }
 
+// Can this page write a readable copy with the signatures on it? Only when
+// pdf-lib opens the file as it is (no password lock) and pdf.js showed the
+// same pages. Otherwise the signature still binds the exact bytes (the hash),
+// but no visible copy comes out, and the page says so before anyone places a
+// paraaf it then never gets (PDF sweep B8: an encrypted pdf promised a paraaf
+// on every page and gave no pdf; a broken file got a signature over text).
+// Returns { ok, why: 'encrypted' | 'broken' }.
+export async function visualCopyCheck(bytes, previewPages) {
+  if (!isPdfBytes(bytes) || !window.PDFLib) return { ok: false, why: 'broken' };
+  try {
+    const doc = await window.PDFLib.PDFDocument.load(bytes, { ignoreEncryption: false, updateMetadata: false });
+    if (!(previewPages > 0) || doc.getPageCount() !== previewPages) return { ok: false, why: 'broken' };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, why: /encrypt/i.test(String(e && e.message)) ? 'encrypted' : 'broken' };
+  }
+}
+
+// A pdf that already carries a digital signature (PAdES, e.g. from Adobe or
+// a notary system): any visible copy rewrites the file, and that earlier
+// signature then no longer checks out in a pdf reader (PDF sweep B3). The
+// original and the .psign stay exactly as they were; the page says so.
+export function hasDigitalSignature(bytes) {
+  if (!bytes || !bytes.length) return false;
+  const CH = 1 << 20;
+  for (let i = 0; i < bytes.length; i += CH - 64) {
+    const part = bytes.subarray(i, Math.min(bytes.length, i + CH));
+    let t = '';
+    for (let j = 0; j < part.length; j += 8192) t += String.fromCharCode.apply(null, part.subarray(j, Math.min(part.length, j + 8192)));
+    if (/\/ByteRange\s*\[\s*\d+\s+\d+\s+\d+\s+\d+\s*\]/.test(t)) return true;
+  }
+  return false;
+}
+
+function setPdfNote(msg) {
+  let el = $('pdf-note');
+  if (!el && msg) {
+    const anchor = $('verify-result');
+    if (!anchor) return;
+    el = document.createElement('div');
+    el.id = 'pdf-note';
+    el.className = 'banner warn';
+    el.setAttribute('role', 'status');
+    anchor.parentNode.insertBefore(el, anchor.nextSibling);
+  }
+  if (el) { el.hidden = !msg; el.textContent = msg || ''; }
+}
+
+// The pages where this party's paraaf would lie over text, said out loud:
+// the margins had no free spot on every page (PDF sweep B1). '' when free.
+// Pages (0-based) where this party's paraaf lies over text: outlined red in
+// the preview, the way /sign marks it for a solo signature.
+let __coverPages = new Set();
+async function paraafCoverNote(appearance) {
+  __coverPages = new Set();
+  const par = ((appearance && appearance.fields) || []).find(isParaaf);
+  if (!par || !__previewPdf) return '';
+  const { pages, boxes } = await textOfAllPages();
+  const over = paraafCoveredPages({ spot: par, pages, textBoxesPerPage: boxes });
+  __coverPages = new Set(over);
+  if (!over.length) return '';
+  return L('Let op: op ' + pageListText(over, false) + ' is in de marge geen vrije plek, dus daar staat uw paraaf over de tekst. Kijk in het voorbeeld of dat zo kan; de paraaf blijft wel klein.',
+    'Note: on ' + pageListText(over, true) + ' the margin has no free spot, so your paraaf lies over the text there. Check in the preview whether that is acceptable; the paraaf stays small.');
+}
+
+let __visualCopy = { ok: true };
 async function verifyAndRenderDocument(buf, source) {
   const h = toHex(sha3_256(buf));
   __hashMatches = (h === __envelope.doc_hash);
@@ -711,8 +810,17 @@ async function verifyAndRenderDocument(buf, source) {
   }
   await renderDocPreview(buf);
   await decryptPriorInks();
+  __visualCopy = (__hashMatches && isPdfBytes(buf)) ? await visualCopyCheck(buf, __previewPdf ? __previewPdf.numPages : 0) : { ok: true };
+  const notes = [];
+  if (__hashMatches && isPdfBytes(buf) && !__visualCopy.ok) {
+    notes.push(__visualCopy.why === 'encrypted'
+      ? L('Deze pdf is beveiligd met een wachtwoord of een slot van de maker. Uw handtekening geldt voor precies dit bestand, maar er kan geen kopie met zichtbare handtekening of paraaf worden gemaakt. U krijgt het bewijs (.psign) bij het originele bestand.', 'This PDF is locked with a password or an author lock. Your signature binds exactly this file, but no copy with a visible signature or initials can be made. You get the proof (.psign) for the original file.')
+      : L('Deze pdf is beschadigd of onvolledig en kan hier niet goed worden geopend. Uw handtekening geldt voor precies dit bestand, maar er komt geen kopie met zichtbare handtekening of paraaf. U krijgt het bewijs (.psign) bij het originele bestand.', 'This PDF is damaged or incomplete and cannot be opened properly here. Your signature binds exactly this file, but no copy with a visible signature or initials comes out. You get the proof (.psign) for the original file.'));
+  } else if (__hashMatches && isPdfBytes(buf) && hasDigitalSignature(buf)) {
+    notes.push(L('Dit document heeft al een digitale handtekening (bijvoorbeeld van Adobe of een notaris). In de pdf-kopie met de handtekeningen van ParaSign geldt die eerdere handtekening niet meer, want die kopie is een gewijzigd bestand. Het originele document en het bewijs (.psign) blijven ongewijzigd en geldig; bewaar het origineel.', 'This document already carries a digital signature (for example from Adobe or a notary). In the PDF copy with the ParaSign signatures that earlier signature no longer holds, because the copy is a changed file. The original document and the proof (.psign) stay unchanged and valid; keep the original.'));
+  }
   const editor = $('appearance-editor');
-  const editorOn = __hashMatches && isPdfBytes(buf) && Number(__envelope.recipe_version) >= 5 && !__ownerMode && !isResultMode();
+  const editorOn = __hashMatches && isPdfBytes(buf) && __visualCopy.ok && Number(__envelope.recipe_version) >= 5 && !__ownerMode && !isResultMode();
   if (editor) editor.hidden = !editorOn;
   let seeded = false;
   if (editorOn) {
@@ -724,12 +832,15 @@ async function verifyAndRenderDocument(buf, source) {
     __appearanceIsSeed = !!seed;
     seeded = !!seed;
     syncParaafBox();
+    const cover = await paraafCoverNote(__appearance);
+    if (cover) notes.push(cover);
     if (seed) {
       setAppearanceHelp((__pageNote ? __pageNote + ' ' : '') + L('De gemarkeerde plekken zijn voor u: niemand anders tekent daar. Kies Plaats mijn handtekening om de handtekening te verplaatsen. Uw handtekening geldt voor de plek waar u echt tekent.', 'The marked spots are yours: nobody else signs there. Choose Place my signature to move the signature. Your signature binds where you actually sign.'), false);
     } else if (__pageNote) {
       setAppearanceHelp(__pageNote, true);
     }
   }
+  setPdfNote(notes.join(' '));
   renderAppearanceOverlays();
   // The requested spot can be on page three of a long agreement, so pointing at
   // it is not enough: take the reader there, and leave a way back to it.
@@ -942,6 +1053,8 @@ async function computeSeed() {
 
 // ---------- document preview (zero-knowledge: the bytes the signer holds, never the relay) ----------
 async function renderDocPreview(bytes) {
+  __previewPdf = null;
+  __pageSizes = [];
   const host = $('doc-preview');
   host.hidden = false;
   host.innerHTML = '<div class="doc-preview-meta">' + L('Het document wordt getoond...', 'Rendering document...') + '</div>';
@@ -1279,7 +1392,12 @@ function renderAppearanceOverlays() {
       : pages.filter((node) => Number(node.dataset.pageIndex) === Math.min(Number(field.page_index), pages.length - 1));
     for (const page of targets) {
       const layer = page.querySelector('.appearance-layer');
-      if (layer) addAppearanceNode(layer, field, party, current, requested);
+      if (!layer) continue;
+      addAppearanceNode(layer, field, party, current, requested);
+      if (current && field.all_pages && __coverPages.has(Number(page.dataset.pageIndex))) {
+        const node = layer.lastElementChild;
+        if (node) { node.classList.add('over-text'); node.title = L('Geen vrije plek in de marge: deze paraaf staat over tekst.', 'No free spot in the margin: this paraaf lies over text.'); }
+      }
     }
   };
   for (const party of (__envelope?.parties || [])) {
@@ -1318,7 +1436,7 @@ function downloadBytes(bytes, filename, type) {
 // own handwriting. No white box over the text any more: the ink, a hairline
 // and a small caption, the way a signature sits on paper.
 export async function buildSignedPdf(currentResult) {
-  if (!__documentBytes || !isPdfBytes(__documentBytes) || !window.PDFLib) return null;
+  if (!__documentBytes || !isPdfBytes(__documentBytes) || !window.PDFLib || !__visualCopy.ok) return null;
   const records = [];
   for (const party of (__envelope.parties || [])) {
     if (party.status !== 'signed' || !party.appearance) continue;
@@ -1590,7 +1708,7 @@ async function initOwner(resultRef, ownerId) {
     const v = await fetch('/api/user/envelopes/' + encodeURIComponent(envId) + '/owner-view', { credentials: 'include', cache: 'no-store' });
     if (v.status === 401) return showError(L('Log in met het account waarmee u het verzoek verstuurde.', 'Sign in with the account you sent the request from.'));
     if (!v.ok) return showError(L('Dit verzoek is niet gevonden bij uw account.', 'This request was not found on your account.'));
-    __envelope = (await v.json()).envelope;
+    __envelope = withPlainLabels((await v.json()).envelope);
     __partyIndex = -1;
     renderEnvelope();
     showStep('step-cosign');
@@ -1691,7 +1809,7 @@ async function doSign() {
     refreshSignGate();
     return;
   }
-  if (__documentBytes && isPdfBytes(__documentBytes) && Number(__envelope.recipe_version) >= 5 && __appearance.fields.length === 0) {
+  if (__documentBytes && isPdfBytes(__documentBytes) && __visualCopy.ok && Number(__envelope.recipe_version) >= 5 && __appearance.fields.length === 0) {
     if (!confirm(L('Ondertekenen zonder zichtbare handtekening in het document? Uw cryptografische handtekening wordt wel vastgelegd.', 'Sign without a visible mark on the PDF? Your cryptographic signature will still be recorded.'))) return;
   }
   $('sign-confirm').disabled = true;

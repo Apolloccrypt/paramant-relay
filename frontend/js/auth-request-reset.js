@@ -14,6 +14,10 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     submitBtn.textContent = nlEn('Bezig met versturen...', 'Sending...');
 
     const email = document.getElementById('email').value.trim();
+    // Required by the server since the mailbox alone stopped being enough
+    // (admin request-totp-reset: backup_code). Without one, support only.
+    const backupEl = document.getElementById('backup-code');
+    const backupCode = backupEl ? backupEl.value.trim().toUpperCase() : '';
 
     try {
       // Solve PoW challenge
@@ -32,7 +36,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       const res = await fetch('/api/user/auth/request-totp-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, challenge_id: proof.challenge_id, nonce: proof.nonce }),
+        body: JSON.stringify({ email, backup_code: backupCode, challenge_id: proof.challenge_id, nonce: proof.nonce }),
         credentials: 'include',
       });
 
@@ -41,8 +45,17 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         successDiv.style.display = 'block';
         const safeEmail = email.replace(/[&<>"]/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; });
         successDiv.innerHTML = nlEn(
-          '<p>Bestaat er een account voor <strong>' + safeEmail + '</strong>, dan is er een bevestigingsmail onderweg. Kijk in uw inbox, en in de map met ongewenste mail. De afzender is noreply@paramant.app.</p><p style="margin-top:8px">Die eerste mail bevestigt alleen het verzoek, en de link werkt 60 minuten. Zodra u hem opent, sturen wij de tweede mail met de link waarmee u een nieuwe authenticator-app koppelt. Die werkt 14 dagen.</p><p style="margin-top:8px">Wij zeggen niet of het adres bekend is, dus dit bericht ziet er altijd hetzelfde uit.</p>',
-          '<p>If an account exists for <strong>' + safeEmail + '</strong>, a confirmation email is on its way. Look in your inbox, and in the spam folder. The sender is noreply@paramant.app.</p><p style="margin-top:8px">That first mail only confirms the request, and its link is valid for 60 minutes. Once you open it, we send the second mail with the link that links a new authenticator app; that one works for 14 days.</p><p style="margin-top:8px">We do not say whether the address is registered, so this message looks the same either way.</p>');
+          '<p>Bestaat er een account voor <strong>' + safeEmail + '</strong>, dan is er een bevestigingsmail onderweg. Kijk in uw inbox, en in de map met ongewenste mail. De afzender is noreply@paramant.app.</p><p style="margin-top:8px">Die eerste mail bevestigt alleen het verzoek, en de link werkt 60 minuten. Zodra u hem opent, sturen wij de tweede mail met de link waarmee u een nieuwe authenticator-app koppelt. Die werkt twee dagen.</p><p style="margin-top:8px">Wij zeggen niet of het adres bekend is, dus dit bericht ziet er altijd hetzelfde uit.</p>',
+          '<p>If an account exists for <strong>' + safeEmail + '</strong>, a confirmation email is on its way. Look in your inbox, and in the spam folder. The sender is noreply@paramant.app.</p><p style="margin-top:8px">That first mail only confirms the request, and its link is valid for 60 minutes. Once you open it, we send the second mail with the link that links a new authenticator app; that one works for two days.</p><p style="margin-top:8px">We do not say whether the address is registered, so this message looks the same either way.</p>');
+      } else if (res.status === 400 || res.status === 401) {
+        // 400 backup_code_required, 401 invalid_credentials: the same answer for
+        // an unknown address and a wrong code, so nothing is enumerated.
+        errorDiv.textContent = res.status === 400
+          ? nlEn('Vul een back-upcode in. Heeft u er geen meer, mail dan vanaf het adres van uw account naar privacy@paramant.app; support herstelt de toegang.', 'Enter a back-up code. If you have none left, mail privacy@paramant.app from your account address; support restores access.')
+          : nlEn('Dit e-mailadres en deze back-upcode horen niet bij elkaar, of de code is al gebruikt. Er is niets veranderd. Controleer beide en probeer het opnieuw, of mail privacy@paramant.app.', 'This email address and back-up code do not match, or the code was already used. Nothing changed. Check both and try again, or mail privacy@paramant.app.');
+        errorDiv.classList.add('visible');
+        submitBtn.disabled = false;
+        submitBtn.textContent = nlEn('Resetlink versturen', 'Send reset link');
       } else if (res.status === 429) {
         // server.js returns retry_after 86400 here: 5 requests per address per
         // 24 hours, 10 per connection per hour. Telling the reader to try again

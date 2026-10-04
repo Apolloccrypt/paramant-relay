@@ -19,10 +19,10 @@ import { vaultDelete } from '/vendor/vault.js?v=5';
 import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=2';
 import { previewTargetWidth, viewportTargetWidth, renderGeneration } from '/js/preview-render.js?v=1';
 import { initialsFrom, planParaafs, textBoxesFromItems, inkBoxesFromImageData, paraafFooter, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes, paraafInset } from '/js/paraaf-place.js?v=5';
-import { requestsForParties } from '/js/cosign-layout.js?v=4';
+import { requestsForParties, pageListText } from '/js/cosign-layout.js?v=5';
 import { saveDraft, loadDraft, clearDraft, loadAccountKey } from '/js/sign-draft.js?v=4';
 import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
-import { splitKey, keyShareFragment, b64url as keyB64url, fromB64url as keyFromB64url } from '/js/parasign-ink.js?v=3';
+import { splitKey, keyShareFragment, b64url as keyB64url, fromB64url as keyFromB64url } from '/js/parasign-ink.js?v=4';
 
 // One file, two languages. /sign is Dutch and /en/sign is the English copy of
 // the same page; both load this script, and the page's own lang attribute picks
@@ -642,7 +642,7 @@ function applyModeCopy(mode) {
     set('#step-doc .ds-sub', L('ParaSign ondertekent pdf-bestanden. Kies een pdf en zet uw stempel op een pagina naar keuze. Het bestand blijft in deze browser.', 'ParaSign signs PDF files. Choose a PDF and put your stamp on a page of your choice. The file stays in this browser.'));
     set('#step-recipients h2', L('Medeondertekenaars toevoegen (optioneel)', 'Add co-signers (optional)'));
     set('.ds-stepper li[data-step="recipients"]', L('Medeondertekenaars', 'Co-signers'));
-    set('#step-recipients > .ds-sub', L('Voeg iedereen toe die moet meetekenen. De uitnodiging is gebonden aan precies het e-mailadres hieronder. Na uw handtekening krijgt u voor ieder een eigen link, die u zelf doorgeeft.', 'Add everyone who needs to co-sign. Each invitation is bound to the exact email address below. After you sign you get a link for each person, which you pass on yourself.'));
+    set('#step-recipients > .ds-sub', L('Voeg iedereen toe die moet meetekenen. U tekent eerst; daarna krijgt ieder per e-mail een eigen uitnodiging die het document met uw handtekening opent zodra hij of zij inlogt met precies dit e-mailadres.', 'Add everyone who needs to co-sign. You sign first; then each person gets an invitation by email that opens the document with your signature once they sign in with exactly this address.'));
   }
 }
 
@@ -653,12 +653,14 @@ function enterRecipients() {
   if (cont) { cont.textContent = (state.signingMode === 'invite') ? L('Versturen om te laten tekenen', 'Send for signature') : L('Verder', 'Continue'); cont.disabled = false; }
   const hint = $('ds-recipients-hint'); if (hint) hint.hidden = true;
   const delivery = $('ds-invite-delivery');
-  if (delivery) delivery.hidden = state.signingMode !== 'invite';
+  // Both setups with other signers deliver the same way: one invitation per
+  // person that opens the document after sign-in (COSIGN-02).
+  if (delivery) delivery.hidden = state.signingMode !== 'invite' && state.signingMode !== 'cosign';
   // The default subject used to be 'Please sign: ' + the filename, which posted
   // the filename to a mail provider outside the EU without the sender ever
   // deciding to. A filename is content. The default says nothing about the file;
   // the sender can still type whatever they like in a field they can see.
-  if (state.signingMode === 'invite' && !state.inviteSubject && state.doc) {
+  if ((state.signingMode === 'invite' || state.signingMode === 'cosign') && !state.inviteSubject && state.doc) {
     state.inviteSubject = L('Verzoek om te ondertekenen / Signature requested', 'Signature requested');
     const subject = $('ds-invite-subject'); if (subject) subject.value = state.inviteSubject;
   }
@@ -691,31 +693,52 @@ function noticeUrl(signPath) {
 // a slot of its own beside or under it for every next one, plus (with "every
 // page" on) a paraaf per party side by side in the margin. One box for all
 // parties made every signature land on the same spot (2026-10-04).
-async function partyRequests(base) {
-  if (state.mode !== 'pdf') return null;
+async function partyRequests(base, { bytes = state.doc && state.doc.bytes, count = state.recipients.length, skipFirst = false } = {}) {
+  state.paraafCoveredPages = [];
+  if (state.mode !== 'pdf' || !bytes) return null;
   const noBox = !base || !base.fields || !base.fields.length;
   if (noBox && !state.stampAllPages) return null;
   // The parafen are placed against the text of every page: wait for it, a
   // missing text layer here once meant parafen slid over the last line.
-  if (state.stampAllPages) { try { await loadTextBoxes(state.doc.bytes); } catch { /* bottom right */ } }
+  if (state.stampAllPages) { try { await loadTextBoxes(bytes); } catch { /* bottom right */ } }
   const anchor = noBox ? null : base.fields[0];
   // Every page of the document, also those past the preview: the sizes pdf.js
   // read with the text, else the rendered pages.
-  const geoms = (_textBoxCache && _textBoxCache.bytes === state.doc.bytes) ? _textBoxCache.geoms : [];
+  const geoms = (_textBoxCache && _textBoxCache.bytes === bytes) ? _textBoxCache.geoms : [];
   const pages = geoms.length && geoms.every(Boolean)
     ? geoms.map((g) => viewSize(g))
     : (placeState && Array.isArray(placeState.pages))
       ? placeState.pages.map((p) => ({ width: p.wrap._pdfPage.width, height: p.wrap._pdfPage.height }))
       : [];
   try {
-    const reqs = requestsForParties({
-      anchor, signPage: anchor ? anchor.page_index : 0, count: state.recipients.length,
-      withParaaf: !!state.stampAllPages, pages, textBoxesPerPage: textBoxesIfReady(state.doc.bytes),
+    const all = requestsForParties({
+      anchor, signPage: anchor ? anchor.page_index : 0, count: count + (skipFirst ? 1 : 0),
+      withParaaf: !!state.stampAllPages, pages, textBoxesPerPage: textBoxesIfReady(bytes),
     });
+    state.paraafCoveredPages = all.paraafCoveredPages || [];
+    // "Samen ondertekenen": slot 0 is the sender, who signed on the box itself.
+    const reqs = skipFirst ? all.slice(1) : all;
     // No box pointed at, only "a paraaf on every page": each party gets the
     // paraaf and finds its own signature spot on /co-sign.
     return noBox ? reqs.map((r) => ({ version: 2, fields: r.fields.filter((f) => f.all_pages) })) : reqs;
   } catch { return null; }
+}
+
+// No margin was free on every page, so a paraaf lies over text there. Said
+// out loud, never silent (PDF sweep B1): the pages, and what the reader can do.
+function paraafCoveredNotice() {
+  const pages = state.paraafCoveredPages || [];
+  if (!pages.length) return '';
+  return L('Let op: op ' + pageListText(pages, false) + ' is in de marge geen vrije plek voor alle parafen. Daar staat een paraaf over de tekst. Wilt u dat niet, maak dan de marge van het document ruimer of vraag geen paraaf op elke pagina.',
+    'Note: on ' + pageListText(pages, true) + ' the margin has no free spot for every paraaf, so a paraaf lies over the text there. If you do not want that, widen the document margin or do not ask for initials on every page.');
+}
+
+// The recipient row behind a party of the envelope. "Handtekeningen vragen"
+// has recipients only (party i = row i); "Samen ondertekenen" has the sender
+// as party 0, so party i is row i - 1. Null for the sender.
+function recipientOfParty(partyIndex) {
+  const i = state.signingMode === 'invite' ? partyIndex : partyIndex - 1;
+  return i >= 0 ? (state.recipients[i] || null) : null;
 }
 
 async function deliverInviteEmails(partyIndexes) {
@@ -723,11 +746,12 @@ async function deliverInviteEmails(partyIndexes) {
   if (!mp) throw new Error(L('Het verzoek om te ondertekenen is niet beschikbaar.', 'The signing request is unavailable.'));
   const wanted = Array.isArray(partyIndexes) ? new Set(partyIndexes) : null;
   const invitations = mp.party_links
-    .filter((p) => !wanted || wanted.has(p.party_index))
+    // "Samen ondertekenen": party 0 is the sender, who has signed already.
+    .filter((p) => recipientOfParty(p.party_index) && (!wanted || wanted.has(p.party_index)))
     .map((p) => ({
       party_index: p.party_index,
-      email: state.recipients[p.party_index]?.email || '',
-      label: state.recipients[p.party_index]?.label || '',
+      email: recipientOfParty(p.party_index)?.email || '',
+      label: recipientOfParty(p.party_index)?.label || '',
       invite_url: noticeUrl(p.sign_path),
     }));
   const response = await fetch('/api/user/envelopes/' + encodeURIComponent(mp.envelope_id) + '/invitations', {
@@ -750,6 +774,75 @@ function showRecipientsHint(msg, isErr) {
   el.textContent = msg; el.hidden = false; el.className = isErr ? 'ds-banner err' : 'ds-banner';
 }
 
+// The document every invited party opens, encrypted in this browser and
+// uploaded as an opaque capsule. The key is split: half B goes to the relay
+// with the ciphertext, half A into the invitation links (state.keyShareFragment,
+// see noticeUrl). The whole key stays in the sender's own links and on this
+// device, for the sender's result page. Shared by "Handtekeningen vragen"
+// (sendForSignature) and "Samen ondertekenen" (after the sender signed): the
+// second used to make an envelope with no capsule at all, so nobody it named
+// could open the document (matrix COSIGN-02, 2026-10-04).
+// Returns { fragment } (the whole key as '#doc=v1.<key>').
+async function shareEncryptedDocument({ envelopeId, bytes, filename, mime, docHash, onUpload }) {
+  const encrypted = await encryptDocumentCapsule({ bytes, filename, mime, envelopeId, docHash });
+  if (onUpload) onUpload();
+  const wholeKey = keyFromB64url(String(encrypted.fragment).replace(/^#doc=v1\./, ''));
+  const shares = splitKey(wholeKey);
+  wholeKey.fill(0);
+  state.keyShareFragment = keyShareFragment(shares.a);
+  const keyShareB = keyB64url(shares.b);
+  shares.a.fill(0); shares.b.fill(0);
+  // Kept only as long as needed: until the request has run its course (the
+  // result page shortens it once everyone signed), wiped on sign-out or when
+  // another account signs in here (nav-auth.js; security review r2 a3).
+  try {
+    const exp = Date.now() + 31 * 864e5;
+    localStorage.setItem('paramant.cosign.key.v1:' + envelopeId, JSON.stringify({ f: encrypted.fragment, exp }));
+  } catch { /* storage off: the sender opens the original file instead */ }
+  let upload;
+  try {
+    upload = await fetch('/api/user/envelopes/' + encodeURIComponent(envelopeId) + '/document', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-Capsule-Sha256': encrypted.capsuleSha256,
+        'X-Document-Key-Share': keyShareB,
+      },
+      body: encrypted.capsule,
+    });
+  } finally {
+    encrypted.capsule.fill(0);
+  }
+  const uploadBody = await upload.json().catch(() => ({}));
+  if (!upload.ok) {
+    state.keyShareFragment = '';
+    const tooLarge = uploadBody.error === 'document_too_large' || uploadBody.error === 'payload_too_large' || upload.status === 413;
+    const err = new Error(tooLarge
+      ? L('Dit document is te groot om versleuteld mee te sturen (maximaal 5 MB).', 'This document is too large for encrypted co-sign delivery (maximum 5 MB).')
+      : (uploadBody.error || L('Het versleutelde document kon niet worden opgeslagen.', 'Could not store the encrypted document.')));
+    err.status = upload.status;
+    throw err;
+  }
+  return { fragment: encrypted.fragment };
+}
+
+// The largest document that travels encrypted with a request: the relay
+// stores a capsule of at most MAX_BLOB (5 MB) plus a small header. Checked
+// BEFORE the request is made: a scan of 6 MB used to create the request,
+// fail the upload with "payload_too_large", and tell the sender to "try again
+// in a moment", which could never work (PDF sweep B4).
+const SHARE_MAX_BYTES = 5 * 1024 * 1024;
+function tooLargeToShare(bytes) {
+  const n = bytes ? bytes.length : 0;
+  if (n <= SHARE_MAX_BYTES) return null;
+  const mb = (n / (1024 * 1024)).toFixed(1).replace('.', EN ? '.' : ',');
+  const e = new Error(L('Dit document is ' + mb + ' MB. Versleuteld meesturen met een verzoek kan tot 5 MB. Maak de pdf kleiner (bijvoorbeeld opnieuw scannen op 150 dpi, of de functie pdf verkleinen van uw pdf-programma) en probeer het daarna opnieuw. Er is nog niets aangemaakt of verstuurd.',
+    'This document is ' + mb + ' MB. Sending it encrypted with a request works up to 5 MB. Make the PDF smaller (for example rescan at 150 dpi, or use the reduce-size function of your PDF app) and try again. Nothing has been created or sent yet.'));
+  e.code = 'document_too_large';
+  return e;
+}
+
 // Invite-to-sign: the requester coordinates but is not a signer. The envelope
 // therefore contains recipients only. Its document is encrypted in this browser
 // and uploaded as an opaque capsule. The key is appended to each personal link
@@ -759,6 +852,7 @@ async function sendForSignature() {
   if (cont) cont.disabled = true;
   showRecipientsHint(L('Het verzoek wordt aangemaakt…', 'Creating the signing request…'), false);
   try {
+    { const big = tooLargeToShare(state.doc.bytes); if (big) throw big; }
     const docHashForEnvelope = toHex(sha3_256(state.doc.bytes));
     // The box the requester placed, and from it a spot of its own for every
     // party. Absent when the requester placed nothing, or for a non-PDF. The
@@ -782,53 +876,10 @@ async function sendForSignature() {
       : state.imageType === 'png' ? 'image/png'
       : state.imageType === 'jpg' ? 'image/jpeg'
       : 'application/octet-stream';
-    const encrypted = await encryptDocumentCapsule({
-      bytes: state.doc.bytes,
-      filename: state.doc.name,
-      mime,
-      envelopeId: envelope.id,
-      docHash: docHashForEnvelope,
+    const encrypted = await shareEncryptedDocument({
+      envelopeId: envelope.id, bytes: state.doc.bytes, filename: state.doc.name, mime, docHash: docHashForEnvelope,
+      onUpload: () => showRecipientsHint(L('Het versleutelde document wordt geüpload…', 'Uploading the encrypted document…'), false),
     });
-    showRecipientsHint(L('Het versleutelde document wordt geüpload…', 'Uploading the encrypted document…'), false);
-    // Split the key: half B goes to the relay with the ciphertext, half A into
-    // the invitation links. The whole key stays in the sender's own links and
-    // on this device, for the sender's result page.
-    const wholeKey = keyFromB64url(String(encrypted.fragment).replace(/^#doc=v1\./, ''));
-    const shares = splitKey(wholeKey);
-    wholeKey.fill(0);
-    state.keyShareFragment = keyShareFragment(shares.a);
-    const keyShareB = keyB64url(shares.b);
-    shares.a.fill(0); shares.b.fill(0);
-    // Kept only as long as needed: until the request has run its course (the
-    // result page shortens it once everyone signed), wiped on sign-out or when
-    // another account signs in here (nav-auth.js; security review r2 a3).
-    try {
-      const exp = Date.now() + 31 * 864e5;
-      localStorage.setItem('paramant.cosign.key.v1:' + envelope.id, JSON.stringify({ f: encrypted.fragment, exp }));
-    } catch { /* storage off: the sender opens the original file instead */ }
-    let upload;
-    try {
-      upload = await fetch('/api/user/envelopes/' + encodeURIComponent(envelope.id) + '/document', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/octet-stream',
-          'X-Capsule-Sha256': encrypted.capsuleSha256,
-          'X-Document-Key-Share': keyShareB,
-        },
-        body: encrypted.capsule,
-      });
-    } finally {
-      encrypted.capsule.fill(0);
-    }
-    const uploadBody = await upload.json().catch(() => ({}));
-    if (!upload.ok) {
-      const err = new Error(uploadBody.error === 'document_too_large'
-        ? L('Dit document is te groot om versleuteld mee te sturen (maximaal 5 MB).', 'This document is too large for encrypted co-sign delivery (maximum 5 MB).')
-        : (uploadBody.error || L('Het versleutelde document kon niet worden opgeslagen.', 'Could not store the encrypted document.')));
-      err.status = upload.status;
-      throw err;
-    }
     envelope.party_links = (envelope.party_links || []).map((p) => ({
       ...p,
       sign_path: p.sign_path + encrypted.fragment,
@@ -863,6 +914,35 @@ async function sendForSignature() {
     if (cont) cont.disabled = false;
     if (e && e.status === 401) { showSessionLost($('ds-recipients-hint')); return; }
     showRecipientsHint(readableError(e, L('Het verzoek kon niet worden aangemaakt. Probeer het zo nog eens.', 'Could not create the request. Please try again in a moment.')), true);
+  }
+}
+
+// After the sender signed in "Samen ondertekenen": upload the document as the
+// co-signers will open it and send the invitations. A failure here does not
+// undo the signature; the end screen says what did not happen and what to do.
+async function shareCosignDocument(env, mp, bytes, docHash) {
+  state.cosignShareError = '';
+  state.inviteDelivery = null;
+  const status = (m) => { const el = $('ds-sign-status'); if (el) { el.className = 'ds-banner'; el.textContent = m; } };
+  try {
+    status(L('Het document wordt versleuteld voor de medeondertekenaars…', 'Encrypting the document for the co-signers…'));
+    const mime = state.mode === 'pdf' ? 'application/pdf'
+      : state.mode === 'image' ? signedDocMime()
+      : 'application/octet-stream';
+    const name = state.mode === 'pdf' || state.mode === 'image' ? signedDocName() : state.doc.name;
+    const encrypted = await shareEncryptedDocument({
+      envelopeId: env.id, bytes, filename: name, mime, docHash,
+      onUpload: () => status(L('Het versleutelde document wordt geüpload…', 'Uploading the encrypted document…')),
+    });
+    mp.party_links = (mp.party_links || []).map((p) => ({ ...p, sign_path: p.sign_path + encrypted.fragment }));
+    if (state.deliveryMode !== 'copy') {
+      status(L('De persoonlijke uitnodigingen worden gemaild…', 'Sending personal email invitations…'));
+      state.inviteDelivery = await deliverInviteEmails();
+    }
+  } catch (e) {
+    state.keyShareFragment = '';
+    state.inviteDelivery = null;
+    state.cosignShareError = readableError(e, L('Het versleutelde document kon niet worden opgeslagen.', 'Could not store the encrypted document.'));
   }
 }
 
@@ -3907,9 +3987,21 @@ async function doSign() {
     //    every signature goes through the per-document activation gate (R018) —
     //    no separate weaker self-sign route.
     status(L('Dit document wordt klaargezet om te ondertekenen...', 'Preparing this document for signing...'));
+    // "Samen ondertekenen": every co-signer gets a spot of their own beside the
+    // sender's box, and the paraaf on every page when the sender put one on
+    // every page, read against the document they will actually open (the one
+    // with the sender's seal on it).
+    const cosignWithOthers = state.signingMode === 'cosign' && state.recipients.length > 0;
+    // Too large to send along: stop before anything is created or signed.
+    if (cosignWithOthers) { const big = tooLargeToShare(stampedBytes || state.doc.bytes); if (big) throw big; }
+    const coBase = cosignWithOthers && state.mode === 'pdf' && (state.sealPlacement || 'inline') === 'inline'
+      ? requestedAppearanceFromStamp(state.stamp, state.stampPage) : null;
+    const coRequests = cosignWithOthers && state.mode === 'pdf'
+      ? await partyRequests(coBase, { bytes: stampedBytes, count: state.recipients.length, skipFirst: true })
+      : null;
     const created = await createSigningEnvelope({
       docHash: docHashForEnvelope,
-      recipients: state.recipients,
+      recipients: coRequests ? state.recipients.map((r, i) => ({ ...r, requested_appearance: coRequests[i] })) : state.recipients,
       originalFilename: state.mode === 'pdf' ? 'signed-' + state.doc.name : state.doc.name,
       signerLabel: state.signer.name,
       creatorPublicKey: signKey.pk_b64,
@@ -3987,6 +4079,12 @@ async function doSign() {
     }
 
     state.result = { stampedBytes, envelope, fingerprint, quota: submitted.quota };
+    // "Samen ondertekenen": the others open the document the sender just
+    // signed, the same way "Handtekeningen vragen" delivers it (encrypted
+    // capsule, split key, one invitation each). It used to stop here: no
+    // capsule and no mail, while the end screen said the key was in the link
+    // (matrix COSIGN-02). The signature above stands whatever happens next.
+    if (cosignWithOthers) await shareCosignDocument(env, mp, stampedBytes || state.doc.bytes, docHashForEnvelope);
     showDone();
   } catch (e) {
     // Zeroize any unconsumed ephemeral secret (error before it was handed to the signer).
@@ -4026,7 +4124,7 @@ async function doSign() {
     // Already translated by the signer (js/error-message.js): the message on
     // this error is our own vetted sentence with a next step, never the wire's
     // "http_502" or a browser's TypeError text. The detail is in the console.
-    else if (e && e.code === 'service_error') msg = e.message;
+    else if (e && (e.code === 'service_error' || e.code === 'document_too_large')) msg = e.message;
     else if (e && e.code === 'bake_failed') msg = e.bakeKind === 'encrypted'
       ? L('Deze pdf is beveiligd tegen wijzigen, dus er kan geen zichtbare handtekening op. Er is niets ondertekend. Kies het bestand opnieuw: ParaSign ondertekent het dan via de hash, zonder zichtbare stempel.', 'This PDF is protected against changes, so it cannot carry a visible signature. Nothing was signed. Pick the file again: ParaSign then signs it by its hash, without a visible seal.')
       : e.bakeKind === 'image'
@@ -4405,8 +4503,30 @@ function renderPartyLinks(mp) {
   const result = $('ds-invite-delivery-result');
   const retry = $('ds-invite-retry');
   const deliveryByParty = new Map((state.inviteDelivery?.results || []).map((item) => [item.party_index, item]));
+  // What these links do, in the words of what actually happened. It used to
+  // say "the key is in the link" on every screen, also when no document had
+  // been sent along at all (matrix COSIGN-02).
+  const copyLine = $('ds-party-links-copy');
+  if (copyLine) {
+    copyLine.textContent = state.cosignShareError
+      ? L('Deze links openen het verzoek, maar niet het document: dat kon niet worden meegestuurd. Stuur iedereen zelf de getekende pdf (Getekende pdf downloaden). Op de eigen pagina kiest ieder dat bestand en tekent dan.', 'These links open the request, but not the document: it could not be sent along. Send everyone the signed PDF yourself (Download signed PDF). On their own page each person chooses that file and then signs.')
+      : L('Eén link per persoon. Die opent het document na inloggen; geef hem alleen aan die persoon.', 'One link per person. It opens the document after sign-in; give it to that person only.');
+  }
+  const covered = paraafCoveredNotice();
+  let coveredEl = $('ds-paraaf-covered');
+  if (covered && !coveredEl && copyLine) {
+    coveredEl = document.createElement('div');
+    coveredEl.id = 'ds-paraaf-covered';
+    coveredEl.className = 'ds-banner err';
+    coveredEl.setAttribute('role', 'status');
+    copyLine.parentNode.insertBefore(coveredEl, copyLine.nextSibling);
+  }
+  if (coveredEl) { coveredEl.hidden = !covered; coveredEl.textContent = covered; }
   if (result) {
-    if (state.deliveryMode === 'copy') {
+    if (state.cosignShareError) {
+      result.hidden = false; result.className = 'ds-banner err';
+      result.textContent = L('Uw handtekening staat. Alleen het document kon niet versleuteld worden meegestuurd: ', 'Your signature stands. Only the document could not be sent along encrypted: ') + state.cosignShareError + L(' Er is daarom geen e-mail verstuurd.', ' No email was sent for that reason.');
+    } else if (state.deliveryMode === 'copy') {
       result.hidden = false; result.className = 'ds-banner';
       result.textContent = L('Er is geen e-mail verstuurd. Stuur iedereen zelf de eigen link.', 'No email was sent. Send each person their link yourself.');
     } else if (state.inviteDelivery?.ok) {
