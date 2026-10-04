@@ -5290,7 +5290,31 @@ function requireSameOrigin(req, res, next) {
   console.warn('[csrf] refused', req.method, req.originalUrl, v.reason);
   return res.status(403).json({ error: 'csrf_origin', message: 'This request did not come from paramant.app.' });
 }
-app.use(`${BASE_PATH}/api`, requireSameOrigin);
+// ── CORS for the Outlook add-in, strictly ───────────────────────────────────
+// The add-in runs on https://addin.paramant.app and needs to sign in (password
+// + TOTP) and get a ParaSend token from inside Outlook. ONLY that origin (plus
+// ADDIN_ORIGINS for a self-host), ONLY these routes, with credentials because
+// the session is a cookie (addin.paramant.app is same-site with paramant.app,
+// so SameSite=Lax lets it travel). Everything else stays same-origin only.
+const ADDIN_ORIGINS = new Set(['https://addin.paramant.app',
+  ...String(process.env.ADDIN_ORIGINS || '').split(',').map((x) => x.trim()).filter((x) => /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(x))]);
+const ADDIN_CORS_PATHS = new Set(['/user/login', '/user/login-with-backup', '/user/session/verify', '/user/parasend/token', '/user/logout']);
+app.use(`${BASE_PATH}/api`, (req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin || !ADDIN_ORIGINS.has(origin) || !ADDIN_CORS_PATHS.has(req.path)) return next();
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Vary', 'Origin');
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Max-Age', '600');
+    return res.status(204).end();
+  }
+  req._addinCors = true;
+  next();
+});
+app.use(`${BASE_PATH}/api`, (req, res, next) => (req._addinCors ? next() : requireSameOrigin(req, res, next)));
 
 app.use(`${BASE_PATH}/api`, api);
 // /cli -- web debug terminal page (served before the SPA wildcard fallback).

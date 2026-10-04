@@ -132,6 +132,8 @@ const SCOPE = [
   // take it straight away instead of the relay holding the whole file
   // (SENDNAME-29-K: every announce got 403 here).
   { method: 'POST', re: /^\/v2\/session\/inv_[a-zA-Z0-9]{32}\/manifest$/ },
+  // Saying no after comparing fingerprints, so the receiver stops waiting.
+  { method: 'POST', re: /^\/v2\/session\/inv_[a-zA-Z0-9]{32}\/reject$/ },
 ];
 
 // ── The second purpose: the signed-in app pages ──────────────────────────────

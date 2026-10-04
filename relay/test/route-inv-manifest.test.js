@@ -46,3 +46,18 @@ test('sender announces with his key, receiver reads without one, a stranger cann
   await srv.stop();
   checks++;
 });
+
+test('the sender says no: the receiver reading _ready or the manifest gets 410 handover_rejected', async () => {
+  const srv = await boot({ tag: 'invrej', users: { api_keys: [{ key: KEY, plan: 'pro', active: true, email: 'a@example.test', account_id: 'acct_inv_a' }] } });
+  const inv = 'inv_' + crypto.randomBytes(16).toString('hex');
+  assert.ok(st.scopeAllows('POST', `/v2/session/${inv}/reject`), 'a pst_ token may say no');
+  assert.strictEqual((await srv.post(`/v2/session/${inv}/reject`, { body: {} })).status, 401, 'not without a credential');
+  const r = await srv.post(`/v2/session/${inv}/reject`, { headers: { 'X-Api-Key': KEY }, body: {} });
+  assert.strictEqual(r.status, 200, r.text);
+  const ready = await srv.get(`/v2/pubkey/${inv}_ready`);
+  assert.strictEqual(ready.status, 410);
+  assert.strictEqual(ready.json.error, 'handover_rejected');
+  assert.strictEqual((await srv.get(`/v2/session/${inv}/manifest`)).status, 410);
+  await srv.stop();
+  checks++;
+});

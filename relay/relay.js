@@ -1592,7 +1592,7 @@ function _notifyDownloaded(entry, hash, opts) {
     const ownerKd = entry.apiKey ? apiKeys.get(entry.apiKey) : null;
     const once = entry.file_id ? !_alGemeld(entry.account_id, 'dl:' + entry.file_id) : true;
     if (once && !(opts && opts.skipMail)) {
-      transferNotify.maybeNotify({ keyData: ownerKd, event: 'download', hashPrefix: hash, bytes: entry.size || 0, sendEmail: mailLater });
+      transferNotify.maybeNotify({ keyData: ownerKd, event: 'download', hashPrefix: hash, bytes: entry.size || 0, sendEmail: mailLater, lang: entry.lang || '' });
     }
     if (entry.device_id && entry.apiKey) {
       pushWebhooks(entry.apiKey, entry.device_id, 'blob_downloaded', { hash, size: entry.size || 0, via: (opts && opts.via) || 'link' }).catch(() => {});
@@ -2516,6 +2516,7 @@ const relayRegisterIpRequests = new Map(); // ip → [timestamps] for /v2/relays
 const teamRateLimits = new Map(); // team_id → { count, resetAt }
 // Streaming manifests of live inv_ hand-overs: inv id -> { owner, total, tokens, meta, expires }.
 const invManifests = new Map();
+const invRejections = new Map(); // inv id -> expires (ms)
 const INV_MANIFEST_TTL_MS = 60 * 60 * 1000;
 const INV_MANIFEST_MAX = 5000;
 setInterval(() => { const now = Date.now(); for (const [k, m] of invManifests) if (now > m.expires) invManifests.delete(k); }, 60000).unref();
@@ -7773,8 +7774,29 @@ async function handleRelayRequest(req, res) {
   // sender's credential and the first writer owns it; reading needs only the
   // inv_ id, which is the capability, and the tokens it lists are useless
   // without the receiver's private key.
+  // POST /v2/session/inv_<id>/reject -- the sender compared the fingerprint
+  // and said no. The receiver used to keep waiting on "read this code to the
+  // sender" until the ten-minute limit (SENDNAME-28-A); the stopgap was an
+  // empty `_ready` record. This is the honest signal: the inv_ id is marked
+  // rejected, and the receiver's next read of the `_ready` slot or of the
+  // manifest answers 410 handover_rejected. Sender's credential required, the
+  // same one that registered nothing on the inv_ slot: only the side that
+  // compares fingerprints can say no.
+  const invRejm = path.match(/^\/v2\/session\/(inv_[a-zA-Z0-9]{32})\/reject$/);
+  if (invRejm && req.method === 'POST') {
+    if (!keyData?.active) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Valid API key required' })); }
+    if (invRejections.size >= INV_MANIFEST_MAX) for (const [k, t] of invRejections) if (Date.now() > t) invRejections.delete(k);
+    invRejections.set(invRejm[1], Date.now() + INV_MANIFEST_TTL_MS);
+    invManifests.delete(invRejm[1]);
+    log('info', 'handover_rejected', { inv: invRejm[1].slice(0, 8) });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(J({ ok: true, rejected: true }));
+  }
+  const _invRejected = (inv) => { const t = invRejections.get(inv); if (!t) return false; if (Date.now() > t) { invRejections.delete(inv); return false; } return true; };
+
   const invMfm = path.match(/^\/v2\/session\/(inv_[a-zA-Z0-9]{32})\/manifest$/);
   if (invMfm && req.method === 'GET') {
+    if (_invRejected(invMfm[1])) { res.writeHead(410, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'handover_rejected' })); }
     const m = invManifests.get(invMfm[1]);
     if (!m || Date.now() > m.expires) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(J({ ok: true, total: 0, chunks: [], complete: false })); }
     const chunks = [...m.tokens.entries()].sort((a, b) => a[0] - b[0]).map(([index, token]) => ({ index, token }));
@@ -7827,6 +7849,12 @@ async function handleRelayRequest(req, res) {
     if (!INVITE_RE.test(deviceId) && !keyData?.active) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Invalid API key', hint: 'X-Api-Key: pgp_...' }));
+    }
+    // A rejected hand-over (POST /v2/session/inv_<id>/reject): the receiver
+    // polling the `_ready` slot learns it now instead of at the time limit.
+    if (INVITE_RE.test(deviceId) && _invRejected(deviceId.replace(/_ready$/, ''))) {
+      res.writeHead(410, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'handover_rejected' }));
     }
     // Invite sessions: stored and retrieved without API key
     const _pkKey = INVITE_RE.test(deviceId) ? deviceId : `${deviceId}:${acctOf(apiKey)}`;
@@ -8607,6 +8635,7 @@ async function handleRelayRequest(req, res) {
         // which file a block belongs to so one file mails once.
         device_id: (meta && typeof meta.device_id === 'string') ? meta.device_id.slice(0, 128) : null,
         file_id: (meta && meta.file_id) ? String(meta.file_id).slice(0, 128) : null,
+        lang: (meta && (meta.lang === 'nl' || meta.lang === 'en')) ? meta.lang : '',
         sig_valid: sigResult.valid, apiKey, max_views: maxViews, views_remaining: maxViews, pw_hash,
         sector: SECTOR,
         ct_entry: {
@@ -8642,7 +8671,7 @@ async function handleRelayRequest(req, res) {
       // Remembered in memory as well, so it holds without redis (the quota
       // gate fails open there and cannot say "already counted").
       if (!_volgblok && !_alGemeld(acctOf(apiKey), meta && meta.file_id)) {
-        transferNotify.maybeNotify({ keyData, event: 'upload', hashPrefix: hash, bytes: blob.length, sendEmail: mailLater });
+        transferNotify.maybeNotify({ keyData, event: 'upload', hashPrefix: hash, bytes: blob.length, sendEmail: mailLater, lang: (meta && (meta.lang === 'nl' || meta.lang === 'en')) ? meta.lang : '' });
       }
 
       // (Transfer already counted by the quota gate above, before storage.)
