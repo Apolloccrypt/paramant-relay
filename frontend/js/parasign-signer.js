@@ -169,7 +169,13 @@ export function buildDocSignMessage({ envelopeId, docHash, partyIndex, emailHash
 // is never written to the vault). If no PRF signing key is enrolled on this
 // device, throws code 'no_signing_passkey'.
 export async function resolvePasskeySigningKey() {
-  if (!(await vaultAvailable())) throw new Error(tr('Deze browser kan geen ondertekensleutels bewaren (IndexedDB of WebCrypto ontbreekt).', 'This browser cannot store signing keys (IndexedDB/WebCrypto unavailable).'));
+  if (!(await vaultAvailable())) {
+    // Coded, so a caller can fall back to signing with the authenticator code
+    // (that key is never stored, so it needs no vault).
+    const err = new Error(tr('Deze browser kan geen ondertekensleutels bewaren (IndexedDB of WebCrypto ontbreekt).', 'This browser cannot store signing keys (IndexedDB/WebCrypto unavailable).'));
+    err.code = 'vault_unavailable';
+    throw err;
+  }
   const keys = await vaultList();
   const candidates = keys.filter((k) => (k.kekSources || []).some((s) => s === 'webauthn-prf'));
   // Verify the PRF wrap is actually present (not just listed in kekSources). A
@@ -333,6 +339,23 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
   try {
     // 2) Step-up challenge over THIS account's passkeys.
     say(tr('Ondertekenen instellen met uw passkey…', 'Setting up signing with your passkey…'));
+    // An account without a passkey takes the authenticator-code path. Asked
+    // with a plain read first, so the expected "no passkey" is not a 409 in the
+    // console on every signature (retest T2-B6). A failed read changes nothing:
+    // the options call below still answers.
+    try {
+      const r = await fetch('/api/user/account/webauthn/credentials', { credentials: 'include' });
+      if (r.ok) {
+        const j = await r.json().catch(() => null);
+        if (j && Array.isArray(j.passkeys) && j.passkeys.length === 0) {
+          const err = new Error(tr('Voeg eerst een passkey toe aan uw account. Daarna kunt u ermee ondertekenen.', 'Add a passkey to your account first, then you can sign with it.'));
+          err.code = 'no_passkey';
+          throw err;
+        }
+      }
+    } catch (e) {
+      if (e && e.code === 'no_passkey') throw e;
+    }
     let opt;
     try {
       opt = await _postJSON('/api/user/account/signing-key/step-up/options', {});
@@ -395,24 +418,27 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
     }
     const prfOutput = new Uint8Array(prfFirst);
 
-    // 4) Wrap the ML-DSA key with the PRF output — PRF ONLY, no passphrase. The
-    //    PRF output stays in the browser; only the assertion goes to the server.
+    // 4) Bind the PUBLIC key to the account FIRST: the admin verifies the
+    //    step-up assertion, then the relay records the pubkey (TOTP-free
+    //    attested route). Only a key the account knows is kept in this browser:
+    //    storing it before the bind left a key behind that every later
+    //    signature picked again and the relay refused as signer_not_enrolled
+    //    (retest T3-4).
     const credentialId = _b64urlFromBuffer(cred.rawId);
     try {
+      say(tr('Uw ondertekensleutel wordt aan uw account gekoppeld…', 'Linking your signing key to your account…'));
+      await _postJSON('/api/user/account/signing-key/step-up/bind', {
+        flowId: opt.flowId,
+        response: _serializeAssertion(cred),
+        pk_b64,
+        label: label || 'Signing key',
+      });
+      // 5) Wrap the ML-DSA key with the PRF output, PRF ONLY, no passphrase.
+      //    The PRF output stays in the browser; only the assertion went out.
       await vaultCreatePrfOnly({ alg: 'ML-DSA-65', label: label || 'Signing key', pk_b64, pk_hash, secretKeyBytes: kp.secretKey, credentialId, prfSalt, prfOutput });
     } finally {
       prfOutput.fill(0);
     }
-
-    // 5) Bind the PUBLIC key to the account: the admin verifies the step-up
-    //    assertion, then the relay records the pubkey (TOTP-free attested route).
-    say(tr('Uw ondertekensleutel wordt aan uw account gekoppeld…', 'Linking your signing key to your account…'));
-    await _postJSON('/api/user/account/signing-key/step-up/bind', {
-      flowId: opt.flowId,
-      response: _serializeAssertion(cred),
-      pk_b64,
-      label: label || 'Signing key',
-    });
   } finally {
     kp.secretKey.fill(0);   // zeroize the plaintext key
   }

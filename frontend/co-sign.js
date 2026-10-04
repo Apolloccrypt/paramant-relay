@@ -28,6 +28,7 @@
 import { sha3_256 } from '/vendor/paramant-pqc.js';
 import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=19';
 import { promptTotp } from '/js/totp-prompt.js?v=2';
+import { vaultDelete } from '/vendor/vault.js?v=5';
 import { decryptDocumentCapsule, parseDocumentKeyFragment, documentKeyFragment } from '/js/parasign-document-capsule.js?v=2';
 import { textBoxesFromItems, initialsFrom, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=2';
 import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParties, textBoxesToFractions, strokesToInk } from '/js/cosign-layout.js?v=2';
@@ -1448,7 +1449,10 @@ async function doSign() {
       try {
         __signKey = await ensureSigningKey({ rpId: location.hostname, onStatus: (m) => setStatus('', m) });
       } catch (e) {
-        if (!e || (e.code !== 'prf_unsupported' && e.code !== 'no_passkey')) throw e;
+        // No one-tap passkey here (no passkey, a provider without PRF, a
+        // browser without WebAuthn or key storage): sign with the
+        // authenticator code, a key that is never stored.
+        if (!e || !['prf_unsupported', 'no_passkey', 'no_webauthn', 'vault_unavailable'].includes(e.code)) throw e;
         const code = await promptTotp('cs-pass');
         if (code == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
         setStatus('', L('Uw ondertekensleutel wordt klaargezet...', 'Setting up your signing key…'));
@@ -1547,6 +1551,7 @@ async function doSign() {
         ? L('Het is even te druk. Probeer het over ' + Math.ceil(wait) + ' seconden opnieuw.', 'It is busy right now. Try again in ' + Math.ceil(wait) + ' seconds.')
         : L('Het is even te druk. Probeer het over een minuut opnieuw.', 'It is busy right now. Try again in a minute.');
     }
+    else if (e && e.status === 403 && (reason === 'signer_not_enrolled' || e.message === 'signer_not_enrolled')) msg = 'relink';
     else if (e && e.status === 403) msg = L('Deze uitnodiging hoort bij een ander e-mailadres. Log in met het adres waar de uitnodiging naartoe ging.', 'This invite is bound to a different email address. Sign in with the address the invite was sent to.');
     else if (e && e.status === 410 && (reason === 'voided' || reason === 'declined')) msg = closedExplanation(reason === 'declined' ? 'declined' : 'cancelled');
     else if (e && e.status === 410) msg = L('De termijn om te tekenen is voorbij (tot ', 'The signing period has ended (until ') + humanDate(__envelope.sign_expires_at) + L('). Vraag de afzender om een nieuw verzoek.', '). Ask the sender for a new request.');
@@ -1560,9 +1565,40 @@ async function doSign() {
     else if (e && (e.code === 'prf_unsupported' || e.code === 'need_passkey')) msg = L('Uw passkey kan hier niet met één tik ondertekenen. Tik op Ondertekenen om met de code uit uw authenticator-app te tekenen.', 'Your passkey can’t do one-tap signing here. Tap Sign to sign with your authenticator code instead.');
     else if (e && e.status) msg = L('Ondertekenen lukt nu niet (serverfout ', 'Signing could not be completed right now (server error ') + e.status + L('). Probeer het zo opnieuw.', '). Please try again in a moment.');
     else msg = L('Uw passkey kon het ondertekenen in deze browser niet afronden. Tik op Ondertekenen om het opnieuw te proberen. Lukt het steeds niet, probeer dan een andere browser of gebruik de passkey op uw telefoon.', 'Your passkey could not complete signing on this browser. Tap Sign to try again. If it keeps failing, try a different browser, or use the passkey on your phone.');
+    if (msg === 'relink') {
+      // 403 signer_not_enrolled: the key in this browser is not linked to this
+      // account (a link that stopped halfway, or another account signing in the
+      // same browser). It is not the e-mail address (retest T3-4). The way out
+      // is a new key, linked now, as /sign offers it.
+      setStatus('err', L('De ondertekensleutel in deze browser is niet aan uw account gekoppeld, bijvoorbeeld omdat het koppelen eerder halverwege stopte of omdat hier ook een ander account tekent. Koppel opnieuw: deze browser maakt een nieuwe sleutel en koppelt die met één bevestiging aan uw account. Er is nog niets ondertekend. ', 'The signing key in this browser is not linked to your account, for example because linking stopped halfway earlier or because another account also signs here. Link again: this browser makes a new key and links it to your account with one confirmation. Nothing has been signed yet. '));
+      const st = $('sign-status');
+      if (st) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.id = 'cs-relink-key'; b.className = 'btn btn-primary';
+        b.textContent = L('Sleutel opnieuw koppelen', 'Link the key again');
+        b.addEventListener('click', relinkSigningKey);
+        st.appendChild(b);
+      }
+      $('sign-confirm').disabled = false;
+      return;
+    }
     setStatus('err', msg);
     $('sign-confirm').disabled = false;
   }
+}
+
+// Retire exactly the key that was refused, then sign again: the next run finds
+// no key here and sets up a new one, linked to THIS account.
+async function relinkSigningKey() {
+  const btn = $('cs-relink-key'); if (btn) btn.disabled = true;
+  try {
+    if (__signKey && __signKey.vaultId) await vaultDelete(__signKey.vaultId);
+  } catch (e) {
+    try { console.error('[paramant] vault delete', e); } catch { /* no console */ }
+  }
+  __signKey = null;
+  __ephemeralSigner = null;
+  doSign();
 }
 
 // For the browser tests: the page's own state, read-only.

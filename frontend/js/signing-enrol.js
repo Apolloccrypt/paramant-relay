@@ -46,7 +46,7 @@ function wireSigningEnrol() {
     } catch (e) {
       let msg;
       if (e && e.code === 'no_passkey') msg = nlEn('Voeg eerst een passkey toe aan uw account (het blok "Inloggen met een passkey" hierboven) en stel daarna ondertekenen in. Geen passkey? U kunt nog steeds ondertekenen via /sign met de code uit uw authenticator-app.', 'Add a passkey to your account first (the "Passkey sign-in" card above), then set up signing. No passkey? You can still sign at /sign with your authenticator code.');
-      else if (e && (e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message;
+      else if (e && (e.code === 'vault_unavailable' || e.code === 'no_webauthn')) msg = e.message + ' ' + nlEn('U kunt nog steeds ondertekenen via /sign met de code van 6 cijfers uit uw authenticator-app.', 'You can still sign at /sign with the 6-digit code from your authenticator app.');
       else if (e && e.name === 'NotAllowedError') msg = nlEn('De bevestiging met uw passkey is afgebroken of duurde te lang. Tik op de knop om het opnieuw te proberen.', 'Passkey confirmation was cancelled or timed out. Tap the button to try again.');
       else if (e && e.status) msg = nlEn('Uw ondertekensleutel kon nu niet worden ingesteld (serverfout ', 'Could not set up your signing key right now (server error ') + e.status + nlEn('). Probeer het zo opnieuw.', '). Please try again in a moment.');
       else msg = nlEn('Uw passkey kon het instellen in deze browser niet afronden. Tik op de knop om het opnieuw te proberen. Blijft het mislukken, probeer dan een andere browser of de passkey op uw telefoon.', 'Your passkey could not complete setup on this browser. Tap the button to try again. If it keeps failing, try a different browser, or use the passkey on your phone.');

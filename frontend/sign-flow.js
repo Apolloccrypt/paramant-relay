@@ -3468,6 +3468,11 @@ function isWebAuthnError(e) {
   return /authenticator|webauthn|passkey|credential|\bprf\b/i.test(String(e.message || '')) || /Authenticator/.test(String(e.name || ''));
 }
 
+// Every reason one-tap passkey signing is not available on this device, and
+// for each the authenticator code is the way to sign (retest: a browser
+// without WebAuthn had no way to sign at all).
+const TOTP_FALLBACK_CODES = ['prf_unsupported', 'no_passkey', 'no_webauthn', 'vault_unavailable'];
+
 function isSignerNotEnrolled(e) {
   return !!e && e.status === 403 && ((e.data && e.data.error) === 'signer_not_enrolled' || e.message === 'signer_not_enrolled');
 }
@@ -3516,7 +3521,11 @@ async function doSign() {
     try {
       signKey = await ensureSigningKey({ rpId: location.hostname, label: state.signer.name || 'Signing key', onStatus: status });
     } catch (e) {
-      if (!e || (e.code !== 'prf_unsupported' && e.code !== 'no_passkey')) throw e;
+      // No one-tap passkey here, for whatever reason (no passkey, a provider
+      // without PRF, a browser without WebAuthn or without key storage): sign
+      // with the authenticator code. That key is never stored, so it needs
+      // neither WebAuthn nor IndexedDB.
+      if (!e || !TOTP_FALLBACK_CODES.includes(e.code)) throw e;
       const code = await promptTotp('ds-pass');
       if (code == null) { const c = new Error('cancelled'); c.code = 'cancelled'; throw c; }
       status(L('Uw ondertekensleutel wordt aangemaakt…', 'Setting up your signing key…'));
