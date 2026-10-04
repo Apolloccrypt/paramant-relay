@@ -14,7 +14,7 @@ import { anchorByFingerprint } from '/js/relay-trust-anchors.js?v=2';
 const RELAY_URL = 'https://relay.paramant.app';
 // Byte-identical to relay/envelope.js SIGN_DOMAIN_DOC (recipe v3). Keep in sync.
 const SIGN_DOMAIN_DOC = 'paramant/parasign/doc/v1';
-let documentBuffer = null, envelope = null, isV3 = false, isMulti = false;
+let documentFile = null, envelope = null, isV3 = false, isMulti = false;
 
 const $ = id => document.getElementById(id);
 const toHex = u8 => Array.from(u8, b => b.toString(16).padStart(2, '0')).join('');
@@ -53,8 +53,13 @@ const T = {
     expired: 'envelop verlopen op {v}',
     missingEnvId: 'envelope_id ontbreekt',
     missingDocHash: 'document_hash ontbreekt',
-    hashMismatchMulti: 'Dit is niet het document dat is ondertekend. De handtekeningen gelden voor het originele bestand, met SHA3-256-vingerafdruk {hash}…. Een pdf met een Paramant-stempel (voettekst "Signed with ParaSign" of een pagina "ParaSign signature certificate") is een leesbare kopie en geeft altijd deze melding. Kies het originele bestand dat ter ondertekening is aangeboden.',
+    hashMismatchMulti: 'Dit is niet het document dat is ondertekend. De handtekeningen gelden voor het originele bestand, met SHA3-256-vingerafdruk {hash}…. De pdf met de zichtbare handtekeningen en parafen (onder elke handtekening de regel "Paramant ParaSign · PQ …") is een leesbare kopie en geeft altijd deze melding. Kies het originele bestand dat ter ondertekening is aangeboden.',
     missingParties: 'partijen ontbreken',
+    stampedCopy: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>Dit is niet het ondertekende bestand. Is het de pdf met de zichtbare handtekeningen? Controleer dan met het origineel.</strong> De handtekeningen in het .psign-bestand kloppen, maar ze gelden voor het originele document (SHA3-256-vingerafdruk {hash}…). De pdf met de handtekeningen en parafen erin, met onder elke handtekening de regel "Paramant ParaSign · PQ …", is daar een leesbare kopie van en geeft altijd deze melding. Kies het originele bestand; u kunt het downloaden op de pagina waar u tekende.</div>',
+    soloChecked: '<div class="ps-banner info"><span class="ps-mark" aria-hidden="true">\u2713</span><strong>De handtekening klopt met dit document.</strong> Wie tekende, staat niet in de handtekening: de naam hieronder is niet gecontroleerd.</div>',
+    fpTampered: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>De handtekening klopt, maar dit bestand is aangepast.</strong> De gegevens over de ondertekenaar horen niet bij de sleutel die tekende. Vertrouw de naam in dit bestand niet.</div>',
+    lookupBtn: 'Wie hoort bij deze sleutel? (vraagt het aan Paramant)',
+    lookupNote: 'De controle hierboven gebeurde helemaal in uw browser. Deze knop is de enige vraag aan Paramant: welke account bij deze sleutel hoort.',
     partyIncomplete: '{who} heeft geen volledige handtekening',
     partyWho: 'partij {i}',
     partyAt: 'de partij op plaats {n} in het bewijs',
@@ -123,8 +128,13 @@ const T = {
     expired: 'envelope expired at {v}',
     missingEnvId: 'missing envelope_id',
     missingDocHash: 'missing document_hash',
-    hashMismatchMulti: 'This is not the document that was signed. The signatures cover the original file, with SHA3-256 fingerprint {hash}…. A PDF carrying a Paramant stamp (footer "Signed with ParaSign" or a "ParaSign signature certificate" page) is a reading copy and always gives this message. Choose the original file that was put up for signing.',
+    hashMismatchMulti: 'This is not the document that was signed. The signatures cover the original file, with SHA3-256 fingerprint {hash}…. The PDF with the visible signatures and initials (the line "Paramant ParaSign · PQ …" under each signature) is a reading copy and always gives this message. Choose the original file that was put up for signing.',
     missingParties: 'missing parties',
+    stampedCopy: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>This is not the signed file. Is it the PDF with the visible signatures? Then check with the original.</strong> The signatures in the .psign file are correct, but they cover the original document (SHA3-256 fingerprint {hash}…). The PDF with the signatures and initials in it, with the line "Paramant ParaSign · PQ …" under each signature, is a reading copy of it and always gives this message. Choose the original file; you can download it on the page where you signed.</div>',
+    soloChecked: '<div class="ps-banner info"><span class="ps-mark" aria-hidden="true">\u2713</span><strong>The signature matches this document.</strong> Who signed is not part of the signature: the name below has not been checked.</div>',
+    fpTampered: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>The signature is correct, but this file has been altered.</strong> The signer details do not belong to the key that signed. Do not trust the name in this file.</div>',
+    lookupBtn: 'Who does this key belong to? (asks Paramant)',
+    lookupNote: 'The check above happened entirely in your browser. This button is the only question to Paramant: which account this key belongs to.',
     partyIncomplete: '{who} has no complete signature',
     partyWho: 'party {i}',
     partyAt: 'the party in position {n} of the proof',
@@ -207,14 +217,40 @@ function canonicalJSON(value) {
 // v2, one mark repeated on every page) is emitted only when true, which is what
 // keeps every proof made before v2 verifying unchanged.
 function normaliseAppearance(value) {
+  // The same checks as normaliseSigningAppearance (js/parasign-signer.js) and
+  // normaliseAppearance (relay/envelope.js): a manifest the other two refuse is
+  // refused here too, instead of being hashed as if it were fine (retest
+  // T2-B5). Accepted input comes out byte for byte as before.
+  const bad = () => { throw new Error('invalid appearance'); };
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const declared = source.version === undefined ? null : Number(source.version);
+  if (declared !== null && declared !== 1 && declared !== 2) bad();
+  const input = source.fields === undefined ? [] : source.fields;
+  if (!Array.isArray(input) || input.length > 8) bad();
   let anyAllPages = false;
-  const fields = Array.isArray(source.fields) ? source.fields.map((field) => {
-    const clean = { type: String(field.type || ''), page_index: Number(field.page_index) };
-    for (const name of ['x', 'y', 'w', 'h']) clean[name] = Math.round(Number(field[name]) * 1000000) / 1000000;
-    if (field.all_pages === true) { clean.all_pages = true; anyAllPages = true; }
+  const fields = input.map((field) => {
+    if (!field || typeof field !== 'object' || Array.isArray(field)) bad();
+    const type = String(field.type || '');
+    if (type !== 'seal' && type !== 'date') bad();
+    const pageIndex = Number(field.page_index);
+    if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex > 999) bad();
+    const clean = { type, page_index: pageIndex };
+    for (const name of ['x', 'y', 'w', 'h']) {
+      const n = Number(field[name]);
+      if (!Number.isFinite(n) || n < 0 || n > 1) bad();
+      clean[name] = Math.round(n * 1000000) / 1000000;
+    }
+    if (clean.w < 0.02 || clean.h < 0.01 || clean.x + clean.w > 1.000001 || clean.y + clean.h > 1.000001) bad();
+    if (field.all_pages !== undefined) {
+      if (typeof field.all_pages !== 'boolean') bad();
+      if (field.all_pages) {
+        if (pageIndex !== 0 || declared !== 2) bad();
+        clean.all_pages = true;
+        anyAllPages = true;
+      }
+    }
     return clean;
-  }) : [];
+  });
   return { version: anyAllPages ? 2 : 1, fields };
 }
 
@@ -262,7 +298,7 @@ function partyWho(party, pos) {
 // v3 verifies keyless client-side; v1/v2 need the relay (and its API key).
 function update() {
   const apiKey = ($('vf-api-key').value || '').trim();
-  const ready = documentBuffer && envelope && (isV3 || apiKey);
+  const ready = documentFile && envelope && (isV3 || apiKey);
   $('vf-verify').disabled = !ready;
 }
 
@@ -275,14 +311,10 @@ function syncKeyField() {
 
 async function onDoc(file) {
   if (!file) return;
-  try {
-    documentBuffer = await file.arrayBuffer();
-  } catch {
-    documentBuffer = null;
-    $('vf-document-info').textContent = t('docUnreadable');
-    update();
-    return;
-  }
+  // Kept as the File, read in slices when it is checked (hashFileInSlices):
+  // reading 500 MB in one go and hashing it in one call froze the page for
+  // 20 seconds (retest T3-9).
+  documentFile = file;
   $('vf-document-info').textContent = file.name + t('fileSize', { kb: LANG === 'en' ? (file.size / 1024).toFixed(1) : (file.size / 1024).toFixed(1).replace('.', ',') });
   update();
 }
@@ -407,7 +439,8 @@ function verifyMultiClient(docHashHex) {
   // and co-sign hand out is a reading copy made after signing, and its hash is in
   // no signature, so it can never verify here; the message says which file to
   // use instead. (Protocol option, not taken: docs/parasign-open-api-spec.md.)
-  if (env.document_hash && docHashHex !== env.document_hash) errors.push(t('hashMismatchMulti', { hash: String(env.document_hash).slice(0, 16) }));
+  const docMismatch = !!(env.document_hash && docHashHex !== env.document_hash);
+  if (docMismatch) errors.push(t('hashMismatchMulti', { hash: String(env.document_hash).slice(0, 16) }));
   const recipe = Number(env.sign_recipe || env.recipe_version) || 1;
   const parties = Array.isArray(env.parties) ? env.parties : [];
   if (!parties.length) errors.push(t('missingParties'));
@@ -459,7 +492,10 @@ function verifyMultiClient(docHashHex) {
   // mode/sandbox sit inside the notary signature (parasign-open-api.js
   // buildEnvelopePsign), so on a valid receipt they are facts, not claims.
   const test = env.mode === 'test' || env.sandbox === true;
-  return { valid: errors.length === 0, errors, anchor, test };
+  // Every signature holds and only the file differs: the reader most likely
+  // chose the stamped copy. That is not "INVALID" (retest A8/T5-7).
+  const copyOnly = docMismatch && errors.length === 1;
+  return { valid: errors.length === 0, errors, anchor, test, copyOnly, docHash: env.document_hash };
 }
 
 async function verify() {
@@ -468,7 +504,16 @@ async function verify() {
   $('vf-result').innerHTML = '<div class="ps-banner info">' +
     (isV3 ? t('verifyingLocal') : t('verifyingRelay')) + '</div>';
   try {
-    const docHash = sha3_256(new Uint8Array(documentBuffer)); // local
+    let docHash;
+    try {
+      docHash = await hashFileInSlices(documentFile, (pct) => {
+        const el = $('vf-result');
+        if (el && pct < 100) el.innerHTML = '<div class="ps-banner info">' + (isV3 ? t('verifyingLocal') : t('verifyingRelay')) + ' ' + pct + '%</div>';
+      });
+    } catch {
+      $('vf-result').innerHTML = '<div class="ps-banner err">' + esc(t('docUnreadable')) + '</div>';
+      return;
+    }
     if (isMulti) {
       await renderResult(verifyMultiClient(toHex(docHash)));
       return;
@@ -499,6 +544,31 @@ async function verify() {
   } finally { $('vf-verify').disabled = false; }
 }
 
+// SHA3-256 of a File, read in 8 MB slices and hashed 1 MB at a time, with the
+// event loop free between pieces: the page keeps answering and shows progress,
+// and a file larger than one ArrayBuffer can hold is still hashed. Same digest
+// as sha3_256(wholeBytes).
+const SLICE = 8 * 1024 * 1024;
+const PIECE = 1024 * 1024;
+const breathe = () => new Promise((r) => setTimeout(r, 0));
+async function hashFileInSlices(file, onProgress) {
+  const h = sha3_256.create();
+  const total = file.size || 0;
+  let lastPct = -1;
+  for (let off = 0; off < total; off += SLICE) {
+    const buf = new Uint8Array(await file.slice(off, Math.min(total, off + SLICE)).arrayBuffer());
+    for (let i = 0; i < buf.length; i += PIECE) {
+      h.update(buf.subarray(i, Math.min(buf.length, i + PIECE)));
+      if (total > PIECE) {
+        const pct = Math.floor(((off + i + PIECE) / total) * 100);
+        if (onProgress && pct !== lastPct && pct < 100) { lastPct = pct; onProgress(pct); }
+        await breathe();
+      }
+    }
+  }
+  return h.digest();
+}
+
 // Resolve "Signed by <label> (<email>)" via the public lookup endpoint.
 // Returns { html, revoked } (html already escaped, '' if nothing found).
 async function lookupSignerHtml(envelope) {
@@ -524,7 +594,7 @@ async function lookupSignerHtml(envelope) {
     } else if (d.enrolled_at) {
       html += t('enrolled', { when: esc(d.enrolled_at) });
     }
-    return { html, revoked: !!d.revoked_at };
+    return { html, revoked: !!d.revoked_at, found: true };
   } catch { return { html: '', revoked: false }; }
 }
 
@@ -557,9 +627,16 @@ function v3ScopeHtml(env) {
 
 async function renderResult(r) {
   const out = [];
-  const banner = !r.valid ? t('invalid') : (r.test ? t('validTest') : t('valid'));
+  // A v3 solo proof binds a key, not a person: no reassuring green for a name
+  // nobody checked, and a warning when the file's signer details were altered
+  // (retest T3-2).
+  const solo = r.valid && isV3 && !isMulti && envelope;
+  const fpBad = solo && claimFingerprintBad(envelope);
+  const banner = !r.valid
+    ? (r.copyOnly ? t('stampedCopy', { hash: esc(String(r.docHash || '').slice(0, 16)) }) : t('invalid'))
+    : r.test ? t('validTest') : fpBad ? t('fpTampered') : solo ? t('soloChecked') : t('valid');
   out.push(banner);
-  if (r.errors && r.errors.length) {
+  if (r.errors && r.errors.length && !r.copyOnly) {
     out.push('<ul style="margin-top:var(--space-3)">');
     r.errors.forEach(e => out.push('<li class="ps-help">' + esc(e) + '</li>'));
     out.push('</ul>');
@@ -579,18 +656,46 @@ async function renderResult(r) {
     const idx = envelope && envelope.notary && envelope.notary.ct_log_index;
     if (idx != null) out.push(t('ctIndex', { idx: esc(String(idx)) }));
   }
-  // First paint without attribution so the user sees the valid/invalid badge fast.
   $('vf-result').innerHTML = out.join('');
-  // Then enrich with public-key lookup (best-effort, can be 404).
-  if (r.valid && !isMulti) {
+  // v1/v2 were checked by the relay already, so the account lookup rides along.
+  if (r.valid && !isMulti && !isV3) {
     const attr = await lookupSignerHtml(envelope);
-    if (attr.html) {
-      // A revoked key takes the green away: the proof has no signed time, so
-      // "valid if signed before the revocation" cannot be checked.
-      if (attr.revoked && isV3) out[0] = t('revokedBanner');
-      $('vf-result').innerHTML = out.join('') + attr.html;
-    }
+    if (attr.html) $('vf-result').innerHTML = out.join('') + attr.html;
+    return;
   }
+  // v3 solo is checked offline, and stays offline unless the reader asks: the
+  // page used to ask the relay about every key on its own, while promising
+  // "no call home" (retest T3-10).
+  if (solo) {
+    const wrap = document.createElement('p');
+    wrap.className = 'ps-help';
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'btn btn-outline'; btn.id = 'vf-lookup';
+    btn.textContent = t('lookupBtn');
+    const note = document.createElement('span');
+    note.className = 'ps-help'; note.style.display = 'block';
+    note.textContent = t('lookupNote');
+    wrap.append(btn, note);
+    $('vf-result').appendChild(wrap);
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      const attr = await lookupSignerHtml(envelope);
+      // A revoked key takes the green away: the proof has no signed time, so
+      // "valid if signed before the revocation" cannot be checked. A key the
+      // relay links to an account names the signer: then the green is earned.
+      if (attr.revoked) out[0] = t('revokedBanner');
+      else if (attr.found && !fpBad) out[0] = t('valid');
+      $('vf-result').innerHTML = out.join('') + (attr.html || '');
+    });
+  }
+}
+
+// The signer fingerprint written in a v3 solo proof, against the key that
+// actually signed (the same test v3ScopeHtml shows as claimFpBad).
+function claimFingerprintBad(env) {
+  const fp = keyFingerprint(env.signer_public_key);
+  const claimedFp = String(env.signer_pk_fingerprint || '').toLowerCase();
+  return !!(claimedFp && fp && !fp.startsWith(claimedFp.slice(0, 16)));
 }
 
 $('vf-document').addEventListener('change', e => onDoc(e.target.files[0]));

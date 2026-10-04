@@ -104,10 +104,10 @@ async function runOnce({ url, verdict, receipt, doc, trustRelay }) {
 // The same receipt through both copies of the page: the English words on
 // /en/verify, the Dutch words on /verify. One parasign-verify.js serves both.
 const runs = [
-  { url:'/en/verify.html', verdict:/Signature valid|Signature INVALID|Test proof/, valid:/Signature valid/, invalid:/Signature INVALID/, offline:/verified offline/,
-    unknownRelay:/is not a Paramant key/, pinned:/Counter-signed by the test relay/, test:/Test proof, not a real signature/, stampedHint:/reading copy/ },
-  { url:'/verify.html', verdict:/Handtekening geldig|Handtekening ONGELDIG|Testbewijs/, valid:/Handtekening geldig/, invalid:/Handtekening ONGELDIG/, offline:/offline gecontroleerd/,
-    unknownRelay:/is geen sleutel van Paramant/, pinned:/Bekrachtigd door de testrelay/, test:/Testbewijs, geen echte ondertekening/, stampedHint:/leesbare kopie/ },
+  { url:'/en/verify.html', verdict:/Signature valid|Signature INVALID|Test proof|This is not the signed file/, valid:/Signature valid/, invalid:/Signature INVALID/, offline:/verified offline/,
+    unknownRelay:/is not a Paramant key/, pinned:/Counter-signed by the test relay/, test:/Test proof, not a real signature/, stampedHint:/reading copy/, stampedHead:/This is not the signed file[\s\S]*check with the original/, stampedMark:/Paramant ParaSign · PQ/ },
+  { url:'/verify.html', verdict:/Handtekening geldig|Handtekening ONGELDIG|Testbewijs|Dit is niet het ondertekende bestand/, valid:/Handtekening geldig/, invalid:/Handtekening ONGELDIG/, offline:/offline gecontroleerd/,
+    unknownRelay:/is geen sleutel van Paramant/, pinned:/Bekrachtigd door de testrelay/, test:/Testbewijs, geen echte ondertekening/, stampedHint:/leesbare kopie/, stampedHead:/Dit is niet het ondertekende bestand[\s\S]*Controleer dan met het origineel/, stampedMark:/Paramant ParaSign · PQ/ },
 ];
 const outcomes = [];
 for (const run of runs) {
@@ -144,7 +144,12 @@ for (const o of outcomes) {
     if (run.valid.test(result)) throw new Error(where + 'sandbox receipt shown as a real valid signature: ' + result);
   }
   if (kind === 'stamped') {
-    if (!run.invalid.test(result) || !run.stampedHint.test(result)) throw new Error(where + 'stamped copy not explained: ' + result);
+    // Every signature holds and only the file differs: an orange "check with
+    // the original", not a red INVALID, naming the mark the copy really carries
+    // (retest A8/T5-7: the old text named a footer the co-sign copy does not have).
+    if (run.invalid.test(result)) throw new Error(where + 'stamped copy still called INVALID: ' + result);
+    if (!run.stampedHead.test(result) || !run.stampedHint.test(result) || !run.stampedMark.test(result)) throw new Error(where + 'stamped copy not explained: ' + result);
+    if (!/\bwarn\b/.test(banner) || /\b(ok|err)\b/.test(banner)) throw new Error(where + 'stamped copy banner should be orange: ' + banner);
   }
 }
 console.log('parasign-multi-verify: recipe 5 receipt verifies offline against a pinned relay key; a self-signed relay key, a sandbox receipt and a stamped copy are each called what they are, in Chromium');
