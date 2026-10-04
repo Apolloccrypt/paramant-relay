@@ -156,16 +156,16 @@ ok('the sender is shown the complete link, key and all', /#doc=v1\.[A-Za-z0-9_-]
   ok('the two shares together are exactly the document key', whole.length === 32 && joined.equals(whole), whole.length);
 }
 // This run has a failed mail: whoever did not get one still needs the link.
-ok('the screen says a signer without a delivered mail needs the link', /eigen link van u nodig|stuur de persoonlijke links hieronder zelf/i.test(await page.locator('#step-done').innerText()), await page.locator('#step-done').innerText().then((t) => t.slice(0, 220)));
+ok('the screen says a signer without a delivered mail needs the link', /eigen link van u nodig|eigen link hieronder zelf|stuur de persoonlijke links hieronder zelf/i.test(await page.locator('#step-done').innerText()), await page.locator('#step-done').innerText().then((t) => t.slice(0, 220)));
 ok('email invitation is bound to the intended party and address', firstInvite?.party_index === 0 && firstInvite?.email === 'signer@example.com', JSON.stringify(firstInvite));
 ok('partial email failure is not shown as success', /niet elk bericht is bezorgd/i.test(await page.locator('#ds-success-banner').innerText()), await page.locator('#ds-success-banner').innerText());
 ok('failed email offers a retry', await page.locator('#ds-invite-retry').isVisible(), await page.locator('#ds-invite-retry').innerText());
 ok('sender still has a copy-link fallback', await page.locator('.ds-pl-copy').isVisible(), await page.locator('.ds-pl-copy').innerText());
 
 await page.locator('#ds-invite-retry').click();
-await page.waitForFunction(() => /alle berichten zijn bezorgd/i.test(document.querySelector('#ds-invite-delivery-result')?.textContent || ''));
+await page.waitForFunction(() => /alle uitnodigingen zijn bezorgd/i.test(document.querySelector('#ds-invite-delivery-result')?.textContent || ''));
 ok('retry sends only failed parties', invitationCalls.length === 2 && invitationCalls[1].invitations.length === 1 && invitationCalls[1].invitations[0].party_index === 0, JSON.stringify(invitationCalls[1]?.invitations));
-ok('successful retry clears the warning', /alle berichten zijn bezorgd/i.test(await page.locator('#ds-invite-delivery-result').innerText()) && !(await page.locator('#ds-invite-retry').isVisible()), await page.locator('#ds-invite-delivery-result').innerText());
+ok('successful retry clears the warning', /alle uitnodigingen zijn bezorgd/i.test(await page.locator('#ds-invite-delivery-result').innerText()) && !(await page.locator('#ds-invite-retry').isVisible()), await page.locator('#ds-invite-delivery-result').innerText());
 ok('phone viewport has no horizontal overflow', await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 1, await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
 
 // ── PDF variant: the requester points at the spot where the other party signs ──
@@ -249,7 +249,7 @@ ok('the requested position names the page that was clicked', seal?.page_index ==
 ok('the requested position is fractions of the page, y from the top',
   seal && [seal.x, seal.y, seal.w, seal.h].every((n) => typeof n === 'number' && n >= 0 && n <= 1)
   && seal.x + seal.w <= 1.000001 && seal.y + seal.h <= 1.000001
-  && seal.y < 0.4 && Math.abs(seal.w - 0.8) < 0.01 && Math.abs(seal.h - 0.25) < 0.01,
+  && seal.y < 0.4 && Math.abs(seal.w - 170 / 300) < 0.01 && Math.abs(seal.h - 70 / 400) < 0.01,   // STAMP_PDF_W x STAMP_PDF_H on a 300 x 400 page
   JSON.stringify(seal));
 await pdfPage.close();
 
