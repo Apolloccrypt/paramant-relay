@@ -3330,7 +3330,7 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
   // No band, no badge: on a 38pt box those would only crowd the initials.
   const paintParaaf = async (pg, box) => {
     // Outline only, like the seal: nothing under the paraaf is hidden.
-    pg.drawRectangle({ x: box.x, y: box.y, width: box.w, height: box.h, borderColor: navy, borderWidth: 0.6 });
+    pg.drawRectangle({ x: box.x, y: box.y, width: box.w, height: box.h, borderColor: navy, borderWidth: 1 });
     // A thin navy bar on the left edge: the house style of the seal, in small.
     const bar = Math.max(1.5, box.w * 0.03);
     pg.drawRectangle({ x: box.x, y: box.y, width: bar, height: box.h, color: navy });

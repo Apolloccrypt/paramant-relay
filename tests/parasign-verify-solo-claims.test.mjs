@@ -83,6 +83,9 @@ async function runOnce({ url, verdict, lookup }) {
   await page.goto(origin + url, { waitUntil:'domcontentloaded' });
   await page.locator('#vf-document').setInputFiles({ name:'contract.txt', mimeType:'text/plain', buffer:Buffer.from(forged.source) });
   await page.locator('#vf-envelope').setInputFiles({ name:'contract.psign', mimeType:'application/json', buffer:Buffer.from(JSON.stringify(forged.psign)) });
+  // The file line is written once the .psign is read; wait for it rather
+  // than reading it the same instant (WebKit reads files a tick later).
+  await page.waitForFunction(() => /\|/.test(document.querySelector('#vf-envelope-info')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
   const info = await page.locator('#vf-envelope-info').innerText();
   const lookups = [];
   const onReq = (req) => { if (/lookup-signer/.test(req.url())) lookups.push(req.url()); };
