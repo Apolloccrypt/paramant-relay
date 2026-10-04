@@ -10734,6 +10734,42 @@ async function handleRelayRequest(req, res) {
     return _envStore._inst;
   }
 
+  // POST /v2/admin/envelopes/void-account -- withdraw every open envelope of an
+  // account (internal; admin plane calls it when a customer deletes his
+  // account). Before this a deleted account's envelopes stayed signable, the
+  // signatures were counted on the deactivated account, and "everyone signed"
+  // went to the erased address (sweep-acct finding 5).
+  if (path === '/v2/admin/envelopes/void-account' && req.method === 'POST') {
+    if (!_internalOk()) return _internalReject();
+    let d;
+    try { d = JSON.parse((await readBody(req, 1024)).toString() || '{}'); }
+    catch { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'bad_json' })); }
+    let accountId = typeof d.account_id === 'string' ? d.account_id : '';
+    if (!accountId && typeof d.key === 'string' && d.key) {
+      const kd = apiKeys.get(d.key);
+      accountId = (kd && kd.account_id) || d.key;
+    }
+    if (!accountId) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'account_id or key required' })); }
+    const store = _envStore();
+    if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'envelopes_unavailable' })); }
+    let voided = 0, done = 0;
+    try {
+      const ids = await store.listAccountEnvelopeIds(accountId, { limit: 100000 });
+      for (const id of ids) {
+        const out = await store.voidEnvelope(id, 'The sender deleted the account');
+        if (out.ok && out.code === 'void') voided++;
+        else if (out.code === 'already_complete') done++;
+      }
+      log('info', 'envelopes_voided_for_account', { account: accountId.slice(0, 12), voided, completed: done, total: ids.length });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(J({ ok: true, voided, completed: done, total: ids.length }));
+    } catch (e) {
+      if (redisOutage503(e, res)) return;
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: 'void_failed' }));
+    }
+  }
+
   // POST /v2/envelopes -- create a new envelope.
   if (path === '/v2/envelopes' && req.method === 'POST') {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }

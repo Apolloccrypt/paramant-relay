@@ -4,6 +4,9 @@ const emailTemplates = require('./lib/email-templates');
 const mailer = require('../relay/lib/mail');   // one way out, carrier is a setting
 const emailPolicy = require('./lib/email-policy');
 const pow = require('./lib/pow-captcha');
+const publicPlans = require('./lib/public-plans');
+const inviteText = require('./lib/invite-text');
+const { uaLabel } = require('./lib/ua-label');
 const http    = require('http');
 const crypto  = require('crypto');
 const path    = require('path');
@@ -1974,6 +1977,28 @@ api.get("/user/account/webauthn/credentials", authUser, async (req, res) => {
 });
 
 
+// DELETE /api/user/account/webauthn/credentials/:credId  (authUser + fresh 2FA)
+// Removing a passkey had a relay route and no way in from the account page
+// (ACCT-32). Fresh second factor, like adding one: a stolen cookie must not be
+// able to strip the owner's sign-in. The account keeps its TOTP, so removing
+// the last passkey cannot lock anyone out.
+api.delete("/user/account/webauthn/credentials/:credId", authUser, async (req, res) => {
+  const { user_id } = req.userSession;
+  const credId = (req.params.credId || "").toString();
+  if (!/^[A-Za-z0-9_-]{16,512}$/.test(credId)) return res.status(400).json({ error: "invalid_credential" });
+  const sf = await freshSecondFactor(req, user_id);
+  if (sf) return res.status(sf.status).json({ error: sf.error });
+  try {
+    const r = await callRelay("/v2/user/webauthn/credential", { user_id, cred_id: credId }, "DELETE");
+    const body = await r.json().catch(() => ({}));
+    if (r.status === 200) {
+      try { await logAuditEvent(user_id, "passkey_removed", { cred: credId.slice(0, 12) + "…" }); } catch {}
+      return res.json({ ok: true, remaining_active: body.remaining_active });
+    }
+    return res.status(r.status === 404 ? 404 : 409).json({ error: body.error || "remove_failed" });
+  } catch { return res.status(502).json({ error: "relay_unreachable" }); }
+});
+
 // POST /api/user/envelopes (authUser) — create a signing envelope SAME-ORIGIN
 // (replaces the old direct browser -> health.paramant.app POST, audit #2).
 // recipe_version 5 (domain, signer key and visual placement bound). Party 0 is the signer themselves (their
@@ -2224,8 +2249,10 @@ api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
     checked.push({ email, label, inviteUrl: inviteUrl.href, partyIndex, env, opensDocument: inviteUrl.hash !== "" });
   }
 
-  const subject = (req.body?.subject || "").toString().trim().slice(0, 140);
-  const message = (req.body?.message || "").toString().trim().slice(0, 1000);
+  // No links, no addresses, no CR/LF in the subject (lib/invite-text.js): this
+  // mail leaves from our domain to people who are not our customers.
+  const subject = inviteText.safeSubject(req.body?.subject);
+  const message = inviteText.safeMessage(req.body?.message);
   const senderLabel = req.userSession.email;
   // Optional. Without it the invitation is Dutch with the English underneath.
   const lang = ["nl", "en"].includes(req.body?.lang) ? req.body.lang : undefined;
@@ -2484,9 +2511,19 @@ api.post("/user/sign/submit", authUser, async (req, res) => {
 
 
 // POST /api/user/auth/request-totp-reset (public — two-stage: sends confirmation first)
+//
+// A BACK-UP CODE IS REQUIRED. This used to need the mailbox and nothing else:
+// request, click, new authenticator, new back-up codes, session. Two factors
+// became one, and help/lost-authenticator says the opposite (recovery without
+// back-up codes goes through support, so nobody takes an account over that
+// way). Now the code is consumed here, before any mail goes out; without one
+// the answer says to contact support.
 api.post("/user/auth/request-totp-reset", async (req, res) => {
-  const { email, challenge_id, nonce } = req.body || {};
+  const { email, challenge_id, nonce, backup_code } = req.body || {};
   if (!email || typeof email !== "string") return res.status(400).json({ error: "invalid_request" });
+  if (typeof backup_code !== "string" || !backup_code.trim()) {
+    return res.status(400).json({ error: "backup_code_required", message: "Without a back-up code, 2FA is reset by support only: mail privacy@paramant.app from the account address." });
+  }
   const norm = email.toLowerCase().trim();
 
   // PoW verification — prevents automated reset flooding
@@ -2510,7 +2547,15 @@ api.post("/user/auth/request-totp-reset", async (req, res) => {
   const alwaysOk = { success: true, message: "If an account exists for this email, a confirmation email has been sent." };
 
   const user = await findUserByEmail(norm).catch(() => null);
-  if (!user) return res.json(alwaysOk); // no enumeration
+  // Same answer for no account and a wrong code: no enumeration.
+  if (!user) return res.status(401).json({ error: "invalid_credentials" });
+  let codeOk = false;
+  try {
+    const cr = await callRelay("/v2/user/consume-backup", { user_id: user.key, code: backup_code.trim().toUpperCase() });
+    const cb = await cr.json().catch(() => ({}));
+    codeOk = cr.ok && cb.valid === true;
+  } catch { return res.status(502).json({ error: "relay_unreachable" }); }
+  if (!codeOk) return res.status(401).json({ error: "invalid_credentials" });
 
   // Generate short-lived confirmation token — does NOT touch TOTP state yet
   const confirmToken = crypto.randomBytes(32).toString("hex");
@@ -2706,7 +2751,9 @@ api.get("/user/me", authUser, async (req, res) => {
       label: user?.label || null,
       plan: (user && user.plan) || "standard",
       ...productPlanFields(user),
-      created_at: user?.created_at || null,
+      // The relay calls it `created`; created_at only exists on older
+      // records. Reading only created_at gave null for everyone (ACCT-25).
+      created_at: user?.created_at || user?.created || null,
       api_key_masked: user_id.slice(0, 8) + "..." + user_id.slice(-4),
       backup_codes_remaining: backupCount,
       // The earlier of the idle window and the absolute cap: with an absolute
@@ -2990,7 +3037,10 @@ api.get("/user/account", authUser, async (req, res) => {
     for (const { token, session: s } of (await userSessions.list(redis(), user_id, scanSessions)).sessions) {
       sessions.push({
         ip_masked: maskIp(s.ip || ""),
-        user_agent_short: (s.ua || "").split(" ")[0].slice(0, 40) || "—",
+        // A label a person can read ("Safari on iPhone"); the first word of
+        // the raw string was "Mozilla/5.0" for every browser (ACCT-26).
+        user_agent_short: uaLabel(s.ua),
+        device_label: uaLabel(s.ua),
         // last_seen, now that authUser maintains one. Falls back to the login
         // time for a record not touched since the field was introduced, and to
         // now for one written before created_at existed. Never to
@@ -3006,7 +3056,9 @@ api.get("/user/account", authUser, async (req, res) => {
       label: user?.label || null,
       plan: user?.plan || null,
       ...productPlanFields(user),
-      created_at: user?.created_at || null,
+      // The relay calls it `created`; created_at only exists on older
+      // records. Reading only created_at gave null for everyone (ACCT-25).
+      created_at: user?.created_at || user?.created || null,
       api_key_masked: user_id.slice(0, 8) + "..." + user_id.slice(-4),
       backup_codes_remaining: backupCount,
       // The earlier of the idle window and the absolute cap: with an absolute
@@ -3585,16 +3637,53 @@ api.delete("/user/account/signing-key", authUser, async (req, res) => {
   }
 });
 
-// POST /api/user/account/backup-codes/regenerate
+// ── Fresh second factor for account-changing actions ────────────────────────
+// A session cookie alone is what a thief has. With it, back-up codes could be
+// regenerated (a permanent way back in after the victim signed out everywhere)
+// and the account deleted (sweep-acct finding 2). Revoking a signing key and
+// adding a passkey already asked for a TOTP code; these now ask too. A
+// back-up code is accepted as well and is consumed, for the customer who
+// has lost the authenticator and signed in with one.
+// Returns null when the factor is good, else { status, error } to send.
+async function freshSecondFactor(req, user_id) {
+  const b = req.body || {};
+  const totp = (b.totp == null ? "" : String(b.totp)).trim();
+  const backup = (b.backup_code == null ? "" : String(b.backup_code)).trim().toUpperCase();
+  if (!totp && !backup) return { status: 400, error: "second_factor_required" };
+  try {
+    if (totp) {
+      if (!/^\d{6}$/.test(totp)) return { status: 400, error: "second_factor_required" };
+      const vr = await callRelay("/v2/user/verify-totp", { user_id, totp });
+      const vb = await vr.json().catch(() => ({}));
+      return (vr.ok && vb.valid === true) ? null : { status: 403, error: "invalid_second_factor" };
+    }
+    if (!(await webauthn.rateHit(redis(), `sf:acct:${webauthn.scopeHash(user_id)}`, 5, 900))) return { status: 429, error: "rate_limited" };
+    const cr = await callRelay("/v2/user/consume-backup", { user_id, code: backup });
+    const cb = await cr.json().catch(() => ({}));
+    return (cr.ok && cb.valid === true) ? null : { status: 403, error: "invalid_second_factor" };
+  } catch (e) {
+    return { status: 502, error: "relay_unreachable" };
+  }
+}
+
+// POST /api/user/account/backup-codes/regenerate  (authUser + fresh 2FA)
 api.post("/user/account/backup-codes/regenerate", authUser, async (req, res) => {
+  const sf = await freshSecondFactor(req, req.userSession.user_id);
+  if (sf) return res.status(sf.status).json({ error: sf.error });
   const relayRes = await callRelay("/v2/user/regenerate-backup", { user_id: req.userSession.user_id });
   if (!relayRes.ok) return res.status(500).json({ error: "regenerate_failed" });
   res.json(await relayRes.json());
 });
 
-// POST /api/user/account/totp/reset
+// POST /api/user/account/totp/reset  (authUser + fresh 2FA, unless this
+// session was itself opened with a back-up code: that is the customer who
+// lost the authenticator, and the code he used is the fresh factor)
 api.post("/user/account/totp/reset", authUser, async (req, res) => {
   const { user_id, email } = req.userSession;
+  if (req.userSession.via !== "backup_code") {
+    const sf = await freshSecondFactor(req, user_id);
+    if (sf) return res.status(sf.status).json({ error: sf.error });
+  }
 
   await callRelay("/v2/user/delete-totp", { user_id });
 
@@ -3621,9 +3710,22 @@ api.post("/user/account/sessions/revoke-others", authUser, async (req, res) => {
   res.json({ success: true, revoked });
 });
 
-// DELETE /api/user/account
+// DELETE /api/user/account  (authUser + fresh 2FA)
 api.delete("/user/account", authUser, async (req, res) => {
   const { user_id } = req.userSession;
+  const sf = await freshSecondFactor(req, user_id);
+  if (sf) return res.status(sf.status).json({ error: sf.error });
+
+  // Open envelopes go first, while the key still resolves: a deleted account's
+  // requests stayed signable, counted on the dead account, and "everyone
+  // signed" went to the erased address (sweep-acct finding 5).
+  let envelopesVoided = null;
+  try {
+    const vr = await callRelay("/v2/admin/envelopes/void-account", { key: user_id });
+    const vb = await vr.json().catch(() => ({}));
+    if (vr.ok) envelopesVoided = vb.voided || 0;
+    else console.error("[user/account DELETE] void envelopes:", vr.status, vb.error || "");
+  } catch (e) { console.error("[user/account DELETE] void envelopes:", e.message); }
 
   // Revoke key across all sectors
   await eachSector(Object.keys(SECTORS), async s => {
@@ -3642,8 +3744,17 @@ api.delete("/user/account", authUser, async (req, res) => {
 
   await userSessions.revokeAll(redis(), user_id, { scan: scanSessions });
 
+  // The same redis records the admin delete clears. user:meta kept the email
+  // address after a self-service delete (ACCT-37, sweep-acct finding 5).
+  for (const k of [`paramant:user:meta:${user_id}`, `paramant:user:totp:${user_id}`, `paramant:user:totp_active:${user_id}`,
+    `paramant:user:billing:${user_id}`, `paramant:user:backup_codes:${user_id}`, `paramant:user:backup_codes_plaintext:${user_id}`,
+    `paramant:user:plan_cancel_at:${user_id}`]) {
+    await redis().del(k).catch(() => {});
+  }
+  try { await logAuditEvent(user_id, "account_deleted_self", { envelopes_voided: envelopesVoided }); } catch {}
+
   clearUserCookie(res);
-  res.json({ success: true });
+  res.json({ success: true, envelopes_voided: envelopesVoided });
 });
 
 // ── Session → API key proxy ───────────────────────────────────────────────────
@@ -3780,7 +3891,6 @@ api.post("/drop/upload", async (req, res) => {
 
 // ── Billing ───────────────────────────────────────────────────────────────────
 
-const publicPlans = require('./lib/public-plans');
 
 // No caller since the stub checkout was hard-disabled below; the plan-change
 // route mails its own copy. Left in place, and the note is derived rather than
