@@ -20,6 +20,7 @@ import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=2';
 import { previewTargetWidth, viewportTargetWidth, renderGeneration } from '/js/preview-render.js?v=1';
 import { initialsFrom, planParaafs, textBoxesFromItems, paraafFooter, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=2';
 import { requestsForParties } from '/js/cosign-layout.js?v=2';
+import { saveDraft, loadDraft, clearDraft } from '/js/sign-draft.js?v=1';
 import { splitKey, keyShareFragment, b64url as keyB64url, fromB64url as keyFromB64url } from '/js/parasign-ink.js?v=2';
 
 // One file, two languages. /sign is Dutch and /en/sign is the English copy of
@@ -691,7 +692,8 @@ async function sendForSignature() {
     clearSensitiveDocState();
   } catch (e) {
     if (cont) cont.disabled = false;
-    showRecipientsHint((e && e.status === 401) ? L('Log eerst in (via /auth/login) en kom dan hier terug.', 'Please sign in first (open /auth/login), then return here.') : readableError(e, L('Het verzoek kon niet worden aangemaakt. Probeer het zo nog eens.', 'Could not create the request. Please try again in a moment.')), true);
+    if (e && e.status === 401) { showSessionLost($('ds-recipients-hint')); return; }
+    showRecipientsHint(readableError(e, L('Het verzoek kon niet worden aangemaakt. Probeer het zo nog eens.', 'Could not create the request. Please try again in a moment.')), true);
   }
 }
 
@@ -3675,6 +3677,7 @@ async function doSign() {
     // opaque "AuthenticatorError" from a PRF assertion) has no e.status/e.code,
     // so it lands in the final else with a recovery path — never the raw engine
     // string, which leaked before and read as a crash to the user.
+    if (e && e.status === 401) { showSessionLost($('ds-sign-status')); $('ds-sign-now').disabled = false; return; }
     let msg;
     if (e && e.status === 401) msg = L('Log in om documenten te ondertekenen. Open /auth/login en kom dan hier terug.', 'Please sign in to sign documents. Open /auth/login, then return here.');
     else if (e && e.code === 'no_passkey') msg = L('Voeg eerst een passkey toe aan uw account (Account, inloggen met passkey) en onderteken daarna. De passkey waarmee u inlogt wordt uw ondertekensleutel.', 'Add a passkey to your account first (Account → Passkey sign-in), then sign, your sign-in passkey becomes your signing key.');
@@ -3863,6 +3866,7 @@ function renderTotpSha1Note(afterEl) {
 
 function showDone() {
   setActive('step-done');
+  clearDraft();   // sent or signed: the kept draft has done its job
   const r = state.result;
   // Say what the proof covers before the reader draws his own conclusion from
   // a green checkmark. Only ever from what the server actually reported: the
@@ -4212,7 +4216,7 @@ function wireNav() {
     // Whatever was typed here is lost by the navigation; applySessionToSendButton
     // has already said so on screen, above the button.
     if ($('ds-recipients-continue').dataset.signInFirst === '1') {
-      location.href = '/auth/login?next=' + (EN ? '/en/sign' : '/sign');
+      signInKeepingWork();
       return;
     }
     commitRecipientsFromDom();
@@ -4250,12 +4254,12 @@ function wireNav() {
     // first call is the step-up options, which is the 401 this gate exists to
     // stop; applySessionToSignButton has already said so above the button.
     if ($('ds-sign-now').dataset.signInFirst === '1') {
-      location.href = '/auth/login?next=' + (EN ? '/en/sign' : '/sign');
+      signInKeepingWork();
       return;
     }
     doSign();
   });
-  $('ds-restart').addEventListener('click', () => location.reload());
+  $('ds-restart').addEventListener('click', () => { clearDraft().finally(() => location.reload()); });
 }
 
 // ====================================================================
@@ -4341,6 +4345,123 @@ function wireLiveStampUpdates() {
   });
 }
 
+// ── Keeping the work across a sign-in (T5-6) ───────────────────────────────
+// Everything the customer prepared, as js/sign-draft.js keeps it.
+function draftMeta() {
+  if (!$('step-recipients').hidden) { try { commitRecipientsFromDom(); commitInviteDeliveryFromDom(); } catch { /* not rendered */ } }
+  const active = document.querySelector('.ds-step:not([hidden])');
+  return {
+    mode: state.signingMode,
+    step: active ? active.id : '',
+    docName: state.doc ? state.doc.name : '',
+    docHash: state.doc && state.doc.bytes ? toHex(sha3_256(state.doc.bytes)) : '',
+    stamp: state.stamp && !state.stamp.isImage ? { ...state.stamp } : null,
+    stampPage: state.stampPage ? { ...state.stampPage } : null,
+    stampAllPages: !!state.stampAllPages,
+    sealPlacement: state.sealPlacement || 'inline',
+    recipients: (state.recipients || []).map((r) => ({ label: r.label || '', email: r.email || '' })),
+    inviteSubject: state.inviteSubject || '',
+    inviteMessage: state.inviteMessage || '',
+    deliveryMode: state.deliveryMode || 'email',
+    signerName: ($('ds-signer-name') && $('ds-signer-name').value) || '',
+  };
+}
+
+async function signInKeepingWork() {
+  try {
+    if (state.doc && state.doc.bytes && state.doc.bytes.length) await saveDraft(draftMeta(), state.doc.bytes);
+  } catch (e) {
+    try { console.warn('[paramant] draft not kept', e); } catch { /* no console */ }
+  }
+  location.href = '/auth/login?next=' + encodeURIComponent((EN ? '/en/sign' : '/sign') + '?herstel=1');
+}
+
+// The session ran out halfway: one sentence and one button, and the work
+// stays (it used to be "open /auth/login and come back", and everything was
+// gone on return).
+function showSessionLost(el) {
+  if (!el) return;
+  el.hidden = false;
+  el.className = 'ds-banner err';
+  el.textContent = L('Uw sessie is verlopen. Log opnieuw in; uw document, de plek en de ontvangers blijven in deze browser bewaard en staan daarna weer klaar. ', 'Your session has expired. Sign in again; your document, the spot and the recipients are kept in this browser and are ready again afterwards. ');
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'btn btn-primary'; b.id = 'ds-signin-keep';
+  b.textContent = L('Inloggen en verdergaan', 'Sign in and continue');
+  b.addEventListener('click', signInKeepingWork);
+  el.appendChild(b);
+}
+
+function waitFor(cond, ms = 15000) {
+  return new Promise((resolve) => {
+    const t0 = Date.now();
+    const tick = () => { if (cond()) return resolve(true); if (Date.now() - t0 > ms) return resolve(false); setTimeout(tick, 50); };
+    tick();
+  });
+}
+
+// Back from the sign-in: put the draft back where the customer left it.
+async function restoreDraft(draft) {
+  const m = draft.meta || {};
+  if (!draft.bytes || !m.mode || toHex(sha3_256(draft.bytes)) !== m.docHash) { await clearDraft(); return false; }
+  state.signingMode = m.mode;
+  setStepperForMode(m.mode);
+  setActive('step-doc');
+  await onDocChosen(new File([draft.bytes], m.docName || 'document.pdf', { type: 'application/pdf' }));
+  if (state.mode === 'pdf' && m.stamp) {
+    await waitFor(() => placeState && Array.isArray(placeState.pages) && placeState.pages.length
+      && placeState.pages.every((p) => p.wrap && p.wrap.querySelector('canvas') && p.wrap.querySelector('canvas').getBoundingClientRect().width > 0));
+    state.stamp = { ...m.stamp };
+    state.stampPage = m.stampPage ? { ...m.stampPage } : state.stampPage;
+    if (m.sealPlacement) state.sealPlacement = m.sealPlacement;
+    reflowStampMarker();
+    setStampAllPages(!!m.stampAllPages, false);
+    $('ds-place-continue').disabled = false;
+  }
+  state.recipients = Array.isArray(m.recipients) ? m.recipients.map((r) => ({ label: r.label || '', email: r.email || '' })) : [];
+  state.inviteSubject = m.inviteSubject || '';
+  state.inviteMessage = m.inviteMessage || '';
+  state.deliveryMode = m.deliveryMode || 'email';
+  { const el = $('ds-invite-subject'); if (el) el.value = state.inviteSubject; }
+  { const el = $('ds-invite-message'); if (el) el.value = state.inviteMessage; }
+  { const el = document.querySelector('input[name="ds-delivery-mode"][value="' + state.deliveryMode + '"]'); if (el) el.checked = true; }
+  if (m.signerName && $('ds-signer-name')) { $('ds-signer-name').value = m.signerName; $('ds-signer-name').dispatchEvent(new Event('input', { bubbles: true })); }
+  const back = L('Welkom terug. Uw document, de plek en de ontvangers staan er nog.', 'Welcome back. Your document, the spot and the recipients are still here.');
+  const wasLater = ['step-recipients', 'step-identity', 'step-sign'].includes(m.step);
+  if (wasLater && m.mode !== 'alone') {
+    enterRecipients();
+    showRecipientsHint(back, false);
+  } else if (wasLater && m.mode === 'alone') {
+    setActive('step-identity');
+  } else {
+    setPlaceHint(back);
+  }
+  await clearDraft();
+  return true;
+}
+
+async function offerDraftAfterSignIn() {
+  await sessionKnown;
+  if (sessionState !== 'in') return;
+  const draft = await loadDraft();
+  if (!draft) return;
+  const q = new URLSearchParams(location.search);
+  if (q.get('herstel') === '1') { await restoreDraft(draft); return; }
+  // Not straight back from the sign-in: ask, once, on the first screen.
+  const host = $('step-mode');
+  if (!host || host.hidden) return;
+  const box = document.createElement('div');
+  box.className = 'ds-banner'; box.id = 'ds-draft-offer';
+  box.textContent = L('U was bezig met ', 'You were working on ') + '"' + (draft.meta.docName || 'document') + '". ';
+  const go = document.createElement('button');
+  go.type = 'button'; go.className = 'btn btn-primary'; go.textContent = L('Verdergaan', 'Continue');
+  go.addEventListener('click', () => { box.remove(); restoreDraft(draft); });
+  const drop = document.createElement('button');
+  drop.type = 'button'; drop.className = 'btn btn-tertiary'; drop.textContent = L('Weggooien', 'Discard');
+  drop.addEventListener('click', () => { box.remove(); clearDraft(); });
+  box.append(go, ' ', drop);
+  host.insertBefore(box, host.firstChild.nextSibling);
+}
+
 function init() {
   // First, before anything that might want to ask the API a question only a
   // session can answer: initStepIdentity() below is one such caller.
@@ -4364,6 +4485,7 @@ function init() {
   } else {
     setActive('step-mode');
   }
+  offerDraftAfterSignIn().catch(() => { /* no draft, nothing to offer */ });
 }
 
 // What the probe answered, kept so every later step can ask the same question
@@ -4404,12 +4526,11 @@ function applySignedOut() {
 // button whose only possible answer is 401, three steps after the moment we
 // already knew. So it becomes the sign-in.
 //
-// The prepared state does NOT survive it, and the button says so rather than
-// pretending. The document lives in this page as raw bytes; a scanned contract
-// or a phone photo is megabytes and sessionStorage is about 5MB per origin, so
-// stashing it would fail on exactly the files people bring. The recipients and
-// the message are small enough to keep, but keeping half a flow and silently
-// dropping the other half is worse than one honest sentence.
+// The prepared state survives it (retest T5-6): signInKeepingWork keeps the
+// document, the spot and the recipients as a draft in IndexedDB
+// (js/sign-draft.js, the bytes encrypted, wiped after two hours or once sent),
+// and /sign?herstel=1 puts it all back after the sign-in. sessionStorage could
+// not: a scanned contract is megabytes and it holds about 5MB per origin.
 function applySessionToSendButton() {
   const cont = $('ds-recipients-continue');
   if (!cont) return;
@@ -4419,7 +4540,7 @@ function applySessionToSendButton() {
   cont.textContent = L('Inloggen om te versturen', 'Sign in to send');
   cont.disabled = false;
   if (!$('step-recipients').hidden) {
-    showRecipientsHint(L('Uw document is niet geüpload en blijft in deze browser. Inloggen laadt deze pagina opnieuw, dus daarna kiest u het bestand en de ontvangers nog een keer.', 'Your document has not been uploaded and stays in this browser. Signing in reloads this page, so you pick the file and the recipients again afterwards.'), false);
+    showRecipientsHint(L('Uw document is niet geüpload en blijft in deze browser. Na het inloggen staan het document, de plek en de ontvangers weer klaar.', 'Your document has not been uploaded and stays in this browser. After you sign in, the document, the spot and the recipients are ready again.'), false);
   }
 }
 

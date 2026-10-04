@@ -109,7 +109,7 @@ ok('the default subject is the English one',
   await out.locator('#ds-invite-subject').inputValue());
 await out.locator('#ds-recipients-continue').click();
 await out.waitForURL(/\/auth\/login/, { timeout: 15000 }).catch(() => {});
-ok('pressing it comes back to the English page', /\/auth\/login\?next=(\/|%2F)en(\/|%2F)sign$/.test(out.url()), out.url());
+ok('pressing it comes back to the English page', /\/auth\/login\?next=(\/|%2F)en(\/|%2F)sign(%3Fherstel%3D1)?$/.test(out.url()), out.url());
 await out.close();
 
 const jpeg = await openSign(true);
