@@ -653,8 +653,10 @@ function renderBurnReceipt(burnedHashes) {
 
 // Bytes into something a person reads. Same rounding as /get.
 function formatSize(n) {
-  if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
-  if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
+  const nl = !/^en\b/i.test(document.documentElement.lang || '');
+  const one = (x) => { const v = x.toFixed(1); return nl ? v.replace('.', ',') : v; };
+  if (n >= 1024 * 1024) return one(n / 1024 / 1024) + ' MB';
+  if (n >= 1024) return one(n / 1024) + ' KB';
   return n + ' B';
 }
 

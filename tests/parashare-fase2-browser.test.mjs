@@ -153,3 +153,28 @@ test('SENDNAME-49-A: "Open de webapp" opens the web app, not the home page', () 
   assert.match(fs.readFileSync(path.join(PF_ROOT, 'download.html'), 'utf8'), /href="\/parashare">Open de webapp/);
   assert.match(fs.readFileSync(path.join(PF_ROOT, 'en/download.html'), 'utf8'), /href="\/en\/parashare">Open the web app/);
 });
+
+test('P04: the file line says KB with a decimal comma, and a file name stays text', async () => {
+  const page = await senderPage({ checkKey: (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ valid: true, plan: 'pro', link_ttl_ms_by_plan: TTLS }) }) });
+  await page.goto(PF_ORIGIN + '/parashare');
+  await page.locator('#file-input').setInputFiles({ name: 'loonstrook.pdf', mimeType: 'application/pdf', buffer: crypto.randomBytes(40_000) });
+  assert.match(await page.locator('#file-status').innerText(), /loonstrook\.pdf \(39,1 KB\)/);
+  await page.locator('#file-input').setInputFiles([
+    { name: '<img src=x onerror=window.__pwned=1>.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(10) },
+    { name: 'b.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(10) },
+  ]);
+  await page.waitForTimeout(200);
+  assert.equal(await page.evaluate(() => window.__pwned || 0), 0, 'a file name became markup');
+  assert.match(await page.locator('#vault-list').innerText(), /<img src=x/);
+  await page.close();
+});
+
+test('jargon: the Dutch messages on /parashare do not speak of a relay or a sector', () => {
+  const src = fs.readFileSync(path.join(PF_ROOT, 'js/parashare.page.js'), 'utf8');
+  const nl = src.slice(src.indexOf('\n  nl: {'), src.indexOf('\n};', src.indexOf('\n  nl: {')));
+  const lines = nl.split('\n').filter((l) => /^\s+\w+: /.test(l) && !/^\s+relayLoc:/.test(l));
+  // Only what a reader sees: drop the key, arrow parameters and ${...} slots.
+  const said = (l) => l.replace(/^\s+\w+:/, '').replace(/\([^)]*\)\s*=>/g, '').replace(/\$\{[^}]*\}/g, '');
+  const hits = lines.filter((l) => /\brelay\b|\bsector\b/i.test(said(l)));
+  assert.deepEqual(hits, []);
+});

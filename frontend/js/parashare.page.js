@@ -15,17 +15,17 @@ const T = {
     receiverConnected: 'Receiver connected',
     receiverWaits: 'Your receiver is waiting for you to compare the code',
     validPlan: (plan, sector) => `✓ Valid, plan: ${plan}${sector}`,
-    accountNoSector: 'This account is not active on any relay sector',
+    accountNoSector: 'This account is not active on any of our servers. Mail privacy@paramant.app and we will look into it.',
     keyInvalid: 'Invalid or revoked key',
-    noSectorAnswered: 'No relay sector answered. Check your connection and press Create secure session again.',
+    noSectorAnswered: 'Our server did not answer. Check your connection and press Create secure session again.',
     tooManyChecks: 'Too many checks from this network just now. Wait a minute and reload the page. Your key is not the problem.',
-    sectorUnreachable: 'Could not reach a relay sector. You can still continue.',
+    sectorUnreachable: 'Could not reach our server. You can still continue.',
     enterKey: 'Enter your API key to continue',
     notAKey: 'That does not look like a key. It starts with pgp_.',
     noFile: 'No file selected',
     filesPackage: (n) => n + ' files, each sealed on its own',
     sendingPart: (name, i, n) => 'Sending ' + name + ', part ' + i + ' of ' + n + '...',
-    lookingSector: 'Looking for a relay sector...',
+    lookingSector: 'Connecting...',
     waitingOpen: 'Waiting for your receiver to open the link...',
     receiverClosed: 'Your receiver closed the link',
     receiverClosedLong: 'Your receiver closed the link before you compared the code. Nothing was uploaded and your file is still here in this browser.',
@@ -38,7 +38,7 @@ const T = {
       + '. Each one gets their own link and a code to this address.',
     xOfY: (a, b) => a + ' of ' + b,
     testModeTitle: 'Not sent: test mode',
-    testModeLead: (n) => 'This relay delivers no mail (test mode). The file is stored for ' + n + (n === 1 ? ' recipient' : ' recipients') + ', but no invitation went out.',
+    testModeLead: (n) => 'This server delivers no mail (test mode). The file is stored for ' + n + (n === 1 ? ' recipient' : ' recipients') + ', but no invitation went out.',
     testModeNote: 'Ask the administrator to set up a mail provider (MAIL_PROVIDER), then send again.',
     sentTitle: 'Sent',
     invitesLead: (aantal) => aantal + ' invitations are on their way. Everyone got their own link.',
@@ -135,17 +135,17 @@ const T = {
     receiverConnected: 'Ontvanger verbonden',
     receiverWaits: 'De ontvanger wacht tot u de controlecode vergelijkt',
     validPlan: (plan, sector) => `✓ Geldig, abonnement: ${plan}${sector}`,
-    accountNoSector: 'Dit account is op geen enkele relay actief',
+    accountNoSector: 'Dit account is op geen van onze servers actief. Mail privacy@paramant.app, dan zoeken we het uit.',
     keyInvalid: 'Ongeldige of ingetrokken sleutel',
-    noSectorAnswered: 'Geen relay gaf antwoord. Controleer uw verbinding en druk opnieuw op Veilige sessie starten.',
+    noSectorAnswered: 'Onze server gaf geen antwoord. Controleer uw verbinding en druk opnieuw op Veilige sessie starten.',
     tooManyChecks: 'Even te veel controles vanaf dit netwerk. Wacht een minuut en laad de pagina opnieuw. Aan uw sleutel ligt het niet.',
-    sectorUnreachable: 'Geen relay bereikbaar. U kunt wel verder.',
+    sectorUnreachable: 'Onze server is niet bereikbaar. U kunt wel verder.',
     enterKey: 'Vul uw API-sleutel in om verder te gaan',
     notAKey: 'Dat lijkt geen sleutel. Een sleutel begint met pgp_.',
     noFile: 'Geen bestand gekozen',
     filesPackage: (n) => n + ' bestanden, elk apart verzegeld',
     sendingPart: (name, i, n) => name + ' wordt verstuurd, deel ' + i + ' van ' + n + '...',
-    lookingSector: 'Relay zoeken...',
+    lookingSector: 'Verbinding maken...',
     waitingOpen: 'Wachten tot de ontvanger de link opent...',
     receiverClosed: 'De ontvanger heeft de link gesloten',
     receiverClosedLong: 'De ontvanger sloot de link voordat u de controlecode vergeleek. Er is niets geüpload en uw bestand staat nog hier in deze browser.',
@@ -158,7 +158,7 @@ const T = {
       + '. Iedere ontvanger krijgt een eigen link en een controlecode op dit adres.',
     xOfY: (a, b) => a + ' van ' + b,
     testModeTitle: 'Niet verstuurd: testmodus',
-    testModeLead: (n) => 'Deze relay bezorgt geen mail (testmodus). Het bestand staat klaar voor ' + n + (n === 1 ? ' ontvanger' : ' ontvangers') + ', maar er is geen uitnodiging verstuurd.',
+    testModeLead: (n) => 'Deze server bezorgt geen mail (testmodus). Het bestand staat klaar voor ' + n + (n === 1 ? ' ontvanger' : ' ontvangers') + ', maar er is geen uitnodiging verstuurd.',
     testModeNote: 'Vraag de beheerder een mailprovider in te stellen (MAIL_PROVIDER) en verstuur het daarna opnieuw.',
     sentTitle: 'Verstuurd',
     invitesLead: (aantal) => aantal + ' uitnodigingen zijn onderweg. Iedere ontvanger kreeg een eigen link.',
@@ -859,20 +859,38 @@ function setCreateStatus(msg, cls) {
   el.className = 'status-line' + (cls ? ' ' + cls : '');
 }
 
+// Bytes into something a person reads, decimal comma on the Dutch page. The
+// status line used to say "(0.0 MB)" for a 40 KB payslip (fase 1, P04).
+function humanSize(n) {
+  const one = (x) => { const v = x.toFixed(1); return LANG === 'en' ? v : v.replace('.', ','); };
+  if (n >= 1048576) return one(n / 1048576) + ' MB';
+  if (n >= 1024) return one(n / 1024) + ' KB';
+  return n + ' B';
+}
+
 function onFileSelect() {
   const files = $('file-input').files;
   selectedFile = files[0] || null;
   if (!files.length) { setStatus('file-status', t('noFile')); $('vault-list').style.display='none'; updateBtn(); return; }
   if (files.length === 1) {
-    setStatus('file-status', '✓ ' + files[0].name + ' (' + (files[0].size/1024/1024).toFixed(1) + ' MB)', 'ok');
+    setStatus('file-status', '✓ ' + files[0].name + ' (' + humanSize(files[0].size) + ')', 'ok');
     $('vault-list').style.display = 'none';
   } else {
     setStatus('file-status', '✓ ' + t('filesPackage')(files.length), 'ok');
     const vl = $('vault-list');
     vl.style.display = 'block';
-    vl.innerHTML = [...files].map(f =>
-      '<div style="font-size:10px;color:var(--ink-2);padding:2px 0;font-family:var(--mono)">' + f.name + ' <span style="color:var(--ink-dim)">(' + (f.size/1024/1024).toFixed(1) + ' MB)</span></div>'
-    ).join('');
+    // Nodes, not innerHTML: a file name is text, whatever characters it has.
+    vl.textContent = '';
+    [...files].forEach((f) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'font-size:10px;color:var(--ink-2);padding:2px 0;font-family:var(--mono)';
+      row.textContent = f.name + ' ';
+      const sz = document.createElement('span');
+      sz.style.color = 'var(--ink-dim)';
+      sz.textContent = '(' + humanSize(f.size) + ')';
+      row.appendChild(sz);
+      vl.appendChild(row);
+    });
   }
   updateBtn();
 }
