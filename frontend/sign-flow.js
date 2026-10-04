@@ -3969,7 +3969,7 @@ function showDone() {
   if ($('ds-done-notary')) $('ds-done-notary').textContent = L('Ja, vastgelegd op de relay en in het openbare CT-logboek', 'Yes - recorded on the relay and the public CT log');
 
   const psignName = (state.mode === 'pdf' ? 'signed-' + state.doc.name : state.doc.name).replace(/\.[^.]+$/, '') + '.psign';
-  $('ds-dl-psign').onclick = () => downloadBytes(new TextEncoder().encode(JSON.stringify(r.envelope, null, 2)), psignName, 'application/json');
+  $('ds-dl-psign').onclick = () => downloadBytes(new TextEncoder().encode(JSON.stringify(psignForFile(r.envelope), null, 2)), psignName, 'application/json');
   // One loud button per end screen. When there is a stamped document it is the
   // one people came for and the proof file is the quiet line beside it; in
   // hash-only mode the proof file IS the document's only companion, so it takes
@@ -4097,6 +4097,18 @@ function setDonePrimary(id) {
     if (!el) return;
     el.className = (btn === id) ? 'btn btn-primary done-primary' : 'done-quiet';
   });
+}
+
+// The .psign as it leaves the browser. The personal invitation links (with
+// each co-signer's invite token) are for this screen only: in the file they
+// handed every reader of the proof the means to open the others' invitations
+// (retest T3-11). Nothing that verifies reads them; every other byte of the
+// proof stays exactly as before.
+export function psignForFile(envelope) {
+  if (!envelope || !envelope.multiparty || !('party_links' in envelope.multiparty)) return envelope;
+  const multiparty = { ...envelope.multiparty };
+  delete multiparty.party_links;
+  return { ...envelope, multiparty };
 }
 
 function renderPartyLinks(mp) {

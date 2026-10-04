@@ -46,8 +46,8 @@ const json = (route, status, body) => route.fulfill({ status, contentType: 'appl
 const NO_WEBAUTHN = () => { try { delete window.PublicKeyCredential; } catch { /* */ } window.PublicKeyCredential = undefined; };
 
 // /sign alleen tekenen, tot het scherm met de code, en daarna klaar.
-async function soloSign({ noWebAuthn, passkeys }) {
-  const ctx = await browser.newContext({ viewport: { width: 1100, height: 900 } });
+async function soloSign({ noWebAuthn, passkeys, download }) {
+  const ctx = await browser.newContext({ viewport: { width: 1100, height: 900 }, acceptDownloads: true });
   if (noWebAuthn) await ctx.addInitScript(NO_WEBAUTHN);
   const page = await ctx.newPage();
   const calls = [];
@@ -59,7 +59,8 @@ async function soloSign({ noWebAuthn, passkeys }) {
   await page.route('**/api/user/account/webauthn/credentials', (r) => json(r, 200, { passkeys: passkeys || [], total: (passkeys || []).length }));
   await page.route('**/api/user/account/signing-key/step-up/options', (r) => json(r, 409, { error: 'no_passkey' }));
   await page.route('**/api/user/account/signing-key', (r) => r.request().method() === 'POST' ? json(r, 200, { ok: true, totp_algorithm: 'sha256' }) : json(r, 200, { keys: [] }));
-  await page.route('**/api/user/envelopes', (r) => json(r, 200, { ok: true, envelope: { id: 'env_demo_sleutelpadenxyz', party_count: 1, party_links: [] } }));
+  await page.route('**/api/user/envelopes', (r) => json(r, 200, { ok: true, envelope: { id: 'env_demo_sleutelpadenxyz', party_count: 2, expires_at: '2026-11-01T00:00:00.000Z',
+    party_links: [0, 1].map((i) => ({ party_index: i, sign_path: '/co-sign?env=env_demo_sleutelpadenxyz&p=' + i + '&t=GEHEIMTOKEN' + i, invite_token: 'GEHEIMTOKEN' + i })) } }));
   await page.route('**/api/user/sign/activation', (r) => json(r, 200, { activation_id: 'act_demo_0001', email_hash: 'b'.repeat(64), recipe_version: 4 }));
   await page.route('**/api/user/sign/submit', (r) => json(r, 200, { ok: true, signed_count: 1, party_count: 1, status: 'complete' }));
   await page.goto(`${ORIGIN}/sign?mode=alone`, { waitUntil: 'domcontentloaded' });
@@ -92,8 +93,13 @@ async function soloSign({ noWebAuthn, passkeys }) {
     await page.locator('#ds-pass-confirm').click();
     done = await page.locator('#step-done:not([hidden])').waitFor({ timeout: 90000 }).then(() => true, () => false);
   }
+  let psign = null;
+  if (done && download) {
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('#ds-dl-psign').click()]);
+    psign = fs.readFileSync(await dl.path(), 'utf8');
+  }
   await ctx.close();
-  return { panel, done, statusText, calls, consoleErrors };
+  return { panel, done, statusText, calls, consoleErrors, psign };
 }
 
 test('zonder WebAuthn tekent de klant met de code uit de authenticator-app', async () => {
@@ -184,4 +190,13 @@ test('/co-sign noemt een niet-gekoppelde sleutel bij naam en biedt opnieuw koppe
   assert.match(text, /niet aan uw account gekoppeld/, text);
   assert.doesNotMatch(text, /ander e-mailadres/, text);
   assert.equal(relink, 1, 'er is een knop om de sleutel opnieuw te koppelen');
+});
+
+test('het .psign-bestand bevat geen uitnodigingslinks of -tokens', async () => {
+  const r = await soloSign({ noWebAuthn: false, passkeys: [], download: true });
+  assert.ok(r.psign, 'het bewijs is gedownload');
+  assert.doesNotMatch(r.psign, /GEHEIMTOKEN|invite_token|party_links/, 'uitnodigingen in het bewijs');
+  const env = JSON.parse(r.psign);
+  assert.equal(env.multiparty.envelope_id, 'env_demo_sleutelpadenxyz', 'de verwijzing naar de envelop blijft');
+  assert.equal(env.multiparty.party_count, 2);
 });
