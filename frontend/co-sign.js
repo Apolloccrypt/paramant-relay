@@ -112,6 +112,10 @@ let __appearance = { version: 1, fields: [] };
 // what tells the overlay to draw dashed "requested spots" instead of placed
 // marks, and it goes false the moment the signer places, moves or clears.
 let __appearanceIsSeed = false;
+// The sender asked for a paraaf on every page (a paraaf field in the request
+// for this party, retest T5-4): then this party cannot leave it out. UI only;
+// the request already carries the field, nothing new on the wire.
+let __requiredParaaf = null;
 let __signedPdfBytes = null;
 // The pdf.js document of the preview: page sizes and the text layer.
 let __previewPdf = null;
@@ -146,7 +150,13 @@ function saveAppearanceDraft() {
   } catch { /* session storage unavailable */ }
 }
 
+function withRequiredParaaf(fields) {
+  if (!__requiredParaaf || fields.some(isParaaf)) return fields;
+  return fields.concat({ ...__requiredParaaf });
+}
+
 function setAppearance(fields) {
+  fields = withRequiredParaaf(fields);
   __appearance = normaliseSigningAppearance({ version: fields.some((f) => f.all_pages) ? 2 : 1, fields });
   __appearanceIsSeed = false;
   { const note = $('requested-note'); if (note) note.hidden = true; }
@@ -160,7 +170,14 @@ const isSignature = (f) => f.type === 'seal' && !f.all_pages;
 
 function syncParaafBox() {
   const box = $('appearance-allpages');
-  if (box) box.checked = (__appearance.fields || []).some(isParaaf);
+  if (box) {
+    box.checked = (__appearance.fields || []).some(isParaaf);
+    box.disabled = !!__requiredParaaf;
+  }
+  const label = $('appearance-allpages-label');
+  if (label) label.title = __requiredParaaf ? L('De afzender vraagt een paraaf op elke pagina.', 'The sender asks for initials on every page.') : '';
+  const req = $('appearance-allpages-required');
+  if (req) req.hidden = !__requiredParaaf;
 }
 
 // ---------- status: what a person reads at the top ----------
@@ -300,7 +317,7 @@ function renderEnvelope() {
   $('appearance-seal').onclick = () => armAppearanceTool('seal');
   $('appearance-date').onclick = () => armAppearanceTool('date');
   $('appearance-clear').onclick = () => {
-    __appearance = { version: 1, fields: [] };
+    __appearance = normaliseSigningAppearance({ version: __requiredParaaf ? 2 : 1, fields: withRequiredParaaf([]) });
     __appearanceIsSeed = false;
     { const note = $('requested-note'); if (note) note.hidden = true; }
     saveAppearanceDraft();
@@ -637,7 +654,9 @@ async function verifyAndRenderDocument(buf, source) {
   if (editorOn) {
     const draft = loadAppearanceDraft();
     const seed = draft ? null : await computeSeed();
+    __requiredParaaf = requiredParaafOfRequest();
     __appearance = draft ? clampToPages(draft).appearance : (seed || { version: 1, fields: [] });
+    if (__requiredParaaf && !__appearance.fields.some(isParaaf)) __appearance = normaliseSigningAppearance({ version: 2, fields: withRequiredParaaf(__appearance.fields) });
     __appearanceIsSeed = !!seed;
     seeded = !!seed;
     syncParaafBox();
@@ -747,6 +766,16 @@ function clampToPages(appearance) {
   return { appearance: normaliseSigningAppearance({ version: fields.some((f) => f.all_pages) ? 2 : 1, fields }), moved };
 }
 
+// The paraaf the sender asked of THIS party, or null.
+function requiredParaafOfRequest() {
+  const e = __envelope || {};
+  if (!e.requested_for_party || !e.requested_appearance) return null;
+  let req = null;
+  try { req = normaliseSigningAppearance(e.requested_appearance); } catch { return null; }
+  const par = (req.fields || []).find(isParaaf);
+  return par ? { type: 'seal', page_index: 0, x: par.x, y: par.y, w: par.w, h: par.h, all_pages: true } : null;
+}
+
 async function computeSeed() {
   const e = __envelope;
   const count = Math.max(1, Number(e.party_count) || 1);
@@ -756,8 +785,16 @@ async function computeSeed() {
   try { requested = e.requested_appearance ? normaliseSigningAppearance(e.requested_appearance) : null; } catch { requested = null; }
   if (requested && !requested.fields.length) requested = null;
 
-  // 1. The sender chose a spot for THIS party: take it as it is.
-  if (requested && e.requested_for_party) return clampToPages(requested).appearance;
+  // 1. The sender chose a spot for THIS party: take it as it is. A request
+  //    with only the paraaf (the sender asked for initials but pointed at no
+  //    spot) gets a free place for the signature, as in case 3.
+  if (requested && e.requested_for_party) {
+    const clamped = clampToPages(requested).appearance;
+    if (clamped.fields.some(isSignature)) return clamped;
+    const boxes = await textBoxesOfPage(lastPage);
+    const sig = { type: 'seal', page_index: lastPage, ...partySignatureSpot({ anchor: null, index, count, textBoxes: boxes }) };
+    return normaliseSigningAppearance({ version: 2, fields: [sig, ...clamped.fields] });
+  }
 
   const fields = [];
   if (requested) {
