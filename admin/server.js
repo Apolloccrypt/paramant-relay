@@ -5275,6 +5275,8 @@ const sameOrigin = require('./lib/same-origin');
 const CSRF_ALLOWED_ORIGINS = sameOrigin.buildAllowList(SITE_URL, process.env.CSRF_EXTRA_ORIGINS);
 const CSRF_ALLOW_LOCALHOST = process.env.NODE_ENV !== 'production';
 function requireSameOrigin(req, res, next) {
+  // The Outlook add-in's own origin on its few routes (see ADDIN_CORS_PATHS).
+  if (req._addinCors) return next();
   const v = sameOrigin.verdict({
     method: req.method,
     // req.path inside a mounted router is the path BELOW the mount, so this is
@@ -5314,7 +5316,7 @@ app.use(`${BASE_PATH}/api`, (req, res, next) => {
   req._addinCors = true;
   next();
 });
-app.use(`${BASE_PATH}/api`, (req, res, next) => (req._addinCors ? next() : requireSameOrigin(req, res, next)));
+app.use(`${BASE_PATH}/api`, requireSameOrigin);
 
 app.use(`${BASE_PATH}/api`, api);
 // /cli -- web debug terminal page (served before the SPA wildcard fallback).
