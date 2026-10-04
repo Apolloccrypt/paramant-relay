@@ -18,6 +18,7 @@ const T = {
     accountNoSector: 'This account is not active on any relay sector',
     keyInvalid: 'Invalid or revoked key',
     noSectorAnswered: 'No relay sector answered. Check your connection and press Create secure session again.',
+    tooManyChecks: 'Too many checks from this network just now. Wait a minute and reload the page. Your key is not the problem.',
     sectorUnreachable: 'Could not reach a relay sector. You can still continue.',
     enterKey: 'Enter your API key to continue',
     notAKey: 'That does not look like a key. It starts with pgp_.',
@@ -137,6 +138,7 @@ const T = {
     accountNoSector: 'Dit account is op geen enkele relay actief',
     keyInvalid: 'Ongeldige of ingetrokken sleutel',
     noSectorAnswered: 'Geen relay gaf antwoord. Controleer uw verbinding en druk opnieuw op Veilige sessie starten.',
+    tooManyChecks: 'Even te veel controles vanaf dit netwerk. Wacht een minuut en laad de pagina opnieuw. Aan uw sleutel ligt het niet.',
     sectorUnreachable: 'Geen relay bereikbaar. U kunt wel verder.',
     enterKey: 'Vul uw API-sleutel in om verder te gaan',
     notAKey: 'Dat lijkt geen sleutel. Een sleutel begint met pgp_.',
@@ -340,7 +342,21 @@ function $(id) { return document.getElementById(id); }
 // retry failed the same way. Now the deadline scales with the block: two
 // minutes, or as long as the body takes at 16 KB/s, whichever is longer. If it
 // still runs out, or the line drops, the sender is told it is the connection.
-function postInbound(bodyStr) {
+// A 503 from /v2/inbound is the relay's memory guard saying "not now", with a
+// Retry-After. It stored nothing, so the same block may go again. Until
+// 2026-10-04 the first 503 broke a 24 MB send at 36% with "Er ging aan onze
+// kant iets mis" (fase 1, SENDNAME-09-RAM). Three more tries, at most 30 s apart.
+const INBOUND_503_RETRIES = 3;
+async function postInbound(bodyStr) {
+  for (let attempt = 0; ; attempt++) {
+    const r = await postInboundOnce(bodyStr);
+    if (r.status !== 503 || attempt >= INBOUND_503_RETRIES) return r;
+    const ra = parseInt(r.headers.get('Retry-After') || '', 10);
+    const waitS = Math.min(30, Number.isFinite(ra) && ra > 0 ? ra : 2 * (attempt + 1));
+    await new Promise((res) => setTimeout(res, waitS * 1000));
+  }
+}
+function postInboundOnce(bodyStr) {
   const ms = Math.max(120000, Math.ceil(bodyStr.length / 16384) * 1000);
   return relayFetch(RELAY_API + '/v2/inbound', {
     method: 'POST',
@@ -739,6 +755,10 @@ async function discoverRelay() {
       const r = await relayFetch(`${url}/v2/check-key`, {
         signal: AbortSignal.timeout(5000)
       });
+      // A 429 is "slow down", not an answer about the key. Read as valid:false
+      // it told a customer with a good key "Ongeldige of ingetrokken sleutel"
+      // (fase 1, P04 bij SEND-03-A).
+      if (r.status === 429) { const e = new Error('rate_limited'); e.rateLimited = true; throw e; }
       const d = await r.json();
       return {
         sector, url, plan: d.plan, valid: !!d.valid,
@@ -748,9 +768,12 @@ async function discoverRelay() {
   );
   const answered = results.filter(r => r.status === 'fulfilled').map(r => r.value);
   const valid = answered.filter(a => a.valid);
+  const rateLimited = results.some(r => r.status === 'rejected' && r.reason && r.reason.rateLimited);
   return {
-    // Every sector that spoke said no. That is a verdict on the key.
-    rejected: answered.length > 0 && valid.length === 0,
+    rateLimited,
+    // Every sector that spoke said no, and none of them only said "slow down":
+    // the one that holds the key may be the one that was busy.
+    rejected: answered.length > 0 && valid.length === 0 && !rateLimited,
     // Prefer health; otherwise first sector that responded
     found: valid.find(v => v.sector === 'health') || valid[0] || null
   };
@@ -781,6 +804,9 @@ async function discoverAndReport() {
     applyPlanTtls(d.found);
     const sectorLabel = d.found.sector !== 'health' ? ` · ${d.found.sector}` : '';
     setStatus('key-status', t('validPlan')(d.found.plan, sectorLabel), 'ok');
+  } else if (d.rateLimited) {
+    relayError = t('tooManyChecks');
+    setStatus('key-status', t('tooManyChecks'), 'err');
   } else if (d.rejected) {
     // A sector answered and said no. On the session path that is a verdict on
     // the account, not on anything the sender typed, so it is not called a bad
@@ -1050,8 +1076,8 @@ function toonVerzending(verzending, naam) {
       title: t('sentTitle'),
       lead: t('invitesLead')(aantal),
       note: t('invitesNote'),
-      actions: [{ label: t('openDashboard'), href: '/dashboard' },
-                { label: t('sendAnother'), href: LANG === 'en' ? '/en/parashare' : '/parashare' }],
+      // "Nog een bestand versturen" is already the primary button of step-done.
+      actions: [{ label: t('openDashboard'), href: LANG === 'en' ? '/en/dashboard' : '/dashboard' }],
     });
   }
   showStep('step-done');
@@ -1904,8 +1930,23 @@ async function refreshSentLinks() {
   for (const btn of btns) { btn.disabled = false; btn.textContent = t('checkAgain'); }
 }
 
+// The receiver never heard a rejection: it has no API key, so no WebSocket
+// ticket and no socket, and waited ten minutes behind its code (fase 1,
+// SENDNAME-28-A). What it does poll is the `_ready` slot. A rejection fills
+// that slot with a record no real send can make, zero blocks and an all-zero
+// token, within the grammar relay/lib/handshake-record.js allows. The slot is
+// first-write-wins, so the session is spent either way; the sender starts a
+// fresh one.
+const REJECT_READY = { kyber_pub: 'file|0|0', ecdh_pub: '0'.repeat(48) };
 function rejectFingerprint() {
-  ws.close();
+  if (sessionToken) {
+    relayFetch(RELAY_API + '/v2/pubkey', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_id: sessionToken + '_ready', ...REJECT_READY }),
+    }).catch(() => {});
+  }
+  try { if (ws) ws.close(); } catch (_) { /* already closed */ }
   showStep('step-setup');
   setStatus('key-status', t('fpMismatch'), 'err');
 }
