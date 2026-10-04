@@ -327,14 +327,23 @@ test('7. geld terug levert een creditnota op die bij de factuur past', async () 
   // toekenningstak en alleen de idempotentiemarkering hield een verse maand
   // tegen. De vloer per product staat in relay/lib/billing-catalog.js.
   const vloer = { parasign: 'free', parasend: 'community' };
+  // Deze koper betaalde twee keer (twee maanden). Geld terug voor de EERSTE
+  // neemt sinds 2026-10-04 alleen die maand terug, niet de maand die de
+  // tweede betaling kocht (sweep-acct bevinding 8): het recht blijft dan staan,
+  // een maand korter. Stap 8 boekt de andere terug en ziet de vloer.
+  const overige = betalingen.filter((p) => p.status === 'paid' && p.id !== eerste.id);
   const gekocht = eerste.metadata && eerste.metadata.product;
   assert.ok(gekocht, 'de betaling draagt geen product in zijn metadata');
   const producten = gekocht === 'firm' ? ['parasign', 'parasend'] : [gekocht];
   for (const [naam, port] of [['main', S.relayPort], ['health', S.healthPort]]) {
     const e = await rechtenOp(port, S.koper.key);
     for (const prod of producten) {
-      assert.equal(e[prod].tier, vloer[prod],
-        `${naam} geeft na een volledige terugbetaling nog ${prod} op ${e[prod].tier}`);
+      if (overige.length) {
+        assert.equal(e[prod].tier, 'pro', `${naam}: geld terug voor een maand nam ook de andere betaalde maand van ${prod} af`);
+      } else {
+        assert.equal(e[prod].tier, vloer[prod],
+          `${naam} geeft na een volledige terugbetaling nog ${prod} op ${e[prod].tier}`);
+      }
     }
   }
 });

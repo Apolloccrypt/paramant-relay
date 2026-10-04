@@ -190,8 +190,12 @@ async function processPayment(payment, deps) {
           try { await d.setProductPlan(accountId, g.product, pz.tier, back, null, { shorten: true }); } catch { /* logged by caller */ }
         }
       }
-      if (per && Number.isFinite(span) && span > 0 && Number.isFinite(curMs)) {
-        const left = new Date(Math.max(curMs - span, nowR.getTime()));
+      // Only when paid time is LEFT after taking this payment's period off:
+      // otherwise this payment was the whole term and the old rule (floor,
+      // period cleared) is exactly right. A term shortened to "now" would still
+      // read as running for the rest of a day where periods resolve per day.
+      if (per && Number.isFinite(span) && span > 0 && Number.isFinite(curMs) && curMs - span > nowR.getTime() + 60_000) {
+        const left = new Date(curMs - span);
         try { await d.setProductPlan(accountId, g.product, g.tier, left, order.bundle || null, { shorten: true }); } catch { /* logged by caller */ }
         revoked.push({ product: g.product, tier: left.getTime() > nowR.getTime() ? g.tier : floor, paidUntil: left.toISOString(), partial: true });
         continue;

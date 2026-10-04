@@ -58,7 +58,10 @@ function fleetFromCompose() {
   const yml = fs.readFileSync(path.join(REPO, 'docker-compose.yml'), 'utf8');
   const hosts = [];
   for (const m of yml.matchAll(/^\s*RELAY_SELF_URL:\s*["']?([^"'\s]+)["']?\s*$/gm)) {
-    hosts.push(hostOfRelayId(m[1]));
+    // "${RELAY_SELF_URL_HEALTH:-https://health.paramant.app}": a self-host sets
+    // its own in .env; the fleet is what the default names.
+    const v = m[1].replace(/^\$\{[A-Z0-9_]+:-(.*)\}$/, '$1');
+    hosts.push(hostOfRelayId(v));
   }
   return [...new Set(hosts)];
 }
