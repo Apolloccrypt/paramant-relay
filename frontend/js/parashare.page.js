@@ -1074,6 +1074,11 @@ function onRecipientsInput() {
 // at 100 percent with one line of text: no confirmation, no way onward, and no
 // idea whether the invitations had gone out.
 function toonVerzending(verzending, naam) {
+  // The live block on step-done describes a hand-over with a check code and a
+  // key we never hold. That is not this path: show the honest one instead.
+  const live = $('done-details-live'), named = $('done-details-named');
+  if (live) live.hidden = true;
+  if (named) named.hidden = false;
   // A relay without a mail provider (test mode) accepts the invitations and
   // delivers none. Say that, not "sent to 2 of 2" (hertest L6).
   if (verzending && verzending.mail_test_mode) {
@@ -1424,6 +1429,23 @@ async function confirmFingerprint() {
       $('enc-status').className = 'status-line err';
     }
   }
+}
+
+// The receiver never heard a rejection: it has no API key, so no WebSocket
+// ticket and no socket, and waited ten minutes behind its code (fase 1,
+// SENDNAME-28-A). What it does poll is the `_ready` slot. A rejection fills
+// that slot with a record no real send can make, zero blocks and an all-zero
+// token, within the grammar relay/lib/handshake-record.js allows. The slot is
+// first-write-wins, so the session is spent either way; the sender starts a
+// fresh one.
+const REJECT_READY = { kyber_pub: 'file|0|0', ecdh_pub: '0'.repeat(48) };
+function announceRejection() {
+  if (!sessionToken) return;
+  relayFetch(RELAY_API + '/v2/pubkey', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ device_id: sessionToken + '_ready', ...REJECT_READY }),
+  }).catch(() => {});
 }
 
 // ── Send a link ──────────────────────────────────────────────────────────────
@@ -1786,8 +1808,11 @@ async function createLink() {
       const sealed = {};
       for (const adres of ontvangers) {
         const token = paramantSendWrap.newToken();
-        // Wrapped here, in this browser. The relay receives the wrapping and
-        // the hash of the token, never the token and never the key.
+        // Wrapped here, in this browser. NOT zero-knowledge: the relay receives
+        // the token together with the wrapping, because it mails the token to
+        // the recipient in the invitation link. While it holds both it could
+        // unwrap the key. The end screen says so (done-details-named); a real
+        // recipient key for this path is a later project.
         sealed[adres.toLowerCase()] = {
           token,
           wrapped_key: await paramantSendWrap.wrap(token, geheim),
@@ -1948,22 +1973,8 @@ async function refreshSentLinks() {
   for (const btn of btns) { btn.disabled = false; btn.textContent = t('checkAgain'); }
 }
 
-// The receiver never heard a rejection: it has no API key, so no WebSocket
-// ticket and no socket, and waited ten minutes behind its code (fase 1,
-// SENDNAME-28-A). What it does poll is the `_ready` slot. A rejection fills
-// that slot with a record no real send can make, zero blocks and an all-zero
-// token, within the grammar relay/lib/handshake-record.js allows. The slot is
-// first-write-wins, so the session is spent either way; the sender starts a
-// fresh one.
-const REJECT_READY = { kyber_pub: 'file|0|0', ecdh_pub: '0'.repeat(48) };
 function rejectFingerprint() {
-  if (sessionToken) {
-    relayFetch(RELAY_API + '/v2/pubkey', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ device_id: sessionToken + '_ready', ...REJECT_READY }),
-    }).catch(() => {});
-  }
+  announceRejection();
   try { if (ws) ws.close(); } catch (_) { /* already closed */ }
   showStep('step-setup');
   setStatus('key-status', t('fpMismatch'), 'err');

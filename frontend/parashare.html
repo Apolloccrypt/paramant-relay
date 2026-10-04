@@ -823,13 +823,25 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
       <button type="button" class="done-quiet" id="done-receipt" hidden>Bewijs bewaren</button>
     </div>
 
-    <details class="done-details">
+    <details class="done-details" id="done-details-live">
       <summary>Waarom dit veilig was</summary>
       <div class="done-details-body">
         <p>Het slot is in uw browser gemaakt, niet op onze server. Uw bestand werd verzegeld voor de eigen sleutel van de ontvanger voordat het dit apparaat verliet: een hybride sleuteluitwisseling, <code>ML-KEM-768</code> naast <code>ECDH P-256</code>, met beide gedeelde geheimen samengevoegd tot één <code>AES-256-GCM</code>-sleutel. Wie er één van de twee breekt, heeft nog niets. Daarom zit de klassieke helft er nog in.</p>
         <p>De controlecode die u aan elkaar voorlas, berekenen beide browsers zelf uit de openbare sleutels van de ontvanger. Tonen beide schermen dezelfde code, dan heeft niemand onderweg een sleutel verwisseld. Daarom vragen we u hem te vergelijken via een kanaal dat niet van ons is.</p>
         <p>Wij bewaren een verzegelde kopie. De sleutel hebben wij nooit gehad, dus wij kunnen die kopie niet openen. Hij wordt gewist zodra de ontvanger hem ophaalt. Haalt niemand hem op, dan wordt hij vernietigd als de tijd om is.</p>
         <p><strong>Bewijs bewaren</strong> slaat de regel op die deze verzending in ons openbare logboek maakte. Iedereen kan die controleren in <a href="/ct-log">het logboek</a>: de regel, de plek in de boom en de ondertekende boomkop.</p>
+      </div>
+    </details>
+    <!-- Versturen op naam is een ander pad dan de live-overdracht: de sleutel is
+         verpakt met een token per ontvanger en dat token staat in de uitnodiging
+         die onze server mailt. Dus geen zero-knowledge; dit blok zegt dat eerlijk
+         en vervangt het live-blok hierboven (parashare.page.js, toonVerzending). -->
+    <details class="done-details" id="done-details-named" hidden>
+      <summary>Hoe dit beveiligd is</summary>
+      <div class="done-details-body">
+        <p>Uw browser heeft het bestand verzegeld voordat het dit apparaat verliet (<code>AES-256-GCM</code>). De sleutel is per ontvanger verpakt met een eigen link.</p>
+        <p>Die link zit in de uitnodiging die onze server aan de ontvanger mailt. Op het moment van versturen kan onze server dus bij de sleutel. Dit is daarom geen zero-knowledge, anders dan de live-overdracht met een controlecode. Wilt u dat wij nooit bij de sleutel kunnen, gebruik dan de live-overdracht.</p>
+        <p>De ontvanger bevestigt eerst het eigen e-mailadres met een code die naar hetzelfde adres gaat. Wie alleen de link heeft, komt er zo niet in. Wij bewaren de verzegelde kopie tot de ontvanger hem ophaalt of de tijd om is.</p>
       </div>
     </details>
   </div>

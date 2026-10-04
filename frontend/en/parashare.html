@@ -824,13 +824,25 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
       <button type="button" class="done-quiet" id="done-receipt" hidden>Keep the receipt</button>
     </div>
 
-    <details class="done-details">
+    <details class="done-details" id="done-details-live">
       <summary>What made this safe</summary>
       <div class="done-details-body">
         <p>The lock was made in your browser, not on our server. Your file was sealed for the other person's own key before it left this device: a hybrid key exchange, <code>ML-KEM-768</code> alongside <code>ECDH P-256</code>, with both shared secrets derived into one <code>AES-256-GCM</code> key. Breaking one of the two on its own gets an attacker nowhere, which is why the classical half is still in there.</p>
         <p>The short code you read out to each other is worked out by both browsers from the other side's public keys. Two screens showing the same code means nobody swapped a key in between, and that is the whole reason we ask you to compare it somewhere we do not run.</p>
         <p>We are holding a sealed copy and never held the key, so it is not ours to open. It is wiped the moment the other side takes it, and destroyed on its own clock if that never happens.</p>
         <p><strong>Keep the receipt</strong> saves the entry this transfer made in our public log, which anyone can check at <a href="/ct-log">the log</a>: the entry, where it sits in the tree, and the signed tree head.</p>
+      </div>
+    </details>
+    <!-- Sending to named people is a different path from the live hand-over: the
+         key is wrapped with a token per recipient, and that token is in the
+         invitation our server mails. So it is not zero-knowledge; this block says
+         so and replaces the live block above (parashare.page.js, toonVerzending). -->
+    <details class="done-details" id="done-details-named" hidden>
+      <summary>How this is protected</summary>
+      <div class="done-details-body">
+        <p>Your browser sealed the file before it left this device (<code>AES-256-GCM</code>). The key is wrapped for each recipient with a link of their own.</p>
+        <p>That link is in the invitation our server mails to the recipient. At the moment of sending, our server can therefore reach the key. So this is not zero-knowledge, unlike the live hand-over with a check code. If we must never be able to reach the key, use the live hand-over.</p>
+        <p>The recipient first confirms their own email address with a code sent to that same address, so a link alone does not open it. We keep the sealed copy until the recipient collects it or the time runs out.</p>
       </div>
     </details>
   </div>

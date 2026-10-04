@@ -182,3 +182,16 @@ test('jargon: the Dutch messages on /parashare do not speak of a relay or a sect
   const hits = lines.filter((l) => /\brelay\b|\bsector\b/i.test(said(l)));
   assert.deepEqual(hits, []);
 });
+
+test('rule 3: the send-to-people end screen does not claim we never had the key', async () => {
+  const page = await senderPage({ checkKey: (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ valid: true, plan: 'pro', link_ttl_ms_by_plan: TTLS }) }) });
+  await page.goto(PF_ORIGIN + '/parashare');
+  await page.waitForFunction(() => typeof toonVerzending === 'function', null, { timeout: 10000 });
+  await page.evaluate(() => toonVerzending({ invited: 2, recipients: 2 }, 'a.pdf'));
+  assert.equal(await page.locator('#done-details-live').isVisible(), false);
+  assert.equal(await page.locator('#done-details-named').isVisible(), true);
+  const named = await page.locator('#done-details-named').textContent();
+  assert.match(named, /geen zero-knowledge/);
+  assert.doesNotMatch(named, /nooit gehad|controlecode die u aan elkaar voorlas/);
+  await page.close();
+});
