@@ -534,11 +534,13 @@ function noticeUrl(signPath) {
 // page" on) a paraaf per party side by side in the margin. One box for all
 // parties made every signature land on the same spot (2026-10-04).
 async function partyRequests(base) {
-  if (!base || !base.fields || !base.fields.length || state.mode !== 'pdf') return null;
+  if (state.mode !== 'pdf') return null;
+  const noBox = !base || !base.fields || !base.fields.length;
+  if (noBox && !state.stampAllPages) return null;
   // The parafen are placed against the text of every page: wait for it, a
   // missing text layer here once meant parafen slid over the last line.
   if (state.stampAllPages) { try { await loadTextBoxes(state.doc.bytes); } catch { /* bottom right */ } }
-  const anchor = base.fields[0];
+  const anchor = noBox ? null : base.fields[0];
   // Every page of the document, also those past the preview: the sizes pdf.js
   // read with the text, else the rendered pages.
   const geoms = (_textBoxCache && _textBoxCache.bytes === state.doc.bytes) ? _textBoxCache.geoms : [];
@@ -548,10 +550,13 @@ async function partyRequests(base) {
       ? placeState.pages.map((p) => ({ width: p.wrap._pdfPage.width, height: p.wrap._pdfPage.height }))
       : [];
   try {
-    return requestsForParties({
-      anchor, signPage: anchor.page_index, count: state.recipients.length,
+    const reqs = requestsForParties({
+      anchor, signPage: anchor ? anchor.page_index : 0, count: state.recipients.length,
       withParaaf: !!state.stampAllPages, pages, textBoxesPerPage: textBoxesIfReady(state.doc.bytes),
     });
+    // No box pointed at, only "a paraaf on every page": each party gets the
+    // paraaf and finds its own signature spot on /co-sign.
+    return noBox ? reqs.map((r) => ({ version: 2, fields: r.fields.filter((f) => f.all_pages) })) : reqs;
   } catch { return null; }
 }
 
@@ -911,6 +916,11 @@ function applyPlaceChromeForMode() {
       ? L('Optioneel: u kunt ook verder zonder een plek aan te wijzen.', 'Optional: you can continue without asking for a spot.')
       : L('Klik op een pagina om de stempel te plaatsen.', 'Click a page to drop the signature stamp.');
   }
+  const invPar = $('ds-invite-paraaf');
+  if (invPar) {
+    invPar.checked = invite && !!state.stampAllPages;
+    invPar.onchange = () => { state.stampAllPages = !!invPar.checked; };
+  }
   if (invite) {
     // Asking for a position is a courtesy, not a requirement: the requester may
     // always continue without one, so this step is never a dead end.
@@ -1168,11 +1178,12 @@ function applyPlacementTemplate() {
   const pw = p.wrap._pdfPage.width, ph = p.wrap._pdfPage.height;
   state.stamp = { pageIndex: p.wrap._pdfPage.index, x: tpl.fx * pw, y: tpl.fy * ph, w: tpl.fw * pw, h: tpl.fh * ph };
   reflowStampMarker();
-  setStampAllPages(!!tpl.allPages, false);   // don't re-save; we just loaded it
+  // Position and size only. "Every page" stays as the signer set it for THIS
+  // document: a saved template switched it back on without asking, a paraaf
+  // on every page of a contract nobody asked for (retest T1-11).
+  reflowGhostStamps();
   $('ds-place-continue').disabled = false;
-  setPlaceHint(tpl.allPages
-    ? L("Uw opgeslagen positie is toegepast, met een paraaf op de andere pagina's. Klik op een pagina om de stempel te verplaatsen.", 'Applied your saved signature position, with initials on the other pages. Click a page to move the seal.')
-    : L('Uw opgeslagen positie is toegepast. Klik op een pagina om hem te verplaatsen.', 'Applied your saved signature position. Click a page to move it.'));
+  setPlaceHint(L('Uw opgeslagen positie is toegepast. Klik op een pagina om hem te verplaatsen.', 'Applied your saved signature position. Click a page to move it.'));
 }
 
 // Toggle the sign-every-page mode; re-render ghosts and persist the choice.

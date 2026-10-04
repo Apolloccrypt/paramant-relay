@@ -340,10 +340,13 @@ test('a saved template does not switch "every page" on for the next document', a
   await page.reload();
   await readyOnePage(page, { pages: [{ size: A4 }, { size: A4 }] });
   assert.equal(await page.locator('#ds-allpages').isChecked(), false, '"every page" stays off until the signer asks for it');
-  // Using the saved position on purpose does bring it back, and says so.
+  // Using the saved position applies the position only (retest T1-11: it used
+  // to switch "every page" back on, on a document that was never asked for it).
   await page.click('#ds-apply-tpl');
-  assert.equal(await page.locator('#ds-allpages').isChecked(), true);
-  assert.match(await page.locator('#ds-place-hint').textContent(), /paraaf op de andere pagina/);
+  await page.waitForTimeout(300);
+  assert.equal(await page.locator('#ds-allpages').isChecked(), false, 'the saved position does not switch "every page" on');
+  assert.equal(await page.locator('.ds-paraaf').count(), 0, 'and puts no paraaf anywhere');
+  assert.doesNotMatch(await page.locator('#ds-place-hint').textContent(), /paraaf/);
   // And placing by hand on a fresh visit puts no paraaf anywhere.
   await page.reload();
   await readyOnePage(page, { pages: [{ size: A4 }, { size: A4 }] });
