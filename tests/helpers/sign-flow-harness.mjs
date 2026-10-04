@@ -63,6 +63,20 @@ export async function newPage(browser, { mobile = false, overrides = {}, viewpor
   const opts = mobile ? { ...devices['iPhone 13'] } : { viewport: viewport || { width: 1366, height: 900 } };
   delete opts.defaultBrowserType;
   const ctx = await browser.newContext({ ...opts, acceptDownloads: true });
+  // Playwright's Linux WebKit ships without WebAuthn, where every real Safari
+  // has it. The signing path these suites drive never calls it (the stubbed
+  // server answers no_passkey and the TOTP route takes over); it only asks
+  // whether the browser COULD. Answer that the way Safari does, so the same
+  // suites run in WebKit (~/bin/pw-webkit.sh). A call would still refuse.
+  await ctx.addInitScript(() => {
+    if (typeof window.PublicKeyCredential !== 'undefined' && navigator.credentials && navigator.credentials.get) return;
+    const refuse = () => Promise.reject(new DOMException('no authenticator in this test browser', 'NotAllowedError'));
+    window.PublicKeyCredential = function PublicKeyCredential() {};
+    window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable = () => Promise.resolve(false);
+    if (!navigator.credentials) Object.defineProperty(navigator, 'credentials', { value: {}, configurable: true });
+    navigator.credentials.get = refuse;
+    navigator.credentials.create = refuse;
+  });
   const page = await ctx.newPage();
   page._errors = [];
   page.on('pageerror', (e) => page._errors.push('pageerror: ' + e.message));
