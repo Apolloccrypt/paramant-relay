@@ -136,6 +136,8 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
    colours on purpose: this is what lands on the white PDF page. */
 .ds-paraaf{position:absolute;box-sizing:border-box;overflow:hidden;pointer-events:none;z-index:4;display:flex;flex-direction:column;background:#FFFFFF;border:1px solid #0b3a6a;border-left:.08em solid #0b3a6a;padding:.08em .1em .1em .13em;line-height:1;color:#0b3a6a}
 .ds-paraaf.ds-stamp-ghost{opacity:.9;border-style:solid}
+/* A page this browser could not draw (iOS canvas limit, see renderPageCapped in sign-flow.js). */
+.ds-blank-note{position:absolute;left:8px;right:8px;top:8px;z-index:6;padding:8px 10px;background:var(--surface);border:1px solid var(--line-2);border-left:2px solid var(--mark);font-size:13px;line-height:1.4;color:var(--ink-1);pointer-events:none}
 .ds-pf-initials{flex:1 1 auto;display:flex;align-items:center;font-family:'Times New Roman',Times,serif;font-style:italic;font-size:.47em;white-space:nowrap}
 .ds-pf-foot{flex:0 0 auto;font-family:Helvetica,Arial,sans-serif;font-size:.18em;color:#4d4d4d;white-space:nowrap}
 /* Sign-every-page toggle + reuse-position row */
@@ -550,7 +552,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <h1 class="ds-title">Laat een belangrijk document ondertekenen.</h1>
     <p class="ds-lede">Onderteken zelf, teken samen of stuur het naar anderen. Uw document blijft privé en bij elke handtekening hoort bewijs dat iedereen zelf kan controleren.</p>
     <ul class="ds-facts">
-      <li><b>Altijd gratis</b> &middot; 2 handtekeningen per maand, geen betaalkaart</li>
+      <li id="ds-plan-fact"><b>Altijd gratis</b> &middot; 2 handtekeningen per maand, geen betaalkaart</li>
       <li><b>Uw ondertekensleutel blijft hier</b> &middot; hij wordt op uw apparaat gemaakt en komt nooit op onze servers</li>
       <li><b>Europees recht</b> &middot; servers in Duitsland, onder EU-recht</li>
     </ul>
@@ -1030,6 +1032,6 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
 <script src="/js/quota-upgrade.js?v=7" defer></script>
 <script src="/js/done-state.js?v=1" defer></script>
-<script type="module" src="/sign-flow.js?v=62"></script>
+<script type="module" src="/sign-flow.js?v=63"></script>
 </body>
 </html>
