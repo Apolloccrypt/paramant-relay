@@ -3941,8 +3941,7 @@ function mintParasignKey(accountId, opts = {}) {
   // atomic in the event loop, the same property the /v2/admin/keys mint relies
   // on. Throws rather than answering, because the two callers own their own
   // response shape; both map `code` to a 402.
-  const _capPlan = tiers.normalisePlan((acct && acct.plan) || plan);
-  const _cap = ACCOUNT_KEY_LIMIT[_capPlan] ?? ACCOUNT_KEY_LIMIT.community;
+  const { plan: _capPlan, cap: _cap } = accountKeyCap(accountId, (acct && acct.plan) || plan);
   const _active = [...(accountKeys.get(accountId) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
   if (_active >= _cap) {
     const e = new Error(`Account key limit reached (${_cap} keys on the ${_capPlan} plan).`);
@@ -7616,7 +7615,15 @@ async function handleRelayRequest(req, res) {
   if (path === '/v2/pubkey' && req.method === 'POST') {
     try {
       const d = JSON.parse((await readBody(req, 65536)).toString());
-      if (!d.device_id || !d.ecdh_pub) { res.writeHead(400); return res.end(J({ error: 'device_id and ecdh_pub required' })); }
+      // A PURE post-quantum registration is valid too: sdk-js 3.3 (wire format
+      // v1, ML-KEM only) sends kem_pub/kyber_pub and no ecdh_pub, and every
+      // registerPubkeys() from it answered 400 (sweep-api finding 5). The
+      // browser's hybrid handshake and the inv_ rendezvous still need ecdh_pub.
+      if (d && !d.ecdh_pub && !d.kyber_pub && typeof d.kem_pub === 'string') d.kyber_pub = d.kem_pub;
+      const _pqOnly = !!(d && !d.ecdh_pub && typeof d.kyber_pub === 'string' && /^[0-9a-fA-F]{64,8192}$/.test(d.kyber_pub));
+      if (!d.device_id || (!d.ecdh_pub && !_pqOnly)) { res.writeHead(400); return res.end(J({ error: 'device_id and ecdh_pub (or, for a post-quantum-only key, kem_pub) required' })); }
+      if (_pqOnly && typeof d.device_id === 'string' && /^inv_/.test(d.device_id)) { res.writeHead(400); return res.end(J({ error: 'the inv_ rendezvous needs ecdh_pub' })); }
+      if (_pqOnly) d.ecdh_pub = '';
       // M3: reject oversized device_id to prevent memory exhaustion / map-key attacks
       if (typeof d.device_id !== 'string' || d.device_id.length > 256) { res.writeHead(400); return res.end(J({ error: 'device_id must be a string of at most 256 characters' })); }
       if (INVITE_RE.test(d.device_id)) {
@@ -7697,8 +7704,8 @@ async function handleRelayRequest(req, res) {
         }
       }
       const ttl = _pubkeyTtl[plan] ?? _pubkeyTtl.free;
-      const ctEntry = ctAppend(d.device_id, d.ecdh_pub, apiKey);
-      const attestResult = verifyAttestation(d.ecdh_pub, d.device_id, d.attestation || null);
+      const ctEntry = ctAppend(d.device_id, d.ecdh_pub || d.kyber_pub, apiKey);
+      const attestResult = verifyAttestation(d.ecdh_pub || d.kyber_pub, d.device_id, d.attestation || null);
       const existingPubkey = pubkeys.get(_pkSlot);
       if (existingPubkey && (!existingPubkey.expires || Date.now() < existingPubkey.expires)) {
         res.writeHead(409); return res.end(J({ error: 'Pubkey already registered for this session: first registration wins' }));
@@ -9189,8 +9196,7 @@ async function handleRelayRequest(req, res) {
 
       // Per-account cap (and the self-host relay-total cap) — checked atomically
       // with the insert below.
-      const acctPlan = tiers.normalisePlan((accounts.get(account_id) && accounts.get(account_id).plan) || plan);
-      const acctCap = ACCOUNT_KEY_LIMIT[acctPlan] ?? ACCOUNT_KEY_LIMIT.community;
+      const { plan: acctPlan, cap: acctCap } = accountKeyCap(account_id, (accounts.get(account_id) && accounts.get(account_id).plan) || plan);
       const acctActive = [...(accountKeys.get(account_id) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
       if (acctActive >= acctCap) {
         res.writeHead(402, { 'Content-Type': 'application/json' });
@@ -10660,8 +10666,7 @@ async function handleRelayRequest(req, res) {
       const account_id = kd.account_id || apiKey;
       const scope = keysTable.VALID_SCOPES.has(kd.scope) ? kd.scope : 'full';
       const email = kd.email || '';
-      const capPlan = tiers.normalisePlan(kd.plan);
-      const cap = ACCOUNT_KEY_LIMIT[capPlan] ?? ACCOUNT_KEY_LIMIT.community;
+      const { plan: capPlan, cap } = accountKeyCap(account_id, kd.plan);
       const active = [...(accountKeys.get(account_id) || [])].filter((k) => apiKeys.get(k) && apiKeys.get(k).active !== false).length;
       if (active >= cap) {
         res.writeHead(402, { 'Content-Type': 'application/json' });
@@ -11750,8 +11755,33 @@ let LICENSE_MAX_KEYS = COMMUNITY_KEY_LIMIT; // effective limit — updated by ch
 const ACCOUNT_KEY_LIMIT = Object.freeze({
   community: Math.min(5, Math.max(3, parseInt(process.env.ACCOUNT_KEY_LIMIT_COMMUNITY || '5', 10) || 5)),
   pro: Math.max(10, parseInt(process.env.ACCOUNT_KEY_LIMIT_PRO || '100', 10) || 100),
+  // Business had no row and fell through to community's five.
+  business: Math.max(10, parseInt(process.env.ACCOUNT_KEY_LIMIT_PRO || '100', 10) || 100),
   enterprise: Math.max(10, parseInt(process.env.ACCOUNT_KEY_LIMIT_ENTERPRISE || '1000', 10) || 1000),
 });
+
+// The plan the key cap follows: the HIGHEST of the legacy unified plan and the
+// account's paid ParaSign/ParaSend tiers. A purchase moves only the product
+// tiers (setProductPlan never touches `plan`), so a paying Firm account stayed
+// "community" here and was refused its fifth key (API-10-A).
+const _CAP_RANK = ['community', 'pro', 'business', 'enterprise'];
+function accountCapPlan(accountId, legacyPlan) {
+  const cands = [tiers.normalisePlan(legacyPlan || 'community')];
+  try {
+    const rec = accountId ? entitlementRecordOf(accountId) : null;
+    if (rec) {
+      for (const product of entitlements.PRODUCTS) {
+        const t = entitlements.effectiveProductTier(rec, product).tier;
+        cands.push(tiers.normalisePlan(t === 'free' ? 'community' : t));
+      }
+    }
+  } catch { /* the legacy plan alone */ }
+  return cands.reduce((a, b) => (_CAP_RANK.indexOf(b) > _CAP_RANK.indexOf(a) ? b : a), 'community');
+}
+function accountKeyCap(accountId, legacyPlan) {
+  const p = accountCapPlan(accountId, legacyPlan);
+  return { plan: p, cap: ACCOUNT_KEY_LIMIT[p] ?? ACCOUNT_KEY_LIMIT.community };
+}
 let LICENSE_PAYLOAD  = null;                // { max_keys, expires_at, issued_to, issued_at }
 
 // ── Ed25519 base64url decoder ─────────────────────────────────────────────────
@@ -11857,6 +11887,7 @@ function applyKeyLimitEnforcement() {
   // on upgrade, mirroring the prior community-edition behaviour.
   const over = keysTable.computeOverLimit(apiKeys, accounts, accountKeys, {
     capForPlan: (p) => ACCOUNT_KEY_LIMIT[tiers.normalisePlan(p)] ?? ACCOUNT_KEY_LIMIT.community,
+    capForAccount: (accountId, p) => accountKeyCap(accountId, p).cap,
     licenseMaxKeys: LICENSE_MAX_KEYS,
     edition: EDITION,
   });

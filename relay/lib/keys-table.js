@@ -364,7 +364,7 @@ function migrateUsersV2(data) {
 // Pure: reads the Maps, mutates nothing. `capForPlan(plan)` returns the numeric
 // per-account cap (Infinity for uncapped plans).
 function computeOverLimit(apiKeys, accounts, accountKeys, opts) {
-  const { capForPlan, licenseMaxKeys = Infinity, edition = 'community' } = opts || {};
+  const { capForPlan, capForAccount, licenseMaxKeys = Infinity, edition = 'community' } = opts || {};
   const over = new Set();
 
   const order = new Map();
@@ -373,7 +373,10 @@ function computeOverLimit(apiKeys, accounts, accountKeys, opts) {
 
   for (const [accountId, keySet] of accountKeys) {
     const acct = accounts.get(accountId);
-    const cap = capForPlan ? capForPlan(acct ? acct.plan : 'community') : Infinity;
+    // capForAccount, when given, decides from the whole account (its paid
+    // product tiers too); capForPlan only sees the legacy unified plan.
+    const cap = capForAccount ? capForAccount(accountId, acct ? acct.plan : 'community')
+      : capForPlan ? capForPlan(acct ? acct.plan : 'community') : Infinity;
     if (!(cap < Infinity)) continue;
     const active = [...keySet].filter((k) => { const v = apiKeys.get(k); return v && v.active !== false; });
     active.sort((a, b) => {
