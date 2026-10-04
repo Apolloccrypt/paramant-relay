@@ -760,6 +760,19 @@ async function textOfAllPages() {
   return { pages, boxes: pages.length ? boxes : null };
 }
 
+// More than a sliver of text under a box (15% of its area)?
+async function coversText(box) {
+  const boxes = await textBoxesOfPage(box.page_index);
+  if (!boxes || !boxes.length) return false;
+  let area = 0;
+  for (const t of boxes) {
+    const w = Math.min(box.x + box.w, t.x + t.w) - Math.max(box.x, t.x);
+    const h = Math.min(box.y + box.h, t.y + t.h) - Math.max(box.y, t.y);
+    if (w > 0 && h > 0) area += w * h;
+  }
+  return area > 0.15 * box.w * box.h;
+}
+
 // Where party `index` signs when nobody pointed at a spot: under the text of
 // the last page if all signatures fit there free of text, else on a signature
 // sheet after the last page. The same answer for every party.
@@ -841,7 +854,16 @@ async function computeSeed() {
   //    spot) gets a free place for the signature, as in case 3.
   if (requested && e.requested_for_party) {
     const clamped = clampToPages(requested).appearance;
-    if (clamped.fields.some(isSignature)) return clamped;
+    const asked = clamped.fields.find(isSignature);
+    if (asked) {
+      // The sender's spot is kept, unless it lies on the text itself (a box
+      // dropped on a page that is text from top to bottom): then every
+      // signature goes onto the signature sheet, the same for every party,
+      // instead of over the articles (acceptance test 2026-10-04).
+      if (asked.page_index >= __pageSizes.length || !(await coversText(asked))) return clamped;
+      const sheet = autoSignaturePlace({ index, count, pageCount: __pageSizes.length, textBoxes: [{ x: 0, y: 0, w: 1, h: 1 }] });
+      return normaliseSigningAppearance({ version: clamped.version, fields: clamped.fields.map((f) => (f === asked ? { type: 'seal', page_index: sheet.page_index, ...sheet.spot } : f)) });
+    }
     const sig = await autoSignatureField(index, count);
     return normaliseSigningAppearance({ version: 2, fields: [sig, ...clamped.fields] });
   }

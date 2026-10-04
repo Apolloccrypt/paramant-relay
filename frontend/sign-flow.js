@@ -2094,6 +2094,22 @@ function onPlaceClick(e) {
     // request the other party may move, so no ghosts and no saved template.
     $('ds-place-hint').textContent =
       L('U vraagt om een handtekening op pagina ', 'You are asking for a signature on page ') + (wrap._pdfPage.index + 1) + L('. Tik op een andere plek om het vak te verplaatsen.', '. Tap another spot to move the box.');
+    // On the text itself: say what will happen (/co-sign then uses a
+    // signature sheet after the last page rather than sign over the text).
+    const tb = textBoxesIfReady(state.doc.bytes);
+    const onPage = tb && tb[wrap._pdfPage.index];
+    if (Array.isArray(onPage)) {
+      const st = state.stamp;
+      let area = 0;
+      for (const t of onPage) {
+        const w = Math.min(st.x + st.w, t.x + t.w) - Math.max(st.x, t.x);
+        const h = Math.min(st.y + st.h, t.y + t.h) - Math.max(st.y, t.y);
+        if (w > 0 && h > 0) area += w * h;
+      }
+      if (area > 0.15 * st.w * st.h) {
+        $('ds-place-hint').textContent = L('Dit vak ligt op de tekst. Dan tekent iedereen op een apart handtekeningblad achter het document. Kies een lege plek als u wilt dat ze op deze pagina tekenen.', 'This box lies on the text. Everyone then signs on a separate signature sheet after the document. Pick an empty spot if you want them to sign on this page.');
+      }
+    }
     const btn = $('ds-invite-place'); if (btn) btn.textContent = L('Verplaats het handtekeningvak', 'Move the signature box');
     return;
   }
