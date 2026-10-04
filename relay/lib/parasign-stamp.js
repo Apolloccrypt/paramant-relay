@@ -127,7 +127,12 @@ async function stampPdf(originalPdf, opts = {}) {
   y -= 16;
   page.drawText('Verify this document', { x: M, y, size: 10, font: bold, color: ink }); y -= 14;
   page.drawText(ellip(opts.verifyUrl || 'https://paramant.app/verify', 90), { x: M, y, size: 9, font, color: accent }); y -= 12;
-  page.drawText('Upload the .psign receipt to check every ML-DSA-65 signature and the relay counter-signature.',
+  // This stamped copy is made AFTER signing; its hash is in no signature. The
+  // signatures cover the original bytes (Document SHA3-256 above), so say that
+  // here, or a reader uploads this copy to /verify and is told it is invalid.
+  page.drawText('Upload the .psign receipt with the ORIGINAL unstamped document (SHA3-256 above) to check every',
+    { x: M, y, size: 8, font, color: sub }); y -= 11;
+  page.drawText('ML-DSA-65 signature and the relay counter-signature. This stamped copy is for reading only.',
     { x: M, y, size: 8, font, color: sub });
 
   const bytes = await doc.save();

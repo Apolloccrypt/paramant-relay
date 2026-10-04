@@ -10,7 +10,7 @@
 // The checks mirror relay.js POST /v2/verify-receipt and relay/lib/ct-hash.js
 // byte for byte. Keep them in sync.
 import { sha3_256, ml_dsa65 } from '/vendor/paramant-pqc.js';
-import { anchorForReceipt, anchorByFingerprint, hostOfRelayId, PUBKEY_URL } from '/js/relay-trust-anchors.js';
+import { anchorForReceipt, anchorByFingerprint, hostOfRelayId, PUBKEY_URL } from '/js/relay-trust-anchors.js?v=2';
 
 const LEAF_TRANSFER = 0x02; // domain separator for blob/transfer leaves
 const NODE = 0x01;          // domain separator for inner Merkle nodes

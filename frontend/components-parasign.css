@@ -54,8 +54,17 @@
 
 .ps-banner { margin-top: var(--space-4); padding: var(--space-3) var(--space-4); border-radius: 8px; font-size: var(--text-sm); border-left: 3px solid var(--ink-hair); background: var(--ink-ghost); color: var(--ink); }
 .ps-banner.info { border-left-color: var(--navy); }
-.ps-banner.ok   { border-left-color: var(--lime); }
-.ps-banner.err  { border-left-color: var(--ink); background: var(--bone-2); }
+/* Valid and invalid must be told apart without colour too: each verdict
+   carries its own mark (check, cross, exclamation) and its own words. */
+.ps-banner.ok, .ps-banner.err, .ps-banner.warn { border-left-width: 4px; }
+.ps-banner .ps-mark { font-family: var(--mono); font-weight: 700; font-size: var(--text-md); line-height: 1; margin-right: var(--space-2); }
+.ps-banner.ok   { border-left-color: var(--ok-ink, var(--lime)); }
+.ps-banner.ok .ps-mark, .ps-banner.ok strong { color: var(--ok-ink, var(--ink)); }
+.ps-banner.err  { border-left-color: var(--brick-ink, var(--ink)); background: var(--bone-2); }
+.ps-banner.err .ps-mark, .ps-banner.err strong { color: var(--brick-ink, var(--ink)); }
+.ps-banner.warn { border-left-color: var(--warn-ink, var(--ink)); }
+.ps-banner.warn .ps-mark, .ps-banner.warn strong { color: var(--warn-ink, var(--ink)); }
+.ps-unverified { margin: var(--space-1) 0 var(--space-3); padding-left: var(--space-5); }
 
 .ps-result { margin-top: var(--space-4); padding: var(--space-4); border-radius: 8px; background: var(--ink-ghost); }
 .ps-result .ps-btn-row { margin-top: var(--space-4); }
