@@ -10336,6 +10336,8 @@ async function handleRelayRequest(req, res) {
         'X-Capsule-Sha256': out.sha256,
         ...(out.keyShare ? { 'X-Document-Key-Share': out.keyShare } : {}),
       });
+      // The verified recipient has the document: this is a real view.
+      store.markViewed(envDocumentMatch[1], pi).catch(() => {});
       return res.end(out.capsule);
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -10562,6 +10564,23 @@ async function handleRelayRequest(req, res) {
       // falsified record, not a cosmetic one.
       const gate = await store.getForParty(id, pi, (d.token || '').toString());
       if (!gate) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
+      // "Bekeken" means the invited PERSON opened it (hertest T5-12). For an
+      // email-bound slot the link alone is anyone the mail reached: a scanner,
+      // a forwarded mail, an anonymous open before sign-in. Only a request the
+      // admin plane vouches for (X-Internal-Auth + the verified mailbox hash of
+      // this party) stamps the view. The anonymous page still gets a 200, so
+      // nothing breaks; it simply records nothing. The verified stamp is also
+      // set when that person fetches the document (GET .../document).
+      if ((gate.binding_mode || 'open') !== 'open') {
+        const vh = (req.headers['x-verified-email-hash'] || '').toString().trim().toLowerCase();
+        const verified = _internalOk() && /^[0-9a-f]{64}$/.test(vh)
+          && /^[0-9a-f]{64}$/.test(String((gate.party || {}).email_hash || ''))
+          && crypto.timingSafeEqual(Buffer.from(vh, 'hex'), Buffer.from(gate.party.email_hash, 'hex'));
+        if (!verified) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          return res.end(J({ ok: true, recorded: false }));
+        }
+      }
       const ok = await store.markViewed(id, pi);
       if (!ok) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'not found' })); }
       res.writeHead(200, { 'Content-Type': 'application/json' });
