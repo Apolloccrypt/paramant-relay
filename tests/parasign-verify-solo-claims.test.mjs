@@ -95,7 +95,7 @@ async function runOnce({ url, verdict, lookup }) {
   const lookupsBeforeClick = lookups.length;
   if (lookup) {
     await page.locator('#vf-lookup').click();
-    await page.waitForFunction(() => /ingetrokken|revoked/i.test(document.querySelector('#vf-result')?.textContent || ''));
+    await page.waitForFunction(() => /Sleutel ingetrokken|Key revoked/.test(document.querySelector('#vf-result')?.textContent || ''));
   }
   page.off('request', onReq);
   return { info, lookupsBeforeClick, result: await page.locator('#vf-result').innerText(), banner: await page.locator('#vf-result .ps-banner').first().getAttribute('class') };

@@ -243,7 +243,7 @@ function normaliseAppearance(value) {
     if (clean.w < 0.02 || clean.h < 0.01 || clean.x + clean.w > 1.000001 || clean.y + clean.h > 1.000001) bad();
     if (field.all_pages !== undefined) {
       if (typeof field.all_pages !== 'boolean') bad();
-      if (field.all_pages) {
+      if (field.all_pages === true) {
         if (pageIndex !== 0 || declared !== 2) bad();
         clean.all_pages = true;
         anyAllPages = true;
