@@ -53,7 +53,7 @@ await page.route('**/api/user/session/verify', (route) => route.fulfill({ status
 await page.goto(`${ORIGIN}/sign.html?mode=alone`, { waitUntil: 'domcontentloaded' });
 await loadPdfLibs(page);
 
-const SEAL = { pageIndex: 2, x: 300, y: 130, w: 240, h: 100 };
+const SEAL = { pageIndex: 2, x: 300, y: 130, w: 170, h: 70 };   // STAMP_PDF_W x STAMP_PDF_H in sign-flow.js
 
 // Build the source, pick it, tick "sign every page", place the seal on page 3
 // by clicking the free line, and bake through the module instance the page

@@ -17,7 +17,6 @@
 // Units: page fractions 0..1 with y measured from the TOP, the convention of the
 // signed appearance manifest (relay/envelope.js normaliseAppearance).
 
-import { pickSharedSpot } from './paraaf-place.js?v=2';
 
 // A signature box: wide enough for a written name and a caption under it.
 export const SIGNATURE_FR = { w: 0.3, h: 0.085 };
@@ -106,10 +105,53 @@ export function freeAnchor(grid, textBoxes) {
   return best ? { x: best.x, y: best.y, w: grid.w, h: grid.h } : { x, y: 1 - EDGE - blockH, w: grid.w, h: grid.h };
 }
 
+// A free place for the whole block of signatures, or null when the page has
+// none. Unlike freeAnchor this never settles for "the least text": the
+// acceptance test of 2026-10-04 found every signature on top of the title and
+// the first articles of a last page that was text from top to bottom, because
+// the least-covered spot was the top. Searched from the bottom up (under the
+// last text first), each row from the left margin to the right, with a little
+// room kept around every line. textBoxes: fractions, y from the top.
+const TEXT_ROOM = 0.006;
+export function freeSignatureBlock(grid, textBoxes) {
+  const blockW = grid.cols * grid.w + (grid.cols - 1) * GAP_X;
+  const blockH = grid.rows * grid.h + (grid.rows - 1) * GAP_Y;
+  const boxes = (Array.isArray(textBoxes) ? textBoxes : []).map((t) => ({ x: t.x - TEXT_ROOM, y: t.y - TEXT_ROOM, w: t.w + 2 * TEXT_ROOM, h: t.h + 2 * TEXT_ROOM }));
+  for (let y = 1 - EDGE - blockH; y >= EDGE; y -= 0.005) {
+    for (let x = EDGE + 0.02; x + blockW <= 1 - EDGE + 1e-9; x += 0.02) {
+      const block = { x, y, w: blockW, h: blockH };
+      if (!boxes.some((t) => overlapArea(block, t) > 0)) return { x: round6(x), y: round6(y), w: grid.w, h: grid.h };
+    }
+  }
+  return null;
+}
+
+// Where the signatures go when nobody pointed at a spot: under the text of the
+// last page when there is room for all of them, else on a signature sheet
+// after the last page (page index = pageCount), never over text.
+// Returns { page_index, spot } for party `index`.
+export function autoSignaturePlace({ index, count, pageCount, textBoxes }) {
+  const grid = signatureGrid(count);
+  const last = Math.max(0, (Number(pageCount) || 1) - 1);
+  const free = freeSignatureBlock(grid, textBoxes);
+  if (free) return { page_index: last, spot: slotAt(blockOrigin(free, grid), grid, index) };
+  const sheetAnchor = { x: EDGE + 0.02, y: 0.16, w: grid.w, h: grid.h };
+  return { page_index: last + 1, spot: slotAt(blockOrigin(sheetAnchor, grid), grid, index) };
+}
+
 // The signature spot of party `index` out of `count`. anchor: the sender's
 // box as a fraction box, or null to find a free place (then textBoxes count).
 export function partySignatureSpot({ anchor, index, count, textBoxes }) {
-  const grid = signatureGrid(count, anchor);
+  let grid = signatureGrid(count, anchor);
+  // The sender's box stays where the sender put it: the other parties go to
+  // its right as far as the page allows and then on the next row, instead of
+  // the whole row sliding left off the chosen spot (acceptance test
+  // 2026-10-04: a box placed at x 0.5 came out at x 0.04).
+  if (anchor && Number.isFinite(anchor.x)) {
+    const fit = Math.floor((1 - EDGE - anchor.x + GAP_X + 1e-9) / (grid.w + GAP_X));
+    const rows = fit >= 1 ? Math.ceil(grid.count / fit) : 0;
+    if (fit >= 1 && fit < grid.cols && rows * grid.h + (rows - 1) * GAP_Y <= 1 - EDGE) grid = { ...grid, cols: fit, rows };
+  }
   const start = anchor && Number.isFinite(anchor.x) && Number.isFinite(anchor.y)
     ? anchor
     : freeAnchor(grid, textBoxes);
@@ -142,16 +184,161 @@ export function partyParaafSpot({ corner, index, count }) {
   return { x: round6(x), y: round6(y), w: round6(w), h: round6(h) };
 }
 
+// ── Every party's paraaf, free of text (the retest of 2026-10-04) ──────────
+// partyParaafSpot above lines the parafen up from ONE free corner without ever
+// looking at the text again: with three or more parties on a full page the
+// third, fourth and fifth paraaf slid over the last line of text. Here every
+// paraaf is placed against the text itself:
+//
+//   - the text of ALL pages is laid on one fine grid (a paraaf sits on the same
+//     spot on every page, so a cell is taken when ANY page has text there), and
+//     the signature boxes of the parties count as taken too;
+//   - candidate spots run through the page margins: the bottom margin first,
+//     then the top margin, then the side margins;
+//   - the first paraaf takes the free spot nearest the bottom right, every next
+//     one the free spot nearest the parafen already placed (preferring the
+//     same row), never on another party's paraaf;
+//   - when the margins cannot hold every paraaf free of text at full size, all
+//     parafen get a step smaller, down to 55%, and only then does the spot with
+//     the least text under it win.
+//
+// Pure and deterministic: /sign (the sender) and /co-sign (every signer) feed
+// it the same pdf.js text and get the same spots.
+//
+// pages: [{width,height}] in PDF points (view space); textBoxesPerPage: the
+// same length, each [{x,y,w,h}] in points with a bottom-left origin
+// (js/paraaf-place.js textBoxesFromItems), or null for a page without a text
+// layer. avoid: [{ x, y, w, h }] in fractions with y from the top (signature
+// boxes). Returns `count` boxes in fractions with y from the top.
+const GRID_COLS = 300;
+const GRID_ROWS = 400;
+const PARAAF_SCALES = [1, 0.85, 0.7, 0.55];
+const PARAAF_PAD_PT = 3;          // breathing room kept between a paraaf and text
+const MIN_EDGE_X = 0.02;          // never closer to the paper edge than this
+const MIN_EDGE_Y = 0.012;
+const BAND = 0.16;                // how deep into the page a margin reaches
+
+function buildOccupancy(pages, textBoxesPerPage, avoid) {
+  const list = Array.isArray(pages) && pages.length ? pages : [{ width: 595.28, height: 841.89 }];
+  const occ = new Uint16Array(GRID_COLS * GRID_ROWS);
+  const mark = (fx0, fy0, fx1, fy1, weight) => {
+    if (fx1 <= 0 || fy1 <= 0 || fx0 >= 1 || fy0 >= 1) return;
+    const c0 = clamp(Math.floor(fx0 * GRID_COLS), 0, GRID_COLS - 1);
+    const c1 = clamp(Math.ceil(fx1 * GRID_COLS) - 1, 0, GRID_COLS - 1);
+    const r0 = clamp(Math.floor(fy0 * GRID_ROWS), 0, GRID_ROWS - 1);
+    const r1 = clamp(Math.ceil(fy1 * GRID_ROWS) - 1, 0, GRID_ROWS - 1);
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) occ[r * GRID_COLS + c] = Math.min(65000, occ[r * GRID_COLS + c] + weight);
+  };
+  list.forEach((pg, i) => {
+    const boxes = Array.isArray(textBoxesPerPage) ? textBoxesPerPage[i] : null;
+    if (!Array.isArray(boxes) || !(pg && pg.width > 0 && pg.height > 0)) return;
+    const px = PARAAF_PAD_PT / pg.width, py = PARAAF_PAD_PT / pg.height;
+    for (const b of boxes) {
+      if (!b || ![b.x, b.y, b.w, b.h].every(Number.isFinite)) continue;
+      mark(b.x / pg.width - px, 1 - (b.y + b.h) / pg.height - py, (b.x + b.w) / pg.width + px, 1 - b.y / pg.height + py, 1);
+    }
+  });
+  // A signature box is never covered: weigh it above every page of text together.
+  for (const a of Array.isArray(avoid) ? avoid : []) {
+    if (!a || ![a.x, a.y, a.w, a.h].every(Number.isFinite)) continue;
+    mark(a.x - 0.006, a.y - 0.004, a.x + a.w + 0.006, a.y + a.h + 0.004, list.length + 1);
+  }
+  // 2D prefix sums: the text under any rectangle in O(1).
+  const W = GRID_COLS + 1;
+  const sum = new Float64Array(W * (GRID_ROWS + 1));
+  for (let r = 0; r < GRID_ROWS; r++) {
+    let row = 0;
+    for (let c = 0; c < GRID_COLS; c++) {
+      row += occ[r * GRID_COLS + c];
+      sum[(r + 1) * W + c + 1] = sum[r * W + c + 1] + row;
+    }
+  }
+  return (x, y, w, h) => {
+    const c0 = clamp(Math.floor(x * GRID_COLS + 1e-9), 0, GRID_COLS), c1 = clamp(Math.ceil((x + w) * GRID_COLS - 1e-9), 0, GRID_COLS);
+    const r0 = clamp(Math.floor(y * GRID_ROWS + 1e-9), 0, GRID_ROWS), r1 = clamp(Math.ceil((y + h) * GRID_ROWS - 1e-9), 0, GRID_ROWS);
+    return sum[r1 * W + c1] - sum[r0 * W + c1] - sum[r1 * W + c0] + sum[r0 * W + c0];
+  };
+}
+
+// Every candidate spot of a w x h paraaf, with the margin it lies in:
+// 0 bottom, 1 top, 2 side. Steps of one grid cell.
+function paraafCandidates(w, h) {
+  const out = [];
+  const xMax = 1 - MIN_EDGE_X - w, yMax = 1 - MIN_EDGE_Y - h;
+  const c0 = Math.ceil(MIN_EDGE_X * GRID_COLS), c1 = Math.floor(xMax * GRID_COLS);
+  const r0 = Math.ceil(MIN_EDGE_Y * GRID_ROWS), r1 = Math.floor(yMax * GRID_ROWS);
+  for (let r = r0; r <= r1; r++) {
+    const y = r / GRID_ROWS;
+    const inBottom = y + h >= 1 - BAND;
+    const inTop = y <= BAND;
+    for (let c = c0; c <= c1; c++) {
+      const x = c / GRID_COLS;
+      const inSide = x <= BAND || x + w >= 1 - BAND;
+      const band = inBottom ? 0 : inTop ? 1 : inSide ? 2 : -1;
+      if (band >= 0) out.push({ x, y, band });
+    }
+  }
+  return out;
+}
+
+export function paraafSpotsForParties({ pages, textBoxesPerPage, count, avoid }) {
+  const n = Math.max(1, Math.min(30, Number(count) || 1));
+  const cover = buildOccupancy(pages, textBoxesPerPage, avoid);
+  // The spot a single paraaf has always had: bottom right, inside the margin.
+  const homeOf = (w, h) => ({ x: 1 - 0.035 - w, y: 1 - 0.025 - h });
+  const clash = (a, picked, w, h) => picked.some((p) =>
+    a.x < p.x + w + GAP_X / 2 && p.x < a.x + w + GAP_X / 2 && a.y < p.y + h + GAP_Y / 3 && p.y < a.y + h + GAP_Y / 3);
+  const cost = (c, picked, w, h) => {
+    const bandCost = c.band * 2;
+    if (!picked.length) {
+      const home = homeOf(w, h);
+      return bandCost + Math.abs(c.x - home.x) + 3 * Math.abs(c.y - home.y);
+    }
+    let best = Infinity;
+    for (const p of picked) best = Math.min(best, Math.abs(c.x - p.x) + 3 * Math.abs(c.y - p.y));
+    return bandCost + best;
+  };
+  const choose = (cands, w, h, keyOf) => {
+    const picked = [];
+    while (picked.length < n) {
+      let best = null, bestKey = Infinity;
+      for (const c of cands) {
+        if (clash(c, picked, w, h)) continue;
+        const k = keyOf(c, picked);
+        if (k < bestKey - 1e-12) { best = c; bestKey = k; }
+      }
+      if (!best) break;
+      picked.push(best);
+    }
+    return picked;
+  };
+  const out = (picked, w, h) => picked.map((p) => ({ x: round6(p.x), y: round6(p.y), w: round6(w), h: round6(h) }));
+  for (const s of PARAAF_SCALES) {
+    const w = PARAAF_FR.w * s, h = PARAAF_FR.h * s;
+    const free = paraafCandidates(w, h).filter((c) => cover(c.x, c.y, w, h) === 0);
+    const picked = choose(free, w, h, (c, p) => cost(c, p, w, h));
+    if (picked.length === n) return out(picked, w, h);
+  }
+  // Nothing fits free of text even at the smallest size (text from edge to
+  // edge): the least covered spots, still never on top of each other.
+  const s = PARAAF_SCALES[PARAAF_SCALES.length - 1];
+  const w = PARAAF_FR.w * s, h = PARAAF_FR.h * s;
+  const all = paraafCandidates(w, h).map((c) => ({ ...c, cover: cover(c.x, c.y, w, h) }));
+  const picked = choose(all, w, h, (c, p) => c.cover * 1000 + cost(c, p, w, h));
+  while (picked.length < n) picked.push(picked[picked.length - 1] || homeOf(w, h));
+  return out(picked, w, h);
+}
+
 // Everything one party is asked for: a signature on `signPage` and, when the
 // sender wants it, a paraaf on every page. Returns a manifest-shaped object
 // ({ version, fields }) for normaliseSigningAppearance.
-export function partyRequest({ index, count, signPage, anchor, textBoxes, paraafCorner, withParaaf }) {
+export function partyRequest({ index, count, signPage, anchor, textBoxes, paraafCorner, paraafSpot, withParaaf }) {
   const fields = [];
   const sig = partySignatureSpot({ anchor, index, count, textBoxes });
   fields.push({ type: 'seal', page_index: Math.max(0, Number(signPage) || 0), ...sig });
   if (withParaaf) {
-    const p = partyParaafSpot({ corner: paraafCorner, index, count });
-    fields.push({ type: 'seal', page_index: 0, ...p, all_pages: true });
+    const p = paraafSpot && Number.isFinite(paraafSpot.x) ? paraafSpot : partyParaafSpot({ corner: paraafCorner, index, count });
+    fields.push({ type: 'seal', page_index: 0, x: p.x, y: p.y, w: p.w, h: p.h, all_pages: true });
   }
   return { version: withParaaf ? 2 : 1, fields };
 }
@@ -160,16 +347,27 @@ export function partyRequest({ index, count, signPage, anchor, textBoxes, paraaf
 // box the sender placed. anchor: the sender's box as a manifest field
 // (requestedAppearanceFromStamp), signPage its page. withParaaf: the sender
 // ticked "every page". pages: [{width,height}] in PDF points and
-// textBoxesPerPage as js/paraaf-place.js reads them, for the margin corner
-// that is free of text on the most pages. Returns one manifest per party.
+// textBoxesPerPage as js/paraaf-place.js reads them. The parafen are placed
+// against the text of every page and clear of every party's signature
+// (paraafSpotsForParties). Returns one manifest per party.
 export function requestsForParties({ anchor, signPage, count, withParaaf, pages, textBoxesPerPage }) {
   const n = Math.max(1, Math.min(30, Number(count) || 1));
-  const corner = withParaaf
-    ? pickSharedSpot(pages && pages.length ? pages : null, Array.isArray(textBoxesPerPage) ? textBoxesPerPage : null, PARAAF_FR.w, PARAAF_FR.h)
+  // Without a box from the sender every party signs where /co-sign puts it
+  // (autoSignaturePlace on the last page, or the signature sheet): the parafen
+  // keep clear of exactly those spots.
+  const lastIdx = Math.max(0, (pages && pages.length ? pages.length : 1) - 1);
+  const lastBoxes = !anchor && pages && pages.length && Array.isArray(textBoxesPerPage) && textBoxesPerPage[lastIdx]
+    ? textBoxesToFractions(textBoxesPerPage[lastIdx], pages[lastIdx].width, pages[lastIdx].height) : null;
+  const sigs = anchor
+    ? Array.from({ length: n }, (_, i) => partySignatureSpot({ anchor, index: i, count: n }))
+    : Array.from({ length: n }, (_, i) => autoSignaturePlace({ index: i, count: n, pageCount: lastIdx + 1, textBoxes: lastBoxes }))
+      .filter((p) => p.page_index <= lastIdx).map((p) => p.spot);
+  const spots = withParaaf
+    ? paraafSpotsForParties({ pages: pages && pages.length ? pages : null, textBoxesPerPage: Array.isArray(textBoxesPerPage) ? textBoxesPerPage : null, count: n, avoid: sigs })
     : null;
   const out = [];
   for (let i = 0; i < n; i++) {
-    out.push(partyRequest({ index: i, count: n, signPage, anchor, paraafCorner: corner, withParaaf: !!withParaaf }));
+    out.push(partyRequest({ index: i, count: n, signPage, anchor, paraafSpot: spots ? spots[i] : null, withParaaf: !!withParaaf }));
   }
   return out;
 }

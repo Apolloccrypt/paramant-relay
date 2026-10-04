@@ -163,6 +163,7 @@ function wireSetupPasskey() {
   // Passkey-specific success UI (own ids; the TOTP success section is untouched).
   function showRecoveryCodes(codes) {
     document.querySelectorAll('section[id^="state-"]').forEach((s) => s.classList.add('hidden'));
+    { const intro = document.getElementById('setup-intro'); if (intro) intro.classList.add('hidden'); }   // no "step 3 of 5" above the codes
     const section = document.getElementById('state-passkey-success');
     const grid = document.getElementById('passkey-backup-codes');
     if (!section || !grid) { window.location = nlEn('/dashboard', '/en/dashboard'); return; }
@@ -268,6 +269,15 @@ function wireLoginPasskey() {
 
 // ── Account dashboard: add a passkey to an existing logged-in account ────────
 // authUser + TOTP step-up (the server gates the ceremony on a valid TOTP).
+// A failed load in words, never "(HTTP 429)" (retest T5-1): what happened
+// and what the reader can do, by status.
+function loadFailText(status, nlWhat, enWhat) {
+  if (status === 429) return nlEn(nlWhat + ' konden even niet worden geladen: er kwamen te veel verzoeken tegelijk binnen. Ververs de pagina over een minuut.', 'Could not load ' + enWhat + ' just now: too many requests arrived at once. Refresh the page in a minute.');
+  if (status === 401 || status === 403) return nlEn('Uw sessie is verlopen. Log opnieuw in om uw ' + nlWhat.toLowerCase() + ' te zien.', 'Your session has expired. Sign in again to see your ' + enWhat + '.');
+  if (status >= 500) return nlEn(nlWhat + ' konden nu niet worden geladen door een storing bij ons. Er is niets mis met uw account. Probeer het zo opnieuw.', 'Could not load ' + enWhat + ' right now because of a fault on our side. Nothing is wrong with your account. Please try again shortly.');
+  return nlEn(nlWhat + ' konden nu niet worden geladen. Ververs de pagina om het opnieuw te proberen.', 'Could not load ' + enWhat + ' right now. Refresh the page to try again.');
+}
+
 function wireAccountPasskey() {
   const btn = document.getElementById('account-passkey-btn');
   if (!btn) return;                                  // not the account page
@@ -279,7 +289,7 @@ function wireAccountPasskey() {
   async function refresh() {
     try {
       const r = await fetch('/api/user/account/webauthn/credentials', { credentials: 'include' });
-      if (!r.ok) { if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = nlEn('De passkeys konden niet worden geladen (HTTP ', 'Could not load passkeys (HTTP ') + r.status + ').'; } return; }
+      if (!r.ok) { if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = loadFailText(r.status, 'Uw passkeys', 'your passkeys'); } return; }
       const d = await r.json();
       const pk = d.passkeys || [];
       if (!pk.length) {

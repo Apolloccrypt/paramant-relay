@@ -68,7 +68,7 @@ await page.route(`**/api/user/envelopes/${ENV_ID}/document*`, (route) => route.f
 await page.route('**/api/user/account', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"email":"demo@example.com"}' }));
 
 await page.goto(`${ORIGIN}/co-sign?env=${ENV_ID}&p=0&t=${TOKEN}${fixture.fragment}`, { waitUntil: 'domcontentloaded' });
-await page.waitForFunction(() => document.querySelectorAll('.doc-page[data-page-index]').length === 2 && !document.querySelector('#sign-confirm')?.disabled, null, { timeout: 20000 });
+await page.waitForFunction(() => document.querySelectorAll('.doc-page[data-page-index]:not(.sheet-page)').length === 2 && !document.querySelector('#sign-confirm')?.disabled, null, { timeout: 20000 });
 await page.locator('#appearance-allpages').check();
 await page.waitForFunction(() => document.querySelectorAll('.appearance-field.seal.paraaf').length === 2, null, { timeout: 10000 });
 
@@ -108,16 +108,16 @@ test('ticking the box adds one small repeated paraaf in the bottom-right margin,
 });
 
 test('the baked repeated seal does not overlap the text on any page', () => {
-  assert.equal(r.out.length, 2);
+  // Two pages of text from top to bottom: the signature has no free place on
+  // the last page, so it goes onto a signature sheet after it (acceptance test
+  // 2026-10-04: it used to land on the least covered spot, over the text).
+  assert.equal(r.out.length, 3, 'two pages plus the signature sheet');
   for (let i = 0; i < 2; i++) {
     const srcStrs = new Set(r.src[i].map((b) => b.str));
     const added = r.out[i].filter((b) => !srcStrs.has(b.str));
     assert.ok(added.some((b) => /S\.G\.P\./.test(b.str)), `page ${i + 1} has the paraaf with initials`);
     assert.ok(!added.some((b) => /PARAMANT SIGNED/.test(b.str)), 'no English frame text any more');
-    // The paraaf is what this suite is about. (The fixture is text from top to
-    // bottom, so the suggested signature spot has no free place to go; it is a
-    // suggestion the signer moves, and js/cosign-layout.js picks the least
-    // covered spot, tested in tests/cosign-layout.test.mjs.)
+    // The paraaf is what this suite is about; the signature sits on the sheet.
     for (const a of added.filter((b) => /S\.G\.P\./.test(b.str))) for (const t of r.src[i]) assert.ok(!overlaps(a, t), `page ${i + 1}: "${a.str}" overlaps "${t.str.slice(0, 20)}"`);
   }
 });

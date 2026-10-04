@@ -17,6 +17,10 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       s.classList.add('hidden');
     });
     document.getElementById(stateId).classList.remove('hidden');
+    // "Step 3 of 5, choose how you sign in" belongs to the choosing only: it
+    // stood above step 4, step 5 and even "All set" (retest T5-12a).
+    const intro = document.getElementById('setup-intro');
+    if (intro) intro.classList.toggle('hidden', !['state-loading', 'state-connecting'].includes(stateId));
   }
 
   async function init() {

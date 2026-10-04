@@ -172,9 +172,7 @@
     <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="v2" class="ps-panel-title">.psign envelope</h2></div>
     <label class="ps-file"><input type="file" id="vf-envelope" accept=".psign,application/json,.json"><span class="ps-file-cta">Choose the .psign file</span><span class="ps-file-meta" id="vf-envelope-info">No file selected</span></label>
     <div class="ps-field" id="vf-key-block" hidden>
-      <label class="ps-label" for="vf-api-key">API key (X-Api-Key)</label>
-      <input class="ps-input mono" type="password" id="vf-api-key" placeholder="pgp_..." autocomplete="off">
-      <p class="ps-warn">This is a legacy (v1/v2) envelope; its relay notary signature can only be checked by the relay, which requires an API key. Current signatures verify fully offline with no key.</p>
+      <p class="ps-warn">This is a legacy (v1/v2) envelope. Its relay notary signature is checked by the relay: this page sends the document's fingerprint and the proof, never the document itself. No account or key needed. Current signatures verify fully offline.</p>
     </div>
   </section>
 
@@ -273,7 +271,7 @@
 </footer>
 <script src="/nav.js?v=16" defer></script>
 <script src="/js/nav-auth.js?v=12" defer></script>
-<script type="module" src="/parasign-verify.js?v=8"></script>
+<script type="module" src="/parasign-verify.js?v=9"></script>
 <script type="module" src="/js/receipt-verify.js?v=4"></script>
 </body>
 </html>

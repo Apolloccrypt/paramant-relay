@@ -152,9 +152,9 @@ for (const [mode, label] of [['alone', 'Inloggen om te ondertekenen'], ['cosign'
     calls.length === 0, calls.join(', ') || 'none');
 
   await page.locator(button).click();
-  await page.waitForURL(/\/auth\/login\?next=(%2F|\/)sign$/, { timeout: 15000 }).catch(() => {});
+  await page.waitForURL(/\/auth\/login\?next=(%2F|\/)sign(%3Fherstel%3D1)?$/, { timeout: 15000 }).catch(() => {});
   ok(`${mode}: pressing it goes to the sign-in and back to /sign`,
-    /\/auth\/login\?next=(%2F|\/)sign$/.test(page.url()), page.url());
+    /\/auth\/login\?next=(%2F|\/)sign(%3Fherstel%3D1)?$/.test(page.url()), page.url());
   await page.close();
 }
 

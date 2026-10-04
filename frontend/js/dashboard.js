@@ -738,11 +738,14 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       return esc(p.label || (nlEn('Ondertekenaar ', 'Signer ') + (Number(p.index || 0) + 1))) + ': ' + esc(p.status === 'signed' ? nlEn('getekend', 'signed') : p.status === 'viewed' ? nlEn('geopend', 'opened') : nlEn('wacht', 'waiting'));
     }).join('<br>') : signed + nlEn(' van ', ' of ') + total + nlEn(' getekend', ' signed');
     var help = state === 'completed'
-      ? nlEn('De relay bewaart het cryptografische bewijs, geen leesbare kopie van uw document. Download hier het .psign-bewijs. Bewaar het naast uw eigen opgeslagen ondertekende document. U kunt beide later in Paramant controleren.', 'The relay keeps the cryptographic proof, not a plaintext copy of your document. Download the .psign proof here. Keep it next to your locally saved signed document. You can verify both later in Paramant.')
+      ? nlEn('De relay bewaart het cryptografische bewijs, geen leesbare kopie van uw document. De complete pdf met alle handtekeningen maakt deze browser: op het apparaat waarmee u verstuurde opent hij meteen, elders kiest u uw originele bestand. Controleren doet u later met het originele document en het .psign-bewijs.', 'The relay keeps the cryptographic proof, not a plaintext copy of your document. This browser builds the complete PDF with every signature: on the device you sent from it opens straight away, elsewhere you choose your original file. To verify later, use the original document and the .psign proof.')
       : state === 'cancelled'
         ? nlEn('Dit verzoek is gesloten. Gezette handtekeningen blijven in het auditlog, maar niemand kan nog tekenen.', 'This request is closed. Existing signatures remain in the audit record, but nobody can add another signature.')
         : nlEn('Dit verzoek loopt nog. Paramant bewaart het afgeleverde document versleuteld. Het leesbare document en de sleutel zijn niet terug te halen via het relay-overzicht.', 'This request is still open. Paramant stores the delivered document encrypted. The plaintext document and its key are not recoverable from the relay dashboard.');
     var actions = '';
+    // The complete PDF next to the proof: the result page builds it in this
+    // browser from the encrypted document (acceptance test 2026-10-04).
+    if (state === 'completed' && parties.length) actions += '<a class="dh-btn" href="/co-sign?owner=' + encodeURIComponent(doc.id) + nlEn('">Complete pdf openen</a>', '">Open the complete PDF</a>');
     if (state === 'completed') actions += '<a class="dh-btn" href="/api/user/documents/' + encodeURIComponent(doc.id) + nlEn('/receipt" download>.psign-bewijs downloaden</a>', '/receipt" download>Download .psign proof</a>');
     if (state === 'waiting' || state === 'in_progress') actions += '<button class="dh-btn danger" type="button" data-pa-action="document-cancel" data-document-id="' + esc(doc.id) + nlEn('">Verzoek annuleren</button>', '">Cancel request</button>');
     actions += nlEn('<a class="dh-btn" href="/verify">Een document controleren</a>', '<a class="dh-btn" href="/verify">Verify a document</a>');
@@ -1042,14 +1045,13 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     ]).then(function (res) {
       var signing = res[0], passkeys = res[1];
       var items = [];
-      if (signing && Array.isArray(signing.keys) && signing.keys.length === 0) {
-        items.push({
-          href: '/account#signing-identity-section',
-          title: nlEn('Ondertekenen instellen', 'Set up document signing'),
-          body: nlEn('Maak uw ML-DSA-65-ondertekensleutel, zodat u documenten kunt ondertekenen en medeondertekenen.', 'Create your ML-DSA-65 signing key so you can sign and co-sign documents.')
-        });
-      }
-      if (passkeys && Array.isArray(passkeys.passkeys) && passkeys.passkeys.length === 0) {
+      // No "set up signing" nag: without a stored key everybody signs with the
+      // code from the authenticator app, so nothing is missing. And the
+      // passkey offer only where this browser can make one (acceptance test
+      // 2026-10-04: the pop-up came whether it was relevant or not).
+      void signing;
+      var canPasskey = typeof window.PublicKeyCredential === 'function';
+      if (canPasskey && passkeys && Array.isArray(passkeys.passkeys) && passkeys.passkeys.length === 0) {
         items.push({
           href: '/account#passkey-section',
           title: nlEn('Passkey toevoegen om in te loggen', 'Add a sign-in passkey'),

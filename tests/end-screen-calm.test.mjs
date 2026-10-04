@@ -467,6 +467,12 @@ async function pickPdf(page, name) {
   await page.locator('#ds-pdf-canvas-list .ds-page-wrap[data-page-index="1"]').click({ position: { x: 150, y: 300 } });
   await page.locator('#ds-place-continue').click();
   await page.locator('#step-recipients:not([hidden])').waitFor({ timeout: 20000 });
+  // The recipients step in the invite flow: no promise that the sender hands
+  // over a key "on the next screen" (retest T5-3), and no "optional" for the
+  // people the whole request is for (T5-12d).
+  const recipientsText = await page.locator('#step-recipients').evaluate((el) => el.innerText);
+  ok('/sign invite recipients: it does not send the sender to hand over a key',
+    !/volgende scherm|zelf door/i.test(recipientsText) && !/optioneel/i.test(recipientsText.split('\n')[0]), recipientsText.slice(0, 300));
   await page.locator('#ds-add-recipient').click();
   await page.locator('[data-field="label"]').fill('Marije de Vries');
   await page.locator('[data-field="email"]').fill('marije@example.com');
@@ -482,6 +488,16 @@ async function pickPdf(page, name) {
   ok('/sign invitations sent: it says what is true now, in words',
     /Uitnodigingen verstuurd\./.test(text) && /hoeft niets meer te sturen/.test(text),
     text.slice(0, 200));
+  // And nothing on the screen, also not in the fold, says the opposite
+  // (retest T5-3: "niets meer sturen" next to "Stuur nu iedereen de eigen link").
+  const everything = await page.locator('#step-done').evaluate((root) => {
+    const parts = [];
+    const walk = (el) => { if (el.hidden) return; for (const n of el.childNodes) { if (n.nodeType === 3) parts.push(n.textContent); else if (n.nodeType === 1) walk(n); } };
+    walk(root);
+    return parts.join(' ').replace(/\s+/g, ' ');
+  });
+  ok('/sign invitations sent: no line tells the sender to send the links after all',
+    !/Stuur nu iedereen|stuur .{0,20}zelf|geef .{0,30}zelf door/i.test(everything.replace(/geef wie geen mail kreeg[^.]*\./, '')), everything.slice(0, 600));
   await page.close();
 }
 

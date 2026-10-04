@@ -129,8 +129,9 @@
 </form>
 
 <div id="sha1-notice" class="auth-note" hidden role="note">
-  <p><strong>You are signed in.</strong> Your authenticator app still sends SHA-1 codes. They work, and a SHA-256 app such as Raivo (iOS) or Aegis (Android) is stronger. <a href="/help/authenticator-apps">See which apps do this</a>.</p>
-  <a href="#" class="btn btn-primary mt-3" id="sha1-continue">Continue to your account</a>
+  <p><strong>You are signed in.</strong> A tip for later: your authenticator app (Google Authenticator, for example) makes codes the common, slightly older way. That works fine; some other apps protect a little more strongly. <a href="/help/authenticator-apps">See which apps those are</a>.</p>
+  <a href="#" class="btn btn-primary mt-3" id="sha1-continue">Continue</a>
+  <p class="auth-note-sub" id="sha1-auto" aria-live="polite"></p>
 </div>
 
 <p class="footer-text auth-foot">
@@ -148,8 +149,8 @@
 <script src="/js/pow-captcha.js?v=1"></script>
 <script src="/nav.js?v=16" defer></script>
 <script src="/js/nav-auth.js?v=12" defer></script>
-<script src="/js/auth-login.js?v=5"></script>
-<script type="module" src="/js/passkey.js?v=7"></script>
+<script src="/js/auth-login.js?v=6"></script>
+<script type="module" src="/js/passkey.js?v=8"></script>
 
 <p class="lang-switch" style="max-width:760px;margin:0 auto;padding:24px 16px;font-size:14px"><a href="/auth/login" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></p>
 <footer class="legal-strip">

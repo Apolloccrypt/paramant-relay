@@ -23,10 +23,24 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     if (errorDiv) errorDiv.classList.remove('visible');
     notice.hidden = false;
     const cont = document.getElementById('sha1-continue');
+    // Where the button goes, in words: back to the document the customer came
+    // from, not "to your account" (retest T5-5).
+    const toDoc = /^\/(en\/)?(co-sign|sign)\b/.test(dest);
     if (cont) {
       cont.setAttribute('href', dest);
+      cont.textContent = toDoc ? nlEn('Verder naar het document', 'Continue to the document') : nlEn('Verder naar uw account', 'Continue to your account');
       cont.addEventListener('click', function(ev) { ev.preventDefault(); window.location = dest; });
     }
+    // And on its own after a few seconds: the tip must never be a stop.
+    const auto = document.getElementById('sha1-auto');
+    let left = 8;
+    const say = function () { if (auto) auto.textContent = nlEn('U gaat over ' + left + ' seconden vanzelf verder.', 'Continuing on its own in ' + left + ' seconds.'); };
+    say();
+    const timer = setInterval(function () {
+      left -= 1;
+      if (left <= 0) { clearInterval(timer); window.location = dest; return; }
+      say();
+    }, 1000);
   }
 
   // One sign-in POST. `proof`, when present, is a solved proof-of-work; the
@@ -70,7 +84,12 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         // soft, dismissible note before continuing; otherwise redirect as before.
         let body = null;
         try { body = await res.json(); } catch (_) { /* non-JSON, ignore */ }
-        if (body && body.totp_algorithm === 'sha1') { showSha1Notice(returnUrl); return; }
+        // The tip about an older authenticator app at most once per browser:
+        // Google Authenticator works this way and that is normal, so it is
+        // not something to read at every sign-in (acceptance test 2026-10-04).
+        let seen = false;
+        try { seen = localStorage.getItem('paramant.sha1tip.v1') === '1'; localStorage.setItem('paramant.sha1tip.v1', '1'); } catch (_) { seen = false; }
+        if (body && body.totp_algorithm === 'sha1' && !seen) { showSha1Notice(returnUrl); return; }
         window.location = returnUrl;
       } else if (res.status === 401) {
         errorDiv.textContent = nlEn('Dit e-mailadres en deze code horen niet bij elkaar. De code verandert elke 30 seconden, dus gebruik de code die uw app nu toont.', 'That email and code do not match. Codes change every 30 seconds, so use the one your app is showing right now.');

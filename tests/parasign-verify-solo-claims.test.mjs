@@ -43,7 +43,7 @@ await page.goto(origin + '/', { waitUntil:'domcontentloaded' });
 
 const forged = await page.evaluate(async () => {
   const pqc = await import('/vendor/paramant-pqc.js');
-  const signer = await import('/js/parasign-signer.js?v=19');
+  const signer = await import('/js/parasign-signer.js?v=20');
   const enc = new TextEncoder();
   const hex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
   const b64 = (bytes) => { let value = ''; for (const byte of bytes) value += String.fromCharCode(byte); return btoa(value); };
@@ -83,15 +83,29 @@ async function runOnce({ url, verdict, lookup }) {
   await page.goto(origin + url, { waitUntil:'domcontentloaded' });
   await page.locator('#vf-document').setInputFiles({ name:'contract.txt', mimeType:'text/plain', buffer:Buffer.from(forged.source) });
   await page.locator('#vf-envelope').setInputFiles({ name:'contract.psign', mimeType:'application/json', buffer:Buffer.from(JSON.stringify(forged.psign)) });
+  // The file line is written once the .psign is read; wait for it rather
+  // than reading it the same instant (WebKit reads files a tick later).
+  await page.waitForFunction(() => /\|/.test(document.querySelector('#vf-envelope-info')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
   const info = await page.locator('#vf-envelope-info').innerText();
+  const lookups = [];
+  const onReq = (req) => { if (/lookup-signer/.test(req.url())) lookups.push(req.url()); };
+  page.on('request', onReq);
   await page.locator('#vf-verify').click();
   await page.waitForFunction((src) => new RegExp(src).test(document.querySelector('#vf-result')?.textContent || ''), verdict.source);
-  if (lookup) await page.waitForFunction(() => /ingetrokken|revoked/i.test(document.querySelector('#vf-result')?.textContent || ''));
-  return { info, result: await page.locator('#vf-result').innerText(), banner: await page.locator('#vf-result .ps-banner').first().getAttribute('class') };
+  // The account lookup is a question the reader asks, never one the page asks
+  // by itself (retest T3-10).
+  await page.waitForTimeout(300);
+  const lookupsBeforeClick = lookups.length;
+  if (lookup) {
+    await page.locator('#vf-lookup').click();
+    await page.waitForFunction(() => /Sleutel ingetrokken|Key revoked/.test(document.querySelector('#vf-result')?.textContent || ''));
+  }
+  page.off('request', onReq);
+  return { info, lookupsBeforeClick, result: await page.locator('#vf-result').innerText(), banner: await page.locator('#vf-result .ps-banner').first().getAttribute('class') };
 }
 
-const nl = { url:'/verify.html', verdict:/Handtekening geldig|Handtekening ONGELDIG|Sleutel ingetrokken/ };
-const en = { url:'/en/verify.html', verdict:/Signature valid|Signature INVALID|Key revoked/ };
+const nl = { url:'/verify.html', verdict:/Handtekening geldig|Handtekening ONGELDIG|Sleutel ingetrokken|bestand is aangepast|handtekening klopt met dit document/ };
+const en = { url:'/en/verify.html', verdict:/Signature valid|Signature INVALID|Key revoked|has been altered|signature matches this document/ };
 const offlineNl = await runOnce(nl);
 const offlineEn = await runOnce(en);
 const revokedNl = await runOnce({ ...nl, lookup:{ found:true, label:'Someone', email:'someone@example.invalid', alg:'ML-DSA-65', revoked_at:'2026-06-01T00:00:00Z' } });
@@ -110,10 +124,17 @@ for (const [lang, o] of [['nl', offlineNl], ['en', offlineEn]]) {
   if (!o.result.includes(forged.realFp)) fail(lang + ': the computed key fingerprint is missing from the result', o.result);
 }
 
-// The mathematics is sound (it is a real signature by some key), so the banner
-// may be green, but everything the key does not prove is labelled.
+// The mathematics is sound (it is a real signature by some key), but the file
+// writes a fingerprint that belongs to another key: someone altered it. The
+// banner says so in orange instead of a reassuring green (retest T3-2), and
+// everything the key does not prove is labelled.
 const r = offlineNl.result;
-if (!/Handtekening geldig/.test(r)) fail('nl: the signature itself should check out', r);
+if (!/De handtekening klopt, maar dit bestand is aangepast/.test(r)) fail('nl: the banner should say the signature holds but the file was altered', r);
+if (!/\bwarn\b/.test(offlineNl.banner) || /\bok\b/.test(offlineNl.banner)) fail('nl: an altered file must not get the green banner: ' + offlineNl.banner, r);
+if (!/has been altered/.test(offlineEn.result)) fail('en: the banner should say the file was altered', offlineEn.result);
+for (const [lang, o] of [['nl', offlineNl], ['en', offlineEn], ['nl revoked', revokedNl]]) {
+  if (o.lookupsBeforeClick !== 0) fail(lang + ': the page asked the relay about the key without being asked', String(o.lookupsBeforeClick));
+}
 if (!/koppelt deze sleutel niet aan een persoon of account/.test(r)) fail('nl offline: "not tied to a person" sentence missing with the network cut', r);
 if (!/Naam: Mick \(Paramant\) \(opgegeven door de ondertekenaar, niet gecontroleerd\)/.test(r)) fail('nl: name not labelled as unchecked', r);
 if (!/Datum: 2020-01-01T00:00:00Z \(opgegeven door de ondertekenaar, niet gecontroleerd\)/.test(r)) fail('nl: date not labelled as unchecked', r);

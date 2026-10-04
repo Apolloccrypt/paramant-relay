@@ -184,6 +184,17 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
    gets a single-row toolbar instead of the 160px editor and the 247px seal
    panel. That is what keeps the PDF above the fold on a 390px phone. */
 .ds-invite-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+/* On a phone the document comes first (retest T5-12c: it started a full screen
+   below the fold). The extra tools fold behind one button; the paraaf choice
+   stays in view. */
+.ds-more-tools{display:none;margin-bottom:10px}
+@media (max-width:640px){
+  .ds-more-tools{display:inline-flex}
+  .ds-more-tools[hidden]{display:none}
+  #step-place:not(.tools-open) #ds-edit-tools,
+  #step-place:not(.tools-open) .ds-seal-choice,
+  #step-place:not(.tools-open) #ds-seal-tip{display:none !important}
+}
 .ds-edit-label{font-size:12px;color:var(--ink-dim);font-weight:600}
 .ds-edit-btn{font:inherit;font-size:12.5px;min-height:34px;padding:6px 13px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-1);border-radius:var(--r-1);cursor:pointer;line-height:1.4;font-weight:500}
 .ds-edit-btn:hover{border-color:var(--ink-3);background:var(--line-ghost)}
@@ -689,9 +700,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       <button id="ds-zoom-in" type="button" aria-label="Zoom in">+</button>
       <button id="ds-zoom-fit" type="button">Fit</button>
     </div>
+    <button class="ds-edit-btn ds-more-tools" id="ds-more-tools" type="button" aria-expanded="false" aria-controls="ds-edit-tools">Text, date and more</button>
     <div class="ds-invite-tools" id="ds-invite-tools" hidden>
       <button class="ds-edit-btn" id="ds-invite-place" type="button">Place the signature box</button>
-      <span class="ds-edit-tip" id="ds-invite-paraaf-tip">Does every page need initials too? Each signer adds them while signing, with the Repeat on every page checkbox.</span>
+      <label class="ds-seal-check" id="ds-invite-paraaf-label"><input type="checkbox" id="ds-invite-paraaf"> Initials on every page, required for everyone</label>
+      <span class="ds-edit-tip" id="ds-invite-paraaf-tip">Each signer then puts their own initials in the margin of every page, clear of the text.</span>
     </div>
     <p class="ds-edit-hint" id="ds-edit-tools-hint" hidden>This file is an image, so you can place your signature stamp only. The full editor (+ Text, + Date, highlights, notes and page management) works on PDF files: pick a PDF to use it.</p>
     <div class="ds-edit-tools" id="ds-edit-tools" hidden>
@@ -720,7 +733,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <div class="ds-page-nav" id="ds-page-nav" hidden>
       <button id="ds-page-nav-prev" type="button" aria-label="Previous page">&#8593;</button>
       <span id="ds-page-nav-label"></span>
-      <input id="ds-page-nav-jump" type="number" min="1" aria-label="Go to page">
+      <input id="ds-page-nav-jump" type="number" min="1" aria-label="Go to page" placeholder="no.">
       <button id="ds-page-nav-next" type="button" aria-label="Next page">&#8595;</button>
     </div>
     <!-- The sticky action bar belongs to the document, not to the whole step:
@@ -758,7 +771,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 2.5: recipients (optional - if empty, this is a personal sign) -->
   <section class="ds-step" id="step-recipients" hidden>
     <h2>Add co-signers (optional)</h2>
-    <p class="ds-sub">Add each person who needs to sign. Their invitation is bound to the exact email address below. The encrypted document travels with the request, so nobody needs a separate copy of the file. The key that opens it is the one thing we do not email: you pass that on yourself, on the next screen.</p>
+    <p class="ds-sub">Add each person who needs to sign. Their invitation is bound to the exact email address below. The encrypted document travels with the request, so nobody needs a separate copy of the file.</p>
 
     <div class="ds-recipients-list" id="ds-recipients-list"></div>
 
@@ -768,7 +781,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
     <fieldset class="ds-delivery-card" id="ds-invite-delivery" hidden>
       <legend>Email invitation</legend>
-      <p class="ds-usage-p">Paramant emails each recipient a notice with a link to the request. They must sign in with the invited email address. The notice does not carry the key to the document, because that email leaves our infrastructure through a mail provider abroad. You get each full link on the next screen to pass on yourself.</p>
+      <p class="ds-usage-p">Paramant emails each recipient an invitation with a link of their own. It opens the document once they sign in with the invited email address. The mail carries only half of the key; we hand the other half to that account alone, so the mail provider cannot open the document.</p>
       <div class="ds-delivery-fields" id="ds-delivery-fields">
         <label><span class="ds-label">Email subject</span><input class="ds-input" id="ds-invite-subject" maxlength="140"></label>
         <label><span class="ds-label">Message (optional)</span><textarea class="ds-input ds-textarea" id="ds-invite-message" maxlength="1000" placeholder="Add context, a reference or the requested deadline."></textarea></label>
@@ -777,11 +790,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         <summary>Security settings</summary>
         <label class="ds-delivery-option">
           <input type="radio" name="ds-delivery-mode" value="email" checked>
-          <span><strong>Email a notice, hand over the link yourself</strong><span>Recommended. The notice works only for the invited Paramant account, and the key never reaches our mail provider.</span></span>
+          <span><strong>Email everyone an invitation</strong><span>Recommended. The invitation works only for the invited Paramant account, and the whole key never reaches our mail provider.</span></span>
         </label>
         <label class="ds-delivery-option">
           <input type="radio" name="ds-delivery-mode" value="copy">
-          <span><strong>Create links without sending anything</strong><span>No email at all. You share each personal link yourself, exactly as above.</span></span>
+          <span><strong>Create links without sending anything</strong><span>No email at all. You share each personal link yourself.</span></span>
         </label>
       </details>
     </fieldset>
@@ -899,7 +912,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
          step where it costs something: the file lives in this page and does not
          survive the navigation to the sign-in. sign-flow.js reveals it together
          with turning the button below into the sign-in. -->
-    <p class="ds-hint" id="ds-sign-signin-hint" hidden>Your document has not been uploaded and stays in this browser. Signing in reloads this page, so you pick the file again afterwards.</p>
+    <p class="ds-hint" id="ds-sign-signin-hint" hidden>Your document has not been uploaded and stays in this browser. After you sign in, the document and the spot are ready again.</p>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-sign-back" type="button">Back</button>
       <button class="btn btn-primary" id="ds-sign-now" type="button">Sign this document</button>
@@ -1045,6 +1058,6 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
 <script src="/js/quota-upgrade.js?v=7" defer></script>
 <script src="/js/done-state.js?v=1" defer></script>
-<script type="module" src="/sign-flow.js?v=64"></script>
+<script type="module" src="/sign-flow.js?v=65"></script>
 </body>
 </html>
