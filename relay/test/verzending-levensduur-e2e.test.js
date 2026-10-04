@@ -153,7 +153,9 @@ test('de afzender houdt van een verlopen verzending alleen een id over', async (
   };
 
   const vers = (await lijst()).find(s => s.id === id);
-  assert.equal(vers.filename, 'kwartaalcijfers.pdf');
+  // Sinds review ronde 2 (f) neemt de relay de bestandsnaam niet aan, ook niet
+  // voor het eigen overzicht van de afzender (dat zegt dan "Een bestand").
+  assert.equal(vers.filename, '');
   assert.equal(vers.status, 'open');
   assert.equal(vers.total, 1);
 

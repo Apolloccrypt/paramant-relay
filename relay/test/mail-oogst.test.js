@@ -146,9 +146,9 @@ test('dertig uitnodigingen: een per persoon, en niemand ziet een ander', { todo:
     assert.equal(m.reply_to, AFZENDER);
   }
 
-  // 6. De bestandsnaam. Die staat er voluit in, bij naam en al.
-  assert.ok(uit[0].text.includes(NAAM),
-    'de bestandsnaam hoort in de mail (dit is een BEVINDING, geen eis)');
+  // 6. De bestandsnaam. Stond er voluit in (een BEVINDING); sinds review
+  //    ronde 2 (f) neemt de relay hem niet meer aan en staat hij er niet in.
+  assert.ok(!uit[0].text.includes(NAAM), 'de bestandsnaam staat in de uitnodiging');
 });
 
 test('de ophaalcode: wat een mailprovider te zien krijgt', async () => {
@@ -179,8 +179,9 @@ test('de ophaalcode: wat een mailprovider te zien krijgt', async () => {
   assert.ok(!hooi.includes(tokens[doel]),
     'het token staat in de codemail; dan draagt een mailbox beide helften');
   assert.match(code.text, /\b\d{6}\b/, 'geen zescijferige code');
-  // BEVINDING: de bestandsnaam reist mee met de code.
-  assert.ok(code.text.includes(NAAM), 'bestandsnaam in de codemail');
+  // Was een BEVINDING: de bestandsnaam reisde mee met de code. Sinds review
+  // ronde 2 (f) neemt de relay de naam niet meer aan, dus hij staat nergens.
+  assert.ok(!hooi.includes(NAAM), 'bestandsnaam in de codemail');
 });
 
 test('de herinnering: wat er in staat en wat er niet in staat', async () => {

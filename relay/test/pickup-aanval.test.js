@@ -497,7 +497,8 @@ test('7a: een bestandsnaam met CR/LF of unicode breekt de levering niet', async 
   await r.arrayBuffer();
   assert.equal(r.headers.get('x-injected'), null,
     'de bestandsnaam smokkelde een eigen header mee');
-  assert.equal(decodeURIComponent(r.headers.get('X-Paramant-Filename')).slice(0, 4), 'jaar');
+  // Sinds review ronde 2 (f) neemt de relay de naam niet aan: de header zegt 'file'.
+  assert.equal(decodeURIComponent(r.headers.get('X-Paramant-Filename')), 'file');
 });
 
 test('7b: een verpakking die geen header kan zijn wordt bij de verzending geweigerd', async () => {
@@ -542,7 +543,8 @@ test('T4-10: de codemail drukt geen link en geen adres uit de bestandsnaam af', 
   for (const deel of [c.mail.text, c.mail.html || '']) {
     assert.doesNotMatch(deel, /evil-example|www\.|help@/i, 'de codemail draagt een link of adres uit de naam: ' + deel);
   }
-  assert.match(c.mail.text, /\[link\]/);
+  // Sinds review ronde 2 (f) staat de naam er helemaal niet meer in.
+  assert.doesNotMatch(c.mail.text, /PARAMANT SUPPORT|Voor het bestand/);
 });
 
 // T4-11: een bestand van 24 MB gaat in vijf blokken onder één file_id. De
