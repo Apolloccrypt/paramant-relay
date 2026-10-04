@@ -1010,6 +1010,72 @@ ${BASE_URL}`;
   };
 }
 
+// To the person who sent a document for signing, when somebody else signs it.
+// A count and a link, nothing else: no file name and no party names, because
+// those would travel to the mail provider for no gain, and the dashboard
+// behind the link shows both to the one person entitled to them. Dutch first
+// with the English underneath, like the invitation: the sender's language is
+// not stored with the envelope.
+function signatureReceivedEmail({ signedCount, partyCount, complete, envelopeId }) {
+  const n = Math.max(0, parseInt(signedCount, 10) || 0);
+  const m = Math.max(1, parseInt(partyCount, 10) || 1);
+  const dashUrl = `${BASE_URL}/dashboard`;
+  const heeft = n === 1 ? 'heeft' : 'hebben';
+  const has = n === 1 ? 'has' : 'have';
+  const W = {
+    nl: complete ? {
+      heading: 'Iedereen heeft getekend',
+      line: `Uw document is ondertekend door alle ${m} ondertekenaars.`,
+      next: 'Het getekende document en het bewijs staan bij uw documenten.',
+      pre: 'Uw document is door iedereen ondertekend.',
+      subject: 'Iedereen heeft getekend',
+    } : {
+      heading: 'Er is getekend',
+      line: `${n} van de ${m} ondertekenaars ${heeft} nu getekend.`,
+      next: 'U krijgt weer bericht zodra er opnieuw iemand tekent.',
+      pre: `${n} van de ${m} ondertekenaars ${heeft} getekend.`,
+      subject: `Er is getekend (${n} van ${m})`,
+    },
+    en: complete ? {
+      heading: 'Everyone has signed',
+      line: `Your document has been signed by all ${m} signers.`,
+      next: 'The signed document and its proof are with your documents.',
+      pre: 'Your document has been signed by everyone.',
+      subject: 'Everyone has signed',
+    } : {
+      heading: 'Someone signed',
+      line: `${n} of ${m} signers ${has} now signed.`,
+      next: 'We will let you know again when the next person signs.',
+      pre: `${n} of ${m} signers ${has} signed.`,
+      subject: `Someone signed (${n} of ${m})`,
+    },
+  };
+  const open = { nl: 'Naar mijn documenten', en: 'Go to my documents' };
+  const textBlock = (l) => `${W[l].heading}
+
+${W[l].line}
+${W[l].next}
+
+${open[l]}:
+${dashUrl}`;
+  const text = `${textBlock('nl')}\n\n---\n\n${textBlock('en')}
+
+Paramant
+${BASE_URL}`;
+  const htmlBlock = (l, first) => `
+    <h1 style="margin:${first ? '0' : '32px'} 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">${escHtml(W[l].heading)}</h1>
+    <p style="margin:0 0 16px 0;line-height:1.6;">${escHtml(W[l].line)}</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">${escHtml(W[l].next)}</p>
+    ${btn(dashUrl, escHtml(open[l]))}`;
+  const html = htmlShell(`${W.nl.pre} ${W.en.pre}`,
+    htmlBlock('nl', true) + '\n    <hr style="margin:32px 0 0 0;border:0;border-top:1px solid #E2E8F0;">' + htmlBlock('en', false),
+    'nl');
+  return {
+    ...wrap(text, html, { refId: 'signed-' + refIdHash(`${envelopeId}:${n}`) }),
+    subject: `${W.nl.subject} / ${W.en.subject}`,
+  };
+}
+
 // Every message this file sends goes through the one door in lib/mail.js.
 //
 // This used to POST straight to api.resend.com with RESEND_API_KEY, which meant
@@ -1047,6 +1113,7 @@ module.exports = {
   welcomeEmail,
   parasignOnboardingEmail, /*MARK:parasign_export*/
   signingInviteEmail,
+  signatureReceivedEmail,
   billingConfirmationEmail,
   productPlanChangeEmail,
   billingCancellationEmail,
