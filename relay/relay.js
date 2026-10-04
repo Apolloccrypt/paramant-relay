@@ -10221,7 +10221,7 @@ async function handleRelayRequest(req, res) {
   // where. Ownership is the durable account_id, as for /cancel and /receipt.
   const envOwnerReadMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/(owner-document|owner-view)$/);
   if (envOwnerReadMatch && req.method === 'GET') {
-    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' })); }
+    if (!keyData?.active) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' })); }
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
     try {
@@ -10268,7 +10268,7 @@ async function handleRelayRequest(req, res) {
   // authenticated services that send invitations. It reveals no envelope data.
   const envOwnerMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/owner-check$/);
   if (envOwnerMatch && req.method === 'GET') {
-    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
+    if (!keyData?.active) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required (X-Api-Key)' })); }
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'Envelope store unavailable' })); }
     try {
@@ -10290,7 +10290,7 @@ async function handleRelayRequest(req, res) {
   // against the durable account_id before state or evidence is returned.
   const envCancelMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/cancel$/);
   if (envCancelMatch && req.method === 'POST') {
-    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' })); }
+    if (!keyData?.active) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' })); }
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
     try {
@@ -10312,7 +10312,7 @@ async function handleRelayRequest(req, res) {
 
   const envReceiptMatch = path.match(/^\/v2\/envelopes\/([A-Za-z0-9_-]{20,64})\/receipt$/);
   if (envReceiptMatch && req.method === 'GET') {
-    if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' })); }
+    if (!keyData?.active) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'API key required' })); }
     const store = _envStore();
     if (!store) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'store_unavailable' })); }
     try {
