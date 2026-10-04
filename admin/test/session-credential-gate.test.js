@@ -54,7 +54,9 @@ function authUserBody() {
 test('authUser binds the session to the client that opened it', () => {
   const body = authUserBody();
   assert.match(body, /req\.get\('user-agent'\)/, 'authUser does not read the request user agent');
-  assert.match(body, /sess\.ua !== ua/, 'authUser reads the stored client and never compares it');
+  // Compared on the browser engine (lib/session-client.js clientFamily), not the
+  // exact string: a desktop-site toggle or a browser update is not a theft.
+  assert.match(body, /clientFamily\(sess\.ua\) !== clientFamily\(ua\)/, 'authUser reads the stored client and never compares it');
   assert.match(body, /session_expired/, 'a mismatch does not end the session');
   // Stamped, not refused, when the record predates the field.
   assert.match(body, /typeof sess\.ua !== 'string'/, 'a record without a stored client is refused rather than stamped');

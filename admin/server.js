@@ -110,7 +110,9 @@ if (!ADMIN_TOKEN) { console.error('[PARAMANT-ADMIN] ADMIN_TOKEN is not set — r
 // invented here.
 const DECOY_SECRET = ADMIN_TOKEN || crypto.randomBytes(32);
 
-const USER_SESSION_MAX_AGE_MS = 12 * 3600 * 1000;
+// One hour idle, twelve hours at most; the cookie and the record get the same
+// number from sessionLifetimeS (lib/session-client.js).
+const { USER_SESSION_IDLE_S, USER_SESSION_MAX_AGE_MS, sessionLifetimeS, clientFamily } = require('./lib/session-client');
 // How stale last_seen may get before authUser rewrites the session record. A
 // write per request would double the redis traffic of every dashboard poll for
 // a field that is only ever rendered to the minute.
@@ -837,7 +839,11 @@ async function authUser(req, res, next) {
     // showed the login time. Written at most once a minute (see
     // LAST_SEEN_REFRESH_MS) so an open dashboard does not add a write per poll.
     if (!(now - Number(sess.last_seen) < LAST_SEEN_REFRESH_MS)) { sess.last_seen = now; rewrite = true; }
-    // BOUND TO THE CLIENT THAT LOGGED IN. Finding 22i: the session record holds
+    // BOUND TO THE KIND OF CLIENT THAT LOGGED IN (see lib/session-client.js for
+    // why the engine and not the exact string: "Request Desktop Website" and a
+    // browser update both rewrite the string and logged honest people out).
+    //
+    // The history: Finding 22i: the session record holds
     // the account's raw pgp_ API key -- twice, since user_id IS that key -- and
     // `ip` and `ua` were stored at login and then read only to be PRINTED on the
     // account screen. Nothing compared them. A cookie lifted off one machine
@@ -855,15 +861,20 @@ async function authUser(req, res, next) {
     // stamped rather than refused, so a deploy does not log everybody out.
     const ua = req.get('user-agent') || '';
     if (typeof sess.ua !== 'string') { sess.ua = ua; rewrite = true; }
-    else if (sess.ua !== ua) {
+    else if (clientFamily(sess.ua) !== clientFamily(ua)) {
       await redis().del(key).catch(() => {});
       try { await logAuditEvent(sess.user_id, 'session_client_changed', { via: sess.via || 'totp' }); } catch (_) { /* audit is best effort */ }
       return res.status(401).json({ error: "session_expired" });
     }
 
     // One command either way: SET with EX both stores and slides the window.
-    if (rewrite) await redis().set(key, JSON.stringify(sess), { EX: 3600 });
-    else await redis().expire(key, 3600);
+    // The cookie is re-issued with the same lifetime. It used to be set once at
+    // login with Max-Age=3600 and never again, so the browser dropped it an hour
+    // after login however active the person was, while this record lived on.
+    const lifetime = sessionLifetimeS(created, now);
+    if (rewrite) await redis().set(key, JSON.stringify(sess), { EX: lifetime });
+    else await redis().expire(key, lifetime);
+    setUserCookie(res, token, lifetime);
 
     req.userSession = sess;
     req.userSessionToken = token;
@@ -905,9 +916,11 @@ const developerConfig = require('./lib/developer-config');
 // POST/DELETE -- so CSRF protection for the state-changing endpoints is
 // preserved. HttpOnly + Secure are unchanged. NOTE: this also moves the
 // existing email+TOTP login to Lax (one shared cookie).
-function setUserCookie(res, token) {
+// Max-Age defaults to the idle hour at login; authUser and session/verify pass
+// what is left (sessionLifetimeS), so an active session keeps its cookie.
+function setUserCookie(res, token, maxAgeS = USER_SESSION_IDLE_S) {
   res.setHeader("Set-Cookie",
-    `paramant_user_session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=3600`
+    `paramant_user_session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${Math.max(1, Math.floor(maxAgeS))}`
   );
 }
 
@@ -2455,14 +2468,29 @@ api.post("/user/logout", async (req, res) => {
 api.get("/user/session/verify", async (req, res) => {
   const token = parseCookies(req).paramant_user_session;
   if (!token) return res.json({ authenticated: false });
-  const raw = await redis().get(`paramant:user:session:${token}`);
+  const key = `paramant:user:session:${token}`;
+  const raw = await redis().get(key);
   if (!raw) return res.json({ authenticated: false });
-  await redis().expire(`paramant:user:session:${token}`, 3600);
-  const s = JSON.parse(raw);
+  let s;
+  try { s = JSON.parse(raw); } catch { return res.json({ authenticated: false }); }
+  // Every page asks this first (nav-auth), so it slides the session like
+  // authUser does: the record AND the cookie, with the same lifetime, and never
+  // past the twelve-hour cap. It used to slide only the record, and answer
+  // "authenticated" for a session authUser would already refuse as too old.
+  const now = Date.now();
+  const created = Number(s.created_at);
+  if (Number.isFinite(created) && created > 0 && now - created > USER_SESSION_MAX_AGE_MS) {
+    await redis().del(key).catch(() => {});
+    clearUserCookie(res);
+    return res.json({ authenticated: false });
+  }
+  const lifetime = sessionLifetimeS(Number.isFinite(created) && created > 0 ? created : now, now);
+  await redis().expire(key, lifetime);
+  setUserCookie(res, token, lifetime);
   res.json({
     authenticated: true,
     email: s.email,
-    expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+    expires_at: new Date(now + lifetime * 1000).toISOString(),
   });
 });
 

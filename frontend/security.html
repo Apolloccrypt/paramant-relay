@@ -412,7 +412,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="grid2" style="margin-top:20px">
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Voor mensen</div>
-      <p style="margin:0">U logt in op paramant.app of via een browserextensie met uw e-mailadres en de huidige code van 6 cijfers uit uw authenticator-app. Een sessie duurt een uur. De TOTP-controle accepteert HMAC met SHA-256 en SHA-1, dus elke gangbare authenticator-app werkt; SHA-1 is de standaard van RFC 6238 en een aantal veelgebruikte apps kent niets anders. Geschikte authenticator-apps staan op <a href="/help/authenticator-apps">/help/authenticator-apps</a>.</p>
+      <p style="margin:0">U logt in op paramant.app of via een browserextensie met uw e-mailadres en de huidige code van 6 cijfers uit uw authenticator-app. Een sessie loopt af na een uur zonder activiteit, en na twaalf uur in elk geval. De TOTP-controle accepteert HMAC met SHA-256 en SHA-1, dus elke gangbare authenticator-app werkt; SHA-1 is de standaard van RFC 6238 en een aantal veelgebruikte apps kent niets anders. Geschikte authenticator-apps staan op <a href="/help/authenticator-apps">/help/authenticator-apps</a>.</p>
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Voor machines</div>
@@ -424,7 +424,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Beveiliging van de sessie</div>
-      <p style="margin:0">Na de TOTP-controle krijgt u een sessietoken van 256 bits als cookie met httpOnly, Secure en SameSite=Lax. Lax en niet Strict, zodat een uitgenodigde ondertekenaar die via een link in zijn mailprogramma binnenkomt niet terug naar het inlogscherm wordt gestuurd; een POST vanaf een andere site draagt nog steeds geen cookie. Het token staat in Redis en verloopt na een uur zonder activiteit. API-sleutels komen nooit in de browser.</p>
+      <p style="margin:0">Na de TOTP-controle krijgt u een sessietoken van 256 bits als cookie met httpOnly, Secure en SameSite=Lax. Lax en niet Strict, zodat een uitgenodigde ondertekenaar die via een link in zijn mailprogramma binnenkomt niet terug naar het inlogscherm wordt gestuurd; een POST vanaf een andere site draagt nog steeds geen cookie. Het token staat in Redis en verloopt na een uur zonder activiteit, en na twaalf uur in elk geval. API-sleutels komen nooit in de browser.</p>
     </div>
   </div>
 
