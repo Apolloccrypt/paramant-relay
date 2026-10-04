@@ -230,3 +230,51 @@ test('after a relay restart a live link says lost and a burned one still says do
   assert.equal((await info(burned.token)).json.reason, 'downloaded');
   clDid();
 });
+
+// Hertest 04-10, new: a tab closed mid-download left its claim held, and the
+// same receiver opening the link again was told "already being downloaded" for
+// three minutes. The page now releases on pagehide, and the relay honours a
+// release from the claim holder even while its own write is still flushing.
+test('a release from the holder frees the link at once, also while the relay is still writing', async (t) => {
+  if (!clRc) return t.skip('no redis');
+  const { token, payload } = await clUpload('midrelease', {}, 5 * 1024 * 1024 - 4096);
+  const a = claimId();
+  let req = null;
+  await new Promise((resolve, reject) => {
+    req = http.get(`${clSrv.base}/v2/dl/${token}/get?claim=${a}`, (res) => {
+      assert.equal(res.statusCode, 200);
+      res.once('data', () => { res.pause(); setTimeout(resolve, 100); });
+    });
+    req.on('error', () => {});
+    setTimeout(() => reject(new Error('no data')), 5000);
+  });
+  assert.equal((await release(token, a)).status, 200);
+  const b = claimId();
+  const got = await claimGet(token, b);
+  req.destroy();
+  assert.equal(got.status, 200, `the receiver had to wait after giving the claim back: ${got.status} ${got.text.slice(0, 80)}`);
+  assert.ok(got.buf.equals(payload));
+  assert.equal((await ack(token, b)).status, 200);
+  clDid();
+});
+
+// Hertest T4-3: the relay's own confirm page had a plain link to .../get, the
+// burn-on-finish route, so a download broken off after 80 KB burned the file.
+// Its button now runs in claim mode from a same-origin script (CSP 'self').
+test('the relay confirm page downloads in claim mode, and the old link stays for no-JS clients', async (t) => {
+  if (!clRc) return t.skip('no redis');
+  const { token } = await clUpload('confirmpage');
+  const page = await clSrv.get(`/v2/dl/${token}`, { headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) Firefox/128.0' } });
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<script src="\/v2\/dl\/confirm\.js" defer><\/script>/);
+  assert.match(page.text, new RegExp(`data-token="${token}"`));
+  const js = await clSrv.get('/v2/dl/confirm.js');
+  assert.equal(js.status, 200);
+  assert.match(js.headers['content-type'], /javascript/);
+  assert.match(js.text, /\/get\?claim=/, 'the button must claim');
+  assert.match(js.text, /\/ack'/, 'and ack only after the bytes are in');
+  assert.match(js.text, /byteLength !== total/, 'after checking the length');
+  assert.match(js.text, /pagehide/, 'and give the claim back when the tab closes');
+  assert.equal((await info(token)).status, 200, 'serving the page burns nothing');
+  clDid();
+});

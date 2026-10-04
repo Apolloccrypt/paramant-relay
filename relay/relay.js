@@ -319,7 +319,11 @@ function tweetaligHtml(taal, nl, en) {
        + '<div lang="en">' + en + '</div>';
 }
 function mailDatum(ms, taal, opties) {
-  return new Date(ms).toLocaleString(taal === 'en' ? 'en-GB' : 'nl-NL', opties);
+  // Explicit zone and its name (hertest T4-L4): the container runs in UTC, the
+  // sender's page showed UTC, and the mail printed a bare "15:08" that meant
+  // one or the other depending on where the relay happened to run.
+  return new Date(ms).toLocaleString(taal === 'en' ? 'en-GB' : 'nl-NL',
+    { timeZone: 'Europe/Amsterdam', timeZoneName: 'short', ...opties });
 }
 
 // Which sector an account lives on, from its key label -- the same derivation
@@ -351,6 +355,25 @@ function veiligCodeer(waarde) {
       return encodeURIComponent(String(waarde).replace(/[\uD800-\uDFFF]/g, ''));
     } catch (e2) { return 'file'; }
   }
+}
+
+// A sender-chosen file name, made safe to print in a mail to somebody who is
+// not our customer: one line, printable, no link and no address. Used by the
+// invitation AND the code mail (hertest T4-10: the code mail printed
+// "PARAMANT SUPPORT bevestig uw account op www.evil-example.com" verbatim).
+// Returns '' for an empty name; the caller picks the fallback wording.
+function veiligeBestandsnaam(raw) {
+  return String(raw == null ? '' : raw)
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/[\uD800-\uDFFF]/gu, '') // lone halves only; an emoji stays
+    .replace(/\s+/g, ' ')
+    .replace(/\b(?:https?:\/\/|www\.)\S*/gi, '[link]')
+    .replace(/\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/gi, '[adres]')
+    // A bare domain ("evil-example.com") is made clickable by most clients too.
+    .replace(/\b(?:[a-z0-9-]+\.)+(?:com|net|org|nl|be|de|eu|io|app|info|biz|co|uk|ru|xyz|top|site|online)\b(?:\/\S*)?/gi, '[link]')
+    .trim()
+    .slice(0, 120);
 }
 
 // HTML-escape user-supplied strings before embedding in email templates.
@@ -1405,6 +1428,22 @@ const downloadTokens = new Map(); // token -> { hash, key, expires_ms, used }
 // It outlives the link by a week so "expired" stays answerable after expiry.
 // Without redis the answer is the honest "unknown".
 const DL_TOMB_GRACE_MS = 7 * 86_400_000;
+// One upload notification per file (hertest T4-11). Keyed on a hash of
+// account + meta.file_id, an hour long, capped so it cannot grow unbounded.
+const _gemeldeBestanden = new Map();
+function _alGemeld(account, fileId) {
+  if (!fileId) return false;
+  const k = crypto.createHash('sha256').update(String(account || '') + '|' + String(fileId)).digest('hex').slice(0, 32);
+  const now = Date.now();
+  const tot = _gemeldeBestanden.get(k);
+  if (tot && tot > now) return true;
+  if (_gemeldeBestanden.size > 5000) {
+    for (const [kk, t] of _gemeldeBestanden) { if (t <= now) _gemeldeBestanden.delete(kk); }
+    if (_gemeldeBestanden.size > 5000) _gemeldeBestanden.delete(_gemeldeBestanden.keys().next().value);
+  }
+  _gemeldeBestanden.set(k, now + 3_600_000);
+  return false;
+}
 // A download in claim mode (?claim=) is only burned when the receiver's page
 // confirms it decrypted the file (POST /v2/dl/:token/ack). Until then the blob
 // stays, so an interrupted or slow download, or a key with one wrong character,
@@ -1412,7 +1451,13 @@ const DL_TOMB_GRACE_MS = 7 * 86_400_000;
 // one claim at a time with a lease, and at most DL_MAX_FETCHES fetches per
 // link, after which it burns as before.
 const DL_MAX_FETCHES = 5;
-const DL_CLAIM_LEASE_MS = 3 * 60_000;
+// How long a claim stays held once the bytes are out, waiting for the ack.
+// Was three minutes, and a receiver who closed the tab mid-download and opened
+// the link again was told "already being downloaded" for all three (hertest
+// T4, new). The page now gives the claim back on close (sendBeacon release),
+// a tab of the same browser reuses its claim, and a lost release costs one
+// minute. Decrypting even a 30 MB file takes seconds.
+const DL_CLAIM_LEASE_MS = 60_000;
 const DL_CLAIM_RE = /^[a-f0-9]{32}$/;
 function _dlRk(token) {
   return 'dl:tok:' + crypto.createHash('sha256').update('paramant-dl:' + token).digest('hex').slice(0, 40);
@@ -1483,6 +1528,60 @@ setInterval(() => {
 // Known link-preview bots — serve safe HTML placeholder, never trigger burn
 const PRELOAD_BOTS = /WhatsApp|Telegram(?:Bot)?|Slackbot|Discordbot|facebookexternalhit|Twitterbot|LinkedInBot|Googlebot|bingbot|YandexBot|DuckDuckBot|ia_archiver|python-requests|python-urllib|Go-http-client/i;
 
+const DL_CONFIRM_JS = `'use strict';
+(function () {
+  var a = document.querySelector('a.btn[data-token]');
+  var st = document.getElementById('dl-state');
+  if (!a || !window.fetch || !window.crypto || !crypto.getRandomValues) return;
+  var tok = a.getAttribute('data-token');
+  if (!/^[a-f0-9]{48}$/.test(tok)) return;
+  var b = crypto.getRandomValues(new Uint8Array(16));
+  var claim = Array.prototype.map.call(b, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+  var busy = false;
+  function say(m) { if (st) st.textContent = m; }
+  function release() {
+    var body = JSON.stringify({ claim: claim });
+    try { if (navigator.sendBeacon && navigator.sendBeacon('/v2/dl/' + tok + '/release', body)) return; } catch (e) {}
+    fetch('/v2/dl/' + tok + '/release', { method: 'POST', body: body, keepalive: true }).catch(function () {});
+  }
+  addEventListener('pagehide', function () { if (busy) release(); });
+  a.addEventListener('click', function (e) {
+    e.preventDefault();
+    if (busy) return;
+    busy = true;
+    say('Downloading...');
+    fetch('/v2/dl/' + tok + '/get?claim=' + claim, { cache: 'no-store' }).then(function (r) {
+      if (!r.ok) {
+        busy = false;
+        return r.json().catch(function () { return {}; }).then(function (j) {
+          say(r.status === 409 ? 'This file is being downloaded right now. Try again in a minute.'
+            : 'This link no longer works (' + ((j && j.reason) || r.status) + ').');
+        });
+      }
+      var total = Number(r.headers.get('Content-Length')) || 0;
+      return r.arrayBuffer().then(function (buf) {
+        if (total && buf.byteLength !== total) throw new Error('short');
+        return fetch('/v2/dl/' + tok + '/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ claim: claim }) }).then(function () {
+          busy = false;
+          var url = URL.createObjectURL(new Blob([buf], { type: 'application/octet-stream' }));
+          var s = document.createElement('a');
+          s.href = url; s.download = 'paramant-encrypted-payload';
+          document.body.appendChild(s); s.click(); s.remove();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+          a.hidden = true;
+          say('Downloaded. The copy on the relay is now deleted.');
+        });
+      });
+    }).catch(function () {
+      if (busy) release();
+      busy = false;
+      say('The download did not arrive in full. Nothing was deleted: try again.');
+    });
+  });
+})();
+`;
+
 function _dlConfirmPage(token, encMeta, sizeStr, ttlStr) {
   // encMeta is ciphertext only — relay never sees plaintext filename (finding #4)
   // If present, embed as data attribute for SDK to decrypt client-side
@@ -1531,8 +1630,10 @@ h1{font-size:1.1rem;font-weight:600;margin-bottom:8px}
     <div class="meta-row"><span class="meta-label">Size</span><span class="meta-val">${sizeStr}</span></div>
     <div class="meta-row"><span class="meta-label">Expires in</span><span class="meta-val">${ttlStr}</span></div>
   </div>
-  <p class="warn">⚠ This file is deleted from the server immediately after download. You get one chance.</p>
-  <a class="btn" href="/v2/dl/${token}/get">Download &amp; Burn</a>
+  <p class="warn">This file is deleted from the server once it has arrived in full. A broken download costs nothing: try again.</p>
+  <a class="btn" href="/v2/dl/${token}/get" data-token="${token}">Download &amp; Burn</a>
+  <p class="sub" id="dl-state" role="status" aria-live="polite"></p>
+  <script src="/v2/dl/confirm.js" defer></script>
   <p class="footer">ML-KEM-768 encrypted · Zero plaintext stored · PARAMANT</p>
 </div>
 </body></html>`;
@@ -5190,21 +5291,14 @@ async function handleRelayRequest(req, res) {
       // that throw happens in writeHead on the pickup route -- after the token
       // is claimed. The recipient got a 500 and then already_collected on every
       // retry: a file destroyed by its own name.
-      const naamRuw = (String((input.filename == null ? '' : input.filename))
-        .replace(/[\r\n\t]+/g, ' ')
-        .replace(/[\u0000-\u001f\u007f]/g, '')
-        .replace(/[\uD800-\uDFFF]/g, '')
-        .replace(/\s+/g, ' ')
+      const naamRuw = (veiligeBestandsnaam(input.filename)
         // GEEN LINK. Regeleinden waren er al uit, maar honderdtwintig tekens
         // vrije tekst met een URL erin is nog steeds een eigen regel in de mail
         // van iemand die geen klant is, en elke mailclient maakt hem klikbaar.
         // Gemeten met een bestandsnaam die "PARAMANT SUPPORT: uw account
         // verloopt, bevestig hier: <link>" droeg: die kwam er zo uit, boven
         // onze eigen link, dertig keer.
-        .replace(/\b(?:https?:\/\/|www\.)\S*/gi, '[link]')
-        .replace(/\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/gi, '[adres]')
-        .trim()
-        .slice(0, 120)) || (taal === 'en' ? 'a file' : 'een bestand');
+        ) || (taal === 'en' ? 'a file' : 'een bestand');
       const naam = escHtml(naamRuw);
       // The human above the mail. Thirty people who are not our customers get
       // this, and a message with no sender in it reads as phishing no matter
@@ -6665,6 +6759,20 @@ async function handleRelayRequest(req, res) {
     return res.end(J(entry.doc));
   }
 
+  // ── GET /v2/dl/confirm.js: the confirm page's button, in claim mode ───────
+  // Hertest T4-3: the button on the confirm page above was a plain link to
+  // .../get without a claim, so it burned on 'finish' ("handed to the kernel
+  // or the proxy"), and a download broken off after 80 KB cost the receiver
+  // the file. With JavaScript the button now claims, reads every byte,
+  // checks the length, and only then acks; a broken or closed download gives
+  // the claim back. Without JavaScript the link is the old route, unchanged
+  // (SDK and CLI semantics, see the comment at .../get). A file, not inline:
+  // the relay CSP is script-src 'self'.
+  if (path === '/v2/dl/confirm.js' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=300' });
+    return res.end(DL_CONFIRM_JS);
+  }
+
   // ── GET /v2/dl/:token — two-step: HTML confirm page (safe for link preloaders)
   const dlm = path.match(/^\/v2\/dl\/([a-f0-9]{48})$/);
   if (dlm && req.method === 'GET') {
@@ -6765,13 +6873,16 @@ async function handleRelayRequest(req, res) {
         'X-Burned': 'pending-ack',
         'X-Hash': blobHash,
       });
+      // Only the write that still holds the claim may say the line is free: a
+      // released claim may already belong to the next tab, mid-download.
+      const mine = () => !td.claim || td.claim.id === claim;
       res.on('finish', () => {
-        td.in_progress = false;
+        if (mine()) td.in_progress = false;
         if (td.claim && td.claim.id === claim) td.claim.until = Date.now() + DL_CLAIM_LEASE_MS;
       });
       res.on('close', () => {
         if (!res.writableFinished) {
-          td.in_progress = false;
+          if (mine()) td.in_progress = false;
           if (td.claim && td.claim.id === claim) td.claim = null;
           log('warn', 'dl_aborted_before_finish', { token: token.slice(0,8), hash: blobHash.slice(0,16), mode: 'claim' });
         }
@@ -6841,7 +6952,11 @@ async function handleRelayRequest(req, res) {
     }
     const td = downloadTokens.get(token);
     if (dlam[2] === 'release') {
-      if (td && !td.used && td.claim && td.claim.id === claim && !td.in_progress) td.claim = null;
+      // Also while the relay is still writing: a tab that is closed mid-download
+      // sends this from pagehide, and the response it abandons may still be
+      // flushing into a proxy buffer. The claim goes back now; the old write
+      // ends on its own and touches only a claim with its own id.
+      if (td && !td.used && td.claim && td.claim.id === claim) { td.claim = null; td.in_progress = false; }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true }));
     }
@@ -7387,7 +7502,10 @@ async function handleRelayRequest(req, res) {
       // DIFFERENT sender than the mail it belongs to, which is the single most
       // reliable way to make a legitimate code look like a scam.
       const wie2 = mailer.veiligeNaam(vraag.sender_name || '');
-      const bestand2 = escHtml(String(vraag.filename || '').slice(0, 120));
+      // Cleaned again here: sends filed before the name was cleaned on the way
+      // in still carry the raw one.
+      const bestandRuw2 = veiligeBestandsnaam(vraag.filename);
+      const bestand2 = escHtml(bestandRuw2);
       const taal2 = mailTaal(vraag.lang);
       const bezorgd = await mailer.stuur({
         to: vraag.email,
@@ -7397,12 +7515,12 @@ async function handleRelayRequest(req, res) {
                                 : 'Uw controlecode om het bestand te openen',
         text: tweetaligTekst(taal2,
               'Uw controlecode is ' + vraag.code + '. De code is ' + minuten + ' minuten geldig.'
-            + (vraag.filename ? '\n\nVoor het bestand: ' + vraag.filename : '')
+            + (bestandRuw2 ? '\n\nVoor het bestand: ' + bestandRuw2 : '')
             + (wie2 ? '\nGestuurd door ' + wie2 + ' via Paramant.' : '')
             + '\n\nHeeft u deze code niet zelf net aangevraagd? Dan heeft iemand anders uw link. '
             + 'Geef de code niet door en laat het de afzender weten.',
               'Your code is ' + vraag.code + '. It works for ' + minuten + ' minutes.'
-            + (vraag.filename ? '\n\nIt opens: ' + vraag.filename : '')
+            + (bestandRuw2 ? '\n\nIt opens: ' + bestandRuw2 : '')
             + (wie2 ? '\nSent to you by ' + wie2 + ' through Paramant.' : '')
             + '\n\nIf you did not just ask for this code, somebody else has your link. '
             + 'Do not pass the code on, and let the sender know.'),
@@ -7850,6 +7968,7 @@ async function handleRelayRequest(req, res) {
       // cap is reached. Access to existing blobs (download/view) is never gated.
       // A continuing multi-chunk upload (dedup hit) and Redis outages both pass
       // (fail-open) — this only declines fresh active use over the cap.
+      let _volgblok = false; // a later block of a file already counted
       if (keyData && keyData.account_id) {
         const _dedupKey = (meta && meta.file_id)
           ? crypto.createHash('sha3-256').update(String(meta.file_id)).digest('hex')
@@ -7867,6 +7986,7 @@ async function handleRelayRequest(req, res) {
           res.writeHead(402, { 'Content-Type': 'application/json' });
           return res.end(J({ error: 'monthly_transfer_quota_reached', dimension: 'transfers_month', plan: _psend.tier, limit: _tLimit }));
         }
+        _volgblok = !!_tGate.deduped;
       }
 
       // Append transfer to CT log before storing — so proof is available at outbound time
@@ -7902,7 +8022,14 @@ async function handleRelayRequest(req, res) {
       auditAppend(apiKey, 'inbound', { hash: hash.slice(0,16)+'...', bytes: blob.length, device: deviceId, sig: sigResult.valid ? 'ML-DSA-OK' : 'unsigned', ...(viaSessionToken ? { via: 'pst' } : {}) });
       log('info', 'blob_stored', { hash: hash.slice(0,16), size: blob.length, sig: sigResult.valid });
       // ParaSend Pro upload notification (no-op below Pro+ or without RESEND key).
-      transferNotify.maybeNotify({ keyData, event: 'upload', hashPrefix: hash, bytes: blob.length, sendEmail: mailLater });
+      // One file is one mail (hertest T4-11): a 24 MB send arrives as five
+      // blocks under one meta.file_id, and every block used to mail "Your
+      // Paramant transfer is ready". Only the block that was counted mails.
+      // Remembered in memory as well, so it holds without redis (the quota
+      // gate fails open there and cannot say "already counted").
+      if (!_volgblok && !_alGemeld(acctOf(apiKey), meta && meta.file_id)) {
+        transferNotify.maybeNotify({ keyData, event: 'upload', hashPrefix: hash, bytes: blob.length, sendEmail: mailLater });
+      }
 
       // (Transfer already counted by the quota gate above, before storage.)
 
