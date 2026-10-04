@@ -747,7 +747,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 2.5: recipients (optional - if empty, this is a personal sign) -->
   <section class="ds-step" id="step-recipients" hidden>
     <h2>Medeondertekenaars toevoegen (optioneel)</h2>
-    <p class="ds-sub">Voeg iedereen toe die moet tekenen. De uitnodiging is gebonden aan precies het e-mailadres hieronder. Het versleutelde document gaat met het verzoek mee, dus niemand heeft een aparte kopie nodig. Alleen de sleutel die het document opent, mailen wij niet mee. Die geeft u zelf door, op het volgende scherm.</p>
+    <p class="ds-sub">Voeg iedereen toe die moet tekenen. De uitnodiging is gebonden aan precies het e-mailadres hieronder. Het versleutelde document gaat met het verzoek mee, dus niemand heeft een aparte kopie nodig.</p>
 
     <div class="ds-recipients-list" id="ds-recipients-list"></div>
 
@@ -757,7 +757,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
     <fieldset class="ds-delivery-card" id="ds-invite-delivery" hidden>
       <legend>Uitnodiging per e-mail</legend>
-      <p class="ds-usage-p">Paramant stuurt elke ontvanger een bericht met een link naar het verzoek. De ontvanger logt in met het uitgenodigde e-mailadres. De sleutel van het document staat niet in het bericht, want die e-mail gaat via een mailprovider in het buitenland. Op het volgende scherm krijgt u de volledige links, die u zelf doorgeeft.</p>
+      <p class="ds-usage-p">Paramant stuurt elke ontvanger een uitnodiging met een eigen link. De ontvanger logt in met het uitgenodigde e-mailadres, en dan opent de link het document. In de mail staat maar de helft van de sleutel; de andere helft geven wij alleen aan dat account. Zo kan de mailprovider het document niet openen.</p>
       <div class="ds-delivery-fields" id="ds-delivery-fields">
         <label><span class="ds-label">Onderwerp van de e-mail</span><input class="ds-input" id="ds-invite-subject" maxlength="140"></label>
         <label><span class="ds-label">Bericht (optioneel)</span><textarea class="ds-input ds-textarea" id="ds-invite-message" maxlength="1000" placeholder="Voeg uitleg, een kenmerk of de gewenste termijn toe."></textarea></label>
@@ -766,11 +766,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         <summary>Beveiligingsinstellingen</summary>
         <label class="ds-delivery-option">
           <input type="radio" name="ds-delivery-mode" value="email" checked>
-          <span><strong>Stuur een bericht, geef de link zelf door</strong><span>Aanbevolen. Het bericht werkt alleen voor het uitgenodigde Paramant-account, en de sleutel komt nooit bij onze mailprovider.</span></span>
+          <span><strong>Stuur iedereen een uitnodiging per e-mail</strong><span>Aanbevolen. De uitnodiging werkt alleen voor het uitgenodigde Paramant-account, en de volledige sleutel komt nooit bij onze mailprovider.</span></span>
         </label>
         <label class="ds-delivery-option">
           <input type="radio" name="ds-delivery-mode" value="copy">
-          <span><strong>Maak links zonder iets te versturen</strong><span>Helemaal geen e-mail. U deelt elke persoonlijke link zelf, net als hierboven.</span></span>
+          <span><strong>Maak links zonder iets te versturen</strong><span>Helemaal geen e-mail. U deelt elke persoonlijke link zelf.</span></span>
         </label>
       </details>
     </fieldset>

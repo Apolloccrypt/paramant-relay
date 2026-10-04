@@ -416,6 +416,7 @@ function initStepMode() {
 // Show only the stepper items this mode uses, and label the last one 'Send'
 // for the invite (request-signatures) flow.
 function setStepperForMode(mode) {
+  applyModeCopy(mode);
   const steps = {
     alone:  ['doc', 'place', 'identity', 'sign'],
     cosign: ['doc', 'place', 'recipients', 'identity', 'sign'],
@@ -466,8 +467,29 @@ function readableError(e, fallback) {
   return m;
 }
 
+// The words of the document and recipients steps follow the chosen setup.
+// In the invite flow the requester signs nothing, so "the document you want to
+// sign" and "put your stamp on it" were wrong (retest T5-12d), and the line
+// that the key had to be passed on by hand no longer matched what the
+// invitation mail does: it opens the document for the invited account (T5-3).
+function applyModeCopy(mode) {
+  const set = (sel, text) => { const el = document.querySelector(sel); if (el && text) el.textContent = text; };
+  if (mode === 'invite') {
+    set('#step-doc h2', L('Kies het document dat anderen moeten tekenen', 'Choose the document others need to sign'));
+    set('#step-doc .ds-sub', L('ParaSign werkt met pdf-bestanden. Kies een pdf; daarna wijst u aan waar getekend moet worden. Het bestand blijft in deze browser tot u het versleuteld verstuurt.', 'ParaSign works with PDF files. Choose a PDF; next you point out where to sign. The file stays in this browser until you send it encrypted.'));
+    set('#step-recipients h2', L('Wie moet er tekenen?', 'Who needs to sign?'));
+    set('#step-recipients > .ds-sub', L('Voeg iedereen toe die moet tekenen. Ieder krijgt per e-mail een eigen uitnodiging die het document opent zodra hij of zij inlogt met precies dit e-mailadres. U hoeft daarna niets meer te sturen.', 'Add everyone who needs to sign. Each person gets an invitation by email that opens the document once they sign in with exactly this address. There is nothing more for you to send.'));
+  } else {
+    set('#step-doc h2', L('Kies het document dat u wilt ondertekenen', 'Choose the document you want to sign'));
+    set('#step-doc .ds-sub', L('ParaSign ondertekent pdf-bestanden. Kies een pdf en zet uw stempel op een pagina naar keuze. Het bestand blijft in deze browser.', 'ParaSign signs PDF files. Choose a PDF and put your stamp on a page of your choice. The file stays in this browser.'));
+    set('#step-recipients h2', L('Medeondertekenaars toevoegen (optioneel)', 'Add co-signers (optional)'));
+    set('#step-recipients > .ds-sub', L('Voeg iedereen toe die moet meetekenen. De uitnodiging is gebonden aan precies het e-mailadres hieronder. Na uw handtekening krijgt u voor ieder een eigen link, die u zelf doorgeeft.', 'Add everyone who needs to co-sign. Each invitation is bound to the exact email address below. After you sign you get a link for each person, which you pass on yourself.'));
+  }
+}
+
 function enterRecipients() {
   setActive('step-recipients');
+  applyModeCopy(state.signingMode);
   const cont = $('ds-recipients-continue');
   if (cont) { cont.textContent = (state.signingMode === 'invite') ? L('Versturen om te laten tekenen', 'Send for signature') : L('Verder', 'Continue'); cont.disabled = false; }
   const hint = $('ds-recipients-hint'); if (hint) hint.hidden = true;
@@ -3971,7 +3993,7 @@ function showDoneInvite(r) {
          : emailOk      ? L('Uitnodigingen verstuurd.', 'Invitations sent.')
          :                L('Klaar om te ondertekenen.', 'Ready for signature.'),
     line: emailPartial
-      ? L('Sommige berichten zijn niet bezorgd. Probeer het hieronder opnieuw. Elke ondertekenaar heeft in elk geval de eigen link van u nodig.', 'Some notices were not delivered. Retry below. Either way each signer still needs their link from you.')
+      ? L('Sommige uitnodigingen zijn niet bezorgd. Probeer het hieronder opnieuw, of geef wie geen mail kreeg de eigen link hieronder zelf.', 'Some invitations were not delivered. Retry below, or give anyone who got no mail their own link below yourself.')
       : emailOk
         ? L('Iedereen kreeg een eigen link die het document opent zodra hij of zij inlogt. U hoeft niets meer te sturen. U krijgt bericht als er getekend is, en als iedereen getekend heeft een link naar het complete document.', 'Everyone received a link of their own that opens the document once they sign in. There is nothing more to send. You hear when someone signs, and when everyone has signed you get a link to the complete document.')
         : L('Elke ondertekenaar heeft hieronder een eigen link. Stuur die zoals u wilt en volg hier de voortgang.', 'Each signer has a link of their own below. Send it to them any way you like and follow progress here.'),
@@ -4027,7 +4049,7 @@ function renderPartyLinks(mp) {
       result.textContent = L('Er is geen e-mail verstuurd. Stuur iedereen zelf de eigen link.', 'No email was sent. Send each person their link yourself.');
     } else if (state.inviteDelivery?.ok) {
       result.hidden = false; result.className = 'ds-banner ok';
-      result.textContent = L('Alle berichten zijn bezorgd. Stuur nu iedereen de eigen link.', 'All notices were delivered. Now send each person their link.');
+      result.textContent = L('Alle uitnodigingen zijn bezorgd.', 'Every invitation was delivered.');
     } else if (state.inviteDelivery) {
       const failedCount = state.inviteDelivery.failed_party_indexes?.length || 0;
       result.hidden = false; result.className = 'ds-banner err';
