@@ -322,7 +322,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <tr><td>Server location</td><td>Hetzner Nuremberg, Germany</td></tr>
         <tr><td>Legal jurisdiction</td><td>EU / Germany (GDPR)</td></tr>
         <tr><td>US CLOUD Act</td><td>No US provider in the data path: files and keys stay in the EU and never reach a US company. Email (only the email address and the invite link, never the document or a key) still goes through Resend Inc. in the United States for now. That is the one exception in the chain; we are moving to a Dutch provider. See <a href="/privacy">privacy</a>. Current status: <a href="/en/partners">/en/partners</a>.</td></tr>
-        <tr><td>Data retained</td><td>No plaintext, no keys. Only: transfer hash, creation timestamp, approximate encrypted size per block (up to 5 MB; exact 5 MB for the ParaSend web app), view count. Deleted after its last read.</td></tr>
+        <tr><td>Data retained</td><td>No plaintext, no keys. Only: transfer hash, creation timestamp, encrypted size per block (up to 5 MB; exactly 5 MB for the live hand-over, roughly the file size for a one-time link or a send to a person), view count. Deleted after its last read.</td></tr>
         <tr><td>IP logging</td><td>Nginx access logging is switched off in the deploy configuration (<code>access_log off</code> on every server block that serves the site and the relays in <code>deploy/nginx-paramant-live.conf</code>). Not linked to transfer content. No separate retention period is promised. A relay you host yourself is the other way round: <code>deploy/nginx-selfhost.conf</code> writes an access log whose first field is the client address, so switch it off if you do not want it.</td></tr>
         <tr><td>Analytics</td><td>None. No third-party scripts on the relay or API.</td></tr>
       </tbody>
@@ -395,8 +395,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <p style="margin:0">Each blob is destroyed after the last read the link allows. The web app and the extensions delete the file after the first read on every plan. Through the API a paid link can allow more reads: up to 10 reads on Firm and 100 on Enterprise. Memory is zeroed immediately. There is no second chance to retrieve it.</p>
     </div>
     <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">5 MB padding</div>
-      <p style="margin:0">Authenticated uploads from the ParaSend web app are padded to a fixed 5 MB block, so deep packet inspection (DPI) on the network cannot read the file size. A single block reveals no file size, type or content. A transfer that needs more than one block sends its chunk count in the clear, so the number of blocks is visible and the size can be placed within an order of magnitude (audit finding 5, accepted).</p>
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">5 MB padding, live hand-over only</div>
+      <p style="margin:0">In the live hand-over (Together, now: encrypted to the receiver's key) every block is padded to exactly 5 MB, so deep packet inspection (DPI) on the network cannot read the file size. One such block reveals no file size, type or content. A one-time link and a send to a person are not padded: there the network and the relay see the encrypted size, which is roughly the file size. A transfer that needs more than one block sends its chunk count in the clear, so the number of blocks is visible and the size can be placed within an order of magnitude (audit finding 5, accepted).</p>
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">ML-DSA-65 relay identity</div>
@@ -410,7 +410,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <div><span class="check">&#10003;</span><span>Read file contents: outside the hosted <code>/v1</code> signing ceremony the relay holds only ciphertext, never keys</span></div>
       <div><span class="check">&#10003;</span><span>Substitute a registered public key once your own browser has pinned it (TOFU), or once you have compared the short code out of band</span></div>
       <div><span class="check">&#10003;</span><span>Decrypt any stored ciphertext: no key access</span></div>
-      <div><span class="check">&#10003;</span><span>Read an exact file size: every web app block is a fixed 5 MB, and only the block count is visible</span></div>
+      <div><span class="check">&#10003;</span><span>Read an exact file size in the live hand-over: every block there is exactly 5 MB, and only the block count is visible (for a one-time link or a send to a person the size is roughly visible)</span></div>
       <div><span class="check">&#10003;</span><span>Recover burned blobs: memory is zeroed the moment the last read is spent</span></div>
       <div><span class="check">&#10003;</span><span>Forge a CT log entry without it showing: the Merkle chain is append-only, so a rewrite contradicts any signed tree head kept from before it</span></div>
       <div><span class="check">&#10003;</span><span>Break ML-KEM-768: NIST FIPS 203, post-quantum secure</span></div>
@@ -559,6 +559,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=13" defer></script>
 </body>
 </html>

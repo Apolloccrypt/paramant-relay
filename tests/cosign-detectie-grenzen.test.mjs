@@ -76,7 +76,7 @@ await loadPdfLibs(page);
 await page.waitForFunction(() => window.PDFLib && window.pdfjsLib, null, { timeout: 30000 });
 
 const scan = await page.evaluate(async () => {
-  const { scanPdfPages, pdfjsPageBoxes } = await import('/js/paraaf-place.js?v=4');
+  const { scanPdfPages, pdfjsPageBoxes } = await import('/js/paraaf-place.js?v=5');
   const doc = await window.PDFLib.PDFDocument.create();
   for (let i = 0; i < 2000; i++) doc.addPage([595.28, 841.89]);
   const bytes = await doc.save();
@@ -91,7 +91,7 @@ const scan = await page.evaluate(async () => {
 });
 
 const g3 = await page.evaluate(async () => {
-  const { pdfjsPageBoxes, inkBoxesOfPdfjsPage } = await import('/js/paraaf-place.js?v=4');
+  const { pdfjsPageBoxes, inkBoxesOfPdfjsPage } = await import('/js/paraaf-place.js?v=5');
   const L = window.PDFLib;
   const doc = await L.PDFDocument.create();
   const font = await doc.embedFont(L.StandardFonts.Helvetica);

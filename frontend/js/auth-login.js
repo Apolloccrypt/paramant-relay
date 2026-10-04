@@ -19,6 +19,8 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   function showSha1Notice(dest) {
     const notice = document.getElementById('sha1-notice');
     if (!notice) { window.location = dest; return; }
+    // The session is there now: the bar should say so, not "Account maken".
+    try { window.dispatchEvent(new Event('paramant:session-changed')); } catch (e) { /* old browser */ }
     if (form) form.hidden = true;
     if (errorDiv) errorDiv.classList.remove('visible');
     notice.hidden = false;

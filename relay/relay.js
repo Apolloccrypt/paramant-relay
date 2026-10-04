@@ -5358,6 +5358,9 @@ async function handleRelayRequest(req, res) {
       const wieRuw = mailer.veiligeNaam(kd.label || '');
       const wie = escHtml(wieRuw);
       let gemaild = 0;
+      // dryrun answers ok without delivering: counted apart, so the page can
+      // say "nothing went out" instead of "sent to 2 of 2" (hertest L6).
+      let echtBezorgd = 0;
       // One invitation per person, never a visible list of the others: who else
       // receives a confidential document is not for the group to know.
       const sector = sectorOfKey(kd);
@@ -5418,14 +5421,16 @@ async function handleRelayRequest(req, res) {
               + 'this mailbox can collect the file.<br>Available until ' + totEn + '.</p>')
               + VOET(wieRuw, kd.email, taal),
         });
-        if (bezorgd && bezorgd.ok) gemaild += 1;
+        if (bezorgd && bezorgd.ok) { gemaild += 1; if (bezorgd.delivered !== false) echtBezorgd += 1; }
         else log('warn', 'invitation_failed', { reason: bezorgd && bezorgd.reason });
       }
       log('info', 'send_invitations', { id: made.id, mailed: gemaild, of: made.count });
 
       res.writeHead(201, { 'Content-Type': 'application/json' });
       return res.end(J({ ok: true, send_id: made.id, recipients: made.count,
-                         invited: gemaild, size: blob.length,
+                         invited: gemaild, delivered: echtBezorgd,
+                         ...(gemaild > 0 && echtBezorgd === 0 ? { mail_test_mode: true } : {}),
+                         size: blob.length,
                          expires_at: new Date(made.expires_at).toISOString() }));
     } catch (err) {
       if (redisOutage503(err, res)) return;

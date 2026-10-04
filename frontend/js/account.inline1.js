@@ -92,7 +92,14 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     try {
       const res = await fetch('/api/user/account', { credentials: 'include' });
       if (!res.ok) {
-        show('state-unauth');
+        // Only a 401 means signed out. A 429 from an empty nginx bucket, or a
+        // 5xx, told a signed-in customer "U bent niet ingelogd" (hertest r2 R2-a).
+        if (res.status === 401 || res.status === 403) { show('state-unauth'); return; }
+        show('state-busy');
+        if (res.status !== 429) {
+          var bt = document.getElementById('acct-busy-text');
+          if (bt) bt.firstChild.textContent = nlEn('Uw account kon even niet worden geladen door een storing bij ons. U bent nog ingelogd. ', 'Your account could not be loaded just now because of a fault on our side. You are still signed in. ');
+        }
         return;
       }
       const data = await res.json();

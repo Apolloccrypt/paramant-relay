@@ -54,3 +54,30 @@ for (const [route, button] of [['/auth/login', /Verder naar het document/], ['/e
     assert.ok(moved, 'de klant gaat vanzelf door naar het document');
   });
 }
+
+// Hertest r2 K4: tijdens de tip zei de kop nog "Account maken", terwijl de
+// klant al was ingelogd. De kop volgt nu de sessie zodra die er is.
+for (const [route, cta] of [['/auth/login', /Account maken/], ['/en/auth/login', /Create account/]]) {
+  test(`${route}: na het inloggen staat er geen "account maken" meer in de kop`, async () => {
+    const page = await browser.newPage();
+    let signedIn = false;
+    await page.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+    await page.route('**/api/user/session/verify', (r) => r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify(signedIn ? { authenticated: true, email: 'sandeep@example.com' } : { authenticated: false }) }));
+    await page.route('**/api/user/login', (r) => { signedIn = true; return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"totp_algorithm":"sha1"}' }); });
+    await page.goto(ORIGIN + route + '?next=' + encodeURIComponent('/dashboard'), { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(500);
+    const before = await page.locator('#nav-auth').innerText();
+    await page.locator('#email').fill('sandeep@example.com');
+    await page.locator('#show-code-btn').click();
+    await page.locator('#totp').fill('123456');
+    await page.locator('#submit-btn').click();
+    await page.locator('#sha1-notice:not([hidden])').waitFor({ timeout: 10000 });
+    await page.waitForFunction(() => /sandeep/.test(document.getElementById('nav-auth')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+    const afterText = await page.locator('#nav-auth').innerText();
+    await page.close();
+    assert.match(before, cta, 'voor het inloggen hoort de knop er te staan: ' + before);
+    assert.doesNotMatch(afterText, cta, 'na het inloggen staat er nog: ' + afterText);
+    assert.match(afterText, /sandeep/i);
+  });
+}

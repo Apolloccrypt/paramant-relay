@@ -60,8 +60,24 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     }
   }
 
-  document.getElementById('copy-secret').addEventListener('click', function() {
-    if (setupData) navigator.clipboard.writeText(setupData.secret);
+  // Copying can be refused (no permission, an older browser): then say so and
+  // leave the text to select by hand, instead of an unhandled error (hertest r2).
+  function copyText(text, btn) {
+    const said = function(ok) {
+      if (!btn) return;
+      const was = btn.dataset.label || btn.textContent;
+      btn.dataset.label = was;
+      btn.textContent = ok ? nlEn('Gekopieerd', 'Copied') : nlEn('Kopiëren lukte niet: selecteer de tekst', 'Copy failed: select the text');
+      setTimeout(function() { btn.textContent = was; }, 2500);
+    };
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.writeText) { said(false); return; }
+      navigator.clipboard.writeText(text).then(function() { said(true); }, function() { said(false); });
+    } catch (e) { said(false); }
+  }
+
+  document.getElementById('copy-secret').addEventListener('click', function(e) {
+    if (setupData) copyText(setupData.secret, e.currentTarget);
   });
 
   document.getElementById('verify-form').addEventListener('submit', async function(e) {
@@ -111,14 +127,16 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     });
 
     show('state-success');
+    // The confirm signed the account in: the bar should say so (hertest r2 K4).
+    try { window.dispatchEvent(new Event('paramant:session-changed')); } catch (e) { /* old browser */ }
   });
 
   document.getElementById('saved-confirm').addEventListener('change', function(e) {
     document.getElementById('finish-btn').disabled = !e.target.checked;
   });
 
-  document.getElementById('copy-codes').addEventListener('click', function() {
-    navigator.clipboard.writeText(backupCodes.join('\n'));
+  document.getElementById('copy-codes').addEventListener('click', function(e) {
+    copyText(backupCodes.join('\n'), e.currentTarget);
   });
 
   document.getElementById('download-codes').addEventListener('click', function() {

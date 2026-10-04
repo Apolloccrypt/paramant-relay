@@ -2383,7 +2383,10 @@ api.post("/user/sign/activation", authUser, async (req, res) => {
     // that is down. Only an answer about the invitation itself stays a 403.
     if (r.status === 429) return relayRateLimited(res, r);
     if (r.status >= 500) return res.status(502).json({ error: "relay_unavailable" });
-    if (r.status !== 200) return res.status(403).json({ error: "not_authorized" });
+    // The invitation itself did not open (a broken or outdated link). Its own
+    // code: "not_authorized" below is the e-mail address, and the page says
+    // "another e-mail address" only for that (hertest r2, T3-4 co-sign).
+    if (r.status !== 200) return res.status(403).json({ error: "invite_invalid" });
     env = (await r.json()).envelope;
   } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }
   // A withdrawn, refused or finished request is not signable. Said here, before

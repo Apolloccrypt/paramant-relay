@@ -13,14 +13,14 @@
 // sign path. Signing goes through the passkey-PRF activation chain (LocalVaultSigner
 // in parasign-signer.js); sha3_256 stays for document hashing only.
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp, requestedAppearanceFromStamp } from '/js/parasign-signer.js?v=20';
+import { LocalVaultSigner, buildDocSignMessage, createSigningEnvelope, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp, requestedAppearanceFromStamp } from '/js/parasign-signer.js?v=21';
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { vaultDelete } from '/vendor/vault.js?v=5';
 import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=2';
 import { previewTargetWidth, viewportTargetWidth, renderGeneration } from '/js/preview-render.js?v=1';
-import { initialsFrom, planParaafs, textBoxesFromItems, inkBoxesFromImageData, paraafFooter, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=4';
-import { requestsForParties } from '/js/cosign-layout.js?v=3';
-import { saveDraft, loadDraft, clearDraft, loadAccountKey } from '/js/sign-draft.js?v=3';
+import { initialsFrom, planParaafs, textBoxesFromItems, inkBoxesFromImageData, paraafFooter, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=5';
+import { requestsForParties } from '/js/cosign-layout.js?v=4';
+import { saveDraft, loadDraft, clearDraft, loadAccountKey } from '/js/sign-draft.js?v=4';
 import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
 import { splitKey, keyShareFragment, b64url as keyB64url, fromB64url as keyFromB64url } from '/js/parasign-ink.js?v=3';
 
@@ -162,6 +162,23 @@ function setActive(stepId) {
       if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
       try { heading.focus({ preventScroll: false }); } catch (e) { heading.focus(); }
     }
+  }
+  // A phone: bring the step, and so page 1 of the document, to the top of
+  // the screen (hertest r2 T5-12c: the document began at the bottom edge).
+  if (stepId === 'step-place') {
+    try {
+      if (window.matchMedia && window.matchMedia('(max-width: 600px)').matches) {
+        // After page 1 has a size: before that the page is too short to scroll.
+        const el = document.getElementById('ds-place-hint') || document.getElementById('step-place');
+        const t0 = Date.now();
+        const tick = () => {
+          const c = document.querySelector('#ds-pdf-canvas-list .ds-page-wrap canvas');
+          if (c && c.getBoundingClientRect().height > 0) { el.scrollIntoView({ block: 'start', behavior: 'auto' }); return; }
+          if (Date.now() - t0 < 5000 && document.body.getAttribute('data-ds-step') === 'step-place') setTimeout(tick, 60);
+        };
+        tick();
+      }
+    } catch (e) { /* no scrolling, nothing lost */ }
   }
   __firstStepRender = false;
   document.querySelectorAll('.ds-stepper li').forEach(li => {
@@ -521,11 +538,15 @@ function applyModeCopy(mode) {
     set('#step-doc h2', L('Kies het document dat anderen moeten tekenen', 'Choose the document others need to sign'));
     set('#step-doc .ds-sub', L('ParaSign werkt met pdf-bestanden. Kies een pdf; daarna wijst u aan waar getekend moet worden. Het bestand blijft in deze browser tot u het versleuteld verstuurt.', 'ParaSign works with PDF files. Choose a PDF; next you point out where to sign. The file stays in this browser until you send it encrypted.'));
     set('#step-recipients h2', L('Wie moet er tekenen?', 'Who needs to sign?'));
+    // The stepper tab says it the same way (hertest r2: it still read
+    // "Medeondertekenaars" while the sender signs nothing here).
+    set('.ds-stepper li[data-step="recipients"]', L('Ondertekenaars', 'Signers'));
     set('#step-recipients > .ds-sub', L('Voeg iedereen toe die moet tekenen. Ieder krijgt per e-mail een eigen uitnodiging die het document opent zodra hij of zij inlogt met precies dit e-mailadres. U hoeft daarna niets meer te sturen.', 'Add everyone who needs to sign. Each person gets an invitation by email that opens the document once they sign in with exactly this address. There is nothing more for you to send.'));
   } else {
     set('#step-doc h2', L('Kies het document dat u wilt ondertekenen', 'Choose the document you want to sign'));
     set('#step-doc .ds-sub', L('ParaSign ondertekent pdf-bestanden. Kies een pdf en zet uw stempel op een pagina naar keuze. Het bestand blijft in deze browser.', 'ParaSign signs PDF files. Choose a PDF and put your stamp on a page of your choice. The file stays in this browser.'));
     set('#step-recipients h2', L('Medeondertekenaars toevoegen (optioneel)', 'Add co-signers (optional)'));
+    set('.ds-stepper li[data-step="recipients"]', L('Medeondertekenaars', 'Co-signers'));
     set('#step-recipients > .ds-sub', L('Voeg iedereen toe die moet meetekenen. De uitnodiging is gebonden aan precies het e-mailadres hieronder. Na uw handtekening krijgt u voor ieder een eigen link, die u zelf doorgeeft.', 'Add everyone who needs to co-sign. Each invitation is bound to the exact email address below. After you sign you get a link for each person, which you pass on yourself.'));
   }
 }

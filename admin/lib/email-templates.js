@@ -1045,7 +1045,7 @@ function signatureReceivedEmail({ signedCount, partyCount, complete, envelopeId,
   const W = {
     nl: complete ? {
       heading: 'Iedereen heeft getekend',
-      line: `Uw document is ondertekend door alle ${m} ondertekenaars.`,
+      line: m === 1 ? 'Uw document is ondertekend door de ondertekenaar.' : `Uw document is ondertekend door alle ${m} ondertekenaars.`,
       next: safeResult
         ? 'Open het getekende document met alle handtekeningen en download het bewijs. Log in met dit account; de link werkt 30 dagen.'
         : 'Het getekende document en het bewijs staan bij uw documenten.',
@@ -1060,7 +1060,7 @@ function signatureReceivedEmail({ signedCount, partyCount, complete, envelopeId,
     },
     en: complete ? {
       heading: 'Everyone has signed',
-      line: `Your document has been signed by all ${m} signers.`,
+      line: m === 1 ? 'Your document has been signed by the signer.' : `Your document has been signed by all ${m} signers.`,
       next: safeResult
         ? 'Open the signed document with every signature and download the proof. Sign in with this account; the link works for 30 days.'
         : 'The signed document and its proof are with your documents.',

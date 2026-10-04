@@ -130,7 +130,7 @@ await p2.route('**/api/user/session/verify', (r) => json(r, 200, { authenticated
 await p2.route('**/api/user/sign-draft-key', (r) => json(r, 200, { key: currentKey }));
 await p2.goto(`${ORIGIN}/sign`, { waitUntil: 'domcontentloaded' });
 await p2.evaluate(async (k) => {
-  const m = await import('/js/sign-draft.js?v=3');
+  const m = await import('/js/sign-draft.js?v=4');
   await m.loadAccountKey(async () => new Response(JSON.stringify({ key: k })));
   await m.saveDraft({ docName: 'van-A.pdf', recipients: [{ label: 'Piet', email: 'piet@example.com' }] }, new TextEncoder().encode('%PDF geheim'));
 }, keyA);
@@ -142,7 +142,7 @@ const other = await p2.evaluate(() => new Promise((resolve) => {
   r.onsuccess = () => { try { const g = r.result.transaction('kv').objectStore('kv').get('current'); g.onsuccess = () => resolve({ left: !!g.result, offered: !!document.getElementById('ds-draft-offer'), recip: [...document.querySelectorAll('[data-field="email"]')].map((i) => i.value) }); } catch { resolve({ left: false }); } };
 }));
 const expired = await p2.evaluate(async (k) => {
-  const m = await import('/js/sign-draft.js?v=3');
+  const m = await import('/js/sign-draft.js?v=4');
   await m.loadAccountKey(async () => new Response(JSON.stringify({ key: k })));
   await m.saveDraft({ docName: 'oud.pdf' }, new TextEncoder().encode('x'));
   const later = Date.now() + 25 * 3600 * 1000;

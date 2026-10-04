@@ -56,3 +56,24 @@ for (const [route, status, want] of [['/account', 429, /te veel verzoeken/], ['/
     }
   });
 }
+
+// Hertest r2 R2-a: een lege nginx-emmer (429) op /api/user/account liet een
+// ingelogde klant "U bent niet ingelogd" zien. Alleen 401 is uitgelogd.
+for (const [route, status, want, notWant] of [
+  ['/account', 429, /te veel verzoeken tegelijk[\s\S]*nog ingelogd/, /niet ingelogd/],
+  ['/en/account', 429, /too many requests came in at once[\s\S]*still signed in/, /not signed in/i],
+  ['/account', 502, /storing bij ons[\s\S]*nog ingelogd/, /niet ingelogd/],
+  ['/account', 401, /niet ingelogd/, /te veel verzoeken/],
+]) {
+  test(`${route}: /api/user/account ${status} is ${status === 401 ? 'uitgelogd' : 'niet "uitgelogd"'}`, async () => {
+    const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
+    await page.route('**/api/**', (r) => json(r, {}));
+    await page.route('**/api/user/account', (r) => json(r, { error: 'x' }, status));
+    await page.goto(ORIGIN + route, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => !document.getElementById('state-loading') || document.getElementById('state-loading').classList.contains('hidden'), null, { timeout: 10000 }).catch(() => {});
+    const shown = await page.evaluate(() => [...document.querySelectorAll('[id^="state-"]')].filter((e) => !e.classList.contains('hidden')).map((e) => e.innerText).join(' | '));
+    await page.close();
+    assert.match(shown, want, shown);
+    assert.doesNotMatch(shown, notWant, shown);
+  });
+}

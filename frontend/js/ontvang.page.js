@@ -596,6 +596,20 @@ async function receiveVault(vaultFiles, ttl_ms, kyberSec, ecdhPriv) {
 // nothing to hand over again the dashboard link takes that place instead, so
 // the screen is never a dead end and never has two loud buttons.
 let savedFile = null;
+// The receiver usually has no account here: the quiet link goes to the site.
+// Only a visitor who IS signed in gets their overview (hertest r2 T4-L2).
+(async function dashboardOnlyWhenSignedIn() {
+  try {
+    const r = await fetch('/api/user/session/verify', { credentials: 'include', cache: 'no-store' });
+    const d = r.ok ? await r.json() : null;
+    const dash = $('done-dashboard');
+    if (dash && d && d.authenticated) {
+      const en = /^en\b/i.test(document.documentElement.lang || '');
+      dash.setAttribute('href', '/dashboard');
+      dash.textContent = en ? 'Open your dashboard' : 'Naar uw overzicht';
+    }
+  } catch { /* stays the link to the site */ }
+})();
 function offerSaveAgain(blob, name) {
   const btn = $('done-save');
   const dash = $('done-dashboard');

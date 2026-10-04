@@ -217,10 +217,10 @@ test('a 200 from /api/user/parasend/token gives the slim row, a usable button, a
   const slim = run.getElementById('ps-key-slim');
   assert.equal(slim.hidden, false, 'the slim row is shown');
   assert.equal(slim.classList.contains('is-loading'), false, 'the slim row stops claiming to be loading');
-  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'Using your account');
-  assert.equal(run.getElementById('ps-key-mask').hidden, false, 'the masked credential is shown next to the label');
-  assert.match(run.getElementById('ps-key-mask').textContent, /^pst_.*\.\.\..{4}$/,
-    'the row shows a masked session token, and it says pst_ because that is what the page is holding');
+  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'You are signed in; we send on behalf of your account.');
+  // Hertest r2 T5-11: "pst_4b4b...c589" said nothing to a person. No token on screen.
+  assert.equal(run.getElementById('ps-key-mask').hidden, true, 'no session token on the screen');
+  assert.doesNotMatch(run.getElementById('ps-key-mask').textContent, /pst_/, 'not even masked');
   assert.equal(run.getElementById('step-setup').classList.contains('manual-key'), false,
     'the manual card stays closed: #step-setup only carries .manual-key when the user asks for the box');
   assert.equal(run.getElementById('ps-key-error').classList.contains('is-shown'), false, 'no banner on the happy path');
@@ -688,7 +688,7 @@ test('de Nederlandse /parashare zegt hetzelfde, in het Nederlands', async () => 
   assert.match(PS_HTML_NL, /<span class="ps-step-label">3 &middot; Vergelijken<\/span>/, 'de stepper noemt dezelfde stap zo');
 
   const run = await loadPage({ keyResponses: [ok200], lang: 'nl' });
-  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'Uw account wordt gebruikt');
+  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'U bent ingelogd; we versturen namens uw account.');
   const leeg = await loadPage({ keyResponses: [{ status: 500, body: {} }], lang: 'nl' });
   evalIn(leeg, 'expandApiKeyCard()');
   assert.equal(leeg.getElementById('key-status').textContent, 'Vul uw API-sleutel in om verder te gaan',

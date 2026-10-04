@@ -124,6 +124,13 @@ test('the mail carries a count and a link, never a file name, a party name or th
   assert.match(two.text, /2 of 3 signers have now signed/);
 });
 
+test('one signer is one signer: no "alle 1 ondertekenaars" (hertest r2 K2)', () => {
+  const one = emailTemplates.signatureReceivedEmail({ signedCount: 1, partyCount: 1, complete: true, envelopeId: 'X' });
+  assert.doesNotMatch(one.text, /alle 1 ondertekenaars|all 1 signers/);
+  assert.match(one.text, /Uw document is ondertekend door de ondertekenaar\./);
+  assert.match(one.text, /Your document has been signed by the signer\./);
+});
+
 test('server.js remembers the sender on create and tells them after a submit, without awaiting the mail', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   const create = src.match(/api\.post\("\/user\/envelopes", authUser[\s\S]*?\n\}\);/);

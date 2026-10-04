@@ -317,7 +317,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
         <tr><td>Locatie van de servers</td><td>Hetzner Neurenberg, Duitsland</td></tr>
         <tr><td>Rechtsgebied</td><td>EU / Duitsland (AVG)</td></tr>
         <tr><td>Amerikaanse CLOUD Act</td><td>Geen Amerikaanse partij op de route van uw gegevens: bestanden en sleutels blijven in de EU en komen nooit bij een Amerikaans bedrijf. E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten. Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Zie <a href="/privacy">privacy</a>. Actuele status: <a href="/partners">/partners</a>.</td></tr>
-        <tr><td>Wat bewaard wordt</td><td>Geen leesbare inhoud, geen sleutels. Alleen: de hash van de overdracht, het tijdstip van aanmaken, de geschatte versleutelde grootte per blok (tot 5 MB; precies 5 MB voor de webapp Versturen) en het aantal keer bekeken. Verwijderd na de laatste keer lezen.</td></tr>
+        <tr><td>Wat bewaard wordt</td><td>Geen leesbare inhoud, geen sleutels. Alleen: de hash van de overdracht, het tijdstip van aanmaken, de versleutelde grootte per blok (tot 5 MB; precies 5 MB bij de live overdracht, ongeveer de bestandsgrootte bij een eenmalige link of een verzending naar een persoon) en het aantal keer bekeken. Verwijderd na de laatste keer lezen.</td></tr>
         <tr><td>IP-logging</td><td>De toegangslog van Nginx staat uit in de deploy-configuratie (<code>access_log off</code> op elk serverblok dat de site en de relays bedient in <code>deploy/nginx-paramant-live.conf</code>). Niet gekoppeld aan de inhoud van een overdracht. Er wordt geen aparte bewaartermijn beloofd. Bij een relay die u zelf host is het andersom: <code>deploy/nginx-selfhost.conf</code> schrijft een toegangslog met als eerste veld het adres van de client. Zet die uit als u dat niet wilt.</td></tr>
         <tr><td>Analytics</td><td>Geen. Geen scripts van derden op de relay of de API.</td></tr>
       </tbody>
@@ -380,8 +380,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <p style="margin:0">Elke blob wordt vernietigd na de laatste keer lezen die de link toestaat. De webapp en de extensies verwijderen het bestand op elk plan na de eerste keer lezen. Via de API kan een betaalde link vaker gelezen worden: tot 10 keer op Firm en 100 keer op Enterprise. Het geheugen wordt direct overschreven met nullen. Er is geen tweede kans om het op te halen.</p>
     </div>
     <div class="card">
-      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Opvulling tot 5 MB</div>
-      <p style="margin:0">Geauthenticeerde uploads vanuit de webapp Versturen worden opgevuld tot een vast blok van 5 MB, zodat DPI er niets uit kan afleiden. Eén blok verraadt geen bestandsgrootte, type of inhoud. Heeft een overdracht meer dan één blok nodig, dan gaat het aantal blokken onversleuteld mee. Het aantal blokken is dus zichtbaar, en de grootte is tot op een orde van grootte in te schatten (auditbevinding 5, geaccepteerd).</p>
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Opvulling tot 5 MB, alleen bij de live overdracht</div>
+      <p style="margin:0">Bij de live overdracht (Samen, nu: versleuteld naar de sleutel van de ontvanger) wordt elk blok opgevuld tot precies 5 MB, zodat DPI er niets uit kan afleiden. Eén zo'n blok verraadt geen bestandsgrootte, type of inhoud. Een eenmalige link en een verzending naar een persoon worden niet opgevuld: daar zien het netwerk en de relay de versleutelde grootte, die ongeveer de bestandsgrootte is. Heeft een overdracht meer dan één blok nodig, dan gaat het aantal blokken onversleuteld mee. Het aantal blokken is dus zichtbaar, en de grootte is tot op een orde van grootte in te schatten (auditbevinding 5, geaccepteerd).</p>
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Identiteit van de relay met ML-DSA-65</div>
@@ -395,7 +395,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
       <div><span class="check">&#10003;</span><span>De inhoud van bestanden lezen: buiten de gehoste ondertekenprocedure op <code>/v1</code> heeft de relay alleen versleutelde gegevens, nooit sleutels</span></div>
       <div><span class="check">&#10003;</span><span>Een geregistreerde publieke sleutel vervangen zodra uw eigen browser die heeft vastgelegd (TOFU), of zodra u de korte code buiten Paramant om hebt vergeleken</span></div>
       <div><span class="check">&#10003;</span><span>Opgeslagen versleutelde gegevens ontsleutelen: geen toegang tot sleutels</span></div>
-      <div><span class="check">&#10003;</span><span>Een exacte bestandsgrootte lezen: elk blok van de webapp is precies 5 MB, en alleen het aantal blokken is zichtbaar</span></div>
+      <div><span class="check">&#10003;</span><span>Een exacte bestandsgrootte lezen bij de live overdracht: elk blok is daar precies 5 MB, en alleen het aantal blokken is zichtbaar (bij een eenmalige link of een verzending naar een persoon is de grootte ongeveer zichtbaar)</span></div>
       <div><span class="check">&#10003;</span><span>Verbrande blobs terughalen: het geheugen wordt overschreven op het moment dat de laatste keer lezen op is</span></div>
       <div><span class="check">&#10003;</span><span>Ongemerkt een regel in het CT-log vervalsen: de Merkle-keten kan alleen aangevuld worden, dus een herschrijving spreekt elke ondertekende tree head van daarvoor tegen</span></div>
       <div><span class="check">&#10003;</span><span>ML-KEM-768 breken: NIST FIPS 203, bestand tegen quantumcomputers</span></div>
@@ -540,6 +540,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=13" defer></script>
 </body>
 </html>

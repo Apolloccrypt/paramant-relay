@@ -7,7 +7,7 @@
 const LANG = ((document.documentElement && document.documentElement.lang) || 'nl').slice(0, 2) === 'en' ? 'en' : 'nl';
 const T = {
   en: {
-    usingAccount: 'Using your account',
+    usingAccount: 'You are signed in; we send on behalf of your account.',
     waitingTitle: 'Waiting for receiver...',
     copied: 'Copied',
     copyFailed: 'Copy failed',
@@ -36,6 +36,9 @@ const T = {
       + (dubbel ? ', ' + dubbel + ' duplicate' + (dubbel === 1 ? '' : 's') + ' ignored' : '')
       + '. Each one gets their own link and a code to this address.',
     xOfY: (a, b) => a + ' of ' + b,
+    testModeTitle: 'Not sent: test mode',
+    testModeLead: (n) => 'This relay delivers no mail (test mode). The file is stored for ' + n + (n === 1 ? ' recipient' : ' recipients') + ', but no invitation went out.',
+    testModeNote: 'Ask the administrator to set up a mail provider (MAIL_PROVIDER), then send again.',
     sentTitle: 'Sent',
     invitesLead: (aantal) => aantal + ' invitations are on their way. Everyone got their own link.',
     invitesNote: 'They each prove their mailbox with a short code before the file opens. '
@@ -123,7 +126,7 @@ const T = {
     gpComplete: 'Transfer Complete ✓',
   },
   nl: {
-    usingAccount: 'Uw account wordt gebruikt',
+    usingAccount: 'U bent ingelogd; we versturen namens uw account.',
     waitingTitle: 'Wachten op de ontvanger...',
     copied: 'Gekopieerd',
     copyFailed: 'Kopiëren mislukt',
@@ -152,6 +155,9 @@ const T = {
       + (dubbel ? ', ' + dubbel + (dubbel === 1 ? ' dubbel adres' : ' dubbele adressen') + ' overgeslagen' : '')
       + '. Iedere ontvanger krijgt een eigen link en een controlecode op dit adres.',
     xOfY: (a, b) => a + ' van ' + b,
+    testModeTitle: 'Niet verstuurd: testmodus',
+    testModeLead: (n) => 'Deze relay bezorgt geen mail (testmodus). Het bestand staat klaar voor ' + n + (n === 1 ? ' ontvanger' : ' ontvangers') + ', maar er is geen uitnodiging verstuurd.',
+    testModeNote: 'Vraag de beheerder een mailprovider in te stellen (MAIL_PROVIDER) en verstuur het daarna opnieuw.',
     sentTitle: 'Verstuurd',
     invitesLead: (aantal) => aantal + ' uitnodigingen zijn onderweg. Iedere ontvanger kreeg een eigen link.',
     invitesNote: 'Iedere ontvanger bevestigt eerst het eigen e-mailadres met een controlecode. '
@@ -443,11 +449,10 @@ function expandApiKeyCard() {
 // session key has really arrived: the mask, the label, and the green dot.
 function applySlimApiKeyView(shown) {
   if (!shown) return;
+  // No session token on the screen: it says nothing to a person and is
+  // machine detail (hertest r2 T5-11). The element stays for the layout.
   var mask = $('ps-key-mask');
-  if (mask) {
-    mask.textContent = shown.length > 14 ? shown.slice(0, 8) + '...' + shown.slice(-4) : shown;
-    mask.hidden = false;
-  }
+  if (mask) { mask.textContent = ''; mask.hidden = true; }
   var label = $('ps-key-slim-label');
   if (label) label.textContent = t('usingAccount');
   var row = $('ps-key-slim');
@@ -1025,6 +1030,20 @@ function onRecipientsInput() {
 // at 100 percent with one line of text: no confirmation, no way onward, and no
 // idea whether the invitations had gone out.
 function toonVerzending(verzending, naam) {
+  // A relay without a mail provider (test mode) accepts the invitations and
+  // delivers none. Say that, not "sent to 2 of 2" (hertest L6).
+  if (verzending && verzending.mail_test_mode) {
+    if (window.paramantDone && paramantDone.fill) {
+      paramantDone.fill('step-done', {
+        title: t('testModeTitle'),
+        line: t('testModeLead')(verzending.recipients) + ' ' + t('testModeNote'),
+      });
+    }
+    showStep('step-done');
+    const kop0 = $('done-title');
+    if (kop0) kop0.textContent = t('testModeTitle');
+    return { send: verzending, name: naam };
+  }
   const aantal = t('xOfY')(verzending.invited, verzending.recipients);
   if (window.paramantDone && paramantDone.fill) {
     paramantDone.fill('step-done', {
@@ -1818,15 +1837,16 @@ function renderSentLinksInto(list) {
     copy.textContent = t('copyLink');
     li.appendChild(copy);
 
-    // One line, one date format (#424): day, month in full, year and a 24-hour
-    // clock in UTC, because a one-hour link is a moment and not a day. The two
-    // things a sender needs about a link are how often it opens and when it
-    // stops, so they are one sentence and not two badges.
+    // One line: day, month in full, year and a 24-hour clock, because a
+    // one-hour link is a moment and not a day. In the sender's own clock with
+    // the zone named, the same way the mail says it (hertest r2 T4-L4: this
+    // line said UTC and the mail CEST). The two things a sender needs about a
+    // link are how often it opens and when it stops: one sentence.
     const meta = document.createElement('p');
     meta.className = 'ps-link-meta done-link-meta';
-    meta.textContent = t('worksOnce') + (window.paramantDate
-      ? window.paramantDate.moment(row.expires_ms)
-      : new Date(row.expires_ms).toISOString());
+    meta.textContent = t('worksOnce') + (window.paramantDate && window.paramantDate.localMoment
+      ? window.paramantDate.localMoment(row.expires_ms)
+      : new Date(row.expires_ms).toLocaleString());
     li.appendChild(meta);
 
     const state = document.createElement('p');

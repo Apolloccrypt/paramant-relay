@@ -158,7 +158,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 <script src="/js/theme.js?v=6"></script>
 <!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
      Blocking and above every other script, so it exists before any renderer runs. -->
-<script src="/js/format-date.js?v=2"></script>
+<script src="/js/format-date.js?v=3"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Naar de inhoud</a>
@@ -204,6 +204,10 @@ main.acct input::placeholder { color: var(--ink-3); }
 
 <section id="state-loading" class="section-lg">
   <p class="lede">Uw account wordt geladen...</p>
+</section>
+
+<section id="state-busy" class="section-lg hidden">
+  <p class="lede" id="acct-busy-text">Uw account kon even niet worden geladen: er kwamen te veel verzoeken tegelijk binnen. U bent nog ingelogd. <a href="/account">Probeer het over een minuut opnieuw</a>.</p>
 </section>
 
 <section id="state-unauth" class="section-lg hidden">
@@ -252,7 +256,8 @@ main.acct input::placeholder { color: var(--ink-3); }
   <div class="acct-grid2">
     <div class="acct-block">
       <h3>Authenticator-app</h3>
-      <p>Gekoppeld. Algoritme: SHA-256, 30 seconden, 6 cijfers.</p>
+      <p>Gekoppeld. Uw app geeft elke 30 seconden een nieuwe code van 6 cijfers.</p>
+      <details class="small"><summary>Technische gegevens</summary><p class="small">TOTP volgens RFC 6238, met SHA-256, een stap van 30 seconden en 6 cijfers.</p></details>
       <button type="button" class="btn btn-secondary btn-small" id="reset-totp">Nieuwe authenticator-app instellen</button>
       <p class="small mt-2">De huidige codes werken dan niet meer. U scant een nieuwe QR-code.</p>
     </div>
@@ -286,7 +291,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 </section>
 
 <section class="acct-card" id="signing-identity-section">
-  <div class="acct-kicker">Ondertekensleutel &middot; ML-DSA-65, blijvend</div>
+  <div class="acct-kicker">Ondertekensleutel &middot; blijvend</div>
   <h2>Ondertekensleutel.</h2>
   <p class="acct-lead">
     Met uw ondertekensleutel ondertekent u documenten. Dat staat los van inloggen. De publieke sleutels horen bij uw
@@ -316,7 +321,7 @@ main.acct input::placeholder { color: var(--ink-3); }
   <div class="acct-block">
     <h3>Uw ondertekensleutel instellen</h3>
     <p class="small">
-      Uw ondertekensleutel wordt hier in deze browser gemaakt, met ML-DSA-65 (post-quantum).
+      Uw ondertekensleutel wordt hier in deze browser gemaakt.
       Alleen u hebt hem. U stelt hem in en opent hem bij elke handtekening met dezelfde
       passkey waarmee u inlogt (Face ID, Touch ID of een beveiligingssleutel). U hebt dus geen
       wachtwoordzin of extra code nodig. Geen passkey in deze browser? Dan kunt u nog steeds
@@ -515,13 +520,13 @@ main.acct input::placeholder { color: var(--ink-3); }
 </main>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=13" defer></script>
 <script src="/js/account-api-keys.js?v=2" defer></script>
-<script src="/js/account.inline1.js?v=10"></script>
+<script src="/js/account.inline1.js?v=11"></script>
 <script src="/js/app-session-token.js?v=1" defer></script>
 <script src="/js/redeem-code.js?v=3" defer></script>
 
-<script type="module" src="/js/account.inline2.js?v=6"></script>
+<script type="module" src="/js/account.inline2.js?v=7"></script>
 <script type="module" src="/js/passkey.js?v=8"></script>
 <script type="module" src="/js/signing-enrol.js?v=18"></script>
 <script src="/js/account-theme.js?v=4" defer></script>

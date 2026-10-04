@@ -59,7 +59,8 @@ const CONFS = [
   { file: 'deploy/nginx-paramant-live.conf', strict: false },
   { file: 'deploy/nginx-paramant-public.conf', strict: false },
   // Unused copy in the repo root (deploy/de-server.md, step 8), held to the same rule while it exists.
-  { file: 'nginx-selfhost.conf', strict: false, min: 4 },
+  // strict since review r2: X-Forwarded-Proto came from the client on /health, /v2/inbound and /.
+  { file: 'nginx-selfhost.conf', strict: true, min: 4 },
 ];
 
 for (const { file, strict, min = 8 } of CONFS) {

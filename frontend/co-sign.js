@@ -26,12 +26,12 @@
 // The manifest itself did not change: type, page and coordinates, hashed byte
 // for byte as before (relay/envelope.js normaliseAppearance).
 import { sha3_256 } from '/vendor/paramant-pqc.js';
-import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=20';
+import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=21';
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { vaultDelete } from '/vendor/vault.js?v=5';
 import { decryptDocumentCapsule, parseDocumentKeyFragment, documentKeyFragment } from '/js/parasign-document-capsule.js?v=2';
-import { initialsFrom, normaliseRotation, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes, pdfjsPageBoxes, scanPdfPages } from '/js/paraaf-place.js?v=4';
-import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParties, autoSignaturePlace, textBoxesToFractions, strokesToInk } from '/js/cosign-layout.js?v=3';
+import { initialsFrom, normaliseRotation, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes, pdfjsPageBoxes, scanPdfPages } from '/js/paraaf-place.js?v=5';
+import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParties, autoSignaturePlace, textBoxesToFractions, strokesToInk } from '/js/cosign-layout.js?v=4';
 import { sealInk, openInk, joinKey, parseKeyShareFragment } from '/js/parasign-ink.js?v=3';
 import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
 
@@ -552,7 +552,19 @@ async function prepareSigning() {
   if (__signKey) {
     setStatus('', L('Ingelogd als ', 'Signed in as ') + (__session.email || L('uw account', 'your account')) + L('. U tekent met uw ondertekensleutel (vingerafdruk ', '. You\'ll sign with your signing key (fingerprint ') + __signKey.fingerprint + ').');
   } else {
-    setStatus('', L('Ingelogd als ', 'Signed in as ') + (__session.email || L('uw account', 'your account')) + L('. U tekent met de passkey waarmee u inlogt. Die zet u met één tik klaar als u tekent. Geen passkey op dit apparaat? Dan tekent u met de code uit uw authenticator-app.', '. You\'ll sign with your sign-in passkey. It is set up with one tap when you sign. No passkey here? You can sign with your authenticator code instead.'));
+    // An account without a passkey, or a browser without WebAuthn, signs with
+    // the code: say that, not "the passkey you sign in with" (hertest r2 R2-c).
+    let passkeys = null;
+    try {
+      if (window.PublicKeyCredential && navigator.credentials && typeof navigator.credentials.get === 'function') {
+        const r = await fetch('/api/user/account/webauthn/credentials', { credentials: 'include', cache: 'no-store' });
+        if (r.ok) { const d = await r.json(); passkeys = d && Array.isArray(d.passkeys) ? d.passkeys.length : Number(d && d.total); }
+      } else passkeys = 0;
+    } catch { passkeys = null; }
+    const who = L('Ingelogd als ', 'Signed in as ') + (__session.email || L('uw account', 'your account'));
+    setStatus('', who + (passkeys === 0
+      ? L('. U tekent met de code uit uw authenticator-app.', '. You\'ll sign with the code from your authenticator app.')
+      : L('. U tekent met de passkey waarmee u inlogt. Die zet u met één tik klaar als u tekent. Geen passkey op dit apparaat? Dan tekent u met de code uit uw authenticator-app.', '. You\'ll sign with your sign-in passkey. It is set up with one tap when you sign. No passkey here? You can sign with your authenticator code instead.')));
   }
   $('sign-confirm').onclick = doSign;
   const decline = $('decline-btn');
@@ -600,7 +612,12 @@ async function fetchAndOpenCapsule(url, envId) {
   }
   const r = await fetch(url, { credentials: 'include', cache: 'no-store', signal: AbortSignal.timeout(60000) });
   if (r.status === 401) throw new Error(L('Log in met het uitgenodigde e-mailadres om dit document te openen.', 'Sign in with the invited email address to open this document.'));
-  if (r.status === 403) throw new Error(L('Deze uitnodiging hoort bij een ander e-mailadres. Log in met het uitgenodigde adres.', 'This invitation belongs to a different email address. Sign in with the invited address.'));
+  if (r.status === 403) {
+    let code = '';
+    try { code = ((await r.clone().json()) || {}).error || ''; } catch { code = ''; }
+    if (code === 'recipient_mismatch' || code === 'not_authorized') throw new Error(L('Deze uitnodiging hoort bij een ander e-mailadres. Log in met het uitgenodigde adres.', 'This invitation belongs to a different email address. Sign in with the invited address.'));
+    throw new Error(L('Het document kon niet worden geopend met deze link. Open de link uit de uitnodigingsmail opnieuw.', 'The document could not be opened with this link. Open the link from the invitation email again.'));
+  }
   if (r.status === 404) throw new Error(L('Het versleutelde document is niet beschikbaar. Misschien is het een ouder verzoek, of is de link onvolledig.', 'The encrypted document is unavailable. It may be an older request or the link may be incomplete.'));
   if (r.status === 410) throw new Error(L('Dit verzoek of het document is verlopen. Vraag de afzender om een nieuw verzoek.', 'This signing request or its document has expired. Ask the sender for a new request.'));
   if (r.status === 429) throw new Error(L('Het is even te druk. Probeer het over een minuut opnieuw.', 'It is busy right now. Try again in a minute.'));
@@ -1682,6 +1699,11 @@ async function doSign() {
     try { ink = await sealInk({ ink: __ink, documentKey: __docKey, envelopeId: __envelope.id, partyIndex: __partyIndex }); } catch { ink = ''; }
     const data = await submitSignature({ activationId: act.activation_id, signerPublicKey: signer.publicKey, signature: sigB64, appearance, ink });
 
+    // The line under the heading follows the status: the last signer read
+    // "once everyone has signed..." under "Signed by everyone" (hertest r2 K1).
+    { const sub = $('done-sub'); if (sub) sub.textContent = data.status === 'complete'
+      ? L('Uw handtekening is vastgelegd. Iedereen heeft nu getekend: download hieronder het complete document met alle handtekeningen. Dezelfde link uit uw uitnodiging opent het later opnieuw.', 'Your signature is recorded. Everyone has now signed: download the complete document with every signature below. The same link from your invitation opens it again later.')
+      : L('Uw handtekening is vastgelegd. Zodra iedereen heeft getekend, opent dezelfde link uit uw uitnodiging het complete document met alle handtekeningen.', 'Your signature is recorded. Once everyone has signed, the same link from your invitation opens the complete document with every signature.'); }
     $('done-env-id').textContent = __envelope.id;
     $('done-status').textContent = data.status === 'complete' ? L('Door iedereen getekend', 'Signed by everyone') : L('Wacht op de anderen', 'Waiting for the others');
     $('done-progress').textContent = (data.signed_count != null ? data.signed_count : '?') + ' / ' + (data.party_count != null ? data.party_count : __envelope.party_count) + L(' getekend', ' signed');
@@ -1747,7 +1769,13 @@ async function doSign() {
         : L('Het is even te druk. Probeer het over een minuut opnieuw.', 'It is busy right now. Try again in a minute.');
     }
     else if (e && e.status === 403 && (reason === 'signer_not_enrolled' || e.message === 'signer_not_enrolled')) msg = 'relink';
-    else if (e && e.status === 403) msg = L('Deze uitnodiging hoort bij een ander e-mailadres. Log in met het adres waar de uitnodiging naartoe ging.', 'This invite is bound to a different email address. Sign in with the address the invite was sent to.');
+    // "Another e-mail address" only when that is the reason (hertest r2): the
+    // other 403s used to say it too and sent people looking for an account.
+    else if (e && e.status === 403 && (reason === 'not_authorized' || reason === 'recipient_mismatch')) msg = L('Deze uitnodiging hoort bij een ander e-mailadres. Log in met het adres waar de uitnodiging naartoe ging.', 'This invite is bound to a different email address. Sign in with the address the invite was sent to.');
+    else if (e && e.status === 403 && reason === 'doc_hash_mismatch') msg = L('Het document in deze browser is niet het document uit dit verzoek. Laad de pagina opnieuw; er is niets ondertekend.', 'The document in this browser is not the document in this request. Reload the page; nothing has been signed.');
+    else if (e && e.status === 403 && reason === 'invite_invalid') msg = L('Deze uitnodigingslink werkt niet (meer). Open de link uit de uitnodigingsmail opnieuw, of vraag de afzender om een nieuwe uitnodiging. Er is niets ondertekend.', 'This invitation link does not work (any more). Open the link from the invitation email again, or ask the sender for a new invitation. Nothing has been signed.');
+    else if (e && e.status === 403 && reason === 'account_mismatch') msg = L('U bent tussendoor met een ander account ingelogd. Laad de pagina opnieuw en teken met het uitgenodigde account. Er is niets ondertekend.', 'You signed in with another account in the meantime. Reload the page and sign with the invited account. Nothing has been signed.');
+    else if (e && e.status === 403) msg = L('Ondertekenen werd geweigerd. Laad de pagina opnieuw en probeer het nog eens; er is niets ondertekend.', 'Signing was refused. Reload the page and try again; nothing has been signed.');
     else if (e && e.status === 410 && (reason === 'voided' || reason === 'declined')) msg = closedExplanation(reason === 'declined' ? 'declined' : 'cancelled');
     else if (e && e.status === 410) msg = L('De termijn om te tekenen is voorbij (tot ', 'The signing period has ended (until ') + humanDate(__envelope.sign_expires_at) + L('). Vraag de afzender om een nieuw verzoek.', '). Ask the sender for a new request.');
     else if (e && e.status === 409 && reason === 'already_complete') msg = L('Iedereen heeft al getekend. Laad de pagina opnieuw om het document te downloaden.', 'Everyone has already signed. Reload the page to download the document.');

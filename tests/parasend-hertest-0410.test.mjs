@@ -56,7 +56,7 @@ after(async () => {
   if (server) await new Promise((r) => server.close(r));
 });
 
-async function openSender(pagePath) {
+async function openSender(pagePath, sendsReply = { status: 500, body: {} }) {
   const seen = { inbound: [], sends: [] };
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await page.addInitScript(() => {
@@ -80,7 +80,7 @@ async function openSender(pagePath) {
     status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, limit: 30, count: 1 }) }));
   await page.route('https://health.paramant.app/v2/sends', (r) => {
     seen.sends.push(r.request().postData() || '');
-    return r.fulfill({ status: 500, contentType: 'application/json', body: '{}' });
+    return r.fulfill({ status: sendsReply.status, contentType: 'application/json', body: JSON.stringify(sendsReply.body) });
   });
   let n = 0;
   await page.route('https://health.paramant.app/v2/inbound', (r) => {
@@ -122,6 +122,24 @@ test('T4-9, T4-11, T4-L1: a send to a person carries no file name, one file_id o
     const seal = await page.evaluate(() => window.__seal);
     assert.ok(!seal.some((s) => /^Sending /.test(s)), `English progress on the Dutch page: ${JSON.stringify(seal)}`);
     assert.ok(seal.some((s) => s.includes(NAME + ' wordt verstuurd, deel 1 van 2')), `Dutch progress expected: ${JSON.stringify(seal)}`);
+  } finally { await page.close(); }
+});
+
+// Hertest L6: a relay without a mail provider (dryrun) answered "invited: 2"
+// and the page said "Verstuurd naar 2 van 2". The relay now says
+// mail_test_mode, and the page says nothing went out.
+test('L6: test mode on the relay is not shown as "sent"', async () => {
+  const { page } = await openSender('/parashare', { status: 201, body: { ok: true, send_id: 's1', recipients: 2, invited: 2, delivered: 0, mail_test_mode: true, size: 100, expires_at: new Date(Date.now() + 3600e3).toISOString() } });
+  try {
+    await page.locator('#file-input').setInputFiles({ name: 'a.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(100 * 1024, 7) });
+    await page.waitForFunction(() => !document.getElementById('btn-create-session').disabled, null, { timeout: 15000 });
+    await page.fill('#recipients-input', 'een@example.com, twee@example.com');
+    await page.locator('#btn-create-session').click();
+    await page.locator('#step-done:not([hidden])').waitFor({ timeout: 30000 });
+    const text = await page.locator('#step-done').innerText();
+    assert.doesNotMatch(text, /Verstuurd naar 2 van 2|uitnodigingen zijn onderweg/, text);
+    assert.match(text, /Niet verstuurd: testmodus/, text);
+    assert.match(text, /geen uitnodiging verstuurd/, text);
   } finally { await page.close(); }
 });
 
@@ -182,6 +200,17 @@ test('T4-13, T4-L5: no "one package" claim, no 30-second expiry', async () => {
 test('T4-12, T4-L2, T4-L3: page texts and the receive landing', () => {
   for (const f of ['frontend/parasend.html', 'frontend/en/parasend.html']) {
     assert.doesNotMatch(read(f), /blokken van vast 5 MB|blocks of a fixed 5 MB/, f);
+  }
+  // Hertest r2: the security pages still said every web app block is 5 MB.
+  // Only the live hand-over pads; a link and a send to a person do not.
+  for (const f of ['frontend/security.html', 'frontend/en/security.html']) {
+    assert.doesNotMatch(read(f), /elk blok van de webapp is precies 5 MB|every web app block is a fixed 5 MB|webapp Versturen worden opgevuld|ParaSend web app are padded/, f);
+  }
+  // Hertest r2 T4-L2: /ontvang (Samen, nu) offered "Naar uw overzicht" to a
+  // receiver without an account. The page itself links to the site; only a
+  // signed-in visitor gets the overview (ontvang.page.js).
+  for (const f of ['frontend/ontvang.html', 'frontend/en/ontvang.html']) {
+    assert.doesNotMatch(read(f), /href="\/dashboard"/, `${f}: a receiver has no dashboard`);
   }
   for (const f of ['frontend/get.html', 'frontend/en/get.html']) {
     const s = read(f);

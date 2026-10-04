@@ -241,7 +241,12 @@
   setNavigation(PUBLIC_NAV, DUTCH ? 'Hoofdmenu' : 'Primary');
   container.innerHTML = '<span class="nav-signin" aria-hidden="true">' + (DUTCH ? 'Even kijken' : 'Checking session') + '</span>';
 
-  (async function check() {
+  // A page that signs the visitor in without a reload (the login tip, the end
+  // of the account setup) says so, and the bar follows: it showed "Account
+  // maken" to somebody who was already signed in (hertest r2 K4).
+  window.addEventListener('paramant:session-changed', function() { check(); });
+  check();
+  async function check() {
     try {
       var res = await fetch('/api/user/session/verify', {
         credentials: 'include',
@@ -258,5 +263,5 @@
     } catch (err) {
       renderLoggedOut();
     }
-  })();
+  }
 })();

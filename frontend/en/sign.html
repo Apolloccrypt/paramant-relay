@@ -72,6 +72,15 @@ body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]
 body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-facts,
 body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-headlink{display:none}
 body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-title{font-size:15px;font-weight:600;line-height:1.4;letter-spacing:0;margin:0;max-width:none;color:var(--ink-2)}
+/* On a phone the document itself comes into view on the Place step: the
+   explanations that repeat the hint go, and sign-flow.js scrolls the step to
+   the top. Measured on an iPhone 13 (hertest r2 T5-12c): only the top 36 px of
+   page 1 showed under the zoom, the box button, the paraaf option and the page
+   bar. */
+@media (max-width: 600px){
+  #step-place > .ds-sub, #ds-invite-paraaf-tip, #ds-seal-tip{display:none}
+  #ds-place-hint{scroll-margin-top:72px}
+}
 /* The chosen file, named where the document is worked on. */
 .ds-doc-meta{display:flex;align-items:center;gap:10px;min-width:0;margin:0 0 14px;padding:9px 12px;border:1px solid var(--line-2);border-left:2px solid var(--mark);border-radius:var(--r-1);background:var(--surface-sunk);font-family:var(--mono);font-size:12px;color:var(--ink-2)}
 .ds-doc-meta-label{flex:0 0 auto;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
@@ -1054,10 +1063,10 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   </div>
 </footer>
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=13" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
 <script src="/js/quota-upgrade.js?v=7" defer></script>
 <script src="/js/done-state.js?v=1" defer></script>
-<script type="module" src="/sign-flow.js?v=65"></script>
+<script type="module" src="/sign-flow.js?v=66"></script>
 </body>
 </html>

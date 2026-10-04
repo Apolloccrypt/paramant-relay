@@ -74,5 +74,22 @@
     return day(d) + ', ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ' UTC';
   }
 
-  window.paramantDate = { __paramant: true, day: day, moment: moment };
+  // "5 oktober 2026 om 18:02 (CEST)". A moment in the reader's OWN clock, with
+  // the zone named: the mail about a link says its expiry in local time, and
+  // the sender's page said the same moment in UTC, two different clock times
+  // for one moment (hertest r2 T4-L4).
+  function localMoment(value, fallback) {
+    var d = toDate(value);
+    if (!d) return fallback === undefined ? '--' : fallback;
+    var zone = '';
+    try {
+      var parts = new Intl.DateTimeFormat(ENGLISH ? 'en-GB' : 'nl-NL', { timeZoneName: 'short' }).formatToParts(d);
+      for (var i = 0; i < parts.length; i++) if (parts[i].type === 'timeZoneName') zone = parts[i].value;
+    } catch (e) { zone = ''; }
+    var when = d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear()
+      + (ENGLISH ? ' at ' : ' om ') + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    return zone ? when + ' (' + zone + ')' : when;
+  }
+
+  window.paramantDate = { __paramant: true, day: day, moment: moment, localMoment: localMoment };
 })();

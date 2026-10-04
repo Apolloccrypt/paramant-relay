@@ -158,7 +158,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 <script src="/js/theme.js?v=6"></script>
 <!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
      Blocking and above every other script, so it exists before any renderer runs. -->
-<script src="/js/format-date.js?v=2"></script>
+<script src="/js/format-date.js?v=3"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -204,6 +204,10 @@ main.acct input::placeholder { color: var(--ink-3); }
 
 <section id="state-loading" class="section-lg">
   <p class="lede">Loading your account...</p>
+</section>
+
+<section id="state-busy" class="section-lg hidden">
+  <p class="lede" id="acct-busy-text">Your account could not be loaded just now: too many requests came in at once. You are still signed in. <a href="/en/account">Try again in a minute</a>.</p>
 </section>
 
 <section id="state-unauth" class="section-lg hidden">
@@ -252,7 +256,8 @@ main.acct input::placeholder { color: var(--ink-3); }
   <div class="acct-grid2">
     <div class="acct-block">
       <h3>Authenticator app</h3>
-      <p>Connected. Algorithm: SHA-256, 30 seconds, 6 digits.</p>
+      <p>Connected. Your app shows a new 6-digit code every 30 seconds.</p>
+      <details class="small"><summary>Technical details</summary><p class="small">TOTP per RFC 6238, with SHA-256, a 30-second step and 6 digits.</p></details>
       <button type="button" class="btn btn-secondary btn-small" id="reset-totp">Set up a new authenticator</button>
       <p class="small mt-2">Your current authenticator codes stop working. You then scan a new QR code.</p>
     </div>
@@ -286,7 +291,7 @@ main.acct input::placeholder { color: var(--ink-3); }
 </section>
 
 <section class="acct-card" id="signing-identity-section">
-  <div class="acct-kicker">Signing identity &middot; ML-DSA-65, persistent</div>
+  <div class="acct-kicker">Signing identity &middot; persistent</div>
   <h2>Signing identity.</h2>
   <p class="acct-lead">
     Your signing key signs documents, separate from signing in. Public keys are bound to your
@@ -316,7 +321,7 @@ main.acct input::placeholder { color: var(--ink-3); }
   <div class="acct-block">
     <h3>Set up your signing key</h3>
     <p class="small">
-      Your signing key is created here, in this browser, with ML-DSA-65 (post-quantum), and
+      Your signing key is created here, in this browser, and
       only you hold it. You set it up, and open it each time you sign, with the same
       passkey you sign in with (Face ID, Touch ID, or a security key). No passphrase, no extra
       code: your sign-in passkey is your signing key. If this browser has no passkey, you can still
@@ -515,13 +520,13 @@ main.acct input::placeholder { color: var(--ink-3); }
 </main>
 
 <script src="/nav.js?v=16" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=13" defer></script>
 <script src="/js/account-api-keys.js?v=2" defer></script>
-<script src="/js/account.inline1.js?v=10"></script>
+<script src="/js/account.inline1.js?v=11"></script>
 <script src="/js/app-session-token.js?v=1" defer></script>
 <script src="/js/redeem-code.js?v=3" defer></script>
 
-<script type="module" src="/js/account.inline2.js?v=6"></script>
+<script type="module" src="/js/account.inline2.js?v=7"></script>
 <script type="module" src="/js/passkey.js?v=8"></script>
 <script type="module" src="/js/signing-enrol.js?v=18"></script>
 <script src="/js/account-theme.js?v=4" defer></script>
