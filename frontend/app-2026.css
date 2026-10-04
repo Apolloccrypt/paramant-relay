@@ -647,14 +647,14 @@ a.plan-term-warn-cta:hover { background: var(--ink-1); }
   border: 1px solid var(--sig-stop); border-radius: 50%;
   font: 700 11px/1 var(--mono); color: var(--sig-stop);
 }
-.error a, .msg-error a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.error a:not(.btn), .msg-error a:not(.btn) { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
 .msg-success { border-left-color: var(--sig-done); background: var(--sig-done-bg); color: var(--ink-1); }
 .msg-success::before { content: none; }
 
 .eyebrow { color: var(--ink-3); }
 .eyebrow .bar { background: var(--mark); height: 2px; }
 .footer-text { color: var(--ink-2); }
-.footer-text a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.footer-text a:not(.btn) { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
 .legal-strip { background: var(--surface-sunk); border-top: 1px solid var(--line); color: var(--ink-3); }
 .legal-strip a { color: var(--ink-2); }
 
@@ -689,7 +689,10 @@ a.plan-term-warn-cta:hover { background: var(--ink-1); }
   border-radius: var(--r-1); background: var(--sig-wait-bg);
   color: var(--ink-1); font: 13.5px/1.6 var(--sans);
 }
-.auth-note a { color: var(--accent); }
+/* :not(.btn): the notice carries a real button ("Verder naar uw account" after a
+   SHA-1 login). Without the exclusion this rule outranks .btn-primary and paints
+   the label in the button's own background colour, blue on blue. */
+.auth-note a:not(.btn) { color: var(--accent); }
 
 /* Passkey and code are two ways in, not a first and a second choice. The
    divider that said "or" is gone; they sit next to each other and the fields
