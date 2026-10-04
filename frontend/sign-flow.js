@@ -37,8 +37,12 @@ const RELAY_PUBLIC = 'https://health.paramant.app';
 // State
 // ====================================================================
 
-const STAMP_PDF_W = 240;
-const STAMP_PDF_H = 100;
+// The default seal: 170 x 70 pt, about 29% of an A4 width. It used to be
+// 240 x 100 pt (40% of the width) with a solid white body, which covered the
+// text under it (retest 2026-10-04, T1-10). The body is now see-through with
+// a thin line, and the signer can still drag the corner to make it larger.
+const STAMP_PDF_W = 170;
+const STAMP_PDF_H = 70;
 const MAX_PREVIEW_PAGES = 30;
 
 // Preview robustness (see js/preview-render.js). One generation per surface, so
@@ -2335,8 +2339,20 @@ function initDrawCanvas() {
     const out = document.createElement('canvas');
     out.width = w; out.height = h;
     const octx = out.getContext('2d');
-    octx.fillStyle = '#ffffff'; octx.fillRect(0, 0, w, h);
     octx.drawImage(cv, x0, y0, w, h, 0, 0, w, h);
+    // The paper of the drawing pad stays behind: white becomes see-through and
+    // the ink keeps its own colour, with its soft edge as transparency. A white
+    // block under the signature used to hide the text of the document (T1-10).
+    try {
+      const img = octx.getImageData(0, 0, w, h);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const paper = Math.min(d[i], d[i + 1], d[i + 2]);
+        const a = Math.max(0, Math.min(255, Math.round((255 - paper) * 255 / 244)));
+        d[i] = 11; d[i + 1] = 58; d[i + 2] = 106; d[i + 3] = a;
+      }
+      octx.putImageData(img, 0, 0);
+    } catch { /* a tainted canvas cannot happen here; keep the plain copy */ }
     const blob = await new Promise((resolve) => out.toBlob(resolve, 'image/png'));
     if (!blob) return;
     const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -3171,7 +3187,6 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
   };
   const navy  = PDFLib.rgb(0.043, 0.227, 0.416);
   const dim   = PDFLib.rgb(0.30, 0.30, 0.30);
-  const white = PDFLib.rgb(1, 1, 1);
 
   // Embed the signature image ONCE, reused on every stamped page.
   let sigEmbed = null;
@@ -3203,12 +3218,14 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
     const k = Math.max(0.5, Math.min(1, Math.min(box.h / 64, box.w / 190)));
     const bandH = 16 * k, footerH = 22 * k, padX = 8 * k;
     const sWord = 9 * k, sBadge = 4.6 * k, sName = 8 * k, sDate = 7 * k, sCrypto = 6 * k;
-    // Outer border + SOLID WHITE body (always legible: dark text on white).
-    pg.drawRectangle({ x: box.x, y: box.y, width: box.w, height: box.h, borderColor: navy, borderWidth: 1.2, color: white, opacity: 1 });
-    // Branded cobalt top band: wordmark + PQ badge.
-    pg.drawRectangle({ x: box.x, y: box.y + box.h - bandH, width: box.w, height: bandH, color: navy });
+    // A thin outline and NO fill: the seal never hides what is printed under
+    // it. A solid white body with a solid navy band used to cover the text
+    // (retest 2026-10-04, T1-10).
+    pg.drawRectangle({ x: box.x, y: box.y, width: box.w, height: box.h, borderColor: navy, borderWidth: 1 });
+    // Top band: wordmark + PQ badge in navy on the paper, a hairline under it.
+    pg.drawLine({ start: { x: box.x + 6 * k, y: box.y + box.h - bandH }, end: { x: box.x + box.w - 6 * k, y: box.y + box.h - bandH }, thickness: 0.5, color: navy, opacity: 0.35 });
     const wordW = fontBold.widthOfTextAtSize('ParaMANT', sWord);
-    pg.drawText('ParaMANT', { x: box.x + padX, y: box.y + box.h - bandH + (bandH - sWord) / 2 + 0.5, size: sWord, font: fontBold, color: white });
+    pg.drawText('ParaMANT', { x: box.x + padX, y: box.y + box.h - bandH + (bandH - sWord) / 2 + 0.5, size: sWord, font: fontBold, color: navy });
     // The badge is a QUALIFIER, not a second wordmark. At 6pt bold in full white it
     // competed with ParaMANT for the eye and made the band read as two headlines.
     // Smaller, regular weight, and held back in opacity so it supports the mark
@@ -3218,7 +3235,7 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
     const badge = 'POST-QUANTUM SIGNED';
     const badgeW = font.widthOfTextAtSize(badge, sBadge);
     if (padX + wordW + 14 * k + badgeW + padX <= box.w) {
-      pg.drawText(badge, { x: box.x + box.w - badgeW - padX, y: box.y + box.h - bandH + (bandH - sBadge) / 2 + 0.5, size: sBadge, font, color: white, opacity: 0.72 });
+      pg.drawText(badge, { x: box.x + box.w - badgeW - padX, y: box.y + box.h - bandH + (bandH - sBadge) / 2 + 0.5, size: sBadge, font, color: dim });
     }
     // Bottom metadata band: signer + date on row 1, algo + fingerprint on row 2.
     const row1Y = box.y + footerH - sName - 1.5 * k;
@@ -3289,7 +3306,8 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
   // fingerprint, in the seal's navy, in a box planned by js/paraaf-place.js.
   // No band, no badge: on a 38pt box those would only crowd the initials.
   const paintParaaf = async (pg, box) => {
-    pg.drawRectangle({ x: box.x, y: box.y, width: box.w, height: box.h, borderColor: navy, borderWidth: 0.8, color: white, opacity: 1 });
+    // Outline only, like the seal: nothing under the paraaf is hidden.
+    pg.drawRectangle({ x: box.x, y: box.y, width: box.w, height: box.h, borderColor: navy, borderWidth: 0.6 });
     // A thin navy bar on the left edge: the house style of the seal, in small.
     const bar = Math.max(1.5, box.w * 0.03);
     pg.drawRectangle({ x: box.x, y: box.y, width: bar, height: box.h, color: navy });

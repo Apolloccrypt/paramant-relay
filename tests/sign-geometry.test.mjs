@@ -67,8 +67,13 @@ function checkPage({ ui, m }, label) {
   assert.ok(seal && hl && date, `${label}: the UI shows seal, highlight and date`);
   nearBox(m.navy, seal, `${label} seal`);
   nearBox(m.highlight, hl, `${label} highlight`);
-  // Upright: the navy band is on top of the seal as the page is shown.
-  assert.ok(m.bandTop.top > 0.6 && m.bandTop.bottom < 0.45, `${label}: the seal is not upright (band ${m.bandTop.top.toFixed(2)} top, ${m.bandTop.bottom.toFixed(2)} bottom)`);
+  // Upright: the wordmark sits in the top of the seal as the page is shown and
+  // runs left to right. (The seal used to have a solid navy band to look for;
+  // since T1-10 it is see-through with a thin line, so the words decide.)
+  const mark = m.texts.find((x) => x.str.includes('ParaMANT'));
+  assert.ok(mark, `${label}: the seal's wordmark is in the signed PDF`);
+  assert.ok(mark.y > seal.y && mark.y < seal.y + seal.h * 0.4, `${label}: the seal is not upright (wordmark at ${mark.y.toFixed(3)}, seal ${seal.y.toFixed(3)}..${(seal.y + seal.h).toFixed(3)})`);
+  assert.ok(mark.dirX > 0 && Math.abs(mark.dirY) < 1e-6, `${label}: the wordmark does not run left to right`);
   // The date: where its box says, and running left to right on the shown page.
   const dateStr = date.text.replace(/[^0-9-]/g, '').slice(0, 10);
   const t = m.texts.find((x) => x.str === dateStr);

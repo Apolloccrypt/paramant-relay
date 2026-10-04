@@ -394,15 +394,17 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 .ds-page-wrap canvas,
 .ds-review-pane.has-pdf,
 .ds-signature-sheet-preview,
-.ds-sheet-seal,
+.ds-sheet-seal { background: #FFFFFF; color: #0C1B2A; }
+/* The seal is see-through with a thin line, as it is baked into the PDF: the
+   text under it stays readable (retest 2026-10-04, T1-10). */
 .ds-stamp-marker,
-.ds-review-pane .ds-mockup-stamp { background: #FFFFFF; color: #0C1B2A; }
+.ds-review-pane .ds-mockup-stamp { background: transparent; color: #0C1B2A; border-width: 1px; }
 .ds-signature-sheet-preview,
 .ds-sheet-seal,
 .ds-stamp-marker,
 .ds-review-pane .ds-mockup-stamp { border-color: #1D4ED8; }
-.ds-sm-band { background: #1D4ED8; color: #FFFFFF; }
-.ds-sm-logo span { color: #B2FF3F; }
+.ds-sm-band { background: transparent; color: #1D4ED8; border-bottom: 1px solid rgba(29,78,216,.35); }
+.ds-sm-logo span { color: #1D4ED8; }
 .ds-sm-foot .ds-sm-name { color: #0C1B2A; }
 .ds-sm-foot .ds-sm-date, .ds-sm-crypto { color: #5C6A78; }
 .ds-sheet-title, .ds-sheet-fields dd, .ds-mode-t { }
