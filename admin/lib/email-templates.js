@@ -943,7 +943,7 @@ ${BASE_URL}`;
 // open the document, and the site's promise that no US party holds a key
 // stays true. A whole key ('#doc=') is still cut off below, whatever happens
 // upstream.
-function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt, subject, message, envelopeId, partyIndex, lang }) {
+function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt, subject, message, envelopeId, partyIndex, lang, asksParaaf }) {
   // The last gate before the mail provider, and the one that holds even when
   // the two in front of it are wrong. Only a key SHARE survives; any other
   // fragment (a whole '#doc=' key above all) is cut off here, again.
@@ -951,6 +951,9 @@ function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt,
   const share = /^ks=v1\.[A-Za-z0-9_-]{43}$/.test(fragment || '') ? '#' + fragment : '';
   const noticeUrl = beforeHash + share;
   const opensDocument = !!share;
+  // The paraaf is only promised when the sender asked for one: a request field
+  // with all_pages (retest 04-10). Without it the mail names the signature only.
+  const paraaf = !!asksParaaf;
   // Dutch first with the English underneath, because the sender does not know
   // which language the recipient reads. A caller that does know passes
   // lang 'nl' or 'en' and gets that one language only.
@@ -966,7 +969,7 @@ function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt,
       sender: senderLabel || 'Een Paramant-gebruiker',
       asks: 'heeft u gevraagd een document te bekijken en te ondertekenen.',
       carries: opensDocument
-        ? 'De link opent het document in uw browser zodra u bent ingelogd. U ziet het document, zet uw paraaf en handtekening en bent klaar. Zonder inloggen opent de link niets.'
+        ? `De link opent het document in uw browser zodra u bent ingelogd. U ziet het document, ${paraaf ? 'zet uw paraaf en handtekening' : 'zet uw handtekening'} en bent klaar. Zonder inloggen opent de link niets.`
         : 'Deze link opent het verzoek. Hij opent het document niet. De sleutel die het document opent staat bewust niet in deze e-mail. Vraag de afzender om de volledige link, of open het bestand als u al een kopie hebt.',
       open: opensDocument ? 'Open het document' : 'Open het verzoek',
       fromSender: 'Bericht van de afzender:',
@@ -980,7 +983,7 @@ function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt,
       sender: senderLabel || 'A Paramant user',
       asks: 'has asked you to review and sign a document.',
       carries: opensDocument
-        ? 'The link opens the document in your browser once you have signed in. You see the document, add your initials and signature, and you are done. Without signing in the link opens nothing.'
+        ? `The link opens the document in your browser once you have signed in. You see the document, ${paraaf ? 'add your initials and signature' : 'add your signature'}, and you are done. Without signing in the link opens nothing.`
         : 'This link opens the request. It does not open the document. The key that unlocks it is deliberately not in this email, so ask the sender for their complete link, or open the file if you already have a copy.',
       open: opensDocument ? 'Open the document' : 'Open the request',
       fromSender: 'Message from the sender:',

@@ -2245,6 +2245,9 @@ api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
         partyIndex: item.partyIndex,
         lang,
         opensDocument: item.opensDocument,
+        // A paraaf is only promised when this party's request carries one
+        // (a field with all_pages); otherwise the mail names the signature only.
+        asksParaaf: !!(item.env?.requested_appearance?.fields || []).some((f) => f && f.all_pages),
       }));
       return { party_index: item.partyIndex, ok: true };
     } catch {

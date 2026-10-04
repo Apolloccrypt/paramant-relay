@@ -80,3 +80,15 @@ console.log('signing-invite-email: 22 checks passed');
   assert.ok(!(sneaky.text + sneaky.html).includes(key), 'a whole key smuggled next to a share is cut off');
   assert.ok(/It does not open the document/.test(sneaky.text), 'and that mail falls back to the notice');
 }
+
+// Retest 04-10: the mail promised "zet uw paraaf" also when the sender asked
+// for no paraaf. It is only named when the request carries an all_pages field.
+{
+  const share = 's'.repeat(43);
+  const url = `${base}#ks=v1.${share}`;
+  const plain = signingInviteEmail({ inviteUrl: url, senderLabel: 'x', envelopeId: 'e', partyIndex: 0 });
+  assert.ok(!/paraaf/i.test(plain.text + plain.html) && !/initials/i.test(plain.text + plain.html), 'no paraaf asked: the mail promises none');
+  assert.ok(/zet uw handtekening en bent klaar/.test(plain.text) && /add your signature, and you are done/.test(plain.text), 'it names the signature only');
+  const withParaaf = signingInviteEmail({ inviteUrl: url, senderLabel: 'x', envelopeId: 'e', partyIndex: 0, asksParaaf: true });
+  assert.ok(/zet uw paraaf en handtekening/.test(withParaaf.text) && /add your initials and signature/.test(withParaaf.text), 'paraaf asked: the mail names it');
+}
