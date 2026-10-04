@@ -611,17 +611,23 @@ async function _ctDrain() {
   _ctDraining = true;
   while (_ctWriteQueue.length > 0 && !_shuttingDown) {
     const item = _ctWriteQueue.shift();
-    // Leaf first: the tree is rebuilt from the leaf file, and a leaf with no
-    // entry line costs one entry's details in the window after a crash, while
-    // an entry with no leaf is recovered from CT_FILE at the next start.
+    // Both writes are handed to their streams in the SAME tick and only then
+    // awaited. Awaiting the leaf before writing the line left a gap in which a
+    // shutdown could end the streams; the line then hit "write after end",
+    // that error destroyed the stream, and every line still buffered in it was
+    // lost (route-ct-exit-durability: 10 of 40 on disk). The leaf goes first
+    // into its stream; a leaf with no line costs one entry's details after a
+    // crash, an entry with no leaf is recovered from CT_FILE at the next start.
+    const writes = [];
     if (_ctLeafStream && item.leaf) {
-      await new Promise((resolve, reject) => {
+      writes.push(new Promise((resolve, reject) => {
         _ctLeafStream.write(item.leaf, err => err ? reject(err) : resolve());
-      }).catch(e => log('warn', 'ct_leaf_write_error', { err: e.message }));
+      }).catch(e => log('warn', 'ct_leaf_write_error', { err: e.message })));
     }
-    await new Promise((resolve, reject) => {
+    writes.push(new Promise((resolve, reject) => {
       _ctStream.write(item.line, err => err ? reject(err) : resolve());
-    }).catch(e => log('warn', 'ct_write_error', { err: e.message }));
+    }).catch(e => log('warn', 'ct_write_error', { err: e.message })));
+    await Promise.all(writes);
   }
   _ctDraining = false;
   // Check rotation after draining. Not during a shutdown: rotation ends the
@@ -4474,7 +4480,19 @@ if (_static.serveFrontend) log('info', 'static_serving_enabled', { root: _static
 //
 // Redis unreachable is 503 (the service could not answer, the caller did
 // nothing wrong); anything else is 500.
+// Requests in flight, for the drain on SIGTERM (see _onExitSignal).
+let _inFlightRequests = 0;
+let _draining = false;
 const server = http.createServer((req, res) => {
+  if (_draining) {
+    // Shutting down: tell the client to come back rather than half-handle it.
+    res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '2', 'Connection': 'close' });
+    return res.end(J({ error: 'restarting', retry_after_s: 2 }));
+  }
+  _inFlightRequests++;
+  let done = false;
+  const finish = () => { if (!done) { done = true; _inFlightRequests--; } };
+  res.on('finish', finish); res.on('close', finish);
   handleRelayRequest(req, res).catch((err) => relayRequestFailed(req, res, err));
 });
 
@@ -12346,9 +12364,27 @@ async function emergencyZeroAndExit(reason, code = 0) {
 // Graceful shutdown on SIGTERM (systemctl stop) and SIGINT (Ctrl+C). A second
 // signal arriving while the first is still flushing means the caller wants out
 // now, so it exits without waiting rather than starting the flush over.
+// SIGTERM DRAINS FIRST (sweep-chaos 9). A restart used to exit at once: a
+// signature being submitted at that moment got 502 after its one-time
+// activation was already spent, and the retry said "already used". Now new
+// requests get 503 Retry-After and the ones in flight get up to
+// SHUTDOWN_DRAIN_MS (default 5 s) to finish; then the blobs are zeroed and the
+// process exits as before. A second signal exits at once.
+const SHUTDOWN_DRAIN_MS = Math.max(0, Math.min(parseInt(process.env.SHUTDOWN_DRAIN_MS || '5000', 10) || 0, 30000));
 function _onExitSignal(reason) {
-  if (_shuttingDown) { process.exit(0); return; }
-  emergencyZeroAndExit(reason);
+  if (_shuttingDown || _draining) { process.exit(0); return; }
+  if (!SHUTDOWN_DRAIN_MS || _inFlightRequests <= 0) { emergencyZeroAndExit(reason); return; }
+  _draining = true;
+  log('info', 'shutdown_draining', { in_flight: _inFlightRequests, max_ms: SHUTDOWN_DRAIN_MS });
+  try { server.close(); } catch {}
+  const until = Date.now() + SHUTDOWN_DRAIN_MS;
+  const tick = setInterval(() => {
+    if (_inFlightRequests <= 0 || Date.now() > until) {
+      clearInterval(tick);
+      if (_inFlightRequests > 0) log('warn', 'shutdown_drain_timeout', { in_flight: _inFlightRequests });
+      emergencyZeroAndExit(reason);
+    }
+  }, 25);
 }
 process.on('SIGTERM', () => _onExitSignal('SIGTERM'));
 process.on('SIGINT',  () => _onExitSignal('SIGINT'));
