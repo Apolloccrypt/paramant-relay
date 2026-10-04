@@ -301,11 +301,49 @@ function wireAccountPasskey() {
       if (listEl) listEl.innerHTML = pk.map((c) => {
         const lbl = c.label ? esc(c.label) : 'passkey';
         const when = c.created_at ? esc(paramantDate.moment(c.created_at, '')) : '';
+        // A lost or stolen device must not stay a valid sign-in (ACCT-32).
+        const del = c.credId
+          ? ' <button type="button" class="btn btn-small btn-secondary" data-remove-passkey="' + esc(c.credId) + '" style="margin-left:8px">' + nlEn('Verwijderen', 'Remove') + '</button>'
+          : '';
         return '<li style="padding:8px 0;border-bottom:1px solid var(--ink-hair,#e5e7eb)">'
           + '<strong>' + lbl + nlEn('</strong> <span class="small" style="color:var(--ink-dim,#6b7280)">&middot; actief', '</strong> <span class="small" style="color:var(--ink-dim,#6b7280)">&middot; active')
-          + (when ? nlEn(' &middot; toegevoegd ', ' &middot; added ') + when : '') + '</span></li>';
+          + (when ? nlEn(' &middot; toegevoegd ', ' &middot; added ') + when : '') + '</span>' + del + '</li>';
       }).join('');
+      if (listEl) listEl.querySelectorAll('[data-remove-passkey]').forEach((b) => b.addEventListener('click', () => removePasskey(b)));
     } catch { /* leave existing UI */ }
+  }
+
+  // DELETE /api/user/account/webauthn/credentials/:credId with { totp } or
+  // { backup_code } in the body (admin freshSecondFactor). The account keeps
+  // its authenticator app, so removing the last passkey locks nobody out.
+  async function removePasskey(b) {
+    const credId = b.getAttribute('data-remove-passkey');
+    const ask = window.paAskSecondFactor;
+    if (typeof ask !== 'function') return;
+    const factor = await ask(b.closest('li') || b,
+      nlEn('Deze passkey verwijderen: daarna kunt u er niet meer mee inloggen. Bevestig met de code van 6 cijfers uit uw authenticator-app, of een back-upcode.', 'Remove this passkey: you can no longer sign in with it afterwards. Confirm with the 6-digit code from your authenticator app, or a back-up code.'),
+      nlEn('Passkey verwijderen', 'Remove passkey'));
+    if (!factor) return;
+    b.disabled = true;
+    try {
+      const r = await fetch('/api/user/account/webauthn/credentials/' + encodeURIComponent(credId), {
+        method: 'DELETE', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(factor),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (r.ok) {
+        setStatus(status, nlEn('Passkey verwijderd. U logt er niet meer mee in.', 'Passkey removed. It no longer signs you in.'), false);
+      } else if (r.status === 404) {
+        setStatus(status, nlEn('Deze passkey bestaat niet meer, of de functie verwijderen is op deze server nog niet beschikbaar. Er is niets veranderd.', 'This passkey no longer exists, or removing is not available on this server yet. Nothing changed.'), true);
+      } else {
+        const t = typeof window.paSecondFactorError === 'function' ? window.paSecondFactorError(r.status, body) : nlEn('Verwijderen is niet gelukt. Er is niets veranderd.', 'Removing did not work. Nothing changed.');
+        setStatus(status, t, true);
+      }
+    } catch {
+      setStatus(status, nlEn('Paramant is niet bereikbaar. Er is niets veranderd.', 'We could not reach Paramant. Nothing changed.'), true);
+    }
+    b.disabled = false;
+    refresh();
   }
 
   if (!browserSupportsWebAuthn()) {

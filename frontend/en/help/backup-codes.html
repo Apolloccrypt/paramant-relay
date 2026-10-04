@@ -268,7 +268,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h2>What backup codes are</h2>
 
-  <p>A backup code is a 12-character code, made in advance, that works in place of your 6-digit TOTP code when you sign in. Once used, it stops working. You start with 10. When they run out, you must contact support for a manual account reset.</p>
+  <p>A backup code is a 12-character code, made in advance, that works in place of your 6-digit TOTP code when you sign in. Once used, it stops working. You start with 10. While you can still sign in, you make a new set on your account page. When they have run out and your authenticator app is gone, only support can restore your access.</p>
 
   <div class="warn"><p>Backup codes are as sensitive as your API key. Anyone who has one can sign in to your account without your authenticator device.</p></div>
 
@@ -282,15 +282,15 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">1</div>
     <div class="step-body">
       <h2>Go to the sign-in page</h2>
-      <p>Open <a href="/auth/login">paramant.app/auth/login</a> and enter your email and API key as usual.</p>
+      <p>Open <a href="/en/auth/login">paramant.app/en/auth/login</a>. Signing in asks for your email address and then a passkey or a 6-digit code. You do not need an API key here.</p>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">2</div>
     <div class="step-body">
-      <h2>Click "Use a backup code"</h2>
-      <p>Below the TOTP field you will see a link: <strong>Use a backup code</strong>. Click it. The input switches from a 6-digit field to a text field that accepts your full backup code.</p>
+      <h2>Click "Sign in with a backup code"</h2>
+      <p>Below the sign-in form it says <strong>Lost your authenticator app? Sign in with a backup code</strong>. That link opens a separate page, <a href="/en/auth/backup">paramant.app/en/auth/backup</a>, with a field for your email address and a field for the backup code.</p>
     </div>
   </div>
 
@@ -298,7 +298,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">3</div>
     <div class="step-body">
       <h2>Enter the code</h2>
-      <p>Type or paste one of your unused backup codes and click <strong>Sign in</strong>. The code is used up straight away. Do not try it a second time.</p>
+      <p>Enter your email address, type or paste one of your unused backup codes (twelve characters, three groups of four) and sign in. The code is used up straight away. Do not try it a second time.</p>
     </div>
   </div>
 
@@ -306,13 +306,13 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">4</div>
     <div class="step-body">
       <h2>Set up your authenticator again</h2>
-      <p>Once in the dashboard, go to <strong>Account &rarr; Security &rarr; Authenticator</strong> and set up a new authenticator app. Do this before the session expires (1 hour), so you do not get locked out again.</p>
+      <p>Go to <a href="/en/account">Account</a> &rarr; <strong>Security</strong> &rarr; <strong>Set up a new authenticator</strong>. You get a setup email and link a new app with it. Do this straight away: a session ends after an hour without activity, and always after twelve hours.</p>
     </div>
   </div>
 
   <h2>How to get a new set of backup codes</h2>
 
-  <p>Dashboard &rarr; Account &rarr; Security &rarr; <strong>Backup codes</strong> &rarr; <strong>Regenerate</strong>. You will be asked for a code from your authenticator app. The old codes stop working the moment you confirm. Save the new set immediately.</p>
+  <p><a href="/en/account">Account</a> &rarr; <strong>Security</strong> &rarr; <strong>Backup codes</strong> &rarr; <strong>Regenerate all codes</strong>. You confirm with the 6-digit code from your authenticator app, or with a backup code. The old codes stop working the moment you confirm. You see the new set once: save it immediately.</p>
 
   <h2>Where to store backup codes</h2>
 
@@ -335,7 +335,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <div class="troubleshoot-item">
     <div class="q">Can I see which codes I have already used?</div>
-    <div class="a">No. The dashboard shows only how many codes remain. Once a code is used it is gone. If you are unsure which codes are still valid, regenerate a fresh set while you still have TOTP access.</div>
+    <div class="a">No. The dashboard shows only how many codes remain. Once a code is used it is gone. If you are unsure which codes are still valid, regenerate a fresh set while you can still sign in.</div>
   </div>
 
   <div class="troubleshoot-item">

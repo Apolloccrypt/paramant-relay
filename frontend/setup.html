@@ -34,7 +34,7 @@
       <label><input type="checkbox" name="sector-finance"> Financiën (NIS2/DORA)</label><br>
       <label><input type="checkbox" name="sector-legal"> Juridisch (eIDAS)</label><br>
       <label><input type="checkbox" name="sector-iot"> IoT (IEC 62443)</label>
-      <div class="actions"><button class="next" type="button">Volgende</button></div>
+      <div class="actions" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px"><button class="next btn btn-primary" type="button">Volgende</button></div>
     </div>
 
     <div class="step" data-step="2" hidden>
@@ -44,10 +44,10 @@
       <p class="hint">Laat leeg om in localhost-modus te draaien (geen publiek domein, geen TLS).</p>
       <label><input type="checkbox" name="auto-tls" checked> TLS automatisch aanvragen via Let's Encrypt</label>
       <p class="hint">Hiervoor zijn DNS A-records nodig voor elk subdomein per sector.</p>
-      <p id="dns-status" class="hint" aria-live="polite"></p>
-      <div class="actions">
-        <button class="back" type="button">Terug</button>
-        <button class="next" type="button">Volgende</button>
+      <p id="dns-status" class="hint" aria-live="polite" style="min-height:3.2em"></p>
+      <div class="actions" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px">
+        <button class="back btn btn-secondary" type="button">Terug</button>
+        <button class="next btn btn-primary" type="button">Volgende</button>
       </div>
     </div>
 
@@ -55,9 +55,9 @@
       <h2>Stap 3 van 6: e-mail van de beheerder en beveiliging</h2>
       <input type="email" name="admin-email" required placeholder="naam@uwkantoor.nl">
       <label><input type="checkbox" name="enable-totp" checked> TOTP aanzetten voor het inloggen als beheerder</label>
-      <div class="actions">
-        <button class="back" type="button">Terug</button>
-        <button class="next" type="button">Volgende</button>
+      <div class="actions" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px">
+        <button class="back btn btn-secondary" type="button">Terug</button>
+        <button class="next btn btn-primary" type="button">Volgende</button>
       </div>
     </div>
 
@@ -70,9 +70,9 @@
         <option value="pro">Pro</option>
         <option value="enterprise">Enterprise (vereist PLK_KEY)</option>
       </select>
-      <div class="actions">
-        <button class="back" type="button">Terug</button>
-        <button class="next" type="button">Volgende</button>
+      <div class="actions" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px">
+        <button class="back btn btn-secondary" type="button">Terug</button>
+        <button class="next btn btn-primary" type="button">Volgende</button>
       </div>
     </div>
 
@@ -86,9 +86,9 @@
         <option value="dora">DORA (financiële instellingen)</option>
         <option value="custom">Eigen instelling (later met de hand instellen)</option>
       </select>
-      <div class="actions">
-        <button class="back" type="button">Terug</button>
-        <button class="next" type="button">Volgende</button>
+      <div class="actions" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px">
+        <button class="back btn btn-secondary" type="button">Terug</button>
+        <button class="next btn btn-primary" type="button">Volgende</button>
       </div>
     </div>
 
@@ -96,9 +96,9 @@
       <h2>Stap 6 van 6: controleren en starten</h2>
       <p>Controleer uw instellingen voordat u ze toepast.</p>
       <div id="review-summary" aria-live="polite"></div>
-      <div class="actions">
-        <button class="back" type="button">Terug</button>
-        <button id="apply" type="button">Instellingen toepassen</button>
+      <div class="actions" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px">
+        <button class="back btn btn-secondary" type="button">Terug</button>
+        <button id="apply" class="btn btn-primary" type="button">Instellingen toepassen</button>
       </div>
       <p id="apply-status" class="hint" aria-live="polite"></p>
     </div>
@@ -112,6 +112,6 @@
     </div>
   </main>
 
-  <script src="/setup.js?v=5"></script>
+  <script src="/setup.js?v=6"></script>
 </body>
 </html>

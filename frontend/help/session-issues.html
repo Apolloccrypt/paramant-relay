@@ -277,17 +277,17 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 
   <div class="issue-block">
-    <div class="issue-header">"Invalid API key"</div>
+    <div class="issue-header">Een script of koppeling krijgt "Invalid API key"</div>
     <div class="issue-body">
-      <p>Controleer of u de volledige sleutel van 64 tekens hebt gekopieerd, zonder spaties aan het eind. Gebruik in een wachtwoordbeheerder de kopieerknop in plaats van zelf te selecteren. Heeft u onlangs een nieuwe sleutel gemaakt, zorg dan dat u die had bewaard voordat u het dashboard sloot.</p>
-      <p>Is de sleutel ingetrokken? Maak dan een nieuwe in Dashboard &rarr; API-sleutels.</p>
+      <p>Dit gaat over de API, niet over inloggen: op de website logt u in met uw e-mailadres en een passkey of code, zonder sleutel. Controleer of de koppeling de volledige sleutel meestuurt (<code>pgp_</code> gevolgd door 64 tekens) in de <code>X-Api-Key</code>-header, zonder spaties aan het eind. U vindt de sleutel op <a href="/account">Account</a> onder <strong>Geavanceerde accountsleutel</strong>.</p>
+      <p>Gaat het om een <code>psk_live_</code>-sleutel voor de ParaSign-API, kijk dan op uw accountpagina of hij nog actief is, en maak daar zo nodig een nieuwe. Een nieuwe accountsleutel (<code>pgp_</code>) vraagt u aan via <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
     </div>
   </div>
 
   <div class="issue-block">
     <div class="issue-header">"Session expired", opnieuw inloggen</div>
     <div class="issue-body">
-      <p>Een sessie duurt <strong>1 uur</strong> vanaf het inloggen. Dat is bewust: Paramant verwerkt gevoelige bestanden en kent geen blijvende sessies. Ga terug naar <a href="/auth/login">paramant.app/auth/login</a> en log opnieuw in.</p>
+      <p>Een sessie loopt af na <strong>een uur zonder activiteit</strong>. Zolang u bezig bent, schuift dat uur mee, maar na <strong>twaalf uur</strong> loopt elke sessie af, hoe actief u ook was. Dat is bewust: Paramant verwerkt gevoelige bestanden en kent geen blijvende sessies. Ga terug naar <a href="/auth/login">paramant.app/auth/login</a> en log opnieuw in.</p>
       <p>Wordt u vaak midden in uw werk uitgelogd, overweeg dan de API rechtstreeks vanuit een script te gebruiken in plaats van het webdashboard. Dan onderbreekt een verlopen sessie uw werk niet.</p>
     </div>
   </div>

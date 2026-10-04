@@ -287,9 +287,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-body">
       <h2>Open your Paramant setup link</h2>
       <p>Your welcome email contains a setup link. It looks like this:</p>
-      <div class="code-block">https://paramant.app/auth/setup?token=XXXXXXXX</div>
-      <p>Open it on your computer. The link expires 14 days after it was issued.</p>
-      <div class="tip"><p>If your link has expired, request a new one at <a href="/auth/request-reset">paramant.app/auth/request-reset</a>.</p></div>
+      <div class="code-block">https://paramant.app/auth/setup/XXXXXXXX</div>
+      <p>Open it on your computer. The link works for two days after it was sent. On the first page you choose how you sign in from now on: with a passkey on this device (<strong>Set up a passkey</strong>), or with an authenticator app (<strong>Set up an app instead</strong>). This guide follows the authenticator app.</p>
+      <div class="tip"><p>Did your link expire before you linked an app? Mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> from your account address and we send a new one.</p></div>
     </div>
   </div>
 
@@ -313,7 +313,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">4</div>
     <div class="step-body">
       <h2>Confirm it works</h2>
-      <p>Type the current 6-digit code from your app into the paramant.app setup page and click <strong>Confirm setup</strong>.</p>
+      <p>Type the current 6-digit code from your app into the paramant.app setup page and click <strong>Confirm and activate account</strong>.</p>
       <div class="warn"><p>If it says "Invalid code", check that your phone's time is set automatically (Settings &rarr; General &rarr; Date &amp; Time &rarr; Set Automatically). The codes depend on the correct time.</p></div>
     </div>
   </div>
@@ -336,7 +336,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <hr class="divider">
 
   <h2 style="margin-top:0">You're done</h2>
-  <p>From now on, sign in at <a href="/auth/login">paramant.app/auth/login</a> with your email and the current 6-digit code from your app. Sessions last 1 hour.</p>
+  <p>From now on, sign in at <a href="/auth/login">paramant.app/auth/login</a> with your email and the current 6-digit code from your app. A session ends after an hour without activity, and always after twelve hours.</p>
 
   <hr class="divider">
 
@@ -353,7 +353,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="troubleshoot-item">
     <div class="q">"Setup link expired"</div>
     <div class="a">
-      <p>Request a new link at <a href="/auth/request-reset">paramant.app/auth/request-reset</a>.</p>
+      <p>A setup link works for two days. Mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> from your account address and we send a new one. If you had already linked the app and lost it, see <a href="/en/help/lost-authenticator">Lost authenticator</a>.</p>
     </div>
   </div>
 
