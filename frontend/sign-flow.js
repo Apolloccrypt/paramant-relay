@@ -506,12 +506,20 @@ function noticeUrl(signPath) {
 // a slot of its own beside or under it for every next one, plus (with "every
 // page" on) a paraaf per party side by side in the margin. One box for all
 // parties made every signature land on the same spot (2026-10-04).
-function partyRequests(base) {
+async function partyRequests(base) {
   if (!base || !base.fields || !base.fields.length || state.mode !== 'pdf') return null;
+  // The parafen are placed against the text of every page: wait for it, a
+  // missing text layer here once meant parafen slid over the last line.
+  if (state.stampAllPages) { try { await loadTextBoxes(state.doc.bytes); } catch { /* bottom right */ } }
   const anchor = base.fields[0];
-  const pages = (placeState && Array.isArray(placeState.pages))
-    ? placeState.pages.map((p) => ({ width: p.wrap._pdfPage.width, height: p.wrap._pdfPage.height }))
-    : [];
+  // Every page of the document, also those past the preview: the sizes pdf.js
+  // read with the text, else the rendered pages.
+  const geoms = (_textBoxCache && _textBoxCache.bytes === state.doc.bytes) ? _textBoxCache.geoms : [];
+  const pages = geoms.length && geoms.every(Boolean)
+    ? geoms.map((g) => viewSize(g))
+    : (placeState && Array.isArray(placeState.pages))
+      ? placeState.pages.map((p) => ({ width: p.wrap._pdfPage.width, height: p.wrap._pdfPage.height }))
+      : [];
   try {
     return requestsForParties({
       anchor, signPage: anchor.page_index, count: state.recipients.length,
@@ -568,7 +576,7 @@ async function sendForSignature() {
     const requestedAppearance = state.mode === 'pdf'
       ? requestedAppearanceFromStamp(state.stamp, state.stampPage)
       : null;
-    const perParty = partyRequests(requestedAppearance);
+    const perParty = await partyRequests(requestedAppearance);
     const created = await createSigningEnvelope({
       docHash: docHashForEnvelope,
       recipients: perParty ? state.recipients.map((r, i) => ({ ...r, requested_appearance: perParty[i] })) : state.recipients,

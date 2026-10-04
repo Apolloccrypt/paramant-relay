@@ -29,8 +29,8 @@ import { sha3_256 } from '/vendor/paramant-pqc.js';
 import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requestSignActivation, submitSignature, resolvePasskeySigningKey, ensureSigningKey, enrolEphemeralSigningKeyWithTotp } from '/js/parasign-signer.js?v=19';
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { decryptDocumentCapsule, parseDocumentKeyFragment, documentKeyFragment } from '/js/parasign-document-capsule.js?v=2';
-import { pickSharedSpot, textBoxesFromItems, initialsFrom, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=2';
-import { PARAAF_FR, signatureGrid, partySignatureSpot, partyParaafSpot, textBoxesToFractions, strokesToInk } from '/js/cosign-layout.js?v=2';
+import { textBoxesFromItems, initialsFrom, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=2';
+import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParties, textBoxesToFractions, strokesToInk } from '/js/cosign-layout.js?v=2';
 import { sealInk, openInk, joinKey, parseKeyShareFragment } from '/js/parasign-ink.js?v=2';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
@@ -684,14 +684,15 @@ async function textBoxesOfPage(pageIndex) {
   } catch { return null; }
 }
 
-// The margin corner for the paraafs, read from the text layer of the first
-// pages: the corner free of text on the most pages. Every party's paraaf then
-// stands in that corner's row, each on a slot of its own.
-async function sharedParaafCorner() {
+// The parafen of all parties, read against the text of every page: each
+// party a spot of its own, none over text, none over a signature
+// (js/cosign-layout.js paraafSpotsForParties). Every party computes the same
+// spots from the same document, so nobody lands on somebody else.
+async function textOfAllPages() {
   const pages = [], boxes = [];
   try {
     const pdf = __previewPdf;
-    const n = pdf ? Math.min(pdf.numPages, 30) : 0;
+    const n = pdf ? pdf.numPages : 0;
     for (let i = 1; i <= n; i++) {
       const page = await pdf.getPage(i);
       const vp = page.getViewport({ scale: 1 });
@@ -699,13 +700,29 @@ async function sharedParaafCorner() {
       try { boxes.push(viewTextBoxes(page, (await page.getTextContent()).items)); }
       catch { boxes.push(null); }
     }
-  } catch { /* fall through: bottom right */ }
-  return pickSharedSpot(pages, pages.length ? boxes : null, PARAAF_FR.w, PARAAF_FR.h);
+  } catch { /* fall through: no text layer, bottom right */ }
+  return { pages, boxes: pages.length ? boxes : null };
+}
+
+// The signature boxes of every party, as the envelope asks for them, so a
+// paraaf never covers one. Deterministic from the envelope alone.
+function signatureBoxesOfAllParties() {
+  const e = __envelope || {};
+  const count = Math.max(1, Number(e.party_count) || 1);
+  let req = null;
+  try { req = e.requested_appearance ? normaliseSigningAppearance(e.requested_appearance) : null; } catch { req = null; }
+  const sig = req && req.fields ? req.fields.find(isSignature) : null;
+  const out = [];
+  if (sig) for (let i = 0; i < count; i++) out.push(partySignatureSpot({ anchor: sig, index: i, count }));
+  for (const f of (__appearance && __appearance.fields) || []) if (isSignature(f)) out.push(f);
+  return out;
 }
 
 async function paraafSpotForMe() {
-  const corner = await sharedParaafCorner();
-  return partyParaafSpot({ corner, index: __partyIndex, count: __envelope.party_count });
+  const { pages, boxes } = await textOfAllPages();
+  const count = Math.max(1, Number(__envelope.party_count) || 1);
+  const spots = paraafSpotsForParties({ pages, textBoxesPerPage: boxes, count, avoid: signatureBoxesOfAllParties() });
+  return spots[Math.max(0, Math.min(count - 1, __partyIndex))];
 }
 
 function cornerNameOf(box) {
@@ -749,7 +766,16 @@ async function computeSeed() {
     const sig = clamped.fields.find(isSignature);
     const par = clamped.fields.find(isParaaf);
     if (sig) fields.push({ type: 'seal', page_index: sig.page_index, ...partySignatureSpot({ anchor: sig, index, count }) });
-    if (par) fields.push({ type: 'seal', page_index: 0, ...partyParaafSpot({ corner: { ...par, corner: cornerNameOf(par) }, index, count }), all_pages: true });
+    if (par) {
+      // The parafen are placed against the text of every page, not slid
+      // along a row from one corner (with 3+ parties that row ran over text).
+      const { pages, boxes } = await textOfAllPages();
+      const avoid = sig ? Array.from({ length: count }, (_, i) => partySignatureSpot({ anchor: sig, index: i, count })) : [];
+      const spot = pages.length
+        ? paraafSpotsForParties({ pages, textBoxesPerPage: boxes, count, avoid })[index]
+        : partyParaafSpot({ corner: { ...par, corner: cornerNameOf(par) }, index, count });
+      fields.push({ type: 'seal', page_index: 0, x: spot.x, y: spot.y, w: spot.w, h: spot.h, all_pages: true });
+    }
     if (!sig && !par) return clamped;
     if (!sig) {
       const boxes = await textBoxesOfPage(lastPage);
