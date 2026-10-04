@@ -265,7 +265,7 @@ deze regels doorbreken.
 
 | bestand | richtlijn | waarde |
 |---|---|---|
-| `deploy/nginx-paramant-live.conf` | `client_max_body_size` | `4k / 64k / 16k / 16k / 50M / 30M / 12M / 35M / 12M / 12M / 12M` |
+| `deploy/nginx-paramant-live.conf` | `client_max_body_size` | `4k / 64k / 64k / 64k / 64k / 64k / 64k / 64k / 16k / 16k / 50M / 30M / 12M / 35M / 12M / 12M / 12M` |
 | `deploy/nginx-paramant-live.conf` | `limit_req_zone` | `afwezig` |
 | `deploy/nginx-paramant-live.conf` | `limit_conn` | `afwezig` |
 | `deploy/nginx-paramant-live.conf` | `proxy_read_timeout` | `3600s / 3600s / 3600s / 3600s / 3600s` |
@@ -276,9 +276,9 @@ deze regels doorbreken.
 | `deploy/nginx-paramant-public.conf` | `proxy_read_timeout` | `3600s / 3600s / 3600s / 3600s / 3600s / 30s / 3600s / 3600s / 3600s` |
 | `deploy/nginx-paramant-public.conf` | `client_body_timeout` | `300s` |
 | `deploy/nginx-selfhost.conf` | `client_max_body_size` | `35M / 35M` |
-| `deploy/nginx-selfhost.conf` | `limit_req_zone` | `$binary_remote_addr zone=inbound:10m rate=5r/m / $binary_remote_addr zone=pubkey:10m rate=20r/m / $binary_remote_addr zone=auth:10m rate=10r/m / $binary_remote_addr zone=api:10m rate=60r/m / $binary_remote_addr zone=health_chk:10m rate=6r/m / $binary_remote_addr zone=sign_dpa:1m rate=3r/m` |
+| `deploy/nginx-selfhost.conf` | `limit_req_zone` | `$binary_remote_addr zone=inbound:10m rate=5r/m / $binary_remote_addr zone=pubkey:10m rate=20r/m / $binary_remote_addr zone=auth:10m rate=10r/m / $binary_remote_addr zone=session:10m rate=300r/m / $binary_remote_addr zone=api:10m rate=60r/m / $binary_remote_addr zone=health_chk:10m rate=6r/m / $binary_remote_addr zone=sign_dpa:1m rate=3r/m` |
 | `deploy/nginx-selfhost.conf` | `limit_conn` | `conn 20` |
-| `deploy/nginx-selfhost.conf` | `proxy_read_timeout` | `10s / 10s / 3600s / 30s / 30s / 15s / 30s / 10s / 30s / 3600s` |
+| `deploy/nginx-selfhost.conf` | `proxy_read_timeout` | `10s / 10s / 3600s / 30s / 30s / 15s / 30s / 30s / 10s / 30s / 3600s` |
 | `deploy/nginx-selfhost.conf` | `client_body_timeout` | `60s` |
 | `deploy/nginx/addin.paramant.app.conf` | `client_max_body_size` | `afwezig` |
 | `deploy/nginx/addin.paramant.app.conf` | `limit_req_zone` | `afwezig` |
@@ -286,7 +286,7 @@ deze regels doorbreken.
 | `deploy/nginx/addin.paramant.app.conf` | `proxy_read_timeout` | `afwezig` |
 | `deploy/nginx/addin.paramant.app.conf` | `client_body_timeout` | `afwezig` |
 | `deploy/nginx/snippets/paramant-limit-req.conf` | `client_max_body_size` | `afwezig` |
-| `deploy/nginx/snippets/paramant-limit-req.conf` | `limit_req_zone` | `$binary_remote_addr zone=relay_auth:10m rate=10r/m / $binary_remote_addr zone=api:10m rate=60r/m / $binary_remote_addr zone=relay_inbound:10m rate=5r/m / $binary_remote_addr zone=relay_outbound:10m rate=60r/m / $binary_remote_addr zone=relay_trial:1m rate=3r/m` |
+| `deploy/nginx/snippets/paramant-limit-req.conf` | `limit_req_zone` | `$binary_remote_addr zone=relay_auth:10m rate=10r/m / $binary_remote_addr zone=user_session:10m rate=300r/m / $binary_remote_addr zone=api:10m rate=60r/m / $binary_remote_addr zone=relay_inbound:10m rate=5r/m / $binary_remote_addr zone=relay_outbound:10m rate=60r/m / $binary_remote_addr zone=relay_trial:1m rate=3r/m` |
 | `deploy/nginx/snippets/paramant-limit-req.conf` | `limit_conn` | `afwezig` |
 | `deploy/nginx/snippets/paramant-limit-req.conf` | `proxy_read_timeout` | `afwezig` |
 | `deploy/nginx/snippets/paramant-limit-req.conf` | `client_body_timeout` | `afwezig` |

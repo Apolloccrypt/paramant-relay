@@ -333,10 +333,14 @@ test('the authentication numbers on the security page are the ones the code enfo
   const sec = visible(page('en/security'));
   const secNl = visible(page('security'));
 
-  const maxAge = Number(/paramant_user_session=\$\{token\}[^`]*Max-Age=(\d+)/.exec(srv)[1]);
-  assert.equal(maxAge, 3600);
-  assert.match(sec, /Sessions last one hour/);
-  assert.match(secNl, /Een sessie duurt een uur/);
+  // The session slides: one hour idle, twelve at most (admin/lib/session-client.js).
+  // "Sessions last one hour" was true of the cookie, which was the bug: it
+  // ended an hour after login however active the person was.
+  const lib = read('admin/lib/session-client.js');
+  assert.equal(Number(/const USER_SESSION_IDLE_S = (\d+);/.exec(lib)[1]), 3600);
+  assert.match(srv, /paramant_user_session=\$\{token\}[^`]*Max-Age=\$\{/);
+  assert.match(sec, /A session ends after one hour without activity, and after twelve hours at most/);
+  assert.match(secNl, /Een sessie loopt af na een uur zonder activiteit, en na twaalf uur in elk geval/);
 
   const step = Number(/Math\.floor\(now \/ 1000 \/ (\d+)\)/.exec(read('relay/lib/totp.js'))[1]);
   assert.equal(step, 30);
@@ -1209,21 +1213,26 @@ test('the session cookie described on /security is the cookie admin/server.js se
   assert.ok(set, 'admin/server.js must set the session cookie from a template literal');
   const attrs = set[1];
   const sameSite = /SameSite=(\w+)/.exec(attrs)[1];
-  const maxAge = Number(/Max-Age=(\d+)/.exec(attrs)[1]);
   const bits = Number(/const sessionToken = crypto\.randomBytes\((\d+)\)/.exec(srv)[1]) * 8;
-  assert.equal(maxAge, 3600);
-  // Sliding, because every authenticated read pushes the Redis TTL back out.
-  assert.match(srv, /expire\(`paramant:user:session:\$\{token\}`,\s*3600\)/,
-    'the session TTL must be refreshed on use for "sliding" to be true');
+  // The lifetime is lib/session-client.js: one hour idle, twelve hours at most.
+  const lib = read('admin/lib/session-client.js');
+  assert.equal(Number(/const USER_SESSION_IDLE_S = (\d+);/.exec(lib)[1]), 3600, 'the idle hour moved; update /security with it');
+  assert.equal(/const USER_SESSION_MAX_AGE_MS = ([\d\s*]+);/.exec(lib)[1].replace(/\s/g, ''), '12*3600*1000', 'the twelve-hour cap moved; update /security with it');
+  assert.match(attrs, /Max-Age=\$\{/, 'the cookie lifetime comes from the caller, so it can slide');
+  // Sliding, because every authenticated read pushes the Redis TTL back out
+  // AND re-issues the cookie with the same lifetime. A record that slides under
+  // a cookie that does not is how people were logged out after an hour of work.
+  assert.match(srv, /expire\(key, lifetime\);\s*setUserCookie\(res, token, lifetime\);/,
+    'the session TTL and the cookie must be refreshed together for "sliding" to be true');
 
   const sec = visible(page('en/security'));
   const problems = [];
-  for (const phrase of [`${bits}-bit session token`, 'httpOnly', 'Secure', `SameSite=${sameSite}`, 'one-hour sliding expiry']) {
+  for (const phrase of [`${bits}-bit session token`, 'httpOnly', 'Secure', `SameSite=${sameSite}`, 'one-hour sliding expiry', 'twelve hours at most']) {
     if (!sec.includes(phrase)) problems.push(`security: the session row must say "${phrase}"`);
   }
   // Dutch: "verloopt na een uur zonder activiteit" is the sliding expiry.
   const secNl = visible(page('security'));
-  for (const phrase of [`sessietoken van ${bits} bits`, 'httpOnly', 'Secure', `SameSite=${sameSite}`, 'verloopt na een uur zonder activiteit']) {
+  for (const phrase of [`sessietoken van ${bits} bits`, 'httpOnly', 'Secure', `SameSite=${sameSite}`, 'verloopt na een uur zonder activiteit', 'na twaalf uur in elk geval']) {
     if (!secNl.includes(phrase)) problems.push(`security (nl): the session row must say "${phrase}"`);
   }
   // Nowhere may the site claim an attribute value the code does not set.

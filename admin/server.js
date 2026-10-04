@@ -22,6 +22,7 @@ const { meetDeStand } = require('./lib/stand');
 const standIo = require('./lib/stand-io');
 // One user's sessions, without reading everybody else's. See admin/lib/user-sessions.js.
 const userSessions = require('./lib/user-sessions');
+const clientIpForward = require('./lib/client-ip-forward');
 // The scan is now a FALLBACK, handed to user-sessions only for a user who has no
 // index yet: every session minted before this deploy. Nothing calls it per
 // request any more.
@@ -110,7 +111,9 @@ if (!ADMIN_TOKEN) { console.error('[PARAMANT-ADMIN] ADMIN_TOKEN is not set — r
 // invented here.
 const DECOY_SECRET = ADMIN_TOKEN || crypto.randomBytes(32);
 
-const USER_SESSION_MAX_AGE_MS = 12 * 3600 * 1000;
+// One hour idle, twelve hours at most; the cookie and the record get the same
+// number from sessionLifetimeS (lib/session-client.js).
+const { USER_SESSION_IDLE_S, USER_SESSION_MAX_AGE_MS, sessionLifetimeS, clientFamily } = require('./lib/session-client');
 // How stale last_seen may get before authUser rewrites the session record. A
 // write per request would double the redis traffic of every dashboard poll for
 // a field that is only ever rendered to the minute.
@@ -253,7 +256,7 @@ function relayFetch(sector, relPath, method, body, rawResponse, tokenOverride, w
       path: url.pathname + (url.search || ''), method: method || 'GET',
       headers: { 'Content-Type': 'application/json', 'X-Admin-Token': tok, 'Authorization': `Bearer ${tok}` },
     };
-    if (withInternal) opts.headers['X-Internal-Auth'] = INTERNAL_TOKEN;
+    if (withInternal) Object.assign(opts.headers, { 'X-Internal-Auth': INTERNAL_TOKEN }, clientIpForward.headers());
     if (payload) opts.headers['Content-Length'] = Buffer.byteLength(payload);
     const req = http.request(opts, r => {
       const chunks = [];
@@ -279,6 +282,10 @@ async function eachSector(list, fn) {
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
+// Every relay call made while serving this request names the customer's
+// address (lib/client-ip-forward.js). After the body parser, so the handlers
+// run inside the store.
+app.use(clientIpForward.middleware);
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err)
     return res.status(400).json({ error: 'invalid_json', message: 'Request body must be valid JSON' });
@@ -653,6 +660,9 @@ async function callRelay(endpoint, body, method = "POST", sector = "health") {
       "X-Admin-Token": ADMIN_TOKEN,
       "Authorization": `Bearer ${ADMIN_TOKEN}`,
       "X-Internal-Auth": INTERNAL_TOKEN,
+      // The customer's own address, so the relay's per-IP limits are per
+      // customer and not one bucket for everyone (lib/client-ip-forward.js).
+      ...clientIpForward.headers(),
     },
     keepalive: false,
   };
@@ -830,7 +840,11 @@ async function authUser(req, res, next) {
     // showed the login time. Written at most once a minute (see
     // LAST_SEEN_REFRESH_MS) so an open dashboard does not add a write per poll.
     if (!(now - Number(sess.last_seen) < LAST_SEEN_REFRESH_MS)) { sess.last_seen = now; rewrite = true; }
-    // BOUND TO THE CLIENT THAT LOGGED IN. Finding 22i: the session record holds
+    // BOUND TO THE KIND OF CLIENT THAT LOGGED IN (see lib/session-client.js for
+    // why the engine and not the exact string: "Request Desktop Website" and a
+    // browser update both rewrite the string and logged honest people out).
+    //
+    // The history: Finding 22i: the session record holds
     // the account's raw pgp_ API key -- twice, since user_id IS that key -- and
     // `ip` and `ua` were stored at login and then read only to be PRINTED on the
     // account screen. Nothing compared them. A cookie lifted off one machine
@@ -848,15 +862,20 @@ async function authUser(req, res, next) {
     // stamped rather than refused, so a deploy does not log everybody out.
     const ua = req.get('user-agent') || '';
     if (typeof sess.ua !== 'string') { sess.ua = ua; rewrite = true; }
-    else if (sess.ua !== ua) {
+    else if (clientFamily(sess.ua) !== clientFamily(ua)) {
       await redis().del(key).catch(() => {});
       try { await logAuditEvent(sess.user_id, 'session_client_changed', { via: sess.via || 'totp' }); } catch (_) { /* audit is best effort */ }
       return res.status(401).json({ error: "session_expired" });
     }
 
     // One command either way: SET with EX both stores and slides the window.
-    if (rewrite) await redis().set(key, JSON.stringify(sess), { EX: 3600 });
-    else await redis().expire(key, 3600);
+    // The cookie is re-issued with the same lifetime. It used to be set once at
+    // login with Max-Age=3600 and never again, so the browser dropped it an hour
+    // after login however active the person was, while this record lived on.
+    const lifetime = sessionLifetimeS(created, now);
+    if (rewrite) await redis().set(key, JSON.stringify(sess), { EX: lifetime });
+    else await redis().expire(key, lifetime);
+    setUserCookie(res, token, lifetime);
 
     req.userSession = sess;
     req.userSessionToken = token;
@@ -898,9 +917,11 @@ const developerConfig = require('./lib/developer-config');
 // POST/DELETE -- so CSRF protection for the state-changing endpoints is
 // preserved. HttpOnly + Secure are unchanged. NOTE: this also moves the
 // existing email+TOTP login to Lax (one shared cookie).
-function setUserCookie(res, token) {
+// Max-Age defaults to the idle hour at login; authUser and session/verify pass
+// what is left (sessionLifetimeS), so an active session keeps its cookie.
+function setUserCookie(res, token, maxAgeS = USER_SESSION_IDLE_S) {
   res.setHeader("Set-Cookie",
-    `paramant_user_session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=3600`
+    `paramant_user_session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${Math.max(1, Math.floor(maxAgeS))}`
   );
 }
 
@@ -2077,7 +2098,7 @@ api.get("/user/envelopes/:id/document", authUser, async (req, res) => {
     if (!env?.party || !emailHash || env.party.email_hash !== emailHash) return res.status(403).json({ error: "recipient_mismatch" });
     const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/document?p=${partyIndex}&t=${encodeURIComponent(token)}`, {
       method: "GET",
-      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash },
+      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash, ...clientIpForward.headers() },
       signal: AbortSignal.timeout(30000),
     });
     if (!rr.ok) {
@@ -2108,7 +2129,7 @@ api.get("/user/envelopes/:id/receipt", authUser, async (req, res) => {
   const emailHash = partyEmailHashAdmin(req.userSession.email);
   try {
     const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/participant-receipt?p=${partyIndex}&t=${encodeURIComponent(token)}`, {
-      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash },
+      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash, ...clientIpForward.headers() },
       signal: AbortSignal.timeout(15000),
     });
     const body = Buffer.from(await rr.arrayBuffer());
@@ -2307,6 +2328,20 @@ function partyEmailHashAdmin(email) {
   return crypto.createHash("sha3-256").update("paramant/party-email/v1\x00", "utf8").update(norm, "utf8").digest("hex");
 }
 
+// A relay 429 passed on as what it is, with words a signer can act on. The
+// limit is per client address (the admin names it, lib/client-ip-forward.js),
+// so "from your address" is true.
+function relayRateLimited(res, relayRes) {
+  const after = Number((relayRes.headers && relayRes.headers.get && relayRes.headers.get("retry-after")) || 60) || 60;
+  res.setHeader("Retry-After", String(after));
+  return res.status(429).json({
+    error: "rate_limited",
+    retry_after: after,
+    message: "Te veel ondertekenverzoeken vanaf uw adres in korte tijd. Wacht een minuut en probeer het opnieuw.",
+    message_en: "Too many signing requests from your address in a short time. Wait a minute and try again.",
+  });
+}
+
 // POST /api/user/sign/activation (authUser) — AUTHORIZE + ISSUE (pre-unlock gate).
 api.post("/user/sign/activation", authUser, async (req, res) => {
   const { user_id, email } = req.userSession;          // identity from the session, never the client
@@ -2329,9 +2364,13 @@ api.post("/user/sign/activation", authUser, async (req, res) => {
   let env;
   try {
     const r = await callRelay(`/v2/envelopes/${encodeURIComponent(envelope_id)}?p=${party_index}&t=${encodeURIComponent(invite_token)}`, null, "GET");
-    // A busy relay is not a wrong mailbox: a 429 used to come back as 403 and
-    // the page then said "this invitation belongs to another address".
-    if (r.status === 429) return res.status(429).json({ error: "rate_limited" });
+    // A relay 429 is a rate limit, not a verdict on who the signer is. It used
+    // to come back as 403 not_authorized, which the signing page reads as
+    // "this invitation belongs to a different email address": the wrong reason,
+    // and one that sends people looking for another account. Same for a relay
+    // that is down. Only an answer about the invitation itself stays a 403.
+    if (r.status === 429) return relayRateLimited(res, r);
+    if (r.status >= 500) return res.status(502).json({ error: "relay_unavailable" });
     if (r.status !== 200) return res.status(403).json({ error: "not_authorized" });
     env = (await r.json()).envelope;
   } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }
@@ -2402,6 +2441,7 @@ api.post("/user/sign/submit", authUser, async (req, res) => {
       // 402 quota: pass the relay JSON through unchanged (dimension/plan/
       // limit) so the frontend can render the upgrade notice.
       if (r.status === 402) return res.status(402).json(body);
+      if (r.status === 429) return relayRateLimited(res, r);
       return res.status(r.status).json({ error: body.error || "sign_failed" });
     }
     // The signature receipt. Truncating the envelope id INSIDE the metadata is
@@ -2537,14 +2577,29 @@ api.post("/user/logout", async (req, res) => {
 api.get("/user/session/verify", async (req, res) => {
   const token = parseCookies(req).paramant_user_session;
   if (!token) return res.json({ authenticated: false });
-  const raw = await redis().get(`paramant:user:session:${token}`);
+  const key = `paramant:user:session:${token}`;
+  const raw = await redis().get(key);
   if (!raw) return res.json({ authenticated: false });
-  await redis().expire(`paramant:user:session:${token}`, 3600);
-  const s = JSON.parse(raw);
+  let s;
+  try { s = JSON.parse(raw); } catch { return res.json({ authenticated: false }); }
+  // Every page asks this first (nav-auth), so it slides the session like
+  // authUser does: the record AND the cookie, with the same lifetime, and never
+  // past the twelve-hour cap. It used to slide only the record, and answer
+  // "authenticated" for a session authUser would already refuse as too old.
+  const now = Date.now();
+  const created = Number(s.created_at);
+  if (Number.isFinite(created) && created > 0 && now - created > USER_SESSION_MAX_AGE_MS) {
+    await redis().del(key).catch(() => {});
+    clearUserCookie(res);
+    return res.json({ authenticated: false });
+  }
+  const lifetime = sessionLifetimeS(Number.isFinite(created) && created > 0 ? created : now, now);
+  await redis().expire(key, lifetime);
+  setUserCookie(res, token, lifetime);
   res.json({
     authenticated: true,
     email: s.email,
-    expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+    expires_at: new Date(now + lifetime * 1000).toISOString(),
   });
 });
 
@@ -2973,6 +3028,7 @@ async function mintSessionToken(req, res, purpose, label) {
         "Content-Type": "application/json",
         "X-Internal-Auth": INTERNAL_TOKEN,
         "X-Api-Key": key,
+        ...clientIpForward.headers(),
       },
       body: JSON.stringify({ purpose }),
       signal: AbortSignal.timeout(10000),
@@ -3262,6 +3318,7 @@ api.post("/user/parasign/inbox/:id/resend", authUser, async (req, res) => {
         "Content-Type": "application/json",
         "X-Internal-Auth": INTERNAL_TOKEN,
         "X-Verified-Email-Hash": partyEmailHashAdmin(email),
+        ...clientIpForward.headers(),
       },
       body: JSON.stringify({}),
       signal: AbortSignal.timeout(10000),

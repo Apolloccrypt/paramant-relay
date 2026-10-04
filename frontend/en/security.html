@@ -427,7 +427,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <div class="grid2" style="margin-top:20px">
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">For humans</div>
-      <p style="margin:0">Sign in at paramant.app or through a browser extension with your email address and the current 6-digit code from your authenticator app. Sessions last one hour. TOTP verification accepts SHA-256 and SHA-1 HMAC, so every standard authenticator app works; SHA-1 is the RFC 6238 default and several common apps offer nothing else. Compatible authenticator apps are listed at <a href="/help/authenticator-apps">/help/authenticator-apps</a>.</p>
+      <p style="margin:0">Sign in at paramant.app or through a browser extension with your email address and the current 6-digit code from your authenticator app. A session ends after one hour without activity, and after twelve hours at most. TOTP verification accepts SHA-256 and SHA-1 HMAC, so every standard authenticator app works; SHA-1 is the RFC 6238 default and several common apps offer nothing else. Compatible authenticator apps are listed at <a href="/help/authenticator-apps">/help/authenticator-apps</a>.</p>
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">For machines</div>
@@ -439,7 +439,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     </div>
     <div class="card">
       <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:8px">Session security</div>
-      <p style="margin:0">After TOTP verification, a 256-bit session token is issued as an httpOnly Secure SameSite=Lax cookie. Lax, not Strict, so an invited signer arriving from a link in their mail client is not bounced back to the login screen; a cross-site POST still carries no cookie. The token lives in Redis with a one-hour sliding expiry. API keys never touch the browser.</p>
+      <p style="margin:0">After TOTP verification, a 256-bit session token is issued as an httpOnly Secure SameSite=Lax cookie. Lax, not Strict, so an invited signer arriving from a link in their mail client is not bounced back to the login screen; a cross-site POST still carries no cookie. The token lives in Redis with a one-hour sliding expiry, twelve hours at most. API keys never touch the browser.</p>
     </div>
   </div>
 

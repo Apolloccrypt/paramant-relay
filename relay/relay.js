@@ -2007,6 +2007,17 @@ function entitlementRecordOf(accountId) {
   return entitlements.mergeAccountRecord(acct, [...members].map(m => apiKeys.get(m)));
 }
 
+// The account's ParaSign entitlement, ONE reading for every ParaSign limit: the
+// party cap at envelope create and the signs gate on the sign path both ask it,
+// so a buyer can never be Business for one and the free floor for the other.
+// It reads plan_parasign (the field a Mollie purchase writes) through the
+// merged account record, falls back to the legacy plan on its own, and a lapsed
+// paid term falls to the floor. `fallback` is the record to read when the
+// account has none yet (a bare key).
+function parasignEntitlementOf(accountId, fallback) {
+  return entitlements.getEntitlements(entitlementRecordOf(accountId) || fallback || {}).parasign;
+}
+
 // May this account start new ParaSign API work? One answer for both doors: POST
 // /v2/user/parasign-keys asks it before it mints a psk_ key, and the /v1 router
 // asks it before every new envelope such a key creates (injected there as
@@ -2375,7 +2386,13 @@ function J(o) { return JSON.stringify(o); }
 // loopback. The edge configs now set the header everywhere, and
 // test/trusted-edge-gate.test.js keeps them that way; this is the lock on the
 // other side of that door, so a single missed nginx block is no longer a bypass.
-const getClientIp = clientIpLib.makeClientIp({ trusted: process.env.TRUSTED_PROXY_CIDRS });
+// A request the admin makes for a user names that user's address in
+// X-Paramant-Client-IP, believed only next to a valid X-Internal-Auth. Without
+// it every admin-proxied call shared the admin container's address, and so one
+// envelope sign/view bucket for every customer. See lib/client-ip.js.
+const getClientIp = clientIpLib.withInternalClientIp(
+  clientIpLib.makeClientIp({ trusted: process.env.TRUSTED_PROXY_CIDRS }),
+  { token: () => process.env.INTERNAL_AUTH_TOKEN, internalAuthOk: authGate.internalAuthOk });
 
 // ── HTML escaping for email templates (prevents HTML injection in Resend emails) ──
 function escHtml(s) {
@@ -8442,9 +8459,20 @@ async function handleRelayRequest(req, res) {
       // both pass a stale count — closes the prior check-before-await TOCTOU.
       const d = JSON.parse((await readBody(req, 4096)).toString());
       const newKey = (d.key && /^pgp_[0-9a-f]{32,64}$/.test(d.key)) ? d.key : 'pgp_' + crypto.randomBytes(32).toString('hex');
-      // Fix 13: validate plan against allowlist
-      const VALID_PLANS = new Set(['community', 'dev', 'pro', 'licensed', 'enterprise']);
-      const plan = VALID_PLANS.has(d.plan) ? d.plan : 'community';
+      // Fix 13: validate plan against allowlist. 'business' was missing, so a
+      // Business key made here was stored as community without a word (the
+      // update-plan route below has always had it). An unknown plan is now a
+      // 400, not a silent community: a downgrade nobody asked for is the worst
+      // way to be wrong about money. 'free' and 'trial' are what the CLI and the
+      // admin UI send for the free tier, so they are spelled out as community.
+      const VALID_PLANS = new Set(['community', 'dev', 'pro', 'business', 'licensed', 'enterprise']);
+      const PLAN_ALIASES = { free: 'community', trial: 'community' };
+      const askedPlan = d.plan == null || d.plan === '' ? 'community' : String(d.plan);
+      const plan = PLAN_ALIASES[askedPlan] || askedPlan;
+      if (!VALID_PLANS.has(plan)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(J({ error: 'invalid_plan', valid: [...VALID_PLANS] }));
+      }
       const label = typeof d.label === 'string' ? d.label.slice(0, 128) : '';
       // L4: validate email format and length before storing/sending
       const rawEmail = (d.email || '').toString().trim();
@@ -10107,19 +10135,13 @@ async function handleRelayRequest(req, res) {
         : '';
       const creatorApiHash = crypto.createHash('sha3-256').update(apiKey).digest('hex');
       // The plan travels with the request now: it decides how many names may go
-      // on one document. Read here rather than passed down from the quota block
-      // above, whose const lives in its own scope.
-      //
-      // Whichever is higher: the key's legacy plan or the account's ParaSign
-      // entitlement (plan_parasign, the field billing writes). Reading the key
-      // alone held a paying account to the free twenty (tester report A9).
-      const _keyPlan = (apiKeys.get(apiKey) || {}).plan;
-      let _planForParties = _keyPlan;
-      try {
-        const _pgTier = entitlements.getEntitlements(entitlementRecordOf(acctOf(apiKey)) || { plan: _keyPlan }).parasign.tier;
-        const _entPlan = _pgTier === 'free' ? 'community' : _pgTier;
-        if ((tiers.tierLimitNum(_entPlan, 'max_parties') || 0) > (tiers.tierLimitNum(_keyPlan, 'max_parties') || 0)) _planForParties = _entPlan;
-      } catch { /* the key plan stands */ }
+      // on one document. It used to be the key's unified `plan`, which a
+      // purchase never moves (a Mollie upgrade writes plan_parasign only), so a
+      // ParaSign Business buyer was held to the community twenty instead of
+      // thirty (tester report A9). It is the account's ParaSign entitlement now,
+      // parasignEntitlementOf, the same reading the signs gate makes. ParaSign
+      // calls its floor 'free', which tiers.normalisePlan reads as community.
+      const _planForParties = parasignEntitlementOf(acctOf(apiKey), apiKeys.get(apiKey)).tier;
       const out = await store.create({ creatorPkHash, creatorApiKeyHash: creatorApiHash, accountId: acctOf(apiKey), docHash, parties, originalFilename: origFilename, expiresInDays: ttlDays, bindingMode: d.binding_mode, recipeVersion: d.recipe_version, requestedAppearance: d.requested_appearance, plan: _planForParties });
       log('info', 'envelope_created', { id: out.id, parties: out.party_count, binding_mode: out.binding_mode });
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -10517,8 +10539,24 @@ async function handleRelayRequest(req, res) {
       // increment happens AFTER, and ONLY for a genuinely NEW signature, so an
       // idempotent retry ('idem') never double-counts. Fail-open on redis trouble
       // or an unknown account: a signer is never blocked by infra.
-      const _signerPlan = (accounts.get(accountId) && accounts.get(accountId).plan)
-        || (apiKeys.get(accountId) && apiKeys.get(accountId).plan) || 'community';
+      //
+      // WHOSE METER, 2026-10-04: THE SENDER PAYS. It was the signer's. So a
+      // paying Firm customer who invited a client made that client spend one of
+      // his own two free signatures, and at the third invitation that month the
+      // client hit "you have used your free signatures, Firm EUR 29 a month" on
+      // a contract he had not asked for (tester 5 finding 2, tester 2 A6). The
+      // envelope's owner chose to send it and holds the plan, so a signature on
+      // an envelope counts on the owner's month, within the owner's plan. The
+      // owner signing his own envelope (solo, or as one of the parties) counts
+      // exactly as before, because then owner and signer are one account. Only
+      // an envelope with no stored owner (written before create() recorded one)
+      // still meters the signer, the account resolved above.
+      // Compared through acctOf, so a key that belongs to the owner's account is
+      // the owner, and solo signing keeps metering the very id it metered before.
+      const billedToSender = !!ownerAccountId && acctOf(ownerAccountId) !== acctOf(accountId);
+      const meterAccountId = billedToSender ? ownerAccountId : accountId;
+      const _signerPlan = (accounts.get(meterAccountId) && accounts.get(meterAccountId).plan)
+        || (apiKeys.get(meterAccountId) && apiKeys.get(meterAccountId).plan) || 'community';
       // Signs limit from ENTITLEMENTS (plan_parasign, legacy-plan fallback), the
       // per-product ParaSign tier -- never the product-blind tiers.js helpers.
       // Tier behaviour: every tier blocks AT its included quota.
@@ -10533,8 +10571,7 @@ async function handleRelayRequest(req, res) {
       // /v1 create gate so both paths can never diverge.
       // entitlementRecordOf merges the accounts summary with the per-product
       // plans on the account's keys; reading `accounts` alone hid paid upgrades.
-      const _signerRec = entitlementRecordOf(accountId) || { plan: _signerPlan };
-      const _signEnt = entitlements.getEntitlements(_signerRec).parasign;
+      const _signEnt = parasignEntitlementOf(meterAccountId, { plan: _signerPlan });
       const _signIncluded = _signEnt.quotas.signs_month;
       let _signUsed = null;      // count this month, feeds the 200 quota field
       let _signReserved = false; // this request took a slot and owes a release if the signature does not land
@@ -10558,10 +10595,18 @@ async function handleRelayRequest(req, res) {
       // each other at the boundary so the /v1 create gate cannot drift from this
       // one.
       if (Number.isFinite(_signIncluded)) {
-        const _g = await quota.gateSign(redisClient, accountId, _signIncluded, log);
+        const _g = await quota.gateSign(redisClient, meterAccountId, _signIncluded, log);
         if (!_g.allowed) {
-          log('info', 'quota_sign_declined', { account: String(accountId).slice(0, 12), plan: _signEnt.tier, reason: 'quota', limit: _signIncluded, used: _g.used });
+          log('info', 'quota_sign_declined', { account: String(meterAccountId).slice(0, 12), plan: _signEnt.tier, reason: 'quota', limit: _signIncluded, used: _g.used, billed_to: billedToSender ? 'sender' : 'signer' });
           res.writeHead(402, { 'Content-Type': 'application/json' });
+          if (billedToSender) {
+            // The invitee did nothing wrong and has nothing to buy: it is the
+            // sender's month that is full. No upgrade pitch, no numbers from the
+            // sender's account, just what happened and who can fix it.
+            return res.end(J({ error: 'sender_sign_quota_reached', billed_to: 'sender',
+              message: 'De afzender van dit verzoek heeft zijn handtekeningen voor deze maand gebruikt. Vraag de afzender om zijn plan te verhogen of het verzoek volgende maand opnieuw te sturen.',
+              message_en: 'The sender of this request has used this month\'s signatures. Ask the sender to upgrade their plan or to send the request again next month.' }));
+          }
           return res.end(J({ error: 'monthly_sign_quota_reached', dimension: 'signs_month',
             plan: _signEnt.tier, limit: _signIncluded, used: _g.used,
             reset_date: quota.nextResetDate() }));
@@ -10580,7 +10625,7 @@ async function handleRelayRequest(req, res) {
       if (!out.ok) {
         // The slot was taken before the store had its say. The signature did not
         // land, so the month does not owe it.
-        if (_signReserved) await quota.releaseSign(redisClient, accountId, log);
+        if (_signReserved) await quota.releaseSign(redisClient, meterAccountId, log);
         const code = out.code === 'not_found' ? 404
           : (out.code === 'bad_signature' || out.code === 'invalid_appearance' || out.code === 'invalid_ink') ? 400
           : (out.code === 'closed' || out.code === 'voided' || out.code === 'invite_expired') ? 410
@@ -10598,7 +10643,7 @@ async function handleRelayRequest(req, res) {
       // already counted the first time round, and the slot this request reserved
       // has to go back or a client that retries pays twice for one signature.
       if (out.code !== 'new' && _signReserved) {
-        const _rel = await quota.releaseSign(redisClient, accountId, log);
+        const _rel = await quota.releaseSign(redisClient, meterAccountId, log);
         if (Number.isFinite(_rel.used)) _signUsed = _rel.used;
         _signReserved = false;
       }
@@ -10633,7 +10678,10 @@ async function handleRelayRequest(req, res) {
       // this month and what its tier includes. Omitted entirely when redis could
       // not be read (fail-open, the field is best-effort). There is always an
       // account by this point; a request without one never got here.
-      const _quotaField = (_signUsed != null && Number.isFinite(_signIncluded)) ? {
+      // Only the account that pays sees its own numbers: when the sender pays,
+      // the signer's 200 carries no quota field, so a sender's usage never
+      // leaks to the people he invites.
+      const _quotaField = (!billedToSender && _signUsed != null && Number.isFinite(_signIncluded)) ? {
         used: _signUsed,
         included: _signIncluded,
         reset_date: quota.nextResetDate(),
