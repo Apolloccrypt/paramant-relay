@@ -161,6 +161,26 @@ test('CLIENT: a cookie replayed from another kind of client is still refused and
   }
 });
 
+test('CLIENT: session/verify refuses a cookie from another kind of client too, and ends it', async () => {
+  if (!srv) return;
+  // Review PR #546: verify slid the cookie without the client check authUser
+  // makes, so every page load kept a lifted cookie alive.
+  const token = await plant({ ua: CHROME_120 });
+  const r = await ask(token, CURL, '/api/user/session/verify');
+  assert.strictEqual((await r.json()).authenticated, false, 'session/verify called a client-swapped cookie signed in');
+  assert.strictEqual(await rc.get(`paramant:user:session:${token}`), null, 'the session survived a client swap on verify');
+  const same = await plant({ ua: CHROME_120 });
+  assert.strictEqual((await (await ask(same, CHROME_121, '/api/user/session/verify')).json()).authenticated, true, 'a browser update keeps the session');
+});
+
+test('SLIDING: session/verify stamps a record without created_at, so it is capped from now on', async () => {
+  if (!srv) return;
+  const token = await plant({ ua: CHROME_120, created_at: undefined });
+  await ask(token, CHROME_120, '/api/user/session/verify');
+  const rec = JSON.parse(await rc.get(`paramant:user:session:${token}`));
+  assert.ok(Number(rec.created_at) > 0, 'a legacy record was slid without being stamped');
+});
+
 test('CLIENT: the engine rule itself', () => {
   const f = sessionClient.clientFamily;
   assert.strictEqual(f(IPHONE), f(IPHONE_DESKTOP));

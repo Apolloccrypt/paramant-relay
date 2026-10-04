@@ -2197,6 +2197,15 @@ api.post("/user/envelopes/:id/invitations", authUser, async (req, res) => {
     // to the invited mailbox after it signs in, so the mail provider, holding
     // this half and no ciphertext, can open nothing. A '#doc=' fragment is the
     // whole key and is still refused, as is anything else after the '#'.
+    //
+    // LIMIT, ON PURPOSE (review PR #546, LAAG): this check is syntax only. A
+    // half is 32 random bytes, exactly as long as the whole AES-256 key, and an
+    // XOR share is uniformly random, so no tag or length the server can read
+    // tells A from K. A tag would be written by the same client that chooses
+    // what to put behind it. Only a modified client of the SENDER (who holds K
+    // anyway) can put K here; the recipient page refuses to open without half
+    // B (co-sign.js parseKeyShareFragment). Closing it would need the server to
+    // see K or a commitment to it, which this design exists to avoid.
     if (inviteUrl.hash !== "" && !/^#ks=v1\.[A-Za-z0-9_-]{43}$/.test(inviteUrl.hash)) {
       return res.status(400).json({ error: "invite_url_carries_key" });
     }
@@ -2586,15 +2595,31 @@ api.get("/user/session/verify", async (req, res) => {
   // authUser does: the record AND the cookie, with the same lifetime, and never
   // past the twelve-hour cap. It used to slide only the record, and answer
   // "authenticated" for a session authUser would already refuse as too old.
+  // The same three rules as authUser, in the same order (review PR #546): the
+  // twelve-hour cap, a record without created_at is stamped rather than
+  // slid forever, and the client family must match the one that logged in. A
+  // cookie lifted to another kind of client used to be slid here on every
+  // page load, even though authUser would refuse it on the next API call.
   const now = Date.now();
-  const created = Number(s.created_at);
-  if (Number.isFinite(created) && created > 0 && now - created > USER_SESSION_MAX_AGE_MS) {
+  let created = Number(s.created_at);
+  let rewrite = false;
+  if (!Number.isFinite(created) || created <= 0) { created = now; s.created_at = now; rewrite = true; }
+  if (now - created > USER_SESSION_MAX_AGE_MS) {
     await redis().del(key).catch(() => {});
     clearUserCookie(res);
     return res.json({ authenticated: false });
   }
-  const lifetime = sessionLifetimeS(Number.isFinite(created) && created > 0 ? created : now, now);
-  await redis().expire(key, lifetime);
+  const ua = req.get('user-agent') || '';
+  if (typeof s.ua !== 'string') { s.ua = ua; rewrite = true; }
+  else if (clientFamily(s.ua) !== clientFamily(ua)) {
+    await redis().del(key).catch(() => {});
+    try { await logAuditEvent(s.user_id, 'session_client_changed', { via: s.via || 'totp' }); } catch (_) { /* audit is best effort */ }
+    clearUserCookie(res);
+    return res.json({ authenticated: false });
+  }
+  const lifetime = sessionLifetimeS(created, now);
+  if (rewrite) await redis().set(key, JSON.stringify(s), { EX: lifetime });
+  else await redis().expire(key, lifetime);
   setUserCookie(res, token, lifetime);
   res.json({
     authenticated: true,
