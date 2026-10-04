@@ -30,7 +30,7 @@ import { LocalVaultSigner, buildDocSignMessage, normaliseSigningAppearance, requ
 import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { vaultDelete } from '/vendor/vault.js?v=5';
 import { decryptDocumentCapsule, parseDocumentKeyFragment, documentKeyFragment } from '/js/parasign-document-capsule.js?v=2';
-import { textBoxesFromItems, inkBoxesFromImageData, initialsFrom, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=3';
+import { initialsFrom, normaliseRotation, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes, pdfjsPageBoxes, scanPdfPages } from '/js/paraaf-place.js?v=4';
 import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParties, autoSignaturePlace, textBoxesToFractions, strokesToInk } from '/js/cosign-layout.js?v=3';
 import { sealInk, openInk, joinKey, parseKeyShareFragment } from '/js/parasign-ink.js?v=3';
 import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
@@ -700,43 +700,32 @@ async function verifyAndRenderDocument(buf, source) {
 function geomOfPdfjsPage(page) {
   return { view: Array.from(page.view), rotate: normaliseRotation(page.rotate) };
 }
-function viewTextBoxes(page, items) {
-  return userBoxesToView(textBoxesFromItems(items), geomOfPdfjsPage(page));
-}
 
 // The text of one page in view space, PDF points, bottom-left origin. A page
 // without any text (a scan) is looked at instead of read: dark pixels on a
 // small render count as text (js/paraaf-place.js inkBoxesFromImageData), so a
 // paraaf or a signature never lands on the page number of a scanned contract.
+//
+// ink: also look when the page HAS text, and count both. One invisible or
+// white character used to make a page "text" in a corner only, so the pixel
+// scan never ran and a sender's box over articles set as images stayed put
+// (security review r2 (g) G3). Used for the one page a signature box is on.
 const __pageBoxCache = new Map();
-async function boxesOfPdfjsPage(page) {
-  const key = page.pageNumber;
+const MAX_SCAN_PAGES = 300;        // the same cap the sender's /sign shows (sign-flow.js MAX_PLACE_PAGES)
+async function boxesOfPdfjsPage(page, { ink = false } = {}) {
+  const key = page.pageNumber + (ink ? ':ink' : '');
   if (__pageBoxCache.has(key)) return __pageBoxCache.get(key);
   let boxes = null;
-  try {
-    const items = (await page.getTextContent()).items;
-    boxes = viewTextBoxes(page, items);
-    if (!boxes.length) {
-      const vp1 = page.getViewport({ scale: 1 });
-      const scale = 360 / vp1.width;
-      const vp = page.getViewport({ scale });
-      const c = document.createElement('canvas');
-      c.width = Math.round(vp.width); c.height = Math.round(vp.height);
-      const ctx = c.getContext('2d');
-      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
-      await page.render({ canvasContext: ctx, viewport: vp }).promise;
-      boxes = inkBoxesFromImageData(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height, vp1.width, vp1.height);
-    }
-  } catch { boxes = null; }
+  try { boxes = await pdfjsPageBoxes(page, { ink }); } catch { boxes = null; }
   __pageBoxCache.set(key, boxes);
   return boxes;
 }
 
-async function textBoxesOfPage(pageIndex) {
+async function textBoxesOfPage(pageIndex, opts) {
   try {
     const page = await __previewPdf.getPage(pageIndex + 1);
     const vp = page.getViewport({ scale: 1 });
-    const boxes = await boxesOfPdfjsPage(page);
+    const boxes = await boxesOfPdfjsPage(page, opts);
     return boxes ? textBoxesToFractions(boxes, vp.width, vp.height) : null;
   } catch { return null; }
 }
@@ -744,26 +733,24 @@ async function textBoxesOfPage(pageIndex) {
 // The parafen of all parties, read against the text of every page: each
 // party a spot of its own, none over text, none over a signature
 // (js/cosign-layout.js paraafSpotsForParties). Every party computes the same
-// spots from the same document, so nobody lands on somebody else.
+// spots from the same document, so nobody lands on somebody else. At most the
+// first MAX_SCAN_PAGES pages are read (a fixed cap, so every party still gets
+// the same answer), with the page free between pages: 2.000 empty pages used
+// to be rendered one after the other (security review r2 (g) G1).
 async function textOfAllPages() {
-  const pages = [], boxes = [];
   try {
-    const pdf = __previewPdf;
-    const n = pdf ? pdf.numPages : 0;
-    for (let i = 1; i <= n; i++) {
-      const page = await pdf.getPage(i);
-      const vp = page.getViewport({ scale: 1 });
-      pages.push({ width: vp.width, height: vp.height });
-      boxes.push(await boxesOfPdfjsPage(page));
-    }
-  } catch { /* fall through: no text layer, bottom right */ }
-  return { pages, boxes: pages.length ? boxes : null };
+    const { pages, results } = await scanPdfPages(__previewPdf, (page) => boxesOfPdfjsPage(page), MAX_SCAN_PAGES);
+    return { pages, boxes: pages.length ? results : null };
+  } catch { return { pages: [], boxes: null }; }   // no text layer: bottom right
 }
 
-// More than a sliver of text under a box (15% of its area)?
+// Text and ink both count, and when the page cannot be read at all the answer
+// is "yes": the signatures then go onto the signature sheet, never over
+// whatever is there (security review r2 (g) G3).
 async function coversText(box) {
-  const boxes = await textBoxesOfPage(box.page_index);
-  if (!boxes || !boxes.length) return false;
+  const boxes = await textBoxesOfPage(box.page_index, { ink: true });
+  if (!boxes) return true;
+  if (!boxes.length) return false;
   let area = 0;
   for (const t of boxes) {
     const w = Math.min(box.x + box.w, t.x + t.w) - Math.max(box.x, t.x);
@@ -779,7 +766,8 @@ async function coversText(box) {
 async function autoSignatureField(index, count) {
   const lastPage = Math.max(0, __pageSizes.length - 1);
   const boxes = await textBoxesOfPage(lastPage);
-  const placed = autoSignaturePlace({ index, count, pageCount: __pageSizes.length, textBoxes: boxes });
+  // A last page that cannot be read counts as full: signature sheet, not "free".
+  const placed = autoSignaturePlace({ index, count, pageCount: __pageSizes.length, textBoxes: boxes || [{ x: 0, y: 0, w: 1, h: 1 }] });
   return { type: 'seal', page_index: placed.page_index, ...placed.spot };
 }
 

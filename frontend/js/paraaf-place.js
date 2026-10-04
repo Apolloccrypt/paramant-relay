@@ -112,6 +112,9 @@ export function textBoxesFromItems(items) {
     const ux = a / len, uy = b / len;            // text direction
     const vx = -uy, vy = ux;                      // up, perpendicular
     const width = Number(it.width) || 0;
+    // Zero-size text is no text: it cannot be seen and must not make a page
+    // look "read" (security review r2 (g) G3).
+    if (!(fs > 0.5) || !(width > 0 || Number(it.height) > 0)) continue;
     const lo = -0.25 * fs, hi = fs;
     const pts = [
       [e + vx * lo, f + vy * lo],
@@ -303,4 +306,52 @@ export function inkBoxesFromImageData(data, w, h, pageW, pageH, cell = 4) {
     }
   }
   return out;
+}
+
+// ── Reading a pdf.js page (browser) ─────────────────────────────────────────
+// Dark pixels on a 360 px wide render of a pdf.js page, as view-space boxes in
+// points. Throws when the page cannot be rendered (no size, a canvas taller
+// than browsers allow): the caller then knows nothing, which is not "empty".
+export async function inkBoxesOfPdfjsPage(page) {
+  const vp1 = page.getViewport({ scale: 1 });
+  const scale = 360 / vp1.width;
+  if (!(Number.isFinite(scale) && scale > 0) || !(vp1.height > 0)) throw new Error('page size');
+  const vp = page.getViewport({ scale });
+  const cw = Math.round(vp.width), ch = Math.round(vp.height);
+  if (!(cw > 0 && ch > 0 && ch <= 8192)) throw new Error('canvas size');
+  const c = document.createElement('canvas');
+  c.width = cw; c.height = ch;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+  return inkBoxesFromImageData(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height, vp1.width, vp1.height);
+}
+
+// The text of one pdf.js page in view space (points, bottom-left origin). A
+// page without text is looked at instead. ink: look at it ALWAYS and count
+// both, so one invisible character cannot make a page of images look "read"
+// (security review r2 (g) G3). Throws when nothing can be said.
+export async function pdfjsPageBoxes(page, { ink = false } = {}) {
+  const geom = { view: Array.from(page.view), rotate: normaliseRotation(page.rotate) };
+  const boxes = userBoxesToView(textBoxesFromItems((await page.getTextContent()).items), geom);
+  if (ink || !boxes.length) return boxes.concat(await inkBoxesOfPdfjsPage(page));
+  return boxes;
+}
+
+// Every page up to maxPages through fn(page, i), with the page free between
+// pages, so a pdf of 2.000 pages never holds the tab (review r2 (g) G1).
+// Returns { pages: [{width,height}], results } for the pages read.
+export async function scanPdfPages(pdf, fn, maxPages) {
+  const n = Math.min(Number(pdf && pdf.numPages) || 0, maxPages);
+  const pages = [], results = [];
+  for (let i = 1; i <= n; i++) {
+    const page = await pdf.getPage(i);
+    const vp = page.getViewport({ scale: 1 });
+    pages.push({ width: vp.width, height: vp.height });
+    let r = null;
+    try { r = await fn(page, i); } catch { r = null; }
+    results.push(r);
+    await new Promise((res) => setTimeout(res, 0));
+  }
+  return { pages, results };
 }

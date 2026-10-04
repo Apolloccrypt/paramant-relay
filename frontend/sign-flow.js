@@ -18,7 +18,7 @@ import { promptTotp } from '/js/totp-prompt.js?v=2';
 import { vaultDelete } from '/vendor/vault.js?v=5';
 import { encryptDocumentCapsule } from '/js/parasign-document-capsule.js?v=2';
 import { previewTargetWidth, viewportTargetWidth, renderGeneration } from '/js/preview-render.js?v=1';
-import { initialsFrom, planParaafs, textBoxesFromItems, inkBoxesFromImageData, paraafFooter, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=3';
+import { initialsFrom, planParaafs, textBoxesFromItems, inkBoxesFromImageData, paraafFooter, normaliseRotation, userBoxesToView, viewSize, viewToUserMatrix, isIdentityGeom, geomFromBoxes } from '/js/paraaf-place.js?v=4';
 import { requestsForParties } from '/js/cosign-layout.js?v=3';
 import { saveDraft, loadDraft, clearDraft, loadAccountKey } from '/js/sign-draft.js?v=3';
 import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
@@ -373,7 +373,11 @@ function loadTextBoxes(bytes) {
       const pdfjs = await waitForPdfjs();
       const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableAutoFetch: true, disableStream: true }).promise;
       const out = [];
-      for (let i = 1; i <= pdf.numPages; i++) {
+      // The same cap as the pages shown, and the page free between pages: a
+      // pdf of 2.000 empty pages was rendered page after page (review r2 (g)).
+      const n = Math.min(pdf.numPages, MAX_PLACE_PAGES);
+      for (let i = 1; i <= n; i++) {
+        if (i > 1) await new Promise((r) => setTimeout(r, 0));
         try {
           const page = await pdf.getPage(i);
           const geom = { view: Array.from(page.view), rotate: normaliseRotation(page.rotate) };
@@ -399,14 +403,17 @@ function loadTextBoxes(bytes) {
 async function inkBoxesOfPage(page) {
   try {
     const vp1 = page.getViewport({ scale: 1 });
-    const vp = page.getViewport({ scale: 360 / vp1.width });
+    const scale = 360 / vp1.width;
+    if (!(Number.isFinite(scale) && scale > 0)) return null;
+    const vp = page.getViewport({ scale });
     const c = document.createElement('canvas');
     c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+    if (!(c.width > 0 && c.height > 0 && c.height <= 8192)) return null;
     const ctx = c.getContext('2d');
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
     await page.render({ canvasContext: ctx, viewport: vp }).promise;
     return inkBoxesFromImageData(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height, vp1.width, vp1.height);
-  } catch (e) { return []; }
+  } catch (e) { return null; }   // unknown, not "empty"
 }
 
 // The cached boxes when they are already read, else undefined.

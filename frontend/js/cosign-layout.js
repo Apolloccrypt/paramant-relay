@@ -220,14 +220,23 @@ const BAND = 0.16;                // how deep into the page a margin reaches
 
 function buildOccupancy(pages, textBoxesPerPage, avoid) {
   const list = Array.isArray(pages) && pages.length ? pages : [{ width: 595.28, height: 841.89 }];
-  const occ = new Uint16Array(GRID_COLS * GRID_ROWS);
+  // Every box is added in O(1) to a 2D difference grid and the grid is summed
+  // once: a pdf with 50.000 page-sized text boxes used to mark 120k cells per
+  // box on the main thread and froze the tab for 20 s (security review r2 (g)).
+  // The cell values are the same as marking cell by cell.
+  const DW = GRID_COLS + 1;
+  const diff = new Float64Array(DW * (GRID_ROWS + 1));
   const mark = (fx0, fy0, fx1, fy1, weight) => {
-    if (fx1 <= 0 || fy1 <= 0 || fx0 >= 1 || fy0 >= 1) return;
+    if (!(fx1 > 0 && fy1 > 0 && fx0 < 1 && fy0 < 1)) return;
     const c0 = clamp(Math.floor(fx0 * GRID_COLS), 0, GRID_COLS - 1);
     const c1 = clamp(Math.ceil(fx1 * GRID_COLS) - 1, 0, GRID_COLS - 1);
     const r0 = clamp(Math.floor(fy0 * GRID_ROWS), 0, GRID_ROWS - 1);
     const r1 = clamp(Math.ceil(fy1 * GRID_ROWS) - 1, 0, GRID_ROWS - 1);
-    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) occ[r * GRID_COLS + c] = Math.min(65000, occ[r * GRID_COLS + c] + weight);
+    if (c1 < c0 || r1 < r0) return;
+    diff[r0 * DW + c0] += weight;
+    diff[r0 * DW + c1 + 1] -= weight;
+    diff[(r1 + 1) * DW + c0] -= weight;
+    diff[(r1 + 1) * DW + c1 + 1] += weight;
   };
   list.forEach((pg, i) => {
     const boxes = Array.isArray(textBoxesPerPage) ? textBoxesPerPage[i] : null;
@@ -242,6 +251,18 @@ function buildOccupancy(pages, textBoxesPerPage, avoid) {
   for (const a of Array.isArray(avoid) ? avoid : []) {
     if (!a || ![a.x, a.y, a.w, a.h].every(Number.isFinite)) continue;
     mark(a.x - 0.006, a.y - 0.004, a.x + a.w + 0.006, a.y + a.h + 0.004, list.length + 1);
+  }
+  // Integrate the difference grid: raw = the weight covering each cell.
+  const raw = new Float64Array(GRID_COLS * GRID_ROWS);
+  const occ = new Float64Array(GRID_COLS * GRID_ROWS);
+  for (let r = 0; r < GRID_ROWS; r++) {
+    let run = 0;
+    for (let c = 0; c < GRID_COLS; c++) {
+      run += diff[r * DW + c];
+      const v = (r ? raw[(r - 1) * GRID_COLS + c] : 0) + run;
+      raw[r * GRID_COLS + c] = v;
+      occ[r * GRID_COLS + c] = Math.min(65000, v);
+    }
   }
   // 2D prefix sums: the text under any rectangle in O(1).
   const W = GRID_COLS + 1;
