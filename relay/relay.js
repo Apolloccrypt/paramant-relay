@@ -491,6 +491,12 @@ const CT_MAX = 10000;
 // pruned index return null instead of the wrong entry.
 const { CtWindow, reindexEntries } = require('./lib/ct-window');
 const ctWindow = new CtWindow(CT_MAX);
+// The Merkle tree itself covers the WHOLE log, not the window (lib/ct-tree).
+// The window only bounds how many full entries (ts, type, stored proof) stay in
+// memory; every leaf hash stays, so tree_size, roots, audit paths and
+// consistency proofs keep working past CT_MAX and after a rotation.
+const { CtMerkle } = require('./lib/ct-tree');
+const ctTree = new CtMerkle();
 // Where the transparency log lives on disk.
 //
 // This used to be `process.env.CT_FILE || null`: opt-in, RAM-only unless a
@@ -521,6 +527,10 @@ const CT_FILE = process.env.CT_FILE !== undefined
   ? (process.env.CT_FILE || null)   // explicit, empty means RAM-only on purpose
   : _ctFileDefault();
 const CT_MAX_SIZE = parseInt(process.env.CT_MAX_SIZE || String(100 * 1024 * 1024)); // 100 MB default
+// Compact leaf file next to CT_FILE: 32 raw bytes per leaf, append-only and
+// never rotated. CT_FILE rotates at CT_MAX_SIZE; this is what lets a restart
+// after a rotation rebuild the full tree (32 MB per million entries).
+const CT_LEAVES_FILE = CT_FILE ? CT_FILE + '.leaves' : null;
 
 // Set the moment a shutdown starts, and never cleared. Both append logs check
 // it before taking another line out of their queue, so from that point the exit
@@ -530,7 +540,8 @@ let _shuttingDown = false;
 
 // Fix 8: async CT write stream with queued writes and log rotation
 let _ctStream    = null;
-let _ctWriteQueue = [];
+let _ctLeafStream = null;
+let _ctWriteQueue = [];   // [{ line, leaf }]
 let _ctDraining  = false;
 
 function _ctOpenStream() {
@@ -542,6 +553,10 @@ function _ctOpenStream() {
     fs.mkdirSync(nodePath.dirname(CT_FILE), { recursive: true });
     _ctStream = fs.createWriteStream(CT_FILE, { flags: 'a' });
     _ctStream.on('error', e => log('warn', 'ct_stream_error', { err: e.message }));
+    if (!_ctLeafStream) {
+      _ctLeafStream = fs.createWriteStream(CT_LEAVES_FILE, { flags: 'a' });
+      _ctLeafStream.on('error', e => log('warn', 'ct_leaf_stream_error', { err: e.message }));
+    }
   } catch (e) {
     log('error', 'ct_log_not_persisted', {
       err: e.message, file: CT_FILE,
@@ -558,19 +573,54 @@ async function _ctRotate() {
     const stat = await fs.promises.stat(CT_FILE).catch(() => null);
     if (!stat || stat.size < CT_MAX_SIZE) return;
     if (_ctStream) { await new Promise(r => _ctStream.end(r)); _ctStream = null; }
-    await fs.promises.rename(CT_FILE, CT_FILE + '.1').catch(() => {});
+    // Numbered, never overwritten. This used to rename to CT_FILE + '.1' every
+    // time, so the second rotation destroyed the first one's entries, and the
+    // startup read only CT_FILE: after rotation plus restart the tree came
+    // back with a handful of leaves and the relay refused every next head.
+    // The leaf file is what rebuilds the tree now; the numbered parts keep the
+    // full entries for anyone who needs them.
+    const target = _ctNextRotatedName();
+    await fs.promises.rename(CT_FILE, target).catch(e => log('warn', 'ct_rotate_rename_failed', { err: e.message }));
     _ctOpenStream();
-    log('info', 'ct_log_rotated', { file: CT_FILE });
+    log('info', 'ct_log_rotated', { file: CT_FILE, archived_as: target });
   } catch(e) { log('warn', 'ct_rotate_error', { err: e.message }); }
+}
+
+// The rotated parts of CT_FILE, oldest first: CT_FILE.1, CT_FILE.2, ...
+function _ctRotatedFiles() {
+  if (!CT_FILE) return [];
+  const dir = nodePath.dirname(CT_FILE);
+  const base = nodePath.basename(CT_FILE) + '.';
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch { return []; }
+  return names
+    .filter(n => n.startsWith(base) && /^\d+$/.test(n.slice(base.length)))
+    .map(n => ({ n: parseInt(n.slice(base.length), 10), file: nodePath.join(dir, n) }))
+    .sort((a, b) => a.n - b.n)
+    .map(x => x.file);
+}
+
+function _ctNextRotatedName() {
+  const parts = _ctRotatedFiles();
+  const last = parts.length ? parseInt(parts[parts.length - 1].slice(CT_FILE.length + 1), 10) : 0;
+  return CT_FILE + '.' + (last + 1);
 }
 
 async function _ctDrain() {
   if (_ctDraining || !_ctStream) return;
   _ctDraining = true;
   while (_ctWriteQueue.length > 0 && !_shuttingDown) {
-    const line = _ctWriteQueue.shift();
+    const item = _ctWriteQueue.shift();
+    // Leaf first: the tree is rebuilt from the leaf file, and a leaf with no
+    // entry line costs one entry's details in the window after a crash, while
+    // an entry with no leaf is recovered from CT_FILE at the next start.
+    if (_ctLeafStream && item.leaf) {
+      await new Promise((resolve, reject) => {
+        _ctLeafStream.write(item.leaf, err => err ? reject(err) : resolve());
+      }).catch(e => log('warn', 'ct_leaf_write_error', { err: e.message }));
+    }
     await new Promise((resolve, reject) => {
-      _ctStream.write(line, err => err ? reject(err) : resolve());
+      _ctStream.write(item.line, err => err ? reject(err) : resolve());
     }).catch(e => log('warn', 'ct_write_error', { err: e.message }));
   }
   _ctDraining = false;
@@ -581,7 +631,7 @@ async function _ctDrain() {
 
 function ctWrite(entry) {
   if (!CT_FILE || !_ctStream || _shuttingDown) return;
-  _ctWriteQueue.push(JSON.stringify(entry) + '\n');
+  _ctWriteQueue.push({ line: JSON.stringify(entry) + '\n', leaf: Buffer.from(entry.leaf_hash, 'hex') });
   setImmediate(_ctDrain);
 }
 
@@ -590,27 +640,39 @@ function ctWrite(entry) {
 // them to reach the fd.
 function _flushCtOnExit() {
   if (!_ctStream || _ctWriteQueue.length === 0) return;
-  for (const line of _ctWriteQueue) { try { _ctStream.write(line); } catch {} }
+  for (const item of _ctWriteQueue) {
+    if (_ctLeafStream && item.leaf) { try { _ctLeafStream.write(item.leaf); } catch {} }
+    try { _ctStream.write(item.line); } catch {}
+  }
   _ctWriteQueue = [];
 }
 
+// Parse one CT_FILE (or rotated part) into an oldest-first entry list.
+function _ctReadEntries(file) {
+  const lines = fs.readFileSync(file, 'utf8').split('\n').filter(l => l.trim());
+  const loaded = [];
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line);
+      if (Array.isArray(parsed)) {
+        for (const entry of parsed) {
+          if (entry && typeof entry === 'object' && !Array.isArray(entry)) loaded.push(entry);
+        }
+      } else {
+        loaded.push(parsed);
+      }
+    } catch {}
+  }
+  return loaded;
+}
+
+const _isLeafHex = (h) => typeof h === 'string' && /^[0-9a-f]{64}$/i.test(h);
+
 // Load persisted CT log on startup (sync read only at startup, not on hot path)
 if (CT_FILE) {
+  let loaded = [];
   try {
-    const lines = fs.readFileSync(CT_FILE, 'utf8').split('\n').filter(l => l.trim());
-    const loaded = [];
-    for (const line of lines) {
-      try {
-        const parsed = JSON.parse(line);
-        if (Array.isArray(parsed)) {
-          for (const entry of parsed) {
-            if (entry && typeof entry === 'object' && !Array.isArray(entry)) loaded.push(entry);
-          }
-        } else {
-          loaded.push(parsed);
-        }
-      } catch {}
-    }
+    loaded = _ctReadEntries(CT_FILE);
     // One-shot, idempotent recount of the stored index field (2026-09). The
     // public log had five entries whose persisted .index was stale after an
     // April rebuild: positions 42..46 carried indices 4..8, so /v2/ct/log
@@ -633,11 +695,83 @@ if (CT_FILE) {
         log('warn', 'ct_log_reindex_write_failed', { err: e.message, file: CT_FILE });
       }
     }
-    ctWindow.load(loaded);
-    if (ctWindow.windowLength) log('info', 'ct_log_loaded', { entries: ctWindow.windowLength, file: CT_FILE });
   } catch (e) {
     if (e.code !== 'ENOENT') log('warn', 'ct_log_load_failed', { err: e.message });
   }
+
+  // Rebuild the full tree. Source of truth is the leaf file; whatever it is
+  // missing (a relay upgrading from the window code has none, a crash can lose
+  // its tail) is recovered from the entries in CT_FILE and, for indices older
+  // than CT_FILE's first entry, from the rotated parts.
+  let leafBuf = Buffer.alloc(0);
+  try { leafBuf = fs.readFileSync(CT_LEAVES_FILE); }
+  catch (e) { if (e.code !== 'ENOENT') log('warn', 'ct_leaves_load_failed', { err: e.message }); }
+  const leafCount = Math.floor(leafBuf.length / 32);
+  for (let i = 0; i < leafCount; i++) ctTree.append(leafBuf.toString('hex', i * 32, (i + 1) * 32));
+  if (leafBuf.length % 32) log('warn', 'ct_leaves_partial_tail', { bytes: leafBuf.length % 32 });
+
+  const firstIdx = loaded.length ? loaded[0].index : 0;
+  const wantSize = loaded.length ? firstIdx + loaded.length : 0;
+  const recovered = [];
+  if (ctTree.size < wantSize) {
+    if (ctTree.size < firstIdx) {
+      // Older leaves live only in the rotated parts.
+      const byIndex = new Map();
+      for (const part of _ctRotatedFiles()) {
+        try {
+          const ents = _ctReadEntries(part);
+          reindexEntries(ents);
+          for (const e of ents) if (Number.isInteger(e.index) && e.index >= ctTree.size && e.index < firstIdx) byIndex.set(e.index, e.leaf_hash);
+        } catch (e) { log('warn', 'ct_rotated_read_failed', { file: part, err: e.message }); }
+      }
+      while (ctTree.size < firstIdx && _isLeafHex(byIndex.get(ctTree.size))) {
+        const h = byIndex.get(ctTree.size); ctTree.append(h); recovered.push(h);
+      }
+    }
+    if (ctTree.size >= firstIdx) {
+      for (let p = ctTree.size - firstIdx; p < loaded.length; p++) {
+        const h = loaded[p].leaf_hash;
+        if (!_isLeafHex(h)) break;
+        ctTree.append(h); recovered.push(h);
+      }
+    }
+  }
+  if (recovered.length) {
+    try { fs.appendFileSync(CT_LEAVES_FILE, Buffer.concat(recovered.map(h => Buffer.from(h, 'hex'))), { flag: 'a' }); }
+    catch (e) { log('warn', 'ct_leaves_recover_write_failed', { err: e.message }); }
+    log('info', 'ct_leaves_recovered', { leaves: recovered.length, tree_size: ctTree.size });
+  }
+
+  if (ctTree.size === wantSize) {
+    ctWindow.load(loaded);
+    // Self-check: the newest entry must say the same root the tree now has.
+    const last = ctWindow.last();
+    if (last && last.tree_hash && last.tree_hash !== ctTree.root()) {
+      log('error', 'ct_tree_root_mismatch', {
+        tree_size: ctTree.size, entry_root: String(last.tree_hash).slice(0, 16) + '…',
+        tree_root: ctTree.root().slice(0, 16) + '…',
+        hint: 'The leaf file and CT_FILE disagree. Restore both from the same backup.',
+      });
+    }
+  } else if (ctTree.size > wantSize) {
+    // Leaves made it to disk, entry lines did not (crash between the two).
+    // The tree is complete; only those entries' details are gone, so the
+    // window restarts empty at the tree size rather than with a gap in it.
+    ctWindow.load([]);
+    ctWindow.base = ctTree.size;
+    log('warn', 'ct_entries_behind_leaves', { tree_size: ctTree.size, entries_through: wantSize });
+  } else {
+    // Leaves are missing that nothing on disk can give back. Carry on from what
+    // is whole; produceSth will refuse to sign a size below one already signed,
+    // and /v2/sth says so, which is the honest outcome of lost data.
+    ctWindow.load([]);
+    ctWindow.base = ctTree.size;
+    log('error', 'ct_tree_incomplete', {
+      tree_size: ctTree.size, expected: wantSize,
+      hint: 'Leaves are missing from both the leaf file and the CT_FILE parts. Restore them from backup.',
+    });
+  }
+  if (ctTree.size) log('info', 'ct_log_loaded', { entries: ctWindow.windowLength, tree_size: ctTree.size, file: CT_FILE });
   _ctOpenStream();
 }
 
@@ -817,7 +951,7 @@ function ctLeafHash(deviceIdHash, pubKeyHex, ts) {
 }
 
 // CT-log hash primitives live in ./lib/ct-hash (pure, unit-tested there).
-const { ctNodeHash, ctTreeHash, ctInclusionProof, blobLeafHash } = require('./lib/ct-hash');
+const { ctNodeHash, blobLeafHash } = require('./lib/ct-hash');
 
 // The field gate. Every name that reaches a log entry, a leaf preimage or an
 // entry type is declared in ./lib/ct-fields, and relay/test/ct-fields.test.js
@@ -908,6 +1042,19 @@ function canonicalJSON(obj) {
   return '{' + Object.keys(obj).sort().map(k => JSON.stringify(k) + ':' + canonicalJSON(obj[k])).join(',') + '}';
 }
 
+// Put a new leaf into the full tree and hand back what its entry carries: the
+// index it sits at, the root of the tree it completes, and its audit path in
+// that tree. O(log n): the old code rebuilt the window's tree twice per append
+// (130-240 ms at 10 000 entries, synchronously on the request thread).
+function ctStage(leaf_hash) {
+  const index = ctTree.size;
+  if (index !== ctWindow.nextIndex()) {
+    throw new Error(`ct: tree size ${index} != window next index ${ctWindow.nextIndex()}`);
+  }
+  ctTree.append(leaf_hash);
+  return { index, tree_hash: ctTree.root(), proof: ctTree.inclusionProof(index, index + 1) };
+}
+
 // Every ctAppend* below takes its index from ctWindow.nextIndex(), which is
 // base + window length: the position the new leaf is about to occupy. The
 // value is stored on the entry as a convenience for the response it goes into,
@@ -918,15 +1065,12 @@ function ctAppend(deviceId, pubKeyHex, apiKey) {
   const ts = new Date().toISOString();
   const deviceIdHash = crypto.createHash('sha3-256').update(deviceId + apiKey.slice(0,8)).digest('hex');
   const leaf_hash = ctLeafHash(deviceIdHash, pubKeyHex, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1); // real audit path at the new leaf position
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('key_reg', { index, leaf_hash, tree_hash, device_hash: deviceIdHash, ts, proof });
   ctWindow.append(entry);
   // Fix 8: async write via stream queue instead of appendFileSync
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -938,10 +1082,7 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
   const urlSectorHash = crypto.createHash('sha3-256').update(relayUrl + '|' + sector).digest('hex');
   // ctLeafHash(deviceIdHash, pubKeyHex, ts) — reuse with urlSectorHash as identity, pkHash as key
   const leaf_hash = ctLeafHash(urlSectorHash, pkHash, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('relay_reg', {
     index, type: 'relay_reg', leaf_hash, tree_hash,
     device_hash: pkHash,          // reused field — relay public key hash
@@ -953,7 +1094,7 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
   ctWindow.append(entry);
   // Fix 8: async write via stream queue
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -964,17 +1105,14 @@ function ctAppendRelayReg(relayUrl, sector, version, edition, pkHash) {
 function ctAppendTransfer(blobHash, sector) {
   const ts = new Date().toISOString();
   const leaf_hash = blobLeafHash(blobHash, sector, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('transfer', {
     index, type: 'transfer', leaf_hash, tree_hash,
     blob_hash: blobHash, sector, ts, proof
   });
   ctWindow.append(entry);
   ctWrite(entry);
-  const sth = produceSth(allEntries.length, entry.tree_hash);
+  const sth = produceSth(ctTree.size, entry.tree_hash);
   return { ...entry, sth };
 }
 
@@ -985,17 +1123,14 @@ function ctAppendTransfer(blobHash, sector) {
 function ctAppendParasign(documentHashHex, signerPkHash) {
   const ts = new Date().toISOString();
   const leaf_hash = ctLeafHash(signerPkHash, documentHashHex, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('parasign', {
     index, type: 'parasign', leaf_hash, tree_hash,
     document_hash: documentHashHex, signer_pk_hash: signerPkHash, ts, proof
   });
   ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -1026,17 +1161,14 @@ function ctAppendEnvelope(eventType, envelopeId, payload) {
     .update(eventType).update('|').update(envelopeId).update('|')
     .update(JSON.stringify(gatedPayload)).digest('hex');
   const leaf_hash = ctLeafHash(envelopeId, valueHash, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('envelope', {
     index, type, leaf_hash, tree_hash,
     envelope_id: envelopeId, payload: gatedPayload, ts, proof
   });
   ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -1055,17 +1187,14 @@ function ctAppendSigningPkEvent(eventType, userId, signerPkHash) {
   const ts = new Date().toISOString();
   const userIdHash = crypto.createHash('sha3-256').update(String(userId)).digest('hex');
   const leaf_hash = ctLeafHash(userIdHash, signerPkHash, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('signing_pk', {
     index, type: eventType, leaf_hash, tree_hash,
     user_id_hash: userIdHash, signer_pk_hash: signerPkHash, ts, proof
   });
   ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -1269,35 +1398,12 @@ async function broadcastSTH(sth) {
 
 // ── RFC 6962 consistency proof ─────────────────────────────────────────────────
 // Proves the tree at toSize is an append-only extension of the tree at fromSize.
-function _merkleRootOf(leafHashes) {
-  if (leafHashes.length === 0) return '0'.repeat(64);
-  let h = [...leafHashes];
-  while (h.length > 1) {
-    const next = [];
-    for (let i = 0; i < h.length; i += 2)
-      next.push(i + 1 < h.length ? ctNodeHash(h[i], h[i + 1]) : h[i]);
-    h = next;
-  }
-  return h[0];
-}
-
-function _subproof(m, nodes, b) {
-  const n = nodes.length;
-  if (m === n) return b ? [] : [_merkleRootOf(nodes)];
-  let k = 1;
-  while (k * 2 < n) k *= 2; // k = largest power of 2 strictly less than n
-  if (m <= k) return _subproof(m, nodes.slice(0, k), b).concat([_merkleRootOf(nodes.slice(k))]);
-  return [_merkleRootOf(nodes.slice(0, k))].concat(_subproof(m - k, nodes.slice(k), false));
-}
-
-// Consistency proof over the retained window. fromSize/toSize are leaf counts
-// within the in-memory tree (0 ≤ from ≤ to ≤ windowLength); entries pruned past
-// the CT_MAX window cannot participate.
+// Over the FULL tree (lib/ct-tree): any 0 <= from <= to <= tree size works, also
+// for sizes whose entries have left the in-memory window. The old window
+// version put MTH(left) before the subproof and started with b=false, so none
+// of its proofs verified against a standard RFC 9162 verifier.
 function ctConsistencyProof(fromSize, toSize) {
-  if (fromSize < 0 || toSize < fromSize || toSize > ctWindow.windowLength) return null;
-  if (fromSize === 0 || fromSize === toSize) return [];
-  const leaves = ctWindow.entries.slice(0, toSize).map(e => e.leaf_hash);
-  return _subproof(fromSize, leaves, fromSize === leaves.length);
+  return ctTree.consistencyProof(fromSize, toSize);
 }
 
 // ── Fingerprint — out-of-band key verification ────────────────────────────────
@@ -1350,7 +1456,7 @@ function renderPrometheus() {
   // signing a second history, and a relay that has refused to sign has stopped
   // producing heads entirely. Both were invisible before: the first showed as
   // nothing at all, the second as a log that simply went quiet.
-  for(const [k,v] of [['blobs_in_flight',blobStore.size],['pubkeys',pubkeys.size],['edition',EDITION==='licensed'?1:0],['did_registry',didRegistry.size],['ct_log',ctWindow.size],['ct_log_persisted',CT_FILE?1:0],['ct_log_forked',ctLogForked?1:0],['uptime_s',Math.floor(process.uptime())],['heap_bytes',process.memoryUsage().heapUsed]]){
+  for(const [k,v] of [['blobs_in_flight',blobStore.size],['pubkeys',pubkeys.size],['edition',EDITION==='licensed'?1:0],['did_registry',didRegistry.size],['ct_log',ctTree.size],['ct_log_persisted',CT_FILE?1:0],['ct_log_forked',ctLogForked?1:0],['uptime_s',Math.floor(process.uptime())],['heap_bytes',process.memoryUsage().heapUsed]]){
     L.push(`# TYPE paramant_${k} gauge`);
     L.push(`paramant_${k}{sector="${SECTOR}"} ${v}`);
   }
@@ -4119,14 +4225,11 @@ function ctAppendEvent(eventType, did, payload) {
     .update(eventType).update('|').update(did).update('|')
     .update(JSON.stringify(gatedPayload)).digest('hex');
   const leaf_hash = ctLeafHash(did, valueHash, ts);
-  const index = ctWindow.nextIndex();
-  const allEntries = [...ctWindow.entries, { leaf_hash }];
-  const tree_hash = ctTreeHash(allEntries);
-  const proof = ctInclusionProof(allEntries, allEntries.length - 1);
+  const { index, tree_hash, proof } = ctStage(leaf_hash);
   const entry = ctGateEntry('did_event', { index, type: eventType, leaf_hash, tree_hash, did, payload: gatedPayload, ts, proof });
   ctWindow.append(entry);
   ctWrite(entry);
-  produceSth(allEntries.length, entry.tree_hash);
+  produceSth(ctTree.size, entry.tree_hash);
   return entry;
 }
 
@@ -6506,13 +6609,13 @@ async function handleRelayRequest(req, res) {
     // log. Every projection that leaves this process goes through ctCoarseTs;
     // the full ts stays in the stored entry and in the receipt.
     const last50 = ctWindow.recentPage(50);
-    const root   = ctWindow.last() ? ctWindow.last().tree_hash : '0'.repeat(64);
+    const root   = ctTree.root();
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
     return res.end(J({
       relay_id: relayIdentity ? relayIdentity.pk_hash : null,
       sector:   SECTOR,
       version:  VERSION,
-      tree_size: ctWindow.size,
+      tree_size: ctTree.size,
       root,
       entries: last50.entries.map((e, i) => ({
         i:    last50.start_index + i,
@@ -6545,7 +6648,7 @@ async function handleRelayRequest(req, res) {
     const pageR = ctWindow.page(from, limit);
     const entries = pageR.entries.map((e, i) => ({ index: pageR.start_index + i, type: e.type, leaf_hash: e.leaf_hash, tree_hash: e.tree_hash, ts: ctCoarseTs(e.ts) }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(J({ ok: true, size: ctWindow.size, root: ctWindow.last() ? ctWindow.last().tree_hash : '0'.repeat(64), entries }));
+    return res.end(J({ ok: true, size: ctTree.size, root: ctTree.root(), entries }));
   }
   const ctpm0 = path.match(/^\/v2\/ct\/proof\/(\d+)$/);
   const ctpq0 = (!ctpm0 && path === '/v2/ct/proof') ? query.index : null;
@@ -6555,7 +6658,16 @@ async function handleRelayRequest(req, res) {
     // this route never consulted the stored index field and was already right
     // while the listing was wrong. The echoed `index` is the requested one.
     const entry = ctWindow.get(idx);
-    if (!entry) { res.writeHead(404); return res.end(J({ error: 'Index not found' })); }
+    if (!entry) {
+      // Aged out of the in-memory window but still in the tree: the leaf, its
+      // root and its audit path are all still exact. The full timestamp is not
+      // kept for pruned entries, so ts is null rather than invented.
+      if (Number.isInteger(idx) && idx >= 0 && idx < ctTree.size) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(J({ ok: true, index: idx, leaf_hash: ctTree.leaf(idx), tree_hash: ctTree.root(idx + 1), proof: ctTree.inclusionProof(idx, idx + 1), ts: null, pruned: true }));
+      }
+      res.writeHead(404); return res.end(J({ error: 'Index not found' }));
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, index: idx, leaf_hash: entry.leaf_hash, tree_hash: entry.tree_hash, proof: entry.proof, ts: ctCoarseTs(entry.ts) }));
   }
@@ -6823,14 +6935,14 @@ async function handleRelayRequest(req, res) {
   // ── GET /v2/sth/consistency — RFC 6962 consistency proof ──────────────────────
   if (path === '/v2/sth/consistency' && req.method === 'GET') {
     const fromSize = parseInt(query.from);
-    const toSize   = query.to !== undefined ? parseInt(query.to) : ctWindow.windowLength;
+    const toSize   = query.to !== undefined ? parseInt(query.to) : ctTree.size;
     if (isNaN(fromSize) || isNaN(toSize)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       return res.end(J({ error: 'Query params required: from=<integer> (and optionally to=<integer>)' }));
     }
-    if (fromSize < 0 || toSize < fromSize || toSize > ctWindow.windowLength) {
+    if (fromSize < 0 || toSize < fromSize || toSize > ctTree.size) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: `Invalid range: 0 ≤ from (${fromSize}) ≤ to (${toSize}) ≤ window size (${ctWindow.windowLength})` }));
+      return res.end(J({ error: `Invalid range: 0 ≤ from (${fromSize}) ≤ to (${toSize}) ≤ tree size (${ctTree.size})` }));
     }
     const proof = ctConsistencyProof(fromSize, toSize);
     if (proof === null) { res.writeHead(500); return res.end(J({ error: 'Could not compute proof' })); }
@@ -8379,7 +8491,7 @@ async function handleRelayRequest(req, res) {
         retrieved_at:           Date.now(),
         sector:                 entry.sector || SECTOR,
         relay_id:               RELAY_SELF_URL || (SECTOR + '.paramant.app'),
-        tree_size_at_retrieval: ctWindow.size,
+        tree_size_at_retrieval: ctTree.size,
         inclusion_proof:        inclusionProof,
         burn_confirmed:         burned,
       };
@@ -11394,9 +11506,10 @@ loadPeerSths();
 // Generate a startup STH if the CT log has entries but no STH was persisted.
 // Covers the case where the STH file was missing or the relay restarted after
 // new CT entries were written without a corresponding STH flush.
-if (ctWindow.windowLength > 0 && sthLog.length === 0) {
-  const last = ctWindow.last();
-  produceSth(ctWindow.windowLength, last.tree_hash);
+// tree_size is the full tree, never the window length: that confusion is what
+// froze the head at 10 001 entries.
+if (ctTree.size > 0 && sthLog.length === 0) {
+  produceSth(ctTree.size, ctTree.root());
 }
 // Periodic STH gossip — re-broadcast latest STH every 10 min to catch newly registered peers
 setInterval(() => {
@@ -11631,7 +11744,7 @@ async function _flushAppendLogsOnExit() {
   _shuttingDown = true;                 // the drains stop; this is now the only writer
   _flushCtOnExit();                     // queue -> stream
   _flushSthOnExit();
-  const streams = [_ctStream, _sthStream, ..._peerSthStreams.values()].filter(Boolean);
+  const streams = [_ctStream, _ctLeafStream, _sthStream, ..._peerSthStreams.values()].filter(Boolean);
   if (streams.length === 0) return;
   let timer = null;
   const guard = new Promise((resolve) => {
