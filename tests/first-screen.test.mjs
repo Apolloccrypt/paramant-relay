@@ -348,7 +348,8 @@ const PAGES = [
     claims: [
       { name: 'the status sentence', css: 'header.dl-lead h1', text: 'niet meer onderhouden' },
       { name: 'the sentence under it', css: 'header.dl-lead p.dl-sub', text: 'De laatste build is van maart 2026' },
-      { name: 'the first button', css: '.dl-actions a.btn-primary', href: '/' },
+      // "Open de webapp" opens the web app, not the home page (fase 1, SENDNAME-49-A).
+      { name: 'the first button', css: '.dl-actions a.btn-primary', href: '/parashare' },
       { name: 'the second button', css: '.dl-actions a.btn-outline', href: '/pricing' },
     ],
   },
@@ -357,7 +358,7 @@ const PAGES = [
     claims: [
       { name: 'the status sentence', css: 'header.dl-lead h1', text: 'no longer maintained' },
       { name: 'the sentence under it', css: 'header.dl-lead p.dl-sub', text: 'The last build is from March 2026' },
-      { name: 'the first button', css: '.dl-actions a.btn-primary', href: '/' },
+      { name: 'the first button', css: '.dl-actions a.btn-primary', href: '/en/parashare' },
       { name: 'the second button', css: '.dl-actions a.btn-outline', href: '/pricing' },
     ],
   },
