@@ -125,14 +125,29 @@ test('T4-9, T4-11, T4-L1: a send to a person carries no file name, one file_id o
   } finally { await page.close(); }
 });
 
-test('T4-15: the link list survives a reload of the tab', async () => {
+test('T4-15: the link list survives a reload of the tab, and no key or plaintext leaves the browser (HAR check)', async () => {
   const { page } = await openSender('/parashare');
+  const wire = [];
+  page.on('request', (r) => wire.push({ url: r.url(), body: r.postData() || '', headers: JSON.stringify(r.headers()) }));
   try {
-    await page.locator('#file-input').setInputFiles({ name: 'klein.txt', mimeType: 'text/plain', buffer: Buffer.from('hallo daar') });
+    const PLAIN = 'hallo daar, dit is geheim ' + 'x'.repeat(40);
+    await page.locator('#file-input').setInputFiles({ name: 'klein-geheim.txt', mimeType: 'text/plain', buffer: Buffer.from(PLAIN) });
     await page.waitForFunction(() => !document.getElementById('btn-create-session').disabled, null, { timeout: 15000 });
     await page.locator('#btn-create-session').click();
     await page.waitForSelector('#step-link.active', { timeout: 20000 });
     assert.equal(await page.locator('#ps-link-list li').count(), 1);
+    // The HAR check of the hertest, on this flow: the key (the fragment of the
+    // link), the plaintext and the file name never appear in a request.
+    const link = (await page.locator('#ps-link-list .ps-link-url').first().textContent()).trim();
+    const frag = link.split('#')[1] || '';
+    assert.ok(frag.length >= 40, 'the link carries its key in the fragment');
+    for (const w of wire) {
+      const all = w.url + '\n' + w.body + '\n' + w.headers;
+      assert.ok(!all.includes(frag), `the key left the browser: ${w.url}`);
+      assert.ok(!all.includes(PLAIN) && !all.includes(Buffer.from(PLAIN).toString('base64').slice(0, 40)), `plaintext left the browser: ${w.url}`);
+      assert.ok(!all.includes('klein-geheim'), `the file name left the browser: ${w.url}`);
+      assert.ok(!/referer":"[^"]*#/.test(w.headers), 'a Referer with a fragment');
+    }
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('#ps-earlier:not([hidden])', { timeout: 10000 });
     assert.equal(await page.locator('#ps-earlier-list li').count(), 1, 'the link is still listed after the reload');
