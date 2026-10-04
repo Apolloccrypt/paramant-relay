@@ -55,14 +55,23 @@ test('/sign: het vinkje zet een paraaf per partij in het verzoek, vrij van tekst
       const pg = doc.addPage([595.28, 841.89]);
       for (let y = 790; y >= 40; y -= 14) pg.drawText('Artikel ' + p + '. Deze regel tekst mag niet bedekt worden door een paraaf.', { x: 56, y, size: 10, font });
     }
+    const saved = await doc.save();
+    // The text boxes of page 1 as pdf.js reads them, to hold the parafen to.
+    const pd = await window.pdfjsLib.getDocument({ data: saved.slice() }).promise;
+    const p1 = await pd.getPage(1);
+    window.__boxes = (await p1.getTextContent()).items.filter((it) => it.str.trim()).map((it) => {
+      const fs = Math.hypot(it.transform[2], it.transform[3]);
+      return { x: it.transform[4] / 595.28, y: 1 - (it.transform[5] + fs) / 841.89, w: it.width / 595.28, h: 1.25 * fs / 841.89 };
+    });
     const t = new DataTransfer();
-    t.items.add(new File([await doc.save()], 'drie.pdf', { type: 'application/pdf' }));
+    t.items.add(new File([saved], 'drie.pdf', { type: 'application/pdf' }));
     const input = document.getElementById('ds-doc-input');
     input.files = t.files;
     input.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await page.locator('#step-place:not([hidden])').waitFor({ timeout: 30000 });
   await page.locator('#ds-pdf-canvas-list .ds-page-wrap[data-page-index="2"] canvas').waitFor({ timeout: 30000 });
+  const textBoxes = await page.evaluate(() => window.__boxes);
   const box = page.locator('#ds-invite-paraaf');
   assert.equal(await box.count(), 1, 'er is een vinkje voor een verplichte paraaf');
   await box.check();
@@ -84,7 +93,9 @@ test('/sign: het vinkje zet een paraaf per partij in het verzoek, vrij van tekst
   parafen.forEach((p, i) => assert.ok(p, `partij ${i + 1} krijgt een paraaf in het verzoek`));
   // Text runs from 40 pt above the bottom edge to the top on every page: a
   // paraaf over it would sit between y = 0.05 and 0.95 of the page height.
-  for (const p of parafen) assert.ok(p.y + p.h <= 1 - (36 / 841.89) || p.y >= 1 - (40 / 841.89) + 0.001 || p.x >= 0.9 || p.x + p.w <= 56 / 595.28, `paraaf ${JSON.stringify(p)} ligt over tekst`);
+  const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  assert.ok(textBoxes.length > 40, 'de tekst van pagina 1 is gelezen');
+  for (const p of parafen) for (const t of textBoxes) assert.ok(!hit(p, t), `paraaf ${JSON.stringify(p)} ligt over tekst ${JSON.stringify(t)}`);
 });
 
 test('/co-sign: een gevraagde paraaf staat klaar en gaat er niet af', async () => {

@@ -142,7 +142,16 @@ export function autoSignaturePlace({ index, count, pageCount, textBoxes }) {
 // The signature spot of party `index` out of `count`. anchor: the sender's
 // box as a fraction box, or null to find a free place (then textBoxes count).
 export function partySignatureSpot({ anchor, index, count, textBoxes }) {
-  const grid = signatureGrid(count, anchor);
+  let grid = signatureGrid(count, anchor);
+  // The sender's box stays where the sender put it: the other parties go to
+  // its right as far as the page allows and then on the next row, instead of
+  // the whole row sliding left off the chosen spot (acceptance test
+  // 2026-10-04: a box placed at x 0.5 came out at x 0.04).
+  if (anchor && Number.isFinite(anchor.x)) {
+    const fit = Math.floor((1 - EDGE - anchor.x + GAP_X + 1e-9) / (grid.w + GAP_X));
+    const rows = fit >= 1 ? Math.ceil(grid.count / fit) : 0;
+    if (fit >= 1 && fit < grid.cols && rows * grid.h + (rows - 1) * GAP_Y <= 1 - EDGE) grid = { ...grid, cols: fit, rows };
+  }
   const start = anchor && Number.isFinite(anchor.x) && Number.isFinite(anchor.y)
     ? anchor
     : freeAnchor(grid, textBoxes);

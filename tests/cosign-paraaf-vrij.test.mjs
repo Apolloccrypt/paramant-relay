@@ -106,3 +106,11 @@ test('een scan zonder tekstlaag: donkere pixels tellen als tekst', async () => {
   const spots = layout.paraafSpotsForParties({ pages: [A4], textBoxesPerPage: [boxes], count: 2 });
   for (const s of spots) for (const b of boxes) assert.ok(!overlap(s, frac(b, A4)), 'paraaf over het paginanummer van de scan');
 });
+
+test('de plek die de afzender koos, blijft de plek van de eerste ondertekenaar', () => {
+  const anchor = { x: 0.5, y: 0.82, w: 0.3, h: 0.085, page_index: 3 };
+  for (let n = 1; n <= 5; n++) {
+    const first = layout.partySignatureSpot({ anchor, index: 0, count: n });
+    assert.ok(Math.abs(first.x - 0.5) < 1e-6, `${n} partijen: x ${first.x} in plaats van 0.5`);
+  }
+});
