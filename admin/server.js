@@ -22,6 +22,7 @@ const { meetDeStand } = require('./lib/stand');
 const standIo = require('./lib/stand-io');
 // One user's sessions, without reading everybody else's. See admin/lib/user-sessions.js.
 const userSessions = require('./lib/user-sessions');
+const clientIpForward = require('./lib/client-ip-forward');
 // The scan is now a FALLBACK, handed to user-sessions only for a user who has no
 // index yet: every session minted before this deploy. Nothing calls it per
 // request any more.
@@ -252,7 +253,7 @@ function relayFetch(sector, relPath, method, body, rawResponse, tokenOverride, w
       path: url.pathname + (url.search || ''), method: method || 'GET',
       headers: { 'Content-Type': 'application/json', 'X-Admin-Token': tok, 'Authorization': `Bearer ${tok}` },
     };
-    if (withInternal) opts.headers['X-Internal-Auth'] = INTERNAL_TOKEN;
+    if (withInternal) Object.assign(opts.headers, { 'X-Internal-Auth': INTERNAL_TOKEN }, clientIpForward.headers());
     if (payload) opts.headers['Content-Length'] = Buffer.byteLength(payload);
     const req = http.request(opts, r => {
       const chunks = [];
@@ -278,6 +279,10 @@ async function eachSector(list, fn) {
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
+// Every relay call made while serving this request names the customer's
+// address (lib/client-ip-forward.js). After the body parser, so the handlers
+// run inside the store.
+app.use(clientIpForward.middleware);
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err)
     return res.status(400).json({ error: 'invalid_json', message: 'Request body must be valid JSON' });
@@ -652,6 +657,9 @@ async function callRelay(endpoint, body, method = "POST", sector = "health") {
       "X-Admin-Token": ADMIN_TOKEN,
       "Authorization": `Bearer ${ADMIN_TOKEN}`,
       "X-Internal-Auth": INTERNAL_TOKEN,
+      // The customer's own address, so the relay's per-IP limits are per
+      // customer and not one bucket for everyone (lib/client-ip-forward.js).
+      ...clientIpForward.headers(),
     },
     keepalive: false,
   };
@@ -2061,7 +2069,7 @@ api.get("/user/envelopes/:id/document", authUser, async (req, res) => {
     if (!env?.party || !emailHash || env.party.email_hash !== emailHash) return res.status(403).json({ error: "recipient_mismatch" });
     const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/document?p=${partyIndex}&t=${encodeURIComponent(token)}`, {
       method: "GET",
-      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash },
+      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash, ...clientIpForward.headers() },
       signal: AbortSignal.timeout(30000),
     });
     if (!rr.ok) {
@@ -2090,7 +2098,7 @@ api.get("/user/envelopes/:id/receipt", authUser, async (req, res) => {
   const emailHash = partyEmailHashAdmin(req.userSession.email);
   try {
     const rr = await fetch(`${SECTORS.health}/v2/envelopes/${encodeURIComponent(id)}/participant-receipt?p=${partyIndex}&t=${encodeURIComponent(token)}`, {
-      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash },
+      headers: { "X-Internal-Auth": INTERNAL_TOKEN, "X-Verified-Email-Hash": emailHash, ...clientIpForward.headers() },
       signal: AbortSignal.timeout(15000),
     });
     const body = Buffer.from(await rr.arrayBuffer());
@@ -2215,6 +2223,20 @@ function partyEmailHashAdmin(email) {
   return crypto.createHash("sha3-256").update("paramant/party-email/v1\x00", "utf8").update(norm, "utf8").digest("hex");
 }
 
+// A relay 429 passed on as what it is, with words a signer can act on. The
+// limit is per client address (the admin names it, lib/client-ip-forward.js),
+// so "from your address" is true.
+function relayRateLimited(res, relayRes) {
+  const after = Number((relayRes.headers && relayRes.headers.get && relayRes.headers.get("retry-after")) || 60) || 60;
+  res.setHeader("Retry-After", String(after));
+  return res.status(429).json({
+    error: "rate_limited",
+    retry_after: after,
+    message: "Te veel ondertekenverzoeken vanaf uw adres in korte tijd. Wacht een minuut en probeer het opnieuw.",
+    message_en: "Too many signing requests from your address in a short time. Wait a minute and try again.",
+  });
+}
+
 // POST /api/user/sign/activation (authUser) — AUTHORIZE + ISSUE (pre-unlock gate).
 api.post("/user/sign/activation", authUser, async (req, res) => {
   const { user_id, email } = req.userSession;          // identity from the session, never the client
@@ -2237,6 +2259,13 @@ api.post("/user/sign/activation", authUser, async (req, res) => {
   let env;
   try {
     const r = await callRelay(`/v2/envelopes/${encodeURIComponent(envelope_id)}?p=${party_index}&t=${encodeURIComponent(invite_token)}`, null, "GET");
+    // A relay 429 is a rate limit, not a verdict on who the signer is. It used
+    // to come back as 403 not_authorized, which the signing page reads as
+    // "this invitation belongs to a different email address": the wrong reason,
+    // and one that sends people looking for another account. Same for a relay
+    // that is down. Only an answer about the invitation itself stays a 403.
+    if (r.status === 429) return relayRateLimited(res, r);
+    if (r.status >= 500) return res.status(502).json({ error: "relay_unavailable" });
     if (r.status !== 200) return res.status(403).json({ error: "not_authorized" });
     env = (await r.json()).envelope;
   } catch (e) { return res.status(502).json({ error: "relay_unreachable" }); }
@@ -2297,6 +2326,7 @@ api.post("/user/sign/submit", authUser, async (req, res) => {
       // 402 quota: pass the relay JSON through unchanged (dimension/plan/
       // limit) so the frontend can render the upgrade notice.
       if (r.status === 402) return res.status(402).json(body);
+      if (r.status === 429) return relayRateLimited(res, r);
       return res.status(r.status).json({ error: body.error || "sign_failed" });
     }
     // The signature receipt. Truncating the envelope id INSIDE the metadata is
@@ -2861,6 +2891,7 @@ async function mintSessionToken(req, res, purpose, label) {
         "Content-Type": "application/json",
         "X-Internal-Auth": INTERNAL_TOKEN,
         "X-Api-Key": key,
+        ...clientIpForward.headers(),
       },
       body: JSON.stringify({ purpose }),
       signal: AbortSignal.timeout(10000),
@@ -3150,6 +3181,7 @@ api.post("/user/parasign/inbox/:id/resend", authUser, async (req, res) => {
         "Content-Type": "application/json",
         "X-Internal-Auth": INTERNAL_TOKEN,
         "X-Verified-Email-Hash": partyEmailHashAdmin(email),
+        ...clientIpForward.headers(),
       },
       body: JSON.stringify({}),
       signal: AbortSignal.timeout(10000),

@@ -195,4 +195,39 @@ function makeClientIp({ trusted, headerName = 'x-real-ip' } = {}) {
   return clientIp;
 }
 
-module.exports = { makeClientIp, isIpLiteral, toBytes, parseCidr, inCidr, DEFAULT_TRUSTED };
+// THE ADMIN HOP. The edge rule above answers "who is the caller" for a request
+// that came through nginx. A request the admin panel makes on a user's behalf
+// did not: it came from the admin container, which sends no X-Real-IP, so its
+// peer address (the docker bridge) was the "client" for every customer at once.
+// The envelope view and sign limiters (30 and 10 a minute) and the MFA limiter
+// were therefore one bucket for all of ParaSign: ten people signing in the same
+// minute and the eleventh got a 429 (tester 2, 2026-10-04, finding A4).
+//
+// The admin now names the real client in X-Paramant-Client-IP. That header is
+// believed ONLY on a request that also carries a valid X-Internal-Auth, the
+// shared secret only the admin holds. A browser cannot produce that secret, and
+// every nginx block blanks X-Internal-Auth (and X-Paramant-Client-IP) on the way
+// in, so the header cannot be used from outside to pick an address. Anything
+// that is not an IP literal falls back to the edge rule, never to the header.
+const INTERNAL_CLIENT_HEADER = 'x-paramant-client-ip';
+
+function withInternalClientIp(edgeClientIp, { token, internalAuthOk, headerName = INTERNAL_CLIENT_HEADER } = {}) {
+  const header = String(headerName).toLowerCase();
+  const tokenOf = typeof token === 'function' ? token : () => token;
+  function clientIp(req) {
+    const h = (req && req.headers) || {};
+    const named = h[header];
+    if (typeof named === 'string' && named
+        && typeof internalAuthOk === 'function' && internalAuthOk(tokenOf(), h['x-internal-auth'])) {
+      const first = named.split(',')[0].trim();
+      if (isIpLiteral(first)) return first;
+    }
+    return edgeClientIp(req);
+  }
+  clientIp.trusts = edgeClientIp.trusts;
+  clientIp.header = edgeClientIp.header;
+  clientIp.internalHeader = header;
+  return clientIp;
+}
+
+module.exports = { makeClientIp, withInternalClientIp, INTERNAL_CLIENT_HEADER, isIpLiteral, toBytes, parseCidr, inCidr, DEFAULT_TRUSTED };

@@ -2296,7 +2296,13 @@ function J(o) { return JSON.stringify(o); }
 // loopback. The edge configs now set the header everywhere, and
 // test/trusted-edge-gate.test.js keeps them that way; this is the lock on the
 // other side of that door, so a single missed nginx block is no longer a bypass.
-const getClientIp = clientIpLib.makeClientIp({ trusted: process.env.TRUSTED_PROXY_CIDRS });
+// A request the admin makes for a user names that user's address in
+// X-Paramant-Client-IP, believed only next to a valid X-Internal-Auth. Without
+// it every admin-proxied call shared the admin container's address, and so one
+// envelope sign/view bucket for every customer. See lib/client-ip.js.
+const getClientIp = clientIpLib.withInternalClientIp(
+  clientIpLib.makeClientIp({ trusted: process.env.TRUSTED_PROXY_CIDRS }),
+  { token: () => process.env.INTERNAL_AUTH_TOKEN, internalAuthOk: authGate.internalAuthOk });
 
 // ── HTML escaping for email templates (prevents HTML injection in Resend emails) ──
 function escHtml(s) {
