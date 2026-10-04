@@ -61,3 +61,17 @@ test('a broken body gets a fixed error code, never internal error text', async (
   assert.ok(!/Maximum call stack|Unexpected token|in JSON at position/i.test(r2.text), r2.text.slice(0, 200));
   checks++;
 });
+
+test('IPv6 is limited per /64, not per address (review r2 (e))', async () => {
+  if (!srv) return;
+  let last = 0;
+  for (let i = 1; i <= 25; i++) {
+    const r = await srv.post('/v2/verify', { headers: { 'X-Real-IP': '2001:db8:7:9::' + i.toString(16) }, body: { envelope: {} } });
+    last = r.status;
+    if (last === 429) break;
+  }
+  assert.strictEqual(last, 429, 'twenty-five addresses from one /64 share one budget');
+  const other = await srv.post('/v2/verify', { headers: { 'X-Real-IP': '2001:db8:7:a::1' }, body: { envelope: {} } });
+  assert.notStrictEqual(other.status, 429, 'another /64 has its own budget');
+  checks++;
+});

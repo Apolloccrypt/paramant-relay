@@ -485,6 +485,10 @@ export async function enrolEphemeralSigningKeyWithTotp({ label, totp, onStatus }
     const errCode = (e && e.data && e.data.error) || '';
     // Relay gates the TOTP enrol: 403 invalid_totp (wrong code) / 403 no_totp_setup
     // (account has no authenticator), 400 totp_required (malformed — caught above).
+    if (errCode === 'too_many_active_keys') {
+      const err = new Error(tr('Er zijn al 50 ondertekensleutels aan uw account gekoppeld. Trek oude sleutels in via Instellingen en probeer het daarna opnieuw.', 'Your account already has 50 signing keys linked. Revoke old keys in Settings, then try again.'));
+      err.code = 'service_error'; throw err;
+    }
     if (errCode === 'totp_locked') {
       const min = Math.max(1, Math.ceil((Number(e.data && e.data.retry_after) || 60) / 60));
       const err = new Error(tr('Te veel foute codes achter elkaar. Probeer het over ' + min + (min === 1 ? ' minuut' : ' minuten') + ' opnieuw.', 'Too many wrong codes in a row. Try again in ' + min + (min === 1 ? ' minute.' : ' minutes.')));

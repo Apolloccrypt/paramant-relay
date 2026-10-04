@@ -44,6 +44,8 @@ async function _writeArray(redisClient, userId, arr) {
   await redisClient.set(_userKey(userId), JSON.stringify(arr));
 }
 
+const MAX_ACTIVE_KEYS = 50;
+
 // Append a new enrollment. Server computes pk_hash itself — never trusts client.
 // Idempotent: re-enrolling the same pk for the same user returns the existing
 // entry (and clears revoked_at if it was revoked, treating it as re-enrollment).
@@ -82,6 +84,13 @@ async function storeSigningPk(redisClient, userId, { pk_b64, label }) {
     return { entry: existing, reenrolled: true };
   }
 
+  // A ceiling on active keys: every new key needs its own confirmation, but a
+  // bind that succeeded while the answer was lost leaves a key nobody holds,
+  // and nothing bounded how many could pile up (review r2 (c)). Revoked keys
+  // stay as history and do not count.
+  if (arr.filter((e) => !e.revoked_at).length >= MAX_ACTIVE_KEYS) {
+    throw new Error('too_many_active_keys');
+  }
   const entry = {
     alg: ALG,
     pk_b64,
@@ -138,6 +147,7 @@ async function lookupByPkHash(redisClient, pkHashSha3) {
 }
 
 module.exports = {
+  MAX_ACTIVE_KEYS,
   ALG,
   ML_DSA_65_PK_LEN,
   storeSigningPk,

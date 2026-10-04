@@ -2425,8 +2425,19 @@ function envSignRateOk(ip) {
 // POST /v2/verify without a key (hertest T3-12): stateless, reads nothing
 // stored, so the only cost is CPU. 20 a minute per address bounds that.
 const verifyLimits = new Map();           // ip      -> { count, resetAt }
+// IPv6 per /64, not per address: one customer line hands out a whole /64, and
+// counting per /128 let one caller use 2^64 budgets (review r2 (e)).
+function verifyRateKey(ip) {
+  const a = String(ip || '').replace(/^::ffff:(?=\d+\.)/i, '');
+  if (!a.includes(':')) return a;
+  const [head, tail = ''] = a.split('::');
+  const h = head ? head.split(':') : [];
+  const t = tail ? tail.split(':') : [];
+  const full = a.includes('::') ? [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t] : h;
+  return full.slice(0, 4).map((x) => (x || '0').toLowerCase().replace(/^0+(?=.)/, '')).join(':') + '::/64';
+}
 function verifyRateOk(ip) {
-  return rateLimit.fixedWindowAllow(verifyLimits, ip, 20, 60_000);
+  return rateLimit.fixedWindowAllow(verifyLimits, verifyRateKey(ip), 20, 60_000);
 }
 setInterval(() => { const now = Date.now(); for (const [k, v] of verifyLimits) if (now > v.resetAt + 60_000) verifyLimits.delete(k); }, 120_000);
 setInterval(() => {
@@ -7558,7 +7569,12 @@ async function handleRelayRequest(req, res) {
         result.note = 'envelope was notarised by a different relay; verify its envelope_signature against notary.relay_pubkey_url';
       }
 
-      const out = { valid: result.valid, errors: result.errors, verified_at: new Date().toISOString(),
+      // The reasons, without the text of an internal exception ("... verify
+      // error: Maximum call stack size exceeded"): fixed words only (review r2 (e)).
+      const cleanErrors = (result.errors || []).map((m) => String(m)
+        .replace(/ verify error: [\s\S]*$/, ' could not be checked')
+        .replace(/^invalid appearance manifest: [\s\S]*$/, 'invalid appearance manifest'));
+      const out = { valid: result.valid, errors: cleanErrors, verified_at: new Date().toISOString(),
         signer_label: (d.envelope.signer && d.envelope.signer.label) || null };
       if (result.note) out.note = result.note;
       res.writeHead(result.valid ? 200 : 422, { 'Content-Type': 'application/json' });
