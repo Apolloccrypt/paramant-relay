@@ -330,6 +330,43 @@ app.get(`${BASE_PATH}/health`, async (req, res) => {
 
 const api = express.Router();
 
+// ── Key handles in the panel ─────────────────────────────────────────────────
+// The user list used to hand every account's FULL pgp_ key to the browser as
+// key_id (ADMIN-06-H; the comment said "not exposed"). It carries the kid now,
+// a stable non-secret handle (k_<hex>), and every /admin/ route that takes a
+// key resolves a kid back to the key here, server-side, before it runs. A
+// full pgp_ key still works for the API and the CLI.
+const KID_RE = /^k_[0-9a-f]{6,64}(?:_\d{1,4})?$/;
+let _kidCache = { at: 0, map: new Map() };
+async function keyFromKid(kid) {
+  if (Date.now() - _kidCache.at > 10_000) {
+    const r = await relayFetch('health', '/v2/admin/keys?reveal=1', 'GET', null, false, ADMIN_TOKEN);
+    const map = new Map();
+    for (const k of (r.body?.keys || [])) if (k.kid && k.key) map.set(k.kid, k.key);
+    _kidCache = { at: Date.now(), map };
+  }
+  return _kidCache.map.get(kid) || null;
+}
+api.use('/admin', async (req, res, next) => {
+  try {
+    if (req.body && typeof req.body.key === 'string' && KID_RE.test(req.body.key)) {
+      const full = await keyFromKid(req.body.key);
+      if (!full) return res.status(404).json({ error: 'unknown_key' });
+      req.body.key = full;
+    }
+  } catch { return res.status(502).json({ error: 'relay_unreachable' }); }
+  next();
+});
+api.param('key', async (req, res, next, value) => {
+  if (!KID_RE.test(value)) return next();
+  try {
+    const full = await keyFromKid(value);
+    if (!full) return res.status(404).json({ error: 'unknown_key' });
+    req.params.key = full;
+    next();
+  } catch { res.status(502).json({ error: 'relay_unreachable' }); }
+});
+
 api.post('/auth/login', async (req, res) => {
   // Rate limit by IP — use X-Real-IP (set by nginx to $remote_addr, not client-spoofable)
   // rather than X-Forwarded-For first-entry, which an attacker can set arbitrarily.
@@ -432,6 +469,24 @@ function keyResults(results) {
   return { created, failed, allOk: failed.length === 0, upgradeRequired };
 }
 
+// A key made from the panel WITH an address is an account for that person. It
+// got no user:meta and no setup mail, so the owner had a key and no way to
+// sign in, and force-totp found no address to mail (ADMIN-18, "+ New key").
+// Now it gets both, unless the panel says send_setup: false.
+async function onboardPanelKey(key, email, label, wantMail) {
+  if (!email) return { setup_email_sent: false };
+  await redis().set(`paramant:user:meta:${key}`, JSON.stringify({ email, created_at: new Date().toISOString(), created_by: 'admin' })).catch(() => {});
+  if (wantMail === false) return { setup_email_sent: false };
+  try {
+    const setupToken = await issueSetupToken(key, email, { label: label || null });
+    await sendSetupEmail(email, setupToken);
+    return { setup_email_sent: true };
+  } catch (e) {
+    console.error('[keys/all] setup email:', e.message);
+    return { setup_email_sent: false, setup_email_error: 'send_failed' };
+  }
+}
+
 api.post('/keys/all', authMiddleware, async (req, res) => {
   if (req.body && req.body.email) {
     const beleid = await emailPolicy.toets(req.body.email, 'aanmelden', { mx: false });
@@ -444,7 +499,8 @@ api.post('/keys/all', authMiddleware, async (req, res) => {
   });
   const { created, failed, allOk, upgradeRequired } = keyResults(results);
   const statusCode = upgradeRequired ? 402 : (allOk ? 200 : 207);
-  res.status(statusCode).json({ ok: allOk, created, failed, results,
+  const onboard = created.length ? await onboardPanelKey(body.key, body.email, body.label, req.body && req.body.send_setup) : { setup_email_sent: false };
+  res.status(statusCode).json({ ok: allOk, created, failed, results, ...onboard,
     ...(upgradeRequired ? { upgrade_url: 'https://paramant.app/pricing' } : {}) });
 });
 
@@ -464,7 +520,8 @@ api.post('/keys/sectors', authMiddleware, async (req, res) => {
   });
   const { created, failed, allOk, upgradeRequired } = keyResults(results);
   const statusCode = upgradeRequired ? 402 : (allOk ? 200 : 207);
-  res.status(statusCode).json({ ok: allOk, created, failed, results,
+  const onboard = created.length ? await onboardPanelKey(sectorBody.key, sectorBody.email, sectorBody.label, req.body && req.body.send_setup) : { setup_email_sent: false };
+  res.status(statusCode).json({ ok: allOk, created, failed, results, ...onboard,
     ...(upgradeRequired ? { upgrade_url: 'https://paramant.app/pricing' } : {}) });
 });
 
@@ -494,9 +551,21 @@ api.post('/admin/resend-setup', async (req, res) => {
   // safeEqual, not a hand-rolled length check plus timingSafeEqual: see its
   // definition above for why the character count and the byte count are not the
   // same number, and why the difference used to be a 500 and an oracle.
-  if (!ADMIN_TOKEN || !safeEqual(tok, ADMIN_TOKEN))
-    return res.status(401).json({ error: 'unauthorized' });
-  const { user_id, email } = req.body || {};
+  //
+  // OR the panel's own session. The panel only ever sends X-Session, so this
+  // route answered every click with "Send failed: unauthorized" (ADMIN-16).
+  let authed = !!ADMIN_TOKEN && safeEqual(tok, ADMIN_TOKEN);
+  if (!authed) {
+    const sid = (req.headers['x-session'] || '').trim();
+    try { authed = !!(sid && await validateSession(sid)); }
+    catch { return res.status(503).json({ error: 'session_store_unavailable' }); }
+  }
+  if (!authed) return res.status(401).json({ error: 'unauthorized' });
+  // { user_id, email } as before, or { key } as ADMIN.md documents: the
+  // address is then looked up (users.json first, user:meta as fallback).
+  let { user_id, email } = req.body || {};
+  if (!user_id && req.body && typeof req.body.key === 'string') user_id = req.body.key;
+  if (user_id && !email) { try { email = (await getAdminKeyMeta(user_id)).email; } catch { /* answered below */ } }
   if (!user_id || !email) return res.status(400).json({ error: 'missing_fields' });
   // Rate limit: max 10 admin resends per user per 24h
   const adminRlKey = `paramant:ratelimit:admin_resend:${user_id}`;
@@ -4307,7 +4376,7 @@ api.get("/admin/overview", authMiddleware, async (req, res) => {
       new Date(e.ts).toISOString().startsWith(today)
     ).length;
     res.json({
-      stats: { signups_today: signupsToday, active_sessions: activeSessions, pro_upgrades_today: proUpgrades, revenue_mrr: 0 },
+      stats: { signups_today: signupsToday, active_sessions: activeSessions, pro_upgrades_today: proUpgrades, revenue_mrr: null },  // not tracked in this panel: Mollie holds it. null, not a 0 that reads as no revenue (ADMIN-05)
       recent_activity: recentAudit,
       alerts: [],
       plan_distribution: planDist,
@@ -4341,7 +4410,8 @@ api.get("/admin/users", authMiddleware, async (req, res) => {
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
     const safePage   = Math.min(page, totalPages);
     const start = (safePage - 1) * pageSize;
-    const users = filtered.slice(start, start + pageSize);
+    // _full is the key for server-side matching only; it never goes out.
+    const users = filtered.slice(start, start + pageSize).map(({ _full, ...u }) => u);
 
     res.json({
       users,
@@ -4370,11 +4440,15 @@ api.get("/admin/user-detail/:key", authMiddleware, async (req, res) => {
     const { key } = req.params;
     if (!key || !key.startsWith("pgp_")) return res.status(400).json({ error: "invalid_key" });
     const allUsers = await telemetry.getUsersWithTotp(relayFetch, ADMIN_TOKEN);
-    const user = allUsers.find(u => u.key === key);
+    // u.key is the MASKED key; the full one never leaves telemetry any more,
+    // so match on the kid or the masked form (ADMIN-55: always 404).
+    const masked = key.slice(0, 8) + '...' + key.slice(-4);
+    const user = allUsers.find(u => u._full === key) || allUsers.find(u => u.key === masked);
     if (!user) return res.status(404).json({ error: "not_found" });
+    delete user._full;
     const events = await getAuditEvents(key, { limit: 20 });
     try { await logAuditEvent(key, 'admin_key_viewed', { admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
-    res.json({ ...user, key: key, key_id: key, audit_events: events });
+    res.json({ ...user, key: masked, audit_events: events });
   } catch (err) { console.error("[admin/user-detail]", err.message); res.status(500).json({ error: "internal" }); }
 });
 
@@ -4385,6 +4459,11 @@ api.get("/admin/audit", authMiddleware, async (req, res) => {
     const eventFilter = req.query.event || null;
     const sinceMs = req.query.since ? new Date(req.query.since).getTime() : 0;
     const events = [];
+    // The event names that really occur, for the panel's filter. It offered a
+    // fixed list (signup, login, plan_changed ...) that mostly never matched:
+    // the real events are admin_plan_changed, totp_reset_confirmed and so on
+    // (ADMIN-27-F).
+    const eventTypes = new Set();
     for await (const key of scanKeys(redis(), { MATCH: "paramant:user:audit:*", COUNT: 100 })) {
       const userId = key.split(":").pop();
       if (userFilter && !userId.includes(userFilter)) continue;
@@ -4392,6 +4471,7 @@ api.get("/admin/audit", authMiddleware, async (req, res) => {
       for (const entry of entries) {
         try {
           const ev = JSON.parse(entry);
+          if (ev.event_type) eventTypes.add(ev.event_type);
           if (sinceMs && ev.ts < sinceMs) continue;
           if (eventFilter && ev.event_type !== eventFilter) continue;
           events.push({ user_id: userId, ...ev });
@@ -4399,7 +4479,7 @@ api.get("/admin/audit", authMiddleware, async (req, res) => {
       }
     }
     events.sort((a, b) => (b.ts || 0) - (a.ts || 0));
-    res.json({ events: events.slice(0, limit), total: events.length });
+    res.json({ events: events.slice(0, limit), total: events.length, event_types: [...eventTypes].sort() });
   } catch (err) { console.error("[admin/audit]", err.message); res.status(500).json({ error: "internal" }); }
 });
 
@@ -4566,6 +4646,10 @@ api.post('/admin/force-totp', authMiddleware, async (req, res) => {
     const metaRaw = await redis().get(`paramant:user:meta:${key}`).catch(() => null);
     let userMeta = {};
     try { if (metaRaw) userMeta = JSON.parse(metaRaw); } catch {}
+    // A key made from the panel (+ New key) has no user:meta record, so the
+    // address was never found and the setup mail never went (ADMIN-18). The
+    // relay's users.json has it.
+    if (!userMeta.email) { try { const km = await getAdminKeyMeta(key); if (km.email) userMeta.email = km.email; } catch { /* no address: reported below */ } }
     const before = !!userMeta.totp_required;
     if (required) {
       userMeta.totp_required = true;
@@ -4713,8 +4797,13 @@ api.post('/admin/reset-totp', authMiddleware, async (req, res) => {
 
 // ── POST /admin/change-plan ───────────────────────────────────────────────────
 api.post('/admin/change-plan', authMiddleware, async (req, res) => {
-  const { key, new_plan, notify = true } = req.body || {};
-  const VALID = ['community', 'pro', 'enterprise', 'trial'];
+  const { key, notify = true } = req.body || {};
+  // 'trial' is not a plan the relays accept (they answered every trial with 207
+  // fleet_not_consistent, ADMIN-19-B). It is the free tier, as on the relay's
+  // own key-create route. business is a plan they do accept.
+  const VALID = ['community', 'pro', 'business', 'enterprise'];
+  if (req.body && (req.body.new_plan === 'trial' || req.body.new_plan === 'free')) req.body.new_plan = 'community';
+  const new_plan = req.body ? req.body.new_plan : undefined;
   if (!key?.startsWith('pgp_')) return res.status(400).json({ error: 'invalid_key' });
   if (!VALID.includes(new_plan)) return res.status(400).json({ error: 'invalid_plan', valid: VALID });
   if (!await checkAdminRl('change_plan', 'admin', 20)) return res.status(429).json({ error: 'rate_limited' });
@@ -4837,8 +4926,7 @@ api.post('/admin/disable-key', authMiddleware, async (req, res) => {
     const meta = await getAdminKeyMeta(key);
     await eachSector(Object.keys(SECTORS), async s => relayFetch(s, '/v2/admin/keys/revoke', 'POST', { key }, false, ADMIN_TOKEN).catch(() => {}));
     if (notify && meta.email) {
-      const planName = meta.plan.charAt(0).toUpperCase() + meta.plan.slice(1);
-      emailTemplates.sendEmail(meta.email, emailTemplates.billingCancellationEmail({ planName, cancelDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) })).catch(e => console.error('[admin/disable-key] email:', e.message));
+      emailTemplates.sendEmail(meta.email, emailTemplates.keyDisabledEmail({ disabledAt: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Amsterdam' }) })).catch(e => console.error('[admin/disable-key] email:', e.message));
     }
     try { await logAuditEvent(key, 'admin_key_disabled', { reason, notify: !!(notify && meta.email), admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
     res.json({ ok: true, reason, email_sent: !!(notify && meta.email) });

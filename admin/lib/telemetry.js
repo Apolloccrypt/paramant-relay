@@ -53,7 +53,10 @@ async function getUsersWithTotp(relayFetch, ADMIN_TOKEN) {
       : null;
     return {
       key: k.key.slice(0, 8) + '...' + k.key.slice(-4), // masked
-      key_id: k.key, // internal id for actions (not exposed in list response)
+      // The handle the panel acts with: the kid, never the key itself
+      // (ADMIN-06-H). server.js resolves it back for every /admin/ route.
+      key_id: k.kid || null,
+      _full: k.key,
       email: meta.email || k.email || null, label: k.label || null,
       plan: k.plan || 'community', sectors: k.sectors || [],
       parasign: k.parasign === true, /*MARK:parasign_user*/

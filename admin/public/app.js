@@ -120,7 +120,7 @@ async function loadOverview(){
       statCard('Signups today',st.signups_today??0)+
       statCard('Active sessions',st.active_sessions??0)+
       statCard('Pro upgrades today',st.pro_upgrades_today??0)+
-      statCard('MRR (EUR)','€'+((st.revenue_mrr||0)/100).toFixed(0))+
+      statCard('MRR (EUR)',st.revenue_mrr==null?'n/a (see Mollie)':'€'+(st.revenue_mrr/100).toFixed(0))+
     '</div>'+
     (d.alerts&&d.alerts.length?'<div class="card"><div class="card-hdr">Alerts</div>'+d.alerts.map(a=>'<div class="banner info">'+esc(a)+'</div>').join('')+'</div>':'')+
     '<div class="g2">'+
@@ -142,7 +142,7 @@ async function loadOverview(){
 function statCard(lbl,val){return '<div class="sc"><div class="sc-lbl">'+lbl+'</div><div class="sc-val">'+esc(val)+'</div></div>'}
 
 function planBars(dist,total){
-  return ['community','pro','enterprise','trial'].map(p=>{
+  return ['community','pro','business','enterprise'].map(p=>{
     const n=dist[p]||0;
     return '<div class="pb"><span class="pl">'+p+'</span><div class="tr"><div class="fi" style="width:'+(n/total*100).toFixed(1)+'%"></div></div><span class="cn">'+n+'</span></div>';
   }).join('');
@@ -172,7 +172,7 @@ function renderUsers(el,users,counts){
     '<div class="fb">'+
       '<label for="u-search" class="sr-only">Search users</label>'+
       '<input id="u-search" placeholder="Search email or label…" data-input="filterUsers" style="width:220px">'+
-      '<select id="u-plan" aria-label="Filter by plan" data-change="filterUsers"><option value="">All plans</option><option>community</option><option>pro</option><option>enterprise</option><option>trial</option></select>'+
+      '<select id="u-plan" aria-label="Filter by plan" data-change="filterUsers"><option value="">All plans</option><option>community</option><option>pro</option><option>business</option><option>enterprise</option></select>'+
       '<select id="u-totp" aria-label="Filter by TOTP" data-change="filterUsers"><option value="">Any TOTP</option><option value="active">Active</option><option value="pending">Pending</option><option value="none">None</option></select>'+
       '<select id="u-status" aria-label="Filter by status" data-change="filterUsers"><option value="">All status</option><option value="active">Active</option><option value="revoked">Revoked</option></select>'+
     '</div>'+
@@ -254,8 +254,10 @@ function usersTable(users){
 
 function toggleMenu(e,id){
   e.stopImmediatePropagation();
-  const btn=e.currentTarget||e.target;
   const m=document.getElementById(id);
+  // The click is delegated, so e.currentTarget is the document and has no
+  // setAttribute (ADMIN-07-G). The menu's own button sits right before it.
+  const btn=(m&&m.previousElementSibling&&m.previousElementSibling.setAttribute)?m.previousElementSibling:{setAttribute(){}};
   const wasOpen=m.classList.contains('open');
   if(openMenu){openMenu.classList.remove('open');const ob=openMenu.previousElementSibling;if(ob)ob.setAttribute('aria-expanded','false');}
   if(!wasOpen){
@@ -334,7 +336,7 @@ function showNewKeyModal(){
   o.innerHTML='<div style="background:#F8FAFC;border:1.5px solid rgba(11,58,106,.12);padding:28px;max-width:480px;width:100%">'+
     '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#475569;margin-bottom:16px">Create new API key</div>'+
     '<label class="l-lbl">Label</label><input id="nk-l" class="l-inp" placeholder="acme-corp"><br>'+
-    '<label class="l-lbl">Plan</label><select id="nk-p" class="l-inp"><option value="community">community</option><option value="pro" selected>pro</option><option value="enterprise">enterprise</option><option value="trial">trial</option></select><br>'+
+    '<label class="l-lbl">Plan</label><select id="nk-p" class="l-inp"><option value="community">community</option><option value="pro" selected>pro</option><option value="business">business</option><option value="enterprise">enterprise</option></select><br>'+
     '<label class="l-lbl">Email (optional)</label><input id="nk-e" class="l-inp" type="email" placeholder="client@example.com"><br>'+
     '<div style="display:flex;gap:10px;margin-top:8px">'+
     '<button data-click="doCreateKey" class="btn" style="flex:1">Create key</button>'+
@@ -373,9 +375,7 @@ async function loadAudit(){
 function renderAuditShell(el){
   el.innerHTML='<div class="card"><div class="card-hdr">Audit log</div>'+
     '<div class="fb">'+
-      '<select id="a-event"><option value="">All events</option>'+
-        ['signup','login','logout','setup_totp','activate_totp','revoke_session','plan_changed','delete_account'].map(e=>'<option>'+e+'</option>').join('')+
-      '</select>'+
+      '<select id="a-event"><option value="">All events</option></select>'+
       '<input id="a-user" placeholder="User key prefix…" style="width:200px">'+
       '<select id="a-since"><option value="">All time</option><option value="1">Last hour</option><option value="24">Last 24h</option><option value="168">Last 7d</option></select>'+
       '<div class="sp"></div>'+
@@ -399,6 +399,12 @@ async function fetchAudit(){
   if(!el)return;
   if(!r.ok){el.innerHTML='<div class="empty">Error loading audit log</div>';return}
   const events=r.data.events||[];
+  // The filter lists the events that really occur (ADMIN-27-F).
+  const sel=document.getElementById('a-event');
+  if(sel&&Array.isArray(r.data.event_types)){
+    const cur=sel.value;
+    sel.innerHTML='<option value="">All events</option>'+r.data.event_types.map(t=>'<option'+(t===cur?' selected':'')+'>'+esc(t)+'</option>').join('');
+  }
   if(!events.length){el.innerHTML='<div class="empty">No audit events match filters</div>';return}
   el.innerHTML='<table class="tbl"><thead><tr><th>Timestamp</th><th>Event</th><th>User</th><th>Details</th></tr></thead><tbody>'+
     events.map(e=>'<tr>'+
@@ -415,7 +421,10 @@ function exportAuditCSV(){
   let csv='timestamp,event,user_id,metadata\n';
   rows.forEach(r=>{
     const cells=r.querySelectorAll('td');
-    if(cells.length)csv+=[cells[0],cells[1],cells[2],''].map((c,i)=>'"'+(c?.textContent?.trim()||'').replace(/"/g,'""')+'"').join(',')+'\n';
+    // The fourth column is the event's details (the <pre> in the row), not
+    // an empty string (ADMIN-28).
+    const meta=cells[3]?cells[3].querySelector('pre'):null;
+    if(cells.length)csv+=[cells[0],cells[1],cells[2],meta].map((c,i)=>'"'+(c?.textContent?.trim()||'').replace(/\s+/g,' ').replace(/"/g,'""')+'"').join(',')+'\n';
   });
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
