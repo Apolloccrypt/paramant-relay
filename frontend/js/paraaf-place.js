@@ -178,3 +178,99 @@ export function paraafFooter(dateStr, fingerprint8) {
   const fp = String(fingerprint8 || '').slice(0, 8);
   return [date, fp ? 'PQ ' + fp : ''].filter(Boolean).join(' · ');
 }
+
+// ── Page geometry: the view the signer sees vs. the space the PDF draws in ──
+//
+// pdf.js shows a page in its VIEW space: the visible box (CropBox clipped to
+// the MediaBox) turned by the page's /Rotate, origin at the visible bottom
+// left. pdf-lib draws in USER space: unturned, with the box wherever the file
+// put it (a CropBox at 50,80 or a MediaBox at -100,-100 is not at 0,0). Every
+// position the signer makes on screen (seal, paraaf, text, date, highlight,
+// note, pen) is in view space, so the bake maps view space onto user space with
+// one matrix and draws upright in the view. Test report 2026-10-04: on
+// /Rotate 90/180/270 pages everything landed 50-77% off and sideways, and a
+// CropBox offset shifted it 10-17%.
+//
+// geom: { view: [x0, y0, x1, y1] (pdf.js page.view, user space), rotate: 0|90|180|270 }.
+
+// The rotation the way pdf.js reads it: multiples of 90 only, normalised into
+// 0..270; anything else is shown unrotated, so it is treated as 0 here too.
+export function normaliseRotation(r) {
+  let n = Number(r) || 0;
+  if (n % 90 !== 0) return 0;
+  n %= 360;
+  if (n < 0) n += 360;
+  return n;
+}
+
+// The size of the page as the signer sees it (pdf.js getViewport({scale:1})).
+export function viewSize(geom) {
+  const [x0, y0, x1, y1] = geom.view;
+  const W = Math.abs(x1 - x0), H = Math.abs(y1 - y0);
+  const r = normaliseRotation(geom.rotate);
+  return (r === 90 || r === 270) ? { width: H, height: W } : { width: W, height: H };
+}
+
+// [a, b, c, d, e, f] with x = a*u + c*v + e, y = b*u + d*v + f: view point
+// (u, v), bottom-left origin, to user space. /Rotate turns the page CLOCKWISE
+// for display, so drawing upright in the view means turning counter-clockwise
+// in user space; that is what this matrix does when used as a PDF `cm`.
+export function viewToUserMatrix(geom) {
+  const x0 = Math.min(geom.view[0], geom.view[2]), y0 = Math.min(geom.view[1], geom.view[3]);
+  const W = Math.abs(geom.view[2] - geom.view[0]), H = Math.abs(geom.view[3] - geom.view[1]);
+  switch (normaliseRotation(geom.rotate)) {
+    case 90:  return [0, 1, -1, 0, x0 + W, y0];
+    case 180: return [-1, 0, 0, -1, x0 + W, y0 + H];
+    case 270: return [0, -1, 1, 0, x0, y0 + H];
+    default:  return [1, 0, 0, 1, x0, y0];
+  }
+}
+
+// True when view space IS user space (no rotation, box at the origin): the bake
+// then draws exactly as it always did, byte for byte.
+export function isIdentityGeom(geom) {
+  const m = viewToUserMatrix(geom);
+  return m[0] === 1 && m[1] === 0 && m[2] === 0 && m[3] === 1 && m[4] === 0 && m[5] === 0;
+}
+
+export function viewToUserPoint(geom, u, v) {
+  const [a, b, c, d, e, f] = viewToUserMatrix(geom);
+  return { x: a * u + c * v + e, y: b * u + d * v + f };
+}
+
+export function userToViewPoint(geom, x, y) {
+  const [a, b, c, d, e, f] = viewToUserMatrix(geom);
+  const det = a * d - b * c;
+  const dx = x - e, dy = y - f;
+  return { u: (d * dx - c * dy) / det, v: (a * dy - b * dx) / det };
+}
+
+// Boxes in user space (textBoxesFromItems) -> boxes in view space, so the
+// paraaf corners are judged on the page as the signer sees it: "bottom right"
+// is the visible bottom right, also on a turned or cropped page.
+export function userBoxesToView(boxes, geom) {
+  if (!Array.isArray(boxes)) return boxes;
+  if (!geom || isIdentityGeom(geom)) return boxes;
+  return boxes.map((b) => {
+    const pts = [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]]
+      .map(([x, y]) => userToViewPoint(geom, x, y));
+    const us = pts.map((p) => p.u), vs = pts.map((p) => p.v);
+    const x = Math.min(...us), y = Math.min(...vs);
+    return { x, y, w: Math.max(...us) - x, h: Math.max(...vs) - y };
+  });
+}
+
+// The page geometry from pdf-lib, for when pdf.js could not read a page: the
+// same rule pdf.js applies (CropBox clipped to the MediaBox, else the
+// MediaBox; /Rotate in multiples of 90).
+export function geomFromBoxes(mediaBox, cropBox, rotate) {
+  const norm = (b) => b && [Math.min(b[0], b[2]), Math.min(b[1], b[3]), Math.max(b[0], b[2]), Math.max(b[1], b[3])];
+  const m = norm(mediaBox) || [0, 0, 612, 792];
+  let view = m;
+  const c = norm(cropBox);
+  if (c) {
+    const box = [Math.max(c[0], m[0]), Math.max(c[1], m[1]), Math.min(c[2], m[2]), Math.min(c[3], m[3])];
+    if (box[2] - box[0] > 0 && box[3] - box[1] > 0) view = box;
+  }
+  return { view, rotate: normaliseRotation(rotate) };
+}
