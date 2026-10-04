@@ -60,6 +60,12 @@ const PUBLIC_ROUTES = [
   { method: 'GET',  docs: '/v2/relays',
     src: "path === '/v2/relays'",
     why: 'relay discovery. A client picks a relay before it authenticates to one.' },
+  { method: 'POST', docs: '/v2/verify',
+    src: "path === '/v2/verify' && req.method === 'POST'",
+    why: 'checks an old (v1/v2) .psign against this relay\'s notary key. A pure function '
+       + 'of the posted bytes: nothing stored, no account read, only valid/errors back. '
+       + 'Anyone holding a signed document must be able to check it (hertest 2026-10-04, '
+       + 'T3-12). Rate limited per IP for keyless callers.' },
 ];
 
 // The identifiers in the API-key gate in relay.js that let a request past it.

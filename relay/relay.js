@@ -2381,6 +2381,13 @@ function envViewRateOk(ip) {
 function envSignRateOk(ip) {
   return rateLimit.fixedWindowAllow(envSignLimits, ip, 10, 60_000);
 }
+// POST /v2/verify without a key (hertest T3-12): stateless, reads nothing
+// stored, so the only cost is CPU. 20 a minute per address bounds that.
+const verifyLimits = new Map();           // ip      -> { count, resetAt }
+function verifyRateOk(ip) {
+  return rateLimit.fixedWindowAllow(verifyLimits, ip, 20, 60_000);
+}
+setInterval(() => { const now = Date.now(); for (const [k, v] of verifyLimits) if (now > v.resetAt + 60_000) verifyLimits.delete(k); }, 120_000);
 setInterval(() => {
   const now = Date.now();
   for (const [k, v] of envCreateLimits) if (now > v.resetAt + 60_000) envCreateLimits.delete(k);
@@ -7409,9 +7416,45 @@ async function handleRelayRequest(req, res) {
     finally { inFlightInbound--; }
   }
 
+  // ── POST /v2/verify, above the key gate: public (hertest T3-12) ──────────
+  // Checks an old (v1/v2) .psign against THIS relay's notary key. A pure
+  // function of the posted bytes: it stores nothing, reads no account and
+  // answers only valid/errors. /verify promised "offline and without an
+  // account" while v1/v2 asked for an API key. Rate-limited per address for
+  // keyless callers (relay/lib/public-routes.js has the declaration).
+  if (path === '/v2/verify' && req.method === 'POST') {
+    if (!keyData?.active && !verifyRateOk(clientIp)) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); return res.end(J({ error: 'Too many requests' })); }
+    if (!mlDsa || !relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'ML-DSA-65 not available on this relay' })); }
+    try {
+      const d = JSON.parse((await readBody(req, 65536)).toString());
+      if (!d.envelope) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'envelope required' })); }
+      const documentHashHex = d.document_hash ? d.document_hash.toString().trim().toLowerCase() : null;
+
+      const result = parasign.verifyEnvelope(
+        { documentHashHex, envelope: d.envelope },
+        { sigVerify: (sig, msg, pub) => { try { return registry.getSig(0x0002).verify(sig, msg, pub); } catch (e) { return false; } },
+          relayPub: relayIdentity.pk });
+
+      // The envelope signature can only be checked here if THIS relay notarised it.
+      if (d.envelope.notary && d.envelope.notary.relay_pk_hash && d.envelope.notary.relay_pk_hash !== relayIdentity.pk_hash) {
+        result.note = 'envelope was notarised by a different relay; verify its envelope_signature against notary.relay_pubkey_url';
+      }
+
+      const out = { valid: result.valid, errors: result.errors, verified_at: new Date().toISOString(),
+        signer_label: (d.envelope.signer && d.envelope.signer.label) || null };
+      if (result.note) out.note = result.note;
+      res.writeHead(result.valid ? 200 : 422, { 'Content-Type': 'application/json' });
+      return res.end(J(out));
+    } catch (e) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(J({ error: e.message }));
+    }
+  }
+
   // Admin paths: ONLY ADMIN_TOKEN is accepted — no enterprise keys, no pgp_ keys
   // All other paths: require a valid X-Api-Key (pgp_ key in users.json)
   const isAdminPath = path.startsWith('/v2/admin');
+
   // Public envelope recipient endpoints: GET status, POST view, POST sign
   // are reachable without an API key (the recipient may be an external
   // party). POST /v2/envelopes (create) is intentionally NOT in this list
@@ -10194,34 +10237,6 @@ async function handleRelayRequest(req, res) {
 
   // ── POST /v2/verify — ParaSign envelope verification (R017, public) ──────────
   // Stateless. The same checks run client-side; this is a convenience endpoint.
-  if (path === '/v2/verify' && req.method === 'POST') {
-    if (!mlDsa || !relayIdentity) { res.writeHead(503, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'ML-DSA-65 not available on this relay' })); }
-    try {
-      const d = JSON.parse((await readBody(req, 65536)).toString());
-      if (!d.envelope) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'envelope required' })); }
-      const documentHashHex = d.document_hash ? d.document_hash.toString().trim().toLowerCase() : null;
-
-      const result = parasign.verifyEnvelope(
-        { documentHashHex, envelope: d.envelope },
-        { sigVerify: (sig, msg, pub) => { try { return registry.getSig(0x0002).verify(sig, msg, pub); } catch (e) { return false; } },
-          relayPub: relayIdentity.pk });
-
-      // The envelope signature can only be checked here if THIS relay notarised it.
-      if (d.envelope.notary && d.envelope.notary.relay_pk_hash && d.envelope.notary.relay_pk_hash !== relayIdentity.pk_hash) {
-        result.note = 'envelope was notarised by a different relay; verify its envelope_signature against notary.relay_pubkey_url';
-      }
-
-      const out = { valid: result.valid, errors: result.errors, verified_at: new Date().toISOString(),
-        signer_label: (d.envelope.signer && d.envelope.signer.label) || null };
-      if (result.note) out.note = result.note;
-      res.writeHead(result.valid ? 200 : 422, { 'Content-Type': 'application/json' });
-      return res.end(J(out));
-    } catch (e) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: e.message }));
-    }
-  }
-
   // ── Multi-party envelope endpoints (ParaSign Model 2) ───────────────────────
   // The relay only knows: doc hash (sha3-256), envelope id (unguessable),
   // party labels, and party signatures over (sha3_256(id||doc_hash||index)).

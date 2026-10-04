@@ -494,6 +494,7 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
       <tr><td><span class="method get">GET</span></td><td>/v2/did/:did</td><td>DID-document opvragen</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/ct/log</td><td>Certificate Transparency-log (openbaar)</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/relays</td><td>Geregistreerde relaynodes en hun status</td><td>n/a</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/verify</td><td>Een oude .psign (v1/v2) controleren tegen de notarissleutel van deze relay</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/audit</td><td>Merkle-auditketen: export als JSON en CSV</td><td>Sleutel</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/team/devices</td><td>Apparaten van het team tonen</td><td>Sleutel</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/team/add-device</td><td>Apparaat aan het team toevoegen (Firm of hoger)</td><td>Sleutel</td></tr>

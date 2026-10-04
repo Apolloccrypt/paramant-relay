@@ -517,6 +517,7 @@ hash_, receipt = gp.send(open("pacs008.xml","rb").read())
       <tr><td><span class="method get">GET</span></td><td>/v2/did/:did</td><td>Resolve a DID document</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/ct/log</td><td>Certificate Transparency log (public)</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/relays</td><td>Registered relay nodes and status</td><td>n/a</td></tr>
+      <tr><td><span class="method post">POST</span></td><td>/v2/verify</td><td>Check an old .psign (v1/v2) against this relay's notary key</td><td>n/a</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/audit</td><td>Merkle audit chain, exportable as JSON or CSV</td><td>Key</td></tr>
       <tr><td><span class="method get">GET</span></td><td>/v2/team/devices</td><td>List team devices</td><td>Key</td></tr>
       <tr><td><span class="method post">POST</span></td><td>/v2/team/add-device</td><td>Add a device to a team (Firm or higher)</td><td>Key</td></tr>
