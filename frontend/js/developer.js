@@ -110,8 +110,19 @@
     });
   }
   function loadSnapshot() {
-    return json('/api/user/developer/snapshot').then(renderSnapshot).catch(function () {
+    return json('/api/user/developer/snapshot').then(renderSnapshot).catch(function (error) {
       byId('api-status-dot').className = 'status-dot err';
+      // A customer without developer access gets 404 here (developerGate). The
+      // page said "Verbruik wordt geladen." for ever (matrix DASH-27-N): say
+      // where the usage is instead.
+      var note = byId('usage-note');
+      if (!note) return;
+      note.textContent = error && error.status === 404
+        ? 'Het verbruik per maand staat voor uw account op het dashboard. '
+        : 'Het verbruik kon nu niet worden geladen. ';
+      var link = document.createElement('a');
+      link.href = '/dashboard'; link.textContent = 'Naar het dashboard';
+      note.appendChild(link);
     });
   }
 
