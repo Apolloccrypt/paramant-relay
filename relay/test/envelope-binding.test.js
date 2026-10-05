@@ -415,6 +415,10 @@ async function main() {
     assert.ok(!JSON.stringify(rows).includes(EMAIL_HASH), 'summary omits recipient email hash');
     assert.ok(!JSON.stringify(rows).includes('secret-invite-token'), 'summary omits invite token');
     assert.deepStrictEqual(await store.listAccountEnvelopes('acct_other', {}), [], 'stored account mismatch rejected');
+    // acceptatie r4, A2: the dashboard has to judge "still open" on the 7-day
+    // signing window, the date /co-sign shows, not on the 30-day record TTL.
+    assert.strictEqual(rows[0].sign_expires_at, new Date(Date.parse(hash.created_at) + 7 * 86400000).toISOString(),
+      'summary carries the signing window (created_at + 7d) for an email envelope');
     ok('dashboard worklist is account-scoped and capability-free');
   }
 

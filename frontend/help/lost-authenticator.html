@@ -268,8 +268,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">1</div>
     <div class="step-body">
       <h2>Probeer uw back-upcodes</h2>
-      <p>Vul op het inlogscherm uw e-mailadres en API-sleutel in en klik op <strong>Inloggen met een back-upcode</strong>. Vul een van de 10 eenmalige codes in die u kreeg toen u uw authenticator-app voor het eerst koppelde.</p>
-      <p>Werkt de code, ga dan naar <strong>Account &rarr; Beveiliging &rarr; Nieuwe authenticator-app instellen</strong>. Koppel een nieuwe authenticator-app voordat uw sessie verloopt.</p>
+      <p>Klik op het inlogscherm op <strong>Authenticator-app kwijt? Inloggen met een back-upcode</strong>. Op die pagina (<a href="/auth/backup">/auth/backup</a>) vult u uw e-mailadres in en een van de 10 eenmalige codes die u kreeg toen u uw authenticator-app voor het eerst koppelde.</p>
+      <p>Werkt de code, ga dan naar <a href="/account">Account</a> &rarr; <strong>Beveiliging</strong> &rarr; <strong>Nieuwe authenticator-app instellen</strong>. U krijgt een instelmail waarmee u een nieuwe app koppelt. Doe dat meteen: een sessie loopt af na een uur zonder activiteit.</p>
+      <p>Liever niet inloggen? Op <a href="/auth/request-reset">/auth/request-reset</a> vult u uw e-mailadres en een back-upcode in, en dan krijgt u de instelmail zonder in te loggen. Ook daar is een back-upcode nodig: de mailbox alleen is niet genoeg.</p>
       <div class="tip"><p>Heeft u de instelhandleiding gevolgd, dan staan uw back-upcodes in uw wachtwoordbeheerder. Kijk in 1Password, Bitwarden of waar u beveiligde notities bewaart.</p></div>
     </div>
   </div>
@@ -323,7 +324,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <div class="troubleshoot-item">
     <div class="q">Mijn hele team kan er niet meer in en het is dringend.</div>
-    <div class="a">Zet "URGENT" in de onderwerpregel en leg uit wat de gevolgen voor uw werk zijn. Een team dat helemaal niet meer bij zijn account kan, krijgt voorrang. Heeft een teamlid nog beheerderstoegang, dan kan die vanuit het dashboard namens u een herstel starten.</div>
+    <div class="a">Zet "URGENT" in de onderwerpregel en leg uit wat de gevolgen voor uw werk zijn. Elk account heeft zijn eigen authenticator-app en back-upcodes; een collega kan uw toegang niet vanuit zijn eigen account herstellen.</div>
   </div>
 
   <div class="troubleshoot-item">
@@ -379,6 +380,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 </body>
 </html>

@@ -86,6 +86,17 @@ bash deploy/ops/backup-full-state.sh --recipients    # expect "recipients: 2" or
 1. Only from **[admin]**. Read `deploy/DEPLOY-3.1.md` once before the first deploy.
 2. `main` is green in CI for the commit you deploy. Nothing gets merged while a deploy runs: the script expects one HEAD from start to finish.
 3. Preflight, read-only: `bash deploy/deploy-3.1.sh --preflight-only`
+   Mail carrier, **[server]**: the production `.env` must carry `MAIL_PROVIDER`
+   explicitly, `MAIL_PROVIDER=mailjet` as in `deploy/.env.example`. Left empty,
+   the relay takes the first carrier whose keys are present and lettermint heads
+   that list, so filling in `LETTERMINT_API_TOKEN` would switch carrier without
+   anyone deciding it. Check first that `MAILJET_API_KEY` and
+   `MAILJET_SECRET_KEY` are in that same `.env` (`grep -c '^MAILJET_' .env`
+   gives 2; names only, never print the values). A pinned carrier without keys
+   delivers nothing. Are they missing, then pin the carrier whose keys are there
+   and that `deploy/partners.json` lists as `actief`, and fix partners.json in
+   the same change. After the deploy the boot log's mail diagnosis must say that
+   provider with `gereed` true.
 4. Start detached, so a dropped connection does not kill it halfway:
    `setsid nohup bash deploy/deploy-3.1.sh > deploy-$(date +%Y%m%d-%H%M).log 2>&1 < /dev/null &`
 5. Follow it with `tail -f deploy-*.log`. Phase 2 prints a `TS`; write it down.
@@ -427,3 +438,18 @@ add it under `handmatig` in the right category with `reden`, `datum` and
 
 A new outside source also goes into `deploy/partners.json` as a party with
 role `blocklist-bron` (section 7); the test checks that.
+
+## 9. Relay identity key rotation
+
+Every relay signs receipts and multi-party proofs with its own ML-DSA-65 identity key (`RELAY_IDENTITY_FILE` on its own volume). `/verify` checks those signatures offline against the keys pinned in `frontend/js/relay-trust-anchors.js`. A relay that signs with a key that is not pinned makes every new proof it counter-signs show red. A proof signed before a rotation must keep verifying for years.
+
+The rule: the old key goes to `RETIRED_RELAY_ANCHORS` BEFORE the relay starts signing with the new one. Never delete a pin.
+
+1. Read the current key of the relay, over TLS: `curl -s https://<host>/v2/pubkey`. It must equal the pin for that host. If it does not, stop: the relay already rotated (or lost its volume), go to step 5.
+2. In one commit on a branch:
+   - move the entry for that host from `RELAY_TRUST_ANCHORS` to `RETIRED_RELAY_ANCHORS`, unchanged, plus `retired_at: 'JJJJ-MM-DD'`;
+   - leave the new pin out for now: the new key does not exist yet.
+3. Deploy that commit (frontend only). Old proofs keep verifying through the retired entry.
+4. Rotate: stop the relay, move its identity file aside (keep it, offline, with the escrow), start it. It generates a new key. Read it with `curl -s https://<host>/v2/pubkey`, add it to `RELAY_TRUST_ANCHORS` with `fingerprint` = SHA3-256 of the decoded key (`node -e "console.log(require('crypto').createHash('sha3-256').update(Buffer.from(process.argv[1],'base64')).digest('hex'))" <key>`), and deploy. Between step 4 and this deploy, new proofs from that relay show "signed by a key this page does not recognise": keep that window short.
+5. Unplanned rotation (volume lost): there is no old key to retire if it was never pinned; if it was pinned, step 2 still applies (the pin is the old key). Then pin the new key as in step 4.
+6. Check: `node deploy/check-relay-anchors.mjs` must end with "every relay serves its pinned key". `deploy/deploy-3.1.sh` runs the same check in phase 6 (step 6k), also under `--verify-only`, and stops the deploy when a relay serves a key that is not the current pin. CI runs `tests/relay-anchors-check.test.mjs`, which holds the pin file consistent (every fingerprint is the SHA3-256 of its own key, a retired entry has `retired_at` and is not also pinned) but cannot reach the relays.

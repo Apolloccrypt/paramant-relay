@@ -9,10 +9,28 @@
 // Pure w.r.t. I/O: it never touches Resend, env, or globals directly.
 const tierGate = require('./tier-gate');
 
+// Dutch and English (SENDNAME-23-F: a Dutch sender got "Your Paramant transfer
+// is ready"). `lang` 'nl' or 'en' picks one; anything else sends Dutch with the
+// English underneath, like the relay's other mails.
 const SUBJECTS = {
   upload:   'Your Paramant transfer is ready',
   download: 'Your Paramant transfer was downloaded',
 };
+const SUBJECTS_NL = {
+  upload:   'Uw Paramant-verzending staat klaar',
+  download: 'Uw Paramant-verzending is opgehaald',
+};
+
+function bodies(event, hashPrefix, bytes) {
+  const ref = String(hashPrefix || '').slice(0, 16);
+  const nl = `Een verzending van uw Paramant-account is ${event === 'download' ? 'opgehaald' : 'opgeslagen'}.\n\n`
+    + `Kenmerk: ${ref}\nGrootte: ${bytes || 0} bytes\n\n`
+    + 'U krijgt deze meldingen omdat uw abonnement ze bevat.';
+  const en = `A transfer on your Paramant account was ${event === 'download' ? 'downloaded' : 'stored'}.\n\n`
+    + `Reference: ${ref}\nSize: ${bytes || 0} bytes\n\n`
+    + 'You receive these notifications because your plan includes them.';
+  return { nl, en };
+}
 
 // maybeNotify: fire an upload/download notification IFF the account is ParaSend
 // Pro+ and has a contact e-mail. Returns { sent, reason }.
@@ -20,19 +38,17 @@ const SUBJECTS = {
 //   event     — 'upload' | 'download'
 //   hashPrefix— short content-hash prefix for the message (never the payload)
 //   bytes     — transfer size for the message
+//   lang      - 'nl' | 'en' | anything else = both
 //   sendEmail({ to, subject, text }) — injected mailer (relay: Resend helper)
-function maybeNotify({ keyData, event, hashPrefix, bytes, sendEmail }) {
+function maybeNotify({ keyData, event, hashPrefix, bytes, sendEmail, lang }) {
   if (!tierGate.isParasendProPlus(keyData)) return { sent: false, reason: 'tier' };
   const to = keyData && keyData.email;
   if (!to) return { sent: false, reason: 'no_email' };
   if (typeof sendEmail !== 'function') return { sent: false, reason: 'no_mailer' };
-  const subject = SUBJECTS[event] || SUBJECTS.upload;
-  const verb = event === 'download' ? 'downloaded' : 'stored';
-  const text =
-    `A transfer on your Paramant account was ${verb}.\n\n` +
-    `Reference: ${String(hashPrefix || '').slice(0, 16)}\n` +
-    `Size: ${bytes || 0} bytes\n\n` +
-    `You receive these notifications because your plan includes them.`;
+  const ev = event === 'download' ? 'download' : 'upload';
+  const { nl, en } = bodies(ev, hashPrefix, bytes);
+  const subject = lang === 'en' ? SUBJECTS[ev] : lang === 'nl' ? SUBJECTS_NL[ev] : `${SUBJECTS_NL[ev]} / ${SUBJECTS[ev]}`;
+  const text = lang === 'en' ? en : lang === 'nl' ? nl : `${nl}\n\n---\n\n${en}`;
   try {
     sendEmail({ to, subject, text });
     return { sent: true, reason: 'ok' };
@@ -41,4 +57,4 @@ function maybeNotify({ keyData, event, hashPrefix, bytes, sendEmail }) {
   }
 }
 
-module.exports = { maybeNotify, SUBJECTS };
+module.exports = { maybeNotify, SUBJECTS, SUBJECTS_NL };

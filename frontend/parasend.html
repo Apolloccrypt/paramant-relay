@@ -259,11 +259,11 @@
   <div class="container-md">
     <span class="mono-eyebrow">02 / Wat het doet</span>
     <h2 style="margin-top:var(--space-2)">Versleuteld op uw apparaat, gewist na het lezen</h2>
-    <p>ParaSend is het verzenddeel van Paramant. Het draait op dezelfde post-quantumkern als ParaSign. Uw bestand wordt versleuteld voordat het uw apparaat verlaat. Onze servers hebben dus niets dat ze kunnen afgeven of kwijtraken.</p>
+    <p>ParaSend is het verzenddeel van Paramant. Het draait op dezelfde servers als ParaSign. Uw bestand wordt versleuteld voordat het uw apparaat verlaat: met AES-256-GCM bij een eenmalige link of een verzending op naam, en bij Samen met ML-KEM-768 plus ECDH P-256 naar de sleutel van de ontvanger. Onze servers bewaren dus geen leesbaar bestand dat ze kunnen afgeven of kwijtraken.</p>
     <div class="check-grid">
       <div class="check-card">
         <div class="k">Verzegeld voordat het vertrekt</div>
-        <p>Uw browser verzegelt het bestand op uw eigen apparaat. Onze servers hebben alleen de verzegelde versie, nooit het bestand zelf en nooit de sleutel die het opent.</p>
+        <p>Uw browser verzegelt het bestand op uw eigen apparaat. Onze servers hebben alleen de verzegelde versie, nooit het bestand zelf. Bij een eenmalige link krijgen ze ook de sleutel nooit. Bij versturen naar ontvangers op naam gaat de sleutel ingepakt mee, en het token dat hem uitpakt gaat één keer langs de relay om te worden gemaild: die route is daarom niet zero-knowledge.</p>
       </div>
       <div class="check-card">
         <div class="k">Weg na de laatste keer lezen</div>
@@ -392,7 +392,7 @@
     <div class="check-grid">
       <div class="check-card">
         <div class="k">Wij zien de inhoud nooit</div>
-        <p>AES-256-GCM met een sleutel die uw browser maakt. De relay heeft alleen versleutelde data, nooit de leesbare tekst en nooit de sleutel, en houdt die in het werkgeheugen tot de laatste keer lezen hem wist. Een verzending uit de web app wordt bewaard in blokken van vast 5 MB. Een blok zegt dus niets over de grootte van het bestand. De bewaarregel staat op de <a href="/security">beveiligingspagina</a>.</p>
+        <p>AES-256-GCM met een sleutel die uw browser maakt. Bij ParaSend heeft de relay alleen versleutelde data en nooit de leesbare tekst. Bij een eenmalige link heeft hij ook nooit de sleutel. Bij een verzending naar ontvangers op naam ziet de relay het token dat de sleutel uitpakt één keer, als hij het in de uitnodiging mailt, en bewaart daarna alleen een hash ervan. De relay houdt de data die in het werkgeheugen tot de laatste keer lezen hem wist. De grootte ziet de relay wel ongeveer: een eenmalige link wordt niet opgevuld tot een vaste maat. De bewaarregel staat op de <a href="/security">beveiligingspagina</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">Het berichtformaat, volledig</div>
@@ -404,7 +404,7 @@
       </div>
       <div class="check-card">
         <div class="k">Europese grond, Europees recht</div>
-        <p>Hetzner in Duitsland, Bunny DNS (Slovenië). Uw bestanden gaan niet langs een Amerikaanse partij. E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten, zoals <a href="/privacy">/privacy</a> uitlegt. Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Geen Amerikaanse partij komt aan een bestand of een sleutel. Op die pagina staan ook de subverwerkers. Regel 5 op <a href="/rules">onze regelspagina</a> zegt hetzelfde, volledig.</p>
+        <p>Hetzner in Duitsland, Bunny DNS (Slovenië). De versleutelde bestanden staan alleen op onze servers in de EU. E-mail gaat nu nog via Resend in de Verenigde Staten, zoals <a href="/privacy">/privacy</a> uitlegt; we stappen over naar een Nederlandse aanbieder. Bij versturen naar ontvangers op naam bevat die mail de link met het token, en de ophaalcode komt ook per mail: wie beide leest, kan het bestand openen. Wilt u dat niet, stuur dan een eenmalige link, die wij niet mailen. Op die pagina staan ook de subverwerkers. Regel 5 op <a href="/rules">onze regelspagina</a> zegt hetzelfde, volledig.</p>
       </div>
       <div class="check-card">
         <div class="k">Geen verzoeken aan derden</div>
@@ -476,6 +476,6 @@
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 </body>
 </html>

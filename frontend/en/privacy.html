@@ -199,14 +199,14 @@ footer a{color:var(--ink);text-decoration:none}
 
   <ul class="nav-links">
     <li><a href="/en#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
     <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/help" class="nav-help">Help</a>
     <a href="/en/auth/login" class="nav-signin">Sign in</a>
     <a href="/en/signup" class="nav-cta">Create account</a>
   </div>
@@ -220,14 +220,14 @@ footer a{color:var(--ink);text-decoration:none}
 </nav>
 <div class="nav-mobile" id="nav-mobile">
   <a href="/en#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
   <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/en/help" class="nav-tail-link">Help</a>
   <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/privacy" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/privacy" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main id="main-content" tabindex="-1">
@@ -244,7 +244,7 @@ footer a{color:var(--ink);text-decoration:none}
 
 <h2>How sending works (the ParaSend web app)</h2>
 <p>Files sent through the web app are encrypted <strong>client-side in your browser</strong> using post-quantum cryptography (ML-KEM-768 + ECDH P-256 + AES-256-GCM + HKDF-SHA256) before they ever reach our servers. The relay never sees plaintext on that path. The one place it does is the hosted signing ceremony on the <code>/v1</code> API, where the document is sent to us so that we can run the ceremony; we hold it, sealed at rest under our own key, until that envelope ends.</p>
-<p>Files are split into 5 MB encrypted chunks. Each chunk exists only in RAM on our relay server. On the Community plan it is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>); a paid plan buys more reads per link through the API before that same destruction, up to 10 on Firm and 100 on Enterprise. Encrypted payload data is never written to disk. From a <em>transfer</em>, the only thing persisted to disk is cryptographic hashes in the public Certificate Transparency log: no file content, no keys, no plaintext. (Account data, listed below, is stored separately to run your account.)</p>
+<p>Files travel encrypted in blocks of at most 5 MB: in the live hand-over in blocks padded to exactly 5 MB, for a one-time link or a send to a person without padding, at the encrypted size. Each block exists only in RAM on our relay server. On the Community plan it is permanently and irreversibly destroyed after the first download (<strong>burn-on-read</strong>); a paid plan buys more reads per link through the API before that same destruction, up to 10 on Firm and 100 on Enterprise. Encrypted payload data is never written to disk. From a <em>transfer</em>, the only thing persisted to disk is cryptographic hashes in the public Certificate Transparency log: no file content, no keys, no plaintext. (Account data, listed below, is stored separately to run your account.)</p>
 <p>Community plan blobs expire after 1 hour maximum. Firm blobs after 24 hours. Enterprise blobs after 7 days. All are destroyed earlier once the last read of the link is spent.</p>
 
 <h2>How ParaSign document delivery works</h2>
@@ -256,7 +256,7 @@ footer a{color:var(--ink);text-decoration:none}
 <table>
 <thead><tr><th>Data</th><th>Purpose</th><th>Storage</th><th>Shared</th></tr></thead>
 <tbody>
-<tr><td>Encrypted blob (5 MB padded chunks)</td><td>One-time secure transfer</td><td>RAM only &middot; burn-on-read</td><td>Never</td></tr>
+<tr><td>Encrypted blob (blocks up to 5 MB; padded only in the live hand-over)</td><td>One-time secure transfer</td><td>RAM only &middot; burn-on-read</td><td>Never</td></tr>
 <tr><td>ParaSign encrypted document capsule</td><td>Deliver the document with a signing request</td><td>Redis &middot; expires with the envelope</td><td>Hosting provider stores ciphertext only</td></tr>
 <tr><td>Personal ParaSign invitation link</td><td>Bind one recipient to one encrypted document and signing slot</td><td>Processed during delivery; not written to application logs</td><td>Resend (United States) only when you choose email delivery</td></tr>
 <tr><td>SHA-256 hash of blob</td><td>Routing &amp; delivery confirmation</td><td>RAM only &middot; deleted after its last read</td><td>Never</td></tr>
@@ -265,7 +265,7 @@ footer a{color:var(--ink);text-decoration:none}
 <tr><td>Device ID hash (CT log)</td><td>Public tamper-evident audit log</td><td>Disk &middot; /data/ct-log.json &middot; SHA3-256 one-way hash only</td><td>Never</td></tr>
 <tr><td>Signed delivery receipt</td><td>Proof that a transfer was delivered</td><td>Redis &middot; 15 minutes, then deleted</td><td>Never</td></tr>
 <tr><td>Aggregated relay statistics</td><td>System health monitoring</td><td>In-process counters only</td><td>Never</td></tr>
-<tr><td>Email address</td><td>Account identity, login, recovery, signing-invite delivery</td><td>Stored (server) &middot; also kept as a hash for rate-limiting</td><td>Email provider (Resend, United States) for messages we send you</td></tr>
+<tr><td>Email address</td><td>Account identity, login, recovery, signing-invite delivery, and telling the sender that someone signed (kept until the document is complete, at most 8 days). The addresses a sender invites to sign are kept readable, not as a hash, because we email those people that everyone has signed; an email cannot go to a hash. They are deleted as soon as the document is complete or someone declines, after 8 days at most.</td><td>Stored (server) &middot; also kept as a hash for rate-limiting</td><td>Email provider (Resend, United States) for messages we send you</td></tr>
 <tr><td>Sign-in factors: passkey public keys, TOTP secret (encrypted), recovery codes (hashed)</td><td>Account authentication</td><td>Stored (server)</td><td>Never</td></tr>
 <tr><td>ParaSign signing public key + fingerprint</td><td>Verifiable signing identity</td><td>Stored (server) &middot; public half only; the private key never leaves your browser</td><td>Public (its hash is in the CT log)</td></tr>
 <tr><td>Plan + anonymised billing reference</td><td>Firm/Enterprise billing</td><td>Stored (server)</td><td>Payment processor (Mollie, EU)</td></tr>
@@ -296,10 +296,15 @@ footer a{color:var(--ink);text-decoration:none}
 <li><strong>ECDH + ML-KEM key pairs</strong>: generated locally for end-to-end encryption (SDK / Ghost Pipe sessions)</li>
 <li><strong>Nonce registry</strong>: replay-attack protection (SDK sessions)</li>
 <li><strong>Status history</strong> (<code>paramant_status_v1</code>): the last 24 hours of relay health checks your own browser made on the status page</li>
+<li><strong>Key of a document you sent for signing</strong> (<code>paramant.cosign.key.v1:&hellip;</code>): when you send a document for signing on /sign, this browser keeps the key of that encrypted document, so you can open the complete signed document here later. It is your own document; the key is not sent to us. It is wiped when you sign out, when your session runs out, when another account signs in on this browser, when the request is withdrawn, declined or expired, as soon as you open the completed document here, and in any case after 24 hours.</li>
+<li><strong>Signing links of a request you sent</strong> (<code>paramant.cosign.links.v1:&hellip;</code>): each signer's personal link, with the half of the document key that is also in the invitation, so you can give a signer the link again from your dashboard. That half opens nothing without the invited email address signing in. They are not sent to us and are wiped when you sign out, when another account signs in on this browser, and when the request expires (at the latest after eight days).</li>
+<li><strong>Authenticator tip seen</strong> (<code>paramant.sha1tip.v1</code>): that you have seen the tip after signing in once, so it does not come back at every sign-in</li>
+<li><strong>Which account signed in here last</strong> (<code>paramant.local.owner</code>): a hash of the email address, not the address itself. When another account signs in here, this browser wipes the previous account's draft and document keys. It is not sent to us.</li>
+<li><strong>Draft of a document you prepared</strong> (in IndexedDB, under the name paramant-sign-draft): if your session on /sign expires halfway, this browser keeps the document, the spot and the recipients, so everything is back after you sign in. All of it is encrypted with a key that belongs to your account and is not stored in this browser, so another account cannot open the draft. It is wiped as soon as you send or sign, when you start over, when you sign out, when another account signs in here, and otherwise after two hours. The document is not sent to us.</li>
 <li><strong>Signature placement template</strong> (<code>parasign.placement.tpl.v1</code>): where you last put a seal on a page, so the next document opens the same way</li>
 <li><strong>Seen signing fingerprints</strong> (<code>paramant_fp_&hellip;</code>): a marker per signing key you have already been shown, so a known key is not flagged as new</li>
 <li><strong>Dismissed key-setup notice</strong> (<code>paramant.keysetup.dismissed.v1</code>): that you closed the signing-key banner on your dashboard</li>
-<li><strong>A gift code you have not spent yet</strong> (<code>paramant.redeem.code</code>): the code you typed on <a href="/redeem">/redeem</a> before you had an account. A code grants nothing on its own and is not a key to anything; it is kept only so that making an account, which finishes through a link in your email, does not cost you the code. It is deleted the moment the code is used.</li>
+<li><strong>A gift code you have not spent yet</strong> (<code>paramant.redeem.code</code>): the code you typed on <a href="/en/redeem">/redeem</a> before you had an account. A code grants nothing on its own and is not a key to anything; it is kept only so that making an account, which finishes through a link in your email, does not cost you the code. It is deleted the moment the code is used.</li>
 <li><strong>Appearance</strong> (<code>paramant.theme.v1</code>): whether you asked the site to follow your system, stay light or go dark, set on /account or with the sun and moon in the menu bar. Without it the site follows your system. Nothing is sent to us; the choice lives in this browser and on this device only.</li>
 <li><strong>Passkey / WebAuthn credentials</strong>: your passkey&rsquo;s private key is created and held by your device or password manager. PARAMANT only ever stores its <em>public</em> key, server-side; the private key never leaves your device.</li>
 <li><strong>ParaSign signing vault</strong> (IndexedDB): if you sign documents, your post-quantum signing key (ML-DSA-65) is generated and kept in your browser&rsquo;s IndexedDB, encrypted either with your passkey (WebAuthn-PRF &rarr; HKDF &rarr; AES-256-GCM) or, if your passkey provider cannot do that, with a passphrase (PBKDF2 &rarr; AES-256-GCM). The private key never leaves your device; only its public half is registered to your account.</li>
@@ -309,14 +314,14 @@ footer a{color:var(--ink);text-decoration:none}
 <h2>Your API key, and which pages hold it</h2>
 <p>Your account has an API key. It is stored on our servers; nothing in the list above keeps it in your browser, and no page writes it to local storage. Some pages do load it into memory for as long as their tab is open, and we would rather name them than leave you to guess.</p>
 <ul>
-<li><strong>Sending a file (<code>/parashare</code>) does not.</strong> It asks our server for a <em>session token</em> instead. That token lives fifteen minutes, the relay accepts it on the seven requests a transfer makes and refuses it on everything else, and it is held in the page&rsquo;s memory only, so closing the tab ends it. Revoking your API key revokes every token minted from it. On a self-hosted relay without our admin panel you can still type a key by hand on that page, and then it is in that browser for as long as the tab is open, which is why the page says so where it offers it.</li>
+<li><strong>Sending a file (<code>/parashare</code>) does not.</strong> It asks our server for a <em>session token</em> instead. That token lives fifteen minutes, the relay accepts it on the nine requests a transfer makes and refuses it on everything else, and it is held in the page&rsquo;s memory only, so closing the tab ends it. Revoking your API key revokes every token minted from it. On a self-hosted relay without our admin panel you can still type a key by hand on that page, and then it is in that browser for as long as the tab is open, which is why the page says so where it offers it.</li>
 <li><strong>Your account page (<code>/account</code>) does, but only when you ask it to.</strong> Showing you your key is what that page is for, so it is the one page that still loads it. Opening <em>Advanced account key</em> is what fetches it; a visit that never opens that section never asks our server for the key at all, and nothing of it is on the page.</li>
 <li><strong>The pricing and dashboard pages (<code>/pricing</code>, <code>/dashboard</code>) no longer do.</strong> They used to authenticate to the relay with the key itself, to start a checkout and to read your history. They now use the same kind of session token as the send page: a different token, minted for those pages, which the relay accepts on five requests (starting a checkout, spending a gift code on your own account, reading your own history, exporting your own signing audit, and reading the list of documents waiting for your signature) and refuses on everything else. It is not the send page&rsquo;s token and cannot do what that one does, or the other way round.</li>
 </ul>
 <p>Nothing on this list survives the tab. Closing the page ends it, and a later visit starts again from the server.</p>
 
 <h2>Servers &amp; jurisdiction</h2>
-<p>All relay servers run on <strong>Hetzner</strong> infrastructure in <strong>Nuremberg, Germany (EU/DE)</strong>. There is no infrastructure in the United States or outside the EU. No CLOUD Act exposure for files and keys: they are subject to EU/GDPR jurisdiction only. Email (only the email address and the invite link, never the document or a key) still goes through Resend Inc. in the United States for now. That is the one exception in the chain; we are moving to a Dutch provider. See the sub-processors below.</p>
+<p>All relay servers run on <strong>Hetzner</strong> infrastructure in <strong>Nuremberg, Germany (EU/DE)</strong>. There is no infrastructure in the United States or outside the EU. The encrypted files sit only on those servers. Email still goes through Resend in the United States for now. A signing invite carries half of a split key, which opens nothing without the other half that only the signed-in recipient receives. For a send to named recipients the invitation carries the link with the token, and the pickup code is emailed too: whoever reads both emails can open the file. That is the one exception in the chain; we are moving to a Dutch provider. See the sub-processors below.</p>
 
 <h2>Network edge</h2>
 <p>TLS is terminated by <strong>our own edge (Caddy)</strong>, running on the same Hetzner infrastructure in Germany, with post-quantum key exchange. There is no third-party reverse proxy or CDN in front of the site: your connection reaches our server and nowhere else. Short-lived connection metadata (IP, timestamp) is processed transiently for security and abuse-prevention as described above, never for analytics.</p>
@@ -335,7 +340,7 @@ footer a{color:var(--ink);text-decoration:none}
 <ul>
 <li><strong>Hetzner</strong> (Germany, EU): hosting and infrastructure.</li>
 <li><strong>Bunny.net</strong> (Slovenia, EU): DNS hosting for paramant.app. It answers the lookup for our name; it is not a CDN or a proxy, and no request for a page or a file passes through it.</li>
-<li><strong>Resend</strong> (Plus Five Five, Inc., United States): transactional email only (account verification, signing invites, billing notices, and invitations to collect a file sent to named recipients). Resend receives the email address, the subject and the message with the link. For a signing invite that is the complete personal link. For a send to named recipients it also receives the file name the sender chose, and a one-time link; the key that opens the file is wrapped and stays with us, so the link alone does not open anything. Resend never receives the document or a key and is never used for marketing. The transfer to the United States is covered by Standard Contractual Clauses (Commission Implementing Decision (EU) 2021/914). That is the one exception in the chain; we are moving to a Dutch provider.</li>
+<li><strong>Resend</strong> (Plus Five Five, Inc., United States): transactional email only (account verification, signing invites, telling the sender that someone signed (only the number of signatures, no file name or names), telling each invitee that everyone has signed (no link, file name or names), billing notices, and invitations to collect a file sent to named recipients). Resend receives the email address, the subject and the message with the link. For a signing invite that is the complete personal link. For a send to named recipients it also receives the file name the sender chose, and a one-time link with the token that unwraps the wrapped key. Collecting the file also takes a pickup code, and that too goes through Resend to the same address. So whoever reads both emails can open the file. Resend never receives the document itself and is never used for marketing. The transfer to the United States is covered by Standard Contractual Clauses (Commission Implementing Decision (EU) 2021/914). That is the one exception in the chain; we are moving to a Dutch provider.</li>
 <li><strong>Mollie</strong> (the Netherlands: a Dutch company, EU jurisdiction, GDPR-native): payment processing for paid plans. Checkout runs through Mollie today. <strong>Every payment is a one-off for the term you buy; there are no subscriptions</strong>, because the recurring layer stays switched off until an operator sets it. The relay sends Mollie the amount, a plan description and payment metadata (accountId, product, plan, interval), and no email address while the recurring layer is off. Only when the VAT is reverse charged are the business&rsquo;s VAT number and the proof of the check added (vat, vatId, vatCheckedAt, vatConsultation). Card data is entered on Mollie&rsquo;s own pages; PARAMANT never sees or stores card numbers, only your plan and an anonymised reference.</li>
 <li data-partner-context="moneybird voorwaardelijk"><strong>Moneybird</strong> (the Netherlands: a Dutch company, EU jurisdiction): bookkeeping, and only when the operator of this deployment has connected an administration. It then receives the invoice or credit note itself: the document number, date, description, amounts and VAT, the billing details you entered (company name, invoice address, VAT number) and your email address, together with the PDF of the document. It receives nothing about your files, your transfers or your signatures.</li>
 <li data-partner-context="vies voorwaardelijk"><strong>VIES</strong> (the European Commission&rsquo;s VAT number check, ec.europa.eu, European Union): only when a business from another EU country checks out with a VAT number and the operator of this deployment has configured the seller&rsquo;s VAT number. The relay then asks whether that VAT number is valid, so the VAT can be reverse charged. VIES receives only that VAT number and the seller&rsquo;s VAT number, no name, email address, address or amount. What VIES answers (the date, the consultation number and the name and address it holds for the number) is kept with the invoice as proof of the check. If no payment follows, it is deleted after 30 days.</li>
@@ -343,7 +348,7 @@ footer a{color:var(--ink);text-decoration:none}
 <p>What each party receives and never receives, and whether it is active today: <a href="/en/partners">current status at /en/partners</a>.</p>
 
 <h2>GDPR / AVG</h2>
-<p>We process the minimum personal data needed to run your account, on a lawful basis (performing the service you request, and our legitimate interest in keeping it secure). You can request access to, or deletion of, your account data by emailing us. The standard <strong>Data Processing Agreement (DPA)</strong> is published at <a href="/dpa">/dpa</a> and applies to all plans; anyone can sign it electronically, with no account and no paid tier required.</p>
+<p>We process the minimum personal data needed to run your account, on a lawful basis (performing the service you request, and our legitimate interest in keeping it secure). You can request access to, or deletion of, your account data by emailing us. The standard <strong>Data Processing Agreement (DPA)</strong> is published at <a href="/en/dpa">/dpa</a> and applies to all plans; anyone can sign it electronically, with no account and no paid tier required.</p>
 <p>Temporary relay data is never retained longer than the applicable TTL (1 hour for Community, 24 hours for Firm, 7 days for Enterprise). In practice it is destroyed much earlier on download.</p>
 
 <h2>Children</h2>
@@ -389,6 +394,6 @@ footer a{color:var(--ink);text-decoration:none}
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 </body>
 </html>

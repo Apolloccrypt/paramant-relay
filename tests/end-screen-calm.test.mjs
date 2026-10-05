@@ -198,9 +198,9 @@ async function stubSender(page) {
 // Both languages: /parashare is Dutch, and the English text it carried before
 // lives on at /en/parashare with the same pins.
 for (const P of [
-  { path: '/en/parashare', once: /Works once, until \d{1,2} \w+ \d{4}, \d{2}:\d{2} UTC/,
+  { path: '/en/parashare', once: /Works once, until \d{1,2} \w+ \d{4} at \d{2}:\d{2}( \([^)]+\))?/,
     canNow: /can now download/i, compared: /compared the code with/ },
-  { path: '/parashare', once: /Werkt één keer, tot \d{1,2} \w+ \d{4}, \d{2}:\d{2} UTC/,
+  { path: '/parashare', once: /Werkt één keer, tot \d{1,2} \w+ \d{4} om \d{2}:\d{2}( \([^)]+\))?/,
     canNow: /can now download|kan nu downloaden|kan het nu downloaden/i, compared: /met wie u de controlecode vergeleek/ },
 ]) {
 {
@@ -276,6 +276,23 @@ const GLANGS = [
     onePage: /1 page/, openHere: /is open here in this tab/, save: 'Save' },
 ];
 
+// /get fetches nothing before the receiver presses the button (2026-10-04), and
+// confirms the download afterwards. The probe and the confirmation are stubbed
+// here so no request leaves the machine; the button is pressed like a person.
+// A regex, not a glob: the page asks .../get?claim=<id>, and a glob is matched
+// against the whole URL, query included.
+const DL_GET_RE = /^https:\/\/health\.paramant\.app\/v2\/dl\/[^/]+\/get(\?|$)/;
+async function stubDlSides(page) {
+  await page.route('https://health.paramant.app/v2/dl/**/info', (r) => r.fulfill({ status: 200,
+    contentType: 'application/json', body: JSON.stringify({ ok: true, file_size: 2000, ttl_left_s: 3600, used: false }) }));
+  await page.route(/https:\/\/health\.paramant\.app\/v2\/dl\/.*\/(ack|release)$/, (r) => r.fulfill({ status: 200,
+    contentType: 'application/json', body: '{"ok":true,"burned":true}' }));
+}
+async function pressDownload(page) {
+  await page.waitForSelector('#step-ready.active #ready-btn:not([disabled])', { timeout: 20000 });
+  await page.click('#ready-btn');
+}
+
 // ── /get, received through a link ───────────────────────────────────────────
 for (const G of GLANGS) {
   {
@@ -285,10 +302,12 @@ for (const G of GLANGS) {
 
     const ctx = await browser.newContext({ viewport: PHONE, acceptDownloads: true });
     const page = await ctx.newPage();
-    await page.route('https://health.paramant.app/v2/dl/**/get', (r) =>
+    await page.route(DL_GET_RE, (r) =>
       r.fulfill({ status: 200, contentType: 'application/octet-stream', body: ct }));
+    await stubDlSides(page);
     const dl = page.waitForEvent('download', { timeout: 30000 });
     await page.goto(`${ORIGIN}${G.pre}/get?t=${'a'.repeat(48)}&r=health#${frag}`, { waitUntil: 'domcontentloaded' });
+    await pressDownload(page);
     await dl;
     await page.waitForSelector('#step-done.active', { timeout: 20000 });
     const text = await audit(page, G.pre + '/get', '#step-done');
@@ -313,9 +332,11 @@ for (const G of GLANGS) {
 
     const ctx = await browser.newContext({ viewport: PHONE, acceptDownloads: true });
     const page = await ctx.newPage();
-    await page.route('https://health.paramant.app/v2/dl/**/get', (r) =>
+    await page.route(DL_GET_RE, (r) =>
       r.fulfill({ status: 200, contentType: 'application/octet-stream', body: ct }));
+    await stubDlSides(page);
     await page.goto(`${ORIGIN}${G.pre}/get?t=${'a'.repeat(48)}&r=health#${frag}`, { waitUntil: 'domcontentloaded' });
+    await pressDownload(page);
     await page.waitForSelector('#step-done.active', { timeout: 40000 });
     await page.locator('#step-done .done-payload canvas').first().waitFor({ timeout: 40000 });
     const text = await audit(page, G.pre + '/get PDF', '#step-done');
@@ -367,9 +388,13 @@ for (const G of GLANGS) {
           body: JSON.stringify({ ecdh_pub: 'tok_' + 'c'.repeat(44), kyber_pub: '1|3600000' }) })
       : r.fulfill({ status: 404, body: '' }));
     await page.route('https://health.paramant.app/v2/pubkey', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }));
-    await page.route('https://health.paramant.app/v2/dl/**/get', (r) => r.fulfill({ status: 200,
+    // Claim mode since the hertest of 04-10 (T4-3): .../get?claim=..., then an
+    // ack once the block is decrypted.
+    await page.route(/^https:\/\/health\.paramant\.app\/v2\/dl\/[^/]+\/get(\?|$)/, (r) => r.fulfill({ status: 200,
       contentType: 'application/octet-stream', headers: { 'X-Hash': 'deadbeefcafe01234567890abcdef' },
       body: Buffer.from([1, 2, 3]) }));
+    await page.route(/^https:\/\/health\.paramant\.app\/v2\/dl\/[^/]+\/(ack|release)$/, (r) => r.fulfill({ status: 200,
+      contentType: 'application/json', body: '{"ok":true,"burned":true}' }));
     const dl = page.waitForEvent('download', { timeout: 40000 }).catch(() => null);
     await page.goto(`${ORIGIN}${G.pre}/ontvang?s=${S}`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => /^[0-9A-F]{4}(-[0-9A-F]{4}){4}$/.test((document.getElementById('fp-display')?.textContent || '').trim()),
@@ -444,6 +469,12 @@ async function pickPdf(page, name) {
   await page.locator('#ds-pdf-canvas-list .ds-page-wrap[data-page-index="1"]').click({ position: { x: 150, y: 300 } });
   await page.locator('#ds-place-continue').click();
   await page.locator('#step-recipients:not([hidden])').waitFor({ timeout: 20000 });
+  // The recipients step in the invite flow: no promise that the sender hands
+  // over a key "on the next screen" (retest T5-3), and no "optional" for the
+  // people the whole request is for (T5-12d).
+  const recipientsText = await page.locator('#step-recipients').evaluate((el) => el.innerText);
+  ok('/sign invite recipients: it does not send the sender to hand over a key',
+    !/volgende scherm|zelf door/i.test(recipientsText) && !/optioneel/i.test(recipientsText.split('\n')[0]), recipientsText.slice(0, 300));
   await page.locator('#ds-add-recipient').click();
   await page.locator('[data-field="label"]').fill('Marije de Vries');
   await page.locator('[data-field="email"]').fill('marije@example.com');
@@ -452,12 +483,23 @@ async function pickPdf(page, name) {
   await page.locator('.ds-pl-copy').first().waitFor({ timeout: 20000 });
   const text = await audit(page, '/sign invitations sent', '#step-done');
   ok('/sign invitations sent: the stage bar is gone', !(await page.locator('#ds-stepper').isVisible()));
-  // The screen may not stop at "sent": the email is a notice and the key is
-  // deliberately not in it, so the sender has one more thing to do and has to
-  // be told. See admin/lib/email-templates.js for why the key stays here.
+  // Since 2026-10-04 the invitation link opens the document for the signed-in
+  // invitee (half a split key in the link, the other half from the relay; see
+  // admin/lib/email-templates.js). So the screen says the sender is done, and
+  // what happens next.
   ok('/sign invitations sent: it says what is true now, in words',
-    /Bericht verstuurd\. Stuur nu de links\./.test(text) && /bevat geen sleutel/.test(text),
+    /Uitnodigingen verstuurd\./.test(text) && /hoeft niets meer te sturen/.test(text),
     text.slice(0, 200));
+  // And nothing on the screen, also not in the fold, says the opposite
+  // (retest T5-3: "niets meer sturen" next to "Stuur nu iedereen de eigen link").
+  const everything = await page.locator('#step-done').evaluate((root) => {
+    const parts = [];
+    const walk = (el) => { if (el.hidden) return; for (const n of el.childNodes) { if (n.nodeType === 3) parts.push(n.textContent); else if (n.nodeType === 1) walk(n); } };
+    walk(root);
+    return parts.join(' ').replace(/\s+/g, ' ');
+  });
+  ok('/sign invitations sent: no line tells the sender to send the links after all',
+    !/Stuur nu iedereen|stuur .{0,20}zelf|geef .{0,30}zelf door/i.test(everything.replace(/geef wie geen mail kreeg[^.]*\./, '')), everything.slice(0, 600));
   await page.close();
 }
 
@@ -483,6 +525,10 @@ async function pickPdf(page, name) {
   ok('/sign signed yourself: the stage bar is gone', !(await page.locator('#ds-stepper').isVisible()));
   ok('/sign signed yourself: it says to keep both files, without naming a scheme',
     /Bewaar nu beide bestanden/.test(text), text.slice(0, 200));
+  // Acceptatie r4, punt 3: /verify turns green with the stamped copy, not the
+  // file the signer started from, so the end screen says which one by name.
+  ok('/sign signed yourself: it names the file to check with on /verify',
+    /Controleer later op \/verify met signed-Lease agreement 2026\.pdf en het bewijsbestand, niet met Lease agreement 2026\.pdf/.test(text), text.slice(0, 400));
   await page.close();
 }
 

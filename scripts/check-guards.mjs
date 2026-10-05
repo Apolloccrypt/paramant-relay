@@ -524,8 +524,9 @@ export function checkInvariants() {
   // I2. A guard whose threshold sits above the ceiling that kills the process
   // first can never refuse anything.
   //
-  // relay.js:1356 refuses an upload when
-  //   rss + BLOB_SIZE_MB * (inFlight + 1) > RAM_LIMIT_MB + RAM_RESERVE_MB
+  // relay.js ramOk() refuses an upload when
+  //   blob bytes held + 4 * MAX_BLOB * (inFlight + 1) > RAM_LIMIT_MB + RAM_RESERVE_MB
+  // (its own tracked bytes, not RSS, which does not come back after a peak)
   // and the container is killed by the kernel at its cgroup limit. If the sum on
   // the right is at or above that limit, the kernel always acts first and the
   // branch is dead code: the relay never answers "at capacity", it just

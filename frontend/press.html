@@ -231,7 +231,7 @@ td{color:var(--cobalt)}
 
   <div class="blurb">
     <strong>50 woorden</strong>
-    <p>Met Paramant laten professionele kantoren in de EU documenten ondertekenen en versturen ze bestanden versleuteld. Het is van Paramantis Solutions B.V. in Harderwijk. Handtekeningen gebruiken ML-DSA-65. Bestanden worden op het eigen apparaat versleuteld, na inloggen met een hybride van ML-KEM-768 en ECDH P-256. De server bewaart alleen versleutelde gegevens, in het werkgeheugen. Servers bij Hetzner in Neurenberg, Duitsland.</p>
+    <p>Met Paramant laten professionele kantoren in de EU documenten ondertekenen en versturen ze bestanden versleuteld. Het is van Paramantis Solutions B.V. in Harderwijk. Handtekeningen gebruiken ML-DSA-65. Bestanden worden op het eigen apparaat versleuteld: bij Samen met een hybride van ML-KEM-768 en ECDH P-256, bij een eenmalige link of een verzending op naam met AES-256-GCM. Bij Versturen bewaart de server alleen versleutelde gegevens, in het werkgeheugen; bij een verzending op naam ziet hij het token dat de sleutel uitpakt één keer, om het te mailen. Servers bij Hetzner in Neurenberg, Duitsland.</p>
   </div>
 
   <div class="blurb">
@@ -273,9 +273,9 @@ td{color:var(--cobalt)}
   <h2>Waarin Paramant verschilt</h2>
 
   <ul class="bullet-list">
-    <li><strong>Wij zien nooit leesbare inhoud.</strong> De versleuteling gebeurt op uw eigen computer, vóór het uploaden. In de webapp gebeurt dat met Rust, gecompileerd naar WASM; bij de eenmalige link met Web Crypto. Onze server kan uw bestand niet lezen, ook niet op bevel van een rechter, omdat hij het leesbare bestand nooit heeft gehad.</li>
+    <li><strong>Wij zien nooit leesbare inhoud.</strong> De versleuteling gebeurt op uw eigen computer, vóór het uploaden. In de webapp gebeurt dat met Rust, gecompileerd naar WASM; bij de eenmalige link met Web Crypto. Onze server kan uw bestand niet lezen, ook niet op bevel van een rechter, omdat hij het leesbare bestand nooit heeft gehad. Uitzondering: bij versturen naar ontvangers op naam gaat het token dat de sleutel uitpakt één keer langs de server om te worden gemaild.</li>
     <li><strong>Gewist na lezen, en anders na een vaste tijd.</strong> Het versleutelde bestand wordt vernietigd zodra de link zo vaak is gelezen als toegestaan. Op Community is dat na de eerste keer. Wordt het niet gelezen, dan wordt het na een vaste tijd vernietigd: een uur op Community, vierentwintig uur op Firm, zeven dagen op Enterprise. Wie daarna bij onze server inbreekt, vindt niets.</li>
-    <li><strong>Europees recht als uitgangspunt.</strong> De servers staan bij Hetzner in Neurenberg, Duitsland. Geen Amerikaanse partij krijgt ooit versleutelde gegevens of een sleutel in handen. Eén subverwerker is Amerikaans, en de <a href="/dpa">verwerkersovereenkomst</a> noemt die: e-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten. Dat is de enige uitzondering; we stappen over naar een Nederlandse aanbieder. Geen blootstelling aan de CLOUD Act voor de inhoud van overdrachten. AVG-conform door de architectuur, niet door beleid.</li>
+    <li><strong>Europees recht als uitgangspunt.</strong> De servers staan bij Hetzner in Neurenberg, Duitsland. Eén subverwerker is Amerikaans, en de <a href="/dpa">verwerkersovereenkomst</a> noemt die: e-mail gaat nu nog via Resend in de Verenigde Staten. Bij versturen naar ontvangers op naam bevat die mail de link met het token en gaat ook de ophaalcode per mail; samen openen ze het bestand. Dat is de enige Amerikaanse partij; we stappen over naar een Nederlandse aanbieder. Geen blootstelling aan de CLOUD Act voor de inhoud van overdrachten. AVG-conform door de architectuur, niet door beleid.</li>
     <li><strong>Eén bestand naar een groep.</strong> Op Firm bereikt één verzending maximaal 30 genoemde ontvangers, elk met een eigen eenmalige link. Op Community gaat een verzending naar één ontvanger.</li>
     <li><strong>Nu al post-quantum.</strong> ML-KEM-768 (NIST FIPS 203) beschermt tegen aanvallers die gegevens nu opslaan om ze later te ontsleutelen (store-now-decrypt-later). Zorggegevens die vandaag worden verstuurd, kan een quantumcomputer in 2030 niet ontsleutelen.</li>
   </ul>
@@ -356,6 +356,6 @@ td{color:var(--cobalt)}
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 </body>
 </html>

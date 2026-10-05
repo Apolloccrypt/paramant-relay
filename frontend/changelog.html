@@ -186,9 +186,56 @@ footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex
       <li>Outlook-invoegtoepassing (<code>addin.paramant.app</code>): de basis van de broncode staat</li>
       <li>Openbare vermelding in de Chrome Web Store</li>
       <li>Teamaccounts en SSO</li>
-      <li>WebAuthn / passkey als tweede factor</li>
       <li>Voorbeeldvenster voor e-mails in het beheerpaneel, met verzendacties per gebruiker</li>
-      <li>Openbare statuspagina</li>
+    </ul>
+  </section>
+
+  <!-- ── 3.1.0 en 3.0.0: samengevat uit CHANGELOG.md in de repository ── -->
+  <section class="release">
+    <div class="release-header">
+      <h2>v3.1.0</h2>
+      <span class="release-date">draait in productie, nog niet getagd</span>
+    </div>
+    <p class="release-summary">ParaSign als product, beveiligingsbevindingen opgelost en betalen via Mollie. De volledige lijst staat in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</p>
+    <h3><span class="badge badge-security">Beveiliging</span></h3>
+    <ul>
+      <li>API-sleutels komen via een eenmalige ophaallink in plaats van leesbaar in een e-mail</li>
+      <li>Het openbare transparantielog publiceert geen apparaat-kenmerken meer</li>
+      <li>Ondertekenen vraagt een verse stap-omhoog-bevestiging, en de handtekeningen van de notaris zijn domeingescheiden (v2); oude v1-bewijzen blijven controleerbaar</li>
+      <li><code>script-src 'unsafe-inline'</code> is weg uit het beheerpaneel en de openbare site</li>
+    </ul>
+    <h3><span class="badge badge-added">Toegevoegd</span></h3>
+    <ul>
+      <li>ParaSign: ondertekenen in de browser op <a href="/sign">/sign</a>, de pdf-editor, ondertekenen met meerdere partijen en de ontwikkelaars-API <code>/v1</code></li>
+      <li>Inloggen en ondertekenen met een passkey</li>
+      <li>De openbare statuspagina op <a href="/status">/status</a></li>
+      <li>Een productcontrole die elk uur een echt bestand door de echte relay stuurt</li>
+    </ul>
+    <h3><span class="badge badge-changed">Gewijzigd</span></h3>
+    <ul>
+      <li>De relay heet source-available (BUSL-1.1), niet open source</li>
+      <li>De navigatie noemt wat we verkopen: zeven onderdelen in plaats van veertig</li>
+    </ul>
+    <h3><span class="badge badge-fixed">Verwijderd</span></h3>
+    <ul>
+      <li>De Android-app, ParamantOS en ParaID</li>
+    </ul>
+  </section>
+
+  <section class="release">
+    <div class="release-header">
+      <h2>v3.0.0</h2>
+      <span class="release-date">27 mei 2026</span>
+    </div>
+    <p class="release-summary">Eén versienummer voor het hele project, en de post-quantum bouwstenen in een eigen bibliotheek.</p>
+    <h3><span class="badge badge-changed">Gewijzigd</span></h3>
+    <ul>
+      <li>ML-KEM-768 draait op de Rust-bibliotheek <code>@paramant/core</code> in plaats van op <code>@noble/post-quantum</code>; wire format en gedrag voor clients blijven gelijk</li>
+      <li>Eén versie overal: <code>package.json</code>, <code>/health</code>, de site en de installatie zeggen 3.0.0</li>
+    </ul>
+    <h3><span class="badge badge-fixed">Opgelost</span></h3>
+    <ul>
+      <li>Inloggen na het aanmaken van een sleutel werkt weer; <code>users.json</code> wordt atomair geschreven</li>
     </ul>
   </section>
 
@@ -317,6 +364,6 @@ footer{border-top:1px solid rgba(var(--tint), .1);padding:40px 48px;display:flex
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 </body>
 </html>

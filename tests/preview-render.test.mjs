@@ -61,9 +61,10 @@ test('sign-flow.js uses the guards on every PDF preview surface', () => {
   const doc = body('renderDocPreview');
   assert.match(doc, /docPreviewGen\.start\(\)/);
   assert.match(doc, /previewTargetWidth\(pane\.clientWidth, 340, 280\)/);
-  assert.match(doc, /await page\.render\([^\n]*\n\s*\/\/[^\n]*\n\s*if \(stale\(\)\) return;/);
+  // renderPageCapped: page.render within the iOS canvas cap (sign-flow.js).
+  assert.match(doc, /await (?:page\.render|renderPageCapped)\([^\n]*\n\s*\/\/[^\n]*\n\s*if \(stale\(\)\) return;/);
   const signed = body('renderSignedPreview');
   assert.match(signed, /signedPreviewGen\.start\(\)/);
   assert.match(signed, /viewportTargetWidth\(window\.innerWidth\)/);
-  assert.match(signed, /await page\.render\([^\n]*\n\s*if \(stale\(\)\) return;/);
+  assert.match(signed, /await (?:page\.render|renderPageCapped)\([^\n]*\n\s*if \(stale\(\)\) return;/);
 });

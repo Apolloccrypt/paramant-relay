@@ -73,6 +73,29 @@ async function handle({
       });
     }
   }
+  // THE SIGNING EVENTS THEMSELVES (COSIGN-47). The rows above come from the
+  // key audit chain, which holds transfers, not signatures: after dozens of
+  // signatures the export said entries 0 and the CSV was a header. Each of the
+  // account's envelopes now contributes its own events: created, viewed per
+  // party, signed per party, declined, withdrawn, completed.
+  if (envStore && account && typeof envStore.auditTimeline === 'function') {
+    let ids = [];
+    try { ids = await envStore.listAccountEnvelopeIds(account, { limit }); } catch { ids = []; }
+    for (const id of ids) {
+      let tl = null;
+      try { tl = await envStore.auditTimeline(id); } catch { tl = null; }
+      if (!tl) continue;
+      const add = (time, event, extra) => { if (time) rows.push({ time, event, doc_hash: tl.doc_hash, bytes: 0, device: '', chain_hash: '', envelope_id: id, ...(extra || {}) }); };
+      add(tl.created_at, 'envelope_created');
+      for (const p of tl.parties) {
+        add(p.viewed_at, 'envelope_viewed', { party: p.index, party_label: p.label || '' });
+        add(p.signed_at, 'envelope_signed', { party: p.index, party_label: p.label || '' });
+        add(p.declined_at, 'envelope_declined', { party: p.index, party_label: p.label || '' });
+      }
+      if (tl.voided_at && tl.void_reason !== 'declined') add(tl.voided_at, 'envelope_withdrawn');
+      add(tl.completed_at, 'envelope_completed');
+    }
+  }
   rows.sort((a, b) => (Date.parse(b.time) || 0) - (Date.parse(a.time) || 0));
   const entries = rows.slice(0, limit);
   const sth = (typeof ctHead === 'function') ? ctHead() : null;
@@ -82,9 +105,9 @@ async function handle({
       'Content-Type': 'text/csv',
       'Content-Disposition': 'attachment; filename="parasign_audit.csv"',
     });
-    const header = 'time,event,doc_hash,bytes,device,chain_hash';
+    const header = 'time,event,doc_hash,bytes,device,chain_hash,envelope_id,party,party_label';
     const body = entries.map((e) =>
-      [e.time, e.event, e.doc_hash, e.bytes, e.device, e.chain_hash].map(csvCell).join(',')
+      [e.time, e.event, e.doc_hash, e.bytes, e.device, e.chain_hash, e.envelope_id || '', e.party == null ? '' : e.party, e.party_label || ''].map(csvCell).join(',')
     ).join('\n');
     return res.end(header + '\n' + body + '\n');
   }

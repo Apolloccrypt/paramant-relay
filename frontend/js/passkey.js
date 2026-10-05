@@ -163,6 +163,7 @@ function wireSetupPasskey() {
   // Passkey-specific success UI (own ids; the TOTP success section is untouched).
   function showRecoveryCodes(codes) {
     document.querySelectorAll('section[id^="state-"]').forEach((s) => s.classList.add('hidden'));
+    { const intro = document.getElementById('setup-intro'); if (intro) intro.classList.add('hidden'); }   // no "step 3 of 5" above the codes
     const section = document.getElementById('state-passkey-success');
     const grid = document.getElementById('passkey-backup-codes');
     if (!section || !grid) { window.location = nlEn('/dashboard', '/en/dashboard'); return; }
@@ -268,6 +269,15 @@ function wireLoginPasskey() {
 
 // ── Account dashboard: add a passkey to an existing logged-in account ────────
 // authUser + TOTP step-up (the server gates the ceremony on a valid TOTP).
+// A failed load in words, never "(HTTP 429)" (retest T5-1): what happened
+// and what the reader can do, by status.
+function loadFailText(status, nlWhat, enWhat) {
+  if (status === 429) return nlEn(nlWhat + ' konden even niet worden geladen: er kwamen te veel verzoeken tegelijk binnen. Ververs de pagina over een minuut.', 'Could not load ' + enWhat + ' just now: too many requests arrived at once. Refresh the page in a minute.');
+  if (status === 401 || status === 403) return nlEn('Uw sessie is verlopen. Log opnieuw in om uw ' + nlWhat.toLowerCase() + ' te zien.', 'Your session has expired. Sign in again to see your ' + enWhat + '.');
+  if (status >= 500) return nlEn(nlWhat + ' konden nu niet worden geladen door een storing bij ons. Er is niets mis met uw account. Probeer het zo opnieuw.', 'Could not load ' + enWhat + ' right now because of a fault on our side. Nothing is wrong with your account. Please try again shortly.');
+  return nlEn(nlWhat + ' konden nu niet worden geladen. Ververs de pagina om het opnieuw te proberen.', 'Could not load ' + enWhat + ' right now. Refresh the page to try again.');
+}
+
 function wireAccountPasskey() {
   const btn = document.getElementById('account-passkey-btn');
   if (!btn) return;                                  // not the account page
@@ -279,7 +289,7 @@ function wireAccountPasskey() {
   async function refresh() {
     try {
       const r = await fetch('/api/user/account/webauthn/credentials', { credentials: 'include' });
-      if (!r.ok) { if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = nlEn('De passkeys konden niet worden geladen (HTTP ', 'Could not load passkeys (HTTP ') + r.status + ').'; } return; }
+      if (!r.ok) { if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = loadFailText(r.status, 'Uw passkeys', 'your passkeys'); } return; }
       const d = await r.json();
       const pk = d.passkeys || [];
       if (!pk.length) {
@@ -291,11 +301,49 @@ function wireAccountPasskey() {
       if (listEl) listEl.innerHTML = pk.map((c) => {
         const lbl = c.label ? esc(c.label) : 'passkey';
         const when = c.created_at ? esc(paramantDate.moment(c.created_at, '')) : '';
+        // A lost or stolen device must not stay a valid sign-in (ACCT-32).
+        const del = c.credId
+          ? ' <button type="button" class="btn btn-small btn-secondary" data-remove-passkey="' + esc(c.credId) + '" style="margin-left:8px">' + nlEn('Verwijderen', 'Remove') + '</button>'
+          : '';
         return '<li style="padding:8px 0;border-bottom:1px solid var(--ink-hair,#e5e7eb)">'
           + '<strong>' + lbl + nlEn('</strong> <span class="small" style="color:var(--ink-dim,#6b7280)">&middot; actief', '</strong> <span class="small" style="color:var(--ink-dim,#6b7280)">&middot; active')
-          + (when ? nlEn(' &middot; toegevoegd ', ' &middot; added ') + when : '') + '</span></li>';
+          + (when ? nlEn(' &middot; toegevoegd ', ' &middot; added ') + when : '') + '</span>' + del + '</li>';
       }).join('');
+      if (listEl) listEl.querySelectorAll('[data-remove-passkey]').forEach((b) => b.addEventListener('click', () => removePasskey(b)));
     } catch { /* leave existing UI */ }
+  }
+
+  // DELETE /api/user/account/webauthn/credentials/:credId with { totp } or
+  // { backup_code } in the body (admin freshSecondFactor). The account keeps
+  // its authenticator app, so removing the last passkey locks nobody out.
+  async function removePasskey(b) {
+    const credId = b.getAttribute('data-remove-passkey');
+    const ask = window.paAskSecondFactor;
+    if (typeof ask !== 'function') return;
+    const factor = await ask(b.closest('li') || b,
+      nlEn('Deze passkey verwijderen: daarna kunt u er niet meer mee inloggen. Bevestig met de code van 6 cijfers uit uw authenticator-app, of een back-upcode.', 'Remove this passkey: you can no longer sign in with it afterwards. Confirm with the 6-digit code from your authenticator app, or a back-up code.'),
+      nlEn('Passkey verwijderen', 'Remove passkey'));
+    if (!factor) return;
+    b.disabled = true;
+    try {
+      const r = await fetch('/api/user/account/webauthn/credentials/' + encodeURIComponent(credId), {
+        method: 'DELETE', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(factor),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (r.ok) {
+        setStatus(status, nlEn('Passkey verwijderd. U logt er niet meer mee in.', 'Passkey removed. It no longer signs you in.'), false);
+      } else if (r.status === 404) {
+        setStatus(status, nlEn('Deze passkey bestaat niet meer, of de functie verwijderen is op deze server nog niet beschikbaar. Er is niets veranderd.', 'This passkey no longer exists, or removing is not available on this server yet. Nothing changed.'), true);
+      } else {
+        const t = typeof window.paSecondFactorError === 'function' ? window.paSecondFactorError(r.status, body) : nlEn('Verwijderen is niet gelukt. Er is niets veranderd.', 'Removing did not work. Nothing changed.');
+        setStatus(status, t, true);
+      }
+    } catch {
+      setStatus(status, nlEn('Paramant is niet bereikbaar. Er is niets veranderd.', 'We could not reach Paramant. Nothing changed.'), true);
+    }
+    b.disabled = false;
+    refresh();
   }
 
   if (!browserSupportsWebAuthn()) {

@@ -497,7 +497,8 @@ test('7a: een bestandsnaam met CR/LF of unicode breekt de levering niet', async 
   await r.arrayBuffer();
   assert.equal(r.headers.get('x-injected'), null,
     'de bestandsnaam smokkelde een eigen header mee');
-  assert.equal(decodeURIComponent(r.headers.get('X-Paramant-Filename')).slice(0, 4), 'jaar');
+  // Sinds review ronde 2 (f) neemt de relay de naam niet aan: de header zegt 'file'.
+  assert.equal(decodeURIComponent(r.headers.get('X-Paramant-Filename')), 'file');
 });
 
 test('7b: een verpakking die geen header kan zijn wordt bij de verzending geweigerd', async () => {
@@ -523,4 +524,46 @@ test('7b: een verpakking die geen header kan zijn wordt bij de verzending geweig
   assert.notEqual(vr.status, 201,
     'een verpakking met CRLF werd geaccepteerd; die komt terug als HTTP-header '
     + 'bij de ontvanger');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HERTEST 04-10 (T4-10, T4-11)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// T4-10: de uitnodiging filterde links en adressen uit de bestandsnaam, de
+// codemail niet. Die zei letterlijk "Voor het bestand: PARAMANT SUPPORT
+// bevestig uw account op www.evil-example.com of mail help@...".
+test('T4-10: de codemail drukt geen link en geen adres uit de bestandsnaam af', async () => {
+  const adres = 'ontvanger-t410@extern.test';
+  const v = await maakVerzending([adres], {
+    filename: 'PARAMANT SUPPORT bevestig uw account op www.evil-example.com of mail help@evil-example.com of evil-example.com/login.txt',
+  });
+  const c = await vraagCode(v.tokens[adres], adres);
+  assert.ok(c.mail, 'geen codemail');
+  for (const deel of [c.mail.text, c.mail.html || '']) {
+    assert.doesNotMatch(deel, /evil-example|www\.|help@/i, 'de codemail draagt een link of adres uit de naam: ' + deel);
+  }
+  // Sinds review ronde 2 (f) staat de naam er helemaal niet meer in.
+  assert.doesNotMatch(c.mail.text, /PARAMANT SUPPORT|Voor het bestand/);
+});
+
+// T4-11: een bestand van 24 MB gaat in vijf blokken onder één file_id. De
+// teller deed al één tel per file_id; de Pro-melding ging per blok de deur
+// uit ("Your Paramant transfer is ready", vijf keer).
+test('T4-11: vijf blokken van één bestand geven één Pro-melding', async () => {
+  post.length = 0;
+  const fileId = crypto.randomBytes(16).toString('hex');
+  for (let i = 0; i < 5; i++) {
+    const inhoud = crypto.randomBytes(2048);
+    const ir = await fetch(BASE + '/v2/inbound', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
+      body: JSON.stringify({ hash: sha256hex(inhoud), payload: inhoud.toString('base64'),
+                             meta: { device_id: 'transfer-web-link', file_id: fileId } }),
+    });
+    assert.equal(ir.status, 200, 'blok ' + i + ': ' + (await ir.text()));
+  }
+  await wachtOpPost();
+  const meldingen = post.filter((p) => /transfer is ready/i.test(p.subject || ''));
+  assert.equal(meldingen.length, 1, 'één bestand gaf ' + meldingen.length + ' meldingen');
 });

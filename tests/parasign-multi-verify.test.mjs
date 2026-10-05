@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
 const EXE = process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined;
+const pqc = await import(path.join(ROOT, 'vendor', 'paramant-pqc.js'));
 const MIME = { '.js':'text/javascript', '.css':'text/css', '.html':'text/html', '.svg':'image/svg+xml', '.wasm':'application/wasm', '.png':'image/png' };
 const server = http.createServer((req, res) => {
   let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
@@ -26,7 +27,7 @@ await page.goto(origin + '/', { waitUntil:'domcontentloaded' });
 
 const fixture = await page.evaluate(async () => {
   const pqc = await import('/vendor/paramant-pqc.js');
-  const signer = await import('/js/parasign-signer.js?v=18');
+  const signer = await import('/js/parasign-signer.js?v=22');
   const enc = new TextEncoder();
   const hex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
   const b64 = (bytes) => { let value = ''; for (const byte of bytes) value += String.fromCharCode(byte); return btoa(value); };
@@ -59,37 +60,131 @@ const fixture = await page.evaluate(async () => {
     }],
     notary:{ relay_pk_hash:hex(pqc.sha3_256(relayKeys.publicKey)), relay_public_key:b64(relayKeys.publicKey), relay_pubkey_url:'https://paramant.app/v2/pubkey' },
   };
+  const notarise = (body) => ({ ...body, notary_signature:b64(pqc.ml_dsa65.sign(relayKeys.secretKey, enc.encode(canonical(body)))) });
   receipt.notary_signature = b64(pqc.ml_dsa65.sign(relayKeys.secretKey, enc.encode(canonical(receipt))));
-  return { source:Array.from(source), receipt };
+  // A sandbox receipt carries mode/sandbox INSIDE the notary signature, as
+  // relay/lib/parasign-open-api.js buildEnvelopePsign writes it.
+  const { notary_signature: _drop, ...plain } = receipt;
+  const sandboxReceipt = notarise({ ...plain, mode:'test', sandbox:true });
+  // A qualified-signature pointer, also inside the notary signature (psign.qes).
+  const qesReceipt = notarise({ ...plain, qes:{ provider:'Cleverbase', certificate_fingerprint:'9f'.repeat(32), signed_at:'2026-07-21T12:00:05.000Z' } });
+  return { source:Array.from(source), receipt, sandboxReceipt, qesReceipt, relayPublicKey:b64(relayKeys.publicKey) };
 });
+
+
+// The relay key of this fixture is made up on the spot, exactly like the one a
+// forger would make up. The page may only call such a receipt genuine when that
+// key is one of the pins in js/relay-trust-anchors.js, so the "real" runs below
+// serve the anchors module with this key added, the way a pinned relay would
+// be, and the forged runs serve the module as it ships.
+const relayKeyBytes = Buffer.from(fixture.relayPublicKey, 'base64');
+const relayFp = Buffer.from(pqc.sha3_256(new Uint8Array(relayKeyBytes))).toString('hex');
+const anchorsSource = fs.readFileSync(path.join(ROOT, 'js', 'relay-trust-anchors.js'), 'utf8');
+const anchorsWithTestRelay = anchorsSource + `
+RELAY_TRUST_ANCHORS.push({ name:'the test relay', name_nl:'de testrelay', host:'test-relay.invalid', sector:'test', alg:'ML-DSA-65', fingerprint:'${relayFp}', key:'${fixture.relayPublicKey}' });
+`;
+
+async function runOnce({ url, verdict, receipt, doc, trustRelay }) {
+  await page.unroute('**/js/relay-trust-anchors.js*');
+  if (trustRelay) {
+    await page.route('**/js/relay-trust-anchors.js*', (route) => route.fulfill({ status:200, contentType:'text/javascript', body:anchorsWithTestRelay }));
+  }
+  await page.goto(origin + url, { waitUntil:'domcontentloaded' });
+  await page.locator('#vf-document').setInputFiles({ name:'source-demo.pdf', mimeType:'application/pdf', buffer:Buffer.from(doc || fixture.source) });
+  await page.locator('#vf-envelope').setInputFiles({ name:'source-demo.psign', mimeType:'application/json', buffer:Buffer.from(JSON.stringify(receipt)) });
+  await page.locator('#vf-verify').click();
+  await page.waitForFunction((src) => new RegExp(src).test(document.querySelector('#vf-result')?.textContent || ''), verdict.source);
+  return {
+    result: await page.locator('#vf-result').innerText(),
+    banner: await page.locator('#vf-result .ps-banner').first().getAttribute('class'),
+    mark: await page.locator('#vf-result .ps-banner .ps-mark').first().textContent().catch(() => ''),
+    keyHidden: await page.locator('#vf-key-block').isHidden(),
+    overflow: await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+  };
+}
 
 // The same receipt through both copies of the page: the English words on
 // /en/verify, the Dutch words on /verify. One parasign-verify.js serves both.
 const runs = [
-  { url:'/en/verify.html', verdict:/Signature valid|Signature INVALID/, valid:/Signature valid/, offline:/verified offline/ },
-  { url:'/verify.html', verdict:/Handtekening geldig|Handtekening ONGELDIG/, valid:/Handtekening geldig/, offline:/offline gecontroleerd/ },
+  { url:'/en/verify.html', verdict:/Signature valid[\s\S]*(Envelope|Counter)|Signature INVALID|Test proof|This is not the signed file/, valid:/Signature valid/, invalid:/Signature INVALID/, offline:/verified offline/,
+    unknownRelay:/is not a Paramant key/, pinned:/Counter-signed by the test relay/, test:/Test proof, not a real signature/, stampedHint:/is a reading copy of it/, stampedHead:/This is not the signed file[\s\S]*check with the original/, stampedMark:/Paramant ParaSign · PQ/,
+    wrongFile:/This is not the signed file\. Check with the original file\./, qes:/qualified signature \(PAdES\) from Cleverbase[\s\S]*does not check that second signature/ },
+  { url:'/verify.html', verdict:/Handtekening geldig[\s\S]*(Envelop|Bekrachtigd)|Handtekening ONGELDIG|Testbewijs|Dit is niet het ondertekende bestand/, valid:/Handtekening geldig/, invalid:/Handtekening ONGELDIG/, offline:/offline gecontroleerd/,
+    unknownRelay:/is geen sleutel van Paramant/, pinned:/Bekrachtigd door de testrelay/, test:/Testbewijs, geen echte ondertekening/, stampedHint:/is daar een leesbare kopie van/, stampedHead:/Dit is niet het ondertekende bestand[\s\S]*Controleer dan met het origineel/, stampedMark:/Paramant ParaSign · PQ/,
+    wrongFile:/Dit is niet het ondertekende bestand\. Controleer met het originele bestand\./, qes:/gekwalificeerde handtekening \(PAdES\) van Cleverbase[\s\S]*controleert deze pagina niet/ },
 ];
 const outcomes = [];
 for (const run of runs) {
-  await page.goto(origin + run.url, { waitUntil:'domcontentloaded' });
-  await page.locator('#vf-document').setInputFiles({ name:'source-demo.pdf', mimeType:'application/pdf', buffer:Buffer.from(fixture.source) });
-  await page.locator('#vf-envelope').setInputFiles({ name:'source-demo.psign', mimeType:'application/json', buffer:Buffer.from(JSON.stringify(fixture.receipt)) });
-  await page.locator('#vf-verify').click();
-  await page.waitForFunction((src) => new RegExp(src).test(document.querySelector('#vf-result')?.textContent || ''), run.verdict.source);
-  outcomes.push({
-    run,
-    result: await page.locator('#vf-result').innerText(),
-    keyHidden: await page.locator('#vf-key-block').isHidden(),
-    overflow: await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
-  });
+  outcomes.push({ run, kind:'pinned', ...(await runOnce({ ...run, receipt:fixture.receipt, trustRelay:true })) });
+  outcomes.push({ run, kind:'forged', ...(await runOnce({ ...run, receipt:fixture.receipt, trustRelay:false })) });
+  outcomes.push({ run, kind:'sandbox', ...(await runOnce({ ...run, receipt:fixture.sandboxReceipt, trustRelay:true })) });
+  outcomes.push({ run, kind:'qes', ...(await runOnce({ ...run, receipt:fixture.qesReceipt, trustRelay:true })) });
+  // The marker co-sign.js writes into the reading copy is under no signature:
+  // anyone can paste it into a forged contract (review #555, B1). A file with
+  // a matching marker is just another wrong file: red, no names, no QES.
+  const docHash = fixture.receipt.document_hash;
+  const mark = (env, doc) => Buffer.from('\n%stamped copy\n<< /ParamantStampedCopy (env=' + env + ';doc=' + doc + ') >>\n');
+  const forgedContract = [...Buffer.from('%PDF-1.4\nFORGED CONTRACT: Party B owes Party A EUR 1.000.000\n'), ...mark(fixture.receipt.envelope_id, docHash)];
+  outcomes.push({ run, kind:'forgedmarker', ...(await runOnce({ ...run, receipt:fixture.receipt, doc:forgedContract, trustRelay:true })) });
+  const forgedQes = [...Buffer.from('%PDF-1.4\nFORGED CONTRACT\n'), ...mark(fixture.qesReceipt.envelope_id, fixture.qesReceipt.document_hash)];
+  outcomes.push({ run, kind:'forgedmarker', ...(await runOnce({ ...run, receipt:fixture.qesReceipt, doc:forgedQes, trustRelay:true })) });
+  const stamped = [...fixture.source, ...mark(fixture.receipt.envelope_id, docHash)];
+  outcomes.push({ run, kind:'wrongdoc', ...(await runOnce({ ...run, receipt:fixture.receipt, doc:stamped, trustRelay:true })) });
+  const oneByte = fixture.source.slice(); oneByte[3] ^= 1;
+  outcomes.push({ run, kind:'wrongdoc', ...(await runOnce({ ...run, receipt:fixture.receipt, doc:oneByte, trustRelay:true })) });
+  const otherEnv = [...fixture.source, ...mark('env_some_other_envelope', docHash)];
+  outcomes.push({ run, kind:'wrongdoc', ...(await runOnce({ ...run, receipt:fixture.receipt, doc:otherEnv, trustRelay:true })) });
+  const otherDoc = [...fixture.source, ...mark(fixture.receipt.envelope_id, 'ab'.repeat(32))];
+  outcomes.push({ run, kind:'wrongdoc', ...(await runOnce({ ...run, receipt:fixture.receipt, doc:otherDoc, trustRelay:true })) });
+  const unmarked = [...fixture.source, ...Buffer.from('\n%stamped copy without the marker')];
+  outcomes.push({ run, kind:'wrongdoc', ...(await runOnce({ ...run, receipt:fixture.receipt, doc:unmarked, trustRelay:true })) });
 }
 
 await browser.close();
 server.close();
-for (const { run, result, keyHidden, overflow } of outcomes) {
-  if (!run.valid.test(result)) throw new Error(run.url + ': ' + result);
-  if (!run.offline.test(result)) throw new Error(run.url + ': offline result missing');
-  if (!keyHidden) throw new Error(run.url + ': API key field visible for self-contained proof');
-  if (overflow > 1) throw new Error(run.url + ': phone overflow: ' + overflow);
+for (const o of outcomes) {
+  const { run, kind, result, banner, mark, keyHidden, overflow } = o;
+  const where = run.url + ' [' + kind + ']: ';
+  if (!keyHidden) throw new Error(where + 'API key field visible for self-contained proof');
+  if (overflow > 1) throw new Error(where + 'phone overflow: ' + overflow);
+  if (kind === 'pinned') {
+    if (!run.valid.test(result)) throw new Error(where + result);
+    if (!run.offline.test(result)) throw new Error(where + 'offline result missing');
+    if (!run.pinned.test(result)) throw new Error(where + 'pinned relay not named: ' + result);
+    // Acceptance r2, 5: the names, as the sender entered them, labelled unchecked.
+    if (!/Signer Demo/.test(result) || !/niet gecontroleerd|not checked/.test(result)) throw new Error(where + 'party names not shown as unchecked: ' + result);
+    if (!/\bok\b/.test(banner) || mark !== '✓') throw new Error(where + 'valid verdict lacks the green check: ' + banner + ' ' + mark);
+  }
+  if (kind === 'forged') {
+    // Finding 1 of test round 3: a receipt whose notary key is not one of ours
+    // was "Handtekening geldig" because the page checked it against the key
+    // printed inside the file. It must be red, and say why.
+    if (run.valid.test(result) || !run.invalid.test(result)) throw new Error(where + 'self-signed receipt not refused: ' + result);
+    if (!run.unknownRelay.test(result)) throw new Error(where + 'unknown relay key not explained: ' + result);
+    if (!/\berr\b/.test(banner) || mark !== '✕') throw new Error(where + 'invalid verdict lacks the red cross: ' + banner + ' ' + mark);
+  }
+  if (kind === 'sandbox') {
+    if (!run.test.test(result)) throw new Error(where + 'sandbox receipt not marked as a test: ' + result);
+    if (run.valid.test(result)) throw new Error(where + 'sandbox receipt shown as a real valid signature: ' + result);
+  }
+  if (kind === 'wrongdoc') {
+    // Fase 2: a wrong file next to a sound proof is "not the signed file, check
+    // with the original": red, never green, no reading-copy reassurance, and no
+    // "INVALID" as if the proof were forged (an old stamped copy without the
+    // marker lands here too).
+    if (!run.wrongFile.test(result)) throw new Error(where + 'a wrong document must say it is not the signed file: ' + result);
+    if (run.valid.test(result) || run.invalid.test(result) || run.stampedHead.test(result) || run.stampedHint.test(result)) throw new Error(where + 'wrong document got green, INVALID or the reading-copy text: ' + result);
+    if (!/\berr\b/.test(banner) || mark !== '✕') throw new Error(where + 'wrong document lacks the red cross: ' + banner + ' ' + mark);
+  }
+  if (kind === 'qes') {
+    if (!run.valid.test(result) || !run.qes.test(result)) throw new Error(where + 'qualified-signature pointer not shown: ' + result);
+  }
+  if (kind === 'forgedmarker' || kind === 'wrongdoc') {
+    // No party names, no QES pointer and no orange next to a file that is not
+    // the signed one: nothing on the page may read as a reassurance.
+    if (/Signer Demo/.test(result) || /Cleverbase/.test(result)) throw new Error(where + 'party names or QES shown next to a wrong file: ' + result);
+    if (/\bwarn\b/.test(banner)) throw new Error(where + 'wrong file got an orange banner: ' + banner);
+    if (!run.wrongFile.test(result) || !/\berr\b/.test(banner)) throw new Error(where + 'forged marker not red: ' + banner + ' ' + result);
+  }
 }
-console.log('parasign-multi-verify: recipe 5 receipt verifies offline in Chromium');
+console.log('parasign-multi-verify: recipe 5 receipt verifies offline against a pinned relay key; a self-signed relay key and a sandbox receipt are called what they are, and a file with a pasted reading-copy marker is red, in Chromium');

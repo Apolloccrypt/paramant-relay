@@ -1,4 +1,4 @@
-# Self-Hosting Guide — PARAMANT Relay v3.0.0
+# Self-Hosting Guide: PARAMANT Relay v3.1.0
 
 **License:** BUSL-1.1 — source available, free for up to 5 active API keys per relay.
 
@@ -13,16 +13,36 @@ curl -fsSL https://paramant.app/install.sh | bash
 # Prompts: domain, Let's Encrypt email, admin token, sectors, license key
 ```
 
+The installer clones release tag `v3.1.0` (override with `PARAMANT_VERSION`) and
+writes a `.env` (mode 600) with everything the compose stack needs:
+`ADMIN_TOKEN`, `REDIS_PASSWORD` and `RELAY_REDIS_URL`
+(`redis://:<password>@redis:6379`), `PARAMANT_TOTP_MASTER_KEY` (32 bytes,
+base64), `INTERNAL_AUTH_TOKEN`, `PARASIGN_PUBLIC_ORIGIN` and
+`RELAY_SELF_URL_MAIN/HEALTH/FINANCE/LEGAL/IOT` (all `https://<your domain>`, or
+`http://localhost` without a domain), and your license as `PLK_KEY` when you
+enter one. On a re-run it keeps the existing `REDIS_PASSWORD`,
+`PARAMANT_TOTP_MASTER_KEY` and `INTERNAL_AUTH_TOKEN`: a new TOTP master key
+would make every stored TOTP secret unreadable. An existing install is moved to
+the requested tag (`git fetch` of the tag plus `checkout`); local changes stop
+the installer instead of being overwritten.
+
 **Option 2 — manual Docker setup** (4 steps):
 
 ```bash
 git clone https://github.com/Apolloccrypt/paramant-relay
 cd paramant-relay
 cp .env.example .env
-echo "ADMIN_TOKEN=$(openssl rand -hex 32)" >> .env
+# Fill in the required secrets in .env (see .env.example):
+#   ADMIN_TOKEN               openssl rand -hex 32
+#   REDIS_PASSWORD            openssl rand -hex 32  (empty: redis refuses to start)
+#   RELAY_REDIS_URL           redis://:<REDIS_PASSWORD>@redis:6379
+#   PARAMANT_TOTP_MASTER_KEY  openssl rand -base64 32
+#   INTERNAL_AUTH_TOKEN       openssl rand -hex 32
+#   PARASIGN_PUBLIC_ORIGIN and RELAY_SELF_URL_<SECTOR>: your own public URL
+nano .env
 docker compose up -d
 curl http://localhost:3001/health
-# {"ok":true,"version":"3.0.0","sector":"health","edition":"community"}
+# {"ok":true,"version":"3.1.0","sector":"health","edition":"community"}
 ```
 
 **Option 3 — Raspberry Pi / arm64:**
@@ -36,6 +56,34 @@ curl -fsSL https://paramant.app/install-pi.sh | bash
 
 Flash [paramantOS](https://github.com/Apolloccrypt/ParamantOS) to USB. Relay starts on boot.
 No Linux expertise required. BIOS and UEFI supported.
+
+---
+
+## First-run setup (`/setup`)
+
+A fresh relay (no API keys yet, or `SETUP_MODE=true`) serves the setup wizard at
+`/setup`. Finishing it (`POST /v2/setup/apply`) is not anonymous: the request
+must carry the one-time setup token in the `X-Setup-Token` header, or your
+`ADMIN_TOKEN` in `X-Admin-Token`. Without either the relay answers
+`401 setup_token_required`.
+
+On every start that still needs setup, the relay makes a fresh token (`pst_...`
+from random bytes) and writes it to the file `setup-token` next to `users.json`
+(mode 600). The log line `setup_token_ready` only names that file; the token
+itself is never logged. A `setup-token` file that is already there is never
+read, only replaced, so a restart gives a new token. A `PARAMANT_SETUP_TOKEN` in
+the relay's own environment pins it instead (`docker-compose.yml` does not pass
+that variable on). In the wizard, paste it into the **Setup code** field
+(Dutch: **Installatiecode**). After a successful setup the token is deleted and
+stops working.
+
+```bash
+docker compose exec relay-main cat /data/setup-token
+# bare metal, run from relay/ with the default USERS_FILE=./users.json:
+cat relay/setup-token
+```
+
+The file is in `.gitignore`; never commit it.
 
 ---
 
@@ -77,7 +125,14 @@ nano .env
 | `RELAY_MODE` | No | `ghost_pipe` | Endpoint set: `ghost_pipe` or `iot` |
 | `USERS_FILE` | No | `./users.json` | Path to API key store |
 | `CT_LOG_FILE` | No | `/data/ct-log.json` | Path to CT log persistence file (health relay only) |
-| `PARAMANT_LICENSE` | No | — | Relay license key (`plk_...`) — unlocks unlimited users |
+| `REDIS_PASSWORD` | **Yes** | - | Password for the redis container (`--requirepass`). Empty, redis refuses to start. Generate: `openssl rand -hex 32` |
+| `RELAY_REDIS_URL` | **Yes** | - | `redis://:<REDIS_PASSWORD>@redis:6379`; passed to the relays as `REDIS_URL` |
+| `PARAMANT_TOTP_MASTER_KEY` | **Yes** | - | Encrypts users' TOTP secrets at rest. 32 bytes, base64: `openssl rand -base64 32`. Never change it on a running install |
+| `INTERNAL_AUTH_TOKEN` | **Yes** | - | Second gate on the relays' internal routes (admin plane to relay). Generate: `openssl rand -hex 32` |
+| `PARASIGN_PUBLIC_ORIGIN` | No | - | Your own public site; checkout returns here. Without it a self-host returns to paramant.app |
+| `RELAY_SELF_URL_MAIN` / `_HEALTH` / `_FINANCE` / `_LEGAL` / `_IOT` | No | `https://<sector>.paramant.app` | Mapped by `docker-compose.yml` to `RELAY_SELF_URL` of each relay. Without it, signed tree heads and receipts name a paramant.app host; the relay warns at boot (`relay_self_url_unset`) |
+| `PLK_KEY` | No | - | Relay license key (`plk_...`), unlocks unlimited users. The older name `PARAMANT_LICENSE` is still read; `PLK_KEY` wins when both are set |
+| `PARAMANT_SETUP_TOKEN` | No | generated | Pins the one-time setup token for `/v2/setup/apply` instead of a generated one. Read from the relay's environment; `docker-compose.yml` does not pass it on |
 | `RESEND_API_KEY` | No | — | For welcome emails when adding users |
 | `RELAY_SELF_URL` | No | — | This relay's public URL (e.g. `https://relay.yourdomain.com`). Required for relay registry self-registration. |
 | `RELAY_PRIMARY_URL` | No | self | URL of the registry relay to POST registrations to (e.g. `https://health.yourdomain.com`). Defaults to posting to self. |
@@ -112,7 +167,7 @@ All five relay containers run the **same image** (`build: ./relay`). The `SECTOR
 
 **TLS:**
 - Handled by **system nginx** (not a Docker container). Install via Certbot / Let's Encrypt or bring your own cert.
-- See `nginx-selfhost.conf` in the repo for a hardened nginx config with rate limiting, HSTS, and OCSP stapling.
+- See `deploy/nginx-selfhost.conf` in the repo for a hardened nginx config with rate limiting, HSTS, and OCSP stapling (the `nginx-selfhost.conf` in the repo root is an older copy; use the one in `deploy/`).
 
 **Dockerfile — two-stage build:**
 - Stage 1 (`build`): `node:22-alpine` + `python3`/`make`/`g++` → compiles `argon2` native bindings
@@ -125,15 +180,15 @@ All five relay containers run the **same image** (`build: ./relay`). The `SECTOR
 ### Add a user (zero downtime)
 
 ```bash
-# On the host, with ADMIN_TOKEN exported
-export $(grep -v '^#' .env | xargs)
+# On the host, in the install directory: export ADMIN_TOKEN from .env
+export ADMIN_TOKEN="$(grep '^ADMIN_TOKEN=' .env | cut -d= -f2-)"
 
-python3 scripts/paramant-admin.py add \
+python3 deploy/paramant-admin.py add \
   --label "alice" \
   --plan pro \
   --email alice@example.com
 
-python3 scripts/paramant-admin.py sync
+python3 deploy/paramant-admin.py sync
 # ✓ health: 3 keys loaded (zero downtime)
 # ✓ legal: 3 keys loaded
 # ✓ finance: 3 keys loaded
@@ -143,14 +198,14 @@ python3 scripts/paramant-admin.py sync
 ### List all keys
 
 ```bash
-python3 scripts/paramant-admin.py list
+python3 deploy/paramant-admin.py list
 ```
 
 ### Revoke a key
 
 ```bash
-python3 scripts/paramant-admin.py revoke --key pgp_xxxxx
-python3 scripts/paramant-admin.py sync
+python3 deploy/paramant-admin.py revoke --key pgp_xxxxx
+python3 deploy/paramant-admin.py sync
 ```
 
 ### Plans
@@ -198,8 +253,12 @@ curl -s -H "X-Admin-Token: $ADMIN_TOKEN" https://your-domain/health \
 To unlock unlimited users, add a relay license key to `.env`:
 
 ```bash
-PARAMANT_LICENSE=plk_your_relay_license_key
+PLK_KEY=plk_your_relay_license_key
 ```
+
+`docker-compose.yml` passes `PLK_KEY` to the relays. The older name
+`PARAMANT_LICENSE` is still read when set inside the relay's environment, but the
+compose file does not pass it on, so use `PLK_KEY`.
 
 After adding, restart the relay — logs will show `edition: licensed`.
 
@@ -217,7 +276,7 @@ paramant status          # show all relay health
 paramant logs health     # tail logs for health relay
 paramant logs legal      # tail logs for legal relay
 paramant reload          # zero-downtime key reload
-paramant upgrade         # pull latest and restart
+paramant upgrade         # fetch the newest v* release tag (or $PARAMANT_VERSION), rebuild, restart
 paramant start           # docker compose up -d
 paramant stop            # docker compose down
 paramant restart         # restart all containers
@@ -231,19 +290,31 @@ paramant token           # show your ADMIN_TOKEN
 Before starting, run the pre-flight check:
 
 ```bash
-bash scripts/preflight.sh
+bash deploy/preflight.sh
 ```
 
-Output:
+It checks the ports, Docker, swap and the secrets in `.env`: `ADMIN_TOKEN`,
+`REDIS_PASSWORD` (and that `RELAY_REDIS_URL` carries it), `RELAY_SELF_URL_<SECTOR>`
+(your own address, not the example value), `PARAMANT_TOTP_MASTER_KEY` and
+`INTERNAL_AUTH_TOKEN`. Without `REDIS_PASSWORD` redis does not start, so the
+check says so instead of "All checks passed". Output on a complete `.env`:
 ```
-PARAMANT pre-flight check
-─────────────────────────
-HTTP_PORT=80  HTTPS_PORT=443
-✓ Port 80 free
-✓ Port 443 free
-✓ Docker 29.3.1
-✓ Swap disabled
-✓ Ready for docker compose up -d
+✓  Port 80 free
+✓  Port 443 free
+✓  Docker 29.3.1
+✓  Docker Compose 2.40.3
+✓  Swap disabled
+✓  ADMIN_TOKEN configured
+✓  REDIS_PASSWORD configured
+✓  RELAY_REDIS_URL uses REDIS_PASSWORD
+✓  RELAY_SELF_URL_<SECTOR> set to your own address
+✓  PARAMANT_TOTP_MASTER_KEY configured
+✓  INTERNAL_AUTH_TOKEN configured
+
+╔═══════════════════════════════════════╗
+║  ✓  All checks passed                 ║
+║     Ready: docker compose up -d       ║
+╚═══════════════════════════════════════╝
 ```
 
 If ports are in use, add to `.env`:
@@ -329,11 +400,17 @@ relay/relay.js ──(build: ./relay)──► relay-main    (SECTOR=relay)
 
 ## Upgrade
 
-The Docker image is built from the `relay/` subdirectory in your clone. After pulling new code you must rebuild the images before restarting:
+With the installer: `paramant upgrade` fetches the newest `v*` release tag (or
+the tag in `PARAMANT_VERSION`), checks it out, rebuilds and restarts. The install
+is a `--depth 1` clone of one tag, so `git pull` does not move it; local changes
+stop the upgrade and nothing is changed.
+
+By hand: the Docker image is built from the `relay/` subdirectory in your clone. Check out the new release tag, then rebuild the images before restarting:
 
 ```bash
 cd /path/to/paramant-relay   # wherever you cloned the repo
-git pull
+git fetch --depth 1 origin tag v3.1.0
+git checkout v3.1.0
 
 # Build new images (node_modules cached; only relay.js layer is rebuilt)
 docker compose build relay-main relay-health relay-finance relay-legal relay-iot
@@ -497,7 +574,7 @@ Expected output (one entry per registered relay):
     {
       "url": "https://relay.yourdomain.com",
       "sector": "relay",
-      "version": "3.0.0",
+      "version": "3.1.0",
       "edition": "community",
       "pk_hash": "3d9b960c...",
       "verified_since": "2026-04-11T02:14:13Z",
@@ -515,7 +592,7 @@ Expected output (one entry per registered relay):
 
 ### Admin Panel — `/admin/`
 
-**Access:** ADMIN_TOKEN (or enterprise `pgp_` key) + TOTP (6-digit authenticator)
+**Access:** ADMIN_TOKEN + TOTP (6-digit authenticator). A `pgp_` API key does not log in to the admin panel, whatever its plan.
 
 > ⚠ Restrict access to your IP in nginx for extra security:
 > ```nginx
@@ -529,7 +606,7 @@ Expected output (one entry per registered relay):
 
 **Login flow:**
 1. Go to `https://your-domain/admin/`
-2. Enter your `ADMIN_TOKEN` (from `.env`) or an enterprise `pgp_` key
+2. Enter your `ADMIN_TOKEN` (from `.env`)
 3. Enter 6-digit TOTP code from your authenticator app
 4. Access granted
 
@@ -537,9 +614,19 @@ Expected output (one entry per registered relay):
 
 | Tab | Actions |
 |-----|---------|
-| Relay Monitor | Version, edition, active keys vs limit, uptime, blobs in flight, CT log |
-| API Keys | Load all keys (with BLOCKED indicator for over-limit keys), create, revoke, resend mail |
-| Licenses | Generate `plk_` license key for a customer — shown once with install instructions |
+| Overview | Accounts, active sessions, sign-ups today, plan distribution, recent audit events |
+| Users | All accounts with plan, per-product tiers and TOTP state; per account: details, welcome/setup/TOTP-reset mail, change plan or one product tier, ParaSign API on/off, revoke sessions, require TOTP, disable the key, deactivate the account; `+ New key` |
+| Audit | Audit events per account, filter on event type, CSV export |
+| Billing | Recent plan changes and gift/discount codes (create, revoke) |
+| Relay | Health of every relay sector, refreshed every 10 s |
+
+Next to the tabs: **Settings** (`/admin/settings.html`, relay configuration
+written to the env file, restart by hand), **CLI** (`/admin/cli`, a whitelist of
+commands such as `status`, `logs`, `key list`) and **Stand** (`/admin/stand`).
+
+The panel does not generate relay licenses. A `plk_` license key is issued by
+Paramant (see *Community Edition Limits* above) and set as `PLK_KEY` in `.env`;
+`scripts/paramant-license.sh` shows the license state of a running relay.
 
 **Set up TOTP:**
 ```bash
@@ -578,13 +665,13 @@ After deploying, create your first API key:
 export $(grep -v '^#' .env | xargs)
 
 # Create an enterprise key for yourself (admin)
-python3 scripts/paramant-admin.py add \
+python3 deploy/paramant-admin.py add \
   --label "admin" \
   --plan enterprise \
   --email you@example.com
 
 # Reload all relays
-python3 scripts/paramant-admin.py sync
+python3 deploy/paramant-admin.py sync
 
 # Your key is shown in the output — save it immediately
 # pgp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

@@ -60,6 +60,7 @@ OWNER/PARTICIPANT.
 ```
 curl -X POST https://paramant.app/v1/envelopes \
   -H "Authorization: Bearer psk_live_..." \
+  -H "Idempotency-Key: quote-8842-v1" \
   -H "Content-Type: application/json" \
   -d '{
         "document": { "content_base64": "JVBERi0xLjc..." },
@@ -93,7 +94,7 @@ roughly 15 MB must therefore be delivered via `document.url`, not base64.
 
 ```json
 {
-  "id": "env_...",
+  "id": "Us4rFoLj35sU_4cOlPJcs3eMZlw4xjMp",
   "status": "sent",
   "mode": "live",
   "doc_hash": "<sha3-256 hex>",
@@ -101,7 +102,7 @@ roughly 15 MB must therefore be delivered via `document.url`, not base64.
   "created_at": "...", "expires_at": "...",
   "signers": [
     { "index": 0, "name": "A. Jansen", "email": "a@example.org",
-      "order": 1, "status": "pending", "sign_url": "https://paramant.app/sign/..." }
+      "order": 1, "status": "pending", "sign_url": "https://paramant.app/co-sign?env=...&p=0&t=..." }
   ],
   "webhook_secret": "<hex, returned ONCE>",
   "metadata": { "quote_id": "8842" }
@@ -110,10 +111,53 @@ roughly 15 MB must therefore be delivered via `document.url`, not base64.
 
 `webhook_secret` is returned only here; store it to verify webhook HMACs.
 
-Create errors: `400 bad_json | missing_document | empty_document |
-missing_signers`, `422 not_a_pdf | document_unfetchable` (includes SSRF-guard
-rejections), `413 document_too_large`, `429 rate_limited` (50 creations per key
-per hour), `402 monthly_sign_quota_reached` (plan cap; `Retry-After: 86400`).
+- `id` is a random string of 20 to 64 characters (`A-Z a-z 0-9 _ -`), with no
+  prefix.
+- `sign_url` points at the hosted page `/co-sign` on `PARASIGN_PUBLIC_ORIGIN`
+  (see Operator configuration), one per signer.
+- A signer's `status` is `pending` until that slot is signed and `signed` after
+  it, in this response and in `GET /v1/envelopes/:id` alike. A `psk_test_`
+  envelope comes back with every slot already `signed` (see Test mode).
+- `documents` is `null` until the envelope is `completed`, then
+  `{ "signed_pdf": "/v1/envelopes/<id>/document", "receipt": "/v1/envelopes/<id>/receipt" }`.
+
+Create errors: `400 bad_json | invalid_idempotency_key | ambiguous_document |
+invalid_binding_mode | invalid_metadata | missing_signers | invalid_signer_email |
+missing_document | empty_document | too_many_signers | invalid_webhook_url`,
+`422 not_a_pdf | document_unfetchable` (includes SSRF-guard rejections),
+`413 document_too_large`, `429 rate_limited` (50 creations per key per clock
+hour), `402 monthly_sign_quota_reached` (plan cap; `Retry-After: 86400`).
+Every `/v1` error body is `{ "error": "<code>", "message": "<sentence>" }`, plus
+the extra fields named below.
+
+- `invalid_metadata`: `metadata` is set but is not a JSON object (a string or an
+  array is refused, not silently replaced by `{}`).
+- `missing_document`: neither `document.content_base64` nor `document.url`.
+- `empty_document`: `document.content_base64` is the empty string.
+- `too_many_signers`: more signers than the plan allows on one document; the
+  body carries `max_signers` and `plan`.
+- `402 monthly_sign_quota_reached` carries `plan`, `limit`, `used` and
+  `reset_date`; no envelope is created and nothing is counted.
+
+- `ambiguous_document`: both `document.content_base64` and `document.url` were sent.
+- `invalid_binding_mode`: `binding_mode` is set but is not `email` or `open`.
+- `invalid_signer_email`: with `binding_mode` `email` (the default) every signer
+  needs a valid email address; the body names the first bad one in
+  `signer_index`.
+- The body shape is checked before the hourly quota, so a malformed request
+  (400) does not spend one of the 50 creations.
+- `429 rate_limited` carries `Retry-After` and `retry_after_s`: the seconds left
+  until the current clock hour ends, not a flat 3600. The window is the clock
+  hour (UTC), not a sliding hour: the count starts again at every full hour, so
+  around the boundary up to 100 creations can land within a few minutes.
+
+Idempotency: send an `Idempotency-Key` header (8-128 characters of
+`A-Z a-z 0-9 _ . : -`) to make a retry safe. When the same key comes from the
+same API key within 24 hours, the relay returns the first `201` response again,
+with the header `Idempotent-Replay: true`, and creates no second envelope and
+spends no quota. Only a successful `201` is stored; an error is not replayed, so
+a retry after a 4xx or 5xx runs as a new request. A key in another format is a
+`400 invalid_idempotency_key`.
 
 ### GET /v1/envelopes/:id — status
 
@@ -132,11 +176,30 @@ over the canonical JSON. Verifiable offline against the relay public key
 
 ### GET /v1/envelopes/:id/document — the signed PDF
 
-OWNER/PARTICIPANT only; `409 not_ready` until completed. **This build has no
-stamp-worker: the ORIGINAL (unstamped) PDF is returned, flagged with
-`X-ParaSign-Stamped: false`.** The cryptographic proof lives in the `.psign`,
-not in a visible stamp. If the ephemeral document store has expired the blob you
-get `404 document_gone` (see Storage caveats).
+OWNER/PARTICIPANT only; `409 not_ready` until completed. Returns a STAMPED
+reading copy (`X-ParaSign-Stamped: true`): a footer on every page plus a
+"ParaSign signature certificate" page, baked by `relay/lib/parasign-stamp.js`.
+When stamping is unavailable the ORIGINAL bytes come back with
+`X-ParaSign-Stamped: false`. The cryptographic proof lives in the `.psign`,
+not in the visible stamp. Once the envelope's retention has expired the stored
+PDF is gone and you get `404 document_gone` (see Storage caveats).
+
+**Verifying: use the original, not the stamped copy.** Every party signed the
+SHA3-256 of the ORIGINAL bytes (`document_hash` in the receipt). The stamp is
+made after completion and its hash is in no signature, so `/verify` with the
+stamped PDF reports "not the document that was signed" and names the hash of
+the original. The certificate page prints that same hash (`Document SHA3-256`)
+and says to upload the original. Keep the PDF you created the envelope with.
+
+Protocol option, not implemented. The receipt could carry the hash of the
+stamped copy as well, inside the notary signature (for example
+`stamped_document_hash`), so `/verify` could accept the stamped PDF and say
+"stamped copy of the signed original, stamped by Paramant". Two conditions
+first: stamping has to be deterministic (pdf-lib output is not guaranteed
+byte-stable across versions) or the stamped bytes have to be produced and
+frozen before the receipt is notarised; and only receipts issued after the
+change would carry the field, so the original stays the one file that always
+verifies. Existing receipts and their bytes stay as they are.
 
 ### POST /v1/envelopes/:id/void — retract
 
@@ -152,38 +215,66 @@ Set `webhook_url` at create. Events POST a JSON body with headers:
 
 - `X-Paramant-Event`: event name.
 - `X-Paramant-Sig`: hex `HMAC_SHA256(webhook_secret, raw_body)` — verify this.
+- `X-Paramant-Timestamp` and `X-Paramant-Signature: t=<unix seconds>,v1=<hex HMAC_SHA256(webhook_secret, "<t>.<raw_body>")>`. The time is inside this signature: reject a delivery whose `t` is more than 300 seconds from your clock, so a captured delivery cannot be replayed later (`relay/lib/webhook-sign.js` `verifySignature`).
 - `X-Paramant-Delivery`: unique id for replay dedupe.
 
-Delivery uses the SSRF-guarded fetcher, so an internal/non-HTTPS `webhook_url`
-is accepted at create but silently never delivers. Use a public HTTPS URL.
+Delivery uses the SSRF-guarded fetcher. A `webhook_url` that is not a public
+HTTPS URL is refused at create with `400 invalid_webhook_url`.
 
-Emitted in this build: `envelope.sent`, `envelope.voided`. NOT yet auto-fired
-(poll `GET /v1/envelopes/:id` instead): `signer.completed`,
-`envelope.completed`, `envelope.declined`.
+Emitted in this build: `envelope.sent`, `signer.completed`,
+`envelope.completed`, `envelope.voided`. Not produced: `envelope.declined`.
+
+Delivery, retry and order:
+
+- Each attempt has a 5 s timeout. An attempt that fails on the network or gets a
+  5xx or 429 back is retried after 2 s and after 10 s: three attempts in all.
+  Any other answer (2xx, 3xx, other 4xx) ends it. After the third failed attempt
+  there is no further retry, so poll `GET /v1/envelopes/:id` as the source of
+  truth.
+- A retry repeats the same body, the same `X-Paramant-Sig` and the same
+  `X-Paramant-Delivery`; dedupe on that id. `X-Paramant-Attempt` is 1, 2 or 3.
+- The events of one envelope are delivered one after another in the order they
+  happened: the next waits until the previous is delivered or has used its
+  attempts. The order is kept within one relay process; it is not a queue that
+  survives a restart.
+- Every body carries `seq`, computed from the envelope's state, so it is the
+  same on any relay and after a restart: `envelope.sent` = 1,
+  `signer.completed` = 1 + `signed_count`, `envelope.completed` and
+  `envelope.voided` = number of signers + 2.
 
 ## Test mode
 
-`psk_test_` keys are accepted and behave like live, EXCEPT there is no sandbox
-auto-signer yet: a test envelope still needs a human to sign via the hosted
-page. End-to-end automated sandbox signing is planned.
+`psk_test_` keys are accepted. Test envelopes are signed automatically by a
+throwaway sandbox signer (when the relay has a signing engine; otherwise they
+behave like live ones), and their receipt carries `mode: "test"` and
+`sandbox: true` inside the notary signature. `/verify` shows such a receipt as
+a test proof, never as a real valid signature.
 
 ## Storage and privacy caveats (Model A)
 
 - The envelope record stores the document hash, per-party email HASH (SHA3-256),
   and metadata; the signed `.psign` carries only hashes and signatures.
-- Model-A concession: for `/v1` envelopes the relay DOES hold the PDF bytes, in
-  an in-memory + TTL blobstore, so it can serve `/document`. This is ephemeral
-  and NOT durable across restarts in this build; a production deployment must
-  relocate it to encrypted-at-rest storage with the same TTL. The webhook target
-  and secret live in the same ephemeral side-store.
+- Model-A concession: for `/v1` envelopes the relay DOES hold the PDF bytes so it
+  can serve `/document`. They are stored durably in redis, encrypted at rest
+  (AES-256-GCM, `PARASIGN_STORE_KEY`, else the TOTP master key;
+  `lib/parasign-store.js`), with the same TTL as the envelope, so the document
+  survives a relay restart and is gone when the envelope expires. A relay with
+  no redis falls back to memory, and then a restart loses it. The webhook target
+  and secret live in the same store.
 - `original_filename` and signer `label` are stored as given (not hashed); avoid
   putting sensitive data in filenames or labels.
 
 ## Operator configuration
 
 - `PARASIGN_PUBLIC_ORIGIN` — REQUIRED on any non-`paramant.app` (self-hosted)
-  deployment. It fixes the origin used to build `sign_url`s. If unset, only a
-  `*.paramant.app` request Host is trusted (forced to https); any other Host
-  falls back to `https://paramant.app`. This prevents a spoofed
-  `Host` / `X-Forwarded-Host` header from poisoning the signing links.
+  deployment. It fixes the origin used to build `sign_url`s and the receipt's
+  `notary.relay_pubkey_url`. If unset, a `*.paramant.app` request Host is
+  trusted (forced to https); any other Host falls back to this relay's own
+  `RELAY_SELF_URL` when that is set and not a paramant.app host, and only
+  otherwise to `https://paramant.app`. The relay logs
+  `parasign_public_origin_unset` at start with the origin it will use. A request
+  header is never used outside paramant.app, so a spoofed
+  `Host` / `X-Forwarded-Host` cannot poison the signing links.
+- The receipt has no `relay_id` field. The notary block names the relay by its
+  key: `relay_pk_hash` and `relay_public_key`. Pin those, not the URL.
 - `PARASIGN_MAX_PDF_BYTES` — max document size (default 20 MB).

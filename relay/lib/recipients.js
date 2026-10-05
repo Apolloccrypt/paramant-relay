@@ -362,8 +362,13 @@ function revoke(record, now) {
 // way back, since the record then counted as collected.
 //
 // It cannot be fixed by keeping the token either: not writing the token down
-// is the whole reason the relay cannot open what it stores. A relay that could
-// re-send the link is a relay that could open the file.
+// is why the relay cannot open what it has STORED. A relay that could re-send
+// the link is a relay that could open the file.
+//
+// Not zero-knowledge, and the difference matters: the relay mails the
+// invitation, so it holds each token for that moment, and the wrapping key is
+// derived from the token. "Not stored" is the honest claim; a recipient key the
+// relay never sees is the design that would make it zero-knowledge.
 //
 // So a reminder points at the invitation the recipient already has. Their link
 // is untouched and still works. If the mail is truly gone, the sender sends

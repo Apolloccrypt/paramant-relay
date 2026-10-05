@@ -2832,6 +2832,27 @@ for svc in relay-main relay-health relay-finance relay-legal relay-iot; do
 done
 EOF
   judge_seller_known
+
+  # 6k. A relay that signs with a key /verify does not pin turns every new
+  # multi-party proof red, and nothing above would notice (hertest
+  # 2026-10-04). Read from here, over TLS, like 6b. RUNBOOK.md, "Relay
+  # identity key rotation", is what to do when this is red.
+  step "6k. every relay signs with the key /verify pins (frontend/js/relay-trust-anchors.js)"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    printf '\n  $ node deploy/check-relay-anchors.mjs   # GET https://<host>/v2/pubkey, five relays\n'
+    printf '  [dry-run] not executed\n'
+    printf '  SKIP  assert (dry-run): every relay serves its pinned key\n'
+  elif ! command -v node >/dev/null 2>&1; then
+    warn "node is not installed here: NOT proven that the relays still sign with the pinned keys. Run node deploy/check-relay-anchors.mjs from a checkout that has node."
+  else
+    local rc=0
+    node deploy/check-relay-anchors.mjs 2>/dev/null || rc=$?
+    case "$rc" in
+      0) ok "every relay serves the key /verify pins" ;;
+      2) warn "relay anchors NOT PROVEN: a relay did not answer /v2/pubkey" ;;
+      *) die "a relay signs with a key /verify does not pin as current; follow RUNBOOK.md, Relay identity key rotation" ;;
+    esac
+  fi
 }
 
 # =============================================================== PHASE V =====

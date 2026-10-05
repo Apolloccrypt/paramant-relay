@@ -58,9 +58,9 @@ def encrypt_hybrid(data, key, blob_size=BLOB_SIZE):
         salt1 = secrets.token_bytes(32)
         salt2 = secrets.token_bytes(32)
         k_classical = HKDF(algorithm=hashes.SHA256(), length=32, salt=salt1,
-                           info=b"paramant-hybrid-classical-v1").derive(key.encode())
+                           info=b"paramant-hybrid-classical-v1").derive(key)
         k_pq        = HKDF(algorithm=hashes.SHA256(), length=32, salt=salt2,
-                           info=b"paramant-hybrid-pq-v1").derive(key.encode())
+                           info=b"paramant-hybrid-pq-v1").derive(key)
         k_combined  = bytes(a ^ b for a, b in zip(k_classical, k_pq))
         nonce       = secrets.token_bytes(12)
         overhead    = 1 + 32 + 32 + 12 + 16   # mode + salt1 + salt2 + nonce + GCM tag
@@ -72,6 +72,24 @@ def encrypt_hybrid(data, key, blob_size=BLOB_SIZE):
         for k in (k_classical, k_pq, k_combined):
             if k: _zero(k)
 
+# THE FILE KEY IS NOT THE API KEY. encrypt() and encrypt_hybrid() used to
+# derive the AES key from the API key, which the relay checks on every request:
+# the relay could decrypt every transfer, the opposite of docs/ot-guide.md
+# (sweep-api finding 2). The key material is now a random 32-byte transfer
+# secret that the relay never sees: --secret / PARAMANT_TRANSFER_SECRET, or one
+# made here and printed once, for the operator to hand to the receiver out of band.
+def transfer_secret(arg_value):
+    raw = arg_value or os.environ.get("PARAMANT_TRANSFER_SECRET", "")
+    if raw:
+        try:
+            sec = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4))
+        except Exception:
+            sec = b""
+        if len(sec) != 32:
+            log(f"{R}--secret / PARAMANT_TRANSFER_SECRET moet 32 bytes base64url zijn.{E}"); sys.exit(1)
+        return sec, False
+    return secrets.token_bytes(32), True
+
 def encrypt(data, key, blob_size=BLOB_SIZE):
     aes_key = None
     try:
@@ -80,15 +98,16 @@ def encrypt(data, key, blob_size=BLOB_SIZE):
         from cryptography.hazmat.primitives import hashes
         salt    = secrets.token_bytes(32)
         hkdf    = HKDF(algorithm=hashes.SHA256(), length=32, salt=salt, info=b"paramant-v6")
-        aes_key = hkdf.derive(key.encode())
+        aes_key = hkdf.derive(key)
         nonce   = secrets.token_bytes(12)
         padded  = pad(data, blob_size - AES_OVERHEAD)
         ct      = AESGCM(aes_key).encrypt(nonce, padded, None)
         blob    = salt + nonce + ct
         return blob, hashlib.sha256(blob).hexdigest()
     except ImportError:
-        log(f"{Y}⚠ cryptography niet geinstalleerd — plaintext (pip install cryptography){E}")
-        return pad(data, blob_size), hashlib.sha256(pad(data, blob_size)).hexdigest()
+        # Never plaintext without being asked: --no-encrypt is the explicit way.
+        log(f"{R}cryptography is niet geinstalleerd (pip install cryptography). Niets verstuurd.{E}")
+        sys.exit(1)
     finally:
         if aes_key: _zero(aes_key)
 
@@ -159,6 +178,9 @@ def main():
     p.add_argument("--stdin",      action="store_true")
     p.add_argument("--text",       help="Stuur tekst direct")
     p.add_argument("--no-encrypt", action="store_true")
+    p.add_argument("--secret",     metavar="BASE64URL",
+                   help="32-byte transfer secret (or PARAMANT_TRANSFER_SECRET); "
+                        "without it one is made and printed once. Never the API key.")
     p.add_argument("--ttl",        type=int, default=300,
                    help="Levensduur in seconden (default: 300)")
     p.add_argument("--max-views",  type=int, default=1,
@@ -182,6 +204,13 @@ def main():
 
     relay_url = RELAYS[args.relay]
     blob_size = BLOCKS[args.pad_block]
+    secret = None
+    if not args.no_encrypt and not args.drop:
+        secret, made = transfer_secret(args.secret)
+        if made:
+            shown = base64.urlsafe_b64encode(secret).decode().rstrip("=")
+            log(f"{Y}Transfergeheim (geef het de ontvanger via een ander kanaal, het staat nergens anders):{E}")
+            log(f"  PARAMANT_TRANSFER_SECRET={shown}")
     dev = f"[{args.device_id}] " if args.device_id else ""
     log(f"{B}PARAMANT Sender v{VERSION}{E}")
     log(f"Relay: {relay_url}")
@@ -229,9 +258,9 @@ def main():
                 _zero(entropy)
         if not args.no_encrypt:
             if args.hybrid:
-                blob, _ = encrypt_hybrid(data, args.key, blob_size=blob_size)
+                blob, _ = encrypt_hybrid(data, secret, blob_size=blob_size)
             else:
-                blob, _ = encrypt(data, args.key, blob_size=blob_size)
+                blob, _ = encrypt(data, secret, blob_size=blob_size)
         else:
             blob = pad(data, blob_size)
         h = send_blob(relay_url, args.key, blob,

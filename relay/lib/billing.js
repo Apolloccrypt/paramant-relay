@@ -110,7 +110,10 @@ function keepLonger(candidate, currentPaidUntil) {
 //   currentPaidUntil(accountId, product) -> date | null      (async; optional,
 //                                  the one-date-per-product fallback)
 //   isProcessed(paymentId) -> boolean                        (async; optional)
-//   markProcessed(paymentId, value) -> void                  (async; optional)
+//   markProcessed(paymentId, value, { grants }) -> void      (async; optional)
+//   periodOf(paymentId) -> [{ product, tier, from, until }]  (async; optional,
+//                                  what a payment bought; a revoke takes back
+//                                  only that)
 // }
 // Returns { result, level, account, product, tier, reason }, and on a grant
 // also grants and paidUntil.
@@ -157,9 +160,55 @@ async function processPayment(payment, deps) {
     // EVERY product the order bought goes back to its floor. A bundle that
     // granted two entitlements and revoked one would leave the customer holding
     // half a plan he has taken the money back for.
+    //
+    // UNLESS WE KNOW WHAT THIS PAYMENT BOUGHT. A chargeback on month 2 used to
+    // floor the product and clear paid_until, so the paid month 1 went with it
+    // while its invoice stood without a credit note. When the ledger has the
+    // period this payment bought (deps.periodOf), only that period comes off
+    // the end of the same tier's term; what is left is what was paid for by
+    // other payments. Without it (payments settled before the ledger existed)
+    // the old rule stands: floor.
     const revoked = [];
+    let periods = null;
+    if (typeof d.periodOf === 'function') { try { periods = await d.periodOf(payment.id); } catch { periods = null; } }
+    const nowR = d.now instanceof Date ? d.now : new Date();
     for (const g of order.grants) {
       const floor = catalog.floorTier(g.product);
+      const per = Array.isArray(periods) ? periods.find((p) => p && p.product === g.product && p.tier === g.tier) : null;
+      let cur = null;
+      if (per && typeof d.currentTermEnd === 'function') { try { cur = await d.currentTermEnd(accountId, g.product, g.tier); } catch { cur = null; } }
+      const span = per ? (new Date(per.until).getTime() - new Date(per.from).getTime()) : NaN;
+      const curMs = cur ? new Date(cur).getTime() : NaN;
+      // Undo a pause this payment caused on lower tiers of the product.
+      if (per && Array.isArray(per.paused) && typeof d.currentTermEnd === 'function') {
+        for (const pz of per.paused) {
+          let pe = null;
+          try { pe = await d.currentTermEnd(accountId, g.product, pz.tier); } catch { pe = null; }
+          const peMs = pe ? new Date(pe).getTime() : NaN;
+          if (!Number.isFinite(peMs) || !(pz.by > 0)) continue;
+          const back = new Date(Math.max(peMs - pz.by, nowR.getTime()));
+          try { await d.setProductPlan(accountId, g.product, pz.tier, back, null, { shorten: true }); } catch { /* logged by caller */ }
+        }
+      }
+      // Only when paid time is LEFT after taking this payment's period off:
+      // otherwise this payment was the whole term and the old rule (floor,
+      // period cleared) is exactly right. A term shortened to "now" would still
+      // read as running for the rest of a day where periods resolve per day.
+      if (per && Number.isFinite(span) && span > 0 && Number.isFinite(curMs) && curMs - span > nowR.getTime() + 60_000) {
+        const left = new Date(curMs - span);
+        try { await d.setProductPlan(accountId, g.product, g.tier, left, order.bundle || null, { shorten: true }); } catch { /* logged by caller */ }
+        revoked.push({ product: g.product, tier: left.getTime() > nowR.getTime() ? g.tier : floor, paidUntil: left.toISOString(), partial: true });
+        continue;
+      }
+      // This payment was an upgrade that paused a lower paid term (Pro year,
+      // then Business month on top): the pause was undone above, so only this
+      // payment's own tier comes off. Flooring here wiped the Pro year the
+      // customer still paid for (review #555, M2).
+      if (per && Array.isArray(per.paused) && per.paused.length) {
+        try { await d.setProductPlan(accountId, g.product, g.tier, new Date(nowR.getTime() - 1000), null, { shorten: true }); } catch { /* logged by caller */ }
+        revoked.push({ product: g.product, tier: String(per.paused[0].tier), partial: true });
+        continue;
+      }
       // null clears the period along with the tier: money reclaimed leaves no
       // paid time on record.
       try { await d.setProductPlan(accountId, g.product, floor, null, null); } catch { /* logged by caller via reason */ }
@@ -254,7 +303,26 @@ async function processPayment(payment, deps) {
       }
       granted.push({ product: g.product, tier: g.tier, paidUntil: until.toISOString() });
     }
-    if (typeof d.markProcessed === 'function') { try { await d.markProcessed(payment.id, 'granted'); } catch { /* best effort */ } }
+    // The period this payment bought, per product, so a later chargeback can
+    // take back exactly this and nothing paid before it.
+    const anchor = bundleExtendFrom(currents, now);
+    const bought = order.grants.map((g) => ({ product: g.product, tier: g.tier, from: anchor.toISOString(), until: paidUntil.toISOString() }));
+    // An UPGRADE pauses what runs under it. A Firm customer who buys a month
+    // of ParaSign Business holds a ParaSign Pro term under it; without this
+    // the Pro weeks under the Business month were paid for and never used.
+    // deps.pauseLowerTerms moves the end of every lower running term of the
+    // product out by the span this payment bought, and says what it moved so
+    // a chargeback can move it back.
+    if (typeof d.pauseLowerTerms === 'function') {
+      const span = paidUntil.getTime() - anchor.getTime();
+      for (const b of bought) {
+        try {
+          const moved = await d.pauseLowerTerms(accountId, b.product, b.tier, span);
+          if (Array.isArray(moved) && moved.length) b.paused = moved;
+        } catch { /* nothing moved; the grant itself stands */ }
+      }
+    }
+    if (typeof d.markProcessed === 'function') { try { await d.markProcessed(payment.id, 'granted', { grants: bought }); } catch { /* best effort */ } }
     return {
       result: 'granted', level: 'info', account: accountId, product, tier: order.tier,
       bundle: order.bundle || null,

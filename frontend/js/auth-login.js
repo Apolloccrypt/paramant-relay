@@ -19,14 +19,30 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
   function showSha1Notice(dest) {
     const notice = document.getElementById('sha1-notice');
     if (!notice) { window.location = dest; return; }
+    // The session is there now: the bar should say so, not "Account maken".
+    try { window.dispatchEvent(new Event('paramant:session-changed')); } catch (e) { /* old browser */ }
     if (form) form.hidden = true;
     if (errorDiv) errorDiv.classList.remove('visible');
     notice.hidden = false;
     const cont = document.getElementById('sha1-continue');
+    // Where the button goes, in words: back to the document the customer came
+    // from, not "to your account" (retest T5-5).
+    const toDoc = /^\/(en\/)?(co-sign|sign)\b/.test(dest);
     if (cont) {
       cont.setAttribute('href', dest);
+      cont.textContent = toDoc ? nlEn('Verder naar het document', 'Continue to the document') : nlEn('Verder naar uw account', 'Continue to your account');
       cont.addEventListener('click', function(ev) { ev.preventDefault(); window.location = dest; });
     }
+    // And on its own after a few seconds: the tip must never be a stop.
+    const auto = document.getElementById('sha1-auto');
+    let left = 8;
+    const say = function () { if (auto) auto.textContent = nlEn('U gaat over ' + left + ' seconden vanzelf verder.', 'Continuing on its own in ' + left + ' seconds.'); };
+    say();
+    const timer = setInterval(function () {
+      left -= 1;
+      if (left <= 0) { clearInterval(timer); window.location = dest; return; }
+      say();
+    }, 1000);
   }
 
   // One sign-in POST. `proof`, when present, is a solved proof-of-work; the
@@ -70,7 +86,12 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         // soft, dismissible note before continuing; otherwise redirect as before.
         let body = null;
         try { body = await res.json(); } catch (_) { /* non-JSON, ignore */ }
-        if (body && body.totp_algorithm === 'sha1') { showSha1Notice(returnUrl); return; }
+        // The tip about an older authenticator app at most once per browser:
+        // Google Authenticator works this way and that is normal, so it is
+        // not something to read at every sign-in (acceptance test 2026-10-04).
+        let seen = false;
+        try { seen = localStorage.getItem('paramant.sha1tip.v1') === '1'; localStorage.setItem('paramant.sha1tip.v1', '1'); } catch (_) { seen = false; }
+        if (body && body.totp_algorithm === 'sha1' && !seen) { showSha1Notice(returnUrl); return; }
         window.location = returnUrl;
       } else if (res.status === 401) {
         errorDiv.textContent = nlEn('Dit e-mailadres en deze code horen niet bij elkaar. De code verandert elke 30 seconden, dus gebruik de code die uw app nu toont.', 'That email and code do not match. Codes change every 30 seconds, so use the one your app is showing right now.');
@@ -78,7 +99,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         document.getElementById('totp').value = '';
         document.getElementById('totp').focus();
       } else if (res.status === 403) {
-        errorDiv.innerHTML = nlEn('Aan dit account is nog geen authenticator-app gekoppeld. <a href="/auth/request-reset">Stuur mij een instellink</a>, of <a href="/signup">maak een account</a>.', 'This account has no authenticator app linked to it yet. <a href="/auth/request-reset">Email me a setup link</a>, or <a href="/signup">create an account</a>.');
+        errorDiv.innerHTML = nlEn('Aan dit account is nog geen authenticator-app gekoppeld. Heeft u een back-upcode, <a href="/auth/request-reset">koppel dan een nieuwe app</a>. Zonder back-upcode: mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> vanaf uw accountadres.', 'This account has no authenticator app linked to it yet. If you have a backup code, <a href="/en/auth/request-reset">link a new app</a>. Without a backup code: email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> from your account address.');
         errorDiv.classList.add('visible');
       } else if (res.status === 428) {
         errorDiv.textContent = nlEn('De extra controle voor deze inlogpoging lukte niet. Vernieuw de pagina en probeer het opnieuw.', 'We could not run the extra verification this sign-in needs. Refresh the page and try again.');

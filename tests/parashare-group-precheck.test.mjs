@@ -136,7 +136,8 @@ test('with no ceiling known, the precheck refuses before anything is uploaded, w
     await page.waitForSelector('#step-over-limit.active', { timeout: 10000 });
     const line = await page.textContent('#over-limit-line');
     assert.match(line, /Your plan sends to 1 person at a time\. You listed 2\./);
-    assert.equal(await page.getAttribute('#step-over-limit a.btn', 'href'), '/pricing');
+    assert.doesNotMatch(line, /1 recipients/);
+    assert.equal(await page.getAttribute('#step-over-limit a.btn', 'href'), '/en/pricing');
     assert.equal(calls.precheck, 1);
     assert.equal(calls.inbound, 0, 'nothing was uploaded');
     assert.equal(calls.sends, 0);
@@ -302,7 +303,7 @@ test('the file picker is a big button in the page language, and says what was ta
     const name = await page.evaluate(() => { const i = document.getElementById('file-input'); return i.labels && i.labels[0] && i.labels[0].id; });
     assert.equal(name, 'ps-drop');
     await page.locator('#file-input').setInputFiles({ name: 'loonstrook.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(2048, 1) });
-    assert.equal(await page.textContent('#file-status'), '✓ loonstrook.pdf (2 KB)');
+    assert.equal(await page.textContent('#file-status'), '✓ loonstrook.pdf (2,0 KB)');
     assert.equal(await page.textContent('#ps-drop-btn'), 'Ander bestand kiezen');
     assert.equal(await page.textContent('#ps-go-why'), '');
   } finally { await page.close(); }

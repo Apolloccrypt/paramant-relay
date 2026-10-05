@@ -252,7 +252,7 @@ a:hover{opacity:.8}
     </div>
   </div>
 
-  <p>De beschikbaarheid wordt per kalendermaand gemeten over het primaire relay-endpoint dat aan uw plan is toegewezen. Alle vijf sectorrelays (health, legal, finance, IoT, relay) vallen eronder.</p>
+  <p>De toezegging geldt per kalendermaand voor het primaire relay-endpoint dat aan uw plan is toegewezen. Alle vijf sectorrelays (health, legal, finance, IoT, relay) vallen eronder. Een automatische meting draait nog niet (zie <a href="#measurement">5. Meetmethode</a>); tot die er is, beoordelen we een verzoek om tegoed op wat u en wij over de uitval kunnen laten zien.</p>
 
   <!-- 2. Credits -->
   <h2 id="credits">2. Tegoed bij uitval</h2>
@@ -335,7 +335,7 @@ a:hover{opacity:.8}
 
   <!-- 5. Measurement -->
   <h2 id="measurement">5. Meetmethode</h2>
-  <p>PARAMANT draait nog geen geautomatiseerde beschikbaarheidsmonitor op elke relay. Wat er vandaag draait: de pagina <a href="/status">/status</a> roept vanuit uw eigen browser GET <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">/health</code> aan op alle vijf relays en bewaart het resultaat 24 uur. Een controle van begin tot eind, elk uur, van de site en de hoofdrelay (<code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">relay.paramant.app</code>) is gebouwd en staat openbaar in de open-source repository als de heartbeat-workflow: een pagina laden in een echte browser, een overdracht versturen en teruglezen, een document ondertekenen en de handtekening verifiëren. Zodra hij is ingeschakeld, draait hij elk uur. Hij staat uit tot de inloggegevens ervoor klaarstaan, dus niets op deze pagina steunt er nog op. Een run die mislukt, opent een issue in de repository. De vier sectorrelays (health, legal, finance, IoT) worden alleen benaderd om te bevestigen dat een uitgefaseerde route daar geweigerd blijft, dus hun beschikbaarheid wordt niet gemeten.</p>
+  <p>PARAMANT draait nog geen geautomatiseerde beschikbaarheidsmonitor op elke relay. Wat er vandaag draait: de pagina <a href="/status">/status</a> roept vanuit uw eigen browser GET <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">/health</code> aan op alle vijf relays en bewaart het resultaat 24 uur. Een controle van begin tot eind, elk uur, van de site en de hoofdrelay (<code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">relay.paramant.app</code>) is gebouwd en staat openbaar in de source-available repository (BUSL 1.1) als de heartbeat-workflow: een pagina laden in een echte browser, een overdracht versturen en teruglezen, een document ondertekenen en de handtekening verifiëren. Zodra hij is ingeschakeld, draait hij elk uur. Hij staat uit tot de inloggegevens ervoor klaarstaan, dus niets op deze pagina steunt er nog op. Een run die mislukt, opent een issue in de repository. De vier sectorrelays (health, legal, finance, IoT) worden alleen benaderd om te bevestigen dat een uitgefaseerde route daar geweigerd blijft, dus hun beschikbaarheid wordt niet gemeten.</p>
   <p>Historische gegevens over beschikbaarheid worden nog niet gepubliceerd; de pagina <a href="/status">/status</a> toont de afgelopen 24 uur, zoals gemeten vanuit uw browser. Beheerders van een eigen installatie kunnen de gezondheid van de relay zelfstandig controleren via het API-endpoint <code style="font-family:var(--mono);font-size:12px;background:var(--ink-ghost);padding:2px 6px">/v2/ct/log</code>.</p>
 
   <!-- 6. Changes -->
@@ -383,6 +383,6 @@ a:hover{opacity:.8}
   </div>
 </footer>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 </body>
 </html>

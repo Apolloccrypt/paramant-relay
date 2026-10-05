@@ -121,7 +121,7 @@ ok('and it says the prepared document does not survive signing in',
   await out.locator('#ds-recipients-hint').innerText());
 await out.locator('#ds-recipients-continue').click();
 await out.waitForURL(/\/auth\/login\?next=%2Fsign|\/auth\/login\?next=\/sign/, { timeout: 15000 }).catch(() => {});
-ok('pressing it goes to the sign-in and back to /sign', /\/auth\/login\?next=(\/|%2F)sign$/.test(out.url()), out.url());
+ok('pressing it goes to the sign-in and back to /sign', /\/auth\/login\?next=(\/|%2F)sign(%3Fherstel%3D1)?$/.test(out.url()), out.url());
 await out.close();
 
 // ── signed in: nothing of the above ──────────────────────────────────────────
@@ -147,7 +147,7 @@ await pickJpeg(jpeg);
 await jpeg.locator('#ds-doc-error:not([hidden])').waitFor({ timeout: 15000 });
 ok('a JPEG is refused, and named',
   (await jpeg.locator('#ds-doc-error').innerText()).trim()
-    === 'Dit is een JPEG-afbeelding, geen pdf. ParaSign ondertekent pdf-documenten. Exporteer of print uw bestand eerst naar pdf.',
+    === 'Dit is een JPEG-afbeelding, geen pdf. ParaSign ondertekent alleen pdf. Zet uw bestand eerst om naar pdf: exporteer het, of druk het af als pdf.',
   await jpeg.locator('#ds-doc-error').innerText());
 ok('a refused file does not move the flow on',
   await jpeg.locator('#step-doc').isVisible()

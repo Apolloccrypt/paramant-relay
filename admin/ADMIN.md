@@ -115,7 +115,7 @@ All endpoints are mounted at `/admin/api/`. Authentication: `X-Session: <session
 | `POST` | `/admin/send-welcome` | `{ key }` | Send welcome email |
 | `POST` | `/admin/reset-totp` | `{ key }` | Send TOTP reset email |
 | `POST` | `/admin/force-totp` | `{ key, required: bool, reason? }` | Require or remove TOTP for user |
-| `POST` | `/admin/resend-setup` | `{ key }` | Resend TOTP setup link |
+| `POST` | `/admin/resend-setup` | `{ key }` or `{ user_id, email }` | Resend TOTP setup link (`key` may be the account kid; the address is then looked up) |
 | `POST` | `/admin/change-plan` | `{ key, new_plan, notify }` | Change the legacy plan on every relay sector (`community`/`pro`/`enterprise`/`trial`) |
 | `POST` | `/admin/set-product-plan` | `{ key, product, tier, notify }` | Change one product tier on every relay sector without changing the legacy plan |
 

@@ -77,6 +77,22 @@ async function main() {
   );
   ok('conflict: cross-account pubkey bind refused');
 
+  // 4. CEILING (review r2 (c)) - at most MAX_ACTIVE_KEYS active keys per
+  //    account; revoked ones do not count, so revoking makes room again.
+  {
+    const U3 = 'pgp_user_ceiling';
+    const pkN = (n) => { const b = Buffer.alloc(us.ML_DSA_65_PK_LEN, 1); b.writeUInt32BE(n + 1000, 0); return b.toString('base64'); };
+    for (let n = 0; n < us.MAX_ACTIVE_KEYS; n++) await us.storeSigningPk(r, U3, { pk_b64: pkN(n), label: 'k' + n });
+    // At the ceiling the oldest key lapses instead of the bind being refused
+    // (review #555, M9); the active count never passes the ceiling.
+    const first = (await us.getActiveSigningPks(r, U3))[0];
+    const room = await us.storeSigningPk(r, U3, { pk_b64: pkN(9999), label: 'one more' });
+    assert.strictEqual(room.reenrolled, false);
+    assert.deepStrictEqual(room.retired, [first.pk_hash_sha3]);
+    assert.strictEqual((await us.getActiveSigningPks(r, U3)).length, us.MAX_ACTIVE_KEYS);
+    ok('ceiling: at most ' + us.MAX_ACTIVE_KEYS + ' active keys, the oldest lapses to make room');
+  }
+
   // A different pubkey for U2 is fine (independent accounts, independent keys).
   await us.storeSigningPk(r, U2, { pk_b64: PK2, label: 'ok' });
   assert.strictEqual((await us.getActiveSigningPks(r, U2)).length, 1, 'U2 binds its own distinct key');

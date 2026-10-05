@@ -333,15 +333,25 @@ test('the authentication numbers on the security page are the ones the code enfo
   const sec = visible(page('en/security'));
   const secNl = visible(page('security'));
 
-  const maxAge = Number(/paramant_user_session=\$\{token\}[^`]*Max-Age=(\d+)/.exec(srv)[1]);
-  assert.equal(maxAge, 3600);
-  assert.match(sec, /Sessions last one hour/);
-  assert.match(secNl, /Een sessie duurt een uur/);
+  // The session slides: one hour idle, twelve at most (admin/lib/session-client.js).
+  // "Sessions last one hour" was true of the cookie, which was the bug: it
+  // ended an hour after login however active the person was.
+  const lib = read('admin/lib/session-client.js');
+  assert.equal(Number(/const USER_SESSION_IDLE_S = (\d+);/.exec(lib)[1]), 3600);
+  assert.match(srv, /paramant_user_session=\$\{token\}[^`]*Max-Age=\$\{/);
+  assert.match(sec, /A session ends after one hour without activity, and after twelve hours at most/);
+  assert.match(secNl, /Een sessie loopt af na een uur zonder activiteit, en na twaalf uur in elk geval/);
 
   const step = Number(/Math\.floor\(now \/ 1000 \/ (\d+)\)/.exec(read('relay/lib/totp.js'))[1]);
   assert.equal(step, 30);
-  assert.match(sec, /TOTP codes expire thirty seconds after issue/);
-  assert.match(secNl, /Een TOTP-code verloopt dertig seconden nadat hij is gemaakt/);
+  // Fase 2 (SITE-40): the relay accepts the step before and after
+  // (matchTotpSlot, window = 1), so "expires thirty seconds after issue" was
+  // untrue. The page now names the step and the tolerance.
+  const totpWindow = Number(/window = (\d+)/.exec(read('relay/lib/totp.js'))[1]);
+  assert.equal(totpWindow, 1, 'relay/lib/totp.js changed its tolerance; rewrite the TOTP sentence on /security');
+  assert.match(sec, /A TOTP code belongs to a thirty-second time step\. To absorb a clock that is slightly off, the server also accepts the code of the step before and after/);
+  assert.match(secNl, /Een TOTP-code hoort bij een tijdvak van dertig seconden\. Om een klok die iets afwijkt op te vangen, accepteert de server ook de code van het tijdvak ervoor en erna/);
+  assert.doesNotMatch(sec, /TOTP codes expire thirty seconds after issue/);
 
   // /auth/login: per-IP fixed window.
   const fn = srv.slice(srv.indexOf('function checkLoginRateLimit'));
@@ -435,7 +445,9 @@ test('the audit numbers on press, trust and the DPA match the audit table on /do
     }
   }
   for (const slug of ['trust', 'dpa', 'en/trust', 'en/dpa']) {
-    assert.match(page(slug), /href="\/docs#audits"/, `${slug}: the audit link must point at the table that exists`);
+    // An English page links to the English docs (tests/en-links-blijven-engels.test.mjs).
+    const want = slug.startsWith('en/') ? /href="\/en\/docs#audits"/ : /href="\/docs#audits"/;
+    assert.match(page(slug), want, `${slug}: the audit link must point at the table that exists`);
   }
 });
 
@@ -610,7 +622,7 @@ test('the SLA figures are consistent across pages and the measurement described 
   assert.match(nl, /gemeten vanuit uw (eigen )?browser/);
 });
 
-// 8b ── TLS. /dpa row: "TLS 1.3 minimum on all relay endpoints", in an article
+// 44 ── TLS. /dpa row: "TLS 1.3 minimum on all relay endpoints", in an article
 // 28 agreement customers sign electronically. Until 5 September 2026 every
 // nginx config in the repository allowed TLS 1.2 as well, and the Outlook
 // add-in vhost named no protocols at all and so inherited the host default,
@@ -699,7 +711,9 @@ test('the IP-logging row says what the deploy configuration does and promises no
     assert.doesNotMatch(sec, /Retention:\s*\d+ days/, 'security: no retention config in deploy/, so no retention number on the page');
     assert.match(sec, /No separate retention period is promised/);
   }
-  assert.match(sec, /Not linked to transfer content/);
+  // Fase 2 (SITE-35): the edge in front of nginx does log, and /privacy says
+  // so. The row names it instead of claiming the transfer is never in a log.
+  assert.match(row, /The edge \(Caddy\) in front of nginx does write an access log/);
   // The Dutch row.
   const secNl = visible(page('security'));
   const rowNl = /IP-logging<\/td><td>(.*?)<\/td>/s.exec(page('security'))?.[1] || '';
@@ -710,7 +724,7 @@ test('the IP-logging row says what the deploy configuration does and promises no
     assert.doesNotMatch(secNl, /Bewaartermijn:\s*\d+ dagen/, 'security (nl): no retention config in deploy/, so no retention number on the page');
     assert.match(secNl, /Er wordt geen aparte bewaartermijn beloofd/);
   }
-  assert.match(secNl, /Niet gekoppeld aan de inhoud van een overdracht/);
+  assert.match(rowNl, /De edge \(Caddy\) die voor nginx staat, schrijft wel een toegangslog/);
 });
 
 // 10 ── "10 encrypted CLI tools" on the homepage is the developer catalogue.
@@ -1209,21 +1223,26 @@ test('the session cookie described on /security is the cookie admin/server.js se
   assert.ok(set, 'admin/server.js must set the session cookie from a template literal');
   const attrs = set[1];
   const sameSite = /SameSite=(\w+)/.exec(attrs)[1];
-  const maxAge = Number(/Max-Age=(\d+)/.exec(attrs)[1]);
   const bits = Number(/const sessionToken = crypto\.randomBytes\((\d+)\)/.exec(srv)[1]) * 8;
-  assert.equal(maxAge, 3600);
-  // Sliding, because every authenticated read pushes the Redis TTL back out.
-  assert.match(srv, /expire\(`paramant:user:session:\$\{token\}`,\s*3600\)/,
-    'the session TTL must be refreshed on use for "sliding" to be true');
+  // The lifetime is lib/session-client.js: one hour idle, twelve hours at most.
+  const lib = read('admin/lib/session-client.js');
+  assert.equal(Number(/const USER_SESSION_IDLE_S = (\d+);/.exec(lib)[1]), 3600, 'the idle hour moved; update /security with it');
+  assert.equal(/const USER_SESSION_MAX_AGE_MS = ([\d\s*]+);/.exec(lib)[1].replace(/\s/g, ''), '12*3600*1000', 'the twelve-hour cap moved; update /security with it');
+  assert.match(attrs, /Max-Age=\$\{/, 'the cookie lifetime comes from the caller, so it can slide');
+  // Sliding, because every authenticated read pushes the Redis TTL back out
+  // AND re-issues the cookie with the same lifetime. A record that slides under
+  // a cookie that does not is how people were logged out after an hour of work.
+  assert.match(srv, /expire\(key, lifetime\);\s*setUserCookie\(res, token, lifetime\);/,
+    'the session TTL and the cookie must be refreshed together for "sliding" to be true');
 
   const sec = visible(page('en/security'));
   const problems = [];
-  for (const phrase of [`${bits}-bit session token`, 'httpOnly', 'Secure', `SameSite=${sameSite}`, 'one-hour sliding expiry']) {
+  for (const phrase of [`${bits}-bit session token`, 'httpOnly', 'Secure', `SameSite=${sameSite}`, 'one-hour sliding expiry', 'twelve hours at most']) {
     if (!sec.includes(phrase)) problems.push(`security: the session row must say "${phrase}"`);
   }
   // Dutch: "verloopt na een uur zonder activiteit" is the sliding expiry.
   const secNl = visible(page('security'));
-  for (const phrase of [`sessietoken van ${bits} bits`, 'httpOnly', 'Secure', `SameSite=${sameSite}`, 'verloopt na een uur zonder activiteit']) {
+  for (const phrase of [`sessietoken van ${bits} bits`, 'httpOnly', 'Secure', `SameSite=${sameSite}`, 'verloopt na een uur zonder activiteit', 'na twaalf uur in elk geval']) {
     if (!secNl.includes(phrase)) problems.push(`security (nl): the session row must say "${phrase}"`);
   }
   // Nowhere may the site claim an attribute value the code does not set.
@@ -1789,6 +1808,23 @@ test('the signing and receipt retentions on /privacy are the ones the relay appl
     `privacy: the delivery-receipt row must say ${minutes} minutes`);
   assert.ok(privNl.includes(`Redis · ${minutes} minuten, daarna verwijderd`),
     `privacy (nl): the delivery-receipt row must say ${minutes} minutes`);
+});
+
+// 52 ── Acceptatie r4, Nieuw 1: the admin keeps the invited addresses so each
+// party hears "Iedereen heeft getekend". They are readable (a mail cannot go
+// to a hash), so /privacy has to say that, with the term sign-notify.js keeps
+// them for. Verified by sabotage: TTL_SECONDS 8 -> 9 days turns this red.
+test('the invited-address retention on /privacy is the one sign-notify.js applies', () => {
+  const src = stripJsComments(read('admin/lib/sign-notify.js'));
+  const m = /TTL_SECONDS\s*=\s*(\d+)\s*\*\s*86400/.exec(src);
+  assert.ok(m, 'sign-notify.js must declare TTL_SECONDS as <days> * 86400');
+  const days = Number(m[1]);
+  assert.match(src, /async function rememberParties\(/, 'sign-notify.js keeps the invited addresses');
+  assert.match(src, /async function forget\([\s\S]*?partiesKeyFor\(envelopeId\)/, 'forget() drops the invited addresses with the record');
+  assert.ok(visible(page('privacy')).includes(`De adressen die een afzender uitnodigt om te tekenen, bewaren wij leesbaar en niet als hash, omdat wij die mensen mailen dat iedereen getekend heeft; naar een hash kan geen mail. Ze worden gewist zodra het document compleet is of iemand weigert, hooguit na ${days} dagen.`),
+    `privacy (nl): the invited addresses must be named, readable, with ${days} days at most`);
+  assert.ok(visible(page('en/privacy')).includes(`The addresses a sender invites to sign are kept readable, not as a hash, because we email those people that everyone has signed; an email cannot go to a hash. They are deleted as soon as the document is complete or someone declines, after ${days} days at most.`),
+    `privacy: the invited addresses must be named, readable, with ${days} days at most`);
 });
 
 // 27 ── The CT log hash. ct-hash.js is SHA3-256 throughout and /dpa says so;
@@ -2511,8 +2547,14 @@ test('every page that promises burn-on-read says which client and which plan it 
   // at the counter. Only GET /v2/outbound/:hash, the API's own route, spends a
   // read. So the exemption those three pages get below is not a slug allowlist,
   // it stands or falls with these two lines.
-  assert.match(relaySrc, /td\.used = true;\s*blobDrop\(blobHash\);/,
+  // Since 2026-10-04 the burn goes through dlBurn() and comes in two shapes:
+  // on 'finish' for an old client, and on POST .../ack for /get, which confirms
+  // only once it has decrypted the file. Either way the blob is deleted
+  // outright and the read counter is never consulted.
+  assert.match(relaySrc, /dlBurn\(token, td, 'downloaded'\);\s*blobDrop\(blobHash\);/,
     'the /v2/dl download-token route no longer deletes the blob outright; /get, /ontvang and /parashare call a Paramant link single-use because it does');
+  assert.match(relaySrc, /dlBurn\(token, td, 'downloaded'\);\s*blobDrop\(td\.hash\);/,
+    'the /v2/dl ack no longer deletes the blob outright; /get calls a link single-use because a confirmed download does');
   assert.equal((relaySrc.match(/entry\.views_remaining = \(entry\.views_remaining \?\? 1\) - 1;/g) || []).length, 1,
     'the read counter is spent in more than one place now; the download-link pages promise single-use because only GET /v2/outbound/:hash spends a read');
 
@@ -2834,7 +2876,7 @@ test('every page that promises burn-on-read says which client and which plan it 
   assert.deepEqual(driftedNl, [], `\n  ${driftedNl.join('\n  ')}\n`);
 });
 
-// 36 ── The account key and the browser. /privacy now has a section that names
+// 45 ── The account key and the browser. /privacy now has a section that names
 // which pages hold the API key in memory and which do not, and the list is a
 // claim about code: /parashare runs on a fifteen-minute session token, /account
 // reveals on purpose, /pricing and /dashboard still authenticate with the key
@@ -2873,10 +2915,14 @@ test('the ParaSend credential /privacy describes is the credential the code impl
   const countRules = (from, to) => (scope.slice(scope.indexOf(from), scope.indexOf(to))
     .match(/\{ method:/g) || []).length;
   const rules = countRules('const SCOPE = [', 'const APP_SCOPE = [');
-  assert.equal(rules, 7,
-    `the relay's ParaSend allowlist now has ${rules} entries; /privacy says seven, so change the page with the code`);
-  assert.ok(priv.includes('the relay accepts it on the seven requests a transfer makes and refuses it on everything else'),
+  // Nine since 2026-10-04: announcing the blocks of a live hand-over and saying
+  // no after the fingerprint check (SENDNAME-28/29) joined the seven.
+  assert.equal(rules, 9,
+    `the relay's ParaSend allowlist now has ${rules} entries; /privacy says nine, so change the page with the code`);
+  assert.ok(priv.includes('the relay accepts it on the nine requests a transfer makes and refuses it on everything else'),
     'privacy: the storage section must state what the token can and cannot do');
+  assert.ok(privNl.includes('de relay accepteert het bij de negen verzoeken die een overdracht doet'),
+    'privacy (NL): the storage section must state the same count');
   const appRules = countRules('const APP_SCOPE = [', 'const PURPOSE_PARASEND');
   assert.equal(appRules, 5,
     `the relay's app allowlist now has ${appRules} entries; /privacy says five, so change the page with the code`);
@@ -2952,7 +2998,7 @@ test('the ParaSend credential /privacy describes is the credential the code impl
     'privacy (nl): the self-host exception must be stated');
 });
 
-// 37 ── The two legal facts, and the sentence that keeps them honest.
+// 46 ── The two legal facts, and the sentence that keeps them honest.
 //
 // Verified against the primary sources on 2026-09-03 (vault: "Verificatie -
 // twee juridische argumenten voor Paramant"). Both are true and both are one
@@ -3182,7 +3228,7 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
   // all three: the homepage card's list sits above its .prod-cta, the /parasend
   // hero line above .ps-actions, the /pricing paragraph above the tier grid.
   const before = {
-    'en/index': /class="prod-cta"><a class="hp-btn hp-btn-line" href="\/parasend"/,
+    'en/index': /class="prod-cta"><a class="hp-btn hp-btn-line" href="\/en\/parasend"/,
     parasend: /<div class="ps-actions">/,
     'en/parasend': /<div class="ps-actions">/,
     'en/pricing': /<div class="tier-grid">/,
@@ -3199,7 +3245,7 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
   }
 });
 
-// 39 ── The plans ParaSend actually has, and the reads they actually buy.
+// 47 ── The plans ParaSend actually has, and the reads they actually buy.
 //
 // Found by a writer reading the live site on 4 September 2026: /pricing and
 // /parasend offered "up to 10 reads on Pro, 25 on Business and 100 on
@@ -3289,7 +3335,7 @@ test('the ParaSend read counts are the ones tiers.js grants to plans ParaSend se
   assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}\n`);
 });
 
-// 40 ── The plans a ParaSend link lifetime may name, and the durations tiers.js
+// 48 ── The plans a ParaSend link lifetime may name, and the durations tiers.js
 // sets for them.
 //
 // The sequel to block 39, the same family of untruth one claim over. /terms and
@@ -3405,7 +3451,7 @@ test('every ParaSend link lifetime on the site names a plan ParaSend sells, with
   assert.deepEqual(named, [], `\n  ${named.join('\n  ')}\n`);
 });
 
-// ── /gereedschap: the page that says what works without an account ──────────
+// 49 ── /gereedschap: the page that says what works without an account ──────────
 //
 // This page is written in Dutch and every sweep above matches English, so none
 // of them can read it. That is exactly why it needs its own block: its whole
@@ -3742,7 +3788,7 @@ test('the recipients per send on the site are the max_recipients tiers.js sets',
   assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}\n`);
 });
 
-// The sign-in and account pages are Dutch on their own path and English under
+// 50 ── The sign-in and account pages are Dutch on their own path and English under
 // /en/ since 23 September 2026, the way /, /pricing, /about and /security went
 // first. Each pair has to say its language, point search engines at both, and
 // give the reader a visible way across and back. The token pages carry the
@@ -3783,7 +3829,7 @@ test('the sign-in and account pages exist in both languages and link each other'
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
 });
 
-// ── Co-signing: no fixed order, initials on every page for every signer ──────
+// 43 ── Co-signing: no fixed order, initials on every page for every signer ──────
 // /parasign promised "Medeondertekenaars in een vaste volgorde" and the English
 // page "Co-signing with routing order", while the relay never checked it:
 // sign() in relay/envelope.js fills any party slot at any time, and the

@@ -220,14 +220,14 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <ul class="nav-links">
     <li><a href="/en#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
     <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/help" class="nav-help">Help</a>
     <a href="/en/auth/login" class="nav-signin">Sign in</a>
     <a href="/en/signup" class="nav-cta">Create account</a>
   </div>
@@ -241,19 +241,19 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </nav>
 <div class="nav-mobile" id="nav-mobile">
   <a href="/en#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
   <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/en/help" class="nav-tail-link">Help</a>
   <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/session-issues" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/session-issues" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div><main>
 
   <div class="breadcrumb">
-    <a href="/help">Help</a>
+    <a href="/en/help">Help</a>
     <span>/</span>
     Session and login issues
   </div>
@@ -275,17 +275,17 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 
   <div class="issue-block">
-    <div class="issue-header">"Invalid API key"</div>
+    <div class="issue-header">A script or integration gets "Invalid API key"</div>
     <div class="issue-body">
-      <p>Check that you copied the full 64-character key with no trailing spaces. In password managers, use the copy button rather than selecting the text by hand. If you recently regenerated your key, make sure you saved the new one before closing the dashboard.</p>
-      <p>If the key was revoked: generate a new one in Dashboard &rarr; API keys.</p>
+      <p>This is about the API, not about signing in: on the website you sign in with your email address and a passkey or code, without a key. Check that the integration sends the full key (<code>pgp_</code> followed by 64 characters) in the <code>X-Api-Key</code> header, with no trailing spaces. You find the key on <a href="/en/account">Account</a> under <strong>Advanced account key</strong>.</p>
+      <p>For a <code>psk_live_</code> key for the ParaSign API, check on your account page that it is still active, and make a new one there if needed. A new account key (<code>pgp_</code>) you request at <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
     </div>
   </div>
 
   <div class="issue-block">
     <div class="issue-header">"Session expired, sign in again"</div>
     <div class="issue-body">
-      <p>Sessions last <strong>1 hour</strong> from the time of login. This is deliberate. Paramant handles sensitive files and does not keep you signed in for longer. Go back to <a href="/auth/login">paramant.app/auth/login</a> and sign in again.</p>
+      <p>A session ends after <strong>an hour without activity</strong>. While you are working that hour moves along, but after <strong>twelve hours</strong> every session ends, however active you were. This is deliberate: Paramant handles sensitive files and keeps no lasting sessions. Go back to <a href="/en/auth/login">paramant.app/en/auth/login</a> and sign in again.</p>
       <p>If you are often signed out halfway through a task, you could use the API from a script instead of the web dashboard, so an expiring session does not interrupt your work.</p>
     </div>
   </div>
@@ -324,7 +324,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <div class="troubleshoot-item">
     <div class="q">None of this applies and I still cannot sign in.</div>
-    <div class="a">Check <a href="/status">paramant.app/status</a> for any active incidents. If status is green, email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> with your account email and a description of the exact error you see. Include a screenshot if possible.</div>
+    <div class="a">Check <a href="/en/status">paramant.app/status</a> for any active incidents. If status is green, email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> with your account email and a description of the exact error you see. Include a screenshot if possible.</div>
   </div>
 
   <div class="troubleshoot-item">
@@ -380,6 +380,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 </body>
 </html>

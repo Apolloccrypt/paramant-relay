@@ -13,7 +13,16 @@
 //   paramant:signing_pk_index:${pk_hash}    → JSON { userId }  (O(1) reverse lookup)
 //
 // Each entry shape:
-//   { alg: 'ML-DSA-65', pk_b64, pk_hash_sha3, label, enrolled_at, revoked_at|null }
+//   { alg: 'ML-DSA-65', pk_b64, pk_hash_sha3, label, enrolled_at, revoked_at|null,
+//     expires_at|absent }
+//
+// expires_at (36-K): a key bound with a 6-digit code is made for ONE signature.
+// The browser does not keep its secret half, so it can never sign again, yet it
+// stayed "active" for ever and fifty of them closed the account off
+// (MAX_ACTIVE_KEYS). Such a key now lapses by itself after CODE_KEY_TTL_MS. A
+// lapsed key is history like a revoked one: it stays in the list and in the
+// reverse index, so old signatures still resolve, but it no longer counts as
+// active and cannot fill a new signature slot.
 
 const crypto = require('crypto');
 
@@ -44,10 +53,26 @@ async function _writeArray(redisClient, userId, arr) {
   await redisClient.set(_userKey(userId), JSON.stringify(arr));
 }
 
+const MAX_ACTIVE_KEYS = 50;
+// Long enough for the signature it was made for (bind, sign and submit happen
+// in one sitting), short enough that the ceiling is never a dead end.
+const CODE_KEY_TTL_MS = 24 * 60 * 60 * 1000;
+
+function isExpired(e, nowMs = Date.now()) {
+  if (!e || !e.expires_at) return false;
+  const t = Date.parse(e.expires_at);
+  return Number.isFinite(t) && t <= nowMs;
+}
+function isActive(e, nowMs = Date.now()) {
+  return !!e && !e.revoked_at && !isExpired(e, nowMs);
+}
+
 // Append a new enrollment. Server computes pk_hash itself — never trusts client.
 // Idempotent: re-enrolling the same pk for the same user returns the existing
 // entry (and clears revoked_at if it was revoked, treating it as re-enrollment).
-async function storeSigningPk(redisClient, userId, { pk_b64, label }) {
+// expiresInMs: set for a key bound with a code (one signature, see expires_at
+// above); absent for passkey-attested and invite keys, which do not lapse.
+async function storeSigningPk(redisClient, userId, { pk_b64, label, expiresInMs } = {}) {
   if (!userId) throw new Error('userId required');
   if (typeof pk_b64 !== 'string' || !pk_b64) throw new Error('pk_b64 required');
   const pk_hash_sha3 = _computePkHash(pk_b64); // also validates length
@@ -71,17 +96,40 @@ async function storeSigningPk(redisClient, userId, { pk_b64, label }) {
 
   const arr = await _readArray(redisClient, userId);
   const existing = arr.find(e => e.pk_hash_sha3 === pk_hash_sha3);
-  const now = new Date().toISOString();
+  const nowMs = Date.now();
+  const now = new Date(nowMs).toISOString();
+  const expiresAt = Number.isFinite(expiresInMs) && expiresInMs > 0 ? new Date(nowMs + expiresInMs).toISOString() : null;
 
   if (existing) {
     // Re-enrollment of a previously revoked key clears the revocation.
     existing.revoked_at = null;
     if (cleanLabel) existing.label = cleanLabel;
+    // A code bind lapses again from now; any other bind makes it lasting.
+    if (expiresAt) existing.expires_at = expiresAt; else delete existing.expires_at;
     await _writeArray(redisClient, userId, arr);
     await redisClient.set(_indexKey(pk_hash_sha3), JSON.stringify({ userId }));
     return { entry: existing, reenrolled: true };
   }
 
+  // A ceiling on active keys: every new key needs its own confirmation, but a
+  // bind that succeeded while the answer was lost leaves a key nobody holds,
+  // and nothing bounded how many could pile up (review r2 (c)). Revoked keys
+  // stay as history and do not count, and neither do lapsed code keys (36-K).
+  //
+  // At the ceiling the OLDEST active keys lapse, they are not refused (review
+  // #555, M9): code keys bound before keys had an expiry stay active forever,
+  // so an account that signed fifty times before the deploy could not sign
+  // again. A lapsed key is not revoked: signatures it made still verify and
+  // its lookup still names the account; it only stops counting and binding.
+  const active = arr.filter((e) => isActive(e, nowMs))
+    .sort((a, b) => (Date.parse(a.enrolled_at) || 0) - (Date.parse(b.enrolled_at) || 0));
+  const retired = [];
+  while (active.length >= MAX_ACTIVE_KEYS) {
+    const old = active.shift();
+    old.expires_at = now;
+    old.expired_reason = 'key_cap';
+    retired.push(old.pk_hash_sha3);
+  }
   const entry = {
     alg: ALG,
     pk_b64,
@@ -90,10 +138,11 @@ async function storeSigningPk(redisClient, userId, { pk_b64, label }) {
     enrolled_at: now,
     revoked_at: null,
   };
+  if (expiresAt) entry.expires_at = expiresAt;
   arr.push(entry);
   await _writeArray(redisClient, userId, arr);
   await redisClient.set(_indexKey(pk_hash_sha3), JSON.stringify({ userId }));
-  return { entry, reenrolled: false };
+  return { entry, reenrolled: false, ...(retired.length ? { retired } : {}) };
 }
 
 async function getSigningPks(redisClient, userId) {
@@ -102,7 +151,8 @@ async function getSigningPks(redisClient, userId) {
 
 async function getActiveSigningPks(redisClient, userId) {
   const arr = await _readArray(redisClient, userId);
-  return arr.filter(e => !e.revoked_at);
+  const nowMs = Date.now();
+  return arr.filter(e => isActive(e, nowMs));
 }
 
 // Marks the entry with matching pk_hash_sha3 as revoked. History is kept so
@@ -138,6 +188,10 @@ async function lookupByPkHash(redisClient, pkHashSha3) {
 }
 
 module.exports = {
+  MAX_ACTIVE_KEYS,
+  CODE_KEY_TTL_MS,
+  isExpired,
+  isActive,
   ALG,
   ML_DSA_65_PK_LEN,
   storeSigningPk,

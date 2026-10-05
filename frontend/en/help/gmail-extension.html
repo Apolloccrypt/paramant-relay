@@ -231,14 +231,14 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <ul class="nav-links">
     <li><a href="/en#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
     <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/help" class="nav-help">Help</a>
     <a href="/en/auth/login" class="nav-signin">Sign in</a>
     <a href="/en/signup" class="nav-cta">Create account</a>
   </div>
@@ -252,19 +252,19 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </nav>
 <div class="nav-mobile" id="nav-mobile">
   <a href="/en#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
   <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/en/help" class="nav-tail-link">Help</a>
   <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/help/gmail-extension" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/help/gmail-extension" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div><main>
 
   <div class="breadcrumb">
-    <a href="/help">Help</a>
+    <a href="/en/help">Help</a>
     <span>/</span>
     Gmail extension
   </div>
@@ -278,8 +278,8 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   <ul class="compat-list">
     <li><span class="dot dot-yes"></span><strong>Chrome or Chromium</strong>: version 120 or later</li>
     <li><span class="dot dot-yes"></span><strong>Gmail in a browser tab</strong>: gmail.com or Google Workspace</li>
-    <li><span class="dot dot-yes"></span><strong>Paramant account with an API key</strong>: <a href="/signup">create an account</a> if you don't have one</li>
-    <li><span class="dot dot-no"></span><strong>Firefox / Safari</strong>: not supported; use the <a href="/parashare">web uploader</a> instead</li>
+    <li><span class="dot dot-yes"></span><strong>Paramant account with an API key</strong>: <a href="/en/signup">create an account</a> if you don't have one</li>
+    <li><span class="dot dot-no"></span><strong>Firefox / Safari</strong>: not supported; use the <a href="/en/parashare">web uploader</a> instead</li>
     <li><span class="dot dot-no"></span><strong>Gmail mobile app</strong>: extensions do not run in mobile apps</li>
   </ul>
 
@@ -289,18 +289,19 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">1</div>
     <div class="step-body">
       <h2>Install the extension</h2>
-      <p>Open Chrome and go to the Chrome Web Store. Search for <strong>Paramant</strong> or find it under the developer name <strong>Apolloccrypt</strong>. Click <strong>Add to Chrome</strong>, then <strong>Add extension</strong> in the confirmation dialog.</p>
-      <p>The Paramant icon (a small shield) appears in your Chrome toolbar. If it is hidden, click the puzzle icon in the toolbar and pin Paramant.</p>
+      <p>The extension is not in the Chrome Web Store yet. For now you load it yourself, as an unpacked extension, from the source on <a href="https://github.com/Apolloccrypt/paramant-relay">GitHub</a> (folder <code>extensions/chromium</code>). Build it there with <code>npm ci</code> and <code>npm run build</code>. Then open <code>chrome://extensions</code> in Chrome, switch on <strong>Developer mode</strong> at the top right, click <strong>Load unpacked</strong> and choose the <code>dist</code> folder.</p>
+      <p>The Paramant icon appears in your Chrome toolbar. If it is hidden, click the puzzle icon in the toolbar and pin Paramant.</p>
+      <div class="tip"><p>If that is too much for your organisation, use the <a href="/en/parashare">web uploader</a>. It does the same without installing anything. Once the extension is in the Chrome Web Store, this page will say so.</p></div>
     </div>
   </div>
 
   <div class="step">
     <div class="step-num">2</div>
     <div class="step-body">
-      <h2>Enter your API key</h2>
-      <p>Click the Paramant icon in the toolbar. A popup opens with a single field: <strong>API key</strong>. Paste your API key from your Paramant dashboard and click <strong>Save</strong>.</p>
-      <p>The extension keeps the key locally in Chrome's extension storage. It is sent nowhere except to paramant.app when you upload a file.</p>
-      <div class="tip"><p>Your API key is in Dashboard &rarr; API keys. If you don't see one, click <strong>Generate new key</strong>.</p></div>
+      <h2>Sign in</h2>
+      <p>Click the Paramant icon in the toolbar. Paste your key into the <strong>API key</strong> field and click <strong>Sign in</strong>. Or choose <strong>Use TOTP instead</strong> and sign in with your email address and the six digits from your authenticator app.</p>
+      <p>The extension keeps the key locally in Chrome's extension storage. It goes only to the Paramant relays (*.paramant.app), and only when you sign in or upload a file. After eight hours the extension signs you out by itself.</p>
+      <div class="tip"><p>Your key is on <a href="/en/account">Account</a>, under <strong>Advanced account key</strong>. It starts with <code>pgp_</code>.</p></div>
     </div>
   </div>
 
@@ -308,7 +309,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">3</div>
     <div class="step-body">
       <h2>Verify the connection</h2>
-      <p>The popup shows a green indicator and your account email when the key is valid. If you see a red indicator, double-check that you copied the full 64-character key with no trailing spaces or line breaks.</p>
+      <p>When the key is valid, the popup shows <strong>Signed in</strong> with your plan and how long the session still runs. If you see <strong>Invalid API key</strong>, check that you copied the whole key: <code>pgp_</code> and 64 characters, with no trailing spaces. If you see <strong>Too many sign-in attempts</strong>, wait a minute.</p>
     </div>
   </div>
 
@@ -318,7 +319,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">1</div>
     <div class="step-body">
       <h2>Open a compose window</h2>
-      <p>In Gmail, click <strong>Compose</strong>. At the bottom of the compose window, you will see the Paramant shield icon next to the standard Gmail toolbar icons.</p>
+      <p>In Gmail, click <strong>Compose</strong>. At the bottom of the compose window you will see the <strong>Paramant</strong> button, next to the button for attaching files.</p>
     </div>
   </div>
 
@@ -326,7 +327,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">2</div>
     <div class="step-body">
       <h2>Click the Paramant icon and select a file</h2>
-      <p>Click the shield icon. A file picker opens. Select the file you want to send. The extension uploads it to Paramant in the background. A progress indicator shows in the compose toolbar.</p>
+      <p>Click <strong>Paramant</strong>. A file picker opens. Select the file you want to send. The extension encrypts it in your browser and then uploads it. A progress bar shows at the top of the window.</p>
       <p>You can send files up to 500 MB. That is the limit per file on every plan (<code>file_mb</code> in <code>relay/lib/tiers.js</code>). The extension splits the file into fixed blocks of 5 MB for the upload. The 5 MB is only how the file travels, not a limit on the size of your file.</p>
     </div>
   </div>
@@ -335,8 +336,9 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">3</div>
     <div class="step-body">
       <h2>The link is inserted automatically</h2>
-      <p>When the upload completes, the extension inserts a formatted line into your email body:</p>
-      <p style="font-family:var(--mono,ui-monospace);font-size:var(--text-sm);color:var(--ink-dim);border:1px solid var(--ink-hair);padding:10px 14px;line-height:1.6">Secure file: [filename], download once at paramant.app/get/XXXXX<br>(link expires in 24 hours, file deleted after download)</p>
+      <p>When the upload completes, the extension puts a box into your email where your cursor was. It holds the file name as a link, the expiry, and the line <em>Sent via paramant.app</em>. The link looks like this:</p>
+      <p style="font-family:var(--mono,ui-monospace);font-size:var(--text-sm);color:var(--ink-dim);border:1px solid var(--ink-hair);padding:10px 14px;line-height:1.6;overflow-wrap:anywhere">https://paramant.app/get?t=...&amp;c=1&amp;r=...#k=...</p>
+      <p>The part after <code>#</code> is the key. It never reaches our server. The file name is not in the link, only in your own email.</p>
       <p>Edit the text around the link if you want, then send your email as usual.</p>
     </div>
   </div>
@@ -345,17 +347,18 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">4</div>
     <div class="step-body">
       <h2>Your recipient downloads the file</h2>
-      <p>Your recipient clicks the link. They see the file name and size, click <strong>Download</strong>, and the file downloads. The link and file are deleted immediately after that first download on every plan. The extension never asks the relay for a second read, so a second try gets a 404 (not found).</p>
+      <p>Your recipient needs no account. They click the link, see how long the file is still available, click <strong>Download the file</strong> and get the file under its original name. The link and file are deleted immediately after that first download on every plan. The extension never asks the relay for a second read, so a second try gets a 404 (not found).</p>
     </div>
   </div>
 
   <h2>Extension settings</h2>
 
-  <p>Click the Paramant toolbar icon at any time to open the settings:</p>
+  <p>Click the Paramant toolbar icon, then <strong>Settings</strong>:</p>
   <ul style="margin:12px 0 12px 20px;display:flex;flex-direction:column;gap:8px">
     <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Default TTL</strong>: how long the link stays active before expiring without a download. Default is 24 hours; options range from 1 hour to 7 days.</li>
-    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Link format</strong>: plain URL or formatted text block. Plain URL is better if the recipient's email client does not render HTML.</li>
-    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Transfer history</strong>: a list of recent uploads with their status (active, downloaded, expired). Stored only in this browser, not synced.</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Link format</strong>: a formatted box, or one plain line with the file name and the full link. The plain line is better if the recipient's email client does not render HTML.</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Transfer history</strong>: in the extension popup, a list of recent uploads with name, size and time. Stored only in this browser, with no link or key. It does not show whether a file was collected.</li>
+    <li style="color:var(--ink-dim);font-size:var(--text-sm);line-height:1.6"><strong style="color:var(--ink)">Relay</strong>: leave it empty. A self-hosted relay does not work with the extension yet, because the recipient opens the link on paramant.app and that page only fetches from Paramant relays.</li>
   </ul>
 
   <hr class="divider">
@@ -368,18 +371,18 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
   </div>
 
   <div class="troubleshoot-item">
-    <div class="q">Upload fails with "authentication error".</div>
-    <div class="a">Your API key may have been revoked or regenerated. Open the extension popup, clear the current key, paste the new one, and save. Get your current key from Dashboard &rarr; API keys.</div>
+    <div class="q">The extension says "Sign in to Paramant" or "Invalid API key".</div>
+    <div class="a">Your eight-hour session may have ended, or your key was revoked or replaced. Open the extension popup, click <strong>Sign out</strong> and sign in again. Your current key is on <a href="/en/account">Account</a>, under <strong>Advanced account key</strong>.</div>
   </div>
 
   <div class="troubleshoot-item">
     <div class="q">The extension stopped working after a Chrome update.</div>
-    <div class="a">Check the Extensions page for any error banners on the Paramant extension. If you see "This extension is disabled", re-enable it. If Chrome removed it automatically, reinstall from the Chrome Web Store.</div>
+    <div class="a">Check the Extensions page for any error banners on the Paramant extension. If you see "This extension is disabled", re-enable it. If Chrome switched it off, load it again as an unpacked extension (see Installation).</div>
   </div>
 
   <div class="troubleshoot-item">
     <div class="q">My company's Chrome policy blocks extensions.</div>
-    <div class="a">Ask your IT administrator to allowlist the Paramant extension by its ID (visible in Chrome &rarr; Extensions &rarr; Details). Alternatively, use the <a href="/parashare">web uploader</a> or the API directly.</div>
+    <div class="a">Ask your IT administrator to allowlist the Paramant extension by its ID (visible in Chrome &rarr; Extensions &rarr; Details). Alternatively, use the <a href="/en/parashare">web uploader</a> or the API directly.</div>
   </div>
 
   <hr class="divider">
@@ -430,6 +433,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 </body>
 </html>

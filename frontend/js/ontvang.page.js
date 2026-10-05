@@ -24,6 +24,8 @@ const T = {
     fpOkTitle: 'Controlecode bevestigd. Bestand komt binnen...',
     fpOkStatus: 'De afzender heeft de controlecode bevestigd. Het bestand wordt voor u verzegeld.',
     peerLeft: 'De verbinding met de afzender is verbroken.',
+    senderRejected: 'De afzender zag een andere controlecode dan u en is gestopt. Er is niets verstuurd en niets ontvangen. Vraag de afzender om een nieuwe link.',
+    senderGone: 'De afzender heeft deze sessie niet afgemaakt: er kwam in tien minuten geen bestand. Er is niets ontvangen en niets gewist. Is de afzender er nog, druk dan op Opnieuw proberen; anders vraagt u om een nieuwe link.',
     keygenFail: 'Sleutels maken is mislukt: ',
     dlChunk: (i, n) => `Deel ${i} van ${n} wordt gedownload...`,
     notAnnounced: (i) => 'Deel ' + i + ' is nooit door de afzender aangemeld',
@@ -52,6 +54,8 @@ const T = {
     fpOkTitle: 'Fingerprint confirmed - receiving file...',
     fpOkStatus: 'Sender confirmed fingerprint - file is being encrypted for you',
     peerLeft: 'Sender disconnected',
+    senderRejected: 'The sender saw a different check code from yours and stopped. Nothing was sent and nothing was received. Ask the sender for a new link.',
+    senderGone: 'The sender did not finish this session: no file arrived in ten minutes. Nothing was received and nothing was deleted. If the sender is still there, press Try again; otherwise ask for a new link.',
     keygenFail: 'Keypair generation failed: ',
     dlChunk: (i, n) => `Downloading chunk ${i}/${n}...`,
     notAnnounced: (i) => 'Chunk ' + i + ' was never announced by the sender',
@@ -340,6 +344,21 @@ async function init() {
       );
     }, 1000);
 
+    // A dead or abandoned session link used to wait forever behind "waiting for
+    // the sender" (hertest T4-14). The relay keeps no record of an invitation
+    // the receiver could ask about, so the honest bound is time: ten minutes
+    // without a file is a session the sender did not finish. Try again reloads
+    // and waits again with the same keys (kept in sessionStorage).
+    const SENDER_WAIT_MS = 10 * 60 * 1000;
+    setTimeout(() => {
+      if (_transferClaimed) return;
+      _transferClaimed = true;
+      clearInterval(pollManifest);
+      clearInterval(pollTransfer);
+      try { if (ws) ws.close(); } catch (_) { /* already closed */ }
+      showError(t('senderGone'));
+    }, SENDER_WAIT_MS);
+
     const pollTransfer = setInterval(async () => {
       if (_transferClaimed) return;
       try {
@@ -348,6 +367,17 @@ async function init() {
         });
         if (r.ok) {
           const d = await r.json();
+          // The sender compared the codes and said no (see REJECT_READY in
+          // parashare.page.js): zero blocks, an all-zero token.
+          if (d.kyber_pub === 'file|0|0' && /^0{48}$/.test(d.ecdh_pub || '')) {
+            if (_transferClaimed) return;
+            _transferClaimed = true;
+            clearInterval(pollTransfer);
+            clearInterval(pollManifest);
+            try { if (ws) ws.close(); } catch (_) { /* already closed */ }
+            showError(t('senderRejected'));
+            return;
+          }
           if (d.ecdh_pub && d.kyber_pub) {
             if (_transferClaimed) return;
             _transferClaimed = true;
@@ -392,6 +422,27 @@ async function init() {
 // sealing block 1 and the relay never holds more than a few blocks of the file.
 // Without it this loop reads a token list that is complete before it starts,
 // which is what made the relay hold a whole 500 MB file at once.
+// Claim mode for the blocks of a live send. One id per page; the relay only
+// lets the holder ack, and a release frees the block for a retry at once.
+const DL_CLAIM = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+let dlBusy = null;
+function dlRelease(tok) {
+  const body = JSON.stringify({ claim: DL_CLAIM });
+  try { if (navigator.sendBeacon && navigator.sendBeacon(`${RELAY_API}/v2/dl/${tok}/release`, body)) return; } catch (_) { /* fall back */ }
+  fetch(`${RELAY_API}/v2/dl/${tok}/release`, { method: 'POST', body, keepalive: true, cache: 'no-store' }).catch(() => {});
+}
+async function dlAck(tok) {
+  for (let i = 0; i < 3; i++) {
+    try {
+      const r = await fetch(`${RELAY_API}/v2/dl/${tok}/ack`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claim: DL_CLAIM }), cache: 'no-store' });
+      if (r.ok || r.status === 404 || r.status === 410) return;
+    } catch (_) { /* try again */ }
+    await new Promise((res) => setTimeout(res, 800 * (i + 1)));
+  }
+}
+addEventListener('pagehide', () => { if (dlBusy) dlRelease(dlBusy); });
+
 async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
   showStep('step-receiving');
   const tokens = msg.tokens ? msg.tokens.split(',') : [];
@@ -410,8 +461,12 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
 
       const tok = await awaitToken(i);
       if (!tok) throw new Error(t('notAnnounced')(i+1));
-      const r = await fetch(`${RELAY_API}/v2/dl/${tok}/get`, {
-        signal: AbortSignal.timeout(60000)
+      // Claimed, not burned on read (hertest T4-3): the relay keeps the block
+      // until this page has decrypted it and acks below. A broken download or a
+      // closed tab gives it back (see dlRelease) instead of losing the block.
+      dlBusy = tok;
+      const r = await fetch(`${RELAY_API}/v2/dl/${tok}/get?claim=${DL_CLAIM}`, {
+        signal: AbortSignal.timeout(60000), cache: 'no-store'
       });
       if (!r.ok) throw new Error(t('dlFail')(i+1, r.status));
       const burnHash = r.headers.get('X-Hash') || r.headers.get('X-Paramant-Hash') || '';
@@ -422,6 +477,9 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
 
       if (!window._cryptoBridge) throw new Error(t('bridge'));
       const plainPadded = await window._cryptoBridge.decryptBlob(raw, kyberSec, ecdhPrivRaw);
+      // Decrypted, so this block has arrived whole: only now is it burned.
+      await dlAck(tok);
+      dlBusy = null;
 
       // Strip metadata header: META_MAGIC(4) | metaLen(4) | meta | chunkData
       const META_MAGIC = new Uint8Array([0x50, 0x52, 0x53, 0x48]);
@@ -508,6 +566,7 @@ async function receiveFile(msg, kyberSec, ecdhPrivRaw, opts = {}) {
     document.addEventListener('visibilitychange', _burnOnHide);
 
   } catch(e) {
+    if (dlBusy) { dlRelease(dlBusy); dlBusy = null; }
     if (fileWriter) { try { await fileWriter.abort(); } catch(_) {} fileWriter = null; }
     showError(t('decFail') + e.message);
   }
@@ -550,6 +609,20 @@ async function receiveVault(vaultFiles, ttl_ms, kyberSec, ecdhPriv) {
 // nothing to hand over again the dashboard link takes that place instead, so
 // the screen is never a dead end and never has two loud buttons.
 let savedFile = null;
+// The receiver usually has no account here: the quiet link goes to the site.
+// Only a visitor who IS signed in gets their overview (hertest r2 T4-L2).
+(async function dashboardOnlyWhenSignedIn() {
+  try {
+    const r = await fetch('/api/user/session/verify', { credentials: 'include', cache: 'no-store' });
+    const d = r.ok ? await r.json() : null;
+    const dash = $('done-dashboard');
+    if (dash && d && d.authenticated) {
+      const en = /^en\b/i.test(document.documentElement.lang || '');
+      dash.setAttribute('href', en ? '/en/dashboard' : '/dashboard');
+      dash.textContent = en ? 'Open your dashboard' : 'Naar uw overzicht';
+    }
+  } catch { /* stays the link to the site */ }
+})();
 function offerSaveAgain(blob, name) {
   const btn = $('done-save');
   const dash = $('done-dashboard');
@@ -580,8 +653,10 @@ function renderBurnReceipt(burnedHashes) {
 
 // Bytes into something a person reads. Same rounding as /get.
 function formatSize(n) {
-  if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
-  if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
+  const nl = !/^en\b/i.test(document.documentElement.lang || '');
+  const one = (x) => { const v = x.toFixed(1); return nl ? v.replace('.', ',') : v; };
+  if (n >= 1024 * 1024) return one(n / 1024 / 1024) + ' MB';
+  if (n >= 1024) return one(n / 1024) + ' KB';
   return n + ' B';
 }
 

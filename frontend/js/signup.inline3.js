@@ -21,7 +21,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     },
     account_exists: {
       t: nlEn('Er is al een account met dit e-mailadres', 'An account already exists for this email'),
-      m: nlEn('Ga naar <a href="/auth/login">Inloggen</a>, of <a href="/auth/request-reset">vraag een nieuwe instellink aan</a> als u niet meer bij uw authenticator-app kunt.', 'Go to <a href="/auth/login">Sign in</a> to log in, or <a href="/auth/request-reset">request a new setup link</a> if you no longer have access to your authenticator app.')
+      m: nlEn('Ga naar <a href="/auth/login">Inloggen</a>. Kunt u niet meer bij uw authenticator-app, <a href="/auth/request-reset">koppel dan een nieuwe met een back-upcode</a>. Zonder back-upcode: mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> vanaf uw accountadres.', 'Go to <a href="/en/auth/login">Sign in</a>. If you no longer have your authenticator app, <a href="/en/auth/request-reset">link a new one with a backup code</a>. Without a backup code: email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> from your account address.')
     },
     server_error: {
       t: nlEn('Er ging bij ons iets mis', 'Something went wrong on our side'),

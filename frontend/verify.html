@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="/design-system.css?v=33">
 <link rel="stylesheet" href="/nav.css?v=29">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
-<link rel="stylesheet" href="/components-parasign.css?v=6">
+<link rel="stylesheet" href="/components-parasign.css?v=7">
 <script type="application/ld+json" data-paramant-seo="1">
 {
   "@context": "https://schema.org",
@@ -160,9 +160,7 @@
     <div class="ps-panel-head"><span class="ps-step">2</span><h2 id="v2" class="ps-panel-title">.psign-envelop</h2></div>
     <label class="ps-file"><input type="file" id="vf-envelope" accept=".psign,application/json,.json"><span class="ps-file-cta">Kies het .psign-bestand</span><span class="ps-file-meta" id="vf-envelope-info">Geen bestand gekozen</span></label>
     <div class="ps-field" id="vf-key-block" hidden>
-      <label class="ps-label" for="vf-api-key">API-sleutel (X-Api-Key)</label>
-      <input class="ps-input mono" type="password" id="vf-api-key" placeholder="pgp_..." autocomplete="off">
-      <p class="ps-warn">Dit is een oude envelop (v1 of v2). De notarishandtekening van de relay kan alleen de relay zelf controleren, en daarvoor heeft u een API-sleutel nodig. Nieuwe handtekeningen controleert u volledig offline, zonder sleutel.</p>
+      <p class="ps-warn">Dit is een oude envelop (v1 of v2). De notarishandtekening daarvan controleert de relay: deze pagina stuurt de vingerafdruk van het document en het bewijs, nooit het document zelf. U heeft geen account of sleutel nodig. Nieuwe handtekeningen controleert u volledig offline.</p>
     </div>
   </section>
 
@@ -177,9 +175,9 @@
     <ul>
       <li>De SHA3-256-hash van uw document is gelijk aan de hash in de envelop</li>
       <li>De ML-DSA-65-handtekening van de ondertekenaar over die hash is geldig</li>
-      <li>De envelop is niet verlopen</li>
+      <li>Bij een bewijs met meerdere ondertekenaars: de bekrachtiging is gezet met een vaste sleutel van Paramant, niet met een sleutel uit het bestand zelf</li>
     </ul>
-    <p class="ps-help">De controle gebeurt volledig in uw browser. U heeft geen account of API-sleutel nodig, en het werkt ook offline.</p>
+    <p class="ps-help">Een bewijs van nu controleert uw browser volledig zelf, ook offline. Alleen een oude envelop (v1 of v2) gaat langs de relay: dan stuurt deze pagina de vingerafdruk en het bewijs, nooit het document. U heeft geen account of API-sleutel nodig.</p>
     <p><a href="/dashboard">Naar uw dashboard &rarr;</a></p>
   </aside>
   </div>
@@ -259,8 +257,8 @@
   </div>
 </footer>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
-<script type="module" src="/parasign-verify.js?v=7"></script>
-<script type="module" src="/js/receipt-verify.js?v=3"></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
+<script type="module" src="/parasign-verify.js?v=15"></script>
+<script type="module" src="/js/receipt-verify.js?v=4"></script>
 </body>
 </html>

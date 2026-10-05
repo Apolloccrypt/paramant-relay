@@ -103,7 +103,7 @@ test('with redis the budget is FLEET-WIDE: two relays share one 50/hour cap', as
   await awaitStableHour();
 
   const key = `pgp_rl_shared_${runId()}`;
-  const users = { api_keys: [{ key, plan: 'pro', active: true, account_id: 'acct_shared', email: 's@example.test' }] };
+  const users = { api_keys: [{ key, plan: 'pro', active: true, account_id: `acct_shared_${runId()}`, email: 's@example.test' }] };
   const env = { REDIS_URL: process.env.REDIS_URL || DEFAULT_REDIS };
   const a = await boot({ tag: 'rl-shared-a', users, env });
   const b = await boot({ tag: 'rl-shared-b', users, env });

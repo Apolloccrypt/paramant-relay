@@ -40,6 +40,10 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 .pa-spinner { display: inline-block; width: 15px; height: 15px; border: 2px solid var(--line-2); border-top-color: var(--accent); border-radius: 50%; animation: pa-spin .8s linear infinite; vertical-align: -2px; margin-right: 10px; }
 @keyframes pa-spin { to { transform: rotate(360deg); } }
 .pa-err-link { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.dh-records-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; }
+.dh-records-row > div { flex-basis: 100%; }
+.dh-records-label { font-family: var(--mono); font-size: var(--text-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+#dh-error .dh-btn { margin: 10px 8px 0 0; }
 #dh-error { border: 1px solid var(--line-2); border-left: 3px solid var(--sig-stop); border-radius: var(--r-1); background: var(--sig-stop-bg); padding: 16px 18px; color: var(--ink-1); }
 
 /* ── Hero: who you are and which plan pays for it ──────────────────────────── */
@@ -132,8 +136,8 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-send-row:last-child { border-bottom: 0; }
 .dh-document:hover { background: var(--accent-soft); }
 .dh-send-row:hover { background: var(--accent-soft); }
-.dh-document-open { display: grid; grid-template-columns: minmax(0, 1fr) 132px 148px; gap: 22px; align-items: center; width: 100%; text-align: left; padding: 17px 26px 13px; border: 0; background: transparent; color: inherit; cursor: pointer; }
-.dh-send-open { display: grid; grid-template-columns: minmax(0, 1fr) 132px 148px; gap: 22px; align-items: center; width: 100%; text-align: left; padding: 17px 26px 13px; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.dh-document-open { display: grid; grid-template-columns: minmax(0, 1fr) 132px minmax(148px, max-content); gap: 22px; align-items: center; width: 100%; text-align: left; padding: 17px 26px 13px; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.dh-send-open { display: grid; grid-template-columns: minmax(0, 1fr) 132px minmax(148px, max-content); gap: 22px; align-items: center; width: 100%; text-align: left; padding: 17px 26px 13px; border: 0; background: transparent; color: inherit; cursor: pointer; }
 .dh-document-open:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-ring); }
 .dh-send-open:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-ring); }
 /* The affordance the old row never had: a hint that there is more behind it. */
@@ -154,6 +158,8 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 .dh-rowask strong { font-weight: 600; }
 .dh-rowsay { font: 500 13px/1.45 var(--sans); color: var(--ink-2); }
 .dh-rowsay.done { color: var(--sig-ok, #4c9a72); }
+.dh-doc-link { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 4px 0; }
+.dh-doc-linknote { display: block; margin-top: 6px; font-size: 12px; color: var(--ink-3); }
 .dh-rowsay.fail { color: var(--sig-stop, #d05b52); }
 .dh-send-people { display: flex; flex-direction: column; gap: 2px; padding: 0 26px 14px; }
 .dh-send-person { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
@@ -443,11 +449,11 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 }
 </style>
 <meta name="theme-color" content="#FFFFFF">
-<link rel="stylesheet" href="/app-2026.css?v=11">
+<link rel="stylesheet" href="/app-2026.css?v=12">
 <script src="/js/theme.js?v=6"></script>
 <!-- One date notation for the whole site: 8 September 2026, never 8/9/2026.
      Blocking and above every other script, so it exists before any renderer runs. -->
-<script src="/js/format-date.js?v=2"></script>
+<script src="/js/format-date.js?v=3"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Naar de inhoud</a>
@@ -637,7 +643,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
           <h2 id="dh-inbox-title">Wacht op uw handtekening</h2>
           <p>Documenten die anderen u stuurden. Elk document opent via de persoonlijke link in de uitnodigingsmail.</p>
         </div>
-        <button class="dh-refresh" type="button" id="dh-inbox-refresh">Vernieuwen</button>
+        <button class="dh-refresh" type="button" id="dh-inbox-refresh" data-pa-action="inbox-refresh">Vernieuwen</button>
       </div>
       <div class="dh-inbox-list" id="dh-inbox-list" aria-live="polite"></div>
     </section>
@@ -653,7 +659,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
           <h2 id="dh-sends-title">Bestanden die u verstuurde</h2>
           <p>Wie heeft opgehaald, en wie nog niet.</p>
         </div>
-        <button class="dh-refresh" type="button" id="dh-sends-refresh">Vernieuwen</button>
+        <button class="dh-refresh" type="button" id="dh-sends-refresh" data-pa-action="sends-refresh">Vernieuwen</button>
       </div>
       <div class="dh-documents" id="dh-sends" aria-live="polite"></div>
     </section>
@@ -664,12 +670,12 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
           <h2 id="dh-documents-title">Lopende documenten</h2>
           <p>Elk ondertekenverzoek dat u startte, en precies hoe ver elk verzoek is.</p>
         </div>
-        <button class="dh-refresh" type="button" id="dh-documents-refresh">Vernieuwen</button>
+        <button class="dh-refresh" type="button" id="dh-documents-refresh" data-pa-action="documents-refresh">Vernieuwen</button>
       </div>
       <div class="dh-filters" role="group" aria-label="Documenten filteren">
         <button class="dh-filter" type="button" data-doc-filter="open" aria-pressed="true">Lopend <span data-doc-count="open">0</span></button>
         <button class="dh-filter" type="button" data-doc-filter="completed" aria-pressed="false">Afgerond <span data-doc-count="completed">0</span></button>
-        <button class="dh-filter" type="button" data-doc-filter="cancelled" aria-pressed="false">Geannuleerd <span data-doc-count="cancelled">0</span></button>
+        <button class="dh-filter" type="button" data-doc-filter="cancelled" aria-pressed="false">Gestopt <span data-doc-count="cancelled">0</span></button>
         <button class="dh-filter" type="button" data-doc-filter="all" aria-pressed="false">Alle <span data-doc-count="all">0</span></button>
       </div>
       <div class="dh-documents" id="dh-documents" aria-live="polite" aria-busy="true">
@@ -697,6 +703,29 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     <!-- The three questions someone asks before he puts a real contract through
          this. Each answer links to the page that carries the proof, so nothing
          here is a claim this file has to be trusted on. -->
+    <!-- Verzendgeschiedenis (Firm en hoger) en de ParaSign-audit-export
+         (Business en hoger). Weggevallen in c10723bd terwijl de pagina de export
+         bleef beloven (fase 1, VERIFY-36-A). Getoond door dashboard.js op een
+         betaald plan; js/dashboard-history.js haalt pas iets op bij een klik. -->
+    <section class="dh-workspace" id="dh-records" aria-labelledby="dh-records-title" hidden>
+      <div class="dh-workspace-head">
+        <div>
+          <h2 id="dh-records-title">Geschiedenis en audit-export</h2>
+          <p>Uw verzendgeschiedenis (Firm en hoger) en het ondertekenspoor als bestand (Business en hoger).</p>
+        </div>
+      </div>
+      <div class="dh-records-row">
+        <button class="dh-btn" type="button" id="dh-hist-load">Geschiedenis tonen</button>
+        <div id="dh-hist-body" aria-live="polite"></div>
+      </div>
+      <div class="dh-records-row">
+        <span class="dh-records-label">Audit-export</span>
+        <button class="dh-btn" type="button" id="dh-export-csv">CSV downloaden</button>
+        <button class="dh-btn" type="button" id="dh-export-json">JSON downloaden</button>
+        <div id="dh-export-body" aria-live="polite"></div>
+      </div>
+    </section>
+
     <section class="dh-ask" aria-labelledby="dh-ask-title">
       <h2 id="dh-ask-title">Wat mensen vragen voordat ze erop vertrouwen</h2>
       <dl class="dh-ask-list">
@@ -716,7 +745,7 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
         </div>
         <div class="dh-ask-item">
           <dt>Kan de andere partij een handtekening controleren?</dt>
-          <dd>Ondertekende documenten zijn te controleren zonder account. Oudere envelopformaten hebben de relay nodig. <a href="/verify">Probeer de controle</a></dd>
+          <dd>Ondertekende documenten zijn te controleren zonder account. Oudere bewijsbestanden worden nog op onze server gecontroleerd. <a href="/verify">Probeer de controle</a></dd>
         </div>
       </dl>
       <p class="dh-ask-foot">Andere vragen beantwoorden we in het <a href="/help">hulpcentrum</a>.</p>
@@ -753,9 +782,10 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
     </details>
   </div>
 
-  <div id="dh-error" class="pa-loading" hidden>
-    Uw overzicht kon niet worden geladen.
-    <a class="pa-err-link" href="/auth/login?next=%2Fdashboard">Opnieuw inloggen</a>
+  <div id="dh-error" class="pa-loading" hidden role="alert">
+    <span id="dh-error-text">Uw overzicht kon niet worden geladen.</span>
+    <button type="button" class="dh-btn" id="dh-error-retry">Opnieuw proberen</button>
+    <a class="pa-err-link" id="dh-error-login" href="/auth/login?next=%2Fdashboard" hidden>Opnieuw inloggen</a>
     <div id="dh-error-detail" style="margin-top:8px;font-size:12px;color:var(--ink-dim)"></div>
   </div>
 </main>
@@ -803,7 +833,9 @@ main.pa-main { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
-<script src="/js/dashboard.js?v=18" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
+<script src="/js/app-session-token.js?v=1" defer></script>
+<script src="/js/dashboard-history.js?v=2" defer></script>
+<script src="/js/dashboard.js?v=25" defer></script>
 </body>
 </html>

@@ -30,6 +30,7 @@
 //     never declines; a dedicated decline route would drive it).
 
 const crypto = require('crypto');
+const webhookSign = require('./webhook-sign');
 const { isSsrfSafeUrl } = require('./ssrf-guard');
 const contentDisposition = require('./content-disposition');
 const { createParaSignStore } = require('./parasign-store');
@@ -37,6 +38,9 @@ const envelopeMod = require('../envelope');   // pure helpers: signMessageBytes,
 
 const SHA3 = (buf) => crypto.createHash('sha3-256').update(buf).digest('hex');
 const MAX_PDF_BYTES = parseInt(process.env.PARASIGN_MAX_PDF_BYTES || String(20 * 1024 * 1024), 10);
+// How long an Idempotency-Key claim of a running create holds. Longer than one
+// create with a document fetched by url; a crashed create frees it by expiry.
+const IDEM_INFLIGHT_MS = 120_000;
 
 // ── Durable side-store (documents + webhook meta) ─────────────────────────────
 // The blob (PDF bytes) and the meta side-record (webhook target/secret,
@@ -201,34 +205,95 @@ const errRes = (res, code, error, message, J) => jsonRes(res, code, { error, mes
 // Mirrors relay.pushWebhooks headers so a client verifies identically:
 //   X-Paramant-Sig = hex HMAC_SHA256(webhook_secret, raw_body). Adds a unique
 //   X-Paramant-Delivery so clients can dedupe replays.
-async function emitEvent(deps, id, event, extra) {
-  const m = await resolveStore(deps).getMeta(id);
-  if (!m || !m.webhook_url) return { skipped: 'no_webhook' };
-  const payload = deps.J({
-    event, id, ts: new Date().toISOString(),
-    data: extra || {}, metadata: m.metadata || {},
-  });
-  const sig = m.webhook_secret
-    ? crypto.createHmac('sha256', m.webhook_secret).update(payload).digest('hex') : '';
-  const delivery = crypto.randomBytes(12).toString('hex');
-  try {
-    await deps.safeHttpsRequest(m.webhook_url, {
-      method: 'POST', timeout: 5000,
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(payload),
-        'X-Paramant-Event': event,
-        'X-Paramant-Sig': sig,
-        'X-Paramant-Delivery': delivery,
-        'User-Agent': 'paramant-relay/parasign-v1',
-      },
-      body: payload,
-    });
-    return { ok: true, delivery };
-  } catch (e) {
-    deps.log && deps.log('warn', 'parasign_v1_webhook_fail', { id, event, err: e.message, code: e.code });
-    return { ok: false, err: e.message };
+//
+// P10 API-19-C and API-19-J. Each event used to be one fire-and-forget POST:
+// a receiver that blinked lost the event for good, and signer.completed and
+// envelope.completed raced each other with nothing in the body to put them back
+// in order. Now:
+//   * RETRY. A delivery that fails on the network or answers 5xx (or 429) is
+//     tried again after WEBHOOK_RETRY_DELAYS_MS, three attempts in all, with the
+//     SAME body, signature and X-Paramant-Delivery, so a receiver that did get
+//     an earlier attempt drops the repeat by that id. A 2xx, 3xx or other 4xx
+//     ends it: the receiver answered, and a 4xx will not get better by asking
+//     again. X-Paramant-Attempt says which try this is.
+//   * ORDER. The events of one envelope go out one after another, in the order
+//     they happened, from a queue per envelope id; the next event waits until
+//     the previous one is delivered or has used up its attempts.
+//   * SEQ. Every body carries `seq`, derived from the envelope's own state, so
+//     it is the same number after a restart and on any relay:
+//       envelope.sent = 1, signer.completed = 1 + signed_count,
+//       envelope.completed and envelope.voided = party_count + 2 (terminal).
+//     A receiver that sees seq go down knows it holds a newer state already.
+const WEBHOOK_RETRY_DELAYS_MS = [2000, 10000];
+const _webhookQueues = new Map();   // envelope id -> tail promise
+
+function webhookSeq(event, extra) {
+  const x = extra || {};
+  if (event === 'envelope.sent') return 1;
+  if (event === 'signer.completed') return 1 + (Number(x.signed_count) || 0);
+  if (event === 'envelope.completed' || event === 'envelope.voided') {
+    const n = Number(x.party_count || x.signer_count);
+    return Number.isFinite(n) && n > 0 ? n + 2 : null;
   }
+  return null;
+}
+
+function _retryable(r) {
+  return !r || !Number.isFinite(r.status) || r.status >= 500 || r.status === 429;
+}
+
+async function _deliverWithRetry(deps, m, id, event, payload, sig, delivery) {
+  const delays = Array.isArray(deps.webhookRetryDelaysMs) ? deps.webhookRetryDelaysMs : WEBHOOK_RETRY_DELAYS_MS;
+  const wait = deps.webhookSleep || ((ms) => new Promise((r) => { const t = setTimeout(r, ms); if (t.unref) t.unref(); }));
+  let last = null;
+  for (let attempt = 1; attempt <= delays.length + 1; attempt++) {
+    try {
+      const r = await deps.safeHttpsRequest(m.webhook_url, {
+        method: 'POST', timeout: 5000,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+          'X-Paramant-Event': event,
+          'X-Paramant-Sig': sig,
+          ...webhookSign.signatureHeaders(m.webhook_secret, payload),
+          'X-Paramant-Delivery': delivery,
+          'X-Paramant-Attempt': String(attempt),
+          'User-Agent': 'paramant-relay/parasign-v1',
+        },
+        body: payload,
+      });
+      if (!_retryable(r)) return { ok: true, delivery, attempts: attempt, status: r.status };
+      last = { ok: false, err: 'http_' + (r && r.status), status: r && r.status };
+    } catch (e) {
+      last = { ok: false, err: e.message, code: e.code };
+    }
+    if (attempt <= delays.length) await wait(delays[attempt - 1]);
+  }
+  deps.log && deps.log('warn', 'parasign_v1_webhook_fail', { id, event, err: last && last.err, code: last && last.code, attempts: delays.length + 1 });
+  return Object.assign({ delivery, attempts: delays.length + 1 }, last);
+}
+
+function emitEvent(deps, id, event, extra) {
+  const prev = _webhookQueues.get(id) || Promise.resolve();
+  const run = prev.catch(() => {}).then(async () => {
+    const m = await resolveStore(deps).getMeta(id);
+    if (!m || !m.webhook_url) return { skipped: 'no_webhook' };
+    const seq = webhookSeq(event, extra);
+    const payload = deps.J({
+      event, id, ...(seq !== null ? { seq } : {}), ts: new Date().toISOString(),
+      data: extra || {}, metadata: m.metadata || {},
+    });
+    const sig = m.webhook_secret
+      ? crypto.createHmac('sha256', m.webhook_secret).update(payload).digest('hex') : '';
+    const delivery = crypto.randomBytes(12).toString('hex');
+    return _deliverWithRetry(deps, m, id, event, payload, sig, delivery);
+  });
+  _webhookQueues.set(id, run);
+  // Drop the queue entry once this was the last event in it, so the map holds
+  // only envelopes with a delivery in flight.
+  run.then(() => { if (_webhookQueues.get(id) === run) _webhookQueues.delete(id); },
+           () => { if (_webhookQueues.get(id) === run) _webhookQueues.delete(id); });
+  return run;
 }
 
 // ── /v1 Bearer authentication ─────────────────────────────────────────────────
@@ -314,19 +379,103 @@ async function route(deps) {
 async function createEnvelope(deps, apiKey, mode, rec) {
   const { res, apiKeys, envStore, envCreateRateOk, readBody, J, publicOrigin } = deps;
   const store = resolveStore(deps);
-  // envCreateRateOk is now the fleet-wide (redis-backed) limiter, so await it.
-  if (!(await envCreateRateOk(apiKey))) {
-    return jsonRes(res, 429, { error: 'rate_limited', message: 'Envelope create quota exceeded (50/hour/key).' }, J, { 'Retry-After': '3600' });
-  }
 
   let d;
-  try { d = JSON.parse((await readBody(deps.req, MAX_PDF_BYTES + 1_000_000)).toString()); }
+  let rawBody;
+  try { rawBody = await readBody(deps.req, MAX_PDF_BYTES + 1_000_000); d = JSON.parse(rawBody.toString()); }
   catch (e) { return errRes(res, 400, 'bad_json', 'Body is not valid JSON.', J); }
+  if (!d || typeof d !== 'object') return errRes(res, 400, 'bad_json', 'Body must be a JSON object.', J);
+  const bodyHash = crypto.createHash('sha256').update(rawBody).digest('hex');
+
+  // IDEMPOTENCY-KEY (sweep-api A5). A retry after a timeout used to make a
+  // second envelope with fresh sign_urls. The same key from the same API key
+  // within 24 hours gets the first answer back, from the encrypted store.
+  const idemRaw = String((deps.req && deps.req.headers && deps.req.headers['idempotency-key']) || '').trim();
+  let idemKey = null;
+  if (idemRaw) {
+    if (!/^[A-Za-z0-9_.:-]{8,128}$/.test(idemRaw)) return errRes(res, 400, 'invalid_idempotency_key', 'Idempotency-Key must be 8-128 characters of A-Z a-z 0-9 _ . : -', J);
+    idemKey = 'idem:' + crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 32) + ':' + idemRaw;
+    try {
+      const prev = store && typeof store.getMeta === 'function' ? await store.getMeta(idemKey) : null;
+      // Bound to the body (review #555, LAAG): the same key with another body
+      // is refused, not answered with the first envelope.
+      if (prev && prev.body_hash && prev.body_hash !== bodyHash) return errRes(res, 422, 'idempotency_key_reused', 'This Idempotency-Key was used for a request with a different body.', J);
+      if (prev && prev.status && prev.body) return jsonRes(res, prev.status, prev.body, J, { 'Idempotent-Replay': 'true' });
+      if (prev && prev.state === 'running') return inFlight();
+    } catch (e) { /* no store: run as a first request */ }
+  }
+
+  // IN-FLIGHT LOCK (herreview #560, LAAG). The replay above only sees a
+  // FINISHED first request. Two requests with the same key in the same moment
+  // both found nothing and made two envelopes. The first claims the key (SET
+  // NX) for the length of one create; a twin gets 409 and retries into the
+  // replay. A create that ends in anything but 201 releases the claim, so the
+  // retry runs for real.
+  function inFlight() {
+    return jsonRes(res, 409, { error: 'idempotency_in_flight', message: 'A request with this Idempotency-Key is still running. Retry shortly.' }, J, { 'Retry-After': '2' });
+  }
+  const pre = { stored: false };
+  let claimed = false;
+  if (idemKey && store && typeof store.claimMeta === 'function') {
+    try { claimed = await store.claimMeta(idemKey, { state: 'running', body_hash: bodyHash }, IDEM_INFLIGHT_MS); }
+    catch (e) { claimed = false; }
+    if (!claimed) {
+      let cur = null;
+      try { cur = await store.getMeta(idemKey); } catch (e) { cur = null; }
+      if (cur && cur.body_hash && cur.body_hash !== bodyHash) return errRes(res, 422, 'idempotency_key_reused', 'This Idempotency-Key was used for a request with a different body.', J);
+      if (cur && cur.status && cur.body) return jsonRes(res, cur.status, cur.body, J, { 'Idempotent-Replay': 'true' });
+      if (cur) return inFlight();
+      // Claim refused and nothing there: the store is out; run as before.
+    }
+  }
+  try {
+    return await createEnvelopeRun(deps, apiKey, mode, rec, { d, bodyHash, idemKey, store, pre });
+  } finally {
+    if (claimed && !pre.stored) { try { await store.delMeta(idemKey); } catch (e) { /* expires by itself */ } }
+  }
+}
+
+async function createEnvelopeRun(deps, apiKey, mode, rec, { d, bodyHash, idemKey, store, pre }) {
+  const { res, apiKeys, envStore, envCreateRateOk, readBody, J, publicOrigin } = deps;
+
+  // SHAPE FIRST, then the hourly quota (sweep-api A6): fifty malformed
+  // requests used to spend the whole hour's quota and the real create got 429.
+  const doc0 = d.document || {};
+  if (doc0.content_base64 && doc0.url) return errRes(res, 400, 'ambiguous_document', 'Provide exactly one of document.content_base64 and document.url.', J);
+  if (d.binding_mode !== undefined && d.binding_mode !== 'email' && d.binding_mode !== 'open') {
+    return errRes(res, 400, 'invalid_binding_mode', 'binding_mode must be "email" or "open".', J);
+  }
+  // metadata is echoed back to the owner and into every webhook as an object.
+  // A string or an array used to be answered 201 and silently stored as {}
+  // (P10 API-13-B): the caller lost what it sent and was told nothing.
+  if (d.metadata !== undefined && d.metadata !== null && (typeof d.metadata !== 'object' || Array.isArray(d.metadata))) {
+    return errRes(res, 400, 'invalid_metadata', 'metadata must be a JSON object.', J);
+  }
+  const signers0 = Array.isArray(d.signers) ? d.signers : [];
+  if (signers0.length === 0) return errRes(res, 400, 'missing_signers', 'At least one signer is required.', J);
+  // With email binding every slot is bound to a mailbox; a signer without a
+  // valid address made an envelope that could never complete, answered 201
+  // (sweep-api A4).
+  if (d.binding_mode !== 'open') {
+    const bad = signers0.findIndex((s) => !s || typeof s.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.email.trim()) || s.email.length > 254);
+    if (bad !== -1) return jsonRes(res, 400, { error: 'invalid_signer_email', signer_index: bad, message: 'Every signer needs a valid email address with binding_mode "email".' }, J);
+  }
+
+  // envCreateRateOk is now the fleet-wide (redis-backed) limiter, so await it.
+  if (!(await envCreateRateOk(apiKey))) {
+    const left = 3600 - Math.floor((Date.now() % 3600000) / 1000);
+    return jsonRes(res, 429, { error: 'rate_limited', message: 'Envelope create quota exceeded (50/hour/key).', retry_after_s: left }, J, { 'Retry-After': String(left) });
+  }
 
   // 1) obtain PDF bytes (base64 or HTTPS url via the SSRF-guarded fetcher).
   let pdf = null;
   const doc = d.document || {};
   try {
+    // An empty content_base64 is an empty document, not a missing one: the
+    // caller did send the field (P10 API-13-C, the spec names empty_document).
+    if (typeof doc.content_base64 === 'string' && doc.content_base64.trim() === '' && !doc.url) {
+      return errRes(res, 400, 'empty_document', 'Empty document.', J);
+    }
     if (doc.content_base64) {
       pdf = Buffer.from(String(doc.content_base64), 'base64');
     } else if (doc.url) {
@@ -410,6 +559,14 @@ async function createEnvelope(deps, apiKey, mode, rec) {
       plan: rec && rec.plan,
     });
   } catch (e) {
+    // More names than the plan allows on one document is a caller error with a
+    // name of its own and the ceiling in numbers (P10 API-13-C), not the
+    // catch-all create_failed.
+    const tooMany = /too many parties \(max (\d+) on the ([a-z_-]+) plan\)/i.exec(String(e.message || ''));
+    if (tooMany) {
+      return jsonRes(res, 400, { error: 'too_many_signers', max_signers: Number(tooMany[1]), plan: tooMany[2],
+        message: e.message }, J);
+    }
     return errRes(res, 400, 'create_failed', e.message, J);
   }
 
@@ -453,7 +610,9 @@ async function createEnvelope(deps, apiKey, mode, rec) {
     name: signers[i] ? (signers[i].name || null) : null,
     email: signers[i] ? (signers[i].email || null) : null,
     order: signers[i] ? (signers[i].order || (i + 1)) : (i + 1),
-    status: signedSet.has(pl.party_index) ? 'completed' : 'pending',
+    // The same word GET /v1/envelopes/:id uses for a signed slot ('signed'),
+    // so a client reads one enum, not two (P10 API-14-L).
+    status: signedSet.has(pl.party_index) ? 'signed' : 'pending',
     sign_url: origin + pl.sign_path,
   }));
   const finalStatus = (sandbox && sandbox.status === 'complete') ? 'completed' : 'sent';
@@ -463,7 +622,7 @@ async function createEnvelope(deps, apiKey, mode, rec) {
         : `sandbox auto-signer unavailable (${(sandbox && sandbox.error) || 'no signing engine'}); test envelope behaves like a live one`)
     : undefined;
 
-  return jsonRes(res, 201, {
+  const created = {
     id: out.id,
     status: finalStatus,
     mode,
@@ -478,7 +637,11 @@ async function createEnvelope(deps, apiKey, mode, rec) {
       ? { signed_pdf: `/v1/envelopes/${out.id}/document`, receipt: `/v1/envelopes/${out.id}/receipt` }
       : null,
     _sandbox_note: sandboxNote,
-  }, J);
+  };
+  if (idemKey && store && typeof store.putMeta === 'function') {
+    try { await store.putMeta(idemKey, { status: 201, body: created, body_hash: bodyHash }, 24 * 3600 * 1000); pre.stored = true; } catch (e) { /* replay protection is best effort */ }
+  }
+  return jsonRes(res, 201, created, J);
 }
 
 // ── Sandbox auto-signer (psk_test_) ───────────────────────────────────────────
@@ -793,12 +956,12 @@ async function voidEnvelope(deps, id, token, rec) {
   // drop the stored PDF + any stamped copy immediately (PII minimisation). The
   // small meta record is kept (TTL'd) so the webhook can still fire.
   try { await resolveStore(deps).delBlob(id); } catch (_) { /* best effort */ }
-  emitEvent(deps, id, 'envelope.voided', { status: 'void', reason });
+  emitEvent(deps, id, 'envelope.voided', { status: 'void', reason, party_count: Array.isArray(env.parties) ? env.parties.length : undefined });
   return jsonRes(res, 200, { id, status: 'void', voided_at: out.voided_at }, J);
 }
 
 module.exports = {
-  route, emitEvent, hasParaSignScope, externalStatus,
+  route, emitEvent, webhookSeq, hasParaSignScope, externalStatus,
   authenticateBearer,           // shared with the relay's own /v1 handlers
   grantParaSignScope, setParaSignEnabled,
   authorizeReceipt, hexEqual,   // exposed for tests

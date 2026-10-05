@@ -200,14 +200,14 @@ footer a{color:var(--ink);text-decoration:none}
 
   <ul class="nav-links">
     <li><a href="/en#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
     <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/help" class="nav-help">Help</a>
     <a href="/en/auth/login" class="nav-signin">Sign in</a>
     <a href="/en/signup" class="nav-cta">Create account</a>
   </div>
@@ -221,14 +221,14 @@ footer a{color:var(--ink);text-decoration:none}
 </nav>
 <div class="nav-mobile" id="nav-mobile">
   <a href="/en#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
   <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/en/help" class="nav-tail-link">Help</a>
   <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/rules" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/rules" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main id="main-content" tabindex="-1">
@@ -248,36 +248,36 @@ footer a{color:var(--ink);text-decoration:none}
 <h2>What we guarantee</h2>
 
 <h3>1 &middot; We never had it</h3>
-<p>Files are encrypted in your browser before they reach us. For a ParaSend transfer the relay holds only ciphertext, in RAM, and burns it after the last read the link allows: one on Community, up to 10 on Firm. We can&rsquo;t read it, can&rsquo;t leak it, and can&rsquo;t be compelled to hand over what we never had.</p>
-<p class="rule-verify"><a href="/security">verify: the relay architecture &rarr;</a></p>
+<p>Files are encrypted in your browser before they reach us. For a ParaSend transfer the relay holds only ciphertext, in RAM, and burns it after the last read the link allows: one on Community, up to 10 on Firm. We can&rsquo;t read it, can&rsquo;t leak it, and can&rsquo;t be compelled to hand over what we never had. One exception: in a send to named recipients (by email address) the token that unwraps the key passes through the relay once so it can be emailed. At that moment we could open the file, so that route is not zero-knowledge. A one-time link is.</p>
+<p class="rule-verify"><a href="/en/security">verify: the relay architecture &rarr;</a></p>
 
 <h3>2 &middot; Your browser talks only to us</h3>
 <p>No third-party requests. No Google fonts, no CDN, no analytics, no pixels, no embedded widgets. Open your network inspector on any page: every request goes to paramant.app and nowhere else.</p>
-<p class="rule-verify"><a href="/security">verify: the content-security policy we ship &rarr;</a></p>
+<p class="rule-verify"><a href="/en/security">verify: the content-security policy we ship &rarr;</a></p>
 
 <h3>3 &middot; No surveillance</h3>
 <p>No tracking cookies, no fingerprinting, no ad tech. One functional session cookie after you sign in. That is the entire list.</p>
-<p class="rule-verify"><a href="/privacy">verify: the cookie and logging list &rarr;</a></p>
+<p class="rule-verify"><a href="/en/privacy">verify: the cookie and logging list &rarr;</a></p>
 
 <h3>4 &middot; You own your keys</h3>
 <p>Keys are generated on your device and never leave it. Your passkey&rsquo;s private key is yours alone. We only ever see the public half.</p>
 <p class="rule-verify"><a href="https://github.com/Apolloccrypt/paramant-relay">verify: the key generation in the source &rarr;</a></p>
 
 <h3>5 &middot; EU soil, EU law</h3>
-<p>Hosted in Germany, owned top to bottom in the EU. No US CLOUD Act reach over your files or your keys: they never leave the EU, and they are ciphertext everywhere but your own browser. One exception we would rather name ourselves: email (only the email address and the invite link, never the document or a key) still goes through Resend Inc. in the United States for now. That is the one exception in the chain; we are moving to a Dutch provider. We would rather say that than claim a purity that is not true. See <a href="/privacy">the subprocessor list</a>.</p>
-<p class="rule-verify"><a href="/security">verify: the jurisdiction table &rarr;</a></p>
+<p>Hosted in Germany, owned top to bottom in the EU. The encrypted files never leave the EU. One exception we would rather name ourselves: email still goes through Resend in the United States for now. For a send to named recipients that email carries the link with the token, and the pickup code is emailed too: whoever reads both emails can open the file. An invitation to sign carries half of the document key; the relay hands the other half only to the signed-in recipient. Resend, our email provider, is the one US party in the chain; we are moving to a Dutch provider. We would rather say that than claim a purity that is not true. See <a href="/en/privacy">the subprocessor list</a>.</p>
+<p class="rule-verify"><a href="/en/security">verify: the jurisdiction table &rarr;</a></p>
 
 <h3>6 &middot; Quantum-ready by default</h3>
 <p>FIPS 203/204 (ML-KEM and ML-DSA) today, not &ldquo;soon&rdquo;. Harvest-now-decrypt-later is already happening; we encrypt for the decade, not the demo.</p>
-<p class="rule-verify"><a href="/crypto-agility">verify: the FIPS 203/204 parameters &rarr;</a></p>
+<p class="rule-verify"><a href="/en/crypto-agility">verify: the FIPS 203/204 parameters &rarr;</a></p>
 
 <h3>7 &middot; Honest by design</h3>
 <p>No dark patterns. When something fails, we tell you what failed and how to recover. Never a vague or misleading message to keep the UI looking tidy.</p>
-<p class="rule-verify"><a href="/changelog">verify: what we changed and admitted &rarr;</a></p>
+<p class="rule-verify"><a href="/en/changelog">verify: what we changed and admitted &rarr;</a></p>
 
 <h3>8 &middot; Verifiable, not trust-me</h3>
 <p>Open-core you can run yourself, a public Certificate Transparency log, and a relay that proves what it does. You don&rsquo;t have to trust us. You can check it.</p>
-<p class="rule-verify"><a href="/ct-log">verify: the public transparency log &rarr;</a></p>
+<p class="rule-verify"><a href="/en/ct-log">verify: the public transparency log &rarr;</a></p>
 
 <h3>9 &middot; Only what&rsquo;s required</h3>
 <p>An email to hold your account. No phone number, no IP logging beyond transit. Minimalism as a security property: data we don&rsquo;t hold can&rsquo;t be breached, subpoenaed, or sold.</p>
@@ -335,6 +335,6 @@ footer a{color:var(--ink);text-decoration:none}
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 </body>
 </html>

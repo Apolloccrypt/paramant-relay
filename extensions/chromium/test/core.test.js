@@ -127,16 +127,20 @@ describe('encryptChunk → parashare receiver', () => {
 // ── Share URL ────────────────────────────────────────────────────────────────────
 
 describe('buildShareUrl', () => {
-  it('matches the ?t&n&c&r#k= shape and parses back', () => {
+  it('matches the ?t&c&r#k= shape, parses back, and carries no file name', () => {
     const url = buildShareUrl({ tokens: ['t1', 't2'], name: 'a b €.pdf', chunks: 2, relay: 'https://legal.paramant.app', keys: ['k1', 'k2'] });
-    expect(url.startsWith('https://paramant.app/parashare?')).toBe(true);
+    // The public receiving page, never the sender's /parashare behind the login.
+    expect(url.startsWith('https://paramant.app/get?')).toBe(true);
+    expect(url).not.toMatch(/\/parashare/);
     const [base, frag] = url.split('#');
     expect(frag).toBe('k=k1,k2');
     const sp = new URLSearchParams(base.split('?')[1]);
     expect(sp.get('t')).toBe('t1,t2');
     expect(sp.get('c')).toBe('2');
     expect(sp.get('r')).toBe('https://legal.paramant.app');
-    expect(decodeURIComponent(sp.get('n'))).toBe('a b €.pdf');
+    // Hertest T4-9: the name stays inside the seal, never in the URL.
+    expect(sp.get('n')).toBe(null);
+    expect(url).not.toMatch(/a%20b|%E2%82%AC|\.pdf/);
   });
 });
 

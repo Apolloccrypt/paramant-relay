@@ -415,6 +415,65 @@ function messageFor(error) {
   return MESSAGES[error] || MESSAGES.unknown;
 }
 
+// The same sentences for the Dutch pages. /pricing, /account and /redeem are
+// Dutch and printed these English answers word for word (fase 1, PLAN-28/29/31):
+// a Dutch customer who typed in a code was told "Your code is redeemed" or
+// "We do not know that code". The relay sends both, `message` and `message_nl`,
+// and the page picks the one for its own language; an API client that only
+// reads `message` sees exactly what it always saw.
+const MESSAGES_NL = Object.freeze({
+  unknown: 'Deze code kennen we niet. Controleer de spelling en probeer het opnieuw.',
+  bad_code: 'Deze code kennen we niet. Controleer de spelling en probeer het opnieuw.',
+  revoked: 'Deze code is niet meer geldig.',
+  expired: 'Deze code is verlopen.',
+  already_used: 'U heeft deze code al gebruikt op dit account.',
+  exhausted: 'Deze code is op: alle plaatsen zijn al gebruikt.',
+  no_redis: 'We kunnen codes nu niet controleren. Probeer het over een minuut opnieuw.',
+  grant_failed: 'We konden de termijn niet aan uw account toevoegen. Er is niets veranderd, probeer het opnieuw.',
+  nothing_to_add: 'Deze code voegt niets toe aan wat u al heeft, dus hij is niet gebruikt.',
+});
+
+function messageForNl(error) {
+  return MESSAGES_NL[error] || MESSAGES_NL.unknown;
+}
+
+function joinPlansNl(parts) {
+  return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} en ${parts[parts.length - 1]}`;
+}
+
+function keptPhraseNl(kept) {
+  const list = Array.isArray(kept) ? kept : [];
+  if (list.length === 0) return '';
+  return joinPlansNl(list.map((k) => {
+    const date = k.ends ? planExpiry.formatDateNl(k.ends) : null;
+    return `${planExpiry.planLabel(k.product, k.tier)}${date ? ` tot ${date}` : ''}`;
+  }));
+}
+
+// The product names stay ParaSign and ParaSend: that is what /pricing and
+// /account call them on the Dutch site too.
+function successMessageNl(grants, kept) {
+  const list = Array.isArray(grants) ? grants : [];
+  if (list.length === 0) return 'Uw code is ingewisseld.';
+  const joined = joinPlansNl(list.map((g) => `${planExpiry.planLabel(g.product, g.tier)} tot ${planExpiry.formatDateNl(g.ends)}`));
+  const keep = keptPhraseNl(kept);
+  return `Uw code is ingewisseld. U heeft nu ${joined}.${keep ? ` U houdt ${keep}.` : ''} Er is niets afgeschreven.`;
+}
+
+function nothingToAddMessageNl(kept) {
+  const keep = keptPhraseNl(kept);
+  if (!keep) return MESSAGES_NL.nothing_to_add;
+  return `Deze code voegt niets toe aan wat u al heeft (${keep}), dus hij is niet gebruikt.`;
+}
+
+// The billing-history line on the Dutch /account. Same facts as historyLabel.
+function historyLabelNl(code, grants) {
+  const list = Array.isArray(grants) ? grants : [];
+  const plans = list.map((g) => planExpiry.planLabel(g.product, g.tier));
+  const what = list.length ? `${humanDurationNl(list[0].days)} ${joinPlansNl(plans)}` : 'niets';
+  return `Cadeau: ${what}, code ${code}`;
+}
+
 function joinPlans(parts) {
   return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
 }
@@ -459,4 +518,5 @@ module.exports = {
   validateGrants, validateMax, validateValidUntil,
   createCoupon, getCoupon, listCoupons, revokeCoupon, redemptionsOf,
   claim, release, grantEnd, redeemMail, messageFor, successMessage, nothingToAddMessage,
+  MESSAGES_NL, messageForNl, successMessageNl, nothingToAddMessageNl, historyLabelNl,
 };

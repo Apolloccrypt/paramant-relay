@@ -153,14 +153,46 @@ function signGateDecision(used, ent) {
 // KEYS[1] the monthly counter.
 // ARGV[1] the cap, ARGV[2] the counter TTL in seconds.
 // Returns { status, used } with status one of: ok | over
+//
+// KEYS[2] (optional, ARGV[3] = '1'): a HOLD for this one signature slot (one
+// party of one envelope). Set together with the count, in the same script.
+// A retry for a slot that already holds a unit is not counted again: the
+// sweep-chaos repro cut redis right after the count, the store write failed,
+// the 503 released nothing (the release could not reach redis either), and
+// the retry counted a second unit for one signature. ARGV[4] the hold TTL.
+//
+// The hold counts the requests that depend on the unit (review #555, H4). It
+// used to be a bare '1': request A (a deliberately bad signature) counted and
+// set the hold, request B (a good one) saw the hold and went through
+// uncounted, A failed and its release deleted the hold and gave the unit
+// back, and B landed for free. Now the hold is 'p:<n>', n the requests still
+// in flight on that one unit: a request that finds a pending hold adds itself,
+// a release takes itself off, and only the LAST one gives the unit back. A
+// landed signature turns the hold into 'd' (done): the unit stays, and later
+// requests for that slot pass uncounted and have nothing to give back. A
+// request that dies in flight leaves its reference behind, so that unit is
+// never given back: the safe direction, as before.
+// Returns { status, used } with status one of: ok | over | held | done
 const GATE_SIGN_LUA = `
 local limit = tonumber(ARGV[1])
 local cur = tonumber(redis.call('GET', KEYS[1]) or '0')
+local hasHold = ARGV[3] == '1'
+if hasHold then
+  local v = redis.call('GET', KEYS[2])
+  if v == 'd' then return {'done', tostring(cur)} end
+  if v then
+    local refs = tonumber(string.match(v, '^p:(%d+)$') or '1') + 1
+    redis.call('SET', KEYS[2], 'p:' .. refs, 'EX', ARGV[4])
+    return {'held', tostring(cur)}
+  end
+end
 if cur >= limit then return {'over', tostring(cur)} end
 local n = redis.call('INCR', KEYS[1])
 if redis.call('TTL', KEYS[1]) < 0 then redis.call('EXPIRE', KEYS[1], ARGV[2]) end
+if hasHold then redis.call('SET', KEYS[2], 'p:1', 'EX', ARGV[4]) end
 return {'ok', tostring(n)}
 `;
+const HOLD_TTL_SECONDS = 40 * 86400; // longer than any envelope stays signable
 
 // KEYS[1] the monthly counter, KEYS[2] the dedup `seen` key. When there is no
 // chunk hash the caller passes KEYS[1] again and sets ARGV[4] to '0'; nothing in
@@ -187,10 +219,33 @@ return {'ok', tostring(n)}
 // for did not happen, so the tally counts what was actually delivered. Never
 // goes below zero: a release without a matching reservation must not hand out a
 // free unit to the next caller.
+// KEYS[2] (optional, ARGV[1] = '1'): the hold that went with the unit. The
+// request takes itself off the hold; only the last request on a pending hold
+// gives the unit back. A done hold ('d') gives nothing back: a signature
+// landed on that unit (H4). ARGV[2] the hold TTL.
 const RELEASE_LUA = `
+if ARGV[1] == '1' then
+  local v = redis.call('GET', KEYS[2])
+  if v == 'd' then return '-1' end
+  if v then
+    local refs = tonumber(string.match(v, '^p:(%d+)$') or '1') - 1
+    if refs > 0 then
+      redis.call('SET', KEYS[2], 'p:' .. refs, 'EX', ARGV[2])
+      return '-1'
+    end
+    redis.call('DEL', KEYS[2])
+  end
+end
 local cur = tonumber(redis.call('GET', KEYS[1]) or '0')
 if cur <= 0 then return '0' end
 return tostring(redis.call('DECR', KEYS[1]))
+`;
+
+// The signature landed: the hold becomes 'done', so later requests for the
+// slot neither count nor own a unit that could be given back.
+const FINALIZE_LUA = `
+redis.call('SET', KEYS[1], 'd', 'EX', ARGV[1])
+return 1
 `;
 
 // node-redis returns Lua's table as an array of strings, exactly as
@@ -221,21 +276,37 @@ async function gateTransfer(redisClient, accountId, chunkHash, limit, log) {
   }
 }
 
-async function gateSign(redisClient, accountId, limit, log) {
-  if (!accountId || !redisClient || !redisClient.isReady || !Number.isFinite(limit)) {
+// FAIL CLOSED for a capped plan. This used to answer allowed:true whenever
+// redis was not ready or the script threw, so during an outage (or the boot
+// window before the client connects) every signature went through uncounted
+// and a free account could sign without limit. A signature is a sold unit;
+// when it cannot be counted it is refused with `unavailable`, and the route
+// answers 503 with Retry-After. An unlimited plan (no finite cap) has nothing
+// to enforce and still passes.
+// opts.holdKey: see GATE_SIGN_LUA.
+async function gateSign(redisClient, accountId, limit, log, opts) {
+  if (!accountId || !Number.isFinite(limit)) {
     const r = await recordSign(redisClient, accountId, log);
     return { allowed: true, counted: r.counted, used: r.used, over_limit: false, error: r.error };
   }
+  if (!redisClient || !redisClient.isReady) {
+    return { allowed: false, unavailable: true, counted: false, used: null, over_limit: false, error: 'redis_not_ready' };
+  }
+  const hold = opts && opts.holdKey ? String(opts.holdKey) : null;
   try {
     const r = _gateResult(await redisClient.eval(GATE_SIGN_LUA, {
-      keys: [signsKey(accountId)],
-      arguments: [String(limit), String(MONTH_TTL_SECONDS)],
+      keys: [signsKey(accountId), hold || signsKey(accountId)],
+      arguments: [String(limit), String(MONTH_TTL_SECONDS), hold ? '1' : '0', String(HOLD_TTL_SECONDS)],
     }));
     if (r.status === 'over') return { allowed: false, counted: false, used: r.used, over_limit: true, error: null };
-    return { allowed: true, counted: true, used: r.used, over_limit: false, error: null };
+    // held: this request rides a unit an earlier request counted for this slot
+    // and holds a reference on it, so it must release when it does not land.
+    if (r.status === 'held') return { allowed: true, counted: false, held: true, ref: true, used: r.used, over_limit: false, error: null };
+    if (r.status === 'done') return { allowed: true, counted: false, held: true, ref: false, used: r.used, over_limit: false, error: null };
+    return { allowed: true, counted: true, ref: !!hold, used: r.used, over_limit: false, error: null };
   } catch (e) {
     if (log) log('warn', 'quota_gate_sign_failed', { account: String(accountId).slice(0, 12), err: e.message });
-    return { allowed: true, counted: false, used: null, over_limit: false, error: e.message }; // fail open
+    return { allowed: false, unavailable: true, counted: false, used: null, over_limit: false, error: e.message };
   }
 }
 
@@ -245,10 +316,12 @@ async function gateSign(redisClient, accountId, limit, log) {
 // would be charged for, so the sign route releases it. This is the same
 // reservation shape lib/coupon.js uses for a seat: claim, and release when the
 // grant that followed the claim did not happen.
-async function releaseSign(redisClient, accountId, log) {
+async function releaseSign(redisClient, accountId, log, opts) {
   if (!accountId || !redisClient || !redisClient.isReady) return { released: false, used: null };
+  const hold = opts && opts.holdKey ? String(opts.holdKey) : null;
   try {
-    const used = parseInt(String(await redisClient.eval(RELEASE_LUA, { keys: [signsKey(accountId)], arguments: [] })), 10);
+    const used = parseInt(String(await redisClient.eval(RELEASE_LUA, { keys: [signsKey(accountId), hold || signsKey(accountId)], arguments: [hold ? '1' : '0', String(HOLD_TTL_SECONDS)] })), 10);
+    if (used === -1) return { released: false, used: null, kept: true };
     return { released: true, used: Number.isFinite(used) ? used : null };
   } catch (e) {
     // A release that fails leaves the account one unit poorer for the month.
@@ -256,6 +329,15 @@ async function releaseSign(redisClient, accountId, log) {
     if (log) log('warn', 'quota_release_sign_failed', { account: String(accountId).slice(0, 12), err: e.message });
     return { released: false, used: null };
   }
+}
+
+// Mark a slot's hold as done once its signature landed. Best effort: a
+// failure leaves a pending hold whose last reference is never released, so it
+// can only ever cost a unit, never hand one out.
+async function finalizeSign(redisClient, holdKey, log) {
+  if (!holdKey || !redisClient || !redisClient.isReady) return false;
+  try { await redisClient.eval(FINALIZE_LUA, { keys: [String(holdKey)], arguments: [String(HOLD_TTL_SECONDS)] }); return true; }
+  catch (e) { if (log) log('warn', 'quota_finalize_sign_failed', { err: e.message }); return false; }
 }
 
 // Read the current month's counts. Used by the Phase 4 admin/usage endpoint.
@@ -290,6 +372,7 @@ module.exports = {
   gateTransfer,
   gateSign,
   releaseSign,
+  finalizeSign,
   readUsage,
   // exported for tests / admin tooling
   transfersKey,

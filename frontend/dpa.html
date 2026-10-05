@@ -221,12 +221,12 @@ input:focus{border-color:var(--cobalt)}
 <main id="main-content" tabindex="-1">
 
 <div class="wrap">
-  <div class="eyebrow">Juridisch &middot; geldig vanaf 1 januari 2025</div>
+  <div class="eyebrow" data-dpa-versie="2026-10-04">Juridisch &middot; versie 4 oktober 2026</div>
   <h1>Verwerkersovereenkomst</h1>
   <p class="lang-prevails">Bij verschil tussen de Nederlandse en de Engelse tekst geldt de Nederlandse versie. De Engelse tekst staat op <a href="/en/dpa" hreflang="en" lang="en">/en/dpa</a>.</p>
   <p class="sub">Overeenkomst conform artikel 28 AVG tussen Paramantis Solutions B.V. (verwerker) en uw organisatie (verwerkingsverantwoordelijke). Geldt voor alle persoonsgegevens die via de relaydienst van Paramant worden verwerkt.</p>
 
-  <div class="note-box"><strong>Samenvatting zero-knowledge:</strong> Paramantis exploiteert een zero-knowledge relay voor overdrachten en voor ondertekenverzoeken die in de browser zijn aangemaakt. Die inhoud wordt aan de kant van de gebruiker versleuteld voordat ze onze infrastructuur bereikt. Buiten de gehoste ondertekenprocedure op de <code>/v1</code> API hebben wij dus alleen versleutelde gegevens en kunnen wij niet bij de inhoud. De gehoste ondertekenprocedure op de <code>/v1</code> API is de uitzondering waarvan de verwerkingsverantwoordelijke zich bewust moet zijn: daar wordt het document in leesbare vorm aan Paramantis geleverd, zodat Paramantis de procedure kan uitvoeren, en is Paramantis verwerker van die inhoud zolang de envelop bestaat. Wij verwerken alleen de minimale technische metadata die nodig zijn om overdrachten te routeren en te laten verlopen.</div>
+  <div class="note-box"><strong>Samenvatting zero-knowledge:</strong> Paramantis exploiteert een zero-knowledge relay voor overdrachten en voor ondertekenverzoeken die in de browser zijn aangemaakt. Die inhoud wordt aan de kant van de gebruiker versleuteld voordat ze onze infrastructuur bereikt. Buiten de uitzonderingen hieronder hebben wij dus alleen versleutelde gegevens en kunnen wij niet bij de inhoud. Twee uitzonderingen zijn er voor ParaSend: bij versturen naar ontvangers op naam (per e-mailadres) gaat het token dat de bestandssleutel uitpakt één keer langs de relay om in de uitnodiging te worden gemaild, en op dat moment zou Paramantis het bestand kunnen openen; en de extensies voor Chromium en Outlook versleutelen nu nog op de server. De gehoste ondertekenprocedure op de <code>/v1</code> API is de uitzondering waarvan de verwerkingsverantwoordelijke zich bewust moet zijn: daar wordt het document in leesbare vorm aan Paramantis geleverd, zodat Paramantis de procedure kan uitvoeren, en is Paramantis verwerker van die inhoud zolang de envelop bestaat. Wij verwerken alleen de minimale technische metadata die nodig zijn om overdrachten te routeren en te laten verlopen.</div>
 
   <h2 id="parties">1. Partijen</h2>
   <table>
@@ -280,7 +280,7 @@ input:focus{border-color:var(--cobalt)}
   <p>Paramantis meldt de verwerkingsverantwoordelijke beoogde wijzigingen in subverwerkers minstens 14 dagen vooraf, zodat de verwerkingsverantwoordelijke bezwaar kan maken.</p>
 
   <h2 id="transfers">6. Internationale doorgifte</h2>
-  <p><strong>Eén doorgifte buiten de EER: transactionele e-mail.</strong> Alle relay-infrastructuur staat in de EU (Hetzner DE, NBG1). E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten. De doorgifte is gedekt door de standaardcontractbepalingen (Uitvoeringsbesluit (EU) 2021/914 van de Europese Commissie). Betalingen lopen via Mollie B.V. in Nederland.<span data-partner-context="moneybird voorwaardelijk"> De boekhouding loopt alleen via Moneybird B.V., ook in Nederland, als de exploitant een administratie heeft gekoppeld.</span> Er worden geen andere persoonsgegevens buiten de EER doorgegeven.</p>
+  <p><strong>Eén doorgifte buiten de EER: transactionele e-mail.</strong> Alle relay-infrastructuur staat in de EU (Hetzner DE, NBG1). E-mail gaat nu nog via Resend (Plus Five Five, Inc.) in de Verenigde Staten. De mail bevat nooit het document. Bij versturen naar ontvangers op naam bevat hij wel de link met het token, en de ophaalcode gaat ook per mail: samen openen ze het bestand. Een uitnodiging om te ondertekenen bevat de helft van de documentsleutel; de andere helft geeft de relay alleen aan de ingelogde ontvanger. De doorgifte is gedekt door de standaardcontractbepalingen (Uitvoeringsbesluit (EU) 2021/914 van de Europese Commissie). Betalingen lopen via Mollie B.V. in Nederland.<span data-partner-context="moneybird voorwaardelijk"> De boekhouding loopt alleen via Moneybird B.V., ook in Nederland, als de exploitant een administratie heeft gekoppeld.</span> Er worden geen andere persoonsgegevens buiten de EER doorgegeven.</p>
   <p>Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. Die komt pas op de lijst in artikel 5 als het contract er is, en u hoort het minstens 14 dagen vooraf.</p>
 
   <h2 id="security">7. Technische en organisatorische maatregelen (artikel 32)</h2>
@@ -293,7 +293,7 @@ input:focus{border-color:var(--cobalt)}
       <tr><td>Dataminimalisatie</td><td>Bestandsnamen niet in leesbare vorm opgeslagen (alleen versleuteld in enc_meta); apparaat-ID's gehasht met SHA3-256 in de CT-log; geen logging van de inhoud</td></tr>
       <tr><td>Toegangsbeheer</td><td>Authenticatie met API-sleutel op alle relay-endpoints; beheerpaneel beveiligd met TOTP-MFA en rate limiting per IP-adres (5 pogingen per 15 minuten)</td></tr>
       <tr><td>Auditlogging</td><td>Certificate Transparency-log: hashes van overdrachten en commitments van apparaatsleutels, geen inhoud; Merkle-boom die manipulatie zichtbaar maakt</td></tr>
-      <tr><td>Integriteit en beschikbaarheid</td><td>auditd (49 CIS L2-regels), dagelijkse integriteitscontrole van bestanden met AIDE, AppArmor in enforcing-modus, CIS Ubuntu 24.04 L2-benchmark: 114 controles</td></tr>
+      <tr><td>Integriteit en beschikbaarheid</td><td>auditd (49 CIS L2-regels), dagelijkse integriteitscontrole van bestanden met AIDE, AppArmor in enforcing-modus (119 van de 121 profielen), CIS Ubuntu 24.04 L2-benchmark: 114 controles</td></tr>
       <tr><td>Hardening van infrastructuur</td><td>Docker-containers: alleen-lezen bestandssysteem, no-new-privileges, cap_drop ALL, gebruiker zonder rootrechten; HSTS max-age=63072000</td></tr>
       <tr><td>Kwetsbaarhedenbeheer</td><td>Onafhankelijke beveiligingsaudit afgerond in april 2026, zie de <a href="/docs#audits">samenvatting van de beveiligingsaudit</a></td></tr>
     </tbody>
@@ -312,13 +312,13 @@ input:focus{border-color:var(--cobalt)}
   <p>Deze overeenkomst geldt vanaf de datum van ondertekening en blijft van kracht zolang het abonnement van de verwerkingsverantwoordelijke op de dienst loopt. Bij beëindiging verwijdert Paramantis alle persoonsgegevens binnen 30 dagen, behalve waar bewaring verplicht is op grond van toepasselijk recht. De CT-log (met alleen gehashte identificatoren, geen inhoud) mag worden bewaard voor audit- en nalevingsdoeleinden.</p>
 
   <h2 id="governing">12. Toepasselijk recht en bevoegde rechter</h2>
-  <p>Op deze overeenkomst is het recht van de Bondsrepubliek Duitsland van toepassing. Elk geschil dat voortkomt uit of verband houdt met deze overeenkomst, valt onder de exclusieve bevoegdheid van de Duitse rechter.</p>
+  <p>Op deze overeenkomst is Nederlands recht van toepassing. Elk geschil dat voortkomt uit of verband houdt met deze overeenkomst, valt onder de exclusieve bevoegdheid van de bevoegde rechter in Nederland.</p>
 
   <hr class="divider">
 
   <div class="sign-box" id="signBox">
     <h2>Elektronisch ondertekenen</h2>
-    <p style="color:var(--ink-dim);font-size:14px;margin-bottom:28px">Vul hieronder uw gegevens in om deze overeenkomst te ondertekenen. U ontvangt direct een door ons medeondertekend exemplaar per e-mail.</p>
+    <p style="color:var(--ink-dim);font-size:14px;margin-bottom:28px">Vul hieronder uw gegevens in om deze overeenkomst te ondertekenen. U ontvangt per e-mail een bevestiging (nu nog in het Engels) met uw referentienummer, de versie en de link naar de tekst van deze overeenkomst.</p>
 
     <div class="form-grid">
       <div class="field">
@@ -353,7 +353,7 @@ input:focus{border-color:var(--cobalt)}
     <div class="success-box" id="successBox">
       <div style="color:var(--ink);font-size:13px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">&#10003; Overeenkomst ondertekend</div>
       <div class="ref" id="refNumber"></div>
-      <div style="color:var(--ink-dim);font-size:13px;margin-top:8px">Een medeondertekend exemplaar is verstuurd naar <span id="sigEmailDisplay" style="color:var(--cobalt)"></span></div>
+      <div style="color:var(--ink-dim);font-size:13px;margin-top:8px">Een bevestiging met de referentie gaat naar <span id="sigEmailDisplay" style="color:var(--cobalt)"></span></div>
       <div style="color:var(--ink-dim);font-size:12px;margin-top:16px">Bewaar uw referentienummer. Vragen: <a href="mailto:privacy@paramant.app">privacy@paramant.app</a></div>
     </div>
 
@@ -394,8 +394,8 @@ input:focus{border-color:var(--cobalt)}
   </div>
 </footer>
 
-<script src="/js/dpa.inline1.js?v=2"></script>
+<script src="/js/dpa.inline1.js?v=4"></script>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 </body>
 </html>

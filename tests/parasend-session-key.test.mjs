@@ -221,7 +221,10 @@ test('a 200 from /api/user/parasend/token gives the slim row, a usable button, a
   const slim = run.getElementById('ps-key-slim');
   assert.equal(slim.hidden, false, 'the slim row is shown');
   assert.equal(slim.classList.contains('is-loading'), false, 'the slim row stops claiming to be loading');
-  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'You are signed in');
+  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'You are signed in; we send on behalf of your account.');
+  // Hertest r2 T5-11: "pst_4b4b...c589" said nothing to a person. No token on screen.
+  assert.equal(run.getElementById('ps-key-mask').hidden, true, 'no session token on the screen');
+  assert.doesNotMatch(run.getElementById('ps-key-mask').textContent, /pst_/, 'not even masked');
   // Since 24 September 2026 the token is not on screen at all, not even
   // masked: "pst_1e99...c811" next to "Change" read like a fault code to the
   // owner. The row says who is signed in; the credential stays in memory.
@@ -332,7 +335,7 @@ test('a sector that will not answer leaves the button live and reports itself at
 
   await evalIn(run, 'createSession()');
   const status = run.getElementById('create-status');
-  assert.match(status.textContent, /No relay sector answered/, 'pressing the button states the sector failure');
+  assert.match(status.textContent, /Our server did not answer/, 'pressing the button states the sector failure');
   assert.equal(status.className, 'status-line err');
   assert.equal(run.getElementById('session-link').textContent, '', 'and no session is created on a dead sector');
 });
@@ -358,7 +361,7 @@ test('the key banner leads with signing in again, and says who the manual key is
   const bannerAt = PS_HTML.indexOf('id="ps-key-error"');
   assert.ok(bannerAt > 0, 'the banner markup must still be findable by its id');
   const banner = PS_HTML.slice(bannerAt, bannerAt + 900);
-  assert.match(banner, /class="ps-alert-primary" href="\/auth\/login">Sign in again</,
+  assert.match(banner, /class="ps-alert-primary" href="\/en\/auth\/login">Sign in again</,
     'signing in again is the action that works on the hosted relay, so it is the primary');
   assert.match(banner, /data-click="expandApiKeyCard">Use a key by hand</,
     'the manual card must stay reachable for a self-host with no /api/user/account/key');
@@ -370,7 +373,7 @@ test('the key banner leads with signing in again, and says who the manual key is
   const actionsAt = banner.indexOf('class="ps-alert-actions"');
   assert.ok(actionsAt > 0, 'the banner must group its actions, so their order is a fact and not an accident of wrapping');
   const actions = banner.slice(actionsAt);
-  assert.ok(actions.indexOf('href="/auth/login"') < actions.indexOf('data-click="expandApiKeyCard"'),
+  assert.ok(actions.indexOf('href="/en/auth/login"') < actions.indexOf('data-click="expandApiKeyCard"'),
     'the primary action must come first in the markup, which is the order a screen reader and a phone both follow');
 });
 
@@ -696,7 +699,7 @@ test('de Nederlandse /parashare zegt hetzelfde, in het Nederlands', async () => 
   assert.match(PS_HTML_NL, /<span class="ps-step-label">3 &middot; Vergelijken<\/span>/, 'de stepper noemt dezelfde stap zo');
 
   const run = await loadPage({ keyResponses: [ok200], lang: 'nl' });
-  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'U bent ingelogd');
+  assert.equal(run.getElementById('ps-key-slim-label').textContent, 'U bent ingelogd; we versturen namens uw account.');
   const leeg = await loadPage({ keyResponses: [{ status: 500, body: {} }], lang: 'nl' });
   evalIn(leeg, 'expandApiKeyCard()');
   assert.equal(leeg.getElementById('key-status').textContent, 'Vul uw API-sleutel in om verder te gaan',

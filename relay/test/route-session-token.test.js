@@ -697,7 +697,8 @@ test('an account is held to twenty live tokens, and the twenty-first is a 429', 
       { key: CAP_KEY, plan: 'community', active: true, email: 'cap@example.test', account_id: `acct_cap_${SUFFIX}` },
       { key: OWNER, plan: 'community', active: true, email: 'owner@example.test', account_id: OWNER_ACCT },
     ] },
-    env: { INTERNAL_AUTH_TOKEN: INTERNAL, REDIS_URL: process.env.REDIS_URL || DEFAULT_REDIS },
+    // The default is 200 (one office); twenty here keeps the walk short.
+    env: { INTERNAL_AUTH_TOKEN: INTERNAL, REDIS_URL: process.env.REDIS_URL || DEFAULT_REDIS, SESSION_TOKEN_MAX_LIVE: '20' },
   });
   t.after(async () => {
     await capSrv.stop();

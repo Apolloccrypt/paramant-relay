@@ -227,6 +227,7 @@ html[data-session="in"] .home-hero{padding-bottom:56px}
    the reading, so the shape of the page does not change under a reader. */
 .hw-quiet{font-size:15px;line-height:1.6;color:var(--fg-mid);margin:14px 0 0;max-width:34ch}
 
+.home-notice{margin:0 0 14px;padding:10px 14px;border:1px solid var(--line);border-radius:8px;font-size:.95rem}
 html[data-session="in"] [data-home="in"] .home-actions{margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
 /* A new account already has both first steps inside its own card, so the row
    underneath would be the same two buttons a second time. js/home-auth.js sets
@@ -562,6 +563,7 @@ html[data-session="in"] .lang-switch{display:none}
     </div>
     <div class="home-state" data-home="in" hidden>
       <h2 class="paramant-h1">Uw documenten<span class="home-hi-name" data-home-name></span>.</h2>
+      <p class="home-notice" data-home-notice role="status" hidden>We kunnen uw sessie nu even niet controleren, de server is druk. Deze pagina probeert het vanzelf opnieuw; uw documenten verschijnen zodra dat lukt.</p>
 
       <!-- The workbench. Every value in here is written by js/home-auth.js from
            /api/user/documents, /api/user/dashboard/overview and
@@ -677,7 +679,7 @@ html[data-session="in"] .lang-switch{display:none}
     <ul class="check-grid why-grid">
       <li data-partner-context="digicert geen-partij"><span class="ck-fact">De Nederlandse namen zijn verkocht</span><p class="ck-how">Zivver is sinds juni 2025 onderdeel van Kiteworks in Californi&euml;. WeTransfer valt sinds juli 2024 onder Bending Spoons in Milaan. Signhost ging in 2022 naar Entrust, SignRequest in 2021 naar Box, en QuoVadis staat op de Nederlandse vertrouwenslijst als DigiCert Europe Netherlands. De namen bleven Nederlands. De eigenaren niet.</p></li>
       <li><span class="ck-fact">Deze niet</span><p class="ck-how">Paramantis Solutions B.V., Harderwijk, KvK 42115132. Het moederbedrijf is Paramantis Digital B.V., ook Nederlands, KvK 42114664. Er is geen moederbedrijf in het buitenland. Op de voorwaarden is Nederlands recht van toepassing, en bij een geschil beslist een Nederlandse rechter.</p><a href="/terms#law">Toepasselijk recht &rarr;</a></li>
-      <li><span class="ck-fact">En de weg van uw bestanden ook niet</span><p class="ck-how" data-partners-rollen>Servers bij Hetzner in Neurenberg, Duitsland. DNS bij Bunny in Sloveni&euml;. Op de route van uw bestanden en sleutels zit geen Amerikaanse partij. E-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten. Dat is de enige uitzondering; we stappen over naar een Nederlandse aanbieder. Alle partijen en hun status staan op <a href="/partners">de partnerpagina</a>.</p><a href="/privacy">De subverwerkers &rarr;</a></li>
+      <li><span class="ck-fact">En de weg van uw bestanden ook niet</span><p class="ck-how" data-partners-rollen>Servers bij Hetzner in Neurenberg, Duitsland. DNS bij Bunny in Sloveni&euml;. De versleutelde bestanden staan alleen daar. E-mail gaat nu nog via Resend in de Verenigde Staten. Bij versturen naar ontvangers op naam bevat die mail de link met het token, en de ophaalcode gaat ook per mail: wie beide mails leest, kan het bestand openen. Een uitnodiging om te ondertekenen bevat de helft van de documentsleutel; de andere helft geeft de relay alleen aan de ingelogde ontvanger. Resend, onze e-mailprovider, is de enige Amerikaanse partij; we stappen over naar een Nederlandse aanbieder. Alle partijen en hun status staan op <a href="/partners">de partnerpagina</a>.</p><a href="/privacy">De subverwerkers &rarr;</a></li>
     </ul>
     <p class="why-src" data-partner-context="digicert geen-partij">Bronnen eigendom: de aankondiging van Kiteworks over de overname van Zivver (17 juni 2025); de aankondiging van Bending Spoons over de overname van WeTransfer (31 juli 2024); Entrust over Signhost (2022); Box over SignRequest (2021); de vertrouwenslijst van de RDI, met QuoVadis als DigiCert Europe Netherlands B.V. Gecontroleerd op 3 september 2026. Het moederbedrijf van Paramant staat op paramantis.nl, gecontroleerd op 23 september 2026.</p>
   </div>
@@ -801,8 +803,8 @@ html[data-session="in"] .lang-switch{display:none}
   </div>
 </footer>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
-<script src="/js/format-date.js?v=2" defer></script>
-<script src="/js/home-auth.js?v=7" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
+<script src="/js/format-date.js?v=3" defer></script>
+<script src="/js/home-auth.js?v=9" defer></script>
 </body>
 </html>

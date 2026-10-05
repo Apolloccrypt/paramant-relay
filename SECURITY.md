@@ -102,7 +102,8 @@ Full report: [docs/security-audit-2026-04.md](docs/security-audit-2026-04.md)
 |---|----------|--------|
 | 1–3 | Critical | Fixed |
 | 4 | Critical | In progress: plaintext filename in relay RAM |
-| 5–9 | High | Fixed |
+| 5, 7–9 | High | Fixed |
+| 6 | High | In progress: key zeroization is CPython-only and does not warn yet |
 | 10–15 | Medium | Fixed (13: accepted — documented) |
 | 16–20 | Low | Fixed |
 
@@ -113,6 +114,7 @@ Full report: [docs/security-audit-2026-04.md](docs/security-audit-2026-04.md)
 | # | Severity | Finding | ETA |
 |---|----------|---------|-----|
 | 4 | Critical | Plaintext filename stored in relay RAM | v2.4.6 |
+| 6 | High | `_zero()` is CPython-only and gives no warning where it cannot wipe | open |
 | 14 | Medium | CT Merkle tree non-RFC-6962 compliant | v2.5.0 |
 
 ---

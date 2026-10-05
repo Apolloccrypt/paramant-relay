@@ -34,7 +34,7 @@
 <link rel="stylesheet" href="/design-system.css?v=33">
 <link rel="stylesheet" href="/nav.css?v=29">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
-<link rel="stylesheet" href="/components-parasign.css?v=6">
+<link rel="stylesheet" href="/components-parasign.css?v=7">
 <style>
 .ds-note{margin:12px 0 0;padding:13px 16px;border:1px solid var(--line);border-left:2px solid var(--mark);border-radius:var(--r-1);background:var(--surface-sunk);color:var(--ink-2);font-size:14px;line-height:1.6}
 .ds-note p{margin:0 0 8px}
@@ -72,6 +72,15 @@ body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]
 body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-facts,
 body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-headlink{display:none}
 body[data-ds-step]:not([data-ds-step="step-mode"]):not([data-ds-step="step-doc"]) .ds-head .ds-title{font-size:15px;font-weight:600;line-height:1.4;letter-spacing:0;margin:0;max-width:none;color:var(--ink-2)}
+/* On a phone the document itself comes into view on the Place step: the
+   explanations that repeat the hint go, and sign-flow.js scrolls the step to
+   the top. Measured on an iPhone 13 (hertest r2 T5-12c): only the top 36 px of
+   page 1 showed under the zoom, the box button, the paraaf option and the page
+   bar. */
+@media (max-width: 600px){
+  #step-place > .ds-sub, #ds-invite-paraaf-tip, #ds-seal-tip{display:none}
+  #ds-place-hint{scroll-margin-top:72px}
+}
 /* The chosen file, named where the document is worked on. */
 .ds-doc-meta{display:flex;align-items:center;gap:10px;min-width:0;margin:0 0 14px;padding:9px 12px;border:1px solid var(--line-2);border-left:2px solid var(--mark);border-radius:var(--r-1);background:var(--surface-sunk);font-family:var(--mono);font-size:12px;color:var(--ink-2)}
 .ds-doc-meta-label{flex:0 0 auto;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
@@ -130,6 +139,16 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 .ds-stamp-ghost{opacity:.42;pointer-events:none !important;cursor:default;border-style:dashed}
 .ds-stamp-ghost .ds-stamp-del,.ds-stamp-ghost .ds-stamp-resize{display:none}
 .ds-review-pane .ds-mockup-ghost{opacity:.55}
+/* The paraaf on the other pages (sign every page). The box is sized and placed
+   by js/paraaf-place.js, the same plan buildStampedPdf bakes; font-size is set
+   to the box height so the em values below scale like the baked vectors. Fixed
+   colours on purpose: this is what lands on the white PDF page. */
+.ds-paraaf{position:absolute;box-sizing:border-box;overflow:hidden;pointer-events:none;z-index:4;display:flex;flex-direction:column;background:#FFFFFF;border:1px solid #0b3a6a;border-left:.08em solid #0b3a6a;padding:.08em .1em .1em .13em;line-height:1;color:#0b3a6a}
+.ds-paraaf.ds-stamp-ghost{opacity:.9;border-style:solid}
+/* A page this browser could not draw (iOS canvas limit, see renderPageCapped in sign-flow.js). */
+.ds-blank-note{position:absolute;left:8px;right:8px;top:8px;z-index:6;padding:8px 10px;background:var(--surface);border:1px solid var(--line-2);border-left:2px solid var(--mark);font-size:13px;line-height:1.4;color:var(--ink-1);pointer-events:none}
+.ds-pf-initials{flex:1 1 auto;display:flex;align-items:center;font-family:'Times New Roman',Times,serif;font-style:italic;font-size:.47em;white-space:nowrap}
+.ds-pf-foot{flex:0 0 auto;font-family:Helvetica,Arial,sans-serif;font-size:.18em;color:#4d4d4d;white-space:nowrap}
 /* Sign-every-page toggle + reuse-position row */
 .ds-seal-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .ds-seal-check{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;user-select:none}
@@ -174,6 +193,17 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
    gets a single-row toolbar instead of the 160px editor and the 247px seal
    panel. That is what keeps the PDF above the fold on a 390px phone. */
 .ds-invite-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+/* On a phone the document comes first (retest T5-12c: it started a full screen
+   below the fold). The extra tools fold behind one button; the paraaf choice
+   stays in view. */
+.ds-more-tools{display:none;margin-bottom:10px}
+@media (max-width:640px){
+  .ds-more-tools{display:inline-flex}
+  .ds-more-tools[hidden]{display:none}
+  #step-place:not(.tools-open) #ds-edit-tools,
+  #step-place:not(.tools-open) .ds-seal-choice,
+  #step-place:not(.tools-open) #ds-seal-tip{display:none !important}
+}
 .ds-edit-label{font-size:12px;color:var(--ink-dim);font-weight:600}
 .ds-edit-btn{font:inherit;font-size:12.5px;min-height:34px;padding:6px 13px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-1);border-radius:var(--r-1);cursor:pointer;line-height:1.4;font-weight:500}
 .ds-edit-btn:hover{border-color:var(--ink-3);background:var(--line-ghost)}
@@ -356,7 +386,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 .ds-zoom #ds-zoom-pct{font-family:var(--mono);font-size:11px;color:var(--ink-dim);min-width:42px;text-align:center}
 #ds-pdf-canvas-list{overflow:auto}
 #ds-pdf-canvas-list .ds-page-wrap{max-width:none;margin-left:auto;margin-right:auto}
-.ds-page-nav{position:sticky;top:8px;z-index:5;display:flex;align-items:center;gap:8px;width:fit-content;margin:0 auto 10px;padding:5px 12px;border:1px solid var(--ink-hair);border-radius:999px;background:rgba(var(--tint), .92);backdrop-filter:saturate(1.2) blur(2px);font:600 12px/1 Inter,sans-serif;color:var(--navy);pointer-events:none}
+.ds-page-nav{position:sticky;top:64px;z-index:9;display:flex;align-items:center;gap:8px;width:fit-content;margin:0 auto 10px;padding:5px 12px;border:1px solid var(--ink-hair);border-radius:999px;background:rgba(var(--tint), .92);backdrop-filter:saturate(1.2) blur(2px);font:600 12px/1 Inter,sans-serif;color:var(--navy);pointer-events:none}
 .ds-page-nav>*{pointer-events:auto}
 .ds-page-nav input{width:46px;text-align:center;font:inherit;border:1px solid var(--ink-hair);border-radius:6px;padding:2px 4px}
 .ds-page-nav button{border:1px solid var(--ink-hair);background:var(--card);border-radius:6px;cursor:pointer;padding:2px 8px;font:inherit}
@@ -384,15 +414,17 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 .ds-page-wrap canvas,
 .ds-review-pane.has-pdf,
 .ds-signature-sheet-preview,
-.ds-sheet-seal,
+.ds-sheet-seal { background: #FFFFFF; color: #0C1B2A; }
+/* The seal is see-through with a thin line, as it is baked into the PDF: the
+   text under it stays readable (retest 2026-10-04, T1-10). */
 .ds-stamp-marker,
-.ds-review-pane .ds-mockup-stamp { background: #FFFFFF; color: #0C1B2A; }
+.ds-review-pane .ds-mockup-stamp { background: transparent; color: #0C1B2A; border-width: 1px; }
 .ds-signature-sheet-preview,
 .ds-sheet-seal,
 .ds-stamp-marker,
 .ds-review-pane .ds-mockup-stamp { border-color: #1D4ED8; }
-.ds-sm-band { background: #1D4ED8; color: #FFFFFF; }
-.ds-sm-logo span { color: #B2FF3F; }
+.ds-sm-band { background: transparent; color: #1D4ED8; border-bottom: 1px solid rgba(29,78,216,.35); }
+.ds-sm-logo span { color: #1D4ED8; }
 .ds-sm-foot .ds-sm-name { color: #0C1B2A; }
 .ds-sm-foot .ds-sm-date, .ds-sm-crypto { color: #5C6A78; }
 .ds-sheet-title, .ds-sheet-fields dd, .ds-mode-t { }
@@ -492,7 +524,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 }
 </script>
 <meta name="theme-color" content="#FFFFFF">
-<link rel="stylesheet" href="/app-2026.css?v=11">
+<link rel="stylesheet" href="/app-2026.css?v=12">
 <link rel="stylesheet" href="/done-state.css?v=1">
 <script src="/js/theme.js?v=6"></script>
 </head>
@@ -542,7 +574,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <h1 class="ds-title">Laat een belangrijk document ondertekenen.</h1>
     <p class="ds-lede">Onderteken zelf, teken samen of stuur het naar anderen. Uw document blijft privé en bij elke handtekening hoort bewijs dat iedereen zelf kan controleren.</p>
     <ul class="ds-facts">
-      <li><b>Altijd gratis</b> &middot; 2 handtekeningen per maand, geen betaalkaart</li>
+      <li id="ds-plan-fact"><b>Altijd gratis</b> &middot; 2 handtekeningen per maand, geen betaalkaart</li>
       <li><b>Uw ondertekensleutel blijft hier</b> &middot; hij wordt op uw apparaat gemaakt en komt nooit op onze servers</li>
       <li><b>Europees recht</b> &middot; servers in Duitsland, onder EU-recht</li>
     </ul>
@@ -666,9 +698,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       <button id="ds-zoom-in" type="button" aria-label="Inzoomen">+</button>
       <button id="ds-zoom-fit" type="button">Passend</button>
     </div>
+    <button class="ds-edit-btn ds-more-tools" id="ds-more-tools" type="button" aria-expanded="false" aria-controls="ds-edit-tools">Tekst, datum en meer</button>
     <div class="ds-invite-tools" id="ds-invite-tools" hidden>
       <button class="ds-edit-btn" id="ds-invite-place" type="button">Plaats het handtekeningvak</button>
-      <span class="ds-edit-tip" id="ds-invite-paraaf-tip">Moet elke pagina ook geparafeerd worden? Dat doet elke ondertekenaar zelf bij het tekenen, met het vinkje Ook op elke andere pagina.</span>
+      <label class="ds-seal-check" id="ds-invite-paraaf-label"><input type="checkbox" id="ds-invite-paraaf"> Paraaf op elke pagina, verplicht voor iedereen</label>
+      <span class="ds-edit-tip" id="ds-invite-paraaf-tip">Iedere ondertekenaar zet dan een eigen paraaf in de marge van elke pagina, vrij van de tekst.</span>
     </div>
     <p class="ds-edit-hint" id="ds-edit-tools-hint" hidden>Dit bestand is een afbeelding, dus u kunt alleen uw stempel plaatsen. De volledige editor (+ Tekst, + Datum, markeringen, notities en paginabeheer) werkt op pdf-bestanden: kies een pdf om die te gebruiken.</p>
     <div class="ds-edit-tools" id="ds-edit-tools" hidden>
@@ -692,12 +726,12 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       </div>
       <label class="ds-seal-check" id="ds-allpages-label"><input type="checkbox" id="ds-allpages"> Onderteken elke pagina met deze handtekening (paraaf)</label>
       <button class="ds-edit-btn" id="ds-apply-tpl" type="button" hidden>Opgeslagen positie gebruiken</button>
-      <span class="ds-edit-tip" id="ds-seal-tip">Herhaalt uw stempel op dezelfde plek op elke pagina. Positie en grootte worden onthouden voor de volgende keer (nooit uw naam of handtekening).</span>
+      <span class="ds-edit-tip" id="ds-seal-tip">Op de andere pagina's komt een kleine paraaf in een vrije plek in de marge. Is er op een pagina geen vrije plek, dan ziet u dat hier voordat u tekent. Positie en grootte worden onthouden voor de volgende keer (nooit uw naam of handtekening).</span>
     </div>
     <div class="ds-page-nav" id="ds-page-nav" hidden>
       <button id="ds-page-nav-prev" type="button" aria-label="Vorige pagina">&#8593;</button>
       <span id="ds-page-nav-label"></span>
-      <input id="ds-page-nav-jump" type="number" min="1" aria-label="Ga naar pagina">
+      <input id="ds-page-nav-jump" type="number" min="1" aria-label="Ga naar pagina" placeholder="nr.">
       <button id="ds-page-nav-next" type="button" aria-label="Volgende pagina">&#8595;</button>
     </div>
     <!-- The sticky action bar belongs to the document, not to the whole step:
@@ -735,7 +769,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 2.5: recipients (optional - if empty, this is a personal sign) -->
   <section class="ds-step" id="step-recipients" hidden>
     <h2>Medeondertekenaars toevoegen (optioneel)</h2>
-    <p class="ds-sub">Voeg iedereen toe die moet tekenen. De uitnodiging is gebonden aan precies het e-mailadres hieronder. Het versleutelde document gaat met het verzoek mee, dus niemand heeft een aparte kopie nodig. Alleen de sleutel die het document opent, mailen wij niet mee. Die geeft u zelf door, op het volgende scherm.</p>
+    <p class="ds-sub">Voeg iedereen toe die moet tekenen. De uitnodiging is gebonden aan precies het e-mailadres hieronder. Het versleutelde document gaat met het verzoek mee, dus niemand heeft een aparte kopie nodig.</p>
 
     <div class="ds-recipients-list" id="ds-recipients-list"></div>
 
@@ -745,7 +779,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 
     <fieldset class="ds-delivery-card" id="ds-invite-delivery" hidden>
       <legend>Uitnodiging per e-mail</legend>
-      <p class="ds-usage-p">Paramant stuurt elke ontvanger een bericht met een link naar het verzoek. De ontvanger logt in met het uitgenodigde e-mailadres. De sleutel van het document staat niet in het bericht, want die e-mail gaat via een mailprovider in het buitenland. Op het volgende scherm krijgt u de volledige links, die u zelf doorgeeft.</p>
+      <p class="ds-usage-p">Paramant stuurt elke ontvanger een uitnodiging met een eigen link. De ontvanger logt in met het uitgenodigde e-mailadres, en dan opent de link het document. In de mail staat maar de helft van de sleutel; de andere helft geven wij alleen aan dat account. Zo kan de mailprovider het document niet openen.</p>
       <div class="ds-delivery-fields" id="ds-delivery-fields">
         <label><span class="ds-label">Onderwerp van de e-mail</span><input class="ds-input" id="ds-invite-subject" maxlength="140"></label>
         <label><span class="ds-label">Bericht (optioneel)</span><textarea class="ds-input ds-textarea" id="ds-invite-message" maxlength="1000" placeholder="Voeg uitleg, een kenmerk of de gewenste termijn toe."></textarea></label>
@@ -754,11 +788,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         <summary>Beveiligingsinstellingen</summary>
         <label class="ds-delivery-option">
           <input type="radio" name="ds-delivery-mode" value="email" checked>
-          <span><strong>Stuur een bericht, geef de link zelf door</strong><span>Aanbevolen. Het bericht werkt alleen voor het uitgenodigde Paramant-account, en de sleutel komt nooit bij onze mailprovider.</span></span>
+          <span><strong>Stuur iedereen een uitnodiging per e-mail</strong><span>Aanbevolen. De uitnodiging werkt alleen voor het uitgenodigde Paramant-account, en de volledige sleutel komt nooit bij onze mailprovider.</span></span>
         </label>
         <label class="ds-delivery-option">
           <input type="radio" name="ds-delivery-mode" value="copy">
-          <span><strong>Maak links zonder iets te versturen</strong><span>Helemaal geen e-mail. U deelt elke persoonlijke link zelf, net als hierboven.</span></span>
+          <span><strong>Maak links zonder iets te versturen</strong><span>Helemaal geen e-mail. U deelt elke persoonlijke link zelf.</span></span>
         </label>
       </details>
     </fieldset>
@@ -811,7 +845,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
     <div class="ds-field">
       <label class="ds-label">Cryptografische sleutel (ML-DSA-65)</label>
       <p class="ds-hint" id="ds-signing-identity">Uw ondertekensleutel wordt gecontroleerd...</p>
-      <p class="ds-hint" style="margin-top:6px">De soort handtekening is wat mensen zien. Wat de handtekening cryptografisch vastlegt, is uw ondertekensleutel (ML-DSA-65). Die ontgrendelt u met Face ID, Touch ID of een beveiligingssleutel op het moment dat u tekent, en hij wordt nooit geëxporteerd. Ontvangers die u toevoegt, tekenen op <code>/co-sign</code> met hun eigen ondertekensleutel.</p>
+      <p class="ds-hint" style="margin-top:6px">De soort handtekening is wat mensen zien. Wat de handtekening cryptografisch vastlegt, is uw ondertekensleutel (ML-DSA-65). Die ontgrendelt u op het moment dat u tekent met uw passkey (Face ID, Touch ID of een beveiligingssleutel) of, zonder passkey, met de code uit uw authenticator-app, en hij wordt nooit geëxporteerd. Ontvangers die u toevoegt, tekenen op <code>/co-sign</code> met hun eigen ondertekensleutel.</p>
     </div>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-identity-back" type="button">Terug</button>
@@ -822,7 +856,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <!-- Step 4: review + sign -->
   <section class="ds-step" id="step-sign" hidden>
     <h2>Controleren en ondertekenen</h2>
-    <p class="ds-sub">Dit is wat u gaat ondertekenen. Controleer het document, uw handtekening en de gegevens. Klikt u op <strong>Dit document ondertekenen</strong>, dan bevestigt u met Face ID, Touch ID of uw beveiligingssleutel. Dat ontgrendelt uw ondertekensleutel voor dit ene document en de handtekening wordt op uw apparaat gemaakt.</p>
+    <p class="ds-sub">Dit is wat u gaat ondertekenen. Controleer het document, uw handtekening en de gegevens. Klikt u op <strong>Dit document ondertekenen</strong>, dan bevestigt u met uw passkey (Face ID, Touch ID of beveiligingssleutel) of, als u geen passkey heeft, met de code uit uw authenticator-app. Dat ontgrendelt uw ondertekensleutel voor dit ene document en de handtekening wordt op uw apparaat gemaakt.</p>
 
     <div class="ds-review-grid">
       <div class="ds-review-col">
@@ -843,7 +877,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       <dl class="ds-proof-dl">
         <dt>Algoritme</dt>          <dd>ML-DSA-65 (FIPS 204, post-quantum)</dd>
         <dt>Hash-algoritme</dt>     <dd>SHA3-256</dd>
-        <dt>SHA3-256 van het document</dt>  <dd id="ds-proof-doc-hash">-</dd>
+        <dt id="ds-proof-doc-hash-label">SHA3-256 van het document</dt>  <dd id="ds-proof-doc-hash">-</dd>
         <dt>Vingerafdruk sleutel ondertekenaar</dt><dd id="ds-proof-fp">-</dd>
         <dt>Versie envelop</dt>   <dd id="ds-proof-version">-</dd>
       </dl>
@@ -876,7 +910,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
          step where it costs something: the file lives in this page and does not
          survive the navigation to the sign-in. sign-flow.js reveals it together
          with turning the button below into the sign-in. -->
-    <p class="ds-hint" id="ds-sign-signin-hint" hidden>Uw document is niet geüpload en blijft in deze browser. Inloggen laadt deze pagina opnieuw, dus daarna kiest u het bestand nog een keer.</p>
+    <p class="ds-hint" id="ds-sign-signin-hint" hidden>Uw document is niet geüpload en blijft in deze browser. Na het inloggen staan het document en de plek weer klaar.</p>
     <div class="ds-actions">
       <button class="btn btn-tertiary" id="ds-sign-back" type="button">Terug</button>
       <button class="btn btn-primary" id="ds-sign-now" type="button">Dit document ondertekenen</button>
@@ -963,7 +997,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
         <summary>Waarom dit veilig was</summary>
         <div class="done-details-body">
           <p>De handtekening is hier gemaakt, op dit apparaat, met een sleutel die de browser nooit verliet en die u op het moment van tekenen ontgrendelde met uw gezicht, uw vingerafdruk of uw beveiligingssleutel (<code>ML-DSA-65</code>, het handtekeningschema uit FIPS 204). Wij bewaren de publieke helft en de vastlegging daarvan. De helft die tekent hebben wij nooit gehad.</p>
-          <p>Het bewijsbestand hoort bij het document en staat op zichzelf. Iedereen kan het tweetal controleren, zonder account en zonder ons: op <a href="/verify">paramant.app/verify</a>, dat de eigen hash van het document opnieuw berekent (<code>SHA3-256</code>), de handtekening toetst aan de publieke sleutel in de envelop en, als de envelop is medeondertekend, onze handtekening toetst aan het openbare <a href="/ct-log">CT-logboek</a>. Of offline, met <code>paramant-sign verify &lt;file&gt; &lt;envelope.psign&gt;</code> uit <a href="/docs#operator-scripts">paramant-sign</a>.</p>
+          <p>Het bewijsbestand hoort bij het document en staat op zichzelf. Iedereen kan het tweetal controleren, zonder account en zonder ons: op <a href="/verify">paramant.app/verify</a>, dat de eigen hash van het document opnieuw berekent (<code>SHA3-256</code>), de handtekening toetst aan de publieke sleutel in de envelop en, bij een bewijs met meerdere ondertekenaars, onze bekrachtiging toetst aan een vaste sleutel van Paramant die in de pagina zit. Dat rekenen gebeurt in uw browser; het document gaat nergens heen. Het script <code>paramant-sign</code> kan dit bewijs niet controleren: het kent alleen de oude enveloppen (v1 en v2) en vraagt daarvoor de relay.</p>
           <p>Een groene uitslag daar betekent drie dingen tegelijk: de bytes zijn niet veranderd sinds u tekende, de handtekening komt van de houder van die sleutel, en <span id="ds-usage-notary-line"></span></p>
 
           <div class="ds-info-card">
@@ -1017,10 +1051,10 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   </div>
 </footer>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
-<script src="/js/quota-upgrade.js?v=7" defer></script>
-<script src="/js/done-state.js?v=1" defer></script>
-<script type="module" src="/sign-flow.js?v=61"></script>
+<script src="/js/quota-upgrade.js?v=8" defer></script>
+<script src="/js/done-state.js?v=2" defer></script>
+<script type="module" src="/sign-flow.js?v=75"></script>
 </body>
 </html>

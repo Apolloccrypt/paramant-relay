@@ -486,10 +486,32 @@ https://paramant.app`;
 }
 
 // ── 5. BILLING CANCELLATION ───────────────────────────────────────────────────
-function billingCancellationEmail({ planName, cancelDate }) {
-  const preheader = `Your ${planName} plan ends on ${cancelDate}.`;
+// Dutch first, English below, like the account mails (bilingualMail). The
+// cancel button sits on the Dutch /account as much as on /en/account, and the
+// mail was English only (fase 1, PLAN-25). `cancelDateNl` is the same day in
+// Dutch; a caller that does not pass it gets the English date in both halves.
+function billingCancellationEmail({ planName, cancelDate, cancelDateNl }) {
+  const dateNl = cancelDateNl || cancelDate;
+  const preheader = `Uw ${planName}-plan stopt op ${dateNl}.`;
 
-  const text = `Hi,
+  const nlText = `Hallo,
+
+We hebben de opzegging van uw Paramant ${planName}-plan ingepland.
+
+Stopt op: ${dateNl}
+
+Tot die datum houdt u ${planName}. Daarna gaat uw account terug naar het
+Community-plan.
+
+Uw API-sleutel blijft werken. Bestanden die u al verstuurd heeft, blijven
+zoals ze zijn. De toegang per sector gaat naar de grenzen van Community.
+
+Bedacht? Beantwoord deze mail voor de einddatum, dan zetten we het terug.
+
+Paramant
+https://paramant.app`;
+
+  const enText = `Hi,
 
 We have scheduled the cancellation of your Paramant ${planName} plan.
 
@@ -506,13 +528,30 @@ Changed your mind? Reply to this email before the end date to reactivate.
 Paramant
 https://paramant.app`;
 
-  const html = htmlShell(preheader, `
+  const box = (label, value) => `
+    <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.1);padding:16px 20px;margin:0 0 24px 0;">
+      <p style="margin:0 0 6px 0;font-family:monospace;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;">${label}</p>
+      <p style="margin:0;font-size:16px;font-weight:500;color:#0B3A6A;">${value}</p>
+    </div>`;
+
+  const nlHtml = `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Opzegging gepland</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">We hebben de opzegging van uw Paramant ${planName}-plan ingepland.</p>
+    ${box('Stopt op', dateNl)}
+    <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
+      <li>Tot die datum houdt u <strong>${planName}</strong></li>
+      <li>Daarna gaat uw account terug naar het <strong>Community</strong>-plan</li>
+      <li>Uw API-sleutel blijft werken</li>
+      <li>Bestanden die u al verstuurd heeft, blijven zoals ze zijn</li>
+      <li>De toegang per sector gaat naar de grenzen van Community</li>
+    </ul>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">Bedacht? Beantwoord deze mail voor de einddatum, dan zetten we het terug.</p>
+  `;
+
+  const enHtml = `
     <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Cancellation scheduled</h1>
     <p style="margin:0 0 20px 0;line-height:1.6;">We have scheduled the cancellation of your Paramant ${planName} plan.</p>
-    <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,0.1);padding:16px 20px;margin:0 0 24px 0;">
-      <p style="margin:0 0 6px 0;font-family:monospace;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;">Ends on</p>
-      <p style="margin:0;font-size:16px;font-weight:500;color:#0B3A6A;">${cancelDate}</p>
-    </div>
+    ${box('Ends on', cancelDate)}
     <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
       <li>You keep <strong>${planName}</strong> access until that date</li>
       <li>After that, your account reverts to the <strong>Community</strong> plan</li>
@@ -521,11 +560,39 @@ https://paramant.app`;
       <li>Sector access adjusts to Community tier limits</li>
     </ul>
     <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">Changed your mind? Reply to this email before the end date to reactivate.</p>
-  `);
+  `;
 
+  return bilingualMail({
+    subject: 'Opzegging van uw Paramant-plan gepland / Your Paramant plan cancellation is scheduled',
+    preheader, nlText, enText, nlHtml, enHtml,
+    refId: 'cancel-' + Date.now(),
+  });
+}
+
+// ── 5b. KEY DISABLED ──────────────────────────────────────────────────────────
+// What disable-key mails. It used to send the cancellation mail above ("your
+// plan ends on ..., your API key continues to work") on the very moment the key
+// stopped working (ADMIN-24). This one says what happened.
+function keyDisabledEmail({ disabledAt }) {
+  const preheader = 'Your Paramant API key has been disabled.';
+  const text = `Hi,
+
+Your Paramant API key was disabled on ${disabledAt}. It no longer works
+on any Paramant relay, as of now.
+
+Files you sent before are not affected. If you did not expect this,
+reply to this email and we will look into it.
+
+Paramant
+https://paramant.app`;
+  const html = htmlShell(preheader, `
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Your API key has been disabled</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Your Paramant API key was disabled on <strong>${disabledAt}</strong>. It no longer works on any Paramant relay, as of now.</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">Files you sent before are not affected. If you did not expect this, reply to this email and we will look into it.</p>
+  `);
   return {
-    ...wrap(text, html, { refId: 'cancel-' + Date.now() }),
-    subject: 'Your Paramant plan cancellation is scheduled',
+    ...wrap(text, html, { refId: 'disabled-' + Date.now() }),
+    subject: 'Your Paramant API key has been disabled',
   };
 }
 
@@ -933,16 +1000,27 @@ ${BASE_URL}`;
 // handled in readable form. The recipient reads the name once the link has
 // opened the document in their own browser.
 //
-// This is why the function takes neither a documentName nor a flag for whether
-// the link carries a key: there is one kind of invitation mail now, and it is
-// the one that can be posted abroad without contradicting the site.
-function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt, subject, message, envelopeId, partyIndex, lang }) {
+// SINCE 2026-10-04: HALF A KEY, NEVER A KEY. A link that only named the request
+// meant the invitee could not see the document without a second link from the
+// sender, and a customer's counterparty then signed blind or gave up. So the
+// sender's browser splits the document key in two: A xor B = K. The mail link
+// carries A ('#ks=v1.<43>'), the relay keeps B next to the ciphertext and
+// releases it only to the invited mailbox after it signs in. The mail provider
+// holds A and no ciphertext; the relay holds B and the ciphertext; neither can
+// open the document, and the site's promise that no US party holds a key
+// stays true. A whole key ('#doc=') is still cut off below, whatever happens
+// upstream.
+function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt, subject, message, envelopeId, partyIndex, lang, asksParaaf }) {
   // The last gate before the mail provider, and the one that holds even when
-  // the two in front of it are wrong. The browser cuts the fragment off before
-  // it posts the invitation, and the invitations endpoint refuses a link that
-  // still has one; this cuts it again. A key arriving here is a bug upstream,
-  // and an outgoing mail is the worst possible place to discover it.
-  const noticeUrl = String(inviteUrl || '').split('#')[0];
+  // the two in front of it are wrong. Only a key SHARE survives; any other
+  // fragment (a whole '#doc=' key above all) is cut off here, again.
+  const [beforeHash, fragment] = String(inviteUrl || '').split('#');
+  const share = /^ks=v1\.[A-Za-z0-9_-]{43}$/.test(fragment || '') ? '#' + fragment : '';
+  const noticeUrl = beforeHash + share;
+  const opensDocument = !!share;
+  // The paraaf is only promised when the sender asked for one: a request field
+  // with all_pages (retest 04-10). Without it the mail names the signature only.
+  const paraaf = !!asksParaaf;
   // Dutch first with the English underneath, because the sender does not know
   // which language the recipient reads. A caller that does know passes
   // lang 'nl' or 'en' and gets that one language only.
@@ -957,8 +1035,10 @@ function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt,
       greeting: recipientLabel ? `Beste ${recipientLabel},` : 'Beste,',
       sender: senderLabel || 'Een Paramant-gebruiker',
       asks: 'heeft u gevraagd een document te bekijken en te ondertekenen.',
-      carries: 'Deze link opent het verzoek. Hij opent het document niet. De sleutel die het document opent staat bewust niet in deze e-mail. Vraag de afzender om de volledige link, of open het bestand als u al een kopie hebt.',
-      open: 'Open het verzoek',
+      carries: opensDocument
+        ? `De link opent het document in uw browser zodra u bent ingelogd. U ziet het document, ${paraaf ? 'zet uw paraaf en handtekening' : 'zet uw handtekening'} en bent klaar. Zonder inloggen opent de link niets.`
+        : 'Deze link opent het verzoek. Hij opent het document niet. De sleutel die het document opent staat bewust niet in deze e-mail. Heeft u een eerdere uitnodigingsmail voor dit verzoek, open dan de link daaruit; die opent het document wel. Anders: vraag de afzender om de link opnieuw te sturen.',
+      open: opensDocument ? 'Open het document' : 'Open het verzoek',
       fromSender: 'Bericht van de afzender:',
       signIn: 'Log in met het e-mailadres waarop u bent uitgenodigd. Stuur de link niet door.',
       closes: `Ondertekenen kan tot ${expiryTs || '7 dagen na het aanmaken'}.`,
@@ -969,8 +1049,10 @@ function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt,
       greeting: recipientLabel ? `Hi ${recipientLabel},` : 'Hi,',
       sender: senderLabel || 'A Paramant user',
       asks: 'has asked you to review and sign a document.',
-      carries: 'This link opens the request. It does not open the document. The key that unlocks it is deliberately not in this email, so ask the sender for their complete link, or open the file if you already have a copy.',
-      open: 'Open the request',
+      carries: opensDocument
+        ? `The link opens the document in your browser once you have signed in. You see the document, ${paraaf ? 'add your initials and signature' : 'add your signature'}, and you are done. Without signing in the link opens nothing.`
+        : 'This link opens the request. It does not open the document. The key that unlocks it is deliberately not in this email. If you have an earlier invitation email for this request, open the link from that one; it opens the document. Otherwise, ask the sender to send you the link again.',
+      open: opensDocument ? 'Open the document' : 'Open the request',
       fromSender: 'Message from the sender:',
       signIn: 'Sign in with this invited email address. Do not forward the link.',
       closes: `Signing closes at ${expiryTs || '7 days after creation'}.`,
@@ -1007,6 +1089,152 @@ ${BASE_URL}`;
   return {
     ...wrap(text, html, { refId: 'sign-' + refIdHash(`${envelopeId}:${partyIndex}`) }),
     subject: safeSubject,
+  };
+}
+
+// To the person who sent a document for signing, when somebody else signs it.
+// A count and a link, nothing else: no file name and no party names, because
+// those would travel to the mail provider for no gain, and the dashboard
+// behind the link shows both to the one person entitled to them. Dutch first
+// with the English underneath, like the invitation: the sender's language is
+// not stored with the envelope.
+//
+// When everyone has signed, the button opens the finished document itself
+// (resultUrl, an opaque one-off reference from lib/sign-notify.js, never the
+// envelope id). Without one it falls back to the dashboard.
+function signatureReceivedEmail({ signedCount, partyCount, complete, envelopeId, resultUrl }) {
+  const n = Math.max(0, parseInt(signedCount, 10) || 0);
+  const m = Math.max(1, parseInt(partyCount, 10) || 1);
+  const safeResult = complete && /^https:\/\/[^\s#]+\/co-sign\?result=[A-Za-z0-9_-]{43}$/.test(String(resultUrl || '')) ? String(resultUrl) : '';
+  const dashUrl = safeResult || `${BASE_URL}/dashboard`;
+  const heeft = n === 1 ? 'heeft' : 'hebben';
+  const has = n === 1 ? 'has' : 'have';
+  const W = {
+    nl: complete ? {
+      heading: 'Iedereen heeft getekend',
+      line: m === 1 ? 'Uw document is ondertekend door de ondertekenaar.' : `Uw document is ondertekend door alle ${m} ondertekenaars.`,
+      next: safeResult
+        ? 'Open het getekende document met alle handtekeningen en download het bewijs. Log in met dit account; de link werkt 30 dagen.'
+        : 'Het getekende document en het bewijs staan bij uw documenten.',
+      pre: 'Uw document is door iedereen ondertekend.',
+      subject: 'Iedereen heeft getekend',
+    } : {
+      heading: 'Er is getekend',
+      line: `${n} van de ${m} ondertekenaars ${heeft} nu getekend.`,
+      next: 'U krijgt weer bericht zodra er opnieuw iemand tekent.',
+      pre: `${n} van de ${m} ondertekenaars ${heeft} getekend.`,
+      subject: `Er is getekend (${n} van ${m})`,
+    },
+    en: complete ? {
+      heading: 'Everyone has signed',
+      line: m === 1 ? 'Your document has been signed by the signer.' : `Your document has been signed by all ${m} signers.`,
+      next: safeResult
+        ? 'Open the signed document with every signature and download the proof. Sign in with this account; the link works for 30 days.'
+        : 'The signed document and its proof are with your documents.',
+      pre: 'Your document has been signed by everyone.',
+      subject: 'Everyone has signed',
+    } : {
+      heading: 'Someone signed',
+      line: `${n} of ${m} signers ${has} now signed.`,
+      next: 'We will let you know again when the next person signs.',
+      pre: `${n} of ${m} signers ${has} signed.`,
+      subject: `Someone signed (${n} of ${m})`,
+    },
+  };
+  const open = safeResult
+    ? { nl: 'Open het getekende document', en: 'Open the signed document' }
+    : { nl: 'Naar mijn documenten', en: 'Go to my documents' };
+  const textBlock = (l) => `${W[l].heading}
+
+${W[l].line}
+${W[l].next}
+
+${open[l]}:
+${dashUrl}`;
+  const text = `${textBlock('nl')}\n\n---\n\n${textBlock('en')}
+
+Paramant
+${BASE_URL}`;
+  const htmlBlock = (l, first) => `
+    <h1 style="margin:${first ? '0' : '32px'} 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">${escHtml(W[l].heading)}</h1>
+    <p style="margin:0 0 16px 0;line-height:1.6;">${escHtml(W[l].line)}</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">${escHtml(W[l].next)}</p>
+    ${btn(dashUrl, escHtml(open[l]))}`;
+  const html = htmlShell(`${W.nl.pre} ${W.en.pre}`,
+    htmlBlock('nl', true) + '\n    <hr style="margin:32px 0 0 0;border:0;border-top:1px solid #E2E8F0;">' + htmlBlock('en', false),
+    'nl');
+  return {
+    ...wrap(text, html, { refId: 'signed-' + refIdHash(`${envelopeId}:${n}`) }),
+    subject: `${W.nl.subject} / ${W.en.subject}`,
+  };
+}
+
+// To an invited party, when the last signature has landed (acceptatie r4,
+// Nieuw 1). The sender's mail carries a result link; this one cannot: the link
+// that opens the document for this party holds half of the document key and
+// was never kept on a server. Their own invitation link opens the finished
+// document, so the mail says to use that. No file name, no names, no
+// envelope id, like every mail in this family.
+function everyoneSignedPartyEmail({ partyCount, envelopeId }) {
+  const m = Number.isInteger(partyCount) && partyCount > 1 ? partyCount : null;
+  const W = {
+    nl: { heading: 'Iedereen heeft getekend', line: m ? `Het document dat u ondertekende, is nu door alle ${m} ondertekenaars getekend.` : 'Het document dat u ondertekende, is nu door iedereen getekend.',
+      next: 'Open de link uit uw uitnodigingsmail en log in met dit e-mailadres: daar downloadt u het complete document met alle handtekeningen en het bewijs.', pre: 'Het document is door iedereen ondertekend.', subject: 'Iedereen heeft getekend' },
+    en: { heading: 'Everyone has signed', line: m ? `The document you signed has now been signed by all ${m} signers.` : 'The document you signed has now been signed by everyone.',
+      next: 'Open the link from your invitation email and sign in with this email address: there you download the complete document with every signature, and the proof.', pre: 'The document has been signed by everyone.', subject: 'Everyone has signed' },
+  };
+  const textBlock = (l) => `${W[l].heading}
+
+${W[l].line}
+${W[l].next}`;
+  const text = `${textBlock('nl')}\n\n---\n\n${textBlock('en')}
+
+Paramant
+${BASE_URL}`;
+  const htmlBlock = (l, first) => `
+    <h1 style="margin:${first ? '0' : '32px'} 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">${escHtml(W[l].heading)}</h1>
+    <p style="margin:0 0 16px 0;line-height:1.6;">${escHtml(W[l].line)}</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">${escHtml(W[l].next)}</p>`;
+  const html = htmlShell(`${W.nl.pre} ${W.en.pre}`,
+    htmlBlock('nl', true) + '\n    <hr style="margin:32px 0 0 0;border:0;border-top:1px solid #E2E8F0;">' + htmlBlock('en', false),
+    'nl');
+  return {
+    ...wrap(text, html, { refId: 'complete-' + refIdHash(`${envelopeId}:party`) }),
+    subject: `${W.nl.subject} / ${W.en.subject}`,
+  };
+}
+
+// To the sender, when an invited party refused to sign. The request is then
+// over for everybody. No names, no file name, no envelope id (the same rule as
+// signatureReceivedEmail); the dashboard shows who.
+function signatureDeclinedEmail({ envelopeId }) {
+  const dashUrl = `${BASE_URL}/dashboard`;
+  const W = {
+    nl: { heading: 'Er is geweigerd', line: 'Een ondertekenaar heeft uw verzoek om te ondertekenen geweigerd. Het verzoek is daarmee gestopt; niemand kan er nog op tekenen.', next: 'In uw documenten ziet u wie. Wilt u het opnieuw proberen, stuur dan een nieuw verzoek.', open: 'Naar mijn documenten', subject: 'Verzoek geweigerd' },
+    en: { heading: 'A signer declined', line: 'A signer declined your signature request. The request has stopped; nobody can sign it any more.', next: 'Your documents show who. To try again, send a new request.', open: 'Go to my documents', subject: 'Request declined' },
+  };
+  const textBlock = (l) => `${W[l].heading}
+
+${W[l].line}
+${W[l].next}
+
+${W[l].open}:
+${dashUrl}`;
+  const text = `${textBlock('nl')}\n\n---\n\n${textBlock('en')}
+
+Paramant
+${BASE_URL}`;
+  const htmlBlock = (l, first) => `
+    <h1 style="margin:${first ? '0' : '32px'} 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">${escHtml(W[l].heading)}</h1>
+    <p style="margin:0 0 16px 0;line-height:1.6;">${escHtml(W[l].line)}</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">${escHtml(W[l].next)}</p>
+    ${btn(dashUrl, escHtml(W[l].open))}`;
+  const html = htmlShell(`${W.nl.line} ${W.en.line}`,
+    htmlBlock('nl', true) + '\n    <hr style="margin:32px 0 0 0;border:0;border-top:1px solid #E2E8F0;">' + htmlBlock('en', false),
+    'nl');
+  return {
+    ...wrap(text, html, { refId: 'declined-' + refIdHash(String(envelopeId)) }),
+    subject: `${W.nl.subject} / ${W.en.subject}`,
   };
 }
 
@@ -1047,9 +1275,13 @@ module.exports = {
   welcomeEmail,
   parasignOnboardingEmail, /*MARK:parasign_export*/
   signingInviteEmail,
+  signatureReceivedEmail,
+  everyoneSignedPartyEmail,
+  signatureDeclinedEmail,
   billingConfirmationEmail,
   productPlanChangeEmail,
   billingCancellationEmail,
+  keyDisabledEmail,
   accountDeletionEmail,
   sendEmail,
   FROM_ADDR,

@@ -1,4 +1,4 @@
-# Self-Hosting Guide — PARAMANT Relay v3.0.0
+# Self-Hosting Guide: PARAMANT Relay v3.1.0
 
 **License:** BUSL-1.1 — source available, free for up to 5 active API keys per relay.
 
@@ -14,16 +14,36 @@ curl -fsSL https://paramant.app/install.sh | bash
 # (falls back to a localhost URL on a headless host)
 ```
 
+The installer clones release tag `v3.1.0` (override with `PARAMANT_VERSION`) and
+writes a `.env` (mode 600) with everything the compose stack needs:
+`ADMIN_TOKEN`, `REDIS_PASSWORD` and `RELAY_REDIS_URL`
+(`redis://:<password>@redis:6379`), `PARAMANT_TOTP_MASTER_KEY` (32 bytes,
+base64), `INTERNAL_AUTH_TOKEN`, `PARASIGN_PUBLIC_ORIGIN` and
+`RELAY_SELF_URL_MAIN/HEALTH/FINANCE/LEGAL/IOT` (all `https://<your domain>`, or
+`http://localhost` without a domain), and your license as `PLK_KEY` when you
+enter one. On a re-run it keeps the existing `REDIS_PASSWORD`,
+`PARAMANT_TOTP_MASTER_KEY` and `INTERNAL_AUTH_TOKEN`: a new TOTP master key
+would make every stored TOTP secret unreadable. An existing install is moved to
+the requested tag (`git fetch` of the tag plus `checkout`); local changes stop
+the installer instead of being overwritten.
+
 **Option 2 — manual Docker setup** (4 steps):
 
 ```bash
 git clone https://github.com/Apolloccrypt/paramant-relay
 cd paramant-relay
 cp .env.example .env
-echo "ADMIN_TOKEN=$(openssl rand -hex 32)" >> .env
+# Fill in the required secrets in .env (see .env.example):
+#   ADMIN_TOKEN               openssl rand -hex 32
+#   REDIS_PASSWORD            openssl rand -hex 32  (empty: redis refuses to start)
+#   RELAY_REDIS_URL           redis://:<REDIS_PASSWORD>@redis:6379
+#   PARAMANT_TOTP_MASTER_KEY  openssl rand -base64 32
+#   INTERNAL_AUTH_TOKEN       openssl rand -hex 32
+#   PARASIGN_PUBLIC_ORIGIN and RELAY_SELF_URL_<SECTOR>: your own public URL
+nano .env
 docker compose up -d
 curl http://localhost:3001/health
-# {"ok":true,"version":"3.0.0","sector":"health","edition":"community"}
+# {"ok":true,"version":"3.1.0","sector":"health","edition":"community"}
 ```
 
 **Option 3 — Raspberry Pi / arm64:**
@@ -42,18 +62,35 @@ No Linux expertise required. BIOS and UEFI supported.
 
 ## First-run setup wizard (new in v3.0.0)
 
-Whichever option you choose, the first boot lands on a web wizard at `/setup` that replaces the hand-run admin scripts (ADR R005). It is gated to a relay with no keys yet — or forced on with `SETUP_MODE=1` — and walks you through:
+Whichever option you choose, the first boot lands on a web wizard at `/setup` that replaces the hand-run admin scripts (ADR R005). It is gated to a relay with no keys yet (or forced on with `SETUP_MODE=true`) and walks you through:
 
-1. **Domain & DNS** — `POST /v2/setup/check` validates the domain, DNS and TLS readiness without writing anything.
+1. **Domain & DNS**: `GET /v2/setup/check` reports whether the relay is in setup mode, and `GET /v2/setup/dns-check?domain=` checks whether your domain resolves. Neither writes anything.
 2. **Deep health**: `GET /v2/health/deep` aggregates nine checks (relay, crypto, storage, memory, disk, tls, users, audit, redis) into one verdict, green, yellow or red. There is no CT-log check, no relay-identity check and no peer-reachability check. This page claimed all three; none of them was ever written.
-3. **Apply** — `POST /v2/setup/apply` generates the admin token, enrolls TOTP and mints your first API key from the browser, ending on an all-systems-go summary.
+3. **Apply**: `POST /v2/setup/apply` mints an enterprise admin key (and optionally a first user key), applies a compliance preset and writes `.env` (backing up an existing one), ending on an all-systems-go summary. This step needs the one-time setup token, see below.
 
 After setup the panel exposes day-to-day operation visually:
 
 - **`/admin/settings`** — change relay configuration from the panel instead of editing `.env` and restarting.
 - **`/admin/cli`** — an in-browser admin terminal for debugging relay state without opening an SSH session.
 
-For a fully self-contained host, set `SERVE_FRONTEND=1` (ADR R011) so the relay serves its own UI and no separate web server is needed.
+For a fully self-contained host, set `SERVE_FRONTEND=true` (ADR R011) so the relay serves its own UI and no separate web server is needed.
+
+### The setup token
+
+Finishing setup (`POST /v2/setup/apply`) is not anonymous: the request
+must carry the one-time setup token in the `X-Setup-Token` header, or your
+`ADMIN_TOKEN` in `X-Admin-Token`. Without either the relay answers
+`401 setup_token_required`.
+
+On first start the relay makes the token (`pst_...`), prints it in its log (log
+line `setup_token`) and writes it to the file `setup-token` next to `users.json`
+(mode 600). A `PARAMANT_SETUP_TOKEN` in the relay's own environment pins it instead (`docker-compose.yml` does not pass that variable on). In the wizard,
+paste it into the **Setup code** field (Dutch: **Installatiecode**). After a
+successful setup the token is deleted and stops working.
+
+```bash
+docker compose logs relay-main | grep setup_token
+```
 
 ---
 
@@ -94,11 +131,18 @@ nano .env
 | `RAM_RESERVE_MB` | No | `256` | RAM reserve before rejecting uploads |
 | `RELAY_MODE` | No | `ghost_pipe` | Endpoint set: `ghost_pipe` or `iot` |
 | `CRYPTO_MODE` | No | `core` | Algorithm set advertised on `/v2/capabilities`. `core` = ML-KEM-768 + ML-DSA-65 (compact default); `extended` opts in to the full algorithm set (ADR R006). |
-| `SERVE_FRONTEND` | No | `0` (off) | Set to `1` to have the relay serve its own UI from a read-only static handler — plug-and-play self-hosting without a separate web server (ADR R011). |
+| `SERVE_FRONTEND` | No | `false` | Set to `true` to have the relay serve its own UI from a read-only static handler: plug-and-play self-hosting without a separate web server (ADR R011). |
 | `SETUP_MODE` | No | auto | Forces the first-run `/setup` wizard on even when keys already exist. Normally the wizard auto-gates to a relay with no keys yet (ADR R005). |
 | `USERS_FILE` | No | `./users.json` | Path to API key store |
 | `CT_LOG_FILE` | No | `/data/ct-log.json` | Path to CT log persistence file (health relay only) |
-| `PARAMANT_LICENSE` | No | — | Relay license key (`plk_...`) — unlocks unlimited users |
+| `REDIS_PASSWORD` | **Yes** | - | Password for the redis container (`--requirepass`). Empty, redis refuses to start. Generate: `openssl rand -hex 32` |
+| `RELAY_REDIS_URL` | **Yes** | - | `redis://:<REDIS_PASSWORD>@redis:6379`; passed to the relays as `REDIS_URL` |
+| `PARAMANT_TOTP_MASTER_KEY` | **Yes** | - | Encrypts users' TOTP secrets at rest. 32 bytes, base64: `openssl rand -base64 32`. Never change it on a running install |
+| `INTERNAL_AUTH_TOKEN` | **Yes** | - | Second gate on the relays' internal routes (admin plane to relay). Generate: `openssl rand -hex 32` |
+| `PARASIGN_PUBLIC_ORIGIN` | No | - | Your own public site; checkout returns here. Without it a self-host returns to paramant.app |
+| `RELAY_SELF_URL_MAIN` / `_HEALTH` / `_FINANCE` / `_LEGAL` / `_IOT` | No | `https://<sector>.paramant.app` | Mapped by `docker-compose.yml` to `RELAY_SELF_URL` of each relay. Without it, signed tree heads and receipts name a paramant.app host; the relay warns at boot (`relay_self_url_unset`) |
+| `PLK_KEY` | No | - | Relay license key (`plk_...`), unlocks unlimited users. The older name `PARAMANT_LICENSE` is still read; `PLK_KEY` wins when both are set |
+| `PARAMANT_SETUP_TOKEN` | No | generated | Pins the one-time setup token for `/v2/setup/apply` instead of a generated one. Read from the relay's environment; `docker-compose.yml` does not pass it on |
 | `RESEND_API_KEY` | No | — | For welcome emails when adding users |
 | `RELAY_SELF_URL` | No | — | This relay's public URL (e.g. `https://relay.yourdomain.com`). Required for relay registry self-registration. |
 | `RELAY_PRIMARY_URL` | No | self | URL of the registry relay to POST registrations to (e.g. `https://health.yourdomain.com`). Defaults to posting to self. |
@@ -151,12 +195,12 @@ All five relay containers run the **same image** (`build: ./relay`). The `SECTOR
 # On the host, with ADMIN_TOKEN exported
 export $(grep -v '^#' .env | xargs)
 
-python3 scripts/paramant-admin.py add \
+python3 deploy/paramant-admin.py add \
   --label "alice" \
   --plan pro \
   --email alice@example.com
 
-python3 scripts/paramant-admin.py sync
+python3 deploy/paramant-admin.py sync
 # ✓ health: 3 keys loaded (zero downtime)
 # ✓ legal: 3 keys loaded
 # ✓ finance: 3 keys loaded
@@ -166,14 +210,14 @@ python3 scripts/paramant-admin.py sync
 ### List all keys
 
 ```bash
-python3 scripts/paramant-admin.py list
+python3 deploy/paramant-admin.py list
 ```
 
 ### Revoke a key
 
 ```bash
-python3 scripts/paramant-admin.py revoke --key pgp_xxxxx
-python3 scripts/paramant-admin.py sync
+python3 deploy/paramant-admin.py revoke --key pgp_xxxxx
+python3 deploy/paramant-admin.py sync
 ```
 
 ### Plans
@@ -221,8 +265,12 @@ curl -s -H "X-Admin-Token: $ADMIN_TOKEN" https://your-domain/health \
 To unlock unlimited users, add a relay license key to `.env`:
 
 ```bash
-PARAMANT_LICENSE=plk_your_relay_license_key
+PLK_KEY=plk_your_relay_license_key
 ```
+
+`docker-compose.yml` passes `PLK_KEY` to the relays. The older name
+`PARAMANT_LICENSE` is still read when set inside the relay's environment, but the
+compose file does not pass it on, so use `PLK_KEY`.
 
 After adding, restart the relay — logs will show `edition: licensed`.
 
@@ -240,7 +288,7 @@ paramant status          # show all relay health
 paramant logs health     # tail logs for health relay
 paramant logs legal      # tail logs for legal relay
 paramant reload          # zero-downtime key reload
-paramant upgrade         # pull latest and restart
+paramant upgrade         # fetch the newest v* release tag (or $PARAMANT_VERSION), rebuild, restart
 paramant start           # docker compose up -d
 paramant stop            # docker compose down
 paramant restart         # restart all containers
@@ -352,11 +400,17 @@ relay/relay.js ──(build: ./relay)──► relay-main    (SECTOR=relay)
 
 ## Upgrade
 
-The Docker image is built from the `relay/` subdirectory in your clone. After pulling new code you must rebuild the images before restarting:
+With the installer: `paramant upgrade` fetches the newest `v*` release tag (or
+the tag in `PARAMANT_VERSION`), checks it out, rebuilds and restarts. The install
+is a `--depth 1` clone of one tag, so `git pull` does not move it; local changes
+stop the upgrade and nothing is changed.
+
+By hand: the Docker image is built from the `relay/` subdirectory in your clone. Check out the new release tag, then rebuild the images before restarting:
 
 ```bash
 cd /path/to/paramant-relay   # wherever you cloned the repo
-git pull
+git fetch --depth 1 origin tag v3.1.0
+git checkout v3.1.0
 
 # Build new images (node_modules cached; only relay.js layer is rebuilt)
 docker compose build relay-main relay-health relay-finance relay-legal relay-iot
@@ -522,7 +576,7 @@ Expected output (one entry per registered relay):
     {
       "url": "https://relay.yourdomain.com",
       "sector": "relay",
-      "version": "3.0.0",
+      "version": "3.1.0",
       "edition": "community",
       "pk_hash": "3d9b960c...",
       "verified_since": "2026-04-11T02:14:13Z",
@@ -603,13 +657,13 @@ After deploying, create your first API key:
 export $(grep -v '^#' .env | xargs)
 
 # Create an enterprise key for yourself (admin)
-python3 scripts/paramant-admin.py add \
+python3 deploy/paramant-admin.py add \
   --label "admin" \
   --plan enterprise \
   --email you@example.com
 
 # Reload all relays
-python3 scripts/paramant-admin.py sync
+python3 deploy/paramant-admin.py sync
 
 # Your key is shown in the output — save it immediately
 # pgp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

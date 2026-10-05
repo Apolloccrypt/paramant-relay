@@ -193,14 +193,14 @@
 
   <ul class="nav-links">
     <li><a href="/en#products" class="nav-link">Product</a></li>
-    <li><a href="/gereedschap" class="nav-link">Tools</a></li>
+    <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
     <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
-    <a href="/help" class="nav-help">Help</a>
+    <a href="/en/help" class="nav-help">Help</a>
     <a href="/en/auth/login" class="nav-signin">Sign in</a>
     <a href="/en/signup" class="nav-cta">Create account</a>
   </div>
@@ -214,14 +214,14 @@
 </nav>
 <div class="nav-mobile" id="nav-mobile">
   <a href="/en#products" class="nav-mobile-standalone">Product</a>
-  <a href="/gereedschap" class="nav-mobile-standalone">Tools</a>
+  <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
   <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
-  <a href="/help" class="nav-tail-link">Help</a>
+  <a href="/en/help" class="nav-tail-link">Help</a>
   <span class="nav-prefs"><span class="nav-lang" role="group" aria-label="Taal / Language"><a href="/parasend" hreflang="nl" lang="nl">NL</a><span class="nav-lang-sep" aria-hidden="true">|</span><a href="/en/parasend" hreflang="en" lang="en" aria-current="true">EN</a></span><button type="button" class="nav-theme" data-theme-toggle aria-label="Theme" aria-pressed="false" title="Light or dark"><span class="nav-theme-opt nav-theme-light"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.2v1.5M8 13.3v1.5M1.2 8h1.5M13.3 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="nav-theme-sep" aria-hidden="true">|</span><span class="nav-theme-opt nav-theme-dark"><svg class="nav-theme-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M13.6 9.9A5.8 5.8 0 0 1 6.1 2.4a5.8 5.8 0 1 0 7.5 7.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></button></span>
 </div>
 <main>
@@ -245,8 +245,8 @@
          above the button, in the words the reviewer would have wanted. -->
     <p class="ps-live">In the web app you send a link that the other person opens when it suits them, to one person or, with Firm, to several people at once. With Extra safe you and the receiver are both online and compare a short code, and the file is handed over live. You can also send with the API or the SDK.</p>
     <div class="ps-actions">
-      <a href="/parashare" class="btn btn-primary">Send a file &rarr;</a>
-      <a href="/pricing" class="btn btn-secondary">See pricing &rarr;</a>
+      <a href="/en/parashare" class="btn btn-primary">Send a file &rarr;</a>
+      <a href="/en/pricing" class="btn btn-secondary">See pricing &rarr;</a>
     </div>
     <p class="ps-sub">Free on the Community plan, forever: 50 transfers a month, 500 MB a file handed over live, 5 MB by one-time link, links that last an hour, and a web app link gone after one read.</p>
     <p class="ps-note">Sending needs a free account. Receiving does not: the person you send to opens the link, gets the file, and the copy is wiped after its last read. Keep your own copy, because a file that is gone cannot be fetched again.</p>
@@ -262,7 +262,7 @@
     <h2 style="margin-top:var(--space-2)">Free for everyone. Paid for organisations.</h2>
     <p><strong>The Community plan is free, forever.</strong> It is not a trial and not a funnel. Businesses pay for the higher limits (longer links, more reads through the API, more devices, a dedicated relay), not to unlock features, and that is what keeps the Community plan free. More reads is not a weaker promise: it is one link a whole team can open, or a counterparty reopening it after a misclick, instead of you sending the file a second time.</p>
     <p><strong>Every plan gets the same encryption, the same post-quantum signatures and the same public proof log. Pay for volume, never for security. And pay per organisation, not per user.</strong></p>
-    <p class="ps-sub">The plans and what each one costs are <a href="#plans">further down this page</a>. Checkout and the full comparison are on the <a href="/pricing">pricing page</a>.</p>
+    <p class="ps-sub">The plans and what each one costs are <a href="#plans">further down this page</a>. Checkout and the full comparison are on the <a href="/en/pricing">pricing page</a>.</p>
   </div>
 </section>
 
@@ -271,11 +271,11 @@
   <div class="container-md">
     <span class="mono-eyebrow">02 / What it does</span>
     <h2 style="margin-top:var(--space-2)">Encrypted on your device, deleted after its last read</h2>
-    <p>ParaSend is the transfer half of Paramant. It runs on the same post-quantum encryption as ParaSign (protection built to hold against future quantum computers). Your file is encrypted before it leaves your device, so our servers hold nothing they could hand over or lose.</p>
+    <p>ParaSend is the transfer half of Paramant. It runs on the same servers as ParaSign. Your file is encrypted before it leaves your device: with AES-256-GCM for a one-time link or a send to named recipients, and for Together with ML-KEM-768 plus ECDH P-256 to the receiver's key. So our servers keep no readable file they could hand over or lose.</p>
     <div class="check-grid">
       <div class="check-card">
         <div class="k">Locked before it leaves you</div>
-        <p>Your browser locks the file on your own device. Our servers only ever hold the locked version, never the file itself and never the key that opens it.</p>
+        <p>Your browser locks the file on your own device. Our servers only ever hold the locked version, never the file itself. With a one-time link they never get the key either. With a send to named recipients the key travels wrapped, and the token that unwraps it passes through the relay once so it can be emailed: that route is therefore not zero-knowledge.</p>
       </div>
       <div class="check-card">
         <div class="k">Gone after its last read</div>
@@ -291,7 +291,7 @@
       </div>
       <div class="check-card">
         <div class="k">Lock a file for yourself</div>
-        <p>No recipient, no account: <a href="/vault">lock a file</a> into a .prmnt container with a passphrase. The file and the passphrase never leave your browser.</p>
+        <p>No recipient, no account: <a href="/en/vault">lock a file</a> into a .prmnt container with a passphrase. The file and the passphrase never leave your browser.</p>
       </div>
       <div class="check-card">
         <div class="k">Your own server, if you need one</div>
@@ -308,8 +308,8 @@
     <h2 style="margin-top:var(--space-2)">Three steps to a file that disappears</h2>
     <p>Sending needs a Paramant account. Receiving needs nothing at all.</p>
     <ol class="ps-steps">
-      <li><strong><a href="/signup">Create a free account</a>.</strong> No card, no time limit. On the Community plan a link lasts 1 hour, and the web app deletes the file after the first read.</li>
-      <li><strong><a href="/parashare">Open the ParaSend web app</a> and pick your file.</strong> It is encrypted in your browser before anything is uploaded. Our servers receive only an unreadable copy, and they keep it in memory only.</li>
+      <li><strong><a href="/en/signup">Create a free account</a>.</strong> No card, no time limit. On the Community plan a link lasts 1 hour, and the web app deletes the file after the first read.</li>
+      <li><strong><a href="/en/parashare">Open the ParaSend web app</a> and pick your file.</strong> It is encrypted in your browser before anything is uploaded. Our servers receive only an unreadable copy, and they keep it in memory only.</li>
       <li><strong>Share the link.</strong> The recipient opens it and the file is wiped after its last read. On the Community plan the link expires after an hour whether it is opened or not.</li>
     </ol>
   </div>
@@ -323,7 +323,7 @@
     <div class="person-card">
       <p>Paramant is a product of <strong>Paramantis Solutions B.V.</strong> in Harderwijk, the Netherlands. The product is built on choices you can check for yourself: post-quantum signatures, a public transparency log, offline-verifiable documents, and source code you can read.</p>
       <p>The Community plan is free and stays free; the business plans pay for the servers and keep it that way. Paramantis Solutions B.V. is the contracting and responsible party.</p>
-      <p><a href="/about">More about Paramant &rarr;</a></p>
+      <p><a href="/en/about">More about Paramant &rarr;</a></p>
     </div>
   </div>
 </section>
@@ -391,7 +391,7 @@
     </div>
     <p class="ps-fine">What the hourly figure counts: fetching a transfer back yourself with your own API key, the route the SDKs and scripts use. A recipient who opens the link you sent goes through the download token instead, and that path is not counted against your hour. Past the ceiling the relay answers 429 until the hour rolls over. The number is outbound_per_hour in relay/lib/tiers.js, the same table the transfer, file size and link limits above come from.</p>
     <p class="ps-fine">Every tier stores transfers in RAM and every tier uses the same cryptography. There is no lesser encryption at lower tiers. Cryptography is not a paywalled feature at Paramant.</p>
-    <p class="ps-fine">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Firm &euro;35.09/mo or &euro;350.90/yr. Checkout and the full comparison are on the <a href="/pricing">pricing page</a>.</p>
+    <p class="ps-fine">Prices shown excl. btw (VAT). Checkout charges incl. 21% btw: Firm &euro;35.09/mo or &euro;350.90/yr. Checkout and the full comparison are on the <a href="/en/pricing">pricing page</a>.</p>
   </div>
 </section>
 
@@ -404,19 +404,19 @@
     <div class="check-grid">
       <div class="check-card">
         <div class="k">We never had it</div>
-        <p>AES-256-GCM with a key your browser generates. The relay only ever holds ciphertext, never the plaintext and never the key, and it holds it in RAM until its last read burns it. A web app transfer is stored in blocks of a fixed 5 MB, so a block says nothing about the size of the file. The retention row is on the <a href="/security">security page</a>.</p>
+        <p>AES-256-GCM with a key your browser generates. The relay only ever holds ciphertext, never the plaintext. With a one-time link it never holds the key either. With a send to named recipients the relay sees the token that unwraps the key once, when it emails it in the invitation, and keeps only a hash of it afterwards. The relay holds the data in RAM until its last read burns it. The relay does see roughly how large it is: a one-time link is not padded to a fixed size. The retention row is on the <a href="/en/security">security page</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">The wire format, in full</div>
-        <p>The ParaSend web app uses ML-KEM-768 plus ECDH P-256 hybrid key exchange. The register lists the webapp on the pre-v1 hybrid wire, signature n/a, migrating to v1; ML-DSA-65 signed receipts are live on the v1 wire in sdk-py 3.0.0 and sdk-js 3.0.0. Read the register on the <a href="/crypto-agility">crypto agility page</a>.</p>
+        <p>The ParaSend web app uses ML-KEM-768 plus ECDH P-256 hybrid key exchange. The register lists the webapp on the pre-v1 hybrid wire, signature n/a, migrating to v1; ML-DSA-65 signed receipts are live on the v1 wire in sdk-py 3.0.0 and sdk-js 3.0.0. Read the register on the <a href="/en/crypto-agility">crypto agility page</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">You own your keys</div>
-        <p>Generated on your device, never sent. We see only the public half. Read <a href="/rules">our rules</a>.</p>
+        <p>Generated on your device, never sent. We see only the public half. Read <a href="/en/rules">our rules</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">EU soil, EU law</div>
-        <p>Hetzner Germany, Bunny DNS (Slovenia). No US provider in the data path. Email (only the email address and the invite link, never the document or a key) still goes through Resend Inc. in the United States for now, as our <a href="/privacy">privacy policy</a> sets out. That is the one exception in the chain; we are moving to a Dutch provider. No US provider touches a file or a key. The subprocessors are listed there, and rule 5 states the same claim in full on <a href="/rules">our rules page</a>.</p>
+        <p>Hetzner Germany, Bunny DNS (Slovenia). The encrypted files sit only on our servers in the EU. Email still goes through Resend in the United States for now, as our <a href="/en/privacy">privacy policy</a> sets out; we are moving to a Dutch provider. For a send to named recipients that email carries the link with the token, and the pickup code is emailed too: whoever reads both can open the file. If you do not want that, send a one-time link, which we do not email. The subprocessors are listed there, and rule 5 states the same claim in full on <a href="/en/rules">our rules page</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">No third-party requests</div>
@@ -424,11 +424,11 @@
       </div>
       <div class="check-card">
         <div class="k">Quantum-ready by default</div>
-        <p>FIPS 203/204 today, not &ldquo;soon&rdquo;. The algorithm register is on the <a href="/crypto-agility">crypto agility page</a>.</p>
+        <p>FIPS 203/204 today, not &ldquo;soon&rdquo;. The algorithm register is on the <a href="/en/crypto-agility">crypto agility page</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">Dedicated relays, on the same rules</div>
-        <p>Enterprise customers run a dedicated relay on our infrastructure or their own, with limits configured per tenant within its RAM budget. The tiers are on the <a href="/pricing">pricing page</a>.</p>
+        <p>Enterprise customers run a dedicated relay on our infrastructure or their own, with limits configured per tenant within its RAM budget. The tiers are on the <a href="/en/pricing">pricing page</a>.</p>
       </div>
       <div class="check-card">
         <div class="k">Source-available code</div>
@@ -440,8 +440,8 @@
       <p><strong>What burn-on-read costs you.</strong> A file is wiped after its last read, or on expiry, whichever comes first. There is no disk storage, so a file that is gone cannot be fetched again. Keep your own copy.</p>
     </div>
     <div class="ps-actions">
-      <a href="/parashare" class="btn btn-primary">Send a file &rarr;</a>
-      <a href="/pricing" class="btn btn-secondary">See pricing &rarr;</a>
+      <a href="/en/parashare" class="btn btn-primary">Send a file &rarr;</a>
+      <a href="/en/pricing" class="btn btn-secondary">See pricing &rarr;</a>
     </div>
   </div>
 </section>
@@ -451,7 +451,7 @@
   <div class="container-md">
     <span class="mono-eyebrow">07 / Developers</span>
     <h2 style="margin-top:var(--space-2)">Send from your own code</h2>
-    <p class="dev-line">There is an open SDK in JavaScript and Python and a self-host installer. Read the <a href="/docs">documentation</a>, or run the relay yourself from <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a>.</p>
+    <p class="dev-line">There is an open SDK in JavaScript and Python and a self-host installer. Read the <a href="/en/docs">documentation</a>, or run the relay yourself from <a href="https://github.com/Apolloccrypt/paramant-relay" target="_blank" rel="noopener">GitHub</a>.</p>
   </div>
 </section>
 
@@ -488,6 +488,6 @@
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 </body>
 </html>

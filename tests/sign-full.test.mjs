@@ -78,7 +78,7 @@ CRED_ID = await page.evaluate(async () => {
 });
 
 const phase1 = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=18');
+  const m = await import('/js/parasign-signer.js?v=22');
   const pqc = await import('/vendor/paramant-pqc.js');
   const vault = await import('/vendor/vault.js?v=5');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
@@ -125,7 +125,7 @@ const phase1 = await page.evaluate(async () => {
 
 // Phase 2a: ensureSigningKey branching + ephemeral TOTP enrol (admin stubbed ok).
 const phase2a = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=18');
+  const m = await import('/js/parasign-signer.js?v=22');
   const pqc = await import('/vendor/paramant-pqc.js');
   const vault = await import('/vendor/vault.js?v=5');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
@@ -151,14 +151,14 @@ const phase2a = await page.evaluate(async () => {
 // Phase 2b: TOTP enrol error mapping (admin stub returns relay 403s).
 totpResp = { status: 403, body: { error: 'invalid_totp' } };
 const phase2b1 = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=18');
+  const m = await import('/js/parasign-signer.js?v=22');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   let c=''; try { await m.enrolEphemeralSigningKeyWithTotp({ totp:'654321' }); } catch(e){ c=e.code; } ok('J1 relay 403 invalid_totp -> totp_invalid', c==='totp_invalid', c);
   return T;
 });
 totpResp = { status: 403, body: { error: 'no_totp_setup' } };
 const phase2b2 = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=18');
+  const m = await import('/js/parasign-signer.js?v=22');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   let c=''; try { await m.enrolEphemeralSigningKeyWithTotp({ totp:'654321' }); } catch(e){ c=e.code; } ok('J2 relay 403 no_totp_setup -> totp_unavailable', c==='totp_unavailable', c);
   return T;
@@ -168,7 +168,7 @@ totpResp = { status: 200, body: { ok: true } };
 // Phase 2c: server 409 no_passkey path.
 noPasskeyMode = true;
 const phase2c = await page.evaluate(async () => {
-  const m = await import('/js/parasign-signer.js?v=18');
+  const m = await import('/js/parasign-signer.js?v=22');
   const T = []; const ok = (name, cond, detail='') => T.push({ name, pass: !!cond, detail: String(detail) });
   const delDB = () => new Promise(r => { const q = indexedDB.deleteDatabase('paramant'); q.onsuccess=q.onerror=q.onblocked=()=>r(); });
   await delDB();
@@ -425,7 +425,7 @@ await browser.close();
 await new Promise(r => server.close(r));
 
 const all = [...phase1, ...phase2a, ...phase2b1, ...phase2b2, ...phase2c, ...phase3,
-  { name: 'P4 separate sheet appends a referenced page and shows its preview', pass: phase4.continued && phase4.pages === 2 && phase4.text.includes('ParaSign-handtekeningblad') && phase4.text.includes('ParaSign signature sheet') && phase4.text.includes('sheet-source.pdf') && phase4.text.includes('SHA3-256 bron') && phase4.text.includes('Source SHA3-256') && phase4.text.includes('Controleer de getekende pdf samen met het bijbehorende .psign-bestand.') && phase4.text.includes('Verify the signed PDF together with its .psign file.') && phase4.sheetPreview, detail: JSON.stringify(phase4) },
+  { name: 'P4 separate sheet appends a referenced page and shows its preview', pass: phase4.continued && phase4.pages === 2 && phase4.text.includes('ParaSign-handtekeningblad') && phase4.text.includes('ParaSign signature sheet') && phase4.text.includes('sheet-source.pdf') && phase4.text.includes('SHA3-256 bron') && phase4.text.includes('Source SHA3-256') && phase4.text.includes('Controleer met de pdf zoals die uit deze ondertekening kwam, samen met het bijbehorende .psign-bestand.') && phase4.text.includes('Verify with the PDF as it came out of this signing, together with its .psign file.') && phase4.sheetPreview, detail: JSON.stringify(phase4) },
   { name: 'P5 inline seal plus separate sheet renders both outputs', pass: phase4.bothPreview && phase4.bothPages === 2 && phase4.bothPage1.includes('Demo signer') && phase4.bothPage2.includes('ParaSign-handtekeningblad') && phase4.bothPage2.includes('ParaSign signature sheet'), detail: JSON.stringify(phase4) },
   { name: 'P6 stamp drag follows the pointer before release through a transform', pass: stampDrag.transformX > 50 && stampDrag.transformY > 20 && /translate3d/.test(stampDrag.transform), detail: JSON.stringify(stampDrag) },
   { name: 'P7 stamp delete and resize controls are visible and keyboard reachable', pass: stampControls.deleteVisible.width >= 28 && stampControls.deleteVisible.height >= 28 && stampControls.resizeVisible.width >= 28 && stampControls.resizeVisible.height >= 28 && stampControls.resizeTag === 'BUTTON' && /pijltjestoetsen/i.test(stampControls.resizeLabel) && stampControls.keyboardResized, detail: JSON.stringify(stampControls) },

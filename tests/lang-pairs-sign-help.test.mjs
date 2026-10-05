@@ -62,7 +62,7 @@ test('the Dutch pages read Dutch and the English copies keep the English text', 
   ];
   for (const [file, phrase] of says) assert.ok(read(file).includes(phrase), `${file} must say "${phrase}"`);
   // The English copy logs in and comes back to itself, not to the Dutch page.
-  assert.match(read('frontend/en/sign.html'), /href="\/auth\/login\?next=\/en\/sign"/);
+  assert.match(read('frontend/en/sign.html'), /href="\/en\/auth\/login\?next=\/en\/sign"/);
 });
 
 // Every L( call, its two string literals, parsed the way the browser would read
@@ -103,8 +103,13 @@ test('the signature sheet in the PDF is bilingual and the seal keeps its fixed t
   for (const pair of [
     ["'ParaSign-handtekeningblad'", "'ParaSign signature sheet'"],
     ["'Bronbestand', 'Source file'", "'Ondertekend op', 'Signed at'"],
-    ["'Controleer de getekende pdf samen met het bijbehorende .psign-bestand.", "'Verify the signed PDF together with its .psign file."],
+    ["'Controleer met de pdf zoals die uit deze ondertekening kwam, samen met het bijbehorende .psign-bestand.", "'Verify with the PDF as it came out of this signing, together with its .psign file."],
   ]) for (const s of pair) assert.ok(sf.includes(s), `sign-flow.js must draw ${s} on the sheet`);
   assert.equal((sf.match(/'POST-QUANTUM SIGNED'/g) || []).length, 2, 'the seal badge is one fixed text in both languages');
-  assert.match(read('frontend/co-sign.js'), /page\.drawText\('PARAMANT SIGNED'/, 'the co-sign seal is one fixed text in both languages');
+  // Since 2026-10-04 the co-sign mark is the signer's own handwriting with a
+  // caption; the one fixed text left under it is the product name, the same in
+  // both languages. The English-only frame text is gone.
+  const cs = read('frontend/co-sign.js');
+  assert.match(cs, /const proof = 'Paramant ParaSign'/, 'the co-sign caption is one fixed text in both languages');
+  assert.doesNotMatch(cs, /PARAMANT SIGNED/, 'no English-only frame text in a Dutch document');
 });

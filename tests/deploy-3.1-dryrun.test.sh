@@ -2442,10 +2442,13 @@ fi
 # Every zone is per client IP. /help/iot-integration says so in those words and
 # tests/site-claims.test.mjs holds it there, so a key change here would make
 # the site lie.
+# No exception: user_session was keyed on the session cookie for a while, and
+# a cookie is the client's choice (review #555, H1).
 if [ -n "$SNIP_DEF" ] \
    && [ "$(grep -cE '^[[:space:]]*limit_req_zone[[:space:]]+\$binary_remote_addr' "$SNIPPET")" \
-      = "$(grep -cE '^[[:space:]]*limit_req_zone' "$SNIPPET")" ]; then
-  pass "every zone in the snippet is keyed on \$binary_remote_addr, so the limits stay per IP"
+      = "$(grep -cE '^[[:space:]]*limit_req_zone' "$SNIPPET" | awk '{print $1}')" ] \
+   && ! grep -vE '^[[:space:]]*#' "$SNIPPET" | grep -q '\$cookie_'; then
+  pass "every zone in the snippet is keyed per IP, none on a cookie"
 else
   fail "a zone in the snippet is keyed on something other than \$binary_remote_addr"
 fi

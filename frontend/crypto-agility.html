@@ -334,8 +334,8 @@ FLAGS    1 byte    gereserveerd voor latere functies</pre>
 
   <!-- ── 04 What is loaded today ── -->
   <section>
-    <h2><span class="s-num">04</span>Wat er vandaag geladen is</h2>
-    <p class="section-sub">3 KEMs en 17 signature-algoritmen, samen FIPS 203, 204, 205 en 206.</p>
+    <h2><span class="s-num">04</span>Wat er ondersteund wordt, en wat er geladen is</h2>
+    <p class="section-sub">3 KEMs en 17 signature-algoritmen in de code, samen FIPS 203, 204, 205 en 206. Onze relays draaien de standaardmodus core, die er twee laadt: ML-KEM-768 en ML-DSA-65.</p>
 
     <h3 style="font-size:13px;font-weight:600;margin-top:26px;margin-bottom:6px;color:var(--ink)">KEM-register (FIPS 203, ML-KEM)</h3>
     <table class="algo-table">
@@ -343,9 +343,9 @@ FLAGS    1 byte    gereserveerd voor latere functies</pre>
         <tr><th>ID</th><th>Algoritme</th><th>NIST-categorie</th><th>Status</th></tr>
       </thead>
       <tbody>
-        <tr><td>0x0001</td><td>ML-KEM-512</td><td>1</td><td class="safe">geladen</td></tr>
-        <tr><td>0x0002</td><td>ML-KEM-768</td><td>3</td><td class="safe">geladen (standaard)</td></tr>
-        <tr><td>0x0003</td><td>ML-KEM-1024</td><td>5</td><td class="safe">geladen</td></tr>
+        <tr><td>0x0001</td><td>ML-KEM-512</td><td>1</td><td>alleen in modus extended</td></tr>
+        <tr><td>0x0002</td><td>ML-KEM-768</td><td>3</td><td class="safe">geladen (standaard, core)</td></tr>
+        <tr><td>0x0003</td><td>ML-KEM-1024</td><td>5</td><td>alleen in modus extended</td></tr>
       </tbody>
     </table>
 
@@ -356,9 +356,9 @@ FLAGS    1 byte    gereserveerd voor latere functies</pre>
       </thead>
       <tbody>
         <tr><td>0x0000</td><td>none</td><td>anoniem</td><td class="safe">geldig (geen handtekening)</td></tr>
-        <tr><td>0x0001</td><td>ML-DSA-44</td><td>cat 2</td><td class="safe">geladen</td></tr>
-        <tr><td>0x0002</td><td>ML-DSA-65</td><td>cat 3</td><td class="safe">geladen (standaard)</td></tr>
-        <tr><td>0x0003</td><td>ML-DSA-87</td><td>cat 5</td><td class="safe">geladen</td></tr>
+        <tr><td>0x0001</td><td>ML-DSA-44</td><td>cat 2</td><td>alleen in modus extended</td></tr>
+        <tr><td>0x0002</td><td>ML-DSA-65</td><td>cat 3</td><td class="safe">geladen (standaard, core)</td></tr>
+        <tr><td>0x0003</td><td>ML-DSA-87</td><td>cat 5</td><td>alleen in modus extended</td></tr>
       </tbody>
     </table>
 
@@ -368,8 +368,8 @@ FLAGS    1 byte    gereserveerd voor latere functies</pre>
         <tr><th>ID</th><th>Algoritme</th><th>NIST-categorie</th><th>Status</th></tr>
       </thead>
       <tbody>
-        <tr><td>0x0100</td><td>Falcon-512</td><td>cat 1</td><td class="safe">geladen (compact, snel)</td></tr>
-        <tr><td>0x0101</td><td>Falcon-1024</td><td>cat 5</td><td class="safe">geladen (compact, snel)</td></tr>
+        <tr><td>0x0100</td><td>Falcon-512</td><td>cat 1</td><td>alleen in modus extended (compact, snel)</td></tr>
+        <tr><td>0x0101</td><td>Falcon-1024</td><td>cat 5</td><td>alleen in modus extended (compact, snel)</td></tr>
       </tbody>
     </table>
 
@@ -379,18 +379,18 @@ FLAGS    1 byte    gereserveerd voor latere functies</pre>
         <tr><th>ID</th><th>Algoritme</th><th>NIST-categorie</th><th>Status</th></tr>
       </thead>
       <tbody>
-        <tr><td>0x0200</td><td>SLH-DSA-SHA2-128s</td><td>cat 1</td><td class="safe">geladen · traag ondertekenen</td></tr>
-        <tr><td>0x0201</td><td>SLH-DSA-SHA2-128f</td><td>cat 1</td><td class="safe">geladen</td></tr>
-        <tr><td>0x0202</td><td>SLH-DSA-SHA2-192s</td><td>cat 3</td><td class="safe">geladen · traag ondertekenen</td></tr>
-        <tr><td>0x0203</td><td>SLH-DSA-SHA2-192f</td><td>cat 3</td><td class="safe">geladen</td></tr>
-        <tr><td>0x0204</td><td>SLH-DSA-SHA2-256s</td><td>cat 5</td><td class="safe">geladen · traag ondertekenen</td></tr>
-        <tr><td>0x0205</td><td>SLH-DSA-SHA2-256f</td><td>cat 5</td><td class="safe">geladen</td></tr>
-        <tr><td>0x0206</td><td>SLH-DSA-SHAKE-128s</td><td>cat 1</td><td class="safe">geladen · traag ondertekenen</td></tr>
-        <tr><td>0x0207</td><td>SLH-DSA-SHAKE-128f</td><td>cat 1</td><td class="safe">geladen</td></tr>
-        <tr><td>0x0208</td><td>SLH-DSA-SHAKE-192s</td><td>cat 3</td><td class="safe">geladen · traag ondertekenen</td></tr>
-        <tr><td>0x0209</td><td>SLH-DSA-SHAKE-192f</td><td>cat 3</td><td class="safe">geladen</td></tr>
-        <tr><td>0x020A</td><td>SLH-DSA-SHAKE-256s</td><td>cat 5</td><td class="safe">geladen · traag ondertekenen</td></tr>
-        <tr><td>0x020B</td><td>SLH-DSA-SHAKE-256f</td><td>cat 5</td><td class="safe">geladen</td></tr>
+        <tr><td>0x0200</td><td>SLH-DSA-SHA2-128s</td><td>cat 1</td><td>alleen in modus extended · traag ondertekenen</td></tr>
+        <tr><td>0x0201</td><td>SLH-DSA-SHA2-128f</td><td>cat 1</td><td>alleen in modus extended</td></tr>
+        <tr><td>0x0202</td><td>SLH-DSA-SHA2-192s</td><td>cat 3</td><td>alleen in modus extended · traag ondertekenen</td></tr>
+        <tr><td>0x0203</td><td>SLH-DSA-SHA2-192f</td><td>cat 3</td><td>alleen in modus extended</td></tr>
+        <tr><td>0x0204</td><td>SLH-DSA-SHA2-256s</td><td>cat 5</td><td>alleen in modus extended · traag ondertekenen</td></tr>
+        <tr><td>0x0205</td><td>SLH-DSA-SHA2-256f</td><td>cat 5</td><td>alleen in modus extended</td></tr>
+        <tr><td>0x0206</td><td>SLH-DSA-SHAKE-128s</td><td>cat 1</td><td>alleen in modus extended · traag ondertekenen</td></tr>
+        <tr><td>0x0207</td><td>SLH-DSA-SHAKE-128f</td><td>cat 1</td><td>alleen in modus extended</td></tr>
+        <tr><td>0x0208</td><td>SLH-DSA-SHAKE-192s</td><td>cat 3</td><td>alleen in modus extended · traag ondertekenen</td></tr>
+        <tr><td>0x0209</td><td>SLH-DSA-SHAKE-192f</td><td>cat 3</td><td>alleen in modus extended</td></tr>
+        <tr><td>0x020A</td><td>SLH-DSA-SHAKE-256s</td><td>cat 5</td><td>alleen in modus extended · traag ondertekenen</td></tr>
+        <tr><td>0x020B</td><td>SLH-DSA-SHAKE-256f</td><td>cat 5</td><td>alleen in modus extended</td></tr>
       </tbody>
     </table>
 
@@ -403,7 +403,7 @@ FLAGS    1 byte    gereserveerd voor latere functies</pre>
     </p>
 
     <div class="summary" style="margin-top:24px">
-      <p><strong>Totaal</strong>: 3 KEM's en 17 handtekeningalgoritmen beschikbaar. De standaardmodus core laadt ML-KEM-768 en ML-DSA-65; de modus extended laadt ze allemaal.</p>
+      <p><strong>Totaal</strong>: 3 KEM's en 17 handtekeningalgoritmen in de code. De standaardmodus core laadt ML-KEM-768 en ML-DSA-65, en die draaien onze relays; een zelf gehoste relay met <code>CRYPTO_MODE=extended</code> laadt ze allemaal.</p>
     </div>
   </section>
 
@@ -412,20 +412,15 @@ FLAGS    1 byte    gereserveerd voor latere functies</pre>
     <h2><span class="s-num">05</span>Controleer het zelf</h2>
     <p class="section-sub">Het live capabilities-endpoint is de bron van waarheid.</p>
     <pre style="background:var(--invert);color:var(--invert-ink);border:1px solid var(--ink-hair);padding:14px 20px;font-size:12px;overflow-x:auto;font-family:'IBM Plex Mono',ui-monospace,monospace">curl https://paramant.app/v2/capabilities</pre>
-    <p style="font-size:12px;color:var(--ink-dim);margin-top:12px;margin-bottom:10px">Uittreksel (het volledige antwoord noemt alle 21 vermeldingen):</p>
+    <p style="font-size:12px;color:var(--ink-dim);margin-top:12px;margin-bottom:10px">Wat onze relays vandaag antwoorden (modus core). Een relay in de modus extended noemt 21 vermeldingen:</p>
     <pre style="background:var(--invert);color:var(--invert-ink);border:1px solid var(--ink-hair);padding:16px 20px;font-size:12px;overflow-x:auto;line-height:1.6;font-family:'IBM Plex Mono',ui-monospace,monospace">{
   "wire_version": 1,
   "kem": [
-    { "id": 1, "name": "ML-KEM-512",  "loaded": true },
-    { "id": 2, "name": "ML-KEM-768",  "loaded": true },
-    { "id": 3, "name": "ML-KEM-1024", "loaded": true }
+    { "id": 2, "name": "ML-KEM-768", "loaded": true }
   ],
   "sig": [
-    { "id": 0,   "name": "none",              "loaded": true },
-    { "id": 2,   "name": "ML-DSA-65",         "loaded": true },
-    { "id": 256, "name": "Falcon-512",        "loaded": true },
-    { "id": 512, "name": "SLH-DSA-SHA2-128s", "loaded": true, "performance_hint": "slow_signing" },
-    ...
+    { "id": 0, "name": "none",      "loaded": true },
+    { "id": 2, "name": "ML-DSA-65", "loaded": true }
   ]
 }</pre>
     <p style="font-size:13px;color:var(--ink-dim);margin-top:14px;line-height:1.7">
@@ -610,6 +605,6 @@ FLAGS    1 byte    gereserveerd voor latere functies</pre>
   </div>
 </footer>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 </body>
 </html>

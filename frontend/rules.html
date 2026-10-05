@@ -225,7 +225,7 @@ footer a{color:var(--ink);text-decoration:none}
 <h2>Wat we garanderen</h2>
 
 <h3>1 &middot; We hebben het nooit gehad</h3>
-<p>Bestanden worden in uw browser versleuteld voordat ze bij ons aankomen. Bij Versturen bewaart de relay alleen versleutelde data, in het werkgeheugen, en vernietigt die na de laatste keer ophalen die de link toestaat: één keer op Community, tot 10 keer op Firm. We kunnen het niet lezen, niet lekken, en niet gedwongen worden af te staan wat we nooit hadden.</p>
+<p>Bestanden worden in uw browser versleuteld voordat ze bij ons aankomen. Bij Versturen bewaart de relay alleen versleutelde data, in het werkgeheugen, en vernietigt die na de laatste keer ophalen die de link toestaat: één keer op Community, tot 10 keer op Firm. We kunnen het niet lezen, niet lekken, en niet gedwongen worden af te staan wat we nooit hadden. Eén uitzondering: bij versturen naar ontvangers op naam (per e-mailadres) gaat het token dat de sleutel uitpakt één keer langs de relay om te worden gemaild. Op dat moment zouden we het bestand kunnen openen, dus die route is niet zero-knowledge. Een eenmalige link is dat wel.</p>
 <p class="rule-verify"><a href="/security">controleer: de opbouw van de relay &rarr;</a></p>
 
 <h3>2 &middot; Uw browser praat alleen met ons</h3>
@@ -241,7 +241,7 @@ footer a{color:var(--ink);text-decoration:none}
 <p class="rule-verify"><a href="https://github.com/Apolloccrypt/paramant-relay">controleer: het maken van sleutels in de broncode &rarr;</a></p>
 
 <h3>5 &middot; Europese bodem, Europees recht</h3>
-<p>Gehost in Duitsland, van boven tot onder in Europese handen. De Amerikaanse CLOUD Act reikt niet tot uw bestanden of uw sleutels: ze verlaten de EU nooit, en ze zijn overal versleuteld behalve in uw eigen browser. Eén uitzondering noemen we liever zelf: e-mail (alleen het e-mailadres en de uitnodigingslink, nooit het document of een sleutel) gaat nu nog via Resend Inc. in de Verenigde Staten. Dat is de enige uitzondering in de keten; we stappen over naar een Nederlandse aanbieder. We zeggen dat liever dan dat we een zuiverheid claimen die niet klopt. Zie <a href="/privacy">de lijst met subverwerkers</a>.</p>
+<p>Gehost in Duitsland, van boven tot onder in Europese handen. De versleutelde bestanden verlaten de EU nooit. Eén uitzondering noemen we liever zelf: e-mail gaat nu nog via Resend in de Verenigde Staten. Bij versturen naar ontvangers op naam bevat die mail de link met het token, en de ophaalcode gaat ook per mail: wie beide mails leest, kan het bestand openen. Een uitnodiging om te ondertekenen bevat de helft van de documentsleutel; de andere helft geeft de relay alleen aan de ingelogde ontvanger. Resend, onze e-mailprovider, is de enige Amerikaanse partij in de keten; we stappen over naar een Nederlandse aanbieder. We zeggen dat liever dan dat we een zuiverheid claimen die niet klopt. Zie <a href="/privacy">de lijst met subverwerkers</a>.</p>
 <p class="rule-verify"><a href="/security">controleer: de tabel met rechtsgebieden &rarr;</a></p>
 
 <h3>6 &middot; Standaard bestand tegen quantumcomputers</h3>
@@ -312,6 +312,6 @@ footer a{color:var(--ink);text-decoration:none}
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 </body>
 </html>

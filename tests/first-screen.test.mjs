@@ -182,7 +182,7 @@ const PAGES = [
       // split, so both halves are checked in one line: free tier named, paid
       // tier named, on the first screen.
       { name: 'the Community and business plans split', css: '[data-home="out"] p.hero-note', text: 'Community plan', also: ['business plans from'] },
-      { name: 'the first action', css: '[data-home="out"] .home-actions a', href: '/sign' },
+      { name: 'the first action', css: '[data-home="out"] .home-actions a', href: '/en/parashare' },
       // Mick, 4 September: one note is enough. The founder line left both hero
       // states; the letter signature further down the page is the one place the
       // homepage still names him, and tests/ui-truthfulness pins that block.
@@ -348,7 +348,8 @@ const PAGES = [
     claims: [
       { name: 'the status sentence', css: 'header.dl-lead h1', text: 'niet meer onderhouden' },
       { name: 'the sentence under it', css: 'header.dl-lead p.dl-sub', text: 'De laatste build is van maart 2026' },
-      { name: 'the first button', css: '.dl-actions a.btn-primary', href: '/' },
+      // "Open de webapp" opens the web app, not the home page (fase 1, SENDNAME-49-A).
+      { name: 'the first button', css: '.dl-actions a.btn-primary', href: '/parashare' },
       { name: 'the second button', css: '.dl-actions a.btn-outline', href: '/pricing' },
     ],
   },
@@ -357,7 +358,7 @@ const PAGES = [
     claims: [
       { name: 'the status sentence', css: 'header.dl-lead h1', text: 'no longer maintained' },
       { name: 'the sentence under it', css: 'header.dl-lead p.dl-sub', text: 'The last build is from March 2026' },
-      { name: 'the first button', css: '.dl-actions a.btn-primary', href: '/' },
+      { name: 'the first button', css: '.dl-actions a.btn-primary', href: '/en/parashare' },
       { name: 'the second button', css: '.dl-actions a.btn-outline', href: '/pricing' },
     ],
   },
@@ -389,8 +390,14 @@ for (const spec of PAGES) {
         }
       }
       if (claim.href) {
-        assert.equal(hit.href, claim.href,
-          `${spec.slug}: ${hit.name} points at ${hit.href}, not ${claim.href}`);
+        // An English page leads to the English page where one exists (fase 2,
+        // SITE-03-F); the spec keeps the route, the /en in front follows.
+        const enRoute = (h) => (/^\/en(\/|$)/.test(spec.slug) && /^\/(?!en(\/|$))/.test(h)
+          && (fs.existsSync(path.join(ROOT, 'en', h.replace(/^\/|[#?].*$/g, '') + '.html')) || fs.existsSync(path.join(ROOT, 'en', h.replace(/^\/|[#?].*$/g, ''), 'index.html')))
+          ? (h === '/' ? '/en' : '/en' + h) : h);
+        const want = enRoute(claim.href);
+        assert.equal(hit.href, want,
+          `${spec.slug}: ${hit.name} points at ${hit.href}, not ${want}`);
       }
       assert.ok(hit.bottom <= FOLD.height,
         `${spec.slug}: ${hit.name} ends at y=${hit.bottom}, ${hit.bottom - FOLD.height}px past the ${FOLD.height}px first screen (top y=${hit.top}, font ${hit.font})${claim.at ? `. It was measured at y=${claim.at} when the CSS that pulled it onto the screen was written, so it moved ${hit.bottom - claim.at}px down since` : ''}. A phone reader has to scroll for it.`);

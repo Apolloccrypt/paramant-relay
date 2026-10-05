@@ -97,6 +97,10 @@ export function normaliseSigningAppearance(value) {
       if (typeof field.all_pages !== 'boolean') throw new Error(tr('De keuze voor elke pagina is ongeldig.', 'Invalid all-pages flag.'));
       if (field.all_pages) {
         if (pageIndex !== 0) throw new Error(tr('Een veld op elke pagina begint op de eerste pagina.', 'An all-pages field anchors on the first page.'));
+        // Same rule as the relay (relay/envelope.js): a manifest that repeats a
+        // mark must say it is version 2. Accepting it here and having the relay
+        // refuse it later was a signature made for nothing (tester report B5).
+        if (declared !== 2) throw new Error(tr('Een veld op elke pagina vraagt versie 2 van de plaatsing.', 'all_pages requires appearance version 2.'));
         clean.all_pages = true;
         anyAllPages = true;
       }
@@ -165,7 +169,13 @@ export function buildDocSignMessage({ envelopeId, docHash, partyIndex, emailHash
 // is never written to the vault). If no PRF signing key is enrolled on this
 // device, throws code 'no_signing_passkey'.
 export async function resolvePasskeySigningKey() {
-  if (!(await vaultAvailable())) throw new Error(tr('Deze browser kan geen ondertekensleutels bewaren (IndexedDB of WebCrypto ontbreekt).', 'This browser cannot store signing keys (IndexedDB/WebCrypto unavailable).'));
+  if (!(await vaultAvailable())) {
+    // Coded, so a caller can fall back to signing with the authenticator code
+    // (that key is never stored, so it needs no vault).
+    const err = new Error(tr('Deze browser kan geen ondertekensleutels bewaren (IndexedDB of WebCrypto ontbreekt).', 'This browser cannot store signing keys (IndexedDB/WebCrypto unavailable).'));
+    err.code = 'vault_unavailable';
+    throw err;
+  }
   const keys = await vaultList();
   const candidates = keys.filter((k) => (k.kekSources || []).some((s) => s === 'webauthn-prf'));
   // Verify the PRF wrap is actually present (not just listed in kekSources). A
@@ -329,6 +339,23 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
   try {
     // 2) Step-up challenge over THIS account's passkeys.
     say(tr('Ondertekenen instellen met uw passkey…', 'Setting up signing with your passkey…'));
+    // An account without a passkey takes the authenticator-code path. Asked
+    // with a plain read first, so the expected "no passkey" is not a 409 in the
+    // console on every signature (retest T2-B6). A failed read changes nothing:
+    // the options call below still answers.
+    try {
+      const r = await fetch('/api/user/account/webauthn/credentials', { credentials: 'include' });
+      if (r.ok) {
+        const j = await r.json().catch(() => null);
+        if (j && Array.isArray(j.passkeys) && j.passkeys.length === 0) {
+          const err = new Error(tr('Voeg eerst een passkey toe aan uw account. Daarna kunt u ermee ondertekenen.', 'Add a passkey to your account first, then you can sign with it.'));
+          err.code = 'no_passkey';
+          throw err;
+        }
+      }
+    } catch (e) {
+      if (e && e.code === 'no_passkey') throw e;
+    }
     let opt;
     try {
       opt = await _postJSON('/api/user/account/signing-key/step-up/options', {});
@@ -391,24 +418,27 @@ export async function ensureSigningKey({ rpId, label, onStatus } = {}) {
     }
     const prfOutput = new Uint8Array(prfFirst);
 
-    // 4) Wrap the ML-DSA key with the PRF output — PRF ONLY, no passphrase. The
-    //    PRF output stays in the browser; only the assertion goes to the server.
+    // 4) Bind the PUBLIC key to the account FIRST: the admin verifies the
+    //    step-up assertion, then the relay records the pubkey (TOTP-free
+    //    attested route). Only a key the account knows is kept in this browser:
+    //    storing it before the bind left a key behind that every later
+    //    signature picked again and the relay refused as signer_not_enrolled
+    //    (retest T3-4).
     const credentialId = _b64urlFromBuffer(cred.rawId);
     try {
+      say(tr('Uw ondertekensleutel wordt aan uw account gekoppeld…', 'Linking your signing key to your account…'));
+      await _postJSON('/api/user/account/signing-key/step-up/bind', {
+        flowId: opt.flowId,
+        response: _serializeAssertion(cred),
+        pk_b64,
+        label: label || 'Signing key',
+      });
+      // 5) Wrap the ML-DSA key with the PRF output, PRF ONLY, no passphrase.
+      //    The PRF output stays in the browser; only the assertion went out.
       await vaultCreatePrfOnly({ alg: 'ML-DSA-65', label: label || 'Signing key', pk_b64, pk_hash, secretKeyBytes: kp.secretKey, credentialId, prfSalt, prfOutput });
     } finally {
       prfOutput.fill(0);
     }
-
-    // 5) Bind the PUBLIC key to the account: the admin verifies the step-up
-    //    assertion, then the relay records the pubkey (TOTP-free attested route).
-    say(tr('Uw ondertekensleutel wordt aan uw account gekoppeld…', 'Linking your signing key to your account…'));
-    await _postJSON('/api/user/account/signing-key/step-up/bind', {
-      flowId: opt.flowId,
-      response: _serializeAssertion(cred),
-      pk_b64,
-      label: label || 'Signing key',
-    });
   } finally {
     kp.secretKey.fill(0);   // zeroize the plaintext key
   }
@@ -455,6 +485,15 @@ export async function enrolEphemeralSigningKeyWithTotp({ label, totp, onStatus }
     const errCode = (e && e.data && e.data.error) || '';
     // Relay gates the TOTP enrol: 403 invalid_totp (wrong code) / 403 no_totp_setup
     // (account has no authenticator), 400 totp_required (malformed — caught above).
+    if (errCode === 'too_many_active_keys') {
+      const err = new Error(tr('Er zijn al 50 actieve ondertekensleutels aan uw account gekoppeld. Een sleutel die u met een code koppelde vervalt na 24 uur vanzelf; trek anders oude sleutels in via Account en probeer het daarna opnieuw.', 'Your account already has 50 active signing keys. A key you linked with a code lapses by itself after 24 hours; otherwise revoke old keys on your Account page, then try again.'));
+      err.code = 'service_error'; throw err;
+    }
+    if (errCode === 'totp_locked') {
+      const min = Math.max(1, Math.ceil((Number(e.data && e.data.retry_after) || 60) / 60));
+      const err = new Error(tr('Te veel foute codes achter elkaar. Probeer het over ' + min + (min === 1 ? ' minuut' : ' minuten') + ' opnieuw.', 'Too many wrong codes in a row. Try again in ' + min + (min === 1 ? ' minute.' : ' minutes.')));
+      err.code = 'totp_locked'; throw err;
+    }
     if (errCode === 'no_totp_setup') { const err = new Error(tr('Stel eerst een authenticator-app in op uw account en onderteken daarna met de code.', 'Set up an authenticator app on your account first, then sign with its code.')); err.code = 'totp_unavailable'; throw err; }
     if (errCode === 'invalid_totp' || e.status === 403 || e.status === 401) { const err = new Error(tr('Die authenticatorcode klopt niet. Probeer de huidige 6-cijferige code.', 'That authenticator code didn’t match. Try the current 6-digit code.')); err.code = 'totp_invalid'; throw err; }
     if (e && (e.status === 400 || e.status === 409) && /totp/i.test(errCode)) { const err = new Error(tr('Die authenticatorcode klopt niet. Probeer de huidige 6-cijferige code.', 'That authenticator code didn’t match. Try the current 6-digit code.')); err.code = 'totp_invalid'; throw err; }
@@ -503,8 +542,8 @@ function _b64urlFromBuffer(buf) {
 }
 
 // ── Same-origin admin calls for the per-document signing chain (R018) ────────
-async function _postJSON(url, body) {
-  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}), credentials: 'include' });
+async function _postJSON(url, body, extraHeaders) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(extraHeaders || {}) }, body: JSON.stringify(body || {}), credentials: 'include' });
   let data = null; try { data = await r.json(); } catch { /* non-JSON */ }
   if (!r.ok) { const e = new Error((data && data.error) || ('http_' + r.status)); e.status = r.status; e.data = data; throw e; }
   return data;
@@ -512,9 +551,14 @@ async function _postJSON(url, body) {
 // Create the envelope. Self-sign/co-sign include the requester as party 0;
 // request-signatures sets includeRequester=false and contains recipients only.
 export function createSigningEnvelope({ docHash, recipients, originalFilename, signerLabel, creatorPublicKey, includeRequester = true, requestedAppearance }) {
+  // A recipient may carry the spot the sender asked THAT party to sign at.
+  // Normalised here like the envelope-wide box; a request, never signed.
+  const list = (recipients || []).map((r) => (r && r.requested_appearance)
+    ? { ...r, requested_appearance: normaliseSigningAppearance(r.requested_appearance) }
+    : r);
   const body = {
     doc_hash: docHash,
-    recipients: recipients || [],
+    recipients: list,
     original_filename: originalFilename,
     signer_label: signerLabel,
     creator_public_key: creatorPublicKey,
@@ -525,7 +569,14 @@ export function createSigningEnvelope({ docHash, recipients, originalFilename, s
   // used (submitSignature's `appearance`), never this one, so it is sent on
   // envelope creation and never near the signing message.
   if (requestedAppearance) body.requested_appearance = normaliseSigningAppearance(requestedAppearance);
-  return _postJSON('/api/user/envelopes', body);
+  // One key per send. Without it the admin keyed on the body, so the same
+  // document to the same people within two minutes got the PREVIOUS request
+  // back, also when that one was withdrawn or declined, and its document was
+  // overwritten (fase-1 herrun P02). A double click cannot slip through: the
+  // send button is disabled before this call.
+  let idem = '';
+  try { idem = 'env-' + (crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('')); } catch { idem = ''; }
+  return _postJSON('/api/user/envelopes', body, idem ? { 'Idempotency-Key': idem } : undefined);
 }
 // Authorize + issue the per-document activation (pre-unlock gate). Returns
 // { activation_id, email_hash, recipe_version }.
@@ -534,6 +585,8 @@ export function requestSignActivation({ envelopeId, partyIndex, docHash, inviteT
 }
 // Submit the signature; the admin consumes the activation atomically + forwards
 // to the relay. Returns { ok, signed_count, party_count, status }.
-export function submitSignature({ activationId, signerPublicKey, signature, appearance }) {
-  return _postJSON('/api/user/sign/submit', { activation_id: activationId, signer_public_key: signerPublicKey, signature, appearance });
+// `ink` (optional): the visible handwriting, already encrypted in the browser
+// (js/parasign-ink.js). Presentation only; it is not part of the signed message.
+export function submitSignature({ activationId, signerPublicKey, signature, appearance, ink }) {
+  return _postJSON('/api/user/sign/submit', { activation_id: activationId, signer_public_key: signerPublicKey, signature, appearance, ...(ink ? { ink } : {}) });
 }

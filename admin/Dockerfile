@@ -37,6 +37,10 @@ COPY admin/server.js .
 COPY admin/lib/ lib/
 COPY admin/public/ public/
 COPY relay/lib/mail.js /app/relay/lib/mail.js
+# The public plan list reads the catalog the checkout sells from and the limit
+# table the relay enforces (admin/lib/public-plans.js). Both have no requires.
+COPY relay/lib/billing-catalog.js /app/relay/lib/billing-catalog.js
+COPY relay/lib/tiers.js /app/relay/lib/tiers.js
 # De e-mailblocklist die admin/lib/email-policy.js leest (../../deploy vanaf lib/).
 COPY deploy/email-blocklist.json /app/deploy/email-blocklist.json
 

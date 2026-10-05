@@ -70,6 +70,9 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .btn:hover{opacity:.85}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .btn-outline{background:transparent;color:var(--ink);border:1px solid var(--ink-hair)}
+/* A long button label wraps inside the button on a phone instead of running
+   135px past it (retest T2-B4). */
+.btn{white-space:normal;overflow-wrap:anywhere;line-height:1.35}
 .btn-outline:hover{color:var(--cobalt);border-color:var(--cobalt)}
 .banner{padding:10px 14px;font-size:12px;border:1px solid var(--ink-hair);background:var(--bone-2);margin-bottom:14px;line-height:1.5}
 .banner.ok{border-color:var(--cobalt);color:var(--cobalt);background:rgba(var(--tint), 0.04)}
@@ -95,6 +98,9 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
    card and both sides see the document at the same scale. */
 .doc-preview{margin:12px -50px 0;border:1px solid var(--ink-hair);border-left:0;border-right:0;background:var(--card);max-height:72vh;overflow:auto;padding:10px 8px}
 .doc-page{position:relative;width:100%;margin:0 auto 12px;max-width:100%}
+/* The signature sheet after the last page (readable copy only). */
+.doc-page.sheet-page{background:#FFFFFF;border:1px solid var(--ink-hair)}
+.sheet-page .sheet-head{position:absolute;left:7%;top:5%;right:7%;font:600 14px/1.3 var(--sans);color:#0C1B2A}
 .doc-page:last-child{margin-bottom:0}
 .doc-page canvas,.doc-page img{display:block;width:100%;height:auto;border:1px solid var(--ink-hair);background:#FFFFFF}
 .doc-page.appearance-page{position:relative;cursor:crosshair}
@@ -115,7 +121,9 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
    control, a dashed outline and its own words. It becomes a real placed field
    the moment the signer chooses Place my signature. */
 .appearance-field.requested{border:2px dashed #1D4ED8;background:rgba(29,78,216,.06);box-shadow:none;color:#1D4ED8;font-weight:600;justify-content:center;text-align:center;pointer-events:none}
+.appearance-field.over-text{border-color:#B42318;outline:2px solid #B42318;outline-offset:1px}
 .appearance-field.prior{border-style:solid;background:rgba(239,246,255,.92);pointer-events:none}
+.appearance-field.has-remove{padding-right:26px}
 .appearance-remove{position:absolute;top:1px;right:2px;width:20px;height:20px;border:0;background:#1D4ED8;color:#FFFFFF;font:700 13px/1 var(--sans);cursor:pointer}
 .appearance-tools{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
 .appearance-tools .btn{width:auto;min-width:120px}
@@ -129,9 +137,48 @@ h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
 .requested-note{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding:10px 14px;border:1px solid var(--cobalt);background:rgba(var(--tint), .04);font-size:12px;line-height:1.5;color:var(--cobalt)}
 .requested-note .btn{width:auto;min-width:0;padding:11px 14px;flex:0 0 auto}
 .appearance-help{font-size:12px;line-height:1.55;color:var(--ink-dim)}
+.appearance-field.compact{font-size:8px;line-height:1.15;padding:2px 5px}
 .allpages{display:flex;align-items:center;gap:8px;margin:10px 0 4px;font-size:13px;cursor:pointer;min-height:44px}
 .allpages input{width:18px;height:18px;flex:0 0 auto}
 .appearance-help.active{color:var(--cobalt);font-weight:600}
+/* ── Marks on the page since 2026-10-04 ──
+   A signature sits on paper the way ink does: no white box over the text.
+   The handwriting, a hairline, and under it who and when. The signer's own
+   marks get a thin dashed outline so they read as movable; another party's
+   marks have none. Sizes follow the box (container units), so a mark scales
+   with the page exactly like the PDF it previews. Fixed colours on purpose,
+   see the document-layer note above. */
+.appearance-field{container-type:size;background:transparent;box-shadow:none;border:0;padding:0;flex-direction:column;align-items:stretch;justify-content:flex-end;color:#0C1B2A}
+.appearance-field.mine{outline:1.5px dashed #1D4ED8;outline-offset:1px;background:rgba(29,78,216,.035)}
+.appearance-field.prior{background:transparent;border:0;outline:0}
+.appearance-field .ink{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;font-family:"Times New Roman",Times,serif;font-style:italic;font-weight:400;font-size:min(42cqh,calc(190cqw / var(--len, 12)));line-height:1;color:#1D4ED8;white-space:nowrap;overflow:hidden}
+.appearance-field .ink svg{width:100%;height:100%;display:block}
+.appearance-field .cap{flex:0 0 auto;border-top:1px solid rgba(12,27,42,.55);font-family:var(--sans);font-weight:500;font-size:max(6px,15cqh);line-height:1.25;color:#0C1B2A;padding-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appearance-field.paraaf .ink{font-size:min(62cqh,calc(170cqw / var(--len, 6)));border-bottom:1px solid rgba(29,78,216,.5)}
+.appearance-field.date{border:0;font-family:var(--mono);font-weight:500;justify-content:center}
+.appearance-field.date .lbl{font-size:max(7px,55cqh)}
+.appearance-field.requested{border:2px dashed #1D4ED8;outline:0;background:rgba(29,78,216,.06);color:#1D4ED8;font-family:var(--sans);font-weight:600;line-height:1.15;justify-content:center;align-items:center;text-align:center;padding:2px 4px}
+.appearance-field.requested .lbl{font-size:max(7px,min(22cqh,9cqw))}
+.appearance-field.requested.paraaf .lbl{font-size:max(6px,min(34cqh,11cqw))}
+.ink-style{border:1px solid var(--ink-hair);padding:10px 12px;margin:12px 0;background:var(--card)}
+.ink-style legend{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);padding:0 4px}
+.ink-style .ink-choice{display:flex;align-items:center;gap:8px;font-size:13px;min-height:36px;cursor:pointer}
+.ink-name{margin-top:6px;font-family:"Times New Roman",Times,serif;font-style:italic;font-size:20px;color:#1D4ED8;background:#FFFFFF}
+/* A name the pdf writes upright in Noto Sans (letters outside Times Italic) is shown upright too. */
+@font-face{font-family:"ParaSign Noto";src:url(/vendor/fonts/NotoSans-ParaSign.ttf?v=1) format("truetype");font-display:swap}
+.appearance-field .ink.ink-sans,.ink-name.ink-sans{font-family:"ParaSign Noto","Noto Sans",var(--sans),sans-serif;font-style:normal}
+.ink-pad{display:block;width:100%;height:130px;margin-top:6px;border:1px dashed var(--ink-hair);background:#FFFFFF;touch-action:none;cursor:crosshair}
+.ink-style .btn{width:auto;margin-top:8px}
+.cta-note{font-size:12px;line-height:1.6;color:var(--ink-dim);margin-top:10px}
+.cta-note a{color:var(--cobalt)}
+.gate-ok{color:var(--cobalt)}
+.decline{margin-top:16px;text-align:center}
+.party-status.declined{color:var(--brick-ink)}
+.result-note{margin-top:10px}
+#result-download-proof{margin-top:8px}
+body.result-mode #appearance-editor,body.result-mode #sign-intro,body.result-mode #decline-wrap,body.result-mode #sign-confirm,body.result-mode #review-gate{display:none}
+body.request-closed #review-card,body.request-closed #sign-confirm,body.request-closed #sign-intro,body.request-closed #review-gate,body.request-closed #decline-wrap,body.request-closed #cs-pass-panel{display:none}
+body.owner-mode #sign-card .card-head{display:none}
 .doc-preview-meta{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-dim);text-align:center;padding:8px 0;line-height:1.5}
 .review-gate{font-size:12px;color:var(--ink-dim);margin-top:10px;line-height:1.6}
 .blind-link{background:none;border:none;color:var(--ink-dim);text-decoration:underline;font-family:var(--mono);font-size:11px;cursor:pointer;padding:0}
@@ -187,22 +234,29 @@ body.needs-login #sign-intro{display:none}
   <details class="how">
     <summary>HOE DIT WERKT</summary>
     <div class="how-body">
-      <p>Het ontsleutelen en ondertekenen met ML-DSA-65 gebeurt op uw eigen apparaat. De relay krijgt versleutelde gegevens, uw publieke sleutel, de handtekening en de plek van uw velden. De leesbare inhoud van het document en uw private sleutel krijgt hij nooit.</p>
-      <p><strong>Post-quantum en zero-knowledge. Niet eIDAS-gekwalificeerd.</strong> Een handtekening met ParaSign is een Simple Electronic Signature (SES): een cryptografische verklaring met ML-DSA-65. Het is geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES). Vergelijk de hash hieronder met die van het bestand dat u los ontving.</p>
+      <p>Het ontsleutelen en ondertekenen gebeurt op uw eigen apparaat. De relay krijgt versleutelde gegevens, uw publieke sleutel, de handtekening en de plek van uw velden. De leesbare inhoud van het document en uw private sleutel krijgt hij nooit.</p>
+      <p><strong>Post-quantum en zero-knowledge. Niet eIDAS-gekwalificeerd.</strong> Een handtekening met ParaSign is een Simple Electronic Signature (SES): een post-quantum cryptografische handtekening (ML-DSA-65). Het is geen notariële handtekening onder eIDAS of een ander gekwalificeerd stelsel (QES). Vergelijk de hash hieronder met die van het bestand dat u los ontving.</p>
     </div>
   </details>
 
   <div class="card">
-    <div class="card-head"><div class="dot" id="env-status-dot"></div><div class="card-head-title" id="env-status">Status: ...</div></div>
+    <div class="card-head"><div class="dot" id="env-status-dot"></div><div class="card-head-title" id="env-status">...</div></div>
     <div class="card-body">
       <dl class="kv">
-        <dt>Verzoek-id</dt><dd id="env-id">-</dd>
-        <dt>Document SHA3-256</dt><dd id="env-hash">-</dd>
         <dt>Bestandsnaam</dt><dd id="env-filename">-</dd>
         <dt>Gemaakt</dt><dd id="env-created">-</dd>
-        <dt>Verloopt</dt><dd id="env-expires">-</dd>
+        <dt>Tekenen kan tot</dt><dd id="env-expires">-</dd>
         <dt>Voortgang</dt><dd id="env-progress">-</dd>
       </dl>
+      <details class="how" style="margin:12px 0 0">
+        <summary>Technische gegevens</summary>
+        <div class="how-body">
+          <dl class="kv">
+            <dt>Verzoek-id</dt><dd id="env-id">-</dd>
+            <dt>Vingerafdruk van het document (SHA3-256)</dt><dd id="env-hash">-</dd>
+          </dl>
+        </div>
+      </details>
     </div>
   </div>
 
@@ -230,25 +284,43 @@ body.needs-login #sign-intro{display:none}
       </div>
       <div class="doc-preview" id="doc-preview" hidden></div>
       <div id="appearance-editor" hidden>
+        <fieldset class="ink-style" id="ink-style">
+          <legend>Uw handtekening</legend>
+          <label class="ink-choice"><input type="radio" name="ink-style" value="type" checked> Typ uw naam</label>
+          <label class="ink-choice"><input type="radio" name="ink-style" value="draw"> Teken met uw vinger of muis</label>
+          <div id="ink-type-pane"><input class="input ink-name" id="ink-name" maxlength="80" autocomplete="name" aria-label="Uw naam zoals die in de handtekening komt"></div>
+          <div id="ink-draw-pane" hidden><canvas id="ink-pad" class="ink-pad" aria-label="Teken hier uw handtekening"></canvas><button class="btn btn-outline" id="ink-clear" type="button">Wis tekening</button></div>
+        </fieldset>
         <div class="appearance-tools" role="toolbar" aria-label="Zichtbare velden van uw handtekening">
           <button class="btn btn-outline" id="appearance-seal" type="button">Plaats mijn handtekening</button>
           <button class="btn btn-outline" id="appearance-date" type="button">Plaats datum</button>
           <button class="btn btn-outline" id="appearance-clear" type="button">Wis mijn velden</button>
         </div>
-        <label class="allpages" id="appearance-allpages-label"><input type="checkbox" id="appearance-allpages"> Ook op elke andere pagina</label>
-        <p class="appearance-help">Zet dezelfde handtekening op elke pagina van het document, op dezelfde plek. Dat is de paraaf per blad.</p>
+        <label class="allpages" id="appearance-allpages-label"><input type="checkbox" id="appearance-allpages"> Paraaf op elke pagina (naast uw handtekening)</label>
+        <p class="appearance-help" id="appearance-allpages-required" hidden>De afzender vraagt een paraaf op elke pagina. Die staat al klaar.</p>
+        <p class="appearance-help">Uw paraaf komt in de marge van elke pagina, naast die van de andere ondertekenaars. Niemand tekent op uw plek.</p>
         <p class="appearance-help" id="appearance-help">Kies een veld en klik op de plek in het document waar het moet komen. Deze plekken vallen onder uw cryptografische handtekening.</p>
       </div>
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="result-card" hidden>
+    <div class="card-head"><div class="dot"></div><div class="card-head-title" id="result-title">Het getekende document</div></div>
+    <div class="card-body">
+      <button class="btn" id="result-download-pdf" type="button" hidden></button>
+      <a class="btn btn-outline" id="result-download-proof" href="#" hidden>Download het bewijs (.psign)</a>
+      <button class="btn btn-outline" id="result-download-original" type="button" hidden style="margin-top:8px">Download het originele document</button>
+      <p class="review-gate result-note" id="result-note" hidden></p>
+    </div>
+  </div>
+
+  <div class="card" id="sign-card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Ondertekenen als <span id="me-label">ondertekenaar</span></div></div>
     <div class="card-body">
       <details class="how" id="sign-intro">
         <summary>WAARMEE U TEKENT</summary>
         <div class="how-body">
-          <p>U tekent met uw ondertekensleutel (ML-DSA-65). Op het moment dat u tekent, ontgrendelt u die met Face ID, Touch ID of een beveiligingssleutel. De sleutel verlaat uw apparaat nooit. De handtekening hoort bij het e-mailadres waarop u deze uitnodiging kreeg.</p>
+          <p>U tekent met een ondertekensleutel op uw eigen apparaat. Heeft u een passkey, dan bevestigt u met Face ID, Touch ID of een beveiligingssleutel. Zonder passkey bevestigt u met de code van 6 cijfers uit uw authenticator-app. De sleutel verlaat uw apparaat nooit. De handtekening hoort bij het e-mailadres waarop u deze uitnodiging kreeg.</p>
         </div>
       </details>
       <div class="banner" id="sign-status" hidden></div>
@@ -268,30 +340,37 @@ body.needs-login #sign-intro{display:none}
         </div>
       </div>
       <div class="review-gate" id="review-gate" hidden></div>
+      <div class="decline" id="decline-wrap" hidden><button type="button" class="blind-link" id="decline-btn">Ik teken dit niet (weigeren)</button></div>
     </div>
   </div>
 </div>
 
 <div class="step" id="step-done">
   <h1>Uw handtekening is gezet</h1>
-  <p class="sub">Uw ML-DSA-65-handtekening is verstuurd. De relay heeft hem in het openbare CT-logboek gezet en de status van het verzoek bijgewerkt.</p>
+  <p class="sub" id="done-sub">Uw handtekening is vastgelegd. Zodra iedereen heeft getekend, opent dezelfde link uit uw uitnodiging het complete document met alle handtekeningen.</p>
   <div class="card">
     <div class="card-head"><div class="dot"></div><div class="card-head-title">Resultaat</div></div>
     <div class="card-body">
       <dl class="kv">
-        <dt>Verzoek</dt><dd id="done-env-id">-</dd>
         <dt>Status</dt><dd id="done-status">-</dd>
         <dt>Voortgang</dt><dd id="done-progress">-</dd>
-        <dt>Vingerafdruk van uw sleutel</dt><dd id="done-pk">-</dd>
       </dl>
+      <details class="how" style="margin:12px 0 0">
+        <summary>Technische gegevens</summary>
+        <div class="how-body">
+          <dl class="kv">
+            <dt>Verzoek</dt><dd id="done-env-id">-</dd>
+            <dt>Vingerafdruk van uw sleutel</dt><dd id="done-pk">-</dd>
+          </dl>
+        </div>
+      </details>
       <div style="margin-top:14px">
         <span class="tag green">Op uw apparaat ondertekend</span>
-        <span class="tag green">ML-DSA-65</span>
-        <span class="tag green">Zero-knowledge</span>
       </div>
       <button class="btn" id="done-download-pdf" type="button" hidden style="margin-top:14px">Pdf-kopie met zichtbare stempel downloaden</button>
       <a class="btn btn-outline" id="done-download-proof" href="#" hidden style="margin-top:8px">Definitief .psign-bewijs downloaden</a>
-      <p class="review-gate" id="done-download-note" hidden>Dit is een leesbare werkkopie. Het definitieve .psign-bestand bewijst het oorspronkelijke pdf-document en elke ondertekende plek. Bewaar het origineel, deze kopie en het .psign-bestand samen.</p>
+      <button class="btn btn-outline" id="done-download-original" type="button" hidden style="margin-top:8px">Origineel document downloaden</button>
+      <p class="review-gate" id="done-download-note" hidden>De pdf met handtekeningen is een leesbare kopie. Het bewijs (.psign) hoort bij het originele document: wie wil controleren, opent op /verify het origineel samen met het .psign-bestand.</p>
       <p class="review-gate" id="done-proof-wait" hidden>Het definitieve .psign-bewijs is beschikbaar zodra iedere uitgenodigde ondertekenaar heeft getekend.</p>
     </div>
   </div>
@@ -304,7 +383,7 @@ body.needs-login #sign-intro{display:none}
 
 <script type="module" src="/vendor/pdfjs/pdfjs-loader.js?v=3"></script>
 <script src="/vendor/pdf-lib/pdf-lib.min.js?v=1"></script>
-<script src="/js/quota-upgrade.js?v=7" defer></script>
-<script type="module" src="/co-sign.js?v=26"></script>
+<script src="/js/quota-upgrade.js?v=8" defer></script>
+<script type="module" src="/co-sign.js?v=38"></script>
 </body>
 </html>

@@ -166,13 +166,17 @@ async function tweeTabbladen(acc, volgorde) {
 // dat eronder blijft liggen, op beide relays en in de gedeelde rij. De
 // schermen noemen het einde van het betaalde deel: het einde van het jaar,
 // niet van de maand, want daarna valt hij niet terug op Community.
-async function geenTijdKwijt(acc, naam) {
+// proMaanden: hoe lang het Pro-jaar van Ondertekenen nu loopt. Wordt de
+// Business-maand betaald terwijl het Firm-jaar al loopt, dan is dat een
+// upgrade en pauzeert de Pro-termijn voor die maand (lib/billing
+// pauseLowerTerms): 13 maanden, zodat geen week dubbel betaald is.
+async function geenTijdKwijt(acc, naam, proMaanden = 12) {
   const na = await beide(acc.key);
   assert.equal(na.ondertekenen, 'business', naam);
-  assert.equal(na.ondertekenenTot, plusMaanden(12), `${naam}: betaald tot het einde van het jaar`);
+  assert.equal(na.ondertekenenTot, plusMaanden(proMaanden), `${naam}: betaald tot het einde van het jaar`);
   assert.equal(na.versturen, 'pro', naam);
   assert.equal(na.versturenTot, plusMaanden(12), `${naam}: Versturen een jaar`);
-  assert.equal(na.termijnen, `business:${plusMaanden(1)},pro:${plusMaanden(12)}`,
+  assert.equal(na.termijnen, `business:${plusMaanden(1)},pro:${plusMaanden(proMaanden)}`,
     `${naam}: het Firm-jaar moet onder de Business-maand blijven liggen`);
   const rij = await S.redis.hGetAll(`paramant:entitlements:grant:${acc.key}`);
   const inRij = JSON.parse(rij.terms_parasign || '{}');
@@ -182,7 +186,7 @@ async function geenTijdKwijt(acc, naam) {
 
 test('twee tabbladen: eerst een Firm-jaar, dan een Business-maand', async () => {
   await tweeTabbladen(A.firmJaar, ['firm', 'business']);
-  await geenTijdKwijt(A.firmJaar, 'Firm-jaar dan Business-maand');
+  await geenTijdKwijt(A.firmJaar, 'Firm-jaar dan Business-maand', 13);
 });
 
 test('twee tabbladen: eerst een Business-maand, dan een Firm-jaar', async () => {
@@ -314,10 +318,12 @@ test('na een herstart: Pro tot het einde van het jaar, en één Firm-mail', asyn
   for (const welke of ['main', 'health']) await S.restartRelay(welke, zet, { PLAN_EXPIRY_BOOT_DELAY_MS: '1200' });
   await sleep(5000);
 
-  for (const acc of [A.firmJaar, A.businessFirm]) {
+  // firmJaar kocht de Business-maand als upgrade op een lopend Firm-jaar: de
+  // Pro-termijn pauzeerde die maand en loopt dus een maand langer.
+  for (const [acc, maanden] of [[A.firmJaar, 13], [A.businessFirm, 12]]) {
     const na = await beide(acc.key);
     assert.equal(na.ondertekenen, 'pro', 'na de Business-maand terug op Pro, niet op free');
-    assert.equal(na.ondertekenenTot, plusMaanden(12), 'Pro tot het einde van het betaalde jaar');
+    assert.equal(na.ondertekenenTot, plusMaanden(maanden), 'Pro tot het einde van het betaalde jaar');
     assert.equal(na.versturen, 'pro');
     assert.equal(S.resend.mails.filter((m) => [].concat(m.to).includes(acc.email)).length, 0,
       'het einde van de Business-maand is geen einde van het account, dus geen mail');

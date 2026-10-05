@@ -35,13 +35,13 @@
     </label>
     <label class="radio">
       <input type="radio" name="link_format" value="plain">
-      <span><strong data-i18n="opt_format_plain">Plain link</strong>: a single line with the filename as a link.</span>
+      <span><strong data-i18n="opt_format_plain">Plain link</strong>: one line with the file name and the full link, readable in mail without formatting.</span>
     </label>
   </section>
 
   <section class="card">
     <h2 data-i18n="opt_relay_title">Relay (advanced)</h2>
-    <p class="hint" data-i18n="opt_relay_hint">Leave blank to auto-detect the relay for your API key. Set this only if you run a self-hosted relay.</p>
+    <p class="hint" data-i18n="opt_relay_hint">Leave blank to auto-detect the relay for your API key. You can pin one of the Paramant relays here. A self-hosted relay is not supported yet: the receiver opens the link on paramant.app, which only fetches from Paramant relays.</p>
     <label class="field">
       <span data-i18n="opt_relay_url">Relay URL</span>
       <input type="url" id="relay" placeholder="https://relay.paramant.app" spellcheck="false">

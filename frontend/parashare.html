@@ -440,7 +440,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 }
 </script>
 <meta name="theme-color" content="#FFFFFF">
-<link rel="stylesheet" href="/app-2026.css?v=11">
+<link rel="stylesheet" href="/app-2026.css?v=12">
 <link rel="stylesheet" href="/done-state.css?v=1">
 <link rel="stylesheet" href="/parashare.css?v=3">
 <script src="/js/theme.js?v=6"></script>
@@ -572,6 +572,16 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     </div>
   </div>
 
+  <div class="card" id="ps-earlier" hidden>
+    <div class="card-head"><div class="dot"></div><div class="card-head-title">Uw links van deze sessie</div></div>
+    <div class="card-body">
+      <ul class="ps-links" id="ps-earlier-list"></ul>
+      <button type="button" class="ps-copy" id="ps-earlier-refresh" data-click="refreshSentLinks">Opnieuw kijken</button>
+      <p class="ps-meta">Bewaard in dit tabblad tot u het sluit.</p>
+    </div>
+  </div>
+
+
   <!-- Extra veilig: de live overdracht. Alleen bij "Naar één persoon". -->
   <label class="ps-safe" id="ps-safe" for="ps-extra-safe">
     <input type="checkbox" id="ps-extra-safe" data-change="toggleExtraSafe">
@@ -584,7 +594,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
       <input type="file" id="file-input" class="ps-sr" multiple data-change="onFileSelect" aria-describedby="file-status ps-drop-hint">
       <svg class="ps-drop-icon" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true" focusable="false"><path d="M8 3.5h11l6 6v19H8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M19 3.5v6h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path class="ps-drop-mark" d="M12.5 19.5l3 3 5.5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="ps-drop-btn" id="ps-drop-btn">Kies een bestand</span>
-      <span class="ps-drop-hint" id="ps-drop-hint">of sleep het hierheen. Meer bestanden gaan samen als één pakket.</span>
+      <span class="ps-drop-hint" id="ps-drop-hint">of sleep het hierheen. Kiest u er meer dan één, dan wordt elk bestand apart verzegeld en krijgt elk een eigen link.</span>
     </label>
     <div class="status-line" id="file-status" aria-live="polite">Nog geen bestand gekozen</div>
     <div id="vault-list" style="margin-top:8px;display:none"></div>
@@ -621,7 +631,6 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   <div class="ps-field" id="ps-ttl-field">
     <label class="ps-field-label" for="ttl-select">Hoe lang blijft de link open?</label>
     <select id="ttl-select">
-      <option value="30000">30 seconden</option>
       <option value="300000">5 minuten</option>
       <option value="3600000" selected>1 uur</option>
       <option value="86400000">24 uur</option>
@@ -820,7 +829,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <div class="step" id="step-done">
   <div class="done-state">
     <img class="done-mark" src="/assets/parapear/parapear-success.png" alt="" aria-hidden="true" decoding="async" width="96" height="96">
-    <h2 class="done-title" id="done-title">Aangekomen bij de ontvanger.</h2>
+    <h2 class="done-title" id="done-title">Verstuurd naar de ontvanger.</h2>
     <p class="done-line" id="done-status">Uw bestand is onderweg.</p>
 
     <div class="done-payload"></div>
@@ -830,13 +839,25 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
       <button type="button" class="done-quiet" id="done-receipt" hidden>Bewijs bewaren</button>
     </div>
 
-    <details class="done-details">
+    <details class="done-details" id="done-details-live">
       <summary>Waarom dit veilig was</summary>
       <div class="done-details-body">
         <p>Het slot is in uw browser gemaakt, niet op onze server. Uw bestand werd verzegeld voor de eigen sleutel van de ontvanger voordat het dit apparaat verliet: een hybride sleuteluitwisseling, <code>ML-KEM-768</code> naast <code>ECDH P-256</code>, met beide gedeelde geheimen samengevoegd tot één <code>AES-256-GCM</code>-sleutel. Wie er één van de twee breekt, heeft nog niets. Daarom zit de klassieke helft er nog in.</p>
         <p>De controlecode die u aan elkaar voorlas, berekenen beide browsers zelf uit de openbare sleutels van de ontvanger. Tonen beide schermen dezelfde code, dan heeft niemand onderweg een sleutel verwisseld. Daarom vragen we u hem te vergelijken via een kanaal dat niet van ons is.</p>
         <p>Wij bewaren een verzegelde kopie. De sleutel hebben wij nooit gehad, dus wij kunnen die kopie niet openen. Hij wordt gewist zodra de ontvanger hem ophaalt. Haalt niemand hem op, dan wordt hij vernietigd als de tijd om is.</p>
         <p><strong>Bewijs bewaren</strong> slaat de regel op die deze verzending in ons openbare logboek maakte. Iedereen kan die controleren in <a href="/ct-log">het logboek</a>: de regel, de plek in de boom en de ondertekende boomkop.</p>
+      </div>
+    </details>
+    <!-- Versturen op naam is een ander pad dan de live-overdracht: de sleutel is
+         verpakt met een token per ontvanger en dat token staat in de uitnodiging
+         die onze server mailt. Dus geen zero-knowledge; dit blok zegt dat eerlijk
+         en vervangt het live-blok hierboven (parashare.page.js, toonVerzending). -->
+    <details class="done-details" id="done-details-named" hidden>
+      <summary>Hoe dit beveiligd is</summary>
+      <div class="done-details-body">
+        <p>Uw browser heeft het bestand verzegeld voordat het dit apparaat verliet (<code>AES-256-GCM</code>). De sleutel is per ontvanger verpakt met een eigen link.</p>
+        <p>Die link zit in de uitnodiging die onze server aan de ontvanger mailt. Op het moment van versturen kan onze server dus bij de sleutel. Dit is daarom geen zero-knowledge, anders dan de live-overdracht met een controlecode. Wilt u dat wij nooit bij de sleutel kunnen, gebruik dan de live-overdracht.</p>
+        <p>De ontvanger bevestigt eerst het eigen e-mailadres met een code die naar hetzelfde adres gaat. Wie alleen de link heeft, komt er zo niet in. Wij bewaren de verzegelde kopie tot de ontvanger hem ophaalt of de tijd om is.</p>
       </div>
     </details>
   </div>
@@ -896,7 +917,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <script src="/vendor/qrcode.min.js?v=1"></script>
 <script type="module" src="/js/parashare.inline1.js?v=4"></script>
 <script src="/js/delegate.js?v=1" defer></script>
-<script src="/js/quota-upgrade.js?v=7" defer></script>
+<script src="/js/quota-upgrade.js?v=8" defer></script>
 <!-- One sentence for "we broke it, here is what to do", shared with the signer.
      Plain script, above the page code that reads window.paramantErrors. -->
 <script src="/js/error-message.js?v=2" defer></script>
@@ -907,13 +928,13 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <!-- One date format for the whole site (#424). The Send-a-link stand prints
      an expiry moment, and a slashed locale date next to "24 hours on Firm"
      is the exact ambiguity that file exists to kill. -->
-<script src="/js/format-date.js?v=2" defer></script>
-<script src="/js/done-state.js?v=1" defer></script>
+<script src="/js/format-date.js?v=3" defer></script>
+<script src="/js/done-state.js?v=2" defer></script>
 <script src="/js/handshake-meta.js?v=1" defer></script>
 <script src="/js/send-wrap.js?v=1" defer></script>
-<script src="/js/parashare.page.js?v=20" defer></script>
+<script src="/js/parashare.page.js?v=24" defer></script>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">

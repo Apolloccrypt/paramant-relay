@@ -97,7 +97,7 @@ ok('dashboard leads with three plain-language actions', await page.locator('.dh-
 // and signing alone is third. On a 390px screen the old order put both
 // ParaSign modes above the fold and pushed ParaSend out of sight, which made
 // the dashboard disagree with a homepage that sells two things.
-ok('signing actions enter the intended workflow', await page.locator('.dh-start-card').nth(0).getAttribute('href') === '/sign?mode=invite' && await page.locator('.dh-start-card').nth(1).getAttribute('href') === '/parashare' && await page.locator('.dh-start-card').nth(2).getAttribute('href') === '/sign?mode=alone', await page.locator('.dh-start').innerText());
+ok('signing actions enter the intended workflow', await page.locator('.dh-start-card').nth(0).getAttribute('href') === '/en/sign?mode=invite' && await page.locator('.dh-start-card').nth(1).getAttribute('href') === '/en/parashare' && await page.locator('.dh-start-card').nth(2).getAttribute('href') === '/en/sign?mode=alone', await page.locator('.dh-start').innerText());
 ok('open filter shows waiting and in-progress documents', await page.locator('.dh-document').count() === 2 && /Waiting for signatures/.test(await page.locator('#dh-documents').innerText()) && /In progress/.test(await page.locator('#dh-documents').innerText()), await page.locator('#dh-documents').innerText());
 ok('relay document counts fill every filter', await page.locator('[data-doc-count="open"]').innerText() === '2' && await page.locator('[data-doc-count="completed"]').innerText() === '1' && await page.locator('[data-doc-count="cancelled"]').innerText() === '1' && await page.locator('[data-doc-count="all"]').innerText() === '4', await page.locator('.dh-filters').innerText());
 ok('normal dashboard no longer loads developer operations', overviewRequests === 0 && !/API keys|More tools|Operations/.test(mainText), overviewRequests);
@@ -112,7 +112,7 @@ if (process.env.PARAMANT_DASHBOARD_SCREENSHOT_PATH) await stableScreenshot(page,
 
 await page.locator('[data-doc-filter="completed"]').click();
 ok('completed filter shows only completed work', await page.locator('.dh-document').count() === 1 && /Completed contract/.test(await page.locator('#dh-documents').innerText()), await page.locator('#dh-documents').innerText());
-await page.locator('.dh-document').click();
+await page.locator('.dh-document .dh-document-open').click();
 const completedDialogMetrics = await page.locator('#dh-document-dialog').evaluate((node) => {
   const box = node.getBoundingClientRect();
   const style = getComputedStyle(node);
@@ -122,7 +122,7 @@ const completedDialogMetrics = await page.locator('#dh-document-dialog').evaluat
 });
 const completedDialogInViewport = !completedDialogMetrics.hidden && completedDialogMetrics.top >= -5 && completedDialogMetrics.left >= -5 && completedDialogMetrics.bottom <= completedDialogMetrics.innerHeight + 5 && completedDialogMetrics.right <= completedDialogMetrics.innerWidth + 5;
 console.error('[n]', await page.locator('.dh-document').count(), '[body]', (await page.locator('#dh-document-dialog-body').innerText().catch(()=>'-')).slice(0,80));
-ok('completed document exposes proof export with honest storage guidance', completedDialogInViewport && await page.locator('a[download]').getAttribute('href') === '/api/user/documents/env_complete_abcdefghijklmnop/receipt' && /not a plaintext copy/i.test(await page.locator('#dh-document-dialog-body').innerText()), JSON.stringify(completedDialogMetrics));
+ok('completed document exposes proof export with honest storage guidance', completedDialogInViewport && await page.locator('#dh-document-dialog a[download]').getAttribute('href') === '/api/user/documents/env_complete_abcdefghijklmnop/receipt' && /not a plaintext copy/i.test(await page.locator('#dh-document-dialog-body').innerText()), JSON.stringify(completedDialogMetrics));
 if (process.env.PARAMANT_DASHBOARD_DETAIL_SCREENSHOT_PATH) {
   await page.waitForTimeout(100);
   await stableScreenshot(page.locator('#dh-document-dialog'), { path:process.env.PARAMANT_DASHBOARD_DETAIL_SCREENSHOT_PATH });

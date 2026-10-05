@@ -12,7 +12,7 @@ Gebruik:
 
 Omgeving:
   PARAMANT_SECTORS_DIR   Pad naar sector dirs (default: /home/paramant)
-  PARAMANT_RELAY_BASE    Base URL voor /v2/check-key calls (default: https://health.paramant.app)
+  PARAMANT_RELAY_<SECTOR> Relay-URL per sector (default: http://127.0.0.1:3000-3004, zoals docker-compose.yml)
 """
 import os, sys, json, secrets, argparse, re, urllib.request, urllib.error
 from datetime import datetime, timezone
@@ -106,13 +106,12 @@ def _users_json_path(sector):
     return legacy
 
 SECTORS = {s: _users_json_path(s) for s in SECTOR_NAMES}
-RELAY_URLS = {
-    'main':    'https://relay.paramant.app',
-    'health':  'https://health.paramant.app',
-    'legal':   'https://legal.paramant.app',
-    'finance': 'https://finance.paramant.app',
-    'iot':     'https://iot.paramant.app',
-}
+# The relays on THIS host, as docker-compose.yml maps them (127.0.0.1:3000-3004).
+# This used to be the five *.paramant.app hosts, so `sync` sent a self-hoster's
+# ADMIN_TOKEN to Paramant's servers (SELF-10). Override per sector with
+# PARAMANT_RELAY_<SECTOR>, e.g. PARAMANT_RELAY_HEALTH=http://127.0.0.1:3001.
+_DEFAULT_PORTS = {'main': 3000, 'health': 3001, 'finance': 3002, 'legal': 3003, 'iot': 3004}
+RELAY_URLS = {s: os.environ.get(f'PARAMANT_RELAY_{s.upper()}', f'http://127.0.0.1:{p}') for s, p in _DEFAULT_PORTS.items()}
 VALID_PLANS = ('free', 'pro', 'enterprise')
 
 # ── Kleuren ───────────────────────────────────────────────────────────────────
@@ -242,11 +241,13 @@ def cmd_sync(args):
         if not base: continue
         url = f'{base}/v2/reload-users'
         req = urllib.request.Request(url, data=b'{}', method='POST',
-            headers={'X-Admin-Token': ADMIN_TOKEN, 'Content-Type': 'application/json'})
+            # /v2/reload-users reads X-Api-Key or Authorization (it never read
+            # X-Admin-Token, so every sync was a 401).
+            headers={'X-Api-Key': ADMIN_TOKEN, 'Authorization': f'Bearer {ADMIN_TOKEN}', 'Content-Type': 'application/json'})
         try:
             resp = json.loads(urllib.request.urlopen(req, timeout=6).read())
             if resp.get('ok'):
-                ok(f'{sector}: {resp.get("keys_loaded", "?")} keys loaded (zero downtime)')
+                ok(f'{sector}: {resp.get("loaded", resp.get("keys_loaded", "?"))} keys loaded (zero downtime)')
             else:
                 err(f'{sector}: {resp}')
         except Exception as e:

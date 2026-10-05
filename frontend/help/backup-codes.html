@@ -270,7 +270,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <h2>Wat back-upcodes zijn</h2>
 
-  <p>Een back-upcode is een vooraf gemaakte code van 12 tekens die bij het inloggen uw TOTP-code van 6 cijfers vervangt. Na gebruik vervalt de code en werkt hij niet meer. U begint met 10. Zijn ze op, dan moet u support vragen uw account met de hand te herstellen.</p>
+  <p>Een back-upcode is een vooraf gemaakte code van 12 tekens die bij het inloggen uw TOTP-code van 6 cijfers vervangt. Na gebruik vervalt de code en werkt hij niet meer. U begint met 10. Zolang u nog kunt inloggen, maakt u op uw accountpagina een nieuwe set. Zijn ze op en is uw authenticator-app weg, dan herstelt alleen support uw toegang.</p>
 
   <div class="warn"><p>Back-upcodes zijn net zo gevoelig als uw API-sleutel. Wie er een heeft, kan inloggen op uw account zonder het toestel met uw authenticator-app.</p></div>
 
@@ -284,7 +284,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">1</div>
     <div class="step-body">
       <h2>Ga naar de inlogpagina</h2>
-      <p>Open <a href="/auth/login">paramant.app/auth/login</a> en vul zoals altijd uw e-mailadres en API-sleutel in.</p>
+      <p>Open <a href="/auth/login">paramant.app/auth/login</a>. Inloggen vraagt uw e-mailadres en daarna een passkey of een code van 6 cijfers. Een API-sleutel heeft u hier niet nodig.</p>
     </div>
   </div>
 
@@ -292,7 +292,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">2</div>
     <div class="step-body">
       <h2>Klik op "Inloggen met een back-upcode"</h2>
-      <p>Onder het TOTP-veld ziet u een link: <strong>Inloggen met een back-upcode</strong>. Klik erop. Het veld voor 6 cijfers wordt dan een tekstveld voor uw volledige back-upcode.</p>
+      <p>Onder het inlogformulier staat <strong>Authenticator-app kwijt? Inloggen met een back-upcode</strong>. Die link opent een aparte pagina, <a href="/auth/backup">paramant.app/auth/backup</a>, met een veld voor uw e-mailadres en een veld voor de back-upcode.</p>
     </div>
   </div>
 
@@ -300,7 +300,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">3</div>
     <div class="step-body">
       <h2>Vul de code in</h2>
-      <p>Typ of plak een van uw ongebruikte back-upcodes en klik op <strong>Inloggen met back-upcode</strong>. De code is meteen verbruikt. Gebruik dezelfde code niet nog eens.</p>
+      <p>Vul uw e-mailadres in, typ of plak een van uw ongebruikte back-upcodes (twaalf tekens, drie groepen van vier) en klik op <strong>Inloggen met back-upcode</strong>. De code is meteen verbruikt. Gebruik dezelfde code niet nog eens.</p>
     </div>
   </div>
 
@@ -308,13 +308,13 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
     <div class="step-num">4</div>
     <div class="step-body">
       <h2>Koppel uw authenticator-app opnieuw</h2>
-      <p>Ga in het dashboard naar <strong>Account &rarr; Beveiliging &rarr; Nieuwe authenticator-app instellen</strong> en koppel een nieuwe app. Doe dit voordat de sessie verloopt (1 uur), zodat u niet opnieuw buitengesloten raakt.</p>
+      <p>Ga naar <a href="/account">Account</a> &rarr; <strong>Beveiliging</strong> &rarr; <strong>Nieuwe authenticator-app instellen</strong>. U krijgt een instelmail en koppelt daarmee een nieuwe app. Doe dit meteen: een sessie loopt af na een uur zonder activiteit, en na twaalf uur altijd.</p>
     </div>
   </div>
 
   <h2>Nieuwe back-upcodes maken</h2>
 
-  <p>Dashboard &rarr; Account &rarr; Beveiliging &rarr; <strong>Back-upcodes</strong> &rarr; <strong>Alle codes vernieuwen</strong>. U bevestigt met uw TOTP-code. Op dat moment vervallen de oude codes. Bewaar de nieuwe set meteen.</p>
+  <p><a href="/account">Account</a> &rarr; <strong>Beveiliging</strong> &rarr; <strong>Back-upcodes</strong> &rarr; <strong>Alle codes vernieuwen</strong>. U bevestigt met de code van 6 cijfers uit uw authenticator-app, of met een back-upcode. Op dat moment vervallen de oude codes. De nieuwe set ziet u één keer: bewaar hem meteen.</p>
 
   <h2>Waar u back-upcodes bewaart</h2>
 
@@ -337,7 +337,7 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 
   <div class="troubleshoot-item">
     <div class="q">Kan ik zien welke codes ik al heb gebruikt?</div>
-    <div class="a">Nee. Het dashboard toont alleen hoeveel codes er over zijn. Een gebruikte code is weg. Weet u niet zeker welke codes nog gelden, maak dan een nieuwe set zolang u nog met TOTP kunt inloggen.</div>
+    <div class="a">Nee. Het dashboard toont alleen hoeveel codes er over zijn. Een gebruikte code is weg. Weet u niet zeker welke codes nog gelden, maak dan een nieuwe set zolang u nog kunt inloggen.</div>
   </div>
 
   <div class="troubleshoot-item">
@@ -393,6 +393,6 @@ footer{border-top:1px solid var(--ink-hair);padding:40px 48px;display:flex;align
 </footer>
 
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=12" defer></script>
+<script src="/js/nav-auth.js?v=18" defer></script>
 </body>
 </html>
