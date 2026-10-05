@@ -203,7 +203,7 @@ function usersTable(users){
         '<td class="mono" style="font-size:11px;color:#475569">'+(u.created?u.created.split('T')[0]:'-')+'</td>'+
         '<td><div class="amw">'+
           '<button class="amb" aria-haspopup="menu" aria-expanded="false" data-click="toggleMenu" data-menu="m'+i+'">···</button>'+
-          '<div class="am" role="menu" id="m'+i+'" data-key="'+ki+'" data-email="'+em+'" data-plan="'+pl+'" data-label="'+esc(u.label||'')+'" data-created="'+esc(u.created||'')+'" data-totp-req="'+(u.totp_required?'true':'false')+'">'+
+          '<div class="am" role="menu" id="m'+i+'" data-key="'+ki+'" data-email="'+em+'" data-plan="'+pl+'" data-label="'+esc(u.label||'')+'" data-created="'+esc(u.created||'')+'" data-totp-req="'+(u.totp_required?'true':'false')+'" data-parasign="'+(u.parasign?'true':'false')+'" data-pp-sign="'+esc(u.plan_parasign||'')+'" data-pp-send="'+esc(u.plan_parasend||'')+'">'+
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="details">Gegevens bekijken</button>'+
             '<div class="ag-lbl">E-mail</div>'+
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="welcome"'+(hasE?'':' disabled')+'>Welkomstmail sturen</button>'+
@@ -212,6 +212,10 @@ function usersTable(users){
             '<div class="ag-lbl">Account</div>'+
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="plan">Abonnement wijzigen</button>'+
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="revoke-sessions">Sessies intrekken</button>'+
+            '<div class="ag-lbl">ParaSign</div>'+
+            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="product-plan">Plan per product zetten</button>'+
+            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="parasign-toggle">'+(u.parasign?'ParaSign-API uitzetten':'ParaSign-API aanzetten')+'</button>'+
+            '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="parasign-onboard"'+(hasE?'':' disabled')+'>ParaSign-uitleg mailen</button>'+
             '<div class="ag-lbl">Beveiliging</div>'+
             '<button role="menuitem" tabindex="-1" data-click="uAction" data-uact="force-totp">'+(u.totp_required?'TOTP-verplichting opheffen':'TOTP verplicht stellen')+'</button>'+
 '<div class="ag-lbl danger">Onomkeerbaar</div>'+
@@ -225,8 +229,11 @@ function usersTable(users){
 
 function toggleMenu(e,id){
   e.stopImmediatePropagation();
-  const btn=e.currentTarget||e.target;
   const m=document.getElementById(id);
+  // Delegated click: e.currentTarget is the document, which has no setAttribute
+  // (WebKit threw on every menu open; same fix as admin/public/app.js ADMIN-07-G).
+  // The menu's own button sits right before it.
+  const btn=(m&&m.previousElementSibling&&m.previousElementSibling.setAttribute)?m.previousElementSibling:{setAttribute(){}};
   const wasOpen=m.classList.contains('open');
   if(openMenu){openMenu.classList.remove('open');const ob=openMenu.previousElementSibling;if(ob)ob.setAttribute('aria-expanded','false');}
   if(!wasOpen){
@@ -281,9 +288,44 @@ function uAction(action,btn){
         toast(r.ok?'Sessies ingetrokken ('+(r.data?.revoked||0)+')':'Mislukt: '+(r.data?.error||'onbekend'),r.ok?'ok':'err');
       });
       break;
+    case 'product-plan': setProductPlanFlow(key,m.dataset.ppSign,m.dataset.ppSend); break;
+    case 'parasign-toggle': {
+      const enabled=m.dataset.parasign!=='true';
+      api('/admin/set-parasign',{method:'POST',body:JSON.stringify({key,enabled})}).then(r=>{
+        toast(r.ok?('ParaSign-API '+(enabled?'aangezet':'uitgezet')):'Mislukt: '+(r.data?.error||'onbekend'),r.ok?'ok':'err');
+        if(r.ok){LOADED.users=false;loadUsers();}
+      });
+      break;
+    }
+    case 'parasign-onboard':
+      if(!confirm('ParaSign-uitleg mailen naar '+(email||key.slice(0,20)+'…')+'?'))return;
+      api('/admin/send-parasign-onboarding',{method:'POST',body:JSON.stringify({key})}).then(r=>{
+        toast(r.ok?'ParaSign-uitleg verstuurd':'Mislukt: '+(r.data?.error||'onbekend'),r.ok?'ok':'err');
+      });
+      break;
     case 'disable': openDisableKeyModal(key,email); break;
     case 'delete':  openDeleteAccountModal(key,email); break;
   }
+}
+// Zelfde route als het hoofdscherm (admin/public/app.js doSetProductPlan):
+// een weigering omdat er een hoger plan loopt is geen gedeeltelijke fout;
+// verlagen met behoud van de einddatum is een aparte, expliciete stap.
+async function setProductPlanFlow(key,ppSign,ppSend){
+  const product=(prompt('Welk product? parasign of parasend','parasign')||'').trim().toLowerCase();
+  if(!product)return;
+  if(product!=='parasign'&&product!=='parasend'){toast('Onbekend product: '+product,'err');return;}
+  const current=product==='parasign'?ppSign:ppSend;
+  const tier=(prompt('Nieuw plan voor '+product+' (nu: '+(current||'-')+')',current||'pro')||'').trim().toLowerCase();
+  if(!tier)return;
+  const notify=confirm('De klant een mail sturen over deze wijziging?');
+  let r=await api('/admin/set-product-plan',{method:'POST',body:JSON.stringify({key,product,tier,notify})});
+  if(r.data?.error==='lower_than_running'){
+    if(!confirm((r.data.message||'Er loopt een hoger plan.')+'\n\nDe lopende termijn naar '+tier+' zetten en de einddatum houden?')){toast('Niets gewijzigd','warn');return;}
+    r=await api('/admin/set-product-plan',{method:'POST',body:JSON.stringify({key,product,tier,notify,downgrade:true})});
+  }
+  const failed=(r.data?.failed_sectors||[]).map(x=>x.sector).join(', ');
+  toast(r.data?.ok?(product+' → '+tier+' op alle sectoren'):'Mislukt'+(failed?' op: '+failed:': '+(r.data?.error||'onbekend')),r.data?.ok?'ok':'err');
+  if(r.data?.ok){LOADED.users=false;loadUsers();}
 }
 function showNewKeyModal(){
   const o=document.createElement('div');
