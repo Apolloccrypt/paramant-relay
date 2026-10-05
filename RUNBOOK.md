@@ -86,6 +86,17 @@ bash deploy/ops/backup-full-state.sh --recipients    # expect "recipients: 2" or
 1. Only from **[admin]**. Read `deploy/DEPLOY-3.1.md` once before the first deploy.
 2. `main` is green in CI for the commit you deploy. Nothing gets merged while a deploy runs: the script expects one HEAD from start to finish.
 3. Preflight, read-only: `bash deploy/deploy-3.1.sh --preflight-only`
+   Mail carrier, **[server]**: the production `.env` must carry `MAIL_PROVIDER`
+   explicitly, `MAIL_PROVIDER=mailjet` as in `deploy/.env.example`. Left empty,
+   the relay takes the first carrier whose keys are present and lettermint heads
+   that list, so filling in `LETTERMINT_API_TOKEN` would switch carrier without
+   anyone deciding it. Check first that `MAILJET_API_KEY` and
+   `MAILJET_SECRET_KEY` are in that same `.env` (`grep -c '^MAILJET_' .env`
+   gives 2; names only, never print the values). A pinned carrier without keys
+   delivers nothing. Are they missing, then pin the carrier whose keys are there
+   and that `deploy/partners.json` lists as `actief`, and fix partners.json in
+   the same change. After the deploy the boot log's mail diagnosis must say that
+   provider with `gereed` true.
 4. Start detached, so a dropped connection does not kill it halfway:
    `setsid nohup bash deploy/deploy-3.1.sh > deploy-$(date +%Y%m%d-%H%M).log 2>&1 < /dev/null &`
 5. Follow it with `tail -f deploy-*.log`. Phase 2 prints a `TS`; write it down.
