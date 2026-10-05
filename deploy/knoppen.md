@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **120 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **212 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **213 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -215,6 +215,7 @@ overschrijven zonder de code aan te raken.
 | `NGINX_PAYLOAD` | `deploy/deploy-3.1.sh` | leeg | intern: de regels die `remote_nginx` voor een remote blok zet (de conf en het snippet van 5e, base64). Geen operatorknop |
 | `NGINX_REF` | `deploy/deploy-3.1.sh` | `$DEPLOYED_HEAD` / `$DEPLOY_REF` | intern: de waarde van `PARAMANT_NGINX_REF` binnen fase 5e. Geen operatorknop |
 | `PARAMANT_API_KEY` | `scripts/paramant-cra.sh`, `scripts/paramant-firmware.sh` en 5 meer | `$(python3 -c "import json; print(json.load(open('${CFG` | sleutel voor de losse sectorscripts |
+| `PARAMANT_AIDE_MAX_AGE_DAYS` | `deploy/deploy-3.1.sh` | `2` | stap 6l: hoe oud de laatste AIDE-controle op de host mag zijn; /dpa noemt hetzelfde getal |
 | `PARAMANT_APP` | `scripts/security/audit.sh` | `https://paramant.app` | welke site het beveiligingsauditscript meet |
 | `PARAMANT_BACKUP_DIR` | `deploy/deploy-3.1.sh` | `/home/paramant/backups` | waar de deploy zijn back-ups zet |
 | `PARAMANT_BACKUP_HOST_PATHS` | `deploy/ops/backup-full-state.sh` | `/opt/paramant-relay/.env /etc/nginx /etc/letsencrypt /etc/caddy /home/paramant/secrets` | welke hostpaden de volledige-staatback-up onder host/ meeneemt |
