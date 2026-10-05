@@ -28,6 +28,9 @@ function deps(answers) {
     J: JSON.stringify,
     log: () => {},
     webhookRetryDelaysMs: [0, 0],
+    // The lib unrefs its retry timer; a ref'd one here keeps this script alive
+    // between attempts (otherwise node exits 0 halfway, without a word).
+    webhookSleep: (ms) => new Promise((r) => setTimeout(r, ms)),
     store: { async getMeta() { return { webhook_url: 'https://hooks.example.test/x', webhook_secret: secret, metadata: {} }; } },
     async safeHttpsRequest(url, o) {
       calls.push({ event: o.headers['X-Paramant-Event'], attempt: o.headers['X-Paramant-Attempt'], delivery: o.headers['X-Paramant-Delivery'], sig: o.headers['X-Paramant-Sig'], body: o.body });
