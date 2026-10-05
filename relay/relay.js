@@ -10191,7 +10191,7 @@ async function handleRelayRequest(req, res) {
     if (!keyData) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'unauthorized' })); }
     if (!redisClient || !redisClient.isReady) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis }));
+      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis, message_nl: coupon.MESSAGES_NL.no_redis }));
     }
     let body;
     try { body = JSON.parse((await readBody(req, 512)).toString() || '{}'); }
@@ -10207,7 +10207,7 @@ async function handleRelayRequest(req, res) {
       if (redisOutage503(e, res)) return;
       log('warn', 'coupon_claim_failed', { account: String(accountId).slice(0, 12), err: e.message });
       res.writeHead(503, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis }));
+      return res.end(J({ error: 'redeem_unavailable', message: coupon.MESSAGES.no_redis, message_nl: coupon.MESSAGES_NL.no_redis }));
     }
     if (!claim.ok) {
       // 409 for a code that exists and cannot be spent (run out, already used,
@@ -10217,7 +10217,7 @@ async function handleRelayRequest(req, res) {
       const status = claim.error === 'unknown' || claim.error === 'bad_code' ? 404 : 409;
       log('info', 'coupon_refused', { account: String(accountId).slice(0, 12), reason: claim.error });
       res.writeHead(status, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: claim.error, message: coupon.messageFor(claim.error) }));
+      return res.end(J({ error: claim.error, message: coupon.messageFor(claim.error), message_nl: coupon.messageForNl(claim.error) }));
     }
 
     // Rule 3 (lib/coupon.js): the gift is ADDED to a term that is still
@@ -10266,7 +10266,7 @@ async function handleRelayRequest(req, res) {
       await coupon.release(redisClient, claim.code, accountId);
       log('error', 'coupon_grant_failed', { account: String(accountId).slice(0, 12), code: claim.code, reason: failure });
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'grant_failed', message: coupon.MESSAGES.grant_failed }));
+      return res.end(J({ error: 'grant_failed', message: coupon.MESSAGES.grant_failed, message_nl: coupon.MESSAGES_NL.grant_failed }));
     }
     if (granted.length === 0) {
       // Nothing to add anywhere. The seat goes back, so the code is not spent
@@ -10275,7 +10275,7 @@ async function handleRelayRequest(req, res) {
       log('info', 'coupon_refused', { account: String(accountId).slice(0, 12), reason: 'nothing_to_add',
         kept: kept.map((k) => `${k.product}:${k.tier}`).join(',') });
       res.writeHead(409, { 'Content-Type': 'application/json' });
-      return res.end(J({ error: 'nothing_to_add', kept, message: coupon.nothingToAddMessage(kept) }));
+      return res.end(J({ error: 'nothing_to_add', kept, message: coupon.nothingToAddMessage(kept), message_nl: coupon.nothingToAddMessageNl(kept) }));
     }
 
     // The line on /account. Written after the term is really on the account, so
@@ -10286,6 +10286,7 @@ async function handleRelayRequest(req, res) {
     await billingHistory.recordGift(redisClient, accountId, {
       code: claim.code,
       label: coupon.historyLabel(claim.code, granted),
+      label_nl: coupon.historyLabelNl(claim.code, granted),
       grants: granted,
       redeemed_at: redeemedAt,
     });
@@ -10319,6 +10320,7 @@ async function handleRelayRequest(req, res) {
       // The sentence the page prints. Built here so the mail, the history line
       // and the page all name the same plans and the same dates.
       message: coupon.successMessage(granted, kept),
+      message_nl: coupon.successMessageNl(granted, kept),
     }));
   }
 

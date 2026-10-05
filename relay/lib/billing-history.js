@@ -61,6 +61,22 @@ function tierName(tier) {
   return t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
 }
 
+// The Dutch line for a document. Built from the fields the record carries
+// (product, plan, interval), so it names the same supply as the English
+// description without parsing that sentence. A record without them (older,
+// or hand-made) keeps its English description rather than a guess.
+function documentLabelNl(rec) {
+  if (rec.kind === 'credit_note') {
+    const what = rec.credits_kind === 'invoice' || !rec.credits_kind ? 'Creditnota' : 'Terugbetalingsbewijs';
+    return `${what} voor factuur ${rec.credit_for}${rec.partial ? ' (gedeeltelijk)' : ''}`;
+  }
+  if (!rec.product || !rec.plan) return rec.description || rec.title || 'Betaling';
+  const name = catalog.orderLabel({ product: rec.product, plan: rec.plan, tier: rec.plan });
+  if (!name) return rec.description || rec.title || 'Betaling';
+  const nl = name.replace(/ and /g, ' en ');
+  return `Paramant ${nl}, ${rec.interval === 'yearly' ? 'jaarplan' : 'maandplan'}`;
+}
+
 // ── the money rows ───────────────────────────────────────────────────────────
 // One row per document, in both series. The amount is the document's own total,
 // so a credit note is negative and the column adds up to what the customer
@@ -77,6 +93,12 @@ function documentRow(rec) {
     detail: isCredit
       ? (rec.reason === 'chargeback' ? 'Charged back' : 'Refunded')
       : (rec.kind === 'invoice' ? 'Paid' : 'Paid, receipt issued'),
+    // The Dutch /account reads these two; the English page and the API keep
+    // label and detail. The document itself stays as it was issued.
+    label_nl: documentLabelNl(rec),
+    detail_nl: isCredit
+      ? (rec.reason === 'chargeback' ? 'Teruggeboekt' : 'Terugbetaald')
+      : (rec.kind === 'invoice' ? 'Betaald' : 'Betaald, ontvangstbewijs verstuurd'),
     amount: rec.amount_gross,
     currency: rec.currency || 'EUR',
     document: rec.number,
@@ -165,6 +187,8 @@ function termRow({ product, endsAt, tier, notifiedAt }) {
     type: 'term_ended',
     label: `${plan} term ended`,
     detail: 'Account back on Community',
+    label_nl: `Termijn ${plan} afgelopen`,
+    detail_nl: 'Account terug op Community',
     amount: null,
     currency: null,
     document: null,
@@ -182,12 +206,24 @@ function giftRow(rec) {
     type: 'gift',
     label: rec.label,
     detail: 'No payment, no invoice',
+    // Written at redemption since 2026-10-05; an older record is rebuilt from
+    // the grants it holds, so a gift from before then is Dutch on /account too.
+    label_nl: rec.label_nl || giftLabelNl(rec),
+    detail_nl: 'Geen betaling, geen factuur',
     amount: null,
     currency: null,
     document: null,
     code: rec.code || null,
     grants: Array.isArray(rec.grants) ? rec.grants : [],
   };
+}
+
+function giftLabelNl(rec) {
+  const grants = Array.isArray(rec.grants) ? rec.grants : [];
+  if (!rec.code || grants.length === 0 || !grants[0].days) return rec.label;
+  // Required here and not at the top: coupon.js is the route's module, this
+  // file is the reader, and the one helper is all it needs from it.
+  return require('./coupon').historyLabelNl(rec.code, grants);
 }
 
 // Append one. Called by the redeem route after the term is actually on the

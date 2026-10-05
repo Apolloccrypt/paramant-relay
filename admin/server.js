@@ -4159,7 +4159,8 @@ async function sendCancellationScheduled(email, plan, cancelAt) {
   if (!mailer.gereed()) { console.warn('[billing] no mail provider configured'); return; }
   const planName = publicPlans.planName(plan);
   const cancelDate = new Date(cancelAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-  const msg = emailTemplates.billingCancellationEmail({ planName, cancelDate });
+  const cancelDateNl = new Date(cancelAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
+  const msg = emailTemplates.billingCancellationEmail({ planName, cancelDate, cancelDateNl });
   const res = await mailer.stuur({
     to: email, from: msg.from, replyTo: msg.replyTo,
     subject: msg.subject, text: msg.text, html: msg.html,
@@ -4380,6 +4381,24 @@ const AUDIT_LABEL = {
   plan_cancellation_scheduled: () => 'Cancellation scheduled',
   plan_downgraded: (m) => `Plan downgraded to ${m.to || 'Community'}`,
 };
+const AUDIT_LABEL_NL = {
+  plan_changed: (m) => `Plan gewijzigd van ${m.from || 'onbekend'} naar ${m.to || 'onbekend'}`,
+  plan_cancellation_scheduled: () => 'Opzegging gepland',
+  plan_downgraded: (m) => `Plan verlaagd naar ${m.to || 'Community'}`,
+};
+
+// One clock for both halves. The relay rows carry an ISO string, the audit
+// rows the number logAuditEvent wrote (Date.now()). Date.parse of that number
+// is NaN, so until 2026-10-05 every audit row (the cancellation among them)
+// sorted to the bottom under older payments (fase 1, PLAN-19). The row goes
+// out as ISO, like the rest, and the sort compares milliseconds.
+function historyTimeMs(ts) {
+  if (typeof ts === 'number') return ts;
+  const n = Number(ts);
+  if (typeof ts === 'string' && ts.trim() !== '' && Number.isFinite(n)) return n;
+  const p = Date.parse(ts);
+  return Number.isFinite(p) ? p : 0;
+}
 
 api.get("/user/billing/history", authUser, async (req, res) => {
   const { user_id } = req.userSession;
@@ -4395,10 +4414,13 @@ api.get("/user/billing/history", authUser, async (req, res) => {
   const audit = (events || []).map((e) => {
     const meta = e.metadata || {};
     const label = AUDIT_LABEL[e.event_type];
+    const labelNl = AUDIT_LABEL_NL[e.event_type];
+    const ms = historyTimeMs(e.ts);
     return {
-      ts: e.ts,
+      ts: ms ? new Date(ms).toISOString() : e.ts,
       type: e.event_type,
       label: label ? label(meta) : e.event_type,
+      label_nl: labelNl ? labelNl(meta) : null,
       detail: null,
       amount: null,
       currency: null,
@@ -4425,7 +4447,7 @@ api.get("/user/billing/history", authUser, async (req, res) => {
 
   const history = documents.concat(audit)
     .filter((row) => row && row.ts)
-    .sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts))
+    .sort((a, b) => historyTimeMs(b.ts) - historyTimeMs(a.ts))
     .slice(0, 50);
   res.json({ history });
 });

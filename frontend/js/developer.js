@@ -63,7 +63,21 @@
     byId('sign-cap').textContent = cap == null ? 'van --' : 'van ' + cap;
     var percent = cap == null ? 0 : Math.min(100, Math.round((used / Math.max(1, cap)) * 100));
     var bar = byId('sign-bar'); bar.style.width = percent + '%'; bar.className = percent >= 80 ? 'warn' : '';
-    byId('usage-note').textContent = cap == null ? 'Uw maandtegoed voor ondertekenen kon nu niet worden gelezen.' : 'Nog ' + Math.max(0, cap - used) + ' handtekeningen over deze maand.';
+    var note = byId('usage-note');
+    note.textContent = cap == null ? 'Uw maandtegoed voor ondertekenen kon nu niet worden gelezen.' : 'Nog ' + Math.max(0, cap - used) + ' handtekeningen over deze maand.';
+    // At 80% the bar turns orange, and an orange bar alone tells nobody what
+    // to do about it. The warning names the way up. It lived in dead code on
+    // /dashboard and was never shown (fase 1, DASH-27-N).
+    if (cap != null && percent >= 80) {
+      note.appendChild(document.createTextNode(percent >= 100
+        ? ' Uw tegoed is op. Meer nodig? '
+        : ' Bijna op. Meer nodig? '));
+      var up = document.createElement('a');
+      up.href = '/pricing';
+      up.id = 'usage-upgrade';
+      up.textContent = 'Bekijk een groter plan';
+      note.appendChild(up);
+    }
     renderActivity((data.audit || []).filter(isSignEvent));
   }
 
