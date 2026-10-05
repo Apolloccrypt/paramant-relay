@@ -241,7 +241,7 @@ async function openFailures(focus){
   const intro=focus==='mails'
     ?'<p class="lead">De laatste twintig mails die de beheerkant niet kwijt kon, met de reden van de verzender. Adressen worden niet bewaard.</p>'
     :'<p class="lead">De laatste twintig keer dat deze dienst "te veel verzoeken" antwoordde. Het pad is ingekort tot zijn vaste delen.</p>';
-  body.innerHTML=intro+(list.length?'<table class="tbl cards"><thead><tr><th>Wanneer</th>'+(focus==='mails'?'<th>Onderwerp</th><th>Reden</th>':'<th>Verzoek</th>')+'</tr></thead><tbody>'+list.map(x=>'<tr><td data-label="Wanneer">'+whenCell(x.ts)+'</td>'+(focus==='mails'?'<td data-label="Onderwerp">'+esc(x.subject||'-')+'</td><td data-label="Reden">'+esc((x.reason||'onbekend')+(x.provider?' via '+x.provider:''))+'</td>':'<td data-label="Verzoek" class="mono">'+esc(x.method+' '+x.path)+'</td>')+'</tr>').join('')+'</tbody></table>':'<div class="empty">Niets gevonden in de laatste drie dagen.</div>');
+  body.innerHTML=intro+(list.length?'<table class="tbl cards"><thead><tr><th>Wanneer</th>'+(focus==='mails'?'<th>Kenmerk</th><th>Reden</th>':'<th>Verzoek</th>')+'</tr></thead><tbody>'+list.map(x=>'<tr><td data-label="Wanneer">'+whenCell(x.ts)+'</td>'+(focus==='mails'?'<td data-label="Kenmerk" class="mono" title="Vingerafdruk van het onderwerp; het onderwerp zelf wordt niet bewaard">'+esc(x.subject_fp||'-')+'</td><td data-label="Reden">'+esc((x.reason||'onbekend')+(x.provider?' via '+x.provider:''))+'</td>':'<td data-label="Verzoek" class="mono">'+esc(x.method+' '+x.path)+'</td>')+'</tr>').join('')+'</tbody></table>':'<div class="empty">Niets gevonden in de laatste drie dagen.</div>');
 }
 
 /* ── Klanten ─────────────────────────────────────────────────────────────── */

@@ -20,6 +20,8 @@
 
 // psk-sleutels van de open API hebben een soort ertussen: psk_live_<hex> en
 // psk_test_<hex> (relay/lib/keys-table.js).
+const crypto = require('crypto');
+
 const KEY_RE = /\b(pgp|psk)_(?:live_|test_)?[0-9a-f]{8,}\b/gi;
 
 function maskKey(k) {
@@ -548,7 +550,39 @@ function problems({ relays, mails, http429, ct, redisMem }) {
   return out;
 }
 
+// ── Mislukte mails ──────────────────────────────────────────────────────────
+// Een mislukte mail wordt drie dagen bewaard en aan de beheerder getoond. Het
+// onderwerp gaat daar NIET in: bij een ondertekenuitnodiging kiest de klant het
+// onderwerp zelf (email-templates.js signingInviteEmail), en dat is
+// klantinhoud, net als de bestandsnamen die de templates om /dpa al weghouden
+// (review 573, L1). Gekozen is voor een vingerafdruk: de eerste 8 hex van
+// SHA-256 over het onderwerp. Daaraan ziet de beheerder of dezelfde mail
+// steeds opnieuw faalt, zonder te lezen waar die over ging. Reden en
+// provider blijven, die zijn van ons.
+function subjectFingerprint(subject) {
+  const s = String(subject || '');
+  return s ? crypto.createHash('sha256').update(s).digest('hex').slice(0, 8) : null;
+}
+
+function mailFailedEntry(msg, r, now) {
+  return {
+    ts: now,
+    reason: (r && r.reason) || (r === 'exception' ? 'exception' : 'unknown'),
+    provider: (r && r.provider) || null,
+    subject_fp: subjectFingerprint(msg && msg.subject),
+  };
+}
+
+// Wat er van een opgeslagen fout naar het paneel gaat. Regels van voor deze
+// wijziging droegen nog een leesbaar onderwerp; dat veld gaat er hier af.
+function failureForBrowser(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const { subject: _weg, ...rest } = entry;
+  return rest;
+}
+
 module.exports = {
+  subjectFingerprint, mailFailedEntry, failureForBrowser,
   maskKey, isKey, scrubKeys, EVENT_NL, eventLabel, summarize, buildWhoMap, whoFor,
   normalizeEvent, auditRow, eventTimeMs, cents, intervalMonths, creditsByInvoice,
   documentStatus, documentRow, describeNl, monthRevenue, computeMrr, euro, ymOf, parseMetrics,

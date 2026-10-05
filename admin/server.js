@@ -306,7 +306,8 @@ app.use(clientIpForward.middleware);
 // Twee tellers voor het overzicht van het beheerscherm (lib/beheer.js): elke
 // 429 die deze dienst geeft, en elke mail die niet weg kon. Per uur, drie dagen
 // bewaard, plus de laatste twintig met soort en tijd (nooit een adres of een
-// token: het pad wordt ingekort tot zijn vaste delen). Een teller is nooit een
+// token: het pad wordt ingekort tot zijn vaste delen; van een mail nooit het
+// onderwerp, alleen een vingerafdruk). Een teller is nooit een
 // poort; lukt het schrijven niet, dan gaat het verzoek gewoon door.
 function _telLog(kind, entry) {
   let c; try { c = redis(); } catch { return; }
@@ -328,8 +329,9 @@ app.use((req, res, next) => {
   mailer.stuur = async function stuurGeteld(msg, opts) {
     let r;
     try { r = await _stuur.call(this, msg, opts); }
-    catch (e) { _telLog('mail_failed', { ts: Date.now(), reason: 'exception', provider: null, subject: String((msg && msg.subject) || '').slice(0, 80) }); throw e; }
-    if (!r || !r.ok) _telLog('mail_failed', { ts: Date.now(), reason: (r && r.reason) || 'unknown', provider: (r && r.provider) || null, subject: String((msg && msg.subject) || '').slice(0, 80) });
+    catch (e) { _telLog('mail_failed', beheer.mailFailedEntry(msg, 'exception', Date.now())); throw e; }
+    // Geen onderwerp, alleen een vingerafdruk ervan: zie mailFailedEntry.
+    if (!r || !r.ok) _telLog('mail_failed', beheer.mailFailedEntry(msg, r, Date.now()));
     return r;
   };
 }
@@ -4666,7 +4668,7 @@ async function redisMemory() {
 
 async function lastFailures(kind, n = 20) {
   try {
-    return (await redis().lRange(`paramant:admin:tel:${kind}:log`, 0, n - 1)).map((x) => { try { return JSON.parse(x); } catch { return null; } }).filter(Boolean);
+    return (await redis().lRange(`paramant:admin:tel:${kind}:log`, 0, n - 1)).map((x) => { try { return beheer.failureForBrowser(JSON.parse(x)); } catch { return null; } }).filter(Boolean);
   } catch { return []; }
 }
 

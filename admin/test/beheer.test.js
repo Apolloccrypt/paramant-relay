@@ -38,6 +38,18 @@ test('scrubKeys en isKey kennen ook psk_live_ en psk_test_ (review 573 L2)', () 
   }
 });
 
+test('een mislukte mail bewaart geen onderwerp, alleen een vingerafdruk (review 573 L1)', () => {
+  const msg = { to: 'demo@example.com', subject: 'Opzegging huurcontract Acme' };
+  const e = beheer.mailFailedEntry(msg, { ok: false, reason: 'http_502', provider: 'resend' }, 1759600000000);
+  assert.strictEqual(e.reason, 'http_502');
+  assert.strictEqual(e.provider, 'resend');
+  assert.match(e.subject_fp, /^[0-9a-f]{8}$/);
+  assert.ok(!JSON.stringify(e).includes('huurcontract'), JSON.stringify(e));
+  assert.ok(!JSON.stringify(e).includes('demo@example.com'));
+  assert.strictEqual(beheer.mailFailedEntry(msg, 'exception', 1).reason, 'exception');
+  assert.strictEqual(beheer.failureForBrowser({ ts: 1, subject: 'oud onderwerp', reason: 'x' }).subject, undefined);
+});
+
 test('auditRow: wie is het e-mailadres, de sleutel alleen gemaskeerd', () => {
   const k = 'pgp_' + crypto.randomBytes(32).toString('hex');
   const who = beheer.buildWhoMap([{ _full: k, email: 'jan@bakkerij.test', key_id: 'k_abc123' }]);
@@ -162,6 +174,20 @@ test('geen enkele route van het paneel geeft een volle sleutel terug', async () 
     const r = await get(p);
     assert.strictEqual(r.status, 200, p + ' ' + r.text.slice(0, 200));
     assert.doesNotMatch(r.text, FULL_KEY_RE, p + ' lekt een volle sleutel');
+  }
+});
+
+test('mislukte mails: het paneel krijgt geen onderwerp, ook niet van oude regels', async () => {
+  if (!srv) return;
+  const k = 'paramant:admin:tel:mail_failed:log';
+  const oud = JSON.stringify({ ts: Date.now(), reason: 'http_502', provider: 'resend', subject: `Opzegging huurcontract ${TAG}` });
+  await rc.lPush(k, oud);
+  try {
+    const r = await get('/admin/overview/failures');
+    assert.strictEqual(r.status, 200);
+    assert.ok(!r.text.includes(`huurcontract ${TAG}`), r.text.slice(0, 300));
+  } finally {
+    await rc.lRem(k, 0, oud);
   }
 });
 

@@ -79,7 +79,7 @@ const FIX = {
     recent_activity: [ROW, ROW2],
     plan_distribution: { community: 8, pro: 3, enterprise: 1 },
   },
-  '/admin/overview/failures': { mails: [{ ts: NOW - 600000, reason: 'http_502', provider: 'resend', subject: 'Welkom bij Paramant' }], http429: [] },
+  '/admin/overview/failures': { mails: [{ ts: NOW - 600000, reason: 'http_502', provider: 'resend', subject_fp: 'a1b2c3d4' }], http429: [] },
   '/admin/users': {
     users: [{ key: 'pgp_1a2b...9f0e', key_id: KID, email: 'jan@bakkerij-jansen.nl', label: 'jansen', plan: 'pro', plan_parasign: 'business', plan_parasend: 'community', paid_until_parasign: new Date(NOW + 300 * 86400000).toISOString(), active: true, created: new Date(NOW - 86400000).toISOString(), totp_status: 'active', last_activity: { ts: NOW - 3600000, label: 'Ingelogd met passkey' }, usage_month: { transfers: 4, signs: 2 } }],
     counts: { total: 1, active: 1 }, pagination: { page: 1, page_size: 50, total_items: 1, total_pages: 1, has_next: false, has_prev: false },
@@ -144,7 +144,7 @@ for (const [tag, opts] of VIEWS) {
     await page.click('#tabBtn-overview');
     await page.click('.pr[data-id="mails"]');
     await page.waitForSelector('#mo-info-body table', { timeout: 5000 });
-    assert.match(await page.innerText('#mo-info-body'), /Welkom bij Paramant/);
+    assert.match(await page.innerText('#mo-info-body'), /a1b2c3d4/);
     assert.deepStrictEqual(errors, []);
     await ctx.close();
   });
