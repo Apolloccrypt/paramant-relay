@@ -104,12 +104,12 @@ test('een groot bestand houdt de pagina niet vast', async () => {
   // A probe that notes the largest gap in the event loop while the file is checked.
   await page.evaluate(() => { window.__gap = 0; let last = performance.now(); window.__probe = setInterval(() => { const n = performance.now(); window.__gap = Math.max(window.__gap, n - last); last = n; }, 20); });
   await page.locator('#vf-verify').click();
-  await page.waitForFunction(() => /klopt|geldig|ONGELDIG|aangepast/.test(document.querySelector('#vf-result')?.textContent || ''), null, { timeout: 180000 });
+  await page.waitForFunction(() => /klopt|geldig|ONGELDIG|aangepast|niet het ondertekende bestand/.test(document.querySelector('#vf-result')?.textContent || ''), null, { timeout: 180000 });
   const gap = await page.evaluate(() => { clearInterval(window.__probe); return window.__gap; });
   const text = await page.locator('#vf-result').innerText();
   await page.close();
   fs.rmSync(path.dirname(bigPath), { recursive: true, force: true });
-  assert.match(text, /ONGELDIG|niet het document/, 'het grote bestand is niet het ondertekende');
+  assert.match(text, /ONGELDIG|niet het document|niet het ondertekende bestand/, 'het grote bestand is niet het ondertekende');
   assert.ok(gap < 1000, `de pagina stond ${Math.round(gap)} ms stil`);
 });
 
