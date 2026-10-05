@@ -299,6 +299,11 @@ async function run(job) {
     await page.waitForTimeout(300);
     for (const theme of THEMES) {
       await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+      // Fields fade their background over 180ms (design-system.css, the
+      // background-color transition on input). Measured inside that fade, a
+      // field still reads light in dark and the autofill check sees a
+      // mismatch that no reader ever sees. Let the theme switch finish first.
+      await page.waitForTimeout(250);
       for (const width of widths) {
         await page.setViewportSize({ width, height:Math.round(WINDOW_HEIGHT / zoom) });
         await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
