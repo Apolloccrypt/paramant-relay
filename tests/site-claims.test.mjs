@@ -1881,11 +1881,18 @@ test('the browser storage /privacy lists is the storage the frontend writes', ()
       if (fn) into.add(fn[1]);
     }
   };
+  // The sealed store (js/account-seal.js, review #573 M4) writes localStorage
+  // through sealPut/sealGet: the same three shapes, under those names.
+  const harvestSealed = (src, into) => {
+    const s2 = src.replace(/\b(?:m\.)?seal(Put|Get)\(/g, (x, v) => 'localStorage.' + (v === 'Put' ? 'set' : 'get') + 'Item(');
+    harvest(s2, 'get|set', into);
+  };
   const keys = new Set();
   const cleared = new Set();
   for (const f of files) {
     const src = stripJsComments(read(`frontend/${f}`));
     harvest(src, 'get|set', keys);
+    harvestSealed(src, keys);
     harvest(src, 'remove', cleared);
   }
   assert.ok(keys.size >= 4, `only ${keys.size} storage keys resolved; the check would be vacuous`);
