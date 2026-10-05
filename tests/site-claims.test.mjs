@@ -1810,6 +1810,23 @@ test('the signing and receipt retentions on /privacy are the ones the relay appl
     `privacy (nl): the delivery-receipt row must say ${minutes} minutes`);
 });
 
+// 52 ── Acceptatie r4, Nieuw 1: the admin keeps the invited addresses so each
+// party hears "Iedereen heeft getekend". They are readable (a mail cannot go
+// to a hash), so /privacy has to say that, with the term sign-notify.js keeps
+// them for. Verified by sabotage: TTL_SECONDS 8 -> 9 days turns this red.
+test('the invited-address retention on /privacy is the one sign-notify.js applies', () => {
+  const src = stripJsComments(read('admin/lib/sign-notify.js'));
+  const m = /TTL_SECONDS\s*=\s*(\d+)\s*\*\s*86400/.exec(src);
+  assert.ok(m, 'sign-notify.js must declare TTL_SECONDS as <days> * 86400');
+  const days = Number(m[1]);
+  assert.match(src, /async function rememberParties\(/, 'sign-notify.js keeps the invited addresses');
+  assert.match(src, /async function forget\([\s\S]*?partiesKeyFor\(envelopeId\)/, 'forget() drops the invited addresses with the record');
+  assert.ok(visible(page('privacy')).includes(`De adressen die een afzender uitnodigt om te tekenen, bewaren wij leesbaar en niet als hash, omdat wij die mensen mailen dat iedereen getekend heeft; naar een hash kan geen mail. Ze worden gewist zodra het document compleet is of iemand weigert, hooguit na ${days} dagen.`),
+    `privacy (nl): the invited addresses must be named, readable, with ${days} days at most`);
+  assert.ok(visible(page('en/privacy')).includes(`The addresses a sender invites to sign are kept readable, not as a hash, because we email those people that everyone has signed; an email cannot go to a hash. They are deleted as soon as the document is complete or someone declines, after ${days} days at most.`),
+    `privacy: the invited addresses must be named, readable, with ${days} days at most`);
+});
+
 // 27 ── The CT log hash. ct-hash.js is SHA3-256 throughout and /dpa says so;
 // /privacy said SHA-256 in the same table row, which is a different algorithm
 // and the one the blob hash uses two rows above. Verified by sabotage: the row
