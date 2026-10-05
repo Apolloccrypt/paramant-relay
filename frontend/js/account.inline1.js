@@ -526,6 +526,9 @@ window.paSecondFactorError = paSecondFactorError;
   // document number, a description and an amount that all come from the server,
   // and this page has no business putting any of them through innerHTML.
   function historyLabel(e) {
+    // label_nl since 2026-10-05: the Dutch page printed the English labels
+    // ("Credit note for invoice", "Cancellation scheduled", "Gift: ...").
+    if (e.label_nl && nlEn('nl', 'en') === 'nl') return e.label_nl;
     if (e.label) return e.label;
     // A row from an older API, or an event this page does not know by name. The
     // event name is not pretty, and it is at least true.
@@ -560,7 +563,7 @@ window.paSecondFactorError = paSecondFactorError;
       amount.textContent = (e.currency || 'EUR') + ' ' + e.amount;
       right.appendChild(amount);
     } else if (e.detail) {
-      right.appendChild(document.createTextNode(e.detail));
+      right.appendChild(document.createTextNode(nlEn(e.detail_nl || e.detail, e.detail)));
     }
     if (e.document) {
       right.appendChild(document.createTextNode(' '));

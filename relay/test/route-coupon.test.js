@@ -281,6 +281,10 @@ test('the refusal after the last seat is what a customer sees, through the route
     assert.strictEqual(r.status, 200, `${name} was refused: ${r.text}`);
     assert.strictEqual(r.json.ok, true);
     assert.strictEqual(r.json.granted.length, 2, 'the campaign code grants both products');
+    // The Dutch pages print message_nl (fase 1, PLAN-28/29): same plans, same
+    // dates, in Dutch, and still "nothing was charged".
+    assert.match(r.json.message_nl || '', /^Uw code is ingewisseld\. U heeft nu ParaSign Pro tot \d{1,2} [a-z]+ \d{4} en ParaSend Pro tot \d{1,2} [a-z]+ \d{4}\. Er is niets afgeschreven\.$/,
+      `message_nl: ${r.json.message_nl}`);
   }
 
   // The request after the last seat. Not a warning, not a partial grant: a
@@ -289,6 +293,7 @@ test('the refusal after the last seat is what a customer sees, through the route
   assert.strictEqual(over.status, 409, over.text);
   assert.strictEqual(over.json.error, 'exhausted');
   assert.match(over.json.message, /run out/i, over.json.message);
+  assert.strictEqual(over.json.message_nl, 'Deze code is op: alle plaatsen zijn al gebruikt.', `message_nl: ${over.json.message_nl}`);
   const ent = await entitlementsOf('over');
   assert.strictEqual(ent.json.entitlements.parasign.tier, 'free',
     'a refused redemption must leave the account exactly where it was');
@@ -311,6 +316,7 @@ test('one redemption per account: the same code twice is refused, and grants no 
   assert.strictEqual(again.status, 409, again.text);
   assert.strictEqual(again.json.error, 'already_used');
   assert.match(again.json.message, /already used/i, again.json.message);
+  assert.strictEqual(again.json.message_nl, 'U heeft deze code al gebruikt op dit account.', `message_nl: ${again.json.message_nl}`);
 
   assert.strictEqual((await recordOf('a')).paid_until_parasign, wasUntil,
     '"give it to a hundred people" must not become "one person takes a hundred terms"');
@@ -323,6 +329,7 @@ test('a code we never heard of, and one whose end date has passed, are told apar
   assert.strictEqual(unknown.status, 404, unknown.text);
   assert.strictEqual(unknown.json.error, 'unknown');
   assert.match(unknown.json.message, /spelling/i, unknown.json.message);
+  assert.match(unknown.json.message_nl || '', /^Deze code kennen we niet/, `message_nl: ${unknown.json.message_nl}`);
 
   const code = CODE('LAPSED');
   const made = await createCoupon({ code, max_redemptions: 10, valid_until: '2020-01-01T00:00:00Z' });
@@ -331,6 +338,7 @@ test('a code we never heard of, and one whose end date has passed, are told apar
   assert.strictEqual(late.status, 409, late.text);
   assert.strictEqual(late.json.error, 'expired');
   assert.match(late.json.message, /expired/i, late.json.message);
+  assert.strictEqual(late.json.message_nl, 'Deze code is verlopen.', `message_nl: ${late.json.message_nl}`);
   // An expired code costs no seat: it was never spent.
   const list = await srv.get('/v2/admin/coupons', { headers: ADMIN_H });
   assert.strictEqual(list.json.coupons.find((c) => c.code === code).used, 0);
@@ -353,6 +361,7 @@ test('a withdrawn code stops being redeemable, and takes nothing back that was g
   const after3 = await redeem('over', code);
   assert.strictEqual(after3.status, 409, after3.text);
   assert.strictEqual(after3.json.error, 'revoked');
+  assert.strictEqual(after3.json.message_nl, 'Deze code is niet meer geldig.', `message_nl: ${after3.json.message_nl}`);
 
   // The account that redeemed it before the withdrawal keeps its term.
   assert.strictEqual((await entitlementsOf('b')).json.entitlements.parasign.tier, 'pro',
@@ -425,6 +434,9 @@ test('a gift leaves a line in the billing history and NO document of any kind', 
   assert.strictEqual(gifts.length, 1, `expected one gift row, got ${JSON.stringify(hist.json.history)}`);
   assert.strictEqual(gifts[0].label, `Gift: 3 months of ParaSign Pro and ParaSend Pro, code ${CODE('COFFEE')}`);
   assert.strictEqual(gifts[0].detail, 'No payment, no invoice');
+  // And the Dutch /account line (fase 1, PLAN-19: the Dutch page printed "Gift: ...").
+  assert.strictEqual(gifts[0].label_nl, `Cadeau: 3 maanden ParaSign Pro en ParaSend Pro, code ${CODE('COFFEE')}`);
+  assert.strictEqual(gifts[0].detail_nl, 'Geen betaling, geen factuur');
   // The money columns are empty and stay empty. A 0.00 would add up correctly
   // and still read as a sale of nothing.
   assert.strictEqual(gifts[0].amount, null);
