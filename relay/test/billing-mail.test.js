@@ -78,10 +78,16 @@ test('the invoice mail follows the language the buyer bought in', () => {
     description: 'Paramant Firm (ParaSign Pro and ParaSend Pro), monthly plan',
     description_nl: 'Paramant Firm (versturen en ondertekenen), per maand',
     buyer: { email: 'b@example.com', company: 'X BV', address: 'Straat 1' } };
-  const en = billingMail.invoiceMail({ ...rec, lang: 'en' });
-  assert.strictEqual(en.subject, 'Invoice PS-2026-0001 - Paramant / Factuur PS-2026-0001 - Paramant');
+  const en = billingMail.invoiceMail({ ...rec, lang: 'en', description_en: 'Paramant Firm (sending and signing), monthly plan' });
+  // Ronde 2: English only, no Dutch block under it, and the plan named as
+  // Mollie and /en/pricing name it.
+  assert.strictEqual(en.subject, 'Invoice PS-2026-0001 - Paramant');
   assert.ok(en.text.startsWith('Thank you for your payment.'), en.text);
-  assert.ok(en.text.indexOf('Thank you') < en.text.indexOf('Dank u'), 'English comes first for an English buyer');
+  assert.ok(!/Dank u|Factuur|btw|Totaal/.test(en.text), 'no Dutch in the mail of an English buyer: ' + en.text);
+  assert.ok(en.text.includes('Paramant Firm (sending and signing), monthly plan'), en.text);
+  assert.ok(!en.text.includes('ParaSign Pro and ParaSend Pro'), 'one product name between mail and Mollie');
+  // An older English record without the line falls back to its description.
+  assert.ok(billingMail.invoiceMail({ ...rec, lang: 'en' }).text.includes('Paramant Firm (ParaSign Pro and ParaSend Pro), monthly plan'));
   const nl = billingMail.invoiceMail({ ...rec, lang: 'nl' });
   assert.ok(nl.subject.startsWith('Factuur PS-2026-0001'), nl.subject);
   assert.ok(nl.text.startsWith('Dank u voor uw betaling.'), nl.text);

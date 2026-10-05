@@ -52,11 +52,11 @@ const json = (route, body, status = 200) =>
 // The three terms under test, as an ISO paid_until the pages have to read.
 function term(days) { return new Date(Date.now() + days * DAY).toISOString(); }
 // The one notation the site shows, mirrored from frontend/js/format-date.js:
-// day, month in full, year, in UTC, and never a slash.
+// day, month in full, year, on Dutch time, and never a slash.
 // The Dutch pages write the month in Dutch (format-date.js reads <html lang>),
 // the English copies under /en in English. Same shape either way.
 function readable(iso, lang = 'en') {
-  return new Date(iso).toLocaleDateString(lang === 'nl' ? 'nl-NL' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return new Date(iso).toLocaleDateString(lang === 'nl' ? 'nl-NL' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Amsterdam' });
 }
 
 // ── /account ─────────────────────────────────────────────────────────────────

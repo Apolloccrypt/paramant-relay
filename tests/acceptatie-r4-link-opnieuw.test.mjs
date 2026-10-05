@@ -17,8 +17,11 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const require = createRequire(import.meta.url);
-const SIGNER_NL = /vraag de afzender (dan )?om de link opnieuw te sturen/i;
-const SIGNER_EN = /ask the sender to send you the link again/i;
+// Ronde 2 of 3.1.1 (taal #12): the keyless mail can itself be a re-sent
+// link, so "ask for the link again" went round in a circle. The advice names
+// the one resend that does open the document: from the sender's overview.
+const SIGNER_NL = /vraag de afzender (dan )?om de uitnodiging opnieuw te sturen vanuit zijn overzicht/i;
+const SIGNER_EN = /ask the sender to send the invitation again from their overview/i;
 const OLD = /om de volledige link|om een nieuwe uitnodiging|for their complete link|for a new invitation|for the complete link|for the full link/i;
 
 test('the mail to the signer, for a link without the key, gives the one advice', () => {

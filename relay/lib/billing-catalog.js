@@ -144,6 +144,19 @@ function orderLabelEn(order) {
   return `${TIER_LABEL_NL[tier] || tier} for ${PRODUCT_LABEL_MAIL[order.product] || order.product}`;
 }
 
+// What a bundle supplies, by product: "ParaSign Pro and ParaSend Pro". Empty
+// for a single plan, whose name already is the supply. The English invoice of
+// a buyer who bought in English names the plan the way Mollie and the site do
+// ("Firm (sending and signing)") and carries this as the description of the
+// supply (Wet OB art. 35a) on the line below (acceptatie 3.1.1 ronde 2, P5).
+function orderSupply(order) {
+  if (!order) return '';
+  const bundle = BUNDLES[order.bundle || order.product];
+  if (!bundle) return '';
+  const parts = bundle.grants.map((g) => planLabel(g.product, g.tier));
+  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : (parts[0] || '');
+}
+
 // What the site sells today (the buttons on /pricing and /en/pricing, pinned
 // to this list by relay/test/pricing-page.test.js), and therefore the only
 // thing the checkout sells (resolveSale). The two `pro` rows are NOT here and
@@ -245,6 +258,6 @@ function amountsEqual(a, b) {
 
 module.exports = {
   CATALOG, PRODUCTS, SELLABLE, INTERVALS, BUNDLES, ON_SALE, isOnSale, resolveSale,
-  PRODUCT_LABEL, TIER_LABEL, planLabel, orderLabel, orderLabelNl, orderLabelEn,
+  PRODUCT_LABEL, TIER_LABEL, planLabel, orderLabel, orderLabelNl, orderLabelEn, orderSupply,
   isBundle, bundleKeyOf, grantedTier, grantsOf, floorTier, priceOf, resolveOrder, amountsEqual,
 };

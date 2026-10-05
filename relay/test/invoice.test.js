@@ -328,6 +328,30 @@ test('a buyer who bought in Dutch gets a Dutch document; without a language the 
   did();
 });
 
+// Acceptatie 3.1.1 ronde 2, P5: the English mail and invoice named the plan
+// "Firm (ParaSign Pro and ParaSend Pro)" while Mollie and /en/pricing said
+// "Firm (sending and signing)". The English line now uses the Mollie name, and
+// what the bundle supplied stays on the invoice right under it.
+test('an English Firm invoice names the plan as Mollie does and still states the supply', async () => {
+  const redis = fakeRedis();
+  const p = payment('tr_en_firm', '35.09');
+  p.metadata = { accountId: 'acct_demo', product: 'firm', plan: 'firm', interval: 'monthly', lang: 'en' };
+  const order = orderOf(p);
+  assert.ok(!order.error, order.error);
+  const out = await issue(redis, p);
+  assert.strictEqual(out.record.description_en, 'Paramant Firm (sending and signing), monthly plan');
+  assert.strictEqual(`Paramant ${catalog.orderLabelEn(order)} (monthly)`, 'Paramant Firm (sending and signing) (monthly)', 'the Mollie name');
+  assert.strictEqual(out.record.supply_en, 'ParaSign Pro and ParaSend Pro');
+  assert.strictEqual(out.record.description, 'Paramant Firm (ParaSign Pro and ParaSend Pro), monthly plan', 'the record line stays for the exports');
+  const text = invoicePdf.render(out.record, { buyerHint: invoice.BUYER_HINT }).toString('latin1');
+  assert.ok(text.includes('Paramant Firm \\(sending and signing\\), monthly plan') || text.includes('Paramant Firm (sending and signing), monthly plan'), 'the Mollie name on the invoice');
+  assert.ok(/Supplied: ParaSign Pro and ParaSend Pro/.test(text), 'the supply stays on the invoice');
+  // The Dutch document of the same plan is unchanged: no supply line in English.
+  const nlText = invoicePdf.render(Object.assign({}, out.record, { lang: 'nl' }), { buyerHint: invoice.BUYER_HINT }).toString('latin1');
+  assert.ok(!/Supplied:/.test(nlText));
+  did();
+});
+
 test('an account with no company details still gets a document, and is told why', async () => {
   const redis = fakeRedis();
   const out = await invoice.issueDocument({

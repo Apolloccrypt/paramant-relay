@@ -526,7 +526,7 @@ function renderAuditShell(el){
   el.innerHTML='<div class="card"><div class="card-hdr">Audit <small>wie deed wat, nieuwste boven</small></div>'+
     '<div class="fb">'+
       '<label for="a-event" class="sr-only">Gebeurtenis</label><select id="a-event" data-change="fetchAudit"><option value="">Alle gebeurtenissen</option></select>'+
-      '<label for="a-q" class="sr-only">Zoek op e-mailadres</label><input id="a-q" type="search" placeholder="Zoek op e-mailadres of woord" data-input="auditSearch" autocomplete="off" autocapitalize="off" style="min-width:240px">'+
+      '<label for="a-q" class="sr-only">Zoek op e-mailadres</label><input id="a-q" type="search" placeholder="Zoek op e-mailadres of woord" data-input="auditSearch" class="wide" autocomplete="off" autocapitalize="off">'+
       '<label for="a-since" class="sr-only">Periode</label><select id="a-since" data-change="fetchAudit"><option value="">Altijd</option><option value="1">Laatste uur</option><option value="24">Laatste 24 uur</option><option value="168">Laatste 7 dagen</option><option value="720">Laatste 30 dagen</option></select>'+
       '<div class="sp"></div>'+
       '<button class="btn out" data-click="exportAuditCSV">CSV downloaden</button>'+

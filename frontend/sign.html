@@ -649,7 +649,11 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
        actually does. Hidden by default and revealed by sign-flow.js only when
        /api/user/check answers 401, so a signed-in user never sees it. -->
   <section class="ds-step ds-anon" id="step-anon" hidden>
-    <h2>Voor ondertekenen is een account nodig</h2>
+    <!-- The requirement itself is said once, in the bar above (#ds-signedout).
+         This block repeated that requirement as its heading, right
+         under it (acceptatie 3.1.1 ronde 2, taal #18); it now says what works
+         without one, which the bar does not. -->
+    <h2>Wat zonder account kan</h2>
     <details class="wp-fold">
       <summary>Waarom is een account nodig?</summary>
       <p class="ds-sub">
@@ -659,7 +663,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
       </p>
     </details>
     <p class="ds-sub">
-      <strong>Wat zonder account kan:</strong> een verzoek openen dat iemand u stuurde. U ziet dan om welk
+      Een verzoek openen dat iemand u stuurde. U ziet dan om welk
       bestand het gaat en wie al tekende. Het document zelf opent pas als u inlogt met het adres waarop u
       bent uitgenodigd. Nog geen account? Maak dan gratis een account op dat adres. Daarna opent het
       document en tekent u. <a href="/verify">Een getekend document controleren</a> kan ook zonder account.
@@ -1070,7 +1074,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   </div>
 </footer>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=21" defer></script>
+<script src="/js/nav-auth.js?v=22" defer></script>
 <script src="/js/parasign-pdf-ops.js?v=2" defer></script>
 <script src="/js/quota-upgrade.js?v=10" defer></script>
 <script src="/js/done-state.js?v=2" defer></script>

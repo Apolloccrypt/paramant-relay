@@ -478,7 +478,8 @@ function renderEnvelope() {
   }
 
   const me = e.parties[__partyIndex] || {};
-  $('me-label').textContent = (me.label || L('ondertekenaar ', 'signer ') + (__partyIndex + 1));
+  // Absent once the card is retitled for the result (retitleForResult).
+  if ($('me-label')) $('me-label').textContent = (me.label || L('ondertekenaar ', 'signer ') + (__partyIndex + 1));
   $('verify-file').onchange = onVerifyFile;
   const go = $('requested-note-go');
   if (go) go.onclick = () => scrollToRequestedSpot('smooth');
@@ -830,7 +831,7 @@ async function fetchAndOpenCapsule(url, envId, partyIndex, headers = {}) {
     // or a link that lost its end on the way: matrix COSIGN-46). The request
     // itself is fine; only this copy of the link cannot open the document.
     // Say so, and give the ways that do work, in order.
-    const err = new Error(L('Deze link opent het document niet, omdat het laatste stuk van de link ontbreekt. Open de link uit uw eerste uitnodigingsmail, of open deze link in de browser waarin u die eerste uitnodiging al opende. Lukt dat niet? Vraag de afzender dan om de link opnieuw te sturen. Heeft u het document al als bestand? Kies het dan hieronder. Wij controleren of het precies het document uit dit verzoek is.', 'This link does not open the document, because the last part of the link is missing. Open the link from your first invitation email, or open this link in the browser where you opened that first invitation. Does that not work? Then ask the sender to send you the link again. Do you already have the document as a file? Choose it below. We check that it is exactly the document of this request.'));
+    const err = new Error(L('Deze link opent het document niet, omdat het laatste stuk van de link ontbreekt. Open de link uit uw eerste uitnodigingsmail, of open deze link in de browser waarin u die eerste uitnodiging al opende. Lukt dat niet? Vraag de afzender dan om de uitnodiging opnieuw te sturen vanuit zijn overzicht. Heeft u het document al als bestand? Kies het dan hieronder. Wij controleren of het precies het document uit dit verzoek is.', 'This link does not open the document, because the last part of the link is missing. Open the link from your first invitation email, or open this link in the browser where you opened that first invitation. Does that not work? Then ask the sender to send the invitation again from their overview. Do you already have the document as a file? Choose it below. We check that it is exactly the document of this request.'));
     err.noKey = true;
     throw err;
   }
@@ -1827,11 +1828,23 @@ function fileBase() {
   return (__envelope.original_filename || 'document.pdf').replace(/\.pdf$/i, '');
 }
 
+// After signing there is nothing left to sign: the cards stop saying "Bekijk
+// wat u ondertekent" and "Ondertekenen als ..." (acceptatie 3.1.1 ronde 2,
+// taal #10 and N3). The download buttons stand ABOVE the status line, so the
+// line no longer says "hieronder".
+function retitleForResult(owner) {
+  const review = $('review-title');
+  if (review) review.textContent = L('Het document', 'The document');
+  const sign = $('sign-title');
+  if (sign) sign.textContent = owner ? L('Stand van het verzoek', 'State of the request') : L('Uw handtekening', 'Your signature');
+}
+
 async function showResultForParty(envId, partyIndex) {
   document.body.classList.add('result-mode');
+  retitleForResult(false);
   const complete = __envelope.status === 'complete';
   setStatus('ok', complete
-    ? L('Iedereen heeft getekend. Hieronder downloadt u het complete document met alle handtekeningen, en het bewijs.', 'Everyone has signed. Below you can download the complete document with every signature, and the proof.')
+    ? L('Iedereen heeft getekend. Het complete document met alle handtekeningen en het bewijs staan klaar bij Het getekende document.', 'Everyone has signed. The complete document with every signature and the proof are ready under The signed document.')
     : L('U heeft getekend. Zodra iedereen heeft getekend, opent deze zelfde link het complete document.', 'You have signed. Once everyone has signed, this same link opens the complete document.'));
   $('sign-confirm').hidden = true;
   if (!__session) { showCta(loginCtaHtml()); watchForSignIn(); return; }
@@ -1917,10 +1930,11 @@ async function initOwner(resultRef, ownerId) {
     __partyIndex = -1;
     renderEnvelope();
     showStep('step-cosign');
+    retitleForResult(true);
     $('sign-confirm').hidden = true;
     const state = envelopeState(__envelope);
     setStatus(state === 'complete' ? 'ok' : state === 'open' ? '' : 'err', state === 'complete'
-      ? L('Iedereen heeft getekend. Download hieronder het complete document en het bewijs.', 'Everyone has signed. Download the complete document and the proof below.')
+      ? L('Iedereen heeft getekend. Het complete document en het bewijs staan klaar bij Het getekende document.', 'Everyone has signed. The complete document and the proof are ready under The signed document.')
       : (ownerClosedExplanation(state, __envelope) || L('Nog niet iedereen heeft getekend.', 'Not everyone has signed yet.')));
     // A stopped request has nothing to open or download: no red "choose the
     // original" with a button that leads nowhere, and no fetch that only

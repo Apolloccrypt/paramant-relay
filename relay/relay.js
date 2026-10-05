@@ -2346,11 +2346,11 @@ async function notifySenderLinkRequested(envelopeId, accountId, partyLabel, part
         + '\n\nThe signer then gets the same invitation as the first time. Does it not work in that browser? Then withdraw the request and send it again.'),
       html: tweetaligHtml('nl',
         `<p>${escHtml(who)} vraagt de uitnodiging om te tekenen opnieuw. Alleen uw eigen browser kan die uitnodiging maken, zodat niemand anders het document kan openen.</p>`
-        + '<p>Open deze knop in de browser waarmee u het verzoek verstuurde en klik op Uitnodiging opnieuw sturen.</p>'
+        + '<p>Klik op de knop in de browser waarmee u het verzoek verstuurde, en daarna op Uitnodiging opnieuw sturen.</p>'
         + knopHtml('Uitnodiging opnieuw sturen')
         + '<p style="color:#666;font-size:13px">De ondertekenaar krijgt dan dezelfde uitnodiging als de eerste keer. Lukt het niet in die browser? Trek het verzoek dan in en stuur het opnieuw.</p>',
         `<p>${escHtml(whoEn)} asks for the signing invitation again. Only your own browser can make that invitation, so nobody else can open the document.</p>`
-        + '<p>Open this button in the browser you sent the request from and click Send the invitation again.</p>'
+        + '<p>Click the button in the browser you sent the request from, then click Send the invitation again.</p>'
         + knopHtml('Send the invitation again')
         + '<p style="color:#666;font-size:13px">The signer then gets the same invitation as the first time. Does it not work in that browser? Then withdraw the request and send it again.</p>'),
     });
@@ -6131,7 +6131,7 @@ async function handleRelayRequest(req, res) {
               + 'korte controlecode naar dit adres. Zo kan alleen wie deze mailbox leest het '
               + 'bestand ophalen. Beschikbaar tot ' + tot + '.'
               + '\n\nU krijgt dit bericht omdat ' + (wieRuw || 'een klant van Paramant')
-              + ' uw adres heeft ingevuld. Paramant bewaart het bestand versleuteld. Deze link bewaren wij niet.'
+              + ' uw adres heeft ingevuld. Het bestand staat versleuteld klaar tot het is opgehaald of de link verloopt. Daarna is het weg. Deze link bewaren wij niet.'
               + (kd.email ? '\nBeantwoord deze mail om de afzender direct te bereiken.' : ''),
                 (wieRuw ? wieRuw + ' sent you a file through Paramant.' : 'A file is waiting for you.')
               + (taal === 'en' ? '\n\n' + naamRuw + '\n\n' + link : '\n\nUse the link above.')
@@ -6139,7 +6139,7 @@ async function handleRelayRequest(req, res) {
               + 'to this address, so only somebody who can read this mailbox can collect the '
               + 'file. Available until ' + totEn + '.'
               + '\n\nYou are getting this because ' + (wieRuw || 'a Paramant customer')
-              + ' entered your address. Paramant keeps the file encrypted. We do not keep this link.'
+              + ' entered your address. The file waits, encrypted, until it is picked up or the link expires. Then it is gone. We do not keep this link.'
               + (kd.email ? '\nReply to this mail to reach them directly.' : '')),
           html: tweetaligHtml(taal,
                 '<p>' + (wie ? '<strong>' + wie + '</strong> heeft u via Paramant een bestand gestuurd.'

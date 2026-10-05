@@ -250,7 +250,7 @@
       help: 'Hulp', docs: 'Documenten', account: 'Account', dev: 'Ontwikkelaarsinstellingen',
       plan: 'Abonnement en betaling', out: 'Uitloggen'
     } : {
-      help: 'Help', docs: 'Documents', account: 'Account', dev: 'Developer settings',
+      help: 'Help', docs: 'Documents', account: 'Account', dev: 'Developer settings (in Dutch)', devLang: 'nl',
       plan: 'Plan &amp; billing', out: 'Sign out'
     };
     container.innerHTML =
@@ -263,7 +263,7 @@
         '<div class="nav-user-menu" hidden>' +
           '<a href="' + R.dashboard + '" class="nav-menu-item">' + T.docs + '</a>' +
           '<a href="' + R.account + '" class="nav-menu-item">' + T.account + '</a>' +
-          '<a href="/developer" class="nav-menu-item">' + T.dev + '</a>' +
+          '<a href="/developer" class="nav-menu-item"' + (T.devLang ? ' hreflang="' + T.devLang + '"' : '') + '>' + T.dev + '</a>' +
           '<a href="' + R.pricing + '" class="nav-menu-item">' + T.plan + '</a>' +
           '<a href="' + R.help + '" class="nav-menu-item">' + T.help + '</a>' +
           '<div class="nav-menu-divider"></div>' +

@@ -155,8 +155,8 @@ not work, you can type the code in by hand. You can also choose a passkey there.
 
 This link works for ${validFor}.
 
-Why no password? A code from your phone cannot be typed into a fake site
-and cannot leak with a list of stolen passwords.
+Why no password? A code from your phone cannot leak with a list of stolen
+passwords, and it only works for a short while. Type it only on paramant.app.
 
 After setup you get 10 backup codes. Keep them somewhere safe
 (a password manager, or on paper in a drawer) in case you lose your phone.
@@ -181,7 +181,7 @@ https://paramant.app`;
     ${btn(url, isReset ? 'Set up new authenticator app' : 'Finish my account')}
     <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">The link opens a page with a QR code. Scan it with your authenticator app (for example Google Authenticator, Authy or 1Password). You can also type the code in by hand, or choose a passkey.</p>
     <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">This link works for <strong>${escHtml(validFor)}</strong>.</p>
-    <p style="margin:0 0 12px 0;line-height:1.6;color:#475569;font-size:13px;">Why no password? A code from your phone cannot be typed into a fake site and cannot leak with a list of stolen passwords.</p>
+    <p style="margin:0 0 12px 0;line-height:1.6;color:#475569;font-size:13px;">Why no password? A code from your phone cannot leak with a list of stolen passwords, and it only works for a short while. Type it only on paramant.app.</p>
     <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:13px;">After setup you get 10 backup codes. Keep them somewhere safe (a password manager, or on paper in a drawer) in case you lose your phone.</p>
     <p style="margin:0 0 8px 0;font-size:13px;color:#64748b;">${isReset ? '<strong>Did you not ask for this reset?</strong> Email <a href="mailto:privacy@paramant.app" style="color:#1D4ED8;">privacy@paramant.app</a> straight away.' : '<strong>Did you not sign up for Paramant?</strong> Then you can ignore this email. There is no account until setup is finished.'}</p>
     <p style="margin:16px 0 0 0;font-size:12px;color:#94a3b8;">Requested on ${escHtml(whenEn)}.</p>
@@ -202,8 +202,9 @@ niet, dan typt u de code over. U kunt daar ook een passkey kiezen.
 
 Deze link werkt ${nlValid}.
 
-Waarom geen wachtwoord? Een code van uw telefoon kan niemand op een
-nepsite intypen, en hij lekt niet uit met een lijst gestolen wachtwoorden.
+Waarom geen wachtwoord? Een code van uw telefoon lekt niet uit met een
+lijst gestolen wachtwoorden, en hij werkt maar kort. Typ hem alleen op
+paramant.app.
 
 Na het instellen krijgt u 10 back-upcodes. Bewaar die op een veilige plek
 (wachtwoordbeheerder, of op papier in een la) voor als u uw telefoon kwijtraakt.
@@ -224,7 +225,7 @@ https://paramant.app`;
     ${btn(url, isReset ? 'Nieuwe authenticator-app instellen' : 'Account afmaken')}
     <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">De link opent een pagina met een QR-code. Scan die met uw authenticator-app (bijvoorbeeld Google Authenticator, Authy of 1Password). U kunt de code ook overtypen, of een passkey kiezen.</p>
     <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:14px;">Deze link werkt <strong>${escHtml(nlValid)}</strong>.</p>
-    <p style="margin:0 0 12px 0;line-height:1.6;color:#475569;font-size:13px;">Waarom geen wachtwoord? Een code van uw telefoon kan niemand op een nepsite intypen, en hij lekt niet uit met een lijst gestolen wachtwoorden.</p>
+    <p style="margin:0 0 12px 0;line-height:1.6;color:#475569;font-size:13px;">Waarom geen wachtwoord? Een code van uw telefoon lekt niet uit met een lijst gestolen wachtwoorden, en hij werkt maar kort. Typ hem alleen op paramant.app.</p>
     <p style="margin:0 0 24px 0;line-height:1.6;color:#475569;font-size:13px;">Na het instellen krijgt u 10 back-upcodes. Bewaar die op een veilige plek (wachtwoordbeheerder, of op papier in een la) voor als u uw telefoon kwijtraakt.</p>
     <p style="margin:0 0 8px 0;font-size:13px;color:#64748b;">${isReset ? '<strong>Vroeg u deze reset niet aan?</strong> Mail dan meteen <a href="mailto:privacy@paramant.app" style="color:#1D4ED8;">privacy@paramant.app</a>.' : '<strong>Niet aangemeld bij Paramant?</strong> Dan kunt u deze mail negeren. Er is pas een account als u het instellen afrondt.'}</p>
     <p style="margin:16px 0 0 0;font-size:12px;color:#94a3b8;">Aangevraagd op ${escHtml(whenNl)}.</p>
@@ -1170,7 +1171,7 @@ function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt,
       // free account on that address, through the same link.
       carries: opensDocument
         ? `De link opent het verzoek. Het document zelf opent zodra u inlogt met het e-mailadres waarop u bent uitgenodigd. Heeft u nog geen account? Dan maakt u via de link gratis een account op dit adres. Daarna leest u het document, zet u uw ${paraaf ? 'paraaf en handtekening' : 'handtekening'} en bent u klaar.`
-        : 'Deze link opent het verzoek, maar niet het document. Heeft u een eerdere uitnodiging voor dit verzoek? Gebruik dan de link uit die mail, die opent het document wel. Lukt dat niet? Vraag de afzender dan om de link opnieuw te sturen.',
+        : 'Deze link opent het verzoek, maar niet het document. Heeft u een eerdere uitnodiging voor dit verzoek? Gebruik dan de link uit die mail, die opent het document wel. Lukt dat niet? Vraag de afzender dan om de uitnodiging opnieuw te sturen vanuit zijn overzicht. Die uitnodiging opent het document wel.',
       open: opensDocument ? 'Open het document' : 'Open het verzoek',
       fromSender: 'Bericht van de afzender:',
       signIn: 'Stuur de link niet door. Hij werkt alleen met het e-mailadres waarop u bent uitgenodigd.',
@@ -1184,7 +1185,7 @@ function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt,
       asks: 'has asked you to review and sign a document.',
       carries: opensDocument
         ? `The link opens the request. The document itself opens as soon as you sign in with the email address this invitation went to. No account yet? Then create a free account on this address through the link. After that you read the document, ${paraaf ? 'add your initials and signature' : 'add your signature'}, and you are done.`
-        : 'This link opens the request, but not the document. Do you have an earlier invitation for this request? Use the link from that email, that one does open the document. Otherwise, ask the sender to send you the link again.',
+        : 'This link opens the request, but not the document. Do you have an earlier invitation for this request? Use the link from that email, that one does open the document. Otherwise, ask the sender to send the invitation again from their overview. That invitation does open the document.',
       open: opensDocument ? 'Open the document' : 'Open the request',
       fromSender: 'Message from the sender:',
       signIn: 'Do not forward the link. It only works with the email address this invitation went to.',
@@ -1390,23 +1391,30 @@ ${BASE_URL}`;
 // sender withdrew it, or another party declined (acceptatie 3.1.1, taal #42).
 // No names, no file name, no envelope id, like every mail in this family.
 function requestStoppedPartyEmail({ reason, envelopeId }) {
-  const declined = reason === 'declined';
+  // Three reasons, each in its own words. Anything that is not a decline used
+  // to read "ingetrokken door de afzender", so an expired request would have
+  // blamed the sender for a deadline (acceptatie 3.1.1, taal #42).
+  const kind = reason === 'declined' ? 'declined' : reason === 'expired' ? 'expired' : 'withdrawn';
   const W = {
     nl: {
-      heading: declined ? 'Het verzoek is gestopt' : 'Het verzoek is ingetrokken',
-      line: declined
-        ? 'Een andere ondertekenaar heeft het verzoek geweigerd dat u ook kreeg. Daarmee is het gestopt. Niemand kan nog tekenen.'
-        : 'De afzender heeft het verzoek ingetrokken dat u kreeg. Niemand kan nog tekenen.',
+      heading: { declined: 'Het verzoek is gestopt', expired: 'Het verzoek is verlopen', withdrawn: 'Het verzoek is ingetrokken' }[kind],
+      line: {
+        declined: 'Een andere ondertekenaar heeft het verzoek geweigerd dat u ook kreeg. Daarmee is het gestopt. Niemand kan nog tekenen.',
+        expired: 'De termijn om te tekenen is voorbij voordat iedereen had getekend. Niemand kan nog tekenen.',
+        withdrawn: 'De afzender heeft het verzoek ingetrokken dat u kreeg. Niemand kan nog tekenen.',
+      }[kind],
       next: 'U hoeft niets te doen. Handtekeningen die al gezet zijn, blijven vastgelegd. Heeft u vragen? Neem dan contact op met de afzender.',
-      subject: declined ? 'Verzoek gestopt' : 'Verzoek ingetrokken',
+      subject: { declined: 'Verzoek gestopt', expired: 'Verzoek verlopen', withdrawn: 'Verzoek ingetrokken' }[kind],
     },
     en: {
-      heading: declined ? 'The request has stopped' : 'The request was withdrawn',
-      line: declined
-        ? 'Another signer declined the request you also received. That stopped it, and nobody can sign it any more.'
-        : 'The sender withdrew the request you received. Nobody can sign it any more.',
+      heading: { declined: 'The request has stopped', expired: 'The request has expired', withdrawn: 'The request was withdrawn' }[kind],
+      line: {
+        declined: 'Another signer declined the request you also received. That stopped it, and nobody can sign it any more.',
+        expired: 'The time to sign ran out before everyone had signed. Nobody can sign it any more.',
+        withdrawn: 'The sender withdrew the request you received. Nobody can sign it any more.',
+      }[kind],
       next: 'You do not need to do anything. Signatures already given stay on record. Questions? Contact the sender.',
-      subject: declined ? 'Request stopped' : 'Request withdrawn',
+      subject: { declined: 'Request stopped', expired: 'Request expired', withdrawn: 'Request withdrawn' }[kind],
     },
   };
   const textBlock = (l) => `${W[l].heading}

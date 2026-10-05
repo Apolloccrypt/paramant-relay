@@ -126,7 +126,7 @@ test('COSIGN-46: link zonder sleutel legt uit wat er mis is en wat werkt', async
   const r = await read(page);
   await ctx.close();
   assert.match(r.delivery, /eerste uitnodigingsmail/);
-  assert.match(r.delivery, /Vraag de afzender dan om de link opnieuw te sturen/);
+  assert.match(r.delivery, /Vraag de afzender dan om de uitnodiging opnieuw te sturen vanuit zijn overzicht/);
   assert.equal(r.manual, true, 'het document zelf kiezen staat klaar');
   assert.deepEqual(errors, []);
 });

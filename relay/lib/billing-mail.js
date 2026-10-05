@@ -5,7 +5,8 @@
 // relay, a redis or a PDF.
 //
 // Bilingual on the pattern of lib/plan-expiry.js: the Dutch text first, the
-// English text below it unchanged, subject "Dutch / English". Amounts, numbers
+// English text below it unchanged, subject "Dutch / English". A buyer who
+// bought in English gets the English text only. Amounts, numbers
 // and the seller name are the same in both halves; the description is the line
 // on the attached document and is quoted as it stands there.
 
@@ -36,16 +37,19 @@ const dateEn = (d) => planExpiry.formatDate(d) || String(d || '');
 // have only the English line, which is then quoted as it stands.
 const descNl = (record) => record.description_nl || record.description;
 
-// The buyer's language comes first, in the subject and in the text; the other
-// language follows below the line. A buyer from /en/pricing got "Factuur ..."
-// and a Dutch block first (acceptatie 3.1.1, betalen punt 5). A record without
-// a language is from before the field existed and keeps the Dutch-first order.
+// A buyer who bought in English gets the mail in English only: subject and
+// text. He got "Factuur ..." and a Dutch block first (acceptatie 3.1.1,
+// betalen punt 5), then the English first with the whole Dutch block still
+// under it (ronde 2). A Dutch buyer, or a record from before the language
+// field existed, keeps Dutch first with the English below the line.
 function arrange(record, subjectNl, subjectEn, nl, en) {
-  const english = record.lang === 'en';
-  return english
-    ? { subject: planExpiry.bilingualSubject(subjectEn, subjectNl), text: planExpiry.bilingualText(en.join('\n'), nl.join('\n')) }
-    : { subject: planExpiry.bilingualSubject(subjectNl, subjectEn), text: planExpiry.bilingualText(nl.join('\n'), en.join('\n')) };
+  if (record.lang === 'en') return { subject: subjectEn, text: en.join('\n') };
+  return { subject: planExpiry.bilingualSubject(subjectNl, subjectEn), text: planExpiry.bilingualText(nl.join('\n'), en.join('\n')) };
 }
+
+// The English line of the document: the plan named as Mollie and the site name
+// it, for a record that carries it; older records keep their one line.
+const descEn = (record) => (record.lang === 'en' && record.description_en) || record.description;
 
 const titleNl = (t) => TITLE_NL[t] || t;
 const noteNl = (n) => (n ? (NOTE_NL[n] || n) : '');
@@ -96,7 +100,7 @@ function invoiceMail(record) {
     ``,
     `${record.title} ${record.number}`,
     `Date: ${dateEn(record.invoice_date)}`,
-    `${record.description}`,
+    `${descEn(record)}`,
     `Total: ${record.currency} ${record.amount_gross} (${vatEn(record)})`,
     ``,
     isInvoice ? '' : `${invoiceMod.RECEIPT_NOTE}`,
@@ -139,7 +143,7 @@ function creditNoteMail(record) {
     `${record.title} ${record.number}`,
     `Date: ${dateEn(record.invoice_date)}`,
     `Credit for invoice ${record.credit_for} of ${dateEn(record.credit_for_date)}`,
-    `${record.description}`,
+    `${descEn(record)}`,
     `Total credited: ${record.currency} ${record.amount_gross} (${vatEn(record)})`,
     ``,
     record.partial ? 'This is a partial credit. The remainder of that invoice still stands.' : '',

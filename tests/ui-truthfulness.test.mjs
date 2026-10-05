@@ -126,12 +126,19 @@ assert.doesNotMatch(signJs, /showProofScope\([^)]*signingMode/,
 // 2. A visitor without a session is told what signing needs BEFORE picking a
 // file, not after. The page used to be behind an nginx auth_request; moving the
 // dead end to the last step would be worse than the redirect it replaced.
-assert.match(signHtml, /Voor ondertekenen is een account nodig/i,
+// Said once, in the bar above the steps; the block under it says what works
+// without an account instead of repeating the requirement (acceptatie 3.1.1
+// ronde 2, taal #18).
+assert.match(signHtml, /Om te tekenen of te versturen heeft u een gratis Community-account nodig\./,
   'sign.html must state the account requirement up front');
+assert.doesNotMatch(signHtml, /Voor ondertekenen is een account nodig/i,
+  'sign.html says the requirement twice, in the bar and in the block under it');
 assert.match(signHtml, /een verzoek openen dat iemand u stuurde/i,
   'sign.html must say what an invited signer can still do without an account');
-assert.match(signEnHtml, /Signing a document needs an account/i,
+assert.match(signEnHtml, /To sign or send it, you need a free Community account\./,
   'en/sign.html must state the account requirement up front');
+assert.doesNotMatch(signEnHtml, /Signing a document needs an account/i,
+  'en/sign.html says the requirement twice');
 assert.match(signEnHtml, /open a signing request someone sent you/i,
   'en/sign.html must say what an invited signer can still do without an account');
 // And it may not promise signing WITHOUT an account: co-sign.js asks the

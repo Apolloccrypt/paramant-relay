@@ -204,6 +204,16 @@ function describeNl(order) {
   return `Paramant ${catalog.orderLabelNl(order)}, ${interval}`;
 }
 
+// The same line for a buyer who bought in English, with the plan named as
+// Mollie and /en/pricing name it: "Paramant Firm (sending and signing),
+// monthly plan". The EN mail and invoice said "Firm (ParaSign Pro and ParaSend
+// Pro)" while Mollie and the site said "sending and signing" (acceptatie 3.1.1
+// ronde 2, P5). What the bundle supplies stays on the invoice as `supply_en`.
+function describeEn(order) {
+  const interval = order.interval === 'yearly' ? 'yearly' : 'monthly';
+  return `Paramant ${catalog.orderLabelEn(order)}, ${interval} plan`;
+}
+
 // The language the buyer bought in. relay.js keeps it per account when the
 // checkout starts (it never travels to Mollie) and passes it as `lang`; a
 // payment that names one in its metadata is honoured too. Only 'en' is
@@ -235,6 +245,10 @@ function buildRecord({ number, kind, seller, buyer, order, payment, split, now, 
     interval: order.interval,
     description: describe(order),
     description_nl: describeNl(order),
+    // Only for a bundle (Firm, Business): a single legacy plan keeps its one
+    // line, which already names what it supplied.
+    description_en: catalog.orderSupply(order) ? describeEn(order) : null,
+    supply_en: catalog.orderSupply(order) || null,
     lang: buyerLang(payment, lang),
     service_period_end: periodEnd || null,
     currency: order.currency || 'EUR',

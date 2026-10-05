@@ -113,7 +113,7 @@ function passkeyAuthErrorMessage(e) {
   // NotAllowedError and anything else: ambiguous. Give the actionable options.
   return nlEn('Er is op dit apparaat geen passkey gebruikt. Log hierboven in met uw e-mailadres en code, ', 'No passkey was used on this device. Sign in with your email and code above, ')
     + nlEn('of tik op “Mijn passkey staat op een ander apparaat” om in te loggen met de passkey op uw telefoon. ', 'or tap “My passkey is on another device” to sign in with the passkey on your phone. ')
-    + nlEn('Hebt u zelf afgebroken? Probeer het dan gewoon opnieuw.', 'If you cancelled, just try again.');
+    + nlEn('Heeft u zelf afgebroken? Probeer het dan gewoon opnieuw.', 'If you cancelled, just try again.');
 }
 
 // ── Registration: account-setup page (/auth/setup/<setup_token>) ─────────────

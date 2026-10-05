@@ -316,9 +316,15 @@ function render(record, opts = {}) {
   doc.rule(MARGIN, y, right);
   y += 16;
   const cur = record.currency || 'EUR';
-  doc.text((nl && record.description_nl) || record.description || '', MARGIN, y, { size: 10 });
+  doc.text((nl && record.description_nl) || (!nl && record.description_en) || record.description || '', MARGIN, y, { size: 10 });
   doc.text(`${record.vat_rate}%`, right - 150, y, { font: FONTS.mono, size: 10, align: 'right' });
   doc.text(`${cur} ${amt(record.amount_net)}`, right, y, { font: FONTS.mono, size: 10, align: 'right' });
+  // The English line names the plan as Mollie and the site do; what it
+  // supplied, product by product, stands right under it (Wet OB art. 35a).
+  if (!nl && record.description_en && record.supply_en) {
+    y += 13;
+    doc.text(`Supplied: ${record.supply_en}`, MARGIN, y, { size: 8.5, grey: 0.35 });
+  }
   y += 20;
   doc.rule(MARGIN, y, right);
   y += 16;

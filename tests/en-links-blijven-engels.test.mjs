@@ -50,3 +50,25 @@ test('EN-marketing- en hulppagina’s linken naar de Engelse tegenhanger', () =>
   }
   assert.deepEqual(fout, [], `Engelse pagina's met een link naar de Nederlandse versie:\n${fout.join('\n')}`);
 });
+
+// /developer bestaat alleen in het Nederlands (de route is afgeschermd in
+// nginx). Een Engelse link ernaartoe zegt dat dus, zoals /en/dashboard al deed:
+// /en/account en het accountmenu stuurden zonder "(in Dutch)" naar de
+// Nederlandse pagina (acceptatie 3.1.1 ronde 2, P5).
+test('een Engelse link naar /developer zegt dat de pagina Nederlands is', () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'frontend');
+  const fout = [];
+  const lopen = (dir) => fs.readdirSync(dir).flatMap((n) => {
+    const p = path.join(dir, n);
+    return fs.statSync(p).isDirectory() ? lopen(p) : (n.endsWith('.html') ? [p] : []);
+  });
+  for (const fp of lopen(path.join(root, 'en'))) {
+    const html = fs.readFileSync(fp, 'utf8');
+    for (const m of html.matchAll(/<a\b[^>]*href="\/developer"[^>]*>([^<]*)<\/a>/gi)) {
+      if (!/hreflang="nl"/.test(m[0]) || !/\(in Dutch\)/.test(m[1])) fout.push(`${path.relative(root, fp)}: ${m[0]}`);
+    }
+  }
+  assert.deepEqual(fout, []);
+  const nav = fs.readFileSync(path.join(root, 'js', 'nav-auth.js'), 'utf8');
+  assert.match(nav, /dev: 'Developer settings \(in Dutch\)', devLang: 'nl'/);
+});

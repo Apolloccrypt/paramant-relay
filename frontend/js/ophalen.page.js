@@ -118,7 +118,7 @@
     unknown_token: ['Deze link werkt niet',
       'We herkennen deze link niet. Misschien is hij niet helemaal gekopieerd uit de e-mail.'],
     already_collected: ['U hebt dit bestand al opgehaald',
-      'Deze link werkt \u00e9\u00e9n keer en is al gebruikt. Hebt u het bestand nog nodig, vraag de afzender dan om het opnieuw te sturen.'],
+      'Deze link werkt \u00e9\u00e9n keer en is al gebruikt. Heeft u het bestand nog nodig? Vraag de afzender dan om het opnieuw te sturen.'],
     revoked: ['De afzender heeft deze link ingetrokken',
       'De afzender heeft deze link teruggenomen. Hoort u hem wel te hebben? Vraag het dan na bij de afzender.'],
     expired: ['Dit bestand is niet meer beschikbaar',

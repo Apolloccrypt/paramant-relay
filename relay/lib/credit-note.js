@@ -177,6 +177,8 @@ function buildRecord({ number, original, amounts, reason, payment, now, partial 
   // note reads in the language the buyer bought in (acceptatie 3.1.1).
   if (original.lang) record.lang = original.lang;
   if (original.description_nl) record.description_nl = `Creditering van ${original.description_nl} (factuur ${original.number})`;
+  if (original.description_en) record.description_en = `Credit for ${original.description_en} (invoice ${original.number})`;
+  if (original.supply_en) record.supply_en = original.supply_en;
   return record;
 }
 

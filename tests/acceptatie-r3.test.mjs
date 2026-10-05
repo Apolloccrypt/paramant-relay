@@ -113,6 +113,9 @@ test('A3: the dialog of an open request hands over the full link kept in this br
   await page.locator('[data-pa-action="document-resend-invite"][data-party="0"]').click();
   await page.waitForFunction(() => /Verstuurd naar demo@example\.com/.test(document.querySelector('[data-resend-say="0"]')?.textContent || ''));
   assert.deepEqual(invites[0].invitations, [{ party_index: 0, email: 'demo@example.com', label: 'Signer Demo', invite_url: LINK }]);
+  // Same language behaviour as the first invitation (sign-flow.js sends no
+  // lang, so NL with EN underneath): acceptatie 3.1.1 r2 got the resend in Dutch only.
+  assert.equal(invites[0].lang, undefined, 'the resend picks no single language');
   await page.evaluate(() => localStorage.removeItem('paramant.cosign.links.v1:env_open_000000000000000001'));
   await page.evaluate(() => document.querySelector('[data-pa-action="document-close"]')?.click());
   await page.locator('.dh-document[data-document-id="env_open_000000000000000001"] .dh-document-open').click();

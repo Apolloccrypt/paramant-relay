@@ -68,7 +68,11 @@ function okAll(name, condition, detail='') { checks.push({ name, pass:!!conditio
 // Dutch on / and English on /en, each in its own month names.
 const MONTHS_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_NL = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
-const dayIn = (months) => (v) => { const d = new Date(v); return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
+// Dutch time, like js/format-date.js since acceptatie 3.1.1 ronde 2.
+const dayIn = (months) => (v) => {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Amsterdam', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(new Date(v)).map((x) => [x.type, x.value]));
+  return `${Number(p.day)} ${months[Number(p.month) - 1]} ${p.year}`;
+};
 const inDays = (n) => new Date(Date.now() + n * 86400000).toISOString();
 const agoDays = (n) => new Date(Date.now() - n * 86400000).toISOString();
 

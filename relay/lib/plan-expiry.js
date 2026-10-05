@@ -111,7 +111,7 @@ const FLOOR_NAME = 'Community';
 const MONTHS = Object.freeze(['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December']);
 
-// "3 October 2026". UTC and hand-built rather than toLocaleDateString: the
+// "3 October 2026". Hand-built rather than toLocaleDateString: the
 // same date has to read the same in a mail from any container, and Intl data is
 // not something a slim container image is guaranteed to carry.
 //
@@ -120,14 +120,34 @@ const MONTHS = Object.freeze(['January', 'February', 'March', 'April', 'May', 'J
 // ended last December reads exactly like one that ends this December. The
 // browser side writes the same string from frontend/js/format-date.js, so the
 // date in this mail and the date on /account are one date.
+//
+// Dutch time since acceptatie 3.1.1 ronde 2, like the other mails and the
+// site: a term that ends at 23:30 UTC ends the next day in Amsterdam, and the
+// site said one day while this mail said the other. Only the zone comes from
+// Intl; the month stays our own table. Without zone data it falls back to UTC.
+const NL_DAY = (() => {
+  try { return new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Amsterdam', year: 'numeric', month: 'numeric', day: 'numeric' }); } catch { return null; }
+})();
+function amsterdamParts(d) {
+  if (NL_DAY) {
+    try {
+      const p = {};
+      for (const part of NL_DAY.formatToParts(d)) p[part.type] = part.value;
+      if (p.year && p.month && p.day) return { y: Number(p.year), m: Number(p.month), d: Number(p.day) };
+    } catch { /* UTC below */ }
+  }
+  return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate() };
+}
+
 function formatDate(value) {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return null;
-  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  const p = amsterdamParts(d);
+  return `${p.d} ${MONTHS[p.m - 1]} ${p.y}`;
 }
 
-// The Dutch twin of formatDate: "3 oktober 2026". Same rule, same reason: UTC
-// and a hand-built month table, so the Dutch half of a mail reads the same from
+// The Dutch twin of formatDate: "3 oktober 2026". Same rule, same reason:
+// Dutch time and a hand-built month table, so the Dutch half of a mail reads the same from
 // every container whatever Intl data the image carries.
 const MONTHS_NL = Object.freeze(['januari', 'februari', 'maart', 'april', 'mei', 'juni',
   'juli', 'augustus', 'september', 'oktober', 'november', 'december']);
@@ -135,7 +155,8 @@ const MONTHS_NL = Object.freeze(['januari', 'februari', 'maart', 'april', 'mei',
 function formatDateNl(value) {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return null;
-  return `${d.getUTCDate()} ${MONTHS_NL[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  const p = amsterdamParts(d);
+  return `${p.d} ${MONTHS_NL[p.m - 1]} ${p.y}`;
 }
 
 function memberOf(accountId, product) {

@@ -84,7 +84,7 @@ const FIX = {
     users: [{ key: 'pgp_1a2b...9f0e', key_id: KID, email: 'jan@bakkerij-jansen.nl', label: 'jansen', plan: 'pro', plan_parasign: 'business', plan_parasend: 'community', paid_until_parasign: new Date(NOW + 300 * 86400000).toISOString(), active: true, created: new Date(NOW - 86400000).toISOString(), totp_status: 'active', last_activity: { ts: NOW - 3600000, label: 'Ingelogd met passkey' }, usage_month: { transfers: 4, signs: 2 } }],
     counts: { total: 1, active: 1 }, pagination: { page: 1, page_size: 50, total_items: 1, total_pages: 1, has_next: false, has_prev: false },
   },
-  '/admin/audit': { events: [ROW, ROW2], total: 2, event_types: ['admin_plan_changed', 'webauthn_login'], event_labels: { admin_plan_changed: 'Plan gewijzigd door jou', webauthn_login: 'Ingelogd met passkey' } },
+  '/admin/audit': { events: [ROW, ROW2], total: 2, event_types: ['admin_plan_changed', 'webauthn_login', 'account_activated'], event_labels: { admin_plan_changed: 'Plan gewijzigd door jou', webauthn_login: 'Ingelogd met passkey', account_activated: 'Account in gebruik genomen: authenticator-app gekoppeld' } },
   '/admin/billing': {
     total_customers: 12, plan_distribution: {}, recent_checkouts: [ROW],
     revenue: { this_month: { month: '2026-10', net_cents: 118800, gross_cents: 143748, documents: 1 }, last_month: { month: '2026-09', net_cents: 0, gross_cents: 0, documents: 0 }, mrr_cents: 9900, mrr_basis: 1, paying_accounts: 1 },
@@ -164,7 +164,7 @@ for (const [tag, opts] of VIEWS) {
     assert.match(row, /geleden/);
     assert.doesNotMatch(row, /\{\}/);
     const opts2 = await page.$$eval('#a-event option', (o) => o.map((x) => x.textContent));
-    assert.deepStrictEqual(opts2, ['Alle gebeurtenissen', 'Plan gewijzigd door jou', 'Ingelogd met passkey']);
+    assert.deepStrictEqual(opts2, ['Alle gebeurtenissen', 'Plan gewijzigd door jou', 'Ingelogd met passkey', 'Account in gebruik genomen: authenticator-app gekoppeld']);
     await page.click('#a-results tbody tr:first-child details.det summary');
     assert.match(await page.innerText('#a-results tbody tr:first-child details.det'), /Van\s+community/);
     await shot('audit');
@@ -203,6 +203,15 @@ for (const [tag, opts] of VIEWS) {
       await page.waitForTimeout(400);
       const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       assert.ok(wide <= 1, `${t}: ${wide}px zijwaarts`);
+      // Ook binnen de kaart: de lange optie "Account in gebruik genomen:
+      // authenticator-app gekoppeld" duwde het auditfilter op een iPhone naar
+      // 503 px in een kaart van 390 (acceptatie 3.1.1 ronde 2).
+      const over = await page.$$eval('.card, .fb, .fb > *', (els) => els.filter((e) => e.offsetParent).map((e) => {
+        const card = e.closest('.card') || document.documentElement;
+        const r = e.getBoundingClientRect(), c = card.getBoundingClientRect();
+        return [e.id || e.className || e.tagName, Math.round(r.right - Math.min(c.right, window.innerWidth))];
+      }).filter(([, d]) => d > 1));
+      assert.deepStrictEqual(over, [], `${t}: steekt buiten de kaart`);
       const caps = await page.$$eval('button, a', (els) => els.filter((e) => e.offsetParent && getComputedStyle(e).textTransform === 'uppercase').map((e) => e.textContent.trim()));
       assert.deepStrictEqual(caps, [], `${t}: hoofdletterknoppen`);
       // Op de telefoon elk tabblad, en ook de tekstlinks (.lnk): de acceptatie
@@ -212,6 +221,12 @@ for (const [tag, opts] of VIEWS) {
         assert.deepStrictEqual(small, [], `${t}: raakvlakken kleiner dan 44 px`);
       }
     }
+    // De skiplink is het eerste raakvlak voor wie met het toetsenbord of een
+    // schakelaar werkt: ook die minstens 44 px hoog.
+    await page.focus('.skip-link');
+    const sk = await page.$eval('.skip-link', (e) => { const r = e.getBoundingClientRect(); return { h: r.height, top: r.top }; });
+    assert.ok(sk.h >= 44, `skiplink ${sk.h}px hoog`);
+    assert.ok(sk.top >= 0, 'skiplink in beeld bij focus');
     assert.deepStrictEqual(errors, []);
     await ctx.close();
   });

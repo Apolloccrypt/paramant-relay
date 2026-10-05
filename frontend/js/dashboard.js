@@ -171,7 +171,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     var warn = root.querySelector('#dh-term-warn');
     if (line) line.hidden = true;
     if (warn) warn.hidden = true;
-    if (window.paPlanTerms) window.paPlanTerms.render(root.querySelector('#dh-term-products'), data);
+    if (window.paPlanTerms) window.paPlanTerms.render(root.querySelector('#dh-term-products'), data, { onlyIfAdds: true });
     var term = termState(data);
     if (!term) return;
     var when = paramantDate.day(term.at);
@@ -393,6 +393,15 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       if (!paid.hidden) {
         txt('paid-name', planName);
         txt('paid-includes', lines.join(' '));
+        // "Facturen en verlengen" under a plan with no end date promised a
+        // renewal there is nothing to renew for (taal #25).
+        var foot = paid.querySelector('[data-dh="paid-foot-lead"]');
+        if (foot) {
+          var renewable = !window.paPlanTerms || !window.paPlanTerms.hasEnd || window.paPlanTerms.hasEnd(data);
+          foot.textContent = renewable
+            ? nlEn('Facturen en verlengen vindt u onder ', 'Invoices and renewing are under ')
+            : nlEn('Facturen vindt u onder ', 'Invoices are under ');
+        }
       }
     }
 
@@ -1060,8 +1069,10 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       // reminder: true keeps this body apart from the first invitation's, so
-      // the double-click guard on the route does not swallow it.
-      body: JSON.stringify({ invitations: [{ party_index: partyIndex, email: email, label: link.label && link.label !== email ? link.label : '', invite_url: link.url }], reminder: true, lang: nlEn('nl', 'en') })
+      // the double-click guard on the route does not swallow it. No lang: the
+      // first invitation went out Dutch with the English underneath, and the
+      // signer gets the same mail again, whatever language the sender reads.
+      body: JSON.stringify({ invitations: [{ party_index: partyIndex, email: email, label: link.label && link.label !== email ? link.label : '', invite_url: link.url }], reminder: true })
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (b) { return { ok: r.status === 200 && b && b.ok !== false, b: b }; });
     }).then(function (x) {

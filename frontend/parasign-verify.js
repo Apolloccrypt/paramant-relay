@@ -35,6 +35,15 @@ function humanWhen(iso) {
   return day + t('infoAt') + time;
 }
 
+// Only the day of a moment, on the same Dutch clock: "6 oktober 2026". The
+// party list read "(2026-10-05)", a UTC slice, under "getekend op 6 oktober
+// 2026 om 00:47" (acceptatie 3.1.1 ronde 2, N2).
+function humanDay(iso) {
+  const d = new Date(String(iso || ''));
+  if (Number.isNaN(d.getTime())) return String(iso || '');
+  return d.toLocaleDateString(LANG === 'en' ? 'en-GB' : 'nl-NL', { timeZone: 'Europe/Amsterdam', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 // Visible text in both languages. /verify is Dutch, /en/verify English; the page's <html lang> picks the set.
 const LANG = ((typeof document !== 'undefined' && document.documentElement.lang) || 'nl').slice(0, 2) === 'en' ? 'en' : 'nl';
 const T = {
@@ -860,7 +869,7 @@ function partyNamesHtml(env) {
   const named = parties.filter((p) => p && p.label);
   if (!named.length) return '';
   return '<p class="ps-help">' + esc(t('partyNamesHead')) + '</p><ul>' +
-    named.map((p) => '<li class="ps-help">' + esc(String(p.label)) + (p.signed_at ? ' (' + esc(String(p.signed_at).slice(0, 10)) + ')' : '') + '</li>').join('') + '</ul>';
+    named.map((p) => '<li class="ps-help">' + esc(String(p.label)) + (p.signed_at ? ' (' + esc(humanDay(p.signed_at)) + ')' : '') + '</li>').join('') + '</ul>';
 }
 
 // The signer fingerprint written in a v3 solo proof, against the key that

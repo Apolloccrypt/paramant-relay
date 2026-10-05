@@ -326,11 +326,14 @@ test('no redis is a sweep that does not run, not a sweep that crashes', async ()
 });
 
 test('the date in the mail is the same date in every container', () => {
-  // Hand-built and UTC on purpose: toLocaleDateString needs Intl data a slim
-  // container image is not guaranteed to carry, and a mail that says a
-  // different day depending on which relay sent it is worse than no mail.
+  // Hand-built month table, on Dutch time like the site (format-date.js) and
+  // the other mails: 23:59 UTC on 1 January is 2 January in Amsterdam, and
+  // 22:30 UTC in summer is already the next day (acceptatie 3.1.1 ronde 2).
   assert.equal(planExpiry.formatDate('2026-10-03T00:00:00.000Z'), '3 October 2026');
-  assert.equal(planExpiry.formatDate('2026-01-01T23:59:59.000Z'), '1 January 2026');
+  assert.equal(planExpiry.formatDate('2026-01-01T23:59:59.000Z'), '2 January 2026');
+  assert.equal(planExpiry.formatDate('2026-01-01T22:59:59.000Z'), '1 January 2026');
+  assert.equal(planExpiry.formatDateNl('2026-10-05T22:46:00.000Z'), '6 oktober 2026');
+  assert.equal(planExpiry.formatDateNl('2026-10-05T21:59:00.000Z'), '5 oktober 2026');
   assert.equal(planExpiry.formatDate('not a date'), null);
 });
 
