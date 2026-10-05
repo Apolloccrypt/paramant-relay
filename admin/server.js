@@ -2515,6 +2515,14 @@ api.post("/user/envelopes/:id/invitations", authUser, idempotency.middleware({ r
     }
   }));
   const failed = results.filter((item) => !item.ok).map((item) => item.party_index);
+  // Whoever got an invitation also hears "Iedereen heeft getekend" when the
+  // last signature lands (lib/sign-notify.js, acceptatie r4 Nieuw 1). Best
+  // effort: a failure here costs one notification, never the invitation.
+  const invited = checked.filter((item) => results.some((r) => r.ok && r.party_index === item.partyIndex)).map((item) => item.email);
+  if (invited.length) {
+    try { await signNotify.rememberParties(redis(), id, invited); }
+    catch (e) { console.warn("[envelopes invitations] sign-notify:", e.message); }
+  }
   return res.status(failed.length ? 207 : 200).json({ ok: failed.length === 0, partial_failure: failed.length > 0, failed_party_indexes: failed, results });
 });
 
@@ -2727,6 +2735,7 @@ api.post("/user/sign/submit", authUser, async (req, res) => {
     signNotify.afterSignature({
       client: redis(), envelopeId: act.envelope_id, signerAccountId: user_id, relayBody: body,
       sendEmail: emailTemplates.sendEmail, template: emailTemplates.signatureReceivedEmail,
+      partyTemplate: emailTemplates.everyoneSignedPartyEmail,
       baseUrl: emailTemplates.BASE_URL,
     }).then((r) => { if (r === "failed") console.warn("[sign/submit] sender notification failed"); });
     return res.json({

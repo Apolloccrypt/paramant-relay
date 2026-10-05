@@ -525,6 +525,10 @@ async function pickPdf(page, name) {
   ok('/sign signed yourself: the stage bar is gone', !(await page.locator('#ds-stepper').isVisible()));
   ok('/sign signed yourself: it says to keep both files, without naming a scheme',
     /Bewaar nu beide bestanden/.test(text), text.slice(0, 200));
+  // Acceptatie r4, punt 3: /verify turns green with the stamped copy, not the
+  // file the signer started from, so the end screen says which one by name.
+  ok('/sign signed yourself: it names the file to check with on /verify',
+    /Controleer later op \/verify met signed-Lease agreement 2026\.pdf en het bewijsbestand, niet met Lease agreement 2026\.pdf/.test(text), text.slice(0, 400));
   await page.close();
 }
 

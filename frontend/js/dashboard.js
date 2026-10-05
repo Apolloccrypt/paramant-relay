@@ -617,9 +617,16 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
 
   // A request past its expiry can no longer be signed: it is not "waiting",
   // not open and has nothing to withdraw (acceptatie r3, A2).
+  // The signing window (sign_expires_at, 7 days) is what ends a request, the
+  // same date /co-sign shows as "Tekenen kan tot". expires_at is only how long
+  // the record is kept (30 days) and is the fallback for open envelopes that
+  // have no signing window (acceptatie r4, A2).
+  function documentSignUntil(doc) {
+    return (doc && (doc.sign_expires_at || doc.expires_at)) || '';
+  }
   function documentExpired(doc) {
     if (doc.status === 'expired') return true;
-    var t = Date.parse(doc.expires_at || '');
+    var t = Date.parse(documentSignUntil(doc));
     return !isNaN(t) && t <= Date.now();
   }
   function documentState(doc) {
@@ -841,7 +848,8 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
       '<dt>Status</dt><dd>' + esc(documentLabel(state, doc)) + '</dd>' +
       nlEn('<dt>Kenmerk</dt><dd>', '<dt>Reference</dt><dd>') + esc(doc.id || '') + '</dd>' +
       nlEn('<dt>Gemaakt</dt><dd>', '<dt>Created</dt><dd>') + esc(fmtDate(doc.created_at)) + '</dd>' +
-      nlEn('<dt>Verloopt</dt><dd>', '<dt>Expires</dt><dd>') + esc(fmtDate(doc.expires_at)) + '</dd>' +
+      ((state === 'completed' || state === 'cancelled') ? '' :
+        nlEn('<dt>Tekenen kan tot</dt><dd>', '<dt>Signing closes</dt><dd>') + esc(fmtDate(documentSignUntil(doc))) + '</dd>') +
       nlEn('<dt>Ondertekenaars</dt><dd>', '<dt>Signers</dt><dd>') + partyText + '</dd></dl>' +
       '<div class="dh-doc-help">' + esc(help) + '</div>' +
       ((state === 'waiting' || state === 'in_progress') ? signerLinksHtml(doc) : '') +
@@ -870,8 +878,8 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
     var head = nlEn('<dt>Volledige links</dt>', '<dt>Full links</dt>');
     if (!links || !links.length) {
       return '<dl class="dh-doc-kv">' + head + '<dd>' + esc(nlEn(
-        'De volledige ondertekenlinks staan niet in deze browser. Ze worden alleen bewaard in de browser waarmee u het verzoek verstuurde, en dan hoogstens tot het verzoek verloopt. Heeft een ondertekenaar de link nodig en heeft u hem niet meer, trek dit verzoek dan in en stuur een nieuw verzoek.',
-        'The full signing links are not in this browser. They are kept only in the browser you sent the request from, and at most until the request expires. If a signer needs the link and you no longer have it, withdraw this request and send a new one.')) + '</dd></dl>';
+        'De volledige ondertekenlinks staan niet in deze browser. Ze worden alleen bewaard in de browser waarmee u het verzoek verstuurde, en dan hoogstens tot het verzoek verloopt. Heeft een ondertekenaar de link nodig, open dit verzoek dan in die browser en kopieer de link daar. Lukt dat niet, trek dit verzoek dan in en stuur een nieuw verzoek.',
+        'The full signing links are not in this browser. They are kept only in the browser you sent the request from, and at most until the request expires. If a signer needs the link, open this request in that browser and copy the link there. If that does not work, withdraw this request and send a new one.')) + '</dd></dl>';
     }
     var signedIdx = {};
     (Array.isArray(doc.parties) ? doc.parties : []).forEach(function (p) { if (p && p.status === 'signed') signedIdx[Number(p.index)] = true; });
@@ -1072,8 +1080,8 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         note.className = 'dh-inbox-note';
         note.setAttribute('role', 'status');
         note.textContent = body.sender_notified
-          ? nlEn('Deze link opent het verzoek, niet het document. We hebben de afzender gevraagd u de volledige link te sturen.', 'This link opens the request, not the document. We have asked the sender to send you the full link.')
-          : nlEn('Deze link opent het verzoek, niet het document. Vraag de afzender om de volledige link.', 'This link opens the request, not the document. Ask the sender for the full link.');
+          ? nlEn('Deze link opent het verzoek, niet het document. We hebben de afzender gevraagd u de link opnieuw te sturen.', 'This link opens the request, not the document. We have asked the sender to send you the link again.')
+          : nlEn('Deze link opent het verzoek, niet het document. Vraag de afzender om de link opnieuw te sturen.', 'This link opens the request, not the document. Ask the sender to send you the link again.');
         var prev = button.parentNode && button.parentNode.querySelector('.dh-inbox-note');
         if (prev) prev.remove();
         if (button.parentNode) button.parentNode.appendChild(note);

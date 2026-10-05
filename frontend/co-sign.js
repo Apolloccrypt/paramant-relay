@@ -686,7 +686,7 @@ async function fetchAndOpenCapsule(url, envId) {
     // or a link that lost its end on the way: matrix COSIGN-46). The request
     // itself is fine; only this copy of the link cannot open the document.
     // Say so, and give the ways that do work, in order.
-    const err = new Error(L('Deze link opent het verzoek, maar niet het document: het laatste stuk van de link, met de sleutel, ontbreekt. Dat gebeurt bij een link die opnieuw is verstuurd of onderweg is ingekort. Open de link uit uw eerste uitnodigingsmail; die opent het document wel. Heeft u die niet meer, vraag de afzender dan om een nieuwe uitnodiging. Heeft u het document al als bestand, kies het dan hieronder: wij controleren of het precies het document uit dit verzoek is.', 'This link opens the request, but not the document: the last part of the link, which holds the key, is missing. That happens with a link that was sent again or cut short on the way. Open the link from your first invitation email; that one opens the document. If you no longer have it, ask the sender for a new invitation. If you already have the document as a file, choose it below: we check that it is exactly the document of this request.'));
+    const err = new Error(L('Deze link opent het verzoek, maar niet het document: het laatste stuk van de link, met de sleutel, ontbreekt. Dat gebeurt bij een link die opnieuw is verstuurd of onderweg is ingekort. Heeft u een eerdere uitnodigingsmail voor dit verzoek, open dan de link daaruit; die opent het document wel. Anders: vraag de afzender om de link opnieuw te sturen. Heeft u het document al als bestand, kies het dan hieronder: wij controleren of het precies het document uit dit verzoek is.', 'This link opens the request, but not the document: the last part of the link, which holds the key, is missing. That happens with a link that was sent again or cut short on the way. If you have an earlier invitation email for this request, open the link from that one; it opens the document. Otherwise, ask the sender to send you the link again. If you already have the document as a file, choose it below: we check that it is exactly the document of this request.'));
     err.noKey = true;
     throw err;
   }
@@ -706,7 +706,7 @@ async function fetchAndOpenCapsule(url, envId) {
   if (key.whole) docKey = key.whole;
   else {
     const other = parseKeyShareFragment('#ks=v1.' + (r.headers.get('X-Document-Key-Share') || ''));
-    if (!other) throw new Error(L('De tweede helft van de sleutel ontbreekt. Vraag de afzender om de volledige link.', 'The second half of the key is missing. Ask the sender for the complete link.'));
+    if (!other) throw new Error(L('De tweede helft van de sleutel ontbreekt. Vraag de afzender om de link opnieuw te sturen.', 'The second half of the key is missing. Ask the sender to send you the link again.'));
     docKey = joinKey(key.share, other);
     key.share.fill(0); other.fill(0);
   }

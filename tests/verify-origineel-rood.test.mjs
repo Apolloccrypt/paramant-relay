@@ -72,7 +72,8 @@ async function check(doc, psign) {
   return { text: await page.locator('#vf-result').innerText(), cls: await page.locator('#vf-result .ps-banner').first().getAttribute('class') };
 }
 
-const RED_HEAD = /Dit is niet het ondertekende bestand\. Controleer met het originele bestand\./;
+// Solo: the heading names the file that does turn green (acceptatie r4, 3).
+const RED_HEAD = /Dit is niet het ondertekende bestand\. Kies de getekende pdf \(signed-…pdf\)\./;
 
 test('het origineel naast een kloppend bewijs: rood, zonder naam', async () => {
   const r = await check(fx.original, fx.psign);

@@ -12,7 +12,9 @@
 // account when another party's signature lands. What it keeps is a hash of the
 // account id and the address the session already had, for as long as the invite can
 // still be signed plus one day; the record goes the moment the envelope is
-// complete. What the mail carries is a count and a link, never a file name or
+// complete. Since acceptatie r4 (Nieuw 1) it also keeps the invited addresses
+// for the same window, so every party hears "Iedereen heeft getekend" once,
+// also when the sender signed last. What the mail carries is a count and a link, never a file name or
 // a party name: those would travel to the mail provider for no gain, and the
 // dashboard behind the link shows both to the one person entitled to them.
 
@@ -58,6 +60,29 @@ async function senderToTell(client, envelopeId, { signerAccountId, idempotent } 
 async function forget(client, envelopeId) {
   if (!ID_RE.test(String(envelopeId || ''))) return;
   await client.del(keyFor(envelopeId));
+  await client.del(partiesKeyFor(envelopeId));
+}
+
+// The invited addresses, so they too hear "Iedereen heeft getekend"
+// (acceptatie r4, Nieuw 1). The admin had each address in hand when it sent
+// the invitation; it keeps them, lower-cased, under the same 8-day TTL as the
+// sender's record and drops them the moment the envelope completes or is
+// declined. No link is kept: the opening link holds half a document key and
+// never stays on a server, so the party mail points at the invitation mail.
+const PARTIES_PREFIX = 'paramant:envelope:notify-parties:';
+const partiesKeyFor = (envelopeId) => PARTIES_PREFIX + envelopeId;
+async function rememberParties(client, envelopeId, emails) {
+  if (!ID_RE.test(String(envelopeId || ''))) return false;
+  const list = [...new Set((Array.isArray(emails) ? emails : []).map((e) => String(e || '').toLowerCase().trim()).filter((e) => EMAIL_RE.test(e)))];
+  if (!list.length) return false;
+  await client.sAdd(partiesKeyFor(envelopeId), list);
+  await client.expire(partiesKeyFor(envelopeId), TTL_SECONDS);
+  return true;
+}
+async function partiesFor(client, envelopeId) {
+  if (!ID_RE.test(String(envelopeId || ''))) return [];
+  const list = await client.sMembers(partiesKeyFor(envelopeId));
+  return Array.isArray(list) ? list.filter((e) => EMAIL_RE.test(String(e || ''))) : [];
 }
 
 // The link in "Iedereen heeft getekend" opens the finished document, not the
@@ -96,28 +121,50 @@ async function recordFor(client, envelopeId) {
 
 // The whole decision after a successful submit, so server.js stays one call.
 // Returns what it did, for the log and the tests: 'sent', 'skipped' or 'failed'.
-async function afterSignature({ client, envelopeId, signerAccountId, relayBody, sendEmail, template, baseUrl }) {
+async function afterSignature({ client, envelopeId, signerAccountId, relayBody, sendEmail, template, partyTemplate, baseUrl }) {
   try {
     const body = relayBody || {};
-    const to = await senderToTell(client, envelopeId, { signerAccountId, idempotent: body.idempotent === true });
+    if (body.idempotent === true) return 'skipped';   // a retry: nothing new happened
     const complete = body.status === 'complete';
-    // The reference is made before the record goes, from the record's own
-    // account hash: only the sender's session can resolve it later.
-    let resultUrl = null;
-    if (complete) {
-      const rec = await recordFor(client, envelopeId).catch(() => null);
-      if (rec && to) {
-        const ref = await rememberResult(client, envelopeId, rec.uid).catch(() => null);
-        if (ref && baseUrl) resultUrl = String(baseUrl).replace(/\/$/, '') + '/co-sign?result=' + ref;
-      }
-      await forget(client, envelopeId).catch(() => {});
-    }
-    if (!to) return 'skipped';
     const signed = Number(body.signed_count);
     const total = Number(body.party_count);
-    if (!Number.isInteger(signed) || !Number.isInteger(total) || total < 1) return 'skipped';
-    await sendEmail(to, template({ signedCount: signed, partyCount: total, complete, envelopeId, resultUrl }));
-    return 'sent';
+    const counted = Number.isInteger(signed) && Number.isInteger(total) && total >= 1;
+    if (!complete) {
+      // Progress: only when somebody else signed. The sender who just signed
+      // their own slot knows; they did it.
+      const to = await senderToTell(client, envelopeId, { signerAccountId });
+      if (!to || !counted) return 'skipped';
+      await sendEmail(to, template({ signedCount: signed, partyCount: total, complete, envelopeId, resultUrl: null }));
+      return 'sent';
+    }
+    // Complete. Everyone hears it once, also when the sender was the last to
+    // sign (acceptatie r4, Nieuw 1: then nobody got "Iedereen heeft getekend"
+    // and nobody got the result link). The reference is made before the record
+    // goes, from the record's own account hash: only the sender's session can
+    // resolve it later.
+    const rec = await recordFor(client, envelopeId).catch(() => null);
+    const parties = await partiesFor(client, envelopeId).catch(() => []);
+    let resultUrl = null;
+    if (rec) {
+      const ref = await rememberResult(client, envelopeId, rec.uid).catch(() => null);
+      if (ref && baseUrl) resultUrl = String(baseUrl).replace(/\/$/, '') + '/co-sign?result=' + ref;
+    }
+    await forget(client, envelopeId).catch(() => {});
+    let sent = 0;
+    if (rec && counted) {
+      await sendEmail(rec.email, template({ signedCount: signed, partyCount: total, complete, envelopeId, resultUrl }));
+      sent++;
+    }
+    // One mail per address: the sender's own address, also when it was
+    // invited as a party, already had the mail with the result link.
+    if (typeof partyTemplate === 'function') {
+      for (const to of parties) {
+        if (rec && to === rec.email) continue;
+        try { await sendEmail(to, partyTemplate({ partyCount: counted ? total : null, envelopeId })); sent++; }
+        catch { /* one address failing must not cost the others theirs */ }
+      }
+    }
+    return sent ? 'sent' : 'skipped';
   } catch {
     return 'failed';
   }
@@ -137,4 +184,4 @@ async function afterDecline({ client, envelopeId, sendEmail, template }) {
   }
 }
 
-module.exports = { idHash, rememberSender, senderToTell, forget, afterSignature, afterDecline, rememberResult, resolveResult, KEY_PREFIX, RESULT_PREFIX, TTL_SECONDS, RESULT_TTL_SECONDS };
+module.exports = { idHash, rememberSender, rememberParties, partiesFor, senderToTell, forget, afterSignature, afterDecline, rememberResult, resolveResult, KEY_PREFIX, RESULT_PREFIX, PARTIES_PREFIX, TTL_SECONDS, RESULT_TTL_SECONDS };

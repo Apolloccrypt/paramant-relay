@@ -125,7 +125,9 @@ function hasInlineSeal() {
 }
 
 function describePdfMode() {
-  if (state.sealPlacement === 'sheet') return L('pdf met een apart handtekeningblad waarnaar wordt verwezen', 'PDF with a separate referenced signature sheet');
+  if (state.sealPlacement === 'sheet') return state.stampAllPages
+    ? L('pdf met een apart handtekeningblad waarnaar wordt verwezen en een paraaf op elke pagina', 'PDF with a separate referenced signature sheet and initials on every page')
+    : L('pdf met een apart handtekeningblad waarnaar wordt verwezen', 'PDF with a separate referenced signature sheet');
   const inline = state.stampAllPages
     ? L('zichtbare stempel op pagina ', 'visual stamp on page ') + (state.stamp.pageIndex + 1) + L(" en een paraaf op de andere pagina's", ' and initials on the other pages')
     : L('zichtbare stempel op pagina ', 'visual stamp on page ') + (state.stamp.pageIndex + 1);
@@ -487,8 +489,13 @@ function geomIsIdentity(g) { return geomUU(g) === 1 && isIdentityGeom(g); }
 // The paraaf plan for the current document: one box per page other than the
 // seal page. pages: [{width,height}] in PDF points, from whatever the caller
 // renders or bakes (pdf.js viewport in the preview, pdf-lib getSize when baking).
+// Without a seal in the document (signature sheet only) every page gets one:
+// the sheet carries the signature, the parafen still go on every page of the
+// document itself (acceptatie r4, Nieuw 2).
 function paraafPlanFor(pages, stamp, textBoxes) {
-  const plan = planParaafs(pages, stamp.pageIndex, { w: stamp.w, h: stamp.h }, textBoxes);
+  const plan = stamp
+    ? planParaafs(pages, stamp.pageIndex, { w: stamp.w, h: stamp.h }, textBoxes)
+    : planParaafs(pages, -1, null, textBoxes);
   // planParaafs tries the four corners at three sizes and, when none is free,
   // returns bottom right with free:false, over the text. Nobody read that flag,
   // so the paraaf went over the contract text without a word (PDF sweep
@@ -1504,8 +1511,11 @@ function reflowGhostStamps() {
   // In the invite flow nothing of the requester's is stamped: no solo paraaf
   // preview there (acceptance r2, 3).
   if (state.signingMode === 'invite') return;
-  if (!state.stampAllPages || !state.stamp || !placeState || placeState.isImage || !state.doc) return;
-  if (!hasInlineSeal()) return;
+  if (!state.stampAllPages || !placeState || placeState.isImage || !state.doc) return;
+  // Sheet only: no seal on a page, a paraaf on every page. Otherwise the
+  // parafen are planned around the placed seal.
+  const sealInDoc = hasInlineSeal();
+  if (sealInDoc && !state.stamp) return;
   const textBoxes = textBoxesIfReady(state.doc.bytes);
   if (textBoxes === undefined) {
     // Not read yet: draw once the text layer is in, never a guessed spot.
@@ -1518,8 +1528,8 @@ function reflowGhostStamps() {
     const p = placeState.pages[i];
     pages.push(p ? { width: p.wrap._pdfPage.width, height: p.wrap._pdfPage.height } : { width: 1, height: 1 });
   }
-  if (!pages[state.stamp.pageIndex]) return;
-  const ghostPlan = paraafPlanFor(pages, state.stamp, textBoxes);
+  if (sealInDoc && !pages[state.stamp.pageIndex]) return;
+  const ghostPlan = paraafPlanFor(pages, sealInDoc ? state.stamp : null, textBoxes);
   showParaafOverTextNotice(state.stampAllPages ? paraafOverTextPages(ghostPlan) : []);
   for (const box of ghostPlan) {
     const p = placeState.pages[box.pageIndex];
@@ -1592,6 +1602,8 @@ function setStampAllPages(on, save = true) {
   // The invite flow has its own box ("Paraaf verplicht voor iedereen"); a
   // restored draft set only the solo one (acceptance r2, 3).
   const inv = $('ds-invite-paraaf'); if (inv) inv.checked = state.signingMode === 'invite' && state.stampAllPages;
+  // With a signature sheet the tip says where the parafen go; keep it true.
+  if (state.signingMode !== 'invite' && state.sealPlacement === 'sheet') updateSignatureSheetControls();
   reflowGhostStamps();
   if (save) savePlacementTemplate();
 }
@@ -1637,12 +1649,17 @@ function updateSignatureSheetControls() {
   if (state.signingMode === 'invite') { applyPlaceChromeForMode(); return; }
   const sheetOnly = state.sealPlacement === 'sheet';
   const withSheet = hasSignatureSheet();
-  const allPages = $('ds-allpages'); if (allPages) allPages.disabled = sheetOnly;
-  const allPagesLabel = $('ds-allpages-label'); if (allPagesLabel) allPagesLabel.hidden = sheetOnly;
+  // "Onderteken elke pagina" stays available with a signature sheet: the sheet
+  // takes the signature, the parafen still go on every page (acceptatie r4,
+  // Nieuw 2). It used to be switched off here without a word.
+  const allPages = $('ds-allpages'); if (allPages) allPages.disabled = false;
+  const allPagesLabel = $('ds-allpages-label'); if (allPagesLabel) allPagesLabel.hidden = false;
   const applyTpl = $('ds-apply-tpl'); if (applyTpl) applyTpl.hidden = sheetOnly || !loadPlacementTemplate();
   const tip = $('ds-seal-tip');
   if (tip) tip.textContent = sheetOnly
-    ? L("Voegt één laatste pagina toe met uw stempel en de gegevens van de bron. De oorspronkelijke pagina's krijgen geen stempel.", 'Adds one final page with your seal and source details. The original pages remain unstamped.')
+    ? (state.stampAllPages
+      ? L("Voegt één laatste pagina toe met uw stempel en de gegevens van de bron. Uw handtekening staat op dat blad; elke pagina van het document krijgt uw paraaf in een vrije hoek van de marge.", 'Adds one final page with your seal and source details. Your signature is on that sheet; every page of the document gets your initials in a free margin corner.')
+      : L("Voegt één laatste pagina toe met uw stempel en de gegevens van de bron. De oorspronkelijke pagina's krijgen geen stempel.", 'Adds one final page with your seal and source details. The original pages remain unstamped.'))
     : withSheet
       ? L('Houdt de geplaatste stempel in het document en voegt één laatste pagina toe met de stempel en de gegevens van de bron.', 'Keeps the placed seal in the document and adds one final page with the seal and source details.')
       : L("Op de andere pagina's komt een kleine paraaf op een vrije plek in de marge. Is die er op een pagina niet, dan staat de paraaf daar over de tekst en ziet u dat hier in rood. Positie en grootte worden onthouden voor de volgende keer (nooit uw naam of handtekening).", 'The other pages get small initials in a free spot of the margin. Where a page has none, the initials go over the text there and you see that here in red. Position and scale are remembered for next time (never your name or signature image).');
@@ -1656,7 +1673,6 @@ function updateSignatureSheetControls() {
 
 function setSealPlacement(placement) {
   state.sealPlacement = ['inline', 'sheet', 'both'].includes(placement) ? placement : 'inline';
-  if (state.sealPlacement === 'sheet') state.stampAllPages = false;
   for (const option of ['inline', 'sheet', 'both']) {
     const radio = $('ds-seal-' + option); if (radio) radio.checked = state.sealPlacement === option;
   }
@@ -3300,13 +3316,18 @@ async function renderDocPreview() {
     const zoomwrap = document.createElement('div');
     zoomwrap.style.cssText = 'position:relative;width:100%;transform-origin:0 0';
     pane.appendChild(zoomwrap);
-    if (state.sealPlacement === 'sheet') {
+    // Sheet only, without parafen: the pages are untouched, so the sheet is
+    // all there is to review. With "every page" the pages are shown too, with
+    // the paraaf on each, exactly as baked (acceptatie r4, Nieuw 2).
+    if (state.sealPlacement === 'sheet' && !state.stampAllPages) {
       showStampOverTextNotice(0);
       zoomwrap.appendChild(buildSignatureSheetPreview());
       buildReviewZoom(zoomwrap);
       return;
     }
-    refreshStampOverTextNotice().catch(() => {});
+    const reviewStamp = hasInlineSeal() && state.stamp ? state.stamp : null;
+    if (reviewStamp) refreshStampOverTextNotice().catch(() => {});
+    else showStampOverTextNotice(0);
     // Review shows EVERY page (capped), each with its own annotations, and the
     // seal on its page. Only the seal page gets the heavy supersample; other
     // pages render at screen resolution to keep memory sane on long documents.
@@ -3326,7 +3347,7 @@ async function renderDocPreview() {
         sizes.push({ width: vp.width, height: vp.height });
       }
       if (stale()) return;
-      const reviewPlan = paraafPlanFor(sizes, state.stamp, textBoxes);
+      const reviewPlan = paraafPlanFor(sizes, reviewStamp, textBoxes);
       showParaafOverTextNotice(paraafOverTextPages(reviewPlan));
       paraafByPage = new Map(reviewPlan.map((b) => [b.pageIndex, b]));
     }
@@ -3334,7 +3355,7 @@ async function renderDocPreview() {
       const page = await pdf.getPage(p);
       if (stale()) return;
       const baseViewport = page.getViewport({ scale: 1 });
-      const isSealPage = (p - 1 === state.stamp.pageIndex);
+      const isSealPage = !!reviewStamp && (p - 1 === reviewStamp.pageIndex);
       const paraaf = isSealPage ? null : paraafByPage.get(p - 1);
       const showSeal = isSealPage || !!paraaf;   // seal page, or a paraaf page when the toggle is on
       const superSample = showSeal ? Math.max(2.5, hiDpiScale()) : Math.min(1.5, Math.max(1, hiDpiScale()));
@@ -3901,6 +3922,16 @@ export async function buildStampedPdf(origBytes, stamp, signerName, dateStr, fin
       for (const box of plan) await inView(box.pageIndex, (pg) => paintParaaf(pg, box));
       state.lastParaafPlan = plan;
     }
+  } else if (state.stampAllPages && pages.length) {
+    // Signature sheet only, with "every page": the signature goes on the sheet,
+    // the paraaf on every page of the document (acceptatie r4, Nieuw 2: the
+    // pdf came out without a single paraaf, and nothing said so). pages is the
+    // list from before the sheet was added, so the sheet itself gets none.
+    const textBoxes = await loadTextBoxes(origBytes);
+    const sizes = geoms.map(geomViewSize);
+    const plan = paraafPlanFor(sizes, null, textBoxes);
+    for (const box of plan) await inView(box.pageIndex, (pg) => paintParaaf(pg, box));
+    state.lastParaafPlan = plan;
   }
 
   // Bake the edit layer (text, date, highlight, note, pen strokes) as real
@@ -4095,7 +4126,7 @@ async function doSign() {
       origHashHex = toHex(sha3_256(state.doc.bytes));
       stampedHashHex = toHex(sha3_256(stampedBytes));
       coords = state.mode === 'pdf' && state.sealPlacement === 'sheet'
-        ? { signature_sheet: true, pageIndex: state.pdfPageCount, source_hash: origHashHex, name: state.signer.name, date: dateStr }
+        ? { signature_sheet: true, pageIndex: state.pdfPageCount, source_hash: origHashHex, name: state.signer.name, date: dateStr, ...(state.stampAllPages ? { all_pages: true, ...paraafCoords() } : {}) }
         : state.mode === 'pdf' && state.sealPlacement === 'both'
           ? { signature_sheet: true, pageIndex: state.pdfPageCount, source_hash: origHashHex, inline_seal: { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, all_pages: !!state.stampAllPages, ...paraafCoords() }, name: state.signer.name, date: dateStr }
           : { pageIndex: state.stamp.pageIndex, x: state.stamp.x, y: state.stamp.y, w: state.stamp.w, h: state.stamp.h, name: state.signer.name, date: dateStr, isImage: !!state.stamp.isImage, all_pages: !!(state.mode === 'pdf' && state.stampAllPages), ...(state.mode === 'pdf' ? paraafCoords() : {}) };
@@ -4453,12 +4484,18 @@ function showDone() {
     ? L('De medeondertekenaars tekenen precies dit bestand. Controleer het eindbewijs later op /verify met ', 'Your co-signers sign exactly this file. Later, check the final proof on /verify with ') + signedName +
       L(', niet met ', ', not with ') + state.doc.name + L(' en niet met de leesbare kopie met alle handtekeningen. ', ' and not with the readable copy that shows every signature. ')
     : '';
+  // Alone: the same, by name. The stamped file is what turns /verify green, not
+  // the file the signer started from (acceptatie r4, punt 3).
+  const soloNote = togetherNote ? ''
+    : r.stampedBytes
+      ? L('Controleer later op /verify met ', 'Later, check on /verify with ') + signedName + L(' en het bewijsbestand, niet met ', ' and the proof file, not with ') + state.doc.name + '. '
+      : L('Controleer later op /verify met ', 'Later, check on /verify with ') + signedName + L(' en het bewijsbestand. ', ' and the proof file. ');
   paDone().fill('step-done', {
     title: L('Ondertekend.', 'Signed.'),
     line: r.stampedBytes
-      ? L('Uw handtekening staat op ', 'Your signature is on ') + signedName + '. ' + togetherNote + L('Bewaar nu beide bestanden en houd ze bij elkaar, ', 'Save both files now and keep them together, ') +
+      ? L('Uw handtekening staat op ', 'Your signature is on ') + signedName + '. ' + togetherNote + soloNote + L('Bewaar nu beide bestanden en houd ze bij elkaar, ', 'Save both files now and keep them together, ') +
         L('want wij bewaren geen kopie die u later kunt ophalen.', 'because we do not hold a copy you could come back for.')
-      : L('Uw handtekening geldt voor ', 'Your signature covers ') + signedName + L(', dat precies blijft zoals het was. ', ', which is left exactly as it was. ') +
+      : L('Uw handtekening geldt voor ', 'Your signature covers ') + signedName + L(', dat precies blijft zoals het was. ', ', which is left exactly as it was. ') + soloNote +
         L('Bewaar nu het bewijsbestand bij het document, want wij bewaren geen kopie ', 'Save the proof file now and keep it with the document, because we do not hold a copy ') +
         L('die u later kunt ophalen.', 'you could come back for.'),
   });

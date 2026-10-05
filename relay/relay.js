@@ -2308,16 +2308,16 @@ async function notifySenderLinkRequested(envelopeId, accountId, partyLabel) {
     subject: 'Een ondertekenaar vraagt de link opnieuw',
     text: tweetaligTekst('nl',
       `${who} vroeg de uitnodiging om te ondertekenen opnieuw aan. De opnieuw verstuurde link opent alleen het verzoek, niet het document: de sleutel die het document opent zit alleen in de volledige link die u bij het versturen kreeg, en die bewaren wij niet.`
-      + '\n\nOpen uw dashboard, klik op dit verzoek en kopieer bij de ondertekenaar de volledige link. Die staat alleen in de browser waarmee u het verzoek verstuurde. Staat hij daar niet meer, trek het verzoek dan in en stuur een nieuw verzoek.'
+      + '\n\nKopieer de link uit uw dashboard, in de browser waarmee u het verzoek verstuurde: klik op dit verzoek en kies bij de ondertekenaar Link kopiëren. Stuur die link zelf naar de ondertekenaar. Staat hij daar niet, trek het verzoek dan in en stuur een nieuw verzoek.'
       + '\n\n' + base + '/dashboard',
       `${whoEn} asked for the signing invitation again. The resent link opens the request, not the document: the key that opens the document is only in the full link you got when you sent it, and we do not keep it.`
-      + '\n\nOpen your dashboard, click this request and copy the full link next to the signer. It is kept only in the browser you sent the request from. If it is no longer there, withdraw the request and send a new one.'),
+      + '\n\nCopy the link from your dashboard, in the browser you sent the request from: click this request and choose Copy link next to the signer. Send that link to the signer yourself. If it is not there, withdraw the request and send a new one.'),
     html: tweetaligHtml('nl',
       `<p>${escHtml(who)} vroeg de uitnodiging om te ondertekenen opnieuw aan. De opnieuw verstuurde link opent alleen het verzoek, niet het document: de sleutel die het document opent zit alleen in de volledige link die u bij het versturen kreeg, en die bewaren wij niet.</p>`
-      + '<p>Open uw dashboard, klik op dit verzoek en kopieer bij de ondertekenaar de volledige link. Die staat alleen in de browser waarmee u het verzoek verstuurde. Staat hij daar niet meer, trek het verzoek dan in en stuur een nieuw verzoek.</p>'
+      + '<p>Kopieer de link uit uw dashboard, in de browser waarmee u het verzoek verstuurde: klik op dit verzoek en kies bij de ondertekenaar Link kopiëren. Stuur die link zelf naar de ondertekenaar. Staat hij daar niet, trek het verzoek dan in en stuur een nieuw verzoek.</p>'
       + '<p><a href="' + base + '/dashboard">Naar uw dashboard</a></p>',
       `<p>${escHtml(whoEn)} asked for the signing invitation again. The resent link opens the request, not the document: the key that opens the document is only in the full link you got when you sent it, and we do not keep it.</p>`
-      + '<p>Open your dashboard, click this request and copy the full link next to the signer. It is kept only in the browser you sent the request from. If it is no longer there, withdraw the request and send a new one.</p>'),
+      + '<p>Copy the link from your dashboard, in the browser you sent the request from: click this request and choose Copy link next to the signer. Send that link to the signer yourself. If it is not there, withdraw the request and send a new one.</p>'),
   });
   log('info', 'sender_link_request_notice', { delivered: !!(r && r.ok) });
   return !!(r && r.ok);

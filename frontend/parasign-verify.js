@@ -43,7 +43,7 @@ const T = {
     missingMpId: 'multiparty.envelope_id ontbreekt',
     missingSignedHash: 'de hash van het ondertekende document ontbreekt (stamped_hash of document_hash)',
     hashMismatch: 'documenthash klopt niet: dit document is niet het document dat is ondertekend',
-    wrongFileSolo: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>Dit is niet het ondertekende bestand. Controleer met het originele bestand.</strong> De handtekening in het .psign-bestand geldt voor een ander bestand (SHA3-256-vingerafdruk {hash}…). Bij een pdf of afbeelding is dat de versie met de zegel erop, die u na het ondertekenen kreeg. Wat u koos, is niet wat er is ondertekend. Kies dat bestand en controleer opnieuw.</div>',
+    wrongFileSolo: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>Dit is niet het ondertekende bestand. {pick}</strong> De handtekening in het .psign-bestand geldt voor een ander bestand (SHA3-256-vingerafdruk {hash}…). Bij een pdf of afbeelding is dat de versie met de zegel erop, die u na het ondertekenen kreeg. Wat u koos, is niet wat er is ondertekend. Kies dat bestand en controleer opnieuw.</div>',
     partyNamesHead: 'Namen zoals de afzender ze opgaf (niet gecontroleerd; de handtekeningen zelf zijn wel gecontroleerd):',
     missingSignerPk: 'signer_public_key ontbreekt',
     missingEmailHash: 'party_email_hash ontbreekt (het ondertekende bericht is offline niet na te bouwen)',
@@ -61,6 +61,9 @@ const T = {
     lookupRetry: 'Opnieuw opzoeken',
     qesNote: '<p class="ps-help">Volgens dit bewijs staat er in de pdf ook een gekwalificeerde handtekening (PAdES) van {provider}, certificaat <code class="mono">{fp}</code>{when}. Die tweede handtekening controleert deze pagina niet: open de ondertekende pdf in een PAdES-lezer, zoals Adobe Acrobat of de EU-validatiedienst DSS.</p>',
     qesWhen: ', gezet op {v}',
+    pickSignedPdf: 'Kies de getekende pdf (signed-…pdf).',
+    pickSignedImage: 'Kies de getekende afbeelding (signed-…).',
+    pickOriginal: 'Controleer met het originele bestand.',
     soloChecked: '<div class="ps-banner info"><span class="ps-mark" aria-hidden="true">\u2713</span><strong>De handtekening klopt met dit document.</strong> Wie tekende, staat niet in de handtekening: de naam hieronder is niet gecontroleerd.</div>',
     fpTampered: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>De handtekening klopt, maar dit bestand is aangepast.</strong> De gegevens over de ondertekenaar horen niet bij de sleutel die tekende. Vertrouw de naam in dit bestand niet.</div>',
     lookupBtn: 'Wie hoort bij deze sleutel? (vraagt het aan Paramant)',
@@ -123,7 +126,7 @@ const T = {
     missingMpId: 'missing multiparty.envelope_id',
     missingSignedHash: 'missing signed document hash (stamped_hash or document_hash)',
     hashMismatch: 'document hash mismatch: this document does not match the one that was signed',
-    wrongFileSolo: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>This is not the signed file. Check with the original file.</strong> The signature in the .psign file covers a different file (SHA3-256 fingerprint {hash}…). For a PDF or image that is the version with the seal on it, which you received after signing. What you chose is not what was signed. Choose that file and check again.</div>',
+    wrongFileSolo: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>This is not the signed file. {pick}</strong> The signature in the .psign file covers a different file (SHA3-256 fingerprint {hash}…). For a PDF or image that is the version with the seal on it, which you received after signing. What you chose is not what was signed. Choose that file and check again.</div>',
     partyNamesHead: 'Names as the sender entered them (not checked; the signatures themselves were checked):',
     missingSignerPk: 'missing signer_public_key',
     missingEmailHash: 'missing party_email_hash (cannot reconstruct the signed message offline)',
@@ -141,6 +144,9 @@ const T = {
     lookupRetry: 'Look up again',
     qesNote: '<p class="ps-help">According to this proof, the PDF also carries a qualified signature (PAdES) from {provider}, certificate <code class="mono">{fp}</code>{when}. This page does not check that second signature: open the signed PDF in a PAdES reader, such as Adobe Acrobat or the EU validation service DSS.</p>',
     qesWhen: ', made on {v}',
+    pickSignedPdf: 'Choose the signed PDF (signed-…pdf).',
+    pickSignedImage: 'Choose the signed image (signed-…).',
+    pickOriginal: 'Check with the original file.',
     soloChecked: '<div class="ps-banner info"><span class="ps-mark" aria-hidden="true">\u2713</span><strong>The signature matches this document.</strong> Who signed is not part of the signature: the name below has not been checked.</div>',
     fpTampered: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>The signature is correct, but this file has been altered.</strong> The signer details do not belong to the key that signed. Do not trust the name in this file.</div>',
     lookupBtn: 'Who does this key belong to? (asks Paramant)',
@@ -549,7 +555,14 @@ async function verify() {
       let body = null;
       try { body = await res.json(); } catch { body = null; }
       if (body && body.valid === false) {
-        await renderResult({ valid: false, errors: relayErrors(body.errors), note: null });
+        // A wrong file is the common case here too (an old v2 proof checked
+        // against another file): the same prescribed heading as v3 gets,
+        // "Dit is niet het ondertekende bestand. Controleer met het originele
+        // bestand." (acceptatie r4, punt 3). Only when that is the one reason.
+        const errs = Array.isArray(body.errors) ? body.errors : [];
+        const onlyWrongFile = errs.length === 1 && /document_hash mismatch/i.test(String(errs[0] || ''));
+        await renderResult({ valid: false, errors: relayErrors(errs), note: null, wrongFile: onlyWrongFile,
+          docHash: (envelope && (envelope.document_hash || envelope.stamped_hash)) || '' });
         return;
       }
     }
@@ -573,8 +586,8 @@ function relayErrors(list) {
   for (const raw of Array.isArray(list) ? list : []) {
     const e = String(raw || '');
     if (/document_hash mismatch/i.test(e)) out.push(LANG === 'nl'
-      ? 'Dit document is niet het document dat is ondertekend: de vingerafdruk klopt niet. Kies het originele bestand.'
-      : 'This document is not the one that was signed: the fingerprint does not match. Choose the original file.');
+      ? 'Dit is niet het ondertekende bestand. Controleer met het originele bestand.'
+      : 'This is not the signed file. Check with the original file.');
     else if (/signature/i.test(e)) out.push(LANG === 'nl'
       ? 'Een handtekening in het bewijs klopt niet.' : 'A signature in the proof does not hold.');
     else out.push(e.slice(0, 200));
@@ -681,6 +694,19 @@ function v3ScopeHtml(env) {
   return out.join('');
 }
 
+// Which file a solo proof is checked with, said in the heading itself
+// (acceptatie r4, punt 3). A pdf or image is signed AFTER the seal is stamped
+// on it, so the file that turns green is the signed-… copy, not the original
+// the signer started from; the leek who picks that original must not be told
+// to "check with the original". Hash-only documents are signed as they are.
+// stamped_filename is not covered by the signature, so it only picks the
+// wording (pdf or image), never a file name the page presents as fact.
+function soloPick(env) {
+  if (!env || !env.stamped_hash) return 'pickOriginal';
+  const name = String(env.stamped_filename || env.original_filename || '');
+  return /\.(png|jpe?g|webp|gif)$/i.test(name) || /image/i.test(name) ? 'pickSignedImage' : 'pickSignedPdf';
+}
+
 async function renderResult(r) {
   const out = [];
   // A v3 solo proof binds a key, not a person: no reassuring green for a name
@@ -689,7 +715,7 @@ async function renderResult(r) {
   const solo = r.valid && isV3 && !isMulti && envelope;
   const fpBad = solo && claimFingerprintBad(envelope);
   const banner = !r.valid
-    ? (r.wrongFile ? t(isV3 && !isMulti ? 'wrongFileSolo' : 'wrongFile', { hash: esc(String(r.docHash || '').slice(0, 16)) })
+    ? (r.wrongFile ? t(isV3 && !isMulti ? 'wrongFileSolo' : 'wrongFile', { hash: esc(String(r.docHash || '').slice(0, 16)), pick: t(soloPick(envelope)) })
       : t('invalid'))
     : r.test ? t('validTest') : fpBad ? t('fpTampered') : solo ? t('soloChecked') : t('valid');
   out.push(banner);

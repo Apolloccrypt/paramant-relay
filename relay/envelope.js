@@ -869,6 +869,11 @@ class EnvelopeStore {
         status: env.status,
         created_at: env.created_at,
         expires_at: env.expires_at,
+        // When signing stops (created_at + 7d, email mode), the date /co-sign
+        // shows as "Tekenen kan tot". expires_at is only how long the record is
+        // kept (30d); judging "still open" on that kept an expired request on
+        // the dashboard as waiting, with a Withdraw button (acceptatie r4, A2).
+        sign_expires_at: (env.binding_mode || 'open') === 'email' ? signInviteExpiresAt(env.created_at) : null,
         completed_at: env.completed_at,
         voided_at: env.voided_at,
         party_count: env.party_count,

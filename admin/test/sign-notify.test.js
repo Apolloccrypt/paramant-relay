@@ -94,9 +94,69 @@ test('no mail on a retry, on the sender signing their own slot, or without a rec
   assert.equal(await run(envId('none'), COSIGNER, { signed_count: 1, party_count: 2, status: 'pending' }, mail), 'skipped');
   assert.equal(mail.sent.length, 0);
 
-  // The sender completing the envelope themselves still clears the record.
-  assert.equal(await run(id, SENDER.user_id, { signed_count: 2, party_count: 2, status: 'complete' }, mail), 'skipped');
+  // The sender completing the envelope themselves clears the record, and
+  // still gets "Iedereen heeft getekend" (acceptatie r4, Nieuw 1).
+  assert.equal(await run(id, SENDER.user_id, { signed_count: 2, party_count: 2, status: 'complete' }, mail), 'sent');
+  assert.equal(mail.sent.length, 1);
+  assert.match(mail.sent[0].msg.subject, /^Iedereen heeft getekend \/ Everyone has signed$/);
   assert.equal(await rc.get(signNotify.KEY_PREFIX + id), null);
+  // And a retry of that last signature mails nobody again.
+  assert.equal(await run(id, SENDER.user_id, { idempotent: true, signed_count: 2, party_count: 2, status: 'complete' }, mail), 'skipped');
+  assert.equal(mail.sent.length, 1);
+});
+
+// Acceptatie r4, Nieuw 1: the sender signs last. Then nobody got "Iedereen
+// heeft getekend" and the sender got no result link. Now the sender gets the
+// mail with the link, every invited party gets one mail, and nobody two.
+test('the sender signing last: result link to the sender, one mail per party, no doubles', async (t) => {
+  if (!rc) return t.skip('redis declared absent');
+  const id = envId('last');
+  await signNotify.rememberSender(rc, id, SENDER);
+  const A = `ayse_${RUN}@example.com`;
+  const B = `bram_${RUN}@example.com`;
+  // The sender's own address in the invited set too, and A twice.
+  assert.equal(await signNotify.rememberParties(rc, id, [A, B.toUpperCase(), SENDER.email, A]), true);
+  const ttl = await rc.ttl(signNotify.PARTIES_PREFIX + id);
+  assert.ok(ttl > 7 * 86400 && ttl <= 8 * 86400, `ttl ${ttl}s: the same window as the sender's record`);
+  const mail = capture();
+  const out = await signNotify.afterSignature({
+    client: rc, envelopeId: id, signerAccountId: SENDER.user_id,
+    relayBody: { signed_count: 3, party_count: 3, status: 'complete' },
+    sendEmail: mail.sendEmail, template: emailTemplates.signatureReceivedEmail,
+    partyTemplate: emailTemplates.everyoneSignedPartyEmail, baseUrl: 'https://paramant.app',
+  });
+  assert.equal(out, 'sent');
+  const to = mail.sent.map((m) => m.to).sort();
+  assert.deepEqual(to, [A, B, SENDER.email.toLowerCase()].sort(), 'each address exactly once');
+  const toSender = mail.sent.find((m) => m.to === SENDER.email.toLowerCase()).msg;
+  assert.match(toSender.subject, /^Iedereen heeft getekend \/ Everyone has signed$/);
+  const ref = toSender.text.match(/https:\/\/paramant\.app\/co-sign\?result=([A-Za-z0-9_-]{43})/);
+  assert.ok(ref, 'the sender gets the result link');
+  assert.equal(await signNotify.resolveResult(rc, ref[1], SENDER.user_id), id);
+  const toA = mail.sent.find((m) => m.to === A).msg;
+  assert.match(toA.subject, /^Iedereen heeft getekend \/ Everyone has signed$/);
+  assert.match(toA.text, /Open de link uit uw uitnodigingsmail/);
+  for (const part of [toA.subject, toA.text, toA.html]) assert.ok(!part.includes(id), 'no envelope id in the party mail');
+  assert.doesNotMatch(toA.text, /result=/, 'the result link is the sender\'s alone');
+  assert.equal(await rc.get(signNotify.PARTIES_PREFIX + id), null, 'the invited addresses are gone on completion');
+  assert.equal(await rc.exists(signNotify.PARTIES_PREFIX + id), 0);
+  await rc.del(signNotify.RESULT_PREFIX + ref[1]);
+});
+
+test('a co-signer signing last also tells the other parties, once', async (t) => {
+  if (!rc) return t.skip('redis declared absent');
+  const id = envId('lastco');
+  await signNotify.rememberSender(rc, id, SENDER);
+  const A = `ayse2_${RUN}@example.com`;
+  await signNotify.rememberParties(rc, id, [A]);
+  const mail = capture();
+  assert.equal(await signNotify.afterSignature({
+    client: rc, envelopeId: id, signerAccountId: COSIGNER,
+    relayBody: { signed_count: 2, party_count: 2, status: 'complete' },
+    sendEmail: mail.sendEmail, template: emailTemplates.signatureReceivedEmail,
+    partyTemplate: emailTemplates.everyoneSignedPartyEmail,
+  }), 'sent');
+  assert.deepEqual(mail.sent.map((m) => m.to).sort(), [A, SENDER.email.toLowerCase()].sort());
 });
 
 test('a failing mail provider never throws into the sign route', async (t) => {
@@ -140,6 +200,10 @@ test('server.js remembers the sender on create and tells them after a submit, wi
   assert.ok(submit);
   assert.match(submit[0], /\n    signNotify\.afterSignature\(\{[\s\S]*?signerAccountId: user_id, relayBody: body/);
   assert.doesNotMatch(submit[0], /await signNotify\.afterSignature/, 'the signer\'s 200 must not wait on a mail provider');
+  assert.match(submit[0], /partyTemplate: emailTemplates\.everyoneSignedPartyEmail/, 'the parties hear completion too');
+  const invite = src.match(/api\.post\("\/user\/envelopes\/:id\/invitations"[\s\S]*?\n\}\);/);
+  assert.ok(invite);
+  assert.match(invite[0], /signNotify\.rememberParties\(redis\(\), id, invited\)/, 'the invited addresses are kept for that mail');
 });
 
 // Since 2026-10-04: "Iedereen heeft getekend" opens the finished document.

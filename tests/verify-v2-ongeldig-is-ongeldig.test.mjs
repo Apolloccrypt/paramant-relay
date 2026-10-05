@@ -62,19 +62,27 @@ async function check(url, relayStatus, relayBody) {
 
 const bad = { valid: false, errors: ['document_hash mismatch: expected aaaa, got bbbb'], verified_at: '2026-10-04T00:00:00Z' };
 
-test('NL: 422 from the relay is a red INVALID with the reason, not "storing bij ons"', async () => {
+// Acceptatie r4, punt 3: a wrong file gets the prescribed heading, the same
+// words a v3 proof gets, not a reason of its own.
+test('NL: 422 wrong file is red with the prescribed text, not "storing bij ons"', async () => {
   const r = await check('/verify.html', 422, bad);
   assert.match(r.banner, /\berr\b/, r.banner);
-  assert.match(r.text, /ONGELDIG/, r.text);
-  assert.match(r.text, /niet het document dat is ondertekend/, r.text);
+  assert.match(r.text, /Dit is niet het ondertekende bestand\. Controleer met het originele bestand\./, r.text);
   assert.doesNotMatch(r.text, /storing bij ons/, r.text);
 });
 
-test('EN: 422 from the relay is a red INVALID with the reason', async () => {
+test('EN: 422 wrong file is red with the prescribed text', async () => {
   const r = await check('/en/verify.html', 422, bad);
   assert.match(r.banner, /\berr\b/, r.banner);
-  assert.match(r.text, /INVALID/, r.text);
+  assert.match(r.text, /This is not the signed file\. Check with the original file\./, r.text);
   assert.doesNotMatch(r.text, /fault on our side/, r.text);
+});
+
+test('NL: 422 with a bad signature as well stays a red INVALID with the reasons', async () => {
+  const r = await check('/verify.html', 422, { valid: false, errors: ['document_hash mismatch: x', 'signature invalid'] });
+  assert.match(r.banner, /\berr\b/, r.banner);
+  assert.match(r.text, /ONGELDIG/, r.text);
+  assert.match(r.text, /Een handtekening in het bewijs klopt niet/, r.text);
 });
 
 test('a real fault (500) still says it is a fault, not a verdict', async () => {

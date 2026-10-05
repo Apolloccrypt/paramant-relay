@@ -1037,7 +1037,7 @@ function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt,
       asks: 'heeft u gevraagd een document te bekijken en te ondertekenen.',
       carries: opensDocument
         ? `De link opent het document in uw browser zodra u bent ingelogd. U ziet het document, ${paraaf ? 'zet uw paraaf en handtekening' : 'zet uw handtekening'} en bent klaar. Zonder inloggen opent de link niets.`
-        : 'Deze link opent het verzoek. Hij opent het document niet. De sleutel die het document opent staat bewust niet in deze e-mail. Vraag de afzender om de volledige link, of open het bestand als u al een kopie hebt.',
+        : 'Deze link opent het verzoek. Hij opent het document niet. De sleutel die het document opent staat bewust niet in deze e-mail. Heeft u een eerdere uitnodigingsmail voor dit verzoek, open dan de link daaruit; die opent het document wel. Anders: vraag de afzender om de link opnieuw te sturen.',
       open: opensDocument ? 'Open het document' : 'Open het verzoek',
       fromSender: 'Bericht van de afzender:',
       signIn: 'Log in met het e-mailadres waarop u bent uitgenodigd. Stuur de link niet door.',
@@ -1051,7 +1051,7 @@ function signingInviteEmail({ inviteUrl, recipientLabel, senderLabel, expiresAt,
       asks: 'has asked you to review and sign a document.',
       carries: opensDocument
         ? `The link opens the document in your browser once you have signed in. You see the document, ${paraaf ? 'add your initials and signature' : 'add your signature'}, and you are done. Without signing in the link opens nothing.`
-        : 'This link opens the request. It does not open the document. The key that unlocks it is deliberately not in this email, so ask the sender for their complete link, or open the file if you already have a copy.',
+        : 'This link opens the request. It does not open the document. The key that unlocks it is deliberately not in this email. If you have an earlier invitation email for this request, open the link from that one; it opens the document. Otherwise, ask the sender to send you the link again.',
       open: opensDocument ? 'Open the document' : 'Open the request',
       fromSender: 'Message from the sender:',
       signIn: 'Sign in with this invited email address. Do not forward the link.',
@@ -1169,6 +1169,41 @@ ${BASE_URL}`;
   };
 }
 
+// To an invited party, when the last signature has landed (acceptatie r4,
+// Nieuw 1). The sender's mail carries a result link; this one cannot: the link
+// that opens the document for this party holds half of the document key and
+// was never kept on a server. Their own invitation link opens the finished
+// document, so the mail says to use that. No file name, no names, no
+// envelope id, like every mail in this family.
+function everyoneSignedPartyEmail({ partyCount, envelopeId }) {
+  const m = Number.isInteger(partyCount) && partyCount > 1 ? partyCount : null;
+  const W = {
+    nl: { heading: 'Iedereen heeft getekend', line: m ? `Het document dat u ondertekende, is nu door alle ${m} ondertekenaars getekend.` : 'Het document dat u ondertekende, is nu door iedereen getekend.',
+      next: 'Open de link uit uw uitnodigingsmail en log in met dit e-mailadres: daar downloadt u het complete document met alle handtekeningen en het bewijs.', pre: 'Het document is door iedereen ondertekend.', subject: 'Iedereen heeft getekend' },
+    en: { heading: 'Everyone has signed', line: m ? `The document you signed has now been signed by all ${m} signers.` : 'The document you signed has now been signed by everyone.',
+      next: 'Open the link from your invitation email and sign in with this email address: there you download the complete document with every signature, and the proof.', pre: 'The document has been signed by everyone.', subject: 'Everyone has signed' },
+  };
+  const textBlock = (l) => `${W[l].heading}
+
+${W[l].line}
+${W[l].next}`;
+  const text = `${textBlock('nl')}\n\n---\n\n${textBlock('en')}
+
+Paramant
+${BASE_URL}`;
+  const htmlBlock = (l, first) => `
+    <h1 style="margin:${first ? '0' : '32px'} 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">${escHtml(W[l].heading)}</h1>
+    <p style="margin:0 0 16px 0;line-height:1.6;">${escHtml(W[l].line)}</p>
+    <p style="margin:0 0 16px 0;line-height:1.6;color:#475569;font-size:14px;">${escHtml(W[l].next)}</p>`;
+  const html = htmlShell(`${W.nl.pre} ${W.en.pre}`,
+    htmlBlock('nl', true) + '\n    <hr style="margin:32px 0 0 0;border:0;border-top:1px solid #E2E8F0;">' + htmlBlock('en', false),
+    'nl');
+  return {
+    ...wrap(text, html, { refId: 'complete-' + refIdHash(`${envelopeId}:party`) }),
+    subject: `${W.nl.subject} / ${W.en.subject}`,
+  };
+}
+
 // To the sender, when an invited party refused to sign. The request is then
 // over for everybody. No names, no file name, no envelope id (the same rule as
 // signatureReceivedEmail); the dashboard shows who.
@@ -1241,6 +1276,7 @@ module.exports = {
   parasignOnboardingEmail, /*MARK:parasign_export*/
   signingInviteEmail,
   signatureReceivedEmail,
+  everyoneSignedPartyEmail,
   signatureDeclinedEmail,
   billingConfirmationEmail,
   productPlanChangeEmail,
