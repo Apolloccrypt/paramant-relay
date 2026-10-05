@@ -175,6 +175,11 @@ async function processPayment(payment, deps) {
     for (const g of order.grants) {
       const floor = catalog.floorTier(g.product);
       const per = Array.isArray(periods) ? periods.find((p) => p && p.product === g.product && p.tier === g.tier) : null;
+      // An included grant this payment did not demonstrably buy stays: a
+      // Business payment from before Business carried ParaSend Pro has no
+      // parasend period on record (or no ledger at all), and flooring here
+      // wiped the ParaSend Pro of a paid Firm year (review #573, M2).
+      if (g.included && !per) continue;
       let cur = null;
       if (per && typeof d.currentTermEnd === 'function') { try { cur = await d.currentTermEnd(accountId, g.product, g.tier); } catch { cur = null; } }
       const span = per ? (new Date(per.until).getTime() - new Date(per.from).getTime()) : NaN;
