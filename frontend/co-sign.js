@@ -34,6 +34,7 @@ import { initialsFrom, normaliseRotation, viewSize, viewToUserMatrix, isIdentity
 import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParties, autoSignaturePlace, textBoxesToFractions, strokesToInk, paraafCoveredPages, pageListText } from '/js/cosign-layout.js?v=5';
 import { sealInk, openInk, joinKey, parseKeyShareFragment } from '/js/parasign-ink.js?v=4';
 import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
+import { stashReturn, resumeReturn } from '/js/login-return.js?v=1';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
 
@@ -41,6 +42,10 @@ const RELAY_PUBLIC = 'https://health.paramant.app';
 // person reads goes through L(dutch, english); the page's lang attribute picks.
 const EN = document.documentElement.lang === 'en';
 const L = (nl, en) => (EN ? en : nl);
+
+// Back from signing in: put the full address (token, key fragment) back first,
+// so everything below reads the link as it was (login-return.js).
+try { resumeReturn(window.sessionStorage, location, history); } catch { /* no storage: the link as it is */ }
 
 // The language link has to carry the query (which envelope, which party, the
 // invite token) and the #fragment (the document key). A fragment never leaves
@@ -574,9 +579,12 @@ function showSessionFault() {
 }
 
 function loginCtaHtml() {
-  // Preserve the fragment: it holds (half of) the document key, and is sent to
-  // neither Paramant nor the identity provider.
-  const ret = encodeURIComponent(location.pathname + location.search + location.hash);
+  // The fragment holds (half of) the document key and ?t= the invite token.
+  // Neither may become part of a query, so the full address waits in this
+  // tab's sessionStorage and the login page only gets the path (login-return.js).
+  let store = null;
+  try { store = window.sessionStorage; } catch { store = null; }
+  const ret = encodeURIComponent(store ? stashReturn(store, location) : location.pathname);
   return '<a class="btn" href="/auth/login?return=' + ret + '">' + L('Inloggen om verder te gaan', 'Sign in to continue') + '</a>'
     + '<p class="cta-note">' + L('Nog geen account? <a href="/signup">Maak er gratis een</a> met het e-mailadres waarop u deze uitnodiging kreeg. Open daarna deze link opnieuw.', 'No account yet? <a href="/en/signup">Create one for free</a> with the email address this invitation was sent to, then open this link again.') + '</p>';
 }
