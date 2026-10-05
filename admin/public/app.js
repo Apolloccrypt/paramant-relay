@@ -223,7 +223,7 @@ function usersTable(users){
         '<td data-label="User"><div>'+esc(u.email||'—')+'</div>'+(u.label?'<div class="mono" style="font-size:11px;color:#475569">'+esc(u.label)+'</div>':'')+
         purposeLine(u)+'</td>'+
         '<td data-label="Plan"><span class="badge '+esc(u.plan||'community')+'">'+esc(u.plan||'community')+'</span>'+(u.parasign?' <span class="chip active" title="ParaSign /v1 API enabled">ParaSign</span>':'')+
-          '<div class="mono" style="font-size:10px;color:#475569" title="Per-product tiers">sign:'+esc(u.plan_parasign||'—')+' · send:'+esc(u.plan_parasend||'—')+'</div></td>'+ /*MARK:parasign_badge*/
+          '<div class="mono" style="font-size:10px;color:#475569" title="Per-product tiers">sign:'+esc(u.plan_parasign||'-')+' · send:'+esc(u.plan_parasend||'-')+(u.parasign_keys?' · '+u.parasign_keys+' ParaSign API key'+(u.parasign_keys===1?'':'s'):'')+'</div></td>'+ /*MARK:parasign_badge*/
         '<td data-label="TOTP">'+totpBadge(u)+'</td>'+
         '<td data-label="Status"><span class="chip '+(u.active?'active':'revoked')+'">'+(u.active?'active':'revoked')+'</span></td>'+
         '<td data-label="Created" class="mono" style="font-size:11px;color:#475569">'+(u.created?u.created.split('T')[0]:'—')+'</td>'+

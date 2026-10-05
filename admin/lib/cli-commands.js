@@ -34,11 +34,12 @@ const COMMANDS = {
     totp: false,
   },
   'logs': {
-    description: 'Tail logs of a service',
+    description: 'Tail logs of a service (add "follow" to keep streaming; Ctrl+C stops it, the 60 s limit too)',
     handler: 'paramant-logs.sh',
     args: [
       { name: 'service', type: 'enum', options: ['relay', 'admin', 'nats', 'frontend'], required: true },
       { name: 'tail', type: 'number', default: 100, min: 1, max: 1000 },
+      { name: 'follow', type: 'enum', options: ['no', 'follow'], default: 'no' },
     ],
     class: 'read',
     totp: false,

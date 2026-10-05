@@ -159,7 +159,7 @@ All five relay containers run the **same image** (`build: ./relay`). The `SECTOR
 
 **TLS:**
 - Handled by **system nginx** (not a Docker container). Install via Certbot / Let's Encrypt or bring your own cert.
-- See `nginx-selfhost.conf` in the repo for a hardened nginx config with rate limiting, HSTS, and OCSP stapling.
+- See `deploy/nginx-selfhost.conf` in the repo for a hardened nginx config with rate limiting, HSTS, and OCSP stapling (the `nginx-selfhost.conf` in the repo root is an older copy; use the one in `deploy/`).
 
 **Dockerfile — two-stage build:**
 - Stage 1 (`build`): `node:22-alpine` + `python3`/`make`/`g++` → compiles `argon2` native bindings
@@ -172,8 +172,8 @@ All five relay containers run the **same image** (`build: ./relay`). The `SECTOR
 ### Add a user (zero downtime)
 
 ```bash
-# On the host, with ADMIN_TOKEN exported
-export $(grep -v '^#' .env | xargs)
+# On the host, in the install directory: export ADMIN_TOKEN from .env
+export ADMIN_TOKEN="$(grep '^ADMIN_TOKEN=' .env | cut -d= -f2-)"
 
 python3 deploy/paramant-admin.py add \
   --label "alice" \
@@ -282,19 +282,31 @@ paramant token           # show your ADMIN_TOKEN
 Before starting, run the pre-flight check:
 
 ```bash
-bash scripts/preflight.sh
+bash deploy/preflight.sh
 ```
 
-Output:
+It checks the ports, Docker, swap and the secrets in `.env`: `ADMIN_TOKEN`,
+`REDIS_PASSWORD` (and that `RELAY_REDIS_URL` carries it), `RELAY_SELF_URL_<SECTOR>`
+(your own address, not the example value), `PARAMANT_TOTP_MASTER_KEY` and
+`INTERNAL_AUTH_TOKEN`. Without `REDIS_PASSWORD` redis does not start, so the
+check says so instead of "All checks passed". Output on a complete `.env`:
 ```
-PARAMANT pre-flight check
-─────────────────────────
-HTTP_PORT=80  HTTPS_PORT=443
-✓ Port 80 free
-✓ Port 443 free
-✓ Docker 29.3.1
-✓ Swap disabled
-✓ Ready for docker compose up -d
+✓  Port 80 free
+✓  Port 443 free
+✓  Docker 29.3.1
+✓  Docker Compose 2.40.3
+✓  Swap disabled
+✓  ADMIN_TOKEN configured
+✓  REDIS_PASSWORD configured
+✓  RELAY_REDIS_URL uses REDIS_PASSWORD
+✓  RELAY_SELF_URL_<SECTOR> set to your own address
+✓  PARAMANT_TOTP_MASTER_KEY configured
+✓  INTERNAL_AUTH_TOKEN configured
+
+╔═══════════════════════════════════════╗
+║  ✓  All checks passed                 ║
+║     Ready: docker compose up -d       ║
+╚═══════════════════════════════════════╝
 ```
 
 If ports are in use, add to `.env`:
@@ -572,7 +584,7 @@ Expected output (one entry per registered relay):
 
 ### Admin Panel — `/admin/`
 
-**Access:** ADMIN_TOKEN (or enterprise `pgp_` key) + TOTP (6-digit authenticator)
+**Access:** ADMIN_TOKEN + TOTP (6-digit authenticator). A `pgp_` API key does not log in to the admin panel, whatever its plan.
 
 > ⚠ Restrict access to your IP in nginx for extra security:
 > ```nginx
@@ -586,7 +598,7 @@ Expected output (one entry per registered relay):
 
 **Login flow:**
 1. Go to `https://your-domain/admin/`
-2. Enter your `ADMIN_TOKEN` (from `.env`) or an enterprise `pgp_` key
+2. Enter your `ADMIN_TOKEN` (from `.env`)
 3. Enter 6-digit TOTP code from your authenticator app
 4. Access granted
 
@@ -594,9 +606,19 @@ Expected output (one entry per registered relay):
 
 | Tab | Actions |
 |-----|---------|
-| Relay Monitor | Version, edition, active keys vs limit, uptime, blobs in flight, CT log |
-| API Keys | Load all keys (with BLOCKED indicator for over-limit keys), create, revoke, resend mail |
-| Licenses | Generate `plk_` license key for a customer — shown once with install instructions |
+| Overview | Accounts, active sessions, sign-ups today, plan distribution, recent audit events |
+| Users | All accounts with plan, per-product tiers and TOTP state; per account: details, welcome/setup/TOTP-reset mail, change plan or one product tier, ParaSign API on/off, revoke sessions, require TOTP, disable the key, deactivate the account; `+ New key` |
+| Audit | Audit events per account, filter on event type, CSV export |
+| Billing | Recent plan changes and gift/discount codes (create, revoke) |
+| Relay | Health of every relay sector, refreshed every 10 s |
+
+Next to the tabs: **Settings** (`/admin/settings.html`, relay configuration
+written to the env file, restart by hand), **CLI** (`/admin/cli`, a whitelist of
+commands such as `status`, `logs`, `key list`) and **Stand** (`/admin/stand`).
+
+The panel does not generate relay licenses. A `plk_` license key is issued by
+Paramant (see *Community Edition Limits* above) and set as `PLK_KEY` in `.env`;
+`scripts/paramant-license.sh` shows the license state of a running relay.
 
 **Set up TOTP:**
 ```bash

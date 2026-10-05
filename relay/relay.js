@@ -7664,7 +7664,12 @@ async function handleRelayRequest(req, res) {
 
     // Refuse to wipe a populated Map with an empty load — defends against the
     // 2026-05-08 race where a concurrent write left the file readable but empty.
-    if (candidate.size === 0 && prevCount > 0) {
+    // A file whose keys are all there and all revoked (active:false, the mark
+    // paramant-admin.py revoke writes) is not that race: it is the operator
+    // revoking the last key. Refused, that key stayed valid (SELF-11-A), so it
+    // goes through; only a file with no entries at all is still refused.
+    const allRevoked = parsed.api_keys.length > 0 && parsed.api_keys.every((k) => k && typeof k.key === 'string' && k.active === false);
+    if (candidate.size === 0 && prevCount > 0 && !allRevoked) {
       log('warn', 'reload_users_rejected', { prev: prevCount, candidate: 0, reason: 'refusing_to_wipe_populated_map' });
       res.writeHead(409); return res.end(J({ ok: false, error: 'sanity_check_failed', prev: prevCount, candidate: 0 }));
     }

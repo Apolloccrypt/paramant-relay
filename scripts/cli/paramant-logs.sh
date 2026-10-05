@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # paramant-logs (web-cli) -- last N log lines for a service.
-# Non-interactive (no -f follow, no pager). ASCII-only.
+# Non-interactive (no pager). ASCII-only.
 # Positional args (validated by server against the whitelist schema):
 #   $1 = service  (relay|admin|nats|frontend)
 #   $2 = tail     (integer, default 100)
+#   $3 = follow   (no|follow, default no). With follow the logs keep streaming
+#                 until the operator presses Ctrl+C in /admin/cli or the server's
+#                 60 s limit ends it; both kill this script's process group.
 set -uo pipefail
 
 SERVICE="${1:?service required}"
 TAIL="${2:-100}"
+FOLLOW="${3:-no}"
 
 # Map logical service name to a docker compose service.
 case "$SERVICE" in
@@ -20,7 +24,13 @@ esac
 
 COMPOSE="${COMPOSE_CMD:-docker compose}"
 
-echo "Logs: ${SERVICE} (${SVC}) -- last ${TAIL} lines"
+FOLLOW_FLAG=()
+if [ "$FOLLOW" = "follow" ]; then
+  FOLLOW_FLAG=(--follow)
+  echo "Logs: ${SERVICE} (${SVC}) -- last ${TAIL} lines, then following (Ctrl+C stops)"
+else
+  echo "Logs: ${SERVICE} (${SVC}) -- last ${TAIL} lines"
+fi
 echo "--------------------------------------"
 
 if ! command -v docker >/dev/null 2>&1; then
@@ -30,7 +40,7 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 # --no-color and --tail keep output deterministic and bounded.
-$COMPOSE logs --no-color --tail "$TAIL" "$SVC" 2>&1 || {
+$COMPOSE logs --no-color --tail "$TAIL" "${FOLLOW_FLAG[@]}" "$SVC" 2>&1 || {
   echo "[FAIL] could not read logs for ${SVC}"
   exit 1
 }
