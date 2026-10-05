@@ -4575,7 +4575,7 @@ function showDoneInvite(r) {
     line: emailPartial
       ? L('Sommige uitnodigingen zijn niet bezorgd. Probeer het hieronder opnieuw, of geef wie geen mail kreeg de eigen link hieronder zelf.', 'Some invitations were not delivered. Retry below, or give anyone who got no mail their own link below yourself.')
       : emailOk
-        ? L('Iedereen kreeg een eigen link die het document opent zodra hij of zij inlogt. U hoeft niets meer te sturen. U krijgt bericht als er getekend is, en als iedereen getekend heeft een link naar het complete document.', 'Everyone received a link of their own that opens the document once they sign in. There is nothing more to send. You hear when someone signs, and when everyone has signed you get a link to the complete document.')
+        ? L('Iedereen kreeg een eigen link die het document opent na inloggen. U hoeft niets meer te sturen. U krijgt bericht bij elke handtekening en aan het eind het complete document.', 'Everyone received their own link; it opens the document after sign-in. There is nothing more to send. You hear about every signature, and get the complete document at the end.')
         : L('Elke ondertekenaar heeft hieronder een eigen link. Stuur die zoals u wilt en volg hier de voortgang.', 'Each signer has a link of their own below. Send it to them any way you like and follow progress here.'),
   });
   const preview = $('ds-signed-preview'); if (preview) preview.hidden = true;
