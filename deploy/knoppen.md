@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **120 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **195 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **196 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -182,6 +182,7 @@ overschrijven zonder de code aan te raken.
 
 | naam | gelezen in | standaard | wat hij doet |
 |---|---|---|---|
+| `ADDIN_URL` | `deploy/addin-uitrol.sh` | `https://addin.paramant.app` | welke host de add-in-uitrol publiek nameet na het wisselen van de map |
 | `BACKUP_DIR` | `scripts/cli/paramant-backup.sh`, `scripts/rollback-3.0.0.sh` | `/var/log/paramant/backups` / `/home/paramant/backups` | back-upmap van de relay-CLI en van het terugrolscript |
 | `BACKUP_ROOT` | `deploy/ops/backup-full-state.sh`, `deploy/ops/restore-full-state.sh` | `/home/paramant/backups/full-state` / `$WORK` | waar de volledige-staatback-up landt |
 | `CACHE_BUST_BASE` | `scripts/check-cache-bust.sh` | `origin/main` | met welke ref de cache-bust-poort de inhoud van css/js vergelijkt; gewijzigde inhoud onder dezelfde `?v=` is rood |

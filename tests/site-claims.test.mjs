@@ -659,7 +659,8 @@ test('every TLS-terminating server block in the repository is TLS 1.3 only', () 
       }
     }
   }
-  assert.ok(terminators >= 9, `expected at least 9 TLS-terminating blocks, found ${terminators}; a config was renamed or dropped and this block stopped looking at it`);
+  // Eight since the root nginx-selfhost.conf went (SELF-14-N, 2026-10-05).
+  assert.ok(terminators >= 8, `expected at least 8 TLS-terminating blocks, found ${terminators}; a config was renamed or dropped and this block stopped looking at it`);
   assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}\n`);
   // And the page still says it, so retiring the promise retires the test.
   assert.match(read('frontend/en/dpa.html'), /TLS 1\.3 minimum on all relay endpoints/);
@@ -2550,7 +2551,10 @@ test('every page that promises burn-on-read says which client and which plan it 
   // on 'finish' for an old client, and on POST .../ack for /get, which confirms
   // only once it has decrypted the file. Either way the blob is deleted
   // outright and the read counter is never consulted.
-  assert.match(relaySrc, /dlBurn\(token, td, 'downloaded'\);\s*blobDrop\(blobHash\);/,
+  // Since 2026-10-05 an old client's download burns after delivery: the
+  // token is spent and the blob unlisted on 'finish', and destroyed once the
+  // connection stayed clean (afterDelivery). Still outright, still no counter.
+  assert.match(relaySrc, /td\.used = true; td\.gone = 'downloaded'; td\.claim = null;\s*blobDrop\(blobHash, false\);/,
     'the /v2/dl download-token route no longer deletes the blob outright; /get, /ontvang and /parashare call a Paramant link single-use because it does');
   assert.match(relaySrc, /dlBurn\(token, td, 'downloaded'\);\s*blobDrop\(td\.hash\);/,
     'the /v2/dl ack no longer deletes the blob outright; /get calls a link single-use because a confirmed download does');
