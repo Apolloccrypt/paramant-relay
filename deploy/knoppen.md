@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **120 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **200 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **215 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -190,6 +190,7 @@ overschrijven zonder de code aan te raken.
 | `COMPOSE_CMD` | `scripts/cli/paramant-logs.sh`, `scripts/cli/paramant-restart.sh` | `docker compose` | welk compose-commando de CLI gebruikt |
 | `COMPOSE_DIR` | `scripts/rollback-3.0.0.sh` | `/home/paramant/app` | waar het terugrolscript het compose-bestand zoekt; wijkt af van het deployscript |
 | `CONFIRM` | `install.sh` | `Y` | slaat de bevestigingsvraag van de installateur over |
+| `DEPLOYED_HEAD` | `deploy/deploy-3.1.sh` | `$DEPLOY_REF` | intern: de commit die fase 3 op de server zette; fase 5e rendert daaruit als `PARAMANT_NGINX_REF` leeg is. Geen operatorknop |
 | `DEPLOY_REF` | `deploy/deploy-3.1.sh` | `origin/main` | welke tak de deploy uitrolt |
 | `DEV_EMAIL` | `scripts/dev-local.sh` | `dev@localhost` | welk adres de lokale ontwikkelstack aanmaakt |
 | `DISPLAY` | `install.sh` | leeg | omgevingsherkenning, geen Paramant-knop |
@@ -202,6 +203,7 @@ overschrijven zonder de code aan te raken.
 | `KEYFILE` | `deploy/ops/backup-full-state.sh`, `deploy/ops/restore-full-state.sh` | `/root/.config/paramant-backup/key.txt` | sleutelbestand waarmee de back-up versleuteld wordt |
 | `KNOWN_FLAKY_MAX_DAYS` | `scripts/check-flaky-register.sh` | `14` | hoeveel dagen een regel in `tests/known-flaky.tsv` mag blijven staan voor hij zelf een fout wordt |
 | `LATEST_ENV` | `scripts/rollback-3.0.0.sh` | leeg | welk env-bestand het terugrolscript terugzet |
+| `LB_TRIES` | `deploy/deploy-3.1.sh` (remote blok van 5e) | `20` | hoe vaak 5e na de reload de loopback vraagt, elke 0,5 s (dus 10 s). Gaat niet mee over ssh: alleen de test zet hem lager |
 | `LC_ALL` | `scripts/check-commit-style.sh` | `C.UTF-8` | omgevingsherkenning, geen Paramant-knop |
 | `LE_EMAIL` | `install.sh` | `(n/a in localhost mode)` | adres voor Let's Encrypt |
 | `LOG` | `deploy/deploy-3.1.sh`, `deploy/ops/backup-full-state.sh` | `<none>` / `/var/log/paramant-backup.log` | logbestand van de deploy en van de back-up |
@@ -209,6 +211,8 @@ overschrijven zonder de code aan te raken.
 | `MNT` | `scripts/paramant-export.sh` | `(not mounted)` | koppelpunt in het exportscript |
 | `MOUNTED_AT` | `scripts/paramant-export.sh` | leeg | waar het exportscript denkt gekoppeld te zijn |
 | `NATS_MONITOR_URL` | `scripts/cli/paramant-nats-status.sh` | `http://nats:8222` | waar de NATS-status wordt opgehaald |
+| `NGINX_PAYLOAD` | `deploy/deploy-3.1.sh` | leeg | intern: de regels die `remote_nginx` voor een remote blok zet (de conf en het snippet van 5e, base64). Geen operatorknop |
+| `NGINX_REF` | `deploy/deploy-3.1.sh` | `$DEPLOYED_HEAD` / `$DEPLOY_REF` | intern: de waarde van `PARAMANT_NGINX_REF` binnen fase 5e. Geen operatorknop |
 | `PARAMANT_API_KEY` | `scripts/paramant-cra.sh`, `scripts/paramant-firmware.sh` en 5 meer | `$(python3 -c "import json; print(json.load(open('${CFG` | sleutel voor de losse sectorscripts |
 | `PARAMANT_APP` | `scripts/security/audit.sh` | `https://paramant.app` | welke site het beveiligingsauditscript meet |
 | `PARAMANT_BACKUP_DIR` | `deploy/deploy-3.1.sh` | `/home/paramant/backups` | waar de deploy zijn back-ups zet |
@@ -221,11 +225,20 @@ overschrijven zonder de code aan te raken.
 | `PARAMANT_DOCROOT` | `deploy/deploy-3.1.sh`, `scripts/check-prod-drift.sh` | `/home/paramant/app` | waar de frontend op de server staat |
 | `PARAMANT_DOMAIN` | `install.sh` | `${1:-` | domein waarvoor de installateur een certificaat vraagt |
 | `PARAMANT_EXPECTED_HEAD` | `deploy/deploy-3.1.sh` | leeg | welke commit op de server verwacht wordt voor de deploy begint |
+| `PARAMANT_LEGAL_DOCROOT` | `deploy/nginx-render.sh` | `/home/paramant/app-legal` | docroot van het :8086-blok in de gerenderde site-conf |
 | `PARAMANT_LIMIT_REQ_DEST` | `deploy/deploy-3.1.sh` | `/etc/nginx/conf.d/paramant-limit-req.conf` | waar het snelheidslimiet-snippet heen gaat |
 | `PARAMANT_NGINX_CONFS` | `deploy/deploy-3.1.sh` | `paramant-public.conf paramant-live.conf\|paramant.conf` | welke nginx-bestanden op de server het deployscript patcht |
+| `PARAMANT_NGINX_LIVE_COPY` | `deploy/deploy-3.1.sh`, `scripts/check-prod-drift.sh` | leeg | een lokale kopie van de server-conf; `--dry-run --nginx-sync` toont de diff ertegen zonder te verbinden |
+| `PARAMANT_NGINX_LIVE_SLOT` | `deploy/deploy-3.1.sh` | `paramant-live.conf\|paramant.conf` | op welk bestand in sites-enabled fase 5e de hele repo-conf zet |
+| `PARAMANT_NGINX_PUBLIC_808X_OK` | `deploy/deploy-3.1.sh` | `0` | 1 laat 5e doorgaan als een andere actieve conf naar `127.0.0.1:808[1-6]` proxyt; zonder stopt 5e voor de eerste write |
+| `PARAMANT_NGINX_REF` | `deploy/deploy-3.1.sh` | leeg | uit welke commit fase 5e de site-conf rendert; leeg is de commit van fase 3, of `DEPLOY_REF` bij `--nginx-sync` |
+| `PARAMANT_NGINX_SITES` | `scripts/check-prod-drift.sh` | `/etc/nginx/sites-enabled` | waar de drift-meting de nginx-confs op de server leest |
+| `PARAMANT_NGINX_SNIPPET` | `scripts/check-prod-drift.sh` | `/etc/nginx/snippets/paramant-security-headers.conf` | welk snippet de drift-meting met de repo vergelijkt |
+| `PARAMANT_NGINX_SNIPPET_DIR` | `deploy/deploy-3.1.sh` | `/etc/nginx/snippets` | waar fase 5e het security-headers-snippet neerzet |
 | `PARAMANT_PRIMARY` | `scripts/paramant-scan.sh` | `https://health.paramant.app` | welke relay het scanscript als hoofdrelay neemt |
 | `PARAMANT_PROD_HOST` | `deploy/deploy-3.1.sh`, `scripts/check-prod-drift.sh` | staat in `deploy/deploy-3.1.sh:46` | de productieserver waar het deployscript op inlogt; het adres staat hardgecodeerd in het script en wordt hier niet herhaald |
 | `PARAMANT_PROD_KEY` | `deploy/deploy-3.1.sh`, `scripts/check-prod-drift.sh` | `$HOME/.ssh/paramant_prod_claude` | de ssh-sleutel voor die server |
+| `PARAMANT_PUBLIC_SITE` | `deploy/deploy-3.1.sh` | `https://paramant.app` | waar fase 5e van buiten, via Caddy, controleert |
 | `PARAMANT_RECEIVER` | `scripts/paramant-firmware.sh`, `scripts/paramant-ticket.sh` | `paramant-receiver` | ontvangeridentiteit in de sectorscripts |
 | `PARAMANT_RELAY` | `scripts/security/audit.sh` | `https://relay.paramant.app` | welke relay datzelfde script meet |
 | `PARAMANT_REPO` | `scripts/security/audit.sh` | `$HOME/paramant-relay` | welke repo dat script leest |
@@ -244,6 +257,7 @@ overschrijven zonder de code aan te raken.
 | `POSTURE_NPM` | `scripts/security/posture.sh` | `npm` | idem voor npm |
 | `POSTURE_OPENSSL` | `scripts/security/posture.sh` | `openssl` | idem voor openssl |
 | `PREV_HEAD` | `deploy/deploy-3.1.sh` | `$EXPECT_PROD_COMMIT` | de commit waar naar terug wordt gerold |
+| `PUBLIC_808X_OK` | `deploy/deploy-3.1.sh` (remote blok van 5e) | `0` | intern: `PARAMANT_NGINX_PUBLIC_808X_OK` zoals hij in de payload op de server aankomt. Geen operatorknop |
 | `RECIPIENTS_FILE` | `deploy/ops/backup-full-state.sh` | `/root/.config/paramant-backup/recipients.txt` | extra age-ontvangers (offline escrow-sleutel) naast de serversleutel |
 | `REDIS_CONTAINER` | `deploy/ops/backup-full-state.sh`, `deploy/ops/restore-full-state.sh` | `paramant-relay-redis` | welke container de back-up als Redis beschouwt |
 | `REDIS_SRC_DIR` | `deploy/ops/backup-full-state.sh` | leeg | waar de Redis-bestanden vandaan komen |
@@ -255,17 +269,18 @@ overschrijven zonder de code aan te raken.
 | `RETAIN_DAYS` | `deploy/ops/backup-full-state.sh` | `30` | hoe lang back-ups blijven staan |
 | `SBOM` | `scripts/paramant-cra.sh` | `none` | pad naar de stuklijst in het CRA-script |
 | `SECTORS_INPUT` | `install.sh` | `health legal finance iot` | welke sectoren de installateur vraagt; het antwoord wordt nergens gebruikt, compose start altijd alle vijf |
+| `TMPDIR` | `deploy/deploy-3.1.sh` | `/tmp` | omgevingsherkenning, geen Paramant-knop |
 | `VERSION_ID` | `install.sh` | leeg | omgevingsherkenning, geen Paramant-knop |
 | `WAYLAND_DISPLAY` | `install.sh` | leeg | omgevingsherkenning, geen Paramant-knop |
 | `XTERM_VERSION` | `scripts/paramant-update-vendor.sh` | `5` | omgevingsherkenning, geen Paramant-knop |
 
 ## nginx
 
-Zeven conf-bestanden. **Geen enkel script installeert er een**, op
-`deploy/nginx/snippets/paramant-limit-req.conf` na: `deploy/deploy-3.1.sh` fase 5c patcht
-de bestanden die al op de server staan, met `awk` en `sed` op ankerregels. De confs in
-deze repo zijn dus een verslag en geen bron. *Bevestigd:* het enige `cp` van een conf in
-het hele deployscript is een back-up (`deploy/deploy-3.1.sh:1775`).
+Zeven conf-bestanden. `deploy/deploy-3.1.sh` fase 5d installeert
+`deploy/nginx/snippets/paramant-limit-req.conf`, en fase 5e zet
+`deploy/nginx-paramant-live.conf` (gerenderd door `deploy/nginx-render.sh`) en
+`paramant-security-headers.conf` in hun geheel op de server. De publieke conf wordt nog
+door fase 5c op ankerregels gepatcht en is dus een verslag en geen bron.
 
 `afwezig` is hier een waarde en geen leegte. Een ontbrekende `client_max_body_size` laat
 nginx zonder een woord op zijn eigen 1 MB terugvallen, en dat is precies de stilte die
@@ -275,7 +290,7 @@ deze regels doorbreken.
 
 | bestand | richtlijn | waarde |
 |---|---|---|
-| `deploy/nginx-paramant-live.conf` | `client_max_body_size` | `4k / 64k / 64k / 64k / 64k / 64k / 64k / 64k / 64k / 16k / 16k / 50M / 30M / 12M / 35M / 12M / 12M / 12M` |
+| `deploy/nginx-paramant-live.conf` | `client_max_body_size` | `4k / 64k / 64k / 64k / 64k / 64k / 64k / 64k / 6m / 64k / 16k / 16k / 30M / 12M / 35M / 12M / 12M / 12M` |
 | `deploy/nginx-paramant-live.conf` | `limit_req_zone` | `afwezig` |
 | `deploy/nginx-paramant-live.conf` | `limit_conn` | `afwezig` |
 | `deploy/nginx-paramant-live.conf` | `proxy_read_timeout` | `3600s / 3600s / 3600s / 3600s / 3600s` |
