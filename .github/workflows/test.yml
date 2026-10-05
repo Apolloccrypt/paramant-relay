@@ -275,7 +275,8 @@ jobs:
                 test/quota-gate.test.js test/entitlements.test.js test/did-principal.test.js \
                 test/counter-atomicity-gate.test.js test/public-projection-gate.test.js \
                 test/guess-budget-gate.test.js test/parasign-cosign-parties.test.js \
-                test/parasign-envelope-index.test.js
+                test/parasign-envelope-index.test.js \
+                test/quota-sign-hold-race.test.js test/backup-code-race.test.js
             } | sort -u)
           echo "$suites" | sed 's/^/  /'
           node --test --test-reporter=tap $suites 2>&1 | tee /tmp/relay-routes.log
@@ -452,7 +453,7 @@ jobs:
           # reden om hier niet te draaien, de ML-DSA-65 engine, en die is niet
           # uit de imports af te leiden.
           node --test --test-reporter=tap $(node ../scripts/relay-suites.mjs --zonder-relay | grep -vE \
-            'parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index|parasign-party-index|parasign-signs-quota|quota-gate|entitlements.test|did-principal|counter-atomicity-gate|public-projection-gate|guess-budget-gate|parasign-cosign-parties') \
+            'parasign-sandbox|parasign-open-api-e2e|parasign-envelope-index|parasign-party-index|parasign-signs-quota|quota-gate|entitlements.test|did-principal|counter-atomicity-gate|public-projection-gate|guess-budget-gate|parasign-cosign-parties|quota-sign-hold-race|backup-code-race') \
             2>&1 | tee /tmp/relay-units.log
           # Which suites ran and asserted nothing. The line comes from
           # summary() in test/_requires.js.
