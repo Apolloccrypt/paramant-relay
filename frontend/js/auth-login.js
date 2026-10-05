@@ -99,7 +99,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         document.getElementById('totp').value = '';
         document.getElementById('totp').focus();
       } else if (res.status === 403) {
-        errorDiv.innerHTML = nlEn('Aan dit account is nog geen authenticator-app gekoppeld. Hebt u een back-upcode? <a href="/auth/request-reset">Koppel dan een nieuwe app</a>. Geen back-upcode? Mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> vanaf uw accountadres.', 'This account has no authenticator app linked to it yet. Have a backup code? <a href="/en/auth/request-reset">Link a new app</a>. No backup code? Email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> from your account address.');
+        errorDiv.innerHTML = nlEn('Aan dit account is nog geen authenticator-app gekoppeld. Heeft u een back-upcode? <a href="/auth/request-reset">Koppel dan een nieuwe app</a>. Geen back-upcode? Mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> vanaf uw accountadres.', 'This account has no authenticator app linked to it yet. Have a backup code? <a href="/en/auth/request-reset">Link a new app</a>. No backup code? Email <a href="mailto:privacy@paramant.app">privacy@paramant.app</a> from your account address.');
         errorDiv.classList.add('visible');
       } else if (res.status === 428) {
         errorDiv.textContent = nlEn('De extra controle voor deze inlogpoging lukte niet. Vernieuw de pagina en probeer het opnieuw.', 'We could not run the extra verification this sign-in needs. Refresh the page and try again.');

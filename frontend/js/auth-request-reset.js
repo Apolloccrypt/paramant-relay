@@ -29,7 +29,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         errorDiv.textContent = nlEn('De browsercontrole werd niet afgemaakt. Die draait op dit apparaat en duurt een paar seconden. Probeer het opnieuw.', 'The browser check did not finish. It runs on this device and takes a few seconds. Try again.');
         errorDiv.classList.add('visible');
         submitBtn.disabled = false;
-        submitBtn.textContent = nlEn('Resetlink versturen', 'Send reset link');
+        submitBtn.textContent = nlEn('Verzoek versturen', 'Send request');
         return;
       }
 
@@ -55,7 +55,7 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
           : nlEn('Dit e-mailadres en deze back-upcode horen niet bij elkaar, of de code is al gebruikt. Er is niets veranderd. Controleer beide en probeer het opnieuw, of mail privacy@paramant.app.', 'This email address and backup code do not match, or the code was already used. Nothing changed. Check both and try again, or mail privacy@paramant.app.');
         errorDiv.classList.add('visible');
         submitBtn.disabled = false;
-        submitBtn.textContent = nlEn('Resetlink versturen', 'Send reset link');
+        submitBtn.textContent = nlEn('Verzoek versturen', 'Send request');
       } else if (res.status === 429) {
         // server.js returns retry_after 86400 here: 5 requests per address per
         // 24 hours, 10 per connection per hour. Telling the reader to try again
@@ -63,18 +63,18 @@ function nlEn(nl, en) { return /^en\b/i.test(document.documentElement.lang || ''
         // and the message says how long the wait can be.
         errorDiv.textContent = nlEn('Te veel resetverzoeken. Een adres mag vijf keer per dag een reset vragen, een verbinding tien keer per uur. Het kan dus tot 24 uur duren. Kunt u niet in uw account en niet wachten? Mail dan privacy@paramant.app.', 'Too many reset requests. An address can ask five times a day, a connection ten times an hour. So this can take up to 24 hours to clear. If you are locked out and cannot wait, mail privacy@paramant.app.');
         errorDiv.classList.add('visible');
-        submitBtn.textContent = nlEn('Resetlink versturen', 'Send reset link');
+        submitBtn.textContent = nlEn('Verzoek versturen', 'Send request');
       } else {
         errorDiv.textContent = nlEn('De mail kon niet worden verstuurd. Er is niets aan uw account veranderd. Probeer het opnieuw, of mail privacy@paramant.app.', 'We could not send the mail. Nothing changed on your account. Try again, or mail privacy@paramant.app.');
         errorDiv.classList.add('visible');
         submitBtn.disabled = false;
-        submitBtn.textContent = nlEn('Resetlink versturen', 'Send reset link');
+        submitBtn.textContent = nlEn('Verzoek versturen', 'Send request');
       }
     } catch (err) {
       errorDiv.textContent = nlEn('Paramant is niet bereikbaar. Controleer uw verbinding en probeer het opnieuw.', 'We could not reach Paramant. Check your connection and try again.');
       errorDiv.classList.add('visible');
       submitBtn.disabled = false;
-      submitBtn.textContent = nlEn('Resetlink versturen', 'Send reset link');
+      submitBtn.textContent = nlEn('Verzoek versturen', 'Send request');
     }
   });
 })();
