@@ -91,6 +91,16 @@ const SEND_TOTAL_MB = (() => {
 })();
 const SEND_TOTAL_BYTES = SEND_TOTAL_MB * 1048576;
 const BUDGET_KEY = 'send-budget:v1';
+// THE SHARE of one account in that total (review #555, M6). With only the
+// total, six free 25 MB sends of one account closed ParaSend-op-naam for every
+// other customer until they expired. Default a quarter of the total, and never
+// less than one send of the maximum size.
+const SEND_ACCOUNT_MB = (() => {
+  const n = parseInt(process.env.SEND_ACCOUNT_MB || '', 10);
+  const def = Math.max(SEND_MAX_MB, Math.floor(SEND_TOTAL_MB / 4));
+  return Number.isFinite(n) && n > 0 ? n : def;
+})();
+const SEND_ACCOUNT_BYTES = SEND_ACCOUNT_MB * 1048576;
 
 // The two ceilings that survive a new code.
 //
@@ -250,18 +260,25 @@ function createSendStore({ store, log, now }) {
   // The open-sends ledger: id -> { s: bytes, x: expires_at }. Expired rows
   // fall out on every read, so a send that ran out frees its share without a
   // sweeper; a send whose file is dropped early releases it at once.
-  async function budgetReserve(id, size, expiresAt) {
+  // `a` is a hash of the account, so the ledger names nobody; a send without
+  // an account counts only towards the total.
+  const acctTag = (accountId) => accountId ? crypto.createHash('sha256').update('send-budget|' + String(accountId)).digest('hex').slice(0, 16) : null;
+  async function budgetReserve(id, size, expiresAt, accountId) {
     return opVolgorde(BUDGET_KEY, async () => {
       const meta = (await store.getMeta(BUDGET_KEY)) || {};
       const e = meta.e && typeof meta.e === 'object' ? meta.e : {};
       const nu = clock();
+      const tag = acctTag(accountId);
       let sum = 0;
+      let mine = 0;
       for (const [k, v] of Object.entries(e)) {
         if (!v || !(v.x > nu)) { delete e[k]; continue; }
         sum += Number(v.s) || 0;
+        if (tag && v.a === tag) mine += Number(v.s) || 0;
       }
       if (sum + size > SEND_TOTAL_BYTES) return { ok: false, used: sum };
-      e[id] = { s: size, x: expiresAt };
+      if (tag && mine + size > SEND_ACCOUNT_BYTES) return { ok: false, used: sum, account: true, account_used: mine };
+      e[id] = tag ? { s: size, x: expiresAt, a: tag } : { s: size, x: expiresAt };
       await store.putMeta(BUDGET_KEY, { e }, 8 * 86400 * 1000);
       return { ok: true, used: sum + size };
     });
@@ -378,9 +395,13 @@ function createSendStore({ store, log, now }) {
       // written send used to leave the file in the store under an id nobody
       // knew, for as long as a week, and the sender got a 500 that said
       // nothing about it.
-      const room = await budgetReserve(id, blob.length, created + ttl);
+      const room = await budgetReserve(id, blob.length, created + ttl, accountId);
       if (!room.ok) {
         for (const k of geclaimd) { try { await store.delMeta(k); } catch (e) {} }
+        if (room.account) {
+          if (log) log('warn', 'send_account_share_full', { id, used_mb: Math.round(room.account_used / 1048576), share_mb: SEND_ACCOUNT_MB });
+          return { ok: false, reason: 'account_store_full', limit: SEND_ACCOUNT_MB };
+        }
         if (log) log('warn', 'send_store_full', { id, used_mb: Math.round(room.used / 1048576), total_mb: SEND_TOTAL_MB });
         return { ok: false, reason: 'store_full', limit: SEND_TOTAL_MB };
       }
@@ -777,4 +798,4 @@ function createSendStore({ store, log, now }) {
 
 module.exports = { createSendStore, newSendId, tokenIndexId, accountIndexId,
                    maskEmail, CODE_TTL_MS, CODE_TRIES, CODE_DIGITS, MAX_REMINDERS, MAX_CODE_REQUESTS, MAX_WRONG_TOTAL, COUNTER_WINDOW_MS,
-                   SEND_MAX_MB, SEND_MAX_BYTES, SEND_TOTAL_MB, SEND_TOTAL_BYTES };
+                   SEND_MAX_MB, SEND_MAX_BYTES, SEND_TOTAL_MB, SEND_TOTAL_BYTES, SEND_ACCOUNT_MB };

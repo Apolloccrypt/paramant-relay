@@ -5816,6 +5816,15 @@ async function handleRelayRequest(req, res) {
             message: 'Too many large sends are open right now. Nothing was sent; try again later or send a smaller file.',
             message_nl: 'Er staan nu te veel grote verzendingen open. Er is niets verstuurd; probeer het later opnieuw of verstuur een kleiner bestand.' }));
         }
+        if (made.reason === 'account_store_full') {
+          // This account's own open sends fill its share of the store (review
+          // #555, M6). His sends free it as they expire or are opened.
+          log('warn', 'send_refused', { reason: 'account_store_full', limit_mb: made.limit });
+          res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '900' });
+          return res.end(J({ error: 'send_account_store_full', limit_mb: made.limit, retry_after_s: 900,
+            message: 'Your open sends together have reached what one account may hold at once. Nothing was sent; try again when earlier sends have been collected or have expired.',
+            message_nl: 'Uw openstaande verzendingen samen hebben bereikt wat een account tegelijk mag hebben staan. Er is niets verstuurd; probeer het opnieuw als eerdere verzendingen zijn opgehaald of verlopen.' }));
+        }
         const _dim = made.dimension
           || (made.reason === 'too_large' ? 'send_max_mb' : 'max_recipients');
         const status = made.reason === 'over_limit' ? 403
