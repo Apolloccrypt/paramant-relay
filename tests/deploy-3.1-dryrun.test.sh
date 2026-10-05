@@ -1883,10 +1883,10 @@ fi
 # bug is exactly how this check would go quiet. Adding or removing a remote
 # block is a deliberate act, so updating this number is part of it.
 SCAN_BLOCKS="$(grep -cE "^  remote(_soft|_nginx|_seller)? \".*<<'EOF'\$" "$SCRIPT" || true)"
-if [ "$SCAN_BLOCKS" = "29" ]; then
-  pass "the scan walked all 29 remote blocks"
+if [ "$SCAN_BLOCKS" = "31" ]; then
+  pass "the scan walked all 31 remote blocks"
 else
-  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 29; update the number here on purpose"
+  fail "the script has $SCAN_BLOCKS remote blocks, the scan expects 31; update the number here on purpose"
 fi
 
 # And the three commands that actually read stdin are still there, guarded.
@@ -3487,6 +3487,163 @@ if git -C "$ROOT" check-ignore -q deploy/logs/ 2>/dev/null; then
 else
   fail "deploy/logs/ is not gitignored; a deploy log would be committable"
 fi
+
+# ------------------------------------------------------- 10. phase 5e --
+echo ""
+echo "10. Phase 5e places the whole repo site conf, and goes back on any fault"
+# The 5c edits left about 600 lines of the repo conf out of production (prodtest
+# 2026-10-05: /api/user/ on relay_auth, /parashare?t= without its redirect).
+# 5e copies the rendered conf whole. Its remote block runs here for real
+# against a synthetic sites-enabled, with nginx, systemctl and curl stubbed.
+check_has "$FULL" '\[step\] 5e\. the whole site conf from the repo' "a full dry run reaches step 5e"
+check_has "$FULL" 'zone  /api/user/ +user_session' "5e gates on /api/user/ being on user_session before anything is sent"
+check_has "$FULL" 'zone  /api/user/login +relay_login' "5e gates on the login door staying on its strict zone"
+
+N5="$WORK/n5e"
+mkdir -p "$N5/bin" "$N5/available" "$N5/sites" "$N5/bk" "$N5/snippets"
+extract_remote "nginx full conf" > "$N5/5e.sh"
+if [ -s "$N5/5e.sh" ] && grep -q 'pre-nginx-sync-' "$N5/5e.sh"; then
+  pass "the 5e remote block could be extracted from the script"
+else
+  fail "could not extract the 5e remote block from the script"
+fi
+# nginx -t answers what NGINX_T says; curl answers per path what the test asks.
+cat > "$N5/bin/nginx" <<'STUB'
+#!/bin/sh
+[ "${1:-}" = "-T" ] && { cat "${NGINX_T_DUMP:-/dev/null}"; exit 0; }
+[ "${1:-}" = "-t" ] && [ -n "${NGINX_T_FAIL:-}" ] && { echo "nginx: [emerg] stub says no"; exit 1; }
+exit 0
+STUB
+cat > "$N5/bin/systemctl" <<'STUB'
+#!/bin/sh
+echo "systemctl $*" >> "${STUB_LOG:-/dev/null}"
+exit 0
+STUB
+cat > "$N5/bin/curl" <<'STUB'
+#!/bin/sh
+for a in "$@"; do last="$a"; done
+case "$last" in
+  */parashare*) printf '%s' "${CURL_SHARE:-302 https://paramant.app/get?t=deploycheck5e}" ;;
+  *) printf '%s' "${CURL_HOME:-200 }" ;;
+esac
+STUB
+chmod +x "$N5/bin/nginx" "$N5/bin/systemctl" "$N5/bin/curl"
+bash "$ROOT/deploy/nginx-render.sh" > "$N5/rendered.conf"
+cp "$ROOT/deploy/nginx/snippets/paramant-security-headers.conf" "$N5/repo-snip.conf"
+printf 'server {\n    listen 127.0.0.1:8080;\n    location /api/user/ { limit_req zone=relay_auth burst=5; }\n}\n' > "$N5/old.conf"
+printf 'add_header X-Old "1" always;\n' > "$N5/old-snip.conf"
+
+run_5e() {   # ts -> output in OUT5E, rc in RC5E
+  cp "$N5/old.conf" "$N5/available/paramant.conf"
+  cp "$N5/old-snip.conf" "$N5/snippets/paramant-security-headers.conf"
+  ln -sfn "$N5/available/paramant.conf" "$N5/sites/paramant.conf"
+  OUT5E="$(CONF_B64="$(base64 -w0 < "$N5/rendered.conf")" SNIP_B64="$(base64 -w0 < "$N5/repo-snip.conf")" \
+           WANT_CONF="$(sha256sum "$N5/rendered.conf" | cut -d' ' -f1)" \
+           WANT_SNIP="$(sha256sum "$N5/repo-snip.conf" | cut -d' ' -f1)" \
+           NGINX_T_DUMP="${NGINX_T_DUMP:-$ROOT/deploy/nginx/snippets/paramant-limit-req.conf}" \
+           PATH="$N5/bin:$PATH" bash "$N5/5e.sh" "$1" "$N5/sites" "$N5/bk" \
+           "paramant-live.conf|paramant.conf" "$N5/snippets" </dev/null 2>&1)"; RC5E=$?
+}
+
+run_5e 20260101-0500
+if [ "$RC5E" -eq 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/rendered.conf" \
+   && cmp -s "$N5/snippets/paramant-security-headers.conf" "$N5/repo-snip.conf"; then
+  pass "5e writes the rendered repo conf and the snippet, through the symlink"
+else
+  fail "5e did not leave the repo conf and snippet in place (rc $RC5E)"
+  printf '%s\n' "$OUT5E" | grep -v 'diff ' | sed 's/^/        /' | head -15
+fi
+if [ -L "$N5/sites/paramant.conf" ]; then pass "the sites-enabled symlink is still a symlink"; else fail "5e replaced the symlink with a file"; fi
+if cmp -s "$N5/bk/paramant.conf.pre-nginx-sync-20260101-0500" "$N5/old.conf" \
+   && cmp -s "$N5/bk/paramant-security-headers.conf.pre-nginx-sync-20260101-0500" "$N5/old-snip.conf"; then
+  pass "5e backs up the old conf and the old snippet under the run TS"
+else
+  fail "5e left no exact backup of the old conf and snippet"
+fi
+if grep -qE '^  confdiff [-+] +location /api/user/' <<< "$OUT5E" \
+   && grep -q '^reloaded nginx for the full conf$' <<< "$OUT5E"; then
+  pass "5e prints the diff before it writes, and reloads"
+else
+  fail "5e printed no diff or did not reload"
+fi
+
+NGINX_T_FAIL=1 run_5e 20260101-0501
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && cmp -s "$N5/snippets/paramant-security-headers.conf" "$N5/old-snip.conf" \
+   && grep -q '^FATAL nginx -t failed' <<< "$OUT5E"; then
+  pass "a failing nginx -t puts the old conf and snippet back and stops"
+else
+  fail "a failing nginx -t did not restore the old conf (rc $RC5E)"
+fi
+
+CURL_SHARE="302 https://paramant.app/auth/login?next=/parashare" run_5e 20260101-0502
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && grep -q '^restored and reloaded the previous nginx conf$' <<< "$OUT5E"; then
+  pass "/parashare?t= losing its token after the reload puts the old conf back"
+else
+  fail "a wrong /parashare answer did not restore the old conf (rc $RC5E)"
+fi
+
+CURL_HOME="502 " run_5e 20260101-0503
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf"; then
+  pass "a home page that no longer answers 200 puts the old conf back"
+else
+  fail "a broken home page did not restore the old conf (rc $RC5E)"
+fi
+
+# A zone the loaded config does not bind stops 5e before the first write.
+grep -v 'zone=relay_login' "$ROOT/deploy/nginx/snippets/paramant-limit-req.conf" > "$N5/zones-no-login.conf"
+NGINX_T_DUMP="$N5/zones-no-login.conf" run_5e 20260101-0505
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && grep -q '^FATAL the repo conf limits on zone(s) the loaded config does not bind: relay_login' <<< "$OUT5E" \
+   && [ ! -e "$N5/bk/paramant.conf.pre-nginx-sync-20260101-0505" ]; then
+  pass "a zone nginx does not bind (relay_login) stops 5e before a backup or a write"
+else
+  fail "5e went ahead with a zone the loaded config does not bind (rc $RC5E)"
+fi
+
+# A conf that arrives damaged is never written.
+cp "$N5/old.conf" "$N5/available/paramant.conf"
+OUT5E="$(CONF_B64="$(base64 -w0 < "$N5/rendered.conf")" SNIP_B64="$(base64 -w0 < "$N5/repo-snip.conf")" \
+         WANT_CONF=0000 WANT_SNIP=0000 PATH="$N5/bin:$PATH" bash "$N5/5e.sh" 20260101-0504 "$N5/sites" "$N5/bk" \
+         "paramant-live.conf|paramant.conf" "$N5/snippets" </dev/null 2>&1)"; RC5E=$?
+if [ "$RC5E" -ne 0 ] && cmp -s "$N5/available/paramant.conf" "$N5/old.conf" \
+   && [ ! -e "$N5/bk/paramant.conf.pre-nginx-sync-20260101-0504" ]; then
+  pass "a checksum mismatch stops 5e before a backup or a write"
+else
+  fail "5e wrote a conf whose checksum did not match (rc $RC5E)"
+fi
+
+# --nginx-sync: phase 5e alone, and its dry run shows the diff against a copy.
+# Here-strings, not printf | grep -q: the output is long, grep -q stops reading
+# at the first match, and under pipefail the SIGPIPE to printf fails the check.
+NS="$(PARAMANT_NGINX_LIVE_COPY="$N5/old.conf" bash "$SCRIPT" --dry-run --nginx-sync 2>&1)"; NSRC=$?
+if [ "$NSRC" -eq 0 ] && grep -q '^PHASE 5e:' <<< "$NS" \
+   && ! grep -qE '^PHASE [0-46-8]' <<< "$NS"; then
+  pass "--dry-run --nginx-sync runs phase 5e and no other phase"
+else
+  fail "--dry-run --nginx-sync exited $NSRC or ran other phases"
+  printf '%s\n' "$NS" | grep -E '^PHASE|STOP' | sed 's/^/        /' | head -8
+fi
+if grep -qE '^  confdiff \+ +limit_req +zone=user_session' <<< "$NS" \
+   && grep -q 'would change against' <<< "$NS"; then
+  pass "the dry run shows the diff against PARAMANT_NGINX_LIVE_COPY without writing"
+else
+  fail "the dry run showed no diff against the server copy"
+fi
+if grep -qE '^  \| |[0-9a-f]{32,}' <<< "$NS"; then
+  fail "the --nginx-sync dry run made an ssh call or printed a long hex run"
+else
+  pass "the --nginx-sync dry run made no ssh call and printed no long hex run"
+fi
+for combo in "--nginx-sync --verify-only" "--nginx-sync --rollback 20260101-0000" "--nginx-sync --preflight-only"; do
+  # shellcheck disable=SC2086
+  if bash "$SCRIPT" --dry-run $combo >/dev/null 2>&1; then
+    fail "$combo was accepted; --nginx-sync is its own run"
+  else
+    pass "$combo is refused"
+  fi
+done
 
 # ------------------------------------------------------------------- result --
 echo ""

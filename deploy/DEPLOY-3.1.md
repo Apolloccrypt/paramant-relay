@@ -854,6 +854,90 @@ Doing it by hand:
 nginx -T 2>/dev/null | grep -c 'limit_req_zone .* zone=relay_auth'   # must be 1, never 2
 ```
 
+### Step 5e: the whole site conf, not seven edits
+
+5c edits the server confs by anchor and never copied `deploy/nginx-paramant-live.conf`
+over them. Everything in that file that 5c did not name stayed in git. The
+prodtest of 2026-10-05 (after deploy TS 20261005-1557) measured the cost: the
+server `paramant.conf` differed from the repo by about 600 lines, and two of them
+were visible to every visitor:
+
+- every `/api/user/` route still sat on `relay_auth` (a login brake), so 12
+  parallel `/api/user/me` gave 6 x 429 and one `/account` load already got 429.
+  The `user_session` zone was bound but no location used it.
+- `/parashare?t=` and `/en/parashare?t=` (the add-in link) went to the login
+  page and lost the token, because the `$arg_t` redirect to `/get` was missing.
+
+Step 5e places the **whole** repo conf on the live slot (`paramant-live.conf`,
+else `paramant.conf`; `PARAMANT_NGINX_LIVE_SLOT` overrides), plus the
+security-headers snippet it includes (`/etc/nginx/snippets/paramant-security-headers.conf`).
+The public conf (slot 1) is not touched by 5e.
+
+1. **Render, locally.** `deploy/nginx-render.sh` fills in the two docroots
+   (`PARAMANT_DOCROOT`, `PARAMANT_LEGAL_DOCROOT`). With the production defaults
+   the output is the repo file byte for byte. The conf carries no certificate,
+   no `server_name` and no public listen: TLS ends in Caddy, so there is nothing
+   else per machine. The render comes from the commit phase 3 left the server
+   on (`PARAMANT_NGINX_REF` overrides), not from the NUC's working tree.
+2. **Gate, locally.** Before anything leaves the NUC: `/api/user/login` and
+   `/api/user/auth/webauthn/login/` on `relay_login`; `/api/user/auth/`, `setup/`,
+   `signup`, `account/totp/` and `account/backup-codes/` on `relay_auth`;
+   `/api/user/` on `user_session`; the `$arg_t` redirect on both `/parashare`s.
+3. **Server.** The conf and snippet travel base64 with their sha256 and are
+   checked on arrival. Every zone the conf uses must be bound in `nginx -T`
+   (otherwise FATAL, nothing written). Then backups
+   (`/etc/nginx/backups/<name>.pre-nginx-sync-<TS>` and the snippet; a marker
+   `...absent-nginx-sync-<TS>` when there was no snippet), the diff printed in
+   full (`confdiff`, `snipdiff`), the write (through the symlink, `cat` not
+   `mv`), `nginx -t`, reload. A failing `nginx -t` or reload puts both files
+   back and reloads the old config.
+4. **Loopback on the server**, straight at `127.0.0.1:8080` with
+   `Host: paramant.app`: the home page answers 200 and `/parashare?t=` answers
+   302 to `https://paramant.app/get?t=...`. On a fault: back again.
+5. **From the NUC, through Caddy**: `/parashare?t=x` and `/en/parashare?t=x`
+   answer 302 to `/get?t=x` and `/en/get?t=x`, and 12 parallel
+   `/api/user/me` get no 429. On a fault: the backups go back and the run stops.
+
+What the server had that git did not, and is now in git (so nothing the
+server needs disappears with the copy): `absolute_redirect off` and
+`port_in_redirect off` on `:8080`, the `CT-BACKUP-DENY` location, the
+document-capsule location (`/api/user/envelopes/<id>/document`, 6m, which 5c
+used to insert), and HSTS out of the snippet (CT-DEDUP: Caddy sets it). What
+the server had dropped and git now drops too: the `:8090` block and the
+`/dicom/` gateway in front of it (H2: `paramant-ghost-pipe.fly.dev` no longer
+resolves, so it was a 502 that sent imaging data outside the EEA). The full
+table is in the prodtest evidence, `nginx/DRIFT.md`.
+
+#### Only the nginx conf: `--nginx-sync`
+
+```bash
+# what would change, nothing written, no ssh; diff against a copy of the server conf
+PARAMANT_NGINX_LIVE_COPY=/path/to/paramant.conf bash deploy/deploy-3.1.sh --dry-run --nginx-sync
+# the live diff, read-only
+bash scripts/check-prod-drift.sh
+# place it: steps 1 to 5 above and nothing else
+bash deploy/deploy-3.1.sh --nginx-sync
+```
+
+`--nginx-sync` runs 5e alone: no tags, no pull, no build, no recreate, no
+docroot. It renders from `DEPLOY_REF` (the conf should match the frontend that
+is live; set `PARAMANT_NGINX_REF` to the deployed commit when main has moved on).
+Its backups carry the run TS of that run, not a step-2 TS, so `--rollback`
+does not apply; the restore is
+
+```bash
+cp /etc/nginx/backups/paramant.conf.pre-nginx-sync-<TS> /etc/nginx/sites-enabled/paramant.conf
+cp /etc/nginx/backups/paramant-security-headers.conf.pre-nginx-sync-<TS> /etc/nginx/snippets/paramant-security-headers.conf
+nginx -t && systemctl reload nginx
+```
+
+`scripts/check-prod-drift.sh` now reads the site conf and the snippet as well
+and reports `nginx drift guard: OK` or the diff. Test lock:
+`tests/nginx-volledig-docker.test.mjs` boots the rendered conf in nginx:alpine
+behind a Caddy stand-in and holds the redirect, the 12 parallel calls and the
+strict doors; `tests/deploy-3.1-dryrun.test.sh` section 10 runs the real 5e
+block against stubs, every restore path included.
+
 ## Step 6: smoke tests
 
 In the order `deploy.sh` runs them, plus the two the 3.0.0 runbook used.
@@ -1133,7 +1217,8 @@ bash deploy/deploy-3.1.sh --rollback 20260902-1830
 ```
 
 That reads the manifest of step 2, retags the saved images, recreates the
-containers without rebuilding, restores `.env`, the nginx confs and the
+containers without rebuilding, restores `.env`, the nginx confs (and the
+security-headers snippet when step 5e replaced it in that run) and the
 docroot, and re-runs the smoke tests. The `.env` it restores is the copy from
 before step 1e (`.env-pre-seller-$TS`) when 1e wrote anything in that run, and
 the step 2b copy (`.env-pre-3.1-$TS`) otherwise; the output says which.
