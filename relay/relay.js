@@ -12436,9 +12436,9 @@ if (redisClient && RELAY_REDIS_URL) {
 
 // ── Billing ledger backfill ──────────────────────────────────────────────────
 // Every payment id this relay already knows as settled (paid_by_<product> on
-// the accounts, paramant:billing:done:* in redis) goes into the durable ledger
-// once at boot, so an old tr_ id cannot be granted again after its redis
-// marker expires (review #555, M3). Idempotent, so every boot may run it.
+// the accounts, paramant:billing:done:* and paramant:billing:invoice:for:* in
+// redis) goes into the durable ledger once at boot, so an old tr_ id cannot be
+// granted again after its redis marker expires (review #555, M3). Idempotent, so every boot may run it.
 // BILLING_LEDGER_BACKFILL_DELAY_MS moves it, for a test.
 {
   const _bfDelay = parseInt(process.env.BILLING_LEDGER_BACKFILL_DELAY_MS || '', 10);

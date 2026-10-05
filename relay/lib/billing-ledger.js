@@ -66,9 +66,15 @@ class BillingLedger {
 // only). Once a marker expired and paid_by had moved on, an old tr_ id was
 // grantable again through the public webhook. So at boot every id the relay
 // already knows as settled goes into the ledger: every paid_by_<product>
-// pointer on an account record, and every paramant:billing:done:* marker in
-// redis. Idempotent: an id the ledger has is never written again.
+// pointer on an account record, every paramant:billing:done:* marker in
+// redis, and every paramant:billing:invoice:for:* claim. The invoice claims
+// carry no TTL (seven-year retention) and are only written after a grant, so
+// they cover the payments whose done-marker already expired; a PERSIST on the
+// markers before a deploy is no longer needed. Idempotent: an id the ledger
+// has is never written again, also when the webhook records it while the
+// backfill runs (a chargeback in that window stays 'revoked').
 const DONE_PREFIX = 'paramant:billing:done:';
+const INVOICE_CLAIM_PREFIX = 'paramant:billing:invoice:for:';
 async function backfillLedger(ledger, { redis, records, products, log } = {}) {
   const say = log || (() => {});
   const add = [];
@@ -98,12 +104,27 @@ async function backfillLedger(ledger, { redis, records, products, log } = {}) {
         }
       }
     } catch (e) { say('warn', 'billing_ledger_backfill_scan_failed', { err: e.message }); }
+    // An invoice claim exists only for a payment that was granted (the webhook
+    // issues the document after the grant), so the key alone is the proof.
+    // Scanned after the done-markers, so a 'revoked' marker keeps its value.
+    try {
+      for await (const batch of redis.scanIterator({ MATCH: INVOICE_CLAIM_PREFIX + '*', COUNT: 500 })) {
+        const keys = Array.isArray(batch) ? batch : [batch];
+        for (const k of keys) {
+          scanned++;
+          want(String(k).slice(INVOICE_CLAIM_PREFIX.length), 'granted');
+        }
+      }
+    } catch (e) { say('warn', 'billing_ledger_backfill_scan_failed', { err: e.message, prefix: INVOICE_CLAIM_PREFIX }); }
   }
+  let added = 0;
   for (const [id, val] of add) {
-    try { await ledger.record(id, val); } catch { /* logged by the ledger */ }
+    // The webhook may have written this id while the scan ran; its value wins.
+    if (ledger.status(id)) continue;
+    try { await ledger.record(id, val); added++; } catch { /* logged by the ledger */ }
   }
-  say('info', 'billing_ledger_backfilled', { added: add.length, markers_scanned: scanned });
-  return { added: add.length, scanned };
+  say('info', 'billing_ledger_backfilled', { added, markers_scanned: scanned });
+  return { added, scanned };
 }
 
-module.exports = { BillingLedger, backfillLedger, DONE_PREFIX };
+module.exports = { BillingLedger, backfillLedger, DONE_PREFIX, INVOICE_CLAIM_PREFIX };
