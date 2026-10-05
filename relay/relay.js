@@ -5347,8 +5347,18 @@ async function handleRelayRequest(req, res) {
   if (req.method === "POST" && path === "/v2/user/verify-totp") {
     if (!_internalOk()) return _internalReject();
     try {
-      const { user_id, totp, throttled_upstream } = JSON.parse((await readBody(req, 4096)).toString());
+      const { user_id, totp, throttled_upstream, fresh_factor } = JSON.parse((await readBody(req, 4096)).toString());
       if (!user_id || !totp) { res.writeHead(400); return res.end(J({ error: "missing_fields" })); }
+      // fresh_factor: the admin asks for a TOTP as a fresh second factor from
+      // someone who already holds this account's session (delete account,
+      // passkey, signing key, backup codes). That caller can only aim at its
+      // own account, so a hard per-account lockout is safe here, and it shares
+      // the counter of the signing-key routes (review #555, H2). The login
+      // path does not send it: a lockout there would let anyone lock anyone out.
+      if (fresh_factor === true) {
+        const lockedMs = await totpAccountLocked(user_id);
+        if (lockedMs) return totpLockedReply(res, lockedMs);
+      }
       // Throttle, never refuse: see userMfaDelayMs.
       //
       // WHY throttled_upstream EXISTS. This sleep is charged to an account, and
@@ -5395,9 +5405,16 @@ async function handleRelayRequest(req, res) {
         res.writeHead(503, { "Content-Type": "application/json" });
         return res.end(J({ error: "replay_store_unavailable" }));
       }
-      if (!result || !result.valid) userMfaNoteFailure(user_id);
+      if (!result || !result.valid) {
+        userMfaNoteFailure(user_id);
+        if (fresh_factor === true) {
+          const lockMs = await totpAccountFailed(user_id);
+          if (lockMs) return totpLockedReply(res, lockMs);
+        }
+      }
       if (result && result.valid) {
         userMfaAttemptReset(user_id);
+        if (fresh_factor === true) await totpAccountOk(user_id);
         // Dual-verify accepted this code. If it validated under SHA-1, record a
         // structured, countable event (never the code or the secret) so SHA-1-app
         // usage is measurable in the logs. This is the login/verify path.
