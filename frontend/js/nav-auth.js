@@ -21,10 +21,18 @@
     try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(COSIGN_LINKS) === 0) out.push(k); } } catch (e) { /* storage off */ }
     return out;
   }
+  // The signer's own key half per request (js/cosign-share-memory.js).
+  var COSIGN_SHARE = 'paramant.cosign.share.v1:';
+  function cosignShares() {
+    var out = [];
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(COSIGN_SHARE) === 0) out.push(k); } } catch (e) { /* storage off */ }
+    return out;
+  }
   function wipeLocal() {
     wipeDraft();
     cosignKeys().forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
     cosignLinks().forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
+    cosignShares().forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
     try { localStorage.removeItem(OWNER); } catch (e) {}
   }
   window.paramantWipeLocal = wipeLocal;
@@ -40,8 +48,9 @@
   var COSIGN_KEY_MAX_MS = 864e5;
   (function sweep() {
     var now = Date.now();
-    // The signer links (sign-flow.js rememberSignerLinks) go when they expire.
-    cosignLinks().forEach(function(k) {
+    // The signer links (sign-flow.js rememberSignerLinks) and the signer's own
+    // key halves (cosign-share-memory.js) go when they expire.
+    cosignLinks().concat(cosignShares()).forEach(function(k) {
       try { var r = JSON.parse(localStorage.getItem(k) || 'null'); if (!r || !(now < Number(r.exp))) localStorage.removeItem(k); } catch (e) { try { localStorage.removeItem(k); } catch (e2) {} }
     });
     cosignKeys().forEach(function(k) {

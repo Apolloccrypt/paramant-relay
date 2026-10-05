@@ -4,9 +4,9 @@
 # Positional args (validated by server against the whitelist schema):
 #   $1 = service  (relay|admin|nats|frontend)
 #   $2 = tail     (integer, default 100)
-#   $3 = follow   (no|follow, default no). With follow the logs keep streaming
+#   $3 = follow   (no|follow, default no; the CLI also takes -f). With follow the logs keep streaming
 #                 until the operator presses Ctrl+C in /admin/cli or the server's
-#                 60 s limit ends it; both kill this script's process group.
+#                 10 minute follow limit ends it; both kill this script's process group.
 set -uo pipefail
 
 SERVICE="${1:?service required}"
