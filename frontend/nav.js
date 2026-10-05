@@ -217,8 +217,8 @@
   // ── Reset mobile state when viewport crosses into desktop ─
   // Without this, opening the drawer on mobile then rotating / resizing
   // to desktop leaves the drawer visible with no way to close it
-  // (hamburger is display:none at >1023px) and body stuck scroll-locked.
-  var desktopQuery = window.matchMedia('(min-width: 1024px)');
+  // (hamburger is display:none at >1279px) and body stuck scroll-locked.
+  var desktopQuery = window.matchMedia('(min-width: 1280px)');
   function onDesktopChange(e) {
     if (e.matches && mobile.classList.contains('open')) closeMobileMenu();
   }
