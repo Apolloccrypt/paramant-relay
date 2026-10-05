@@ -72,13 +72,20 @@ test('audit rows carry a Dutch label for the Dutch /account', () => {
 test('the cancellation mail is Dutch first, English below, with the date in both', () => {
   const tpl = require('../lib/email-templates');
   const msg = tpl.billingCancellationEmail({ planName: 'Firm', cancelDate: '5 December 2026', cancelDateNl: '5 december 2026' });
-  assert.match(msg.subject, /^Uw Paramant-plan is opgezegd \/ Your Paramant plan has been cancelled$/);
+  assert.strictEqual(msg.subject, 'Uw Paramant-plan is opgezegd per 5 december 2026 / Your Paramant plan is cancelled as of 5 December 2026');
   const nlAt = msg.text.indexOf('Stopt op: 5 december 2026');
   const enAt = msg.text.indexOf('Ends on: 5 December 2026');
   assert.ok(nlAt >= 0, 'the Dutch half names the Dutch date');
   assert.ok(enAt > nlAt, 'the English half follows the Dutch one');
-  assert.match(msg.html, /Opzegging gepland/);
-  assert.match(msg.html, /Cancellation scheduled/);
+  // Review 573: the heading read as stopped right now. It names the end date,
+  // and says the plan keeps running until then, the same in both languages.
+  assert.match(msg.html, />Opgezegd per 5 december 2026<\/h1>/);
+  assert.match(msg.html, />Cancelled as of 5 December 2026<\/h1>/);
+  for (const body of [msg.text, msg.html]) {
+    assert.match(body, /is opgezegd per 5 december 2026\. Tot die datum loopt het gewoon door\./);
+    assert.match(body, /is cancelled as of 5 December 2026\. Until that date it keeps running as usual\./);
+    assert.doesNotMatch(body, /has been cancelled|is opgezegd\.(?!\d)/, 'no sentence that says it stopped already');
+  }
   assert.ok(!/\u2014/.test(msg.text), 'no em-dash in a customer mail');
 });
 

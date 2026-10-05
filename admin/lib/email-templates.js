@@ -492,7 +492,7 @@ function billingCancellationEmail({ planName, cancelDate, cancelDateNl }) {
 
   const nlText = `Hallo,
 
-Uw Paramant ${planName}-plan is opgezegd.
+Uw Paramant ${planName}-plan is opgezegd per ${dateNl}. Tot die datum loopt het gewoon door.
 
 Stopt op: ${dateNl}
 
@@ -509,7 +509,7 @@ https://paramant.app`;
 
   const enText = `Hi,
 
-Your Paramant ${planName} plan has been cancelled.
+Your Paramant ${planName} plan is cancelled as of ${cancelDate}. Until that date it keeps running as usual.
 
 Ends on: ${cancelDate}
 
@@ -531,8 +531,8 @@ https://paramant.app`;
     </div>`;
 
   const nlHtml = `
-    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Opzegging gepland</h1>
-    <p style="margin:0 0 20px 0;line-height:1.6;">Uw Paramant ${planName}-plan is opgezegd.</p>
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Opgezegd per ${dateNl}</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Uw Paramant ${planName}-plan is opgezegd per ${dateNl}. Tot die datum loopt het gewoon door.</p>
     ${box('Stopt op', dateNl)}
     <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
       <li>Tot die datum houdt u <strong>${planName}</strong></li>
@@ -545,8 +545,8 @@ https://paramant.app`;
   `;
 
   const enHtml = `
-    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Cancellation scheduled</h1>
-    <p style="margin:0 0 20px 0;line-height:1.6;">Your Paramant ${planName} plan has been cancelled.</p>
+    <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:500;color:#0B3A6A;">Cancelled as of ${cancelDate}</h1>
+    <p style="margin:0 0 20px 0;line-height:1.6;">Your Paramant ${planName} plan is cancelled as of ${cancelDate}. Until that date it keeps running as usual.</p>
     ${box('Ends on', cancelDate)}
     <ul style="margin:0 0 24px 0;padding-left:20px;line-height:1.8;color:#475569;font-size:14px;">
       <li>You keep <strong>${planName}</strong> until that date</li>
@@ -559,7 +559,9 @@ https://paramant.app`;
   `;
 
   return bilingualMail({
-    subject: 'Uw Paramant-plan is opgezegd / Your Paramant plan has been cancelled',
+    // Kop en onderwerp noemen de einddatum: opgezegd PER die dag, niet nu
+    // gestopt (review 573). NL en EN zeggen hetzelfde.
+    subject: `Uw Paramant-plan is opgezegd per ${dateNl} / Your Paramant plan is cancelled as of ${cancelDate}`,
     preheader, nlText, enText, nlHtml, enHtml,
     refId: 'cancel-' + Date.now(),
   });

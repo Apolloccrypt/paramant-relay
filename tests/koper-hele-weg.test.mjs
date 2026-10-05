@@ -289,7 +289,7 @@ test('6. opzeggen stopt de incasso echt', async () => {
     'na "Cancellation scheduled" liep de incasso gewoon door');
 
   // De mail noemt het plan zoals de schermen het noemen.
-  const mail = S.resend.mails.find((m) => /cancel/i.test(String(m.subject))); // taalronde: 'has been cancelled'
+  const mail = S.resend.mails.find((m) => /cancel/i.test(String(m.subject))); // onderwerp: 'is cancelled as of <datum>'
   assert.ok(mail, 'er ging geen bevestiging van de opzegging uit');
   assert.match(String(mail.text), /Firm/, 'de opzegmail noemt een ander plan dan de accountpagina');
 
