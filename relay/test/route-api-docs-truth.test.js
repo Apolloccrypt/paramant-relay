@@ -65,7 +65,7 @@ after(async () => {
 // A relay with two accounts: one that pays for ParaSign (legacy plan community,
 // plan_parasign pro, as every self-serve buyer), and one on community with no
 // ParaSign at all.
-async function relay(tag, env = {}) {
+async function relay(tag, env = {}, planParasign = 'pro') {
   const payer = `pgp_${tag}p_${RUN}_${crypto.randomBytes(8).toString('hex')}`;
   const free = `pgp_${tag}f_${RUN}_${crypto.randomBytes(8).toString('hex')}`;
   const srv = await boot({
@@ -74,13 +74,13 @@ async function relay(tag, env = {}) {
     users: { api_keys: [
       { key: payer, plan: 'community', active: true, parasign: true, is_primary: true,
         account_id: `acct_${tag}p_${RUN}`, email: `${tag}p@example.test`,
-        plan_parasign: 'pro', paid_until_parasign: FUTURE },
+        plan_parasign: planParasign, paid_until_parasign: FUTURE },
       { key: free, plan: 'community', active: true, is_primary: true,
         account_id: `acct_${tag}f_${RUN}`, email: `${tag}f@example.test` },
     ] },
     env: { ADMIN_TOKEN: ADMIN, INTERNAL_AUTH_TOKEN: INTERNAL, REDIS_URL: process.env.REDIS_URL || DEFAULT_REDIS, ...env },
   });
-  return { srv, payer: `acct_${tag}p_${RUN}`, free: `acct_${tag}f_${RUN}`, freeKey: free };
+  return { srv, payer: `acct_${tag}p_${RUN}`, payerKey: payer, free: `acct_${tag}f_${RUN}`, freeKey: free };
 }
 const mint = (srv, account, testKey) => srv.post('/v2/user/parasign-keys', {
   headers: BOTH, body: { user_id: account, label: 'docs-truth', test: testKey },
@@ -177,7 +177,7 @@ test('verify-receipt repeats tree_size_at_retrieval', async () => {
 test('without PARASIGN_PUBLIC_ORIGIN a self-host links to its own RELAY_SELF_URL', async () => {
   if (!ready()) return;
   const SELF = 'https://relay.selfhost.example';
-  const { srv, payer } = await relay('origin', { RELAY_SELF_URL: SELF, PARASIGN_PUBLIC_ORIGIN: '' });
+  const { srv, payer, payerKey } = await relay('origin', { RELAY_SELF_URL: SELF, PARASIGN_PUBLIC_ORIGIN: '' }, 'business');
   const k = await mint(srv, payer, true);
   assert.strictEqual(k.status, 201, k.text);
   const c = await create(srv, k.json.key);
@@ -188,6 +188,16 @@ test('without PARASIGN_PUBLIC_ORIGIN a self-host links to its own RELAY_SELF_URL
   assert.strictEqual(r.json.notary.relay_pubkey_url, SELF + '/v2/pubkey');
   // matrix API-16-N: the proof itself names the relay that notarised it.
   assert.strictEqual(r.json.notary.relay_id, SELF, 'the .psign names the self-host, inside the notary signature');
+  // Review #565, M2: the route the dashboard uses and the audit export carry
+  // the same relay_id (they said https://paramant.app).
+  const v2 = await srv.get(`/v2/envelopes/${c.json.id}/receipt`, { headers: { 'X-Api-Key': payerKey } });
+  assert.strictEqual(v2.status, 200, v2.text);
+  assert.strictEqual(v2.json.notary.relay_id, SELF, '/v2/envelopes/:id/receipt names the self-host');
+  const ax = await srv.get('/v2/parasign/audit-export?format=json', { headers: { 'X-Api-Key': payerKey } });
+  assert.strictEqual(ax.status, 200, ax.text);
+  const done = (ax.json.envelopes || []).find((e) => e.envelope_id === c.json.id);
+  assert.ok(done && done.psign, `the export holds the envelope's .psign: ${ax.text.slice(0, 300)}`);
+  assert.strictEqual(done.psign.notary.relay_id, SELF, 'the audit export names the self-host');
   assert.match(srv.log(), /parasign_public_origin_unset[^\n]*relay\.selfhost\.example/, 'the boot log says which origin it uses');
   await srv.stop();
   did();

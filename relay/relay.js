@@ -9439,6 +9439,7 @@ async function handleRelayRequest(req, res) {
       relayIdentity,
       canonicalJSON: parasign.canonicalJSON,
       publicOrigin: process.env.PARASIGN_PUBLIC_ORIGIN || parasignFallbackOrigin(),
+      relayId: RELAY_SELF_URL || process.env.PARASIGN_PUBLIC_ORIGIN || parasignFallbackOrigin(),
     });
   }
 
@@ -11644,6 +11645,9 @@ async function handleRelayRequest(req, res) {
         env, meta: null, canonicalJSON: parasign.canonicalJSON,
         sigEngine: registry.getSig(0x0002), relayIdentity,
         publicOrigin: process.env.PUBLIC_ORIGIN || 'https://paramant.app',
+        // The same relay_id as GET /v1/envelopes/:id/receipt (review #565, M2):
+        // this relay's own URL, not paramant.app on a self-host.
+        relayId: RELAY_SELF_URL || process.env.PARASIGN_PUBLIC_ORIGIN || parasignFallbackOrigin(),
       });
       res.writeHead(200, {
         'Content-Type': 'application/json',
@@ -11680,6 +11684,9 @@ async function handleRelayRequest(req, res) {
         env, meta: null, canonicalJSON: parasign.canonicalJSON,
         sigEngine: registry.getSig(0x0002), relayIdentity,
         publicOrigin: process.env.PUBLIC_ORIGIN || 'https://paramant.app',
+        // The same relay_id as GET /v1/envelopes/:id/receipt (review #565, M2):
+        // this relay's own URL, not paramant.app on a self-host.
+        relayId: RELAY_SELF_URL || process.env.PARASIGN_PUBLIC_ORIGIN || parasignFallbackOrigin(),
       });
       res.writeHead(200, {
         'Content-Type': 'application/json',
