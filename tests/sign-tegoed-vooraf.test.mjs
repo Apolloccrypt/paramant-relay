@@ -1,7 +1,9 @@
 // Acceptatie ronde 2, punt 6: een afzender zonder tegoed kon versturen zonder
 // waarschuwing, en de ondertekenaar strandde. Nu kijkt /sign vooraf: is er
-// minder tegoed dan het aantal ondertekenaars, dan zegt de pagina dat, en pas
-// een tweede klik verstuurt. Met genoeg tegoed (of onbekend) gaat het meteen.
+// minder tegoed dan het aantal ondertekenaars, dan zegt de pagina dat en
+// verstuurt niets, ook niet bij een tweede klik: de relay weigert zo'n verzoek
+// bij het aanmaken toch (acceptatie r3, A4). Met genoeg tegoed (of onbekend)
+// gaat het meteen.
 // Run: node --test tests/sign-tegoed-vooraf.test.mjs
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -68,12 +70,13 @@ async function run(quota) {
   return { first, second };
 }
 
-test('te weinig tegoed: eerst een waarschuwing, pas de tweede klik verstuurt', async () => {
+test('te weinig tegoed: een waarschuwing, en ook een tweede klik verstuurt niets', async () => {
   const r = await run({ signs: 1, caps: { signs: 2 } });
   assert.equal(r.first.creates, 0, 'de eerste klik verstuurde al');
   assert.match(r.first.hint, /nog 1 handtekening over/);
   assert.match(r.first.hint, /vraagt er 2/);
-  assert.equal(r.second.creates, 1, 'de tweede klik verstuurt');
+  assert.doesNotMatch(r.first.hint, /nogmaals op Versturen/);
+  assert.equal(r.second.creates, 0, 'geen "toch versturen" dat de relay weigert');
 });
 
 test('genoeg tegoed: meteen versturen', async () => {
