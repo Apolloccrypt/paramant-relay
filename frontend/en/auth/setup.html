@@ -275,6 +275,11 @@
 <section id="state-welcome" class="section hidden">
   <div class="eyebrow"><span class="bar"></span>all set</div>
   <h2>You're all set.</h2>
+  <div id="welcome-doc-return" hidden>
+    <p class="lede mt-3">Your account is active. You are going back to the document that is waiting for your signature.</p>
+    <a id="welcome-doc-link" class="btn btn-primary mt-3" href="/en/co-sign">Back to the document</a>
+  </div>
+  <div id="welcome-default">
   <p class="lede mt-3">Your account is active. Two things you can do right now.</p>
   <div class="grid2 mt-3">
     <a href="/en/parashare" class="card" style="border-left:3px solid var(--ochre);text-decoration:none;display:block">
@@ -287,6 +292,7 @@
     </a>
   </div>
   <p class="small mt-3">You can always come back to this from your <a href="/en/dashboard">dashboard</a>.</p>
+</div>
 </section>
 
 <p class="small" style="color:var(--ink-dim);margin-top:24px">
@@ -299,6 +305,7 @@
 <script src="/js/nav-auth.js?v=19" defer></script>
 <script src="/js/auth-setup.js?v=7"></script>
 <script type="module" src="/js/passkey.js?v=9"></script>
+<script type="module" src="/js/setup-doc-return.js?v=1"></script>
 
 <footer class="legal-strip">
   <a href="/en/privacy">Privacy</a><span class="legal-sep">&middot;</span><a href="/en/dpa">Data Processing Agreement</a><span class="legal-sep">&middot;</span><a href="/en/terms">Terms of Service</a><span class="legal-sep">&middot;</span><a href="/en/partners">Partners</a><span class="lang-switch"><span class="legal-sep">&middot;</span><a href="/auth/setup" hreflang="nl" lang="nl">Deze pagina in het Nederlands</a></span>

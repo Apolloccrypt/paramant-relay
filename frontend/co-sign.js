@@ -34,7 +34,7 @@ import { initialsFrom, normaliseRotation, viewSize, viewToUserMatrix, isIdentity
 import { signatureGrid, partySignatureSpot, partyParaafSpot, paraafSpotsForParties, autoSignaturePlace, textBoxesToFractions, strokesToInk, paraafCoveredPages, pageListText } from '/js/cosign-layout.js?v=5';
 import { sealInk, openInk, joinKey, parseKeyShareFragment } from '/js/parasign-ink.js?v=4';
 import { makeTextKit } from '/js/pdf-text-kit.js?v=1';
-import { stashReturn, resumeReturn } from '/js/login-return.js?v=1';
+import { stashReturn, resumeReturn, stashSignupReturn, SIGNUP_KEY, SIGNUP_MAX_AGE_MS } from '/js/login-return.js?v=2';
 import { rememberShare, recallShare } from '/js/cosign-share-memory.js?v=1';
 
 const RELAY_PUBLIC = 'https://health.paramant.app';
@@ -44,9 +44,18 @@ const RELAY_PUBLIC = 'https://health.paramant.app';
 const EN = document.documentElement.lang === 'en';
 const L = (nl, en) => (EN ? en : nl);
 
-// Back from signing in: put the full address (token, key fragment) back first,
-// so everything below reads the link as it was (login-return.js).
-try { resumeReturn(window.sessionStorage, location, history); } catch { /* no storage: the link as it is */ }
+// Back from signing in, or from making an account: put the full address
+// (token, key fragment) back first, so everything below reads the link as it
+// was (login-return.js). Signing in left it in this tab's sessionStorage;
+// making an account, which goes through two mails and so new tabs, left it in
+// localStorage.
+let __localStore = null;
+try { __localStore = window.localStorage; } catch { __localStore = null; }
+try {
+  if (!resumeReturn(window.sessionStorage, location, history) && __localStore) {
+    resumeReturn(__localStore, location, history, Date.now(), SIGNUP_KEY, SIGNUP_MAX_AGE_MS);
+  }
+} catch { /* no storage: the link as it is */ }
 
 // The language link has to carry the query (which envelope, which party, the
 // invite token) and the #fragment (the document key). A fragment never leaves
@@ -122,6 +131,9 @@ function waitForPdfjs() {
 let __envelope = null;
 let __partyIndex = -1;
 let __inviteToken = '';
+// The invite token travels in this header, never in a request URL: a URL ends
+// up in access logs (acceptance r5, B). Only the mailed link itself has ?t=.
+function inviteHeaders() { return __inviteToken ? { 'X-Parasign-Invite-Token': __inviteToken } : {}; }
 let __ownerMode = false;    // the sender's result page (?result=<ref> or ?owner=<id>)
 let __session = null;       // { email } when logged in as the invited recipient
 let __signKey = null;       // { vaultId, pk_b64, fingerprint, hasPrf } — PUBLIC metadata only
@@ -283,8 +295,8 @@ async function init() {
   try {
     // Ask as this party, not as a passer-by. The invite token is what entitles
     // this page to the document hash, the filename and the other parties.
-    const partyQuery = '?p=' + encodeURIComponent(partyIndex) + '&t=' + encodeURIComponent(__inviteToken);
-    const r = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(envId) + partyQuery);
+    const partyQuery = '?p=' + encodeURIComponent(partyIndex);
+    const r = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(envId) + partyQuery, { headers: inviteHeaders() });
     if (r.status === 404) return showError(L('Dit verzoek bestaat niet, is verlopen of is al gebruikt.', 'This request does not exist, has expired, or was already used.'));
     if (r.status === 429) return showError(L('Te veel verzoeken vanaf dit adres. Probeer het over een minuut opnieuw.', 'Too many requests from this address. Try again in a minute.'), 'busy');
     if (!r.ok) return showError(L('Het verzoek kon nu niet worden opgehaald door een storing bij ons. Er is niets mis met uw link. Probeer het over een paar minuten opnieuw.', 'The request could not be fetched right now because of a fault on our side. Nothing is wrong with your link. Please try again in a few minutes.'), 'fault');
@@ -549,7 +561,7 @@ function renderQuotaNote(quota) {
 async function refreshEnvelopeStatus() {
   try {
     const response = await fetch(RELAY_PUBLIC + '/v2/envelopes/' + encodeURIComponent(__envelope.id)
-      + '?p=' + encodeURIComponent(__partyIndex) + '&t=' + encodeURIComponent(__inviteToken), { cache: 'no-store' });
+      + '?p=' + encodeURIComponent(__partyIndex), { cache: 'no-store', headers: inviteHeaders() });
     if (response.ok) __envelope = withPlainLabels((await response.json()).envelope) || __envelope;
   } catch { /* the accepted sign result remains authoritative */ }
 }
@@ -587,8 +599,17 @@ function loginCtaHtml() {
   try { store = window.sessionStorage; } catch { store = null; }
   const ret = encodeURIComponent(store ? stashReturn(store, location) : location.pathname);
   return '<a class="btn" href="/auth/login?return=' + ret + '">' + L('Inloggen om verder te gaan', 'Sign in to continue') + '</a>'
-    + '<p class="cta-note">' + L('Nog geen account? <a href="/signup">Maak er gratis een</a> met het e-mailadres waarop u deze uitnodiging kreeg. Open daarna deze link opnieuw.', 'No account yet? <a href="/en/signup">Create one for free</a> with the email address this invitation was sent to, then open this link again.') + '</p>';
+    + '<p class="cta-note">' + L('Nog geen account? <a href="/signup" id="cs-signup-link">Maak er gratis een</a> met het e-mailadres waarop u deze uitnodiging kreeg. Daarna komt u vanzelf hier terug.', 'No account yet? <a href="/en/signup" id="cs-signup-link">Create one for free</a> with the email address this invitation was sent to. Afterwards you come straight back here.') + '</p>';
 }
+
+// "Maak er gratis een": the address of this page waits in this browser until
+// the new account is ready, and the setup page brings the reader back here
+// (login-return.js, acceptance r5, A). Kept on the click, not on showing the
+// button, so nothing is stored for a reader who never signs up.
+document.addEventListener('click', (ev) => {
+  const a = ev.target && ev.target.closest ? ev.target.closest('#cs-signup-link') : null;
+  if (a && __localStore) stashSignupReturn(__localStore, location);
+});
 
 function showClosed(state) {
   document.body.classList.add('request-closed');
@@ -678,7 +699,7 @@ function keyFromFragment() {
   return share ? { share } : null;
 }
 
-async function fetchAndOpenCapsule(url, envId, partyIndex) {
+async function fetchAndOpenCapsule(url, envId, partyIndex, headers = {}) {
   let key;
   try { key = keyFromFragment(); }
   catch (e) { throw new Error(e.message); }
@@ -704,7 +725,7 @@ async function fetchAndOpenCapsule(url, envId, partyIndex) {
     err.noKey = true;
     throw err;
   }
-  const r = await fetch(url, { credentials: 'include', cache: 'no-store', signal: AbortSignal.timeout(60000) });
+  const r = await fetch(url, { credentials: 'include', cache: 'no-store', headers, signal: AbortSignal.timeout(60000) });
   if (r.status === 401) throw new Error(L('Log in met het uitgenodigde e-mailadres om dit document te openen.', 'Sign in with the invited email address to open this document.'));
   if (r.status === 403) {
     let code = '';
@@ -741,8 +762,8 @@ async function fetchAndOpenCapsule(url, envId, partyIndex) {
 async function loadDeliveredDocument(envId, partyIndex) {
   setDeliveryStatus('', L('Het versleutelde document wordt gedownload...', 'Downloading the encrypted document...'));
   try {
-    const url = '/api/user/envelopes/' + encodeURIComponent(envId) + '/document?p=' + encodeURIComponent(partyIndex) + '&t=' + encodeURIComponent(__inviteToken);
-    const delivered = await fetchAndOpenCapsule(url, envId, partyIndex);
+    const url = '/api/user/envelopes/' + encodeURIComponent(envId) + '/document?p=' + encodeURIComponent(partyIndex);
+    const delivered = await fetchAndOpenCapsule(url, envId, partyIndex, inviteHeaders());
     await verifyAndRenderDocument(delivered.bytes, 'delivery');
     if (__hashMatches) {
       setDeliveryStatus('ok', delivered.fromMemory
@@ -1446,6 +1467,30 @@ async function decryptPriorInks() {
   }
 }
 
+// A download that needs the invite token: a fetch with the token in a header
+// and a blob, because a plain link would put the token in the URL (r5, B).
+function wireTokenDownload(anchor, url) {
+  anchor.href = '#';
+  anchor.onclick = async (ev) => {
+    ev.preventDefault();
+    if (anchor.dataset.busy) return;
+    anchor.dataset.busy = '1';
+    try {
+      const r = await fetch(url, { credentials: 'include', cache: 'no-store', headers: inviteHeaders() });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const cd = r.headers.get('content-disposition') || '';
+      const m = cd.match(/filename\*=UTF-8''([^;]+)/i) || cd.match(/filename="?([^";]+)"?/i);
+      let name = fileBase() + '.psign';
+      if (m) { try { name = decodeURIComponent(m[1]); } catch { name = m[1]; } }
+      downloadBytes(new Uint8Array(await r.arrayBuffer()), name, r.headers.get('content-type') || 'application/octet-stream');
+    } catch {
+      setStatus('err', L('Het bewijs kon nu niet worden gedownload. Probeer het over een paar minuten opnieuw.', 'The proof could not be downloaded right now. Please try again in a few minutes.'));
+    } finally {
+      delete anchor.dataset.busy;
+    }
+  };
+}
+
 function downloadBytes(bytes, filename, type) {
   const url = URL.createObjectURL(new Blob([bytes], { type }));
   const anchor = document.createElement('a');
@@ -1679,11 +1724,12 @@ async function showResultForParty(envId, partyIndex) {
   if (!__session) { showCta(loginCtaHtml()); return; }
   await loadDeliveredDocument(envId, partyIndex);
   wireResultCard({
-    proofUrl: complete ? '/api/user/envelopes/' + encodeURIComponent(envId) + '/receipt?p=' + encodeURIComponent(partyIndex) + '&t=' + encodeURIComponent(__inviteToken) : '',
+    proofUrl: complete ? '/api/user/envelopes/' + encodeURIComponent(envId) + '/receipt?p=' + encodeURIComponent(partyIndex) : '',
+    proofNeedsToken: true,
   });
 }
 
-function wireResultCard({ proofUrl }) {
+function wireResultCard({ proofUrl, proofNeedsToken = false }) {
   const card = $('result-card');
   if (!card) return;
   card.hidden = false;
@@ -1705,7 +1751,8 @@ function wireResultCard({ proofUrl }) {
   }
   if (proof) {
     proof.hidden = !proofUrl;
-    if (proofUrl) proof.href = proofUrl;
+    if (proofUrl && proofNeedsToken) wireTokenDownload(proof, proofUrl);
+    else if (proofUrl) { proof.onclick = null; proof.href = proofUrl; }
   }
   const orig = $('result-download-original');
   if (orig) {
@@ -1717,7 +1764,11 @@ function wireResultCard({ proofUrl }) {
     note.textContent = complete
       ? L('Het bewijs (.psign) toont aan wie waar heeft getekend. Controleer het op /verify samen met het bestand dat iedereen tekende: ', 'The proof (.psign) shows who signed where. Check it on /verify together with the file everyone signed: ') +
         String(__envelope.original_filename || L('het originele document', 'the original document')) +
-        L(' (de knop voor het origineel hierboven). De pdf met alle handtekeningen kan ook: daarin zit het origineel ongewijzigd ingebed, en /verify controleert dat ingebedde origineel.', ' (the button for the original above). The pdf with every signature works too: the original is embedded in it unchanged, and /verify checks that embedded original.')
+        // Only point at the buttons that are on screen: without the document
+        // (a session that ran out, a failed download) both are hidden (r5, C).
+        (__documentBytes
+          ? L(' (de knop voor het origineel hierboven). De pdf met alle handtekeningen kan ook: daarin zit het origineel ongewijzigd ingebed, en /verify controleert dat ingebedde origineel.', ' (the button for the original above). The pdf with every signature works too: the original is embedded in it unchanged, and /verify checks that embedded original.')
+          : L('. Dat bestand en de pdf met alle handtekeningen kunt u hier downloaden zodra het document op deze pagina is geopend; de melding hierboven zegt waarom dat nu niet lukte.', '. You can download that file and the pdf with every signature here once the document has opened on this page; the message above says why that did not work just now.'))
       : L('Het bewijs komt beschikbaar zodra iedereen heeft getekend.', 'The proof becomes available once everyone has signed.');
   }
 }
@@ -1941,7 +1992,7 @@ async function doSign() {
     const proofWait = $('done-proof-wait');
     if (data.status === 'complete' && proof) {
       proof.hidden = false;
-      proof.href = '/api/user/envelopes/' + encodeURIComponent(__envelope.id) + '/receipt?p=' + encodeURIComponent(__partyIndex) + '&t=' + encodeURIComponent(__inviteToken);
+      wireTokenDownload(proof, '/api/user/envelopes/' + encodeURIComponent(__envelope.id) + '/receipt?p=' + encodeURIComponent(__partyIndex));
       if (proofWait) proofWait.hidden = true;
     } else if (proofWait) {
       proofWait.hidden = false;
