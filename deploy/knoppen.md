@@ -5,7 +5,7 @@ Wat het gedrag van Paramant verandert staat hier, of in `deploy/.env.example`. N
 - **120 omgevingsvariabelen** die de relay en de admin lezen staan in
   [`.env.example`](.env.example), met per naam een uitleg en een `read in:`-regel.
   `tests/env-documented.test.mjs` bewaakt dat bestand en faalt als een naam er niet in staat.
-- **215 knoppen** staan hieronder: alles wat die poort niet ziet.
+- **212 knoppen** staan hieronder: alles wat die poort niet ziet.
   `tests/knoppen-compleet.test.mjs` bewaakt deze pagina op dezelfde manier.
 
 Samen zijn dat twee bestanden. Dat is een meer dan een, en de reden is dat `.env.example`
@@ -166,6 +166,7 @@ De gevaarlijkste knop is de knop die je niet hoort als hij ontbreekt. Deze doen 
 | `PARTNERS_PROD_SSH` | `tests/partners.test.mjs` | geen | ssh-doel (root@server) waarvandaan de test met `cut -d= -f1` alleen de sleutelnamen van `/opt/paramant-relay/.env` leest. Zonder: productiehelft overgeslagen, geen groen |
 | `PARTNERS_PROD_SSH_KEY` | `tests/partners.test.mjs` | geen, ssh kiest zelf | de ssh-sleutel voor `PARTNERS_PROD_SSH` |
 | `PLAYWRIGHT_CHROMIUM_PATH` | `scripts/shot-dashboard.mjs`, `scripts/ui-contrast-sweep.mjs` en 35 meer | geen | pad naar de browser voor elke Playwright-test |
+| `PW_SHOT_DIR` | `tests/admin-beheer.test.mjs` | geen | pad waar de test van het beheerscherm zijn schermafdrukken neerzet (ook gezet door `~/bin/pw-webkit.sh -o`); leeg betekent geen afdruk |
 | `RECEIPT_SHOTS_DIR` | `tests/receipt-verify.test.mjs` | `''` | pad waar een test zijn schermafdruk neerzet; leeg betekent geen afdruk |
 | `RELAY_URL` | `scripts/dev-local-proxy.js` | `'http://127.0.0.1:3001'` | waar de dev-proxy de relay zoekt |
 | `ROF_JSON` | `tests/responsive-overflow.test.mjs` | geen | pad waar de overloopmeting elke bevinding als JSON neerzet, voor een telling voor en na; leeg betekent geen bestand |

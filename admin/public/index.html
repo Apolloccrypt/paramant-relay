@@ -1,283 +1,321 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PARAMANT · Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>Paramant · Beheer</title>
 <style>
-:root{--ff-sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;--ff-mono:'IBM Plex Mono',ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,'Liberation Mono',monospace}
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#F8FAFC;color:#0B3A6A;font-family:var(--ff-sans);font-size:14px;-webkit-font-smoothing:antialiased;min-height:100vh}
-button,input,select{font-family:inherit;font-size:inherit}
-/* Login */
-.lw{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
-.lb{width:100%;max-width:340px}
-.l-brand{font-family:var(--ff-mono);font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#475569;margin-bottom:20px}
-.l-title{font-size:22px;font-weight:600;color:#0B3A6A;margin-bottom:6px}
-.l-sub{font-size:13px;color:#475569;margin-bottom:26px;line-height:1.5}
-.l-lbl{display:block;font-family:var(--ff-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#475569;margin-bottom:6px}
-.l-inp{width:100%;background:#fff;border:1.5px solid rgba(11,58,106,.15);padding:10px 12px;color:#0B3A6A;font-size:13px;outline:none;margin-bottom:12px;font-family:var(--ff-mono);transition:border-color .15s}
-.l-inp:focus{border-color:#1D4ED8}
-.l-totp{font-size:20px;letter-spacing:.2em;margin-bottom:18px}
-.l-btn{width:100%;background:#0B3A6A;color:#F8FAFC;border:none;padding:11px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--ff-mono);letter-spacing:.1em;text-transform:uppercase;transition:background .15s}
-.l-btn:hover{background:#1D4ED8}
-.l-btn:disabled{opacity:.5;cursor:default}
-.l-err{font-size:12px;color:#dc2626;margin-top:10px;font-family:var(--ff-mono);display:none}
-.l-note{font-size:11px;color:#94a3b8;margin-top:12px;text-align:center;font-family:var(--ff-mono)}
-/* Shell */
-.shell{display:none;flex-direction:column;min-height:100vh}
-.hdr{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 24px;height:56px;border-bottom:1px solid rgba(11,58,106,.1);background:#F8FAFC;position:sticky;top:0;z-index:50;box-shadow:0 1px 0 rgba(11,58,106,.02)}
-.hdr-brand{font-family:var(--ff-mono);font-size:11px;letter-spacing:.14em;font-weight:700;color:#0B3A6A;text-transform:uppercase;white-space:nowrap}
-.tabs{display:flex;gap:0;overflow-x:auto}
-.tabs button{background:transparent;border:none;border-bottom:2px solid transparent;padding:16px 16px 14px;font-family:var(--ff-sans);font-size:13px;color:#475569;cursor:pointer;white-space:nowrap;transition:color .15s}
-.tabs button.on{color:#0B3A6A;border-bottom-color:#1D4ED8;font-weight:600}
-.tabs button:hover:not(.on){color:#0B3A6A}
-.hdr-meta{display:flex;gap:8px;align-items:center;flex-shrink:0}
-.lic{background:rgba(178,255,63,.18);color:#0B3A6A;padding:5px 10px;font-size:10px;letter-spacing:.06em;font-family:var(--ff-mono);white-space:nowrap}
-.lo-btn{padding:6px 12px;background:transparent;border:1.5px solid rgba(11,58,106,.2);color:#0B3A6A;cursor:pointer;font-family:var(--ff-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;transition:border-color .15s}
-.lo-btn:hover{border-color:#0B3A6A}
-.main{flex:1;padding:24px;max-width:1400px;width:100%;margin:0 auto}
-.panel{display:none}.panel.on{display:block}
-/* Stat cards */
-.sg{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
-.sc{background:#fff;border:1px solid rgba(11,58,106,.1);padding:20px}
-.sc-lbl{font-family:var(--ff-mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#475569;margin-bottom:10px}
-.sc-val{font-size:28px;font-weight:500;color:#0B3A6A;font-family:var(--ff-mono);line-height:1}
-/* Cards */
-.card{background:#fff;border:1px solid rgba(11,58,106,.1);padding:20px;margin-bottom:16px}
-.card-hdr{font-size:12px;font-weight:600;color:#0B3A6A;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;font-family:var(--ff-mono);letter-spacing:.06em;text-transform:uppercase}
-.card-hdr small{font-size:11px;font-weight:400;color:#475569;text-transform:none;letter-spacing:0;font-family:var(--ff-sans)}
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.g3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px}
-/* Table */
-.tbl{width:100%;border-collapse:collapse;font-size:13px}
-.tbl th{text-align:left;padding:9px 12px;font-family:var(--ff-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#475569;border-bottom:1.5px solid rgba(11,58,106,.08)}
-.tbl td{padding:11px 12px;border-bottom:1px solid rgba(11,58,106,.04);color:#0B3A6A}
-.tbl tr:hover td{background:rgba(29,78,216,.02)}
-.mono{font-family:var(--ff-mono);font-size:12px}
-/* Badges */
-.badge{display:inline-block;padding:2px 8px;font-size:11px;font-family:var(--ff-mono);text-transform:uppercase;letter-spacing:.06em}
-.badge.community{background:rgba(11,58,106,.08);color:#0B3A6A}
-.badge.pro{background:rgba(29,78,216,.1);color:#1D4ED8}
-.badge.enterprise{background:rgba(178,255,63,.35);color:#2d5a00;font-weight:700}
-.badge.trial{background:rgba(245,158,11,.1);color:#b45309}
-.chip{font-family:var(--ff-mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
-.chip.active{color:#059669}.chip.pending{color:#d97706}.chip.none{color:#94a3b8}.chip.revoked{color:#dc2626}
-/* Filter bar */
-.fb{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
-.fb input,.fb select{padding:7px 10px;border:1.5px solid rgba(11,58,106,.12);font-size:12px;font-family:var(--ff-sans);background:#fff;color:#0B3A6A;outline:none}
-.fb input:focus,.fb select:focus{border-color:#1D4ED8}
-.sp{flex:1}
-.btn{padding:7px 14px;background:#0B3A6A;color:#F8FAFC;border:none;font-size:11px;font-family:var(--ff-mono);letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:background .15s}
-.btn:hover{background:#1D4ED8}
-.btn.out{background:transparent;border:1.5px solid rgba(11,58,106,.2);color:#0B3A6A}
-.btn.out:hover{border-color:#1D4ED8;color:#1D4ED8;background:transparent}
-/* Relay strip */
-.rs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
-.ri{padding:10px 12px;background:rgba(5,150,105,.08);border-left:3px solid #059669;font-family:var(--ff-mono);font-size:12px;color:#065f46}
-.ri.offline{background:rgba(220,38,38,.06);border-left-color:#dc2626;color:#991b1b}
-.ri.loading{background:rgba(11,58,106,.04);border-left-color:#94a3b8;color:#475569}
-.ri-name{font-weight:700;margin-bottom:2px}
-.ri-det{font-size:10px;opacity:.8}
-/* Activity */
-.al{font-family:var(--ff-mono);font-size:11px}
-.ai{display:flex;gap:12px;padding:5px 0;border-bottom:1px solid rgba(11,58,106,.04)}
-.ai .t{color:#475569;flex-shrink:0;width:80px}
-.ai .e{color:#1D4ED8;flex-shrink:0;width:160px}
-.ai .u{color:#0B3A6A;opacity:.6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* Plan bars */
-.pb{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-.pb .pl{width:90px;font-family:var(--ff-mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#475569}
-.pb .tr{flex:1;height:6px;background:rgba(11,58,106,.06);overflow:hidden}
-.pb .fi{height:100%;background:#1D4ED8;transition:width .5s}
-.pb .cn{width:28px;text-align:right;font-family:var(--ff-mono);font-size:11px;color:#475569}
-/* Action menu */
-.amw{position:relative;display:inline-block}
-.amb{background:transparent;border:1px solid rgba(11,58,106,.12);color:#0B3A6A;padding:4px 10px;font-size:11px;font-family:var(--ff-mono);cursor:pointer}
-.amb:hover{background:rgba(11,58,106,.04)}
-.am{display:none;position:absolute;right:0;top:calc(100% + 4px);background:#fff;border:1px solid rgba(11,58,106,.15);z-index:20;min-width:190px;box-shadow:0 4px 16px rgba(11,58,106,.1)}
-.am.open{display:block}
-.am button{display:block;width:100%;text-align:left;padding:9px 14px;background:transparent;border:none;font-size:13px;color:#0B3A6A;cursor:pointer}
-.am button:hover{background:rgba(29,78,216,.05)}
-.am button.danger{color:#dc2626}
-.am button.danger:hover{background:rgba(220,38,38,.05)}
-.am .sep{height:1px;background:rgba(11,58,106,.06);margin:4px 0}
-/* Banner */
-.banner{padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.5}
-.banner.stub{background:rgba(245,158,11,.08);border-left:3px solid #d97706;color:#92400e}
-.banner.info{background:rgba(29,78,216,.06);border-left:3px solid #1D4ED8;color:#1e3a8a}
-/* Toast */
-.toast{position:fixed;bottom:20px;right:20px;background:#0B3A6A;color:#F8FAFC;padding:10px 16px;font-size:12px;font-family:var(--ff-mono);z-index:999;max-width:320px}
-.toast.err{background:#dc2626}
-.toast.warn{background:#b45309}
-.toast.ok{background:#059669}
-/* Loading */
-.sp-icon{display:inline-block;width:14px;height:14px;border:2px solid rgba(11,58,106,.12);border-top-color:#1D4ED8;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
-@keyframes spin{to{transform:rotate(360deg)}}
-.empty{padding:32px;text-align:center;color:#94a3b8;font-family:var(--ff-mono);font-size:12px}
-/* Accessibility */
-.skip-link{position:absolute;top:-40px;left:0;background:#0B3A6A;color:#F8FAFC;padding:8px 12px;text-decoration:none;z-index:200;font-size:13px}
-.skip-link:focus{top:0}
-.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-*:focus-visible{outline:2px solid #1D4ED8;outline-offset:2px}
-button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #1D4ED8;outline-offset:2px}
-/* Pagination */
-.pag{display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid rgba(11,58,106,.06);margin-top:4px}
-.pag button{padding:5px 12px;border:1.5px solid rgba(11,58,106,.15);background:#fff;color:#0B3A6A;cursor:pointer;font-size:12px;font-family:var(--ff-mono)}
-.pag button:hover:not(:disabled){border-color:#1D4ED8;color:#1D4ED8}
-.pag button:disabled{opacity:.4;cursor:default}
-.pag select{padding:5px 8px;border:1.5px solid rgba(11,58,106,.15);background:#fff;color:#0B3A6A;font-size:12px;font-family:var(--ff-mono)}
-.pag-info{font-size:12px;font-family:var(--ff-mono);color:#475569;flex:1;text-align:center}
-/* Responsive */
-@media(max-width:900px){.sg,.rs,.g2,.g3{grid-template-columns:1fr 1fr}.tabs{overflow-x:auto}}
-@media(max-width:720px){
-  .hdr{flex-wrap:wrap;height:auto;min-height:56px;padding-top:8px;padding-bottom:0;align-items:center}
-  .tabs{order:3;flex-basis:100%;width:100%;border-top:1px solid rgba(11,58,106,.08);margin-top:8px;-webkit-overflow-scrolling:touch}
-  .tabs button{padding:12px 14px 10px}
-  .panel .tbl-wrap,.panel #u-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-}
-@media(max-width:600px){.sg,.rs{grid-template-columns:1fr}.hdr{padding-left:12px;padding-right:12px}.main{padding:14px}.hdr-meta .lic{display:none}}
-
-/* Action menu group labels */
-.ag-lbl{display:block;padding:4px 14px 2px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8;pointer-events:none;user-select:none}
-.am button:disabled{opacity:.35;cursor:default}
-/* Toast animation */
-.toast{opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s}
-.toast.show{opacity:1;transform:translateY(0)}
-/* Modal overlay */
-.mo{display:none;position:fixed;inset:0;background:rgba(11,58,106,.45);z-index:100;align-items:center;justify-content:center;padding:16px}
-.mo[open],.mo.vis{display:flex}
-.mb{background:#fff;width:100%;max-width:540px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
-.mh{display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid rgba(11,58,106,.1);gap:8px}
-.mt{flex:1;font-weight:600;font-size:15px;color:#0B3A6A}
-.mh button.close-mo{border:none;background:transparent;font-size:20px;cursor:pointer;padding:0 4px;color:#64748b;line-height:1}
-.mbody{padding:18px;overflow-y:auto;flex:1}
-.mc{margin-bottom:14px}
-.mc label{display:block;font-size:12px;color:#475569;margin-bottom:4px;font-weight:500}
-.mc select,.mc input[type=text]{width:100%;padding:7px 10px;border:1.5px solid rgba(11,58,106,.2);font-size:13px;font-family:var(--ff-mono);color:#0B3A6A;background:#fff;outline:none}
-.mc select:focus,.mc input[type=text]:focus{border-color:#1D4ED8}
-.mfoot{padding:12px 18px;border-top:1px solid rgba(11,58,106,.1);display:flex;justify-content:flex-end;gap:8px}
-/* Email preview tabs */
-.ep-tabs{display:flex;gap:0;border-bottom:1px solid rgba(11,58,106,.1);margin-bottom:14px}
-.ep-tab{padding:7px 14px;border:none;background:transparent;font-size:12px;font-family:var(--ff-mono);cursor:pointer;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-1px}
-.ep-tab.on{color:#1D4ED8;border-bottom-color:#1D4ED8}
-.ep-subj{font-size:12px;color:#475569;margin-bottom:10px;font-family:var(--ff-mono)}
-.ep-content{font-size:12px;line-height:1.6;max-height:320px;overflow-y:auto}
-.ep-content pre{white-space:pre-wrap;word-break:break-word;font-family:var(--ff-mono)}
-.ep-content iframe{width:100%;border:none;height:340px}
-
-/* TOTP required badges */
-.chip.required-missing{background:rgba(220,38,38,.08);color:#dc2626;font-weight:600}
-.chip.required-ok{background:rgba(29,78,216,.08);color:#1D4ED8}
-
-/* ════════════════════════════════════════════════════════════════
-   MOBILE-FIRST UX/UI OVERHAUL  (additive — geen JS-hooks aangeraakt)
-   ════════════════════════════════════════════════════════════════ */
+/* Het beheerscherm, licht thema van Paramant: marineblauwe inkt op wit, de
+   limoen als merkteken, Schiphol-geel alleen voor "let op". Vorm legt uit:
+   een kleur is altijd een toestand, nooit versiering. Geen schaduwen, geen
+   hoofdletterlinks, raakvlakken van minimaal 44 px. */
 :root{
-  --ink:#0B3A6A; --ink-2:#475569; --ink-mut:#94a3b8; --blue:#1D4ED8;
-  --bg:#F8FAFC; --line:rgba(11,58,106,.12); --line-soft:rgba(11,58,106,.06);
-  --ok:#059669; --warn:#d97706; --danger:#dc2626; --tap:44px; --radius:10px;
+  --ff:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --ff-mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --ink:#0B3A6A; --ink-2:#3d5573; --ink-3:#6b7f96; --line:#d9e0e8; --line-2:#eef1f5;
+  --bg:#ffffff; --bg-2:#f4f6f9; --brand:#B2FF3F; --blue:#1D4ED8;
+  --ok:#0f7a4a; --ok-bg:#e8f6ee; --warn:#FFD200; --warn-bg:#fff6cc;
+  --bad:#c0261d; --bad-bg:#fdecea; --mute-bg:#eef1f5;
+  --tap:44px; --r:6px;
 }
-/* Iets warmere kaart-randen + zachte schaduw voor diepte/hiërarchie */
-.card,.sc{border-radius:var(--radius);box-shadow:0 1px 2px rgba(11,58,106,.04)}
-.btn,.l-btn,.lo-btn,.amb,.pag button,.fb input,.fb select,.l-inp,.mc input,.mc select{border-radius:8px}
-.badge,.chip{border-radius:6px}
-.btn{transition:background .15s,transform .05s}.btn:active{transform:translateY(1px)}
-/* Comfortabele tap-targets op touch (laat desktop ongemoeid) */
-@media(hover:none),(pointer:coarse){
-  .btn,.amb,.lo-btn,.pag button,.pag select,.fb input,.fb select{min-height:var(--tap)}
-  .am button{padding-top:13px;padding-bottom:13px;font-size:14px}
-  .tabs button{padding-top:15px;padding-bottom:13px}
-  .amb{padding:9px 14px;font-size:12px}
-}
-/* Tabellen: altijd horizontaal scrollbaar MET een schaduw-cue aan de overvloei-rand */
-.tbl-wrap,#u-table-wrap,#a-results{overflow-x:auto;-webkit-overflow-scrolling:touch;
-  background:
-    radial-gradient(farthest-side at 0 50%,rgba(11,58,106,.10),transparent) 0 0,
-    radial-gradient(farthest-side at 100% 50%,rgba(11,58,106,.10),transparent) 100% 0;
-  background-repeat:no-repeat;background-size:16px 100%,16px 100%;background-attachment:scroll}
-/* ── Tablet ── */
-@media(max-width:900px){.g3{grid-template-columns:1fr 1fr}}
-/* ── Telefoon ── */
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--ff);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;min-height:100vh}
+button,input,select{font-family:inherit;font-size:inherit;color:inherit}
+a{color:var(--blue)}
+.mono{font-family:var(--ff-mono);font-size:13px}
+.mut{color:var(--ink-3)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.skip-link{position:absolute;top:-48px;left:0;background:var(--ink);color:#fff;padding:10px 14px;z-index:300}
+.skip-link:focus{top:0}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+
+/* Inloggen */
+.lw{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.lb{width:100%;max-width:360px}
+.l-brand{display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:28px}
+.l-brand i{width:12px;height:12px;background:var(--brand);border:2px solid var(--ink);display:inline-block}
+.l-title{font-size:26px;font-weight:700;margin-bottom:6px}
+.l-sub{color:var(--ink-2);margin-bottom:24px}
+.l-lbl{display:block;font-weight:600;font-size:14px;margin-bottom:6px}
+.l-inp{width:100%;min-height:var(--tap);background:#fff;border:1.5px solid var(--line);border-radius:var(--r);padding:10px 12px;font-size:16px;margin-bottom:16px;outline:none}
+.l-inp:focus{border-color:var(--ink)}
+.l-totp{font-family:var(--ff-mono);font-size:22px;letter-spacing:.25em}
+.l-btn{width:100%;min-height:48px;background:var(--ink);color:#fff;border:none;border-radius:var(--r);font-size:16px;font-weight:600;cursor:pointer}
+.l-btn:disabled{opacity:.55}
+.l-err{color:var(--bad);margin-top:12px;display:none;font-weight:500}
+.l-note{color:var(--ink-3);font-size:13px;margin-top:14px;text-align:center}
+
+/* Kop en tabbladen */
+.shell{display:none;flex-direction:column;min-height:100vh}
+.hdr{position:sticky;top:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--line)}
+.hdr-row{display:flex;align-items:center;gap:16px;padding:0 24px;min-height:56px;max-width:1400px;margin:0 auto}
+.hdr-brand{display:flex;align-items:center;gap:8px;font-weight:700;white-space:nowrap}
+.hdr-brand i{width:11px;height:11px;background:var(--brand);border:2px solid var(--ink);display:inline-block}
+.hdr-brand small{font-weight:500;color:var(--ink-3);font-size:15px}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex:1}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{background:none;border:none;border-bottom:3px solid transparent;padding:16px 14px 13px;font-size:15px;color:var(--ink-2);cursor:pointer;white-space:nowrap;min-height:var(--tap)}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
+.tabs button:hover:not(.on){color:var(--ink)}
+.hdr-links{display:flex;gap:4px;align-items:center}
+.hdr-links a,.hdr-links button,.more summary{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border-radius:var(--r);background:none;border:none;color:var(--ink);text-decoration:none;font-size:14px;font-weight:500;cursor:pointer}
+.hdr-links a:hover,.hdr-links button:hover,.more summary:hover{background:var(--bg-2)}
+.more{position:relative;display:none}
+.more summary{list-style:none;border:1.5px solid var(--line);font-size:15px}
+.more summary::-webkit-details-marker{display:none}
+.more[open] .more-m{display:block}
+.more-m{display:none;position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1.5px solid var(--ink);border-radius:var(--r);min-width:200px;z-index:60;padding:6px}
+.more-m a,.more-m button{display:flex;align-items:center;width:100%;min-height:var(--tap);padding:0 12px;border:none;background:none;text-align:left;color:var(--ink);text-decoration:none;font-size:16px;border-radius:4px;cursor:pointer}
+.more-m a:hover,.more-m button:hover{background:var(--bg-2)}
+.main{flex:1;padding:24px;max-width:1400px;width:100%;margin:0 auto}
+.panel{display:none}.panel.on{display:block;animation:in .18s ease-out}
+@keyframes in{from{opacity:.4}to{opacity:1}}
+
+/* Koppen en blokken */
+.h1{font-size:24px;font-weight:700;margin-bottom:4px}
+.lead{color:var(--ink-2);margin-bottom:18px}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;margin-bottom:16px}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:17px;font-weight:700;margin-bottom:12px}
+.card-hdr small{font-size:14px;font-weight:400;color:var(--ink-3)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+
+/* Getallen: elk getal is een knop naar de details */
+.sg{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.sc{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:16px;cursor:pointer;min-height:96px;font:inherit;color:inherit}
+.sc:hover{border-color:var(--ink)}
+.sc-lbl{font-size:14px;color:var(--ink-2);margin-bottom:6px}
+.sc-val{font-size:28px;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums;display:inline-block;padding:0 2px;margin:0 -2px}
+.sc-sub{font-size:13px;color:var(--ink-3);margin-top:4px}
+.sc.flash .sc-val{animation:flash 1.4s ease-out}
+@keyframes flash{0%{background:var(--brand)}100%{background:transparent}}
+
+/* Toestanden */
+.st{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;white-space:nowrap}
+.st::before{content:'';width:10px;height:10px;border-radius:50%;background:currentColor;flex:0 0 auto}
+.st.goed{color:var(--ok)}.st.let_op{color:#6b5500}.st.let_op::before{background:var(--warn);box-shadow:0 0 0 1.5px #111}
+.st.kapot{color:var(--bad)}.st.niet_gemeten{color:var(--ink-3)}
+.pr{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:12px 14px;border:1px solid var(--line);border-left-width:5px;border-radius:var(--r);margin-bottom:8px;width:100%;background:#fff;text-align:left;cursor:pointer;font:inherit;color:inherit}
+.pr:hover{border-color:var(--ink)}
+.pr.goed{border-left-color:var(--ok)}.pr.let_op{border-left-color:var(--warn);background:var(--warn-bg)}
+.pr.kapot{border-left-color:var(--bad);background:var(--bad-bg)}.pr.niet_gemeten{border-left-color:var(--ink-3);background:var(--bg-2)}
+.pr b{display:block;font-size:15px}
+.pr span.t{display:block;font-size:14px;color:var(--ink-2)}
+.sign{display:flex;align-items:center;gap:12px;background:var(--warn);color:#111;padding:12px 16px;border-radius:var(--r);font-weight:600;margin-bottom:16px}
+.sign.kapot{background:var(--bad);color:#fff}
+.sign.goed{background:var(--ok-bg);color:var(--ok)}
+.sign.niet_gemeten{background:var(--bg-2);color:var(--ink-2)}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:13px;font-weight:600;background:var(--mute-bg);color:var(--ink);white-space:nowrap}
+.badge.paid{background:var(--ink);color:#fff}
+.badge.ok{background:var(--ok-bg);color:var(--ok)}
+.badge.bad{background:var(--bad-bg);color:var(--bad)}
+.badge.warn{background:var(--warn-bg);color:#5c4900}
+.chip{font-size:14px;font-weight:600}
+.chip.active{color:var(--ok)}.chip.pending{color:#6b5500}.chip.none{color:var(--ink-3)}.chip.revoked{color:var(--bad)}
+.chip.required-missing{color:var(--bad)}.chip.required-ok{color:var(--ok)}
+
+/* Lijsten */
+.ls{list-style:none}
+.ls li{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line-2)}
+.ls li:last-child{border-bottom:none}
+.ls .r{text-align:right;flex:0 0 auto}
+.lnk{background:none;border:none;padding:0;color:var(--blue);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font:inherit;text-align:left;min-height:28px}
+
+/* Tabel */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl{width:100%;border-collapse:collapse;font-size:15px}
+.tbl th{text-align:left;padding:10px 12px;font-size:13px;font-weight:600;color:var(--ink-3);border-bottom:1.5px solid var(--line);white-space:nowrap}
+.tbl td{padding:12px;border-bottom:1px solid var(--line-2);vertical-align:top}
+.tbl tr:hover td{background:#fafbfc}
+.tbl .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.when b{display:block;font-weight:500;white-space:nowrap}
+.when span{font-size:13px;color:var(--ink-3);white-space:nowrap}
+.who b{display:block;font-weight:500;word-break:break-word}
+details.key summary,details.det summary{cursor:pointer;color:var(--ink-3);font-size:13px;min-height:28px;display:inline-flex;align-items:center}
+details.det summary{color:var(--blue);font-size:14px;font-weight:500;min-height:var(--tap)}
+.kv{display:grid;grid-template-columns:minmax(110px,max-content) 1fr;gap:4px 14px;font-size:14px;margin-top:4px;background:var(--bg-2);padding:10px 12px;border-radius:4px;text-align:left}
+.kv dt{color:var(--ink-3)}.kv dd{word-break:break-word}
+
+/* Filters en knoppen */
+.fb{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.fb input,.fb select{min-height:var(--tap);padding:8px 12px;border:1.5px solid var(--line);border-radius:var(--r);background:#fff;font-size:16px;outline:none}
+.fb input:focus,.fb select:focus{border-color:var(--ink)}
+.sp{flex:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:var(--tap);padding:0 16px;background:var(--ink);color:#fff;border:1.5px solid var(--ink);border-radius:var(--r);font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn:hover{background:#082c52}
+.btn.out{background:#fff;color:var(--ink);border-color:var(--line)}
+.btn.out:hover{border-color:var(--ink);background:#fff}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn:disabled{opacity:.45;cursor:default}
+.mfoot .btn:not(.pri):not(.danger){background:#fff;color:var(--ink);border-color:var(--line)}
+
+/* Relays */
+.rs{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+.ri{display:block;width:100%;text-align:left;background:var(--ok-bg);border:1px solid #bfe5cf;border-left:5px solid var(--ok);border-radius:var(--r);padding:12px;cursor:pointer;font:inherit;color:var(--ink);min-height:var(--tap)}
+.ri.offline{background:var(--bad-bg);border-color:#f3c1bd;border-left-color:var(--bad)}
+.ri.loading{background:var(--bg-2);border-color:var(--line);border-left-color:var(--ink-3)}
+.ri-name{font-weight:700}
+.ri-det{font-size:13px;color:var(--ink-2)}
+
+/* Klantmenu */
+.amw{position:relative;display:inline-block}
+.amb{min-width:var(--tap);min-height:var(--tap);background:#fff;border:1.5px solid var(--line);border-radius:var(--r);cursor:pointer;font-size:18px;line-height:1}
+.amb:hover{border-color:var(--ink)}
+.am{display:none;position:absolute;right:0;top:calc(100% + 4px);background:#fff;border:1.5px solid var(--ink);border-radius:var(--r);z-index:20;min-width:250px;padding:6px;text-align:left}
+.am.open{display:block}
+.am button{display:block;width:100%;text-align:left;min-height:42px;padding:8px 12px;background:none;border:none;font-size:15px;cursor:pointer;border-radius:4px}
+.am button:hover{background:var(--bg-2)}
+.am button.danger{color:var(--bad)}
+.am button:disabled{opacity:.4;cursor:default}
+.ag-lbl{display:block;padding:8px 12px 2px;font-size:12px;font-weight:600;color:var(--ink-3)}
+.am.klant-acts{position:static;display:flex;flex-wrap:wrap;gap:8px;border:none;padding:0;min-width:0;background:none}
+.am.klant-acts .ag-lbl{display:none}
+.am.klant-acts button{width:auto;border:1.5px solid var(--line);min-height:var(--tap);padding:0 14px}
+.am.klant-acts button:hover{border-color:var(--ink);background:#fff}
+.am.klant-acts button.danger{border-color:#f3c1bd}
+.plan-line{font-size:14px;white-space:nowrap}
+.plan-line span{color:var(--ink-3)}
+
+/* Paginering */
+.pag{display:flex;align-items:center;gap:10px;padding-top:12px;flex-wrap:wrap}
+.pag button,.pag select{min-height:var(--tap);padding:0 14px;border:1.5px solid var(--line);border-radius:var(--r);background:#fff;cursor:pointer;font-size:15px}
+.pag button:disabled{opacity:.4;cursor:default}
+.pag-info{flex:1;text-align:center;color:var(--ink-2);font-size:14px}
+
+/* Meldingen */
+.banner{padding:12px 14px;margin-bottom:14px;border-radius:var(--r);border-left:5px solid var(--ink);background:var(--bg-2)}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--ink);color:#fff;padding:12px 16px;border-radius:var(--r);z-index:999;max-width:360px;opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s}
+.toast.show{opacity:1;transform:none}
+.toast.err{background:var(--bad)}.toast.warn{background:var(--warn);color:#111}.toast.ok{background:var(--ok)}
+.sp-icon{display:inline-block;width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:spin .7s linear infinite;vertical-align:-3px;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{padding:28px 12px;text-align:center;color:var(--ink-3)}
+
+/* Vensters */
+.mo{display:none;position:fixed;inset:0;background:rgba(11,58,106,.45);z-index:100;align-items:center;justify-content:center;padding:16px}
+.mb{background:#fff;width:100%;max-width:560px;max-height:92vh;display:flex;flex-direction:column;border-radius:var(--r);overflow:hidden}
+.mb.wide{max-width:900px}
+.mh{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 20px;border-bottom:1px solid var(--line)}
+.mt{flex:1;font-weight:700;font-size:18px;word-break:break-word}
+.close-mo{min-width:var(--tap);min-height:var(--tap);border:none;background:none;font-size:26px;cursor:pointer;color:var(--ink-2);border-radius:var(--r)}
+.close-mo:hover{background:var(--bg-2)}
+.mbody{padding:18px 20px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+.mc{margin-bottom:14px}
+.mc label{display:block;font-size:14px;font-weight:600;margin-bottom:6px}
+.mc select,.mc input[type=text]{width:100%;min-height:var(--tap);padding:8px 12px;border:1.5px solid var(--line);border-radius:var(--r);font-size:16px;background:#fff;outline:none}
+.mc input[type=checkbox]{width:22px;height:22px}
+.mfoot{padding:12px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+.ep-tabs{display:flex;border-bottom:1px solid var(--line);margin-bottom:12px}
+.ep-tab{min-height:var(--tap);padding:0 14px;border:none;background:none;cursor:pointer;color:var(--ink-3);border-bottom:3px solid transparent}
+.ep-tab.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
+.ep-subj{color:var(--ink-2);margin-bottom:10px}
+.ep-content{max-height:340px;overflow-y:auto}
+.ep-content pre{white-space:pre-wrap;word-break:break-word;font-family:var(--ff-mono);font-size:13px}
+.sec{margin-top:22px}
+.sec h3{font-size:16px;margin-bottom:8px;display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.sec h3 small{font-weight:400;color:var(--ink-3);font-size:13px}
+.acts{display:flex;flex-wrap:wrap;gap:8px}
+
+@media(max-width:1100px){.rs{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:900px){.sg{grid-template-columns:1fr 1fr}.g2,.g3{grid-template-columns:1fr}}
 @media(max-width:760px){
-  .main{padding:14px}
-  .hdr{flex-wrap:wrap;height:auto;padding:8px 14px 0;row-gap:4px}
-  .hdr-brand{order:1}.hdr-meta{order:2;margin-left:auto}
-  .tabs{order:3;flex-basis:100%;width:100%;margin-top:6px;border-top:1px solid var(--line);
-    scroll-snap-type:x proximity;scrollbar-width:none}
-  .tabs::-webkit-scrollbar{display:none}
-  .tabs button{scroll-snap-align:start;flex:0 0 auto}
-  /* Filters → verticaal, vol-breed */
-  .fb{flex-direction:column;align-items:stretch;gap:8px}
-  .fb>input,.fb>select{width:100%}
+  body{font-size:16px}
+  .hdr-row{padding:0 14px;flex-wrap:wrap;gap:0}
+  .hdr-brand{flex:1;min-height:52px}
+  .hdr-links{display:none}
+  .more{display:block}
+  .tabs{order:3;flex-basis:100%;border-top:1px solid var(--line-2);margin:0 -14px;padding:0 4px}
+  .tabs button{flex:1 0 auto;padding:13px 9px 11px}
+  .main{padding:16px 14px 40px}
+  .rs{grid-template-columns:1fr 1fr}
+  .fb{flex-direction:column;align-items:stretch}
   .fb .sp{display:none}
-  /* Paginatie wikkelt netjes */
-  .pag{flex-wrap:wrap;gap:10px}
-  .pag-info{order:-1;flex-basis:100%;text-align:left;flex:none}
-  /* Modals → bottom-sheet (duim-bereikbaar, knoppen vol-breed) */
   .mo{align-items:flex-end;padding:0}
-  .mb{max-width:none;width:100%;max-height:92vh;border-radius:16px 16px 0 0}
-  .mfoot{flex-direction:column-reverse;gap:10px}
-  .mfoot>.btn,.mfoot>button{width:100%;text-align:center;justify-content:center}
+  .mb,.mb.wide{max-width:none;max-height:94vh;border-radius:14px 14px 0 0}
+  .mfoot{flex-direction:column-reverse}
+  .mfoot .btn{width:100%}
+  .toast{left:14px;right:14px;bottom:14px;max-width:none}
   .sc-val{font-size:24px}
-  .toast{left:14px;right:14px;bottom:14px;max-width:none;text-align:center}
-}
-/* ── Kleine telefoon: Users-tabel → kaarten (data-label gevuld in renderUsers) ── */
-@media(max-width:560px){
+  .sc{min-height:88px;padding:14px}
+  /* Tabellen worden kaarten */
   table.tbl.cards thead{display:none}
-  table.tbl.cards,table.tbl.cards tbody{display:block;width:100%}
-  table.tbl.cards tr{display:block;border:1px solid var(--line);border-radius:var(--radius);
-    margin-bottom:10px;background:#fff;padding:4px 2px;box-shadow:0 1px 2px rgba(11,58,106,.04)}
+  table.tbl.cards,table.tbl.cards tbody{display:block}
+  table.tbl.cards tr{display:block;border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;padding:2px 0;background:#fff}
   table.tbl.cards tr:hover td{background:transparent}
-  table.tbl.cards td{display:flex;justify-content:space-between;align-items:center;gap:12px;
-    border:none;border-bottom:1px solid var(--line-soft);padding:10px 14px;text-align:right}
+  table.tbl.cards td{display:grid;grid-template-columns:minmax(84px,auto) minmax(0,1fr);column-gap:14px;align-items:start;border:none;border-bottom:1px solid var(--line-2);padding:10px 14px;text-align:right;overflow-wrap:anywhere}
+  table.tbl.cards td>*{grid-column:2;justify-self:end;max-width:100%}
   table.tbl.cards tr td:last-child{border-bottom:none}
-  table.tbl.cards td::before{content:attr(data-label);font-family:var(--ff-mono);font-size:10px;
-    letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mut);text-align:left;flex:0 0 auto}
-  table.tbl.cards td.actions{justify-content:flex-end}
+  table.tbl.cards td::before{content:attr(data-label);grid-column:1;grid-row:1 / span 9;font-size:13px;font-weight:600;color:var(--ink-3);text-align:left;padding-top:2px}
+  table.tbl.cards .plan-line{white-space:normal}
+  table.tbl.cards td.full{display:block;text-align:left}
+  table.tbl.cards td.full::before{display:block;margin-bottom:4px}
+  table.tbl.cards td.actions{display:block;text-align:right}
   table.tbl.cards td.actions::before{content:none}
+  /* Audit op de telefoon: één compact blok per gebeurtenis, wat eerst */
+  table.tbl.cards.compact tr{display:grid;grid-template-columns:1fr auto;padding:10px 14px;gap:2px 12px}
+  table.tbl.cards.compact td{display:block;padding:0;border:none;text-align:left}
+  table.tbl.cards.compact td::before{content:none}
+  table.tbl.cards.compact td.c-ev{grid-column:1;grid-row:1}
+  table.tbl.cards.compact td.c-when{grid-column:2;grid-row:1;text-align:right}
+  table.tbl.cards.compact td.c-when b{font-size:13px;font-weight:400;color:var(--ink-3)}
+  table.tbl.cards.compact td.c-when span{font-size:12px}
+  table.tbl.cards.compact td.c-who,table.tbl.cards.compact td.c-what,table.tbl.cards.compact td.full{grid-column:1 / -1;color:var(--ink-2);font-size:15px}
+  table.tbl.cards.compact td.full details.det summary{min-height:36px}
   .amw,.am{position:static}
-  table.tbl.cards td.actions .am{right:0}
+  .am{margin-top:6px}
 }
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
+<a href="#main-content" class="skip-link">Naar de inhoud</a>
 <div aria-live="polite" aria-atomic="true" id="sr-live" class="sr-only"></div>
 
-<!-- LOGIN -->
+<!-- INLOGGEN -->
 <div id="view-login" class="lw">
   <div class="lb">
-    <div class="l-brand">PARAMANT · Infra</div>
-    <h1 class="l-title">Admin panel</h1>
-    <p class="l-sub">Two-factor authentication required to access the dashboard.</p>
-    <label class="l-lbl" for="l-token">Admin token</label>
-    <input id="l-token" type="password" class="l-inp" placeholder="Enter admin token" autocomplete="current-password">
-    <label class="l-lbl" for="l-totp">TOTP code <small style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">(Authenticator app)</small></label>
+    <div class="l-brand"><i></i>Paramant beheer</div>
+    <h1 class="l-title">Inloggen</h1>
+    <p class="l-sub">Met je beheertoken en de code uit je authenticator-app.</p>
+    <label class="l-lbl" for="l-token">Beheertoken</label>
+    <input id="l-token" type="password" class="l-inp" placeholder="Plak je beheertoken" autocomplete="current-password">
+    <label class="l-lbl" for="l-totp">Code uit de authenticator-app</label>
     <input id="l-totp" type="text" class="l-inp l-totp" placeholder="000000" maxlength="6" autocomplete="one-time-code" inputmode="numeric">
-    <button id="l-btn" class="l-btn" data-click="doLogin">Sign in</button>
-    <div id="l-err" class="l-err"></div>
-    <div class="l-note">Session expires after 1 hour</div>
+    <button id="l-btn" class="l-btn" data-click="doLogin">Inloggen</button>
+    <div id="l-err" class="l-err" role="alert"></div>
+    <div class="l-note">Je blijft een uur ingelogd.</div>
   </div>
 </div>
 
-<!-- DASHBOARD -->
+<!-- BEHEER -->
 <div id="view-dashboard" class="shell">
   <header class="hdr" role="banner">
-    <div class="hdr-brand">PARAMANT · Admin</div>
-    <nav class="tabs" id="nav-tabs" role="navigation" aria-label="Admin sections">
-      <button role="tab" aria-selected="true" aria-controls="tab-overview" id="tabBtn-overview" tabindex="0" data-tab="overview" class="on" data-click="switchTab">Overview</button>
-      <button role="tab" aria-selected="false" aria-controls="tab-users" id="tabBtn-users" tabindex="-1" data-tab="users" data-click="switchTab">Users</button>
-      <button role="tab" aria-selected="false" aria-controls="tab-audit" id="tabBtn-audit" tabindex="-1" data-tab="audit" data-click="switchTab">Audit</button>
-      <button role="tab" aria-selected="false" aria-controls="tab-billing" id="tabBtn-billing" tabindex="-1" data-tab="billing" data-click="switchTab">Billing</button>
-      <button role="tab" aria-selected="false" aria-controls="tab-relay" id="tabBtn-relay" tabindex="-1" data-tab="relay" data-click="switchTab">Relay</button>
-    </nav>
-    <div class="hdr-meta">
-      <span class="lic">v3.0.0 · Licensed</span>
-      <a class="lo-btn" href="/admin/stand">Stand</a>
-      <a class="lo-btn" href="/admin/settings.html">Settings</a>
-      <a class="lo-btn" href="/admin/cli.html">CLI</a>
-      <button class="lo-btn" data-click="doLogout">Sign out</button>
+    <div class="hdr-row">
+      <div class="hdr-brand"><i></i>Paramant <small>beheer</small></div>
+      <nav class="tabs" id="nav-tabs" role="tablist" aria-label="Onderdelen">
+        <button role="tab" aria-selected="true" aria-controls="tab-overview" id="tabBtn-overview" tabindex="0" data-tab="overview" class="on" data-click="switchTab">Overzicht</button>
+        <button role="tab" aria-selected="false" aria-controls="tab-users" id="tabBtn-users" tabindex="-1" data-tab="users" data-click="switchTab">Klanten</button>
+        <button role="tab" aria-selected="false" aria-controls="tab-audit" id="tabBtn-audit" tabindex="-1" data-tab="audit" data-click="switchTab">Audit</button>
+        <button role="tab" aria-selected="false" aria-controls="tab-billing" id="tabBtn-billing" tabindex="-1" data-tab="billing" data-click="switchTab">Betalingen</button>
+        <button role="tab" aria-selected="false" aria-controls="tab-relay" id="tabBtn-relay" tabindex="-1" data-tab="relay" data-click="switchTab">Relays</button>
+      </nav>
+      <div class="hdr-links">
+        <a href="/admin/stand">Stand</a>
+        <a href="/admin/settings.html">Instellingen</a>
+        <a href="/admin/cli.html">Terminal</a>
+        <button data-click="doLogout">Uitloggen</button>
+      </div>
+      <details class="more">
+        <summary>Meer</summary>
+        <div class="more-m">
+          <a href="/admin/stand">Stand</a>
+          <a href="/admin/settings.html">Instellingen</a>
+          <a href="/admin/cli.html">Terminal</a>
+          <button data-click="doLogout">Uitloggen</button>
+        </div>
+      </details>
     </div>
   </header>
   <main class="main" role="main" id="main-content">
@@ -289,27 +327,27 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
   </main>
 </div>
 
-<!-- Modals -->
+<!-- Vensters -->
 <div id="mo-email" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-email-title">
   <div class="mb">
     <div class="mh">
-      <span id="mo-email-title" class="mt">Email preview</span>
-      <button class="close-mo" data-click="closeModal" data-modal="mo-email" aria-label="Close">&times;</button>
+      <span id="mo-email-title" class="mt">Voorbeeld van de mail</span>
+      <button class="close-mo" data-click="closeModal" data-modal="mo-email" aria-label="Sluiten">&times;</button>
     </div>
     <div class="mbody">
       <div class="ep-tabs">
-        <button class="ep-tab on" data-click="epTab" data-arg="html" id="ep-tab-html">HTML</button>
-        <button class="ep-tab" data-click="epTab" data-arg="text" id="ep-tab-text">Plain text</button>
+        <button class="ep-tab on" data-click="epTab" data-arg="html" id="ep-tab-html">Opgemaakt</button>
+        <button class="ep-tab" data-click="epTab" data-arg="text" id="ep-tab-text">Platte tekst</button>
       </div>
       <div id="ep-subj" class="ep-subj"></div>
       <div class="ep-content">
         <pre id="ep-text" style="display:none"></pre>
-        <iframe id="ep-html" style="width:100%;border:none;height:340px"></iframe>
+        <iframe id="ep-html" title="Voorbeeld" style="width:100%;border:none;height:340px"></iframe>
       </div>
     </div>
     <div class="mfoot">
-      <button class="btn" data-click="closeModal" data-modal="mo-email">Cancel</button>
-      <button class="btn pri" id="ep-send-btn" data-click="doSendEmail">Send email &rarr;</button>
+      <button class="btn" data-click="closeModal" data-modal="mo-email">Annuleren</button>
+      <button class="btn pri" id="ep-send-btn" data-click="doSendEmail">Mail versturen</button>
     </div>
   </div>
 </div>
@@ -317,51 +355,27 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 <div id="mo-plan" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-plan-title">
   <div class="mb">
     <div class="mh">
-      <span id="mo-plan-title" class="mt">Change plan</span>
-      <button class="close-mo" data-click="closeModal" data-modal="mo-plan" aria-label="Close">&times;</button>
+      <span id="mo-plan-title" class="mt">Plan wijzigen</span>
+      <button class="close-mo" data-click="closeModal" data-modal="mo-plan" aria-label="Sluiten">&times;</button>
     </div>
     <div class="mbody">
-      <div class="mc"><label>Current plan</label><span id="cp-current" style="font-size:12px;font-family:var(--ff-mono);color:#475569"></span></div>
-      <div class="mc">
-        <label for="cp-plan">New plan (coarse: bumps BOTH products)</label>
-        <select id="cp-plan">
-          <option value="community">community</option>
-          <option value="pro">pro</option>
-          <option value="enterprise">enterprise</option>
-        </select>
-        <div style="font-size:11px;color:#92400e;margin-top:4px">Sets ParaSign AND ParaSend together. For one product only, use "Per-product tier" below.</div>
-      </div>
-      <div class="mc" style="display:flex;align-items:center;gap:8px">
-        <input type="checkbox" id="cp-notify" checked>
-        <label for="cp-notify" style="margin:0;font-size:12px;cursor:pointer">Notify user by email</label>
-      </div>
-      <hr style="border:none;border-top:1px solid #e2e8f0;margin:18px 0 14px">
-      <div class="mc" style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Per-product tier (recommended)</div>
-      <div class="mc" style="font-size:12px;color:#475569;margin-top:0">Sets one product only. Leaves the unified plan above and the other product untouched. Use this for a ParaSign-only or ParaSend-only customer; the coarse "New plan" above bumps BOTH products.</div>
-      <div class="mc"><label>Current</label><span id="pp-current" style="font-size:12px;font-family:var(--ff-mono);color:#475569"></span></div>
-      <div class="mc"><label>Gate read-back</label><div id="plan-entitlement-readback" style="font-size:12px;font-family:var(--ff-mono);white-space:pre-line;color:#475569">No mutation measured yet.</div></div>
-      <div class="mc">
-        <label for="pp-product">Product</label>
-        <select id="pp-product" data-change="ppProductChange">
-          <option value="parasign">ParaSign</option>
-          <option value="parasend">ParaSend</option>
-        </select>
-      </div>
-      <div class="mc">
-        <label for="pp-tier">Tier</label>
-        <select id="pp-tier"></select>
-      </div>
-      <div class="mc" style="display:flex;align-items:center;gap:8px">
-        <input type="checkbox" id="pp-notify">
-        <label for="pp-notify" style="margin:0;font-size:12px;cursor:pointer">Notify user by email</label>
-      </div>
-      <div class="mc" style="margin-bottom:0">
-        <button class="btn pri" id="pp-btn" data-click="doSetProductPlan" style="width:100%">Save product tier</button>
-      </div>
+      <div class="mc"><label>Nu</label><span id="pp-current"></span></div>
+      <div class="mc"><label for="pp-product">Product</label>
+        <select id="pp-product" data-change="ppProductChange"><option value="parasign">ParaSign</option><option value="parasend">ParaSend</option></select></div>
+      <div class="mc"><label for="pp-tier">Nieuw plan voor dit product</label><select id="pp-tier"></select></div>
+      <div class="mc" style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="pp-notify"><label for="pp-notify" style="margin:0;font-weight:500">Klant per mail laten weten</label></div>
+      <div class="mc"><button class="btn pri" id="pp-btn" data-click="doSetProductPlan" style="width:100%">Plan van dit product opslaan</button></div>
+      <div class="mc"><label>Gecontroleerd op elke relay</label><div id="plan-entitlement-readback" class="mono" style="white-space:pre-line;color:var(--ink-2)">Nog niets gewijzigd.</div></div>
+      <details style="margin-top:18px"><summary style="cursor:pointer;font-weight:600;min-height:var(--tap);display:flex;align-items:center">Beide producten tegelijk zetten</summary>
+        <div class="mc" style="margin-top:10px"><label>Nu</label><span id="cp-current"></span></div>
+        <div class="mc"><label for="cp-plan">Nieuw plan voor ParaSign en ParaSend samen</label>
+          <select id="cp-plan"><option value="community">community</option><option value="pro">pro</option><option value="enterprise">enterprise</option></select></div>
+        <div class="mc" style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="cp-notify" checked><label for="cp-notify" style="margin:0;font-weight:500">Klant per mail laten weten</label></div>
+        <button class="btn pri" id="cp-btn" data-click="doChangePlan" style="width:100%">Beide producten opslaan</button>
+      </details>
     </div>
     <div class="mfoot">
-      <button class="btn" data-click="closeModal" data-modal="mo-plan">Cancel</button>
-      <button class="btn pri" id="cp-btn" data-click="doChangePlan">Save</button>
+      <button class="btn" data-click="closeModal" data-modal="mo-plan">Sluiten</button>
     </div>
   </div>
 </div>
@@ -369,20 +383,17 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 <div id="mo-disable" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-disable-title">
   <div class="mb">
     <div class="mh">
-      <span id="mo-disable-title" class="mt">Disable key</span>
-      <button class="close-mo" data-click="closeModal" data-modal="mo-disable" aria-label="Close">&times;</button>
+      <span id="mo-disable-title" class="mt">Sleutel uitzetten</span>
+      <button class="close-mo" data-click="closeModal" data-modal="mo-disable" aria-label="Sluiten">&times;</button>
     </div>
     <div class="mbody">
-      <p style="font-size:13px;color:#475569;margin:0 0 12px">Disabling this key will immediately block all API access. It can be re-enabled manually.</p>
-      <div class="mc"><label>Reason (optional)</label><input type="text" id="dk-reason" placeholder="e.g. abuse, non-payment"></div>
-      <div class="mc" style="display:flex;align-items:center;gap:8px">
-        <input type="checkbox" id="dk-notify">
-        <label for="dk-notify" style="margin:0;font-size:12px;cursor:pointer">Notify user by email</label>
-      </div>
+      <p style="margin:0 0 12px">De sleutel werkt meteen niet meer. Je kunt hem later met de hand weer aanzetten.</p>
+      <div class="mc"><label for="dk-reason">Reden (mag leeg)</label><input type="text" id="dk-reason" placeholder="bijvoorbeeld misbruik of niet betaald"></div>
+      <div class="mc" style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="dk-notify"><label for="dk-notify" style="margin:0;font-weight:500">Klant per mail laten weten</label></div>
     </div>
     <div class="mfoot">
-      <button class="btn" data-click="closeModal" data-modal="mo-disable">Cancel</button>
-      <button class="btn danger" id="dk-btn" data-click="doDisableKey">Disable key</button>
+      <button class="btn" data-click="closeModal" data-modal="mo-disable">Annuleren</button>
+      <button class="btn danger" id="dk-btn" data-click="doDisableKey">Sleutel uitzetten</button>
     </div>
   </div>
 </div>
@@ -390,64 +401,75 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 <div id="mo-delete" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-delete-title">
   <div class="mb">
     <div class="mh">
-      <span id="mo-delete-title" class="mt">Deactivate account</span>
-      <button class="close-mo" data-click="closeModal" data-modal="mo-delete" aria-label="Close">&times;</button>
+      <span id="mo-delete-title" class="mt">Account deactiveren</span>
+      <button class="close-mo" data-click="closeModal" data-modal="mo-delete" aria-label="Sluiten">&times;</button>
     </div>
     <div class="mbody">
-      <p style="font-size:13px;color:#dc2626;font-weight:600;margin:0 0 10px">This blocks the account key and removes active sessions and TOTP.</p>
-      <div id="da-recent-warn" style="display:none;background:#FEF2F2;border-left:3px solid #DC2626;padding:10px 12px;margin:0 0 12px;font-size:12px;color:#991B1B;border-radius:3px"><strong>Heads up:</strong> this account is less than 24 hours old. Are you sure it isn't a real tester?</div>
-      <div style="background:#F8FAFC;border:1px solid rgba(11,58,106,.08);padding:12px 14px;margin:0 0 12px;border-radius:3px">
-        <div style="display:grid;grid-template-columns:90px 1fr;gap:6px 12px;font-size:12px">
-          <div style="color:#64748B">Email</div><div id="da-email" style="font-weight:600;color:#0B3A6A;word-break:break-all">—</div>
-          <div style="color:#64748B">Label</div><div id="da-label" style="color:#334155">—</div>
-          <div style="color:#64748B">Plan</div><div><span id="da-plan" class="badge community">—</span></div>
-          <div style="color:#64748B">Created</div><div id="da-created" class="mono" style="font-size:11px;color:#475569">—</div>
-          <div style="color:#64748B">Key</div><div id="da-target" class="mono" style="font-size:11px;color:#475569;word-break:break-all">—</div>
-        </div>
-      </div>
-      <div class="mc" style="display:flex;align-items:center;gap:8px">
-        <input type="checkbox" id="da-notify" checked>
-        <label for="da-notify" style="margin:0;font-size:12px;cursor:pointer">Send deactivation confirmation email</label>
-      </div>
-      <div class="mc" style="margin-top:10px"><label>Type DEACTIVATE to confirm</label><input type="text" id="da-confirm" placeholder="DEACTIVATE" autocomplete="off" data-input="confirmDelete"></div>
+      <p style="color:var(--bad);font-weight:600;margin:0 0 10px">Dit blokkeert de sleutel van het account en verwijdert actieve sessies en TOTP.</p>
+      <div id="da-recent-warn" class="banner" style="display:none;border-left-color:var(--bad);background:var(--bad-bg)"><strong>Let op:</strong> dit account is jonger dan 24 uur. Weet je zeker dat het geen echte tester is?</div>
+      <dl class="kv" style="margin:0 0 12px">
+        <dt>E-mail</dt><dd id="da-email" style="font-weight:600">-</dd>
+        <dt>Label</dt><dd id="da-label">-</dd>
+        <dt>Plan</dt><dd><span id="da-plan" class="badge">-</span></dd>
+        <dt>Aangemaakt</dt><dd id="da-created">-</dd>
+        <dt>Sleutel</dt><dd id="da-target" class="mono">-</dd>
+      </dl>
+      <div class="mc" style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="da-notify" checked><label for="da-notify" style="margin:0;font-weight:500">Bevestiging per mail sturen</label></div>
+      <div class="mc"><label for="da-confirm">Typ DEACTIVATE om te bevestigen</label><input type="text" id="da-confirm" placeholder="DEACTIVATE" autocomplete="off" autocapitalize="characters" data-input="confirmDelete"></div>
     </div>
     <div class="mfoot">
-      <button class="btn" data-click="closeModal" data-modal="mo-delete">Cancel</button>
-      <button class="btn danger" id="da-btn" data-click="doDeleteAccount">Deactivate account</button>
+      <button class="btn" data-click="closeModal" data-modal="mo-delete">Annuleren</button>
+      <button class="btn danger" id="da-btn" data-click="doDeleteAccount">Account deactiveren</button>
     </div>
   </div>
 </div>
 
 <div id="mo-details" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-details-title">
-  <div class="mb">
+  <div class="mb wide">
     <div class="mh">
-      <span id="mo-details-title" class="mt">User details</span>
-      <button class="close-mo" data-click="closeModal" data-modal="mo-details" aria-label="Close">&times;</button>
+      <span id="mo-details-title" class="mt">Klant</span>
+      <button class="close-mo" data-click="closeModal" data-modal="mo-details" aria-label="Sluiten">&times;</button>
     </div>
-    <div class="mbody" id="mo-details-body">
-      <div class="empty"><span class="sp-icon"></span>Loading…</div>
-    </div>
-    <div class="mfoot">
-      <button class="btn" data-click="closeModal" data-modal="mo-details">Close</button>
-    </div>
+    <div class="mbody" id="mo-details-body"><div class="empty"><span class="sp-icon"></span>Laden…</div></div>
+    <div class="mfoot"><button class="btn" data-click="closeModal" data-modal="mo-details">Sluiten</button></div>
   </div>
 </div>
 
+<div id="mo-relay" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-relay-title">
+  <div class="mb wide">
+    <div class="mh">
+      <span id="mo-relay-title" class="mt">Relay</span>
+      <button class="close-mo" data-click="closeModal" data-modal="mo-relay" aria-label="Sluiten">&times;</button>
+    </div>
+    <div class="mbody" id="mo-relay-body"><div class="empty"><span class="sp-icon"></span>Laden…</div></div>
+    <div class="mfoot"><button class="btn" data-click="closeModal" data-modal="mo-relay">Sluiten</button></div>
+  </div>
+</div>
+
+<div id="mo-info" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-info-title">
+  <div class="mb wide">
+    <div class="mh">
+      <span id="mo-info-title" class="mt">Details</span>
+      <button class="close-mo" data-click="closeModal" data-modal="mo-info" aria-label="Sluiten">&times;</button>
+    </div>
+    <div class="mbody" id="mo-info-body"></div>
+    <div class="mfoot"><button class="btn" data-click="closeModal" data-modal="mo-info">Sluiten</button></div>
+  </div>
+</div>
 
 <div id="mo-force-totp" class="mo" role="dialog" aria-modal="true" aria-labelledby="mo-force-totp-title">
   <div class="mb">
     <div class="mh">
-      <span id="mo-force-totp-title" class="mt">Require TOTP</span>
-      <button class="close-mo" data-click="closeModal" data-modal="mo-force-totp" aria-label="Close">&times;</button>
+      <span id="mo-force-totp-title" class="mt">Tweestapsverificatie verplicht maken</span>
+      <button class="close-mo" data-click="closeModal" data-modal="mo-force-totp" aria-label="Sluiten">&times;</button>
     </div>
     <div class="mbody" id="mo-force-totp-body"></div>
     <div class="mfoot">
-      <button class="btn" data-click="closeModal" data-modal="mo-force-totp">Cancel</button>
-      <button class="btn pri" id="ft-btn" data-click="doForceTotpRequirement">Require TOTP</button>
+      <button class="btn" data-click="closeModal" data-modal="mo-force-totp">Annuleren</button>
+      <button class="btn pri" id="ft-btn" data-click="doForceTotpRequirement">Verplicht maken</button>
     </div>
   </div>
 </div>
-
 
 <script src="app.js" defer></script>
 </body>

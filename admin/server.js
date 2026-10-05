@@ -23,6 +23,7 @@ const configStore = require('./lib/config-store');
 const webauthn = require('./lib/webauthn');
 const { sessionKeyFields, proxyApiKey, revealKey } = require('./lib/account-keys');
 const { meetDeStand } = require('./lib/stand');
+const beheer = require('./lib/beheer');
 const standIo = require('./lib/stand-io');
 // One user's sessions, without reading everybody else's. See admin/lib/user-sessions.js.
 const userSessions = require('./lib/user-sessions');
@@ -302,6 +303,36 @@ app.use(express.json({ limit: '1mb' }));
 // address (lib/client-ip-forward.js). After the body parser, so the handlers
 // run inside the store.
 app.use(clientIpForward.middleware);
+// Twee tellers voor het overzicht van het beheerscherm (lib/beheer.js): elke
+// 429 die deze dienst geeft, en elke mail die niet weg kon. Per uur, drie dagen
+// bewaard, plus de laatste twintig met soort en tijd (nooit een adres of een
+// token: het pad wordt ingekort tot zijn vaste delen). Een teller is nooit een
+// poort; lukt het schrijven niet, dan gaat het verzoek gewoon door.
+function _telLog(kind, entry) {
+  let c; try { c = redis(); } catch { return; }
+  beheer.countHit(c, kind);
+  const k = `paramant:admin:tel:${kind}:log`;
+  c.lPush(k, JSON.stringify(entry)).then(() => c.lTrim(k, 0, 19)).then(() => c.expire(k, 3 * 86400)).catch(() => {});
+}
+function _vastPad(p) {
+  return String(p || '').split('?')[0].split('/').map((seg) => (seg.length > 20 || /\d{3,}|[0-9a-f]{12,}/i.test(seg) ? ':id' : seg)).join('/').slice(0, 120);
+}
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    if (res.statusCode === 429) _telLog('http429', { ts: Date.now(), method: req.method, path: _vastPad(req.originalUrl) });
+  });
+  next();
+});
+{
+  const _stuur = mailer.stuur;
+  mailer.stuur = async function stuurGeteld(msg, opts) {
+    let r;
+    try { r = await _stuur.call(this, msg, opts); }
+    catch (e) { _telLog('mail_failed', { ts: Date.now(), reason: 'exception', provider: null, subject: String((msg && msg.subject) || '').slice(0, 80) }); throw e; }
+    if (!r || !r.ok) _telLog('mail_failed', { ts: Date.now(), reason: (r && r.reason) || 'unknown', provider: (r && r.provider) || null, subject: String((msg && msg.subject) || '').slice(0, 80) });
+    return r;
+  };
+}
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err)
     return res.status(400).json({ error: 'invalid_json', message: 'Request body must be valid JSON' });
@@ -4551,13 +4582,117 @@ api.get("/user/billing/history", authUser, async (req, res) => {
 // ─── Telemetry / dashboard endpoints ──────────────────────────────────────────
 const telemetry = require("./lib/telemetry");
 
+// ── Het beheerscherm: wat de eigenaar moet weten ─────────────────────────────
+// lib/beheer.js vertaalt; hieronder wordt alleen opgehaald. Alles achter
+// authMiddleware, niets nieuws publiek. Geen volle sleutel verlaat deze routes:
+// rijen dragen de kid (k_<hex>) als handvat en de sleutel gemaskeerd.
+
+// Alles wat met een liggend streepje begint is server-intern (_full, _account).
+function publicUser(u) {
+  const out = {};
+  for (const [k, v] of Object.entries(u || {})) if (!k.startsWith('_')) out[k] = v;
+  return out;
+}
+
+// Eén accountlijst per paar seconden: overzicht en audit vragen hem tegelijk
+// op bij het openen van het paneel.
+let _usersMemo = { at: 0, p: null };
+function beheerUsers() {
+  if (_usersMemo.p && Date.now() - _usersMemo.at < 4000) return _usersMemo.p;
+  const p = telemetry.getUsersWithTotp(relayFetch, ADMIN_TOKEN);
+  _usersMemo = { at: Date.now(), p };
+  p.catch(() => { _usersMemo = { at: 0, p: null }; });
+  return p;
+}
+
+// Alle documenten die de webhook uitgaf (facturen, betaalbewijzen,
+// creditnota's), nieuwste eerst. Leest de lijst die lib/invoice.js bijhoudt en
+// wijzigt niets.
+async function readDocuments(limit = 2000) {
+  const r = redis();
+  const numbers = (await r.lRange('paramant:billing:invoice:list:all', -limit, -1).catch(() => [])) || [];
+  const out = [];
+  for (let i = 0; i < numbers.length; i += 200) {
+    const chunk = numbers.slice(i, i + 200);
+    const raws = await r.mGet(chunk.map((n) => `paramant:billing:invoice:doc:${n}`)).catch(() => []);
+    for (const raw of raws || []) { try { const d = JSON.parse(raw || 'null'); if (d) out.push(d); } catch { /* onleesbaar document telt niet mee */ } }
+  }
+  out.sort((a, b) => (Date.parse(b.issued_at) || 0) - (Date.parse(a.issued_at) || 0));
+  return out;
+}
+
+// Een document zoals het naar de browser gaat: met wie (e-mail of label) en de
+// kid als klikdoel, zonder account_id (die kan een volle sleutel zijn).
+function docForBrowser(record, credits, now, users) {
+  const row = beheer.documentRow(record, credits, now);
+  const u = (users || []).find((x) => x._account === row.account_id || x._full === row.account_id);
+  delete row.account_id;
+  row.kid = u ? u.key_id : null;
+  if (!row.customer && u) row.customer = u.email || u.label || '';
+  return row;
+}
+
+// Gezondheid, versie en meetwaarden van elke relay.
+async function relaySnapshot() {
+  const out = {};
+  await Promise.all(Object.keys(SECTORS).map(async (s) => {
+    try {
+      const [hRes, mRes] = await Promise.all([
+        relayFetch(s, '/health', 'GET', null, false, ADMIN_TOKEN),
+        relayFetch(s, '/metrics', 'GET', null, true, ADMIN_TOKEN).catch(() => ({ status: 0, text: '' })),
+      ]);
+      if (hRes.status !== 200) { out[s] = { error: 'HTTP ' + hRes.status }; return; }
+      const d = { ...hRes.body };
+      const metrics = beheer.parseMetrics(mRes.text);
+      if (Number.isFinite(metrics.uptime_s)) d.uptime_s = metrics.uptime_s;
+      if (d.blobs_in_flight !== undefined && d.blobs === undefined) d.blobs = d.blobs_in_flight;
+      d.metrics = metrics;
+      out[s] = d;
+    } catch (e) { out[s] = { error: e.message }; }
+  }));
+  // Altijd in dezelfde volgorde, niet in de volgorde waarin ze antwoordden.
+  const ordered = {};
+  for (const s of Object.keys(SECTORS)) ordered[s] = out[s];
+  return ordered;
+}
+
+async function ctStatus(sectors) {
+  const now = Date.now();
+  return Promise.all(Object.entries(sectors).filter(([, d]) => !d.error && d.metrics && Number.isFinite(d.metrics.ct_log)).map(async ([s, d]) => {
+    let client = null; try { client = redis(); } catch { client = null; }
+    if (client) await beheer.sampleCt(client, s, d.metrics.ct_log, now);
+    return {
+      sector: s,
+      size: d.metrics.ct_log,
+      persisted: d.metrics.ct_log_persisted == null ? null : d.metrics.ct_log_persisted === 1,
+      forked: d.metrics.ct_log_forked === 1,
+      growth_24h: client ? await beheer.ctGrowth24h(client, s, d.metrics.ct_log, now) : null,
+    };
+  }));
+}
+
+async function redisMemory() {
+  try { return beheer.parseRedisInfo(await redis().info('memory')); } catch { return null; }
+}
+
+async function lastFailures(kind, n = 20) {
+  try {
+    return (await redis().lRange(`paramant:admin:tel:${kind}:log`, 0, n - 1)).map((x) => { try { return JSON.parse(x); } catch { return null; } }).filter(Boolean);
+  } catch { return []; }
+}
+
 api.get("/admin/overview", authMiddleware, async (req, res) => {
   try {
-    const [activeSessions, recentAudit, planDist, signupsToday] = await Promise.all([
+    const now = Date.now();
+    const [activeSessions, recentAudit, planDist, signupsToday, users, sectors, docs, redisMem] = await Promise.all([
       telemetry.countActiveSessions(),
       telemetry.getRecentAuditEvents(10),
       telemetry.getPlanDistribution(relayFetch, ADMIN_TOKEN),
       telemetry.countSignupsToday(relayFetch, ADMIN_TOKEN),
+      beheerUsers().catch(() => []),
+      relaySnapshot(),
+      readDocuments().catch(() => null),
+      redisMemory(),
     ]);
     const today = new Date().toISOString().split("T")[0];
     const proUpgrades = recentAudit.filter(e =>
@@ -4565,14 +4700,93 @@ api.get("/admin/overview", authMiddleware, async (req, res) => {
       (e.metadata?.to === "pro" || e.metadata?.to === "enterprise") &&
       new Date(e.ts).toISOString().startsWith(today)
     ).length;
+
+    // Geld: gerekend op de documenten die de webhook uitgaf. Lukte het lezen
+    // niet, dan staat er null en zegt het scherm "niet gemeten", nooit 0.
+    const ym = beheer.ymOf(now);
+    const mrr = docs ? beheer.computeMrr(docs, now) : null;
+    const revenue = docs ? beheer.monthRevenue(docs, ym) : null;
+    const credits = docs ? beheer.creditsByInvoice(docs) : new Map();
+
+    let mails = null; let http429 = null;
+    try { mails = await beheer.read24h(redis(), 'mail_failed', now); } catch { mails = null; }
+    try { http429 = await beheer.read24h(redis(), 'http429', now); } catch { http429 = null; }
+    const relays = Object.entries(sectors).map(([s, d]) => ({
+      sector: s, ok: !d.error, error: d.error || null, version: d.version || null,
+      uptime_s: Number.isFinite(d.uptime_s) ? d.uptime_s : null,
+    }));
+    const ct = await ctStatus(sectors);
+
+    const paidTier = (u) => (u.plan_parasign && !['free', 'community'].includes(u.plan_parasign)) || (u.plan_parasend && u.plan_parasend !== 'community');
+    const whoMap = beheer.buildWhoMap(users);
     res.json({
-      stats: { signups_today: signupsToday, active_sessions: activeSessions, pro_upgrades_today: proUpgrades, revenue_mrr: null },  // not tracked in this panel: Mollie holds it. null, not a 0 that reads as no revenue (ADMIN-05)
-      recent_activity: recentAudit,
+      stats: {
+        signups_today: signupsToday,
+        active_sessions: activeSessions,
+        pro_upgrades_today: proUpgrades,
+        // In centen, netto per maand, berekend uit de lopende betaalde
+        // periodes (lib/beheer.js computeMrr). null alleen als de documenten
+        // niet te lezen waren (ADMIN-05: nooit een 0 die "geen omzet" zegt
+        // terwijl er niet gemeten is).
+        revenue_mrr: mrr ? mrr.mrr_cents : null,
+      },
+      customers: {
+        total: users.length,
+        active: users.filter((u) => u.active).length,
+        on_paid_plan: users.filter((u) => u.active && paidTier(u)).length,
+        paying: mrr ? mrr.paying_accounts.size : null,
+      },
+      revenue: revenue ? {
+        month: ym,
+        net_cents: revenue.net_cents,
+        gross_cents: revenue.gross_cents,
+        documents: revenue.documents,
+        mrr_cents: mrr.mrr_cents,
+        mrr_basis: mrr.basis,
+      } : null,
+      relays,
+      problems: beheer.problems({ relays, mails, http429, ct, redisMem }),
+      measurements: {
+        mails_failed: mails, http429, ct,
+        redis: redisMem ? { used_mb: beheer.mb(redisMem.used_bytes), peak_mb: beheer.mb(redisMem.peak_bytes), max_mb: beheer.mb(redisMem.max_bytes), policy: redisMem.policy } : null,
+      },
+      recent_signups: users.filter((u) => u.created).sort((a, b) => Date.parse(b.created) - Date.parse(a.created)).slice(0, 6).map((u) => ({
+        name: u.email || u.label || 'Zonder e-mailadres', kid: u.key_id, created: u.created,
+        plan_parasign: u.plan_parasign, plan_parasend: u.plan_parasend, active: u.active,
+      })),
+      recent_payments: docs ? docs.slice(0, 6).map((d) => docForBrowser(d, credits, now, users)) : null,
+      // Oude velden blijven, maar als vertaalde rijen zonder volle sleutel.
+      recent_activity: recentAudit.map((e) => beheer.auditRow(e, whoMap)),
       alerts: [],
       plan_distribution: planDist,
     });
   } catch (err) { console.error("[admin/overview]", err.message); res.status(500).json({ error: "internal" }); }
 });
+
+// Details achter twee getallen van het overzicht: welke mails mislukten en
+// waar de 429's vielen. Geen adressen, alleen soort, reden en tijd.
+api.get("/admin/overview/failures", authMiddleware, async (req, res) => {
+  res.json({ mails: await lastFailures('mail_failed'), http429: await lastFailures('http429') });
+});
+
+// Laatste handeling van een klant: de nieuwste regel in zijn audit die niet
+// van de beheerder zelf komt (een "bekeken door jou" is geen klantactiviteit).
+async function lastActivity(fullKey) {
+  try {
+    const evs = await getAuditEvents(fullKey, { limit: 25 });
+    const ev = evs.find((e) => typeof e.event_type === 'string' && !e.event_type.startsWith('admin_'));
+    return ev ? { ts: beheer.eventTimeMs(ev.ts), label: beheer.eventLabel(ev.event_type) } : null;
+  } catch { return null; }
+}
+
+async function usageByAccount() {
+  try {
+    const r = await relayFetch('health', '/v2/admin/usage', 'GET', null, false, ADMIN_TOKEN, true);
+    const map = new Map();
+    for (const a of (r.body && r.body.accounts) || []) map.set(a.account_id, a);
+    return map;
+  } catch { return new Map(); }
+}
 
 api.get("/admin/users", authMiddleware, async (req, res) => {
   try {
@@ -4581,10 +4795,12 @@ api.get("/admin/users", authMiddleware, async (req, res) => {
     // Filters
     const statusFilter = req.query.status || "";
     const planFilter   = req.query.plan   || "";
+    const q = String(req.query.q || '').trim().toLowerCase().slice(0, 100);
     let filtered = allUsers;
     if (statusFilter === "active")  filtered = filtered.filter(u => u.active);
     if (statusFilter === "revoked") filtered = filtered.filter(u => !u.active);
     if (planFilter) filtered = filtered.filter(u => (u.plan || "community") === planFilter);
+    if (q) filtered = filtered.filter(u => [u.email, u.label, u.key_id, u.key].some((v) => String(v || '').toLowerCase().includes(q)));
 
     // Sort
     filtered.sort((a, b) => {
@@ -4600,8 +4816,18 @@ api.get("/admin/users", authMiddleware, async (req, res) => {
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
     const safePage   = Math.min(page, totalPages);
     const start = (safePage - 1) * pageSize;
-    // _full is the key for server-side matching only; it never goes out.
-    const users = filtered.slice(start, start + pageSize).map(({ _full, ...u }) => u);
+    const slice = filtered.slice(start, start + pageSize);
+    // Laatste handeling en gebruik deze maand, alleen voor de rijen die
+    // getoond worden. _full en _account zijn server-intern; ze gaan nooit mee.
+    const usage = await usageByAccount();
+    const users = await Promise.all(slice.map(async (u) => {
+      const use = usage.get(u._account) || null;
+      return {
+        ...publicUser(u),
+        last_activity: await lastActivity(u._full),
+        usage_month: use ? { transfers: use.usage?.transfers_this_month ?? null, signs: use.usage?.signs_this_month ?? null } : null,
+      };
+    }));
 
     res.json({
       users,
@@ -4635,10 +4861,11 @@ api.get("/admin/user-detail/:key", authMiddleware, async (req, res) => {
     const masked = key.slice(0, 8) + '...' + key.slice(-4);
     const user = allUsers.find(u => u._full === key) || allUsers.find(u => u.key === masked);
     if (!user) return res.status(404).json({ error: "not_found" });
-    delete user._full;
-    const events = await getAuditEvents(key, { limit: 20 });
+    // Elke regel in de audit draagt de volle sleutel als user_id; die gaat
+    // gemaskeerd naar buiten, net als _full en _account.
+    const events = (await getAuditEvents(key, { limit: 20 })).map((e) => ({ ...beheer.scrubKeys(e), user_id: masked }));
     try { await logAuditEvent(key, 'admin_key_viewed', { admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
-    res.json({ ...user, key: masked, audit_events: events });
+    res.json({ ...publicUser(user), key: masked, audit_events: events });
   } catch (err) { console.error("[admin/user-detail]", err.message); res.status(500).json({ error: "internal" }); }
 });
 
@@ -4647,48 +4874,131 @@ api.get("/admin/audit", authMiddleware, async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 100, 500);
     const userFilter = req.query.user || null;
     const eventFilter = req.query.event || null;
+    const q = String(req.query.q || '').trim().toLowerCase().slice(0, 100);
     const sinceMs = req.query.since ? new Date(req.query.since).getTime() : 0;
-    const events = [];
+    const untilMs = req.query.until ? new Date(req.query.until).getTime() : 0;
+    const users = await beheerUsers().catch(() => []);
+    const whoMap = beheer.buildWhoMap(users);
+    const rows = [];
     // The event names that really occur, for the panel's filter. It offered a
     // fixed list (signup, login, plan_changed ...) that mostly never matched:
     // the real events are admin_plan_changed, totp_reset_confirmed and so on
     // (ADMIN-27-F).
     const eventTypes = new Set();
     for await (const key of scanKeys(redis(), { MATCH: "paramant:user:audit:*", COUNT: 100 })) {
-      const userId = key.split(":").pop();
-      if (userFilter && !userId.includes(userFilter)) continue;
+      const userId = key.slice("paramant:user:audit:".length);
+      // De filter op gebruiker matcht server-side, ook op de volle sleutel; de
+      // browser krijgt die nooit te zien.
+      if (userFilter && !userId.includes(userFilter)) {
+        const w = whoMap.get(userId);
+        const hay = [w && w.email, w && w.label, w && w.kid].filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(String(userFilter).toLowerCase())) continue;
+      }
       const entries = await redis().zRange(key, 0, -1).catch(() => []);
       for (const entry of entries) {
         try {
           const ev = JSON.parse(entry);
-          if (ev.event_type) eventTypes.add(ev.event_type);
-          if (sinceMs && ev.ts < sinceMs) continue;
+          if (typeof ev.event_type === 'string') eventTypes.add(ev.event_type);
+          const ms = beheer.eventTimeMs(ev.ts);
+          if (sinceMs && ms < sinceMs) continue;
+          if (untilMs && ms > untilMs) continue;
           if (eventFilter && ev.event_type !== eventFilter) continue;
-          events.push({ user_id: userId, ...ev });
+          const row = beheer.auditRow({ ...ev, user_id: userId }, whoMap);
+          if (q && !`${row.who} ${row.kid || ''} ${row.summary} ${JSON.stringify(row.metadata)}`.toLowerCase().includes(q)) continue;
+          rows.push(row);
         } catch {}
       }
     }
-    events.sort((a, b) => (b.ts || 0) - (a.ts || 0));
-    res.json({ events: events.slice(0, limit), total: events.length, event_types: [...eventTypes].sort() });
+    rows.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    const types = [...eventTypes].sort();
+    res.json({
+      events: rows.slice(0, limit),
+      total: rows.length,
+      event_types: types,
+      event_labels: Object.fromEntries(types.map((t) => [t, beheer.eventLabel(t)])),
+    });
   } catch (err) { console.error("[admin/audit]", err.message); res.status(500).json({ error: "internal" }); }
 });
 
 api.get("/admin/billing", authMiddleware, async (req, res) => {
   try {
-    const [planDist, recentAudit] = await Promise.all([
+    const now = Date.now();
+    const [planDist, recentAudit, users, docs] = await Promise.all([
       telemetry.getPlanDistribution(relayFetch, ADMIN_TOKEN),
       telemetry.getRecentAuditEvents(200),
+      beheerUsers().catch(() => []),
+      readDocuments().catch(() => null),
     ]);
     // stub_mode, mrr_eur and churn_this_month are gone. The first said billing
     // was a stub, which stopped being true when Mollie went live; the other two
-    // were hardcoded zeros, a revenue and a churn figure this route never
-    // counted. Nothing read any of the three: the served admin screen
-    // (admin/public/app.js) renders plan_distribution and recent_checkouts and
-    // says in the tab itself that it shows neither payments nor revenue.
+    // were hardcoded zeros. What replaces them is counted from the documents
+    // the payment webhook issues (lib/invoice.js, lib/credit-note.js): every
+    // number below has a document behind it, and a store that cannot be read
+    // gives null, never a zero.
+    const whoMap = beheer.buildWhoMap(users);
+    const credits = docs ? beheer.creditsByInvoice(docs) : new Map();
+    const ym = beheer.ymOf(now);
+    const prev = new Date(now); prev.setUTCDate(1); prev.setUTCMonth(prev.getUTCMonth() - 1);
+    const mrr = docs ? beheer.computeMrr(docs, now) : null;
+
+    // Abonnementen: wat Mollie zelf opnieuw incasseert (billing-recurring.js
+    // houdt ze bij in één hash), plus elk betaald plan dat nu loopt.
+    const subscriptions = [];
+    try {
+      const h = await redis().hGetAll('paramant:billing:renewals');
+      for (const [member, raw] of Object.entries(h || {})) {
+        const [accountId, line] = member.split('|');
+        let info = {}; try { info = JSON.parse(raw) || {}; } catch {}
+        const u = users.find((x) => x._account === accountId || x._full === accountId);
+        subscriptions.push({
+          who: u ? (u.email || u.label || 'Klant') : 'Account bestaat niet meer',
+          kid: u ? u.key_id : null,
+          line: line || '',
+          amount: info.amount && info.amount.value ? `${info.amount.value} ${info.amount.currency || ''}`.trim() : (typeof info.amount === 'string' ? info.amount : null),
+          interval: info.interval || null,
+          since: info.start_date || null,
+          status_nl: 'Wordt automatisch verlengd',
+        });
+      }
+    } catch { /* geen hash: geen automatische verlengingen */ }
+    const terms = [];
+    for (const u of users) {
+      for (const [product, field] of [['parasign', 'paid_until_parasign'], ['parasend', 'paid_until_parasend']]) {
+        const until = Date.parse(u[field]);
+        if (!Number.isFinite(until)) continue;
+        terms.push({
+          who: u.email || u.label || 'Klant', kid: u.key_id, product,
+          tier: product === 'parasign' ? u.plan_parasign : u.plan_parasend,
+          until: new Date(until).toISOString(),
+          auto_renews: u.auto_renews === true,
+          status_nl: until > now ? (u.auto_renews ? `Loopt, wordt verlengd op ${new Date(until).toISOString().slice(0, 10)}` : `Loopt tot ${new Date(until).toISOString().slice(0, 10)}, stopt daarna`) : `Afgelopen op ${new Date(until).toISOString().slice(0, 10)}`,
+          running: until > now,
+        });
+      }
+    }
+    terms.sort((a, b) => Date.parse(b.until) - Date.parse(a.until));
+
+    let collectionFailed = 0;
+    try { for await (const _ of scanKeys(redis(), { MATCH: 'paramant:billing:collection_failed:*', COUNT: 200 })) collectionFailed++; } catch { collectionFailed = null; }
+
+    const docRows = docs ? docs.slice(0, 200).map((d) => docForBrowser(d, credits, now, users)) : null;
     res.json({
       total_customers: Object.values(planDist).reduce((a, b) => a + b, 0),
       plan_distribution: planDist,
-      recent_checkouts: recentAudit.filter(e => e.event_type === "plan_changed").slice(0, 20),
+      recent_checkouts: recentAudit.filter(e => e.event_type === "plan_changed" || e.event_type === "admin_plan_changed" || e.event_type === "admin_product_plan_changed").slice(0, 20).map((e) => beheer.auditRow(e, whoMap)),
+      revenue: docs ? {
+        this_month: beheer.monthRevenue(docs, ym),
+        last_month: beheer.monthRevenue(docs, beheer.ymOf(prev.getTime())),
+        mrr_cents: mrr.mrr_cents,
+        mrr_basis: mrr.basis,
+        paying_accounts: mrr.paying_accounts.size,
+      } : null,
+      documents: docRows,
+      payments: docRows ? docRows.filter((d) => d.kind !== 'credit_note') : null,
+      refunds: docRows ? docRows.filter((d) => d.kind === 'credit_note') : null,
+      subscriptions,
+      terms,
+      collection_failed: collectionFailed,
     });
   } catch (err) { console.error("[admin/billing]", err.message); res.status(500).json({ error: "internal" }); }
 });
@@ -4749,25 +5059,35 @@ api.delete('/admin/coupons/:code', authMiddleware, async (req, res) => {
 
 api.get("/admin/relay-detail", authMiddleware, async (req, res) => {
   try {
-    const details = {};
-    await Promise.all(Object.keys(SECTORS).map(async s => {
-      try {
-        const [hRes, mRes] = await Promise.all([
-          relayFetch(s, "/health", "GET", null, false, ADMIN_TOKEN),
-          relayFetch(s, "/metrics", "GET", null, true, ADMIN_TOKEN).catch(() => ({ status: 0, text: '' })),
-        ]);
-        if (hRes.status !== 200) { details[s] = { error: "HTTP " + hRes.status }; return; }
-        const d = { ...hRes.body };
-        // extract uptime_s from prometheus metrics
-        const uptimeMatch = (mRes.text || '').match(/paramant_uptime_s\{[^}]*\}\s+([\d.]+)/);
-        if (uptimeMatch) d.uptime_s = parseFloat(uptimeMatch[1]);
-        // normalize blobs field name for frontend
-        if (d.blobs_in_flight !== undefined && d.blobs === undefined) d.blobs = d.blobs_in_flight;
-        details[s] = d;
-      } catch (e) { details[s] = { error: e.message }; }
-    }));
-    res.json({ sectors: details });
+    const sectors = await relaySnapshot();
+    res.json({ sectors, ct: await ctStatus(sectors) });
   } catch (err) { console.error("[admin/relay-detail]", err.message); res.status(500).json({ error: "internal" }); }
+});
+
+// Alles over één relay op één plek: gezondheid, meetwaarden, de diepe
+// controle (die schrijft echt weg en pingt redis) en het logboek.
+api.get("/admin/relay-info/:sector", authMiddleware, async (req, res) => {
+  const s = String(req.params.sector || '');
+  if (!Object.prototype.hasOwnProperty.call(SECTORS, s)) return res.status(404).json({ error: 'unknown_sector' });
+  try {
+    const [hRes, mRes, dRes] = await Promise.all([
+      relayFetch(s, '/health', 'GET', null, false, ADMIN_TOKEN).catch((e) => ({ status: 0, body: { error: e.message } })),
+      relayFetch(s, '/metrics', 'GET', null, true, ADMIN_TOKEN).catch(() => ({ status: 0, text: '' })),
+      relayFetch(s, '/v2/health/deep', 'GET', null, false, ADMIN_TOKEN, true).catch(() => ({ status: 0, body: null })),
+    ]);
+    const metrics = beheer.parseMetrics(mRes.text);
+    const ct = (await ctStatus({ [s]: { metrics } }))[0] || null;
+    const h = hRes.status === 200 && hRes.body && typeof hRes.body === 'object' ? hRes.body : null;
+    res.json({
+      sector: s,
+      ok: !!h,
+      error: h ? null : (hRes.body && hRes.body.error) || ('HTTP ' + hRes.status),
+      health: h,
+      metrics,
+      deep: dRes.status === 200 && dRes.body && dRes.body.overall ? { overall: dRes.body.overall, checks: dRes.body.checks || [] } : null,
+      ct,
+    });
+  } catch (err) { console.error("[admin/relay-info]", err.message); res.status(500).json({ error: "internal" }); }
 });
 
 // ── De standpagina ──────────────────────────────────────────────────────────
@@ -5153,6 +5473,66 @@ api.post('/admin/delete-account', authMiddleware, async (req, res) => {
   } catch (err) { console.error('[admin/delete-account]', err.message); res.status(500).json({ error: 'internal', message: err.message }); }
 });
 
+// ── De infopagina van één klant ─────────────────────────────────────────────
+// Alles op één plek: sleutels (gemaskeerd), plannen met einddatum, gebruik
+// deze maand, ondertekenverzoeken, betalingen en de audit, vertaald. Leest
+// alleen. De bestandsnamen van ondertekenverzoeken blijven weg: wie wat tekent
+// is van de klant, de beheerder ziet status en aantallen.
+async function klantInfo(key, k, allKeys) {
+  const accountId = k.account_id || key;
+  const now = Date.now();
+  const keys = (allKeys || []).filter((x) => (x.account_id || x.key) === accountId).map((x) => ({
+    kid: x.kid || null,
+    key_masked: beheer.maskKey(x.key),
+    kind: String(x.key || '').startsWith('psk_') ? 'ParaSign-API-sleutel' : 'Accountsleutel',
+    label: x.label || null,
+    active: x.active !== false,
+    primary: !!x.is_primary,
+    scope: x.scope || 'full',
+    created: x.created || null,
+  }));
+  let usage = null;
+  try {
+    const r = await relayFetch('health', `/v2/admin/usage/${encodeURIComponent(accountId)}`, 'GET', null, false, ADMIN_TOKEN, true);
+    if (r.status === 200 && r.body) usage = { month: r.body.month, transfers: r.body.usage?.transfers_this_month ?? null, signs: r.body.usage?.signs_this_month ?? null, limits: r.body.limits || null };
+  } catch { usage = null; }
+  let envelopes = null;
+  try {
+    const idx = `parasign:acct:${accountId}:envelopes`;
+    const [total, ids] = await Promise.all([redis().zCard(idx), redis().zRange(idx, 0, 19, { REV: true })]);
+    const rows = await Promise.all(ids.map(async (id) => {
+      const [status, created, parties, signed, voided, completed] = await redis().hmGet('env:' + id, ['status', 'created_at', 'party_count', 'signed_count', 'voided_at', 'completed_at']);
+      if (!status && !created) return null;
+      const st = status === 'declined' ? 'Geweigerd door een ondertekenaar'
+        : (voided || status === 'void') ? 'Ingetrokken'
+          : (completed || status === 'complete') ? 'Door iedereen getekend' : 'Wacht op ondertekening';
+      return { id: String(id).slice(0, 10) + '…', status: status || null, status_nl: st, created: created || null, parties: Number(parties) || 0, signed: Number(signed) || 0 };
+    }));
+    envelopes = { total, recent: rows.filter(Boolean) };
+  } catch { envelopes = null; }
+  let payments = null;
+  try {
+    const numbers = await redis().lRange(`paramant:billing:invoice:list:${accountId}`, 0, -1);
+    const raws = numbers.length ? await redis().mGet(numbers.map((n) => `paramant:billing:invoice:doc:${n}`)) : [];
+    const recs = raws.map((x) => { try { return JSON.parse(x || 'null'); } catch { return null; } }).filter(Boolean);
+    const credits = beheer.creditsByInvoice(recs);
+    payments = recs.sort((a, b) => (Date.parse(b.issued_at) || 0) - (Date.parse(a.issued_at) || 0)).map((r) => {
+      const row = beheer.documentRow(r, credits, now); delete row.account_id; return row;
+    });
+  } catch { payments = null; }
+  let whoMap = new Map();
+  try { whoMap = beheer.buildWhoMap(await beheerUsers()); } catch { /* zonder kaart: e-mail uit de details */ }
+  let audit = [];
+  try { audit = (await getAuditEvents(key, { limit: 50 })).map((e) => beheer.auditRow({ ...e, user_id: key }, whoMap)); } catch { audit = []; }
+  return {
+    paid_until_parasign: k.paid_until_parasign || null,
+    paid_until_parasend: k.paid_until_parasend || null,
+    auto_renews: k.auto_renews === true,
+    usage_purpose: k.usage_purpose || null,
+    keys, usage, envelopes, payments, audit,
+  };
+}
+
 // ── GET /admin/user-details/:key (rich version) ───────────────────────────────
 api.get('/admin/user-details/:key', authMiddleware, async (req, res) => {
   const { key } = req.params;
@@ -5177,8 +5557,12 @@ api.get('/admin/user-details/:key', authMiddleware, async (req, res) => {
     if (totpActive === 'true') totp_status = 'active';
     else if (totpSecret) totp_status = 'pending';
     try { await logAuditEvent(key, 'admin_user_viewed', { admin_ip: req.headers['x-real-ip'] || 'unknown' }); } catch {}
+    const info = await klantInfo(key, k, keysRes.body?.keys || []);
     res.json({
-      key_id: key,
+      ...info,
+      // De kid als handvat. Dit veld droeg de volle sleutel naar de browser;
+      // de panelen handelen op de kid en de server zet hem terug (ADMIN-06-H).
+      key_id: k.kid || keyHandle(req, key),
       key_masked: key.slice(0, 8) + '...' + key.slice(-4),
       email: meta.email || k.email || null,
       label: k.label || null,
@@ -5199,7 +5583,7 @@ api.get('/admin/user-details/:key', authMiddleware, async (req, res) => {
       // `stub: true` on that fallback claimed the billing system was a stub,
       // which it has not been since Mollie went live, and nothing read it.
       billing: billing || { plan: k.plan || 'community' },
-      audit_events: auditEvents,
+      audit_events: auditEvents.map((e) => ({ ...beheer.scrubKeys(e), user_id: key.slice(0, 8) + '...' + key.slice(-4) })),
     });
   } catch (err) { console.error('[admin/user-details]', err.message); res.status(500).json({ error: 'internal' }); }
 });
