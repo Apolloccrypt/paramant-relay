@@ -122,6 +122,11 @@ body.ps-ended .page-hero{display:none}
    the file is doing meanwhile, and offers the one action that helps. */
 .ps-alert{display:none;flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:16px;padding:12px 14px;border:1px solid var(--line-2);border-left:3px solid var(--sig-stop);border-radius:var(--r-1);background:var(--sig-stop-bg);font:13px/1.62 var(--sans);color:var(--ink-1)}
 .ps-alert.is-shown{display:flex}
+.ps-signedout{margin-bottom:16px;padding:14px 16px;border:1px solid var(--line-2);border-left:3px solid var(--accent);border-radius:var(--r-1);font:14px/1.62 var(--sans);color:var(--ink-1)}
+.ps-signedout h2{margin:0 0 6px;font:600 16px/1.35 var(--sans)}
+.ps-signedout p{margin:0 0 8px}
+.ps-signedout .ps-alert-actions{margin-top:10px}
+.ps-signedout-alt{display:inline-flex;align-items:center;min-height:var(--tap);color:var(--accent);font:600 13px/1 var(--sans)}
 .ps-alert p{margin:0}
 .ps-alert-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
 /* The primary action is the one that actually works on paramant.app: sign in
@@ -496,7 +501,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <!-- Twee keuzes, in de woorden van wie verstuurt: naar wie gaat het. De
      live overdracht met controlecode is geen hoofdkeuze meer maar een vinkje
      onder "Naar één persoon" (Extra veilig). Getallen staan hier niet in de
-     markup: het aantal mensen en de uren per abonnement komen uit GET
+     markup: het aantal mensen en de uren per plan komen uit GET
      /v2/check-key (tiers.js) en worden door parashare.page.js ingevuld. -->
 <div class="ps-mode" id="ps-mode" role="radiogroup" aria-label="Naar wie gaat het bestand">
   <button type="button" class="ps-mode-card" id="ps-mode-link" role="radio" aria-checked="true" data-click="chooseModeLink">
@@ -539,7 +544,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <!-- STEP 1: Setup -->
 <div class="step active" id="step-setup">
 
-  <!-- Wat u met uw abonnement kunt, in één regel, uit de plan-info. Voor
+  <!-- Wat u met uw plan kunt, in één regel, uit de plan-info. Voor
        Community eronder, rustig, wat Firm erbij geeft, met één knop. -->
   <div class="ps-plan" id="ps-plan" hidden>
     <p class="ps-limit" id="ps-limit" aria-live="polite"></p>
@@ -553,13 +558,26 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <span class="ps-key-status"><span id="ps-key-slim-label">Uw account wordt opgehaald</span></span>
   </div>
 
+  <!-- Niet ingelogd. Een bezoeker die nooit inlogde (de knop "Probeer het
+       zelf" op de voorpagina stuurt hem hierheen) krijgt uitleg en twee
+       knoppen, geen foutmelding. De rode melding hieronder is alleen nog voor
+       een sessie die er wel was en toch faalde (acceptatie 3.1.1). -->
+  <div class="ps-signedout" id="ps-signedout" role="status" hidden>
+    <h2>Versturen doet u met een gratis account</h2>
+    <p>U kiest hier een bestand. Het gaat in uw eigen browser op slot en de ontvanger krijgt een link. Alleen de ontvanger kan het openen.</p>
+    <p>Met Community is dat gratis: 50 verzendingen per maand, naar één persoon tegelijk. U heeft geen betaalkaart nodig.</p>
+    <div class="ps-alert-actions">
+      <a class="ps-alert-primary" href="/signup?next=/parashare">Account maken</a>
+      <a class="ps-signedout-alt" href="/auth/login?next=/parashare">Inloggen</a>
+    </div>
+  </div>
+
   <div class="ps-alert" id="ps-key-error" role="alert">
     <p>We konden u niet aanmelden. Log opnieuw in. Blijft het gebeuren, mail dan <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
     <div class="ps-alert-actions">
       <a class="ps-alert-primary" href="/auth/login">Opnieuw inloggen</a>
       <span class="ps-alert-secondary">
-        <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Een sleutel met de hand invoeren</button>
-        <span class="ps-alert-note">voor een eigen server</span>
+        <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Eigen server?</button>
       </span>
     </div>
   </div>
@@ -586,7 +604,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   <!-- Extra veilig: de live overdracht. Alleen bij "Naar één persoon". -->
   <label class="ps-safe" id="ps-safe" for="ps-extra-safe">
     <input type="checkbox" id="ps-extra-safe" data-change="toggleExtraSafe">
-    <span class="ps-safe-text"><strong>Extra veilig</strong>: de ontvanger is nu bereikbaar. U controleert samen een korte code, en er wordt niets bewaard.</span>
+    <span class="ps-safe-text"><strong>Extra veilig</strong>: kies dit als de ontvanger nu ook achter een scherm zit. U vergelijkt samen een korte code, en er wordt niets bewaard.</span>
   </label>
 
   <div class="ps-field" id="ps-file-field">
@@ -627,7 +645,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 
   <!-- Groep op slot (Community): geen formulier dat vastloopt, maar een
        rustige uitleg. De knop staat in het blok bovenaan. -->
-  <p class="ps-locked" id="ps-group-locked" hidden>Naar meerdere mensen tegelijk versturen hoort bij Firm. Met uw abonnement stuurt u naar één persoon.</p>
+  <p class="ps-locked" id="ps-group-locked" hidden>Naar meerdere mensen tegelijk versturen hoort bij Firm. Met uw plan stuurt u naar één persoon.</p>
 
   <div class="ps-field" id="ps-ttl-field">
     <label class="ps-field-label" for="ttl-select">Hoe lang blijft de link open?</label>
@@ -791,9 +809,9 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <!-- The recipient list does not fit the plan. Asked before anything is sealed
      or uploaded (POST /v2/sends/precheck), so nothing was spent. -->
 <div class="step" id="step-over-limit">
-  <h2 class="paramant-h1">Te veel mensen voor uw abonnement</h2>
+  <h2 class="paramant-h1">Te veel mensen voor uw plan</h2>
   <p class="sub" id="over-limit-line"></p>
-  <a class="btn" href="/pricing">Abonnementen bekijken</a>
+  <a class="btn" href="/pricing">Plannen bekijken</a>
   <button type="button" class="btn btn-outline" data-click="backToSetup">Terug</button>
 </div>
 
@@ -929,13 +947,13 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <!-- One date format for the whole site (#424). The Send-a-link stand prints
      an expiry moment, and a slashed locale date next to "24 hours on Firm"
      is the exact ambiguity that file exists to kill. -->
-<script src="/js/format-date.js?v=3" defer></script>
+<script src="/js/format-date.js?v=4" defer></script>
 <script src="/js/done-state.js?v=2" defer></script>
 <script src="/js/handshake-meta.js?v=1" defer></script>
 <script src="/js/send-wrap.js?v=1" defer></script>
 <script src="/js/parashare.page.js?v=26" defer></script>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=20" defer></script>
+<script src="/js/nav-auth.js?v=21" defer></script>
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">

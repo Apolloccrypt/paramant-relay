@@ -75,7 +75,7 @@ const T = {
     linkTtl: (c, pr, ent) => 'The locked file waits on our server for up to ' + c + ' on Community, '
       + pr + ' on Firm and ' + ent + ' on Enterprise, and a link from this web app is wiped after the first download.',
     ttlNote: (d) => 'When the link runs out we destroy the file, picked up or not. '
-      + 'Your plan holds a link to ' + d + ' at most; a longer choice is shortened to that.',
+      + 'On your plan a link stays open for ' + d + ' at most.',
     planOne: 'You send to 1 person.',
     planMany: (n) => 'You send to up to ' + n + ' people at once.',
     planTtl: (d) => ' A link stays open for up to ' + d + '.',
@@ -90,6 +90,9 @@ const T = {
     btnLive: 'Start and wait for the other person',
     whyAccount: 'Getting your account. One moment.',
     whySignIn: 'Sign in again first.',
+    whySignedOut: 'Sign in first, or create a free account.',
+    upsellSignOnly: (name) => 'Your ' + name + ' plan covers signing. For sending you are on Community, with the limits above.',
+    upsellSignOnlyBtn: 'Send with Firm too',
     whyLocked: 'Choose "To one person" to send now.',
     whyFile: 'Choose a file first.',
     whyNoAddress: 'Fill in at least one email address.',
@@ -156,7 +159,7 @@ const T = {
     copyLink: 'Link kopiëren',
     receiverConnected: 'Ontvanger verbonden',
     receiverWaits: 'De ontvanger wacht tot u de controlecode vergelijkt',
-    validPlan: (plan, sector) => `✓ Geldig, abonnement: ${plan}${sector}`,
+    validPlan: (plan, sector) => `✓ Geldig, plan: ${plan}${sector}`,
     accountNoSector: 'Dit account is op geen van onze servers actief. Mail privacy@paramant.app, dan zoeken we het uit.',
     keyInvalid: 'Ongeldige of ingetrokken sleutel',
     noSectorAnswered: 'Onze server gaf geen antwoord. Controleer uw verbinding en probeer het opnieuw.',
@@ -189,8 +192,8 @@ const T = {
     openDashboard: 'Naar uw dashboard',
     sendAnother: 'Nog een bestand versturen',
     sentTo: (aantal) => 'Verstuurd naar ' + aantal,
-    tooMany: (n, asked) => 'Uw abonnement verstuurt naar ' + (n === 1 ? '1 ontvanger' : n + ' ontvangers') + ' tegelijk. U noemde er ' + asked + '.',
-    removeNames: 'Haal namen van de lijst, of kies een abonnement voor meer ontvangers.',
+    tooMany: (n, asked) => 'Uw plan verstuurt naar ' + (n === 1 ? '1 ontvanger' : n + ' ontvangers') + ' tegelijk. U noemde er ' + asked + '.',
+    removeNames: 'Haal namen van de lijst, of kies een plan voor meer ontvangers.',
     starting: 'Starten...',
     badAddress: 'Naar dit adres kunnen we niet versturen: ',
     noUsable: 'Er staat geen bruikbaar adres in die lijst.',
@@ -216,7 +219,7 @@ const T = {
     linkTtl: (c, pr, ent) => 'Het bestand op slot wacht op onze server tot ' + c + ' bij Community, '
       + pr + ' bij Firm en ' + ent + ' bij Enterprise. Een link uit deze web app wordt na de eerste download gewist.',
     ttlNote: (d) => 'Als de link verloopt, vernietigen we het bestand, opgehaald of niet. '
-      + 'Met uw abonnement blijft een link hooguit ' + d + ' open. Kiest u langer, dan wordt dat ingekort.',
+      + 'Met uw plan blijft een link hooguit ' + d + ' open.',
     planOne: 'U stuurt naar 1 persoon.',
     planMany: (n) => 'U stuurt naar maximaal ' + n + ' mensen tegelijk.',
     planTtl: (d) => ' Een link blijft maximaal ' + d + ' open.',
@@ -231,12 +234,15 @@ const T = {
     btnLive: 'Start en wacht op de ontvanger',
     whyAccount: 'Uw account wordt opgehaald. Een ogenblik.',
     whySignIn: 'Log eerst opnieuw in.',
+    whySignedOut: 'Log eerst in, of maak een gratis account.',
+    upsellSignOnly: (name) => 'Uw ' + name + '-plan geldt voor ondertekenen. Voor versturen heeft u Community, met de grenzen hierboven.',
+    upsellSignOnlyBtn: 'Ook versturen met Firm',
     whyLocked: 'Kies Naar één persoon om nu te versturen.',
     whyFile: 'Kies eerst een bestand.',
     whyNoAddress: 'Vul minstens één e-mailadres in.',
     whyBad: 'Verbeter eerst de adressen in rood.',
     whyBadOne: 'Dit e-mailadres klopt niet.',
-    whyTooMany: (n, max) => 'U noemt ' + n + ' mensen. Met uw abonnement kunnen er ' + max + ' tegelijk.',
+    whyTooMany: (n, max) => 'U noemt ' + n + ' mensen. Met uw plan kunnen er ' + max + ' tegelijk.',
     countOf: (n, max) => n + ' van ' + max,
     countOnly: (n) => n + (n === 1 ? ' adres' : ' adressen'),
     badList: (list) => 'Dit zijn geen geldige e-mailadressen: ' + list + '. Verbeter ze of haal ze weg.',
@@ -350,6 +356,7 @@ let audience = 'one', extraSafe = false;
 let planMaxRecipients = 0, planMaxByPlan = null;
 // The address the browser is signed in as, for "Signed in as". Never the token.
 let signedInEmail = '';
+let signPlanName = '';
 // The per-plan link lifetimes, straight from tiers.js by way of GET
 // /v2/check-key. Never written into the page by hand: see the comment on the
 // chooser in parashare.html.
@@ -739,6 +746,7 @@ async function fetchSessionToken() {
   if (!r.ok) {
     var refused = new Error('session token: HTTP ' + r.status);
     refused.expected = r.status === 401 || r.status === 403 || r.status === 404;
+    refused.status = r.status;
     throw refused;
   }
   var d = await r.json();
@@ -981,6 +989,8 @@ function wireDropZone() {
 // Why the button waits, in one sentence, or '' when it does not.
 function whyNotReady() {
   const keyErr = $('ps-key-error');
+  const out = $('ps-signedout');
+  if (!keyValid && out && !out.hidden) return t('whySignedOut');
   if (!keyValid) return (keyErr && keyErr.classList.contains('is-shown')) ? t('whySignIn') : t('whyAccount');
   if (audience === 'group' && groupLocked()) return t('whyLocked');
   if (!selectedFiles.length) return t('whyFile');
@@ -1699,17 +1709,10 @@ function applyPlanTtls(found) {
   }
   // Only times the plan honours are offered. POST /v2/inbound clamps anything
   // longer, and offering 24 hours to an account held to one is a promise the
-  // relay will not keep.
-  const sel = $('ttl-select');
-  if (sel && planTtlMs && sel.options) {
-    let best = null;
-    [...sel.options].forEach(function (o) {
-      const over = Number(o.value) > planTtlMs;
-      o.hidden = over; o.disabled = over;
-      if (!over) best = o;
-    });
-    if (sel.selectedOptions && sel.selectedOptions[0] && sel.selectedOptions[0].disabled && best) sel.value = best.value;
-  }
+  // relay will not keep. The options above the plan are taken out, not hidden:
+  // Safari on an iPhone ignores hidden on an <option>, so a 24-hour plan still
+  // offered "7 days" there (acceptatie 3.1.1, betalen).
+  rebuildTtlOptions();
   applyTtlDefault();
   renderChoice();
 }
@@ -1729,12 +1732,6 @@ function applyTtlDefault() {
     sel.dataset.watch = '1';
     sel.addEventListener('change', () => { sel.dataset.touched = '1'; });
   }
-  if (planTtlMs >= TTL_WEEK_MS && !sel.querySelector('option[value="' + TTL_WEEK_MS + '"]')) {
-    const o = document.createElement('option');
-    o.value = String(TTL_WEEK_MS);
-    o.textContent = t('days')(7);
-    sel.appendChild(o);
-  }
   if (sel.dataset.touched) return;
   const want = Math.min(planTtlMs, TTL_DAY_MS);
   let best = null;
@@ -1743,6 +1740,24 @@ function applyTtlDefault() {
     if (v <= want && (!best || v > Number(best.value))) best = o;
   }
   if (best) sel.value = best.value;
+}
+
+// The choices the picker can ever show, shortest first. The plan cuts the list.
+const TTL_CHOICES = [300000, 3600000, TTL_DAY_MS, TTL_WEEK_MS];
+function rebuildTtlOptions() {
+  const sel = $('ttl-select');
+  if (!sel || !planTtlMs) return;
+  const keep = Number(sel.value);
+  const allowed = TTL_CHOICES.filter(function (v) { return v <= planTtlMs; });
+  if (!allowed.length) allowed.push(TTL_CHOICES[0]);
+  while (sel.options.length) sel.remove(0);
+  allowed.forEach(function (v) {
+    const o = document.createElement('option');
+    o.value = String(v);
+    o.textContent = humanDuration(v);
+    sel.appendChild(o);
+  });
+  sel.value = String(allowed.indexOf(keep) !== -1 ? keep : allowed[allowed.length - 1]);
 }
 
 function groupLocked() { return planMaxRecipients === 1; }
@@ -1766,7 +1781,16 @@ function renderLimit() {
   const firmMax = planMaxByPlan && Number(planMaxByPlan.pro);
   const firmTtl = planTtlByPlan && planTtlByPlan.pro ? humanDuration(planTtlByPlan.pro) : '';
   if (up) up.hidden = !groupLocked();
-  if (upLine && groupLocked()) upLine.textContent = t('upsell')(firmMax > 1 ? firmMax : 0, firmTtl);
+  const upBtn = $('ps-upsell-btn');
+  if (upLine && groupLocked()) {
+    upLine.textContent = signPlanName
+      ? t('upsellSignOnly')(signPlanName)
+      : t('upsell')(firmMax > 1 ? firmMax : 0, firmTtl);
+    if (upBtn) {
+      if (!upBtn.dataset.plain) upBtn.dataset.plain = upBtn.textContent;
+      upBtn.textContent = signPlanName ? t('upsellSignOnlyBtn') : upBtn.dataset.plain;
+    }
+  }
 }
 
 // ── The chooser ──────────────────────────────────────────────────────────────
@@ -2237,18 +2261,69 @@ async function loadSessionCredential() {
     // here to show. The manual box stays empty, which is what makes the two
     // credentials impossible to confuse.
     applySlimApiKeyView(d.token);
+    loadAccountPlans();
     await useSessionToken();
   } catch (e) {
+    keyValid = false;
+    // Two different events, told apart (acceptatie 3.1.1). A visitor without
+    // a session, the one "Try it yourself" on the home page sends here, gets
+    // the signed-out explanation with Sign in and Create account: nothing went
+    // wrong for him. Only a session that exists and still yields no token gets
+    // the red banner. The token route answers 401/403 for both, so the session
+    // probe decides; a probe that does not answer counts as a failure, which
+    // keeps the banner for the case it was built for.
+    if (e && (e.status === 401 || e.status === 403) && !(await hasSession())) {
+      showSignedOut(true);
+      updateBtn();
+      return;
+    }
+    showSignedOut(false);
     setKeyError(true);
-    // The banner carries the sentence either way. Only the unplanned half gets
-    // reported: a 500, or a fetch that never arrived. Reporting the planned half
-    // would put a console error on every signed-out page load, which is both
-    // noise and a false alarm for the heartbeat that reads that console.
+    // Only the unplanned half gets reported: a 500, or a fetch that never
+    // arrived. Reporting the planned half would put a console error on every
+    // page load, which is noise and a false alarm for the heartbeat.
     if (!e || !e.expected) failureText('session token', e);
     setStatus('key-status', t('sessionFailed'), 'err');
-    keyValid = false;
     updateBtn();
   }
+}
+
+// true: a session is there. false: there is none. A probe that does not answer
+// (503, network) returns true, so the page falls back to the failure banner
+// instead of telling a signed-in customer he is signed out.
+async function hasSession() {
+  try {
+    const r = await fetch('/api/user/session/verify', { credentials: 'include', cache: 'no-store' });
+    if (!r.ok) return true;
+    const d = await r.json();
+    return !(d && d.authenticated === false);
+  } catch (_) { return true; }
+}
+
+function showSignedOut(on) {
+  const box = $('ps-signedout');
+  if (box) box.hidden = !on;
+  const row = $('ps-key-slim');
+  if (row && on) row.hidden = true;
+  if (on) setKeyError(false);
+}
+
+// What the account holds on ParaSign, from /api/user/me. Only used to say the
+// truth to a customer whose plan covers signing and not sending (a term from
+// before Firm wrote both products): the send limits stay Community, and the
+// line under them no longer offers him "Firm" as if he had nothing.
+async function loadAccountPlans() {
+  try {
+    const r = await fetch('/api/user/me', { credentials: 'include', cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    const tier = d && d.plan_parasign;
+    const until = d && d.paid_until_parasign;
+    const live = tier && ['pro', 'business', 'enterprise'].indexOf(tier) !== -1
+      && (!until || Date.parse(until) > Date.now());
+    signPlanName = live ? ({ pro: 'Firm', business: 'Business', enterprise: 'Enterprise' })[tier] : '';
+    renderLimit();
+  } catch (_) { /* the plain Community line stays */ }
 }
 
 // Ctrl+G, and nothing else, opens this. Until 6 September 2026 the page booted

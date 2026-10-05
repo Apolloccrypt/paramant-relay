@@ -137,11 +137,13 @@
   ] : [
     // The English bar points at the English pages (apply-nav.py
     // to_english_links), /en/gereedschap included since fase 2 SITE-03-A.
-    ['Product', '/en#products'],
+    // The same five destinations as the Dutch bar since acceptance 3.1.1:
+    // the two products first, then tools, security and pricing.
+    ['Send', '/en/parasend'],
+    ['Sign', '/en/parasign'],
     ['Tools', '/en/gereedschap'],
     ['Security', '/en/security'],
-    ['Pricing', '/en/pricing'],
-    ['Docs', '/en/docs']
+    ['Pricing', '/en/pricing']
   ];
   // The workspace bar is verbs: what you came here to do, in the order you do
   // it. Send and Sign were the two; locking a file with a passphrase is the

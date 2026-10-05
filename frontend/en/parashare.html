@@ -122,6 +122,11 @@ body.ps-ended .page-hero{display:none}
    the file is doing meanwhile, and offers the one action that helps. */
 .ps-alert{display:none;flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:16px;padding:12px 14px;border:1px solid var(--line-2);border-left:3px solid var(--sig-stop);border-radius:var(--r-1);background:var(--sig-stop-bg);font:13px/1.62 var(--sans);color:var(--ink-1)}
 .ps-alert.is-shown{display:flex}
+.ps-signedout{margin-bottom:16px;padding:14px 16px;border:1px solid var(--line-2);border-left:3px solid var(--accent);border-radius:var(--r-1);font:14px/1.62 var(--sans);color:var(--ink-1)}
+.ps-signedout h2{margin:0 0 6px;font:600 16px/1.35 var(--sans)}
+.ps-signedout p{margin:0 0 8px}
+.ps-signedout .ps-alert-actions{margin-top:10px}
+.ps-signedout-alt{display:inline-flex;align-items:center;min-height:var(--tap);color:var(--accent);font:600 13px/1 var(--sans)}
 .ps-alert p{margin:0}
 .ps-alert-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
 /* The primary action is the one that actually works on paramant.app: sign in
@@ -452,11 +457,11 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   <a href="/en" class="nav-logo"><span class="logo-para">Para</span><span class="logo-mant">MANT</span></a>
 
   <ul class="nav-links">
-    <li><a href="/en#products" class="nav-link">Product</a></li>
+    <li><a href="/en/parasend" class="nav-link">Send</a></li>
+    <li><a href="/en/parasign" class="nav-link">Sign</a></li>
     <li><a href="/en/gereedschap" class="nav-link">Tools</a></li>
     <li><a href="/en/security" class="nav-link">Security</a></li>
     <li><a href="/en/pricing" class="nav-link">Pricing</a></li>
-    <li><a href="/en/docs" class="nav-link">Docs</a></li>
   </ul>
 
   <div class="nav-auth" id="nav-auth">
@@ -473,11 +478,11 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   </button>
 </nav>
 <div class="nav-mobile" id="nav-mobile">
-  <a href="/en#products" class="nav-mobile-standalone">Product</a>
+  <a href="/en/parasend" class="nav-mobile-standalone">Send</a>
+  <a href="/en/parasign" class="nav-mobile-standalone">Sign</a>
   <a href="/en/gereedschap" class="nav-mobile-standalone">Tools</a>
   <a href="/en/security" class="nav-mobile-standalone">Security</a>
   <a href="/en/pricing" class="nav-mobile-standalone">Pricing</a>
-  <a href="/en/docs" class="nav-mobile-standalone">Docs</a>
 </div>
 <div class="nav-mobile-tail" id="nav-mobile-tail">
   <a href="/en/auth/login" class="nav-tail-btn">Sign in</a>
@@ -553,13 +558,26 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
     <span class="ps-key-status"><span id="ps-key-slim-label">Getting your account</span></span>
   </div>
 
+  <!-- Not signed in. A visitor who never signed in (the "Try it yourself"
+       button on the home page sends him here) gets an explanation and two
+       buttons, not an error. The red notice below is only for a session that
+       was there and still failed (acceptance 3.1.1). -->
+  <div class="ps-signedout" id="ps-signedout" role="status" hidden>
+    <h2>Sending works with a free account</h2>
+    <p>You pick a file here. It is locked in your own browser and the recipient gets a link. Only the recipient can open it.</p>
+    <p>With Community this is free: 50 sends a month, to one person at a time. You do not need a payment card.</p>
+    <div class="ps-alert-actions">
+      <a class="ps-alert-primary" href="/en/signup?next=/en/parashare">Create account</a>
+      <a class="ps-signedout-alt" href="/en/auth/login?next=/en/parashare">Sign in</a>
+    </div>
+  </div>
+
   <div class="ps-alert" id="ps-key-error" role="alert">
     <p>We could not sign you in. Sign in again. If it keeps happening, mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.</p>
     <div class="ps-alert-actions">
       <a class="ps-alert-primary" href="/en/auth/login">Sign in again</a>
       <span class="ps-alert-secondary">
-        <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Use a key by hand</button>
-        <span class="ps-alert-note">for your own server</span>
+        <button type="button" class="ps-key-change" data-click="expandApiKeyCard">Your own server?</button>
       </span>
     </div>
   </div>
@@ -586,7 +604,7 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
   <!-- Extra safe: the live hand-over. Only under "To one person". -->
   <label class="ps-safe" id="ps-safe" for="ps-extra-safe">
     <input type="checkbox" id="ps-extra-safe" data-change="toggleExtraSafe">
-    <span class="ps-safe-text"><strong>Extra safe</strong>: the other person is available right now. You check a short code together, and nothing is stored.</span>
+    <span class="ps-safe-text"><strong>Extra safe</strong>: choose this when the other person is at a screen right now too. You compare a short code together, and nothing is stored.</span>
   </label>
 
   <div class="ps-field" id="ps-file-field">
@@ -929,13 +947,13 @@ select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 <!-- One date format for the whole site (#424). The Send-a-link stand prints
      an expiry moment, and a slashed locale date next to "24 hours on Firm"
      is the exact ambiguity that file exists to kill. -->
-<script src="/js/format-date.js?v=3" defer></script>
+<script src="/js/format-date.js?v=4" defer></script>
 <script src="/js/done-state.js?v=2" defer></script>
 <script src="/js/handshake-meta.js?v=1" defer></script>
 <script src="/js/send-wrap.js?v=1" defer></script>
 <script src="/js/parashare.page.js?v=26" defer></script>
 <script src="/nav.js?v=17" defer></script>
-<script src="/js/nav-auth.js?v=20" defer></script>
+<script src="/js/nav-auth.js?v=21" defer></script>
 <footer>
   <div class="container-lg">
     <div class="footer-grid footer-slim">
