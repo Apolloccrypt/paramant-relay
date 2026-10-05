@@ -101,6 +101,22 @@ const SEND_ACCOUNT_MB = (() => {
   return Number.isFinite(n) && n > 0 ? n : def;
 })();
 const SEND_ACCOUNT_BYTES = SEND_ACCOUNT_MB * 1048576;
+// THE FREE POOL (herreview #560, M6). A share per account alone still let six
+// free accounts fill the total for every paying customer. Free (community)
+// sends together hold at most half of the total, and one free account at most
+// one send of the maximum size. Whatever free accounts do, the other half
+// stays for paid plans.
+const SEND_FREE_POOL_MB = (() => {
+  const n = parseInt(process.env.SEND_FREE_POOL_MB || '', 10);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, SEND_TOTAL_MB) : Math.max(1, Math.floor(SEND_TOTAL_MB / 2));
+})();
+const SEND_FREE_POOL_BYTES = SEND_FREE_POOL_MB * 1048576;
+const SEND_FREE_ACCOUNT_MB = (() => {
+  const n = parseInt(process.env.SEND_FREE_ACCOUNT_MB || '', 10);
+  const def = Math.min(SEND_ACCOUNT_MB, SEND_MAX_MB, SEND_FREE_POOL_MB);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, SEND_ACCOUNT_MB) : def;
+})();
+const SEND_FREE_ACCOUNT_BYTES = SEND_FREE_ACCOUNT_MB * 1048576;
 
 // The two ceilings that survive a new code.
 //
@@ -263,7 +279,8 @@ function createSendStore({ store, log, now }) {
   // `a` is a hash of the account, so the ledger names nobody; a send without
   // an account counts only towards the total.
   const acctTag = (accountId) => accountId ? crypto.createHash('sha256').update('send-budget|' + String(accountId)).digest('hex').slice(0, 16) : null;
-  async function budgetReserve(id, size, expiresAt, accountId) {
+  // `f` marks a free (community) send; those count towards the free pool too.
+  async function budgetReserve(id, size, expiresAt, accountId, free) {
     return opVolgorde(BUDGET_KEY, async () => {
       const meta = (await store.getMeta(BUDGET_KEY)) || {};
       const e = meta.e && typeof meta.e === 'object' ? meta.e : {};
@@ -271,14 +288,19 @@ function createSendStore({ store, log, now }) {
       const tag = acctTag(accountId);
       let sum = 0;
       let mine = 0;
+      let freeSum = 0;
       for (const [k, v] of Object.entries(e)) {
         if (!v || !(v.x > nu)) { delete e[k]; continue; }
         sum += Number(v.s) || 0;
+        if (v.f) freeSum += Number(v.s) || 0;
         if (tag && v.a === tag) mine += Number(v.s) || 0;
       }
       if (sum + size > SEND_TOTAL_BYTES) return { ok: false, used: sum };
-      if (tag && mine + size > SEND_ACCOUNT_BYTES) return { ok: false, used: sum, account: true, account_used: mine };
+      if (free && freeSum + size > SEND_FREE_POOL_BYTES) return { ok: false, used: freeSum, pool: true };
+      const share = free ? SEND_FREE_ACCOUNT_BYTES : SEND_ACCOUNT_BYTES;
+      if (tag && mine + size > share) return { ok: false, used: sum, account: true, account_used: mine, share_mb: share / 1048576 };
       e[id] = tag ? { s: size, x: expiresAt, a: tag } : { s: size, x: expiresAt };
+      if (free) e[id].f = 1;
       await store.putMeta(BUDGET_KEY, { e }, 8 * 86400 * 1000);
       return { ok: true, used: sum + size };
     });
@@ -395,12 +417,16 @@ function createSendStore({ store, log, now }) {
       // written send used to leave the file in the store under an id nobody
       // knew, for as long as a week, and the sender got a 500 that said
       // nothing about it.
-      const room = await budgetReserve(id, blob.length, created + ttl, accountId);
+      const room = await budgetReserve(id, blob.length, created + ttl, accountId, _plan === 'community');
       if (!room.ok) {
         for (const k of geclaimd) { try { await store.delMeta(k); } catch (e) {} }
         if (room.account) {
-          if (log) log('warn', 'send_account_share_full', { id, used_mb: Math.round(room.account_used / 1048576), share_mb: SEND_ACCOUNT_MB });
-          return { ok: false, reason: 'account_store_full', limit: SEND_ACCOUNT_MB };
+          if (log) log('warn', 'send_account_share_full', { id, used_mb: Math.round(room.account_used / 1048576), share_mb: room.share_mb });
+          return { ok: false, reason: 'account_store_full', limit: room.share_mb };
+        }
+        if (room.pool) {
+          if (log) log('warn', 'send_free_pool_full', { id, used_mb: Math.round(room.used / 1048576), pool_mb: SEND_FREE_POOL_MB });
+          return { ok: false, reason: 'store_full', limit: SEND_FREE_POOL_MB };
         }
         if (log) log('warn', 'send_store_full', { id, used_mb: Math.round(room.used / 1048576), total_mb: SEND_TOTAL_MB });
         return { ok: false, reason: 'store_full', limit: SEND_TOTAL_MB };
@@ -798,4 +824,5 @@ function createSendStore({ store, log, now }) {
 
 module.exports = { createSendStore, newSendId, tokenIndexId, accountIndexId,
                    maskEmail, CODE_TTL_MS, CODE_TRIES, CODE_DIGITS, MAX_REMINDERS, MAX_CODE_REQUESTS, MAX_WRONG_TOTAL, COUNTER_WINDOW_MS,
-                   SEND_MAX_MB, SEND_MAX_BYTES, SEND_TOTAL_MB, SEND_TOTAL_BYTES, SEND_ACCOUNT_MB };
+                   SEND_MAX_MB, SEND_MAX_BYTES, SEND_TOTAL_MB, SEND_TOTAL_BYTES, SEND_ACCOUNT_MB,
+                   SEND_FREE_POOL_MB, SEND_FREE_ACCOUNT_MB };
