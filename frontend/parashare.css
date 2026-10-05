@@ -72,7 +72,7 @@
 .ps-field-label{display:block;margin:0 0 8px;font:600 15px/1.4 var(--sans);color:var(--ink-1)}
 .ps-opt{font-weight:400;color:var(--ink-2)}
 .ps-input,
-#step-setup select{width:100%;min-height:var(--tap);margin:0 0 8px;padding:11px 13px;border:1px solid var(--line-2);border-radius:var(--r-1);background:var(--surface);color:var(--ink-1);font:400 15px/1.5 var(--sans);outline:none}
+#step-setup select{width:100%;min-height:var(--tap);margin:0 0 8px;padding:11px 13px;border:1px solid var(--line-2);border-radius:var(--r-1);background:var(--surface);--field-bg:var(--surface);color:var(--ink-1);--field-ink:var(--ink-1);font:400 15px/1.5 var(--sans);outline:none}
 textarea.ps-input{resize:vertical;min-height:120px}
 .ps-input:hover,#step-setup select:hover{border-color:var(--ink-3)}
 .ps-input:focus,#step-setup select:focus{border-color:var(--accent);box-shadow:var(--ring)}
