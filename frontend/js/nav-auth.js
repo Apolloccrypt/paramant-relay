@@ -106,7 +106,7 @@
     var shortEmail = email.length > 24 ? email.slice(0, 18) + '...' : email;
     // Help sits where it sits signed out: a text link left of the account
     // control. nav.css hides it below 700px, where the drawer tail above takes
-    // over, and gives it a 44px target from 1023px down.
+    // over, and gives it a 44px target from 1279px down.
     //
     // Never interpolate the email into innerHTML (stored/self DOM XSS): the
     // signup regex permits HTML metacharacters. Build static markup, then set

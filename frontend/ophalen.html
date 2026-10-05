@@ -75,6 +75,12 @@
   .say.ok { color: var(--ok); }
   .say.fail { color: var(--stop); }
   [hidden] { display: none !important; }
+  .lang-switch { max-width: 460px; margin: -48px auto 0; padding: 0 20px 48px; font-size: 14px; }
+  .lang-switch a { color: var(--ink-2); }
+  input:-webkit-autofill, input:-webkit-autofill:hover {
+    -webkit-text-fill-color: var(--ink-1); caret-color: var(--ink-1);
+    box-shadow: 0 0 0 1000px var(--paper) inset; }
+  input:-webkit-autofill:focus-visible { box-shadow: 0 0 0 1000px var(--paper) inset, 0 0 0 3px var(--accent-soft); }
 </style>
 </head>
 <body>
@@ -132,7 +138,7 @@
     </div>
   </div>
 </main>
-<p class="lang-switch" style="max-width:460px;margin:-48px auto 0;padding:0 20px 48px;font-size:14px"><a id="lang-switch-link" href="/en/ontvang" hreflang="en" lang="en" style="color:var(--ink-2)">This page in English</a></p>
+<p class="lang-switch"><a id="lang-switch-link" href="/en/ontvang" hreflang="en" lang="en">This page in English</a></p>
 <script src="/js/send-wrap.js?v=1"></script>
 <script src="/js/ophalen.page.js?v=4"></script>
 </body>
