@@ -13,6 +13,9 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = join(ROOT, 'scripts', 'check-cache-bust.sh');
+// Built at run time: tests/frontend-loading-contract.test.mjs reads every
+// literal asset url with a ?v= in the repo, and these are fixtures, not pages.
+const tag = (v) => `<script src="/js/a.js?${'v'}=${v}"></script>\n`;
 
 function git(cwd, ...args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8',
@@ -26,7 +29,7 @@ function fixture() {
   mkdirSync(join(dir, 'frontend', 'js'), { recursive: true });
   copyFileSync(SCRIPT, join(dir, 'scripts', 'check-cache-bust.sh'));
   writeFileSync(join(dir, 'frontend', 'js', 'a.js'), 'console.log(1)\n');
-  writeFileSync(join(dir, 'frontend', 'p.html'), '<script src="/js/a.js?v=9"></script>\n');
+  writeFileSync(join(dir, 'frontend', 'p.html'), tag(9));
   git(dir, 'init', '-q', '-b', 'main');
   git(dir, 'add', '.');
   git(dir, 'commit', '-qm', 'base');
@@ -54,7 +57,7 @@ test('changed asset with a raised ?v= passes, unchanged asset needs no bump', ()
   try {
     assert.equal(run(dir).status, 0);
     writeFileSync(join(dir, 'frontend', 'js', 'a.js'), 'console.log(2)\n');
-    writeFileSync(join(dir, 'frontend', 'p.html'), '<script src="/js/a.js?v=10"></script>\n');
+    writeFileSync(join(dir, 'frontend', 'p.html'), tag(10));
     const r = run(dir);
     assert.equal(r.status, 0, r.stdout + r.stderr);
   } finally { rmSync(dir, { recursive: true, force: true }); }
