@@ -316,7 +316,7 @@ input:focus{border-color:var(--cobalt)}
       <tr><td>Data minimisation</td><td>Filenames not stored in plaintext (enc_meta ciphertext only); device IDs hashed SHA3-256 in CT log; no logging of payload content</td></tr>
       <tr><td>Access control</td><td>API key authentication on all relay endpoints; admin panel protected with TOTP MFA and per-IP rate limiting (5 attempts per 15 minutes)</td></tr>
       <tr><td>Audit logging</td><td>Certificate Transparency log: transfer hashes and device key commitments, no payload content; tamper-evident Merkle tree</td></tr>
-      <tr><td>Integrity and availability</td><td>auditd (49 CIS L2 rules), AIDE daily file integrity check, AppArmor enforcing (119 of 121 profiles), CIS Ubuntu 24.04 L2 benchmark: 114 checks</td></tr>
+      <tr><td>Integrity and availability</td><td>Set up at the CIS check of 13 April 2026 on the production server, recorded in <a href="https://github.com/Apolloccrypt/paramant-relay/blob/main/SECURITY.md">SECURITY.md</a>: auditd (49 CIS L2 rules), AIDE daily file integrity check, AppArmor enforcing (119 of 121 profiles), CIS Ubuntu 24.04 L2 benchmark: 114 checks. That is the state at that check; the public code does not prove the server state continuously. A customer can request the current output of these checks at privacy@paramant.app.</td></tr>
       <tr><td>Infrastructure hardening</td><td>Docker containers: read-only FS, no-new-privileges, cap_drop ALL, non-root user; HSTS max-age=63072000</td></tr>
       <tr><td>Vulnerability management</td><td>Independent security audit completed April 2026; see <a href="/en/docs#audits">security audit summary</a></td></tr>
     </tbody>

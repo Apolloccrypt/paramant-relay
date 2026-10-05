@@ -2276,6 +2276,23 @@ test('the hardening figures on /dpa are the ones SECURITY.md records', () => {
   assert.ok(rowNl.includes(`CIS Ubuntu ${bench[1]} L2-benchmark: ${checks[1]} controles`), `dpa (nl): the Article 32 row must say CIS Ubuntu ${bench[1]} and ${checks[1]} checks`);
   assert.ok(rowNl.includes('dagelijkse integriteitscontrole van bestanden met AIDE'), 'dpa (nl): the Article 32 row must name the daily AIDE check');
   assert.ok(rowNl.includes('AppArmor in enforcing-modus'), 'dpa (nl): the Article 32 row must name AppArmor enforcing');
+
+  // Eindmatrix SITE-48-A: the row stated the host state as a standing fact,
+  // and nothing in the repository can prove that. It now says what it is: the
+  // state at the dated CIS check SECURITY.md records, with a link to that
+  // record, and where to ask for the current output.
+  const date = /### (\d{4})-(\d{2})-(\d{2}) [^\n]*CIS Ubuntu/.exec(sec);
+  assert.ok(date, 'SECURITY.md must date the CIS check');
+  const MONTHS_NL = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
+  const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const day = String(Number(date[3])), m = Number(date[2]) - 1;
+  assert.ok(rowNl.includes(`CIS-controle van ${day} ${MONTHS_NL[m]} ${date[1]} op de productieserver`), 'dpa (nl): the row must name the date of the CIS check SECURITY.md records');
+  assert.ok(row.includes(`CIS check of ${day} ${MONTHS_EN[m]} ${date[1]} on the production server`), 'dpa: the row must name the date of the CIS check SECURITY.md records');
+  assert.ok(rowNl.includes('Dat is de stand bij die controle; de openbare code bewijst de serverstaat niet doorlopend.'), 'dpa (nl): the row must say it is a snapshot');
+  assert.ok(row.includes('That is the state at that check; the public code does not prove the server state continuously.'), 'dpa: the row must say it is a snapshot');
+  for (const slug of ['dpa', 'en/dpa']) {
+    assert.match(page(slug), /<td>[^<]*<a href="https:\/\/github\.com\/Apolloccrypt\/paramant-relay\/blob\/main\/SECURITY\.md">SECURITY\.md<\/a>: auditd/, `${slug}: the hardening row must link the SECURITY.md record`);
+  }
 });
 
 // 34 ── The signature level. /about and /parasign name it: a Simple Electronic
