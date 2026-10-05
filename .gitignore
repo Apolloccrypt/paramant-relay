@@ -94,3 +94,4 @@ backups/
 # One-time setup token the relay writes next to users.json (never commit)
 setup-token
 **/setup-token
+extensions/store/out/
