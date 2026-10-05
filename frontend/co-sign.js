@@ -1596,28 +1596,24 @@ async function renderPdfWithRecords(records) {
 }
 
 // The whole document key K the sender kept on this device when the request
-// was sent (sign-flow.js), as { f, exp }. It is kept only while needed: a
-// voided, declined or expired request drops it, a complete one keeps it seven
-// more days for the result page, an expired entry is gone (security review r2
-// a3). Older bare values are still read once.
-function ownerKeyFragment(envId, state, env) {
+// was sent (sign-flow.js), as { f, exp }. It is kept only while needed and at
+// most 24 hours: a voided, declined or expired request drops it, a complete
+// one is used for this page view and dropped from storage, an expired entry
+// is gone (security review r2 a3, review #555 M4). Older bare values are
+// still read once.
+function ownerKeyFragment(envId, state) {
   const k = 'paramant.cosign.key.v1:' + envId;
   let raw = '';
   try { raw = localStorage.getItem(k) || ''; } catch { return ''; }
   if (!raw) return '';
   let rec;
   try { rec = JSON.parse(raw); } catch { rec = null; }
-  if (!rec || typeof rec !== 'object') rec = { f: raw, exp: Date.now() + 7 * 864e5 };
+  if (!rec || typeof rec !== 'object') rec = { f: raw, exp: Date.now() + 864e5 };
   const now = Date.now();
   const drop = () => { try { localStorage.removeItem(k); } catch { /* storage off */ } };
   if (!(now < Number(rec.exp))) { drop(); return ''; }
   if (state === 'cancelled' || state === 'declined' || state === 'expired') { drop(); return ''; }
-  if (state === 'complete') {
-    const done = Date.parse((env && env.completed_at) || '') || now;
-    const until = Math.min(Number(rec.exp), done + 7 * 864e5);
-    if (!(now < until)) { drop(); return ''; }
-    if (until !== Number(rec.exp)) { try { localStorage.setItem(k, JSON.stringify({ f: rec.f, exp: until })); } catch { /* storage off */ } }
-  }
+  if (state === 'complete') drop();
   return String(rec.f || '');
 }
 
@@ -1728,7 +1724,7 @@ async function initOwner(resultRef, ownerId) {
     }
     // The whole key was kept on this device when the request was sent. On
     // another device the sender opens their own original file instead.
-    const fragment = ownerKeyFragment(envId, state, __envelope);
+    const fragment = ownerKeyFragment(envId, state);
     if (fragment && parseDocumentKeyFragment(fragment)) {
       try {
         const r = await fetch('/api/user/envelopes/' + encodeURIComponent(envId) + '/owner-document', { credentials: 'include', cache: 'no-store' });

@@ -85,14 +85,41 @@ await page.waitForLoadState('domcontentloaded');
 await settle();
 who = '';
 const signedOut = { keys: Object.keys(await keys()).length, draft: await draftLeft() };
+// 4. Review #555, M4: K lives at most 24 hours, and a session that ran out
+// (no sign-out) takes K with it. A K from before (31 days) is cut to 24 hours.
+const ctx2 = await browser.newContext();
+const page2 = await ctx2.newPage();
+let who2 = 'c@example.com';
+await page2.route('**/api/**', (r) => json(r, 200, { ok: true }));
+await page2.route('**/api/user/session/verify', (r) => json(r, 200, who2 ? { authenticated: true, email: who2 } : { authenticated: false }));
+await page2.goto(ORIGIN + '/pricing', { waitUntil: 'domcontentloaded' });
+await page2.evaluate(() => localStorage.setItem('paramant.cosign.key.v1:LANG', JSON.stringify({ f: '#doc=v1.lang', exp: Date.now() + 31 * 864e5 })));
+await page2.reload({ waitUntil: 'domcontentloaded' });
+await page2.waitForTimeout(700);
+const capped = await page2.evaluate(() => localStorage.getItem('paramant.cosign.key.v1:LANG'));
+who2 = '';
+await page2.reload({ waitUntil: 'domcontentloaded' });
+await page2.waitForTimeout(700);
+const afterExpiry = await page2.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('paramant.cosign.key.v1:')).length);
+await ctx2.close();
 await ctx.close();
+
+test('een sleutel leeft hoogstens 24 uur', () => {
+  const rec = JSON.parse(capped);
+  assert.equal(rec.f, '#doc=v1.lang');
+  assert.ok(rec.exp <= Date.now() + 864e5 + 5000, 'expiry cut to 24 hours: ' + new Date(rec.exp).toISOString());
+});
+
+test('een verlopen sessie wist de sleutels ook, zonder uitloggen', () => {
+  assert.equal(afterExpiry, 0);
+});
 
 test('op elke pagina: verlopen sleutels en concepten weg, een oude sleutel krijgt een vervaltijd', () => {
   assert.equal(swept.keys['paramant.cosign.key.v1:VERLOPEN'], undefined);
   assert.ok(swept.keys['paramant.cosign.key.v1:GELDIG']);
   const oud = JSON.parse(swept.keys['paramant.cosign.key.v1:OUD']);
   assert.equal(oud.f, '#doc=v1.oud');
-  assert.ok(oud.exp > Date.now() && oud.exp <= Date.now() + 8 * 864e5);
+  assert.ok(oud.exp > Date.now() && oud.exp <= Date.now() + 864e5 + 5000);
   assert.equal(swept.draft, false, 'een concept in het oude, onversleutelde formaat is gewist');
 });
 

@@ -21,7 +21,16 @@
     try { localStorage.removeItem(OWNER); } catch (e) {}
   }
   window.paramantWipeLocal = wipeLocal;
-  // Expired K entries go; an old bare value (no expiry yet) gets seven days.
+  // A session that simply ran out takes K with it too, not only an explicit
+  // sign-out (review #555, M4): the key of every open envelope must not sit in
+  // a browser nobody is signed in to.
+  function wipeCosignKeys() {
+    cosignKeys().forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
+  }
+  // K lives at most 24 hours (review #555, M4). Expired entries go; an entry
+  // with a later expiry (the 31 days of before) is brought back to 24 hours
+  // from now; an old bare value (no expiry yet) gets 24 hours.
+  var COSIGN_KEY_MAX_MS = 864e5;
   (function sweep() {
     var now = Date.now();
     cosignKeys().forEach(function(k) {
@@ -29,8 +38,9 @@
         var raw = localStorage.getItem(k) || '';
         var rec = null;
         try { rec = JSON.parse(raw); } catch (e) { rec = null; }
-        if (!rec || typeof rec !== 'object') { localStorage.setItem(k, JSON.stringify({ f: raw, exp: now + 7 * 864e5 })); return; }
-        if (!(now < Number(rec.exp))) localStorage.removeItem(k);
+        if (!rec || typeof rec !== 'object') { localStorage.setItem(k, JSON.stringify({ f: raw, exp: now + COSIGN_KEY_MAX_MS })); return; }
+        if (!(now < Number(rec.exp))) { localStorage.removeItem(k); return; }
+        if (Number(rec.exp) > now + COSIGN_KEY_MAX_MS) localStorage.setItem(k, JSON.stringify({ f: rec.f, exp: now + COSIGN_KEY_MAX_MS }));
       } catch (e) { /* storage off */ }
     });
     try {
@@ -279,12 +289,13 @@
         await new Promise(function(r) { setTimeout(r, wait * 1000); });
       }
       if (res.status === 429 || res.status >= 500) { renderUnknown(); return; }
-      if (!res.ok) { renderLoggedOut(); return; }
+      if (!res.ok) { wipeCosignKeys(); renderLoggedOut(); return; }
       var data = await res.json();
       if (data.authenticated && data.email) {
         window.paramantNoteAccount(data.email);
         renderLoggedIn(data.email);
       } else {
+        wipeCosignKeys();
         renderLoggedOut();
       }
     } catch (err) {

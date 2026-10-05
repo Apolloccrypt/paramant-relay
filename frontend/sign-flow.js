@@ -811,11 +811,12 @@ async function shareEncryptedDocument({ envelopeId, bytes, filename, mime, docHa
   state.keyShareFragment = keyShareFragment(shares.a);
   const keyShareB = keyB64url(shares.b);
   shares.a.fill(0); shares.b.fill(0);
-  // Kept only as long as needed: until the request has run its course (the
-  // result page shortens it once everyone signed), wiped on sign-out or when
-  // another account signs in here (nav-auth.js; security review r2 a3).
+  // Kept only as long as needed and never longer than 24 hours: wiped once
+  // the request is complete, on sign-out, when the session runs out, or when
+  // another account signs in here (nav-auth.js; security review r2 a3, review
+  // #555 M4).
   try {
-    const exp = Date.now() + 31 * 864e5;
+    const exp = Date.now() + 864e5;
     localStorage.setItem('paramant.cosign.key.v1:' + envelopeId, JSON.stringify({ f: encrypted.fragment, exp }));
   } catch { /* storage off: the sender opens the original file instead */ }
   let upload;
