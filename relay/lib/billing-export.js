@@ -32,6 +32,7 @@
 // and gross, exactly as the record stores them, and names the invoice it
 // credits. Nothing is netted off and nothing is summarised away: the reader is
 // a bookkeeper who has to see both documents.
+const { neutralize } = require('./csv-safe');
 
 const invoice = require('./invoice');
 
@@ -138,11 +139,11 @@ const SEP = ';';
 const EOL = '\r\n';
 
 // A field is quoted when it holds the separator, a quote or a line break, and a
-// quote inside a quoted field is doubled. Nothing else is escaped: a formula
-// injection guard belongs on a file that is executed, and every value here is a
-// number, a date or a name that came out of our own record.
+// quote inside a quoted field is doubled. A name or company comes from what the
+// buyer typed at checkout, so a cell that would start a formula gets the guard
+// from csv-safe.js; amounts stay numbers.
 function csvField(value) {
-  const s = String(value == null ? '' : value);
+  const s = neutralize(value);
   if (s.includes(SEP) || s.includes('"') || s.includes('\n') || s.includes('\r')) {
     return `"${s.replace(/"/g, '""')}"`;
   }

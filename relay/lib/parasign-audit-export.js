@@ -11,12 +11,13 @@
 // tree head (STH). Driven the DI way (injected state + a fake-free `res`) so the
 // tier gate is unit-testable without a socket (test/parasign-audit-export.test.js).
 const tierGate = require('./tier-gate');
+const { neutralize } = require('./csv-safe');
 
 const DEFAULT_LIMIT = 1000;
 const MAX_LIMIT = 10000;
 
 function csvCell(v) {
-  const s = String(v == null ? '' : v);
+  const s = neutralize(v);
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 

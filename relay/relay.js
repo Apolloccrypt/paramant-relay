@@ -174,6 +174,12 @@ const creditNote       = require('./lib/credit-note');        // credit notes (C
 const billingMail      = require('./lib/billing-mail');       // bilingual (NL, then EN) text of the invoice and credit-note mails
 const billingHistory   = require('./lib/billing-history');    // one chronological list, derived from the records
 const billingExport    = require('./lib/billing-export');     // period export of both series, CSV/JSON, for the books
+const { neutralize: _csvNeutralize } = require('./lib/csv-safe');
+// One cell of GET /v2/audit?format=csv: formula guard, then RFC 4180 quoting.
+function _csvAuditCell(v) {
+  const s = _csvNeutralize(v);
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
 const zipStore         = require('./lib/zip-store');          // store-only zip writer, no dependency
 const moneybird        = require('./lib/moneybird');          // optional Moneybird push (external sales invoices)
 const planExpiry       = require('./lib/plan-expiry');      // paid-term warning + expiry mail (in-process planner)
@@ -9438,7 +9444,7 @@ async function handleRelayRequest(req, res) {
     if (query.format === 'csv') {
         res.writeHead(200, { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="paramant_audit.csv"' });
       return res.end('ts,event,hash,bytes,device,chain_hash\n' +
-        entries.map(e => `${e.ts},${e.event},${e.hash||''},${e.bytes||0},${e.device||''},${e.chain_hash}`).join('\n'));
+        entries.map(e => [e.ts, e.event, e.hash || '', e.bytes || 0, e.device || '', e.chain_hash].map(_csvAuditCell).join(',')).join('\n'));
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(J({ ok: true, count: entries.length, chain_valid: valid, entries }));

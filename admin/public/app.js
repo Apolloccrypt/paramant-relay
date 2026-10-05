@@ -581,7 +581,10 @@ async function fetchAudit(){
     '</tr>').join('')+'</tbody></table></div>';
 }
 // CSV voor een Nederlandse Excel: puntkomma, UTF-8 met BOM, elke kolom gevuld.
-function csvCell(v){return '"'+String(v==null?'':v).replace(/[\r\n]+/g,' ').replace(/"/g,'""')+'"';}
+// Een cel die met = + - @ (of tab/CR) begint, opent Excel als formule; die krijgt
+// een apostrof ervoor. Gewone getallen blijven getallen (relay/lib/csv-safe.js).
+function csvSafe(v){const s=String(v==null?'':v);return /^[=+\-@\t\r]/.test(s)&&!/^[-+]?\d+(?:[.,]\d+)*$/.test(s)?"'"+s:s;}
+function csvCell(v){return '"'+csvSafe(v).replace(/[\r\n]+/g,' ').replace(/"/g,'""')+'"';}
 function exportAuditCSV(){
   if(!AUDIT_ROWS.length){toast('Er staat niets om te downloaden','warn');return}
   const head=['tijd_utc','tijd_lokaal','gebeurtenis','code','wie','sleutel','wat','details'];

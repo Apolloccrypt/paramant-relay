@@ -408,13 +408,15 @@ async function fetchAudit(){
     '</tr>').join('')+'</tbody></table>';
 }
 
+// Formula injection guard, same rule as relay/lib/csv-safe.js.
+function csvSafe(v){const s=String(v==null?'':v);return /^[=+\-@\t\r]/.test(s)&&!/^[-+]?\d+(?:[.,]\d+)*$/.test(s)?"'"+s:s;}
 function exportAuditCSV(){
   const rows=document.querySelectorAll('#a-results tr');
   if(!rows.length)return;
   let csv='timestamp,event,user_id,metadata\n';
   rows.forEach(r=>{
     const cells=r.querySelectorAll('td');
-    if(cells.length)csv+=[cells[0],cells[1],cells[2],''].map((c,i)=>'"'+(c?.textContent?.trim()||'').replace(/"/g,'""')+'"').join(',')+'\n';
+    if(cells.length)csv+=[cells[0],cells[1],cells[2],''].map((c,i)=>'"'+csvSafe(c?.textContent?.trim()||'').replace(/"/g,'""')+'"').join(',')+'\n';
   });
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
