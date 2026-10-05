@@ -65,6 +65,33 @@ function readFirstChunkAndAbort(path, headers = {}, on = srv) {
   });
 }
 
+// Reads the whole body (Content-Length) over a raw socket and then resets the
+// connection at once: the reader took every byte, so the relay has written the
+// last byte before the break, whatever the socket buffers are. Resolves with
+// the number of body bytes read.
+function readAllAndReset(path, headers = {}, on = srv) {
+  const port = Number(new URL(on.base).port);
+  return new Promise((resolve) => {
+    const s = net.connect(port, '127.0.0.1');
+    let buf = Buffer.alloc(0); let want = -1; let body = 0; let done = false;
+    const end = () => { if (done) return; done = true; resolve(body); };
+    s.on('connect', () => s.write(`GET ${path} HTTP/1.1\r\nHost: x\r\n${Object.entries(headers).map(([k, v]) => `${k}: ${v}\r\n`).join('')}\r\n`));
+    s.on('data', (d) => {
+      if (want < 0) {
+        buf = Buffer.concat([buf, d]);
+        const i = buf.indexOf('\r\n\r\n');
+        if (i < 0) return;
+        const m = /content-length:\s*(\d+)/i.exec(buf.slice(0, i).toString('latin1'));
+        want = m ? Number(m[1]) : 0;
+        body = buf.length - i - 4; buf = null;
+      } else body += d.length;
+      if (body >= want) { s.resetAndDestroy(); end(); }
+    });
+    s.on('error', end);
+    s.on('close', end);
+  });
+}
+
 before(async () => {
   srv = await boot({
     tag: 'burn-after-delivery',
@@ -286,12 +313,16 @@ test('broken-off downloads are bounded at five on both routes', async () => {
   did();
 });
 
-// Review #573, M3: what the docs promise at the default blob size. Socket
-// buffers take a few MB, so a 4 MB blob under the default MAX_BLOB of 5 MB is
-// written in full before a reader that stops after the first chunk breaks
-// off: on both claimless routes that read counts. Only the claim mode keeps
-// the link on a broken line at this size, and the docs say so.
-test('at the default MAX_BLOB a 4 MB claimless read broken off after the first chunk counts; a claimed one does not', async () => {
+// Review #573, M3: what the docs promise at the default blob size. Whether a
+// reader that stops after the first chunk is already "after the last byte"
+// depends on the socket buffers of the machine (the docs say "as a rule"), so
+// that is not what this pins: on CI it went both ways. What is deterministic
+// is the rule itself, measured at the relay: once the last byte was written
+// the claimless read counts, even when the client then resets the line (both
+// routes), and with ?claim= the same complete-then-reset read leaves the link.
+// Broken off BEFORE the last byte is pinned with 16 MB blobs above, where the
+// relay's last write is still pending when the reader stops.
+test('at the default MAX_BLOB a 4 MB claimless read that got the last byte counts even on a reset; a claimed one does not', async () => {
   const small = await boot({
     tag: 'burn-after-delivery-default',
     env: { DELIVERY_SETTLE_MS: '500' },
@@ -304,21 +335,22 @@ test('at the default MAX_BLOB a 4 MB claimless read broken off after the first c
     return { ...b, token: up.json.download_token };
   };
   const a = await put();
-  const gotDl = await readFirstChunkAndAbort(`/v2/dl/${a.token}/get`, { 'User-Agent': 'curl/8.9.1' }, small);
-  assert.ok(gotDl > 0 && gotDl < 1024 * 1024, `read ${gotDl} bytes before breaking off`);
+  const gotDl = await readAllAndReset(`/v2/dl/${a.token}/get`, { 'User-Agent': 'curl/8.9.1' }, small);
+  assert.equal(gotDl, a.payload.length, 'the reader took every byte before the reset');
   await sleep(1500);
   assert.equal((await small.get(`/v2/dl/${a.token}/info`)).status, 404, 'the claimless link is spent');
 
   const o = await put();
-  const gotOut = await readFirstChunkAndAbort(`/v2/outbound/${o.hash}`, { 'X-Api-Key': KEY }, small);
-  assert.ok(gotOut > 0 && gotOut < 1024 * 1024, `read ${gotOut} bytes before breaking off`);
+  const gotOut = await readAllAndReset(`/v2/outbound/${o.hash}`, { 'X-Api-Key': KEY }, small);
+  assert.ok(gotOut >= o.payload.length, `read ${gotOut} bytes before the reset`);
   await sleep(1500);
   const st = await small.get(`/v2/status/${o.hash}`, { headers: { 'X-Api-Key': KEY } });
   assert.equal(st.json.available, false, 'the outbound read counted');
 
   const c = await put();
   const claim = crypto.randomBytes(16).toString('hex');
-  await readFirstChunkAndAbort(`/v2/dl/${c.token}/get?claim=${claim}`, { 'User-Agent': 'curl/8.9.1' }, small);
+  const gotC = await readAllAndReset(`/v2/dl/${c.token}/get?claim=${claim}`, { 'User-Agent': 'curl/8.9.1' }, small);
+  assert.equal(gotC, c.payload.length, 'the claimed reader took every byte too');
   await sleep(1500);
   assert.equal((await small.get(`/v2/dl/${c.token}/info`)).status, 200, 'the claimed link is still there');
   did();
