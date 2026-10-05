@@ -10,7 +10,7 @@ import { sha3_256, ml_dsa65 } from '/vendor/paramant-pqc.js';
 // when its notary key is one of these; the key printed inside the receipt is
 // never trusted on its own, or any file could vouch for itself.
 import { anchorByFingerprint } from '/js/relay-trust-anchors.js?v=2';
-import { embeddedFiles, looksLikePdf } from '/js/pdf-embedded.js?v=1';
+import { embeddedFiles, looksLikePdf } from '/js/pdf-embedded.js?v=2';
 
 const RELAY_URL = 'https://relay.paramant.app';
 // Byte-identical to relay/envelope.js SIGN_DOMAIN_DOC (recipe v3). Keep in sync.
@@ -45,6 +45,7 @@ const T = {
     missingSignedHash: 'de hash van het ondertekende document ontbreekt (stamped_hash of document_hash)',
     embeddedOriginal: 'Gecontroleerd met het ondertekende origineel dat ongewijzigd in deze pdf is ingebed. De handtekeningen die op de pagina\u2019s van deze kopie zijn getekend, vallen zelf niet onder het bewijs; wat er is ondertekend, is het ingebedde origineel.',
     embeddedSave: 'Ingebed origineel opslaan',
+    embeddedTooLarge: 'Deze pdf bevat een bijlage die uitgepakt te groot is om hier te controleren. Die bijlage is niet bekeken. Controleer met het originele bestand zelf.',
     // Review #565, M1: a pdf whose visible pages say something else, with the
     // real signed original attached, verified with the full green banner.
     embeddedValid: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>Het ingebedde origineel is geldig ondertekend. De pagina\u2019s die u in dit bestand ziet, zijn niet gecontroleerd.</strong> Dit bestand draagt het ondertekende origineel als bijlage, en alleen dat origineel heeft de ondertekende vingerafdruk. Wat er op de zichtbare pagina\u2019s staat, kan afwijken. Sla het ingebedde origineel op en lees dat.</div>',
@@ -133,6 +134,7 @@ const T = {
     missingSignedHash: 'missing signed document hash (stamped_hash or document_hash)',
     embeddedOriginal: 'Checked against the signed original embedded unchanged in this pdf. The signatures drawn on the pages of this copy are not covered by the proof themselves; what was signed is the embedded original.',
     embeddedSave: 'Save the embedded original',
+    embeddedTooLarge: 'This pdf has an attachment that is too large unpacked to check here. That attachment was not looked at. Check with the original file itself.',
     embeddedValid: '<div class="ps-banner warn"><span class="ps-mark" aria-hidden="true">!</span><strong>The embedded original is validly signed. The pages you see in this file were not checked.</strong> This file carries the signed original as an attachment, and only that original has the signed fingerprint. What the visible pages say may differ. Save the embedded original and read that.</div>',
     hashMismatch: 'the fingerprint does not match: this is not the document that was signed',
     wrongFileSolo: '<div class="ps-banner err"><span class="ps-mark" aria-hidden="true">\u2715</span><strong>This is not the signed file. {pick}</strong> The signature in the .psign file covers a different file (SHA3-256 fingerprint {hash}…). For a PDF or image that is the version with the seal on it, which you received after signing. What you chose is not what was signed. Choose that file and check again.</div>',
@@ -549,6 +551,7 @@ async function verify() {
     // there: an embedded file whose SHA3-256 IS the signed hash is the signed
     // document itself, so the proof is checked against that (DASH-09-L).
     let embedded = null;
+    let embeddedTooLarge = false;
     const expected = String(isMulti ? (envelope && envelope.document_hash) || ''
       : ((envelope && (envelope.stamped_hash || envelope.document_hash)) || '')).toLowerCase();
     if (expected && toHex(docHash) !== expected && documentFile && documentFile.size < 512 * 1024 * 1024) {
@@ -556,14 +559,16 @@ async function verify() {
         const head = new Uint8Array(await documentFile.slice(0, 5).arrayBuffer());
         if (looksLikePdf(head)) {
           const all = new Uint8Array(await documentFile.arrayBuffer());
-          for (const cand of await embeddedFiles(all)) {
+          const cands = await embeddedFiles(all);
+          for (const cand of cands) {
             const h = sha3_256(cand.bytes);
             if (toHex(h) === expected) { docHash = h; embedded = cand; break; }
           }
+          embeddedTooLarge = !embedded && !!cands.tooLarge;
         }
       } catch { embedded = null; }
     }
-    const withEmbedded = (r) => (embedded ? { ...r, embedded } : r);
+    const withEmbedded = (r) => (embedded ? { ...r, embedded } : embeddedTooLarge ? { ...r, embeddedTooLarge } : r);
     if (isMulti) {
       await renderResult(withEmbedded(verifyMultiClient(toHex(docHash))));
       return;
@@ -590,8 +595,8 @@ async function verify() {
         // bestand." (acceptatie r4, punt 3). Only when that is the one reason.
         const errs = Array.isArray(body.errors) ? body.errors : [];
         const onlyWrongFile = errs.length === 1 && /document_hash mismatch/i.test(String(errs[0] || ''));
-        await renderResult({ valid: false, errors: relayErrors(errs), note: null, wrongFile: onlyWrongFile,
-          docHash: (envelope && (envelope.document_hash || envelope.stamped_hash)) || '' });
+        await renderResult(withEmbedded({ valid: false, errors: relayErrors(errs), note: null, wrongFile: onlyWrongFile,
+          docHash: (envelope && (envelope.document_hash || envelope.stamped_hash)) || '' }));
         return;
       }
     }
@@ -766,6 +771,7 @@ async function renderResult(r) {
     out.push('</ul>');
   }
   if (r.note) out.push('<p class="ps-help">' + esc(r.note) + '</p>');
+  if (!r.valid && r.embeddedTooLarge) out.push('<p class="ps-help" id="vf-embedded-too-large">' + esc(t('embeddedTooLarge')) + '</p>');
   if (r.valid && r.embedded) out.push('<p class="ps-help" id="vf-embedded">' + esc(t('embeddedOriginal')) + ' <button type="button" class="btn btn-outline" id="vf-embedded-save">' + esc(t('embeddedSave')) + '</button></p>');
   if (isV3) {
     const envId = isMulti ? envelope && envelope.envelope_id : envelope && envelope.multiparty && envelope.multiparty.envelope_id;

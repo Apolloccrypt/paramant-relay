@@ -10,9 +10,18 @@
 // Plain byte scanning, no PDF library: an uncompressed stream is taken as it
 // is, a /FlateDecode one goes through DecompressionStream('deflate'). Streams
 // with other filters are skipped.
+//
+// Inflating is capped, per stream and over all streams together, because a
+// few hundred KB of deflate can unpack to gigabytes and take the tab down
+// (review 573, D-L3). A signed original is at most 20 MB (MAX_PDF_BYTES in
+// parasign-open-api.js), so 64 MB per stream and 128 MB in total leave room.
+// A stream over a cap is not a candidate; the returned list then carries
+// tooLarge = true, so /verify can say it did not look instead of pretending
+// there was nothing to find.
 
 const MAX_CANDIDATES = 16;
-const MAX_INFLATED = 512 * 1024 * 1024;
+export const MAX_INFLATED = 64 * 1024 * 1024;
+export const MAX_INFLATED_TOTAL = 128 * 1024 * 1024;
 
 function latin1(bytes) {
   // One char per byte, so string offsets are byte offsets.
@@ -24,8 +33,11 @@ function latin1(bytes) {
   return out;
 }
 
-async function inflate(bytes) {
+const TOO_LARGE = Symbol('too large');
+
+async function inflate(bytes, budget) {
   if (typeof DecompressionStream !== 'function') return null;
+  const cap = Math.min(MAX_INFLATED, budget);
   try {
     const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
     const reader = stream.getReader();
@@ -35,7 +47,7 @@ async function inflate(bytes) {
       const { value, done } = await reader.read();
       if (done) break;
       total += value.length;
-      if (total > MAX_INFLATED) { try { reader.cancel(); } catch { /* gone */ } return null; }
+      if (total > cap) { try { reader.cancel(); } catch { /* gone */ } return TOO_LARGE; }
       parts.push(value);
     }
     const out = new Uint8Array(total);
@@ -55,6 +67,8 @@ export async function embeddedFiles(bytes) {
   if (!looksLikePdf(bytes)) return [];
   const text = latin1(bytes);
   const out = [];
+  out.tooLarge = false;
+  let used = 0;
   const re = /\/Type\s*\/EmbeddedFile\b/g;
   let m;
   while ((m = re.exec(text)) && out.length < MAX_CANDIDATES) {
@@ -80,8 +94,10 @@ export async function embeddedFiles(bytes) {
     const filter = /\/Filter\s*(\[\s*)?\/(\w+)/.exec(dict);
     if (filter) {
       if (filter[2] !== 'FlateDecode') continue;
-      data = await inflate(data);
+      data = await inflate(data, MAX_INFLATED_TOTAL - used);
+      if (data === TOO_LARGE) { out.tooLarge = true; continue; }
       if (!data) continue;
+      used += data.length;
     } else {
       data = data.slice();
     }
