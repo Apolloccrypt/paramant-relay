@@ -138,7 +138,7 @@ test('the Firm card shows 29 excl. btw, 35.09 incl., and the same in both sectio
   assert.equal(firmCards.length, 2, 'Firm covers both products, so its card stands in both tables');
   for (const card of firmCards) {
     assert.ok(card.price.includes(`€${euros(monthlyExcl)}`), `Firm card shows "${card.price}", expected the monthly excl-btw price`);
-    assert.ok(card.note.includes(`charged €${monthlyIncl}/mo incl. 21% btw`), `Firm card note is "${card.note}"`);
+    assert.ok(card.note.includes(`charged €${monthlyIncl}/mo incl. 21% VAT`), `Firm card note is "${card.note}"`);
     assert.ok(card.text.includes(`€${euros(yearlyExcl)} excl.`), 'the Firm card states the yearly excl-btw price');
     // Two months free on the yearly term, stated as the percentage.
     assert.ok(card.text.includes('16.7% off'), 'the Firm card states its yearly discount');

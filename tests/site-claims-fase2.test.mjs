@@ -127,8 +127,15 @@ test('SITE-48: AppArmor met de echte telling, en geen NIS2-documentatie die niet
   // (telling SITE-48-A). De telling blijft als historie in SECURITY.md.
   assert.doesNotMatch(tekst('frontend/dpa.html'), /119 van de 121 profielen/);
   assert.doesNotMatch(tekst('frontend/en/dpa.html'), /119 of 121 profiles/);
-  assert.match(tekst('frontend/dpa.html'), /AppArmor staat aan met profielen in enforcing-modus/);
-  assert.match(tekst('frontend/en/dpa.html'), /AppArmor is enabled with profiles in enforce mode/);
+  // Uitrolstap 6l waarschuwt bij een miss (stopt alleen met --host-strict), dus
+  // /dpa belooft de controle bij elke uitrol, nooit de uitkomst als vast feit.
+  assert.match(tekst('frontend/dpa.html'), /We controleren bij elke uitrol[^.]*of AppArmor aan staat met profielen in enforcing-modus/);
+  assert.match(tekst('frontend/dpa.html'), /deze pagina noemt de controle, niet de uitkomst/);
+  assert.doesNotMatch(tekst('frontend/dpa.html'), /AppArmor staat aan met profielen/);
+  assert.match(tekst('frontend/en/dpa.html'), /We check at every deploy[^.]*whether AppArmor is enabled with profiles in enforce mode/);
+  assert.match(tekst('frontend/en/dpa.html'), /this page states the check, not its outcome/);
+  assert.doesNotMatch(tekst('frontend/en/dpa.html'), /(^|[.:] )AppArmor is enabled with profiles/);
+  assert.doesNotMatch(tekst('frontend/dpa.html'), /NIS2[- ]documentatie/);
   assert.doesNotMatch(tekst('frontend/en/pricing.html'), /IEC 62443 \/ NIS2 \/ NEN 7510 documentation|NEN 7510 \/ NIS2 compliance documentation/);
   assert.match(lees('docs/ot-guide.md'), /IEC 62443 compliance mapping/);
   assert.match(lees('docs/dicom-guide.md'), /NEN 7510/);

@@ -32,7 +32,7 @@ await publicPage.route('**/api/user/session/verify', (route) => route.fulfill({ 
 // at /en since 23 September 2026. The Dutch homepage at / has its own bar,
 // checked right after them.
 await publicPage.goto(ORIGIN + '/en', { waitUntil:'domcontentloaded' });
-await publicPage.waitForFunction(() => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === 'Product,Tools,Security,Pricing,Docs');
+await publicPage.waitForFunction(() => Array.from(document.querySelectorAll('nav.nav .nav-links .nav-link')).map((node) => node.textContent).join(',') === 'Send,Sign,Tools,Security,Pricing');
 const publicDesktop = await publicPage.locator('nav.nav .nav-links .nav-link').allInnerTexts();
 // The bar carries the free tools as their own destination. Everything a
 // visitor can use without an account lived one level down, behind /pricing or
@@ -42,7 +42,7 @@ const publicDesktop = await publicPage.locator('nav.nav .nav-links .nav-link').a
 // Dutch because the paid work behind it is, and this is the one word that
 // reads the same in both languages, so the bar stays English on the 42 English
 // pages that also carry it.
-ok('public navigation names its destinations, including the free tools', JSON.stringify(publicDesktop) === JSON.stringify(['Product','Tools','Security','Pricing','Docs']), publicDesktop.join(', '));
+ok('public navigation names its destinations, including the free tools', JSON.stringify(publicDesktop) === JSON.stringify(['Send','Sign','Tools','Security','Pricing']), publicDesktop.join(', '));
 // Signed out, the visitor lands in the demo dashboard (Mick, 5 October 2026),
 // and its head carries ONE primary action and one secondary, not three: make
 // an account, or try it yourself. Both sit inside the dashboard, and there is
@@ -57,8 +57,9 @@ ok('public homepage opens on the demo dashboard, with nothing above it', await p
 // pins the order: explain first, app second, per card.
 await (async () => {
   const ctas = await publicPage.locator('#products .prod-cta a').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')));
-  ok('the homepage leads to both product pages, with the apps as the second action', JSON.stringify(ctas) === JSON.stringify(['/en/parasign','/en/sign','/en/parasend','/en/parashare']), await publicPage.locator('#products').innerText());
-  ok('the homepage still routes to ParaSend from its own section', ctas.includes('/en/parashare'), await publicPage.locator('#products').innerText());
+  // Since acceptance 3.1.1 the English homepage has the Dutch one's cards:
+  // one button per product, to the page that explains it, sending first.
+  ok('the homepage leads to both product pages', JSON.stringify(ctas) === JSON.stringify(['/en/parasend','/en/parasign']), await publicPage.locator('#products').innerText());
 })();
 // The Dutch homepage: the same bar in Dutch, with the two outward product
 // names, re-rendered identically by js/nav-auth.js after the session check;
@@ -551,7 +552,7 @@ await accountPage.locator('.nav-user').waitFor();
 ok('account, billing and developer are one settings hierarchy', JSON.stringify(await accountPage.locator('.settings-tabs a').allInnerTexts()) === JSON.stringify(['Account en beveiliging','Plan en betalingen','Instellingen voor ontwikkelaars']) && await accountPage.locator('.settings-tabs a[aria-current="page"]').getAttribute('href') === '/account', await accountPage.locator('.settings-tabs').innerText());
 ok('legacy account key is advanced instead of the first task', await accountPage.locator('details.acct-advanced:not([open])').count() === 1 && await accountPage.locator('.acct-card:not(.acct-advanced)').first().locator('h2').innerText() === 'Beveiliging.', await accountPage.locator('main').innerText());
 ok('billing settings do not claim live checkout is a stub', !/stub mode|no real payments/i.test(await accountPage.locator('#billing-section').innerText()), await accountPage.locator('#billing-section').innerText());
-ok('account action describes deactivation instead of erasure', /accountrecord blijft bewaard/i.test(await accountPage.locator('.acct-card.danger').innerText()) && !/permanent|delete account|definitief|account verwijderen/i.test(await accountPage.locator('.acct-card.danger').innerText()), await accountPage.locator('.acct-card.danger').innerText());
+ok('account action describes deactivation instead of erasure', /persoonsgegevens wissen we/i.test(await accountPage.locator('.acct-card.danger').innerText()) && !/permanent|delete account|definitief|account verwijderen/i.test(await accountPage.locator('.acct-card.danger').innerText()), await accountPage.locator('.acct-card.danger').innerText());
 ok('settings fit the phone viewport', await accountPage.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth), await accountPage.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
 if (process.env.PARAMANT_SETTINGS_SCREENSHOT_PATH) await stableScreenshot(accountPage, { path:process.env.PARAMANT_SETTINGS_SCREENSHOT_PATH, fullPage:true });
 await accountPage.close();
@@ -568,7 +569,7 @@ await accountPageEn.locator('.nav-user').waitFor();
 ok('en: account, billing and developer are one settings hierarchy', JSON.stringify(await accountPageEn.locator('.settings-tabs a').allInnerTexts()) === JSON.stringify(['Account & security','Plan & billing','Developer settings']) && await accountPageEn.locator('.settings-tabs a[aria-current="page"]').getAttribute('href') === '/en/account', await accountPageEn.locator('.settings-tabs').innerText());
 ok('en: legacy account key is advanced instead of the first task', await accountPageEn.locator('details.acct-advanced:not([open])').count() === 1 && await accountPageEn.locator('.acct-card:not(.acct-advanced)').first().locator('h2').innerText() === 'Security.', await accountPageEn.locator('main').innerText());
 ok('en: billing settings do not claim live checkout is a stub', !/stub mode|no real payments/i.test(await accountPageEn.locator('#billing-section').innerText()), await accountPageEn.locator('#billing-section').innerText());
-ok('en: account action describes deactivation instead of erasure', /account record is retained/i.test(await accountPageEn.locator('.acct-card.danger').innerText()) && !/permanent|delete account/i.test(await accountPageEn.locator('.acct-card.danger').innerText()), await accountPageEn.locator('.acct-card.danger').innerText());
+ok('en: account action describes deactivation instead of erasure', /erase your email address and other personal data/i.test(await accountPageEn.locator('.acct-card.danger').innerText()) && !/permanent|delete account/i.test(await accountPageEn.locator('.acct-card.danger').innerText()), await accountPageEn.locator('.acct-card.danger').innerText());
 ok('en: settings fit the phone viewport', await accountPageEn.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth), await accountPageEn.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
 await accountPageEn.close();
 

@@ -341,5 +341,7 @@ test('C: met geopend document noemt de notitie de knop, en die staat er', async 
   await page.locator('#result-download-original:not([hidden])').waitFor({ timeout: 30000 });
   const note = await page.locator('#result-note').textContent();
   await ctx.close();
-  assert.match(note, /knop voor het origineel hierboven/);
+  // Since acceptance 3.1.1 (16) the note names the original by its file name
+  // and says to keep it with the proof; the button stands right above it.
+  assert.match(note, /Bewaar het origineel \(/);
 });

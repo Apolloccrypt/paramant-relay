@@ -37,6 +37,8 @@ test('de activatie onderscheidt een kapotte uitnodiging van een ander e-mailadre
 test('de tekst onder "Uw handtekening is gezet" volgt de status', () => {
   for (const f of ['frontend/co-sign.html', 'frontend/en/co-sign.html']) assert.match(read(f), /<p class="sub" id="done-sub">/, f);
   const block = cosign.slice(cosign.indexOf("const sub = $('done-sub')"), cosign.indexOf("$('done-env-id').textContent"));
-  assert.match(block, /data\.status === 'complete'\s*\n?\s*\? L\('Uw handtekening is vastgelegd\. Iedereen heeft nu getekend/);
-  assert.match(block, /: L\('Uw handtekening is vastgelegd\. Zodra iedereen heeft getekend/);
+  assert.match(block, /data\.status === 'complete'\s*\n?\s*\? L\('Iedereen heeft nu getekend/);
+  assert.match(block, /: L\('Zodra iedereen heeft getekend/);
+  // Said once: the heading is "Uw handtekening is gezet" (acceptance 3.1.1, 14).
+  assert.doesNotMatch(block, /Uw handtekening is vastgelegd/);
 });

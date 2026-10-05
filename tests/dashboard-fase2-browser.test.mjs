@@ -185,7 +185,8 @@ test('DASH-20-A: no "--" for a member-since date the account does not have', asy
   await ctx.close();
 });
 
-test('VERIFY-36-A: a paying account can export the audit trail as CSV', async () => {
+test('VERIFY-36-A: a Business account can export the audit trail as CSV', async () => {
+  df.me = { status: 200, body: { email: 'business@zorg.test', plan: 'business', usage_purpose: 'organisation', created_at: null, backup_codes_remaining: 10 } };
   const { ctx, page, errors } = await dfOpen();
   await page.waitForSelector('#dh-records:not([hidden])', { timeout: 10000 });
   assert.equal(df.hits['/v2/parasign/audit-export'] || 0, 0, 'nothing may be fetched before the click');
@@ -196,6 +197,19 @@ test('VERIFY-36-A: a paying account can export the audit trail as CSV', async ()
   assert.equal(df.lastAuth['/v2/parasign/audit-export'], 'Bearer pst_app_test');
   assert.match(await page.locator('#dh-export-body').innerText(), /export is klaar/);
   assert.deepEqual(errors, []);
+  df.me = { status: 200, body: { email: 'firm@zorg.test', plan: 'pro', usage_purpose: 'organisation', created_at: null, backup_codes_remaining: 10 } };
+  await ctx.close();
+});
+
+// Acceptatie 3.1.1, betalen punt 10: Firm has no audit export (the relay answers
+// 403), so it gets one sentence and no buttons that can only fail.
+test('Firm sees the history but no audit-export buttons, and is told why', async () => {
+  const { ctx, page } = await dfOpen();
+  await page.waitForSelector('#dh-records:not([hidden])', { timeout: 10000 });
+  assert.equal(await page.locator('#dh-export-csv').isVisible(), false);
+  assert.equal(await page.locator('#dh-export-json').isVisible(), false);
+  assert.equal(await page.locator('#dh-hist-load').isVisible(), true);
+  assert.match(await page.locator('#dh-export-note').innerText(), /hoort bij Business/);
   await ctx.close();
 });
 

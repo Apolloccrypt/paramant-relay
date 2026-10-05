@@ -158,10 +158,15 @@ for (const [lang, prefix] of [['nl', ''], ['en', '/en']]) {
   const s = await account(prefix, upgraded);
   ok(`${lang} account: no cancel button on a one-off payment`, s.cancel === false, JSON.stringify(s));
   ok(`${lang} account: no "subscription" in the heading`, !/abonnement|subscription/i.test(s.kicker), s.kicker);
-  ok(`${lang} account: "paid until <date>, renewing possible from today"`,
+  // Acceptatie 3.1.1, betalen punt 6: the line under "Business" said "paid
+  // until" the Firm date. It now names the plan that runs, its own end and
+  // what follows, the same as the product lines under it.
+  ok(`${lang} account: one truth after the upgrade, Business first, then Firm`,
     s.line === (lang === 'nl'
-      ? `Betaald tot ${day(FIRM_END, 'nl')}, verlengen kan vanaf vandaag: de nieuwe periode sluit aan op ${day(FIRM_END, 'nl')}. Er wordt niets automatisch verlengd.`
-      : `Paid until ${day(FIRM_END, 'en')}, renewing is possible from today: the new term starts on ${day(FIRM_END, 'en')}. Nothing renews automatically.`), s.line);
+      ? `Business betaald tot ${day(BIZ_END, 'nl')}, daarna Firm tot ${day(FIRM_END, 'nl')}. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, u verliest geen dag.`
+      : `Business paid until ${day(BIZ_END, 'en')}, then Firm until ${day(FIRM_END, 'en')}. Nothing renews automatically. You can renew from today without losing a day.`), s.line);
+  ok(`${lang} account: the heading line and the product lines name the same Business date`,
+    s.line.includes(day(BIZ_END, lang)) && (s.products[0] || '').includes(day(BIZ_END, lang)), JSON.stringify(s));
   ok(`${lang} account: one line per product, with what takes over after Business`,
     s.productsShown && JSON.stringify(s.products) === JSON.stringify(lang === 'nl'
       ? [`Ondertekenen: Business tot ${day(BIZ_END, 'nl')}, daarna Firm tot ${day(FIRM_END, 'nl')}.`, `Versturen: Firm tot ${day(FIRM_END, 'nl')}.`]

@@ -122,17 +122,16 @@ for (const [kind, browser] of browsers) {
     // Never the plain green: the visible pages of this file were not checked.
     assert.doesNotMatch(ok.cls, /\bok\b/, 'the full green banner on a copy whose visible pages are not covered');
     assert.match(ok.cls, /\bwarn\b/, ok.text);
-    assert.match(ok.text, /Het ingebedde origineel is geldig ondertekend\. De pagina.s die u in dit bestand ziet, zijn niet gecontroleerd\./);
+    assert.match(ok.text, /De handtekeningen zijn geldig, voor het origineel in deze pdf\. Alleen dat origineel is gecontroleerd, niet de pagina.s die u nu ziet\./);
     assert.equal(ok.embedded, 1, ok.text);
-    assert.match(ok.text, /Gecontroleerd met het ondertekende origineel dat ongewijzigd in deze pdf is ingebed/);
-    assert.match(ok.text, /vallen zelf niet onder het bewijs/);
+    assert.match(ok.text, /Het origineel zit als bijlage in deze pdf\./);
     const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#vf-embedded-save')]);
     const saved = fs.readFileSync(await dl.path());
     assert.deepEqual([...saved], fx.signed, 'the saved original is the signed file, byte for byte');
 
     const forgedPages = await check(fx.forgedVisible);
     assert.match(forgedPages.cls, /\bwarn\b/, 'other visible pages with the real original attached: amber, never green');
-    assert.match(forgedPages.text, /zijn niet gecontroleerd/);
+    assert.match(forgedPages.text, /niet de pagina.s die u nu ziet/);
     assert.equal(forgedPages.embedded, 1);
 
     const plain = await check(fx.copyWithout);

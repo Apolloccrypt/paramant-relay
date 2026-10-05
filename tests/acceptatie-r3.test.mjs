@@ -145,5 +145,7 @@ test('A1 and A4: the texts say what is true', () => {
   assert.match(noKey, /webauthn\/credentials/, 'no passkey on the account: the code, not Face ID');
   assert.match(noKey, /U ondertekent met de code uit uw authenticator-app\./);
   assert.doesNotMatch(read('frontend/sign.html'), /dan bevestigt u met Face ID, Touch ID of uw beveiligingssleutel\./);
-  assert.match(read('frontend/co-sign.js'), /samen met het bestand dat iedereen tekende/);
+  // Since acceptance 3.1.1 (16): keep the original, named by its file name,
+  // together with the proof.
+  assert.match(read('frontend/co-sign.js'), /Bewaar het origineel \(' \+ String\(__envelope\.original_filename/);
 });

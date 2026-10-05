@@ -95,7 +95,9 @@ async function runOnce({ url, verdict, receipt, doc, trustRelay }) {
   await page.locator('#vf-verify').click();
   await page.waitForFunction((src) => new RegExp(src).test(document.querySelector('#vf-result')?.textContent || ''), verdict.source);
   return {
-    result: await page.locator('#vf-result').innerText(),
+    // textContent: the request id and the relay's key sit in a closed
+    // "Technische gegevens" fold since acceptance 3.1.1 (9).
+    result: await page.locator('#vf-result').evaluate((el) => el.textContent),
     banner: await page.locator('#vf-result .ps-banner').first().getAttribute('class'),
     mark: await page.locator('#vf-result .ps-banner .ps-mark').first().textContent().catch(() => ''),
     keyHidden: await page.locator('#vf-key-block').isHidden(),
@@ -106,10 +108,10 @@ async function runOnce({ url, verdict, receipt, doc, trustRelay }) {
 // The same receipt through both copies of the page: the English words on
 // /en/verify, the Dutch words on /verify. One parasign-verify.js serves both.
 const runs = [
-  { url:'/en/verify.html', verdict:/Signature valid[\s\S]*(Envelope|Counter)|Signature INVALID|Test proof|This is not the signed file/, valid:/Signature valid/, invalid:/Signature INVALID/, offline:/verified offline/,
+  { url:'/en/verify.html', verdict:/Signature valid[\s\S]*(Request|Counter)|Signature INVALID|Test proof|This is not the signed file/, valid:/Signature valid/, invalid:/Signature INVALID/, offline:/verified offline/,
     unknownRelay:/is not a Paramant key/, pinned:/Counter-signed by the test relay/, test:/Test proof, not a real signature/, stampedHint:/is a reading copy of it/, stampedHead:/This is not the signed file[\s\S]*check with the original/, stampedMark:/Paramant ParaSign · PQ/,
     wrongFile:/This is not the signed file\. Check with the original file\./, qes:/qualified signature \(PAdES\) from Cleverbase[\s\S]*does not check that second signature/ },
-  { url:'/verify.html', verdict:/Handtekening geldig[\s\S]*(Envelop|Bekrachtigd)|Handtekening ONGELDIG|Testbewijs|Dit is niet het ondertekende bestand/, valid:/Handtekening geldig/, invalid:/Handtekening ONGELDIG/, offline:/offline gecontroleerd/,
+  { url:'/verify.html', verdict:/Handtekening geldig[\s\S]*(Verzoek|Bekrachtigd)|Handtekening ONGELDIG|Testbewijs|Dit is niet het ondertekende bestand/, valid:/Handtekening geldig/, invalid:/Handtekening ONGELDIG/, offline:/offline gecontroleerd/,
     unknownRelay:/is geen sleutel van Paramant/, pinned:/Bekrachtigd door de testrelay/, test:/Testbewijs, geen echte ondertekening/, stampedHint:/is daar een leesbare kopie van/, stampedHead:/Dit is niet het ondertekende bestand[\s\S]*Controleer dan met het origineel/, stampedMark:/Paramant ParaSign · PQ/,
     wrongFile:/Dit is niet het ondertekende bestand\. Controleer met het originele bestand\./, qes:/gekwalificeerde handtekening \(PAdES\) van Cleverbase[\s\S]*controleert deze pagina niet/ },
 ];

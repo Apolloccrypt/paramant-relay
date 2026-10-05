@@ -82,7 +82,7 @@ function makeElement(id) {
 }
 
 // A run of the page: the vm context, the DOM it saw, and what it asked for.
-function runPage({ keyResponses, sectorOk = true, relayStatus = null, lang = 'en' }) {
+function runPage({ keyResponses, sectorOk = true, relayStatus = null, lang = 'en', verifyBody = {}, meBody = {} }) {
   const elements = new Map();
   const getElementById = (id) => {
     if (!elements.has(id)) elements.set(id, makeElement(id));
@@ -153,7 +153,9 @@ function runPage({ keyResponses, sectorOk = true, relayStatus = null, lang = 'en
       // "Signed in as ...": the page asks the same session check the
       // navigation asks. Not a relay call, so it is not counted as one; it
       // answers "not signed in" here so the row keeps its plain sentence.
-      if (String(url).endsWith('/api/user/session/verify')) return respond({ status: 200, body: {} });
+      if (String(url).endsWith('/api/user/session/verify')) return respond({ status: 200, body: verifyBody });
+      // The account's per-product plans, read once for the line under the limits.
+      if (String(url).endsWith('/api/user/me')) return respond({ status: 200, body: meBody });
       const headers = (opts && opts.headers) || {};
       calls.relay.push({ url: String(url), method: (opts && opts.method) || 'GET', headers });
       calls.sector += 1;
@@ -287,7 +289,7 @@ test('/parashare ships the banner copy and opens on the slim row, not the manual
   // Mick 05-10: taalronde
   assert.ok(PS_HTML.includes('We could not sign you in. Sign in again. If it keeps happening, mail <a href="mailto:privacy@paramant.app">privacy@paramant.app</a>.'),
     'the banner must name the one thing to do and the one address to write to');
-  assert.match(PS_HTML, /data-click="expandApiKeyCard">Use a key by hand</, 'the banner must carry the manual way out');
+  assert.match(PS_HTML, /data-click="expandApiKeyCard">Your own server\?</, 'the banner must carry the manual way out');
   // error-message.js is a plain script and parashare.page.js reads
   // window.paramantErrors at call time, so the order of these two tags is what
   // decides whether this page speaks the shared failure sentence or its own
@@ -364,11 +366,10 @@ test('the key banner leads with signing in again, and says who the manual key is
   const banner = PS_HTML.slice(bannerAt, bannerAt + 900);
   assert.match(banner, /class="ps-alert-primary" href="\/en\/auth\/login">Sign in again</,
     'signing in again is the action that works on the hosted relay, so it is the primary');
-  assert.match(banner, /data-click="expandApiKeyCard">Use a key by hand</,
-    'the manual card must stay reachable for a self-host with no /api/user/account/key');
-  // Mick 05-10: taalronde
-  assert.match(banner, /for your own server/,
-    'a hosted customer must be told the manual key is not meant for them');
+  // Acceptatie 3.1.1 (taal 36): the button names who it is for, in four
+  // words, without "key" in the main text.
+  assert.match(banner, /data-click="expandApiKeyCard">Your own server\?</,
+    'the manual card must stay reachable for a self-host, and say who it is for');
   // Compared inside the action row, not the whole banner: the sentence above it
   // also says "Sign in again", and matching that would pass whatever the buttons
   // do.
@@ -684,9 +685,8 @@ test('de Nederlandse /parashare zegt hetzelfde, in het Nederlands', async () => 
   const bannerAt = PS_HTML_NL.indexOf('id="ps-key-error"');
   const banner = PS_HTML_NL.slice(bannerAt, bannerAt + 900);
   assert.match(banner, /class="ps-alert-primary" href="\/auth\/login">Opnieuw inloggen</, 'opnieuw inloggen is de hoofdactie');
-  assert.match(banner, /data-click="expandApiKeyCard">Een sleutel met de hand invoeren</, 'de uitweg met de hand blijft bereikbaar');
-  // Mick 05-10: taalronde
-  assert.match(banner, /voor een eigen server/, 'en zegt voor wie die uitweg is');
+  // Acceptatie 3.1.1 (taal 36): de knop zegt voor wie hij is, zonder "sleutel".
+  assert.match(banner, /data-click="expandApiKeyCard">Eigen server\?</, 'de uitweg voor een eigen server blijft bereikbaar');
   assert.match(PS_HTML_NL, /<details class="ps-how">[\s\S]*?<summary>Hoe werkt dit\?<\/summary>/, 'de techniek staat een klik verder');
   const howPanel = /<details class="ps-how">([\s\S]*?)<\/details>/.exec(PS_HTML_NL);
   for (const name of ['ML-KEM-768', 'ML-DSA-65', 'AES-256-GCM']) {
@@ -708,4 +708,43 @@ test('de Nederlandse /parashare zegt hetzelfde, in het Nederlands', async () => 
   evalIn(leeg, 'expandApiKeyCard()');
   assert.equal(leeg.getElementById('key-status').textContent, 'Vul uw API-sleutel in om verder te gaan',
     'een leeg veld krijgt een uitnodiging, geen oordeel');
+});
+
+// ── Acceptatie 3.1.1: signed out is not an error ────────────────────────────
+// "Try it yourself" on the home page sends a new visitor to /parashare. He has
+// never signed in, the token route answers 401, and the page used to greet him
+// with the red "We could not sign you in. Sign in again." That banner is now
+// only for a session that is there and still fails; a visitor without one gets
+// the explanation with Create account and Sign in.
+// Verified by sabotage: make the catch call setKeyError(true) unconditionally
+// again and the first case goes red; drop the session probe and the second.
+test('a visitor without a session gets the signed-out explanation, not the red banner', async () => {
+  const run = await loadPage({ keyResponses: [{ status: 401, body: {} }], verifyBody: { authenticated: false } });
+  assert.equal(run.getElementById('ps-signedout').hidden, false, 'the signed-out explanation is shown');
+  assert.equal(run.getElementById('ps-key-error').classList.contains('is-shown'), false, 'no failure banner for someone who never signed in');
+  assert.equal(run.getElementById('ps-key-slim').hidden, true, 'no "getting your account" row either');
+  assert.equal(pickAFile(run), false, 'sending still needs an account');
+  assert.equal(run.getElementById('ps-go-why').textContent, 'Sign in first, or create a free account.');
+  assert.deepEqual(run.consoleErrors, [], 'and nothing is reported as a failure');
+});
+
+test('a session that exists and still gets no token keeps the failure banner', async () => {
+  const run = await loadPage({ keyResponses: [{ status: 401, body: {} }], verifyBody: { authenticated: true, email: 'demo@example.com' } });
+  assert.equal(run.getElementById('ps-signedout').hidden, true, 'a signed-in customer is not told he is signed out');
+  assert.equal(run.getElementById('ps-key-error').classList.contains('is-shown'), true, 'the failure is stated');
+  assert.equal(run.getElementById('ps-go-why').textContent, 'Sign in again first.');
+});
+
+test('both /parashare pages ship the signed-out block with sign-in and create-account links back to the page', () => {
+  for (const [html, signup, login] of [
+    [PS_HTML, 'href="/en/signup?next=/en/parashare"', 'href="/en/auth/login?next=/en/parashare"'],
+    [PS_HTML_NL, 'href="/signup?next=/parashare"', 'href="/auth/login?next=/parashare"'],
+  ]) {
+    const at = html.indexOf('id="ps-signedout"');
+    assert.ok(at > 0, 'the block is there');
+    const block = html.slice(at, html.indexOf('id="ps-key-error"'));
+    assert.ok(block.includes(signup) && block.includes(login), block);
+    assert.match(block, /Community/, 'it says what it costs: Community is free');
+    assert.ok(!/niet aanmelden|could not sign you in|opnieuw|again/i.test(block), 'and it is not an error message');
+  }
 });

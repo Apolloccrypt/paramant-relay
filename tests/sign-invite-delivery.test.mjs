@@ -163,9 +163,11 @@ ok('failed email offers a retry', await page.locator('#ds-invite-retry').isVisib
 ok('sender still has a copy-link fallback', await page.locator('.ds-pl-copy').isVisible(), await page.locator('.ds-pl-copy').innerText());
 
 await page.locator('#ds-invite-retry').click();
-await page.waitForFunction(() => /alle uitnodigingen zijn bezorgd/i.test(document.querySelector('#ds-invite-delivery-result')?.textContent || ''));
+// After a good retry the heading says it once ("Uitnodigingen verstuurd."); the
+// green band and a tick per person no longer repeat it (acceptance 3.1.1, 13).
+await page.waitForFunction(() => /Uitnodigingen verstuurd\./.test(document.querySelector('#step-done')?.innerText || ''));
 ok('retry sends only failed parties', invitationCalls.length === 2 && invitationCalls[1].invitations.length === 1 && invitationCalls[1].invitations[0].party_index === 0, JSON.stringify(invitationCalls[1]?.invitations));
-ok('successful retry clears the warning', /alle uitnodigingen zijn bezorgd/i.test(await page.locator('#ds-invite-delivery-result').innerText()) && !(await page.locator('#ds-invite-retry').isVisible()), await page.locator('#ds-invite-delivery-result').innerText());
+ok('successful retry clears the warning', await page.locator('#ds-invite-delivery-result').isHidden() && await page.locator('#ds-success-banner').isHidden() && !(await page.locator('#ds-invite-retry').isVisible()) && (await page.locator('.ds-invite-status').count()) === 0, await page.locator('#step-done').innerText().then((t) => t.slice(0, 220)));
 ok('phone viewport has no horizontal overflow', await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 1, await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
 
 // ── PDF variant: the requester points at the spot where the other party signs ──

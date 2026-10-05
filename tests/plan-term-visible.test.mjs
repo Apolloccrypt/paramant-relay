@@ -62,7 +62,7 @@ function readable(iso, lang = 'en') {
 // ── /account ─────────────────────────────────────────────────────────────────
 // Its billing block hangs on one call. Everything else on the page is stubbed
 // to something harmless so nothing else can fail the run.
-async function account(paidUntil, prefix = '') {
+async function account(paidUntil, prefix = '', extra = {}) {
   const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
   // Playwright tries the most recently added route first, so the catch-all is
   // registered before the two that matter, not after.
@@ -79,6 +79,7 @@ async function account(paidUntil, prefix = '') {
     next_billing_date: null,
     auto_renews: false,
     cancellation_scheduled_at: null,
+    ...extra,
   }));
   await page.route('**/api/user/billing/history', (route) => json(route, { history: [] }));
   await page.route('**/api/user/account', (route) => json(route, {
@@ -150,27 +151,24 @@ async function dashboard(paidUntil, prefix = '') {
 const COPY = {
   nl: {
     lang: 'nl',
-    ends: (d) => `Loopt af op ${d}, er wordt niets automatisch verlengd.`,
+    ends: (d) => `Firm betaald tot ${d}. Er wordt niets automatisch verlengd. Verlengen kan vanaf vandaag, u verliest geen dag.`,
     ended: (d) => `Afgelopen op ${d}, nu op Community.`,
     noCharge: /Er wordt niets automatisch afgeschreven\./, renew: 'Verlengen', pricing: '/pricing',
   },
   en: {
     lang: 'en',
-    ends: (d) => `Ends on ${d}, nothing renews automatically.`,
+    ends: (d) => `Firm paid until ${d}. Nothing renews automatically. You can renew from today without losing a day.`,
     ended: (d) => `Ended on ${d}, now on Community.`,
     noCharge: /Nothing is charged automatically\./, renew: 'Renew', pricing: /^\/(en\/)?pricing$/,
   },
 };
-// /account words the same date as what a one-off payment is (besluit
-// 05-10-2026): paid until that day, and renewing is possible today.
-const ACCOUNT_ENDS = {
-  nl: (d) => `Betaald tot ${d}, verlengen kan vanaf vandaag: de nieuwe periode sluit aan op ${d}. Er wordt niets automatisch verlengd.`,
-  en: (d) => `Paid until ${d}, renewing is possible from today: the new term starts on ${d}. Nothing renews automatically.`,
-};
+// /account and /dashboard write the same sentence since acceptatie 3.1.1
+// (js/plan-terms.js headline): the plan, the day it is paid until, that nothing
+// renews by itself, and that renewing today loses no day.
 const samePricing = (want, href) => (typeof want === 'string' ? href === want : want.test(href || ''));
 for (const [name, run, prefix, base] of [['account', account, '', COPY.nl], ['dashboard', dashboard, '', COPY.nl],
   ['en/account', account, '/en', COPY.en], ['en/dashboard', dashboard, '/en', COPY.en]]) {
-  const copy = name.endsWith('account') ? { ...base, ends: ACCOUNT_ENDS[base.lang] } : base;
+  const copy = base;
   // Far out: the date is stated, and nothing shouts. A warning band on a term
   // with six weeks left is noise, and noise is what makes the real one invisible.
   const far = term(40);
@@ -205,6 +203,23 @@ for (const [name, run, prefix, base] of [['account', account, '', COPY.nl], ['da
   // this repo, and this text is generated rather than written into the HTML.
   ok(`${name}: no em-dash in the term copy`,
     ![farState.line, closeState.line, closeState.warn, goneState.line].some((s) => s && s.includes('\u2014')), '');
+}
+
+// auto_renews true means a subscription stands behind the term and it WILL
+// renew. /account printed "nothing renews automatically" in exactly that case
+// (acceptatie 3.1.1, taal 31). Both values, both languages.
+for (const [prefix, lang] of [['', 'nl'], ['/en', 'en']]) {
+  const far = term(40);
+  const close = term(3);
+  const renewing = await account(far, prefix, { auto_renews: true });
+  const want = lang === 'nl'
+    ? `Firm wordt op ${readable(far, 'nl')} automatisch verlengd. Opzeggen kan tot die dag.`
+    : `Firm renews automatically on ${readable(far, 'en')}. You can cancel until that day.`;
+  ok(`${lang} account, auto_renews true: says it renews, never that nothing renews`, renewing.line === want, JSON.stringify(renewing));
+  const closeRenewing = await account(close, prefix, { auto_renews: true });
+  ok(`${lang} account, auto_renews true: no "renew or fall back" band`, closeRenewing.warn === null, JSON.stringify(closeRenewing));
+  const oneOff = await account(far, prefix, { auto_renews: false });
+  ok(`${lang} account, auto_renews false: says nothing renews`, /niets automatisch verlengd|Nothing renews automatically/.test(oneOff.line || '') && !/automatisch verlengd\. Opzeggen|renews automatically on/.test(oneOff.line || ''), JSON.stringify(oneOff));
 }
 
 await browser.close();

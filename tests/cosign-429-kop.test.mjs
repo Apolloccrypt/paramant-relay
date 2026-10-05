@@ -58,5 +58,5 @@ test('404: de kop over de link blijft', async () => {
   const r = await open(404);
   // Mick 05-10: taalronde
   assert.match(r.h1, /opent niet/);
-  assert.match(r.sub, /klopt niet of is verlopen/);
+  assert.match(r.sub, /klopt niet, of het verzoek is verlopen/);
 });

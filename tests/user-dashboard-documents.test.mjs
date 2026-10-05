@@ -280,7 +280,9 @@ const emptyCtaBox = await emptyCta.boundingBox();
 // Mick 05-10: taalronde
 ok('the empty document list offers the action that fills it',
   await planPage.locator('.dh-empty strong').innerText() === 'Nothing open right now' &&
-  (await emptyCta.getAttribute('href')).startsWith('/sign') &&
+  // This is /en/dashboard: the button opens the English signing page
+  // (acceptatie 3.1.1, betalen punt 5).
+  (await emptyCta.getAttribute('href')).startsWith('/en/sign') &&
   emptyCtaBox.height >= 44, JSON.stringify({ href: await emptyCta.getAttribute('href'), height: emptyCtaBox && Math.round(emptyCtaBox.height) }));
 
 // The stored tier is 'pro' and the badge says Firm. Those are two different

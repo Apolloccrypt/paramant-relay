@@ -124,7 +124,8 @@ test('the first screen at 390px carries the amount, the audience, the company an
     // and false of a one-time link, and a bare figure would be wrong about one
     // of them. The other way's 5 MB is named further down the page and pinned by
     // relay/test/pricing-page.test.js.
-    ['limit', '2 signatures a month, 50 transfers a month, and files up to 500 MB'],
+    // Since acceptatie 3.1.1 (taal 33) both ways are named in the line itself.
+    ['limit', '2 signatures a month, 50 transfers a month, files up to 5 MB over a link or 500 MB with Extra safe'],
     // The paid amount. It used to be two, because sending and signing were two
     // purchases and a buyer who only saw €15 had been told the price of the
     // other one. Firm is one plan over both products, so there is one figure
@@ -262,7 +263,7 @@ test('the Dutch first screen at 390px carries the one offer, its button and Comm
   const width = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
   await page.close();
   assert.equal(cta.count, 1, `the Dutch /pricing carries ${cta.count} primary buttons; the decision is one`);
-  assert.equal(cta.plan, 'firm', 'the one primary button buys the kantoorplan (Firm)');
+  assert.equal(cta.plan, 'firm', 'the one primary button buys Firm');
   const required = { ...seen, cta };
   delete required.foldText;
   for (const [name, hit] of Object.entries(required)) {
@@ -272,7 +273,10 @@ test('the Dutch first screen at 390px carries the one offer, its button and Comm
   assert.ok(seen.what.top < seen.offer.top && seen.offer.top < seen.btw.top && seen.btw.top < cta.top,
     'what it does, then the amount, then the amount with btw, then the button');
   assert.equal(width.scroll, width.client, 'the Dutch /pricing scrolls sideways on a phone');
-  for (const rx of [/\bML-DSA\b/i, /\bML-KEM\b/i, /\bAPI\b/, /\brelay\b/i, /\bFirm\b/]) {
+  // Firm left this list in acceptatie 3.1.1 (taal 4): the customer bought a
+  // "kantoorplan" here and read "Firm" everywhere after it. Firm is now the
+  // one name, introduced as "Firm, het kantoorplan".
+  for (const rx of [/\bML-DSA\b/i, /\bML-KEM\b/i, /\bAPI\b/, /\brelay\b/i]) {
     assert.doesNotMatch(seen.foldText, rx, `the Dutch first screen reads "${seen.foldText}" and carries ${rx}`);
   }
 });

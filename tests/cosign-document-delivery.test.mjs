@@ -92,12 +92,13 @@ let state = await page.evaluate(() => ({
   step: document.querySelector('.step.active')?.id,
   delivery: document.querySelector('#document-delivery-status')?.textContent,
   result: document.querySelector('#verify-result')?.textContent,
+  resultHidden: document.querySelector('#verify-result')?.hidden,
   signDisabled: document.querySelector('#sign-confirm')?.disabled,
   overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
 }));
 ok('automatic delivery opens the co-sign step', state.step === 'step-cosign', state.step);
 ok('automatic delivery reports decrypted + matched', /geopend en klopt met dit verzoek/i.test(state.delivery), state.delivery);
-ok('automatic delivery verifies the document hash', /controle klopt\./i.test(state.result), state.result);
+ok('automatic delivery says it once: the hash line stays hidden next to the delivery line', state.resultHidden === true, String(state.resultHidden));
 ok('verified delivered document enables signing', state.signDisabled === false, state.signDisabled);
 ok('phone viewport has no horizontal overflow', state.overflow <= 1, state.overflow);
 ok('document endpoint read once', documentReads === 1, documentReads);
@@ -143,7 +144,7 @@ const readsBeforeNoKey = documentReads;
 await page.goto(base, { waitUntil: 'domcontentloaded' });
 await waitForDeliveryResult();
 state = await page.evaluate(() => ({ delivery: document.querySelector('#document-delivery-status')?.textContent, manual: document.querySelector('#verify-file-cta')?.textContent }));
-ok('older link without key gives an actionable manual fallback', /sleutel, ontbreekt/i.test(state.delivery) && /zelf/i.test(state.manual), JSON.stringify(state));
+ok('older link without key gives an actionable manual fallback', /laatste stuk van de link ontbreekt/i.test(state.delivery) && /zelf/i.test(state.manual), JSON.stringify(state));
 ok('missing fragment does not fetch undecryptable ciphertext', documentReads === readsBeforeNoKey, documentReads);
 
 const anonPage = await browser.newPage({ viewport: { width: 390, height: 844 } });

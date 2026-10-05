@@ -786,7 +786,7 @@ test('the Community plan limits on the site are the ones tiers.js declares', () 
   const problems = [];
   const says = (where, text, phrase) => { if (!text.includes(phrase)) problems.push(`${where}: must state "${phrase}"`); };
   says('index', visible(page('en/index')), `${transfers} transfers a month`);
-  says('index', visible(page('en/index')), `${mb} MB per file`);
+  says('index', visible(page('en/index')), `files up to ${mb} MB`);
   says('docs', visible(page('en/docs')), `${transfers} transfers a month`);
   says('docs', visible(page('en/docs')), `${mb} MB per file`);
   // The Dutch pages.
@@ -1414,9 +1414,12 @@ test('the hourly ceiling a paid plan buys is outbound_per_hour, and no page sell
   assert.doesNotMatch(relay, /ANON_RPH[^;]*plan/, 'the anonymous per-IP rate must not read a plan');
 
   const problems = [];
-  const idx = visible(page('en/index'));
-  if (!idx.includes(`up to ${pro} retrievals an hour through the API instead of ${community}`)) {
-    problems.push(`index: the paid-plan line must say up to ${pro} retrievals an hour instead of ${community}`);
+  // The English homepage sold this number in a tier list until acceptance
+  // 3.1.1 gave it the same four cards as the Dutch one, which names no hourly
+  // figure. /en/parasend is the page that sells it now.
+  const idx = visible(page('en/parasend'));
+  if (!idx.includes(`Up to ${pro} retrievals an hour through the API`)) {
+    problems.push(`en/parasend: the Firm card must say up to ${pro} retrievals an hour through the API`);
   }
   for (const slug of publicPages()) {
     const m = /no IP rate limit|IP rate limit (?:is )?(?:lifted|removed)/i.exec(visible(page(slug)));
@@ -2818,8 +2821,9 @@ test('every page that promises burn-on-read says which client and which plan it 
     `parasend: the Firm card must offer the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
   assert.ok(page('parasend').includes('<li>Gewist na de eerste keer lezen</li>'),
     'parasend: the Community card must still say the link burns on the first read');
-  assert.ok(flatten(bodyOf(page('en/index'))).includes(`up to ${reads.pro} reads per link through the API`),
-    `index: the ParaSend Firm price line must name the ${reads.pro} reads per link tiers.js grants, and say they come through the API`);
+  // The English homepage carried a ParaSend price line with this figure until
+  // acceptance 3.1.1 gave it the Dutch homepage's four cards; /en/pricing and
+  // /en/parasend, pinned above, are where the figure is sold.
 
   // The two pages that spell the ParaSend plans out on their own terms. The
   // durations on /docs come off view_ttl_ms since 2026-09-04, so a tier change
@@ -2856,7 +2860,7 @@ test('every page that promises burn-on-read says which client and which plan it 
   assert.ok(flatten(bodyOf(page('security'))).includes(unifiedNlSecurity),
     `security (nl): must carry the client-and-plan sentence in full: "${unifiedNlSecurity}"`);
   // Dutch /pricing sells one office plan, so it names that plan's read count.
-  assert.ok(flatten(bodyOf(page('pricing'))).includes(`De webapp en de extensies wissen het na de eerste keer lezen, op elk plan. Via de API mag een betaalde link vaker gelezen worden: tot ${reads.pro} keer op het kantoorplan.`),
+  assert.ok(flatten(bodyOf(page('pricing'))).includes(`De webapp en de extensies wissen het na de eerste keer lezen, op elk plan. Via de API mag een betaalde link vaker gelezen worden: tot ${reads.pro} keer op Firm.`),
     'pricing (nl): must say the web app and extensions burn on the first read on every plan, and that more reads come through the API');
 
   const ERASE_NL = 'verbrand(?:t|en)?|vernietig(?:d|t|en)|gewist|wis(?:t|sen)|verwijder(?:d|t|en)|weg|verdwijn(?:t|en)|verdwenen';
@@ -3013,9 +3017,9 @@ test('the ParaSend credential /privacy describes is the credential the code impl
   // 5. The manual self-host escape on /parashare is named rather than hidden.
   assert.ok(priv.includes('you can still type a key by hand on that page'),
     'privacy: the self-host exception must be stated, because on that path a key really is typed into the browser');
-  assert.match(page('en/parashare'), /data-click="expandApiKeyCard">Use a key by hand/,
+  assert.match(page('en/parashare'), /data-click="expandApiKeyCard">(?:Enter a key|Your own server\?)</,
     'and /en/parashare must still offer it, or /privacy describes a door that is not there');
-  assert.match(page('parashare'), /data-click="expandApiKeyCard">Een sleutel met de hand invoeren/,
+  assert.match(page('parashare'), /data-click="expandApiKeyCard">(?:Voer een sleutel in|Eigen server\?)</,
     'and /parashare must still offer it, or /privacy describes a door that is not there');
 
   // The Dutch /privacy, same claims with the same numbers.
@@ -3182,10 +3186,10 @@ test('the pages before the button say the ParaSend web app is a live handshake, 
   assert.ok(/short code|sas|safety number|compare/i.test(share) && /controlecode|vergelijk/i.test(share),
     'the ParaSend web app no longer derives a code for the two sides to compare; the sentence promises one');
   assert.match(read('frontend/en/parashare.html'),
-    /<strong>Extra safe<\/strong>: the other person is available right now\. You check a short code together/,
+    /<strong>Extra safe<\/strong>: choose this when the other person is at a screen right now too\. You compare a short code together/,
     '/en/parashare step 1 no longer carries the Extra safe promise the pages before it now summarise');
   assert.match(read('frontend/parashare.html'),
-    /<strong>Extra veilig<\/strong>: de ontvanger is nu bereikbaar\. U controleert samen een korte code/,
+    /<strong>Extra veilig<\/strong>: kies dit als de ontvanger nu ook achter een scherm zit\. U vergelijkt samen een korte code/,
     '/parashare step 1 no longer carries the Extra veilig promise the pages before it now summarise');
 
   // Half two. There IS an asynchronous route, it is the API, and it holds the
@@ -3615,7 +3619,7 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
   says('about', `Voor uw kantoor: ${excl} euro per maand`);
   for (const slug of ['index', 'about']) says(slug, 'Meer nodig? Mail Mick: privacy@paramant.app');
   // /pricing since 05-10-2026: who the line is for, and the same address.
-  says('pricing', 'Grotere organisatie? Neem contact op: privacy@paramant.app');
+  says('pricing', 'Grotere organisatie? Dan is er Business, op aanvraag: 1.000 handtekeningen per maand, een vaste contactpersoon en een audittrail die u kunt exporteren, voor €299 per maand excl. btw. Neem contact op: privacy@paramant.app');
   const lim = (tier, dim) => tiers.tierLimit(tier, dim);
   for (const slug of ['index', 'pricing', 'about']) {
     says(slug, `${lim('community', 'signs_month')} handtekeningen per maand`);
@@ -3630,7 +3634,7 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
   // the page: an account is one login today, and the roadmap still lists
   // "multiple users per account" as coming. What the page may say is that the
   // price is per account, and that more users are still to come.
-  says('pricing', 'Het kantoorplan kost per account, niet per gebruiker. Een account met meerdere gebruikers komt nog');
+  says('pricing', 'Firm kost per account, niet per gebruiker. Een account met meerdere gebruikers komt nog');
   assert.match(visible(page('en/pricing')), /Coming to paid plans: multiple users per account/,
     'the Dutch page says more users per account is still coming; the roadmap line it rests on is on /en/pricing');
   for (const slug of ['index', 'pricing']) {
@@ -3753,9 +3757,13 @@ test('the Dutch pages say what the code, the catalog and the files on disk say',
   }
 
   // 8. The same facts the English pages are held to, in Dutch.
-  says('index', 'In de webapp zijn u en de ontvanger allebei online en vergelijkt u een korte code');
+  // Acceptatie 3.1.1: the homepage carried "both online" as the rule for the
+  // whole web app. It now carries the /parasend sentence: a link by default,
+  // both online only with Extra veilig.
+  says('index', 'In de webapp stuurt u een link die de ontvanger opent wanneer het uitkomt');
+  says('index', 'zijn u en de ontvanger allebei online en vergelijkt u een korte controlecode');
   const prodCta = home.indexOf('<div class="prod-cta"><a class="hp-btn hp-btn-line" href="/parasend">');
-  if (!(home.indexOf('vergelijkt u een korte code') > 0 && home.indexOf('vergelijkt u een korte code') < prodCta)) problems.push('index: the handshake sentence stands above the versturen card button');
+  if (!(home.indexOf('vergelijkt u een korte controlecode') > 0 && home.indexOf('vergelijkt u een korte controlecode') < prodCta)) problems.push('index: the handshake sentence stands above the versturen card button');
   const buy = page('pricing').indexOf('data-billing-interval="monthly"');
   const hs = page('pricing').indexOf('allebei online en vergelijkt u een korte code');
   if (!(hs > 0 && hs < buy)) problems.push('pricing: the handshake stands above the button that buys it');
@@ -3977,22 +3985,26 @@ test('what /pricing says each plan can do is what the relay enforces and what /d
   const oneTimeMb = 5; // tests/site-claims block 1 holds the one-time-link ceiling; the table repeats it
   const hr = (n, lang) => (lang === 'nl' ? `${n} uur` : `${n} hour${n === 1 ? '' : 's'}`);
 
-  cell('pricing', 'Handtekeningen per maand', [nlNum(signs(free)), nlNum(signs(firm))]);
-  cell('pricing', 'Verzendingen per maand', [String(sendQ(free)), `${sendQ(firm)}, hooguit ${L(firm, 'outbound_per_hour')} per uur`]);
-  cell('pricing', 'Ontvangers per verzending', [String(L(free, 'max_recipients')), String(L(firm, 'max_recipients'))]);
-  cell('pricing', 'Een link blijft geldig', [hr(hours(L(free, 'view_ttl_ms')), 'nl'), hr(hours(L(firm, 'view_ttl_ms')), 'nl')]);
-  cell('pricing', 'Keer openen per link via de API', [String(L(free, 'max_views')), String(L(firm, 'max_views'))]);
-  cell('pricing', 'Geregistreerde apparaten', [String(L(free, 'devices')), String(L(firm, 'devices'))]);
-  cell('pricing', 'Bestand via een eenmalige link', [`${oneTimeMb} MB`, `${oneTimeMb} MB`]);
-  cell('pricing', 'API-sleutel voor ondertekenen', ['nee', 'ja']);
-  cell('pricing', 'Audittrail exporteren', [audit(free) ? 'ja' : 'nee', audit(firm) ? 'ja' : 'nee']);
+  // Since acceptatie 3.1.1 (taal 5 and 32) the Dutch table carries the same
+  // three plans as the English one, Business marked "op aanvraag", and the API
+  // rows sit under their own heading.
+  cell('pricing', 'Handtekeningen per maand', [nlNum(signs(free)), nlNum(signs(firm)), nlNum(signs(biz))]);
+  cell('pricing', 'Ondertekenaars per document', [free, firm, biz].map((e) => String(parties(e))));
+  cell('pricing', 'Verzendingen per maand', [String(sendQ(free)), `${sendQ(firm)}, hooguit ${L(firm, 'outbound_per_hour')} per uur`, `${sendQ(biz)}, hooguit ${L(biz, 'outbound_per_hour')} per uur`]);
+  cell('pricing', 'Ontvangers per verzending', [free, firm, biz].map((e) => String(L(e, 'max_recipients'))));
+  cell('pricing', 'Een link blijft geldig', [free, firm, biz].map((e) => hr(hours(L(e, 'view_ttl_ms')), 'nl')));
+  cell('pricing', 'Keer openen per link', [free, firm, biz].map((e) => String(L(e, 'max_views'))));
+  cell('pricing', 'Geregistreerde apparaten', [free, firm, biz].map((e) => String(L(e, 'devices'))));
+  cell('pricing', 'Bestand via een eenmalige link', [`${oneTimeMb} MB`, `${oneTimeMb} MB`, `${oneTimeMb} MB`]);
+  cell('pricing', 'API-sleutel voor ondertekenen', ['nee', 'ja', 'ja']);
+  cell('pricing', 'Audittrail exporteren', [free, firm, biz].map((e) => (audit(e) ? 'ja' : 'nee')));
 
   cell('en/pricing', 'Signatures a month', [enNum(signs(free)), enNum(signs(firm)), enNum(signs(biz))]);
-  cell('en/pricing', 'Signers per document (API)', [free, firm, biz].map((e) => String(parties(e))));
+  cell('en/pricing', 'Signers per document', [free, firm, biz].map((e) => String(parties(e))));
   cell('en/pricing', 'Transfers a month', [String(sendQ(free)), `${sendQ(firm)}, at most ${L(firm, 'outbound_per_hour')} an hour`, `${sendQ(biz)}, at most ${L(biz, 'outbound_per_hour')} an hour`]);
   cell('en/pricing', 'Recipients per send', [free, firm, biz].map((e) => String(L(e, 'max_recipients'))));
   cell('en/pricing', 'A link stays valid', [free, firm, biz].map((e) => hr(hours(L(e, 'view_ttl_ms')), 'en')));
-  cell('en/pricing', 'Reads per link through the API', [free, firm, biz].map((e) => String(L(e, 'max_views'))));
+  cell('en/pricing', 'Reads per link', [free, firm, biz].map((e) => String(L(e, 'max_views'))));
   cell('en/pricing', 'Registered devices', [free, firm, biz].map((e) => String(L(e, 'devices'))));
   cell('en/pricing', 'File over a one-time link', [`${oneTimeMb} MB`, `${oneTimeMb} MB`, `${oneTimeMb} MB`]);
   cell('en/pricing', 'ParaSign API key', ['no', 'yes', 'yes']);
@@ -4002,7 +4014,7 @@ test('what /pricing says each plan can do is what the relay enforces and what /d
 
   // /dashboard after paying says the same numbers, and no longer "no rate limit".
   const dash = read('frontend/js/dashboard.js');
-  const firmSend = (dash.match(/pro: nlEn\('(Firm voor Versturen:[^']+)', '([^']+)'\)/) || []);
+  const firmSend = (dash.match(/pro: nlEn\('(Versturen: [^']+)', '([^']+)'\)/) || []);
   if (!firmSend[1]) problems.push('dashboard.js: the Firm ParaSend line is gone');
   else {
     for (const [lang, text] of [['nl', firmSend[1]], ['en', firmSend[2]]]) {
@@ -4013,8 +4025,10 @@ test('what /pricing says each plan can do is what the relay enforces and what /d
     }
   }
   if (/geen snelheidslimiet|no rate limit/i.test(dash.replace(/^\s*\/\/.*$/gm, ''))) problems.push('dashboard.js promises no rate limit; tiers.js holds Firm to outbound_per_hour');
-  if (!/pro_business: nlEn\('Versturen, inbegrepen bij Business/.test(dash)) problems.push('dashboard.js: a Business customer reads his ParaSend half under the name Business');
-  const firmSign = dash.match(/pro: nlEn\('(Firm voor Ondertekenen:[^']+)'/);
+  // The plan name is said once, in the band's heading; the lines under it name
+  // the product (acceptatie 3.1.1, taal 25). The Business heading carries it.
+  if (!/pro_business: nlEn\('Versturen: /.test(dash)) problems.push('dashboard.js: a Business customer reads his ParaSend half');
+  const firmSign = dash.match(/pro: nlEn\('(Ondertekenen: [^']+)'/);
   if (!firmSign || !firmSign[1].includes(`${signs(firm)} handtekeningen per maand`)) problems.push('dashboard.js: the Firm ParaSign line must say the signs ceiling');
 
   // Business on the English page: more than Firm, in words.
