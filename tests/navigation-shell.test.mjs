@@ -363,8 +363,28 @@ const artIn = await artInsideTheClip(true);
 ok('signed in at 1440, no part of the hero art is cut off by the clip', artIn.cut.length === 0, JSON.stringify(artIn));
 // And the measurement above is capable of finding a box, which a vacuous pass
 // on an empty node list would not prove. Signed out the art is drawn, in full.
+//
+// Signed out, the drawn document retired on 5 October 2026: the hero now holds
+// the dashboard itself in a demo state (.wp-demo, js/home-demo.js), which shows
+// the real screens instead of a picture of a document. So signed out the art
+// draws nothing, and the measurement above is proven capable on the demo: its
+// three tiles are drawn, and drawn whole inside the same clip.
 const artOut = await artInsideTheClip(false);
-ok('signed out at 1440, the hero art is drawn and drawn whole', artOut.drawn > 0 && artOut.cut.length === 0, JSON.stringify(artOut));
+ok('signed out at 1440, the retired hero art draws nothing', artOut.drawn === 0, JSON.stringify(artOut));
+const demoPage = await browser.newPage({ viewport:{ width:1440, height:900 } });
+await demoPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:401, contentType:'application/json', body:'{"authenticated":false}' }));
+await demoPage.goto(ORIGIN + '/', { waitUntil:'domcontentloaded' });
+await demoPage.locator('[data-home="out"]:not([hidden])').waitFor();
+const demoOut = await demoPage.evaluate(() => {
+  const main = document.querySelector('main').getBoundingClientRect();
+  const tiles = Array.from(document.querySelectorAll('[data-home="out"] .wp-demo .wp-tile')).map((tile) => tile.getBoundingClientRect());
+  return {
+    tiles: tiles.filter((box) => box.width > 0 && box.height > 0).length,
+    cut: tiles.filter((box) => box.bottom > main.bottom || box.top < main.top || box.left < main.left || box.right > main.right).length,
+  };
+});
+await demoPage.close();
+ok('signed out at 1440, the demo dashboard draws its three tiles whole', demoOut.tiles === 3 && demoOut.cut === 0, JSON.stringify(demoOut));
 
 const appPage = await browser.newPage({ viewport:{ width:390, height:844 } });
 await appPage.route('**/api/user/session/verify', (route) => route.fulfill({ status:200, contentType:'application/json', body:'{"authenticated":true,"email":"demo@example.com"}' }));

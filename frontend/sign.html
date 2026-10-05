@@ -526,6 +526,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 <meta name="theme-color" content="#FFFFFF">
 <link rel="stylesheet" href="/app-2026.css?v=12">
 <link rel="stylesheet" href="/done-state.css?v=1">
+<link rel="stylesheet" href="/werkplek.css?v=1">
 <script src="/js/theme.js?v=6"></script>
 </head>
 <body>
@@ -572,12 +573,17 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <header class="ds-head">
     <p class="ds-kicker">ParaSign · documenten veilig laten tekenen</p>
     <h1 class="ds-title">Laat een belangrijk document ondertekenen.</h1>
-    <p class="ds-lede">Onderteken zelf, teken samen of stuur het naar anderen. Uw document blijft privé en bij elke handtekening hoort bewijs dat iedereen zelf kan controleren.</p>
+    <p class="ds-lede">Zelf tekenen, samen tekenen of naar anderen sturen. Bij elke handtekening hoort bewijs dat iedereen kan nakijken.</p>
     <ul class="ds-facts">
       <li id="ds-plan-fact"><b>Altijd gratis</b> &middot; 2 handtekeningen per maand, geen betaalkaart</li>
+    </ul>
+    <details class="wp-fold ds-facts-fold">
+      <summary>Waarom uw document veilig blijft</summary>
+      <ul class="ds-facts wp-fold-body">
       <li><b>Uw ondertekensleutel blijft hier</b> &middot; hij wordt op uw apparaat gemaakt en komt nooit op onze servers</li>
       <li><b>Europees recht</b> &middot; servers in Duitsland, onder EU-recht</li>
-    </ul>
+      </ul>
+    </details>
     <p class="ds-headlink"><a href="/parasign">Wat ParaSign is, en wat organisaties betalen &rarr;</a></p>
   </header>
 
@@ -628,12 +634,15 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
        /api/user/check answers 401, so a signed-in user never sees it. -->
   <section class="ds-step ds-anon" id="step-anon" hidden>
     <h2>Voor ondertekenen is een account nodig</h2>
-    <p class="ds-sub">
-      Uw document gaat nergens heen: het bestand en uw privésleutel blijven in deze browser,
-      en de relay ziet alleen een hash. U heeft een account nodig omdat u tekent met een sleutel
-      die hoort bij een passkey op uw apparaat. Die sleutel moet eerst zijn vastgelegd voordat
-      hij kan tekenen.
-    </p>
+    <details class="wp-fold">
+      <summary>Waarom is een account nodig?</summary>
+      <p class="ds-sub">
+        Uw document gaat nergens heen: het bestand en uw privésleutel blijven in deze browser,
+        en de relay ziet alleen een hash. U heeft een account nodig omdat u tekent met een sleutel
+        die hoort bij een passkey op uw apparaat. Die sleutel moet eerst zijn vastgelegd voordat
+        hij kan tekenen.
+      </p>
+    </details>
     <p class="ds-sub">
       <strong>Wat zonder account kan:</strong> een verzoek openen dat iemand u stuurde
       en tekenen met de link uit die e-mail, en

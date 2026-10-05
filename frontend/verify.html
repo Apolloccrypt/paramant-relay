@@ -33,6 +33,9 @@
 <link rel="stylesheet" href="/nav.css?v=29">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <link rel="stylesheet" href="/components-parasign.css?v=7">
+<link rel="stylesheet" href="/receipt-verify.css?v=1">
+<link rel="stylesheet" href="/app-2026.css?v=12">
+<link rel="stylesheet" href="/werkplek.css?v=1">
 <script type="application/ld+json" data-paramant-seo="1">
 {
   "@context": "https://schema.org",
@@ -141,7 +144,7 @@
   <header class="ps-head">
     <p class="ps-kicker">Controleren</p>
     <h1 class="ps-title">Controleer een bewijs van Paramant</h1>
-    <p class="ps-lede">Paramant levert twee soorten bewijs: een ondertekend document, en een ontvangstbewijs dat laat zien dat een bestand is afgeleverd en daarna vernietigd. U controleert ze allebei hier, op uw eigen apparaat. Wat u hier kiest of plakt, wordt niet geüpload. U heeft er geen account voor nodig.</p>
+    <p class="ps-lede">Een ondertekend document of een ontvangstbewijs, gecontroleerd op uw eigen apparaat. Er wordt niets geüpload en u heeft er geen account voor nodig.</p>
   </header>
 
   <div class="rv-tabs" role="tablist" aria-label="Wat wilt u controleren">
@@ -170,16 +173,15 @@
     <div class="ps-result" id="vf-result" hidden role="status" aria-live="polite"></div>
   </section>
 
-  <aside class="ps-info">
-    <h2>Wat er wordt gecontroleerd</h2>
+  <details class="ps-info wp-fold">
+    <summary>Wat er wordt gecontroleerd</summary>
     <ul>
       <li>De SHA3-256-hash van uw document is gelijk aan de hash in de envelop</li>
       <li>De ML-DSA-65-handtekening van de ondertekenaar over die hash is geldig</li>
       <li>Bij een bewijs met meerdere ondertekenaars: de bekrachtiging is gezet met een vaste sleutel van Paramant, niet met een sleutel uit het bestand zelf</li>
     </ul>
     <p class="ps-help">Een bewijs van nu controleert uw browser volledig zelf, ook offline. Alleen een oude envelop (v1 of v2) gaat langs de relay: dan stuurt deze pagina de vingerafdruk en het bewijs, nooit het document. U heeft geen account of API-sleutel nodig.</p>
-    <p><a href="/dashboard">Naar uw dashboard &rarr;</a></p>
-  </aside>
+    <p><a href="/dashboard">Naar uw dashboard &rarr;</a></p>  </details>
   </div>
 
   <div id="panel-receipt" role="tabpanel" aria-labelledby="tab-receipt" hidden>
@@ -213,16 +215,15 @@
       </div>
     </details>
 
-    <aside class="ps-info">
-      <h2>Wat er wordt gecontroleerd</h2>
+    <details class="ps-info wp-fold">
+      <summary>Wat er wordt gecontroleerd</summary>
       <ul>
         <li>Het ontvangstbewijs gaat over het bestand dat het noemt, en geen ander</li>
         <li>De regel waar het naar verwijst staat echt in het openbare transparantielogboek</li>
         <li>De handtekening over het hele ontvangstbewijs klopt, dus er is niets veranderd</li>
         <li>De momentopname van het logboek waar het ontvangstbewijs op steunt is ook ondertekend</li>
       </ul>
-      <p class="ps-help">Alle vier de controles gebeuren op dit apparaat. Is de pagina eenmaal geladen, dan kunt u de internetverbinding verbreken. Het antwoord blijft hetzelfde.</p>
-    </aside>
+      <p class="ps-help">Alle vier de controles gebeuren op dit apparaat. Is de pagina eenmaal geladen, dan kunt u de internetverbinding verbreken. Het antwoord blijft hetzelfde.</p>    </details>
   </div>
 </main>
 

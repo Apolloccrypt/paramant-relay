@@ -536,6 +536,7 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
 <meta name="theme-color" content="#FFFFFF">
 <link rel="stylesheet" href="/app-2026.css?v=12">
 <link rel="stylesheet" href="/done-state.css?v=1">
+<link rel="stylesheet" href="/werkplek.css?v=1">
 <script src="/js/theme.js?v=6"></script>
 </head>
 <body>
@@ -582,12 +583,17 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
   <header class="ds-head">
     <p class="ds-kicker">ParaSign · secure document workflow</p>
     <h1 class="ds-title">Get an important document signed.</h1>
-    <p class="ds-lede">Sign it yourself, work together or send it to others. Your document stays private and every completed signature comes with independently verifiable proof.</p>
+    <p class="ds-lede">Sign it yourself, sign together or send it to others. Every signature comes with proof anyone can check.</p>
     <ul class="ds-facts">
       <li id="ds-plan-fact"><b>Free forever</b> &middot; 2 signatures a month, no card</li>
+    </ul>
+    <details class="wp-fold ds-facts-fold">
+      <summary>Why your document stays safe</summary>
+      <ul class="ds-facts wp-fold-body">
       <li><b>Your signing key stays here</b> &middot; it is made on your device and never reaches our servers</li>
       <li><b>EU jurisdiction</b> &middot; servers in Germany, under EU law</li>
-    </ul>
+      </ul>
+    </details>
     <p class="ds-headlink"><a href="/en/parasign">What ParaSign is, and what organisations pay &rarr;</a></p>
   </header>
 
@@ -638,12 +644,15 @@ body[data-ds-step="step-done"] .ds-stepper{display:none}
        /api/user/check answers 401, so a signed-in user never sees it. -->
   <section class="ds-step ds-anon" id="step-anon" hidden>
     <h2>Signing a document needs an account</h2>
-    <p class="ds-sub">
-      Not because the document goes anywhere. It does not: the file and your private key
-      stay in this browser, and the relay only ever sees a hash. The account exists because
-      a Paramant signature is made with a key that belongs to a passkey on your device, and
-      that key has to be enrolled somewhere before it can sign.
-    </p>
+    <details class="wp-fold">
+      <summary>Why an account?</summary>
+      <p class="ds-sub">
+        Not because the document goes anywhere. It does not: the file and your private key
+        stay in this browser, and the relay only ever sees a hash. The account exists because
+        a Paramant signature is made with a key that belongs to a passkey on your device, and
+        that key has to be enrolled somewhere before it can sign.
+      </p>
+    </details>
     <p class="ds-sub">
       <strong>What you can do without one:</strong> open a signing request someone sent you
       and sign it with the link from that email, and

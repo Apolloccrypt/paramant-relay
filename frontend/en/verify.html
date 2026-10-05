@@ -33,6 +33,9 @@
 <link rel="stylesheet" href="/nav.css?v=29">
 <link rel="stylesheet" href="/relay-pulse.css?v=5">
 <link rel="stylesheet" href="/components-parasign.css?v=7">
+<link rel="stylesheet" href="/receipt-verify.css?v=1">
+<link rel="stylesheet" href="/app-2026.css?v=12">
+<link rel="stylesheet" href="/werkplek.css?v=1">
 <script type="application/ld+json" data-paramant-seo="1">
 {
   "@context": "https://schema.org",
@@ -153,7 +156,7 @@
   <header class="ps-head">
     <p class="ps-kicker">Verify</p>
     <h1 class="ps-title">Check a Paramant proof</h1>
-    <p class="ps-lede">Two kinds of proof come out of Paramant: a signed document, and a receipt that says a file was delivered and then destroyed. Both are checked here, on your own device. Nothing you drop in is uploaded, and neither check needs an account.</p>
+    <p class="ps-lede">A signed document or a delivery receipt, checked on your own device. Nothing you drop in is uploaded, and neither check needs an account.</p>
   </header>
 
   <div class="rv-tabs" role="tablist" aria-label="What do you want to check">
@@ -182,16 +185,15 @@
     <div class="ps-result" id="vf-result" hidden role="status" aria-live="polite"></div>
   </section>
 
-  <aside class="ps-info">
-    <h2>What is checked</h2>
+  <details class="ps-info wp-fold">
+    <summary>What is checked</summary>
     <ul>
       <li>SHA3-256 of your document matches the hash inside the envelope</li>
       <li>The signer's ML-DSA-65 signature over that hash is valid</li>
       <li>For a proof with several signers: the counter-signature was made with a key Paramant pins in this site, not with a key taken from the file itself</li>
     </ul>
     <p class="ps-help">A current proof is checked entirely in your browser, offline too. Only an old envelope (v1 or v2) goes past the relay: then this page sends the fingerprint and the proof, never the document. No account or API key needed.</p>
-    <p><a href="/en/dashboard">Open your dashboard &rarr;</a></p>
-  </aside>
+    <p><a href="/en/dashboard">Open your dashboard &rarr;</a></p>  </details>
   </div>
 
   <div id="panel-receipt" role="tabpanel" aria-labelledby="tab-receipt" hidden>
@@ -225,16 +227,15 @@
       </div>
     </details>
 
-    <aside class="ps-info">
-      <h2>What is checked</h2>
+    <details class="ps-info wp-fold">
+      <summary>What is checked</summary>
       <ul>
         <li>The receipt is about the file it names and no other</li>
         <li>The entry it points to really sits in the public transparency log</li>
         <li>The signature over the whole receipt holds, so nothing was altered</li>
         <li>The log snapshot the receipt relies on was signed too</li>
       </ul>
-      <p class="ps-help">All four run on this device. Once the page has loaded, you can go offline and the answer stays the same.</p>
-    </aside>
+      <p class="ps-help">All four run on this device. Once the page has loaded, you can go offline and the answer stays the same.</p>    </details>
   </div>
 </main>
 
