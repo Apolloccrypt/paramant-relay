@@ -4267,16 +4267,57 @@ async function safeHttpsRequest(urlStr, opts = {}) {
 // lost on every restart and not shared between the sector relays, so a
 // registration silently stopped working after a deploy. Memory is the cache.
 const _webhookRedisKey = (k) => 'paramant:webhooks:' + crypto.createHash('sha256').update(k).digest('hex').slice(0, 40);
+// Bounded on every axis (review #555, H3): redis runs with noeviction, so an
+// unbounded registration list was a way for one key to fill it and turn every
+// write of every customer into an error. Per device: a short list. Per
+// account: a cap on device ids. In total: a cap over all accounts. And every
+// registration expires unless it is registered again.
+const WEBHOOK_URL_MAX = 512;
+const WEBHOOK_DEVICE_ID_MAX = 128;
+const WEBHOOK_PER_DEVICE = Math.max(1, parseInt(process.env.WEBHOOK_PER_DEVICE || '5', 10));
+const WEBHOOK_DEVICES_PER_ACCOUNT = Math.max(1, parseInt(process.env.WEBHOOK_DEVICES_PER_ACCOUNT || '20', 10));
+const WEBHOOK_TOTAL_MAX = Math.max(1, parseInt(process.env.WEBHOOK_TOTAL_MAX || '20000', 10));
+const WEBHOOK_TTL_S = Math.max(60, parseInt(process.env.WEBHOOK_TTL_S || String(90 * 86400), 10));
+const _webhookAcctKey = (acct) => 'paramant:webhooks:acct:' + crypto.createHash('sha256').update(String(acct)).digest('hex').slice(0, 40);
+const WEBHOOK_ALL_KEY = 'paramant:webhooks:all';
+// KEYS: account zset, global zset, device list. ARGV: now ms, expiry ms,
+// device member, per-account cap, total cap, entry json, per-device cap, ttl s.
+// Returns 1 stored, -1 account cap, -2 total cap.
+const WEBHOOK_REGISTER_LUA = `
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
+redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', ARGV[1])
+local gm = KEYS[1] .. '|' .. ARGV[3]
+if not redis.call('ZSCORE', KEYS[1], ARGV[3]) then
+  if redis.call('ZCARD', KEYS[1]) >= tonumber(ARGV[4]) then return -1 end
+  if redis.call('ZCARD', KEYS[2]) >= tonumber(ARGV[5]) then return -2 end
+end
+redis.call('ZADD', KEYS[1], ARGV[2], ARGV[3])
+redis.call('ZADD', KEYS[2], ARGV[2], gm)
+redis.call('RPUSH', KEYS[3], ARGV[6])
+redis.call('LTRIM', KEYS[3], -tonumber(ARGV[7]), -1)
+redis.call('EXPIRE', KEYS[3], ARGV[8])
+redis.call('EXPIRE', KEYS[1], ARGV[8])
+return 1`;
+// The in-memory cache obeys the same caps, for a relay without redis.
+function _webhookMemAllowed(k, acct) {
+  if (webhooks.has(k)) return 0;
+  if (webhooks.size >= WEBHOOK_TOTAL_MAX) return -2;
+  let n = 0;
+  const suffix = ':' + acct;
+  for (const key of webhooks.keys()) if (key.endsWith(suffix) && ++n >= WEBHOOK_DEVICES_PER_ACCOUNT) return -1;
+  return 0;
+}
 async function _webhooksFor(k) {
-  const mem = webhooks.get(k);
-  if (mem && mem.length) return mem;
-  if (!redisClient || !redisClient.isReady) return mem || [];
-  try {
-    const raw = await redisClient.lRange(_webhookRedisKey(k), 0, 19);
-    const list = raw.map((x) => { try { return JSON.parse(x); } catch { return null; } }).filter((h) => h && typeof h.url === 'string');
-    if (list.length) webhooks.set(k, list);
-    return list;
-  } catch { return mem || []; }
+  // Redis is the store when there is one (its TTLs and caps hold); the
+  // in-memory map is only for a relay without redis.
+  if (redisClient && redisClient.isReady) {
+    try {
+      const raw = await redisClient.lRange(_webhookRedisKey(k), -WEBHOOK_PER_DEVICE, -1);
+      const list = raw.map((x) => { try { return JSON.parse(x); } catch { return null; } }).filter((h) => h && typeof h.url === 'string');
+      if (list.length) return list;
+    } catch { /* fall back to memory */ }
+  }
+  return webhooks.get(k) || [];
 }
 async function pushWebhooks(apiKey, deviceId, event, data) {
   const hooks = await _webhooksFor(`${deviceId}:${acctOf(apiKey)}`);
@@ -8992,12 +9033,21 @@ async function handleRelayRequest(req, res) {
       const d = JSON.parse((await readBody(req, 4096)).toString());
       if (!d.device_id || !d.url) { res.writeHead(400); return res.end(J({ error: 'device_id and url required' })); }
       if (!isSsrfSafeUrl(d.url)) { res.writeHead(400); return res.end(J({ error: 'url must be a valid public HTTPS URL (private/loopback addresses not allowed)' })); }
-      const k = `${d.device_id}:${acctOf(apiKey)}`;
-      if (!webhooks.has(k)) webhooks.set(k, []);
+      if (typeof d.url !== 'string' || d.url.length > WEBHOOK_URL_MAX) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'url too long', max: WEBHOOK_URL_MAX })); }
+      if (String(d.device_id).length > WEBHOOK_DEVICE_ID_MAX) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'device_id too long', max: WEBHOOK_DEVICE_ID_MAX })); }
+      const _acct = acctOf(apiKey);
+      const k = `${d.device_id}:${_acct}`;
+      const _capReply = (code) => {
+        res.writeHead(429, { 'Content-Type': 'application/json' });
+        return res.end(J(code === -1
+          ? { error: 'webhook_device_limit', max_devices: WEBHOOK_DEVICES_PER_ACCOUNT }
+          : { error: 'webhook_store_full' }));
+      };
       // Every webhook is signed. Without a secret X-Paramant-Sig went out
       // empty and the receiver could not tell our call from anyone's. One is
       // made when the caller sends none, and handed back once, here.
       const _given = d.secret == null ? '' : String(d.secret);
+      if (_given.length > 256) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(J({ error: 'secret too long', max: 256 })); }
       const _secret = _given || ('whsec_' + crypto.randomBytes(24).toString('hex'));
       // String(), want `|| ''` vangt alleen falsy. Een number, object of array
       // overleefde en kwam later in crypto.createHmac terecht, dat op een
@@ -9007,13 +9057,28 @@ async function handleRelayRequest(req, res) {
       // rejection met emergencyZeroAndExit -- alle blobs van ALLE klanten op
       // nul en afsluiten. Een enkel JSON-veld van een betalende klant legde de
       // relay om voor iedereen, telkens opnieuw, want de registratie bleef staan.
-      webhooks.get(k).push({ url: d.url, secret: _secret });
+      const _entry = { url: d.url, secret: _secret };
       if (redisClient && redisClient.isReady) {
+        let rr;
         try {
-          const rk = _webhookRedisKey(k);
-          await redisClient.rPush(rk, JSON.stringify({ url: d.url, secret: _secret }));
-          await redisClient.lTrim(rk, -20, -1);
-        } catch (we) { log('warn', 'webhook_persist_failed', { err: we.message }); }
+          rr = await redisClient.eval(WEBHOOK_REGISTER_LUA, {
+            keys: [_webhookAcctKey(_acct), WEBHOOK_ALL_KEY, _webhookRedisKey(k)],
+            arguments: [String(Date.now()), String(Date.now() + WEBHOOK_TTL_S * 1000), crypto.createHash('sha256').update(String(d.device_id)).digest('hex').slice(0, 32),
+              String(WEBHOOK_DEVICES_PER_ACCOUNT), String(WEBHOOK_TOTAL_MAX), JSON.stringify(_entry), String(WEBHOOK_PER_DEVICE), String(WEBHOOK_TTL_S)],
+          });
+        } catch (we) {
+          log('warn', 'webhook_persist_failed', { err: we.message });
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          return res.end(J({ error: 'webhook_store_unavailable' }));
+        }
+        if (Number(rr) < 0) return _capReply(Number(rr));
+      } else {
+        const memOk = _webhookMemAllowed(k, _acct);
+        if (memOk < 0) return _capReply(memOk);
+        if (!webhooks.has(k)) webhooks.set(k, []);
+        const _list = webhooks.get(k);
+        _list.push(_entry);
+        if (_list.length > WEBHOOK_PER_DEVICE) _list.splice(0, _list.length - WEBHOOK_PER_DEVICE);
       }
       log('info', 'webhook_registered', { device: d.device_id });
       res.writeHead(200, { 'Content-Type': 'application/json' });
