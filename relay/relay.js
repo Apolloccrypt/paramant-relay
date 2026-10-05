@@ -11703,7 +11703,9 @@ async function handleRelayRequest(req, res) {
             plan: _signEnt.tier, limit: _signIncluded, used: _g.used,
             reset_date: quota.nextResetDate() }));
         }
-        _signReserved = _g.counted;
+        // A reference on a unit: counted it here, or rides the pending hold of
+        // an earlier request for this slot (quota.GATE_SIGN_LUA, review #555 H4).
+        _signReserved = _g.counted || _g.ref === true;
         if (Number.isFinite(_g.used)) _signUsed = _g.used;
       }
 
@@ -11743,11 +11745,15 @@ async function handleRelayRequest(req, res) {
       // left here is the retry case: an 'idem' answer means this signature was
       // already counted the first time round, and the slot this request reserved
       // has to go back or a client that retries pays twice for one signature.
+      // The release takes this request's reference off the slot's hold; the
+      // unit only goes back when no other request is still on it and nothing
+      // landed on it (review #555, H4).
       if (out.code !== 'new' && _signReserved) {
-        const _rel = await quota.releaseSign(redisClient, meterAccountId, log);
+        const _rel = await quota.releaseSign(redisClient, meterAccountId, log, { holdKey: _holdKey });
         if (Number.isFinite(_rel.used)) _signUsed = _rel.used;
         _signReserved = false;
       }
+      if (out.code === 'new' && Number.isFinite(_signIncluded)) await quota.finalizeSign(redisClient, _holdKey, log);
       // A path that reserved a slot and neither released it nor signed would
       // leak a unit a month. There is no such path: every return between the
       // gate and here releases first, and the only remaining exits are this
