@@ -229,8 +229,11 @@ function usersTable(users){
 
 function toggleMenu(e,id){
   e.stopImmediatePropagation();
-  const btn=e.currentTarget||e.target;
   const m=document.getElementById(id);
+  // Delegated click: e.currentTarget is the document, which has no setAttribute
+  // (WebKit threw on every menu open; same fix as admin/public/app.js ADMIN-07-G).
+  // The menu's own button sits right before it.
+  const btn=(m&&m.previousElementSibling&&m.previousElementSibling.setAttribute)?m.previousElementSibling:{setAttribute(){}};
   const wasOpen=m.classList.contains('open');
   if(openMenu){openMenu.classList.remove('open');const ob=openMenu.previousElementSibling;if(ob)ob.setAttribute('aria-expanded','false');}
   if(!wasOpen){

@@ -31,3 +31,9 @@ test('admin.html loads the new admin.page.js (cache-bust moved)', () => {
   const m = read('frontend/admin.html').match(/\/js\/admin\.page\.js\?v=(\d+)/);
   assert.ok(m && Number(m[1]) >= 5, 'admin.page.js changed, its ?v= must move');
 });
+
+test('the menu button is found from the menu, not from the delegated event', () => {
+  const fn = second.slice(second.indexOf('function toggleMenu'), second.indexOf('function toggleMenu') + 600);
+  assert.doesNotMatch(fn, /const btn=e\.currentTarget/, 'e.currentTarget is the document under the delegated click');
+  assert.match(fn, /previousElementSibling/);
+});
