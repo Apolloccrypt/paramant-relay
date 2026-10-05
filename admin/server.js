@@ -4271,9 +4271,29 @@ api.post("/user/billing/cancel", authUser, async (req, res) => {
   // 3). The account page shows no button then; this refuses the call too, and
   // sends no mail. Whether something collects is relay-main's answer, the
   // same one GET /user/billing/status reads.
+  //
+  // FAIL CLOSED (review 573, L3). When relay-main does not answer, we cannot
+  // tell a one-off payment from a subscription, and this route used to carry
+  // on and mail "uw plan is opgezegd" anyway. Now it stops before it writes a
+  // date or sends a mail, and says so: 503, try again later.
+  const unavailable = () => res.status(503).json({
+    error: "cancel_check_unavailable",
+    message: "We kunnen nu niet nagaan of er een abonnement loopt. Er is niets opgezegd en er is geen mail verstuurd. Probeer het later opnieuw.",
+    message_en: "We cannot check right now whether a subscription is running. Nothing was cancelled and no mail was sent. Please try again later.",
+  });
+  let mainRes;
   try {
-    const mainRes = await relayFetch("main", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
-    const mainKey = (mainRes.body?.keys || []).find(k => k.key === user_id);
+    mainRes = await relayFetch("main", "/v2/admin/keys?reveal=1", "GET", null, false, ADMIN_TOKEN);
+  } catch (err) {
+    console.error("[billing] cancel precheck failed:", err.message);
+    return unavailable();
+  }
+  if (!mainRes || mainRes.status < 200 || mainRes.status >= 300 || !Array.isArray(mainRes.body?.keys)) {
+    console.error("[billing] cancel precheck failed: relay-main answered", mainRes && mainRes.status);
+    return unavailable();
+  }
+  {
+    const mainKey = mainRes.body.keys.find(k => k.key === user_id);
     if (mainKey && !mainKey.auto_renews) {
       return res.status(409).json({
         error: "nothing_to_cancel",
@@ -4281,8 +4301,6 @@ api.post("/user/billing/cancel", authUser, async (req, res) => {
         message_en: "This plan is a one-off payment. No subscription is running, so there is nothing to cancel: the plan stops by itself on its end date.",
       });
     }
-  } catch (err) {
-    console.error("[billing] cancel precheck failed:", err.message);
   }
   const billingRaw = await redis().get(`paramant:user:billing:${user_id}`);
   const billing = billingRaw ? JSON.parse(billingRaw) : null;

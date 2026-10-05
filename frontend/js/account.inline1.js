@@ -613,6 +613,13 @@ window.paSecondFactorError = paSecondFactorError;
       const d = await res.json();
       alert(nlEn('Opzegging gepland. Uw plan gaat terug op ', 'Cancellation scheduled. Your plan downgrades on ') + paramantDate.day(d.scheduled_downgrade_at));
       loadBilling();
+    } else {
+      // 409 (one-off, nothing to cancel) and 503 (relay-main not reachable,
+      // nothing cancelled) both carry a sentence for the customer.
+      let d = null;
+      try { d = await res.json(); } catch { d = null; }
+      const said = d ? nlEn(d.message || '', d.message_en || d.message || '') : '';
+      alert(said || nlEn('Opzeggen lukte nu niet. Er is niets gewijzigd. Probeer het later opnieuw.', 'Cancelling did not work just now. Nothing was changed. Please try again later.'));
     }
   });
 
